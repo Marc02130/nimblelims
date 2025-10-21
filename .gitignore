@@ -1,0 +1,30 @@
+# Python
+  __pycache__/
+  *.py[cod]
+  *.pyc
+  *.pyo
+  *.pyd
+  .Python
+  *.egg-info/
+  *.egg
+  dist/
+  build/
+  *.venv/
+  venv/
+
+  # Node.js/React
+  node_modules/
+  .pnp
+  .pnp.js
+  .yarn/install-state.gz
+  build/
+  dist/
+
+  # Docker
+  *.dockerignore
+  *.log
+
+  # Misc
+  .DS_Store
+  .env
+  *.env
