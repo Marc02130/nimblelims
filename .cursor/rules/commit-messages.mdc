@@ -2,10 +2,6 @@
 description: Standardized commit message format for consistent version control history
 globs: **/*.{js,jsx,ts,tsx,md,mdx}
 ---
----
-description: Standardized commit message format for consistent version control history
-globs: **/*.{js,jsx,ts,tsx,md,mdx}
----
 
 # Commit Messages
 
@@ -41,9 +37,6 @@ git add . && git commit -m "Type(scope): description"
 # Single file
 git add src/components/Button.tsx
 git commit -m "Feat(component): add new Button component"
-git commit -m "Feat(api): add sample accessioning endpoint"
-git commit -m "Fix(db): resolve migration issues in Alembic"
-git commit -m "Docs(schema): update units table description"
 
 # Multiple files
 git add src/api/auth.ts src/hooks/useAuth.ts
