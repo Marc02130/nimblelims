@@ -1,0 +1,130 @@
+---
+description: Laboratory workflow standards for LIMS MVP
+globs: **/*.{py,js,jsx,ts,tsx}
+---
+
+# LIMS Workflow Standards
+
+<rule>
+name: lims_workflows
+description: Standards for laboratory workflows including sample accessioning, test ordering, and results entry
+
+filters:
+  - type: file_extension
+    pattern: "\\.(py|js|jsx|ts|tsx)$"
+  - type: content
+    pattern: "(accession|sample|test|result|batch|workflow)"
+  - type: path
+    pattern: "(workflows|services|components)"
+
+actions:
+  - type: enforce
+    patterns:
+      # Sample Status Transitions
+      - pattern: |
+          if current_status not in \["Received", "Available for Testing"\]:
+              raise ValueError\("Invalid status transition"\)
+        message: "Validate status transitions in workflows"
+
+      # Batch Processing
+      - pattern: |
+          async def process_batch\(batch_id: UUID\) -> Batch:
+              async with get_db\(\) as db:
+                  batch = await db.get\(Batch, batch_id\)
+                  if batch\.status != "Created":
+                      raise HTTPException\(400, "Batch not in Created status"\)
+        message: "Validate batch status before processing"
+
+      # Test Assignment
+      - pattern: |
+          async def assign_tests_to_sample\(sample_id: UUID, analysis_ids: List[UUID]\):
+              for analysis_id in analysis_ids:
+                  test = Test\(
+                      sample_id=sample_id,
+                      analysis_id=analysis_id,
+                      status="In Process"
+                  \)
+        message: "Create test instances with proper status"
+
+      # Results Validation
+      - pattern: |
+          def validate_result\(result: str, analyte_config: AnalysisAnalyte\) -> bool:
+              if analyte_config\.data_type == "numeric":
+                  try:
+                      float\(result\)
+                      return True
+                  except ValueError:
+                      return False
+        message: "Validate results based on analyte configuration"
+
+examples:
+  - description: "Sample Accessioning Workflow"
+  input: |
+      async def accession_sample(
+          sample_data: SampleAccessionRequest,
+          current_user: User
+      ) -> Sample:
+          # Create sample
+          sample = Sample(
+              name=sample_data.name,
+              project_id=sample_data.project_id,
+              status="Received",
+              received_date=datetime.utcnow(),
+              created_by=current_user.id
+          )
+          
+          # Assign tests
+          for analysis_id in sample_data.analysis_ids:
+              test = Test(
+                  sample_id=sample.id,
+                  analysis_id=analysis_id,
+                  status="In Process"
+              )
+              db.add(test)
+          
+          # Update sample status
+          sample.status = "Available for Testing"
+          
+          return sample
+    output: "Valid accessioning workflow"
+
+  - description: "Results Entry Workflow"
+  input: |
+      async def enter_batch_results(
+          batch_id: UUID,
+          results_data: List[ResultEntryRequest],
+          current_user: User
+      ):
+          batch = await get_batch(batch_id)
+          if batch.status != "In Process":
+              raise HTTPException(400, "Batch not in process")
+          
+          for result_data in results_data:
+              result = Result(
+                  test_id=result_data.test_id,
+                  analyte_id=result_data.analyte_id,
+                  raw_result=result_data.raw_result,
+                  reported_result=result_data.reported_result,
+                  entered_by=current_user.id
+              )
+              
+              # Validate result
+              if not validate_result(result.raw_result, result.analyte):
+                  raise HTTPException(400, f"Invalid result for {result.analyte.name}")
+              
+              db.add(result)
+          
+          # Update batch status
+          batch.status = "Completed"
+    output: "Valid results entry workflow"
+
+metadata:
+  priority: high
+  version: 1.0
+  tags:
+    - workflows
+    - lims
+    - laboratory
+    - samples
+    - results
+</rule>

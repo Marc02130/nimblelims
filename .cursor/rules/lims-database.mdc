@@ -1,0 +1,97 @@
+---
+description: Database and SQLAlchemy standards for LIMS MVP
+globs: **/*.py
+---
+
+# LIMS Database Standards
+
+<rule>
+name: lims_database
+description: Standards for database models, migrations, and SQLAlchemy usage in LIMS
+
+filters:
+  - type: file_extension
+    pattern: "\\.py$"
+  - type: content
+    pattern: "(from sqlalchemy|import sqlalchemy|class.*\\(Base\\)|@declared_attr)"
+  - type: path
+    pattern: "(models|migrations|database)"
+
+actions:
+  - type: enforce
+    patterns:
+      # UUID Primary Keys
+      - pattern: |
+          id = Column\(UUID, primary_key=True, default=uuid\.uuid4\)
+        message: "Use UUID primary keys for all LIMS tables"
+
+      # Standard Audit Fields
+      - pattern: |
+          created_at = Column\(DateTime, default=datetime\.utcnow\)
+          created_by = Column\(UUID, ForeignKey\('users\.id'\)\)
+          modified_at = Column\(DateTime, default=datetime\.utcnow, onupdate=datetime\.utcnow\)
+          modified_by = Column\(UUID, ForeignKey\('users\.id'\)\)
+        message: "Include standard audit fields in all LIMS models"
+
+      # Foreign Key Constraints
+      - pattern: |
+          \w+_id = Column\(UUID, ForeignKey\('\w+\.id'\), nullable=False\)
+        message: "Use proper foreign key constraints with UUID references"
+
+      # Unique Constraints
+      - pattern: |
+          name = Column\(String\(255\), unique=True, nullable=False\)
+        message: "Use unique constraints for name fields"
+
+      # Enum/Status Fields
+      - pattern: |
+          status = Column\(String\(50\), ForeignKey\('list_entries\.id'\), nullable=False\)
+        message: "Use list_entries for status and type fields"
+
+examples:
+  - description: "Sample Model"
+    input: |
+      class Sample(Base):
+          __tablename__ = 'samples'
+          
+          id = Column(UUID, primary_key=True, default=uuid.uuid4)
+          name = Column(String(255), unique=True, nullable=False)
+          description = Column(Text)
+          active = Column(Boolean, default=True)
+          
+          # Audit fields
+          created_at = Column(DateTime, default=datetime.utcnow)
+          created_by = Column(UUID, ForeignKey('users.id'))
+          modified_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+          modified_by = Column(UUID, ForeignKey('users.id'))
+          
+          # LIMS specific fields
+          due_date = Column(DateTime)
+          received_date = Column(DateTime)
+          sample_type = Column(UUID, ForeignKey('list_entries.id'))
+          status = Column(UUID, ForeignKey('list_entries.id'))
+          project_id = Column(UUID, ForeignKey('projects.id'), nullable=False)
+    output: "Valid LIMS model structure"
+
+  - description: "Migration Pattern"
+    input: |
+      def upgrade():
+          op.create_table('samples',
+              sa.Column('id', sa.UUID(), nullable=False),
+              sa.Column('name', sa.String(255), nullable=False),
+              sa.Column('project_id', sa.UUID(), nullable=False),
+              sa.ForeignKeyConstraint(['project_id'], ['projects.id']),
+              sa.PrimaryKeyConstraint('id'),
+              sa.UniqueConstraint('name')
+          )
+    output: "Valid migration structure"
+
+metadata:
+  priority: high
+  version: 1.0
+  tags:
+    - database
+    - sqlalchemy
+    - lims
+    - models
+</rule>

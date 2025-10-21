@@ -1,0 +1,126 @@
+---
+description: Requirements Standards
+globs: *.md
+alwaysApply: false
+---
+# Requirements Standards
+
+## Core Principles
+
+1. Requirements Location
+- All requirements MUST be in .docs/req/ folder
+- Files MUST be prefixed with "req-"
+- Example: docs/req/req-dashboard-layout.md
+
+2. Requirements Verification
+- Check docs/req/req-* files before implementation
+- If no requirements exist:
+  - Ask for requirements
+  - Wait for requirements documentation
+  - Do not proceed without requirements
+- If requirements conflict:
+  - Ask for clarification
+  - Do not proceed until conflicts resolved
+  - Document resolution in requirements
+
+3. Requirements Format
+```markdown
+# Feature Name
+
+## User Requirements
+- User-facing requirements
+- Acceptance criteria
+- UI/UX specifications
+- Responsive design breakpoints
+- Accessibility requirements
+
+## Technical Requirements
+- Implementation details
+- Component structure
+- State management approach
+- Route configuration
+- API endpoints
+- Data schemas
+- Performance criteria
+- Tailwind styling guidelines
+```
+
+4. Implementation Rules
+- MUST verify requirements before coding
+- MUST implement according to requirements
+- MUST NOT add undocumented features
+- MUST NOT add features that are not in requirements
+- MUST request requirements update for changes
+- MUST ask for clarification on conflicts
+- MUST wait for conflict resolution before proceeding
+
+5. Documentation
+```javascript
+/**
+ * Implementation of req-feature-name.md
+ * @see docs/req-feature-name.md#section
+ */
+```
+
+## Examples
+
+Good:
+```javascript
+/**
+ * Implementation of req-auth-flow.md
+ * @see docs/req-auth-flow.md#error-handling
+ */
+const AuthError = {
+  INVALID_CREDENTIALS: 'auth/invalid-credentials',
+  USER_NOT_FOUND: 'auth/user-not-found'
+};
+```
+
+Bad:
+```javascript
+// Missing requirements reference
+const AuthError = {
+  // Unknown if these match requirements
+};
+```
+
+<rule>
+name: requirements_standards
+description: Standards for requirements documentation and verification
+
+filters:
+  - type: file_extension
+    pattern: "\\.(jsx?|tsx?|css)$"
+  - type: content
+    pattern: "function|const|class|interface"
+
+actions:
+  - type: enforce
+    conditions:
+      - pattern: "(?!.*req-.*\\.md)"
+        message: "Implementation missing requirements reference"
+      
+      - pattern: "(?!.*docs/req-)"
+        message: "Requirements must be in docs/req-*.md"
+      
+      - pattern: "(?i)conflict|unclear|ambiguous"
+        message: "Requirements conflict must be resolved before implementation"
+      
+      - pattern: "(?i)responsive|breakpoint"
+        message: "Responsive design requirements must be specified"
+      
+      - pattern: "(?i)route|navigation"
+        message: "Route configuration must be documented"
+
+metadata:
+  priority: high
+  version: 1.1
+  category: requirements
+  tags:
+    - documentation
+    - standards
+    - requirements
+    - react
+    - tailwind
+    - routing
+</rule>

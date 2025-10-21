@@ -1,0 +1,97 @@
+---
+description: Security standards for LIMS MVP including RBAC and data isolation
+globs: **/*.{py,js,jsx,ts,tsx}
+---
+
+# LIMS Security Standards
+
+<rule>
+name: lims_security
+description: Security standards for RBAC, data isolation, and client access control
+
+filters:
+  - type: file_extension
+    pattern: "\\.(py|js|jsx|ts|tsx)$"
+  - type: content
+    pattern: "(RBAC|permission|client_id|project_id|user_id|JWT|auth)"
+  - type: path
+    pattern: "(auth|security|permissions|rbac)"
+
+actions:
+  - type: enforce
+    patterns:
+      # Client Data Isolation
+      - pattern: |
+          .*WHERE.*client_id.*=.*current_user\.client_id
+        message: "Always filter by client_id for data isolation"
+
+      # Permission Checks
+      - pattern: |
+          if not user\.has_permission\(".*"\):
+              raise HTTPException\(status_code=403, detail="Insufficient permissions"\)
+        message: "Check permissions before sensitive operations"
+
+      # JWT Token Validation
+      - pattern: |
+          def get_current_user\(token: str = Depends\(oauth2_scheme\)\):
+              try:
+                  payload = jwt\.decode\(token, SECRET_KEY, algorithms=\[ALGORITHM\]\)
+                  user_id = payload\.get\("sub"\)
+                  if user_id is None:
+                      raise credentials_exception
+              except JWTError:
+                  raise credentials_exception
+        message: "Validate JWT tokens properly"
+
+      # Password Security
+      - pattern: |
+          password_hash = bcrypt\.hashpw\(password\.encode\('utf-8'\), bcrypt\.gensalt\(\)\)
+        message: "Use bcrypt for password hashing"
+
+      # SQL Injection Prevention
+      - pattern: |
+          query = select\(.*\)\.where\(.*\.client_id == current_user\.client_id\)
+        message: "Use SQLAlchemy ORM to prevent SQL injection"
+
+examples:
+  - description: "Secure Data Access"
+  input: |
+      async def get_user_samples(user_id: UUID, current_user: User) -> List[Sample]:
+          # Ensure user can only access their own data
+          if current_user.client_id:
+              query = select(Sample).join(Project).where(
+                  Project.client_id == current_user.client_id
+              )
+          else:
+              # Admin users can see all data
+              query = select(Sample)
+              
+          return await database.fetch_all(query)
+    output: "Valid client data isolation"
+
+  - description: "Permission Decorator"
+  input: |
+      def require_permission(permission: str):
+          def decorator(func):
+              async def wrapper(*args, **kwargs):
+                  current_user = kwargs.get('current_user')
+                  if not current_user.has_permission(permission):
+                      raise HTTPException(
+                          status_code=403, 
+                          detail="Insufficient permissions"
+                      )
+                  return await func(*args, **kwargs)
+              return wrapper
+          return decorator
+    output: "Valid permission decorator"
+
+metadata:
+  priority: critical
+  version: 1.0
+  tags:
+    - security
+    - rbac
+    - lims
+    - authentication
+    - data-isolation
+</rule>

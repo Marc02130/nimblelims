@@ -1,0 +1,117 @@
+---
+description: Python and FastAPI development standards for LIMS backend
+globs: **/*.py
+---
+
+# Python Standards for LIMS
+
+<rule>
+name: python_standards
+description: Python coding standards, type hints, and FastAPI best practices
+
+filters:
+  - type: file_extension
+    pattern: "\\.py$"
+  - type: content
+    pattern: "(def |class |import |from |async def)"
+
+actions:
+  - type: enforce
+    patterns:
+      # Type Hints
+      - pattern: |
+          def \w+\(.*: \w+.*\) -> \w+:
+        message: "Use type hints for all function parameters and return types"
+
+      # Async Functions
+      - pattern: |
+          async def \w+\(.*\) -> \w+:
+        message: "Use async/await for database operations"
+
+      # Pydantic Models
+      - pattern: |
+          class \w+Request\(BaseModel\):
+              \w+: \w+
+              \w+: Optional\[\w+\] = None
+        message: "Use Pydantic models for request/response validation"
+
+      # Error Handling
+      - pattern: |
+          try:
+              .*
+          except \w+Exception as e:
+              logger\.error\(f".*: {e}"\)
+              raise HTTPException\(status_code=500, detail="Internal server error"\)
+        message: "Use proper error handling with logging"
+
+      # Database Sessions
+      - pattern: |
+          async with get_db\(\) as db:
+              .*
+        message: "Use database session context managers"
+
+examples:
+  - description: "Service Layer"
+  input: |
+      from typing import List, Optional
+      from uuid import UUID
+      from sqlalchemy.ext.asyncio import AsyncSession
+      from fastapi import HTTPException
+      import logging
+      
+      logger = logging.getLogger(__name__)
+      
+      class SampleService:
+          def __init__(self, db: AsyncSession):
+              self.db = db
+          
+          async def create_sample(
+              self, 
+              sample_data: SampleCreateRequest, 
+              user_id: UUID
+          ) -> Sample:
+              try:
+                  sample = Sample(
+                      name=sample_data.name,
+                      project_id=sample_data.project_id,
+                      created_by=user_id
+                  )
+                  self.db.add(sample)
+                  await self.db.commit()
+                  await self.db.refresh(sample)
+                  return sample
+              except Exception as e:
+                  logger.error(f"Error creating sample: {e}")
+                  await self.db.rollback()
+                  raise HTTPException(status_code=500, detail="Failed to create sample")
+    output: "Valid service layer with proper error handling"
+
+  - description: "Dependency Injection"
+  input: |
+      from fastapi import Depends
+      from sqlalchemy.ext.asyncio import AsyncSession
+      
+      async def get_sample_service(
+          db: AsyncSession = Depends(get_db)
+      ) -> SampleService:
+          return SampleService(db)
+      
+      @router.post("/samples", response_model=SampleResponse)
+      async def create_sample(
+          sample_data: SampleCreateRequest,
+          service: SampleService = Depends(get_sample_service),
+          current_user: User = Depends(get_current_user)
+      ):
+          return await service.create_sample(sample_data, current_user.id)
+    output: "Valid dependency injection pattern"
+
+metadata:
+  priority: high
+  version: 1.0
+  tags:
+    - python
+    - fastapi
+    - type-hints
+    - async
+    - lims
+</rule>

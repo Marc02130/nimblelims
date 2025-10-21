@@ -1,0 +1,102 @@
+---
+description: FastAPI and API standards for LIMS MVP
+globs: **/*.py
+---
+
+# LIMS API Standards
+
+<rule>
+name: lims_api
+description: Standards for FastAPI endpoints, authentication, and RBAC in LIMS
+
+filters:
+  - type: file_extension
+    pattern: "\\.py$"
+  - type: content
+    pattern: "(from fastapi|@app\.|@router\.|Depends\\(|HTTPException)"
+  - type: path
+    pattern: "(api|routes|endpoints)"
+
+actions:
+  - type: enforce
+    patterns:
+      # JWT Authentication
+      - pattern: |
+          @router\.(get|post|put|patch|delete)\(".*", dependencies=\[Depends\(get_current_user\)\]
+        message: "Protect all endpoints with JWT authentication"
+
+      # RBAC Permission Checks
+      - pattern: |
+          @require_permission\(".*"\)
+        message: "Use permission decorators for RBAC enforcement"
+
+      # Error Handling
+      - pattern: |
+          try:
+              .*
+          except.*as e:
+              raise HTTPException\(status_code=.*, detail=.*\)
+        message: "Use proper HTTPException for error handling"
+
+      # Response Models
+      - pattern: |
+          @router\.(get|post|put|patch|delete)\(".*", response_model=.*\)
+        message: "Use Pydantic response models for API responses"
+
+      # Input Validation
+      - pattern: |
+          def \w+\(.*: \w+Request.*\):
+        message: "Use Pydantic request models for input validation"
+
+examples:
+  - description: "Protected Endpoint"
+  input: |
+      @router.get("/samples", response_model=List[SampleResponse])
+      @require_permission("sample:read")
+      async def get_samples(
+          project_id: Optional[UUID] = None,
+          status: Optional[str] = None,
+          current_user: User = Depends(get_current_user)
+      ):
+          try:
+              samples = await sample_service.get_samples(
+                  project_id=project_id,
+                  status=status,
+                  user_id=current_user.id
+              )
+              return samples
+          except Exception as e:
+              raise HTTPException(status_code=500, detail=str(e))
+    output: "Valid protected endpoint with RBAC"
+
+  - description: "Request/Response Models"
+  input: |
+      class SampleCreateRequest(BaseModel):
+          name: str
+          description: Optional[str] = None
+          project_id: UUID
+          sample_type: UUID
+          matrix: UUID
+          due_date: Optional[datetime] = None
+          
+      class SampleResponse(BaseModel):
+          id: UUID
+          name: str
+          status: str
+          project_id: UUID
+          created_at: datetime
+          
+          class Config:
+              from_attributes = True
+    output: "Valid Pydantic models"
+
+metadata:
+  priority: high
+  version: 1.0
+  tags:
+    - fastapi
+    - api
+    - lims
+    - rbac
+    - authentication
+</rule>

@@ -1,0 +1,63 @@
+---
+description: Foundation-First Development
+globs: 
+alwaysApply: false
+---
+ # Foundation-First Development
+
+## Core Principles
+
+1. **Start with simplicity**: Begin with the simplest solution that works correctly. Don't overcomplicate things from the start.
+
+2. **Get the basics right**: Ensure core functionality works reliably before adding any enhancements or optimizations.
+
+3. **Prioritize stability**: A stable foundation is more important than clever features.
+
+4. **Use proven patterns**: Prefer established, well-understood approaches over novel solutions for core components.
+
+5. **Separate concerns clearly**: Establish clear boundaries between different parts of the system.
+
+## Implementation Guidelines
+
+### Layout and Structure
+
+- Use standard, proven layout techniques before reaching for complex solutions
+- Ensure responsive behavior works at the foundational level
+- Test core layouts on multiple devices/viewports early
+
+### State Management 
+
+- Start with minimal, well-defined state
+- Keep state changes predictable and traceable
+- Document key state transitions
+
+### Architecture
+
+- Build modular components with well-defined interfaces
+- Minimize dependencies between components
+- Establish consistent patterns for common operations
+
+### Adaptability
+
+- Design for extension, not modification (Open/Closed Principle)
+- Create clear extension points for future requirements
+- Document assumptions to make future changes easier
+
+## Anti-Patterns to Avoid
+
+- Premature optimization
+- Overengineering for imagined future requirements
+- Adding complexity before basic functionality works
+- Mixing multiple experimental approaches in foundational code
+- Excessive nesting or coupling
+
+## Example Application
+
+When implementing a new feature:
+
+1. First implement a basic version that fulfills core requirements
+2. Verify it works correctly in all expected scenarios
+3. Refactor for clarity and maintainability 
+4. Only then consider optimizations or enhancements
+
+Remember: A solid foundation that works reliably is more valuable than sophisticated features built on shaky ground.

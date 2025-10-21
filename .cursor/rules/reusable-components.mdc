@@ -1,0 +1,132 @@
+---
+description: Rules for creating and using reusable React components with Material-UI
+globs: **/*.{jsx,tsx}
+---
+# Reusable Components Standards for LIMS
+
+<rule>
+name: reusable_components
+description: Standards for component reusability with Material-UI and LIMS-specific patterns
+
+filters:
+  - type: file_extension
+    pattern: "\\.(jsx?|tsx?)$"
+  - type: content
+    pattern: "(function|const).*\\(?{.*}\\)?.*=>|React\\.memo|React\\.forwardRef"
+
+actions:
+  - type: enforce
+    patterns:
+      # Higher Order Components
+      - pattern: |
+          (function|const) with\w+\s*=\s*\(Component\)\s*=>\s*\{
+            return \(props\)\s*=>\s*\{
+              // Implementation
+            \}
+          \}
+        message: "Create HOCs for shared component logic"
+
+      # Style Components
+      - pattern: |
+          (function|const) \w+Styles\s*=\s*\{
+            base: ".*",
+            variants: \{
+              .*
+            \}
+          \}
+        message: "Create consistent style objects for components"
+
+      # Component Interfaces
+      - pattern: |
+          interface \w+Props \{
+            children(\?)?:.+
+            className(\?)?:\s*string
+            .*
+          \}
+        message: "Define clear component interfaces"
+
+      # Reusable Components
+      - pattern: |
+          (function|const) \w+ = \((\{ .* \}|props)\) => \{
+            (const|let) \[.*\] = useState\(.*\)
+            .*
+            return \(
+              <.*>
+            \)
+          \}
+        message: "Create reusable functional components"
+
+      # Material-UI Integration
+      - pattern: |
+          import \{ \w+ \} from '@mui/material'
+          import \{ \w+ \} from '@mui/icons-material'
+        message: "Use Material-UI components and icons"
+
+      # LIMS Component Patterns
+      - pattern: |
+          interface \w+Props \{
+            sampleId\?: string
+            projectId\?: string
+            onStatusChange\?: \(status: string\) => void
+            .*
+          \}
+        message: "Use LIMS-specific prop patterns for laboratory components"
+
+examples:
+  - description: "Higher Order Component"
+    input: |
+      const withLoading = (Component) => {
+        return ({ isLoading, ...props }) => {
+          if (isLoading) {
+            return <div className="animate-spin">Loading...</div>
+          }
+          return <Component {...props} />
+        }
+      }
+    output: "Valid HOC pattern"
+
+  - description: "Style Object"
+    input: |
+      const buttonStyles = {
+        base: "px-4 py-2 rounded-lg font-medium transition-colors",
+        variants: {
+          primary: "bg-blue-500 hover:bg-blue-600 text-white",
+          secondary: "bg-gray-200 hover:bg-gray-300 text-gray-800"
+        }
+      }
+    output: "Valid style object"
+
+  - description: "Reusable Component"
+    input: |
+      interface DataGridProps<T> {
+        data: T[]
+        columns: Column<T>[]
+        onSort?: (column: keyof T) => void
+        className?: string
+      }
+
+      const DataGrid = <T extends object>({ 
+        data,
+        columns,
+        onSort,
+        className
+      }: DataGridProps<T>) => {
+        const [sortConfig, setSortConfig] = useState(null)
+        
+        return (
+          <div className={cn("overflow-x-auto", className)}>
+            {/* Implementation */}
+          </div>
+        )
+      }
+    output: "Valid reusable component pattern"
+
+metadata:
+  priority: high
+  version: 1.1
+  tags:
+    - react
+    - components
+    - typescript
+    - tailwind
+</rule>
