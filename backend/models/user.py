@@ -1,22 +1,20 @@
-from sqlalchemy import Column, String, DateTime, UUID, ForeignKey, Boolean
+from sqlalchemy import Column, String, DateTime, ForeignKey, Boolean, Table
 from sqlalchemy.dialects.postgresql import UUID as PostgresUUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
-import uuid
-from .base import Base
+from .base import BaseModel
+
+# Association table for many-to-many relationship between roles and permissions
+role_permissions = Table(
+    'role_permissions',
+    BaseModel.metadata,
+    Column('role_id', PostgresUUID(as_uuid=True), ForeignKey('roles.id'), primary_key=True),
+    Column('permission_id', PostgresUUID(as_uuid=True), ForeignKey('permissions.id'), primary_key=True)
+)
 
 
-class User(Base):
+class User(BaseModel):
     __tablename__ = 'users'
-    
-    id = Column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    name = Column(String(255), unique=True, nullable=False)
-    description = Column(String)
-    active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=func.now())
-    created_by = Column(PostgresUUID(as_uuid=True), ForeignKey('users.id'))
-    modified_at = Column(DateTime, default=func.now(), onupdate=func.now())
-    modified_by = Column(PostgresUUID(as_uuid=True), ForeignKey('users.id'))
     
     # User-specific fields
     username = Column(String(255), unique=True, nullable=False)
@@ -33,41 +31,16 @@ class User(Base):
     modified_samples = relationship("Sample", foreign_keys="Sample.modified_by", back_populates="modifier")
 
 
-class Role(Base):
+class Role(BaseModel):
     __tablename__ = 'roles'
-    
-    id = Column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    name = Column(String(255), unique=True, nullable=False)
-    description = Column(String)
-    active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=func.now())
-    created_by = Column(PostgresUUID(as_uuid=True), ForeignKey('users.id'))
-    modified_at = Column(DateTime, default=func.now(), onupdate=func.now())
-    modified_by = Column(PostgresUUID(as_uuid=True), ForeignKey('users.id'))
     
     # Relationships
     users = relationship("User", back_populates="role")
-    permissions = relationship("Permission", secondary="role_permissions", back_populates="roles")
+    permissions = relationship("Permission", secondary=role_permissions, back_populates="roles")
 
 
-class Permission(Base):
+class Permission(BaseModel):
     __tablename__ = 'permissions'
     
-    id = Column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    name = Column(String(255), unique=True, nullable=False)
-    description = Column(String)
-    active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=func.now())
-    created_by = Column(PostgresUUID(as_uuid=True), ForeignKey('users.id'))
-    modified_at = Column(DateTime, default=func.now(), onupdate=func.now())
-    modified_by = Column(PostgresUUID(as_uuid=True), ForeignKey('users.id'))
-    
     # Relationships
-    roles = relationship("Role", secondary="role_permissions", back_populates="permissions")
-
-
-class RolePermission(Base):
-    __tablename__ = 'role_permissions'
-    
-    role_id = Column(PostgresUUID(as_uuid=True), ForeignKey('roles.id'), primary_key=True)
-    permission_id = Column(PostgresUUID(as_uuid=True), ForeignKey('permissions.id'), primary_key=True)
+    roles = relationship("Role", secondary=role_permissions, back_populates="permissions")

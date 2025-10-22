@@ -1,11 +1,15 @@
-from sqlalchemy import Column, String, DateTime, UUID, Boolean
+from sqlalchemy import Column, String, DateTime, Boolean, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID as PostgresUUID
 from sqlalchemy.sql import func
+from sqlalchemy.ext.declarative import declarative_base
 import uuid
 
+Base = declarative_base()
 
-class Base:
+
+class BaseModel(Base):
     """Base class for all LIMS models with standard audit fields."""
+    __abstract__ = True
     
     id = Column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name = Column(String(255), unique=True, nullable=False)

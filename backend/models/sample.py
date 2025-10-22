@@ -1,22 +1,12 @@
-from sqlalchemy import Column, String, DateTime, UUID, ForeignKey, Boolean, Numeric
+from sqlalchemy import Column, String, DateTime, ForeignKey, Boolean, Numeric
 from sqlalchemy.dialects.postgresql import UUID as PostgresUUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
-import uuid
-from .base import Base
+from .base import BaseModel
 
 
-class Sample(Base):
+class Sample(BaseModel):
     __tablename__ = 'samples'
-    
-    id = Column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    name = Column(String(255), unique=True, nullable=False)
-    description = Column(String)
-    active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=func.now())
-    created_by = Column(PostgresUUID(as_uuid=True), ForeignKey('users.id'))
-    modified_at = Column(DateTime, default=func.now(), onupdate=func.now())
-    modified_by = Column(PostgresUUID(as_uuid=True), ForeignKey('users.id'))
     
     # Sample-specific fields
     due_date = Column(DateTime)
@@ -32,9 +22,9 @@ class Sample(Base):
     
     # Relationships
     project = relationship("Project", back_populates="samples")
-    parent_sample = relationship("Sample", remote_side=[id], back_populates="child_samples")
+    parent_sample = relationship("Sample", remote_side=[BaseModel.id], back_populates="child_samples")
     child_samples = relationship("Sample", back_populates="parent_sample")
     tests = relationship("Test", back_populates="sample")
     contents = relationship("Contents", back_populates="sample")
-    creator = relationship("User", foreign_keys=[created_by], back_populates="created_samples")
-    modifier = relationship("User", foreign_keys=[modified_by], back_populates="modified_samples")
+    creator = relationship("User", foreign_keys=[BaseModel.created_by], back_populates="created_samples")
+    modifier = relationship("User", foreign_keys=[BaseModel.modified_by], back_populates="modified_samples")

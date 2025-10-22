@@ -1,4 +1,4 @@
-# LIMS MVP - Laboratory Information Management System
+# NimbleLIMS - Laboratory Information Management System
 
 A modern, API-first Laboratory Information Management System built with FastAPI, React, and PostgreSQL.
 
