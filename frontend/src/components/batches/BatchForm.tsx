@@ -51,13 +51,11 @@ const BatchForm: React.FC<BatchFormProps> = ({ onSuccess, onCancel }) => {
   useEffect(() => {
     const loadData = async () => {
       try {
-        const [batchTypes, batchStatuses] = await Promise.all([
-          apiService.getListEntries('batch_types'),
-          apiService.getListEntries('batch_statuses'),
+        const [batchStatuses] = await Promise.all([
+          apiService.getListEntries('batch_status'),  // Use normalized slug format
         ]);
 
         setListEntries({
-          batch_types: batchTypes,
           batch_statuses: batchStatuses,
         });
 

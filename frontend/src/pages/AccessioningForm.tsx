@@ -139,10 +139,10 @@ const AccessioningForm: React.FC = () => {
         containerTypes,
         units,
       ] = await Promise.all([
-        apiService.getListEntries('sample_types'),
-        apiService.getListEntries('statuses'),
-        apiService.getListEntries('matrices'),
-        apiService.getListEntries('qc_types'),
+        apiService.getListEntries('sample_types'),  // Use normalized slug format
+        apiService.getListEntries('sample_status'),  // Use normalized slug format
+        apiService.getListEntries('matrix_types'),  // Use normalized slug format
+        apiService.getListEntries('qc_types'),  // Use normalized slug format
         apiService.getProjects(),
         apiService.getAnalyses(),
         apiService.getContainerTypes(),

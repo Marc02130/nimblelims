@@ -101,7 +101,7 @@ async def update_container_type(
 
 
 # Containers endpoints
-@router.get("/", response_model=List[ContainerResponse])
+@router.get("", response_model=List[ContainerResponse])
 async def get_containers(
     type_id: Optional[UUID] = Query(None, description="Filter by container type"),
     parent_id: Optional[UUID] = Query(None, description="Filter by parent container"),

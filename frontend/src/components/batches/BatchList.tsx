@@ -83,13 +83,11 @@ const BatchList: React.FC<BatchListProps> = ({ onViewBatch, onEditBatch, onCreat
 
   const loadListEntries = async () => {
     try {
-      const [batchTypes, batchStatuses] = await Promise.all([
-        apiService.getListEntries('batch_types'),
-        apiService.getListEntries('batch_statuses'),
+      const [batchStatuses] = await Promise.all([
+        apiService.getListEntries('batch_status'),  // Use normalized slug format
       ]);
 
       setListEntries({
-        batch_types: batchTypes,
         batch_statuses: batchStatuses,
       });
     } catch (err) {

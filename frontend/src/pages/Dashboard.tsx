@@ -82,7 +82,7 @@ const Dashboard: React.FC = () => {
   const loadData = async () => {
     try {
       const [statuses, projects] = await Promise.all([
-        apiService.getListEntries('statuses'),
+        apiService.getListEntries('sample_status'),  // Use normalized slug format
         apiService.getProjects(),
       ]);
 

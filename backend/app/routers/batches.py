@@ -24,7 +24,7 @@ from uuid import UUID
 router = APIRouter()
 
 
-@router.get("/", response_model=BatchListResponse)
+@router.get("", response_model=BatchListResponse)
 async def get_batches(
     type: Optional[UUID] = Query(None, description="Filter by batch type ID"),
     status: Optional[UUID] = Query(None, description="Filter by status ID"),
