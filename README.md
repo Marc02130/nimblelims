@@ -27,13 +27,27 @@ This project uses a three-container Docker setup:
 
 2. **Start the services**
    ```bash
-   docker-compose up --build
+   docker-compose up -d --build
    ```
+   
+   This will automatically:
+   - Start the database container
+   - Wait for database to be ready
+   - Run Alembic migrations (creates all tables, roles, permissions, and admin user)
+   - Start the backend API server
+   - Start the frontend web server
 
 3. **Access the application**
    - Frontend: http://localhost:3000
    - Backend API: http://localhost:8000
+   - API Documentation: http://localhost:8000/docs
    - Database: localhost:5432
+
+4. **Login with admin credentials**
+   - Username: `admin`
+   - Password: `admin123`
+   - **⚠️ IMPORTANT**: Change the default password immediately after first login!
+   - See [.docs/ADMIN_SETUP.md](.docs/ADMIN_SETUP.md) for detailed security instructions
 
 ### Development
 
@@ -57,10 +71,21 @@ npm start
 ```
 nimblelims/
 ├── backend/                 # FastAPI backend
+│   ├── app/                 # Application code
+│   │   ├── main.py         # FastAPI app entry point
+│   │   ├── routers/        # API route handlers
+│   │   ├── models/         # SQLAlchemy models
+│   │   └── core/           # Core utilities (config, security)
+│   ├── db/                 # Database migrations
+│   │   └── migrations/     # Alembic migration files
 │   ├── requirements.txt     # Python dependencies
 │   ├── Dockerfile          # Backend container config
+│   ├── start.sh            # Startup script (runs migrations)
+│   ├── run_migrations.py   # Migration runner
 │   └── env.example         # Environment variables template
 ├── frontend/               # React frontend
+│   ├── src/                # Source code
+│   ├── public/             # Static assets
 │   ├── package.json        # Node.js dependencies
 │   ├── Dockerfile          # Frontend container config
 │   ├── nginx.conf          # Nginx configuration
@@ -68,6 +93,12 @@ nimblelims/
 ├── db/                     # Database setup
 │   ├── Dockerfile          # Database container config
 │   └── init.sql            # Database initialization
+├── .docs/                  # Documentation
+│   ├── ADMIN_SETUP.md      # Admin user setup guide
+│   ├── backend-auth.md     # Authentication implementation
+│   ├── lims_mvp_prd.md     # Product requirements
+│   ├── lims_mvp_tech.md    # Technical specifications
+│   └── lims_mvp_user.md    # User stories
 ├── docker-compose.yml      # Multi-container orchestration
 ├── .gitignore             # Git ignore rules
 └── README.md              # This file
@@ -107,13 +138,21 @@ All containers include health checks:
 - Backend: HTTP endpoint health check
 - Frontend: HTTP endpoint health check
 
-## Next Steps
+## Database Migrations
 
-1. Implement database schema with Alembic migrations
-2. Create FastAPI models and endpoints
-3. Build React components and routing
-4. Implement authentication and authorization
-5. Add comprehensive testing suite
+Alembic migrations run automatically when the backend container starts. The startup script (`backend/start.sh`) waits for the database to be ready, then runs all migrations before starting the server.
+
+**Migrations create:**
+- All database tables and indexes
+- Initial roles (Administrator, Lab Manager, Lab Technician, Client)
+- Initial permissions (~15 core permissions)
+- Default admin user (username: `admin`, password: `admin123`)
+- Initial lists and list entries for statuses, types, etc.
+
+**Manual migration (if needed):**
+```bash
+docker exec lims-backend python run_migrations.py
+```
 
 ## Support
 

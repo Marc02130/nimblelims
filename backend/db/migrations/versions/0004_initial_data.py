@@ -38,6 +38,7 @@ def upgrade() -> None:
             sa.text("""
                 INSERT INTO lists (id, name, description, active, created_at, modified_at)
                 VALUES (:id, :name, :description, true, NOW(), NOW())
+                ON CONFLICT (id) DO NOTHING
             """),
             list_data
         )
@@ -102,6 +103,7 @@ def upgrade() -> None:
             sa.text("""
                 INSERT INTO list_entries (id, name, description, active, created_at, modified_at, list_id)
                 VALUES (gen_random_uuid(), :name, :description, true, NOW(), NOW(), :list_id)
+                ON CONFLICT (list_id, name) DO NOTHING
             """),
             entry_data
         )
@@ -119,6 +121,7 @@ def upgrade() -> None:
             sa.text("""
                 INSERT INTO roles (id, name, description, active, created_at, modified_at)
                 VALUES (:id, :name, :description, true, NOW(), NOW())
+                ON CONFLICT (id) DO NOTHING
             """),
             role_data
         )
@@ -127,16 +130,16 @@ def upgrade() -> None:
     permissions_data = [
         {'id': 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee', 'name': 'user:manage', 'description': 'Manage users'},
         {'id': 'ffffffff-ffff-ffff-ffff-ffffffffffff', 'name': 'role:manage', 'description': 'Manage roles'},
-        {'id': 'gggggggg-gggg-gggg-gggg-gggggggggggg', 'name': 'config:edit', 'description': 'Edit configuration'},
-        {'id': 'hhhhhhhh-hhhh-hhhh-hhhh-hhhhhhhhhhhh', 'name': 'project:manage', 'description': 'Manage projects'},
-        {'id': 'iiiiiiii-iiii-iiii-iiii-iiiiiiiiiiii', 'name': 'sample:create', 'description': 'Create samples'},
-        {'id': 'jjjjjjjj-jjjj-jjjj-jjjj-jjjjjjjjjjjj', 'name': 'sample:read', 'description': 'Read samples'},
-        {'id': 'kkkkkkkk-kkkk-kkkk-kkkk-kkkkkkkkkkkk', 'name': 'sample:update', 'description': 'Update samples'},
-        {'id': 'llllllll-llll-llll-llll-llllllllllll', 'name': 'test:assign', 'description': 'Assign tests'},
-        {'id': 'mmmmmmmm-mmmm-mmmm-mmmm-mmmmmmmmmmmm', 'name': 'test:update', 'description': 'Update tests'},
-        {'id': 'nnnnnnnn-nnnn-nnnn-nnnn-nnnnnnnnnnnn', 'name': 'result:enter', 'description': 'Enter results'},
-        {'id': 'oooooooo-oooo-oooo-oooo-oooooooooooo', 'name': 'result:review', 'description': 'Review results'},
-        {'id': 'pppppppp-pppp-pppp-pppp-pppppppppppp', 'name': 'batch:manage', 'description': 'Manage batches'},
+        {'id': 'a0a0a0a0-a0a0-a0a0-a0a0-a0a0a0a0a0a0', 'name': 'config:edit', 'description': 'Edit configuration'},
+        {'id': 'b0b0b0b0-b0b0-b0b0-b0b0-b0b0b0b0b0b0', 'name': 'project:manage', 'description': 'Manage projects'},
+        {'id': 'c0c0c0c0-c0c0-c0c0-c0c0-c0c0c0c0c0c0', 'name': 'sample:create', 'description': 'Create samples'},
+        {'id': 'd0d0d0d0-d0d0-d0d0-d0d0-d0d0d0d0d0d0', 'name': 'sample:read', 'description': 'Read samples'},
+        {'id': 'e0e0e0e0-e0e0-e0e0-e0e0-e0e0e0e0e0e0', 'name': 'sample:update', 'description': 'Update samples'},
+        {'id': 'f0f0f0f0-f0f0-f0f0-f0f0-f0f0f0f0f0f0', 'name': 'test:assign', 'description': 'Assign tests'},
+        {'id': 'a1a1a1a1-a1a1-a1a1-a1a1-a1a1a1a1a1a1', 'name': 'test:update', 'description': 'Update tests'},
+        {'id': 'b1b1b1b1-b1b1-b1b1-b1b1-b1b1b1b1b1b1', 'name': 'result:enter', 'description': 'Enter results'},
+        {'id': 'c1c1c1c1-c1c1-c1c1-c1c1-c1c1c1c1c1c1', 'name': 'result:review', 'description': 'Review results'},
+        {'id': 'd1d1d1d1-d1d1-d1d1-d1d1-d1d1d1d1d1d1', 'name': 'batch:manage', 'description': 'Manage batches'},
     ]
     
     for perm_data in permissions_data:
@@ -144,6 +147,7 @@ def upgrade() -> None:
             sa.text("""
                 INSERT INTO permissions (id, name, description, active, created_at, modified_at)
                 VALUES (:id, :name, :description, true, NOW(), NOW())
+                ON CONFLICT (id) DO NOTHING
             """),
             perm_data
         )
@@ -153,39 +157,39 @@ def upgrade() -> None:
         # Administrator gets all permissions
         ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee'),
         ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'ffffffff-ffff-ffff-ffff-ffffffffffff'),
-        ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'gggggggg-gggg-gggg-gggg-gggggggggggg'),
-        ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'hhhhhhhh-hhhh-hhhh-hhhh-hhhhhhhhhhhh'),
-        ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'iiiiiiii-iiii-iiii-iiii-iiiiiiiiiiii'),
-        ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'jjjjjjjj-jjjj-jjjj-jjjj-jjjjjjjjjjjj'),
-        ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'kkkkkkkk-kkkk-kkkk-kkkk-kkkkkkkkkkkk'),
-        ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'llllllll-llll-llll-llll-llllllllllll'),
-        ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'mmmmmmmm-mmmm-mmmm-mmmm-mmmmmmmmmmmm'),
-        ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'nnnnnnnn-nnnn-nnnn-nnnn-nnnnnnnnnnnn'),
-        ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'oooooooo-oooo-oooo-oooo-oooooooooooo'),
-        ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'pppppppp-pppp-pppp-pppp-pppppppppppp'),
+        ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'a0a0a0a0-a0a0-a0a0-a0a0-a0a0a0a0a0a0'),
+        ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'b0b0b0b0-b0b0-b0b0-b0b0-b0b0b0b0b0b0'),
+        ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'c0c0c0c0-c0c0-c0c0-c0c0-c0c0c0c0c0c0'),
+        ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'd0d0d0d0-d0d0-d0d0-d0d0-d0d0d0d0d0d0'),
+        ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'e0e0e0e0-e0e0-e0e0-e0e0-e0e0e0e0e0e0'),
+        ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'f0f0f0f0-f0f0-f0f0-f0f0-f0f0f0f0f0f0'),
+        ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'a1a1a1a1-a1a1-a1a1-a1a1-a1a1a1a1a1a1'),
+        ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'b1b1b1b1-b1b1-b1b1-b1b1-b1b1b1b1b1b1'),
+        ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'c1c1c1c1-c1c1-c1c1-c1c1-c1c1c1c1c1c1'),
+        ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'd1d1d1d1-d1d1-d1d1-d1d1-d1d1d1d1d1d1'),
         
         # Lab Manager permissions
-        ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'hhhhhhhh-hhhh-hhhh-hhhh-hhhhhhhhhhhh'),
-        ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'iiiiiiii-iiii-iiii-iiii-iiiiiiiiiiii'),
-        ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'jjjjjjjj-jjjj-jjjj-jjjj-jjjjjjjjjjjj'),
-        ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'kkkkkkkk-kkkk-kkkk-kkkk-kkkkkkkkkkkk'),
-        ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'llllllll-llll-llll-llll-llllllllllll'),
-        ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'mmmmmmmm-mmmm-mmmm-mmmm-mmmmmmmmmmmm'),
-        ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'nnnnnnnn-nnnn-nnnn-nnnn-nnnnnnnnnnnn'),
-        ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'oooooooo-oooo-oooo-oooo-oooooooooooo'),
-        ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'pppppppp-pppp-pppp-pppp-pppppppppppp'),
+        ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'b0b0b0b0-b0b0-b0b0-b0b0-b0b0b0b0b0b0'),
+        ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'c0c0c0c0-c0c0-c0c0-c0c0-c0c0c0c0c0c0'),
+        ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'd0d0d0d0-d0d0-d0d0-d0d0-d0d0d0d0d0d0'),
+        ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'e0e0e0e0-e0e0-e0e0-e0e0-e0e0e0e0e0e0'),
+        ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'f0f0f0f0-f0f0-f0f0-f0f0-f0f0f0f0f0f0'),
+        ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'a1a1a1a1-a1a1-a1a1-a1a1-a1a1a1a1a1a1'),
+        ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'b1b1b1b1-b1b1-b1b1-b1b1-b1b1b1b1b1b1'),
+        ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'c1c1c1c1-c1c1-c1c1-c1c1-c1c1c1c1c1c1'),
+        ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'd1d1d1d1-d1d1-d1d1-d1d1-d1d1d1d1d1d1'),
         
         # Lab Technician permissions
-        ('cccccccc-cccc-cccc-cccc-cccccccccccc', 'iiiiiiii-iiii-iiii-iiii-iiiiiiiiiiii'),
-        ('cccccccc-cccc-cccc-cccc-cccccccccccc', 'jjjjjjjj-jjjj-jjjj-jjjj-jjjjjjjjjjjj'),
-        ('cccccccc-cccc-cccc-cccc-cccccccccccc', 'kkkkkkkk-kkkk-kkkk-kkkk-kkkkkkkkkkkk'),
-        ('cccccccc-cccc-cccc-cccc-cccccccccccc', 'llllllll-llll-llll-llll-llllllllllll'),
-        ('cccccccc-cccc-cccc-cccc-cccccccccccc', 'mmmmmmmm-mmmm-mmmm-mmmm-mmmmmmmmmmmm'),
-        ('cccccccc-cccc-cccc-cccc-cccccccccccc', 'nnnnnnnn-nnnn-nnnn-nnnn-nnnnnnnnnnnn'),
-        ('cccccccc-cccc-cccc-cccc-cccccccccccc', 'pppppppp-pppp-pppp-pppp-pppppppppppp'),
+        ('cccccccc-cccc-cccc-cccc-cccccccccccc', 'c0c0c0c0-c0c0-c0c0-c0c0-c0c0c0c0c0c0'),
+        ('cccccccc-cccc-cccc-cccc-cccccccccccc', 'd0d0d0d0-d0d0-d0d0-d0d0-d0d0d0d0d0d0'),
+        ('cccccccc-cccc-cccc-cccc-cccccccccccc', 'e0e0e0e0-e0e0-e0e0-e0e0-e0e0e0e0e0e0'),
+        ('cccccccc-cccc-cccc-cccc-cccccccccccc', 'f0f0f0f0-f0f0-f0f0-f0f0-f0f0f0f0f0f0'),
+        ('cccccccc-cccc-cccc-cccc-cccccccccccc', 'a1a1a1a1-a1a1-a1a1-a1a1-a1a1a1a1a1a1'),
+        ('cccccccc-cccc-cccc-cccc-cccccccccccc', 'b1b1b1b1-b1b1-b1b1-b1b1-b1b1b1b1b1b1'),
+        ('cccccccc-cccc-cccc-cccc-cccccccccccc', 'd1d1d1d1-d1d1-d1d1-d1d1-d1d1d1d1d1d1'),
         
         # Client permissions
-        ('dddddddd-dddd-dddd-dddd-dddddddddddd', 'jjjjjjjj-jjjj-jjjj-jjjj-jjjjjjjjjjjj'),
+        ('dddddddd-dddd-dddd-dddd-dddddddddddd', 'd0d0d0d0-d0d0-d0d0-d0d0-d0d0d0d0d0d0'),
     ]
     
     for role_id, perm_id in role_permissions_data:
@@ -193,6 +197,7 @@ def upgrade() -> None:
             sa.text("""
                 INSERT INTO role_permissions (role_id, permission_id)
                 VALUES (:role_id, :perm_id)
+                ON CONFLICT (role_id, permission_id) DO NOTHING
             """),
             {'role_id': role_id, 'perm_id': perm_id}
         )
@@ -228,6 +233,7 @@ def upgrade() -> None:
                 sa.text("""
                     INSERT INTO units (id, name, description, active, created_at, modified_at, multiplier, type)
                     VALUES (gen_random_uuid(), :name, :description, true, NOW(), NOW(), :multiplier, :type_id)
+                    ON CONFLICT (name) DO NOTHING
                 """),
                 {
                     'name': unit_data['name'],
@@ -236,12 +242,33 @@ def upgrade() -> None:
                     'type_id': result[0]
                 }
             )
+    
+    # Create a default client for the admin user
+    connection.execute(
+        sa.text("""
+            INSERT INTO clients (id, name, description, active, created_at, modified_at, billing_info) 
+            VALUES ('00000000-0000-0000-0000-000000000001', 'System', 'System client for admin users', true, NOW(), NOW(), '{}')
+            ON CONFLICT (id) DO NOTHING
+        """)
+    )
+    
+    # Create initial admin user
+    # Use ON CONFLICT on username to handle re-runs
+    connection.execute(
+        sa.text("""
+            INSERT INTO users (id, name, username, email, password_hash, role_id, client_id, active, created_at, modified_at) 
+            VALUES ('00000000-0000-0000-0000-000000000001', 'System Administrator', 'admin', 'admin@lims.local', '240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '00000000-0000-0000-0000-000000000001', true, NOW(), NOW())
+            ON CONFLICT (username) DO NOTHING
+        """)
+    )
 
 
 def downgrade() -> None:
     # Delete all data in reverse order
     connection = op.get_bind()
     
+    connection.execute(sa.text("DELETE FROM users WHERE id = '00000000-0000-0000-0000-000000000001'"))
+    connection.execute(sa.text("DELETE FROM clients WHERE id = '00000000-0000-0000-0000-000000000001'"))
     connection.execute(sa.text("DELETE FROM role_permissions"))
     connection.execute(sa.text("DELETE FROM permissions"))
     connection.execute(sa.text("DELETE FROM roles"))

@@ -1,0 +1,21 @@
+#!/bin/bash
+echo "=== CHECKING DATABASE ==="
+echo ""
+echo "1. Check if admin user exists:"
+docker exec -it lims-db psql -U lims_user -d lims_db -c "SELECT username, email, active FROM users WHERE username = 'admin';"
+echo ""
+echo "2. Count total users:"
+docker exec -it lims-db psql -U lims_user -d lims_db -c "SELECT COUNT(*) as total_users FROM users;"
+echo ""
+echo "3. Check if roles exist:"
+docker exec -it lims-db psql -U lims_user -d lims_db -c "SELECT name FROM roles;"
+echo ""
+echo "4. Check migration version:"
+docker exec -it lims-db psql -U lims_user -d lims_db -c "SELECT version_num FROM alembic_version;"
+echo ""
+echo "5. Run migrations:"
+docker exec lims-backend python run_migrations.py
+echo ""
+echo "6. Check again:"
+docker exec -it lims-db psql -U lims_user -d lims_db -c "SELECT username, email, active FROM users WHERE username = 'admin';"
+

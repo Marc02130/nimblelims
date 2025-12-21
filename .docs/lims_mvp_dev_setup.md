@@ -126,13 +126,20 @@ This step implements the Docker configuration from the Technical Document (Secti
   ```
   - This builds and starts the containers in detached mode.
   - First run may take time (downloads images, installs deps).
+  - **Alembic migrations run automatically** when the backend starts:
+    - Creates all database tables
+    - Creates initial roles and permissions
+    - Creates admin user (username: `admin`, password: `admin123`)
+    - Populates initial lists and list entries
 - Verify:
   - Check running containers: `docker ps` (should show three: db, backend, frontend).
-  - Access Postgres (optional): `docker exec -it <db-container-name> psql -U lims_user -d lims_mvp` (use your env vars).
-  - Backend: Open browser to `http://localhost:8000/docs` (FastAPI Swagger UI should load once implemented, but for now it's setup-only).
-  - Frontend: `http://localhost:3000` (basic React app if generated).
-- Logs: `docker-compose logs -f` to monitor.
-- Stop: `docker-compose down`.
+  - Check migration logs: `docker logs lims-backend | grep -i migration`
+  - Verify admin user exists: `docker exec lims-db psql -U lims_user -d lims_db -c "SELECT username FROM users WHERE username = 'admin';"`
+  - Backend: Open browser to `http://localhost:8000/docs` (FastAPI Swagger UI).
+  - Frontend: `http://localhost:3000` (React app).
+  - Login: Use `admin` / `admin123` at http://localhost:3000
+- Logs: `docker-compose logs -f` to monitor all services.
+- Stop: `docker-compose down` (add `-v` to remove volumes if you want a fresh start).
 
 If Docker has issues (e.g., port conflicts), common macOS fixes: Ensure no other services on ports 5432 (Postgres), 8000, 3000; increase Docker resources in settings if needed.
 

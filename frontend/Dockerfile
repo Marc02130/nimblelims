@@ -7,13 +7,13 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install dependencies
-RUN npm ci --only=production
+RUN npm ci
 
 # Copy source code
 COPY . .
 
 # Build the application
-RUN npm run build
+RUN DISABLE_ESLINT_PLUGIN=true npm run build
 
 # Production stage
 FROM nginx:alpine

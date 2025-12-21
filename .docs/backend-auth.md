@@ -59,13 +59,20 @@ ACCESS_TOKEN_EXPIRE_MINUTES=30
 ```
 
 ### 3. Database Setup
-```bash
-# Run migrations
-python run_migrations.py
 
-# Or create tables directly
-python -c "from app.database import engine, Base; Base.metadata.create_all(bind=engine)"
+**Automatic (Recommended):**
+When using Docker Compose, migrations run automatically on backend startup via `backend/start.sh`. The script:
+1. Waits for the database to be ready
+2. Runs `python run_migrations.py` to execute all Alembic migrations
+3. Starts the FastAPI server
+
+**Manual (Development):**
+```bash
+# Run migrations manually
+python run_migrations.py
 ```
+
+**Note:** `Base.metadata.create_all()` is NOT used in production. All schema changes must go through Alembic migrations.
 
 ### 4. Run the Server
 ```bash
@@ -158,10 +165,10 @@ app/
 
 ## Next Steps
 
-1. **Database Migration**: Run Alembic migrations to create tables
-2. **Initial Data**: Create default roles and permissions
-3. **User Management**: Implement user creation and management
-4. **Frontend Integration**: Connect React frontend to auth endpoints
+1. ✅ **Database Migration**: Alembic migrations run automatically on startup
+2. ✅ **Initial Data**: Default roles, permissions, and admin user created by migrations
+3. **User Management**: Implement user creation and management UI
+4. ✅ **Frontend Integration**: React frontend connected to auth endpoints
 5. **Email Service**: Implement actual email verification
 6. **Audit Logging**: Add comprehensive audit trails
 

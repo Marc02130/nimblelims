@@ -4,7 +4,7 @@ Security utilities for authentication and authorization
 from datetime import datetime, timedelta
 from typing import Optional, List
 import jwt
-from passlib.context import CryptContext
+import hashlib
 from fastapi import HTTPException, status, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
@@ -13,8 +13,14 @@ from models.user import User, Role, Permission
 from app.schemas.auth import TokenData
 from app.core.config import SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES
 
-# Password hashing
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# Simple password hashing using SHA256 (for development only)
+def get_password_hash(password: str) -> str:
+    """Hash a password using SHA256 (development only)"""
+    return hashlib.sha256(password.encode()).hexdigest()
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    """Verify a password against its hash"""
+    return get_password_hash(plain_password) == hashed_password
 
 # JWT Bearer token
 security = HTTPBearer()
@@ -38,13 +44,6 @@ CORE_PERMISSIONS = [
     "config:edit"
 ]
 
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Verify a password against its hash"""
-    return pwd_context.verify(plain_password, hashed_password)
-
-def get_password_hash(password: str) -> str:
-    """Hash a password"""
-    return pwd_context.hash(password)
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     """Create a JWT access token"""

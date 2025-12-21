@@ -3,20 +3,11 @@ from sqlalchemy.dialects.postgresql import UUID as PostgresUUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 import uuid
-from .base import Base
+from .base import BaseModel, Base
 
 
-class Project(Base):
+class Project(BaseModel):
     __tablename__ = 'projects'
-    
-    id = Column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    name = Column(String(255), unique=True, nullable=False)
-    description = Column(String)
-    active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=func.now())
-    created_by = Column(PostgresUUID(as_uuid=True), ForeignKey('users.id'))
-    modified_at = Column(DateTime, default=func.now(), onupdate=func.now())
-    modified_by = Column(PostgresUUID(as_uuid=True), ForeignKey('users.id'))
     
     # Project-specific fields
     start_date = Column(DateTime, nullable=False)
@@ -25,7 +16,13 @@ class Project(Base):
     
     # Relationships
     client = relationship("Client", back_populates="projects")
-    users = relationship("User", secondary="project_users", back_populates="projects")
+    users = relationship(
+        "User", 
+        secondary="project_users", 
+        primaryjoin="Project.id == project_users.c.project_id",
+        secondaryjoin="User.id == project_users.c.user_id",
+        back_populates="projects"
+    )
     samples = relationship("Sample", back_populates="project")
 
 

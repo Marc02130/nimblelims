@@ -22,9 +22,9 @@ class Sample(BaseModel):
     
     # Relationships
     project = relationship("Project", back_populates="samples")
-    parent_sample = relationship("Sample", remote_side=[BaseModel.id], back_populates="child_samples")
-    child_samples = relationship("Sample", back_populates="parent_sample")
+    parent_sample = relationship("Sample", primaryjoin="Sample.parent_sample_id == Sample.id")
+    child_samples = relationship("Sample", primaryjoin="Sample.id == Sample.parent_sample_id")
     tests = relationship("Test", back_populates="sample")
     contents = relationship("Contents", back_populates="sample")
-    creator = relationship("User", foreign_keys=[BaseModel.created_by], back_populates="created_samples")
-    modifier = relationship("User", foreign_keys=[BaseModel.modified_by], back_populates="modified_samples")
+    creator = relationship("User", foreign_keys="Sample.created_by", back_populates="created_samples")
+    modifier = relationship("User", foreign_keys="Sample.modified_by", back_populates="modified_samples")

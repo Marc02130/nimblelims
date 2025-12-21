@@ -2,7 +2,7 @@ from sqlalchemy import Column, String, DateTime, ForeignKey, Boolean, Numeric, I
 from sqlalchemy.dialects.postgresql import UUID as PostgresUUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
-from .base import BaseModel
+from .base import BaseModel, Base
 
 
 class ContainerType(BaseModel):
@@ -33,22 +33,27 @@ class Container(BaseModel):
     
     # Relationships
     container_type = relationship("ContainerType", back_populates="containers")
-    parent_container = relationship("Container", remote_side=[BaseModel.id], back_populates="child_containers")
-    child_containers = relationship("Container", back_populates="parent_container")
+    parent_container = relationship("Container", primaryjoin="Container.parent_container_id == Container.id")
+    child_containers = relationship("Container", primaryjoin="Container.id == Container.parent_container_id")
     contents = relationship("Contents", back_populates="container")
     batches = relationship("Batch", secondary="batch_containers", back_populates="containers")
+    batch_containers = relationship("BatchContainer", back_populates="container")
+    concentration_units_rel = relationship("Unit", foreign_keys=[concentration_units], back_populates="concentration_containers")
+    amount_units_rel = relationship("Unit", foreign_keys=[amount_units], back_populates="amount_containers")
 
 
-class Contents(BaseModel):
+class Contents(Base):  
     __tablename__ = 'contents'
     
     container_id = Column(PostgresUUID(as_uuid=True), ForeignKey('containers.id'), primary_key=True)
     sample_id = Column(PostgresUUID(as_uuid=True), ForeignKey('samples.id'), primary_key=True)
-    concentration = Column(Numeric(15, 6))
-    concentration_units = Column(PostgresUUID(as_uuid=True), ForeignKey('units.id'))
-    amount = Column(Numeric(15, 6))
-    amount_units = Column(PostgresUUID(as_uuid=True), ForeignKey('units.id'))
+    concentration = Column(Numeric(15, 6), nullable=True)
+    concentration_units = Column(PostgresUUID(as_uuid=True), ForeignKey('units.id'), nullable=True)
+    amount = Column(Numeric(15, 6), nullable=True)
+    amount_units = Column(PostgresUUID(as_uuid=True), ForeignKey('units.id'), nullable=True)
     
     # Relationships
     container = relationship("Container", back_populates="contents")
     sample = relationship("Sample", back_populates="contents")
+    concentration_units_rel = relationship("Unit", foreign_keys=[concentration_units], back_populates="concentration_contents")
+    amount_units_rel = relationship("Unit", foreign_keys=[amount_units], back_populates="amount_contents")
