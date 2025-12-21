@@ -184,9 +184,13 @@ require_test_update = require_permission("test:update")
 require_result_enter = require_permission("result:enter")
 require_result_review = require_permission("result:review")
 require_result_read = require_permission("result:read")
+require_result_update = require_permission("result:update")
+require_result_delete = require_permission("result:delete")
 
 require_batch_manage = require_permission("batch:manage")
 require_batch_read = require_permission("batch:read")
+require_batch_update = require_permission("batch:update")
+require_batch_delete = require_permission("batch:delete")
 
 require_project_manage = require_permission("project:manage")
 require_project_read = require_permission("project:read")

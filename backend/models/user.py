@@ -24,23 +24,44 @@ class User(BaseModel):
     client_id = Column(PostgresUUID(as_uuid=True), ForeignKey('clients.id'), nullable=True)
     last_login = Column(DateTime)
     
-    # Relationships
-    role = relationship("Role", back_populates="users")
-    client = relationship("Client", back_populates="users")
+    # Relationships - explicitly specify foreign keys
+    role = relationship("Role", foreign_keys=[role_id], back_populates="users")
+    client = relationship("Client", foreign_keys=[client_id], back_populates="users")
+    projects = relationship(
+        "Project", 
+        secondary="project_users", 
+        primaryjoin="User.id == project_users.c.user_id",
+        secondaryjoin="Project.id == project_users.c.project_id",
+        back_populates="users"
+    )
+    
+    # Creator/modifier relationships (uncommented and fixed; add more if other models exist, e.g., for Analysis, Analyte, Unit)
     created_samples = relationship("Sample", foreign_keys="Sample.created_by", back_populates="creator")
     modified_samples = relationship("Sample", foreign_keys="Sample.modified_by", back_populates="modifier")
+    created_results = relationship("Result", foreign_keys="Result.created_by", back_populates="creator")
+    modified_results = relationship("Result", foreign_keys="Result.modified_by", back_populates="modifier")
+    created_batches = relationship("Batch", foreign_keys="Batch.created_by", back_populates="creator")
+    modified_batches = relationship("Batch", foreign_keys="Batch.modified_by", back_populates="modifier")
+    created_analyses = relationship("Analysis", foreign_keys="Analysis.created_by", back_populates="creator")
+    modified_analyses = relationship("Analysis", foreign_keys="Analysis.modified_by", back_populates="modifier")
+    created_analytes = relationship("Analyte", foreign_keys="Analyte.created_by", back_populates="creator")
+    modified_analytes = relationship("Analyte", foreign_keys="Analyte.modified_by", back_populates="modifier")
+    created_units = relationship("Unit", foreign_keys="Unit.created_by", back_populates="creator")
+    modified_units = relationship("Unit", foreign_keys="Unit.modified_by", back_populates="modifier")
+    entered_results = relationship("Result", foreign_keys="Result.entered_by", back_populates="entered_by_user")
 
 
 class Role(BaseModel):
     __tablename__ = 'roles'
     
-    # Relationships
-    users = relationship("User", back_populates="role")
+    # Relationships - explicitly specify foreign keys
+    users = relationship("User", foreign_keys="User.role_id", back_populates="role")
     permissions = relationship("Permission", secondary=role_permissions, back_populates="roles")
 
 
 class Permission(BaseModel):
     __tablename__ = 'permissions'
     
-    # Relationships
+    # Relationships - temporarily simplified
     roles = relationship("Role", secondary=role_permissions, back_populates="permissions")
+

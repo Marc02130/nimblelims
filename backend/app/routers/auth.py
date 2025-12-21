@@ -11,7 +11,8 @@ from app.core.security import (
     verify_password, 
     create_access_token, 
     get_user_permissions,
-    set_current_user_id
+    set_current_user_id,
+    get_current_user
 )
 from app.core.config import ACCESS_TOKEN_EXPIRE_MINUTES
 
@@ -25,10 +26,32 @@ async def login(
     """
     Authenticate user and return JWT token with permissions
     """
-    # Find user by username
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    # Check total user count first
+    user_count = db.query(User).count()
+    if user_count == 0:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="No users found in database. Run: docker exec lims-backend python run_migrations.py",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
     user = db.query(User).filter(User.username == login_data.username).first()
     
-    if not user or not verify_password(login_data.password, user.password_hash):
+    if not user:
+        logger.warning(f"User not found: {login_data.username}")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    password_valid = verify_password(login_data.password, user.password_hash)
+    
+    if not password_valid:
+        logger.warning(f"Password verification failed for user: {login_data.username}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",
@@ -36,6 +59,7 @@ async def login(
         )
     
     if not user.active:
+        logger.warning(f"Inactive user attempted login: {login_data.username}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="User account is inactive"
@@ -64,7 +88,7 @@ async def login(
     # Set current user for RLS
     set_current_user_id(str(user.id), db)
     
-    return LoginResponse(
+    response = LoginResponse(
         access_token=access_token,
         user_id=str(user.id),
         username=user.username,
@@ -72,6 +96,27 @@ async def login(
         role=user.role.name,
         permissions=permissions
     )
+    
+    return response
+
+@router.get("/me")
+async def get_me(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get current authenticated user information
+    """
+    permissions = get_user_permissions(current_user, db)
+    
+    return {
+        "id": str(current_user.id),
+        "username": current_user.username,
+        "email": current_user.email,
+        "role": current_user.role.name,
+        "permissions": permissions,
+        "client_id": str(current_user.client_id) if current_user.client_id else None,
+    }
 
 @router.post("/verify-email", response_model=VerifyEmailResponse)
 async def verify_email(

@@ -139,13 +139,15 @@ def upgrade() -> None:
         ('analytes', 'name'),
         ('batches', 'name'),
         ('lists', 'name'),
-        ('list_entries', 'name'),
         ('units', 'name'),
     ]
     
     for table, column in unique_indexes:
         index_name = f"idx_{table}_{column}_unique"
         op.create_index(index_name, table, [column], unique=True)
+    
+    # list_entries needs composite unique index on (list_id, name)
+    op.create_index('idx_list_entries_list_id_name_unique', 'list_entries', ['list_id', 'name'], unique=True)
     
     # Partial indexes for active records
     partial_indexes = [

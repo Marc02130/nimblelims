@@ -47,7 +47,7 @@ def upgrade() -> None:
         sa.Column('list_id', postgresql.UUID(as_uuid=True), nullable=False),
         sa.ForeignKeyConstraint(['list_id'], ['lists.id'], ),
         sa.PrimaryKeyConstraint('id'),
-        sa.UniqueConstraint('name')
+        sa.UniqueConstraint('list_id', 'name')
     )
     
     # Create roles table

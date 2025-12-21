@@ -26,12 +26,21 @@ def run_migrations():
     
     try:
         # Run migrations
-        print("Running database migrations...")
+        print("=" * 50, file=sys.stderr, flush=True)
+        print("RUNNING DATABASE MIGRATIONS", file=sys.stderr, flush=True)
+        print("=" * 50, file=sys.stderr, flush=True)
+        print(f"Database URL: {database_url.split('@')[1] if '@' in database_url else 'hidden'}", file=sys.stderr, flush=True)
         command.upgrade(alembic_cfg, "head")
-        print("Migrations completed successfully!")
+        print("=" * 50, file=sys.stderr, flush=True)
+        print("MIGRATIONS COMPLETED SUCCESSFULLY!", file=sys.stderr, flush=True)
+        print("=" * 50, file=sys.stderr, flush=True)
         
     except Exception as e:
-        print(f"Migration failed: {e}")
+        print("=" * 50, file=sys.stderr, flush=True)
+        print(f"MIGRATION FAILED: {e}", file=sys.stderr, flush=True)
+        print("=" * 50, file=sys.stderr, flush=True)
+        import traceback
+        traceback.print_exc(file=sys.stderr)
         sys.exit(1)
 
 if __name__ == "__main__":

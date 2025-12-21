@@ -3,41 +3,23 @@ from sqlalchemy.dialects.postgresql import UUID as PostgresUUID, JSONB
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 import uuid
-from .base import Base
+from .base import BaseModel, Base
 
 
-class Client(Base):
+class Client(BaseModel):
     __tablename__ = 'clients'
-    
-    id = Column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    name = Column(String(255), unique=True, nullable=False)
-    description = Column(String)
-    active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=func.now())
-    created_by = Column(PostgresUUID(as_uuid=True), ForeignKey('users.id'))
-    modified_at = Column(DateTime, default=func.now(), onupdate=func.now())
-    modified_by = Column(PostgresUUID(as_uuid=True), ForeignKey('users.id'))
     
     # Client-specific fields
     billing_info = Column(JSONB, default={})
     
-    # Relationships
-    users = relationship("User", back_populates="client")
-    projects = relationship("Project", back_populates="client")
+    # Relationships - explicitly specify foreign keys
+    users = relationship("User", foreign_keys="User.client_id", back_populates="client")
     locations = relationship("Location", back_populates="client")
+    projects = relationship("Project", back_populates="client")
 
 
-class Location(Base):
+class Location(BaseModel):
     __tablename__ = 'locations'
-    
-    id = Column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    name = Column(String(255), unique=True, nullable=False)
-    description = Column(String)
-    active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=func.now())
-    created_by = Column(PostgresUUID(as_uuid=True), ForeignKey('users.id'))
-    modified_at = Column(DateTime, default=func.now(), onupdate=func.now())
-    modified_by = Column(PostgresUUID(as_uuid=True), ForeignKey('users.id'))
     
     # Location-specific fields
     client_id = Column(PostgresUUID(as_uuid=True), ForeignKey('clients.id'), nullable=False)
@@ -46,27 +28,15 @@ class Location(Base):
     city = Column(String(255), nullable=False)
     state = Column(String(255), nullable=False)
     postal_code = Column(String(20), nullable=False)
-    country = Column(String(255), default='US')
-    latitude = Column(Numeric(10, 8))
-    longitude = Column(Numeric(11, 8))
-    type = Column(PostgresUUID(as_uuid=True), ForeignKey('list_entries.id'))
+    country = Column(String(255), nullable=False)
     
     # Relationships
     client = relationship("Client", back_populates="locations")
     people = relationship("Person", secondary="people_locations", back_populates="locations")
 
 
-class Person(Base):
+class Person(BaseModel):
     __tablename__ = 'people'
-    
-    id = Column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    name = Column(String(255), unique=True, nullable=False)
-    description = Column(String)
-    active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=func.now())
-    created_by = Column(PostgresUUID(as_uuid=True), ForeignKey('users.id'))
-    modified_at = Column(DateTime, default=func.now(), onupdate=func.now())
-    modified_by = Column(PostgresUUID(as_uuid=True), ForeignKey('users.id'))
     
     # Person-specific fields
     first_name = Column(String(255), nullable=False)
