@@ -52,10 +52,21 @@ const ResultsManagement: React.FC<ResultsManagementProps> = ({ onBack }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>('');
+  const [batchStatuses, setBatchStatuses] = useState<any[]>([]);
 
   useEffect(() => {
     loadBatches();
+    loadListEntries();
   }, [statusFilter]);
+
+  const loadListEntries = async () => {
+    try {
+      const statuses = await apiService.getListEntries('batch_status');
+      setBatchStatuses(statuses);
+    } catch (err) {
+      console.error('Failed to load list entries:', err);
+    }
+  };
 
   const loadBatches = async () => {
     try {
@@ -142,9 +153,11 @@ const ResultsManagement: React.FC<ResultsManagementProps> = ({ onBack }) => {
                       onChange={(e) => setStatusFilter(e.target.value)}
                     >
                       <MenuItem value="">All Statuses</MenuItem>
-                      <MenuItem value="Created">Created</MenuItem>
-                      <MenuItem value="In Process">In Process</MenuItem>
-                      <MenuItem value="Completed">Completed</MenuItem>
+                      {batchStatuses.map((entry: any) => (
+                        <MenuItem key={entry.id} value={entry.id}>
+                          {entry.name}
+                        </MenuItem>
+                      ))}
                     </Select>
                   </FormControl>
                 </Grid>

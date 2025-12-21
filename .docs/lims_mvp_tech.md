@@ -222,7 +222,7 @@ All tables include standard fields: `id` (UUID PK), `name` (varchar unique), `de
 
 ### 4.2 Key Endpoints
 - **Samples**: 
-  - GET /samples?project_id=...&status=...: List filtered by user access.
+  - GET /samples?project_id=...&status=...: List filtered by user access (query params accept UUIDs, empty strings converted to None).
   - POST /samples: Create with accessioning data.
   - PATCH /samples/{id}: Update status/container.
 - **Tests**: 
@@ -231,10 +231,21 @@ All tables include standard fields: `id` (UUID PK), `name` (varchar unique), `de
 - **Results**: 
   - POST /results: Enter batch-based results with validation.
 - **Batches**: 
-  - POST /batches: Create and add containers.
+  - GET /batches?status=...&type=...: List batches with filtering (requires `batch:read` permission).
+  - POST /batches: Create and add containers (requires `batch:manage` permission).
   - GET /batches/{id}: Retrieve with contents/samples.
+- **Analyses**:
+  - GET /analyses: List all active analyses.
 - **Units**: 
-  - CRUD /units: Manage units with multipliers/types (admin-only).
+  - GET /units: List all active units with multipliers/types.
+- **Lists**:
+  - GET /lists/{list_name}/entries: Get entries for a list (list names normalized to lowercase slug format, e.g., `sample_status`).
+  - GET /lists: Get all lists with their entries.
+- **Containers**:
+  - GET /containers: List containers.
+  - GET /containers/types: Get container types.
+- **Projects**:
+  - GET /projects: List projects accessible to user (RBAC enforced).
 - **Users/Roles**: Admin-only CRUD for management.
 - Error Handling: Standard HTTP codes; JSON {error, detail}.
 

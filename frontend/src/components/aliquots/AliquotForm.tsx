@@ -64,9 +64,9 @@ const AliquotForm: React.FC<AliquotFormProps> = ({ parentSampleId, onSuccess, on
   useEffect(() => {
     const loadData = async () => {
       try {
-        const [sampleTypes, matrices, unitsData, containerTypesData] = await Promise.all([
-          apiService.getListEntries('sample_types'),
-          apiService.getListEntries('matrices'),
+          const [sampleTypes, matrices, unitsData, containerTypesData] = await Promise.all([
+          apiService.getListEntries('sample_types'),  // Use normalized slug format
+          apiService.getListEntries('matrix_types'),  // Use normalized slug format
           apiService.getUnits(),
           apiService.getContainerTypes(),
         ]);

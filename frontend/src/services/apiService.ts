@@ -73,7 +73,9 @@ class ApiService {
     const response: AxiosResponse = await this.api.get('/samples', {
       params: filters,
     });
-    return response.data;
+    // API returns SampleListResponse with {samples, total, page, size, pages}
+    // Extract the samples array for the frontend
+    return response.data.samples || response.data;
   }
 
   async createSample(sampleData: any) {
@@ -163,7 +165,7 @@ class ApiService {
 
   // Container types endpoints
   async getContainerTypes() {
-    const response: AxiosResponse = await this.api.get('/container-types');
+    const response: AxiosResponse = await this.api.get('/containers/types');
     return response.data;
   }
 
@@ -189,7 +191,9 @@ class ApiService {
     const response: AxiosResponse = await this.api.get('/batches', {
       params: filters,
     });
-    return response.data;
+    // API returns BatchListResponse with {batches, total, page, size, pages}
+    // Extract the batches array for the frontend
+    return response.data.batches || response.data;
   }
 
   async getBatch(batchId: string) {

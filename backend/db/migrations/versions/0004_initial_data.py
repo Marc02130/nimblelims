@@ -140,6 +140,7 @@ def upgrade() -> None:
         {'id': 'b1b1b1b1-b1b1-b1b1-b1b1-b1b1b1b1b1b1', 'name': 'result:enter', 'description': 'Enter results'},
         {'id': 'c1c1c1c1-c1c1-c1c1-c1c1-c1c1c1c1c1c1', 'name': 'result:review', 'description': 'Review results'},
         {'id': 'd1d1d1d1-d1d1-d1d1-d1d1-d1d1d1d1d1d1', 'name': 'batch:manage', 'description': 'Manage batches'},
+        {'id': 'e1e1e1e1-e1e1-e1e1-e1e1-e1e1e1e1e1e1', 'name': 'batch:read', 'description': 'Read batches'},
     ]
     
     for perm_data in permissions_data:
@@ -167,6 +168,7 @@ def upgrade() -> None:
         ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'b1b1b1b1-b1b1-b1b1-b1b1-b1b1b1b1b1b1'),
         ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'c1c1c1c1-c1c1-c1c1-c1c1-c1c1c1c1c1c1'),
         ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'd1d1d1d1-d1d1-d1d1-d1d1-d1d1d1d1d1d1'),
+        ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'e1e1e1e1-e1e1-e1e1-e1e1-e1e1e1e1e1e1'),
         
         # Lab Manager permissions
         ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'b0b0b0b0-b0b0-b0b0-b0b0-b0b0b0b0b0b0'),
@@ -177,6 +179,7 @@ def upgrade() -> None:
         ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'a1a1a1a1-a1a1-a1a1-a1a1-a1a1a1a1a1a1'),
         ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'b1b1b1b1-b1b1-b1b1-b1b1-b1b1b1b1b1b1'),
         ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'c1c1c1c1-c1c1-c1c1-c1c1-c1c1c1c1c1c1'),
+        ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'e1e1e1e1-e1e1-e1e1-e1e1-e1e1e1e1e1e1'),  # batch:read
         ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'd1d1d1d1-d1d1-d1d1-d1d1-d1d1d1d1d1d1'),
         
         # Lab Technician permissions

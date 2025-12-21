@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_
 from app.database import get_db
 from models.sample import Sample
+from models.project import Project
 from models.user import User
 from app.schemas.sample import (
     SampleCreate, SampleUpdate, SampleResponse, SampleListResponse,
@@ -23,11 +24,11 @@ from uuid import UUID
 router = APIRouter()
 
 
-@router.get("/", response_model=SampleListResponse)
+@router.get("", response_model=SampleListResponse)
 async def get_samples(
-    project_id: Optional[UUID] = Query(None, description="Filter by project ID"),
-    status: Optional[UUID] = Query(None, description="Filter by status ID"),
-    qc_type: Optional[UUID] = Query(None, description="Filter by QC type ID"),
+    project_id: Optional[str] = Query(None, description="Filter by project ID"),
+    status: Optional[str] = Query(None, description="Filter by status ID"),
+    qc_type: Optional[str] = Query(None, description="Filter by QC type ID"),
     page: int = Query(1, ge=1, description="Page number"),
     size: int = Query(10, ge=1, le=100, description="Page size"),
     current_user: User = Depends(require_sample_read),
@@ -37,6 +38,29 @@ async def get_samples(
     Get samples with filtering and pagination.
     Scoped by user access (clients see only their projects).
     """
+    # Convert empty strings to None and parse UUIDs
+    project_id_uuid = None
+    status_uuid = None
+    qc_type_uuid = None
+    
+    if project_id and project_id.strip():
+        try:
+            project_id_uuid = UUID(project_id)
+        except (ValueError, AttributeError):
+            pass
+    
+    if status and status.strip():
+        try:
+            status_uuid = UUID(status)
+        except (ValueError, AttributeError):
+            pass
+    
+    if qc_type and qc_type.strip():
+        try:
+            qc_type_uuid = UUID(qc_type)
+        except (ValueError, AttributeError):
+            pass
+    
     # Build query with filters
     query = db.query(Sample).filter(Sample.active == True)
     
@@ -44,8 +68,8 @@ async def get_samples(
     if current_user.role.name != "Administrator":
         if current_user.client_id:
             # Client users can only see their own projects
-            query = query.join("project").filter(
-                "project.client_id" == current_user.client_id
+            query = query.join(Project).filter(
+                Project.client_id == current_user.client_id
             )
         else:
             # Lab users can see projects they have access to
@@ -56,12 +80,12 @@ async def get_samples(
             query = query.filter(Sample.project_id.in_(accessible_projects))
     
     # Apply filters
-    if project_id:
-        query = query.filter(Sample.project_id == project_id)
-    if status:
-        query = query.filter(Sample.status == status)
-    if qc_type:
-        query = query.filter(Sample.qc_type == qc_type)
+    if project_id_uuid:
+        query = query.filter(Sample.project_id == project_id_uuid)
+    if status_uuid:
+        query = query.filter(Sample.status == status_uuid)
+    if qc_type_uuid:
+        query = query.filter(Sample.qc_type == qc_type_uuid)
     
     # Get total count
     total = query.count()

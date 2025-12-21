@@ -47,7 +47,13 @@ This project uses a three-container Docker setup:
    - Username: `admin`
    - Password: `admin123`
    - **⚠️ IMPORTANT**: Change the default password immediately after first login!
-   - See [.docs/ADMIN_SETUP.md](.docs/ADMIN_SETUP.md) for detailed security instructions
+   - See [.docs/admin_setup.md](.docs/admin_setup.md) for detailed security instructions
+
+5. **Run migrations (if needed)**
+   ```bash
+   docker exec lims-backend python run_migrations.py
+   ```
+   This ensures all migrations are applied, including the latest `batch:read` permission.
 
 ### Development
 
@@ -94,8 +100,10 @@ nimblelims/
 │   ├── Dockerfile          # Database container config
 │   └── init.sql            # Database initialization
 ├── .docs/                  # Documentation
-│   ├── ADMIN_SETUP.md      # Admin user setup guide
+│   ├── admin_setup.md      # Admin user setup guide
+│   ├── api_endpoints.md    # Complete API endpoints reference
 │   ├── backend-auth.md     # Authentication implementation
+│   ├── debug_404_errors.md # Troubleshooting guide for API errors
 │   ├── lims_mvp_prd.md     # Product requirements
 │   ├── lims_mvp_tech.md    # Technical specifications
 │   └── lims_mvp_user.md    # User stories
@@ -109,8 +117,11 @@ nimblelims/
 - **Sample Tracking**: Accessioning, status management, container hierarchy
 - **Test Ordering**: Assign analyses to samples with status tracking
 - **Results Entry**: Batch-based results entry with validation
+- **Batch Management**: Create and manage batches with container tracking
 - **Security**: JWT authentication with Role-Based Access Control (RBAC)
 - **Data Isolation**: Client-specific data access controls
+- **Configurable Lists**: Dynamic lists for statuses, types, matrices, etc.
+- **Units Management**: Unit conversions with multipliers
 
 ## API Documentation
 
@@ -145,9 +156,9 @@ Alembic migrations run automatically when the backend container starts. The star
 **Migrations create:**
 - All database tables and indexes
 - Initial roles (Administrator, Lab Manager, Lab Technician, Client)
-- Initial permissions (~15 core permissions)
+- Initial permissions (~15 core permissions including `batch:read`, `batch:manage`, etc.)
 - Default admin user (username: `admin`, password: `admin123`)
-- Initial lists and list entries for statuses, types, etc.
+- Initial lists and list entries for statuses, types, etc. (normalized to lowercase slug format)
 
 **Manual migration (if needed):**
 ```bash

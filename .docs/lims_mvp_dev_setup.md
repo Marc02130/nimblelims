@@ -128,9 +128,10 @@ This step implements the Docker configuration from the Technical Document (Secti
   - First run may take time (downloads images, installs deps).
   - **Alembic migrations run automatically** when the backend starts:
     - Creates all database tables
-    - Creates initial roles and permissions
+    - Creates initial roles and permissions (including `batch:read`, `batch:manage`, etc.)
     - Creates admin user (username: `admin`, password: `admin123`)
-    - Populates initial lists and list entries
+    - Populates initial lists and list entries (normalized to lowercase slug format like `sample_status`)
+    - Migration `0008` adds `batch:read` permission if needed
 - Verify:
   - Check running containers: `docker ps` (should show three: db, backend, frontend).
   - Check migration logs: `docker logs lims-backend | grep -i migration`
