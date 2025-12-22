@@ -127,6 +127,7 @@ Once you've run these in Cursor and have the code base, we can resume here to su
 Thank you for confirming the refinements in our Version 1.6 summary—this gives us a strong foundation to move forward with the admin functionality planning. With container handling locked in (admin pre-setup for types, dynamic instances during workflows) and lists set for full editable CRUD, we can now outline the Cursor prompts to generate the admin web pages. This aligns with the updated "lims_mvp_tech.md" (Version 1.3), where we've enhanced the frontend components (Section 5.1) and API endpoints (Section 4.2) to support these features.
 To keep our iteration focused, I'll provide the prompts below, structured sequentially for use in Cursor. Each one is self-contained, references the tech doc and related files (e.g., "lists.md", "containers.md"), and emphasizes RBAC (config:edit permission), Material-UI for UI, Axios for API calls, and separation from workflows like accessioning or results. They generate full files/components to adhere to our code style planning.
 If these prompts meet your needs, you can copy-paste them directly into Cursor's AI interface. After generation, we can discuss testing or integration details in the next iteration.
+
 Cursor Prompt 1: Admin Dashboard and Routing
 "Extend the React frontend for the LIMS MVP by adding an admin dashboard section, based on the Technical Document (Version 1.3, sections 4.2, 5.1) and User Stories (US-13, US-15). Focus on admin-only configuration for lists and container types.
 

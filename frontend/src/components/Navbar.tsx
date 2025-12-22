@@ -19,6 +19,7 @@ import {
   Assessment,
   Settings,
 } from '@mui/icons-material';
+import Logo from './Logo';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useUser } from '../contexts/UserContext';
 
@@ -46,9 +47,9 @@ const Navbar: React.FC = () => {
   return (
     <AppBar position="static">
       <Toolbar>
-        <Science sx={{ mr: 2 }} />
+        <Logo sx={{ mr: 2, fontSize: 32 }} />
         <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-          LIMS
+          NimbleLIMS
         </Typography>
         
         <Box sx={{ display: 'flex', gap: 1 }}>
