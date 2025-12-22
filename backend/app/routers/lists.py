@@ -13,6 +13,34 @@ from app.core.security import get_current_user
 router = APIRouter()
 
 
+@router.get("", response_model=List[ListResponse])
+async def get_lists(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get all active lists with their entries.
+    """
+    lists = db.query(ListModel).filter(ListModel.active == True).all()
+    result = []
+    for list_obj in lists:
+        entries = db.query(ListEntry).filter(
+            ListEntry.list_id == list_obj.id,
+            ListEntry.active == True
+        ).all()
+        list_response = ListResponse(
+            id=list_obj.id,
+            name=list_obj.name,
+            description=list_obj.description,
+            active=list_obj.active,
+            created_at=list_obj.created_at,
+            modified_at=list_obj.modified_at,
+            entries=[ListEntryResponse.from_orm(entry) for entry in entries]
+        )
+        result.append(list_response)
+    return result
+
+
 @router.get("/{list_name}/entries", response_model=List[ListEntryResponse])
 async def get_list_entries(
     list_name: str,
@@ -42,32 +70,4 @@ async def get_list_entries(
     ).order_by(ListEntry.name).all()
     
     return [ListEntryResponse.from_orm(entry) for entry in entries]
-
-
-@router.get("/", response_model=List[ListResponse])
-async def get_lists(
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """
-    Get all active lists.
-    """
-    lists = db.query(ListModel).filter(ListModel.active == True).all()
-    result = []
-    for list_obj in lists:
-        entries = db.query(ListEntry).filter(
-            ListEntry.list_id == list_obj.id,
-            ListEntry.active == True
-        ).all()
-        list_response = ListResponse(
-            id=list_obj.id,
-            name=list_obj.name,
-            description=list_obj.description,
-            active=list_obj.active,
-            created_at=list_obj.created_at,
-            modified_at=list_obj.modified_at,
-            entries=[ListEntryResponse.from_orm(entry) for entry in entries]
-        )
-        result.append(list_response)
-    return result
 

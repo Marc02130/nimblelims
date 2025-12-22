@@ -169,6 +169,57 @@ class ApiService {
     return response.data;
   }
 
+  async createContainerType(containerTypeData: any) {
+    const response: AxiosResponse = await this.api.post('/containers/types', containerTypeData);
+    return response.data;
+  }
+
+  async updateContainerType(id: string, containerTypeData: any) {
+    const response: AxiosResponse = await this.api.patch(`/containers/types/${id}`, containerTypeData);
+    return response.data;
+  }
+
+  async deleteContainerType(id: string) {
+    const response: AxiosResponse = await this.api.delete(`/containers/types/${id}`);
+    return response.data;
+  }
+
+  // Lists endpoints (admin CRUD)
+  async getLists() {
+    const response: AxiosResponse = await this.api.get('/lists');
+    return response.data;
+  }
+
+  async createList(listData: any) {
+    const response: AxiosResponse = await this.api.post('/lists', listData);
+    return response.data;
+  }
+
+  async updateList(id: string, listData: any) {
+    const response: AxiosResponse = await this.api.patch(`/lists/${id}`, listData);
+    return response.data;
+  }
+
+  async deleteList(id: string) {
+    const response: AxiosResponse = await this.api.delete(`/lists/${id}`);
+    return response.data;
+  }
+
+  async createListEntry(listName: string, entryData: any) {
+    const response: AxiosResponse = await this.api.post(`/lists/${listName}/entries`, entryData);
+    return response.data;
+  }
+
+  async updateListEntry(listName: string, entryId: string, entryData: any) {
+    const response: AxiosResponse = await this.api.patch(`/lists/${listName}/entries/${entryId}`, entryData);
+    return response.data;
+  }
+
+  async deleteListEntry(listName: string, entryId: string) {
+    const response: AxiosResponse = await this.api.delete(`/lists/${listName}/entries/${entryId}`);
+    return response.data;
+  }
+
   // Project endpoints
   async getProjects() {
     const response: AxiosResponse = await this.api.get('/projects');

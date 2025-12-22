@@ -17,6 +17,7 @@ import {
   Logout,
   ViewList,
   Assessment,
+  Settings,
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useUser } from '../contexts/UserContext';
@@ -111,6 +112,19 @@ const Navbar: React.FC = () => {
               }}
             >
               Results
+            </Button>
+          )}
+
+          {hasPermission('config:edit') && (
+            <Button
+              color="inherit"
+              startIcon={<Settings />}
+              onClick={() => navigate('/admin')}
+              sx={{ 
+                bgcolor: isActive('/admin') ? 'rgba(255,255,255,0.1)' : 'transparent'
+              }}
+            >
+              Admin
             </Button>
           )}
         </Box>

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { Box } from '@mui/material';
 import Navbar from './components/Navbar';
 import Dashboard from './pages/Dashboard';
@@ -8,19 +8,38 @@ import ContainerManagement from './pages/ContainerManagement';
 import BatchManagement from './pages/BatchManagement';
 import ResultsManagement from './pages/ResultsManagement';
 import Login from './pages/Login';
+import AdminDashboard from './pages/AdminDashboard';
+import ListsManagement from './pages/admin/ListsManagement';
+import ContainerTypesManagement from './pages/admin/ContainerTypesManagement';
 import { useUser } from './contexts/UserContext';
 
-function App() {
-  const { user, loading } = useUser();
+function AppRoutes() {
+  const { user } = useUser();
+  const location = useLocation();
+  const isAdminRoute = location.pathname.startsWith('/admin');
 
-  if (loading) {
-    return <div>Loading...</div>;
+  // Admin routes have their own layout (AdminDashboard handles it)
+  if (isAdminRoute) {
+    return (
+      <Routes>
+        <Route
+          path="/admin"
+          element={
+            user && user.permissions.includes('config:edit') ? (
+              <AdminDashboard />
+            ) : (
+              <Navigate to="/dashboard" replace />
+            )
+          }
+        >
+          <Route path="lists" element={<ListsManagement />} />
+          <Route path="container-types" element={<ContainerTypesManagement />} />
+        </Route>
+      </Routes>
+    );
   }
 
-  if (!user) {
-    return <Login />;
-  }
-
+  // Regular routes with Navbar
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
       <Navbar />
@@ -36,6 +55,20 @@ function App() {
       </Box>
     </Box>
   );
+}
+
+function App() {
+  const { user, loading } = useUser();
+
+  if (loading) {
+    return <div>Loading...</div>;
+  }
+
+  if (!user) {
+    return <Login />;
+  }
+
+  return <AppRoutes />;
 }
 
 export default App;
