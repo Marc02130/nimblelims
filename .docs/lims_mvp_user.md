@@ -154,9 +154,54 @@ User stories are written in Agile format: "As a [role], I want [feature] so that
   - API: CRUD /units; RBAC: config:edit.  
   *Priority*: Medium | *Estimate*: 3 points
 
+- **US-17: Analyses Management**  
+  As an Administrator, I want to manage analyses (test methods) so that the system supports our laboratory's testing capabilities.  
+  *Acceptance Criteria*:  
+  - CRUD operations for analyses (name, method, turnaround_time, cost).  
+  - Unique name validation.  
+  - Cannot delete if referenced by tests.  
+  - API: CRUD /analyses; RBAC: config:edit or test:configure.  
+  *Priority*: Medium | *Estimate*: 5 points
+
+- **US-18: Analytes Management**  
+  As an Administrator, I want to manage analytes (measurable components) so that they can be assigned to analyses.  
+  *Acceptance Criteria*:  
+  - CRUD operations for analytes (name, description).  
+  - Unique name validation.  
+  - Cannot delete if referenced by analyses.  
+  - API: CRUD /analytes; RBAC: config:edit or test:configure.  
+  *Priority*: Medium | *Estimate*: 3 points
+
+- **US-19: Analysis-Analyte Configuration**  
+  As an Administrator, I want to configure validation rules for analytes within analyses so that results entry is properly validated.  
+  *Acceptance Criteria*:  
+  - Assign analytes to analyses.  
+  - Configure per-analyte rules: data_type, high/low values, significant_figures, is_required, default_value, reported_name, display_order.  
+  - Support for list-based analytes (qualifiers).  
+  - Validation during results entry based on rules.  
+  - API: CRUD /analyses/{id}/analyte-rules; RBAC: config:edit or test:configure.  
+  *Priority*: Medium | *Estimate*: 5 points
+
+- **US-20: Users Management**  
+  As an Administrator, I want to manage users so that access is properly controlled.  
+  *Acceptance Criteria*:  
+  - CRUD operations for users (username, email, role assignment, client assignment).  
+  - Password management (admin can reset).  
+  - Filter by role or client.  
+  - API: CRUD /users; RBAC: user:manage or config:edit.  
+  *Priority*: High | *Estimate*: 5 points
+
+- **US-21: Container Types Management**  
+  As an Administrator, I want to manage container types so that they are standardized before use.  
+  *Acceptance Criteria*:  
+  - CRUD operations for container types (name, capacity, material, dimensions, preservative).  
+  - Types must exist before container instances can be created.  
+  - API: CRUD /containers/types; RBAC: config:edit.  
+  *Priority*: Medium | *Estimate*: 3 points
+
 ## Prioritization and Roadmap
 - **Sprint 1 (Core Data Model)**: US-1, US-5, US-7, US-12 (Foundation: Samples, containers, tests, auth).  
 - **Sprint 2 (Workflows)**: US-3, US-6, US-9, US-11 (Aliquots, pooling, results, batches).  
-- **Sprint 3 (Security/Configs)**: US-13, US-14, US-15, US-16 (RBAC, isolation, lists/units).  
+- **Sprint 3 (Security/Configs)**: US-13, US-14, US-15, US-16, US-17, US-18, US-19, US-20, US-21 (RBAC, isolation, lists/units, analyses/analytes, users, container types).  
 - **Sprint 4 (Reviews/Polish)**: US-2, US-4, US-8, US-10 (Statuses, QC, reviews).  
-Total Estimate: ~84 points. Post-MVP: Add workflows configurability, calculations.
+Total Estimate: ~113 points. Post-MVP: Add workflows configurability, calculations.

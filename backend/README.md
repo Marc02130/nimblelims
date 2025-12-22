@@ -16,7 +16,12 @@ Copyright (c) 2025 Marc Breneiser
 - **Results Entry**: Batch-based results entry with validation
 - **Batch Management**: Create and manage batches with container tracking
 - **Container Management**: Container types (admin-managed) and dynamic instance creation
-- **Lists Management**: Configurable lists and entries (admin-editable)
+- **Lists Management**: Configurable lists and entries (admin-editable, full CRUD)
+- **Analyses Management**: CRUD operations for analyses (admin-only)
+- **Analytes Management**: CRUD operations for analytes (admin-only)
+- **Analysis-Analyte Configuration**: Configure validation rules for analytes in analyses (admin-only)
+- **Users Management**: CRUD operations for users (admin-only)
+- **Roles & Permissions Management**: CRUD operations for roles and permission assignments (admin-only)
 - **Authentication**: JWT-based authentication with RBAC
 - **Authorization**: Role-based access control with granular permissions
 
@@ -63,13 +68,46 @@ Copyright (c) 2025 Marc Breneiser
 #### Lists
 - `GET /lists` - Get all lists with entries
 - `GET /lists/{list_name}/entries` - Get entries for a list
-- `POST /lists` - Create list (admin)
+- `POST /lists` - Create list (admin, requires config:edit)
 - `PATCH /lists/{id}` - Update list (admin)
+- `DELETE /lists/{id}` - Delete list (admin)
 - `POST /lists/{list_name}/entries` - Add entry to list (admin)
 - `PATCH /lists/{list_name}/entries/{entry_id}` - Update entry (admin)
+- `DELETE /lists/{list_name}/entries/{entry_id}` - Delete entry (admin)
+
+#### Analyses
+- `GET /analyses` - List all active analyses
+- `POST /analyses` - Create analysis (admin, requires config:edit or test:configure)
+- `PATCH /analyses/{id}` - Update analysis (admin)
+- `DELETE /analyses/{id}` - Delete analysis (admin)
+- `GET /analyses/{id}/analytes` - Get analytes for analysis
+- `PUT /analyses/{id}/analytes` - Update analyte assignment (admin)
+- `GET /analyses/{id}/analyte-rules` - Get validation rules for analytes
+- `POST /analyses/{id}/analyte-rules` - Create analyte rule (admin)
+- `PATCH /analyses/{id}/analyte-rules/{analyte_id}` - Update analyte rule (admin)
+- `DELETE /analyses/{id}/analyte-rules/{analyte_id}` - Delete analyte rule (admin)
+
+#### Analytes
+- `GET /analytes` - List all active analytes
+- `POST /analytes` - Create analyte (admin, requires config:edit or test:configure)
+- `PATCH /analytes/{id}` - Update analyte (admin)
+- `DELETE /analytes/{id}` - Delete analyte (admin)
+
+#### Users
+- `GET /users` - List users with filtering (admin, requires user:manage or config:edit)
+- `POST /users` - Create user (admin)
+- `PATCH /users/{id}` - Update user (admin)
+- `DELETE /users/{id}` - Delete user (admin)
+
+#### Roles & Permissions
+- `GET /roles` - List all active roles
+- `POST /roles` - Create role (admin, requires user:manage or config:edit)
+- `PATCH /roles/{id}` - Update role (admin)
+- `DELETE /roles/{id}` - Delete role (admin)
+- `PUT /roles/{id}/permissions` - Update role permissions (admin)
+- `GET /permissions` - List all permissions (admin)
 
 #### Other
-- `GET /analyses` - List analyses
 - `GET /units` - List units
 - `GET /projects` - List accessible projects
 

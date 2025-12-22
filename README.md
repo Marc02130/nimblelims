@@ -144,8 +144,13 @@ nimblelims/
 - **Units Integration**: Concentration and amount with unit conversions
 
 ### Configuration Management
-- **Lists Management**: Admin-editable lists for statuses, types, matrices, QC types, etc.
-- **Container Types**: Admin-managed container type definitions
+- **Lists Management**: Admin-editable lists for statuses, types, matrices, QC types, etc. (full CRUD)
+- **Container Types**: Admin-managed container type definitions (CRUD operations)
+- **Analyses Management**: Create and manage analyses with methods, turnaround times, and costs (CRUD)
+- **Analytes Management**: Create and manage analytes (CRUD)
+- **Analysis-Analyte Configuration**: Configure validation rules (data types, ranges, significant figures, required flags)
+- **Users Management**: Create and manage users with role assignments (CRUD)
+- **Roles & Permissions**: Manage roles and assign permissions (CRUD)
 - **Units Management**: Unit definitions with multipliers for conversions
 
 ### Security & Access
