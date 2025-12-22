@@ -317,6 +317,89 @@ class ApiService {
     const response: AxiosResponse = await this.api.get(`/analyses/${analysisId}/analytes`);
     return response.data;
   }
+
+  // Users endpoints (admin CRUD)
+  async getUsers(filters?: { role_id?: string; client_id?: string }) {
+    const response: AxiosResponse = await this.api.get('/users', {
+      params: filters,
+    });
+    return response.data;
+  }
+
+  async createUser(userData: any) {
+    const response: AxiosResponse = await this.api.post('/users', userData);
+    return response.data;
+  }
+
+  async updateUser(id: string, userData: any) {
+    const response: AxiosResponse = await this.api.patch(`/users/${id}`, userData);
+    return response.data;
+  }
+
+  async deleteUser(id: string) {
+    const response: AxiosResponse = await this.api.delete(`/users/${id}`);
+    return response.data;
+  }
+
+  // Roles endpoints
+  async getRoles() {
+    const response: AxiosResponse = await this.api.get('/roles');
+    return response.data;
+  }
+
+  async createRole(roleData: any) {
+    const response: AxiosResponse = await this.api.post('/roles', roleData);
+    return response.data;
+  }
+
+  async updateRole(id: string, roleData: any) {
+    const response: AxiosResponse = await this.api.patch(`/roles/${id}`, roleData);
+    return response.data;
+  }
+
+  async deleteRole(id: string) {
+    const response: AxiosResponse = await this.api.delete(`/roles/${id}`);
+    return response.data;
+  }
+
+  async getRolePermissions(roleId: string) {
+    const response: AxiosResponse = await this.api.get(`/roles/${roleId}/permissions`);
+    return response.data;
+  }
+
+  async updateRolePermissions(roleId: string, permissionIds: string[]) {
+    const response: AxiosResponse = await this.api.put(`/roles/${roleId}/permissions`, {
+      permission_ids: permissionIds,
+    });
+    return response.data;
+  }
+
+  // Permissions endpoints
+  async getPermissions() {
+    const response: AxiosResponse = await this.api.get('/permissions');
+    return response.data;
+  }
+
+  async createPermission(permissionData: any) {
+    const response: AxiosResponse = await this.api.post('/permissions', permissionData);
+    return response.data;
+  }
+
+  async updatePermission(id: string, permissionData: any) {
+    const response: AxiosResponse = await this.api.patch(`/permissions/${id}`, permissionData);
+    return response.data;
+  }
+
+  async deletePermission(id: string) {
+    const response: AxiosResponse = await this.api.delete(`/permissions/${id}`);
+    return response.data;
+  }
+
+  // Clients endpoints
+  async getClients() {
+    const response: AxiosResponse = await this.api.get('/clients');
+    return response.data;
+  }
 }
 
 export const apiService = new ApiService();

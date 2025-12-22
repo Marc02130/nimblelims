@@ -176,12 +176,12 @@ const ReviewStep: React.FC<ReviewStepProps> = ({ values, lookupData }) => {
                   </ListItem>
                 )}
                 {values.container_amount !== null && values.container_amount !== undefined && (
-                  <ListItem>
-                    <ListItemText
-                      primary="Amount"
+                <ListItem>
+                  <ListItemText
+                    primary="Amount"
                       secondary={`${values.container_amount} ${values.container_amount_units ? getLookupName(values.container_amount_units, lookupData.units) : ''}`}
-                    />
-                  </ListItem>
+                  />
+                </ListItem>
                 )}
               </List>
             </CardContent>

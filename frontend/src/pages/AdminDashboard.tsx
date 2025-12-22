@@ -27,6 +27,8 @@ import {
   Logout,
   Dashboard as DashboardIcon,
   ArrowBack,
+  People,
+  Security,
 } from '@mui/icons-material';
 import Logo from '../components/Logo';
 import { useNavigate, useLocation, Outlet } from 'react-router-dom';
@@ -56,6 +58,7 @@ const AdminDashboard: React.FC = () => {
   const [stats, setStats] = useState({
     listsCount: 0,
     containerTypesCount: 0,
+    usersCount: 0,
   });
 
   // Check permission on mount
@@ -74,14 +77,16 @@ const AdminDashboard: React.FC = () => {
       setLoading(true);
       setError(null);
       
-      const [lists, containerTypes] = await Promise.all([
+      const [lists, containerTypes, users] = await Promise.all([
         apiService.getLists(),
         apiService.getContainerTypes(),
+        apiService.getUsers().catch(() => []), // Users endpoint may not exist yet
       ]);
 
       setStats({
         listsCount: lists?.length || 0,
         containerTypesCount: containerTypes?.length || 0,
+        usersCount: users?.length || 0,
       });
     } catch (err: any) {
       if (err.response?.status === 403) {
@@ -124,6 +129,16 @@ const AdminDashboard: React.FC = () => {
       text: 'Container Types',
       icon: <Inventory />,
       path: '/admin/container-types',
+    },
+    {
+      text: 'Users Management',
+      icon: <People />,
+      path: '/admin/users',
+    },
+    {
+      text: 'Roles & Permissions',
+      icon: <Security />,
+      path: '/admin/roles',
     },
   ];
 
@@ -307,6 +322,19 @@ const AdminDashboard: React.FC = () => {
                       </Typography>
                       <Typography variant="h4">
                         {stats.containerTypesCount}
+                      </Typography>
+                    </CardContent>
+                  </Card>
+                </Grid>
+
+                <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                  <Card>
+                    <CardContent>
+                      <Typography color="text.secondary" gutterBottom>
+                        Total Users
+                      </Typography>
+                      <Typography variant="h4">
+                        {stats.usersCount}
                       </Typography>
                     </CardContent>
                   </Card>

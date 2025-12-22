@@ -11,6 +11,8 @@ import Login from './pages/Login';
 import AdminDashboard from './pages/AdminDashboard';
 import ListsManagement from './pages/admin/ListsManagement';
 import ContainerTypesManagement from './pages/admin/ContainerTypesManagement';
+import UsersManagement from './pages/admin/UsersManagement';
+import RolesManagement from './pages/admin/RolesManagement';
 import { useUser } from './contexts/UserContext';
 
 function AppRoutes() {
@@ -34,6 +36,8 @@ function AppRoutes() {
         >
           <Route path="lists" element={<ListsManagement />} />
           <Route path="container-types" element={<ContainerTypesManagement />} />
+          <Route path="users" element={<UsersManagement />} />
+          <Route path="roles" element={<RolesManagement />} />
         </Route>
       </Routes>
     );

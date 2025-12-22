@@ -86,14 +86,17 @@ nimblelims/
 │   ├── app/                 # Application code
 │   │   ├── main.py         # FastAPI app entry point
 │   │   ├── routers/        # API route handlers
-│   │   ├── models/         # SQLAlchemy models
-│   │   └── core/           # Core utilities (config, security)
-│   ├── db/                 # Database migrations
+│   │   ├── schemas/        # Pydantic request/response schemas
+│   │   └── core/           # Core utilities (config, security, rbac)
+│   ├── models/              # SQLAlchemy database models
+│   ├── db/                  # Database migrations
 │   │   └── migrations/     # Alembic migration files
+│   ├── tests/               # Test files
 │   ├── requirements.txt     # Python dependencies
 │   ├── Dockerfile          # Backend container config
 │   ├── start.sh            # Startup script (runs migrations)
 │   ├── run_migrations.py   # Migration runner
+│   ├── run_server.py       # Development server runner
 │   └── env.example         # Environment variables template
 ├── frontend/               # React frontend
 │   ├── src/                # Source code
@@ -110,7 +113,9 @@ nimblelims/
 │   ├── api_endpoints.md    # Complete API endpoints reference
 │   ├── backend-auth.md     # Authentication implementation
 │   ├── debug_404_errors.md # Troubleshooting guide for API errors
-│   ├── lims_mvp_prd.md     # Product requirements
+│   ├── debug_manifest.md  # Manifest debugging guide
+│   ├── inspect_containers.md # Container inspection utilities
+│   ├── lims_mvp_prd.md     # Product requirements document
 │   ├── lims_mvp_tech.md    # Technical specifications
 │   ├── lims_mvp_user.md    # User stories
 │   ├── lims_mvp_dev_setup.md # Development environment setup
@@ -124,16 +129,30 @@ nimblelims/
 
 ## Features (MVP Scope)
 
+### Core Workflows
 - **Sample Tracking**: Accessioning, status management, container hierarchy
 - **Test Ordering**: Assign analyses to samples with status tracking
 - **Results Entry**: Batch-based results entry with validation
 - **Batch Management**: Create and manage batches with container tracking
-- **Container Management**: Pre-setup container types, dynamic instance creation during workflows
-- **Admin Configuration**: Manage container types and lists via admin interface
-- **Security**: JWT authentication with Role-Based Access Control (RBAC)
-- **Data Isolation**: Client-specific data access controls
-- **Configurable Lists**: Dynamic lists for statuses, types, matrices, etc. (editable by admins)
-- **Units Management**: Unit conversions with multipliers
+- **Aliquots/Derivatives**: Create child samples with inheritance
+
+### Container System
+- **Container Types**: Pre-setup by administrators (CRUD via admin interface)
+- **Container Instances**: Created dynamically during workflows (accessioning, aliquoting)
+- **Hierarchical Support**: Parent-child relationships (plates → wells, racks → tubes)
+- **Pooled Samples**: Multiple samples per container with concentration/amount tracking
+- **Units Integration**: Concentration and amount with unit conversions
+
+### Configuration Management
+- **Lists Management**: Admin-editable lists for statuses, types, matrices, QC types, etc.
+- **Container Types**: Admin-managed container type definitions
+- **Units Management**: Unit definitions with multipliers for conversions
+
+### Security & Access
+- **Authentication**: JWT token-based authentication
+- **Authorization**: Role-Based Access Control (RBAC) with ~15 granular permissions
+- **Data Isolation**: Client-specific data access controls via project_users
+- **Row-Level Security**: PostgreSQL RLS policies for data protection
 
 ## API Documentation
 
