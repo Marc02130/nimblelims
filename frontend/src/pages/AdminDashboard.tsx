@@ -28,6 +28,7 @@ import {
   Dashboard as DashboardIcon,
   ArrowBack,
 } from '@mui/icons-material';
+import Logo from '../components/Logo';
 import { useNavigate, useLocation, Outlet } from 'react-router-dom';
 import { useUser } from '../contexts/UserContext';
 import { apiService } from '../services/apiService';
@@ -196,9 +197,12 @@ const AdminDashboard: React.FC = () => {
           >
             <MenuIcon />
           </IconButton>
-          <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
-            Administration
-          </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', flexGrow: 1 }}>
+            <Logo sx={{ mr: 1, fontSize: 24 }} />
+            <Typography variant="h6" noWrap component="div">
+              Administration
+            </Typography>
+          </Box>
           <Button
             color="inherit"
             startIcon={<ArrowBack />}
