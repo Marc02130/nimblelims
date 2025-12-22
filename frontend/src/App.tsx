@@ -13,6 +13,9 @@ import ListsManagement from './pages/admin/ListsManagement';
 import ContainerTypesManagement from './pages/admin/ContainerTypesManagement';
 import UsersManagement from './pages/admin/UsersManagement';
 import RolesManagement from './pages/admin/RolesManagement';
+import AnalysesManagement from './pages/admin/AnalysesManagement';
+import AnalytesManagement from './pages/admin/AnalytesManagement';
+import AnalysisAnalytesConfig from './pages/admin/AnalysisAnalytesConfig';
 import { useUser } from './contexts/UserContext';
 
 function AppRoutes() {
@@ -38,6 +41,9 @@ function AppRoutes() {
           <Route path="container-types" element={<ContainerTypesManagement />} />
           <Route path="users" element={<UsersManagement />} />
           <Route path="roles" element={<RolesManagement />} />
+          <Route path="analyses" element={<AnalysesManagement />} />
+          <Route path="analyses/:analysisId/analytes" element={<AnalysisAnalytesConfig />} />
+          <Route path="analytes" element={<AnalytesManagement />} />
         </Route>
       </Routes>
     );

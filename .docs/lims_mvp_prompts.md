@@ -202,3 +202,42 @@ RBAC: Restricted to user:manage or config:edit; view-only if lacking full access
 Tests: Jest for CRUD, permission assignment, grid interactions.
 Files: Generate full code for src/pages/admin/RolesManagement.tsx and helpers (e.g., RoleFormDialog.tsx, PermissionSelector.tsx).
 Ensure separation: No direct ties to workflows; preview role impacts before save."
+
+Prompt 7: Analyses Management Page
+"Add a React frontend component for managing analyses (tests) in the LIMS MVP admin section, per the Technical Document (Version 1.5, sections 3.1, 4.2 for analyses table/endpoints) and User Stories (US-7, US-15).
+
+Component: Create AnalysesManagement.tsx under src/pages/admin/; Material-UI DataGrid for listing analyses (columns: name, method, turnaround_time, cost, analyte count); CRUD buttons.
+Forms: Dialog for new/edit analysis (fields: name, method, turnaround_time (days, positive int), cost (numeric >=0)); nested section for assigning analytes via multi-select (fetch from GET /analytes).
+Integration: Axios to GET /analyses (fetch active), POST /analyses, PATCH /analyses/{id}, DELETE /analyses/{id} (soft delete); manage analytes with POST/PATCH/DELETE /analyses/{id}/analytes.
+Validation: Formik/Yup for uniqueness (name), required fields; confirm deletes if referenced in tests.
+UI: Search/filter in grid; expandable rows for analyte details; loading/error states.
+RBAC: Requires config:edit or test:configure; error if unauthorized.
+Tests: Jest for CRUD flows, form validation, API mocks.
+Files: Generate full code for src/pages/admin/AnalysesManagement.tsx and helpers (e.g., AnalysisFormDialog.tsx).
+Clarify: Integrate with admin dashboard navigation; seeded data (e.g., pH, EPA 8080) appears on load; no direct workflow ties."
+
+Prompt 8: Analytes Management Page
+"Implement a React frontend component for managing analytes in the LIMS MVP admin section, aligning with the Technical Document (Version 1.5, sections 3.1, 4.2 for analytes table/endpoints) and User Stories (US-9, US-15).
+
+Component: Create AnalytesManagement.tsx under src/pages/admin/; Material-UI DataGrid for listing analytes (columns: name, description); CRUD buttons.
+Forms: Dialog for new/edit analyte (fields: name, description); keep simple as rules are set in analysis_analytes junctions.
+Integration: Axios calls to GET /analytes (fetch), POST /analytes, PATCH /analytes/{id}, DELETE /analytes/{id} (soft delete); handle 404/400 errors.
+Validation: Formik/Yup for unique names; confirm deletes if referenced in analyses.
+UI: Search/filter in grid; loading states.
+RBAC: Restricted to config:edit or test:configure; view-only fallback.
+Tests: Jest for CRUD, validation, grid interactions.
+Files: Generate full code for src/pages/admin/AnalytesManagement.tsx and helpers (e.g., AnalyteFormDialog.tsx).
+Ensure separation: Analytes reusable across analyses; seeded examples (e.g., pH, Aldrin) load initially."
+
+Prompt 9: Analysis Analytes Configuration (Junction Management)
+"Add a React frontend component for configuring analysis-analytes relationships in the LIMS MVP admin section, based on the Technical Document (Version 1.5, sections 3.1, 4.2 for analysis_analytes junction) and User Stories (US-9).
+
+Component: Create AnalysisAnalytesConfig.tsx under src/pages/admin/; accessible from AnalysesManagement (e.g., via expandable row or link); Material-UI DataGrid for listing analytes per analysis (columns: analyte_name, data_type, high/low, sig_figs, is_required).
+Forms: Dialog for adding/editing junction (fields: analyte_id dropdown from GET /analytes, data_type (from lists), high/low (numeric), sig_figs (int >0), is_required (bool), optional calculation/reported_name).
+Integration: Axios to GET /analyses/{id}/analytes, POST /analyses/{id}/analytes, PATCH /analyses/{id}/analytes/{analyte_id}, DELETE /analyses/{id}/analytes/{analyte_id}.
+Validation: Formik/Yup for ranges (e.g., low <= high), required fields; backend handles uniqueness.
+UI: Per-analysis view; edit/delete icons; search/filter.
+RBAC: Requires config:edit or test:configure.
+Tests: Jest for junction CRUD, validation.
+Files: Generate full code for src/pages/admin/AnalysisAnalytesConfig.tsx and helpers (e.g., AnalyteRuleForm.tsx).
+Note: Units/lists integration for measurements; seeded junctions (e.g., pH rules) appear on load."

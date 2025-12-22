@@ -29,6 +29,8 @@ import {
   ArrowBack,
   People,
   Security,
+  Science,
+  Biotech,
 } from '@mui/icons-material';
 import Logo from '../components/Logo';
 import { useNavigate, useLocation, Outlet } from 'react-router-dom';
@@ -59,6 +61,9 @@ const AdminDashboard: React.FC = () => {
     listsCount: 0,
     containerTypesCount: 0,
     usersCount: 0,
+    analysesCount: 0,
+    analytesCount: 0,
+    rolesCount: 0,
   });
 
   // Check permission on mount
@@ -77,16 +82,22 @@ const AdminDashboard: React.FC = () => {
       setLoading(true);
       setError(null);
       
-      const [lists, containerTypes, users] = await Promise.all([
+      const [lists, containerTypes, users, analyses, analytes, roles] = await Promise.all([
         apiService.getLists(),
         apiService.getContainerTypes(),
         apiService.getUsers().catch(() => []), // Users endpoint may not exist yet
+        apiService.getAnalyses().catch(() => []), // Analyses endpoint
+        apiService.getAnalytes().catch(() => []), // Analytes endpoint
+        apiService.getRoles().catch(() => []), // Roles endpoint
       ]);
 
       setStats({
         listsCount: lists?.length || 0,
         containerTypesCount: containerTypes?.length || 0,
         usersCount: users?.length || 0,
+        analysesCount: analyses?.length || 0,
+        analytesCount: analytes?.length || 0,
+        rolesCount: roles?.length || 0,
       });
     } catch (err: any) {
       if (err.response?.status === 403) {
@@ -139,6 +150,16 @@ const AdminDashboard: React.FC = () => {
       text: 'Roles & Permissions',
       icon: <Security />,
       path: '/admin/roles',
+    },
+    {
+      text: 'Analyses Management',
+      icon: <Science />,
+      path: '/admin/analyses',
+    },
+    {
+      text: 'Analytes Management',
+      icon: <Biotech />,
+      path: '/admin/analytes',
     },
   ];
 
@@ -301,7 +322,7 @@ const AdminDashboard: React.FC = () => {
               </Box>
             ) : (
               <Grid container spacing={3}>
-                <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                <Grid size={{ xs: 12, sm: 6, md: 4 }}>
                   <Card>
                     <CardContent>
                       <Typography color="text.secondary" gutterBottom>
@@ -314,7 +335,7 @@ const AdminDashboard: React.FC = () => {
                   </Card>
                 </Grid>
                 
-                <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                <Grid size={{ xs: 12, sm: 6, md: 4 }}>
                   <Card>
                     <CardContent>
                       <Typography color="text.secondary" gutterBottom>
@@ -327,7 +348,7 @@ const AdminDashboard: React.FC = () => {
                   </Card>
                 </Grid>
 
-                <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                <Grid size={{ xs: 12, sm: 6, md: 4 }}>
                   <Card>
                     <CardContent>
                       <Typography color="text.secondary" gutterBottom>
@@ -335,6 +356,45 @@ const AdminDashboard: React.FC = () => {
                       </Typography>
                       <Typography variant="h4">
                         {stats.usersCount}
+                      </Typography>
+                    </CardContent>
+                  </Card>
+                </Grid>
+
+                <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+                  <Card>
+                    <CardContent>
+                      <Typography color="text.secondary" gutterBottom>
+                        Analyses
+                      </Typography>
+                      <Typography variant="h4">
+                        {stats.analysesCount}
+                      </Typography>
+                    </CardContent>
+                  </Card>
+                </Grid>
+
+                <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+                  <Card>
+                    <CardContent>
+                      <Typography color="text.secondary" gutterBottom>
+                        Analytes
+                      </Typography>
+                      <Typography variant="h4">
+                        {stats.analytesCount}
+                      </Typography>
+                    </CardContent>
+                  </Card>
+                </Grid>
+
+                <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+                  <Card>
+                    <CardContent>
+                      <Typography color="text.secondary" gutterBottom>
+                        Roles
+                      </Typography>
+                      <Typography variant="h4">
+                        {stats.rolesCount}
                       </Typography>
                     </CardContent>
                   </Card>
