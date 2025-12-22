@@ -28,6 +28,7 @@ def upgrade() -> None:
         {'id': 'a0000004-a000-a000-a000-a00000000004', 'name': 'PCB-1016', 'description': 'Polychlorinated biphenyl'},
         {'id': 'a0000005-a000-a000-a000-a00000000005', 'name': 'Total Coliforms', 'description': 'Coliform bacteria count'},
         {'id': 'a0000006-a000-a000-a000-a00000000006', 'name': 'E. coli', 'description': 'Escherichia coli count'},
+        {'id': 'a0000004-a000-a000-a000-a00000000005', 'name': 'Initial Volume', 'description': 'Sample volume extracted'},
     ]
     
     for analyte in analytes_data:
@@ -45,6 +46,7 @@ def upgrade() -> None:
         {'id': 'b0000001-b000-b000-b000-b00000000001', 'name': 'pH Measurement', 'method': 'Electrometric', 'turnaround_time': 1, 'cost': 10.00},
         {'id': 'b0000002-b000-b000-b000-b00000000002', 'name': 'EPA Method 8080', 'method': 'GC/ECD for Organochlorine Pesticides and PCBs', 'turnaround_time': 7, 'cost': 150.00},
         {'id': 'b0000003-b000-b000-b000-b00000000003', 'name': 'Total Coliform Enumeration', 'method': 'Colilert or Membrane Filtration', 'turnaround_time': 2, 'cost': 50.00},
+        {'id': 'b0000002-b000-b000-b000-b00000000004', 'name': 'EPA Method 8080 Prep', 'method': 'Sample Extractionfor Organochlorine Pesticides and PCBs', 'turnaround_time': 7, 'cost': 25.00},
     ]
     
     for analysis in analyses_data:
@@ -69,6 +71,8 @@ def upgrade() -> None:
         {'analysis_id': 'b0000002-b000-b000-b000-b00000000002', 'analyte_id': 'a0000003-a000-a000-a000-a00000000003', 
          'data_type': 'numeric', 'high_value': None, 'low_value': 0.0, 'significant_figures': 3, 'is_required': True},
         {'analysis_id': 'b0000002-b000-b000-b000-b00000000002', 'analyte_id': 'a0000004-a000-a000-a000-a00000000004', 
+         'data_type': 'numeric', 'high_value': None, 'low_value': 0.0, 'significant_figures': 3, 'is_required': True},
+        {'analysis_id': 'b0000002-b000-b000-b000-b00000000004', 'analyte_id': 'a0000004-a000-a000-a000-a00000000005', 
          'data_type': 'numeric', 'high_value': None, 'low_value': 0.0, 'significant_figures': 3, 'is_required': True},
         
         # Total Coliform

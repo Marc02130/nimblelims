@@ -44,14 +44,25 @@ The sample accessioning workflow enables Lab Technicians to receive, inspect, an
 **Purpose**: Assign analyses/tests to be performed on the sample.
 
 **Process**:
-- Display all available analyses with details:
-  - Analysis name
-  - Method
-  - Turnaround time (days)
-  - Cost
-- User selects analyses via checkboxes or card selection
-- Selected analyses are displayed in a summary view
-- At least one analysis can be selected (validation allows zero for flexibility)
+- **Option A: Individual Analysis Selection**:
+  - Display all available analyses with details:
+    - Analysis name
+    - Method
+    - Turnaround time (days)
+    - Cost
+  - User selects analyses via checkboxes or card selection
+  - Selected analyses are displayed in a summary view
+  - At least one analysis can be selected (validation allows zero for flexibility)
+
+- **Option B: Test Battery Selection**:
+  - Display all available test batteries with details:
+    - Battery name
+    - Description
+    - Number of analyses in battery
+  - User can select a test battery
+  - System automatically creates tests for all analyses in the battery (ordered by sequence)
+  - Optional analyses in battery are included by default (future: allow skipping)
+  - Can be combined with individual analysis selections (no duplicates created)
 
 **Component**: `frontend/src/components/accessioning/TestAssignmentStep.tsx`
 
@@ -92,7 +103,8 @@ The sample accessioning workflow enables Lab Technicians to receive, inspect, an
     "qc_type": Optional[UUID],      # FK to list_entries
     "anomalies": Optional[str],
     "double_entry_required": bool,   # Default: False
-    "assigned_tests": List[UUID]    # List of analysis IDs
+    "assigned_tests": List[UUID],    # List of analysis IDs (optional)
+    "battery_id": Optional[UUID]     # Optional: Test battery ID (auto-creates tests for all analyses)
 }
 ```
 
@@ -117,11 +129,20 @@ The sample accessioning workflow enables Lab Technicians to receive, inspect, an
    - Uses `db.flush()` to get sample ID before committing
 
 4. **Test Assignment**:
-   - For each analysis ID in `assigned_tests`:
-     - Creates a `Test` record linked to the sample
+   - **If `battery_id` provided**:
+     - Retrieves all analyses in the battery (ordered by sequence)
+     - Creates a `Test` record for each analysis in the battery
+     - Links each test to the battery via `battery_id`
      - Sets test status to "In Process" (from `test_status` list)
      - Assigns `technician_id` to current user
      - Sets audit fields
+   - **If `assigned_tests` provided**:
+     - For each analysis ID in `assigned_tests`:
+       - Checks if test already exists (from battery assignment)
+       - If not, creates a `Test` record linked to the sample
+       - Sets test status to "In Process" (from `test_status` list)
+       - Assigns `technician_id` to current user
+       - Sets audit fields
 
 5. **Transaction Commit**:
    - Commits all changes in a single transaction
@@ -138,7 +159,11 @@ The frontend performs additional operations beyond the `/accession` endpoint:
 3. **Link Sample to Container**: `POST /contents` to create the relationship
    - Links the sample to the newly created container
    - Records sample-specific concentration and amount values
-4. **Create Tests**: `POST /tests` for each selected analysis
+4. **Create Tests**: 
+   - If `battery_id` provided: System creates tests for all analyses in battery (ordered by sequence)
+   - If `assigned_tests` provided: `POST /tests` for each selected analysis
+   - Both can be used together (no duplicate tests created)
+   - Each test is linked to the sample with "In Process" status
 
 **Note**: The frontend uses separate API calls rather than the dedicated `/accession` endpoint. This allows for more granular error handling and step-by-step progress.
 
@@ -165,7 +190,8 @@ Frontend API Calls:
     ├─ POST /samples → Create sample
     ├─ POST /containers → Create container
     ├─ POST /contents → Link sample to container
-    └─ POST /tests (for each analysis) → Create tests
+    ├─ POST /tests (for each analysis in assigned_tests) → Create individual tests
+    └─ [If battery_id] → Auto-creates tests for all analyses in battery (sequenced)
     ↓
 Backend Processing:
     ├─ Validate permissions (sample:create)
@@ -272,6 +298,10 @@ The workflow requires the following configured lists and types:
   - Must be configured by administrators before use
   - Includes fields: name, description, capacity, material, dimensions, preservative
 - **units**: List of measurement units for concentration and amount
+- **analyses**: Available analyses for test assignment (admin-managed via `/analyses` endpoint)
+- **test_batteries**: Optional pre-configured test batteries (admin-managed via `/test-batteries` endpoint)
+  - Groups multiple analyses with sequence ordering and optional flags
+  - Example: "EPA 8080 Full" battery containing EPA Method 8080 analysis
 
 **Note**: Container types are managed separately from lists and must be pre-setup by administrators via the admin interface. Lists are also editable by administrators but are used for dropdown options throughout the system.
 

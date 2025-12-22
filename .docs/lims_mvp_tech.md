@@ -19,6 +19,7 @@ The MVP focuses on core functionality using PostgreSQL for data storage, Python 
 - Version 1.1: Added units table and related integrations for measurements (e.g., concentration/amount units).
 - Version 1.2: Updated deployment section to specify three Docker containers (DB, backend, frontend) as per refined requirements.
 - Version 1.3: Incorporated refinements for containers (admin pre-setup for types, dynamic instance creation during workflows, no pre-created instances in MVP) and lists (full admin-editable CRUD with normalized naming and API support) based on iterative planning (December 21, 2025).
+- Version 1.4: Added test batteries feature (test_batteries table, battery_analyses junction with sequence/optional flags, integration with accessioning workflow) - December 2025.
 
 ## 2. System Architecture
 
@@ -118,10 +119,12 @@ All tables include standard fields: `id` (UUID PK), `name` (varchar unique), `de
 - **Tests**:
   - `sample_id` (FK samples.id)
   - `analysis_id` (FK analyses.id)
+  - `battery_id` (FK test_batteries.id, nullable)
   - `status` (FK list_entries.id)
   - `review_date` (timestamp, nullable)
   - `test_date` (timestamp, nullable)
   - `technician_id` (FK users.id)
+  - Notes: Optional battery_id links test to a test battery for grouped test assignment.
 
 - **Results**:
   - `test_id` (FK tests.id)
@@ -132,6 +135,18 @@ All tables include standard fields: `id` (UUID PK), `name` (varchar unique), `de
   - `calculated_result` (varchar, nullable)
   - `entry_date` (timestamp)
   - `entered_by` (FK users.id)
+
+- **Test_Batteries**:
+  - No additional fields beyond standard.
+  - Notes: Groups of analyses that can be assigned together during accessioning. Admin-managed via UI/API.
+
+- **Battery_Analyses** (Junction):
+  - `battery_id` (FK test_batteries.id)
+  - `analysis_id` (FK analyses.id, RESTRICT delete)
+  - `sequence` (integer, >= 1, for ordering analyses)
+  - `optional` (boolean, default false)
+  - Composite primary key (battery_id, analysis_id)
+  - Notes: Links analyses to batteries with sequence ordering and optional flag.
 
 - **Batches**:
   - `type` (FK list_entries.id, nullable)
@@ -220,6 +235,16 @@ All tables include standard fields: `id` (UUID PK), `name` (varchar unique), `de
   - POST /analytes: Create analyte (admin, requires config:edit or test:configure).
   - PATCH /analytes/{id}: Update analyte (admin).
   - DELETE /analytes/{id}: Soft-delete analyte (admin).
+- **Test Batteries**:
+  - GET /test-batteries: List batteries with filtering (name, pagination).
+  - GET /test-batteries/{id}: Get battery with analyses.
+  - POST /test-batteries: Create battery (admin, requires config:edit or test:configure).
+  - PATCH /test-batteries/{id}: Update battery (admin).
+  - DELETE /test-batteries/{id}: Soft-delete battery (admin, 409 if referenced).
+  - GET /test-batteries/{id}/analyses: List analyses in battery.
+  - POST /test-batteries/{id}/analyses: Add analysis to battery (admin).
+  - PATCH /test-batteries/{id}/analyses/{analysis_id}: Update sequence/optional (admin).
+  - DELETE /test-batteries/{id}/analyses/{analysis_id}: Remove analysis from battery (admin).
 - **Units**: 
   - GET /units: List all active units with multipliers/types.
 - **Lists**:
@@ -272,6 +297,7 @@ All tables include standard fields: `id` (UUID PK), `name` (varchar unique), `de
   - Analyses (CRUD)
   - Analytes (CRUD)
   - Analysis-analyte rules (validation configuration)
+  - Test batteries (CRUD with analysis grouping)
   - Users (CRUD)
   - Roles and permissions (CRUD)
   - Restricted to config:edit or specific permissions.
@@ -283,7 +309,7 @@ All tables include standard fields: `id` (UUID PK), `name` (varchar unique), `de
 
 ## 6. Workflows Implementation
 
-- **Accessioning**: API sequence: POST /containers (dynamic instance creation), POST /contents (link to sample), POST /samples → POST /tests. Requires specifying pre-setup container type.
+- **Accessioning**: API sequence: POST /containers (dynamic instance creation), POST /contents (link to sample), POST /samples → POST /tests (individual) or POST /samples with battery_id (auto-creates sequenced tests). Requires specifying pre-setup container type.
 - **Aliquots/Derivatives**: POST /samples with parent_id; inherit via backend logic; create new container instance dynamically.
 - **Results Entry**: GET /batches/{id}/samples → POST /results with batch context.
 - **Pooled Samples**: POST /contents; backend uses units multipliers for conversions (e.g., volume = amount / concentration, normalized to base units).

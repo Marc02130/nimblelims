@@ -131,7 +131,7 @@ nimblelims/
 
 ### Core Workflows
 - **Sample Tracking**: Accessioning, status management, container hierarchy
-- **Test Ordering**: Assign analyses to samples with status tracking
+- **Test Ordering**: Assign individual analyses or test batteries to samples with status tracking
 - **Results Entry**: Batch-based results entry with validation
 - **Batch Management**: Create and manage batches with container tracking
 - **Aliquots/Derivatives**: Create child samples with inheritance
@@ -149,6 +149,7 @@ nimblelims/
 - **Analyses Management**: Create and manage analyses with methods, turnaround times, and costs (CRUD)
 - **Analytes Management**: Create and manage analytes (CRUD)
 - **Analysis-Analyte Configuration**: Configure validation rules (data types, ranges, significant figures, required flags)
+- **Test Batteries Management**: Group multiple analyses into reusable test batteries with sequence ordering and optional flags (CRUD)
 - **Users Management**: Create and manage users with role assignments (CRUD)
 - **Roles & Permissions**: Manage roles and assign permissions (CRUD)
 - **Units Management**: Unit definitions with multipliers for conversions
@@ -192,9 +193,10 @@ Alembic migrations run automatically when the backend container starts. The star
 **Migrations create:**
 - All database tables and indexes
 - Initial roles (Administrator, Lab Manager, Lab Technician, Client)
-- Initial permissions (~15 core permissions including `batch:read`, `batch:manage`, etc.)
+- Initial permissions (~15 core permissions including `batch:read`, `batch:manage`, `config:edit`, `test:configure`, etc.)
 - Default admin user (username: `admin`, password: `admin123`)
 - Initial lists and list entries for statuses, types, etc. (normalized to lowercase slug format)
+- Seed data: analyses, analytes, and test batteries (e.g., 'EPA 8080 Full' battery)
 
 **Manual migration (if needed):**
 ```bash
@@ -209,7 +211,7 @@ Comprehensive documentation is available in the `.docs/` directory:
 - **Technical Specifications**: `.docs/lims_mvp_tech.md` - Technical architecture and implementation details
 - **User Stories**: `.docs/lims_mvp_user.md` - User stories and acceptance criteria
 - **Workflow Documentation**:
-  - `.docs/accessioning_workflow.md` - Sample accessioning process and workflow
+  - `.docs/accessioning_workflow.md` - Sample accessioning process and workflow (includes test battery assignment)
   - `.docs/containers.md` - Container management, usage, and workflows
   - `.docs/lists.md` - Configurable lists system and administration
 - **Setup Guides**:

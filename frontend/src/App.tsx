@@ -14,6 +14,7 @@ import ContainerTypesManagement from './pages/admin/ContainerTypesManagement';
 import UsersManagement from './pages/admin/UsersManagement';
 import RolesManagement from './pages/admin/RolesManagement';
 import AnalysesManagement from './pages/admin/AnalysesManagement';
+import TestBatteriesManagement from './pages/admin/TestBatteriesManagement';
 import AnalytesManagement from './pages/admin/AnalytesManagement';
 import AnalysisAnalytesConfig from './pages/admin/AnalysisAnalytesConfig';
 import { useUser } from './contexts/UserContext';
@@ -44,6 +45,7 @@ function AppRoutes() {
           <Route path="analyses" element={<AnalysesManagement />} />
           <Route path="analyses/:analysisId/analytes" element={<AnalysisAnalytesConfig />} />
           <Route path="analytes" element={<AnalytesManagement />} />
+          <Route path="test-batteries" element={<TestBatteriesManagement />} />
         </Route>
       </Routes>
     );

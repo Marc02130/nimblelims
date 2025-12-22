@@ -32,13 +32,15 @@ Copyright (c) 2025 Marc Breneiser
 - **Analyses Management**: CRUD operations for analyses (methods, turnaround times, costs)
 - **Analytes Management**: CRUD operations for analytes
 - **Analysis-Analyte Configuration**: Configure validation rules (data types, ranges, significant figures)
+- **Test Batteries Management**: Create and manage test batteries (grouped analyses with sequence and optional flags)
 - **Users Management**: CRUD operations for users
 - **Roles & Permissions Management**: CRUD operations for roles and permission assignments
 - Restricted to users with `config:edit`, `test:configure`, or `user:manage` permissions
 - Enables system customization without code changes
 
 ### Test Assignment (US-7)
-- Assign analyses to samples during accessioning
+- Assign individual analyses or test batteries to samples during accessioning
+- Test batteries automatically create sequenced tests for all analyses in the battery
 - Test instances with status tracking
 - Integration with sample lifecycle
 
@@ -103,6 +105,9 @@ Copyright (c) 2025 Marc Breneiser
 - `AnalysesManagement` - Manage analyses (CRUD operations, admin-only)
 - `AnalysisAnalytesConfig` - Configure analyte rules and validation for analyses (admin-only)
 - `AnalytesManagement` - Manage analytes (CRUD operations, admin-only)
+- `TestBatteriesManagement` - Manage test batteries with analyses grouping (admin-only)
+- `BatteryFormDialog` - Create/edit battery dialog with analysis selector
+- `AnalysisSelector` - Multi-select component for adding analyses to batteries with sequence/optional controls
 - `UsersManagement` - Manage users (CRUD operations, admin-only)
 - `RolesManagement` - Manage roles and permissions (admin-only)
 
@@ -127,6 +132,7 @@ Copyright (c) 2025 Marc Breneiser
 - `PATCH /containers/types/{id}` - Update container type (admin)
 - `POST /contents` - Link sample to container
 - `GET /analyses` - List available analyses
+- `GET /test-batteries` - List test batteries
 - `GET /lists` - Get all lists with entries
 - `GET /lists/{name}/entries` - Get lookup data
 - `POST /lists` - Create list (admin)

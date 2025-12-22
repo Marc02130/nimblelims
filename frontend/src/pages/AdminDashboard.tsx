@@ -31,6 +31,7 @@ import {
   Security,
   Science,
   Biotech,
+  BatteryChargingFull,
 } from '@mui/icons-material';
 import Logo from '../components/Logo';
 import { useNavigate, useLocation, Outlet } from 'react-router-dom';
@@ -64,6 +65,7 @@ const AdminDashboard: React.FC = () => {
     analysesCount: 0,
     analytesCount: 0,
     rolesCount: 0,
+    batteriesCount: 0,
   });
 
   // Check permission on mount
@@ -82,13 +84,14 @@ const AdminDashboard: React.FC = () => {
       setLoading(true);
       setError(null);
       
-      const [lists, containerTypes, users, analyses, analytes, roles] = await Promise.all([
+      const [lists, containerTypes, users, analyses, analytes, roles, batteries] = await Promise.all([
         apiService.getLists(),
         apiService.getContainerTypes(),
         apiService.getUsers().catch(() => []), // Users endpoint may not exist yet
         apiService.getAnalyses().catch(() => []), // Analyses endpoint
         apiService.getAnalytes().catch(() => []), // Analytes endpoint
         apiService.getRoles().catch(() => []), // Roles endpoint
+        apiService.getTestBatteries().catch(() => ({ batteries: [], total: 0 })), // Test batteries endpoint
       ]);
 
       setStats({
@@ -98,6 +101,7 @@ const AdminDashboard: React.FC = () => {
         analysesCount: analyses?.length || 0,
         analytesCount: analytes?.length || 0,
         rolesCount: roles?.length || 0,
+        batteriesCount: batteries?.total || batteries?.batteries?.length || 0,
       });
     } catch (err: any) {
       if (err.response?.status === 403) {
@@ -160,6 +164,11 @@ const AdminDashboard: React.FC = () => {
       text: 'Analytes Management',
       icon: <Biotech />,
       path: '/admin/analytes',
+    },
+    {
+      text: 'Test Batteries',
+      icon: <BatteryChargingFull />,
+      path: '/admin/test-batteries',
     },
   ];
 
@@ -395,6 +404,19 @@ const AdminDashboard: React.FC = () => {
                       </Typography>
                       <Typography variant="h4">
                         {stats.rolesCount}
+                      </Typography>
+                    </CardContent>
+                  </Card>
+                </Grid>
+
+                <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+                  <Card>
+                    <CardContent>
+                      <Typography color="text.secondary" gutterBottom>
+                        Test Batteries
+                      </Typography>
+                      <Typography variant="h4">
+                        {stats.batteriesCount}
                       </Typography>
                     </CardContent>
                   </Card>

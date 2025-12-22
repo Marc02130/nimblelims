@@ -376,6 +376,54 @@ class ApiService {
     return response.data;
   }
 
+  // Test Battery endpoints
+  async getTestBatteries(filters?: { name?: string; page?: number; size?: number }) {
+    const response: AxiosResponse = await this.api.get('/test-batteries', {
+      params: filters,
+    });
+    return response.data;
+  }
+
+  async getTestBattery(id: string) {
+    const response: AxiosResponse = await this.api.get(`/test-batteries/${id}`);
+    return response.data;
+  }
+
+  async createTestBattery(batteryData: { name: string; description?: string }) {
+    const response: AxiosResponse = await this.api.post('/test-batteries', batteryData);
+    return response.data;
+  }
+
+  async updateTestBattery(id: string, batteryData: { name?: string; description?: string; active?: boolean }) {
+    const response: AxiosResponse = await this.api.patch(`/test-batteries/${id}`, batteryData);
+    return response.data;
+  }
+
+  async deleteTestBattery(id: string) {
+    const response: AxiosResponse = await this.api.delete(`/test-batteries/${id}`);
+    return response.data;
+  }
+
+  async getBatteryAnalyses(batteryId: string) {
+    const response: AxiosResponse = await this.api.get(`/test-batteries/${batteryId}/analyses`);
+    return response.data;
+  }
+
+  async addAnalysisToBattery(batteryId: string, analysisData: { analysis_id: string; sequence: number; optional: boolean }) {
+    const response: AxiosResponse = await this.api.post(`/test-batteries/${batteryId}/analyses`, analysisData);
+    return response.data;
+  }
+
+  async updateBatteryAnalysis(batteryId: string, analysisId: string, analysisData: { sequence?: number; optional?: boolean }) {
+    const response: AxiosResponse = await this.api.patch(`/test-batteries/${batteryId}/analyses/${analysisId}`, analysisData);
+    return response.data;
+  }
+
+  async removeAnalysisFromBattery(batteryId: string, analysisId: string) {
+    const response: AxiosResponse = await this.api.delete(`/test-batteries/${batteryId}/analyses/${analysisId}`);
+    return response.data;
+  }
+
   // Users endpoints (admin CRUD)
   async getUsers(filters?: { role_id?: string; client_id?: string }) {
     const response: AxiosResponse = await this.api.get('/users', {

@@ -17,6 +17,7 @@ class Analysis(BaseModel):
     analytes = relationship("Analyte", secondary="analysis_analytes", back_populates="analyses")
     tests = relationship("Test", back_populates="analysis")
     analysis_analytes = relationship("AnalysisAnalyte", back_populates="analysis")
+    battery_analyses = relationship("BatteryAnalysis", back_populates="analysis")
     creator = relationship("User", foreign_keys="Analysis.created_by", back_populates="created_analyses")
     modifier = relationship("User", foreign_keys="Analysis.modified_by", back_populates="modified_analyses")
 
