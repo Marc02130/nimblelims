@@ -2,6 +2,12 @@
 
 A modern, API-first Laboratory Information Management System built with FastAPI, React, and PostgreSQL.
 
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+Copyright (c) 2025 Marc Breneiser
+
 ## Architecture
 
 This project uses a three-container Docker setup:
@@ -106,7 +112,11 @@ nimblelims/
 │   ├── debug_404_errors.md # Troubleshooting guide for API errors
 │   ├── lims_mvp_prd.md     # Product requirements
 │   ├── lims_mvp_tech.md    # Technical specifications
-│   └── lims_mvp_user.md    # User stories
+│   ├── lims_mvp_user.md    # User stories
+│   ├── lims_mvp_dev_setup.md # Development environment setup
+│   ├── accessioning_workflow.md # Sample accessioning process
+│   ├── containers.md       # Container management and usage
+│   └── lists.md            # Configurable lists system
 ├── docker-compose.yml      # Multi-container orchestration
 ├── .gitignore             # Git ignore rules
 └── README.md              # This file
@@ -118,9 +128,11 @@ nimblelims/
 - **Test Ordering**: Assign analyses to samples with status tracking
 - **Results Entry**: Batch-based results entry with validation
 - **Batch Management**: Create and manage batches with container tracking
+- **Container Management**: Pre-setup container types, dynamic instance creation during workflows
+- **Admin Configuration**: Manage container types and lists via admin interface
 - **Security**: JWT authentication with Role-Based Access Control (RBAC)
 - **Data Isolation**: Client-specific data access controls
-- **Configurable Lists**: Dynamic lists for statuses, types, matrices, etc.
+- **Configurable Lists**: Dynamic lists for statuses, types, matrices, etc. (editable by admins)
 - **Units Management**: Unit conversions with multipliers
 
 ## API Documentation
@@ -164,6 +176,22 @@ Alembic migrations run automatically when the backend container starts. The star
 ```bash
 docker exec lims-backend python run_migrations.py
 ```
+
+## Documentation
+
+Comprehensive documentation is available in the `.docs/` directory:
+
+- **Product Requirements**: `.docs/lims_mvp_prd.md` - Product requirements document
+- **Technical Specifications**: `.docs/lims_mvp_tech.md` - Technical architecture and implementation details
+- **User Stories**: `.docs/lims_mvp_user.md` - User stories and acceptance criteria
+- **Workflow Documentation**:
+  - `.docs/accessioning_workflow.md` - Sample accessioning process and workflow
+  - `.docs/containers.md` - Container management, usage, and workflows
+  - `.docs/lists.md` - Configurable lists system and administration
+- **Setup Guides**:
+  - `.docs/lims_mvp_dev_setup.md` - Development environment setup
+  - `.docs/admin_setup.md` - Admin user configuration
+- **API Reference**: `.docs/api_endpoints.md` - Complete API endpoints documentation
 
 ## Support
 
