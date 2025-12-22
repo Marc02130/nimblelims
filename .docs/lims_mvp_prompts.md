@@ -118,3 +118,60 @@ Update Alembic migrations."
 - Polish: Error handling, logging (Sentry stub), migrations."
 
 Once you've run these in Cursor and have the code base, we can resume here to summarize decisions or refine based on any issues. What's one specific aspect you'd like to clarify or adjust before proceeding to implementation?
+
+
+
+
+
+# Admin Prompts
+Thank you for confirming the refinements in our Version 1.6 summary—this gives us a strong foundation to move forward with the admin functionality planning. With container handling locked in (admin pre-setup for types, dynamic instances during workflows) and lists set for full editable CRUD, we can now outline the Cursor prompts to generate the admin web pages. This aligns with the updated "lims_mvp_tech.md" (Version 1.3), where we've enhanced the frontend components (Section 5.1) and API endpoints (Section 4.2) to support these features.
+To keep our iteration focused, I'll provide the prompts below, structured sequentially for use in Cursor. Each one is self-contained, references the tech doc and related files (e.g., "lists.md", "containers.md"), and emphasizes RBAC (config:edit permission), Material-UI for UI, Axios for API calls, and separation from workflows like accessioning or results. They generate full files/components to adhere to our code style planning.
+If these prompts meet your needs, you can copy-paste them directly into Cursor's AI interface. After generation, we can discuss testing or integration details in the next iteration.
+Cursor Prompt 1: Admin Dashboard and Routing
+"Extend the React frontend for the LIMS MVP by adding an admin dashboard section, based on the Technical Document (Version 1.3, sections 4.2, 5.1) and User Stories (US-13, US-15). Focus on admin-only configuration for lists and container types.
+
+Setup: Add protected /admin route in React Router; use Context API to check for admin role/permission (config:edit) from JWT decode; redirect non-admins.
+Components: Create AdminDashboard.tsx as the entry point with sidebar navigation (Material-UI Drawer) linking to Lists Management and Container Types Management.
+UI: Responsive layout; AppBar with logout and user role display; overview cards for quick stats (e.g., number of lists, container types).
+Integration: Axios interceptors for JWT; global error handling with Alerts.
+RBAC: All admin routes require config:edit; 403 handling.
+Tests: Jest for rendering, navigation, and permission checks.
+Files: Generate full code for src/pages/AdminDashboard.tsx, and update src/App.tsx for routing.
+Follow ESLint; ensure no workflow ties (e.g., no accessioning components)."
+
+Cursor Prompt 2: Lists Management Page
+"Implement the React frontend component for full editable lists management in the LIMS MVP admin section, per lists.md (CRUD for lists and entries with normalized naming) and Technical Document (Version 1.3, section 4.2 for endpoints).
+
+Component: Create ListsManagement.tsx under src/pages/admin/; Material-UI DataGrid for listing all lists (columns: name, description, entry count); buttons for create/edit/delete lists.
+Forms: Dialogs for new/edit list (fields: name, description; auto-normalize to slug); nested grid/dialog for entries per list (name, description; CRUD with uniqueness validation).
+Integration: Axios calls to GET /lists (fetch), POST/PATCH/DELETE /lists/{id}, GET/POST/PATCH/DELETE /lists/{list_name}/entries; handle soft deletes (active flag), 404/400 errors, and loading states.
+Validation: Formik/Yup for unique names; confirm deletes to avoid data impacts.
+UI: Search/filter in grid; expandable rows for entries.
+RBAC: Restricted to config:edit; view-only fallback if lacking permission.
+Tests: Jest for CRUD flows, form validation, API mocks.
+Files: Generate full code for src/pages/admin/ListsManagement.tsx and helpers (e.g., ListFormDialog.tsx, EntryFormDialog.tsx).
+Ensure separation: Changes apply system-wide but no real-time workflow updates in MVP."
+
+Cursor Prompt 3: Container Types Management Page
+"Add a React frontend component for managing container types in the LIMS MVP admin section, per containers.md (pre-setup types with fields: name, description, capacity, material, dimensions, preservative) and Technical Document (Version 1.3, section 4.2 for endpoints).
+
+Component: Create ContainerTypesManagement.tsx under src/pages/admin/; Material-UI DataGrid for listing types (columns for all fields); CRUD buttons.
+Forms: Dialog for new/edit type (fields as documented; validation: unique name, positive capacity, required material/dimensions).
+Integration: Axios to GET /containers/types (fetch), POST /containers/types, PATCH /containers/types/{id}, DELETE /containers/types/{id} (soft delete); handle errors and loading.
+Validation: Formik/Yup for constraints; confirm deletes if type is referenced (backend check).
+UI: Edit/delete icons per row; search/filter.
+RBAC: Requires config:edit; error alerts for unauthorized.
+Tests: Jest for CRUD, validation, grid interactions.
+Files: Generate full code for src/pages/admin/ContainerTypesManagement.tsx and helpers (e.g., ContainerTypeForm.tsx).
+Clarify: Types pre-setup here for use in dynamic instance creation (e.g., during accessioning); no instance management in MVP admin."
+
+Cursor Prompt 4: Accessioning Integration for Container Specification
+"Refine the React frontend accessioning form in the LIMS MVP to require container specification during sample receipt, based on accessioning_workflow.md, containers.md, and Technical Document (Version 1.3, section 6).
+
+Component: Update SampleDetailsStep.tsx and AccessioningForm.tsx; add required section for container: dropdown of pre-setup types (fetch via GET /containers/types), fields for new instance (name/barcode, row/column, concentration/amount/units from GET /units).
+Flow: On submit, POST /containers (create instance), POST /contents (link sample), POST /samples; no pre-existing instances.
+Validation: Ensure type exists; positive values; Formik/Yup.
+UI: Material-UI Select for types; conditional fields for instance details.
+Tests: Jest for form updates, submission sequence.
+Files: Generate full updated code for src/components/accessioning/SampleDetailsStep.tsx and src/pages/AccessioningForm.tsx.
+Reinforce: No results/approval here; keep separate from admin configs."

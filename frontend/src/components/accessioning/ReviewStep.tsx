@@ -151,28 +151,38 @@ const ReviewStep: React.FC<ReviewStepProps> = ({ values, lookupData }) => {
               <List dense>
                 <ListItem>
                   <ListItemText
-                    primary="Container Name"
-                    secondary={values.container_name}
+                    primary="Container Name/Barcode"
+                    secondary={values.container_name || 'Not specified'}
                   />
                 </ListItem>
                 <ListItem>
                   <ListItemText
                     primary="Container Type"
-                    secondary={getLookupName(values.container_type, lookupData.containerTypes)}
+                    secondary={getLookupName(values.container_type_id, lookupData.containerTypes)}
                   />
                 </ListItem>
                 <ListItem>
                   <ListItemText
-                    primary="Concentration"
-                    secondary={`${values.concentration} ${getLookupName(values.concentration_units, lookupData.units)}`}
+                    primary="Row/Column"
+                    secondary={`Row: ${values.container_row || 1}, Column: ${values.container_column || 1}`}
                   />
                 </ListItem>
-                <ListItem>
-                  <ListItemText
-                    primary="Amount"
-                    secondary={`${values.amount} ${getLookupName(values.amount_units, lookupData.units)}`}
-                  />
-                </ListItem>
+                {values.container_concentration !== null && values.container_concentration !== undefined && (
+                  <ListItem>
+                    <ListItemText
+                      primary="Concentration"
+                      secondary={`${values.container_concentration} ${values.container_concentration_units ? getLookupName(values.container_concentration_units, lookupData.units) : ''}`}
+                    />
+                  </ListItem>
+                )}
+                {values.container_amount !== null && values.container_amount !== undefined && (
+                  <ListItem>
+                    <ListItemText
+                      primary="Amount"
+                      secondary={`${values.container_amount} ${values.container_amount_units ? getLookupName(values.container_amount_units, lookupData.units) : ''}`}
+                    />
+                  </ListItem>
+                )}
               </List>
             </CardContent>
           </Card>

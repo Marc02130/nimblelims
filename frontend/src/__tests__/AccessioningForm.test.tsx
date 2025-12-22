@@ -129,18 +129,140 @@ describe('AccessioningForm', () => {
   });
 
   test('navigates to next step when valid', async () => {
+    const { apiService } = require('../services/apiService');
+    apiService.getListEntries.mockImplementation((listName: string) => {
+      if (listName === 'sample_types') return Promise.resolve(mockLookupData.sampleTypes);
+      if (listName === 'sample_status') return Promise.resolve(mockLookupData.statuses);
+      if (listName === 'matrix_types') return Promise.resolve(mockLookupData.matrices);
+      if (listName === 'qc_types') return Promise.resolve(mockLookupData.qcTypes);
+      return Promise.resolve([]);
+    });
+    apiService.getProjects.mockResolvedValue(mockLookupData.projects);
+    apiService.getContainerTypes.mockResolvedValue(mockLookupData.containerTypes);
+    apiService.getUnits.mockResolvedValue(mockLookupData.units);
+    
     renderWithProviders(<AccessioningForm />);
+    
+    await waitFor(() => {
+      expect(screen.getByLabelText('Sample Name')).toBeInTheDocument();
+    });
     
     // Fill required fields
     fireEvent.change(screen.getByLabelText('Sample Name'), { target: { value: 'Test Sample' } });
-    fireEvent.change(screen.getByLabelText('Due Date'), { target: { value: '2024-12-31' } });
-    fireEvent.change(screen.getByLabelText('Received Date'), { target: { value: '2024-01-01' } });
+    
+    // Select container type and name
+    const containerTypeSelect = screen.getByLabelText('Container Type');
+    fireEvent.mouseDown(containerTypeSelect);
+    await waitFor(() => {
+      const option = screen.getByText(/Tube/);
+      fireEvent.click(option);
+    });
+    
+    fireEvent.change(screen.getByLabelText('Container Name/Barcode'), { target: { value: 'CONTAINER-001' } });
     
     const nextButton = screen.getByText('Next');
     fireEvent.click(nextButton);
     
     await waitFor(() => {
       expect(screen.getByText('Test Assignment')).toBeInTheDocument();
+    });
+  });
+
+  test('displays container specification section', async () => {
+    const { apiService } = require('../services/apiService');
+    apiService.getListEntries.mockResolvedValue([]);
+    apiService.getProjects.mockResolvedValue([]);
+    apiService.getContainerTypes.mockResolvedValue(mockLookupData.containerTypes);
+    apiService.getUnits.mockResolvedValue(mockLookupData.units);
+    
+    renderWithProviders(<AccessioningForm />);
+    
+    await waitFor(() => {
+      expect(screen.getByText('Container Information')).toBeInTheDocument();
+      expect(screen.getByLabelText('Container Type')).toBeInTheDocument();
+      expect(screen.getByLabelText('Container Name/Barcode')).toBeInTheDocument();
+    });
+  });
+
+  test('validates container type is required', async () => {
+    const { apiService } = require('../services/apiService');
+    apiService.getListEntries.mockResolvedValue([]);
+    apiService.getProjects.mockResolvedValue([]);
+    apiService.getContainerTypes.mockResolvedValue(mockLookupData.containerTypes);
+    apiService.getUnits.mockResolvedValue(mockLookupData.units);
+    
+    renderWithProviders(<AccessioningForm />);
+    
+    await waitFor(() => {
+      expect(screen.getByLabelText('Container Type')).toBeInTheDocument();
+    });
+    
+    const nextButton = screen.getByText('Next');
+    fireEvent.click(nextButton);
+    
+    await waitFor(() => {
+      expect(screen.getByText(/Container type is required/i)).toBeInTheDocument();
+    });
+  });
+
+  test('creates container before sample on submission', async () => {
+    const { apiService } = require('../services/apiService');
+    apiService.getListEntries.mockImplementation((listName: string) => {
+      if (listName === 'sample_types') return Promise.resolve(mockLookupData.sampleTypes);
+      if (listName === 'sample_status') return Promise.resolve(mockLookupData.statuses);
+      if (listName === 'matrix_types') return Promise.resolve(mockLookupData.matrices);
+      if (listName === 'qc_types') return Promise.resolve(mockLookupData.qcTypes);
+      return Promise.resolve([]);
+    });
+    apiService.getProjects.mockResolvedValue(mockLookupData.projects);
+    apiService.getAnalyses.mockResolvedValue(mockLookupData.analyses);
+    apiService.getContainerTypes.mockResolvedValue(mockLookupData.containerTypes);
+    apiService.getUnits.mockResolvedValue(mockLookupData.units);
+    
+    const mockContainer = { id: 'container-1', name: 'CONTAINER-001' };
+    const mockSample = { id: 'sample-1', name: 'Test Sample' };
+    
+    apiService.createContainer.mockResolvedValue(mockContainer);
+    apiService.createSample.mockResolvedValue(mockSample);
+    apiService.createContent.mockResolvedValue({});
+    apiService.createTest.mockResolvedValue({});
+    
+    renderWithProviders(<AccessioningForm />);
+    
+    await waitFor(() => {
+      expect(screen.getByLabelText('Sample Name')).toBeInTheDocument();
+    });
+    
+    // Fill all required fields
+    fireEvent.change(screen.getByLabelText('Sample Name'), { target: { value: 'Test Sample' } });
+    
+    // Select container type
+    const containerTypeSelect = screen.getByLabelText('Container Type');
+    fireEvent.mouseDown(containerTypeSelect);
+    await waitFor(() => {
+      const option = screen.getByText(/Tube/);
+      fireEvent.click(option);
+    });
+    
+    fireEvent.change(screen.getByLabelText('Container Name/Barcode'), { target: { value: 'CONTAINER-001' } });
+    
+    // Navigate through steps
+    fireEvent.click(screen.getByText('Next'));
+    await waitFor(() => {
+      expect(screen.getByText('Test Assignment')).toBeInTheDocument();
+    });
+    
+    fireEvent.click(screen.getByText('Next'));
+    await waitFor(() => {
+      expect(screen.getByText('Review & Submit')).toBeInTheDocument();
+    });
+    
+    // Submit
+    fireEvent.click(screen.getByText('Submit'));
+    
+    await waitFor(() => {
+      expect(apiService.createContainer).toHaveBeenCalledBefore(apiService.createSample as jest.Mock);
+      expect(apiService.createContent).toHaveBeenCalled();
     });
   });
 });

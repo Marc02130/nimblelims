@@ -39,12 +39,14 @@ interface SampleFormData {
   selected_analyses: string[];
   
   // Container assignment
-  container_type: string;
+  container_type_id: string;
   container_name: string;
-  concentration: number;
-  concentration_units: string;
-  amount: number;
-  amount_units: string;
+  container_row: number;
+  container_column: number;
+  container_concentration: number | null;
+  container_concentration_units: string;
+  container_amount: number | null;
+  container_amount_units: string;
   
   // Double entry validation
   double_entry_enabled: boolean;
@@ -65,12 +67,14 @@ const initialValues: SampleFormData = {
   project_id: '',
   qc_type: '',
   selected_analyses: [],
-  container_type: '',
+  container_type_id: '',
   container_name: '',
-  concentration: 0,
-  concentration_units: '',
-  amount: 0,
-  amount_units: '',
+  container_row: 1,
+  container_column: 1,
+  container_concentration: null,
+  container_concentration_units: '',
+  container_amount: null,
+  container_amount_units: '',
   double_entry_enabled: false,
   name_verification: '',
   sample_type_verification: '',
@@ -85,12 +89,22 @@ const validationSchema = Yup.object({
   matrix: Yup.string().required('Matrix is required'),
   temperature: Yup.number().required('Temperature is required'),
   project_id: Yup.string().required('Project is required'),
-  container_type: Yup.string().required('Container type is required'),
-  container_name: Yup.string().required('Container name is required'),
-  concentration: Yup.number().min(0, 'Concentration must be positive'),
-  amount: Yup.number().min(0, 'Amount must be positive'),
-  concentration_units: Yup.string().required('Concentration units are required'),
-  amount_units: Yup.string().required('Amount units are required'),
+  container_type_id: Yup.string().required('Container type is required'),
+  container_name: Yup.string().required('Container name/barcode is required'),
+  container_row: Yup.number().min(1, 'Row must be at least 1').required(),
+  container_column: Yup.number().min(1, 'Column must be at least 1').required(),
+  container_concentration: Yup.number().nullable().min(0, 'Concentration must be positive or zero'),
+  container_amount: Yup.number().nullable().min(0, 'Amount must be positive or zero'),
+  container_concentration_units: Yup.string().when('container_concentration', {
+    is: (val: number | null) => val !== null && val !== undefined && val > 0,
+    then: (schema) => schema.required('Concentration units are required when concentration is specified'),
+    otherwise: (schema) => schema.notRequired(),
+  }),
+  container_amount_units: Yup.string().when('container_amount', {
+    is: (val: number | null) => val !== null && val !== undefined && val > 0,
+    then: (schema) => schema.required('Amount units are required when amount is specified'),
+    otherwise: (schema) => schema.notRequired(),
+  }),
   name_verification: Yup.string().when('double_entry_enabled', {
     is: true,
     then: (schema) => schema.required('Name verification is required for double entry'),
@@ -178,7 +192,32 @@ const AccessioningForm: React.FC = () => {
     setSuccess(null);
 
     try {
-      // Create sample
+      // Step 1: Create container instance
+      const containerData: any = {
+        name: values.container_name,
+        type_id: values.container_type_id,
+        row: values.container_row || 1,
+        column: values.container_column || 1,
+      };
+
+      // Add optional concentration/amount fields if provided
+      if (values.container_concentration !== null && values.container_concentration !== undefined) {
+        containerData.concentration = values.container_concentration;
+        if (values.container_concentration_units) {
+          containerData.concentration_units = values.container_concentration_units;
+        }
+      }
+
+      if (values.container_amount !== null && values.container_amount !== undefined) {
+        containerData.amount = values.container_amount;
+        if (values.container_amount_units) {
+          containerData.amount_units = values.container_amount_units;
+        }
+      }
+
+      const container = await apiService.createContainer(containerData);
+
+      // Step 2: Create sample
       const sampleData = {
         name: values.name,
         description: values.description,
@@ -190,39 +229,39 @@ const AccessioningForm: React.FC = () => {
         temperature: values.temperature,
         anomalies: values.anomalies,
         project_id: values.project_id,
-        qc_type: values.qc_type,
+        qc_type: values.qc_type || undefined,
       };
 
       const sample = await apiService.createSample(sampleData);
 
-      // Create container
-      const containerData = {
-        name: values.container_name,
-        type_id: values.container_type,
-        concentration: values.concentration,
-        concentration_units: values.concentration_units,
-        amount: values.amount,
-        amount_units: values.amount_units,
-      };
-
-      const container = await apiService.createContainer(containerData);
-
-      // Link sample to container
-      await apiService.createContent({
+      // Step 3: Link sample to container via contents
+      const contentData: any = {
         container_id: container.id,
         sample_id: sample.id,
-        concentration: values.concentration,
-        concentration_units: values.concentration_units,
-        amount: values.amount,
-        amount_units: values.amount_units,
-      });
+      };
 
-      // Create tests for selected analyses
+      // Add concentration/amount to contents if provided
+      if (values.container_concentration !== null && values.container_concentration !== undefined) {
+        contentData.concentration = values.container_concentration;
+        if (values.container_concentration_units) {
+          contentData.concentration_units = values.container_concentration_units;
+        }
+      }
+
+      if (values.container_amount !== null && values.container_amount !== undefined) {
+        contentData.amount = values.container_amount;
+        if (values.container_amount_units) {
+          contentData.amount_units = values.container_amount_units;
+        }
+      }
+
+      await apiService.createContent(contentData);
+
+      // Step 4: Create tests for selected analyses
       for (const analysisId of values.selected_analyses) {
         await apiService.createTest({
           sample_id: sample.id,
           analysis_id: analysisId,
-          status: 'In Process',
         });
       }
 
