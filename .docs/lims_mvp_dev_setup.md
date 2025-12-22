@@ -128,14 +128,16 @@ This step implements the Docker configuration from the Technical Document (Secti
   - First run may take time (downloads images, installs deps).
   - **Alembic migrations run automatically** when the backend starts:
     - Creates all database tables
-    - Creates initial roles and permissions (including `batch:read`, `batch:manage`, etc.)
+    - Creates initial roles and permissions (including `batch:read`, `batch:manage`, `config:edit`, `test:configure`, `user:manage`, etc.)
     - Creates admin user (username: `admin`, password: `admin123`)
     - Populates initial lists and list entries (normalized to lowercase slug format like `sample_status`)
     - Migration `0008` adds `batch:read` permission if needed
+    - Migration `0009` seeds initial analyses (pH Measurement, EPA Method 8080, Total Coliform Enumeration) and analytes (pH, Aldrin, DDT, PCB-1016, Total Coliforms, E. coli) with validation rules
 - Verify:
   - Check running containers: `docker ps` (should show three: db, backend, frontend).
   - Check migration logs: `docker logs lims-backend | grep -i migration`
   - Verify admin user exists: `docker exec lims-db psql -U lims_user -d lims_db -c "SELECT username FROM users WHERE username = 'admin';"`
+  - Verify seed data: `docker exec lims-db psql -U lims_user -d lims_db -c "SELECT name FROM analyses WHERE active = true;"`
   - Backend: Open browser to `http://localhost:8000/docs` (FastAPI Swagger UI).
   - Frontend: `http://localhost:3000` (React app).
   - Login: Use `admin` / `admin123` at http://localhost:3000

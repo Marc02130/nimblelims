@@ -27,9 +27,14 @@ Copyright (c) 2025 Marc Breneiser
 - Pooled samples support with calculations
 
 ### Admin Configuration (US-15, US-16)
-- Container types management (CRUD operations)
-- Lists and list entries management (CRUD operations)
-- Restricted to users with `config:edit` permission
+- **Container Types Management**: CRUD operations for container types
+- **Lists Management**: Full CRUD for lists and list entries
+- **Analyses Management**: CRUD operations for analyses (methods, turnaround times, costs)
+- **Analytes Management**: CRUD operations for analytes
+- **Analysis-Analyte Configuration**: Configure validation rules (data types, ranges, significant figures)
+- **Users Management**: CRUD operations for users
+- **Roles & Permissions Management**: CRUD operations for roles and permission assignments
+- Restricted to users with `config:edit`, `test:configure`, or `user:manage` permissions
 - Enables system customization without code changes
 
 ### Test Assignment (US-7)
@@ -92,9 +97,14 @@ Copyright (c) 2025 Marc Breneiser
 - `ContainerGrid` - Batch container grid display
 
 ### Admin Components
-- `AdminDashboard` - Main admin dashboard with navigation
+- `AdminDashboard` - Main admin dashboard with navigation and statistics
 - `ContainerTypesManagement` - Manage container types (admin-only)
 - `ListsManagement` - Manage lists and list entries (admin-only)
+- `AnalysesManagement` - Manage analyses (CRUD operations, admin-only)
+- `AnalysisAnalytesConfig` - Configure analyte rules and validation for analyses (admin-only)
+- `AnalytesManagement` - Manage analytes (CRUD operations, admin-only)
+- `UsersManagement` - Manage users (CRUD operations, admin-only)
+- `RolesManagement` - Manage roles and permissions (admin-only)
 
 ### Shared Components
 - `Navbar` - Navigation with role-based menu items

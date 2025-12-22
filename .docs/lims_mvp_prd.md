@@ -18,6 +18,7 @@ The LIMS MVP enables labs to manage samples from receipt to reporting, including
 
 ### 1.4 Version History
 - Version 1.0: Initial draft based on planning discussions (October 21, 2025).
+- Version 1.1: Added admin configuration features (analyses, analytes, users, roles management) - December 2025.
 
 ## 2. Goals and Objectives
 
@@ -64,7 +65,12 @@ The LIMS MVP enables labs to manage samples from receipt to reporting, including
   - User auth: Username/password + email verification.
   - Client isolation: View own projects/samples only; project_users junction for access.
 - **Configurable Elements**:
-  - Lists for statuses, types, matrices, etc.
+  - Lists for statuses, types, matrices, etc. (admin-editable via UI/API).
+  - Container types: Pre-setup by administrators; instances created dynamically during workflows.
+  - Analyses: Admin-configurable with methods, turnaround times, costs.
+  - Analytes: Admin-configurable; linked to analyses via validation rules.
+  - Analysis-Analyte Rules: Admin-configurable validation (data types, ranges, significant figures, required flags).
+  - Units: Admin-configurable with multipliers for conversions.
   - Workflows: Basic configurable for aliquoting/derivatives.
 - **Data Model**: Normalized Postgres schema with standard fields (id UUID, name unique, description, active, audit timestamps/users).
 
@@ -80,12 +86,12 @@ The LIMS MVP enables labs to manage samples from receipt to reporting, including
 
 | Role            | Description                                                                 | Key Permissions (Examples) |
 |-----------------|-----------------------------------------------------------------------------|----------------------------|
-| Administrator  | Manages system, users, and configs.                                        | All (~15): user:manage, config:edit, project:manage. |
+| Administrator  | Manages system, users, and configs.                                        | All (~15): user:manage, config:edit, test:configure, project:manage. |
 | Lab Manager    | Oversees operations, reviews results.                                       | result:review, batch:manage, test:assign. |
 | Lab Technician | Handles daily tasks like accessioning and entry.                            | sample:create, result:enter, test:assign. |
 | Client         | Views own data.                                                             | sample:read (own), result:read (own). |
 
-Permissions managed via roles, permissions, and role_permissions tables (~15 total, e.g., sample:create, result:enter).
+Permissions managed via roles, permissions, and role_permissions tables (~15 total, e.g., sample:create, result:enter, config:edit, test:configure, user:manage).
 
 ## 5. Functional Requirements
 
@@ -111,6 +117,13 @@ Permissions managed via roles, permissions, and role_permissions tables (~15 tot
 - `/results`: Enter/review per test/analyte.
 - `/batches`: Create/add containers; manage status.
 - `/auth`: Login, verify email.
+- `/analyses`: CRUD for analyses (admin: config:edit or test:configure).
+- `/analytes`: CRUD for analytes (admin: config:edit or test:configure).
+- `/analyses/{id}/analyte-rules`: Configure validation rules (admin).
+- `/users`: CRUD for users (admin: user:manage or config:edit).
+- `/roles`: CRUD for roles and permissions (admin: user:manage or config:edit).
+- `/lists`: CRUD for lists and entries (admin: config:edit).
+- `/containers/types`: CRUD for container types (admin: config:edit).
 - All endpoints secured via JWT with RBAC checks.
 
 ## 6. Non-Functional Requirements

@@ -206,6 +206,20 @@ All tables include standard fields: `id` (UUID PK), `name` (varchar unique), `de
   - GET /batches/{id}: Retrieve with contents/samples.
 - **Analyses**:
   - GET /analyses: List all active analyses.
+  - POST /analyses: Create analysis (admin, requires config:edit or test:configure).
+  - PATCH /analyses/{id}: Update analysis (admin).
+  - DELETE /analyses/{id}: Soft-delete analysis (admin).
+  - GET /analyses/{id}/analytes: Get analytes for analysis.
+  - PUT /analyses/{id}/analytes: Update analyte assignment (admin).
+  - GET /analyses/{id}/analyte-rules: Get validation rules for analytes.
+  - POST /analyses/{id}/analyte-rules: Create analyte rule (admin).
+  - PATCH /analyses/{id}/analyte-rules/{analyte_id}: Update analyte rule (admin).
+  - DELETE /analyses/{id}/analyte-rules/{analyte_id}: Delete analyte rule (admin).
+- **Analytes**:
+  - GET /analytes: List all active analytes.
+  - POST /analytes: Create analyte (admin, requires config:edit or test:configure).
+  - PATCH /analytes/{id}: Update analyte (admin).
+  - DELETE /analytes/{id}: Soft-delete analyte (admin).
 - **Units**: 
   - GET /units: List all active units with multipliers/types.
 - **Lists**:
@@ -227,7 +241,18 @@ All tables include standard fields: `id` (UUID PK), `name` (varchar unique), `de
   - GET /containers/{id}: Retrieve with hierarchy/contents.
 - **Projects**:
   - GET /projects: List projects accessible to user (RBAC enforced).
-- **Users/Roles**: Admin-only CRUD for management.
+- **Users**:
+  - GET /users: List users (admin, requires user:manage or config:edit).
+  - POST /users: Create user (admin).
+  - PATCH /users/{id}: Update user (admin).
+  - DELETE /users/{id}: Soft-delete user (admin).
+- **Roles**:
+  - GET /roles: List roles (admin).
+  - POST /roles: Create role (admin).
+  - PATCH /roles/{id}: Update role (admin).
+  - DELETE /roles/{id}: Soft-delete role (admin).
+- **Permissions**:
+  - GET /permissions: List all permissions (admin).
 - Error Handling: Standard HTTP codes; JSON {error, detail}.
 
 ### 4.3 Validation
@@ -241,7 +266,15 @@ All tables include standard fields: `id` (UUID PK), `name` (varchar unique), `de
 - **Dashboard**: Role-based views (e.g., client sees own projects).
 - **Accessioning Form**: Multi-step wizard for sample entry/test assignment, with required container specification (select pre-setup type, create instance dynamically).
 - **Batch View**: Select containers; grid for plate wells; result entry table.
-- **Admin Section**: Dashboard with links to manage container types (CRUD) and lists (full CRUD for lists/entries); restricted to config:edit.
+- **Admin Section**: Dashboard with links to manage:
+  - Lists and list entries (full CRUD)
+  - Container types (CRUD)
+  - Analyses (CRUD)
+  - Analytes (CRUD)
+  - Analysis-analyte rules (validation configuration)
+  - Users (CRUD)
+  - Roles and permissions (CRUD)
+  - Restricted to config:edit or specific permissions.
 - **State Management**: Redux or Context API for user/session data.
 
 ### 5.2 UI/UX
