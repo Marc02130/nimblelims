@@ -151,6 +151,54 @@ class ApiService {
     return response.data;
   }
 
+  async createAnalysis(analysisData: any) {
+    const response: AxiosResponse = await this.api.post('/analyses', analysisData);
+    return response.data;
+  }
+
+  async updateAnalysis(id: string, analysisData: any) {
+    const response: AxiosResponse = await this.api.patch(`/analyses/${id}`, analysisData);
+    return response.data;
+  }
+
+  async deleteAnalysis(id: string) {
+    const response: AxiosResponse = await this.api.delete(`/analyses/${id}`);
+    return response.data;
+  }
+
+  async getAnalysisAnalytes(analysisId: string) {
+    const response: AxiosResponse = await this.api.get(`/analyses/${analysisId}/analytes`);
+    return response.data;
+  }
+
+  async updateAnalysisAnalytes(analysisId: string, analyteIds: string[]) {
+    const response: AxiosResponse = await this.api.put(`/analyses/${analysisId}/analytes`, {
+      analyte_ids: analyteIds,
+    });
+    return response.data;
+  }
+
+  // Analysis-Analyte junction endpoints (for configuring rules)
+  async getAnalysisAnalyteRules(analysisId: string) {
+    const response: AxiosResponse = await this.api.get(`/analyses/${analysisId}/analyte-rules`);
+    return response.data;
+  }
+
+  async createAnalysisAnalyteRule(analysisId: string, ruleData: any) {
+    const response: AxiosResponse = await this.api.post(`/analyses/${analysisId}/analyte-rules`, ruleData);
+    return response.data;
+  }
+
+  async updateAnalysisAnalyteRule(analysisId: string, analyteId: string, ruleData: any) {
+    const response: AxiosResponse = await this.api.patch(`/analyses/${analysisId}/analyte-rules/${analyteId}`, ruleData);
+    return response.data;
+  }
+
+  async deleteAnalysisAnalyteRule(analysisId: string, analyteId: string) {
+    const response: AxiosResponse = await this.api.delete(`/analyses/${analysisId}/analyte-rules/${analyteId}`);
+    return response.data;
+  }
+
   // List endpoints for dropdowns
   async getListEntries(listName: string) {
     const response: AxiosResponse = await this.api.get(`/lists/${listName}/entries`);
@@ -313,8 +361,18 @@ class ApiService {
     return response.data;
   }
 
-  async getAnalysisAnalytes(analysisId: string) {
-    const response: AxiosResponse = await this.api.get(`/analyses/${analysisId}/analytes`);
+  async createAnalyte(analyteData: any) {
+    const response: AxiosResponse = await this.api.post('/analytes', analyteData);
+    return response.data;
+  }
+
+  async updateAnalyte(id: string, analyteData: any) {
+    const response: AxiosResponse = await this.api.patch(`/analytes/${id}`, analyteData);
+    return response.data;
+  }
+
+  async deleteAnalyte(id: string) {
+    const response: AxiosResponse = await this.api.delete(`/analytes/${id}`);
     return response.data;
   }
 
