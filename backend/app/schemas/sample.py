@@ -104,6 +104,7 @@ class SampleAccessioningRequest(BaseModel):
     anomalies: Optional[str] = Field(None, description="Notes about any anomalies found")
     double_entry_required: bool = Field(False, description="Whether double entry validation is required")
     assigned_tests: List[UUID] = Field(default_factory=list, description="List of analysis IDs to assign")
+    battery_id: Optional[UUID] = Field(None, description="ID of test battery to assign (creates tests for all analyses in battery)")
 
     @validator('due_date', 'received_date')
     def validate_dates(cls, v):

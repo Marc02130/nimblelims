@@ -199,9 +199,31 @@ User stories are written in Agile format: "As a [role], I want [feature] so that
   - API: CRUD /containers/types; RBAC: config:edit.  
   *Priority*: Medium | *Estimate*: 3 points
 
+- **US-22: Test Batteries Management**  
+  As an Administrator, I want to create and manage test batteries (grouped analyses) so that common test combinations can be assigned efficiently during accessioning.  
+  *Acceptance Criteria*:  
+  - CRUD operations for test batteries (name, description).  
+  - Add/remove analyses to/from batteries with sequence ordering (integer >= 1).  
+  - Mark analyses as optional within batteries.  
+  - Unique battery names; at least one analysis required.  
+  - Cannot delete if referenced by tests (409 Conflict).  
+  - API: CRUD /test-batteries and /test-batteries/{id}/analyses; RBAC: config:edit or test:configure.  
+  - UI: Material-UI DataGrid with expandable rows, search/filter, sequence management.  
+  *Priority*: Medium | *Estimate*: 8 points
+
+- **US-23: Test Battery Assignment in Accessioning**  
+  As a Lab Technician, I want to assign a test battery to a sample during accessioning so that all analyses in the battery are automatically created as sequenced tests.  
+  *Acceptance Criteria*:  
+  - Select test battery during accessioning workflow.  
+  - System creates tests for all analyses in battery (ordered by sequence).  
+  - Optional analyses can be skipped (future enhancement).  
+  - Battery assignment can be combined with individual analysis assignments.  
+  - API: POST /samples/accession with battery_id; auto-creates tests.  
+  *Priority*: Medium | *Estimate*: 5 points
+
 ## Prioritization and Roadmap
 - **Sprint 1 (Core Data Model)**: US-1, US-5, US-7, US-12 (Foundation: Samples, containers, tests, auth).  
 - **Sprint 2 (Workflows)**: US-3, US-6, US-9, US-11 (Aliquots, pooling, results, batches).  
-- **Sprint 3 (Security/Configs)**: US-13, US-14, US-15, US-16, US-17, US-18, US-19, US-20, US-21 (RBAC, isolation, lists/units, analyses/analytes, users, container types).  
-- **Sprint 4 (Reviews/Polish)**: US-2, US-4, US-8, US-10 (Statuses, QC, reviews).  
-Total Estimate: ~113 points. Post-MVP: Add workflows configurability, calculations.
+- **Sprint 3 (Security/Configs)**: US-13, US-14, US-15, US-16, US-17, US-18, US-19, US-20, US-21, US-22 (RBAC, isolation, lists/units, analyses/analytes, users, container types, test batteries).  
+- **Sprint 4 (Reviews/Polish)**: US-2, US-4, US-8, US-10, US-23 (Statuses, QC, reviews, battery assignment).  
+Total Estimate: ~126 points. Post-MVP: Add workflows configurability, calculations.

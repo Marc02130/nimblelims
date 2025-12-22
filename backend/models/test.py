@@ -11,6 +11,7 @@ class Test(BaseModel):
     # Test-specific fields
     sample_id = Column(PostgresUUID(as_uuid=True), ForeignKey('samples.id'), nullable=False)
     analysis_id = Column(PostgresUUID(as_uuid=True), ForeignKey('analyses.id'), nullable=False)
+    battery_id = Column(PostgresUUID(as_uuid=True), ForeignKey('test_batteries.id'), nullable=True)
     status = Column(PostgresUUID(as_uuid=True), ForeignKey('list_entries.id'), nullable=False)
     review_date = Column(DateTime)
     test_date = Column(DateTime)
@@ -19,5 +20,6 @@ class Test(BaseModel):
     # Relationships
     sample = relationship("Sample", back_populates="tests")
     analysis = relationship("Analysis", back_populates="tests")
+    battery = relationship("TestBattery", back_populates="tests")
     technician = relationship("User", foreign_keys=[technician_id])
     results = relationship("Result", back_populates="test")

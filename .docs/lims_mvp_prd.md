@@ -19,6 +19,7 @@ The LIMS MVP enables labs to manage samples from receipt to reporting, including
 ### 1.4 Version History
 - Version 1.0: Initial draft based on planning discussions (October 21, 2025).
 - Version 1.1: Added admin configuration features (analyses, analytes, users, roles management) - December 2025.
+- Version 1.2: Added test batteries feature (grouped analyses with sequence ordering) - December 2025.
 
 ## 2. Goals and Objectives
 
@@ -50,7 +51,8 @@ The LIMS MVP enables labs to manage samples from receipt to reporting, including
   - Aliquots/Derivatives: Linked via parent_sample_id; inheritance of project/client; created in workflows (e.g., DNA extraction).
   - QC Integration: qc_type field (e.g., Sample, Positive Control, Blank) from lists.
 - **Test Ordering**:
-  - Assign analyses to samples at accessioning.
+  - Assign individual analyses or test batteries to samples at accessioning.
+  - Test batteries automatically create sequenced tests for all analyses in the battery.
   - Test instances with status: In Process, In Analysis, Complete.
 - **Results Entry**:
   - Batch/plate-based: Select batch (container collection), test; display analytes for entry.
@@ -70,6 +72,7 @@ The LIMS MVP enables labs to manage samples from receipt to reporting, including
   - Analyses: Admin-configurable with methods, turnaround times, costs.
   - Analytes: Admin-configurable; linked to analyses via validation rules.
   - Analysis-Analyte Rules: Admin-configurable validation (data types, ranges, significant figures, required flags).
+  - Test Batteries: Admin-configurable groups of analyses with sequence ordering and optional flags; assignable during accessioning.
   - Units: Admin-configurable with multipliers for conversions.
   - Workflows: Basic configurable for aliquoting/derivatives.
 - **Data Model**: Normalized Postgres schema with standard fields (id UUID, name unique, description, active, audit timestamps/users).
@@ -120,6 +123,7 @@ Permissions managed via roles, permissions, and role_permissions tables (~15 tot
 - `/analyses`: CRUD for analyses (admin: config:edit or test:configure).
 - `/analytes`: CRUD for analytes (admin: config:edit or test:configure).
 - `/analyses/{id}/analyte-rules`: Configure validation rules (admin).
+- `/test-batteries`: CRUD for test batteries and battery-analyses junctions (admin: config:edit or test:configure).
 - `/users`: CRUD for users (admin: user:manage or config:edit).
 - `/roles`: CRUD for roles and permissions (admin: user:manage or config:edit).
 - `/lists`: CRUD for lists and entries (admin: config:edit).
@@ -156,7 +160,9 @@ Permissions managed via roles, permissions, and role_permissions tables (~15 tot
 - **Contents**: container_id, sample_id, concentration, amount.
 - **Analyses**: id, name, method, turnaround_time, cost.
 - **Analysis_Analytes** (Junction): analysis_id, analyte_id, data_type, high/low, sig_figs, etc.
-- **Tests**: id, sample_id, analysis_id, status, review_date, test_date, technician_id.
+- **Test_Batteries**: id, name, description, active, audit fields.
+- **Battery_Analyses** (Junction): battery_id, analysis_id, sequence (int >=1), optional (bool).
+- **Tests**: id, sample_id, analysis_id, battery_id (nullable), status, review_date, test_date, technician_id.
 - **Results**: id, test_id, analyte_id, raw_result, reported_result, qualifiers, etc.
 - **Batches**: id, name, type, status, dates.
 - **Batch_Containers** (Junction): batch_id, container_id.

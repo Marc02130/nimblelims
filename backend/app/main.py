@@ -3,7 +3,7 @@ FastAPI application for LIMS MVP
 """
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routers import auth, samples, tests, containers, batches, results, aliquots, lists, projects, analyses, analytes, units, users, roles, permissions, clients
+from app.routers import auth, samples, tests, containers, batches, results, aliquots, lists, projects, analyses, analytes, units, users, roles, permissions, clients, test_batteries
 import os
 import logging
 
@@ -81,6 +81,7 @@ app.include_router(users.router, prefix="/users", tags=["users"])
 app.include_router(roles.router, prefix="/roles", tags=["roles"])
 app.include_router(permissions.router, prefix="/permissions", tags=["permissions"])
 app.include_router(clients.router, prefix="/clients", tags=["clients"])
+app.include_router(test_batteries.router, prefix="/test-batteries", tags=["test-batteries"])
 logger.info("All routers registered")
 
 @app.get("/")

@@ -241,3 +241,36 @@ RBAC: Requires config:edit or test:configure.
 Tests: Jest for junction CRUD, validation.
 Files: Generate full code for src/pages/admin/AnalysisAnalytesConfig.tsx and helpers (e.g., AnalyteRuleForm.tsx).
 Note: Units/lists integration for measurements; seeded junctions (e.g., pH rules) appear on load."
+
+Prompt 10: Schema Modifications (New Migration File)
+"Generate a new Alembic migration file for adding test batteries to the LIMS MVP schema, per the Technical Document (Version 1.8, section 3.1 refinements) and considerations (new test_batteries table with name, description, active, audit fields; battery_analyses junction with battery_id, analysis_id, sequence/order int, optional flag bool).
+
+Migration: Name it 0010_add_test_batteries.py; revises 0009; include upgrade() to create tables with UUID PKs, FKs (to analyses.id with RESTRICT delete), unique constraints (battery name), and indexes (on battery_id in tests table, composite on battery_analyses).
+Downgrade: Drop tables/junction in reverse.
+Seeding: Include basic seed data in upgrade() (e.g., battery 'EPA 8080 Full' grouping prep and analytical analyses from 0009, with sequence and optional prep flag).
+Files: Generate the full migration code for backend/db/migrations/versions/0010_add_test_batteries.py.
+Follow Alembic best practices; ensure no disruptions to existing tables like analyses or tests."
+
+Prompt 11: Backend Functionality (Models, Schemas, Routers)
+"Implement backend functionality for test batteries in the LIMS MVP, based on the Technical Document (Version 1.8, sections 3.1, 4.2) and new schema from migration 0010.
+
+Models: Add TestBattery and BatteryAnalysis models in backend/models/test_battery.py (inherit BaseModel; TestBattery with name unique, description; BatteryAnalysis with sequence int >=1, is_optional bool default False).
+Schemas: Create Pydantic schemas in backend/app/schemas/test_battery.py (e.g., TestBatteryCreate, TestBatteryResponse, BatteryAnalysisCreate with validations like unique analyses per battery).
+Routers: Add router in backend/app/routers/test_batteries.py with endpoints: GET /test-batteries (list active, filter by name), POST /test-batteries (create, require config:edit), PATCH/DELETE /test-batteries/{id} (update/soft delete, check references), and sub-routes for /test-batteries/{id}/analyses (CRUD junction with sequence/optional).
+Integration: Add optional battery_id to Test model/schema; update accessioning router (samples.py) to handle battery assignment (auto-create sequenced tests).
+RBAC: Dependency checks for test:configure or config:edit.
+Files: Generate full code for backend/models/test_battery.py, backend/app/schemas/test_battery.py, backend/app/routers/test_batteries.py; minor updates to test.py and samples.py for integration.
+Ensure API-first; handle errors like 409 for referenced deletes."
+
+Prompt 12: Admin Page for Test Batteries
+"Create the React frontend admin page for managing test batteries in the LIMS MVP, aligning with the Technical Document (Version 1.8, section 5.1) and User Stories (US-15, US-7 for assignment integration).
+
+Component: Create TestBatteriesManagement.tsx under src/pages/admin/; Material-UI DataGrid for listing batteries (columns: name, description, analysis count); CRUD buttons, with expandable rows for analyses.
+Forms: Dialog for new/edit battery (fields: name unique, description); nested multi-select for analyses (fetch GET /analyses), with sequence input (int) and optional toggle (bool) per analysis.
+Integration: Axios to GET /test-batteries (fetch), POST/PATCH/DELETE /test-batteries/{id}, and /test-batteries/{id}/analyses for junctions; handle loading/errors.
+Validation: Formik/Yup for uniqueness, at least one analysis, sequence >0; confirm deletes if referenced.
+UI: Drag-and-drop for sequence reordering; search/filter; integrate with dashboard navigation.
+RBAC: Requires config:edit or test:configure; view-only fallback.
+Tests: Jest for CRUD, validation, interactions.
+Files: Generate full code for src/pages/admin/TestBatteriesManagement.tsx and helpers (e.g., BatteryFormDialog.tsx, AnalysisSelector.tsx).
+Note: Seeded batteries (e.g., EPA 8080 Full) load initially; no direct accessioning here—separate workflow pulls from these configs."

@@ -48,6 +48,8 @@ class User(BaseModel):
     modified_analytes = relationship("Analyte", foreign_keys="Analyte.modified_by", back_populates="modifier")
     created_units = relationship("Unit", foreign_keys="Unit.created_by", back_populates="creator")
     modified_units = relationship("Unit", foreign_keys="Unit.modified_by", back_populates="modifier")
+    created_test_batteries = relationship("TestBattery", foreign_keys="TestBattery.created_by", back_populates="creator")
+    modified_test_batteries = relationship("TestBattery", foreign_keys="TestBattery.modified_by", back_populates="modifier")
     entered_results = relationship("Result", foreign_keys="Result.entered_by", back_populates="entered_by_user")
 
 

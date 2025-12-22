@@ -243,34 +243,85 @@ async def accession_sample(
     db.add(sample)
     db.flush()  # Get the ID without committing
     
-    # Assign tests if specified
-    if accession_data.assigned_tests:
-        from models.test import Test
-        from models.list import ListEntry
-        
-        # Get "In Process" status for tests
-        in_process_status = db.query(ListEntry).filter(
-            ListEntry.list_id == "test_status",  # Assuming this list exists
-            ListEntry.name == "In Process"
+    # Get "In Process" status for tests
+    from models.test import Test
+    from models.list import ListEntry
+    from models.test_battery import TestBattery, BatteryAnalysis
+    
+    in_process_status = db.query(ListEntry).filter(
+        ListEntry.list_id == "test_status",  # Assuming this list exists
+        ListEntry.name == "In Process"
+    ).first()
+    
+    if not in_process_status:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Test status 'In Process' not found in configuration"
+        )
+    
+    # Handle battery assignment (creates tests for all analyses in battery)
+    if accession_data.battery_id:
+        # Verify battery exists and is active
+        battery = db.query(TestBattery).filter(
+            TestBattery.id == accession_data.battery_id,
+            TestBattery.active == True
         ).first()
         
-        if not in_process_status:
+        if not battery:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Test status 'In Process' not found in configuration"
+                detail="Test battery not found or inactive"
             )
         
-        for analysis_id in accession_data.assigned_tests:
+        # Get all analyses in battery, ordered by sequence
+        battery_analyses = db.query(BatteryAnalysis).filter(
+            BatteryAnalysis.battery_id == accession_data.battery_id
+        ).order_by(BatteryAnalysis.sequence).all()
+        
+        if not battery_analyses:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Test battery has no analyses assigned"
+            )
+        
+        # Create tests for each analysis in the battery (in sequence order)
+        for battery_analysis in battery_analyses:
+            # Skip optional analyses if needed (for now, create all)
+            # In future, could add logic to skip optional analyses based on user preference
             test = Test(
-                name=f"{sample.name}_test_{analysis_id}",
+                name=f"{sample.name}_test_{battery_analysis.analysis_id}",
                 sample_id=sample.id,
-                analysis_id=analysis_id,
+                analysis_id=battery_analysis.analysis_id,
+                battery_id=accession_data.battery_id,
                 status=in_process_status.id,
                 technician_id=current_user.id,
                 created_by=current_user.id,
                 modified_by=current_user.id
             )
             db.add(test)
+    
+    # Also handle individual test assignments (if provided)
+    if accession_data.assigned_tests:
+        for analysis_id in accession_data.assigned_tests:
+            # Check if test already exists (from battery assignment)
+            existing_test = db.query(Test).filter(
+                Test.sample_id == sample.id,
+                Test.analysis_id == analysis_id,
+                Test.active == True
+            ).first()
+            
+            if not existing_test:
+                test = Test(
+                    name=f"{sample.name}_test_{analysis_id}",
+                    sample_id=sample.id,
+                    analysis_id=analysis_id,
+                    battery_id=None,  # Individual assignment, not from battery
+                    status=in_process_status.id,
+                    technician_id=current_user.id,
+                    created_by=current_user.id,
+                    modified_by=current_user.id
+                )
+                db.add(test)
     
     db.commit()
     db.refresh(sample)

@@ -20,6 +20,7 @@ Copyright (c) 2025 Marc Breneiser
 - **Analyses Management**: CRUD operations for analyses (admin-only)
 - **Analytes Management**: CRUD operations for analytes (admin-only)
 - **Analysis-Analyte Configuration**: Configure validation rules for analytes in analyses (admin-only)
+- **Test Batteries Management**: Group analyses into reusable batteries with sequence and optional flags (admin-only)
 - **Users Management**: CRUD operations for users (admin-only)
 - **Roles & Permissions Management**: CRUD operations for roles and permission assignments (admin-only)
 - **Authentication**: JWT-based authentication with RBAC
@@ -106,6 +107,17 @@ Copyright (c) 2025 Marc Breneiser
 - `DELETE /roles/{id}` - Delete role (admin)
 - `PUT /roles/{id}/permissions` - Update role permissions (admin)
 - `GET /permissions` - List all permissions (admin)
+
+#### Test Batteries
+- `GET /test-batteries` - List test batteries with filtering (name, pagination)
+- `GET /test-batteries/{id}` - Get battery with analyses
+- `POST /test-batteries` - Create battery (admin, requires config:edit or test:configure)
+- `PATCH /test-batteries/{id}` - Update battery (admin)
+- `DELETE /test-batteries/{id}` - Soft-delete battery (admin, 409 if referenced)
+- `GET /test-batteries/{id}/analyses` - List analyses in battery
+- `POST /test-batteries/{id}/analyses` - Add analysis to battery (admin)
+- `PATCH /test-batteries/{id}/analyses/{analysis_id}` - Update sequence/optional (admin)
+- `DELETE /test-batteries/{id}/analyses/{analysis_id}` - Remove analysis from battery (admin)
 
 #### Other
 - `GET /units` - List units

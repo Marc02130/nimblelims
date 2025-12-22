@@ -133,6 +133,7 @@ This step implements the Docker configuration from the Technical Document (Secti
     - Populates initial lists and list entries (normalized to lowercase slug format like `sample_status`)
     - Migration `0008` adds `batch:read` permission if needed
     - Migration `0009` seeds initial analyses (pH Measurement, EPA Method 8080, Total Coliform Enumeration) and analytes (pH, Aldrin, DDT, PCB-1016, Total Coliforms, E. coli) with validation rules
+    - Migration `0010` creates test_batteries table and battery_analyses junction, seeds 'EPA 8080 Full' battery
 - Verify:
   - Check running containers: `docker ps` (should show three: db, backend, frontend).
   - Check migration logs: `docker logs lims-backend | grep -i migration`
