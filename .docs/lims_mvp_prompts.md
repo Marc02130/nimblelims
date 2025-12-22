@@ -176,3 +176,29 @@ UI: Material-UI Select for types; conditional fields for instance details.
 Tests: Jest for form updates, submission sequence.
 Files: Generate full updated code for src/components/accessioning/SampleDetailsStep.tsx and src/pages/AccessioningForm.tsx.
 Reinforce: No results/approval here; keep separate from admin configs."
+
+Prompt 5: User Management Page
+"Add a React frontend component for managing users in the LIMS MVP admin section, per the Technical Document (Version 1.4, sections 3.1, 4.2 for users table/endpoints) and User Stories (US-13).
+
+Component: Create UsersManagement.tsx under src/pages/admin/; Material-UI DataGrid for listing users (columns: username, email, role, client_id, last_login); CRUD buttons.
+Forms: Dialog for new/edit user (fields: username, email, password (on create), role_id dropdown from GET /roles, client_id dropdown from GET /clients); handle password hashing via backend.
+Integration: Axios to GET /users (fetch with filters), POST /users, PATCH /users/{id}, DELETE /users/{id} (soft delete); include role assignment via /users/{id}/roles.
+Validation: Formik/Yup for uniqueness (username/email), required fields; confirm deletes if user has active assignments.
+UI: Search/filter in grid; edit/delete icons per row; loading/error states.
+RBAC: Requires user:manage or config:edit; error if unauthorized.
+Tests: Jest for CRUD flows, form validation, API mocks.
+Files: Generate full code for src/pages/admin/UsersManagement.tsx and helpers (e.g., UserFormDialog.tsx).
+Clarify: Integrate with admin dashboard navigation; no self-demotion checks in frontend (handle backend)."
+
+Prompt 6: Role and Permission Management Page
+"Implement a React frontend component for managing roles and permissions in the LIMS MVP admin section, aligning with the Technical Document (Version 1.4, sections 3.1, 4.2 for roles/permissions tables/endpoints) and User Stories (US-13).
+
+Component: Create RolesManagement.tsx under src/pages/admin/; Material-UI DataGrid for listing roles (columns: name, description, permission count); CRUD buttons, with nested view for permissions.
+Forms: Dialog for new/edit role (fields: name, description); checkbox list for permissions (fetch via GET /permissions, assign via role_permissions junction).
+Integration: Axios calls to GET /roles (fetch), POST/PATCH/DELETE /roles/{id}, GET /permissions, POST/PATCH/DELETE /permissions/{id}; manage assignments with /roles/{id}/permissions.
+Validation: Formik/Yup for unique role names; confirm deletes if role is assigned to users.
+UI: Expandable rows for permission details; search/filter; loading states.
+RBAC: Restricted to user:manage or config:edit; view-only if lacking full access.
+Tests: Jest for CRUD, permission assignment, grid interactions.
+Files: Generate full code for src/pages/admin/RolesManagement.tsx and helpers (e.g., RoleFormDialog.tsx, PermissionSelector.tsx).
+Ensure separation: No direct ties to workflows; preview role impacts before save."

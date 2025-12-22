@@ -21,9 +21,14 @@ The sample accessioning workflow enables Lab Technicians to receive, inspect, an
 - **Temperature**: Storage temperature in °C (required, validated: -273.15 to 1000°C)
 - **Project**: Project the sample belongs to (required)
 - **QC Type**: Optional QC classification (Sample, Positive Control, Negative Control, etc.)
+- **Container Type**: Pre-setup container type selected from admin-configured types (required)
+- **Container Name**: Unique identifier for the container instance (e.g., barcode, tube number) (required)
+- **Concentration**: Optional concentration value with units
+- **Amount**: Optional amount value with units
 
 **Optional Fields**:
 - **Anomalies/Notes**: Text field for documenting any issues found during inspection
+- **Parent Container**: Optional parent container for hierarchical relationships
 
 **Double Entry Validation** (Optional):
 - Toggle to enable double-entry verification
@@ -127,11 +132,21 @@ The sample accessioning workflow enables Lab Technicians to receive, inspect, an
 The frontend performs additional operations beyond the `/accession` endpoint:
 
 1. **Create Sample**: `POST /samples` with sample data
-2. **Create Container**: `POST /containers` with container details
+2. **Create Container Instance**: `POST /containers` with container details
+   - Container type is selected from pre-setup admin-configured types
+   - Container instance is created dynamically with name, concentration, amount, etc.
 3. **Link Sample to Container**: `POST /contents` to create the relationship
+   - Links the sample to the newly created container
+   - Records sample-specific concentration and amount values
 4. **Create Tests**: `POST /tests` for each selected analysis
 
 **Note**: The frontend uses separate API calls rather than the dedicated `/accession` endpoint. This allows for more granular error handling and step-by-step progress.
+
+**Container Requirements**:
+- Samples are always received in a container
+- Container type must be selected from admin-pre-setup types (via `GET /containers/types`)
+- Container instance is created dynamically during accessioning (not pre-created)
+- Container name must be unique across all containers
 
 **Implementation**: `frontend/src/pages/AccessioningForm.tsx::handleSubmit()`
 
@@ -246,15 +261,19 @@ After successful accessioning:
 
 ## Configuration Dependencies
 
-The workflow requires the following configured lists:
+The workflow requires the following configured lists and types:
 
-- **sample_types**: List of sample type options
+- **sample_types**: List of sample type options (from lists/list_entries)
 - **sample_status**: List of status options (must include "Received")
 - **matrix_types**: List of matrix options
 - **qc_types**: List of QC type options (optional)
 - **test_status**: List of test status options (must include "In Process")
-- **container_types**: List of container type options
+- **container_types**: Pre-setup container types (admin-managed via `/containers/types` endpoint)
+  - Must be configured by administrators before use
+  - Includes fields: name, description, capacity, material, dimensions, preservative
 - **units**: List of measurement units for concentration and amount
+
+**Note**: Container types are managed separately from lists and must be pre-setup by administrators via the admin interface. Lists are also editable by administrators but are used for dropdown options throughout the system.
 
 ## API Reference
 

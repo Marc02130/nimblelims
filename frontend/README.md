@@ -13,15 +13,24 @@ Copyright (c) 2025 Marc Breneiser
 ### Sample Accessioning (US-1)
 - Multi-step wizard for sample entry
 - Required fields: due_date, received_date, sample_type, status, matrix, temperature
+- Container specification: Select pre-setup container type, create instance dynamically
 - Optional double-entry validation for key fields
 - Test assignment during accessioning
 - Container assignment with concentration/amount tracking
 
 ### Container Management (US-5)
 - Create and manage hierarchical containers
+- Container types pre-setup by administrators
+- Dynamic container instance creation during workflows
 - Support for different container types (tube, plate, well, rack)
 - Contents linking with concentration/amount/units
 - Pooled samples support with calculations
+
+### Admin Configuration (US-15, US-16)
+- Container types management (CRUD operations)
+- Lists and list entries management (CRUD operations)
+- Restricted to users with `config:edit` permission
+- Enables system customization without code changes
 
 ### Test Assignment (US-7)
 - Assign analyses to samples during accessioning
@@ -66,8 +75,11 @@ Copyright (c) 2025 Marc Breneiser
 ### Pages
 - `Dashboard` - Main overview with sample listing and filtering
 - `AccessioningForm` - Multi-step sample accessioning wizard
-- `ContainerManagement` - Container creation and management
+- `ContainerManagement` - Container instance creation and management
+- `BatchManagement` - Batch creation and management
+- `ResultsManagement` - Results entry and review
 - `Login` - User authentication
+- `AdminDashboard` - Admin configuration management (admin-only)
 
 ### Accessioning Components
 - `SampleDetailsStep` - Sample information entry with double-entry validation
@@ -75,8 +87,14 @@ Copyright (c) 2025 Marc Breneiser
 - `ReviewStep` - Final review before submission
 
 ### Container Components
-- `ContainerForm` - Container creation/editing form
+- `ContainerForm` - Container instance creation/editing form
 - `ContainerDetails` - Container information and contents management
+- `ContainerGrid` - Batch container grid display
+
+### Admin Components
+- `AdminDashboard` - Main admin dashboard with navigation
+- `ContainerTypesManagement` - Manage container types (admin-only)
+- `ListsManagement` - Manage lists and list entries (admin-only)
 
 ### Shared Components
 - `Navbar` - Navigation with role-based menu items
@@ -93,12 +111,20 @@ Copyright (c) 2025 Marc Breneiser
 - `GET /tests` - List tests
 - `POST /tests` - Create test assignment
 - `GET /containers` - List containers
-- `POST /containers` - Create container
+- `POST /containers` - Create container instance
+- `GET /containers/types` - Get container types (public lookup)
+- `POST /containers/types` - Create container type (admin)
+- `PATCH /containers/types/{id}` - Update container type (admin)
 - `POST /contents` - Link sample to container
 - `GET /analyses` - List available analyses
+- `GET /lists` - Get all lists with entries
 - `GET /lists/{name}/entries` - Get lookup data
+- `POST /lists` - Create list (admin)
+- `POST /lists/{name}/entries` - Add entry to list (admin)
 - `GET /units` - Get measurement units
 - `GET /projects` - Get user projects
+- `GET /batches` - List batches
+- `POST /batches` - Create batch
 
 ### Error Handling
 - Global error handling with user-friendly messages
