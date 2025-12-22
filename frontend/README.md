@@ -2,6 +2,12 @@
 
 React frontend for the Laboratory Information Management System (LIMS) MVP.
 
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](../LICENSE) file for details.
+
+Copyright (c) 2025 Marc Breneiser
+
 ## Features
 
 ### Sample Accessioning (US-1)
