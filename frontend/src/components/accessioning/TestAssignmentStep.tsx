@@ -23,13 +23,16 @@ interface TestAssignmentStepProps {
   setFieldValue: (field: string, value: any) => void;
   lookupData: {
     analyses: any[];
+    batteries: any[];
   };
+  bulkMode?: boolean;
 }
 
 const TestAssignmentStep: React.FC<TestAssignmentStepProps> = ({
   values,
   setFieldValue,
   lookupData,
+  bulkMode = false,
 }) => {
   const handleAnalysisToggle = (analysisId: string) => {
     const currentAnalyses = values.selected_analyses || [];
@@ -53,8 +56,32 @@ const TestAssignmentStep: React.FC<TestAssignmentStepProps> = ({
       </Typography>
       
       <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-        Select the analyses to be performed on this sample. Tests will be created automatically.
+        {bulkMode
+          ? 'Select the analyses or test battery to be performed on all samples. Tests will be created automatically for each sample.'
+          : 'Select the analyses to be performed on this sample. Tests will be created automatically.'}
       </Typography>
+
+      {lookupData.batteries && lookupData.batteries.length > 0 && (
+        <Box sx={{ mb: 3 }}>
+          <FormControl fullWidth>
+            <InputLabel>Test Battery (Optional)</InputLabel>
+            <Select
+              value={values.battery_id || ''}
+              onChange={(e) => setFieldValue('battery_id', e.target.value || '')}
+            >
+              <MenuItem value="">None</MenuItem>
+              {lookupData.batteries.map((battery) => (
+                <MenuItem key={battery.id} value={battery.id}>
+                  {battery.name}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+            Selecting a test battery will automatically create tests for all analyses in the battery.
+          </Typography>
+        </Box>
+      )}
 
       <Grid container spacing={2}>
         {lookupData.analyses.map((analysis) => (

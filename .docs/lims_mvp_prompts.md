@@ -274,3 +274,206 @@ RBAC: Requires config:edit or test:configure; view-only fallback.
 Tests: Jest for CRUD, validation, interactions.
 Files: Generate full code for src/pages/admin/TestBatteriesManagement.tsx and helpers (e.g., BatteryFormDialog.tsx, AnalysisSelector.tsx).
 Note: Seeded batteries (e.g., EPA 8080 Full) load initially; no direct accessioning here—separate workflow pulls from these configs."
+
+
+
+
+
+# Docker Secrets:  not iplemented
+Prompt 1: Update docker-compose.yml for Secrets Support
+"Refine the docker-compose.yml file in the LIMS MVP project root to add support for Docker secrets, based on the Technical Document (Sections 7.2 and 2.1 for security). Keep compatibility with .env files for local development.
+
+Add a top-level 'secrets' section defining external secrets: db_password, jwt_secret_key (mark as external: true for Swarm compatibility).
+In the db service: Reference db_password as a secret (e.g., environment: POSTGRES_PASSWORD_FILE=/run/secrets/db_password).
+In the backend service: Mount secrets as files (e.g., secrets: - db_password, - jwt_secret_key; then in environment, use DATABASE_URL with a placeholder, but prepare for file-based reading in code).
+Keep existing env_file: .env for dev fallback; add comments explaining dev vs. prod usage (e.g., 'For production, use Docker secrets and remove env_file').
+Include a new docker-compose.prod.yml file that overrides to use secrets only (no env_file), with services depending on secrets.
+Ensure healthchecks and dependencies remain intact; no changes to frontend (as it doesn't handle sensitive creds directly).
+Update README.md to include instructions: For dev, use docker-compose up; for prod simulation, docker swarm init, create secrets, then docker stack deploy -c docker-compose.prod.yml lims.
+Do not alter existing files beyond these; ensure YAML formatting is valid."
+
+Prompt 2: Adjust Backend to Read Credentials from Secret Files
+"Update the backend code in the LIMS MVP to read credentials from Docker secret files when available, falling back to environment variables for dev, aligning with Technical Document (Section 2.1 for security) and PRD (Section 6.1).
+
+In backend/app/config.py (or create if missing): Add logic to load secrets like DB_PASSWORD and JWT_SECRET_KEY—check for files like '/run/secrets/db_password' and read if exists (e.g., using with open() as f: value = f.read().strip()), else os.environ.get().
+Construct DATABASE_URL dynamically: f'postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}'.
+Update main.py or dependencies to use this config; ensure JWT setup (PyJWT) pulls from the loaded JWT_SECRET_KEY.
+Handle errors gracefully (e.g., raise ValueError if neither file nor env var is set).
+Add a note in requirements.txt if any new deps are needed (none expected).
+Tests: Add a simple pytest in backend/tests/test_config.py to mock file/env loading scenarios.
+Generate full code for updated/new files: config.py, and patches to main.py."
+
+Prompt 3: Update DB Initialization and Migrations for Secret Compatibility
+"Enhance the db service and migrations in the LIMS MVP to work with secret files for credentials, per Technical Document (Section 7.2).
+
+In db/Dockerfile (or update if using official image): No major changes needed, but ensure entrypoint can handle _FILE suffixes (Postgres supports POSTGRES_PASSWORD_FILE).
+In backend/db/migrations (Alembic): Ensure init scripts or env.py load DB creds via the new config.py from Prompt 2.
+Update start.sh in backend (if exists) to wait for DB using the dynamic URL.
+Add logging in backend to confirm credential source (e.g., 'Loaded DB_PASSWORD from secret file' or 'from env').
+Generate full code for any updated files, like env.py in migrations."
+
+# Sprint 5
+## Prompt 25: Database Schema Enhancements for Client Projects and Bulk Support
+"Based on the Post-MVP Technical Document (sections 2.2 and 6) and US-25 in Post-MVP User Stories, implement schema changes for client projects using Alembic migrations in the LIMS project.
+In backend/migrations/versions/, create a new migration file (e.g., 0012_add_client_projects.py) to:
+
+Create client_projects table: id (UUID PK default uuid_generate_v4()), name (String unique not null), description (Text nullable), client_id (UUID FK to clients.id not null), active (Boolean default True), created_at (TIMESTAMP default now()), created_by (UUID FK to users.id), modified_at (TIMESTAMP), modified_by (UUID FK to users.id).
+Add client_project_id column to projects table (UUID FK to client_projects.id nullable).
+Add client_sample_id column to samples table (String unique nullable).
+Add indexes: unique on client_projects.name, FK indexes.
+In upgrade(): Use op.create_table, op.add_column.
+In downgrade(): Reverse operations.
+
+Update backend/models/project.py and backend/models/sample.py to include new fields/relationships (e.g., projects.client_project = relationship('ClientProject')).
+Ensure RLS policies in schema_dump are extended: Update projects_access to check via client_projects if client_project_id is set.
+No data seeding yet—handle in later prompt.
+Generate full code for the migration file and model updates."
+
+## Prompt 26: Backend API for Client Projects CRUD
+"Implement CRUD endpoints for client projects as per US-25 in Post-MVP User Stories and Post-MVP PRD (section 4.2), using FastAPI in the LIMS backend.
+In backend/app/routers/client_projects.py (create if missing):
+
+Import dependencies: db session, current_user, schemas (new ClientProjectCreate, ClientProjectUpdate, ClientProjectResponse).
+GET /client-projects: List all accessible (filter by client_id for non-admins via RLS; paginate with query params page/size).
+POST /client-projects: Create (require project:manage; set audit fields).
+GET /client-projects/{id}: Read one (404 if not found).
+PATCH /client-projects/{id}: Update (partial; audit modified).
+DELETE /client-projects/{id}: Soft-delete (set active=False).
+Schemas in backend/app/schemas/client_project.py: Pydantic models with validators (e.g., name 1-255 unique).
+
+In main.py, include_router for client_projects.
+Add tests in backend/tests/test_client_projects.py: Cover CRUD, permissions, RLS.
+Reference MVP security (JWT, RBAC).
+Generate full code for routers/client_projects.py, schemas/client_project.py, and test file."
+
+## Prompt 27: Frontend UI for Client Project Management
+"Develop React components for client project management based on US-25 in Post-MVP User Stories and Post-MVP PRD (section 4.2).
+In frontend/src/pages/ClientProjects.tsx: List view with MUI DataGrid (columns: name, description, client name via join, status); filters by client_id; buttons for create/edit/delete (modals).
+In frontend/src/components/client-projects/ClientProjectForm.tsx: Formik form for CRUD (fields: name, description, client_id dropdown from /clients, status from lists).
+Update apiService.ts: Add methods like getClientProjects(filters), createClientProject(data), etc.
+Integrate with UserContext for permissions (project:manage).
+Add navigation in App.tsx or sidebar.
+Tests in ClientProjects.test.tsx: Render, interactions, API mocks.
+Generate full code for new pages/components, apiService updates, and tests."
+
+## Prompt 28: Bulk Accessioning Backend API
+"Implement bulk accessioning endpoint as per US-24 in Post-MVP User Stories and Post-MVP Technical Document (section 3).
+In backend/app/routers/samples.py: Add POST /samples/bulk-accession.
+
+Schema: BulkSampleAccessioningRequest (common: SampleAccessioningRequest fields; uniques: list of dicts with name, client_sample_id, container_name, overrides).
+Processing: Validate permissions/project access; loop in transaction to create samples/containers/contents/tests (use bulk_insert for efficiency); auto-name if option provided.
+Response: List of SampleResponse.
+Error: 400 for duplicates/invalids; rollback.
+Update existing accession_sample to share logic where possible.
+Tests in test_samples.py: Add bulk scenarios.
+Generate full code for endpoint, schema, and tests."
+
+## Prompt 29: Bulk Accessioning Frontend UI
+"Enhance accessioning UI for bulk mode based on US-24 in Post-MVP User Stories and Post-MVP PRD (section 4.1).
+In frontend/src/pages/AccessioningForm.tsx: Add bulk toggle; common fields section; unique table (MUI DataGrid editable, add/remove rows).
+Update SampleDetailsStep.tsx and TestAssignmentStep.tsx for bulk (Formik arrays for uniques).
+In apiService.ts: Add bulkAccessionSamples(data) calling /samples/bulk-accession.
+ReviewStep.tsx: Summary table for bulk.
+Tests in AccessioningForm.test.tsx: Bulk mode interactions.
+Generate full code for updated pages/components and tests."
+Prompt 30: Integration and Workflow Updates for Sprint 5
+"Integrate Sprint 5 features (bulk accessioning, client projects) into workflows, per Post-MVP PRD (section 4) and User Stories.
+Update backend/app/routers/samples.py accession to optionally link client_project_id.
+Enhance frontend accessioning to include client project dropdown (fetch from /client-projects).
+Add docs updates: In workflow-accessioning-to-reporting.md, add Variation 5: Bulk Accessioning; update Stage 1 for client projects.
+Tests: End-to-end for bulk with client projects.
+Generate full code for integrations, doc patches, and tests."
+
+# Sprint 6
+## Prompt 31: Backend API Enhancements for Cross-Project Batching
+"Implement cross-project batching as per US-26 in Post-MVP User Stories and Post-MVP Technical Document (section 3, Batch Enhancements).
+In backend/app/routers/batches.py: Update POST /batches to accept list of container_ids (cross-project); validate compatibility (e.g., query tests for shared analysis_id like 'EPA Method 8080 Prep').
+
+Add dependency to check RLS-accessible projects via has_project_access.
+If incompatible, raise 400 with details.
+Option for split: If provided (e.g., divergent_analyses list), create sub-batches (future: child_batch_id FK, but stub for now).
+Schema: Update BatchCreate to include cross_project flag or auto-detect.
+Response: BatchResponse with included containers.
+
+Add tests in backend/tests/test_batches.py: Cross-project creation, compatibility validation, RLS denial.
+Generate full code for updated router, schema, and tests."
+
+## Prompt 32: Backend API for QC Addition at Batch Creation
+"Add QC sample creation during batching per US-27 in Post-MVP User Stories and Post-MVP Technical Document (section 3).
+In backend/app/routers/batches.py: Enhance POST /batches with qc_additions list (each: qc_type UUID, optional notes).
+
+For each, auto-create QC sample/container (inherit project_id from first sample or batch-level; set qc_type).
+Link to batch via batch_containers.
+Configurable requirement: Env var REQUIRE_QC_FOR_BATCH_TYPES (list of type UUIDs); enforce if matches.
+Transaction: Atomic with batch creation.
+Schema: Add qc_additions to BatchCreate (list of dicts: qc_type, notes).
+
+Update tests in test_batches.py: QC creation scenarios, requirement enforcement.
+Generate full code for updated endpoint, schema, and tests."
+
+## Prompt 33: Frontend UI for Cross-Project Batching
+"Enhance batch creation UI for cross-project support based on US-26 in Post-MVP User Stories.
+In frontend/src/pages/BatchManagement.tsx (create if missing) or ResultsManagement.tsx: Add search/filter for containers across projects (dropdown or Autocomplete fetching from /containers?project_ids=multiple via query).
+
+Validate compatibility on add (API call to /batches/validate-compatibility with container_ids; return errors).
+Split option: Button to create sub-batches (modal with divergent steps).
+Use UserContext for accessible projects.
+
+Update apiService.ts: Add validateBatchCompatibility(data), createBatch with cross-project support.
+Tests in BatchManagement.test.tsx: Multi-project selection, validation.
+Generate full code for updated pages/components, apiService, and tests."
+
+## Prompt 34: Frontend UI for QC Addition at Batch Creation
+"Add QC integration to batch UI per US-27 in Post-MVP User Stories.
+In frontend/src/components/batches/BatchForm.tsx (create if missing): Add QC section (dropdown for qc_type from /lists/qc_types/entries; add multiple via '+ Add QC' button; fields: type, notes).
+
+Auto-generate on submit (include in createBatch payload).
+Required toggle based on batch_type (fetch config or client-side check).
+Display in batch view with highlights.
+
+Update apiService.ts: Enhance createBatch to include qc_additions.
+Tests: QC addition, requirement validation.
+Generate full code for new/updated components, apiService, and tests."
+
+## Prompt 35: Integration and Workflow Updates for Sprint 6
+"Integrate Sprint 6 features (cross-project batching, QC at batch) into overall system, per Post-MVP PRD (section 4.3) and User Stories.
+Update backend/app/routers/batches.py to handle QC in transaction (create samples/containers, link).
+Enhance frontend batch creation to combine cross-project and QC (e.g., suggest QC based on batch size/type).
+Doc updates: In workflow-accessioning-to-reporting.md, enhance Stage 2 for cross-project and QC; add notes to technical doc for API/validation.
+Tests: End-to-end for batch with cross-project/QC.
+Generate full code for integrations, doc patches, and tests."
+
+# Sprint 7
+## Prompt 36: Backend API for Batch Results Entry
+"Implement batch results entry endpoint as per US-28 in Post-MVP User Stories and Post-MVP Technical Document (section 3, Batch Results).
+In backend/app/routers/results.py (create if missing): Add POST /results/batch.
+
+Schema: BatchResultsEntryRequest (batch_id UUID, results list: each with test_id, analyte_results dict (analyte_id: value, qualifiers, notes)).
+Processing: Validate permissions (result:enter); fetch batch tests/analytes; create/update results in transaction; run validations (data type, range, sig figs from analysis_analytes); update test statuses to 'Complete' if all analytes entered; QC checks (e.g., flag/block if failing, configurable via env FAIL_QC_BLOCKS_BATCH=true/false).
+Response: Updated batch with results.
+Error: 400 for invalids (details per row); rollback.
+
+Add dependency for batch access (batch:read).
+Tests in backend/tests/test_results.py: Bulk entry, validation, QC block/flag, status updates.
+Generate full code for router, schema, and tests."
+
+## Prompt 37: Frontend UI for Batch Results Entry
+"Develop batch results entry UI based on US-28 in Post-MVP User Stories and Post-MVP PRD (section 4.4).
+In frontend/src/components/results/ResultsEntryTable.tsx: Enhance to bulk mode (tabular MUI DataGrid: rows=tests/samples from batch, columns=analytes; editable cells with auto-fill for commons).
+
+Fetch analytes via getAnalysisAnalytes; real-time validation (inline errors for range/type).
+QC rows highlighted; submit button with confirmation (call /results/batch).
+Configurable QC handling: Alert/block on fail.
+
+Update BatchResultsView.tsx: Toggle for bulk entry; status updates post-submit.
+apiService.ts: Add enterBatchResults(batchId, data).
+Tests in ResultsEntryTable.test.tsx: Editing, validation, submit.
+Generate full code for updated components, apiService, and tests."
+
+## Prompt 38: Integration and Workflow Updates for Sprint 7
+"Integrate Sprint 7 feature (batch results entry) into system, per Post-MVP PRD (section 4.4) and US-28.
+Update backend/app/routers/results.py to tie into batch statuses (e.g., set batch to 'Completed' if all tests done).
+Enhance frontend ResultsManagement.tsx to link batch entry with prior features (e.g., show QC flags from Sprint 6).
+Doc updates: In workflow-accessioning-to-reporting.md, enhance Stage 3 for batch entry variation; update technical doc for API/validation.
+Tests: End-to-end for batch results with QC/validation.
+Generate full code for integrations, doc patches, and tests."

@@ -27,13 +27,16 @@ interface ReviewStepProps {
     matrices: any[];
     qcTypes: any[];
     projects: any[];
+    clientProjects: any[];
     analyses: any[];
+    batteries: any[];
     containerTypes: any[];
     units: any[];
   };
+  bulkMode?: boolean;
 }
 
-const ReviewStep: React.FC<ReviewStepProps> = ({ values, lookupData }) => {
+const ReviewStep: React.FC<ReviewStepProps> = ({ values, lookupData, bulkMode = false }) => {
   const getLookupName = (id: string, list: any[]) => {
     const item = list.find(item => item.id === id);
     return item ? item.name : 'Unknown';
@@ -42,6 +45,8 @@ const ReviewStep: React.FC<ReviewStepProps> = ({ values, lookupData }) => {
   const selectedAnalyses = lookupData.analyses.filter(analysis => 
     values.selected_analyses?.includes(analysis.id)
   );
+
+  const selectedBattery = lookupData.batteries?.find((b: any) => b.id === values.battery_id);
 
   return (
     <Box>

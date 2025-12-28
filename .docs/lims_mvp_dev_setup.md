@@ -128,12 +128,15 @@ This step implements the Docker configuration from the Technical Document (Secti
   - First run may take time (downloads images, installs deps).
   - **Alembic migrations run automatically** when the backend starts:
     - Creates all database tables
-    - Creates initial roles and permissions (including `batch:read`, `batch:manage`, `config:edit`, `test:configure`, `user:manage`, etc.)
+    - Creates initial roles and permissions (17 total: `sample:create`, `sample:read`, `sample:update`, `test:assign`, `test:update`, `result:enter`, `result:review`, `result:update`, `result:delete`, `batch:manage`, `batch:read`, `batch:update`, `batch:delete`, `project:manage`, `user:manage`, `role:manage`, `config:edit`)
     - Creates admin user (username: `admin`, password: `admin123`)
     - Populates initial lists and list entries (normalized to lowercase slug format like `sample_status`)
+    - Migration `0006` adds additional permissions: `result:update`, `result:delete`, `batch:update`, `batch:delete`
     - Migration `0008` adds `batch:read` permission if needed
     - Migration `0009` seeds initial analyses (pH Measurement, EPA Method 8080, Total Coliform Enumeration) and analytes (pH, Aldrin, DDT, PCB-1016, Total Coliforms, E. coli) with validation rules
     - Migration `0010` creates test_batteries table and battery_analyses junction, seeds 'EPA 8080 Full' battery
+    - Migration `0011` creates client_projects table and adds client_project_id to projects, client_sample_id to samples
+    - **Note**: The code references `test:configure` permission but it's not in the database; endpoints that use it fall back to `config:edit` permission
 - Verify:
   - Check running containers: `docker ps` (should show three: db, backend, frontend).
   - Check migration logs: `docker logs lims-backend | grep -i migration`

@@ -21,6 +21,7 @@ import {
 } from '@mui/icons-material';
 import BatchList from './BatchList';
 import BatchForm from './BatchForm';
+import BatchFormEnhanced from './BatchFormEnhanced';
 import ContainerGrid from './ContainerGrid';
 import { apiService } from '../../services/apiService';
 
@@ -33,6 +34,7 @@ interface Batch {
   start_date: string;
   end_date: string;
   created_at: string;
+  containers?: any[];
 }
 
 interface BatchManagementProps {
@@ -131,7 +133,7 @@ const BatchManagement: React.FC<BatchManagementProps> = ({ onBack }) => {
               <Typography variant="h5">Create New Batch</Typography>
               <Button onClick={handleBackToList}>Back to List</Button>
             </Box>
-            <BatchForm
+            <BatchFormEnhanced
               onSuccess={handleBatchCreated}
               onCancel={handleBackToList}
             />
@@ -188,8 +190,10 @@ const BatchManagement: React.FC<BatchManagementProps> = ({ onBack }) => {
             {activeTab === 0 && (
               <ContainerGrid
                 batchId={selectedBatch.id}
-                containers={[]} // This would be loaded from the API
-                onContainersChange={() => {}} // This would update the containers
+                containers={selectedBatch.containers || []}
+                onContainersChange={(updatedContainers) => {
+                  setSelectedBatch(prev => prev ? { ...prev, containers: updatedContainers } : null);
+                }}
               />
             )}
 

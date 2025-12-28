@@ -19,6 +19,7 @@ class Sample(BaseModel):
     parent_sample_id = Column(PostgresUUID(as_uuid=True), ForeignKey('samples.id'), nullable=True)
     project_id = Column(PostgresUUID(as_uuid=True), ForeignKey('projects.id'), nullable=False)
     qc_type = Column(PostgresUUID(as_uuid=True), ForeignKey('list_entries.id'), nullable=True)
+    client_sample_id = Column(String(255), nullable=True, unique=True)
     
     # Relationships
     project = relationship("Project", back_populates="samples")

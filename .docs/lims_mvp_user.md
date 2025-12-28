@@ -1,6 +1,6 @@
 # User Stories for LIMS MVP
 
-User stories are written in Agile format: "As a [role], I want [feature] so that [benefit]." They are prioritized for MVP development, grouped by feature area, and include acceptance criteria for clarity. These stories cover the core scope: sample tracking, test ordering, results entry, security, and configurations. Estimates are in story points (Fibonacci scale) for planning in Cursor implementation. Total ~15 permissions are referenced where relevant.
+User stories are written in Agile format: "As a [role], I want [feature] so that [benefit]." They are prioritized for MVP development, grouped by feature area, and include acceptance criteria for clarity. These stories cover the core scope: sample tracking, test ordering, results entry, security, and configurations. Estimates are in story points (Fibonacci scale) for planning in Cursor implementation. The system uses 17 permissions (with `test:configure` referenced in code but not yet in database).
 
 ## 1. Sample Tracking
 
@@ -122,9 +122,10 @@ User stories are written in Agile format: "As a [role], I want [feature] so that
 - **US-13: Role-Based Access Control**  
   As an Administrator, I want to manage roles and granular permissions so that access is controlled.  
   *Acceptance Criteria*:  
-  - ~15 permissions (e.g., sample:create, result:review) via junctions.  
+  - 17 permissions (e.g., sample:create, result:review, batch:manage) via junctions.  
   - Roles: Admin (all), Lab Manager (review/manage), Technician (create/enter), Client (read own).  
   - API: CRUD /roles, /permissions (admin-only).  
+  - Note: `test:configure` is referenced in code but not yet in database; endpoints use `config:edit` as fallback.  
   *Priority*: High | *Estimate*: 8 points
 
 - **US-14: Project and Client Data Isolation**  
@@ -227,3 +228,72 @@ User stories are written in Agile format: "As a [role], I want [feature] so that
 - **Sprint 3 (Security/Configs)**: US-13, US-14, US-15, US-16, US-17, US-18, US-19, US-20, US-21, US-22 (RBAC, isolation, lists/units, analyses/analytes, users, container types, test batteries).  
 - **Sprint 4 (Reviews/Polish)**: US-2, US-4, US-8, US-10, US-23 (Statuses, QC, reviews, battery assignment).  
 Total Estimate: ~126 points. Post-MVP: Add workflows configurability, calculations.
+
+
+# Post-MVP User Stories for LIMS
+This document outlines user stories for post-MVP enhancements to the LIMS, building on the core MVP features. These stories focus on efficiency improvements like bulk processing, advanced batching, and hierarchical project grouping. They are written in Agile format and include acceptance criteria, priorities, and estimates. These extend the 17 MVP permissions without introducing new ones unless specified.
+## 1. Sample Tracking Enhancements
+
+### US-24: Bulk Sample Accessioning
+As a Lab Technician, I want to accession multiple samples at once with shared common fields so that repetitive data entry is minimized for batch submissions.
+Acceptance Criteria:
+Toggle for bulk mode in accessioning UI.
+Common fields: sample_type, matrix, due_date, received_date, project_id, client_project_id, container_type, test battery/analyses.
+Unique fields per sample: name, client_sample_id, container_name/barcode, overrides (e.g., temperature).
+Auto-generation option for sequential names (e.g., prefix + number).
+Single transaction creates all samples/containers/tests; validation for uniques across set.
+API: POST /samples/bulk-accession; RBAC: sample:create.
+Priority: Medium | Estimate: 8 points
+
+### US-25: Client Project Management
+As a Lab Manager, I want to group multiple NimbleLIMS projects under a client project so that ongoing submissions for the same client initiative can be tracked holistically.
+Acceptance Criteria:
+CRUD for client_projects (name, description, client_id, status).
+Link NimbleLIMS projects via client_project_id FK.
+Accessioning allows selection/creation of client project before NimbleLIMS project.
+Reporting aggregates across linked projects.
+API: CRUD /client-projects; RBAC: project:manage.
+Priority: Medium | Estimate: 5 points
+
+
+## 2. Batch Management Enhancements
+
+### US-26: Cross-Project Batching
+As a Lab Technician, I want to batch samples from multiple NimbleLIMS projects together if they have compatible test types so that shared processing steps like prep can be efficient.
+Acceptance Criteria:
+Batch creation allows selection across accessible projects.
+Validation for compatibility (e.g., shared prep analysis like "EPA Method 8080 Prep").
+Option to split into sub-batches for divergent steps (e.g., cleanup/instrument runs).
+RLS enforces access to all included samples.
+API: POST /batches with cross-project container_ids; RBAC: batch:manage.
+Priority: Medium | Estimate: 5 points
+
+### US-27: Add QC Samples at Batch Creation
+As a Lab Technician, I want to add QC samples directly during batch creation so that controls are integrated contextually.
+Acceptance Criteria:
+Select qc_type (e.g., Blank, Blank Spike, Duplicate, Matrix Spike) and auto-generate QC sample/container.
+Link to batch with inherited project_id.
+Required for certain batch types (configurable).
+API: POST /batches with qc_additions list; RBAC: batch:manage.
+Priority: Medium | Estimate: 5 points
+
+
+## 3. Results Management Enhancements
+
+### US-28: Batch Results Entry
+As a Lab Technician, I want to enter results for multiple tests/samples in a batch at once so that data entry is efficient for grouped processing.
+Acceptance Criteria:
+Tabular UI for batch with rows for tests/samples and columns for analytes.
+Auto-fill common fields; real-time validation including QC checks.
+Atomic submit updates all results and statuses.
+Failing QC flags or blocks batch approval (configurable).
+API: POST /results/batch; RBAC: result:enter.
+Priority: Medium | Estimate: 8 points
+
+
+## Prioritization and Roadmap
+
+Sprint 5 (Bulk and Grouping): US-24, US-25 (Bulk accessioning, client projects).
+Sprint 6 (Advanced Batching): US-26, US-27 (Cross-project batching, QC at batch).
+Sprint 7 (Results Efficiency): US-28 (Batch results entry).
+Total Estimate: ~31 points. Future: Instrument integration, automated calculations.##

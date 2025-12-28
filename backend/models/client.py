@@ -16,6 +16,7 @@ class Client(BaseModel):
     users = relationship("User", foreign_keys="User.client_id", back_populates="client")
     locations = relationship("Location", back_populates="client")
     projects = relationship("Project", back_populates="client")
+    client_projects = relationship("ClientProject", back_populates="client")
 
 
 class Location(BaseModel):
@@ -71,3 +72,14 @@ class ContactMethod(Base):
     
     # Relationships
     person = relationship("Person", back_populates="contact_methods")
+
+
+class ClientProject(BaseModel):
+    __tablename__ = 'client_projects'
+    
+    # ClientProject-specific fields
+    client_id = Column(PostgresUUID(as_uuid=True), ForeignKey('clients.id'), nullable=False)
+    
+    # Relationships
+    client = relationship("Client", back_populates="client_projects")
+    projects = relationship("Project", back_populates="client_project")

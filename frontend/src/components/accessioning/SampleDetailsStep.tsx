@@ -16,6 +16,7 @@ import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { useField } from 'formik';
+import BulkUniquesTable from './BulkUniquesTable';
 
 interface SampleDetailsStepProps {
   values: any;
@@ -26,15 +27,18 @@ interface SampleDetailsStepProps {
     matrices: any[];
     qcTypes: any[];
     projects: any[];
+    clientProjects: any[];
     containerTypes: any[];
     units: any[];
   };
+  bulkMode?: boolean;
 }
 
 const SampleDetailsStep: React.FC<SampleDetailsStepProps> = ({
   values,
   setFieldValue,
   lookupData,
+  bulkMode = false,
 }) => {
   const [nameField, nameMeta] = useField('name');
   const [nameVerificationField, nameVerificationMeta] = useField('name_verification');
@@ -56,20 +60,27 @@ const SampleDetailsStep: React.FC<SampleDetailsStepProps> = ({
     <LocalizationProvider dateAdapter={AdapterDateFns}>
       <Box>
         <Typography variant="h6" gutterBottom>
-          Sample Information
+          {bulkMode ? 'Common Sample Information' : 'Sample Information'}
         </Typography>
+        {bulkMode && (
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            These fields will be applied to all samples. Unique fields per sample are configured in the table below.
+          </Typography>
+        )}
         
         <Grid container spacing={3}>
-          <Grid size={{ xs: 12, sm: 6 }}>
-            <TextField
-              {...nameField}
-              label="Sample Name"
-              fullWidth
-              required
-              error={nameMeta.touched && !!nameMeta.error}
-              helperText={nameMeta.touched && nameMeta.error}
-            />
-          </Grid>
+          {!bulkMode && (
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <TextField
+                {...nameField}
+                label="Sample Name"
+                fullWidth
+                required
+                error={nameMeta.touched && !!nameMeta.error}
+                helperText={nameMeta.touched && nameMeta.error}
+              />
+            </Grid>
+          )}
           
           <Grid size={{ xs: 12, sm: 6 }}>
             <TextField
@@ -158,17 +169,19 @@ const SampleDetailsStep: React.FC<SampleDetailsStepProps> = ({
             </FormControl>
           </Grid>
           
-          <Grid size={{ xs: 12, sm: 6 }}>
-            <TextField
-              name="temperature"
-              label="Temperature (°C)"
-              type="number"
-              fullWidth
-              required
-              value={values.temperature}
-              onChange={(e) => setFieldValue('temperature', parseFloat(e.target.value) || 0)}
-            />
-          </Grid>
+          {!bulkMode && (
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <TextField
+                name="temperature"
+                label="Temperature (°C)"
+                type="number"
+                fullWidth
+                required
+                value={values.temperature}
+                onChange={(e) => setFieldValue('temperature', parseFloat(e.target.value) || 0)}
+              />
+            </Grid>
+          )}
           
           <Grid size={{ xs: 12, sm: 6 }}>
             <FormControl fullWidth>
@@ -218,14 +231,16 @@ const SampleDetailsStep: React.FC<SampleDetailsStepProps> = ({
 
         <Divider sx={{ my: 3 }} />
 
-        <Typography variant="h6" gutterBottom>
-          Container Information
-        </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          Specify the container in which this sample is received. A new container instance will be created.
-        </Typography>
+        {!bulkMode && (
+          <>
+            <Typography variant="h6" gutterBottom>
+              Container Information
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              Specify the container in which this sample is received. A new container instance will be created.
+            </Typography>
 
-        <Grid container spacing={3}>
+            <Grid container spacing={3}>
           <Grid size={{ xs: 12, sm: 6 }}>
             <FormControl fullWidth required error={containerTypeMeta.touched && !!containerTypeMeta.error}>
               <InputLabel>Container Type</InputLabel>
@@ -353,51 +368,126 @@ const SampleDetailsStep: React.FC<SampleDetailsStepProps> = ({
             </FormControl>
           </Grid>
         </Grid>
+          </>
+        )}
 
-        <Divider sx={{ my: 3 }} />
-
-        <Box>
-          <FormControlLabel
-            control={
-              <Switch
-                checked={values.double_entry_enabled}
-                onChange={handleDoubleEntryToggle}
-              />
-            }
-            label="Enable Double Entry Validation"
-          />
-          
-          {values.double_entry_enabled && (
-            <Grid container spacing={3} sx={{ mt: 2 }}>
+        {bulkMode && (
+          <>
+            <Typography variant="h6" gutterBottom>
+              Container Type (Common)
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              Select the container type that will be used for all samples in this batch.
+            </Typography>
+            <Grid container spacing={3}>
               <Grid size={{ xs: 12, sm: 6 }}>
-                <TextField
-                  {...nameVerificationField}
-                  label="Verify Sample Name"
-                  fullWidth
-                  required
-                  error={nameVerificationMeta.touched && !!nameVerificationMeta.error}
-                  helperText={nameVerificationMeta.touched && nameVerificationMeta.error}
-                />
-              </Grid>
-              
-              <Grid size={{ xs: 12, sm: 6 }}>
-                <FormControl fullWidth required>
-                  <InputLabel>Verify Sample Type</InputLabel>
+                <FormControl fullWidth required error={containerTypeMeta.touched && !!containerTypeMeta.error}>
+                  <InputLabel>Container Type</InputLabel>
                   <Select
-                    {...sampleTypeVerificationField}
-                    error={sampleTypeVerificationMeta.touched && !!sampleTypeVerificationMeta.error}
+                    {...containerTypeField}
+                    value={containerTypeField.value || ''}
+                    onChange={(e) => {
+                      containerTypeField.onChange(e);
+                      setFieldValue('container_type_id', e.target.value);
+                    }}
                   >
-                    {lookupData.sampleTypes.map((type) => (
+                    {lookupData.containerTypes.map((type) => (
                       <MenuItem key={type.id} value={type.id}>
-                        {type.name}
+                        {type.name} {type.dimensions ? `(${type.dimensions})` : ''}
                       </MenuItem>
                     ))}
                   </Select>
                 </FormControl>
               </Grid>
             </Grid>
-          )}
-        </Box>
+          </>
+        )}
+
+        {bulkMode && (
+          <>
+            <Divider sx={{ my: 3 }} />
+            <Typography variant="h6" gutterBottom>
+              Unique Fields per Sample
+            </Typography>
+            <BulkUniquesTable
+              uniques={values.bulk_uniques || []}
+              onAdd={() => {
+                const newId = String((values.bulk_uniques?.length || 0) + 1);
+                setFieldValue('bulk_uniques', [
+                  ...(values.bulk_uniques || []),
+                  { id: newId, container_name: '' }
+                ]);
+              }}
+              onRemove={(id) => {
+                setFieldValue('bulk_uniques', 
+                  (values.bulk_uniques || []).filter((u: any) => u.id !== id)
+                );
+              }}
+              onUpdate={(id, field, value) => {
+                setFieldValue('bulk_uniques',
+                  (values.bulk_uniques || []).map((u: any) =>
+                    u.id === id ? { ...u, [field]: value } : u
+                  )
+                );
+              }}
+              autoNamePrefix={values.auto_name_prefix}
+              autoNameStart={values.auto_name_start}
+              onAutoNameChange={(prefix, start) => {
+                setFieldValue('auto_name_prefix', prefix || '');
+                setFieldValue('auto_name_start', start || 1);
+              }}
+            />
+          </>
+        )}
+
+        {!bulkMode && (
+          <>
+            <Divider sx={{ my: 3 }} />
+
+            <Box>
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={values.double_entry_enabled}
+                    onChange={handleDoubleEntryToggle}
+                  />
+                }
+                label="Enable Double Entry Validation"
+              />
+              
+              {values.double_entry_enabled && (
+                <Grid container spacing={3} sx={{ mt: 2 }}>
+                  <Grid size={{ xs: 12, sm: 6 }}>
+                    <TextField
+                      {...nameVerificationField}
+                      label="Verify Sample Name"
+                      fullWidth
+                      required
+                      error={nameVerificationMeta.touched && !!nameVerificationMeta.error}
+                      helperText={nameVerificationMeta.touched && nameVerificationMeta.error}
+                    />
+                  </Grid>
+                  
+                  <Grid size={{ xs: 12, sm: 6 }}>
+                    <FormControl fullWidth required>
+                      <InputLabel>Verify Sample Type</InputLabel>
+                      <Select
+                        {...sampleTypeVerificationField}
+                        error={sampleTypeVerificationMeta.touched && !!sampleTypeVerificationMeta.error}
+                      >
+                        {lookupData.sampleTypes.map((type) => (
+                          <MenuItem key={type.id} value={type.id}>
+                            {type.name}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                  </Grid>
+                </Grid>
+              )}
+            </Box>
+          </>
+        )}
       </Box>
     </LocalizationProvider>
   );

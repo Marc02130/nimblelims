@@ -18,18 +18,20 @@ This implementation provides a complete authentication system for the LIMS MVP b
 ### 3. Security Features
 - **Password Hashing**: bcrypt for secure password storage
 - **JWT Tokens**: PyJWT for stateless authentication
-- **RBAC**: 15 core permissions for granular access control
+- **RBAC**: 17 core permissions for granular access control (with additional permissions added in migrations)
 - **Token Validation**: Secure token verification with expiration
 
-### 4. Core Permissions (15 total)
+### 4. Core Permissions (17 total)
 ```
-sample:create, sample:read, sample:update, sample:delete
+sample:create, sample:read, sample:update
 test:assign, test:update
-result:enter, result:review, result:read
-batch:manage, batch:read
-project:manage, project:read
-user:manage, config:edit
+result:enter, result:review, result:update, result:delete
+batch:manage, batch:read, batch:update, batch:delete
+project:manage
+user:manage, role:manage, config:edit
 ```
+
+**Note**: The code references `test:configure` permission in several places (analyses, analytes, test batteries endpoints), but this permission is not currently created in the database. These endpoints use `require_any_permission(["config:edit", "test:configure"])`, which effectively requires `config:edit` since `test:configure` doesn't exist. Consider adding `test:configure` as a separate permission in a future migration if you want to distinguish test configuration from general configuration editing.
 
 ### 5. Database Models
 - **User**: Authentication and user information
@@ -175,7 +177,7 @@ app/
 ## Compliance with Requirements
 
 ✅ **US-12**: User Authentication - Username/password + email verification  
-✅ **US-13**: Role-Based Access Control - ~15 permissions via roles  
+✅ **US-13**: Role-Based Access Control - 17 permissions via roles  
 ✅ **Technical Document 4.1**: JWT authentication with security  
 ✅ **PEP8 Compliance**: Code follows Python standards  
 ✅ **Pydantic Schemas**: Request/response validation  

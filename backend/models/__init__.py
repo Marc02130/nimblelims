@@ -3,7 +3,7 @@ from .base import Base
 
 # Import all models
 from .user import User, Role, Permission
-from .client import Client, Location, Person, PeopleLocation, ContactMethod
+from .client import Client, Location, Person, PeopleLocation, ContactMethod, ClientProject
 from .project import Project, ProjectUser
 from .sample import Sample
 from .container import Container, ContainerType, Contents

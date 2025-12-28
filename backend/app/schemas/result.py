@@ -79,10 +79,31 @@ class BatchResultEntryRequest(BaseModel):
 
 
 class BatchResultsEntryRequest(BaseModel):
-    """Schema for entering multiple results for a batch"""
+    """Schema for entering multiple results for a batch (US-9)"""
     batch_id: UUID = Field(..., description="ID of batch")
     test_id: UUID = Field(..., description="ID of test")
     results: List[BatchResultEntryRequest] = Field(..., description="List of results to enter")
+
+
+class AnalyteResultEntry(BaseModel):
+    """Schema for a single analyte result entry"""
+    analyte_id: UUID = Field(..., description="ID of analyte")
+    raw_result: Optional[str] = Field(None, max_length=255, description="Raw result value")
+    reported_result: Optional[str] = Field(None, max_length=255, description="Reported result value")
+    qualifiers: Optional[UUID] = Field(None, description="ID of qualifier from list_entries")
+    notes: Optional[str] = Field(None, description="Optional notes for this result")
+
+
+class TestResultEntry(BaseModel):
+    """Schema for results for a single test"""
+    test_id: UUID = Field(..., description="ID of test")
+    analyte_results: List[AnalyteResultEntry] = Field(..., description="List of analyte results for this test")
+
+
+class BatchResultsEntryRequestUS28(BaseModel):
+    """Schema for entering batch results (US-28: Batch Results Entry)"""
+    batch_id: UUID = Field(..., description="ID of batch")
+    results: List[TestResultEntry] = Field(..., description="List of test results, each with analyte_results dict")
 
 
 class ResultValidationRequest(BaseModel):

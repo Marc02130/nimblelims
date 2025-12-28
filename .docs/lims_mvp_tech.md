@@ -208,8 +208,9 @@ All tables include standard fields: `id` (UUID PK), `name` (varchar unique), `de
 ### 4.2 Key Endpoints
 - **Samples**: 
   - GET /samples?project_id=...&status=...: List filtered by user access (query params accept UUIDs, empty strings converted to None).
-  - POST /samples: Create with accessioning data.
-  - PATCH /samples/{id}: Update status/container.
+  - POST /samples: Create sample (requires sample:create).
+  - POST /samples/accession: Accession sample with test assignment (requires sample:create). Supports test batteries and individual analyses.
+  - PATCH /samples/{id}: Update status/container (requires sample:update).
 - **Tests**: 
   - POST /tests: Assign analysis to sample.
   - PATCH /tests/{id}: Update status/review.
@@ -339,3 +340,105 @@ All tables include standard fields: `id` (UUID PK), `name` (varchar unique), `de
 ## 9. Appendices
 - References: FastAPI docs, SQLAlchemy guide, React best practices, Docker documentation.
 - Glossary: Aligns with PRD.
+
+
+# Post-MVP Technical Document for LIMS
+## 1. Introduction
+### 1.1 Purpose
+This document details post-MVP technical enhancements for the LIMS, extending the MVP architecture to support bulk operations, advanced batching, and hierarchical client projects. It builds on the MVP tech stack (PostgreSQL, FastAPI, React) with minimal schema changes for scalability.
+### 1.2 Scope
+Focus on efficiency features like bulk accessioning and batch results entry, with integrations for cross-project workflows. Post-MVP expansions (e.g., instrument APIs) are noted.
+### 1.3 Assumptions
+
+Builds on MVP schema and RLS.
+No new permissions; leverages existing 17.
+
+### 1.4 Version History
+
+Version 1.0: Initial post-MVP draft (December 28, 2025).
+
+## 2. System Architecture Enhancements
+### 2.1 Backend
+
+New endpoints for bulk/batch operations (e.g., POST /samples/bulk-accession, POST /results/batch).
+Transactions: Use SQLAlchemy sessions for atomic multi-record creates/updates.
+
+### 2.2 Database
+
+Add client_projects table: id (UUID PK), name (unique), description, client_id (FK), active, audit fields.
+Update projects: Add client_project_id (FK nullable).
+Add client_sample_id to samples (varchar unique nullable).
+Migrations: Alembic for new tables/FKs.
+
+### 2.3 Frontend
+
+Bulk modes in wizards/tables using Formik arrays and MUI DataGrid.
+
+## 3. API Endpoints Enhancements
+Bulk Accessioning
+
+POST /samples/bulk-accession: Accepts common fields + list of uniques; creates multiples atomically.
+
+Client Projects
+
+CRUD /client-projects: Standard operations with RLS via client_id.
+
+Batch Enhancements
+
+POST /batches: Support cross-project container_ids with compatibility validation.
+Include qc_additions for auto-QC creation.
+- Cross-Project Batching (US-26):
+  - Accepts list of container_ids from multiple projects
+  - Auto-detects cross-project mode
+  - Validates compatibility: checks for shared analyses across all samples
+  - RLS access check: uses has_project_access SQL function for all projects
+  - Returns 400 error with details if incompatible (projects, analyses, suggestion)
+  - Returns 403 error if user lacks access to any project
+  - Supports divergent_analyses for future sub-batch creation
+- QC at Batch Creation (US-27):
+  - Accepts qc_additions list (each: qc_type UUID, optional notes)
+  - Auto-generates QC samples/containers atomically within batch transaction
+  - QC samples inherit: project_id, sample_type, matrix, temperature, due_date from first sample
+  - Creates Contents junction linking QC sample to container
+  - Creates BatchContainer junction linking QC container to batch
+  - Validates QC type exists and is active
+  - Enforces QC requirement if batch type in REQUIRE_QC_FOR_BATCH_TYPES env var
+  - All operations wrapped in try/except with rollback on error
+- Validation Endpoint:
+  - POST /batches/validate-compatibility: Validates container compatibility without creating batch
+  - Returns compatibility status with details or error message
+  - Useful for frontend pre-validation before submission
+
+Batch Results
+
+POST /results/batch: List of results; updates statuses in transaction.
+- US-28: Batch Results Entry endpoint
+- Accepts batch_id and list of test results with analyte_results
+- Validates permissions (result:enter, batch:read)
+- Fetches all tests for samples in batch
+- Validates each result against analysis_analytes rules (data type, range, sig figs, required)
+- Creates/updates results in transaction
+- Updates test statuses to 'Complete' when all analytes entered
+- Auto-updates batch status to 'Completed' when all tests complete
+- Sets batch end_date when batch completes
+- QC validation: Checks QC samples for failures
+- Configurable QC blocking via FAIL_QC_BLOCKS_BATCH env var
+- Returns updated batch with containers
+- Error handling: 400 for validation errors (detailed per row), rollback on error
+
+## 4. Workflow Implementations
+
+Bulk: Loop in transaction for creates.
+Cross-Project: Query across accessible projects.
+QC at Batch: Auto-create samples with qc_type.
+Batch Results: Tabular entry with QC validation (flag/block configurable via env).
+
+## 5. Security
+
+Extend RLS: projects_access checks via client_projects.
+No new permissions.
+
+## 6. Testing and Deployment
+
+Add bulk/cross-project tests.
+Docker: No changes needed.

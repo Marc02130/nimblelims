@@ -23,9 +23,18 @@ class BatchBase(BaseModel):
         return v
 
 
+class QCAddition(BaseModel):
+    """Schema for QC sample addition during batch creation"""
+    qc_type: UUID = Field(..., description="ID of QC type from list_entries (e.g., Blank, Blank Spike, Duplicate, Matrix Spike)")
+    notes: Optional[str] = Field(None, description="Optional notes for the QC sample")
+
+
 class BatchCreate(BatchBase):
     """Schema for creating a new batch"""
-    pass
+    container_ids: Optional[List[UUID]] = Field(None, description="List of container IDs for cross-project batching")
+    cross_project: Optional[bool] = Field(None, description="Flag to indicate cross-project batching (auto-detected if container_ids provided)")
+    divergent_analyses: Optional[List[UUID]] = Field(None, description="List of analysis IDs that require separate sub-batches (future: child_batch_id FK)")
+    qc_additions: Optional[List[QCAddition]] = Field(None, description="List of QC samples to auto-create and add to batch (US-27)")
 
 
 class BatchUpdate(BaseModel):
@@ -44,28 +53,6 @@ class BatchUpdate(BaseModel):
         return v
 
 
-class BatchResponse(BatchBase):
-    """Schema for batch response"""
-    id: UUID
-    active: bool
-    created_at: datetime
-    created_by: UUID
-    modified_at: datetime
-    modified_by: UUID
-
-    class Config:
-        from_attributes = True
-
-
-class BatchListResponse(BaseModel):
-    """Schema for batch list response with pagination"""
-    batches: List[BatchResponse]
-    total: int
-    page: int
-    size: int
-    pages: int
-
-
 class BatchContainerRequest(BaseModel):
     """Schema for adding containers to batch"""
     container_id: UUID = Field(..., description="ID of container to add")
@@ -82,6 +69,29 @@ class BatchContainerResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class BatchResponse(BatchBase):
+    """Schema for batch response"""
+    id: UUID
+    active: bool
+    created_at: datetime
+    created_by: UUID
+    modified_at: datetime
+    modified_by: UUID
+    containers: Optional[List[BatchContainerResponse]] = Field(None, description="Containers in this batch")
+
+    class Config:
+        from_attributes = True
+
+
+class BatchListResponse(BaseModel):
+    """Schema for batch list response with pagination"""
+    batches: List[BatchResponse]
+    total: int
+    page: int
+    size: int
+    pages: int
 
 
 class BatchCreateWithContainersRequest(BaseModel):
