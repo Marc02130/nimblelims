@@ -35,7 +35,8 @@ Copyright (c) 2025 Marc Breneiser
 #### Samples
 - `GET /samples` - List samples with filtering
 - `POST /samples` - Create new sample
-- `POST /samples/accession` - Accession sample with test assignment
+- `POST /samples/accession` - Accession sample with test assignment (supports client projects, test batteries)
+- `POST /samples/bulk-accession` - Bulk accession multiple samples (US-24)
 - `GET /samples/{id}` - Get sample details
 - `PATCH /samples/{id}` - Update sample
 - `PATCH /samples/{id}/status` - Update sample status
@@ -48,12 +49,15 @@ Copyright (c) 2025 Marc Breneiser
 
 #### Results
 - `GET /results` - List results
-- `POST /results` - Enter results
-- `PATCH /results/{id}` - Update results
+- `POST /results` - Enter single result
+- `POST /results/batch` - Enter batch results (US-28: Batch Results Entry with QC validation)
+- `POST /results/validate` - Validate result before entry
+- `PATCH /results/{id}` - Update result
 
 #### Batches
 - `GET /batches` - List batches
-- `POST /batches` - Create batch
+- `POST /batches` - Create batch (supports cross-project batching US-26, QC at creation US-27)
+- `POST /batches/validate-compatibility` - Validate container compatibility for cross-project batching
 - `GET /batches/{id}` - Get batch details
 - `POST /batches/{id}/containers` - Add container to batch
 
@@ -118,6 +122,24 @@ Copyright (c) 2025 Marc Breneiser
 - `POST /test-batteries/{id}/analyses` - Add analysis to battery (admin)
 - `PATCH /test-batteries/{id}/analyses/{analysis_id}` - Update sequence/optional (admin)
 - `DELETE /test-batteries/{id}/analyses/{analysis_id}` - Remove analysis from battery (admin)
+
+#### Test Batteries
+- `GET /test-batteries` - List test batteries with filtering
+- `GET /test-batteries/{id}` - Get battery with analyses
+- `POST /test-batteries` - Create battery (admin, requires config:edit or test:configure)
+- `PATCH /test-batteries/{id}` - Update battery (admin)
+- `DELETE /test-batteries/{id}` - Soft-delete battery (admin, 409 if referenced)
+- `GET /test-batteries/{id}/analyses` - List analyses in battery
+- `POST /test-batteries/{id}/analyses` - Add analysis to battery (admin)
+- `PATCH /test-batteries/{id}/analyses/{analysis_id}` - Update sequence/optional (admin)
+- `DELETE /test-batteries/{id}/analyses/{analysis_id}` - Remove analysis from battery (admin)
+
+#### Client Projects
+- `GET /client-projects` - List client projects
+- `POST /client-projects` - Create client project (requires project:manage)
+- `GET /client-projects/{id}` - Get client project details
+- `PATCH /client-projects/{id}` - Update client project
+- `DELETE /client-projects/{id}` - Soft-delete client project
 
 #### Other
 - `GET /units` - List units
@@ -202,6 +224,10 @@ Required environment variables (see `env.example`):
 - `JWT_ALGORITHM` - JWT algorithm (default: HS256)
 - `JWT_ACCESS_TOKEN_EXPIRE_MINUTES` - Token expiration time
 
+Optional environment variables:
+- `REQUIRE_QC_FOR_BATCH_TYPES` - Comma-separated list of batch type UUIDs that require QC samples
+- `FAIL_QC_BLOCKS_BATCH` - Set to `true` to block batch completion on QC failures (default: `false`)
+
 ### Database Migrations
 
 Migrations are managed with Alembic:
@@ -264,7 +290,7 @@ backend/
 
 ## Permissions
 
-The system uses granular permissions (~15 total):
+The system uses granular permissions (17 total):
 
 - `user:manage` - Manage users
 - `role:manage` - Manage roles
@@ -280,6 +306,9 @@ The system uses granular permissions (~15 total):
 - `result:review` - Review results
 - `batch:manage` - Manage batches
 - `batch:read` - Read batches
+- `batch:update` - Update batches
+- `batch:delete` - Delete batches
+- `sample:delete` - Delete samples
 
 ## API Documentation
 

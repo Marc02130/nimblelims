@@ -10,13 +10,15 @@ Copyright (c) 2025 Marc Breneiser
 
 ## Features
 
-### Sample Accessioning (US-1)
+### Sample Accessioning (US-1, US-24)
 - Multi-step wizard for sample entry
+- **Bulk Mode**: Toggle for bulk accessioning with common fields and unique per-sample data
 - Required fields: due_date, received_date, sample_type, status, matrix, temperature
 - Container specification: Select pre-setup container type, create instance dynamically
 - Optional double-entry validation for key fields
-- Test assignment during accessioning
+- Test assignment during accessioning (individual analyses or test batteries)
 - Container assignment with concentration/amount tracking
+- Client project selection for grouping multiple projects
 
 ### Container Management (US-5)
 - Create and manage hierarchical containers
@@ -43,6 +45,20 @@ Copyright (c) 2025 Marc Breneiser
 - Test batteries automatically create sequenced tests for all analyses in the battery
 - Test instances with status tracking
 - Integration with sample lifecycle
+
+### Batch Management (US-11, US-26, US-27)
+- Create batches with container tracking
+- **Cross-Project Batching**: Select containers from multiple projects with compatibility validation
+- **QC at Batch Creation**: Automatically generate QC samples when creating batches
+- Batch status management (Created → In Process → Completed)
+- Batch validation endpoint for pre-checking compatibility
+
+### Results Entry (US-9, US-28)
+- **Batch Results Entry**: Tabular interface for entering results for multiple tests/samples
+- Real-time validation (data type, range, required fields)
+- QC sample indicators and validation
+- Auto-update test and batch statuses on completion
+- Configurable QC blocking behavior
 
 ### Dashboard
 - Role-based views (client sees own projects)
@@ -140,7 +156,11 @@ Copyright (c) 2025 Marc Breneiser
 - `GET /units` - Get measurement units
 - `GET /projects` - Get user projects
 - `GET /batches` - List batches
-- `POST /batches` - Create batch
+- `POST /batches` - Create batch (with cross-project and QC support)
+- `POST /batches/validate-compatibility` - Validate container compatibility
+- `POST /results/batch` - Enter batch results
+- `GET /test-batteries` - List test batteries
+- `GET /client-projects` - List client projects
 
 ### Error Handling
 - Global error handling with user-friendly messages
@@ -211,11 +231,14 @@ The frontend is containerized with Nginx for production serving.
 
 ### Sample Accessioning Workflow
 1. Navigate to Accessioning page
-2. Fill sample details (name, type, dates, etc.)
-3. Enable double-entry validation if needed
-4. Select analyses for testing
-5. Review all information
-6. Submit to create sample, container, and tests
+2. Toggle bulk mode if needed (for multiple samples)
+3. Fill sample details (name, type, dates, etc.)
+   - In bulk mode: Fill common fields and unique per-sample data in table
+4. Enable double-entry validation if needed
+5. Select analyses or test battery for testing
+6. Review all information
+7. Submit to create sample(s), container(s), and tests
+   - Bulk mode: Creates all samples atomically in single transaction
 
 ### Container Management Workflow
 1. Navigate to Containers page

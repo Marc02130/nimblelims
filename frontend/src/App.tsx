@@ -17,6 +17,7 @@ import AnalysesManagement from './pages/admin/AnalysesManagement';
 import TestBatteriesManagement from './pages/admin/TestBatteriesManagement';
 import AnalytesManagement from './pages/admin/AnalytesManagement';
 import AnalysisAnalytesConfig from './pages/admin/AnalysisAnalytesConfig';
+import ClientProjects from './pages/ClientProjects';
 import { useUser } from './contexts/UserContext';
 
 function AppRoutes() {
@@ -63,6 +64,7 @@ function AppRoutes() {
           <Route path="/containers" element={<ContainerManagement />} />
           <Route path="/batches" element={<BatchManagement />} />
           <Route path="/results" element={<ResultsManagement />} />
+          <Route path="/client-projects" element={<ClientProjects />} />
         </Routes>
       </Box>
     </Box>

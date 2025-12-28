@@ -130,11 +130,15 @@ nimblelims/
 ## Features (MVP Scope)
 
 ### Core Workflows
-- **Sample Tracking**: Accessioning, status management, container hierarchy
+- **Sample Tracking**: Accessioning (single and bulk), status management, container hierarchy
 - **Test Ordering**: Assign individual analyses or test batteries to samples with status tracking
-- **Results Entry**: Batch-based results entry with validation
-- **Batch Management**: Create and manage batches with container tracking
+- **Results Entry**: Batch-based results entry with validation and QC checks
+- **Batch Management**: Create and manage batches with cross-project support and automatic QC generation
 - **Aliquots/Derivatives**: Create child samples with inheritance
+- **Bulk Accessioning** (US-24): Accession multiple samples with common fields and unique per-sample data
+- **Cross-Project Batching** (US-26): Batch samples from multiple projects with compatibility validation
+- **QC at Batch Creation** (US-27): Automatically generate QC samples when creating batches
+- **Batch Results Entry** (US-28): Enter results for multiple tests/samples in a batch atomically
 
 ### Container System
 - **Container Types**: Pre-setup by administrators (CRUD via admin interface)
@@ -150,13 +154,14 @@ nimblelims/
 - **Analytes Management**: Create and manage analytes (CRUD)
 - **Analysis-Analyte Configuration**: Configure validation rules (data types, ranges, significant figures, required flags)
 - **Test Batteries Management**: Group multiple analyses into reusable test batteries with sequence ordering and optional flags (CRUD)
+- **Client Projects Management**: Group multiple LIMS projects under client projects for holistic tracking (CRUD)
 - **Users Management**: Create and manage users with role assignments (CRUD)
 - **Roles & Permissions**: Manage roles and assign permissions (CRUD)
 - **Units Management**: Unit definitions with multipliers for conversions
 
 ### Security & Access
 - **Authentication**: JWT token-based authentication
-- **Authorization**: Role-Based Access Control (RBAC) with ~15 granular permissions
+- **Authorization**: Role-Based Access Control (RBAC) with 17 granular permissions
 - **Data Isolation**: Client-specific data access controls via project_users
 - **Row-Level Security**: PostgreSQL RLS policies for data protection
 
@@ -178,6 +183,11 @@ Copy `backend/env.example` to `backend/.env` and configure:
 - Database connection settings
 - JWT secret keys
 - Application environment settings
+
+### Optional Environment Variables
+
+- `REQUIRE_QC_FOR_BATCH_TYPES`: Comma-separated list of batch type UUIDs that require QC samples. If a batch type is in this list, QC samples must be provided during batch creation.
+- `FAIL_QC_BLOCKS_BATCH`: Set to `true` to block batch completion if QC samples fail validation. Default: `false` (warnings only).
 
 ## Health Checks
 
@@ -214,6 +224,9 @@ Comprehensive documentation is available in the `.docs/` directory:
   - `.docs/accessioning_workflow.md` - Sample accessioning process and workflow (includes test battery assignment)
   - `.docs/containers.md` - Container management, usage, and workflows
   - `.docs/lists.md` - Configurable lists system and administration
+  - `.docs/technical-accessioning-to-reporting.md` - Technical implementation details for accessioning through reporting
+  - `.docs/ui-accessioning-to-reporting.md` - UI components and interactions for accessioning through reporting
+  - `.docs/workflow-accessioning-to-reporting.md` - Complete workflow from accessioning through reporting
 - **Setup Guides**:
   - `.docs/lims_mvp_dev_setup.md` - Development environment setup
   - `.docs/admin_setup.md` - Admin user configuration

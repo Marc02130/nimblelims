@@ -14,12 +14,15 @@ import {
   Grid,
   Chip,
   Divider,
+  FormControlLabel,
+  Switch,
 } from '@mui/material';
 import {
   PlayArrow as PlayArrowIcon,
   CheckCircle as CheckCircleIcon,
 } from '@mui/icons-material';
 import ResultsEntryTable from './ResultsEntryTable';
+import BatchResultsEntryTable from './BatchResultsEntryTable';
 import { apiService } from '../../services/apiService';
 
 interface Batch {
@@ -34,6 +37,7 @@ interface Test {
   name: string;
   status: string;
   analysis_id: string;
+  sample_id: string;
 }
 
 interface Sample {
@@ -42,6 +46,7 @@ interface Sample {
   container_id: string;
   row: number;
   column: number;
+  qc_type?: string;
 }
 
 interface BatchResultsViewProps {
@@ -57,6 +62,7 @@ const BatchResultsView: React.FC<BatchResultsViewProps> = ({ batchId, onBack }) 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [resultsSaved, setResultsSaved] = useState(false);
+  const [bulkMode, setBulkMode] = useState(false);
 
   useEffect(() => {
     loadBatchData();
@@ -85,6 +91,7 @@ const BatchResultsView: React.FC<BatchResultsViewProps> = ({ batchId, onBack }) 
               container_id: container.id,
               row: container.row,
               column: container.column,
+              qc_type: content.sample?.qc_type || content.qc_type,
             });
           });
         }
@@ -110,9 +117,10 @@ const BatchResultsView: React.FC<BatchResultsViewProps> = ({ batchId, onBack }) 
     setResultsSaved(false);
   };
 
-  const handleResultsSaved = (results: any[]) => {
+  const handleResultsSaved = (results?: any[]) => {
     setResultsSaved(true);
-    // Optionally refresh the data or show success message
+    // Refresh batch data to get updated statuses
+    loadBatchData();
   };
 
   const getTestStatusColor = (status: string) => {
@@ -205,6 +213,19 @@ const BatchResultsView: React.FC<BatchResultsViewProps> = ({ batchId, onBack }) 
         <CardContent>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
             <Typography variant="h6">Results Entry</Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={bulkMode}
+                    onChange={(e) => {
+                      setBulkMode(e.target.checked);
+                      setResultsSaved(false);
+                    }}
+                  />
+                }
+                label="Bulk Entry Mode"
+              />
             {resultsSaved && (
               <Chip
                 icon={<CheckCircleIcon />}
@@ -213,48 +234,28 @@ const BatchResultsView: React.FC<BatchResultsViewProps> = ({ batchId, onBack }) 
                 variant="outlined"
               />
             )}
+            </Box>
           </Box>
 
           <Divider sx={{ mb: 2 }} />
 
-          <Grid container spacing={2} sx={{ mb: 3 }}>
-            <Grid size={{ xs: 12, sm: 6 }}>
-              <FormControl fullWidth>
-                <InputLabel>Select Test</InputLabel>
-                <Select
-                  value={selectedTest}
-                  onChange={(e) => handleTestChange(e.target.value)}
-                >
-                  {tests.map((test) => (
-                    <MenuItem key={test.id} value={test.id}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <Typography variant="body2">{test.name}</Typography>
-                        <Chip
-                          label={test.status}
-                          size="small"
-                          color={getTestStatusColor(test.status) as any}
-                        />
+          {bulkMode ? (
+            tests.length > 0 && samples.length > 0 ? (
+              <BatchResultsEntryTable
+                batchId={batchId}
+                tests={tests}
+                samples={samples}
+                onResultsSaved={handleResultsSaved}
+              />
+            ) : (
+              <Box textAlign="center" py={4}>
+                <Typography variant="body1" color="text.secondary">
+                  No tests or samples found in this batch
+                </Typography>
                       </Box>
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid size={{ xs: 12, sm: 6 }}>
-              <Button
-                variant="contained"
-                startIcon={<PlayArrowIcon />}
-                disabled={!selectedTest}
-                onClick={() => {
-                  // This could trigger analysis or other batch operations
-                  console.log('Starting analysis for test:', selectedTest);
-                }}
-              >
-                Start Analysis
-              </Button>
-            </Grid>
-          </Grid>
-
+            )
+          ) : (
+            <>
           {selectedTest && samples.length > 0 && (
             <ResultsEntryTable
               batchId={batchId}
@@ -278,6 +279,8 @@ const BatchResultsView: React.FC<BatchResultsViewProps> = ({ batchId, onBack }) 
                 Select a test to enter results
               </Typography>
             </Box>
+              )}
+            </>
           )}
         </CardContent>
       </Card>

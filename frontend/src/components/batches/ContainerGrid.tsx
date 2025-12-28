@@ -32,13 +32,26 @@ interface Container {
   id: string;
   name: string;
   type: string;
+  type_id?: string;
   row: number;
   column: number;
-  concentration: number;
-  concentration_units: string;
-  amount: number;
-  amount_units: string;
+  concentration?: number;
+  concentration_units?: string;
+  amount?: number;
+  amount_units?: string;
   samples?: any[];
+  contents?: Array<{
+    sample_id: string;
+    sample?: {
+      id: string;
+      name: string;
+      qc_type?: string;
+      qc_type_info?: {
+        id: string;
+        name: string;
+      };
+    };
+  }>;
 }
 
 interface ContainerGridProps {
@@ -60,29 +73,68 @@ const ContainerGrid: React.FC<ContainerGridProps> = ({
   const [containerTypes, setContainerTypes] = useState<any[]>([]);
   const [units, setUnits] = useState<any[]>([]);
   const [formData, setFormData] = useState<any>({});
+  const [batchContainers, setBatchContainers] = useState<Container[]>(containers);
+  const [qcTypes, setQcTypes] = useState<any[]>([]);
 
   useEffect(() => {
     loadData();
-  }, []);
+    loadBatchContainers();
+  }, [batchId]);
+
+  useEffect(() => {
+    setBatchContainers(containers);
+  }, [containers]);
+
+  const loadBatchContainers = async () => {
+    if (!batchId) return;
+    try {
+      const batch = await apiService.getBatch(batchId);
+      if (batch.containers) {
+        setBatchContainers(batch.containers.map((bc: any) => bc.container || bc));
+        onContainersChange(batch.containers.map((bc: any) => bc.container || bc));
+      }
+    } catch (err: any) {
+      console.error('Failed to load batch containers:', err);
+    }
+  };
 
   const loadData = async () => {
     try {
-      const [types, unitsData] = await Promise.all([
+      const [types, unitsData, qcTypesData] = await Promise.all([
         apiService.getContainerTypes(),
         apiService.getUnits(),
+        apiService.getListEntries('qc_types').catch(() => []),
       ]);
       setContainerTypes(types);
       setUnits(unitsData);
+      setQcTypes(qcTypesData || []);
     } catch (err) {
       setError('Failed to load container data');
     }
+  };
+
+  const isQCContainer = (container: Container): boolean => {
+    if (!container.contents || container.contents.length === 0) return false;
+    return container.contents.some(content => content.sample?.qc_type);
+  };
+
+  const getQCTypes = (container: Container): string[] => {
+    if (!container.contents) return [];
+    return container.contents
+      .filter(content => content.sample?.qc_type)
+      .map(content => {
+        const qcType = qcTypes.find(qt => qt.id === content.sample?.qc_type);
+        return qcType?.name || 'QC';
+      });
   };
 
   const handleAddContainer = async () => {
     try {
       setLoading(true);
       const result = await apiService.addContainerToBatch(batchId, formData);
-      onContainersChange([...containers, result]);
+      const updatedContainers = [...batchContainers, result];
+      setBatchContainers(updatedContainers);
+      onContainersChange(updatedContainers);
       setAddDialogOpen(false);
       setFormData({});
     } catch (err: any) {
@@ -98,9 +150,10 @@ const ContainerGrid: React.FC<ContainerGridProps> = ({
     try {
       setLoading(true);
       const result = await apiService.updateContainer(selectedContainer.id, formData);
-      const updatedContainers = containers.map(c => 
+      const updatedContainers = batchContainers.map(c => 
         c.id === selectedContainer.id ? result : c
       );
+      setBatchContainers(updatedContainers);
       onContainersChange(updatedContainers);
       setEditDialogOpen(false);
       setSelectedContainer(null);
@@ -116,7 +169,8 @@ const ContainerGrid: React.FC<ContainerGridProps> = ({
     try {
       setLoading(true);
       await apiService.removeContainerFromBatch(batchId, containerId);
-      const updatedContainers = containers.filter(c => c.id !== containerId);
+      const updatedContainers = batchContainers.filter(c => c.id !== containerId);
+      setBatchContainers(updatedContainers);
       onContainersChange(updatedContainers);
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Failed to remove container');
@@ -129,7 +183,7 @@ const ContainerGrid: React.FC<ContainerGridProps> = ({
     setSelectedContainer(container);
     setFormData({
       name: container.name,
-      type_id: container.type,
+      type_id: container.type_id || container.type,
       row: container.row,
       column: container.column,
       concentration: container.concentration,
@@ -140,11 +194,13 @@ const ContainerGrid: React.FC<ContainerGridProps> = ({
     setEditDialogOpen(true);
   };
 
-  const getContainerTypeName = (typeId: string) => {
+  const getContainerTypeName = (typeId: string | undefined) => {
+    if (!typeId) return 'Unknown';
     return containerTypes.find(t => t.id === typeId)?.name || typeId;
   };
 
-  const getUnitName = (unitId: string) => {
+  const getUnitName = (unitId: string | undefined) => {
+    if (!unitId) return '';
     return units.find(u => u.id === unitId)?.name || unitId;
   };
 
@@ -154,7 +210,17 @@ const ContainerGrid: React.FC<ContainerGridProps> = ({
   return (
     <Box>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-        <Typography variant="h6">Containers ({containers.length})</Typography>
+        <Typography variant="h6">
+          Containers ({batchContainers.length})
+          {batchContainers.filter(c => isQCContainer(c)).length > 0 && (
+            <Chip
+              label={`${batchContainers.filter(c => isQCContainer(c)).length} QC`}
+              size="small"
+              color="warning"
+              sx={{ ml: 1 }}
+            />
+          )}
+        </Typography>
         <Button
           variant="contained"
           startIcon={<AddIcon />}
@@ -171,12 +237,32 @@ const ContainerGrid: React.FC<ContainerGridProps> = ({
       )}
 
       <Grid container spacing={2}>
-        {containers.map((container) => (
+        {batchContainers.map((container) => {
+          const isQC = isQCContainer(container);
+          const qcTypeNames = getQCTypes(container);
+          
+          return (
           <Grid size={{ xs: 12, sm: 6, md: 4 }} key={container.id}>
-            <Card>
+              <Card
+                sx={{
+                  border: isQC ? '2px solid' : '1px solid',
+                  borderColor: isQC ? 'warning.main' : 'divider',
+                  bgcolor: isQC ? 'warning.light' : 'background.paper',
+                }}
+              >
               <CardContent>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
+                    <Box>
                   <Typography variant="h6">{container.name}</Typography>
+                      {isQC && (
+                        <Chip
+                          label={`QC: ${qcTypeNames.join(', ')}`}
+                          size="small"
+                          color="warning"
+                          sx={{ mt: 0.5 }}
+                        />
+                      )}
+                    </Box>
                   <Box>
                     <IconButton
                       size="small"
@@ -195,7 +281,7 @@ const ContainerGrid: React.FC<ContainerGridProps> = ({
                 </Box>
                 
                 <Typography variant="body2" color="text.secondary" gutterBottom>
-                  {getContainerTypeName(container.type)}
+                    {getContainerTypeName(container.type_id || container.type)}
                 </Typography>
 
                 <Box sx={{ mb: 1 }}>
@@ -206,17 +292,40 @@ const ContainerGrid: React.FC<ContainerGridProps> = ({
                   />
                 </Box>
 
-                {container.concentration > 0 && (
+                  {container.concentration && container.concentration > 0 && (
                   <Typography variant="body2">
                     Concentration: {container.concentration} {getUnitName(container.concentration_units)}
                   </Typography>
                 )}
 
-                {container.amount > 0 && (
+                  {container.amount && container.amount > 0 && (
                   <Typography variant="body2">
                     Amount: {container.amount} {getUnitName(container.amount_units)}
                   </Typography>
                 )}
+
+                  {container.contents && container.contents.length > 0 && (
+                    <Box sx={{ mt: 1 }}>
+                      {container.contents.map((content, idx) => (
+                        <Typography
+                          key={idx}
+                          variant="body2"
+                          color={content.sample?.qc_type ? 'warning.main' : 'primary'}
+                          fontWeight={content.sample?.qc_type ? 'bold' : 'normal'}
+                        >
+                          {content.sample?.name || `Sample ${idx + 1}`}
+                          {content.sample?.qc_type && (
+                            <Chip
+                              label={qcTypeNames[idx] || 'QC'}
+                              size="small"
+                              color="warning"
+                              sx={{ ml: 1 }}
+                            />
+                          )}
+                        </Typography>
+                      ))}
+                    </Box>
+                  )}
 
                 {container.samples && container.samples.length > 0 && (
                   <Typography variant="body2" color="primary">
@@ -226,7 +335,8 @@ const ContainerGrid: React.FC<ContainerGridProps> = ({
               </CardContent>
             </Card>
           </Grid>
-        ))}
+          );
+        })}
       </Grid>
 
       {/* Add Container Dialog */}

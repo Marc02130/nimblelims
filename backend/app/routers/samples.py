@@ -11,7 +11,7 @@ from models.project import Project
 from models.user import User
 from app.schemas.sample import (
     SampleCreate, SampleUpdate, SampleResponse, SampleListResponse,
-    SampleAccessioningRequest
+    SampleAccessioningRequest, BulkSampleAccessioningRequest
 )
 from app.core.rbac import (
     require_sample_create, require_sample_read, require_sample_update,
@@ -22,6 +22,84 @@ from datetime import datetime
 from uuid import UUID
 
 router = APIRouter()
+
+
+def _create_tests_for_sample(
+    db: Session,
+    sample: Sample,
+    battery_id: Optional[UUID],
+    assigned_tests: List[UUID],
+    in_process_status_id: UUID,
+    current_user_id: UUID
+):
+    """
+    Helper function to create tests for a sample.
+    Shared between single and bulk accessioning.
+    """
+    from models.test import Test
+    from models.test_battery import TestBattery, BatteryAnalysis
+    
+    # Handle battery assignment (creates tests for all analyses in battery)
+    if battery_id:
+        # Verify battery exists and is active
+        battery = db.query(TestBattery).filter(
+            TestBattery.id == battery_id,
+            TestBattery.active == True
+        ).first()
+        
+        if not battery:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Test battery not found or inactive"
+            )
+        
+        # Get all analyses in battery, ordered by sequence
+        battery_analyses = db.query(BatteryAnalysis).filter(
+            BatteryAnalysis.battery_id == battery_id
+        ).order_by(BatteryAnalysis.sequence).all()
+        
+        if not battery_analyses:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Test battery has no analyses assigned"
+            )
+        
+        # Create tests for each analysis in the battery (in sequence order)
+        for battery_analysis in battery_analyses:
+            test = Test(
+                name=f"{sample.name}_test_{battery_analysis.analysis_id}",
+                sample_id=sample.id,
+                analysis_id=battery_analysis.analysis_id,
+                battery_id=battery_id,
+                status=in_process_status_id,
+                technician_id=current_user_id,
+                created_by=current_user_id,
+                modified_by=current_user_id
+            )
+            db.add(test)
+    
+    # Also handle individual test assignments (if provided)
+    if assigned_tests:
+        for analysis_id in assigned_tests:
+            # Check if test already exists (from battery assignment)
+            existing_test = db.query(Test).filter(
+                Test.sample_id == sample.id,
+                Test.analysis_id == analysis_id,
+                Test.active == True
+            ).first()
+            
+            if not existing_test:
+                test = Test(
+                    name=f"{sample.name}_test_{analysis_id}",
+                    sample_id=sample.id,
+                    analysis_id=analysis_id,
+                    battery_id=None,  # Individual assignment, not from battery
+                    status=in_process_status_id,
+                    technician_id=current_user_id,
+                    created_by=current_user_id,
+                    modified_by=current_user_id
+                )
+                db.add(test)
 
 
 @router.get("", response_model=SampleListResponse)
@@ -224,6 +302,28 @@ async def accession_sample(
             detail="Sample status 'Received' not found in configuration"
         )
     
+    # Verify client_project_id if provided
+    if accession_data.client_project_id:
+        from models.client import ClientProject
+        client_project = db.query(ClientProject).filter(
+            ClientProject.id == accession_data.client_project_id,
+            ClientProject.active == True
+        ).first()
+        
+        if not client_project:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Client project not found or inactive"
+            )
+        
+        # Verify client_project belongs to the same client as the project
+        project = db.query(Project).filter(Project.id == accession_data.project_id).first()
+        if project and project.client_id != client_project.client_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Client project does not belong to the same client as the project"
+            )
+    
     # Create sample
     sample = Sample(
         name=accession_data.name,
@@ -239,6 +339,12 @@ async def accession_sample(
         created_by=current_user.id,
         modified_by=current_user.id
     )
+    
+    # Link project to client_project if provided
+    if accession_data.client_project_id:
+        project = db.query(Project).filter(Project.id == accession_data.project_id).first()
+        if project:
+            project.client_project_id = accession_data.client_project_id
     
     db.add(sample)
     db.flush()  # Get the ID without committing
@@ -259,74 +365,274 @@ async def accession_sample(
             detail="Test status 'In Process' not found in configuration"
         )
     
-    # Handle battery assignment (creates tests for all analyses in battery)
-    if accession_data.battery_id:
-        # Verify battery exists and is active
-        battery = db.query(TestBattery).filter(
-            TestBattery.id == accession_data.battery_id,
-            TestBattery.active == True
-        ).first()
-        
-        if not battery:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Test battery not found or inactive"
-            )
-        
-        # Get all analyses in battery, ordered by sequence
-        battery_analyses = db.query(BatteryAnalysis).filter(
-            BatteryAnalysis.battery_id == accession_data.battery_id
-        ).order_by(BatteryAnalysis.sequence).all()
-        
-        if not battery_analyses:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Test battery has no analyses assigned"
-            )
-        
-        # Create tests for each analysis in the battery (in sequence order)
-        for battery_analysis in battery_analyses:
-            # Skip optional analyses if needed (for now, create all)
-            # In future, could add logic to skip optional analyses based on user preference
-            test = Test(
-                name=f"{sample.name}_test_{battery_analysis.analysis_id}",
-                sample_id=sample.id,
-                analysis_id=battery_analysis.analysis_id,
-                battery_id=accession_data.battery_id,
-                status=in_process_status.id,
-                technician_id=current_user.id,
-                created_by=current_user.id,
-                modified_by=current_user.id
-            )
-            db.add(test)
-    
-    # Also handle individual test assignments (if provided)
-    if accession_data.assigned_tests:
-        for analysis_id in accession_data.assigned_tests:
-            # Check if test already exists (from battery assignment)
-            existing_test = db.query(Test).filter(
-                Test.sample_id == sample.id,
-                Test.analysis_id == analysis_id,
-                Test.active == True
-            ).first()
-            
-            if not existing_test:
-                test = Test(
-                    name=f"{sample.name}_test_{analysis_id}",
-                    sample_id=sample.id,
-                    analysis_id=analysis_id,
-                    battery_id=None,  # Individual assignment, not from battery
-                    status=in_process_status.id,
-                    technician_id=current_user.id,
-                    created_by=current_user.id,
-                    modified_by=current_user.id
-                )
-                db.add(test)
+    # Create tests using shared helper function
+    _create_tests_for_sample(
+        db=db,
+        sample=sample,
+        battery_id=accession_data.battery_id,
+        assigned_tests=accession_data.assigned_tests,
+        in_process_status_id=in_process_status.id,
+        current_user_id=current_user.id
+    )
     
     db.commit()
     db.refresh(sample)
     
     return SampleResponse.from_orm(sample)
+
+
+@router.post("/bulk-accession", response_model=List[SampleResponse])
+async def bulk_accession_samples(
+    bulk_data: BulkSampleAccessioningRequest,
+    current_user: User = Depends(require_sample_create),
+    db: Session = Depends(get_db)
+):
+    """
+    Bulk accession multiple samples with test assignment.
+    Implements US-24: Bulk Sample Accessioning.
+    Creates samples, containers, contents, and tests in a single transaction.
+    """
+    # Check project access
+    if current_user.role.name != "Administrator":
+        from models.project import ProjectUser
+        project_access = db.query(ProjectUser).filter(
+            ProjectUser.project_id == bulk_data.project_id,
+            ProjectUser.user_id == current_user.id
+        ).first()
+        
+        if not project_access:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied: insufficient project permissions"
+            )
+    
+    # Validate container type exists
+    from models.container import ContainerType
+    container_type = db.query(ContainerType).filter(
+        ContainerType.id == bulk_data.container_type_id,
+        ContainerType.active == True
+    ).first()
+    
+    if not container_type:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid container type ID"
+        )
+    
+    # Verify client_project_id if provided
+    if bulk_data.client_project_id:
+        from models.client import ClientProject
+        client_project = db.query(ClientProject).filter(
+            ClientProject.id == bulk_data.client_project_id,
+            ClientProject.active == True
+        ).first()
+        
+        if not client_project:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Client project not found or inactive"
+            )
+        
+        # Verify client_project belongs to the same client as the project
+        project = db.query(Project).filter(Project.id == bulk_data.project_id).first()
+        if project and project.client_id != client_project.client_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Client project does not belong to the same client as the project"
+            )
+    
+    # Get initial status (e.g., "Received")
+    from models.list import List, ListEntry
+    sample_status_list = db.query(List).filter(List.name == "sample_status").first()
+    if not sample_status_list:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Sample status list not found in configuration"
+        )
+    
+    received_status = db.query(ListEntry).filter(
+        ListEntry.list_id == sample_status_list.id,
+        ListEntry.name == "Received"
+    ).first()
+    
+    if not received_status:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Sample status 'Received' not found in configuration"
+        )
+    
+    # Get "In Process" status for tests
+    test_status_list = db.query(List).filter(List.name == "test_status").first()
+    if not test_status_list:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Test status list not found in configuration"
+        )
+    
+    in_process_status = db.query(ListEntry).filter(
+        ListEntry.list_id == test_status_list.id,
+        ListEntry.name == "In Process"
+    ).first()
+    
+    if not in_process_status:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Test status 'In Process' not found in configuration"
+        )
+    
+    # Validate unique names and container names
+    sample_names = []
+    container_names = []
+    client_sample_ids = []
+    
+    auto_name_counter = bulk_data.auto_name_start or 1
+    
+    for unique in bulk_data.uniques:
+        # Generate name if not provided
+        if unique.name:
+            sample_name = unique.name
+        elif bulk_data.auto_name_prefix:
+            sample_name = f"{bulk_data.auto_name_prefix}{auto_name_counter}"
+            auto_name_counter += 1
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Sample name required or auto_name_prefix must be provided"
+            )
+        
+        sample_names.append(sample_name)
+        container_names.append(unique.container_name)
+        
+        if unique.client_sample_id:
+            client_sample_ids.append(unique.client_sample_id)
+    
+    # Check for duplicate sample names
+    existing_samples = db.query(Sample).filter(
+        Sample.name.in_(sample_names),
+        Sample.active == True
+    ).all()
+    
+    if existing_samples:
+        duplicate_names = [s.name for s in existing_samples]
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Duplicate sample names found: {', '.join(duplicate_names)}"
+        )
+    
+    # Check for duplicate container names
+    from models.container import Container
+    existing_containers = db.query(Container).filter(
+        Container.name.in_(container_names),
+        Container.active == True
+    ).all()
+    
+    if existing_containers:
+        duplicate_containers = [c.name for c in existing_containers]
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Duplicate container names found: {', '.join(duplicate_containers)}"
+        )
+    
+    # Check for duplicate client_sample_ids
+    if client_sample_ids:
+        existing_client_ids = db.query(Sample).filter(
+            Sample.client_sample_id.in_(client_sample_ids),
+            Sample.active == True
+        ).all()
+        
+        if existing_client_ids:
+            duplicate_client_ids = [s.client_sample_id for s in existing_client_ids if s.client_sample_id]
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Duplicate client_sample_ids found: {', '.join(duplicate_client_ids)}"
+            )
+    
+    # Create all samples, containers, contents, and tests in a transaction
+    created_samples = []
+    auto_name_counter = bulk_data.auto_name_start or 1
+    
+    try:
+        for idx, unique in enumerate(bulk_data.uniques):
+            # Generate name if not provided
+            if unique.name:
+                sample_name = unique.name
+            else:
+                sample_name = f"{bulk_data.auto_name_prefix}{auto_name_counter}"
+                auto_name_counter += 1
+            
+            # Create sample
+            sample = Sample(
+                name=sample_name,
+                description=unique.description,
+                due_date=bulk_data.due_date,
+                received_date=bulk_data.received_date,
+                sample_type=bulk_data.sample_type,
+                status=received_status.id,
+                matrix=bulk_data.matrix,
+                temperature=unique.temperature if unique.temperature is not None else None,
+                project_id=bulk_data.project_id,
+                qc_type=bulk_data.qc_type,
+                client_sample_id=unique.client_sample_id,
+                created_by=current_user.id,
+                modified_by=current_user.id
+            )
+            db.add(sample)
+            db.flush()  # Get the ID without committing
+            
+            # Link project to client_project if provided (only need to do this once)
+            if bulk_data.client_project_id and idx == 0:
+                project = db.query(Project).filter(Project.id == bulk_data.project_id).first()
+                if project:
+                    project.client_project_id = bulk_data.client_project_id
+            
+            # Create container
+            container = Container(
+                name=unique.container_name,
+                type_id=bulk_data.container_type_id,
+                row=1,
+                column=1,
+                created_by=current_user.id,
+                modified_by=current_user.id
+            )
+            db.add(container)
+            db.flush()  # Get the ID without committing
+            
+            # Link sample to container via contents
+            from models.container import Contents
+            contents = Contents(
+                container_id=container.id,
+                sample_id=sample.id
+            )
+            db.add(contents)
+            
+            # Create tests using shared helper function
+            _create_tests_for_sample(
+                db=db,
+                sample=sample,
+                battery_id=bulk_data.battery_id,
+                assigned_tests=bulk_data.assigned_tests,
+                in_process_status_id=in_process_status.id,
+                current_user_id=current_user.id
+            )
+            
+            created_samples.append(sample)
+        
+        # Commit all changes in a single transaction
+        db.commit()
+        
+        # Refresh all samples to get full data
+        for sample in created_samples:
+            db.refresh(sample)
+        
+        return [SampleResponse.from_orm(sample) for sample in created_samples]
+        
+    except Exception as e:
+        # Rollback on any error
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Failed to create samples: {str(e)}"
+        )
 
 
 @router.patch("/{sample_id}", response_model=SampleResponse)

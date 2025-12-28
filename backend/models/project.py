@@ -12,10 +12,12 @@ class Project(BaseModel):
     # Project-specific fields
     start_date = Column(DateTime, nullable=False)
     client_id = Column(PostgresUUID(as_uuid=True), ForeignKey('clients.id'), nullable=False)
+    client_project_id = Column(PostgresUUID(as_uuid=True), ForeignKey('client_projects.id'), nullable=True)
     status = Column(PostgresUUID(as_uuid=True), ForeignKey('list_entries.id'), nullable=False)
     
     # Relationships
     client = relationship("Client", back_populates="projects")
+    client_project = relationship("ClientProject", back_populates="projects")
     users = relationship(
         "User", 
         secondary="project_users", 

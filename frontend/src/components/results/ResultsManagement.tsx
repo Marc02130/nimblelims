@@ -28,6 +28,7 @@ import {
   PlayArrow as PlayArrowIcon,
   Visibility as ViewIcon,
   Edit as EditIcon,
+  Warning as WarningIcon,
 } from '@mui/icons-material';
 import BatchResultsView from './BatchResultsView';
 import { apiService } from '../../services/apiService';
@@ -39,6 +40,16 @@ interface Batch {
   status: string;
   container_count: number;
   created_at: string;
+  containers?: Array<{
+    container_id: string;
+    container?: {
+      contents?: Array<{
+        sample?: {
+          qc_type?: string;
+        };
+      }>;
+    };
+  }>;
 }
 
 interface ResultsManagementProps {
@@ -53,10 +64,12 @@ const ResultsManagement: React.FC<ResultsManagementProps> = ({ onBack }) => {
   const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [batchStatuses, setBatchStatuses] = useState<any[]>([]);
+  const [qcTypes, setQcTypes] = useState<any[]>([]);
 
   useEffect(() => {
     loadBatches();
     loadListEntries();
+    loadQCTypes();
   }, [statusFilter]);
 
   const loadListEntries = async () => {
@@ -66,6 +79,44 @@ const ResultsManagement: React.FC<ResultsManagementProps> = ({ onBack }) => {
     } catch (err) {
       console.error('Failed to load list entries:', err);
     }
+  };
+
+  const loadQCTypes = async () => {
+    try {
+      const types = await apiService.getListEntries('qc_types');
+      setQcTypes(types || []);
+    } catch (err) {
+      console.error('Failed to load QC types:', err);
+    }
+  };
+
+  // Check if batch has QC samples
+  const hasQCSamples = (batch: Batch): boolean => {
+    if (!batch.containers) return false;
+    return batch.containers.some(bc => {
+      const container = bc.container;
+      if (!container?.contents) return false;
+      return container.contents.some(content => content.sample?.qc_type);
+    });
+  };
+
+  // Get QC type names for a batch
+  const getQCTypesForBatch = (batch: Batch): string[] => {
+    if (!batch.containers) return [];
+    const qcTypeIds = new Set<string>();
+    batch.containers.forEach(bc => {
+      const container = bc.container;
+      if (container?.contents) {
+        container.contents.forEach(content => {
+          if (content.sample?.qc_type) {
+            qcTypeIds.add(content.sample.qc_type);
+          }
+        });
+      }
+    });
+    return Array.from(qcTypeIds)
+      .map(id => qcTypes.find(qt => qt.id === id)?.name)
+      .filter(Boolean) as string[];
   };
 
   const loadBatches = async () => {
@@ -91,6 +142,7 @@ const ResultsManagement: React.FC<ResultsManagementProps> = ({ onBack }) => {
   const handleBackToList = () => {
     setView('list');
     setSelectedBatch(null);
+    loadBatches(); // Refresh batches to show updated statuses
   };
 
   const getStatusColor = (status: string) => {
@@ -175,12 +227,16 @@ const ResultsManagement: React.FC<ResultsManagementProps> = ({ onBack }) => {
                       <TableCell>Description</TableCell>
                       <TableCell>Status</TableCell>
                       <TableCell>Containers</TableCell>
+                      <TableCell>QC Samples</TableCell>
                       <TableCell>Created</TableCell>
                       <TableCell align="right">Actions</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {batches.map((batch) => (
+                    {batches.map((batch) => {
+                      const hasQC = hasQCSamples(batch);
+                      const qcTypeNames = getQCTypesForBatch(batch);
+                      return (
                       <TableRow key={batch.id}>
                         <TableCell>{batch.name}</TableCell>
                         <TableCell>{batch.description}</TableCell>
@@ -191,7 +247,22 @@ const ResultsManagement: React.FC<ResultsManagementProps> = ({ onBack }) => {
                             size="small"
                           />
                         </TableCell>
-                        <TableCell>{batch.container_count}</TableCell>
+                          <TableCell>{batch.container_count || batch.containers?.length || 0}</TableCell>
+                          <TableCell>
+                            {hasQC ? (
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                <WarningIcon color="warning" fontSize="small" />
+                                <Chip
+                                  label={qcTypeNames.length > 0 ? qcTypeNames.join(', ') : 'QC'}
+                                  size="small"
+                                  color="warning"
+                                  variant="outlined"
+                                />
+                              </Box>
+                            ) : (
+                              <Typography variant="body2" color="text.secondary">None</Typography>
+                            )}
+                          </TableCell>
                         <TableCell>{formatDate(batch.created_at)}</TableCell>
                         <TableCell align="right">
                           <Button
@@ -204,7 +275,8 @@ const ResultsManagement: React.FC<ResultsManagementProps> = ({ onBack }) => {
                           </Button>
                         </TableCell>
                       </TableRow>
-                    ))}
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </TableContainer>

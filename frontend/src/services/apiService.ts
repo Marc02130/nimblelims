@@ -83,6 +83,32 @@ class ApiService {
     return response.data;
   }
 
+  async bulkAccessionSamples(bulkData: {
+    due_date: string;
+    received_date: string;
+    sample_type: string;
+    matrix: string;
+    project_id: string;
+    client_project_id?: string;
+    qc_type?: string;
+    assigned_tests: string[];
+    battery_id?: string;
+    container_type_id: string;
+    uniques: Array<{
+      name?: string;
+      client_sample_id?: string;
+      container_name: string;
+      temperature?: number;
+      anomalies?: string;
+      description?: string;
+    }>;
+    auto_name_prefix?: string;
+    auto_name_start?: number;
+  }) {
+    const response: AxiosResponse = await this.api.post('/samples/bulk-accession', bulkData);
+    return response.data;
+  }
+
   async updateSample(id: string, sampleData: any) {
     const response: AxiosResponse = await this.api.patch(`/samples/${id}`, sampleData);
     return response.data;
@@ -112,9 +138,14 @@ class ApiService {
   }
 
   // Container endpoints
-  async getContainers(filters?: { type_id?: string; parent_container_id?: string }) {
+  async getContainers(filters?: { type_id?: string; parent_container_id?: string; project_ids?: string[] }) {
+    const params: any = { ...filters };
+    // Handle project_ids array for cross-project queries
+    if (filters?.project_ids && Array.isArray(filters.project_ids)) {
+      params.project_ids = filters.project_ids.join(',');
+    }
     const response: AxiosResponse = await this.api.get('/containers', {
-      params: filters,
+      params,
     });
     return response.data;
   }
@@ -305,6 +336,11 @@ class ApiService {
     return response.data;
   }
 
+  async validateBatchCompatibility(data: { container_ids: string[] }) {
+    const response: AxiosResponse = await this.api.post('/batches/validate-compatibility', data);
+    return response.data;
+  }
+
   async updateBatch(id: string, batchData: any) {
     const response: AxiosResponse = await this.api.patch(`/batches/${id}`, batchData);
     return response.data;
@@ -351,7 +387,8 @@ class ApiService {
   }
 
   async enterBatchResults(batchId: string, resultsData: any) {
-    const response: AxiosResponse = await this.api.post(`/batches/${batchId}/results`, resultsData);
+    // US-28: Batch Results Entry endpoint
+    const response: AxiosResponse = await this.api.post(`/results/batch`, resultsData);
     return response.data;
   }
 
@@ -504,6 +541,42 @@ class ApiService {
   // Clients endpoints
   async getClients() {
     const response: AxiosResponse = await this.api.get('/clients');
+    return response.data;
+  }
+
+  // Client Projects endpoints
+  async getClientProjects(filters?: { client_id?: string; page?: number; size?: number }) {
+    const response: AxiosResponse = await this.api.get('/client-projects', {
+      params: filters,
+    });
+    return response.data;
+  }
+
+  async getClientProject(id: string) {
+    const response: AxiosResponse = await this.api.get(`/client-projects/${id}`);
+    return response.data;
+  }
+
+  async createClientProject(clientProjectData: {
+    name: string;
+    description?: string;
+    client_id: string;
+  }) {
+    const response: AxiosResponse = await this.api.post('/client-projects', clientProjectData);
+    return response.data;
+  }
+
+  async updateClientProject(id: string, clientProjectData: {
+    name?: string;
+    description?: string;
+    active?: boolean;
+  }) {
+    const response: AxiosResponse = await this.api.patch(`/client-projects/${id}`, clientProjectData);
+    return response.data;
+  }
+
+  async deleteClientProject(id: string) {
+    const response: AxiosResponse = await this.api.delete(`/client-projects/${id}`);
     return response.data;
   }
 }

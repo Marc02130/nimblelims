@@ -116,6 +116,19 @@ const Navbar: React.FC = () => {
             </Button>
           )}
 
+          {hasPermission('project:manage') && (
+            <Button
+              color="inherit"
+              startIcon={<ViewList />}
+              onClick={() => navigate('/client-projects')}
+              sx={{ 
+                bgcolor: isActive('/client-projects') ? 'rgba(255,255,255,0.1)' : 'transparent'
+              }}
+            >
+              Client Projects
+            </Button>
+          )}
+
           {hasPermission('config:edit') && (
             <Button
               color="inherit"

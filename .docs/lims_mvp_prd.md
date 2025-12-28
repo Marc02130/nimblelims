@@ -63,7 +63,7 @@ The LIMS MVP enables labs to manage samples from receipt to reporting, including
   - Batches as container groups; statuses: Created, In Process, Completed.
   - Plates as containers with wells; support pooling via contents.
 - **Security and Auth**:
-  - RBAC with ~15 permissions (e.g., sample:create, result:enter).
+  - RBAC with 17 permissions (e.g., sample:create, result:enter, batch:manage).
   - User auth: Username/password + email verification.
   - Client isolation: View own projects/samples only; project_users junction for access.
 - **Configurable Elements**:
@@ -89,12 +89,14 @@ The LIMS MVP enables labs to manage samples from receipt to reporting, including
 
 | Role            | Description                                                                 | Key Permissions (Examples) |
 |-----------------|-----------------------------------------------------------------------------|----------------------------|
-| Administrator  | Manages system, users, and configs.                                        | All (~15): user:manage, config:edit, test:configure, project:manage. |
+| Administrator  | Manages system, users, and configs.                                        | All (17): user:manage, role:manage, config:edit, project:manage, sample:*, test:*, result:*, batch:*. |
 | Lab Manager    | Oversees operations, reviews results.                                       | result:review, batch:manage, test:assign. |
 | Lab Technician | Handles daily tasks like accessioning and entry.                            | sample:create, result:enter, test:assign. |
 | Client         | Views own data.                                                             | sample:read (own), result:read (own). |
 
-Permissions managed via roles, permissions, and role_permissions tables (~15 total, e.g., sample:create, result:enter, config:edit, test:configure, user:manage).
+Permissions managed via roles, permissions, and role_permissions tables (17 total permissions: sample:create, sample:read, sample:update, test:assign, test:update, result:enter, result:review, result:update, result:delete, batch:manage, batch:read, batch:update, batch:delete, project:manage, user:manage, role:manage, config:edit).
+
+**Note**: The code references `test:configure` permission in several places, but this permission is not currently created in the database. Endpoints that reference it use `require_any_permission(["config:edit", "test:configure"])`, which effectively requires `config:edit` permission.
 
 ## 5. Functional Requirements
 
@@ -183,3 +185,87 @@ Relationships: Normalized with FKs (e.g., samples → projects, tests → sample
 ## 9. Appendices
 - Glossary: LIMS (Laboratory Information Management System), RBAC (Role-Based Access Control), etc.
 - References: Discussions with Grok AI for schema/workflows.
+
+
+
+# Post-MVP Product Requirements Document (PRD) for LIMS
+## 1. Introduction
+### 1.1 Purpose
+This PRD outlines post-MVP enhancements for the LIMS, focusing on efficiency for high-volume workflows like bulk accessioning and batch results entry.
+### 1.2 Project Overview
+Extends MVP with bulk features, cross-project batching, and client project grouping for real-world scalability.
+### 1.3 Stakeholders
+
+Same as MVP, with emphasis on Lab Technicians for bulk efficiency.
+
+### 1.4 Version History
+
+Version 1.0: Initial post-MVP draft (December 28, 2025).
+
+## 2. Goals and Objectives
+### 2.1 Business Goals
+
+Improve throughput for batch-heavy labs.
+Enhance QC integration and validation.
+
+### 2.2 User Goals
+
+Reduce repetition in multi-sample workflows.
+Group and process across projects efficiently.
+
+### 2.3 Success Metrics
+
+Reduced accessioning time for batches (<2 min for 5 samples).
+100% QC coverage in batches.
+
+## 3. Scope
+### 3.1 In Scope
+
+Bulk accessioning with common/uniques.
+Client projects for grouping.
+Cross-project batching with compatibility.
+QC addition at batch.
+Batch results entry with validation.
+
+### 3.2 Out of Scope
+
+Full automation (e.g., AI validation).
+External integrations.
+
+## 4. Functional Requirements
+### 4.1 Bulk Accessioning
+
+UI: Toggle, common fields, unique table.
+Backend: Atomic multi-create.
+
+### 4.2 Client Projects
+
+Hierarchy: One client project → many LIMS projects.
+Access: Inherited via RLS.
+
+### 4.3 Advanced Batching
+
+Cross-project: Compatible tests only.
+QC: Auto-generate at creation.
+
+### 4.4 Batch Results
+
+Tabular entry; QC flags/blocks.
+
+## 5. Non-Functional Requirements
+### 5.1 Security
+
+Extend RLS for client projects.
+
+### 5.2 Performance
+
+Handle 50-sample bulks <5s.
+
+## 6. Data Model Enhancements
+
+New: client_projects.
+Updates: projects (client_project_id), samples (client_sample_id).
+
+## 7. Assumptions and Dependencies
+
+Builds on MVP; Alembic for migrations.

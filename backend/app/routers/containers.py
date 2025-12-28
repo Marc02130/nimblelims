@@ -105,18 +105,39 @@ async def update_container_type(
 async def get_containers(
     type_id: Optional[UUID] = Query(None, description="Filter by container type"),
     parent_id: Optional[UUID] = Query(None, description="Filter by parent container"),
+    project_ids: Optional[str] = Query(None, description="Comma-separated list of project IDs for cross-project filtering"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
     Get containers with filtering.
+    Supports cross-project filtering via project_ids parameter.
     """
+    from models.sample import Sample
+    
     query = db.query(Container).filter(Container.active == True)
     
     if type_id:
         query = query.filter(Container.type_id == type_id)
     if parent_id:
         query = query.filter(Container.parent_container_id == parent_id)
+    
+    # Filter by project_ids if provided (for cross-project batching)
+    if project_ids:
+        project_id_list = [UUID(p.strip()) for p in project_ids.split(',') if p.strip()]
+        if project_id_list:
+            # Get samples in these projects
+            sample_ids = db.query(Sample.id).filter(
+                Sample.project_id.in_(project_id_list),
+                Sample.active == True
+            ).subquery()
+            
+            # Get containers that have contents with these samples
+            container_ids = db.query(Contents.container_id).filter(
+                Contents.sample_id.in_(sample_ids)
+            ).distinct().subquery()
+            
+            query = query.filter(Container.id.in_(container_ids))
     
     containers = query.all()
     return [ContainerResponse.from_orm(container) for container in containers]
