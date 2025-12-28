@@ -190,6 +190,7 @@ def upgrade() -> None:
         ('cccccccc-cccc-cccc-cccc-cccccccccccc', 'a1a1a1a1-a1a1-a1a1-a1a1-a1a1a1a1a1a1'),
         ('cccccccc-cccc-cccc-cccc-cccccccccccc', 'b1b1b1b1-b1b1-b1b1-b1b1-b1b1b1b1b1b1'),
         ('cccccccc-cccc-cccc-cccc-cccccccccccc', 'd1d1d1d1-d1d1-d1d1-d1d1-d1d1d1d1d1d1'),
+        ('cccccccc-cccc-cccc-cccc-cccccccccccc', 'e1e1e1e1-e1e1-e1e1-e1e1-e1e1e1e1e1e1'),  # batch:read
         
         # Client permissions
         ('dddddddd-dddd-dddd-dddd-dddddddddddd', 'd0d0d0d0-d0d0-d0d0-d0d0-d0d0d0d0d0d0'),
@@ -264,13 +265,33 @@ def upgrade() -> None:
             ON CONFLICT (username) DO NOTHING
         """)
     )
+    
+    # Create lab-manager user
+    connection.execute(
+        sa.text("""
+            INSERT INTO users (id, name, username, email, password_hash, role_id, client_id, active, created_at, modified_at) 
+            VALUES ('00000000-0000-0000-0000-000000000002', 'Lab Manager', 'lab-manager', 'lab-manager@lims.local', '7dd63afe29407aa45af7fdd4388b71195b552688c2750abd42bdf3b231c13b69', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', '00000000-0000-0000-0000-000000000001', true, NOW(), NOW())
+            ON CONFLICT (username) DO NOTHING
+        """)
+    )
+    
+    # Create lab-tech user
+    connection.execute(
+        sa.text("""
+            INSERT INTO users (id, name, username, email, password_hash, role_id, client_id, active, created_at, modified_at) 
+            VALUES ('00000000-0000-0000-0000-000000000003', 'Lab Technician', 'lab-tech', 'lab-tech@lims.local', 'd81968c60a8a41bdafcb3c5825bf8bc4a76dccc932d673e3f9a7b71ce4538596', 'cccccccc-cccc-cccc-cccc-cccccccccccc', '00000000-0000-0000-0000-000000000001', true, NOW(), NOW())
+            ON CONFLICT (username) DO NOTHING
+        """)
+    )
 
 
 def downgrade() -> None:
     # Delete all data in reverse order
     connection = op.get_bind()
     
-    connection.execute(sa.text("DELETE FROM users WHERE id = '00000000-0000-0000-0000-000000000001'"))
+    connection.execute(sa.text("DELETE FROM users WHERE id = '00000000-0000-0000-0000-000000000003'"))  # lab-tech
+    connection.execute(sa.text("DELETE FROM users WHERE id = '00000000-0000-0000-0000-000000000002'"))  # lab-manager
+    connection.execute(sa.text("DELETE FROM users WHERE id = '00000000-0000-0000-0000-000000000001'"))  # admin
     connection.execute(sa.text("DELETE FROM clients WHERE id = '00000000-0000-0000-0000-000000000001'"))
     connection.execute(sa.text("DELETE FROM role_permissions"))
     connection.execute(sa.text("DELETE FROM permissions"))
