@@ -1,5 +1,5 @@
 """
-Role-Based Access Control (RBAC) dependencies for LIMS MVP
+Role-Based Access Control (RBAC) dependencies for NimbleLims
 """
 from typing import List, Optional
 from fastapi import Depends, HTTPException, status

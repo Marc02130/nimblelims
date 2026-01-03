@@ -1,4 +1,4 @@
-# User Stories for LIMS MVP
+# User Stories for NimbleLims
 
 User stories are written in Agile format: "As a [role], I want [feature] so that [benefit]." They are prioritized for MVP development, grouped by feature area, and include acceptance criteria for clarity. These stories cover the core scope: sample tracking, test ordering, results entry, security, and configurations. Estimates are in story points (Fibonacci scale) for planning in Cursor implementation. The system uses 17 permissions (with `test:configure` referenced in code but not yet in database).
 

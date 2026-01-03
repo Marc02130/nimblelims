@@ -1,4 +1,4 @@
-"""Add initial data for LIMS MVP
+"""Add initial data for NimbleLims
 
 Revision ID: 0004
 Revises: 0003

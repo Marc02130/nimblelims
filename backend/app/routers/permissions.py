@@ -1,5 +1,5 @@
 """
-Permissions router for LIMS MVP
+Permissions router for NimbleLims
 """
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status

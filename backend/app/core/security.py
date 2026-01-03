@@ -25,7 +25,7 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 # JWT Bearer token
 security = HTTPBearer()
 
-# Define the 15 core permissions for LIMS MVP
+# Define the 15 core permissions for NimbleLims
 CORE_PERMISSIONS = [
     "sample:create",
     "sample:read", 

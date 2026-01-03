@@ -1,6 +1,6 @@
 ### Overview of Prompts for Cursor Implementation
 
-Based on our ongoing planning discussions, the attached documents (PRD, User Stories, and Technical Document) provide a comprehensive blueprint for the LIMS MVP. To align with the iterative approach and the sprint-based roadmap in the User Stories document, I've structured the prompts for Cursor below. Each prompt is self-contained, references the relevant sections from the documents, and focuses on one major aspect or sprint to allow for incremental development. This ensures we can refine and test each part before moving on.
+Based on our ongoing planning discussions, the attached documents (PRD, User Stories, and Technical Document) provide a comprehensive blueprint for the NimbleLims. To align with the iterative approach and the sprint-based roadmap in the User Stories document, I've structured the prompts for Cursor below. Each prompt is self-contained, references the relevant sections from the documents, and focuses on one major aspect or sprint to allow for incremental development. This ensures we can refine and test each part before moving on.
 
 These prompts emphasize:
 - **API-first design**: All backend logic via FastAPI endpoints.
@@ -12,7 +12,7 @@ These prompts emphasize:
 Use these prompts sequentially in Cursor, copying them directly into the editor's AI prompt interface. After each, review the generated code, commit to version control (e.g., Git), and we can discuss refinements here before proceeding.
 
 #### Prompt 1: Project Setup and Docker Configuration
-"Create the initial project structure for the LIMS MVP based on the Technical Document (sections 1.3, 2.1, 7.2). Include:
+"Create the initial project structure for the NimbleLims based on the Technical Document (sections 1.3, 2.1, 7.2). Include:
 - Root folder with subfolders: backend (Python/FastAPI), frontend (React), db (Postgres migrations/scripts).
 - Docker setup with three containers: 
   - DB: PostgreSQL 15+ (official image, persistent volume for data, env vars for credentials).
@@ -24,7 +24,7 @@ Use these prompts sequentially in Cursor, copying them directly into the editor'
 Ensure PEP8 and ESLint compliance in planning. Do not implement any code yet beyond setup files."
 
 #### Prompt 2: Database Schema Implementation (Core Tables for Sprint 1)
-"Implement the PostgreSQL database schema for the LIMS MVP core tables as detailed in the Technical Document (section 3) and PRD (section 7.1), focusing on Sprint 1 user stories (US-1, US-5, US-7, US-12). Use SQL scripts for creation.
+"Implement the PostgreSQL database schema for the NimbleLims core tables as detailed in the Technical Document (section 3) and PRD (section 7.1), focusing on Sprint 1 user stories (US-1, US-5, US-7, US-12). Use SQL scripts for creation.
 - Include standard fields on all tables: id (UUID PK), name (varchar unique), description (text), active (boolean default true), created_at (timestamp default NOW()), created_by (UUID FK users.id), modified_at (timestamp), modified_by (UUID FK users.id).
 - Key tables: users (with username unique, password_hash, email unique, role_id FK roles.id, client_id FK clients.id nullable, last_login), roles, samples (due_date, received_date, report_date, sample_type FK list_entries.id, status FK, matrix FK, temperature numeric, parent_sample_id FK samples.id nullable, project_id FK projects.id, qc_type FK nullable), containers (row int default 1, column int default 1, concentration numeric, concentration_units FK units.id, amount numeric, amount_units FK units.id, type_id FK container_types.id, parent_container_id FK containers.id nullable), contents (container_id FK, sample_id FK, concentration numeric, concentration_units FK, amount numeric, amount_units FK; unique container_id+sample_id), container_types (capacity numeric, material varchar, dimensions varchar, preservative varchar), tests (sample_id FK, analysis_id FK analyses.id, status FK, review_date nullable, test_date nullable, technician_id FK users.id), analyses (method varchar, turnaround_time int, cost numeric), projects (start_date, client_id FK, status FK), clients (billing_info JSONB default '{}'), list_entries (list_id FK lists.id), lists, units (multiplier numeric, type FK list_entries.id).
 - Indexes: On all FKs; unique on names.
@@ -34,7 +34,7 @@ Ensure PEP8 and ESLint compliance in planning. Do not implement any code yet bey
 Reference User Stories for fields like qc_type. Ensure normalized schema with cascades where appropriate."
 
 #### Prompt 3: Backend Authentication and User Management (US-12)
-"Implement the backend authentication for the LIMS MVP using FastAPI, based on Technical Document (section 4.1) and User Stories (US-12, US-13).
+"Implement the backend authentication for the NimbleLims using FastAPI, based on Technical Document (section 4.1) and User Stories (US-12, US-13).
 - Setup: app/main.py with FastAPI app; routers for auth.
 - Dependencies: SQLAlchemy ORM models from schema (users, roles, permissions, role_permissions); session dependency.
 - Endpoints: POST /auth/login (body: username, password; verify with bcrypt, return JWT with user_id, role, permissions); POST /auth/verify-email (body: email, token; stub for now).
@@ -45,7 +45,7 @@ Reference User Stories for fields like qc_type. Ensure normalized schema with ca
 Follow PEP8; include Pydantic schemas for requests/responses."
 
 #### Prompt 4: Backend Endpoints for Samples, Containers, and Tests (Sprint 1: US-1, US-5, US-7)
-"Build FastAPI backend endpoints for samples, containers, and tests in the LIMS MVP, aligning with Technical Document (section 4.2) and User Stories (US-1, US-5, US-7).
+"Build FastAPI backend endpoints for samples, containers, and tests in the NimbleLims, aligning with Technical Document (section 4.2) and User Stories (US-1, US-5, US-7).
 - Models: SQLAlchemy for samples, containers, contents, tests, etc.
 - Endpoints:
   - Samples: GET /samples (filtered by project_id, status; scoped by user); POST /samples (create with accessioning data, validate fields); PATCH /samples/{id} (update status/container).
@@ -58,7 +58,7 @@ Follow PEP8; include Pydantic schemas for requests/responses."
 Ensure API-first; JSON responses; HTTP error handling."
 
 #### Prompt 5: Frontend Setup and Auth Components (US-12)
-"Create the React frontend setup and authentication components for the LIMS MVP, based on Technical Document (section 5) and User Stories (US-12).
+"Create the React frontend setup and authentication components for the NimbleLims, based on Technical Document (section 5) and User Stories (US-12).
 - Setup: Create React app with React Router, Axios (for API calls to backend at http://localhost:8000), Material-UI for styling; state management with Context API (for user/session).
 - Components: Login form (username/password, call POST /auth/login, store JWT in localStorage); Email verification modal (POST /auth/verify-email).
 - Routing: Protected routes with auth check (decode JWT).
@@ -67,7 +67,7 @@ Ensure API-first; JSON responses; HTTP error handling."
 Follow ESLint; include axios interceptors for JWT headers."
 
 #### Prompt 6: Frontend Components for Sample Accessioning and Management (Sprint 1: US-1, US-5, US-7)
-"Implement React frontend components for sample accessioning, container management, and test assignment in the LIMS MVP, per User Stories (US-1, US-5, US-7) and Technical Document (section 5.1).
+"Implement React frontend components for sample accessioning, container management, and test assignment in the NimbleLims, per User Stories (US-1, US-5, US-7) and Technical Document (section 5.1).
 - Components: Accessioning form (multi-step wizard: fields like due_date, sample_type; optional double-entry; assign tests; submit to POST /samples then /tests); Container assignment (select type, add contents); Dashboard view (list samples filtered by status/project).
 - Integration: Axios calls to backend endpoints; real-time validation.
 - State: Use Context for user data; handle loading/errors.
@@ -76,7 +76,7 @@ Follow ESLint; include axios interceptors for JWT headers."
 Ensure alignment with workflows in PRD section 5.1."
 
 #### Prompt 7: Backend and DB for Aliquots, Pooling, Results, Batches (Sprint 2: US-3, US-6, US-9, US-11)
-"Extend the FastAPI backend and Postgres schema for aliquots/derivatives, pooling, results entry, and batches in the LIMS MVP, based on User Stories (Sprint 2) and Technical Document (sections 3,4).
+"Extend the FastAPI backend and Postgres schema for aliquots/derivatives, pooling, results entry, and batches in the NimbleLims, based on User Stories (Sprint 2) and Technical Document (sections 3,4).
 - Schema additions: Batches (type FK, status FK, dates); batch_containers (batch_id FK, container_id FK, position, notes); results (test_id FK, analyte_id FK analytes.id, raw_result, reported_result, qualifiers FK, calculated_result nullable, entry_date, entered_by FK).
 - Endpoints: POST /samples/aliquot or /derivative (with parent_id, inherit properties); POST /contents (for pooling, compute volumes using units multipliers); POST /batches (create, add containers via /batch-containers); POST /results (batch-based, validate per analysis_analytes).
 - Logic: Conversions (e.g., volume = amount / concentration, normalized via multipliers); update statuses.
@@ -85,14 +85,14 @@ Ensure alignment with workflows in PRD section 5.1."
 Update Alembic migrations."
 
 #### Prompt 8: Frontend for Aliquots, Batches, and Results (Sprint 2)
-"Add React components for aliquots/derivatives, batches, and results entry in the LIMS MVP frontend, aligning with User Stories (Sprint 2) and Technical Document (section 5).
+"Add React components for aliquots/derivatives, batches, and results entry in the NimbleLims frontend, aligning with User Stories (Sprint 2) and Technical Document (section 5).
 - Components: Aliquot/Derivative creation form (select parent, submit to POST /samples/...); Batch view (create batch, add containers, grid for plates/wells); Results entry table (select batch/test, enter per analyte, validation).
 - Integration: Axios to new endpoints; handle pooling calculations display.
 - UI: Tables for batches; real-time updates.
 - Tests: Jest for workflows."
 
 #### Prompt 9: Backend RBAC, Data Isolation, and Configurations (Sprint 3: US-13, US-14, US-15, US-16)
-"Implement full RBAC, data isolation, and configurations in the FastAPI backend for LIMS MVP, per User Stories (Sprint 3) and Technical Document (sections 3.2,4.3).
+"Implement full RBAC, data isolation, and configurations in the FastAPI backend for NimbleLims, per User Stories (Sprint 3) and Technical Document (sections 3.2,4.3).
 - Schema: Permissions, role_permissions; project_users (project_id FK, user_id FK, access_level FK, granted_at, granted_by FK); update RLS policies for all tables (e.g., using current_user_id).
 - Endpoints: CRUD /roles, /permissions, /lists, /units (admin-only); all queries filter by user context (e.g., client_id).
 - RBAC: Dependency injection for permission checks; load permissions on login.
@@ -100,19 +100,19 @@ Update Alembic migrations."
 - Tests: Pytest for access denials, configs."
 
 #### Prompt 10: Frontend for Security and Configurations (Sprint 3)
-"Extend React frontend for RBAC management and configurations in LIMS MVP, based on User Stories (Sprint 3).
+"Extend React frontend for RBAC management and configurations in NimbleLims, based on User Stories (Sprint 3).
 - Components: Admin dashboard for roles/permissions CRUD; Config forms for lists/units.
 - Integration: Role-based views (e.g., client sees only own projects); Axios with permission checks.
 - UI: Conditional rendering based on user role."
 
 #### Prompt 11: Backend and Frontend for Statuses, QC, Reviews (Sprint 4: US-2, US-4, US-8, US-10)
-"Complete backend and frontend for status management, QC handling, and reviews in LIMS MVP, per User Stories (Sprint 4).
+"Complete backend and frontend for status management, QC handling, and reviews in NimbleLims, per User Stories (Sprint 4).
 - Backend: PATCH endpoints for statuses (samples/tests); include qc_type in samples; PATCH /tests/{id}/review.
 - Frontend: Update forms/views for statuses, QC flags, review workflows.
 - Tests: Full coverage."
 
 #### Prompt 12: Testing, Deployment, and Polish
-"Add testing and finalize deployment for LIMS MVP, based on Technical Document (section 7).
+"Add testing and finalize deployment for NimbleLims, based on Technical Document (section 7).
 - Tests: Pytest (backend unit/integration), Jest (frontend), Cypress (E2E).
 - Deployment: Update docker-compose for prod; CI/CD stubs in GitHub Actions.
 - Polish: Error handling, logging (Sentry stub), migrations."
@@ -129,7 +129,7 @@ To keep our iteration focused, I'll provide the prompts below, structured sequen
 If these prompts meet your needs, you can copy-paste them directly into Cursor's AI interface. After generation, we can discuss testing or integration details in the next iteration.
 
 Cursor Prompt 1: Admin Dashboard and Routing
-"Extend the React frontend for the LIMS MVP by adding an admin dashboard section, based on the Technical Document (Version 1.3, sections 4.2, 5.1) and User Stories (US-13, US-15). Focus on admin-only configuration for lists and container types.
+"Extend the React frontend for the NimbleLims by adding an admin dashboard section, based on the Technical Document (Version 1.3, sections 4.2, 5.1) and User Stories (US-13, US-15). Focus on admin-only configuration for lists and container types.
 
 Setup: Add protected /admin route in React Router; use Context API to check for admin role/permission (config:edit) from JWT decode; redirect non-admins.
 Components: Create AdminDashboard.tsx as the entry point with sidebar navigation (Material-UI Drawer) linking to Lists Management and Container Types Management.
@@ -141,7 +141,7 @@ Files: Generate full code for src/pages/AdminDashboard.tsx, and update src/App.t
 Follow ESLint; ensure no workflow ties (e.g., no accessioning components)."
 
 Cursor Prompt 2: Lists Management Page
-"Implement the React frontend component for full editable lists management in the LIMS MVP admin section, per lists.md (CRUD for lists and entries with normalized naming) and Technical Document (Version 1.3, section 4.2 for endpoints).
+"Implement the React frontend component for full editable lists management in the NimbleLims admin section, per lists.md (CRUD for lists and entries with normalized naming) and Technical Document (Version 1.3, section 4.2 for endpoints).
 
 Component: Create ListsManagement.tsx under src/pages/admin/; Material-UI DataGrid for listing all lists (columns: name, description, entry count); buttons for create/edit/delete lists.
 Forms: Dialogs for new/edit list (fields: name, description; auto-normalize to slug); nested grid/dialog for entries per list (name, description; CRUD with uniqueness validation).
@@ -154,7 +154,7 @@ Files: Generate full code for src/pages/admin/ListsManagement.tsx and helpers (e
 Ensure separation: Changes apply system-wide but no real-time workflow updates in MVP."
 
 Cursor Prompt 3: Container Types Management Page
-"Add a React frontend component for managing container types in the LIMS MVP admin section, per containers.md (pre-setup types with fields: name, description, capacity, material, dimensions, preservative) and Technical Document (Version 1.3, section 4.2 for endpoints).
+"Add a React frontend component for managing container types in the NimbleLims admin section, per containers.md (pre-setup types with fields: name, description, capacity, material, dimensions, preservative) and Technical Document (Version 1.3, section 4.2 for endpoints).
 
 Component: Create ContainerTypesManagement.tsx under src/pages/admin/; Material-UI DataGrid for listing types (columns for all fields); CRUD buttons.
 Forms: Dialog for new/edit type (fields as documented; validation: unique name, positive capacity, required material/dimensions).
@@ -167,7 +167,7 @@ Files: Generate full code for src/pages/admin/ContainerTypesManagement.tsx and h
 Clarify: Types pre-setup here for use in dynamic instance creation (e.g., during accessioning); no instance management in MVP admin."
 
 Cursor Prompt 4: Accessioning Integration for Container Specification
-"Refine the React frontend accessioning form in the LIMS MVP to require container specification during sample receipt, based on accessioning_workflow.md, containers.md, and Technical Document (Version 1.3, section 6).
+"Refine the React frontend accessioning form in the NimbleLims to require container specification during sample receipt, based on accessioning_workflow.md, containers.md, and Technical Document (Version 1.3, section 6).
 
 Component: Update SampleDetailsStep.tsx and AccessioningForm.tsx; add required section for container: dropdown of pre-setup types (fetch via GET /containers/types), fields for new instance (name/barcode, row/column, concentration/amount/units from GET /units).
 Flow: On submit, POST /containers (create instance), POST /contents (link sample), POST /samples; no pre-existing instances.
@@ -178,7 +178,7 @@ Files: Generate full updated code for src/components/accessioning/SampleDetailsS
 Reinforce: No results/approval here; keep separate from admin configs."
 
 Prompt 5: User Management Page
-"Add a React frontend component for managing users in the LIMS MVP admin section, per the Technical Document (Version 1.4, sections 3.1, 4.2 for users table/endpoints) and User Stories (US-13).
+"Add a React frontend component for managing users in the NimbleLims admin section, per the Technical Document (Version 1.4, sections 3.1, 4.2 for users table/endpoints) and User Stories (US-13).
 
 Component: Create UsersManagement.tsx under src/pages/admin/; Material-UI DataGrid for listing users (columns: username, email, role, client_id, last_login); CRUD buttons.
 Forms: Dialog for new/edit user (fields: username, email, password (on create), role_id dropdown from GET /roles, client_id dropdown from GET /clients); handle password hashing via backend.
@@ -191,7 +191,7 @@ Files: Generate full code for src/pages/admin/UsersManagement.tsx and helpers (e
 Clarify: Integrate with admin dashboard navigation; no self-demotion checks in frontend (handle backend)."
 
 Prompt 6: Role and Permission Management Page
-"Implement a React frontend component for managing roles and permissions in the LIMS MVP admin section, aligning with the Technical Document (Version 1.4, sections 3.1, 4.2 for roles/permissions tables/endpoints) and User Stories (US-13).
+"Implement a React frontend component for managing roles and permissions in the NimbleLims admin section, aligning with the Technical Document (Version 1.4, sections 3.1, 4.2 for roles/permissions tables/endpoints) and User Stories (US-13).
 
 Component: Create RolesManagement.tsx under src/pages/admin/; Material-UI DataGrid for listing roles (columns: name, description, permission count); CRUD buttons, with nested view for permissions.
 Forms: Dialog for new/edit role (fields: name, description); checkbox list for permissions (fetch via GET /permissions, assign via role_permissions junction).
@@ -204,7 +204,7 @@ Files: Generate full code for src/pages/admin/RolesManagement.tsx and helpers (e
 Ensure separation: No direct ties to workflows; preview role impacts before save."
 
 Prompt 7: Analyses Management Page
-"Add a React frontend component for managing analyses (tests) in the LIMS MVP admin section, per the Technical Document (Version 1.5, sections 3.1, 4.2 for analyses table/endpoints) and User Stories (US-7, US-15).
+"Add a React frontend component for managing analyses (tests) in the NimbleLims admin section, per the Technical Document (Version 1.5, sections 3.1, 4.2 for analyses table/endpoints) and User Stories (US-7, US-15).
 
 Component: Create AnalysesManagement.tsx under src/pages/admin/; Material-UI DataGrid for listing analyses (columns: name, method, turnaround_time, cost, analyte count); CRUD buttons.
 Forms: Dialog for new/edit analysis (fields: name, method, turnaround_time (days, positive int), cost (numeric >=0)); nested section for assigning analytes via multi-select (fetch from GET /analytes).
@@ -217,7 +217,7 @@ Files: Generate full code for src/pages/admin/AnalysesManagement.tsx and helpers
 Clarify: Integrate with admin dashboard navigation; seeded data (e.g., pH, EPA 8080) appears on load; no direct workflow ties."
 
 Prompt 8: Analytes Management Page
-"Implement a React frontend component for managing analytes in the LIMS MVP admin section, aligning with the Technical Document (Version 1.5, sections 3.1, 4.2 for analytes table/endpoints) and User Stories (US-9, US-15).
+"Implement a React frontend component for managing analytes in the NimbleLims admin section, aligning with the Technical Document (Version 1.5, sections 3.1, 4.2 for analytes table/endpoints) and User Stories (US-9, US-15).
 
 Component: Create AnalytesManagement.tsx under src/pages/admin/; Material-UI DataGrid for listing analytes (columns: name, description); CRUD buttons.
 Forms: Dialog for new/edit analyte (fields: name, description); keep simple as rules are set in analysis_analytes junctions.
@@ -230,7 +230,7 @@ Files: Generate full code for src/pages/admin/AnalytesManagement.tsx and helpers
 Ensure separation: Analytes reusable across analyses; seeded examples (e.g., pH, Aldrin) load initially."
 
 Prompt 9: Analysis Analytes Configuration (Junction Management)
-"Add a React frontend component for configuring analysis-analytes relationships in the LIMS MVP admin section, based on the Technical Document (Version 1.5, sections 3.1, 4.2 for analysis_analytes junction) and User Stories (US-9).
+"Add a React frontend component for configuring analysis-analytes relationships in the NimbleLims admin section, based on the Technical Document (Version 1.5, sections 3.1, 4.2 for analysis_analytes junction) and User Stories (US-9).
 
 Component: Create AnalysisAnalytesConfig.tsx under src/pages/admin/; accessible from AnalysesManagement (e.g., via expandable row or link); Material-UI DataGrid for listing analytes per analysis (columns: analyte_name, data_type, high/low, sig_figs, is_required).
 Forms: Dialog for adding/editing junction (fields: analyte_id dropdown from GET /analytes, data_type (from lists), high/low (numeric), sig_figs (int >0), is_required (bool), optional calculation/reported_name).
@@ -243,7 +243,7 @@ Files: Generate full code for src/pages/admin/AnalysisAnalytesConfig.tsx and hel
 Note: Units/lists integration for measurements; seeded junctions (e.g., pH rules) appear on load."
 
 Prompt 10: Schema Modifications (New Migration File)
-"Generate a new Alembic migration file for adding test batteries to the LIMS MVP schema, per the Technical Document (Version 1.8, section 3.1 refinements) and considerations (new test_batteries table with name, description, active, audit fields; battery_analyses junction with battery_id, analysis_id, sequence/order int, optional flag bool).
+"Generate a new Alembic migration file for adding test batteries to the NimbleLims schema, per the Technical Document (Version 1.8, section 3.1 refinements) and considerations (new test_batteries table with name, description, active, audit fields; battery_analyses junction with battery_id, analysis_id, sequence/order int, optional flag bool).
 
 Migration: Name it 0010_add_test_batteries.py; revises 0009; include upgrade() to create tables with UUID PKs, FKs (to analyses.id with RESTRICT delete), unique constraints (battery name), and indexes (on battery_id in tests table, composite on battery_analyses).
 Downgrade: Drop tables/junction in reverse.
@@ -252,7 +252,7 @@ Files: Generate the full migration code for backend/db/migrations/versions/0010_
 Follow Alembic best practices; ensure no disruptions to existing tables like analyses or tests."
 
 Prompt 11: Backend Functionality (Models, Schemas, Routers)
-"Implement backend functionality for test batteries in the LIMS MVP, based on the Technical Document (Version 1.8, sections 3.1, 4.2) and new schema from migration 0010.
+"Implement backend functionality for test batteries in the NimbleLims, based on the Technical Document (Version 1.8, sections 3.1, 4.2) and new schema from migration 0010.
 
 Models: Add TestBattery and BatteryAnalysis models in backend/models/test_battery.py (inherit BaseModel; TestBattery with name unique, description; BatteryAnalysis with sequence int >=1, is_optional bool default False).
 Schemas: Create Pydantic schemas in backend/app/schemas/test_battery.py (e.g., TestBatteryCreate, TestBatteryResponse, BatteryAnalysisCreate with validations like unique analyses per battery).
@@ -263,7 +263,7 @@ Files: Generate full code for backend/models/test_battery.py, backend/app/schema
 Ensure API-first; handle errors like 409 for referenced deletes."
 
 Prompt 12: Admin Page for Test Batteries
-"Create the React frontend admin page for managing test batteries in the LIMS MVP, aligning with the Technical Document (Version 1.8, section 5.1) and User Stories (US-15, US-7 for assignment integration).
+"Create the React frontend admin page for managing test batteries in the NimbleLims, aligning with the Technical Document (Version 1.8, section 5.1) and User Stories (US-15, US-7 for assignment integration).
 
 Component: Create TestBatteriesManagement.tsx under src/pages/admin/; Material-UI DataGrid for listing batteries (columns: name, description, analysis count); CRUD buttons, with expandable rows for analyses.
 Forms: Dialog for new/edit battery (fields: name unique, description); nested multi-select for analyses (fetch GET /analyses), with sequence input (int) and optional toggle (bool) per analysis.
@@ -281,7 +281,7 @@ Note: Seeded batteries (e.g., EPA 8080 Full) load initially; no direct accession
 
 # Docker Secrets:  not iplemented
 Prompt 1: Update docker-compose.yml for Secrets Support
-"Refine the docker-compose.yml file in the LIMS MVP project root to add support for Docker secrets, based on the Technical Document (Sections 7.2 and 2.1 for security). Keep compatibility with .env files for local development.
+"Refine the docker-compose.yml file in the NimbleLims project root to add support for Docker secrets, based on the Technical Document (Sections 7.2 and 2.1 for security). Keep compatibility with .env files for local development.
 
 Add a top-level 'secrets' section defining external secrets: db_password, jwt_secret_key (mark as external: true for Swarm compatibility).
 In the db service: Reference db_password as a secret (e.g., environment: POSTGRES_PASSWORD_FILE=/run/secrets/db_password).
@@ -293,7 +293,7 @@ Update README.md to include instructions: For dev, use docker-compose up; for pr
 Do not alter existing files beyond these; ensure YAML formatting is valid."
 
 Prompt 2: Adjust Backend to Read Credentials from Secret Files
-"Update the backend code in the LIMS MVP to read credentials from Docker secret files when available, falling back to environment variables for dev, aligning with Technical Document (Section 2.1 for security) and PRD (Section 6.1).
+"Update the backend code in the NimbleLims to read credentials from Docker secret files when available, falling back to environment variables for dev, aligning with Technical Document (Section 2.1 for security) and PRD (Section 6.1).
 
 In backend/app/config.py (or create if missing): Add logic to load secrets like DB_PASSWORD and JWT_SECRET_KEY—check for files like '/run/secrets/db_password' and read if exists (e.g., using with open() as f: value = f.read().strip()), else os.environ.get().
 Construct DATABASE_URL dynamically: f'postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}'.
@@ -304,7 +304,7 @@ Tests: Add a simple pytest in backend/tests/test_config.py to mock file/env load
 Generate full code for updated/new files: config.py, and patches to main.py."
 
 Prompt 3: Update DB Initialization and Migrations for Secret Compatibility
-"Enhance the db service and migrations in the LIMS MVP to work with secret files for credentials, per Technical Document (Section 7.2).
+"Enhance the db service and migrations in the NimbleLims to work with secret files for credentials, per Technical Document (Section 7.2).
 
 In db/Dockerfile (or update if using official image): No major changes needed, but ensure entrypoint can handle _FILE suffixes (Postgres supports POSTGRES_PASSWORD_FILE).
 In backend/db/migrations (Alembic): Ensure init scripts or env.py load DB creds via the new config.py from Prompt 2.

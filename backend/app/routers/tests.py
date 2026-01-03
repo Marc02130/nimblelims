@@ -1,5 +1,5 @@
 """
-Tests router for LIMS MVP
+Tests router for NimbleLims
 """
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Query

@@ -1,5 +1,5 @@
 """
-Test Battery models for LIMS MVP
+Test Battery models for NimbleLims
 """
 from sqlalchemy import Column, Integer, Boolean, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID as PostgresUUID

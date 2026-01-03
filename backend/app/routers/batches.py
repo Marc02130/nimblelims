@@ -1,5 +1,5 @@
 """
-Batches router for LIMS MVP
+Batches router for NimbleLims
 """
 import os
 from typing import List, Optional, Set

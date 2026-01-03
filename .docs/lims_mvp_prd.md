@@ -1,4 +1,4 @@
-# Product Requirements Document (PRD) for LIMS MVP
+# Product Requirements Document (PRD) for NimbleLims
 
 ## 1. Introduction
 
@@ -8,7 +8,7 @@ This Product Requirements Document (PRD) outlines the requirements for the Minim
 The system will be built using PostgreSQL as the database, Python (e.g., FastAPI with SQLAlchemy) for the backend, and React for the frontend. The API-first approach ensures all interactions occur via RESTful endpoints, enabling easy integration and frontend decoupling.
 
 ### 1.2 Project Overview
-The LIMS MVP enables labs to manage samples from receipt to reporting, including tracking statuses, containers, aliquots/derivatives, and QC elements. It supports role-based access control (RBAC) to ensure data privacy, particularly for clients viewing only their own projects. Post-MVP expansions (e.g., instrument integration, result calculations) are noted but out of scope.
+The NimbleLims enables labs to manage samples from receipt to reporting, including tracking statuses, containers, aliquots/derivatives, and QC elements. It supports role-based access control (RBAC) to ensure data privacy, particularly for clients viewing only their own projects. Post-MVP expansions (e.g., instrument integration, result calculations) are noted but out of scope.
 
 ### 1.3 Stakeholders
 - **Lab Technician**: Handles sample accessioning, test assignment, and results entry.

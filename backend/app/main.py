@@ -1,5 +1,5 @@
 """
-FastAPI application for LIMS MVP
+FastAPI application for NimbleLims
 """
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -22,8 +22,8 @@ logger.info("=== FASTAPI APPLICATION STARTING ===")
 # Run migrations: docker exec lims-backend python run_migrations.py
 
 app = FastAPI(
-    title="LIMS MVP API",
-    description="Laboratory Information Management System MVP",
+    title="NimbleLIMS API",
+    description="NimbleLIMS API",
     version="1.0.0",
     redirect_slashes=False  # Don't redirect URLs with/without trailing slashes
 )
@@ -88,7 +88,7 @@ logger.info("All routers registered")
 @app.get("/")
 async def root():
     print("ROOT ENDPOINT HIT", file=sys.stderr, flush=True)
-    return {"message": "LIMS MVP API"}
+    return {"message": "NimbleLims API"}
 
 @app.get("/health")
 async def health_check():

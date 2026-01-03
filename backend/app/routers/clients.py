@@ -1,5 +1,5 @@
 """
-Clients router for LIMS MVP
+Clients router for NimbleLims
 """
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status

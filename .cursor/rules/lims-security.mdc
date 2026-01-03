@@ -1,5 +1,5 @@
 ---
-description: Security standards for LIMS MVP including RBAC and data isolation
+description: Security standards for NimbleLims including RBAC and data isolation
 globs: **/*.{py,js,jsx,ts,tsx}
 ---
 
