@@ -1,14 +1,13 @@
 import React from 'react';
-import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
-import { Box } from '@mui/material';
-import Navbar from './components/Navbar';
+import { Routes, Route, Navigate } from 'react-router-dom';
+import MainLayout from './layouts/MainLayout';
 import Dashboard from './pages/Dashboard';
 import AccessioningForm from './pages/AccessioningForm';
 import ContainerManagement from './pages/ContainerManagement';
 import BatchManagement from './pages/BatchManagement';
 import ResultsManagement from './pages/ResultsManagement';
 import Login from './pages/Login';
-import AdminDashboard from './pages/AdminDashboard';
+import AdminOverview from './pages/admin/AdminOverview';
 import ListsManagement from './pages/admin/ListsManagement';
 import ContainerTypesManagement from './pages/admin/ContainerTypesManagement';
 import UsersManagement from './pages/admin/UsersManagement';
@@ -21,53 +20,160 @@ import ClientProjects from './pages/ClientProjects';
 import { useUser } from './contexts/UserContext';
 
 function AppRoutes() {
-  const { user } = useUser();
-  const location = useLocation();
-  const isAdminRoute = location.pathname.startsWith('/admin');
+  const { user, hasPermission } = useUser();
 
-  // Admin routes have their own layout (AdminDashboard handles it)
-  if (isAdminRoute) {
-    return (
+  return (
+    <MainLayout>
       <Routes>
+        {/* Root redirect */}
+        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+
+        {/* Core Features Routes */}
+        <Route path="/dashboard" element={<Dashboard />} />
         <Route
-          path="/admin"
+          path="/accessioning"
           element={
-            user && user.permissions.includes('config:edit') ? (
-              <AdminDashboard />
+            hasPermission('sample:create') ? (
+              <AccessioningForm />
             ) : (
               <Navigate to="/dashboard" replace />
             )
           }
-        >
-          <Route path="lists" element={<ListsManagement />} />
-          <Route path="container-types" element={<ContainerTypesManagement />} />
-          <Route path="users" element={<UsersManagement />} />
-          <Route path="roles" element={<RolesManagement />} />
-          <Route path="analyses" element={<AnalysesManagement />} />
-          <Route path="analyses/:analysisId/analytes" element={<AnalysisAnalytesConfig />} />
-          <Route path="analytes" element={<AnalytesManagement />} />
-          <Route path="test-batteries" element={<TestBatteriesManagement />} />
-        </Route>
-      </Routes>
-    );
-  }
+        />
+        <Route
+          path="/containers"
+          element={
+            hasPermission('sample:update') ? (
+              <ContainerManagement />
+            ) : (
+              <Navigate to="/dashboard" replace />
+            )
+          }
+        />
+        <Route
+          path="/batches"
+          element={
+            hasPermission('batch:manage') ? (
+              <BatchManagement />
+            ) : (
+              <Navigate to="/dashboard" replace />
+            )
+          }
+        />
+        <Route
+          path="/results"
+          element={
+            hasPermission('result:enter') ? (
+              <ResultsManagement />
+            ) : (
+              <Navigate to="/dashboard" replace />
+            )
+          }
+        />
+        <Route
+          path="/client-projects"
+          element={
+            hasPermission('project:manage') ? (
+              <ClientProjects />
+            ) : (
+              <Navigate to="/dashboard" replace />
+            )
+          }
+        />
 
-  // Regular routes with Navbar
-  return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
-      <Navbar />
-      <Box component="main" sx={{ flexGrow: 1, p: 3 }}>
-        <Routes>
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/accessioning" element={<AccessioningForm />} />
-          <Route path="/containers" element={<ContainerManagement />} />
-          <Route path="/batches" element={<BatchManagement />} />
-          <Route path="/results" element={<ResultsManagement />} />
-          <Route path="/client-projects" element={<ClientProjects />} />
-        </Routes>
-      </Box>
-    </Box>
+        {/* Admin Routes */}
+        <Route
+          path="/admin"
+          element={
+            hasPermission('config:edit') ? (
+              <AdminOverview />
+            ) : (
+              <Navigate to="/dashboard" replace />
+            )
+          }
+        />
+        <Route
+          path="/admin/lists"
+          element={
+            hasPermission('config:edit') ? (
+              <ListsManagement />
+            ) : (
+              <Navigate to="/dashboard" replace />
+            )
+          }
+        />
+        <Route
+          path="/admin/container-types"
+          element={
+            hasPermission('config:edit') ? (
+              <ContainerTypesManagement />
+            ) : (
+              <Navigate to="/dashboard" replace />
+            )
+          }
+        />
+        <Route
+          path="/admin/users"
+          element={
+            hasPermission('config:edit') || hasPermission('user:manage') ? (
+              <UsersManagement />
+            ) : (
+              <Navigate to="/dashboard" replace />
+            )
+          }
+        />
+        <Route
+          path="/admin/roles"
+          element={
+            hasPermission('config:edit') || hasPermission('user:manage') ? (
+              <RolesManagement />
+            ) : (
+              <Navigate to="/dashboard" replace />
+            )
+          }
+        />
+        <Route
+          path="/admin/analyses"
+          element={
+            hasPermission('config:edit') || hasPermission('test:configure') ? (
+              <AnalysesManagement />
+            ) : (
+              <Navigate to="/dashboard" replace />
+            )
+          }
+        />
+        <Route
+          path="/admin/analyses/:analysisId/analytes"
+          element={
+            hasPermission('config:edit') || hasPermission('test:configure') ? (
+              <AnalysisAnalytesConfig />
+            ) : (
+              <Navigate to="/dashboard" replace />
+            )
+          }
+        />
+        <Route
+          path="/admin/analytes"
+          element={
+            hasPermission('config:edit') || hasPermission('test:configure') ? (
+              <AnalytesManagement />
+            ) : (
+              <Navigate to="/dashboard" replace />
+            )
+          }
+        />
+        <Route
+          path="/admin/test-batteries"
+          element={
+            hasPermission('config:edit') || hasPermission('test:configure') ? (
+              <TestBatteriesManagement />
+            ) : (
+              <Navigate to="/dashboard" replace />
+            )
+          }
+        />
+      </Routes>
+    </MainLayout>
   );
 }
 

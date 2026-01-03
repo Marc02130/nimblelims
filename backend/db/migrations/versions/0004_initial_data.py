@@ -190,7 +190,6 @@ def upgrade() -> None:
         ('cccccccc-cccc-cccc-cccc-cccccccccccc', 'a1a1a1a1-a1a1-a1a1-a1a1-a1a1a1a1a1a1'),
         ('cccccccc-cccc-cccc-cccc-cccccccccccc', 'b1b1b1b1-b1b1-b1b1-b1b1-b1b1b1b1b1b1'),
         ('cccccccc-cccc-cccc-cccc-cccccccccccc', 'd1d1d1d1-d1d1-d1d1-d1d1-d1d1d1d1d1d1'),
-        ('cccccccc-cccc-cccc-cccc-cccccccccccc', 'e1e1e1e1-e1e1-e1e1-e1e1-e1e1e1e1e1e1'),  # batch:read
         
         # Client permissions
         ('dddddddd-dddd-dddd-dddd-dddddddddddd', 'd0d0d0d0-d0d0-d0d0-d0d0-d0d0d0d0d0d0'),
