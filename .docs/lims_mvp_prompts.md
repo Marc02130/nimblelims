@@ -477,3 +477,48 @@ Enhance frontend ResultsManagement.tsx to link batch entry with prior features (
 Doc updates: In workflow-accessioning-to-reporting.md, enhance Stage 3 for batch entry variation; update technical doc for API/validation.
 Tests: End-to-end for batch results with QC/validation.
 Generate full code for integrations, doc patches, and tests."
+
+# Navigation update
+## Prompt A: Create Unified Sidebar Component
+"Implement the unified persistent sidebar for the LIMS MVP frontend, based on navigation.md (Sections 1-5) and ui-accessioning-to-reporting.md (Component Architecture). Replace the top Navbar with a single left sidebar using Material-UI Drawer (permanent on desktop, temporary on mobile).
+
+Component: frontend/src/components/Sidebar.tsx
+Structure: Use MUI List with Subheader for sections. For submenus (e.g., Admin), use Accordion for collapsible style.
+Sections:
+'Core Features': Items like Dashboard (/dashboard, DashboardIcon), Accessioning (/accessioning, ScienceIcon) – pull from existing Navbar items, permission-gated.
+'Admin' (accordion): Sub-items like Overview (/admin), Lists Management (/admin/lists), etc. – from existing Admin Sidebar items.
+
+Visuals: Active highlighting, icons, exact/prefix matching for active states.
+Include Logo at top (clickable to /dashboard), User Menu at bottom (username/role, Logout).
+No code yet for routes/layouts – focus on Sidebar.tsx.
+Ensure responsive (width: 240px desktop, full-screen mobile), ARIA labels for accessibility, and ESLint compliance. Generate full code for Sidebar.tsx only."
+
+## Prompt B: Integrate Sidebar with Routes and Layout
+"Integrate the unified sidebar into the LIMS MVP routes and layout, based on navigation.md (Section 3: Route Structure) and the new Sidebar.tsx from previous prompt.
+
+Create: frontend/src/layouts/MainLayout.tsx – Wraps all routes with Sidebar (left) and main content (right, using Box with padding).
+Update App.tsx or index: Use MainLayout for all paths (remove separate Navbar/AdminDashboard layouts).
+Routes: Update to single layout – e.g., /dashboard, /accessioning in Core; /admin/* under Admin accordion.
+Permission-Gating: Use hasPermission() from UserContext to show/hide items (e.g., Admin section only if config:edit).
+Programmatic Navigation: Preserve useNavigate() for clicks.
+Handle layout switch: No more navbar-to-sidebar toggle; sidebar always present (hidden on mobile until toggled via hamburger in top AppBar).
+Include top AppBar: Minimal – title, back button (for nested routes), user info, mobile toggle.
+Generate full code for MainLayout.tsx, updates to App.tsx/routes, and any Sidebar.tsx refinements."
+
+## Prompt C: Add Responsiveness and Tests
+"Enhance the unified sidebar with responsiveness and add tests, per navigation.md (Section 7: Responsive Design) and best practices.
+
+In Sidebar.tsx/MainLayout.tsx: Use MUI useMediaQuery for breakpoints (<600px: temporary Drawer with overlay; >=600px: permanent).
+Mobile: Add hamburger icon in AppBar to toggle sidebar.
+Tests: Create Sidebar.test.tsx (render, snapshot, click navigation, permission hiding) and MainLayout.test.tsx (layout rendering, responsiveness via mocked media queries).
+Edge Cases: No items if no permissions; accordion collapse/expand; active states on nested routes.
+Generate full code for updates to Sidebar.tsx/MainLayout.tsx and new test files."
+
+## Prompt D: Update Documentation and Refinements
+"Update navigation.md to reflect the unified sidebar, based on the implemented changes.
+
+Add 'Refinements' section: Describe shift to single sidebar, accordion for submenus, pros (consistency), and future (breadcrumbs, command palette).
+Revise Sections 1-3: Replace hybrid descriptions with unified (e.g., Structure as vertical Drawer with sections).
+Ensure alignment with permission-based visibility (Section 4).
+Minor: Add notes on accordion usage for Admin.
+Generate full updated content for navigation.md."
