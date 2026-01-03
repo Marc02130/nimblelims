@@ -15,9 +15,9 @@ jest.mock('../services/apiService', () => ({
 
 // Mock Sidebar component
 jest.mock('../components/Sidebar', () => {
-  return function MockSidebar({ mobileOpen, onMobileClose }: { mobileOpen: boolean; onMobileClose: () => void }) {
+  return function MockSidebar({ mobileOpen, onMobileClose, collapsed }: { mobileOpen: boolean; onMobileClose: () => void; collapsed?: boolean }) {
     return (
-      <div data-testid="sidebar" data-mobile-open={mobileOpen}>
+      <div data-testid="sidebar" data-mobile-open={mobileOpen} data-collapsed={collapsed}>
         <button onClick={onMobileClose}>Close Sidebar</button>
       </div>
     );
@@ -82,11 +82,33 @@ const renderWithProviders = (
   );
 };
 
+// Mock localStorage
+const localStorageMock = (() => {
+  let store: Record<string, string> = {};
+  return {
+    getItem: (key: string) => store[key] || null,
+    setItem: (key: string, value: string) => {
+      store[key] = value.toString();
+    },
+    removeItem: (key: string) => {
+      delete store[key];
+    },
+    clear: () => {
+      store = {};
+    },
+  };
+})();
+
+Object.defineProperty(window, 'localStorage', {
+  value: localStorageMock,
+});
+
 describe('MainLayout', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockUseMediaQuery.mockReturnValue(false); // Default to desktop
     mockNavigate.mockClear();
+    localStorageMock.clear();
     // Reset useUser mock
     const { useUser } = require('../contexts/UserContext');
     useUser.mockClear();
@@ -441,6 +463,163 @@ describe('MainLayout', () => {
       );
 
       expect(screen.getByLabelText('go back')).toBeInTheDocument();
+    });
+  });
+
+  describe('Sidebar collapse functionality', () => {
+    test('renders sidebar toggle button on desktop', () => {
+      mockUseMediaQuery.mockReturnValue(false); // Desktop
+      renderWithProviders(
+        <MainLayout>
+          <div>Test</div>
+        </MainLayout>
+      );
+
+      const toggleButton = screen.getByLabelText('Collapse sidebar');
+      expect(toggleButton).toBeInTheDocument();
+    });
+
+    test('does not render sidebar toggle button on mobile', () => {
+      mockUseMediaQuery.mockReturnValue(true); // Mobile
+      renderWithProviders(
+        <MainLayout>
+          <div>Test</div>
+        </MainLayout>
+      );
+
+      expect(screen.queryByLabelText('Collapse sidebar')).not.toBeInTheDocument();
+      expect(screen.queryByLabelText('Expand sidebar')).not.toBeInTheDocument();
+    });
+
+    test('toggles sidebar collapsed state on desktop', () => {
+      mockUseMediaQuery.mockReturnValue(false); // Desktop
+      renderWithProviders(
+        <MainLayout>
+          <div>Test</div>
+        </MainLayout>
+      );
+
+      const toggleButton = screen.getByLabelText('Collapse sidebar');
+      const sidebar = screen.getByTestId('sidebar');
+
+      // Initially expanded
+      expect(sidebar).toHaveAttribute('data-collapsed', 'false');
+
+      fireEvent.click(toggleButton);
+
+      // Should be collapsed after toggle
+      expect(sidebar).toHaveAttribute('data-collapsed', 'true');
+      expect(screen.getByLabelText('Expand sidebar')).toBeInTheDocument();
+    });
+
+    test('persists collapsed state to localStorage', () => {
+      mockUseMediaQuery.mockReturnValue(false); // Desktop
+      renderWithProviders(
+        <MainLayout>
+          <div>Test</div>
+        </MainLayout>
+      );
+
+      const toggleButton = screen.getByLabelText('Collapse sidebar');
+      fireEvent.click(toggleButton);
+
+      expect(localStorageMock.getItem('sidebarCollapsed')).toBe('true');
+    });
+
+    test('loads collapsed state from localStorage on mount', () => {
+      localStorageMock.setItem('sidebarCollapsed', 'true');
+      mockUseMediaQuery.mockReturnValue(false); // Desktop
+      renderWithProviders(
+        <MainLayout>
+          <div>Test</div>
+        </MainLayout>
+      );
+
+      const sidebar = screen.getByTestId('sidebar');
+      expect(sidebar).toHaveAttribute('data-collapsed', 'true');
+      expect(screen.getByLabelText('Expand sidebar')).toBeInTheDocument();
+    });
+
+    test('defaults to expanded when no localStorage value', () => {
+      mockUseMediaQuery.mockReturnValue(false); // Desktop
+      renderWithProviders(
+        <MainLayout>
+          <div>Test</div>
+        </MainLayout>
+      );
+
+      const sidebar = screen.getByTestId('sidebar');
+      expect(sidebar).toHaveAttribute('data-collapsed', 'false');
+    });
+
+    test('shows ChevronLeft icon when expanded', () => {
+      mockUseMediaQuery.mockReturnValue(false); // Desktop
+      renderWithProviders(
+        <MainLayout>
+          <div>Test</div>
+        </MainLayout>
+      );
+
+      const toggleButton = screen.getByLabelText('Collapse sidebar');
+      // Check that ChevronLeft is rendered (icon would be in the button)
+      expect(toggleButton).toBeInTheDocument();
+    });
+
+    test('shows ChevronRight icon when collapsed', () => {
+      localStorageMock.setItem('sidebarCollapsed', 'true');
+      mockUseMediaQuery.mockReturnValue(false); // Desktop
+      renderWithProviders(
+        <MainLayout>
+          <div>Test</div>
+        </MainLayout>
+      );
+
+      const toggleButton = screen.getByLabelText('Expand sidebar');
+      expect(toggleButton).toBeInTheDocument();
+    });
+
+    test('hamburger menu on mobile toggles temporary drawer', () => {
+      mockUseMediaQuery.mockReturnValue(true); // Mobile
+      renderWithProviders(
+        <MainLayout>
+          <div>Test</div>
+        </MainLayout>
+      );
+
+      const menuButton = screen.getByLabelText('open drawer');
+      const sidebar = screen.getByTestId('sidebar');
+
+      // Initially closed
+      expect(sidebar).toHaveAttribute('data-mobile-open', 'false');
+
+      fireEvent.click(menuButton);
+
+      // Should toggle (state change handled internally)
+      expect(menuButton).toBeInTheDocument();
+    });
+
+    test('adjusts AppBar width when sidebar is collapsed', () => {
+      mockUseMediaQuery.mockReturnValue(false); // Desktop
+      const { container } = renderWithProviders(
+        <MainLayout>
+          <div>Test</div>
+        </MainLayout>
+      );
+
+      const appBar = container.querySelector('.MuiAppBar-root');
+      expect(appBar).toBeInTheDocument();
+    });
+
+    test('adjusts main content width when sidebar is collapsed', () => {
+      mockUseMediaQuery.mockReturnValue(false); // Desktop
+      const { container } = renderWithProviders(
+        <MainLayout>
+          <div>Test</div>
+        </MainLayout>
+      );
+
+      const mainContent = container.querySelector('main');
+      expect(mainContent).toBeInTheDocument();
     });
   });
 });

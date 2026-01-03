@@ -19,6 +19,7 @@ import AnalysisAnalytesConfig from './pages/admin/AnalysisAnalytesConfig';
 import CustomFieldsManagement from './pages/admin/CustomFieldsManagement';
 import HelpManagement from './pages/admin/HelpManagement';
 import ClientProjects from './pages/ClientProjects';
+import ClientsManagement from './pages/ClientsManagement';
 import HelpPage from './pages/HelpPage';
 import { useUser } from './contexts/UserContext';
 
@@ -78,6 +79,16 @@ function AppRoutes() {
           element={
             hasPermission('project:manage') ? (
               <ClientProjects />
+            ) : (
+              <Navigate to="/dashboard" replace />
+            )
+          }
+        />
+        <Route
+          path="/clients"
+          element={
+            hasPermission('project:manage') ? (
+              <ClientsManagement />
             ) : (
               <Navigate to="/dashboard" replace />
             )

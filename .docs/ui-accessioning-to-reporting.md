@@ -74,6 +74,20 @@ This document describes the user interface components and interactions for the a
   - ARIA accessibility: Navigation role, labeled headings (id="admin-help-heading"), accordion controls with aria-controls, aria-expanded, and aria-label attributes
   - Tips include: "Custom Attributes: Edit configs (post-MVP EAV)" in EAV Configuration section
 
+### Client Management Components
+- `ClientsManagement.tsx`: Client (organization) management page with DataGrid
+  - Lists clients with columns: name, description, active, created_at
+  - Filtering, sorting, and pagination support
+  - CRUD operations (create, update, soft-delete via active=false)
+  - Requires `project:manage` permission
+  - Accessible via `/clients` route
+  - Responsive design with mobile adaptations
+- `ClientDialog.tsx`: Dialog component for creating/editing clients
+  - Formik/Yup validation
+  - Fields: name (required, unique), description (optional), active (toggle)
+  - Client-side uniqueness validation
+  - Used by ClientsManagement page
+
 ### Admin Components
 - `CustomFieldsManagement.tsx`: Admin page for managing custom attribute configurations
   - Lists custom fields by entity type with filtering

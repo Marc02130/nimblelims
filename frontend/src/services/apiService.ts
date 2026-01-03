@@ -539,8 +539,35 @@ class ApiService {
   }
 
   // Clients endpoints
-  async getClients() {
-    const response: AxiosResponse = await this.api.get('/clients');
+  async getClients(filters?: { name?: string; active?: boolean }) {
+    const response: AxiosResponse = await this.api.get('/clients', {
+      params: filters,
+    });
+    return response.data;
+  }
+
+  async createClient(clientData: {
+    name: string;
+    description?: string;
+    billing_info?: Record<string, any>;
+  }) {
+    const response: AxiosResponse = await this.api.post('/clients', clientData);
+    return response.data;
+  }
+
+  async updateClient(id: string, clientData: {
+    name?: string;
+    description?: string;
+    billing_info?: Record<string, any>;
+    active?: boolean;
+  }) {
+    const response: AxiosResponse = await this.api.patch(`/clients/${id}`, clientData);
+    return response.data;
+  }
+
+  async deleteClient(id: string) {
+    // Soft delete via active=false
+    const response: AxiosResponse = await this.api.delete(`/clients/${id}`);
     return response.data;
   }
 

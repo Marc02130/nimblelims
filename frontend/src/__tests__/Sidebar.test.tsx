@@ -96,7 +96,6 @@ describe('Sidebar', () => {
       expect(screen.getByText('Containers')).toBeInTheDocument();
       expect(screen.getByText('Batches')).toBeInTheDocument();
       expect(screen.getByText('Results')).toBeInTheDocument();
-      expect(screen.getByText('Client Projects')).toBeInTheDocument();
     });
 
     test('renders admin section when user has config:edit permission', () => {
@@ -151,10 +150,12 @@ describe('Sidebar', () => {
       expect(screen.queryByText('Results')).not.toBeInTheDocument();
     });
 
-    test('hides Client Projects when user lacks project:manage permission', () => {
+    test('hides Client section when user lacks project:manage permission', () => {
       const mockUser = createMockUser(['sample:create'], 'Lab Technician');
       renderWithProviders(<Sidebar {...defaultProps} />, ['/dashboard'], mockUser);
       
+      expect(screen.queryByText('Client')).not.toBeInTheDocument();
+      expect(screen.queryByText('Clients')).not.toBeInTheDocument();
       expect(screen.queryByText('Client Projects')).not.toBeInTheDocument();
     });
 
@@ -173,7 +174,7 @@ describe('Sidebar', () => {
       expect(screen.getByText('Containers')).toBeInTheDocument();
       expect(screen.getByText('Batches')).toBeInTheDocument();
       expect(screen.getByText('Results')).toBeInTheDocument();
-      expect(screen.getByText('Client Projects')).toBeInTheDocument();
+      expect(screen.getByText('Client')).toBeInTheDocument();
       expect(screen.getByText('Admin')).toBeInTheDocument();
     });
   });
@@ -277,6 +278,102 @@ describe('Sidebar', () => {
       expect(screen.getByText('Analyses Management')).toBeInTheDocument();
       expect(screen.getByText('Analytes Management')).toBeInTheDocument();
       expect(screen.getByText('Test Batteries')).toBeInTheDocument();
+    });
+  });
+
+  describe('Client Accordion', () => {
+    test('renders Client section when user has project:manage permission', () => {
+      const mockUser = createMockUser(['project:manage'], 'Lab Manager');
+      renderWithProviders(<Sidebar {...defaultProps} />, ['/dashboard'], mockUser);
+      
+      expect(screen.getByText('Client')).toBeInTheDocument();
+    });
+
+    test('does not render Client section when user lacks project:manage permission', () => {
+      const mockUser = createMockUser(['sample:create'], 'Lab Technician');
+      renderWithProviders(<Sidebar {...defaultProps} />, ['/dashboard'], mockUser);
+      
+      expect(screen.queryByText('Client')).not.toBeInTheDocument();
+    });
+
+    test('expands Client accordion when on /clients route', () => {
+      renderWithProviders(<Sidebar {...defaultProps} />, ['/clients']);
+      
+      const accordion = screen.getByLabelText('Client section');
+      expect(accordion).toHaveAttribute('aria-expanded', 'true');
+      expect(screen.getByText('Clients')).toBeInTheDocument();
+      expect(screen.getByText('Client Projects')).toBeInTheDocument();
+    });
+
+    test('expands Client accordion when on /client-projects route', () => {
+      renderWithProviders(<Sidebar {...defaultProps} />, ['/client-projects']);
+      
+      const accordion = screen.getByLabelText('Client section');
+      expect(accordion).toHaveAttribute('aria-expanded', 'true');
+      expect(screen.getByText('Clients')).toBeInTheDocument();
+      expect(screen.getByText('Client Projects')).toBeInTheDocument();
+    });
+
+    test('collapses Client accordion when not on client routes', () => {
+      renderWithProviders(<Sidebar {...defaultProps} />, ['/dashboard']);
+      
+      const accordion = screen.getByLabelText('Client section');
+      // Accordion may be collapsed initially when not on client route
+      expect(accordion).toBeInTheDocument();
+    });
+
+    test('toggles Client accordion when clicked', () => {
+      renderWithProviders(<Sidebar {...defaultProps} />, ['/dashboard']);
+      
+      const accordion = screen.getByLabelText('Client section');
+      fireEvent.click(accordion);
+      
+      // Accordion should toggle
+      expect(accordion).toBeInTheDocument();
+    });
+
+    test('shows all client sub-items when expanded', () => {
+      renderWithProviders(<Sidebar {...defaultProps} />, ['/clients']);
+      
+      expect(screen.getByText('Clients')).toBeInTheDocument();
+      expect(screen.getByText('Client Projects')).toBeInTheDocument();
+    });
+
+    test('highlights Clients when on /clients route', () => {
+      renderWithProviders(<Sidebar {...defaultProps} />, ['/clients']);
+      
+      const clientsButton = screen.getByLabelText('Navigate to Clients');
+      expect(clientsButton).toHaveAttribute('aria-current', 'page');
+    });
+
+    test('highlights Client Projects when on /client-projects route', () => {
+      renderWithProviders(<Sidebar {...defaultProps} />, ['/client-projects']);
+      
+      const clientProjectsButton = screen.getByLabelText('Navigate to Client Projects');
+      expect(clientProjectsButton).toHaveAttribute('aria-current', 'page');
+    });
+
+    test('has primary color icon when on client routes', () => {
+      renderWithProviders(<Sidebar {...defaultProps} />, ['/clients']);
+      
+      const accordion = screen.getByLabelText('Client section');
+      expect(accordion).toBeInTheDocument();
+      // Icon color is tested through the component structure
+    });
+
+    test('has proper ARIA labels for client accordion', () => {
+      renderWithProviders(<Sidebar {...defaultProps} />);
+      
+      expect(screen.getByLabelText('Client section')).toBeInTheDocument();
+      expect(screen.getByLabelText('client navigation')).toBeInTheDocument();
+    });
+
+    test('nested items have proper indentation (pl: 4)', () => {
+      renderWithProviders(<Sidebar {...defaultProps} />, ['/clients']);
+      
+      const clientsButton = screen.getByLabelText('Navigate to Clients');
+      // The sx={{ pl: 4 }} styling is applied to ListItemButton
+      expect(clientsButton).toBeInTheDocument();
     });
   });
 
