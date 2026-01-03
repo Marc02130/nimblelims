@@ -61,6 +61,7 @@ interface ResultsManagementProps {
 const ResultsManagement: React.FC<ResultsManagementProps> = ({ onBack }) => {
   const { user } = useUser();
   const isClient = user?.role === 'Client';
+  const isLabManager = user?.role === 'Lab Manager' || user?.role === 'lab-manager';
   const [view, setView] = useState<'list' | 'entry'>('list');
   const [batches, setBatches] = useState<Batch[]>([]);
   const [selectedBatch, setSelectedBatch] = useState<Batch | null>(null);
@@ -196,7 +197,13 @@ const ResultsManagement: React.FC<ResultsManagementProps> = ({ onBack }) => {
         <Box>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
             <Tooltip
-              title={isClient ? 'This shows your test results. Contact your lab for questions about specific results or if you need assistance.' : ''}
+              title={
+                isClient 
+                  ? 'This shows your test results. Contact your lab for questions about specific results or if you need assistance.' 
+                  : isLabManager
+                  ? 'Review results: Use result:review permission. Approve results, check QC, and flag issues per US-12.'
+                  : ''
+              }
               arrow
             >
             <Typography variant="h5">Results Management</Typography>

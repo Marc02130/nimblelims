@@ -645,3 +645,131 @@ Seeding Verification: Add script in db/scripts/verify_seeding.sql to check Clien
 Generate full code for test files and updated doc content (maintain version history, e.g., Version 1.6: Added client help)."
 
 ## Tech
+### Prompt 1: Database Migration for Lab Tech Help Seeding
+"Extend the help_entries table in NimbleLIMS with Lab Technician seeds, based on Technical Document (Section 3.1) and schema_dump20260103.sql (existing 'lab technician' role). This is post-MVP; use role_filter='lab-technician' slug.
+
+Migration File: Create 0017_lab_tech_help_seeds.py in backend/db/migrations (follows 0016_help_entries).
+Entries: Seed 4–6 items (e.g., section='Accessioning Workflow', content='Step-by-step: Enter details, assign tests/batteries, handle aliquots. Bulk tip (US-24): Use for multiples. Requires sample:create.'; role_filter='lab-technician').
+Idempotency: ON CONFLICT DO NOTHING.
+RLS: No changes; uses existing policy.
+Up/Down: Standard Alembic; downgrade deletes by role_filter.
+
+Generate the full migration file code, ensuring PEP8."
+
+### Prompt 2: Backend API for Lab Tech-Filtered Help
+"Update backend API for Lab Tech help in NimbleLIMS, per ui-accessioning-to-reporting.md and workflow-accessioning-to-reporting.md. Build on help_entries from 0016/0017.
+
+Routers: Update backend/app/routers/help.py (full file):
+Filter GET /help and /help/contextual by ?role=lab-technician (case-insensitive, derive from current_user.role.name.lower().replace(' ', '-')).
+Add Technician examples in docstrings.
+
+Schemas: Reuse HelpEntry.
+Tests: Add to tests/test_help.py (filtering, content).
+
+Generate full code for routers/help.py (updates) and tests/test_help.py (extensions)."
+
+### Prompt 3: Frontend UI for Lab Tech-Specific Help
+"Implement Lab Tech help in frontend, based on ui-accessioning-to-reporting.md. Gate by UserContext.role === 'lab-technician'.
+
+Components: LabTechHelpSection.tsx (accordions; reusable with Client; ARIA labels).
+Updates: HelpPage.tsx (conditional); tooltips in accessioning/SampleDetailsStep.tsx ('QC: Blank—US-4') and results/ResultsEntryTable.tsx ('Analytes: Rules').
+API: apiService.ts update for ?role=lab-technician.
+Sidebar: Role-specific.
+
+Generate full code for components/help/LabTechHelpSection.tsx, pages/HelpPage.tsx (updates), components/accessioning/SampleDetailsStep.tsx (updates), components/results/ResultsEntryTable.tsx (updates), apiService.ts (updates). Ensure MUI responsive, ESLint, ARIA, tests in HelpPage.test.tsx."
+
+### Prompt 4: Integration Testing and Doc Updates
+"Add tests and docs for Lab Tech help.
+
+Tests: Extend test_help.py and HelpPage.test.tsx (scenarios: filtering 'lab-technician', ARIA, RLS-denied).
+Docs: Update nimblelims_tech.md (Section 2.2: Tech flow); ui-accessioning-to-reporting.md (Add LabTechHelpSection); api_endpoints.md (Tech examples).
+Verification: Add db/scripts/verify_lab_tech_help.sql.
+
+Generate full code for test updates and doc content (Version 1.7: Added lab tech help)."
+
+## Manager
+### Prompt 1: Database Migration for Lab Manager Help Seeding
+"Extend help_entries table with Lab Manager seeds in NimbleLIMS, per Technical Document (Section 3.1) and schema_dump20260103.sql (existing 'Lab Manager' role). Post-MVP; use role_filter='lab-manager' slug.
+
+Migration File: Create 0018_lab_manager_help_seeds.py in backend/db/migrations (follows 0017_lab_tech_help_seeds).
+Entries: Seed 4–6 items (e.g., section='Results Review', content='Guide: Approve results, check QC. Use result:review permission. Flag issues per US-12.'; role_filter='lab-manager'; cover batches, projects).
+Idempotency: ON CONFLICT DO NOTHING.
+RLS: No changes.
+Up/Down: Standard Alembic; downgrade deletes by role_filter.
+
+Generate full migration file code, ensuring PEP8."
+
+### Prompt 2: Backend API for Lab Manager-Filtered Help
+"Update backend API for Lab Manager help in NimbleLIMS, per ui-accessioning-to-reporting.md and workflow-accessioning-to-reporting.md. Build on help_entries from prior migrations.
+
+Routers: Update backend/app/routers/help.py (full file):
+Filter GET /help and /help/contextual by ?role=lab-manager (case-insensitive, from current_user.role.name.lower().replace(' ', '-')).
+Add Manager examples in docstrings.
+
+Schemas: Reuse HelpEntry.
+Tests: Add to tests/test_help.py (filtering, content).
+
+Generate full code for routers/help.py (updates) and tests/test_help.py (extensions). Ensure client/Technician compatibility."
+
+### Prompt 3: Frontend UI for Lab Manager-Specific Help
+"Implement Lab Manager help in frontend, based on ui-accessioning-to-reporting.md. Gate by UserContext.role === 'lab-manager'.
+
+Components: LabManagerHelpSection.tsx (accordions; reusable with prior; ARIA labels; tips like 'Batch Management: Cross-project (US-25)', 'Review Workflow: Approvals (US-11)').
+Updates: HelpPage.tsx (conditional); tooltips in ResultsManagement.tsx ('Review results: Use result:review') and BatchResultsView.tsx ('QC at batch: US-27').
+API: apiService.ts update for ?role=lab-manager.
+Sidebar: Role-specific.
+
+Generate full code for components/help/LabManagerHelpSection.tsx, pages/HelpPage.tsx (updates), components/results/ResultsManagement.tsx (updates), components/results/BatchResultsView.tsx (updates), apiService.ts (updates). Ensure MUI responsive, ESLint, ARIA, tests in HelpPage.test.tsx."
+
+### Prompt 4: Integration Testing and Doc Updates
+"Add tests and docs for Lab Manager help in NimbleLIMS.
+
+Tests: Extend test_help.py and HelpPage.test.tsx (scenarios: 'lab-manager' filtering, ARIA, RLS-denied).
+Docs: Update nimblelims_tech.md (Section 2.2: Manager flow); ui-accessioning-to-reporting.md (Add LabManagerHelpSection); api_endpoints.md (Manager examples).
+Verification: Add db/scripts/verify_lab_manager_help.sql.
+
+Generate full code for test updates and doc content (Version 1.8: Added lab manager help)."
+
+## Admin
+### Prompt 1: Database Migration for Admin Help Seeding
+"Extend help_entries table with Admin seeds in NimbleLIMS, per Technical Document (Section 3.1) and schema_dump20260103.sql (existing 'Administrator' role). Post-MVP; use role_filter='administrator' slug.
+
+Migration File: Create 0019_admin_help_seeds.py in backend/db/migrations (follows 0018_lab_manager_help_seeds).
+Entries: Seed 4–6 items (e.g., section='User Management', content='Guide: Create/edit users/roles, assign permissions (user:manage, role:manage). Use admin UI for configs.'; role_filter='administrator'; cover EAV editing, RLS).
+Idempotency: ON CONFLICT DO NOTHING.
+RLS: No changes.
+Up/Down: Standard Alembic; downgrade deletes by role_filter.
+
+Generate full migration file code, ensuring PEP8."
+
+### Prompt 2: Backend API for Admin-Filtered Help and CRUD
+"Update backend API for Admin help and add CRUD for help_entries in NimbleLIMS, per ui-accessioning-to-reporting.md. Build on help_entries; require config:edit for edits.
+
+Routers: Update backend/app/routers/help.py (full file):
+Filter GET /help and /help/contextual by ?role=administrator.
+Add POST/PATCH/DELETE /admin/help/{id} (CRUD; RBAC: config:edit; validate role_filter against existing roles).
+Add examples in docstrings.
+
+Schemas: Add HelpEntryCreate/Update with validation.
+Tests: Add to tests/test_help.py (CRUD, filtering).
+
+Generate full code for routers/help.py (updates), schemas/help.py (additions), tests/test_help.py (extensions). Ensure compatibility with other roles."
+
+### Prompt 3: Frontend UI for Admin-Specific Help and Editing
+"Implement Admin help and editing UI in frontend, based on ui-accessioning-to-reporting.md. Gate by UserContext.role === 'administrator'.
+
+Components: AdminHelpSection.tsx (accordions; reusable; tips like 'Custom Attributes: Edit configs (post-MVP EAV)'); HelpManagement.tsx (CRUD table for help_entries; filter by role; Formik forms; config:edit gate).
+Updates: HelpPage.tsx (conditional, with edit button to HelpManagement); tooltips in admin/CustomFieldsManagement.tsx ('Edit help: Use config:edit').
+API: apiService.ts update for ?role=administrator and /admin/help CRUD.
+Sidebar: Add 'Help Management' for admins.
+
+Generate full code for components/help/AdminHelpSection.tsx, pages/admin/HelpManagement.tsx, pages/HelpPage.tsx (updates), components/admin/CustomFieldsManagement.tsx (updates), apiService.ts (updates). Ensure MUI responsive, ESLint, ARIA, tests in HelpPage.test.tsx and HelpManagement.test.tsx."
+
+### Prompt 4: Integration Testing and Doc Updates
+"Add tests and docs for Admin help/editing in NimbleLIMS.
+
+Tests: Extend test_help.py (CRUD, RBAC) and add HelpManagement.test.tsx (editing, config:edit denial).
+Docs: Update nimblelims_tech.md (Section 2.2: Admin flow with CRUD); ui-accessioning-to-reporting.md (Add HelpManagement); api_endpoints.md (CRUD details).
+Verification: Add db/scripts/verify_admin_help.sql.
+
+Generate full code for test updates and doc content (Version 1.9: Added admin help with editing)."

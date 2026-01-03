@@ -162,6 +162,11 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onMobileClose }) => {
       path: '/admin/custom-fields',
       icon: <TuneIcon />,
     },
+    {
+      text: 'Help Management',
+      path: '/admin/help',
+      icon: <HelpIcon />,
+    },
   ];
 
   const handleNavigation = (path: string) => {

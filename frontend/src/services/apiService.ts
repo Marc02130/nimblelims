@@ -640,6 +640,10 @@ class ApiService {
     const config: any = {};
     if (filters && Object.keys(filters).length > 0) {
       config.params = filters;
+      // Normalize role to slug format if provided (e.g., 'Lab Technician' -> 'lab-technician', 'Lab Manager' -> 'lab-manager')
+      if (config.params.role) {
+        config.params.role = config.params.role.toLowerCase().replace(' ', '-');
+      }
     }
     const response: AxiosResponse = await this.api.get('/help', config);
     return response.data;
@@ -649,6 +653,34 @@ class ApiService {
     const response: AxiosResponse = await this.api.get('/help/contextual', {
       params: { section },
     });
+    return response.data;
+  }
+
+  // Admin Help CRUD endpoints
+  async createHelpEntry(data: {
+    section: string;
+    content: string;
+    role_filter: string | null;
+  }) {
+    const response: AxiosResponse = await this.api.post('/help/admin/help', data);
+    return response.data;
+  }
+
+  async updateHelpEntry(
+    id: string,
+    data: {
+      section?: string;
+      content?: string;
+      role_filter?: string | null;
+      active?: boolean;
+    }
+  ) {
+    const response: AxiosResponse = await this.api.patch(`/help/admin/help/${id}`, data);
+    return response.data;
+  }
+
+  async deleteHelpEntry(id: string) {
+    const response: AxiosResponse = await this.api.delete(`/help/admin/help/${id}`);
     return response.data;
   }
 }

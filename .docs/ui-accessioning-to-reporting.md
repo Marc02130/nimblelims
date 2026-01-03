@@ -44,17 +44,125 @@ This document describes the user interface components and interactions for the a
   - Displays empty state when no help content available
   - Used in `HelpPage.tsx` with conditional rendering based on user role
   - Plain language content focused on 3-5 key topics for Client users
+- `LabTechHelpSection.tsx`: Role-filtered help content component for Lab Technician users
+  - Displays help entries in accordion format (Material-UI Accordion)
+  - Fetches help entries via GET /help?role=lab-technician API endpoint
+  - Shows loading state while fetching with ARIA labels (aria-live="polite", aria-label="Loading help content")
+  - Handles errors gracefully with user-friendly messages (role="alert", aria-live="assertive")
+  - Displays empty state when no help content available (role="status", aria-live="polite")
+  - Used in `HelpPage.tsx` with conditional rendering based on user role (user?.role === 'lab-technician')
+  - Comprehensive workflow content covering accessioning, batch creation, results entry, container management, and test assignment
+  - ARIA accessibility: Navigation role, labeled headings (id="lab-tech-help-heading"), accordion controls with aria-controls, aria-expanded, and aria-label attributes
+- `LabManagerHelpSection.tsx`: Role-filtered help content component for Lab Manager users
+  - Displays help entries in accordion format (Material-UI Accordion)
+  - Fetches help entries via GET /help API endpoint (backend automatically filters by current user's role)
+  - Shows loading state while fetching with ARIA labels (aria-live="polite", aria-label="Loading help content")
+  - Handles errors gracefully with user-friendly messages (role="alert", aria-live="assertive")
+  - Displays empty state when no help content available (role="status", aria-live="polite")
+  - Used in `HelpPage.tsx` with conditional rendering based on user role (user?.role === 'Lab Manager' || user?.role === 'lab-manager')
+  - Comprehensive management content covering results review, batch management, project management, quality control, and test assignment oversight
+  - ARIA accessibility: Navigation role, labeled headings (id="lab-manager-help-heading"), accordion controls with aria-controls, aria-expanded, and aria-label attributes
+  - Tips include: "Batch Management: Cross-project (US-25)", "Review Workflow: Approvals (US-11)"
+- `AdminHelpSection.tsx`: Role-filtered help content component for Administrator users
+  - Displays help entries in accordion format (Material-UI Accordion)
+  - Fetches help entries via GET /help?role=administrator API endpoint
+  - Shows loading state while fetching with ARIA labels (aria-live="polite", aria-label="Loading help content")
+  - Handles errors gracefully with user-friendly messages (role="alert", aria-live="assertive")
+  - Displays empty state when no help content available (role="status", aria-live="polite")
+  - Used in `HelpPage.tsx` with conditional rendering based on user role (user?.role === 'Administrator')
+  - Comprehensive administration content covering user management, EAV configuration, RLS, system configuration, data management, and getting started
+  - ARIA accessibility: Navigation role, labeled headings (id="admin-help-heading"), accordion controls with aria-controls, aria-expanded, and aria-label attributes
+  - Tips include: "Custom Attributes: Edit configs (post-MVP EAV)" in EAV Configuration section
 
 ### Admin Components
 - `CustomFieldsManagement.tsx`: Admin page for managing custom attribute configurations
   - Lists custom fields by entity type with filtering
   - CRUD operations for custom attribute configs
   - Requires `config:edit` permission
+  - Tooltip: "Edit help: Use config:edit permission to manage help entries in Help Management"
 - `CustomFieldDialog.tsx`: Dialog for creating/editing custom attribute configurations
   - Formik/Yup validation
   - Entity type selection
   - Data type selection with validation rules editor
   - Attribute name uniqueness checking
+- `HelpManagement.tsx`: Admin page for managing help entries (CRUD)
+  - Lists help entries in DataGrid with search and role filtering
+  - Create/Edit/Delete operations for help entries
+  - Requires `config:edit` permission
+  - Role filter dropdown to filter by role (All Roles, Administrator, Lab Manager, Lab Technician, Client, Public)
+  - Search functionality for section and content
+  - Pagination support
+  - Responsive design for mobile devices
+  - Used in admin section sidebar navigation
+- `HelpEntryDialog.tsx`: Dialog for creating/editing help entries
+  - Formik/Yup validation
+  - Fields: section (required), content (required, multiline), role_filter (dropdown with validation), active (switch for edits)
+  - Role filter validation against existing roles
+  - Used by HelpManagement page
+
+---
+
+## Help Management UI (Admin)
+
+### Page: Help Management
+
+**Location**: `frontend/src/pages/admin/HelpManagement.tsx`
+
+**Access**: Requires `config:edit` permission. Accessible via `/admin/help` route and "Help Management" link in admin sidebar.
+
+**Layout**:
+- Material-UI DataGrid for displaying help entries
+- Search bar for filtering by section or content
+- Role filter dropdown (All Roles, Administrator, Lab Manager, Lab Technician, Client, Public)
+- Create Help Entry button (top right)
+- Edit/Delete actions in DataGrid rows
+- Responsive design for mobile devices
+
+**Features**:
+- **CRUD Operations**:
+  - Create: Click "Create Help Entry" → Opens HelpEntryDialog → Fill form → Submit
+  - Read: View all help entries in DataGrid with pagination (users with config:edit see ALL entries by default, regardless of role_filter)
+  - Update: Click Edit icon → Opens HelpEntryDialog with pre-filled data → Modify → Submit
+  - Delete: Click Delete icon → Confirmation dialog → Confirm → Soft delete (sets active=false)
+
+- **Search & Filter**:
+  - Search by section name or content text
+  - Filter by role (dropdown with all available roles) - when "All Roles" is selected, shows all entries; when a specific role is selected, filters by that role
+  - Real-time filtering as user types
+
+- **DataGrid Columns**:
+  - Section: Help entry section name
+  - Content Preview: Truncated content (first 100 characters)
+  - Role: Role filter chip (colored for role-specific, outlined for public)
+  - Status: Active/Inactive chip
+  - Actions: Edit and Delete buttons (only visible with config:edit permission)
+
+- **Form Dialog (HelpEntryDialog)**:
+  - Section field (required, text input)
+  - Content field (required, multiline textarea, 8 rows)
+  - Role Filter dropdown (optional, includes "Public (No Role)" option)
+  - Active switch (only shown for edit mode)
+  - Formik/Yup validation
+  - Role filter validation against existing roles
+  - Error handling with user-friendly messages
+
+**RBAC**:
+- All CRUD operations require `config:edit` permission
+- Users without permission see warning message
+- Backend validates permission on all endpoints
+
+**Integration**:
+- Uses `apiService.getHelp()` with role filter for loading entries
+- Uses `apiService.createHelpEntry()` for creating entries
+- Uses `apiService.updateHelpEntry()` for updating entries
+- Uses `apiService.deleteHelpEntry()` for soft deleting entries
+- Uses `apiService.getRoles()` for role filter dropdown
+
+**Accessibility**:
+- ARIA labels on all interactive elements
+- Keyboard navigation support
+- Screen reader friendly DataGrid
+- Form validation with accessible error messages
 
 ---
 
@@ -500,6 +608,29 @@ This document describes the user interface components and interactions for the a
 
 ### Help Access Workflow
 
+**For Administrators**:
+1. Navigate to Help page (`/help`)
+2. View AdminHelpSection with administrator-specific help content
+3. Click "Manage Help" button (if user has config:edit permission)
+4. Redirected to Help Management page (`/admin/help`)
+5. View all help entries in DataGrid (users with config:edit permission see ALL entries by default, regardless of role_filter)
+6. Filter by role (select "All Roles" to see all, or select specific role to filter) or search by section/content
+7. Create new help entry: Click "Create Help Entry" → Fill form → Submit
+8. Edit existing entry: Click Edit icon → Modify form → Submit
+9. Delete entry: Click Delete icon → Confirm → Entry soft-deleted (active=false)
+
+**Help Management CRUD Workflow**:
+1. **Create**: Click "Create Help Entry" → Dialog opens → Enter section, content, select role_filter (optional) → Submit → Entry created → Dialog closes → DataGrid refreshes
+2. **Read**: View entries in DataGrid → Use search/filter to find specific entries → Click on row to view full content in tooltip
+3. **Update**: Click Edit icon on row → Dialog opens with pre-filled data → Modify fields → Submit → Entry updated → Dialog closes → DataGrid refreshes
+4. **Delete**: Click Delete icon on row → Confirmation dialog → Confirm → Entry soft-deleted → DataGrid refreshes → Entry no longer visible (active=false)
+
+**Role Filter Validation**:
+- When creating/editing, role_filter is validated against existing roles
+- Invalid role_filter returns 400 error with list of available roles
+- Role names are normalized to slug format (e.g., "Lab Technician" → "lab-technician")
+- Public entries use role_filter=null
+
 1. **Navigate to Help**:
    - Click "Help" in navigation menu (visible to all users)
    - Help page loads based on user role
@@ -511,7 +642,21 @@ This document describes the user interface components and interactions for the a
    - Plain language, no technical jargon
    - Tooltips available in components like ResultsManagement
 
-3. **Non-Client Users**:
+3. **Lab Technician Users**:
+   - See `LabTechHelpSection` component with accordion-style help
+   - Help entries filtered by role (lab-technician-specific and public entries)
+   - Sections include: "Accessioning Workflow", "Batch Creation", "Results Entry", "Container Management", "Test Assignment", "Getting Started"
+   - Workflow-focused content with step-by-step guidance
+   - Tooltips available in accessioning and results entry components
+
+4. **Lab Manager Users**:
+   - See `LabManagerHelpSection` component with accordion-style help
+   - Help entries filtered by role (lab-manager-specific and public entries)
+   - Sections include: "Results Review", "Batch Management", "Project Management", "Quality Control", "Test Assignment Oversight", "Getting Started"
+   - Management-focused content covering oversight and review workflows
+   - Tooltips available in Results Management ("Review results: Use result:review permission") and Batch Results View ("QC at batch: US-27")
+
+5. **Other Users**:
    - See generic help message
    - No API call made (no role-specific help content)
 
@@ -675,8 +820,11 @@ This document describes the user interface components and interactions for the a
 - `getTestsByBatch(batchId)`: Load tests for batch
 - `getAnalysisAnalytes(testId)`: Load analytes for test
 - `enterBatchResults(batchId, data)`: Save results
-- `getHelp(filters)`: Load help entries filtered by role (e.g., `{role: 'Client'}`)
+- `getHelp(filters)`: Load help entries filtered by role (e.g., `{role: 'Client'}`, `{role: 'administrator'}`)
 - `getContextualHelp(section)`: Load contextual help for a specific section
+- `createHelpEntry(data)`: Create new help entry (requires config:edit permission)
+- `updateHelpEntry(id, data)`: Update existing help entry (requires config:edit permission)
+- `deleteHelpEntry(id)`: Soft delete help entry (requires config:edit permission)
 
 **Error Handling**:
 - Try/catch blocks in components
@@ -765,6 +913,7 @@ frontend/src/
 - `AccessioningForm.test.tsx`
 - `ResultsEntryTable.test.tsx`
 - `HelpPage.test.tsx`
+- `HelpManagement.test.tsx`
 - Component-specific test files
 
 **Test Coverage**:

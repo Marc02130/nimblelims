@@ -25,14 +25,14 @@ class HelpEntryCreate(BaseModel):
     """Schema for creating a help entry"""
     section: str
     content: str
-    role_filter: Optional[str] = None
+    role_filter: Optional[str] = None  # Role name or slug (e.g., "lab-technician", "lab-manager", "administrator", "client"). Will be validated against existing roles.
 
 
 class HelpEntryUpdate(BaseModel):
     """Schema for updating a help entry"""
     section: Optional[str] = None
     content: Optional[str] = None
-    role_filter: Optional[str] = None
+    role_filter: Optional[str] = None  # Role name or slug (e.g., "lab-technician", "lab-manager", "administrator", "client"). Will be validated against existing roles.
     active: Optional[bool] = None
 
 

@@ -1054,8 +1054,10 @@ See `.docs/lims_mvp_prd.md` for complete permission list.
 Get help entries filtered by current user's role.
 
 **Query Parameters:**
-- `role` (optional, string): Filter by role (admins only). Defaults to current user's role.
+- `role` (optional, string): Filter by role (admins only). Accepts role name or slug (case-insensitive). Examples: 'Lab Technician', 'lab-technician', 'Lab Manager', 'lab-manager', 'Administrator', 'administrator', 'Client'. Defaults to current user's role.
 - `section` (optional, string): Filter by section name.
+- `page` (optional, int): Page number (default: 1)
+- `size` (optional, int): Page size (default: 10, max: 100)
 - `page` (optional, int, default=1): Page number
 - `size` (optional, int, default=10): Page size
 
@@ -1084,8 +1086,9 @@ Get help entries filtered by current user's role.
 
 **Access Control:**
 - Users see entries where `role_filter` matches their role OR `role_filter` is NULL (public)
-- RLS enforces filtering at database level
-- Admins can filter by any role using `?role=` parameter
+- Users with `config:edit` permission see ALL entries when no `role` parameter is provided (for Help Management page)
+- Users with `config:edit` permission can filter by any role using `?role=` parameter
+- RLS enforces filtering at database level for users without `config:edit` permission
 
 **Example:**
 ```bash
@@ -1093,13 +1096,58 @@ Get help entries filtered by current user's role.
 GET /help
 Authorization: Bearer <client_token>
 
-# Admin can filter by role
+# Lab Technician user sees lab-technician and public help
+GET /help
+Authorization: Bearer <lab_technician_token>
+# Backend automatically converts "Lab Technician" role name to "lab-technician" slug
+
+# Lab Manager user sees lab-manager and public help
+GET /help
+Authorization: Bearer <lab_manager_token>
+# Backend automatically converts "Lab Manager" role name to "lab-manager" slug
+
+# Admin can filter by role (supports both role name and slug, case-insensitive)
 GET /help?role=Client
 Authorization: Bearer <admin_token>
+
+GET /help?role=lab-technician
+Authorization: Bearer <admin_token>
+
+GET /help?role=lab-manager
+Authorization: Bearer <admin_token>
+
+GET /help?role=Lab Manager
+Authorization: Bearer <admin_token>
+
+GET /help?role=Lab Technician
+Authorization: Bearer <admin_token>
+# All above queries return same results (role name normalized to slug)
+
+# Administrator filtering for administrator help
+GET /help?role=administrator
+Authorization: Bearer <admin_token>
+
+GET /help?role=Administrator
+Authorization: Bearer <admin_token>
+# Both return administrator help entries
+
+# Administrator with config:edit permission sees all entries (for Help Management)
+GET /help
+Authorization: Bearer <admin_token_with_config_edit>
+# Returns ALL help entries (no role filtering applied)
 
 # Filter by section
 GET /help?section=Viewing Projects
 Authorization: Bearer <client_token>
+
+GET /help?section=Accessioning Workflow
+Authorization: Bearer <lab_technician_token>
+
+GET /help?section=Results Review
+Authorization: Bearer <lab_manager_token>
+
+GET /help?section=User Management
+Authorization: Bearer <admin_token>
 ```
 
 ### GET /help/contextual
@@ -1129,8 +1177,32 @@ Get contextual help for a specific section.
 
 **Example:**
 ```bash
+# Client user accessing contextual help
 GET /help/contextual?section=Viewing Projects
 Authorization: Bearer <client_token>
+
+# Lab Technician accessing contextual help
+GET /help/contextual?section=Accessioning Workflow
+Authorization: Bearer <lab_technician_token>
+
+# Lab Manager accessing contextual help
+GET /help/contextual?section=Results Review
+Authorization: Bearer <lab_manager_token>
+
+GET /help/contextual?section=Batch Management
+Authorization: Bearer <lab_manager_token>
+
+# Administrator accessing contextual help
+GET /help/contextual?section=User Management
+Authorization: Bearer <admin_token>
+
+GET /help/contextual?section=EAV Configuration
+Authorization: Bearer <admin_token>
+
+# Lab Technician user accessing contextual help
+GET /help/contextual?section=Accessioning Workflow
+Authorization: Bearer <lab_technician_token>
+# Backend converts "Lab Technician" role to "lab-technician" slug for filtering
 ```
 
 ### POST /help/admin/help
@@ -1139,6 +1211,16 @@ Create a new help entry.
 **Requires:** `config:edit` permission
 
 **Headers:** `Authorization: Bearer <token>`
+
+**Request Body:**
+- `section` (required, string): Section name (e.g., "User Management", "EAV Configuration")
+- `content` (required, string): Help content text
+- `role_filter` (optional, string | null): Role name or slug (e.g., "lab-technician", "lab-manager", "administrator", "client"). Will be validated against existing roles and normalized to slug format. Use null for public help entries.
+
+**Validation:**
+- `role_filter` must match an existing role (validated against roles table)
+- `role_filter` is normalized to slug format (case-insensitive)
+- Returns 400 if `role_filter` doesn't match any existing role
 
 **Request:**
 ```json
@@ -1164,6 +1246,7 @@ Create a new help entry.
 
 **Example:**
 ```bash
+# Create Client help entry
 POST /help/admin/help
 Authorization: Bearer <admin_token>
 Content-Type: application/json
@@ -1173,6 +1256,52 @@ Content-Type: application/json
   "content": "Sample statuses indicate the current state of your samples...",
   "role_filter": "Client"
 }
+
+# Create Lab Technician help entry (role_filter normalized to slug format)
+POST /help/admin/help
+Authorization: Bearer <admin_token>
+Content-Type: application/json
+
+{
+  "section": "Accessioning Workflow",
+  "content": "Step-by-step guide to sample accessioning:\n\n1. Enter sample details...",
+  "role_filter": "Lab Technician"
+}
+# Backend normalizes "Lab Technician" to "lab-technician" slug format
+
+# Create public help entry
+POST /help/admin/help
+Authorization: Bearer <admin_token>
+Content-Type: application/json
+
+{
+  "section": "Getting Started",
+  "content": "Welcome to NimbleLIMS!",
+  "role_filter": null
+}
+
+# Create administrator help entry
+POST /help/admin/help
+Authorization: Bearer <admin_token>
+Content-Type: application/json
+
+{
+  "section": "User Management",
+  "content": "Guide: Create/edit users/roles, assign permissions (user:manage, role:manage). Use admin UI for configs.",
+  "role_filter": "administrator"
+}
+
+# Create help entry with role name (normalized to slug)
+POST /help/admin/help
+Authorization: Bearer <admin_token>
+Content-Type: application/json
+
+{
+  "section": "EAV Configuration",
+  "content": "Configure custom attributes using Entity-Attribute-Value (EAV) model.",
+  "role_filter": "Administrator"
+}
+# Backend normalizes "Administrator" to "administrator" slug format
 ```
 
 ### PATCH /help/admin/help/{id}
@@ -1181,6 +1310,21 @@ Update a help entry (partial update).
 **Requires:** `config:edit` permission
 
 **Headers:** `Authorization: Bearer <token>`
+
+**Path Parameters:**
+- `id` (required, UUID): Help entry ID
+
+**Request Body (all fields optional):**
+- `section` (optional, string): Section name
+- `content` (optional, string): Help content text
+- `role_filter` (optional, string | null): Role name or slug. Will be validated against existing roles and normalized to slug format.
+- `active` (optional, boolean): Active status (for deactivating entries)
+
+**Validation:**
+- `role_filter` must match an existing role if provided (validated against roles table)
+- `role_filter` is normalized to slug format (case-insensitive)
+- Returns 400 if `role_filter` doesn't match any existing role
+- Returns 404 if help entry not found
 
 **Request:**
 ```json
@@ -1201,6 +1345,36 @@ Content-Type: application/json
 {
   "content": "Updated content with more details..."
 }
+
+# Update multiple fields
+PATCH /help/admin/help/123e4567-e89b-12d3-a456-426614174000
+Authorization: Bearer <admin_token>
+Content-Type: application/json
+
+{
+  "section": "Updated Section Name",
+  "content": "Updated content with more details.",
+  "role_filter": "lab-manager"
+}
+
+# Deactivate help entry
+PATCH /help/admin/help/123e4567-e89b-12d3-a456-426614174000
+Authorization: Bearer <admin_token>
+Content-Type: application/json
+
+{
+  "active": false
+}
+
+# Update role_filter (validated against existing roles)
+PATCH /help/admin/help/123e4567-e89b-12d3-a456-426614174000
+Authorization: Bearer <admin_token>
+Content-Type: application/json
+
+{
+  "role_filter": "Administrator"
+}
+# Backend normalizes to "administrator" slug format
 ```
 
 ### DELETE /help/admin/help/{id}
@@ -1209,6 +1383,16 @@ Soft delete a help entry (sets active=false).
 **Requires:** `config:edit` permission
 
 **Headers:** `Authorization: Bearer <token>`
+
+**Path Parameters:**
+- `id` (required, UUID): Help entry ID
+
+**Response:**
+- 204 No Content on success
+- 404 Not Found if help entry doesn't exist
+- 403 Forbidden if user lacks config:edit permission
+
+**Note:** This is a soft delete operation. The help entry is marked as inactive (active=false) but not removed from the database. Inactive entries are not returned by GET /help endpoints.
 
 **Response:** 204 No Content
 

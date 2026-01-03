@@ -28,6 +28,7 @@ import {
   Search,
   Clear,
 } from '@mui/icons-material';
+import Tooltip from '@mui/material/Tooltip';
 import { DataGrid, GridColDef, GridActionsCellItem, GridRowParams } from '@mui/x-data-grid';
 import { useUser } from '../../contexts/UserContext';
 import { apiService } from '../../services/apiService';
@@ -294,7 +295,14 @@ const CustomFieldsManagement: React.FC = () => {
           gap: 2,
         }}
       >
-        <Typography variant="h4">Custom Fields Management</Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Typography variant="h4">Custom Fields Management</Typography>
+          <Tooltip title="Edit help: Use config:edit permission to manage help entries in Help Management">
+            <Typography variant="caption" color="text.secondary" sx={{ cursor: 'help' }}>
+              (EAV)
+            </Typography>
+          </Tooltip>
+        </Box>
         {canEdit && (
           <Button
             variant="contained"
