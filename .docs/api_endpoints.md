@@ -1048,3 +1048,173 @@ Endpoints require specific permissions. The system currently has 17 permissions:
 
 See `.docs/lims_mvp_prd.md` for complete permission list.
 
+## Help Endpoints
+
+### GET /help
+Get help entries filtered by current user's role.
+
+**Query Parameters:**
+- `role` (optional, string): Filter by role (admins only). Defaults to current user's role.
+- `section` (optional, string): Filter by section name.
+- `page` (optional, int, default=1): Page number
+- `size` (optional, int, default=10): Page size
+
+**Headers:** `Authorization: Bearer <token>`
+
+**Response:**
+```json
+{
+  "help_entries": [
+    {
+      "id": "uuid",
+      "section": "Viewing Projects",
+      "content": "Step-by-step guide to access your samples and results...",
+      "role_filter": "Client",
+      "active": true,
+      "created_at": "2025-01-03T12:00:00",
+      "modified_at": "2025-01-03T12:00:00"
+    }
+  ],
+  "total": 4,
+  "page": 1,
+  "size": 10,
+  "pages": 1
+}
+```
+
+**Access Control:**
+- Users see entries where `role_filter` matches their role OR `role_filter` is NULL (public)
+- RLS enforces filtering at database level
+- Admins can filter by any role using `?role=` parameter
+
+**Example:**
+```bash
+# Client user sees Client and public help
+GET /help
+Authorization: Bearer <client_token>
+
+# Admin can filter by role
+GET /help?role=Client
+Authorization: Bearer <admin_token>
+
+# Filter by section
+GET /help?section=Viewing Projects
+Authorization: Bearer <client_token>
+```
+
+### GET /help/contextual
+Get contextual help for a specific section.
+
+**Query Parameters:**
+- `section` (required, string): Section name for contextual help
+
+**Headers:** `Authorization: Bearer <token>`
+
+**Response:**
+```json
+{
+  "id": "uuid",
+  "section": "Viewing Projects",
+  "content": "Step-by-step guide to access your samples and results...",
+  "role_filter": "Client",
+  "active": true,
+  "created_at": "2025-01-03T12:00:00",
+  "modified_at": "2025-01-03T12:00:00"
+}
+```
+
+**Access Control:**
+- Returns help entry filtered by user's role
+- Returns 404 if no matching help entry found
+
+**Example:**
+```bash
+GET /help/contextual?section=Viewing Projects
+Authorization: Bearer <client_token>
+```
+
+### POST /help/admin/help
+Create a new help entry.
+
+**Requires:** `config:edit` permission
+
+**Headers:** `Authorization: Bearer <token>`
+
+**Request:**
+```json
+{
+  "section": "Viewing Samples",
+  "content": "Learn how to view and filter your samples...",
+  "role_filter": "Client"
+}
+```
+
+**Response:**
+```json
+{
+  "id": "uuid",
+  "section": "Viewing Samples",
+  "content": "Learn how to view and filter your samples...",
+  "role_filter": "Client",
+  "active": true,
+  "created_at": "2025-01-03T12:00:00",
+  "modified_at": "2025-01-03T12:00:00"
+}
+```
+
+**Example:**
+```bash
+POST /help/admin/help
+Authorization: Bearer <admin_token>
+Content-Type: application/json
+
+{
+  "section": "Understanding Statuses",
+  "content": "Sample statuses indicate the current state of your samples...",
+  "role_filter": "Client"
+}
+```
+
+### PATCH /help/admin/help/{id}
+Update a help entry (partial update).
+
+**Requires:** `config:edit` permission
+
+**Headers:** `Authorization: Bearer <token>`
+
+**Request:**
+```json
+{
+  "content": "Updated help content...",
+  "active": true
+}
+```
+
+**Response:** Updated help entry object
+
+**Example:**
+```bash
+PATCH /help/admin/help/123e4567-e89b-12d3-a456-426614174000
+Authorization: Bearer <admin_token>
+Content-Type: application/json
+
+{
+  "content": "Updated content with more details..."
+}
+```
+
+### DELETE /help/admin/help/{id}
+Soft delete a help entry (sets active=false).
+
+**Requires:** `config:edit` permission
+
+**Headers:** `Authorization: Bearer <token>`
+
+**Response:** 204 No Content
+
+**Example:**
+```bash
+DELETE /help/admin/help/123e4567-e89b-12d3-a456-426614174000
+Authorization: Bearer <admin_token>
+```
+

@@ -22,6 +22,7 @@ import {
   FormControl,
   InputLabel,
   Select,
+  Tooltip,
 } from '@mui/material';
 import {
   ArrowBack as ArrowBackIcon,
@@ -32,6 +33,7 @@ import {
 } from '@mui/icons-material';
 import BatchResultsView from './BatchResultsView';
 import { apiService } from '../../services/apiService';
+import { useUser } from '../../contexts/UserContext';
 
 interface Batch {
   id: string;
@@ -57,6 +59,8 @@ interface ResultsManagementProps {
 }
 
 const ResultsManagement: React.FC<ResultsManagementProps> = ({ onBack }) => {
+  const { user } = useUser();
+  const isClient = user?.role === 'Client';
   const [view, setView] = useState<'list' | 'entry'>('list');
   const [batches, setBatches] = useState<Batch[]>([]);
   const [selectedBatch, setSelectedBatch] = useState<Batch | null>(null);
@@ -191,7 +195,12 @@ const ResultsManagement: React.FC<ResultsManagementProps> = ({ onBack }) => {
       {view === 'list' && (
         <Box>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+            <Tooltip
+              title={isClient ? 'This shows your test results. Contact your lab for questions about specific results or if you need assistance.' : ''}
+              arrow
+            >
             <Typography variant="h5">Results Management</Typography>
+            </Tooltip>
           </Box>
 
           <Card sx={{ mb: 2 }}>

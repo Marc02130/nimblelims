@@ -103,7 +103,7 @@ def test_admin_user(db_session):
     """Create a test admin user with all permissions"""
     # Create admin role
     admin_role = Role(
-        name="admin",
+        name="Administrator",
         description="Administrator role"
     )
     db_session.add(admin_role)
@@ -141,3 +141,80 @@ def test_admin_user(db_session):
     db_session.commit()
     
     return admin_user
+
+@pytest.fixture(scope="function")
+def admin_token(test_admin_user):
+    """Create a JWT token for admin user"""
+    from app.core.security import create_access_token
+    from app.database import SessionLocal
+    from models.user import Permission
+    
+    db = SessionLocal()
+    try:
+        # Get admin permissions
+        permissions = db.query(Permission).join(
+            RolePermission, Permission.id == RolePermission.permission_id
+        ).filter(RolePermission.role_id == test_admin_user.role_id).all()
+        perm_names = [p.name for p in permissions]
+        
+        token_data = {
+            "sub": str(test_admin_user.id),
+            "username": test_admin_user.username,
+            "role": "Administrator",
+            "permissions": perm_names
+        }
+        token = create_access_token(token_data)
+        return token
+    finally:
+        db.close()
+
+@pytest.fixture(scope="function")
+def client_user_token(db_session):
+    """Create a JWT token for a client user"""
+    from app.core.security import create_access_token
+    from models.user import Permission, RolePermission
+    
+    # Create Client role
+    client_role = Role(
+        name="Client",
+        description="Client user role"
+    )
+    db_session.add(client_role)
+    db_session.flush()
+    
+    # Create client permissions
+    client_permissions = [
+        Permission(name="sample:read", description="Read samples"),
+        Permission(name="result:read", description="Read results"),
+        Permission(name="project:read", description="Read projects"),
+    ]
+    for perm in client_permissions:
+        db_session.add(perm)
+    db_session.flush()
+    
+    # Assign permissions to Client role
+    for perm in client_permissions:
+        role_perm = RolePermission(role_id=client_role.id, permission_id=perm.id)
+        db_session.add(role_perm)
+    
+    # Create client user
+    client_user = User(
+        name="Client User",
+        username="client_user",
+        email="client@example.com",
+        password_hash=get_password_hash("clientpass123"),
+        role_id=client_role.id
+    )
+    db_session.add(client_user)
+    db_session.commit()
+    
+    # Create token
+    perm_names = [p.name for p in client_permissions]
+    token_data = {
+        "sub": str(client_user.id),
+        "username": client_user.username,
+        "role": "Client",
+        "permissions": perm_names
+    }
+    token = create_access_token(token_data)
+    return token
