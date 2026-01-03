@@ -296,4 +296,21 @@ Priority: Medium | Estimate: 8 points
 Sprint 5 (Bulk and Grouping): US-24, US-25 (Bulk accessioning, client projects).
 Sprint 6 (Advanced Batching): US-26, US-27 (Cross-project batching, QC at batch).
 Sprint 7 (Results Efficiency): US-28 (Batch results entry).
-Total Estimate: ~31 points. Future: Instrument integration, automated calculations.##
+Total Estimate: ~31 points. 
+
+## Post-MVP Features
+
+- **Custom Fields (EAV Model)**  
+  As an Administrator, I want to define custom attributes for samples, tests, results, projects, client_projects, and batches without schema changes so that the system can be customized for laboratory-specific requirements.  
+  *Acceptance Criteria*:  
+  - Admin interface for creating custom attribute configurations (entity_type, attr_name, data_type, validation_rules).  
+  - Support for data types: text, number, date, boolean, select.  
+  - Validation rules: min/max for numbers, length for text, options for select.  
+  - Dynamic field rendering in forms based on configurations.  
+  - Server-side validation against active configurations.  
+  - Custom attributes stored in JSONB columns with GIN indexes for querying.  
+  - List endpoints support filtering via `?custom.attr_name=value`.  
+  - API: CRUD /admin/custom-attributes; RBAC: config:edit.  
+  *Status*: Implemented (Post-MVP) | *Estimate*: 13 points
+
+Future: Instrument integration, automated calculations.

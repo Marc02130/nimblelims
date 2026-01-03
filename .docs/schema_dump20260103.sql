@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict E7duE09XQKoCgbOGT4EX7mIvNxmz78bXWeQVhGFSsBifLgOedDcxPwfJ9g5ht1b
+\restrict CUrwEgmNmj3DjIKP5MHAGopI3Ljf4AaPlksSYjxhsssSuPXj1xd7TqB0fvOamHt
 
 -- Dumped from database version 15.15
 -- Dumped by pg_dump version 15.15
@@ -22,6 +22,7 @@ DROP POLICY IF EXISTS tests_access ON public.tests;
 DROP POLICY IF EXISTS samples_access ON public.samples;
 DROP POLICY IF EXISTS results_access ON public.results;
 DROP POLICY IF EXISTS projects_access ON public.projects;
+DROP POLICY IF EXISTS custom_attributes_config_access ON public.custom_attributes_config;
 DROP POLICY IF EXISTS containers_access ON public.containers;
 DROP POLICY IF EXISTS client_projects_access ON public.client_projects;
 DROP POLICY IF EXISTS batches_access ON public.batches;
@@ -59,6 +60,8 @@ ALTER TABLE IF EXISTS ONLY public.people_locations DROP CONSTRAINT IF EXISTS peo
 ALTER TABLE IF EXISTS ONLY public.locations DROP CONSTRAINT IF EXISTS locations_type_fkey;
 ALTER TABLE IF EXISTS ONLY public.locations DROP CONSTRAINT IF EXISTS locations_client_id_fkey;
 ALTER TABLE IF EXISTS ONLY public.list_entries DROP CONSTRAINT IF EXISTS list_entries_list_id_fkey;
+ALTER TABLE IF EXISTS ONLY public.custom_attributes_config DROP CONSTRAINT IF EXISTS custom_attributes_config_modified_by_fkey;
+ALTER TABLE IF EXISTS ONLY public.custom_attributes_config DROP CONSTRAINT IF EXISTS custom_attributes_config_created_by_fkey;
 ALTER TABLE IF EXISTS ONLY public.contents DROP CONSTRAINT IF EXISTS contents_sample_id_fkey;
 ALTER TABLE IF EXISTS ONLY public.contents DROP CONSTRAINT IF EXISTS contents_container_id_fkey;
 ALTER TABLE IF EXISTS ONLY public.contents DROP CONSTRAINT IF EXISTS contents_concentration_units_fkey;
@@ -132,6 +135,7 @@ DROP INDEX IF EXISTS public.idx_tests_sample_id_status;
 DROP INDEX IF EXISTS public.idx_tests_sample_id_active;
 DROP INDEX IF EXISTS public.idx_tests_sample_id;
 DROP INDEX IF EXISTS public.idx_tests_modified_by;
+DROP INDEX IF EXISTS public.idx_tests_custom_attributes_gin;
 DROP INDEX IF EXISTS public.idx_tests_created_by;
 DROP INDEX IF EXISTS public.idx_tests_analysis_id_status;
 DROP INDEX IF EXISTS public.idx_tests_analysis_id;
@@ -148,6 +152,7 @@ DROP INDEX IF EXISTS public.idx_samples_parent_sample_id;
 DROP INDEX IF EXISTS public.idx_samples_name_unique;
 DROP INDEX IF EXISTS public.idx_samples_modified_by;
 DROP INDEX IF EXISTS public.idx_samples_matrix;
+DROP INDEX IF EXISTS public.idx_samples_custom_attributes_gin;
 DROP INDEX IF EXISTS public.idx_samples_created_by;
 DROP INDEX IF EXISTS public.idx_samples_client_sample_id;
 DROP INDEX IF EXISTS public.idx_results_test_id_analyte_id;
@@ -156,10 +161,12 @@ DROP INDEX IF EXISTS public.idx_results_test_id;
 DROP INDEX IF EXISTS public.idx_results_qualifiers;
 DROP INDEX IF EXISTS public.idx_results_modified_by;
 DROP INDEX IF EXISTS public.idx_results_entered_by;
+DROP INDEX IF EXISTS public.idx_results_custom_attributes_gin;
 DROP INDEX IF EXISTS public.idx_results_created_by;
 DROP INDEX IF EXISTS public.idx_results_analyte_id;
 DROP INDEX IF EXISTS public.idx_projects_status;
 DROP INDEX IF EXISTS public.idx_projects_name_unique;
+DROP INDEX IF EXISTS public.idx_projects_custom_attributes_gin;
 DROP INDEX IF EXISTS public.idx_projects_client_project_id;
 DROP INDEX IF EXISTS public.idx_projects_client_id_status;
 DROP INDEX IF EXISTS public.idx_projects_client_id;
@@ -172,6 +179,8 @@ DROP INDEX IF EXISTS public.idx_locations_client_id;
 DROP INDEX IF EXISTS public.idx_lists_name_unique;
 DROP INDEX IF EXISTS public.idx_list_entries_list_id_name_unique;
 DROP INDEX IF EXISTS public.idx_list_entries_list_id;
+DROP INDEX IF EXISTS public.idx_custom_attributes_config_entity_type;
+DROP INDEX IF EXISTS public.idx_custom_attributes_config_active;
 DROP INDEX IF EXISTS public.idx_contents_sample_id;
 DROP INDEX IF EXISTS public.idx_contents_container_id;
 DROP INDEX IF EXISTS public.idx_contents_concentration_units;
@@ -186,6 +195,7 @@ DROP INDEX IF EXISTS public.idx_containers_amount_units;
 DROP INDEX IF EXISTS public.idx_contact_methods_type;
 DROP INDEX IF EXISTS public.idx_contact_methods_person_id;
 DROP INDEX IF EXISTS public.idx_clients_name_unique;
+DROP INDEX IF EXISTS public.idx_client_projects_custom_attributes_gin;
 DROP INDEX IF EXISTS public.idx_client_projects_client_id;
 DROP INDEX IF EXISTS public.idx_battery_analyses_sequence;
 DROP INDEX IF EXISTS public.idx_battery_analyses_battery_id;
@@ -195,6 +205,7 @@ DROP INDEX IF EXISTS public.idx_batches_status_type;
 DROP INDEX IF EXISTS public.idx_batches_status_active;
 DROP INDEX IF EXISTS public.idx_batches_status;
 DROP INDEX IF EXISTS public.idx_batches_name_unique;
+DROP INDEX IF EXISTS public.idx_batches_custom_attributes_gin;
 DROP INDEX IF EXISTS public.idx_batch_containers_container_id;
 DROP INDEX IF EXISTS public.idx_batch_containers_batch_id;
 DROP INDEX IF EXISTS public.idx_analytes_name_unique;
@@ -206,6 +217,7 @@ ALTER TABLE IF EXISTS ONLY public.users DROP CONSTRAINT IF EXISTS users_username
 ALTER TABLE IF EXISTS ONLY public.users DROP CONSTRAINT IF EXISTS users_pkey;
 ALTER TABLE IF EXISTS ONLY public.users DROP CONSTRAINT IF EXISTS users_name_key;
 ALTER TABLE IF EXISTS ONLY public.users DROP CONSTRAINT IF EXISTS users_email_key;
+ALTER TABLE IF EXISTS ONLY public.custom_attributes_config DROP CONSTRAINT IF EXISTS uq_custom_attributes_config_entity_attr;
 ALTER TABLE IF EXISTS ONLY public.units DROP CONSTRAINT IF EXISTS units_pkey;
 ALTER TABLE IF EXISTS ONLY public.units DROP CONSTRAINT IF EXISTS units_name_key;
 ALTER TABLE IF EXISTS ONLY public.tests DROP CONSTRAINT IF EXISTS tests_pkey;
@@ -233,6 +245,7 @@ ALTER TABLE IF EXISTS ONLY public.lists DROP CONSTRAINT IF EXISTS lists_pkey;
 ALTER TABLE IF EXISTS ONLY public.lists DROP CONSTRAINT IF EXISTS lists_name_key;
 ALTER TABLE IF EXISTS ONLY public.list_entries DROP CONSTRAINT IF EXISTS list_entries_pkey;
 ALTER TABLE IF EXISTS ONLY public.list_entries DROP CONSTRAINT IF EXISTS list_entries_list_id_name_key;
+ALTER TABLE IF EXISTS ONLY public.custom_attributes_config DROP CONSTRAINT IF EXISTS custom_attributes_config_pkey;
 ALTER TABLE IF EXISTS ONLY public.contents DROP CONSTRAINT IF EXISTS contents_pkey;
 ALTER TABLE IF EXISTS ONLY public.containers DROP CONSTRAINT IF EXISTS containers_pkey;
 ALTER TABLE IF EXISTS ONLY public.containers DROP CONSTRAINT IF EXISTS containers_name_key;
@@ -269,6 +282,7 @@ DROP TABLE IF EXISTS public.people;
 DROP TABLE IF EXISTS public.locations;
 DROP TABLE IF EXISTS public.lists;
 DROP TABLE IF EXISTS public.list_entries;
+DROP TABLE IF EXISTS public.custom_attributes_config;
 DROP TABLE IF EXISTS public.contents;
 DROP TABLE IF EXISTS public.containers;
 DROP TABLE IF EXISTS public.container_types;
@@ -526,7 +540,8 @@ CREATE TABLE public.batches (
     type uuid,
     status uuid NOT NULL,
     start_date timestamp without time zone,
-    end_date timestamp without time zone
+    end_date timestamp without time zone,
+    custom_attributes jsonb DEFAULT '{}'::jsonb
 );
 
 
@@ -555,7 +570,8 @@ CREATE TABLE public.client_projects (
     created_at timestamp without time zone DEFAULT now() NOT NULL,
     created_by uuid,
     modified_at timestamp without time zone DEFAULT now() NOT NULL,
-    modified_by uuid
+    modified_by uuid,
+    custom_attributes jsonb DEFAULT '{}'::jsonb
 );
 
 
@@ -646,6 +662,25 @@ CREATE TABLE public.contents (
     concentration_units uuid,
     amount numeric(15,6),
     amount_units uuid
+);
+
+
+--
+-- Name: custom_attributes_config; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.custom_attributes_config (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    entity_type character varying(255) NOT NULL,
+    attr_name character varying(255) NOT NULL,
+    data_type character varying(50) NOT NULL,
+    validation_rules jsonb DEFAULT '{}'::jsonb,
+    description text,
+    active boolean DEFAULT true NOT NULL,
+    created_at timestamp without time zone DEFAULT now() NOT NULL,
+    created_by uuid,
+    modified_at timestamp without time zone DEFAULT now() NOT NULL,
+    modified_by uuid
 );
 
 
@@ -785,7 +820,8 @@ CREATE TABLE public.projects (
     start_date timestamp without time zone NOT NULL,
     client_id uuid NOT NULL,
     status uuid NOT NULL,
-    client_project_id uuid
+    client_project_id uuid,
+    custom_attributes jsonb DEFAULT '{}'::jsonb
 );
 
 
@@ -809,7 +845,8 @@ CREATE TABLE public.results (
     qualifiers uuid,
     calculated_result character varying(255),
     entry_date timestamp without time zone DEFAULT now() NOT NULL,
-    entered_by uuid NOT NULL
+    entered_by uuid NOT NULL,
+    custom_attributes jsonb DEFAULT '{}'::jsonb
 );
 
 
@@ -862,7 +899,8 @@ CREATE TABLE public.samples (
     parent_sample_id uuid,
     project_id uuid NOT NULL,
     qc_type uuid,
-    client_sample_id character varying(255)
+    client_sample_id character varying(255),
+    custom_attributes jsonb DEFAULT '{}'::jsonb
 );
 
 
@@ -900,7 +938,8 @@ CREATE TABLE public.tests (
     status uuid NOT NULL,
     review_date timestamp without time zone,
     test_date timestamp without time zone,
-    technician_id uuid
+    technician_id uuid,
+    custom_attributes jsonb DEFAULT '{}'::jsonb
 );
 
 
@@ -949,7 +988,7 @@ CREATE TABLE public.users (
 --
 
 COPY public.alembic_version (version_num) FROM stdin;
-0012
+0014
 \.
 
 
@@ -958,10 +997,10 @@ COPY public.alembic_version (version_num) FROM stdin;
 --
 
 COPY public.analyses (id, name, description, active, created_at, created_by, modified_at, modified_by, method, turnaround_time, cost) FROM stdin;
-b0000001-b000-b000-b000-b00000000001	pH Measurement	\N	t	2025-12-28 19:21:39.478317	\N	2025-12-28 19:21:39.478317	\N	Electrometric	1	10.00
-b0000002-b000-b000-b000-b00000000002	EPA Method 8080	\N	t	2025-12-28 19:21:39.478317	\N	2025-12-28 19:21:39.478317	\N	GC/ECD for Organochlorine Pesticides and PCBs	7	150.00
-b0000003-b000-b000-b000-b00000000003	Total Coliform Enumeration	\N	t	2025-12-28 19:21:39.478317	\N	2025-12-28 19:21:39.478317	\N	Colilert or Membrane Filtration	2	50.00
-b0000002-b000-b000-b000-b00000000004	EPA Method 8080 Prep	\N	t	2025-12-28 19:21:39.478317	\N	2025-12-28 19:21:39.478317	\N	Sample Extractionfor Organochlorine Pesticides and PCBs	7	25.00
+b0000001-b000-b000-b000-b00000000001	pH Measurement	\N	t	2026-01-03 17:36:29.293224	\N	2026-01-03 17:36:29.293224	\N	Electrometric	1	10.00
+b0000002-b000-b000-b000-b00000000002	EPA Method 8080	\N	t	2026-01-03 17:36:29.293224	\N	2026-01-03 17:36:29.293224	\N	GC/ECD for Organochlorine Pesticides and PCBs	7	150.00
+b0000003-b000-b000-b000-b00000000003	Total Coliform Enumeration	\N	t	2026-01-03 17:36:29.293224	\N	2026-01-03 17:36:29.293224	\N	Colilert or Membrane Filtration	2	50.00
+b0000002-b000-b000-b000-b00000000004	EPA Method 8080 Prep	\N	t	2026-01-03 17:36:29.293224	\N	2026-01-03 17:36:29.293224	\N	Sample Extractionfor Organochlorine Pesticides and PCBs	7	25.00
 \.
 
 
@@ -985,13 +1024,13 @@ b0000003-b000-b000-b000-b00000000003	a0000006-a000-a000-a000-a00000000006	count	
 --
 
 COPY public.analytes (id, name, description, active, created_at, created_by, modified_at, modified_by) FROM stdin;
-a0000001-a000-a000-a000-a00000000001	pH	pH value	t	2025-12-28 19:21:39.478317	\N	2025-12-28 19:21:39.478317	\N
-a0000002-a000-a000-a000-a00000000002	Aldrin	Organochlorine pesticide	t	2025-12-28 19:21:39.478317	\N	2025-12-28 19:21:39.478317	\N
-a0000003-a000-a000-a000-a00000000003	DDT	Organochlorine pesticide	t	2025-12-28 19:21:39.478317	\N	2025-12-28 19:21:39.478317	\N
-a0000004-a000-a000-a000-a00000000004	PCB-1016	Polychlorinated biphenyl	t	2025-12-28 19:21:39.478317	\N	2025-12-28 19:21:39.478317	\N
-a0000005-a000-a000-a000-a00000000005	Total Coliforms	Coliform bacteria count	t	2025-12-28 19:21:39.478317	\N	2025-12-28 19:21:39.478317	\N
-a0000006-a000-a000-a000-a00000000006	E. coli	Escherichia coli count	t	2025-12-28 19:21:39.478317	\N	2025-12-28 19:21:39.478317	\N
-a0000004-a000-a000-a000-a00000000005	Initial Volume	Sample volume extracted	t	2025-12-28 19:21:39.478317	\N	2025-12-28 19:21:39.478317	\N
+a0000001-a000-a000-a000-a00000000001	pH	pH value	t	2026-01-03 17:36:29.293224	\N	2026-01-03 17:36:29.293224	\N
+a0000002-a000-a000-a000-a00000000002	Aldrin	Organochlorine pesticide	t	2026-01-03 17:36:29.293224	\N	2026-01-03 17:36:29.293224	\N
+a0000003-a000-a000-a000-a00000000003	DDT	Organochlorine pesticide	t	2026-01-03 17:36:29.293224	\N	2026-01-03 17:36:29.293224	\N
+a0000004-a000-a000-a000-a00000000004	PCB-1016	Polychlorinated biphenyl	t	2026-01-03 17:36:29.293224	\N	2026-01-03 17:36:29.293224	\N
+a0000005-a000-a000-a000-a00000000005	Total Coliforms	Coliform bacteria count	t	2026-01-03 17:36:29.293224	\N	2026-01-03 17:36:29.293224	\N
+a0000006-a000-a000-a000-a00000000006	E. coli	Escherichia coli count	t	2026-01-03 17:36:29.293224	\N	2026-01-03 17:36:29.293224	\N
+a0000004-a000-a000-a000-a00000000005	Initial Volume	Sample volume extracted	t	2026-01-03 17:36:29.293224	\N	2026-01-03 17:36:29.293224	\N
 \.
 
 
@@ -1007,7 +1046,7 @@ COPY public.batch_containers (batch_id, container_id, "position", notes) FROM st
 -- Data for Name: batches; Type: TABLE DATA; Schema: public; Owner: -
 --
 
-COPY public.batches (id, name, description, active, created_at, created_by, modified_at, modified_by, type, status, start_date, end_date) FROM stdin;
+COPY public.batches (id, name, description, active, created_at, created_by, modified_at, modified_by, type, status, start_date, end_date, custom_attributes) FROM stdin;
 \.
 
 
@@ -1025,7 +1064,7 @@ c0000001-c000-c000-c000-c00000000001	b0000002-b000-b000-b000-b00000000004	1	f
 -- Data for Name: client_projects; Type: TABLE DATA; Schema: public; Owner: -
 --
 
-COPY public.client_projects (id, name, description, client_id, active, created_at, created_by, modified_at, modified_by) FROM stdin;
+COPY public.client_projects (id, name, description, client_id, active, created_at, created_by, modified_at, modified_by, custom_attributes) FROM stdin;
 \.
 
 
@@ -1034,7 +1073,7 @@ COPY public.client_projects (id, name, description, client_id, active, created_a
 --
 
 COPY public.clients (id, name, description, active, created_at, created_by, modified_at, modified_by, billing_info) FROM stdin;
-00000000-0000-0000-0000-000000000001	System	System client for admin users	t	2025-12-28 19:21:39.478317	\N	2025-12-28 19:21:39.478317	\N	{}
+00000000-0000-0000-0000-000000000001	System	System client for admin users	t	2026-01-03 17:36:29.293224	\N	2026-01-03 17:36:29.293224	\N	{}
 \.
 
 
@@ -1071,44 +1110,52 @@ COPY public.contents (container_id, sample_id, concentration, concentration_unit
 
 
 --
+-- Data for Name: custom_attributes_config; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY public.custom_attributes_config (id, entity_type, attr_name, data_type, validation_rules, description, active, created_at, created_by, modified_at, modified_by) FROM stdin;
+\.
+
+
+--
 -- Data for Name: list_entries; Type: TABLE DATA; Schema: public; Owner: -
 --
 
 COPY public.list_entries (id, name, description, active, created_at, created_by, modified_at, modified_by, list_id) FROM stdin;
-ce3cf258-637e-4bad-ab48-202385b69d32	Received	Sample received	t	2025-12-28 19:21:39.478317	\N	2025-12-28 19:21:39.478317	\N	11111111-1111-1111-1111-111111111111
-199b0438-e132-429f-92fe-f678006912c0	Available for Testing	Ready for testing	t	2025-12-28 19:21:39.478317	\N	2025-12-28 19:21:39.478317	\N	11111111-1111-1111-1111-111111111111
-fc31f2d3-5507-4220-9c06-92921e78ba92	Testing Complete	Testing finished	t	2025-12-28 19:21:39.478317	\N	2025-12-28 19:21:39.478317	\N	11111111-1111-1111-1111-111111111111
-ca78ad87-7a87-427f-b7db-3136287e9ddf	Reviewed	Results reviewed	t	2025-12-28 19:21:39.478317	\N	2025-12-28 19:21:39.478317	\N	11111111-1111-1111-1111-111111111111
-a0e242a8-bb74-419a-bca1-aaf1d15ac7fe	Reported	Results reported	t	2025-12-28 19:21:39.478317	\N	2025-12-28 19:21:39.478317	\N	11111111-1111-1111-1111-111111111111
-6bd1ea61-c124-417a-ae6a-76c052af1ffb	In Process	Test in progress	t	2025-12-28 19:21:39.478317	\N	2025-12-28 19:21:39.478317	\N	22222222-2222-2222-2222-222222222222
-470c1f38-d466-4fec-82cb-2e4928b00793	In Analysis	Under analysis	t	2025-12-28 19:21:39.478317	\N	2025-12-28 19:21:39.478317	\N	22222222-2222-2222-2222-222222222222
-050bd10b-bd2b-4b5f-9d10-f1d17f2d68fe	Complete	Test completed	t	2025-12-28 19:21:39.478317	\N	2025-12-28 19:21:39.478317	\N	22222222-2222-2222-2222-222222222222
-00dc13c8-8070-4bd8-851f-3f7a863251de	Active	Project active	t	2025-12-28 19:21:39.478317	\N	2025-12-28 19:21:39.478317	\N	33333333-3333-3333-3333-333333333333
-ab94d3b6-6dff-4d7c-8ced-ca5548b9cf31	Completed	Project completed	t	2025-12-28 19:21:39.478317	\N	2025-12-28 19:21:39.478317	\N	33333333-3333-3333-3333-333333333333
-49c81677-e109-415f-a7eb-11343a2db363	On Hold	Project on hold	t	2025-12-28 19:21:39.478317	\N	2025-12-28 19:21:39.478317	\N	33333333-3333-3333-3333-333333333333
-9f3ab8ca-e99b-4789-be01-5b5141769b85	Created	Batch created	t	2025-12-28 19:21:39.478317	\N	2025-12-28 19:21:39.478317	\N	44444444-4444-4444-4444-444444444444
-b97bb095-3c4b-44e6-930a-8012399652be	In Process	Batch in process	t	2025-12-28 19:21:39.478317	\N	2025-12-28 19:21:39.478317	\N	44444444-4444-4444-4444-444444444444
-1bf86869-e1eb-4172-86d1-f85afaf0e1f6	Completed	Batch completed	t	2025-12-28 19:21:39.478317	\N	2025-12-28 19:21:39.478317	\N	44444444-4444-4444-4444-444444444444
-1627dd23-c4d1-45b8-a755-c9fb3b399d39	Blood	Blood sample	t	2025-12-28 19:21:39.478317	\N	2025-12-28 19:21:39.478317	\N	55555555-5555-5555-5555-555555555555
-509c6ba1-35f4-4bf8-b40a-67258a64bc7d	Urine	Urine sample	t	2025-12-28 19:21:39.478317	\N	2025-12-28 19:21:39.478317	\N	55555555-5555-5555-5555-555555555555
-855f1b4c-c499-448d-891b-11af8eb9807d	Tissue	Tissue sample	t	2025-12-28 19:21:39.478317	\N	2025-12-28 19:21:39.478317	\N	55555555-5555-5555-5555-555555555555
-a4ec5c54-6a8f-48a4-aca3-5ff4182aef5e	Water	Water sample	t	2025-12-28 19:21:39.478317	\N	2025-12-28 19:21:39.478317	\N	55555555-5555-5555-5555-555555555555
-867a7485-6e27-4d4a-9aea-b6ae82eff6d4	Human	Human matrix	t	2025-12-28 19:21:39.478317	\N	2025-12-28 19:21:39.478317	\N	66666666-6666-6666-6666-666666666666
-aed5f677-ba3c-4838-8a6a-1badb771388e	Environmental	Environmental matrix	t	2025-12-28 19:21:39.478317	\N	2025-12-28 19:21:39.478317	\N	66666666-6666-6666-6666-666666666666
-b7921ee7-cf8a-4aab-8683-57e5bb38f5c8	Food	Food matrix	t	2025-12-28 19:21:39.478317	\N	2025-12-28 19:21:39.478317	\N	66666666-6666-6666-6666-666666666666
-2de61690-36ca-46e0-bf31-936fc1f804a7	Sample	Regular sample	t	2025-12-28 19:21:39.478317	\N	2025-12-28 19:21:39.478317	\N	77777777-7777-7777-7777-777777777777
-891ff5c1-6e7b-454d-bef8-5eb1d4a16843	Positive Control	Positive control	t	2025-12-28 19:21:39.478317	\N	2025-12-28 19:21:39.478317	\N	77777777-7777-7777-7777-777777777777
-7f9f14de-d764-4842-b9fa-41759dee3b47	Negative Control	Negative control	t	2025-12-28 19:21:39.478317	\N	2025-12-28 19:21:39.478317	\N	77777777-7777-7777-7777-777777777777
-a387b37d-9b80-4b36-9c7b-506c2f1a7306	Matrix Spike	Matrix spike	t	2025-12-28 19:21:39.478317	\N	2025-12-28 19:21:39.478317	\N	77777777-7777-7777-7777-777777777777
-15f19053-7674-477f-93b0-e53b3e00e89e	Duplicate	Duplicate sample	t	2025-12-28 19:21:39.478317	\N	2025-12-28 19:21:39.478317	\N	77777777-7777-7777-7777-777777777777
-f5d78649-eb7b-4cc5-97b3-04a65190f267	Blank	Blank sample	t	2025-12-28 19:21:39.478317	\N	2025-12-28 19:21:39.478317	\N	77777777-7777-7777-7777-777777777777
-6cbb60b6-7708-4b23-83e1-98aa054b7852	concentration	Concentration units	t	2025-12-28 19:21:39.478317	\N	2025-12-28 19:21:39.478317	\N	88888888-8888-8888-8888-888888888888
-5460a872-0673-4a1c-b64b-1405ce8579cc	mass	Mass units	t	2025-12-28 19:21:39.478317	\N	2025-12-28 19:21:39.478317	\N	88888888-8888-8888-8888-888888888888
-84931478-edb9-431c-b964-64c25f9840d3	volume	Volume units	t	2025-12-28 19:21:39.478317	\N	2025-12-28 19:21:39.478317	\N	88888888-8888-8888-8888-888888888888
-16126a88-e075-4682-97f0-caac6f4fbef7	molar	Molar units	t	2025-12-28 19:21:39.478317	\N	2025-12-28 19:21:39.478317	\N	88888888-8888-8888-8888-888888888888
-f8c8cdc5-a869-45de-8dcc-1bd96232d3da	Email	Email address	t	2025-12-28 19:21:39.478317	\N	2025-12-28 19:21:39.478317	\N	99999999-9999-9999-9999-999999999999
-6e81ede1-d7f3-44b7-af8a-f189d13e43b6	Phone	Phone number	t	2025-12-28 19:21:39.478317	\N	2025-12-28 19:21:39.478317	\N	99999999-9999-9999-9999-999999999999
-00e2c448-c009-4cb0-898f-e2e97d50e436	Mobile	Mobile phone	t	2025-12-28 19:21:39.478317	\N	2025-12-28 19:21:39.478317	\N	99999999-9999-9999-9999-999999999999
+9035b7f7-e755-4f4c-8d00-c6dc49000bdb	Received	Sample received	t	2026-01-03 17:36:29.293224	\N	2026-01-03 17:36:29.293224	\N	11111111-1111-1111-1111-111111111111
+2ce67e8c-a0ab-4b86-84d1-369706db63ee	Available for Testing	Ready for testing	t	2026-01-03 17:36:29.293224	\N	2026-01-03 17:36:29.293224	\N	11111111-1111-1111-1111-111111111111
+de24f608-a262-4f9c-9cb4-f52ffc6f1c3e	Testing Complete	Testing finished	t	2026-01-03 17:36:29.293224	\N	2026-01-03 17:36:29.293224	\N	11111111-1111-1111-1111-111111111111
+5db5e555-bab5-4d19-9b82-af8b3a6c84ee	Reviewed	Results reviewed	t	2026-01-03 17:36:29.293224	\N	2026-01-03 17:36:29.293224	\N	11111111-1111-1111-1111-111111111111
+4f1b9974-97c9-432b-8164-ef7f7a269c66	Reported	Results reported	t	2026-01-03 17:36:29.293224	\N	2026-01-03 17:36:29.293224	\N	11111111-1111-1111-1111-111111111111
+e17c380e-7610-48f6-8a3e-29dc0ca40085	In Process	Test in progress	t	2026-01-03 17:36:29.293224	\N	2026-01-03 17:36:29.293224	\N	22222222-2222-2222-2222-222222222222
+aff3970c-8314-4c34-8f01-f2ad22459b55	In Analysis	Under analysis	t	2026-01-03 17:36:29.293224	\N	2026-01-03 17:36:29.293224	\N	22222222-2222-2222-2222-222222222222
+f1abbd83-9426-4a21-bfb9-3ddfe2f83ae6	Complete	Test completed	t	2026-01-03 17:36:29.293224	\N	2026-01-03 17:36:29.293224	\N	22222222-2222-2222-2222-222222222222
+77f59eec-b493-44f3-a23a-bf18fcb226ce	Active	Project active	t	2026-01-03 17:36:29.293224	\N	2026-01-03 17:36:29.293224	\N	33333333-3333-3333-3333-333333333333
+621afcd6-6bf4-472b-958d-aad35528d35b	Completed	Project completed	t	2026-01-03 17:36:29.293224	\N	2026-01-03 17:36:29.293224	\N	33333333-3333-3333-3333-333333333333
+ca1855c3-a7fd-4c68-a003-9f28b0d40416	On Hold	Project on hold	t	2026-01-03 17:36:29.293224	\N	2026-01-03 17:36:29.293224	\N	33333333-3333-3333-3333-333333333333
+6579fd0d-79df-45b5-92c4-fc5364bd0a73	Created	Batch created	t	2026-01-03 17:36:29.293224	\N	2026-01-03 17:36:29.293224	\N	44444444-4444-4444-4444-444444444444
+b2797a08-0e7f-4118-bc07-e53d13264234	In Process	Batch in process	t	2026-01-03 17:36:29.293224	\N	2026-01-03 17:36:29.293224	\N	44444444-4444-4444-4444-444444444444
+2c12c957-fd7a-4f94-9ebd-415679b9b0ae	Completed	Batch completed	t	2026-01-03 17:36:29.293224	\N	2026-01-03 17:36:29.293224	\N	44444444-4444-4444-4444-444444444444
+3ebb9d2c-bfed-4df0-b70d-3e9abe7d6d63	Blood	Blood sample	t	2026-01-03 17:36:29.293224	\N	2026-01-03 17:36:29.293224	\N	55555555-5555-5555-5555-555555555555
+ed7bed1d-77ab-46fa-9ab7-4adfaf1709be	Urine	Urine sample	t	2026-01-03 17:36:29.293224	\N	2026-01-03 17:36:29.293224	\N	55555555-5555-5555-5555-555555555555
+01ae5c61-a1e3-4e11-977d-c8bd9b04fa6d	Tissue	Tissue sample	t	2026-01-03 17:36:29.293224	\N	2026-01-03 17:36:29.293224	\N	55555555-5555-5555-5555-555555555555
+484a9fc8-8443-4597-887e-7df1f1b6b7a0	Water	Water sample	t	2026-01-03 17:36:29.293224	\N	2026-01-03 17:36:29.293224	\N	55555555-5555-5555-5555-555555555555
+e2b58797-8d14-4d84-9483-6904cc64facc	Human	Human matrix	t	2026-01-03 17:36:29.293224	\N	2026-01-03 17:36:29.293224	\N	66666666-6666-6666-6666-666666666666
+caa0178a-84dc-44bd-91c8-c784c7e50cf9	Environmental	Environmental matrix	t	2026-01-03 17:36:29.293224	\N	2026-01-03 17:36:29.293224	\N	66666666-6666-6666-6666-666666666666
+fd559ca4-6104-4da7-8c4a-87765578061d	Food	Food matrix	t	2026-01-03 17:36:29.293224	\N	2026-01-03 17:36:29.293224	\N	66666666-6666-6666-6666-666666666666
+9b373306-ccec-41f0-9ce0-39d149a38875	Sample	Regular sample	t	2026-01-03 17:36:29.293224	\N	2026-01-03 17:36:29.293224	\N	77777777-7777-7777-7777-777777777777
+56291bdb-0232-4ae7-9089-31be5f1c02de	Positive Control	Positive control	t	2026-01-03 17:36:29.293224	\N	2026-01-03 17:36:29.293224	\N	77777777-7777-7777-7777-777777777777
+2cdf87aa-1a53-47de-a85f-3496c9e0b9ba	Negative Control	Negative control	t	2026-01-03 17:36:29.293224	\N	2026-01-03 17:36:29.293224	\N	77777777-7777-7777-7777-777777777777
+93e3b0d4-fc52-4e98-af8a-fb359805c5d5	Matrix Spike	Matrix spike	t	2026-01-03 17:36:29.293224	\N	2026-01-03 17:36:29.293224	\N	77777777-7777-7777-7777-777777777777
+8798d0c4-5644-420e-acd1-e51c8550892b	Duplicate	Duplicate sample	t	2026-01-03 17:36:29.293224	\N	2026-01-03 17:36:29.293224	\N	77777777-7777-7777-7777-777777777777
+09f089db-de3d-4c3d-a10e-f7b169c62470	Blank	Blank sample	t	2026-01-03 17:36:29.293224	\N	2026-01-03 17:36:29.293224	\N	77777777-7777-7777-7777-777777777777
+2c5162e3-0a78-488e-ae27-e9c57bf42759	concentration	Concentration units	t	2026-01-03 17:36:29.293224	\N	2026-01-03 17:36:29.293224	\N	88888888-8888-8888-8888-888888888888
+a4f5937a-a108-4b20-9991-30d4f32d615c	mass	Mass units	t	2026-01-03 17:36:29.293224	\N	2026-01-03 17:36:29.293224	\N	88888888-8888-8888-8888-888888888888
+29676c86-b3bf-4cdf-bf84-c35ce6324a51	volume	Volume units	t	2026-01-03 17:36:29.293224	\N	2026-01-03 17:36:29.293224	\N	88888888-8888-8888-8888-888888888888
+4c2e284b-b3c2-427c-acdb-0f8e9d4d4627	molar	Molar units	t	2026-01-03 17:36:29.293224	\N	2026-01-03 17:36:29.293224	\N	88888888-8888-8888-8888-888888888888
+058a64c7-e3ff-4439-929f-e058d475726b	Email	Email address	t	2026-01-03 17:36:29.293224	\N	2026-01-03 17:36:29.293224	\N	99999999-9999-9999-9999-999999999999
+24679e2c-aae8-45e7-a0ff-83529e82550e	Phone	Phone number	t	2026-01-03 17:36:29.293224	\N	2026-01-03 17:36:29.293224	\N	99999999-9999-9999-9999-999999999999
+05d4b884-cd24-4158-8c16-267a30109da9	Mobile	Mobile phone	t	2026-01-03 17:36:29.293224	\N	2026-01-03 17:36:29.293224	\N	99999999-9999-9999-9999-999999999999
 \.
 
 
@@ -1117,15 +1164,15 @@ f8c8cdc5-a869-45de-8dcc-1bd96232d3da	Email	Email address	t	2025-12-28 19:21:39.4
 --
 
 COPY public.lists (id, name, description, active, created_at, created_by, modified_at, modified_by) FROM stdin;
-11111111-1111-1111-1111-111111111111	sample_status	Sample status values	t	2025-12-28 19:21:39.478317	\N	2025-12-28 19:21:39.478317	\N
-22222222-2222-2222-2222-222222222222	test_status	Test status values	t	2025-12-28 19:21:39.478317	\N	2025-12-28 19:21:39.478317	\N
-33333333-3333-3333-3333-333333333333	project_status	Project status values	t	2025-12-28 19:21:39.478317	\N	2025-12-28 19:21:39.478317	\N
-44444444-4444-4444-4444-444444444444	batch_status	Batch status values	t	2025-12-28 19:21:39.478317	\N	2025-12-28 19:21:39.478317	\N
-55555555-5555-5555-5555-555555555555	sample_types	Sample type values	t	2025-12-28 19:21:39.478317	\N	2025-12-28 19:21:39.478317	\N
-66666666-6666-6666-6666-666666666666	matrix_types	Matrix type values	t	2025-12-28 19:21:39.478317	\N	2025-12-28 19:21:39.478317	\N
-77777777-7777-7777-7777-777777777777	qc_types	QC type values	t	2025-12-28 19:21:39.478317	\N	2025-12-28 19:21:39.478317	\N
-88888888-8888-8888-8888-888888888888	unit_types	Unit type values	t	2025-12-28 19:21:39.478317	\N	2025-12-28 19:21:39.478317	\N
-99999999-9999-9999-9999-999999999999	contact_types	Contact method types	t	2025-12-28 19:21:39.478317	\N	2025-12-28 19:21:39.478317	\N
+11111111-1111-1111-1111-111111111111	sample_status	Sample status values	t	2026-01-03 17:36:29.293224	\N	2026-01-03 17:36:29.293224	\N
+22222222-2222-2222-2222-222222222222	test_status	Test status values	t	2026-01-03 17:36:29.293224	\N	2026-01-03 17:36:29.293224	\N
+33333333-3333-3333-3333-333333333333	project_status	Project status values	t	2026-01-03 17:36:29.293224	\N	2026-01-03 17:36:29.293224	\N
+44444444-4444-4444-4444-444444444444	batch_status	Batch status values	t	2026-01-03 17:36:29.293224	\N	2026-01-03 17:36:29.293224	\N
+55555555-5555-5555-5555-555555555555	sample_types	Sample type values	t	2026-01-03 17:36:29.293224	\N	2026-01-03 17:36:29.293224	\N
+66666666-6666-6666-6666-666666666666	matrix_types	Matrix type values	t	2026-01-03 17:36:29.293224	\N	2026-01-03 17:36:29.293224	\N
+77777777-7777-7777-7777-777777777777	qc_types	QC type values	t	2026-01-03 17:36:29.293224	\N	2026-01-03 17:36:29.293224	\N
+88888888-8888-8888-8888-888888888888	unit_types	Unit type values	t	2026-01-03 17:36:29.293224	\N	2026-01-03 17:36:29.293224	\N
+99999999-9999-9999-9999-999999999999	contact_types	Contact method types	t	2026-01-03 17:36:29.293224	\N	2026-01-03 17:36:29.293224	\N
 \.
 
 
@@ -1158,23 +1205,23 @@ COPY public.people_locations (person_id, location_id, "primary", notes) FROM std
 --
 
 COPY public.permissions (id, name, description, active, created_at, created_by, modified_at, modified_by) FROM stdin;
-eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee	user:manage	Manage users	t	2025-12-28 19:21:39.478317	\N	2025-12-28 19:21:39.478317	\N
-ffffffff-ffff-ffff-ffff-ffffffffffff	role:manage	Manage roles	t	2025-12-28 19:21:39.478317	\N	2025-12-28 19:21:39.478317	\N
-a0a0a0a0-a0a0-a0a0-a0a0-a0a0a0a0a0a0	config:edit	Edit configuration	t	2025-12-28 19:21:39.478317	\N	2025-12-28 19:21:39.478317	\N
-b0b0b0b0-b0b0-b0b0-b0b0-b0b0b0b0b0b0	project:manage	Manage projects	t	2025-12-28 19:21:39.478317	\N	2025-12-28 19:21:39.478317	\N
-c0c0c0c0-c0c0-c0c0-c0c0-c0c0c0c0c0c0	sample:create	Create samples	t	2025-12-28 19:21:39.478317	\N	2025-12-28 19:21:39.478317	\N
-d0d0d0d0-d0d0-d0d0-d0d0-d0d0d0d0d0d0	sample:read	Read samples	t	2025-12-28 19:21:39.478317	\N	2025-12-28 19:21:39.478317	\N
-e0e0e0e0-e0e0-e0e0-e0e0-e0e0e0e0e0e0	sample:update	Update samples	t	2025-12-28 19:21:39.478317	\N	2025-12-28 19:21:39.478317	\N
-f0f0f0f0-f0f0-f0f0-f0f0-f0f0f0f0f0f0	test:assign	Assign tests	t	2025-12-28 19:21:39.478317	\N	2025-12-28 19:21:39.478317	\N
-a1a1a1a1-a1a1-a1a1-a1a1-a1a1a1a1a1a1	test:update	Update tests	t	2025-12-28 19:21:39.478317	\N	2025-12-28 19:21:39.478317	\N
-b1b1b1b1-b1b1-b1b1-b1b1-b1b1b1b1b1b1	result:enter	Enter results	t	2025-12-28 19:21:39.478317	\N	2025-12-28 19:21:39.478317	\N
-c1c1c1c1-c1c1-c1c1-c1c1-c1c1c1c1c1c1	result:review	Review results	t	2025-12-28 19:21:39.478317	\N	2025-12-28 19:21:39.478317	\N
-d1d1d1d1-d1d1-d1d1-d1d1-d1d1d1d1d1d1	batch:manage	Manage batches	t	2025-12-28 19:21:39.478317	\N	2025-12-28 19:21:39.478317	\N
-e1e1e1e1-e1e1-e1e1-e1e1-e1e1e1e1e1e1	batch:read	Read batches	t	2025-12-28 19:21:39.478317	\N	2025-12-28 19:21:39.478317	\N
-e58297d6-2ac8-4fd3-812b-d377cc58a299	result:update	Update results	t	2025-12-28 19:21:39.478317	\N	2025-12-28 19:21:39.478317	\N
-e505b2c4-08f2-4855-a5a0-fff7f4249b8f	result:delete	Delete results	t	2025-12-28 19:21:39.478317	\N	2025-12-28 19:21:39.478317	\N
-ec18805b-02eb-40df-92b6-a31a479f21fe	batch:update	Update batches	t	2025-12-28 19:21:39.478317	\N	2025-12-28 19:21:39.478317	\N
-cd59cff8-e1ba-44af-92ba-3e3a5b92f9ee	batch:delete	Delete batches	t	2025-12-28 19:21:39.478317	\N	2025-12-28 19:21:39.478317	\N
+eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee	user:manage	Manage users	t	2026-01-03 17:36:29.293224	\N	2026-01-03 17:36:29.293224	\N
+ffffffff-ffff-ffff-ffff-ffffffffffff	role:manage	Manage roles	t	2026-01-03 17:36:29.293224	\N	2026-01-03 17:36:29.293224	\N
+a0a0a0a0-a0a0-a0a0-a0a0-a0a0a0a0a0a0	config:edit	Edit configuration	t	2026-01-03 17:36:29.293224	\N	2026-01-03 17:36:29.293224	\N
+b0b0b0b0-b0b0-b0b0-b0b0-b0b0b0b0b0b0	project:manage	Manage projects	t	2026-01-03 17:36:29.293224	\N	2026-01-03 17:36:29.293224	\N
+c0c0c0c0-c0c0-c0c0-c0c0-c0c0c0c0c0c0	sample:create	Create samples	t	2026-01-03 17:36:29.293224	\N	2026-01-03 17:36:29.293224	\N
+d0d0d0d0-d0d0-d0d0-d0d0-d0d0d0d0d0d0	sample:read	Read samples	t	2026-01-03 17:36:29.293224	\N	2026-01-03 17:36:29.293224	\N
+e0e0e0e0-e0e0-e0e0-e0e0-e0e0e0e0e0e0	sample:update	Update samples	t	2026-01-03 17:36:29.293224	\N	2026-01-03 17:36:29.293224	\N
+f0f0f0f0-f0f0-f0f0-f0f0-f0f0f0f0f0f0	test:assign	Assign tests	t	2026-01-03 17:36:29.293224	\N	2026-01-03 17:36:29.293224	\N
+a1a1a1a1-a1a1-a1a1-a1a1-a1a1a1a1a1a1	test:update	Update tests	t	2026-01-03 17:36:29.293224	\N	2026-01-03 17:36:29.293224	\N
+b1b1b1b1-b1b1-b1b1-b1b1-b1b1b1b1b1b1	result:enter	Enter results	t	2026-01-03 17:36:29.293224	\N	2026-01-03 17:36:29.293224	\N
+c1c1c1c1-c1c1-c1c1-c1c1-c1c1c1c1c1c1	result:review	Review results	t	2026-01-03 17:36:29.293224	\N	2026-01-03 17:36:29.293224	\N
+d1d1d1d1-d1d1-d1d1-d1d1-d1d1d1d1d1d1	batch:manage	Manage batches	t	2026-01-03 17:36:29.293224	\N	2026-01-03 17:36:29.293224	\N
+e1e1e1e1-e1e1-e1e1-e1e1-e1e1e1e1e1e1	batch:read	Read batches	t	2026-01-03 17:36:29.293224	\N	2026-01-03 17:36:29.293224	\N
+e2083955-b406-4644-b0ac-1879e2083f1e	result:update	Update results	t	2026-01-03 17:36:29.293224	\N	2026-01-03 17:36:29.293224	\N
+8e85d8f8-bd1f-47f6-a328-cf314fdd6289	result:delete	Delete results	t	2026-01-03 17:36:29.293224	\N	2026-01-03 17:36:29.293224	\N
+bd25b07c-d9f9-46c1-87f4-196ff28a3a66	batch:update	Update batches	t	2026-01-03 17:36:29.293224	\N	2026-01-03 17:36:29.293224	\N
+9c8f7ebf-c808-4aea-b772-fe5110eb9f03	batch:delete	Delete batches	t	2026-01-03 17:36:29.293224	\N	2026-01-03 17:36:29.293224	\N
 \.
 
 
@@ -1190,7 +1237,7 @@ COPY public.project_users (project_id, user_id, access_level, granted_at, grante
 -- Data for Name: projects; Type: TABLE DATA; Schema: public; Owner: -
 --
 
-COPY public.projects (id, name, description, active, created_at, created_by, modified_at, modified_by, start_date, client_id, status, client_project_id) FROM stdin;
+COPY public.projects (id, name, description, active, created_at, created_by, modified_at, modified_by, start_date, client_id, status, client_project_id, custom_attributes) FROM stdin;
 \.
 
 
@@ -1198,7 +1245,7 @@ COPY public.projects (id, name, description, active, created_at, created_by, mod
 -- Data for Name: results; Type: TABLE DATA; Schema: public; Owner: -
 --
 
-COPY public.results (id, name, description, active, created_at, created_by, modified_at, modified_by, test_id, analyte_id, raw_result, reported_result, qualifiers, calculated_result, entry_date, entered_by) FROM stdin;
+COPY public.results (id, name, description, active, created_at, created_by, modified_at, modified_by, test_id, analyte_id, raw_result, reported_result, qualifiers, calculated_result, entry_date, entered_by, custom_attributes) FROM stdin;
 \.
 
 
@@ -1246,10 +1293,10 @@ dddddddd-dddd-dddd-dddd-dddddddddddd	d0d0d0d0-d0d0-d0d0-d0d0-d0d0d0d0d0d0
 --
 
 COPY public.roles (id, name, description, active, created_at, created_by, modified_at, modified_by) FROM stdin;
-aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa	Administrator	System administrator	t	2025-12-28 19:21:39.478317	\N	2025-12-28 19:21:39.478317	\N
-bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb	Lab Manager	Laboratory manager	t	2025-12-28 19:21:39.478317	\N	2025-12-28 19:21:39.478317	\N
-cccccccc-cccc-cccc-cccc-cccccccccccc	Lab Technician	Laboratory technician	t	2025-12-28 19:21:39.478317	\N	2025-12-28 19:21:39.478317	\N
-dddddddd-dddd-dddd-dddd-dddddddddddd	Client	Client user	t	2025-12-28 19:21:39.478317	\N	2025-12-28 19:21:39.478317	\N
+aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa	Administrator	System administrator	t	2026-01-03 17:36:29.293224	\N	2026-01-03 17:36:29.293224	\N
+bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb	Lab Manager	Laboratory manager	t	2026-01-03 17:36:29.293224	\N	2026-01-03 17:36:29.293224	\N
+cccccccc-cccc-cccc-cccc-cccccccccccc	Lab Technician	Laboratory technician	t	2026-01-03 17:36:29.293224	\N	2026-01-03 17:36:29.293224	\N
+dddddddd-dddd-dddd-dddd-dddddddddddd	Client	Client user	t	2026-01-03 17:36:29.293224	\N	2026-01-03 17:36:29.293224	\N
 \.
 
 
@@ -1257,7 +1304,7 @@ dddddddd-dddd-dddd-dddd-dddddddddddd	Client	Client user	t	2025-12-28 19:21:39.47
 -- Data for Name: samples; Type: TABLE DATA; Schema: public; Owner: -
 --
 
-COPY public.samples (id, name, description, active, created_at, created_by, modified_at, modified_by, due_date, received_date, report_date, sample_type, status, matrix, temperature, parent_sample_id, project_id, qc_type, client_sample_id) FROM stdin;
+COPY public.samples (id, name, description, active, created_at, created_by, modified_at, modified_by, due_date, received_date, report_date, sample_type, status, matrix, temperature, parent_sample_id, project_id, qc_type, client_sample_id, custom_attributes) FROM stdin;
 \.
 
 
@@ -1266,7 +1313,7 @@ COPY public.samples (id, name, description, active, created_at, created_by, modi
 --
 
 COPY public.test_batteries (id, name, description, active, created_at, created_by, modified_at, modified_by) FROM stdin;
-c0000001-c000-c000-c000-c00000000001	EPA 8080 Full	Complete EPA Method 8080 test battery for Organochlorine Pesticides and PCBs	t	2025-12-28 19:21:39.478317	\N	2025-12-28 19:21:39.478317	\N
+c0000001-c000-c000-c000-c00000000001	EPA 8080 Full	Complete EPA Method 8080 test battery for Organochlorine Pesticides and PCBs	t	2026-01-03 17:36:29.293224	\N	2026-01-03 17:36:29.293224	\N
 \.
 
 
@@ -1274,7 +1321,7 @@ c0000001-c000-c000-c000-c00000000001	EPA 8080 Full	Complete EPA Method 8080 test
 -- Data for Name: tests; Type: TABLE DATA; Schema: public; Owner: -
 --
 
-COPY public.tests (id, name, description, active, created_at, created_by, modified_at, modified_by, sample_id, analysis_id, status, review_date, test_date, technician_id) FROM stdin;
+COPY public.tests (id, name, description, active, created_at, created_by, modified_at, modified_by, sample_id, analysis_id, status, review_date, test_date, technician_id, custom_attributes) FROM stdin;
 \.
 
 
@@ -1283,17 +1330,17 @@ COPY public.tests (id, name, description, active, created_at, created_by, modifi
 --
 
 COPY public.units (id, name, description, active, created_at, created_by, modified_at, modified_by, multiplier, type) FROM stdin;
-9da7b8d9-d828-423b-86f3-91f475a31be9	g/L	Grams per liter	t	2025-12-28 19:21:39.478317	\N	2025-12-28 19:21:39.478317	\N	1.0000000000	6cbb60b6-7708-4b23-83e1-98aa054b7852
-4c9f6a26-dbd0-4b19-8dc7-3fbf1c0f71b5	mg/L	Milligrams per liter	t	2025-12-28 19:21:39.478317	\N	2025-12-28 19:21:39.478317	\N	0.0010000000	6cbb60b6-7708-4b23-83e1-98aa054b7852
-f5735a9e-e243-48dc-a025-373e5e999974	µg/L	Micrograms per liter	t	2025-12-28 19:21:39.478317	\N	2025-12-28 19:21:39.478317	\N	0.0000010000	6cbb60b6-7708-4b23-83e1-98aa054b7852
-fd44640c-3c79-46cb-aa2e-111d3bac26a4	g	Grams	t	2025-12-28 19:21:39.478317	\N	2025-12-28 19:21:39.478317	\N	1.0000000000	5460a872-0673-4a1c-b64b-1405ce8579cc
-6746a198-6a13-4ee1-9c6f-a6fce0bd3625	mg	Milligrams	t	2025-12-28 19:21:39.478317	\N	2025-12-28 19:21:39.478317	\N	0.0010000000	5460a872-0673-4a1c-b64b-1405ce8579cc
-d20ee8d0-be43-40a4-a476-c192835bfd0b	µg	Micrograms	t	2025-12-28 19:21:39.478317	\N	2025-12-28 19:21:39.478317	\N	0.0000010000	5460a872-0673-4a1c-b64b-1405ce8579cc
-f9a2c662-66c7-4e7d-bc07-42067e7a5931	L	Liters	t	2025-12-28 19:21:39.478317	\N	2025-12-28 19:21:39.478317	\N	1.0000000000	84931478-edb9-431c-b964-64c25f9840d3
-9f9887fd-1dc7-41c0-b54a-881bcc42caf2	mL	Milliliters	t	2025-12-28 19:21:39.478317	\N	2025-12-28 19:21:39.478317	\N	0.0010000000	84931478-edb9-431c-b964-64c25f9840d3
-3e2bab77-489b-4981-9afe-06ddfc4be369	µL	Microliters	t	2025-12-28 19:21:39.478317	\N	2025-12-28 19:21:39.478317	\N	0.0000010000	84931478-edb9-431c-b964-64c25f9840d3
-176f49db-2ea0-44f8-9e35-2d8d9c5b2545	mol/L	Moles per liter	t	2025-12-28 19:21:39.478317	\N	2025-12-28 19:21:39.478317	\N	1.0000000000	16126a88-e075-4682-97f0-caac6f4fbef7
-18ef8146-4055-427a-88b8-e25cabb95473	mmol/L	Millimoles per liter	t	2025-12-28 19:21:39.478317	\N	2025-12-28 19:21:39.478317	\N	0.0010000000	16126a88-e075-4682-97f0-caac6f4fbef7
+2bf7ceb5-5b49-4e97-8331-a495f44386fd	g/L	Grams per liter	t	2026-01-03 17:36:29.293224	\N	2026-01-03 17:36:29.293224	\N	1.0000000000	2c5162e3-0a78-488e-ae27-e9c57bf42759
+2f462ffe-8929-4225-9f10-5cd27924c0a7	mg/L	Milligrams per liter	t	2026-01-03 17:36:29.293224	\N	2026-01-03 17:36:29.293224	\N	0.0010000000	2c5162e3-0a78-488e-ae27-e9c57bf42759
+0154d116-6232-41c5-895d-2ffe35d33782	µg/L	Micrograms per liter	t	2026-01-03 17:36:29.293224	\N	2026-01-03 17:36:29.293224	\N	0.0000010000	2c5162e3-0a78-488e-ae27-e9c57bf42759
+20ce946b-dee9-4edc-9486-6bff8c460a1d	g	Grams	t	2026-01-03 17:36:29.293224	\N	2026-01-03 17:36:29.293224	\N	1.0000000000	a4f5937a-a108-4b20-9991-30d4f32d615c
+15885701-d665-4691-93d0-5afb5b774cd8	mg	Milligrams	t	2026-01-03 17:36:29.293224	\N	2026-01-03 17:36:29.293224	\N	0.0010000000	a4f5937a-a108-4b20-9991-30d4f32d615c
+05b5868e-ff18-4a12-8515-ec91f88abb44	µg	Micrograms	t	2026-01-03 17:36:29.293224	\N	2026-01-03 17:36:29.293224	\N	0.0000010000	a4f5937a-a108-4b20-9991-30d4f32d615c
+e14481b7-fd71-4d62-ab1b-e9047d58325c	L	Liters	t	2026-01-03 17:36:29.293224	\N	2026-01-03 17:36:29.293224	\N	1.0000000000	29676c86-b3bf-4cdf-bf84-c35ce6324a51
+46f8720e-edca-4293-8f2e-771a8b9b1b81	mL	Milliliters	t	2026-01-03 17:36:29.293224	\N	2026-01-03 17:36:29.293224	\N	0.0010000000	29676c86-b3bf-4cdf-bf84-c35ce6324a51
+a6518d18-1b06-4404-a4fe-a18bee4ee815	µL	Microliters	t	2026-01-03 17:36:29.293224	\N	2026-01-03 17:36:29.293224	\N	0.0000010000	29676c86-b3bf-4cdf-bf84-c35ce6324a51
+a48f00fa-2ca5-4ae3-a83d-037457c213df	mol/L	Moles per liter	t	2026-01-03 17:36:29.293224	\N	2026-01-03 17:36:29.293224	\N	1.0000000000	4c2e284b-b3c2-427c-acdb-0f8e9d4d4627
+2d179575-f825-4f77-97f9-7492e6bfbbe3	mmol/L	Millimoles per liter	t	2026-01-03 17:36:29.293224	\N	2026-01-03 17:36:29.293224	\N	0.0010000000	4c2e284b-b3c2-427c-acdb-0f8e9d4d4627
 \.
 
 
@@ -1302,7 +1349,9 @@ f9a2c662-66c7-4e7d-bc07-42067e7a5931	L	Liters	t	2025-12-28 19:21:39.478317	\N	20
 --
 
 COPY public.users (id, name, description, active, created_at, created_by, modified_at, modified_by, username, password_hash, email, role_id, client_id, last_login) FROM stdin;
-00000000-0000-0000-0000-000000000001	System Administrator	\N	t	2025-12-28 19:21:39.478317	\N	2025-12-28 19:21:53.50371	\N	admin	240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9	admin@lims.local	aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa	00000000-0000-0000-0000-000000000001	2025-12-28 19:21:53.50371
+00000000-0000-0000-0000-000000000002	Lab Manager	\N	t	2026-01-03 17:36:29.293224	\N	2026-01-03 17:36:29.293224	\N	lab-manager	7dd63afe29407aa45af7fdd4388b71195b552688c2750abd42bdf3b231c13b69	lab-manager@lims.local	bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb	00000000-0000-0000-0000-000000000001	\N
+00000000-0000-0000-0000-000000000003	Lab Technician	\N	t	2026-01-03 17:36:29.293224	\N	2026-01-03 17:36:29.293224	\N	lab-tech	d81968c60a8a41bdafcb3c5825bf8bc4a76dccc932d673e3f9a7b71ce4538596	lab-tech@lims.local	cccccccc-cccc-cccc-cccc-cccccccccccc	00000000-0000-0000-0000-000000000001	\N
+00000000-0000-0000-0000-000000000001	System Administrator	\N	t	2026-01-03 17:36:29.293224	\N	2026-01-03 17:36:43.714074	\N	admin	240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9	admin@lims.local	aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa	00000000-0000-0000-0000-000000000001	2026-01-03 17:36:43.714074
 \.
 
 
@@ -1464,6 +1513,14 @@ ALTER TABLE ONLY public.containers
 
 ALTER TABLE ONLY public.contents
     ADD CONSTRAINT contents_pkey PRIMARY KEY (container_id, sample_id);
+
+
+--
+-- Name: custom_attributes_config custom_attributes_config_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.custom_attributes_config
+    ADD CONSTRAINT custom_attributes_config_pkey PRIMARY KEY (id);
 
 
 --
@@ -1683,6 +1740,14 @@ ALTER TABLE ONLY public.units
 
 
 --
+-- Name: custom_attributes_config uq_custom_attributes_config_entity_attr; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.custom_attributes_config
+    ADD CONSTRAINT uq_custom_attributes_config_entity_attr UNIQUE (entity_type, attr_name);
+
+
+--
 -- Name: users users_email_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1764,6 +1829,13 @@ CREATE INDEX idx_batch_containers_container_id ON public.batch_containers USING 
 
 
 --
+-- Name: idx_batches_custom_attributes_gin; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_batches_custom_attributes_gin ON public.batches USING gin (custom_attributes);
+
+
+--
 -- Name: idx_batches_name_unique; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1824,6 +1896,13 @@ CREATE INDEX idx_battery_analyses_sequence ON public.battery_analyses USING btre
 --
 
 CREATE INDEX idx_client_projects_client_id ON public.client_projects USING btree (client_id);
+
+
+--
+-- Name: idx_client_projects_custom_attributes_gin; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_client_projects_custom_attributes_gin ON public.client_projects USING gin (custom_attributes);
 
 
 --
@@ -1925,6 +2004,20 @@ CREATE INDEX idx_contents_sample_id ON public.contents USING btree (sample_id);
 
 
 --
+-- Name: idx_custom_attributes_config_active; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_custom_attributes_config_active ON public.custom_attributes_config USING btree (active);
+
+
+--
+-- Name: idx_custom_attributes_config_entity_type; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_custom_attributes_config_entity_type ON public.custom_attributes_config USING btree (entity_type);
+
+
+--
 -- Name: idx_list_entries_list_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2009,6 +2102,13 @@ CREATE INDEX idx_projects_client_project_id ON public.projects USING btree (clie
 
 
 --
+-- Name: idx_projects_custom_attributes_gin; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_projects_custom_attributes_gin ON public.projects USING gin (custom_attributes);
+
+
+--
 -- Name: idx_projects_name_unique; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2034,6 +2134,13 @@ CREATE INDEX idx_results_analyte_id ON public.results USING btree (analyte_id);
 --
 
 CREATE INDEX idx_results_created_by ON public.results USING btree (created_by);
+
+
+--
+-- Name: idx_results_custom_attributes_gin; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_results_custom_attributes_gin ON public.results USING gin (custom_attributes);
 
 
 --
@@ -2090,6 +2197,13 @@ CREATE UNIQUE INDEX idx_samples_client_sample_id ON public.samples USING btree (
 --
 
 CREATE INDEX idx_samples_created_by ON public.samples USING btree (created_by);
+
+
+--
+-- Name: idx_samples_custom_attributes_gin; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_samples_custom_attributes_gin ON public.samples USING gin (custom_attributes);
 
 
 --
@@ -2202,6 +2316,13 @@ CREATE INDEX idx_tests_analysis_id_status ON public.tests USING btree (analysis_
 --
 
 CREATE INDEX idx_tests_created_by ON public.tests USING btree (created_by);
+
+
+--
+-- Name: idx_tests_custom_attributes_gin; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_tests_custom_attributes_gin ON public.tests USING gin (custom_attributes);
 
 
 --
@@ -2738,6 +2859,22 @@ ALTER TABLE ONLY public.contents
 
 
 --
+-- Name: custom_attributes_config custom_attributes_config_created_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.custom_attributes_config
+    ADD CONSTRAINT custom_attributes_config_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(id);
+
+
+--
+-- Name: custom_attributes_config custom_attributes_config_modified_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.custom_attributes_config
+    ADD CONSTRAINT custom_attributes_config_modified_by_fkey FOREIGN KEY (modified_by) REFERENCES public.users(id);
+
+
+--
 -- Name: list_entries list_entries_list_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -3059,6 +3196,19 @@ CREATE POLICY containers_access ON public.containers USING ((public.is_admin() O
 
 
 --
+-- Name: custom_attributes_config; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.custom_attributes_config ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: custom_attributes_config custom_attributes_config_access; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY custom_attributes_config_access ON public.custom_attributes_config USING ((public.is_admin() OR (active = true)));
+
+
+--
 -- Name: projects; Type: ROW SECURITY; Schema: public; Owner: -
 --
 
@@ -3119,5 +3269,5 @@ CREATE POLICY tests_access ON public.tests USING ((public.is_admin() OR (EXISTS 
 -- PostgreSQL database dump complete
 --
 
-\unrestrict E7duE09XQKoCgbOGT4EX7mIvNxmz78bXWeQVhGFSsBifLgOedDcxPwfJ9g5ht1b
+\unrestrict CUrwEgmNmj3DjIKP5MHAGopI3Ljf4AaPlksSYjxhsssSuPXj1xd7TqB0fvOamHt
 

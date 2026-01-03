@@ -13,3 +13,4 @@ from .result import Result
 from .batch import Batch, BatchContainer
 from .list import List, ListEntry
 from .unit import Unit
+from .custom_attributes_config import CustomAttributeConfig

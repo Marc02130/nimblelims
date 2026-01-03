@@ -579,6 +579,56 @@ class ApiService {
     const response: AxiosResponse = await this.api.delete(`/client-projects/${id}`);
     return response.data;
   }
+
+  // Custom Attributes Configuration endpoints
+  async getCustomAttributeConfigs(filters?: {
+    entity_type?: string;
+    active?: boolean;
+    page?: number;
+    size?: number;
+  }) {
+    const response: AxiosResponse = await this.api.get('/admin/custom-attributes', {
+      params: filters,
+    });
+    return response.data;
+  }
+
+  async getCustomAttributeConfig(id: string) {
+    const response: AxiosResponse = await this.api.get(`/admin/custom-attributes/${id}`);
+    return response.data;
+  }
+
+  async createCustomAttributeConfig(configData: {
+    entity_type: string;
+    attr_name: string;
+    data_type: 'text' | 'number' | 'date' | 'boolean' | 'select';
+    validation_rules: Record<string, any>;
+    description?: string;
+    active?: boolean;
+  }) {
+    const response: AxiosResponse = await this.api.post('/admin/custom-attributes', configData);
+    return response.data;
+  }
+
+  async updateCustomAttributeConfig(
+    id: string,
+    configData: {
+      entity_type?: string;
+      attr_name?: string;
+      data_type?: 'text' | 'number' | 'date' | 'boolean' | 'select';
+      validation_rules?: Record<string, any>;
+      description?: string;
+      active?: boolean;
+    }
+  ) {
+    const response: AxiosResponse = await this.api.patch(`/admin/custom-attributes/${id}`, configData);
+    return response.data;
+  }
+
+  async deleteCustomAttributeConfig(id: string) {
+    const response: AxiosResponse = await this.api.delete(`/admin/custom-attributes/${id}`);
+    return response.data;
+  }
 }
 
 export const apiService = new ApiService();

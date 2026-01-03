@@ -33,6 +33,18 @@ This document describes the user interface components and interactions for the a
 
 ### Supporting Components
 - `AliquotDerivativeDialog.tsx`: Dialog for creating aliquots/derivatives
+- `CustomAttributeField.tsx`: Reusable component for rendering custom attribute fields dynamically based on data type (text, number, date, boolean, select)
+
+### Admin Components
+- `CustomFieldsManagement.tsx`: Admin page for managing custom attribute configurations
+  - Lists custom fields by entity type with filtering
+  - CRUD operations for custom attribute configs
+  - Requires `config:edit` permission
+- `CustomFieldDialog.tsx`: Dialog for creating/editing custom attribute configurations
+  - Formik/Yup validation
+  - Entity type selection
+  - Data type selection with validation rules editor
+  - Attribute name uniqueness checking
 
 ---
 
@@ -94,8 +106,10 @@ This document describes the user interface components and interactions for the a
   - Temperature (optional, overrides common)
   - Description (optional)
   - Anomalies (optional)
+  - Custom Attributes (dynamic columns based on active configs for 'samples')
 - Add/Remove rows buttons
 - Validation: Either names provided OR auto-name prefix configured
+- Custom attributes validated per row with inline error display
 
 **UI Features**:
 - Grid layout (responsive: 2 columns on desktop, 1 on mobile)
@@ -277,12 +291,16 @@ This document describes the user interface components and interactions for the a
 
 ### Results Entry Table
 
-**Component**: `BatchResultsEntryTable.tsx` (US-28: Batch Results Entry)
+**Component**: `ResultsEntryTable.tsx` (US-28: Batch Results Entry)
 
 **Layout**:
-- Table with tests/samples as rows, analytes as columns
-- Header row shows analyte names with metadata
-- Each cell contains input fields for that test-analyte combination
+- Table with samples as rows, custom attributes and analytes as columns
+- **Custom Attribute Columns**: Dynamically rendered based on active configs for 'tests' entity type
+  - Displayed before analyte columns
+  - Shows test custom_attributes values (formatted by data type)
+  - Read-only display (values set during test creation/update)
+- Header row shows custom attribute names, then analyte names with metadata
+- Each cell contains input fields for that sample-analyte combination
 - **QC Sample Indicators**: QC samples highlighted with warning background color
 
 **Table Structure**:
@@ -387,6 +405,36 @@ This document describes the user interface components and interactions for the a
 - Save button disabled if validation errors
 
 ---
+
+## Dynamic Field Rendering
+
+### CustomAttributeField Component
+
+**Location**: `frontend/src/components/common/CustomAttributeField.tsx`
+
+**Purpose**: Reusable component for rendering custom attribute fields dynamically based on configuration.
+
+**Props**:
+- `config`: CustomAttributeConfig object with data_type and validation_rules
+- `value`: Current field value
+- `onChange`: Callback function for value changes
+- `error`: Boolean indicating validation error
+- `helperText`: Error message or description
+- `fullWidth`: Boolean for full-width layout
+- `size`: 'small' | 'medium'
+
+**Rendering Logic**:
+- **Text**: Renders TextField with max_length/min_length validation
+- **Number**: Renders NumberField with min/max validation
+- **Date**: Renders DatePicker (MUI X)
+- **Boolean**: Renders Checkbox with FormControlLabel
+- **Select**: Renders Select dropdown with options from validation_rules
+
+**Integration**:
+- Used in `SampleDetailsStep.tsx` for sample custom fields
+- Can be extended to other forms (client projects, batches, etc.)
+- Integrated with Formik for form state management
+- Real-time validation using Yup schema generated from validation_rules
 
 ## User Interactions
 
@@ -650,18 +698,25 @@ This document describes the user interface components and interactions for the a
 frontend/src/
 ├── pages/
 │   ├── AccessioningForm.tsx
-│   └── ResultsManagement.tsx
+│   ├── ResultsManagement.tsx
+│   └── admin/
+│       └── CustomFieldsManagement.tsx
 ├── components/
 │   ├── accessioning/
 │   │   ├── SampleDetailsStep.tsx
 │   │   ├── TestAssignmentStep.tsx
-│   │   └── ReviewStep.tsx
+│   │   ├── ReviewStep.tsx
+│   │   └── BulkUniquesTable.tsx
 │   ├── results/
 │   │   ├── ResultsManagement.tsx
 │   │   ├── BatchResultsView.tsx
 │   │   └── ResultsEntryTable.tsx
-│   └── aliquots/
-│       └── AliquotDerivativeDialog.tsx
+│   ├── aliquots/
+│   │   └── AliquotDerivativeDialog.tsx
+│   ├── admin/
+│   │   └── CustomFieldDialog.tsx
+│   └── common/
+│       └── CustomAttributeField.tsx
 ├── services/
 │   └── apiService.ts
 └── contexts/

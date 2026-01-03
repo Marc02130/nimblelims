@@ -2,7 +2,7 @@
 Pydantic schemas for tests
 """
 from pydantic import BaseModel, Field, validator
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from datetime import datetime
 from uuid import UUID
 
@@ -18,6 +18,7 @@ class TestBase(BaseModel):
     review_date: Optional[datetime] = None
     test_date: Optional[datetime] = None
     technician_id: Optional[UUID] = Field(None, description="ID of technician user")
+    custom_attributes: Dict[str, Any] = Field(default_factory=dict, description="Custom attributes as JSON")
 
     @validator('review_date', 'test_date')
     def validate_dates(cls, v):

@@ -26,6 +26,11 @@ This document describes the complete workflow from sample accessioning through r
    - Optionally select client project (for grouping multiple projects)
    - Optionally select QC type (Sample, Positive Control, Negative Control, Matrix Spike, Duplicate, Blank)
    - Document any anomalies observed during inspection
+   - **Custom Fields Section**: Enter custom attributes if configured for 'samples' entity type
+     - Fields dynamically rendered based on active custom attribute configurations
+     - Supports text, number, date, boolean, and select data types
+     - Real-time validation against validation rules (min/max, length, options)
+     - Integrated with form validation; errors displayed inline
 
 2. **Container Assignment**
    - Select container type from admin-preconfigured types (e.g., tube, plate, well)
@@ -258,8 +263,12 @@ Created → In Process → Completed
 
 2. **Batch Entry Interface**
    - System displays tabular interface:
-     - **Rows**: All tests in the batch (one row per test, which is one per sample-analysis combination)
-     - **Columns**: Sample name, Test name, Position, and all analytes (one column per analyte)
+     - **Rows**: All samples in the batch
+     - **Columns**: Sample name, Position, custom attributes (if configured for 'tests'), and all analytes (one column per analyte)
+   - **Custom Attribute Columns**: Displayed before analyte columns
+     - Shows test custom_attributes values (read-only display)
+     - Formatted by data type (text, number, date, boolean, select)
+     - Values set during test creation/update, displayed here for reference
    - QC sample rows are highlighted with warning background color
    - Each analyte column header shows:
      - Reported name

@@ -16,6 +16,7 @@ import AnalysesManagement from './pages/admin/AnalysesManagement';
 import TestBatteriesManagement from './pages/admin/TestBatteriesManagement';
 import AnalytesManagement from './pages/admin/AnalytesManagement';
 import AnalysisAnalytesConfig from './pages/admin/AnalysisAnalytesConfig';
+import CustomFieldsManagement from './pages/admin/CustomFieldsManagement';
 import ClientProjects from './pages/ClientProjects';
 import { useUser } from './contexts/UserContext';
 
@@ -167,6 +168,16 @@ function AppRoutes() {
           element={
             hasPermission('config:edit') || hasPermission('test:configure') ? (
               <TestBatteriesManagement />
+            ) : (
+              <Navigate to="/dashboard" replace />
+            )
+          }
+        />
+        <Route
+          path="/admin/custom-fields"
+          element={
+            hasPermission('config:edit') ? (
+              <CustomFieldsManagement />
             ) : (
               <Navigate to="/dashboard" replace />
             )

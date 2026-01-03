@@ -2,7 +2,7 @@
 Pydantic schemas for samples
 """
 from pydantic import BaseModel, Field, validator, root_validator
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from datetime import datetime
 from uuid import UUID
 
@@ -21,6 +21,7 @@ class SampleBase(BaseModel):
     parent_sample_id: Optional[UUID] = None
     project_id: UUID = Field(..., description="ID of project")
     qc_type: Optional[UUID] = Field(None, description="ID of QC type from list_entries")
+    custom_attributes: Dict[str, Any] = Field(default_factory=dict, description="Custom attributes as JSON")
 
     @validator('due_date', 'received_date', 'report_date')
     def validate_dates(cls, v):
@@ -109,6 +110,7 @@ class SampleUpdate(BaseModel):
     parent_sample_id: Optional[UUID] = None
     project_id: Optional[UUID] = None
     qc_type: Optional[UUID] = None
+    custom_attributes: Optional[Dict[str, Any]] = Field(None, description="Custom attributes as JSON")
 
     @validator('due_date', 'received_date', 'report_date')
     def validate_dates(cls, v):

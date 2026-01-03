@@ -33,6 +33,7 @@ interface BulkUnique {
   temperature?: number;
   anomalies?: string;
   description?: string;
+  custom_attributes?: Record<string, any>;
 }
 
 interface SampleFormData {
@@ -52,6 +53,9 @@ interface SampleFormData {
   project_id: string;
   client_project_id: string;
   qc_type: string;
+  
+  // Custom attributes
+  custom_attributes: Record<string, any>;
   
   // Test assignment
   selected_analyses: string[];
@@ -92,6 +96,7 @@ const initialValues: SampleFormData = {
   project_id: '',
   client_project_id: '',
   qc_type: '',
+  custom_attributes: {},
   selected_analyses: [],
   battery_id: '',
   container_type_id: '',
@@ -102,7 +107,7 @@ const initialValues: SampleFormData = {
   container_concentration_units: '',
   container_amount: null,
   container_amount_units: '',
-  bulk_uniques: [{ id: '1', container_name: '' }],
+  bulk_uniques: [{ id: '1', container_name: '', custom_attributes: {} }],
   auto_name_prefix: '',
   auto_name_start: 1,
   double_entry_enabled: false,
@@ -110,7 +115,62 @@ const initialValues: SampleFormData = {
   sample_type_verification: '',
 };
 
-const getValidationSchema = (bulkMode: boolean) => {
+const buildCustomAttributesValidation = (configs: any[]): Record<string, any> => {
+  const customAttrsSchema: Record<string, any> = {};
+  
+  configs.forEach((config) => {
+    if (!config.active) return;
+    
+    const fieldPath = `custom_attributes.${config.attr_name}`;
+    let fieldSchema: any = null;
+    
+    switch (config.data_type) {
+      case 'text':
+        fieldSchema = Yup.string();
+        if (config.validation_rules?.max_length) {
+          fieldSchema = fieldSchema.max(config.validation_rules.max_length, `Maximum length is ${config.validation_rules.max_length}`);
+        }
+        if (config.validation_rules?.min_length) {
+          fieldSchema = fieldSchema.min(config.validation_rules.min_length, `Minimum length is ${config.validation_rules.min_length}`);
+        }
+        break;
+      
+      case 'number':
+        fieldSchema = Yup.number().nullable();
+        if (config.validation_rules?.min !== undefined) {
+          fieldSchema = fieldSchema.min(config.validation_rules.min, `Minimum value is ${config.validation_rules.min}`);
+        }
+        if (config.validation_rules?.max !== undefined) {
+          fieldSchema = fieldSchema.max(config.validation_rules.max, `Maximum value is ${config.validation_rules.max}`);
+        }
+        break;
+      
+      case 'date':
+        fieldSchema = Yup.date().nullable();
+        break;
+      
+      case 'boolean':
+        fieldSchema = Yup.boolean().nullable();
+        break;
+      
+      case 'select':
+        const options = config.validation_rules?.options || [];
+        fieldSchema = Yup.string().oneOf([...options, ''], `Must be one of: ${options.join(', ')}`).nullable();
+        break;
+      
+      default:
+        fieldSchema = Yup.mixed().nullable();
+    }
+    
+    if (fieldSchema) {
+      customAttrsSchema[fieldPath] = fieldSchema;
+    }
+  });
+  
+  return customAttrsSchema;
+};
+
+const getValidationSchema = (bulkMode: boolean, customAttributeConfigs: any[] = []) => {
   const baseSchema: any = {
     due_date: Yup.date().required('Due date is required'),
     received_date: Yup.date().required('Received date is required'),
@@ -150,6 +210,52 @@ const getValidationSchema = (bulkMode: boolean) => {
       otherwise: (schema: any) => schema.notRequired(),
     });
   } else {
+    // Build custom attributes validation for bulk uniques
+    const bulkUniqueCustomAttrsValidation: Record<string, any> = {};
+    customAttributeConfigs.forEach((config) => {
+      if (!config.active) return;
+      
+      const fieldPath = `custom_attributes.${config.attr_name}`;
+      let fieldSchema: any = null;
+      
+      switch (config.data_type) {
+        case 'text':
+          fieldSchema = Yup.string().nullable();
+          if (config.validation_rules?.max_length) {
+            fieldSchema = fieldSchema.max(config.validation_rules.max_length);
+          }
+          if (config.validation_rules?.min_length) {
+            fieldSchema = fieldSchema.min(config.validation_rules.min_length);
+          }
+          break;
+        case 'number':
+          fieldSchema = Yup.number().nullable();
+          if (config.validation_rules?.min !== undefined) {
+            fieldSchema = fieldSchema.min(config.validation_rules.min);
+          }
+          if (config.validation_rules?.max !== undefined) {
+            fieldSchema = fieldSchema.max(config.validation_rules.max);
+          }
+          break;
+        case 'date':
+          fieldSchema = Yup.date().nullable();
+          break;
+        case 'boolean':
+          fieldSchema = Yup.boolean().nullable();
+          break;
+        case 'select':
+          const options = config.validation_rules?.options || [];
+          fieldSchema = Yup.string().oneOf([...options, ''], `Must be one of: ${options.join(', ')}`).nullable();
+          break;
+        default:
+          fieldSchema = Yup.mixed().nullable();
+      }
+      
+      if (fieldSchema) {
+        bulkUniqueCustomAttrsValidation[fieldPath] = fieldSchema;
+      }
+    });
+
     baseSchema.bulk_uniques = Yup.array()
       .of(
         Yup.object().shape({
@@ -160,6 +266,7 @@ const getValidationSchema = (bulkMode: boolean) => {
           temperature: Yup.number(),
           anomalies: Yup.string(),
           description: Yup.string(),
+          custom_attributes: Yup.object().shape(bulkUniqueCustomAttrsValidation),
         })
       )
       .min(1, 'At least one sample is required')
@@ -170,6 +277,10 @@ const getValidationSchema = (bulkMode: boolean) => {
         return hasNames || hasAutoNaming;
       });
   }
+
+  // Add custom attributes validation
+  const customAttrsValidation = buildCustomAttributesValidation(customAttributeConfigs);
+  Object.assign(baseSchema, customAttrsValidation);
 
   return Yup.object(baseSchema);
 };
@@ -193,11 +304,13 @@ const AccessioningForm: React.FC = () => {
     containerTypes: [],
     units: [],
   });
+  const [customAttributeConfigs, setCustomAttributeConfigs] = useState<any[]>([]);
 
   const { user } = useUser();
 
   useEffect(() => {
     loadLookupData();
+    loadCustomAttributeConfigs();
   }, []);
 
   const loadLookupData = async () => {
@@ -243,6 +356,18 @@ const AccessioningForm: React.FC = () => {
     }
   };
 
+  const loadCustomAttributeConfigs = async () => {
+    try {
+      const response = await apiService.getCustomAttributeConfigs({
+        entity_type: 'samples',
+        active: true,
+      });
+      setCustomAttributeConfigs(response.configs || []);
+    } catch (err: any) {
+      console.error('Error loading custom attribute configs:', err);
+    }
+  };
+
   const handleNext = () => {
     setActiveStep((prevActiveStep) => prevActiveStep + 1);
   };
@@ -270,14 +395,21 @@ const AccessioningForm: React.FC = () => {
           assigned_tests: values.selected_analyses,
           battery_id: values.battery_id || undefined,
           container_type_id: values.container_type_id,
-          uniques: values.bulk_uniques.map((u) => ({
-            name: u.name || undefined,
-            client_sample_id: u.client_sample_id || undefined,
-            container_name: u.container_name,
-            temperature: u.temperature || undefined,
-            anomalies: u.anomalies || undefined,
-            description: u.description || undefined,
-          })),
+          uniques: values.bulk_uniques.map((u) => {
+            const uniqueData: any = {
+              name: u.name || undefined,
+              client_sample_id: u.client_sample_id || undefined,
+              container_name: u.container_name,
+              temperature: u.temperature || undefined,
+              anomalies: u.anomalies || undefined,
+              description: u.description || undefined,
+            };
+            // Include custom_attributes if present
+            if (u.custom_attributes && Object.keys(u.custom_attributes).length > 0) {
+              uniqueData.custom_attributes = u.custom_attributes;
+            }
+            return uniqueData;
+          }),
           auto_name_prefix: values.auto_name_prefix || undefined,
           auto_name_start: values.auto_name_start || undefined,
         };
@@ -314,7 +446,7 @@ const AccessioningForm: React.FC = () => {
         const container = await apiService.createContainer(containerData);
 
         // Step 2: Create sample
-        const sampleData = {
+        const sampleData: any = {
           name: values.name,
           description: values.description,
           due_date: values.due_date,
@@ -328,6 +460,11 @@ const AccessioningForm: React.FC = () => {
           client_project_id: values.client_project_id || undefined,
           qc_type: values.qc_type || undefined,
         };
+
+        // Include custom_attributes if present
+        if (values.custom_attributes && Object.keys(values.custom_attributes).length > 0) {
+          sampleData.custom_attributes = values.custom_attributes;
+        }
 
         const sample = await apiService.createSample(sampleData);
 
@@ -373,7 +510,7 @@ const AccessioningForm: React.FC = () => {
     }
   };
 
-  const renderStepContent = (step: number, values: SampleFormData, setFieldValue: any) => {
+  const renderStepContent = (step: number, values: SampleFormData, setFieldValue: any, errors?: any, touched?: any) => {
     switch (step) {
       case 0:
         return (
@@ -382,6 +519,9 @@ const AccessioningForm: React.FC = () => {
             setFieldValue={setFieldValue}
             lookupData={lookupData}
             bulkMode={values.bulk_mode}
+            errors={errors}
+            touched={touched}
+            customAttributeConfigs={customAttributeConfigs}
           />
         );
       case 1:
@@ -448,7 +588,7 @@ const AccessioningForm: React.FC = () => {
 
         <Formik
           initialValues={initialValues}
-          validationSchema={getValidationSchema(initialValues.bulk_mode)}
+          validationSchema={getValidationSchema(initialValues.bulk_mode, customAttributeConfigs)}
           onSubmit={handleSubmit}
           enableReinitialize
         >
@@ -469,7 +609,7 @@ const AccessioningForm: React.FC = () => {
                           if (newBulkMode) {
                             // Initialize with one empty unique row
                             if (values.bulk_uniques.length === 0) {
-                              setFieldValue('bulk_uniques', [{ id: '1', container_name: '' }]);
+                              setFieldValue('bulk_uniques', [{ id: '1', container_name: '', custom_attributes: {} }]);
                             }
                           }
                           // Re-validate with new schema
@@ -491,7 +631,7 @@ const AccessioningForm: React.FC = () => {
 
                 <Divider sx={{ mb: 3 }} />
 
-                {renderStepContent(activeStep, values, setFieldValue)}
+                {renderStepContent(activeStep, values, setFieldValue, errors, touched)}
 
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 3 }}>
                   <Button

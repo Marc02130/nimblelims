@@ -2,7 +2,7 @@
 Results router for NimbleLims
 """
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_
 from app.database import get_db
@@ -34,6 +34,7 @@ router = APIRouter()
 
 @router.get("/", response_model=ResultListResponse)
 async def get_results(
+    request: Request,
     test_id: Optional[UUID] = Query(None, description="Filter by test ID"),
     analyte_id: Optional[UUID] = Query(None, description="Filter by analyte ID"),
     entered_by: Optional[UUID] = Query(None, description="Filter by user who entered results"),
@@ -46,6 +47,9 @@ async def get_results(
     Get results with filtering and pagination.
     Scoped by user access.
     """
+    from sqlalchemy.dialects.postgresql import JSONB
+    from sqlalchemy import cast
+    
     # Build query with filters
     query = db.query(Result).filter(Result.active == True)
     
@@ -71,6 +75,28 @@ async def get_results(
         query = query.filter(Result.analyte_id == analyte_id)
     if entered_by:
         query = query.filter(Result.entered_by == entered_by)
+    
+    # Parse and apply custom_attributes filters (e.g., ?custom.attr_name=value)
+    custom_filters = {}
+    for key, value in request.query_params.items():
+        if key.startswith('custom.'):
+            attr_name = key[7:]  # Remove 'custom.' prefix
+            # Try to parse as number, otherwise keep as string
+            try:
+                if '.' in value:
+                    custom_filters[attr_name] = float(value)
+                else:
+                    custom_filters[attr_name] = int(value)
+            except ValueError:
+                custom_filters[attr_name] = value
+    
+    # Apply custom_attributes JSONB filters
+    if custom_filters:
+        for attr_name, attr_value in custom_filters.items():
+            filter_dict = {attr_name: attr_value}
+            query = query.filter(
+                Result.custom_attributes.op("@>")(cast(filter_dict, JSONB))
+            )
     
     # Get total count
     total = query.count()
@@ -153,6 +179,20 @@ async def create_result(
                 detail="Access denied: insufficient project permissions"
             )
     
+    # Validate custom_attributes if provided
+    validated_custom_attributes = {}
+    if result_data.custom_attributes:
+        from app.core.custom_attributes import validate_custom_attributes
+        try:
+            validated_custom_attributes = validate_custom_attributes(
+                db, "results", result_data.custom_attributes
+            )
+        except ValueError as e:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=str(e)
+            )
+    
     # Create result
     result = Result(
         test_id=result_data.test_id,
@@ -163,6 +203,7 @@ async def create_result(
         calculated_result=result_data.calculated_result,
         entry_date=result_data.entry_date,
         entered_by=result_data.entered_by,
+        custom_attributes=validated_custom_attributes,
         created_by=current_user.id,
         modified_by=current_user.id
     )
@@ -645,8 +686,22 @@ async def update_result(
                 detail="Access denied: insufficient project permissions"
             )
     
-    # Update fields
+    # Validate custom_attributes if provided
     update_data = result_data.dict(exclude_unset=True)
+    if 'custom_attributes' in update_data:
+        from app.core.custom_attributes import validate_custom_attributes
+        try:
+            validated_custom_attributes = validate_custom_attributes(
+                db, "results", update_data['custom_attributes']
+            )
+            update_data['custom_attributes'] = validated_custom_attributes
+        except ValueError as e:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=str(e)
+            )
+    
+    # Update fields
     for field, value in update_data.items():
         setattr(result, field, value)
     

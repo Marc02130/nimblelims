@@ -1,5 +1,5 @@
 from sqlalchemy import Column, String, DateTime, ForeignKey, Boolean
-from sqlalchemy.dialects.postgresql import UUID as PostgresUUID
+from sqlalchemy.dialects.postgresql import UUID as PostgresUUID, JSONB
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from .base import BaseModel
@@ -17,6 +17,7 @@ class Result(BaseModel):
     calculated_result = Column(String(255), nullable=True)
     entry_date = Column(DateTime, default=func.now(), nullable=False)
     entered_by = Column(PostgresUUID(as_uuid=True), ForeignKey('users.id'), nullable=False)
+    custom_attributes = Column(JSONB, nullable=True, server_default='{}')
     
     # Relationships
     test = relationship("Test", back_populates="results")

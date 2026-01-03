@@ -728,8 +728,22 @@ async def update_batch(
             detail="Batch not found"
         )
     
-    # Update fields
+    # Validate and update custom_attributes if provided
     update_data = batch_data.dict(exclude_unset=True)
+    if 'custom_attributes' in update_data:
+        from app.core.custom_attributes import validate_custom_attributes
+        try:
+            validated_custom_attributes = validate_custom_attributes(
+                db, "batches", update_data['custom_attributes']
+            )
+            update_data['custom_attributes'] = validated_custom_attributes
+        except ValueError as e:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=str(e)
+            )
+    
+    # Update fields
     for field, value in update_data.items():
         setattr(batch, field, value)
     

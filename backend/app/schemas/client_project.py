@@ -2,7 +2,7 @@
 Pydantic schemas for client projects
 """
 from pydantic import BaseModel, Field, validator
-from typing import Optional
+from typing import Optional, Dict, Any
 from datetime import datetime
 from uuid import UUID
 
@@ -12,6 +12,7 @@ class ClientProjectBase(BaseModel):
     name: str = Field(..., min_length=1, max_length=255, description="Client project name (unique)")
     description: Optional[str] = Field(None, description="Client project description")
     client_id: UUID = Field(..., description="ID of the client that owns this project")
+    custom_attributes: Dict[str, Any] = Field(default_factory=dict, description="Custom attributes as JSON")
 
 
 class ClientProjectCreate(ClientProjectBase):
@@ -24,6 +25,7 @@ class ClientProjectUpdate(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=255, description="Client project name (unique)")
     description: Optional[str] = Field(None, description="Client project description")
     active: Optional[bool] = Field(None, description="Whether the client project is active")
+    custom_attributes: Optional[Dict[str, Any]] = Field(None, description="Custom attributes as JSON")
 
 
 class ClientProjectResponse(ClientProjectBase):

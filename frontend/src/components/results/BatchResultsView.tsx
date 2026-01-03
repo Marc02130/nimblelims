@@ -38,6 +38,7 @@ interface Test {
   status: string;
   analysis_id: string;
   sample_id: string;
+  custom_attributes?: Record<string, any>;
 }
 
 interface Sample {
@@ -261,6 +262,7 @@ const BatchResultsView: React.FC<BatchResultsViewProps> = ({ batchId, onBack }) 
               batchId={batchId}
               testId={selectedTest}
               samples={samples}
+              test={tests.find((t) => t.id === selectedTest)}
               onResultsSaved={handleResultsSaved}
             />
           )}

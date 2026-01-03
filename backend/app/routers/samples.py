@@ -1,10 +1,12 @@
 """
 Samples router for NimbleLims
 """
-from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from typing import List, Optional, Dict, Any
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy import cast
 from app.database import get_db
 from models.sample import Sample
 from models.project import Project
@@ -104,6 +106,7 @@ def _create_tests_for_sample(
 
 @router.get("", response_model=SampleListResponse)
 async def get_samples(
+    request: Request,
     project_id: Optional[str] = Query(None, description="Filter by project ID"),
     status: Optional[str] = Query(None, description="Filter by status ID"),
     qc_type: Optional[str] = Query(None, description="Filter by QC type ID"),
@@ -164,6 +167,28 @@ async def get_samples(
         query = query.filter(Sample.status == status_uuid)
     if qc_type_uuid:
         query = query.filter(Sample.qc_type == qc_type_uuid)
+    
+    # Parse and apply custom_attributes filters (e.g., ?custom.ph_level=7.0)
+    custom_filters = {}
+    for key, value in request.query_params.items():
+        if key.startswith('custom.'):
+            attr_name = key[7:]  # Remove 'custom.' prefix
+            # Try to parse as number, otherwise keep as string
+            try:
+                if '.' in value:
+                    custom_filters[attr_name] = float(value)
+                else:
+                    custom_filters[attr_name] = int(value)
+            except ValueError:
+                custom_filters[attr_name] = value
+    
+    # Apply custom_attributes JSONB filters
+    if custom_filters:
+        for attr_name, attr_value in custom_filters.items():
+            filter_dict = {attr_name: attr_value}
+            query = query.filter(
+                Sample.custom_attributes.op("@>")(cast(filter_dict, JSONB))
+            )
     
     # Get total count
     total = query.count()
@@ -240,6 +265,16 @@ async def create_sample(
                 detail="Access denied: insufficient project permissions"
             )
     
+    # Validate custom_attributes if provided
+    validated_custom_attributes = {}
+    if sample_data.custom_attributes:
+        from app.core.custom_attributes import validate_custom_attributes
+        validated_custom_attributes = validate_custom_attributes(
+            db=db,
+            entity_type='samples',
+            custom_attributes=sample_data.custom_attributes
+        )
+    
     # Create sample
     sample = Sample(
         name=sample_data.name,
@@ -254,6 +289,7 @@ async def create_sample(
         parent_sample_id=sample_data.parent_sample_id,
         project_id=sample_data.project_id,
         qc_type=sample_data.qc_type,
+        custom_attributes=validated_custom_attributes,
         created_by=current_user.id,
         modified_by=current_user.id
     )
@@ -665,8 +701,18 @@ async def update_sample(
                 detail="Access denied: insufficient project permissions"
             )
     
-    # Update fields
-    update_data = sample_data.dict(exclude_unset=True)
+    # Validate and update custom_attributes if provided
+    if sample_data.custom_attributes is not None:
+        from app.core.custom_attributes import validate_custom_attributes
+        validated_custom_attributes = validate_custom_attributes(
+            db=db,
+            entity_type='samples',
+            custom_attributes=sample_data.custom_attributes
+        )
+        sample.custom_attributes = validated_custom_attributes
+    
+    # Update fields (excluding custom_attributes which is handled above)
+    update_data = sample_data.dict(exclude_unset=True, exclude={'custom_attributes'})
     for field, value in update_data.items():
         setattr(sample, field, value)
     

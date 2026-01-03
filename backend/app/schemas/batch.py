@@ -2,7 +2,7 @@
 Pydantic schemas for batches
 """
 from pydantic import BaseModel, Field, validator
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from datetime import datetime
 from uuid import UUID
 
@@ -15,6 +15,7 @@ class BatchBase(BaseModel):
     status: UUID = Field(..., description="ID of status from list_entries")
     start_date: Optional[datetime] = None
     end_date: Optional[datetime] = None
+    custom_attributes: Dict[str, Any] = Field(default_factory=dict, description="Custom attributes as JSON")
 
     @validator('start_date', 'end_date')
     def validate_dates(cls, v):
@@ -45,6 +46,7 @@ class BatchUpdate(BaseModel):
     status: Optional[UUID] = None
     start_date: Optional[datetime] = None
     end_date: Optional[datetime] = None
+    custom_attributes: Optional[Dict[str, Any]] = Field(None, description="Custom attributes as JSON")
 
     @validator('start_date', 'end_date')
     def validate_dates(cls, v):

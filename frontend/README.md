@@ -35,6 +35,7 @@ Copyright (c) 2025 Marc Breneiser
 - **Analytes Management**: CRUD operations for analytes
 - **Analysis-Analyte Configuration**: Configure validation rules (data types, ranges, significant figures)
 - **Test Batteries Management**: Create and manage test batteries (grouped analyses with sequence and optional flags)
+- **Custom Fields Management** (Post-MVP): Define and manage custom attributes for samples, tests, results, projects, client_projects, and batches
 - **Users Management**: CRUD operations for users
 - **Roles & Permissions Management**: CRUD operations for roles and permission assignments
 - Restricted to users with `config:edit`, `test:configure`, or `user:manage` permissions
@@ -126,6 +127,8 @@ Copyright (c) 2025 Marc Breneiser
 - `TestBatteriesManagement` - Manage test batteries with analyses grouping (admin-only)
 - `BatteryFormDialog` - Create/edit battery dialog with analysis selector
 - `AnalysisSelector` - Multi-select component for adding analyses to batteries with sequence/optional controls
+- `CustomFieldsManagement` - Manage custom attribute configurations (Post-MVP, admin-only)
+- `CustomFieldDialog` - Create/edit custom attribute configuration dialog
 - `UsersManagement` - Manage users (CRUD operations, admin-only)
 - `RolesManagement` - Manage roles and permissions (admin-only)
 
@@ -136,6 +139,7 @@ Copyright (c) 2025 Marc Breneiser
 
 ### Shared Components
 - `UserContext` - Authentication and permission management
+- `CustomAttributeField` - Reusable component for rendering custom attribute fields dynamically (text, number, date, boolean, select)
 
 ## API Integration
 
@@ -167,6 +171,10 @@ Copyright (c) 2025 Marc Breneiser
 - `POST /results/batch` - Enter batch results
 - `GET /test-batteries` - List test batteries
 - `GET /client-projects` - List client projects
+- `GET /admin/custom-attributes` - List custom attribute configs (admin)
+- `POST /admin/custom-attributes` - Create custom attribute config (admin)
+- `PATCH /admin/custom-attributes/{id}` - Update custom attribute config (admin)
+- `DELETE /admin/custom-attributes/{id}` - Delete custom attribute config (admin)
 
 ### Error Handling
 - Global error handling with user-friendly messages

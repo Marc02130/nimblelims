@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Grid,
@@ -11,12 +11,26 @@ import {
   Switch,
   Typography,
   Divider,
+  Alert,
+  CircularProgress,
 } from '@mui/material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { useField } from 'formik';
 import BulkUniquesTable from './BulkUniquesTable';
+import CustomAttributeField from '../common/CustomAttributeField';
+import { apiService } from '../../services/apiService';
+
+interface CustomAttributeConfig {
+  id: string;
+  entity_type: string;
+  attr_name: string;
+  data_type: 'text' | 'number' | 'date' | 'boolean' | 'select';
+  validation_rules: Record<string, any>;
+  description?: string;
+  active: boolean;
+}
 
 interface SampleDetailsStepProps {
   values: any;
@@ -32,6 +46,9 @@ interface SampleDetailsStepProps {
     units: any[];
   };
   bulkMode?: boolean;
+  errors?: any;
+  touched?: any;
+  customAttributeConfigs?: CustomAttributeConfig[];
 }
 
 const SampleDetailsStep: React.FC<SampleDetailsStepProps> = ({
@@ -39,6 +56,9 @@ const SampleDetailsStep: React.FC<SampleDetailsStepProps> = ({
   setFieldValue,
   lookupData,
   bulkMode = false,
+  errors,
+  touched,
+  customAttributeConfigs: propsCustomAttributeConfigs,
 }) => {
   const [nameField, nameMeta] = useField('name');
   const [nameVerificationField, nameVerificationMeta] = useField('name_verification');
@@ -46,6 +66,42 @@ const SampleDetailsStep: React.FC<SampleDetailsStepProps> = ({
   const [sampleTypeVerificationField, sampleTypeVerificationMeta] = useField('sample_type_verification');
   const [containerTypeField, containerTypeMeta] = useField('container_type_id');
   const [containerNameField, containerNameMeta] = useField('container_name');
+  const [customAttributeConfigs, setCustomAttributeConfigs] = useState<CustomAttributeConfig[]>([]);
+  const [loadingConfigs, setLoadingConfigs] = useState(false);
+  const [configsError, setConfigsError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (propsCustomAttributeConfigs) {
+      setCustomAttributeConfigs(propsCustomAttributeConfigs);
+    } else {
+      loadCustomAttributeConfigs();
+    }
+  }, [propsCustomAttributeConfigs]);
+
+  const loadCustomAttributeConfigs = async () => {
+    try {
+      setLoadingConfigs(true);
+      setConfigsError(null);
+      const response = await apiService.getCustomAttributeConfigs({
+        entity_type: 'samples',
+        active: true,
+      });
+      setCustomAttributeConfigs(response.configs || []);
+    } catch (err: any) {
+      setConfigsError(err.response?.data?.detail || 'Failed to load custom fields');
+      console.error('Error loading custom attribute configs:', err);
+    } finally {
+      setLoadingConfigs(false);
+    }
+  };
+
+  const handleCustomAttributeChange = (attrName: string, value: any) => {
+    const currentAttrs = values.custom_attributes || {};
+    setFieldValue('custom_attributes', {
+      ...currentAttrs,
+      [attrName]: value,
+    });
+  };
 
   const handleDoubleEntryToggle = (event: React.ChangeEvent<HTMLInputElement>) => {
     const enabled = event.target.checked;
@@ -228,6 +284,50 @@ const SampleDetailsStep: React.FC<SampleDetailsStepProps> = ({
             />
           </Grid>
         </Grid>
+
+        {/* Custom Fields Section */}
+        {customAttributeConfigs.length > 0 && (
+          <>
+            <Divider sx={{ my: 3 }} />
+            <Typography variant="h6" gutterBottom>
+              Custom Fields
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              Additional custom attributes for this sample.
+            </Typography>
+            {configsError && (
+              <Alert severity="warning" sx={{ mb: 2 }} onClose={() => setConfigsError(null)}>
+                {configsError}
+              </Alert>
+            )}
+            {loadingConfigs ? (
+              <Box display="flex" justifyContent="center" p={2}>
+                <CircularProgress size={24} />
+              </Box>
+            ) : (
+              <Grid container spacing={3}>
+                {customAttributeConfigs.map((config) => {
+                  const fieldPath = `custom_attributes.${config.attr_name}`;
+                  const fieldValue = values.custom_attributes?.[config.attr_name];
+                  const fieldError = errors?.custom_attributes?.[config.attr_name];
+                  const fieldTouched = touched?.custom_attributes?.[config.attr_name];
+
+                  return (
+                    <Grid key={config.id} size={{ xs: 12, sm: 6 }}>
+                      <CustomAttributeField
+                        config={config}
+                        value={fieldValue}
+                        onChange={(value) => handleCustomAttributeChange(config.attr_name, value)}
+                        error={fieldTouched && !!fieldError}
+                        helperText={fieldTouched && fieldError ? String(fieldError) : undefined}
+                      />
+                    </Grid>
+                  );
+                })}
+              </Grid>
+            )}
+          </>
+        )}
 
         <Divider sx={{ my: 3 }} />
 
@@ -415,7 +515,7 @@ const SampleDetailsStep: React.FC<SampleDetailsStepProps> = ({
                 const newId = String((values.bulk_uniques?.length || 0) + 1);
                 setFieldValue('bulk_uniques', [
                   ...(values.bulk_uniques || []),
-                  { id: newId, container_name: '' }
+                  { id: newId, container_name: '', custom_attributes: {} }
                 ]);
               }}
               onRemove={(id) => {
@@ -424,11 +524,31 @@ const SampleDetailsStep: React.FC<SampleDetailsStepProps> = ({
                 );
               }}
               onUpdate={(id, field, value) => {
-                setFieldValue('bulk_uniques',
-                  (values.bulk_uniques || []).map((u: any) =>
-                    u.id === id ? { ...u, [field]: value } : u
-                  )
-                );
+                if (field.startsWith('custom_attributes.')) {
+                  // Handle custom attributes nested update
+                  const attrName = field.replace('custom_attributes.', '');
+                  setFieldValue('bulk_uniques',
+                    (values.bulk_uniques || []).map((u: any) => {
+                      if (u.id === id) {
+                        const customAttrs = u.custom_attributes || {};
+                        return {
+                          ...u,
+                          custom_attributes: {
+                            ...customAttrs,
+                            [attrName]: value,
+                          },
+                        };
+                      }
+                      return u;
+                    })
+                  );
+                } else {
+                  setFieldValue('bulk_uniques',
+                    (values.bulk_uniques || []).map((u: any) =>
+                      u.id === id ? { ...u, [field]: value } : u
+                    )
+                  );
+                }
               }}
               autoNamePrefix={values.auto_name_prefix}
               autoNameStart={values.auto_name_start}
@@ -436,6 +556,7 @@ const SampleDetailsStep: React.FC<SampleDetailsStepProps> = ({
                 setFieldValue('auto_name_prefix', prefix || '');
                 setFieldValue('auto_name_start', start || 1);
               }}
+              customAttributeConfigs={customAttributeConfigs}
             />
           </>
         )}

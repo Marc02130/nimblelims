@@ -2,7 +2,7 @@
 Pydantic schemas for results
 """
 from pydantic import BaseModel, Field, validator
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from datetime import datetime
 from uuid import UUID
 
@@ -17,6 +17,7 @@ class ResultBase(BaseModel):
     calculated_result: Optional[str] = Field(None, max_length=255, description="Calculated result (post-MVP)")
     entry_date: datetime = Field(default_factory=datetime.utcnow, description="Date result was entered")
     entered_by: UUID = Field(..., description="ID of user who entered result")
+    custom_attributes: Dict[str, Any] = Field(default_factory=dict, description="Custom attributes as JSON")
 
     @validator('entry_date')
     def validate_entry_date(cls, v):
@@ -38,6 +39,7 @@ class ResultUpdate(BaseModel):
     calculated_result: Optional[str] = Field(None, max_length=255)
     entry_date: Optional[datetime] = None
     entered_by: Optional[UUID] = None
+    custom_attributes: Optional[Dict[str, Any]] = Field(None, description="Custom attributes as JSON")
 
     @validator('entry_date')
     def validate_entry_date(cls, v):

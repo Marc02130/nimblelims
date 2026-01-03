@@ -20,6 +20,7 @@ The MVP focuses on core functionality using PostgreSQL for data storage, Python 
 - Version 1.2: Updated deployment section to specify three Docker containers (DB, backend, frontend) as per refined requirements.
 - Version 1.3: Incorporated refinements for containers (admin pre-setup for types, dynamic instance creation during workflows, no pre-created instances in MVP) and lists (full admin-editable CRUD with normalized naming and API support) based on iterative planning (December 21, 2025).
 - Version 1.4: Added test batteries feature (test_batteries table, battery_analyses junction with sequence/optional flags, integration with accessioning workflow) - December 2025.
+- Version 1.5: Added EAV (Entity-Attribute-Value) model for configurability - custom attributes support for samples, tests, results, projects, client_projects, and batches (December 2025).
 
 ## 2. System Architecture
 
@@ -198,6 +199,66 @@ All tables include standard fields: `id` (UUID PK), `name` (varchar unique), `de
 - RLS Policies: e.g., ON samples FOR SELECT USING (project_id IN (SELECT project_id FROM project_users WHERE user_id = current_user_id()));
 - Triggers: Auto-populate audit fields (e.g., created_at = NOW()).
 
+### 3.5 EAV (Entity-Attribute-Value) Model
+
+The EAV model enables administrators to define custom attributes for various entity types without schema changes, providing flexibility for laboratory-specific requirements.
+
+#### 3.5.1 Custom Attributes Configuration Table
+
+- **custom_attributes_config**:
+  - `id` (UUID PK)
+  - `entity_type` (varchar, NOT NULL): Type of entity (e.g., 'samples', 'tests', 'results', 'projects', 'client_projects', 'batches')
+  - `attr_name` (varchar, NOT NULL): Unique attribute name within entity type
+  - `data_type` (varchar, NOT NULL): One of 'text', 'number', 'date', 'boolean', 'select'
+  - `validation_rules` (JSONB, default '{}'): Validation rules specific to data type:
+    - Text: `max_length`, `min_length`
+    - Number: `min`, `max`
+    - Select: `options` (array of strings)
+  - `description` (text, nullable): Human-readable description
+  - `active` (boolean, default true): Soft-delete flag
+  - Standard audit fields (created_at, created_by, modified_at, modified_by)
+  - Unique constraint: (`entity_type`, `attr_name`)
+
+#### 3.5.2 Entity Custom Attributes Storage
+
+The following tables include a `custom_attributes` JSONB column (default '{}'):
+- `samples`
+- `tests`
+- `results`
+- `projects`
+- `client_projects`
+- `batches`
+
+**JSONB Column Structure**:
+- Column: `custom_attributes` (JSONB, nullable, server_default='{}')
+- Stores key-value pairs where keys match `attr_name` from `custom_attributes_config`
+- Values validated against `data_type` and `validation_rules` on create/update
+
+#### 3.5.3 Indexes
+
+- **GIN Indexes**: Created on all `custom_attributes` JSONB columns for efficient querying:
+  - `idx_samples_custom_attributes_gin`
+  - `idx_tests_custom_attributes_gin`
+  - `idx_results_custom_attributes_gin`
+  - `idx_projects_custom_attributes_gin`
+  - `idx_client_projects_custom_attributes_gin`
+  - `idx_batches_custom_attributes_gin`
+- **Configuration Table Indexes**:
+  - `idx_custom_attributes_config_entity_type` (on `entity_type`)
+  - `idx_custom_attributes_config_active` (on `active`)
+
+#### 3.5.4 Querying Custom Attributes
+
+Custom attributes can be queried using PostgreSQL JSONB operators:
+- Exact match: `custom_attributes @> '{"attr_name": "value"}'::jsonb`
+- Query parameters: `?custom.attr_name=value` (automatically parsed and applied in list endpoints)
+
+**Example Query**:
+```sql
+SELECT * FROM samples 
+WHERE custom_attributes @> '{"ph_level": 7.5}'::jsonb;
+```
+
 ## 4. API Design
 
 ### 4.1 Authentication
@@ -279,10 +340,28 @@ All tables include standard fields: `id` (UUID PK), `name` (varchar unique), `de
   - DELETE /roles/{id}: Soft-delete role (admin).
 - **Permissions**:
   - GET /permissions: List all permissions (admin).
+- **Custom Attributes Configuration**:
+  - GET /admin/custom-attributes: List custom attribute configs with filtering (entity_type, active, pagination). Requires `config:edit` permission.
+  - POST /admin/custom-attributes: Create new custom attribute config (requires `config:edit`).
+  - GET /admin/custom-attributes/{id}: Get specific config (requires `config:edit`).
+  - PATCH /admin/custom-attributes/{id}: Update config (requires `config:edit`).
+  - DELETE /admin/custom-attributes/{id}: Soft-delete config (sets active=false, requires `config:edit`).
+- **Custom Attributes in Entity Endpoints**:
+  - All entity create/update endpoints (samples, tests, results, projects, client_projects, batches) accept `custom_attributes` in request body
+  - List endpoints support filtering via query parameters: `?custom.attr_name=value`
+  - Validation occurs server-side against active configs for the entity type
 - Error Handling: Standard HTTP codes; JSON {error, detail}.
 
 ### 4.3 Validation
 - Backend: Use Pydantic for request schemas; custom validators for analyte rules.
+- **Custom Attributes Validation**:
+  - Server-side validation in `app.core.custom_attributes.validate_custom_attributes()`
+  - Validates against active `custom_attributes_config` for entity type
+  - Type checking: Ensures values match `data_type` (text, number, date, boolean, select)
+  - Rule validation: Applies `validation_rules` (min/max, length, options)
+  - Returns 400 error with detailed message if validation fails
+  - Unknown attributes (not in config) are rejected
+  - Inactive configs are ignored (attributes using inactive configs are rejected)
 - Security: Dependency injection in FastAPI for permission checks (e.g., @requires_permission('sample:create')).
 
 ## 5. Frontend Implementation
@@ -299,9 +378,16 @@ All tables include standard fields: `id` (UUID PK), `name` (varchar unique), `de
   - Analytes (CRUD)
   - Analysis-analyte rules (validation configuration)
   - Test batteries (CRUD with analysis grouping)
+  - Custom Fields (CRUD for custom attribute configurations)
   - Users (CRUD)
   - Roles and permissions (CRUD)
   - Restricted to config:edit or specific permissions.
+- **Custom Fields Management** (`CustomFieldsManagement.tsx`):
+  - Admin page for managing custom attribute configurations
+  - DataGrid with filtering by entity_type
+  - CRUD dialogs for creating/editing custom fields
+  - Supports all entity types: samples, tests, results, projects, client_projects, batches
+  - Dynamic field rendering in forms based on configs
 - **State Management**: Redux or Context API for user/session data.
 
 ### 5.2 UI/UX
@@ -321,6 +407,16 @@ All tables include standard fields: `id` (UUID PK), `name` (varchar unique), `de
 ### 7.1 Testing
 - Unit: Backend endpoints, validators; frontend components.
 - Integration: API-DB interactions; auth flows.
+- **EAV Testing**:
+  - Integration tests in `test_eav_expansion.py`:
+    - Custom attribute validation for all entity types
+    - Cross-entity querying by custom attributes
+    - Inactive config rejection
+    - Type and rule validation (min/max, length, options)
+  - Frontend tests for `CustomFieldsManagement.tsx`:
+    - Dynamic field rendering
+    - Form validation
+    - API integration
 - Security: Penetration testing for RBAC/RLS.
 
 ### 7.2 Deployment

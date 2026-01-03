@@ -13,6 +13,16 @@ import {
 } from '@mui/icons-material';
 import { DataGrid, GridColDef, GridActionsCellItem, GridRowParams } from '@mui/x-data-grid';
 
+interface CustomAttributeConfig {
+  id: string;
+  entity_type: string;
+  attr_name: string;
+  data_type: 'text' | 'number' | 'date' | 'boolean' | 'select';
+  validation_rules: Record<string, any>;
+  description?: string;
+  active: boolean;
+}
+
 interface BulkUnique {
   id: string;
   name?: string;
@@ -21,16 +31,18 @@ interface BulkUnique {
   temperature?: number;
   anomalies?: string;
   description?: string;
+  custom_attributes?: Record<string, any>;
 }
 
 interface BulkUniquesTableProps {
   uniques: BulkUnique[];
   onAdd: () => void;
   onRemove: (id: string) => void;
-  onUpdate: (id: string, field: keyof BulkUnique, value: any) => void;
+  onUpdate: (id: string, field: keyof BulkUnique | string, value: any) => void;
   autoNamePrefix?: string;
   autoNameStart?: number;
   onAutoNameChange: (prefix?: string, start?: number) => void;
+  customAttributeConfigs?: CustomAttributeConfig[];
 }
 
 const BulkUniquesTable: React.FC<BulkUniquesTableProps> = ({
@@ -41,7 +53,48 @@ const BulkUniquesTable: React.FC<BulkUniquesTableProps> = ({
   autoNamePrefix,
   autoNameStart,
   onAutoNameChange,
+  customAttributeConfigs = [],
 }) => {
+  // Build custom attribute columns
+  const customColumns: GridColDef[] = customAttributeConfigs.map((config) => {
+    const displayName = config.attr_name.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase());
+    
+    return {
+      field: `custom_attributes.${config.attr_name}`,
+      headerName: displayName,
+      width: 150,
+      editable: true,
+      type: config.data_type === 'number' ? 'number' : 'string',
+      valueGetter: (value, row) => {
+        return row.custom_attributes?.[config.attr_name] || '';
+      },
+      valueSetter: (value, row) => {
+        const customAttrs = row.custom_attributes || {};
+        return {
+          ...row,
+          custom_attributes: {
+            ...customAttrs,
+            [config.attr_name]: value,
+          },
+        };
+      },
+      renderCell: (params) => {
+        const value = params.row.custom_attributes?.[config.attr_name];
+        if (value === null || value === undefined || value === '') {
+          return <Typography variant="body2" color="text.secondary">—</Typography>;
+        }
+        switch (config.data_type) {
+          case 'boolean':
+            return value === true || value === 'true' ? 'Yes' : 'No';
+          case 'date':
+            return typeof value === 'string' ? value : new Date(value).toLocaleDateString();
+          default:
+            return String(value);
+        }
+      },
+    };
+  });
+
   const columns: GridColDef[] = [
     {
       field: 'name',
@@ -81,6 +134,7 @@ const BulkUniquesTable: React.FC<BulkUniquesTableProps> = ({
       width: 200,
       editable: true,
     },
+    ...customColumns,
     {
       field: 'actions',
       type: 'actions',
@@ -100,7 +154,15 @@ const BulkUniquesTable: React.FC<BulkUniquesTableProps> = ({
     // Update all fields that may have changed
     Object.keys(newRow).forEach((key) => {
       if (key !== 'id') {
-        onUpdate(newRow.id, key as keyof BulkUnique, (newRow as any)[key]);
+        if (key === 'custom_attributes') {
+          // Handle custom attributes separately
+          const customAttrs = (newRow as any).custom_attributes || {};
+          Object.keys(customAttrs).forEach((attrName) => {
+            onUpdate(newRow.id, `custom_attributes.${attrName}`, customAttrs[attrName]);
+          });
+        } else {
+          onUpdate(newRow.id, key as keyof BulkUnique, (newRow as any)[key]);
+        }
       }
     });
     return newRow;
