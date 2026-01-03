@@ -1,4 +1,4 @@
-# Technical Document for NimbleLims
+# Technical Document for NimbleLIMS
 
 ## 1. Introduction
 

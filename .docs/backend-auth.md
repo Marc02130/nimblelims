@@ -1,8 +1,8 @@
-# NimbleLims Authentication Implementation
+# NimbleLIMS Authentication Implementation
 
 ## Overview
 
-This implementation provides a complete authentication system for the NimbleLims based on the technical document and user stories. It includes JWT-based authentication, role-based access control (RBAC), and comprehensive security features.
+This implementation provides a complete authentication system for the NimbleLIMS based on the technical document and user stories. It includes JWT-based authentication, role-based access control (RBAC), and comprehensive security features.
 
 ## Features Implemented
 

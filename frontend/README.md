@@ -1,6 +1,6 @@
-# LIMS Frontend
+# NimbleLIMS Frontend
 
-React frontend for the Laboratory Information Management System (LIMS) MVP.
+React frontend for the NimbleLIMS Laboratory Information Management System (LIMS) MVP.
 
 ## License
 
@@ -75,6 +75,7 @@ Copyright (c) 2025 Marc Breneiser
 - **React Router** for navigation
 - **Axios** for API communication
 - **Jest + Testing Library** for testing
+- **Unified Sidebar Navigation**: Persistent sidebar with permission-based menu items and collapsible admin section
 
 ### State Management
 - Context API for user authentication and permissions
@@ -101,8 +102,9 @@ Copyright (c) 2025 Marc Breneiser
 - `ContainerManagement` - Container instance creation and management
 - `BatchManagement` - Batch creation and management
 - `ResultsManagement` - Results entry and review
+- `ClientProjects` - Client project management
 - `Login` - User authentication
-- `AdminDashboard` - Admin configuration management (admin-only)
+- `AdminOverview` - Admin dashboard with statistics (admin-only)
 
 ### Accessioning Components
 - `SampleDetailsStep` - Sample information entry with double-entry validation
@@ -115,7 +117,7 @@ Copyright (c) 2025 Marc Breneiser
 - `ContainerGrid` - Batch container grid display
 
 ### Admin Components
-- `AdminDashboard` - Main admin dashboard with navigation and statistics
+- `AdminOverview` - Main admin dashboard with statistics (admin-only)
 - `ContainerTypesManagement` - Manage container types (admin-only)
 - `ListsManagement` - Manage lists and list entries (admin-only)
 - `AnalysesManagement` - Manage analyses (CRUD operations, admin-only)
@@ -127,8 +129,12 @@ Copyright (c) 2025 Marc Breneiser
 - `UsersManagement` - Manage users (CRUD operations, admin-only)
 - `RolesManagement` - Manage roles and permissions (admin-only)
 
+### Layout Components
+- `MainLayout` - Unified layout wrapper with sidebar and top AppBar for all authenticated routes
+- `Sidebar` - Persistent sidebar navigation with permission-based menu items and collapsible admin accordion
+- `Logo` - Application logo component (clickable, navigates to dashboard)
+
 ### Shared Components
-- `Navbar` - Navigation with role-based menu items
 - `UserContext` - Authentication and permission management
 
 ## API Integration
@@ -227,10 +233,22 @@ The frontend is containerized with Nginx for production serving.
 - Production: Built files served via Nginx
 - API URL configurable via environment variables
 
+## Navigation
+
+NimbleLIMS uses a unified sidebar navigation system:
+
+- **Sidebar**: Persistent left sidebar (240px) with all navigation items
+- **Permission-Based**: Menu items shown/hidden based on user permissions
+- **Admin Accordion**: Collapsible admin section with submenu items
+- **Top AppBar**: Dynamic page titles, back button for nested routes, user info, logout
+- **Responsive**: Permanent drawer on desktop, temporary drawer on mobile
+
+See [`.docs/navigation.md`](../.docs/navigation.md) for complete navigation documentation.
+
 ## User Workflows
 
 ### Sample Accessioning Workflow
-1. Navigate to Accessioning page
+1. Click "Accessioning" in sidebar (requires `sample:create` permission)
 2. Toggle bulk mode if needed (for multiple samples)
 3. Fill sample details (name, type, dates, etc.)
    - In bulk mode: Fill common fields and unique per-sample data in table
@@ -241,7 +259,7 @@ The frontend is containerized with Nginx for production serving.
    - Bulk mode: Creates all samples atomically in single transaction
 
 ### Container Management Workflow
-1. Navigate to Containers page
+1. Click "Containers" in sidebar (requires `sample:update` permission)
 2. Create new container with type and specifications
 3. Add samples to container with concentration/amount
 4. Manage container contents
@@ -252,6 +270,13 @@ The frontend is containerized with Nginx for production serving.
 2. Filter samples by status/project
 3. Track sample progress
 4. Monitor test assignments
+
+### Admin Configuration Workflow
+1. Click "Admin" accordion in sidebar (requires `config:edit` permission)
+2. Accordion expands to show admin submenu items
+3. Select admin section (e.g., "Lists Management", "Analyses Management")
+4. Manage configuration items via CRUD operations
+5. Use back button in AppBar for nested routes (e.g., Analysis Analytes Configuration)
 
 ## Security Considerations
 

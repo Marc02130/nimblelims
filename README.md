@@ -1,6 +1,6 @@
 # NimbleLIMS - Laboratory Information Management System
 
-A modern, API-first Laboratory Information Management System built with FastAPI, React, and PostgreSQL.
+A modern, API-first Laboratory Information Management System built with FastAPI, React, and PostgreSQL. NimbleLIMS provides a unified sidebar navigation system for consistent access to all features across the application.
 
 ## License
 
@@ -213,10 +213,23 @@ Alembic migrations run automatically when the backend container starts. The star
 docker exec lims-backend python run_migrations.py
 ```
 
+## Navigation
+
+NimbleLIMS uses a unified sidebar navigation system that provides consistent access to all features:
+
+- **Unified Sidebar**: Persistent left sidebar (240px) on all authenticated routes
+- **Permission-Based**: Menu items dynamically shown/hidden based on user roles and permissions
+- **Admin Accordion**: Collapsible admin section with submenu items
+- **Responsive**: Permanent drawer on desktop, temporary drawer on mobile
+- **Top AppBar**: Dynamic page titles, back button for nested routes, user info, and logout
+
+See [`.docs/navigation.md`](.docs/navigation.md) for complete navigation documentation.
+
 ## Documentation
 
 Comprehensive documentation is available in the `.docs/` directory:
 
+- **Navigation**: `.docs/navigation.md` - Complete site navigation documentation
 - **Product Requirements**: `.docs/lims_mvp_prd.md` - Product requirements document
 - **Technical Specifications**: `.docs/lims_mvp_tech.md` - Technical architecture and implementation details
 - **User Stories**: `.docs/lims_mvp_user.md` - User stories and acceptance criteria
