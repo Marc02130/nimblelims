@@ -480,7 +480,7 @@ Generate full code for integrations, doc patches, and tests."
 
 # Navigation update
 ## Prompt A: Create Unified Sidebar Component
-"Implement the unified persistent sidebar for the LIMS MVP frontend, based on navigation.md (Sections 1-5) and ui-accessioning-to-reporting.md (Component Architecture). Replace the top Navbar with a single left sidebar using Material-UI Drawer (permanent on desktop, temporary on mobile).
+"Implement the unified persistent sidebar for the NimbleLims frontend, based on navigation.md (Sections 1-5) and ui-accessioning-to-reporting.md (Component Architecture). Replace the top Navbar with a single left sidebar using Material-UI Drawer (permanent on desktop, temporary on mobile).
 
 Component: frontend/src/components/Sidebar.tsx
 Structure: Use MUI List with Subheader for sections. For submenus (e.g., Admin), use Accordion for collapsible style.
@@ -494,7 +494,7 @@ No code yet for routes/layouts – focus on Sidebar.tsx.
 Ensure responsive (width: 240px desktop, full-screen mobile), ARIA labels for accessibility, and ESLint compliance. Generate full code for Sidebar.tsx only."
 
 ## Prompt B: Integrate Sidebar with Routes and Layout
-"Integrate the unified sidebar into the LIMS MVP routes and layout, based on navigation.md (Section 3: Route Structure) and the new Sidebar.tsx from previous prompt.
+"Integrate the unified sidebar into the NimbleLims routes and layout, based on navigation.md (Section 3: Route Structure) and the new Sidebar.tsx from previous prompt.
 
 Create: frontend/src/layouts/MainLayout.tsx – Wraps all routes with Sidebar (left) and main content (right, using Box with padding).
 Update App.tsx or index: Use MainLayout for all paths (remove separate Navbar/AdminDashboard layouts).
