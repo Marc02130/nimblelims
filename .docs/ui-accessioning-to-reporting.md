@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document describes the user interface components and interactions for the accessioning through reporting workflow in the NimbleLims. The UI is built with React and Material-UI (MUI), using Formik for form management and Yup for validation.
+This document describes the user interface components and interactions for the accessioning through reporting workflow in NimbleLIMS. The UI is built with React and Material-UI (MUI), using Formik for form management and Yup for validation.
 
 ## Technology Stack
 

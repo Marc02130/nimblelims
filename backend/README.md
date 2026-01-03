@@ -1,6 +1,6 @@
-# LIMS Backend
+# NimbleLIMS Backend
 
-FastAPI backend for the Laboratory Information Management System (LIMS) MVP.
+FastAPI backend for the NimbleLIMS Laboratory Information Management System (LIMS) MVP.
 
 ## License
 
