@@ -16,6 +16,7 @@ import {
   Divider,
   FormControlLabel,
   Switch,
+  Tooltip,
 } from '@mui/material';
 import {
   PlayArrow as PlayArrowIcon,
@@ -24,6 +25,7 @@ import {
 import ResultsEntryTable from './ResultsEntryTable';
 import BatchResultsEntryTable from './BatchResultsEntryTable';
 import { apiService } from '../../services/apiService';
+import { useUser } from '../../contexts/UserContext';
 
 interface Batch {
   id: string;
@@ -56,6 +58,8 @@ interface BatchResultsViewProps {
 }
 
 const BatchResultsView: React.FC<BatchResultsViewProps> = ({ batchId, onBack }) => {
+  const { user } = useUser();
+  const isLabManager = user?.role === 'Lab Manager' || user?.role === 'lab-manager';
   const [batch, setBatch] = useState<Batch | null>(null);
   const [tests, setTests] = useState<Test[]>([]);
   const [samples, setSamples] = useState<Sample[]>([]);
@@ -184,7 +188,12 @@ const BatchResultsView: React.FC<BatchResultsViewProps> = ({ batchId, onBack }) 
       <Card sx={{ mb: 3 }}>
         <CardContent>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-            <Typography variant="h5">{batch?.name}</Typography>
+            <Tooltip
+              title={isLabManager ? 'QC at batch: US-27. Review QC samples and validate results meet acceptance criteria.' : ''}
+              arrow
+            >
+              <Typography variant="h5">{batch?.name}</Typography>
+            </Tooltip>
             <Chip
               label={batch?.status}
               color={getBatchStatusColor(batch?.status || '') as any}

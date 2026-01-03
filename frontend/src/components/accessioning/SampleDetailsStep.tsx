@@ -13,7 +13,10 @@ import {
   Divider,
   Alert,
   CircularProgress,
+  Tooltip,
+  IconButton,
 } from '@mui/material';
+import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
@@ -241,10 +244,27 @@ const SampleDetailsStep: React.FC<SampleDetailsStepProps> = ({
           
           <Grid size={{ xs: 12, sm: 6 }}>
             <FormControl fullWidth>
-              <InputLabel>QC Type</InputLabel>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                <InputLabel id="qc-type-label">QC Type</InputLabel>
+                <Tooltip
+                  title="QC: Blank—US-4. Quality control samples are used to ensure test accuracy. Blank samples contain no analyte and are used to verify the absence of contamination."
+                  arrow
+                  placement="top"
+                >
+                  <IconButton
+                    size="small"
+                    aria-label="QC Type help"
+                    sx={{ p: 0.5 }}
+                  >
+                    <HelpOutlineIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+              </Box>
               <Select
-                value={values.qc_type}
+                value={values.qc_type || ''}
                 onChange={(e) => setFieldValue('qc_type', e.target.value)}
+                labelId="qc-type-label"
+                label="QC Type"
               >
                 <MenuItem value="">None</MenuItem>
                 {lookupData.qcTypes.map((qcType) => (

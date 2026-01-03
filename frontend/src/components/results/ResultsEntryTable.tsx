@@ -23,7 +23,10 @@ import {
   Grid,
   FormControlLabel,
   Checkbox,
+  Tooltip,
+  IconButton,
 } from '@mui/material';
+import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import {
   Save as SaveIcon,
   Check as CheckIcon,
@@ -312,19 +315,34 @@ const ResultsEntryTable: React.FC<ResultsEntryTableProps> = ({
                   ))}
                   {analytes.map((analyte) => (
                     <TableCell key={analyte.id}>
-                      <Box>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                        <Box sx={{ flex: 1 }}>
                         <Typography variant="body2" fontWeight="bold">
                           {analyte.reported_name}
                         </Typography>
                         {analyte.is_required && (
-                          <Chip label="Required" size="small" color="error" />
+                            <Chip label="Required" size="small" color="error" sx={{ mt: 0.5 }} />
                         )}
                         {analyte.data_type === 'numeric' && (
-                          <Typography variant="caption" color="text.secondary">
+                            <Typography variant="caption" color="text.secondary" display="block">
                             {analyte.low_value !== undefined && `Min: ${analyte.low_value}`}
                             {analyte.high_value !== undefined && ` Max: ${analyte.high_value}`}
                           </Typography>
                         )}
+                        </Box>
+                        <Tooltip
+                          title={`Analytes: Rules. ${analyte.is_required ? 'Required field. ' : ''}${analyte.data_type === 'numeric' ? `Numeric type with ${analyte.low_value !== undefined ? `minimum ${analyte.low_value}` : ''}${analyte.high_value !== undefined ? ` maximum ${analyte.high_value}` : ''}. ` : ''}${analyte.significant_figures ? `Significant figures: ${analyte.significant_figures}. ` : ''}Follow validation rules when entering results.`}
+                          arrow
+                          placement="top"
+                        >
+                          <IconButton
+                            size="small"
+                            aria-label={`${analyte.reported_name} analyte rules help`}
+                            sx={{ p: 0.5 }}
+                          >
+                            <HelpOutlineIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
                       </Box>
                     </TableCell>
                   ))}

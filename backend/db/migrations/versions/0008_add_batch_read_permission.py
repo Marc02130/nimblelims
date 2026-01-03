@@ -54,6 +54,17 @@ def upgrade() -> None:
             ON CONFLICT DO NOTHING
         """)
     )
+    
+    # Add batch:read permission to Lab Technician role
+    connection.execute(
+        sa.text("""
+            INSERT INTO role_permissions (role_id, permission_id)
+            SELECT r.id, p.id
+            FROM roles r, permissions p
+            WHERE r.name = 'Lab Technician' AND p.name = 'batch:read'
+            ON CONFLICT DO NOTHING
+        """)
+    )
 
 
 def downgrade() -> None:

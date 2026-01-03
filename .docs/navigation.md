@@ -31,6 +31,7 @@ Navigation is permission-based, with menu items and routes dynamically shown/hid
 │ Results     │
 │ Client      │
 │   Projects  │
+│ Help        │
 ├─────────────┤
 │ ▼ Admin     │ ← Accordion (collapsible)
 │   Overview  │
@@ -42,6 +43,8 @@ Navigation is permission-based, with menu items and routes dynamically shown/hid
 │   Analyses  │
 │   Analytes  │
 │   Batteries │
+│   Help      │
+│     Management│
 ├─────────────┤
 │ testuser    │
 │ (Lab Tech)  │
@@ -61,6 +64,7 @@ All items are permission-gated and only visible to users with the required permi
 | **Batches** | `/batches` | ViewList | `batch:manage` | Batch creation and management |
 | **Results** | `/results` | Assessment | `result:enter` | Results entry interface |
 | **Client Projects** | `/client-projects` | ViewList | `project:manage` | Client project management |
+| **Help** | `/help` | Help | Always visible | Role-filtered help content and documentation |
 
 #### Admin Section (Accordion)
 The Admin section uses a Material-UI Accordion component for collapsible submenu functionality. It is only visible to users with `config:edit` permission.
@@ -82,6 +86,7 @@ The Admin section uses a Material-UI Accordion component for collapsible submenu
 | **Analytes Management** | `/admin/analytes` | Biotech | Analyte definitions |
 | **Test Batteries** | `/admin/test-batteries` | BatteryChargingFull | Test battery configuration |
 | **Custom Fields** | `/admin/custom-fields` | Tune | Manage custom attribute configurations (Post-MVP) |
+| **Help Management** | `/admin/help` | Help | Manage help entries (CRUD) - requires `config:edit` permission |
 
 ### Visual States
 
@@ -133,6 +138,7 @@ The AppBar title is automatically determined from the current route:
 | `/batches` | Batches |
 | `/results` | Results |
 | `/client-projects` | Client Projects |
+| `/help` | Help |
 | `/admin` | Admin Dashboard |
 | `/admin/lists` | Lists Management |
 | `/admin/container-types` | Container Types |
@@ -142,6 +148,7 @@ The AppBar title is automatically determined from the current route:
 | `/admin/analyses/:id/analytes` | Analysis Analytes Configuration |
 | `/admin/analytes` | Analytes Management |
 | `/admin/test-batteries` | Test Batteries |
+| `/admin/help` | Help Management |
 | Unknown routes | NimbleLIMS (default) |
 
 ## 3. Route Structure
@@ -159,6 +166,7 @@ All authenticated routes use the `MainLayout` component, which provides the unif
 | `/batches` | BatchManagement | MainLayout |
 | `/results` | ResultsManagement | MainLayout |
 | `/client-projects` | ClientProjects | MainLayout |
+| `/help` | HelpPage | MainLayout |
 | `/admin` | AdminOverview | MainLayout |
 | `/admin/lists` | ListsManagement | MainLayout |
 | `/admin/container-types` | ContainerTypesManagement | MainLayout |
@@ -168,6 +176,7 @@ All authenticated routes use the `MainLayout` component, which provides the unif
 | `/admin/analyses/:analysisId/analytes` | AnalysisAnalytesConfig | MainLayout |
 | `/admin/analytes` | AnalytesManagement | MainLayout |
 | `/admin/test-batteries` | TestBatteriesManagement | MainLayout |
+| `/admin/help` | HelpManagement | MainLayout |
 
 ### Route Protection
 
@@ -190,16 +199,17 @@ hasPermission('batch:manage')   // Batches menu
 hasPermission('result:enter')   // Results menu
 hasPermission('project:manage') // Client Projects menu
 hasPermission('config:edit')    // Admin section (accordion)
+// Help menu: No permission required - always visible to all users
 ```
 
 ### Role-Based Access
 
 | Role | Visible Sidebar Items | Admin Access |
 |------|---------------------|--------------|
-| **Administrator** | All items | Full access (accordion visible) |
-| **Lab Manager** | Dashboard, Batches, Results | No access (accordion hidden) |
-| **Lab Technician** | Dashboard, Accessioning, Containers, Batches, Results | No access (accordion hidden) |
-| **Client** | Dashboard only (read-only) | No access (accordion hidden) |
+| **Administrator** | All items (including Help) | Full access (accordion visible, including Help Management) |
+| **Lab Manager** | Dashboard, Batches, Results, Help | No access (accordion hidden) |
+| **Lab Technician** | Dashboard, Accessioning, Containers, Batches, Results, Help | No access (accordion hidden) |
+| **Client** | Dashboard, Help (read-only) | No access (accordion hidden) |
 
 ### Edge Cases
 
