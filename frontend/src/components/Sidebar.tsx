@@ -28,6 +28,7 @@ import {
   Security,
   Biotech,
   BatteryChargingFull,
+  Tune as TuneIcon,
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useUser } from '../contexts/UserContext';
@@ -148,6 +149,11 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onMobileClose }) => {
       text: 'Test Batteries',
       path: '/admin/test-batteries',
       icon: <BatteryChargingFull />,
+    },
+    {
+      text: 'Custom Fields',
+      path: '/admin/custom-fields',
+      icon: <TuneIcon />,
     },
   ];
 

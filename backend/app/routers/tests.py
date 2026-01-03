@@ -2,8 +2,10 @@
 Tests router for NimbleLims
 """
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
 from sqlalchemy.orm import Session
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy import cast
 from app.database import get_db
 from models.test import Test
 from models.sample import Sample
@@ -25,6 +27,7 @@ router = APIRouter()
 
 @router.get("/", response_model=TestListResponse)
 async def get_tests(
+    request: Request,
     sample_id: Optional[UUID] = Query(None, description="Filter by sample ID"),
     analysis_id: Optional[UUID] = Query(None, description="Filter by analysis ID"),
     status: Optional[UUID] = Query(None, description="Filter by status ID"),
@@ -65,6 +68,28 @@ async def get_tests(
         query = query.filter(Test.status == status)
     if technician_id:
         query = query.filter(Test.technician_id == technician_id)
+    
+    # Parse and apply custom_attributes filters (e.g., ?custom.ph_level=7.0)
+    custom_filters = {}
+    for key, value in request.query_params.items():
+        if key.startswith('custom.'):
+            attr_name = key[7:]  # Remove 'custom.' prefix
+            # Try to parse as number, otherwise keep as string
+            try:
+                if '.' in value:
+                    custom_filters[attr_name] = float(value)
+                else:
+                    custom_filters[attr_name] = int(value)
+            except ValueError:
+                custom_filters[attr_name] = value
+    
+    # Apply custom_attributes JSONB filters
+    if custom_filters:
+        for attr_name, attr_value in custom_filters.items():
+            filter_dict = {attr_name: attr_value}
+            query = query.filter(
+                Test.custom_attributes.op("@>")(cast(filter_dict, JSONB))
+            )
     
     # Get total count
     total = query.count()
@@ -160,6 +185,16 @@ async def create_test(
             detail="Invalid analysis ID"
         )
     
+    # Validate custom_attributes if provided
+    validated_custom_attributes = {}
+    if test_data.custom_attributes:
+        from app.core.custom_attributes import validate_custom_attributes
+        validated_custom_attributes = validate_custom_attributes(
+            db=db,
+            entity_type='tests',
+            custom_attributes=test_data.custom_attributes
+        )
+    
     # Create test
     test = Test(
         name=test_data.name,
@@ -170,6 +205,7 @@ async def create_test(
         review_date=test_data.review_date,
         test_date=test_data.test_date,
         technician_id=test_data.technician_id,
+        custom_attributes=validated_custom_attributes,
         created_by=current_user.id,
         modified_by=current_user.id
     )
@@ -286,8 +322,18 @@ async def update_test(
                 detail="Access denied: insufficient project permissions"
             )
     
-    # Update fields
-    update_data = test_data.dict(exclude_unset=True)
+    # Validate and update custom_attributes if provided
+    if test_data.custom_attributes is not None:
+        from app.core.custom_attributes import validate_custom_attributes
+        validated_custom_attributes = validate_custom_attributes(
+            db=db,
+            entity_type='tests',
+            custom_attributes=test_data.custom_attributes
+        )
+        test.custom_attributes = validated_custom_attributes
+    
+    # Update fields (excluding custom_attributes which is handled above)
+    update_data = test_data.dict(exclude_unset=True, exclude={'custom_attributes'})
     for field, value in update_data.items():
         setattr(test, field, value)
     

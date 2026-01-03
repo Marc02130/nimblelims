@@ -20,6 +20,7 @@ NimbleLIMS enables labs to manage samples from receipt to reporting, including t
 - Version 1.0: Initial draft based on planning discussions (October 21, 2025).
 - Version 1.1: Added admin configuration features (analyses, analytes, users, roles management) - December 2025.
 - Version 1.2: Added test batteries feature (grouped analyses with sequence ordering) - December 2025.
+- Version 1.3: Added EAV (Entity-Attribute-Value) model for custom fields configurability - December 2025.
 
 ## 2. Goals and Objectives
 
@@ -75,6 +76,7 @@ NimbleLIMS enables labs to manage samples from receipt to reporting, including t
   - Test Batteries: Admin-configurable groups of analyses with sequence ordering and optional flags; assignable during accessioning.
   - Units: Admin-configurable with multipliers for conversions.
   - Workflows: Basic configurable for aliquoting/derivatives.
+  - Custom Fields: Admin-configurable custom attributes for samples, tests, results, projects, client_projects, and batches (Post-MVP feature, see Section 4.5).
 - **Data Model**: Normalized Postgres schema with standard fields (id UUID, name unique, description, active, audit timestamps/users).
 
 ### 3.2 Out of Scope
@@ -201,6 +203,7 @@ Same as MVP, with emphasis on Lab Technicians for bulk efficiency.
 ### 1.4 Version History
 
 Version 1.0: Initial post-MVP draft (December 28, 2025).
+Version 1.1: Added custom fields (EAV model) for configurability - December 2025.
 
 ## 2. Goals and Objectives
 ### 2.1 Business Goals
@@ -251,6 +254,53 @@ QC: Auto-generate at creation.
 ### 4.4 Batch Results
 
 Tabular entry; QC flags/blocks.
+
+### 4.5 Custom Fields (Post-MVP)
+
+**Purpose**: Enable administrators to define custom attributes for various entity types without schema changes, providing flexibility for laboratory-specific requirements.
+
+**Functional Requirements**:
+
+1. **Custom Field Definition**:
+   - Administrators can create custom attribute configurations via admin interface
+   - Each configuration specifies:
+     - Entity type (samples, tests, results, projects, client_projects, batches)
+     - Attribute name (unique within entity type)
+     - Data type (text, number, date, boolean, select)
+     - Validation rules (min/max for numbers, length for text, options for select)
+     - Description (optional)
+   - Configurations can be activated/deactivated (soft-delete)
+   - Requires `config:edit` permission
+
+2. **Custom Field Usage**:
+   - Custom fields appear in relevant forms/views based on entity type
+   - Dynamic rendering: Fields rendered based on data type (TextField, NumberField, DatePicker, Checkbox, Select)
+   - Real-time validation: Client-side validation using Yup schema based on validation rules
+   - Server-side validation: Backend validates against active configurations before saving
+   - Unknown attributes are rejected with clear error messages
+
+3. **Entity Support**:
+   - **Samples**: Custom fields in accessioning form (SampleDetailsStep)
+   - **Tests**: Custom attributes displayed in results entry table
+   - **Results**: Custom fields for result metadata (e.g., reviewer notes)
+   - **Projects**: Custom fields for project-specific metadata
+   - **Client Projects**: Custom fields for client project metadata
+   - **Batches**: Custom fields for batch-specific metadata (e.g., instrument serial)
+
+4. **Querying**:
+   - List endpoints support filtering by custom attributes: `?custom.attr_name=value`
+   - Uses PostgreSQL JSONB operators for efficient querying
+   - GIN indexes on custom_attributes columns for performance
+
+5. **Bulk Mode**:
+   - Custom fields can be included in bulk unique fields table
+   - Supports per-sample custom attributes in bulk accessioning
+
+**Technical Implementation**:
+- Database: `custom_attributes_config` table for configurations
+- Storage: JSONB columns on entity tables for actual values
+- Validation: Server-side validation in `app.core.custom_attributes.validate_custom_attributes()`
+- UI: `CustomFieldsManagement.tsx` for admin management, `CustomAttributeField.tsx` for dynamic rendering
 
 ## 5. Non-Functional Requirements
 ### 5.1 Security

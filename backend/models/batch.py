@@ -1,5 +1,5 @@
 from sqlalchemy import Column, String, DateTime, ForeignKey, Boolean, Table
-from sqlalchemy.dialects.postgresql import UUID as PostgresUUID
+from sqlalchemy.dialects.postgresql import UUID as PostgresUUID, JSONB
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from .base import BaseModel, Base
@@ -13,6 +13,7 @@ class Batch(BaseModel):
     status = Column(PostgresUUID(as_uuid=True), ForeignKey('list_entries.id'), nullable=False)
     start_date = Column(DateTime, nullable=True)
     end_date = Column(DateTime, nullable=True)
+    custom_attributes = Column(JSONB, nullable=True, server_default='{}')
     
     # Relationships
     containers = relationship("Container", secondary="batch_containers", back_populates="batches")

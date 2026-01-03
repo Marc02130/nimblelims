@@ -522,3 +522,74 @@ Revise Sections 1-3: Replace hybrid descriptions with unified (e.g., Structure a
 Ensure alignment with permission-based visibility (Section 4).
 Minor: Add notes on accordion usage for Admin.
 Generate full updated content for navigation.md."
+
+# Sprint 8
+## Prompt 1: Database Schema Updates for EAV (Migration)
+"Update the PostgreSQL database schema for NimbleLIMS to incorporate EAV as per planning refinements, focusing on samples and tests tables initially (extend to results, projects, client_projects, batches in a follow-up). Reference nimblelims_tech.md (Section 3: Data Model) and schema_dump_20251228.sql for alignment.
+Create a new Alembic migration script in backend/alembic/versions/ (e.g., 0012_add_eav.py):
+
+New table: custom_attributes_config (id UUID PK, entity_type str NOT NULL e.g. 'samples', attr_name str NOT NULL unique per entity, data_type str NOT NULL e.g. 'text/number/date/boolean/select', validation_rules JSONB default {}, description text, active bool default true, created_at/modified_at timestamp default NOW(), created_by/modified_by UUID FK to users).
+Unique constraint: entity_type + attr_name.
+Add custom_attributes JSONB default {} to: samples, tests (with GIN index for querying).
+Extend RLS policies: Update samples_access, tests_access (etc.) to include custom_attributes visibility, ensuring is_admin() or has_project_access() checks apply.
+Seed initial data: None for now—admins will create via UI.
+Downgrade: Drop column, table, indexes.
+
+Generate the full migration script (upgrade/downgrade functions) and update env.py if needed for auto-detection. Ensure compatibility with existing transactions (technical-accessioning-to-reporting.md). No code beyond migration files."
+
+## Prompt 2: Backend Models, Schemas, and Routers for EAV
+"Implement backend support for EAV in NimbleLIMS, building on the migration from previous prompt. Reference nimblelims_tech.md (Section 3.3: Models/Schemas) and api_endpoints.md for CRUD patterns.
+
+Models: In backend/app/models/, add CustomAttributeConfig (SQLAlchemy ORM with fields from migration). Update Sample and Test models to include custom_attributes: Column(JSONB, default=dict).
+Schemas: In backend/app/schemas/, add CustomAttributeConfigCreate/Update/Response (Pydantic, with validators for data_type enum and validation_rules dict). Update SampleCreate/SampleResponse etc. to include custom_attributes: dict[str, Any] = Field(default_factory=dict), with custom validator to check against configs.
+Routers: In backend/app/routers/admin.py (or new custom_attributes.py), add CRUD endpoints:
+GET /admin/custom-attributes: List with filters (entity_type), pagination.
+POST /admin/custom-attributes: Create, require 'config:edit' via dependency.
+GET /admin/custom-attributes/{id}
+PATCH /admin/custom-attributes/{id}: Update, active toggle.
+DELETE /admin/custom-attributes/{id}: Soft-delete (set active=False).
+
+Validation: In create/update entity endpoints (e.g., POST /samples), fetch configs for entity_type and validate custom_attributes keys/values match (raise 400 with details).
+Querying: Add custom_attributes filters to list endpoints (e.g., ?custom.ph_level=7.0 using JSONB ops in SQLAlchemy).
+
+Generate full code for new/updated files: models/custom_attributes_config.py, schemas/custom_attributes_config.py, routers/admin.py (or new), and patches to sample/test files. Include PEP8 compliance and basic unit tests in backend/tests/test_custom_attributes.py (e.g., validation failures)."
+
+## Prompt 3: Admin UI for Managing Custom Fields
+"Create frontend components for EAV management in NimbleLIMS admin section, per ui-accessioning-to-reporting.md (Component Architecture) and nimblelims_prompts.md (Admin prompts). Gate via hasPermission('config:edit') from UserContext.
+
+New Page: CustomFieldsManagement.tsx in frontend/src/pages/admin/ (table listing by entity_type, MUI DataGrid with columns: attr_name, data_type, description, active; filters for entity_type).
+CRUD Dialogs: Add/Edit dialogs (Formik/Yup) with fields: entity_type Select (hardcoded options: 'samples', 'tests', etc.), attr_name TextField (unique check via API), data_type Select ('text', 'number', 'date', 'boolean', 'select'), validation_rules JSON editor (e.g., MUI TextField multiline for dict string), description TextField.
+API Integration: Use apiService for CRUD (e.g., getCustomAttributes(filters), createCustomAttribute(data)).
+Sidebar: Update Sidebar.tsx to add 'Custom Fields' under Admin accordion, linking to /admin/custom-fields.
+
+Generate full code for: pages/admin/CustomFieldsManagement.tsx, components/admin/CustomFieldDialog.tsx (for CRUD), services/apiService.ts updates (new methods), and Sidebar.tsx refinements. Ensure responsive design (MUI useMediaQuery) and ESLint compliance. Add tests in CustomFieldsManagement.test.tsx (render, form validation, API mocks)."
+
+## Prompt 4: Integrate EAV into Core Workflows (Forms and Views)
+"Integrate EAV into existing NimbleLIMS workflows for samples and tests, per workflow-accessioning-to-reporting.md (Stage 1: Accessioning, Stage 3: Results Entry) and ui-accessioning-to-reporting.md (AccessioningForm.tsx, ResultsEntryTable.tsx).
+
+Forms: In SampleDetailsStep.tsx, fetch configs for 'samples' via apiService.getCustomAttributes('samples'), dynamically render fields (e.g., TextField for text, NumberField for number) in a 'Custom Fields' section; include in Formik values/submit.
+Views: In ResultsEntryTable.tsx, add dynamic columns for test custom_attributes (fetch configs for 'tests', render in table rows).
+Bulk Mode: In AccessioningForm.tsx, extend unique fields table to include custom columns if defined.
+Validation: Real-time Yup validation based on rules (e.g., min/max for numbers); server-side fallback.
+
+Generate full code updates for: components/accessioning/SampleDetailsStep.tsx, results/ResultsEntryTable.tsx, pages/AccessioningForm.tsx. Add error handling (alerts) and tests (e.g., dynamic field rendering). Ensure alignment with RBAC—no edit if lacking permissions."
+
+## Prompt 5: Expand EAV to Remaining Tables
+"Expand EAV implementation to results, projects, client_projects, and batches in NimbleLIMS, building on previous prompts.
+
+Migration Update: New Alembic script (0013_expand_eav.py) to add custom_attributes JSONB (with GIN index) to these tables; extend RLS policies accordingly.
+Models/Schemas/Routers: Update respective files to include custom_attributes; extend validation in create/update endpoints.
+UI: Update CustomFieldsManagement.tsx to support new entity_types; integrate dynamic fields into relevant forms/views (e.g., ResultsManagement.tsx for results, project management pages if exist).
+
+Generate full code for the new migration, model/schema/router updates, and UI refinements. Include integration tests for cross-entity validation."
+
+## Prompt 6: Update Documentation for EAV
+"Update NimbleLIMS documentation to reflect EAV integration, based on implemented changes.
+
+nimblelims_tech.md: Add Section 3.5: EAV Model (describe tables, JSONB usage, indexes); update API Endpoints (new /admin/custom-attributes); add to Security (RLS extensions) and Testing.
+ui-accessioning-to-reporting.md: Add to Component Architecture (CustomFieldsManagement.tsx); describe dynamic rendering in forms.
+workflow-accessioning-to-reporting.md: Update Steps (e.g., Sample Details Entry includes custom fields section).
+nimblelims_prd.md: Post-MVP Section 4.5: Custom Fields (functional reqs, e.g., admin definition, validation).
+api_endpoints.md: Add EAV CRUD details.
+
+Generate full updated content for each file, maintaining version history (e.g., Version 1.5: Added EAV for configurability)."

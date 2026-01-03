@@ -29,6 +29,11 @@ The sample accessioning workflow enables Lab Technicians to receive, inspect, an
 **Optional Fields**:
 - **Anomalies/Notes**: Text field for documenting any issues found during inspection
 - **Parent Container**: Optional parent container for hierarchical relationships
+- **Custom Fields**: Dynamically rendered fields based on active custom attribute configurations for 'samples' entity type
+  - Fields appear in a "Custom Fields" section after standard sample information
+  - Supports text, number, date, boolean, and select data types
+  - Real-time validation based on validation rules (min/max, length, options)
+  - Integrated with form validation; errors displayed inline
 
 **Double Entry Validation** (Optional):
 - Toggle to enable double-entry verification

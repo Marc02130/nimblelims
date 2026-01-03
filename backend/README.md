@@ -21,6 +21,7 @@ Copyright (c) 2025 Marc Breneiser
 - **Analytes Management**: CRUD operations for analytes (admin-only)
 - **Analysis-Analyte Configuration**: Configure validation rules for analytes in analyses (admin-only)
 - **Test Batteries Management**: Group analyses into reusable batteries with sequence and optional flags (admin-only)
+- **Custom Attributes Configuration**: Define custom fields for samples, tests, results, projects, client_projects, and batches (admin-only, Post-MVP)
 - **Users Management**: CRUD operations for users (admin-only)
 - **Roles & Permissions Management**: CRUD operations for roles and permission assignments (admin-only)
 - **Authentication**: JWT-based authentication with RBAC
@@ -140,6 +141,15 @@ Copyright (c) 2025 Marc Breneiser
 - `GET /client-projects/{id}` - Get client project details
 - `PATCH /client-projects/{id}` - Update client project
 - `DELETE /client-projects/{id}` - Soft-delete client project
+
+#### Custom Attributes Configuration (Post-MVP)
+- `GET /admin/custom-attributes` - List custom attribute configs with filtering (requires config:edit)
+- `POST /admin/custom-attributes` - Create custom attribute config (requires config:edit)
+- `GET /admin/custom-attributes/{id}` - Get specific config (requires config:edit)
+- `PATCH /admin/custom-attributes/{id}` - Update config (requires config:edit)
+- `DELETE /admin/custom-attributes/{id}` - Soft-delete config (requires config:edit)
+
+**Note**: All entity endpoints (samples, tests, results, projects, client_projects, batches) support `custom_attributes` in request bodies and filtering via `?custom.attr_name=value` query parameters.
 
 #### Other
 - `GET /units` - List units
@@ -294,7 +304,7 @@ The system uses granular permissions (17 total):
 
 - `user:manage` - Manage users
 - `role:manage` - Manage roles
-- `config:edit` - Edit system configuration (lists, container types)
+- `config:edit` - Edit system configuration (lists, container types, custom attributes)
 - `project:manage` - Manage projects
 - `sample:create` - Create samples
 - `sample:read` - Read samples

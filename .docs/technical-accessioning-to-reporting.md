@@ -44,7 +44,8 @@ This document provides technical implementation details for the accessioning thr
     "anomalies": Optional[str],
     "double_entry_required": bool,   # Default: False
     "assigned_tests": List[UUID],    # List of analysis IDs (optional)
-    "battery_id": Optional[UUID]    # Optional: Test battery ID
+    "battery_id": Optional[UUID],    # Optional: Test battery ID
+    "custom_attributes": Optional[Dict[str, Any]]  # Custom attributes validated against active configs
 }
 ```
 
@@ -57,6 +58,10 @@ This document provides technical implementation details for the accessioning thr
    - Verifies user has `sample:create` permission via `require_sample_create` dependency
    - Checks project access via `project_users` junction table
    - Administrators bypass project checks
+2. **Custom Attributes Validation** (if provided)
+   - Validates `custom_attributes` against active configurations for 'samples' entity type
+   - Checks data types, validation rules (min/max, length, options)
+   - Returns 400 error with details if validation fails
 
 2. **Client Project Validation** (if provided)
    - Verifies `client_project_id` exists and is active
@@ -126,7 +131,8 @@ This document provides technical implementation details for the accessioning thr
         "container_name": str,           # Required, unique
         "temperature": Optional[float],
         "description": Optional[str],
-        "anomalies": Optional[str]
+        "anomalies": Optional[str],
+        "custom_attributes": Optional[Dict[str, Any]]  # Per-sample custom attributes (validated against active configs)
     }]
 }
 ```
@@ -435,7 +441,8 @@ This document provides technical implementation details for the accessioning thr
             "raw_result": Optional[str],
             "reported_result": Optional[str],
             "qualifiers": Optional[UUID],  # FK to list_entries
-            "notes": Optional[str]
+            "notes": Optional[str],
+            "custom_attributes": Optional[Dict[str, Any]]  # Custom attributes for result (validated against active configs)
         }]
     }]
 }
@@ -835,6 +842,17 @@ class AnalysisAnalyte(Base):
 - PostgreSQL RLS policies enforce data isolation
 - Client users see only their own data
 - Lab users see data for accessible projects
+- `custom_attributes_config` table has RLS policy: admins see all, others see only active configs
+- Entity `custom_attributes` JSONB columns are subject to existing entity-level RLS policies
+
+### Custom Attributes Validation
+- Server-side validation in `app.core.custom_attributes.validate_custom_attributes()`
+- Validates against active `custom_attributes_config` for entity type
+- Type checking: Ensures values match `data_type` (text, number, date, boolean, select)
+- Rule validation: Applies `validation_rules` (min/max, length, options)
+- Returns 400 error with detailed message if validation fails
+- Unknown attributes (not in config) are rejected
+- Inactive configs are ignored (attributes using inactive configs are rejected)
 
 ---
 

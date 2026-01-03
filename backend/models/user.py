@@ -51,6 +51,8 @@ class User(BaseModel):
     created_test_batteries = relationship("TestBattery", foreign_keys="TestBattery.created_by", back_populates="creator")
     modified_test_batteries = relationship("TestBattery", foreign_keys="TestBattery.modified_by", back_populates="modifier")
     entered_results = relationship("Result", foreign_keys="Result.entered_by", back_populates="entered_by_user")
+    created_custom_attribute_configs = relationship("CustomAttributeConfig", foreign_keys="CustomAttributeConfig.created_by", back_populates="creator")
+    modified_custom_attribute_configs = relationship("CustomAttributeConfig", foreign_keys="CustomAttributeConfig.modified_by", back_populates="modifier")
 
 
 class Role(BaseModel):

@@ -79,6 +79,7 @@ class ClientProject(BaseModel):
     
     # ClientProject-specific fields
     client_id = Column(PostgresUUID(as_uuid=True), ForeignKey('clients.id'), nullable=False)
+    custom_attributes = Column(JSONB, nullable=True, server_default='{}')
     
     # Relationships
     client = relationship("Client", back_populates="client_projects")

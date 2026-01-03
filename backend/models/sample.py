@@ -1,5 +1,5 @@
 from sqlalchemy import Column, String, DateTime, ForeignKey, Boolean, Numeric
-from sqlalchemy.dialects.postgresql import UUID as PostgresUUID
+from sqlalchemy.dialects.postgresql import UUID as PostgresUUID, JSONB
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from .base import BaseModel
@@ -20,6 +20,7 @@ class Sample(BaseModel):
     project_id = Column(PostgresUUID(as_uuid=True), ForeignKey('projects.id'), nullable=False)
     qc_type = Column(PostgresUUID(as_uuid=True), ForeignKey('list_entries.id'), nullable=True)
     client_sample_id = Column(String(255), nullable=True, unique=True)
+    custom_attributes = Column(JSONB, nullable=True, server_default='{}')
     
     # Relationships
     project = relationship("Project", back_populates="samples")

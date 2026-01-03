@@ -35,6 +35,7 @@ List samples with filtering and pagination.
 - `project_id` (optional, UUID): Filter by project ID
 - `status` (optional, UUID): Filter by status ID
 - `qc_type` (optional, UUID): Filter by QC type ID
+- `custom.{attr_name}` (optional, any): Filter by custom attribute (e.g., `?custom.ph_level=7.5`)
 - `page` (optional, int, default=1): Page number
 - `size` (optional, int, default=10): Page size
 
@@ -76,9 +77,15 @@ Accession a new sample with test assignment.
   "qc_type": "uuid",
   "anomalies": "Notes",
   "battery_id": "uuid",
-  "assigned_tests": ["uuid1", "uuid2"]
+  "assigned_tests": ["uuid1", "uuid2"],
+  "custom_attributes": {
+    "ph_level": 7.5,
+    "color": "blue"
+  }
 }
 ```
+
+**Note:** `custom_attributes` are validated against active configurations for 'samples' entity type.
 
 **Response:** Sample with created tests
 
@@ -150,6 +157,7 @@ List batches with filtering and pagination.
 **Query Parameters:**
 - `status` (optional, UUID): Filter by batch status ID
 - `type` (optional, UUID): Filter by batch type ID
+- `custom.{attr_name}` (optional, any): Filter by custom attribute (e.g., `?custom.instrument_serial=INST-12345`)
 - `page` (optional, int, default=1): Page number
 - `size` (optional, int, default=10): Page size
 
@@ -188,13 +196,18 @@ Create a new batch with cross-project support and QC sample generation (US-26, U
       "qc_type": "uuid",
       "notes": "QC notes"
     }
-  ]
+  ],
+  "custom_attributes": {
+    "instrument_serial": "INST-12345"
+  }
 }
 ```
 
 **Features:**
 - **Cross-Project Batching (US-26)**: Auto-detects when containers are from multiple projects. Validates compatibility (shared analyses) and RLS access.
 - **QC at Batch Creation (US-27)**: Auto-generates QC samples/containers atomically within batch transaction. QC samples inherit properties from first sample.
+
+**Note:** `custom_attributes` are validated against active configurations for 'batches' entity type.
 
 **Response:** Batch with containers
 
@@ -257,6 +270,7 @@ List results with filtering and pagination.
 - `test_id` (optional, UUID): Filter by test ID
 - `analyte_id` (optional, UUID): Filter by analyte ID
 - `entered_by` (optional, UUID): Filter by user who entered results
+- `custom.{attr_name}` (optional, any): Filter by custom attribute (e.g., `?custom.reviewer_notes=Looks good`)
 - `page` (optional, int, default=1): Page number
 - `size` (optional, int, default=10): Page size
 
@@ -280,9 +294,14 @@ Enter a single result.
   "raw_result": "10.5",
   "reported_result": "10.5",
   "qualifiers": "uuid",
-  "calculated_result": null
+  "calculated_result": null,
+  "custom_attributes": {
+    "reviewer_notes": "Looks good"
+  }
 }
 ```
+
+**Note:** `custom_attributes` are validated against active configurations for 'results' entity type.
 
 ### POST /results/batch
 Enter results for multiple tests/samples in a batch atomically (US-28: Batch Results Entry).
@@ -815,9 +834,14 @@ Create a new client project.
 {
   "name": "Client Project Name",
   "description": "Description",
-  "client_id": "uuid"
+  "client_id": "uuid",
+  "custom_attributes": {
+    "contract_number": "CONTRACT-123"
+  }
 }
 ```
+
+**Note:** `custom_attributes` are validated against active configurations for 'client_projects' entity type.
 
 ### GET /client-projects/{id}
 Get client project details.
@@ -833,6 +857,159 @@ Update a client project.
 Soft-delete a client project.
 
 **Requires:** `project:manage` permission
+
+## Custom Attributes Configuration
+
+### GET /admin/custom-attributes
+List custom attribute configurations with filtering and pagination.
+
+**Requires:** `config:edit` permission
+
+**Query Parameters:**
+- `entity_type` (optional, string): Filter by entity type (e.g., 'samples', 'tests', 'results', 'projects', 'client_projects', 'batches')
+- `active` (optional, boolean, default=true): Filter by active status
+- `page` (optional, int, default=1): Page number
+- `size` (optional, int, default=10): Page size
+
+**Response:**
+```json
+{
+  "configs": [
+    {
+      "id": "uuid",
+      "entity_type": "samples",
+      "attr_name": "ph_level",
+      "data_type": "number",
+      "validation_rules": {"min": 0, "max": 14},
+      "description": "pH level of the sample",
+      "active": true,
+      "created_at": "2025-12-29T00:00:00Z",
+      "created_by": "uuid",
+      "modified_at": "2025-12-29T00:00:00Z",
+      "modified_by": "uuid"
+    }
+  ],
+  "total": 10,
+  "page": 1,
+  "size": 10,
+  "pages": 1
+}
+```
+
+### POST /admin/custom-attributes
+Create a new custom attribute configuration.
+
+**Requires:** `config:edit` permission
+
+**Request:**
+```json
+{
+  "entity_type": "samples",
+  "attr_name": "ph_level",
+  "data_type": "number",
+  "validation_rules": {"min": 0, "max": 14},
+  "description": "pH level of the sample"
+}
+```
+
+**Response:** 201 Created with configuration object
+
+**Validation:**
+- `entity_type` must be one of: samples, tests, results, projects, client_projects, batches
+- `attr_name` must be unique within entity_type
+- `data_type` must be one of: text, number, date, boolean, select
+- `validation_rules` must match data_type:
+  - Text: `max_length`, `min_length` (integers)
+  - Number: `min`, `max` (numbers)
+  - Select: `options` (array of strings)
+  - Date/Boolean: no specific rules required
+
+### GET /admin/custom-attributes/{id}
+Get a specific custom attribute configuration by ID.
+
+**Requires:** `config:edit` permission
+
+**Response:** Configuration object
+
+### PATCH /admin/custom-attributes/{id}
+Update an existing custom attribute configuration.
+
+**Requires:** `config:edit` permission
+
+**Request:** Partial update (all fields optional except those being updated)
+```json
+{
+  "data_type": "text",
+  "validation_rules": {"max_length": 100},
+  "description": "Updated description",
+  "active": false
+}
+```
+
+**Response:** Updated configuration object
+
+**Note:** If `attr_name` or `entity_type` is updated, uniqueness is re-checked.
+
+### DELETE /admin/custom-attributes/{id}
+Soft-delete a custom attribute configuration (sets active=false).
+
+**Requires:** `config:edit` permission
+
+**Response:** 204 No Content
+
+**Note:** Existing data retains custom attributes, but new data cannot use inactive configs.
+
+## Custom Attributes in Entity Endpoints
+
+All entity create/update endpoints support `custom_attributes` in the request body:
+
+### Samples
+- **POST /samples**: Accepts `custom_attributes` object
+- **PATCH /samples/{id}**: Accepts `custom_attributes` object
+- **GET /samples**: Supports filtering via `?custom.attr_name=value`
+
+**Example:**
+```json
+{
+  "name": "SAMPLE-001",
+  "custom_attributes": {
+    "ph_level": 7.5,
+    "color": "blue"
+  }
+}
+```
+
+### Tests
+- **POST /tests**: Accepts `custom_attributes` object
+- **PATCH /tests/{id}**: Accepts `custom_attributes` object
+- **GET /tests**: Supports filtering via `?custom.attr_name=value`
+
+### Results
+- **POST /results**: Accepts `custom_attributes` object
+- **PATCH /results/{id}**: Accepts `custom_attributes` object
+- **GET /results**: Supports filtering via `?custom.attr_name=value`
+
+### Projects
+- Projects are read-only (no create/update endpoints), but custom_attributes are stored and returned in GET responses
+
+### Client Projects
+- **POST /client-projects**: Accepts `custom_attributes` object
+- **PATCH /client-projects/{id}**: Accepts `custom_attributes` object
+
+### Batches
+- **POST /batches**: Accepts `custom_attributes` object
+- **PATCH /batches/{id}**: Accepts `custom_attributes` object
+
+**Validation:**
+- All custom_attributes are validated server-side against active configurations
+- Returns 400 Bad Request with detailed error message if validation fails
+- Unknown attributes (not in config) are rejected
+- Values must match data_type and validation_rules
+
+**Querying:**
+- List endpoints support filtering: `?custom.attr_name=value`
+- Multiple custom filters: `?custom.attr1=value1&custom.attr2=value2`
+- Uses PostgreSQL JSONB `@>` operator for efficient querying
 
 ## Permissions Reference
 
@@ -865,7 +1042,7 @@ Endpoints require specific permissions. The system currently has 17 permissions:
 **System Permissions:**
 - `user:manage` - Manage users
 - `role:manage` - Manage roles
-- `config:edit` - Edit system configuration (lists, container types, analyses, analytes)
+- `config:edit` - Edit system configuration (lists, container types, analyses, analytes, custom attributes)
 
 **Note**: The code references `test:configure` permission in analyses, analytes, and test batteries endpoints, but this permission is not currently in the database. These endpoints use `require_any_permission(["config:edit", "test:configure"])`, which effectively requires `config:edit` permission.
 

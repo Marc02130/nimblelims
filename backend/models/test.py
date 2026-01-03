@@ -1,5 +1,5 @@
 from sqlalchemy import Column, String, DateTime, ForeignKey, Boolean
-from sqlalchemy.dialects.postgresql import UUID as PostgresUUID
+from sqlalchemy.dialects.postgresql import UUID as PostgresUUID, JSONB
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from .base import BaseModel
@@ -16,6 +16,7 @@ class Test(BaseModel):
     review_date = Column(DateTime)
     test_date = Column(DateTime)
     technician_id = Column(PostgresUUID(as_uuid=True), ForeignKey('users.id'))
+    custom_attributes = Column(JSONB, nullable=True, server_default='{}')
     
     # Relationships
     sample = relationship("Sample", back_populates="tests")

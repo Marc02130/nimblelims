@@ -81,6 +81,7 @@ The Admin section uses a Material-UI Accordion component for collapsible submenu
 | **Analyses Management** | `/admin/analyses` | Science | Test analysis configuration |
 | **Analytes Management** | `/admin/analytes` | Biotech | Analyte definitions |
 | **Test Batteries** | `/admin/test-batteries` | BatteryChargingFull | Test battery configuration |
+| **Custom Fields** | `/admin/custom-fields` | Tune | Manage custom attribute configurations (Post-MVP) |
 
 ### Visual States
 

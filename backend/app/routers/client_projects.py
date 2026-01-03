@@ -156,10 +156,25 @@ async def create_client_project(
             detail="Client not found"
         )
     
+    # Validate custom_attributes if provided
+    validated_custom_attributes = {}
+    if client_project_data.custom_attributes:
+        from app.core.custom_attributes import validate_custom_attributes
+        try:
+            validated_custom_attributes = validate_custom_attributes(
+                db, "client_projects", client_project_data.custom_attributes
+            )
+        except ValueError as e:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=str(e)
+            )
+    
     new_client_project = ClientProject(
         name=client_project_data.name,
         description=client_project_data.description,
         client_id=client_project_data.client_id,
+        custom_attributes=validated_custom_attributes,
         created_by=current_user.id,
         modified_by=current_user.id,
     )
@@ -168,17 +183,7 @@ async def create_client_project(
     db.commit()
     db.refresh(new_client_project)
     
-    return ClientProjectResponse(
-        id=new_client_project.id,
-        name=new_client_project.name,
-        description=new_client_project.description,
-        client_id=new_client_project.client_id,
-        active=new_client_project.active,
-        created_at=new_client_project.created_at,
-        created_by=new_client_project.created_by,
-        modified_at=new_client_project.modified_at,
-        modified_by=new_client_project.modified_by
-    )
+    return ClientProjectResponse.from_orm(new_client_project)
 
 
 @router.patch("/{client_project_id}", response_model=ClientProjectResponse)
@@ -221,6 +226,20 @@ async def update_client_project(
     if client_project_data.active is not None:
         client_project.active = client_project_data.active
     
+    # Validate and update custom_attributes if provided
+    if client_project_data.custom_attributes is not None:
+        from app.core.custom_attributes import validate_custom_attributes
+        try:
+            validated_custom_attributes = validate_custom_attributes(
+                db, "client_projects", client_project_data.custom_attributes
+            )
+            client_project.custom_attributes = validated_custom_attributes
+        except ValueError as e:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=str(e)
+            )
+    
     # Update audit fields
     client_project.modified_by = current_user.id
     # modified_at is updated automatically via onupdate in BaseModel
@@ -228,17 +247,7 @@ async def update_client_project(
     db.commit()
     db.refresh(client_project)
     
-    return ClientProjectResponse(
-        id=client_project.id,
-        name=client_project.name,
-        description=client_project.description,
-        client_id=client_project.client_id,
-        active=client_project.active,
-        created_at=client_project.created_at,
-        created_by=client_project.created_by,
-        modified_at=client_project.modified_at,
-        modified_by=client_project.modified_by
-    )
+    return ClientProjectResponse.from_orm(client_project)
 
 
 @router.delete("/{client_project_id}", status_code=status.HTTP_200_OK)
