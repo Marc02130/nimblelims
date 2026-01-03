@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Script to run Alembic migrations for LIMS MVP database.
+Script to run Alembic migrations for NimbleLIMS database.
 """
 import os
 import sys
