@@ -11,8 +11,9 @@ Navigation is permission-based, with menu items and routes dynamically shown/hid
 ### Location
 - Component: `frontend/src/components/Sidebar.tsx`
 - Layout Component: `frontend/src/layouts/MainLayout.tsx`
-- Display: Persistent left sidebar (240px width) on all authenticated routes
+- Display: Persistent left sidebar (240px width expanded, 56px collapsed) on all authenticated routes
 - Layout: Permanent drawer on desktop (≥600px), temporary drawer on mobile (<600px)
+- Collapsible: Desktop sidebar can be collapsed to icon-only mode (56px width) with tooltips
 
 ### Structure
 
@@ -29,9 +30,12 @@ Navigation is permission-based, with menu items and routes dynamically shown/hid
 │ Containers  │
 │ Batches     │
 │ Results     │
-│ Client      │
-│   Projects  │
 │ Help        │
+├─────────────┤
+│ ▼ Client    │ ← Accordion (collapsible, requires project:manage)
+│   Clients   │
+│   Client    │
+│   Projects  │
 ├─────────────┤
 │ ▼ Admin     │ ← Accordion (collapsible)
 │   Overview  │
@@ -63,8 +67,21 @@ All items are permission-gated and only visible to users with the required permi
 | **Containers** | `/containers` | Inventory | `sample:update` | Container management interface |
 | **Batches** | `/batches` | ViewList | `batch:manage` | Batch creation and management |
 | **Results** | `/results` | Assessment | `result:enter` | Results entry interface |
-| **Client Projects** | `/client-projects` | ViewList | `project:manage` | Client project management |
 | **Help** | `/help` | Help | Always visible | Role-filtered help content and documentation |
+
+#### Client Section (Accordion)
+The Client section uses a Material-UI Accordion component for collapsible submenu functionality. It is only visible to users with `project:manage` permission.
+
+**Accordion Behavior:**
+- Auto-expands when user navigates to any `/clients` or `/client-projects` route
+- Can be manually collapsed/expanded by clicking the accordion header
+- Shows active state (primary color icon) when on any client route
+- Contains client-related sub-items in a nested list structure
+
+| Menu Item | Route | Icon | Description |
+|-----------|-------|------|-------------|
+| **Clients** | `/clients` | People | Client (organization) management (CRUD) |
+| **Client Projects** | `/client-projects` | ViewList | Client project management (CRUD) |
 
 #### Admin Section (Accordion)
 The Admin section uses a Material-UI Accordion component for collapsible submenu functionality. It is only visible to users with `config:edit` permission.
@@ -121,8 +138,13 @@ Located at the bottom of the sidebar:
 ### AppBar Components
 
 - **Mobile Menu Toggle** (hamburger icon): Visible only on mobile (<600px), toggles sidebar drawer
+- **Desktop Sidebar Toggle** (ChevronLeft/ChevronRight): Visible only on desktop (≥600px), toggles sidebar collapsed state
+  - ChevronLeft icon when expanded (collapses sidebar to icon-only mode)
+  - ChevronRight icon when collapsed (expands sidebar to full width)
+  - ARIA labels: "Collapse sidebar" / "Expand sidebar"
+  - State persists to localStorage
 - **Back Button** (arrow icon): Visible only for nested routes (e.g., `/admin/analyses/:id/analytes`), navigates to parent route
-- **Page Title**: Dynamically set based on current route (e.g., "Dashboard", "Admin Dashboard", "Lists Management")
+- **Page Title**: Dynamically set based on current route (e.g., "Dashboard", "Admin Dashboard", "Lists Management", "Clients")
 - **User Info**: `{username} ({role})` - visible on desktop, hidden on mobile
 - **Logout Button**: Logout icon button, calls logout function and navigates to `/login`
 
@@ -137,6 +159,7 @@ The AppBar title is automatically determined from the current route:
 | `/containers` | Containers |
 | `/batches` | Batches |
 | `/results` | Results |
+| `/clients` | Clients |
 | `/client-projects` | Client Projects |
 | `/help` | Help |
 | `/admin` | Admin Dashboard |
@@ -165,6 +188,7 @@ All authenticated routes use the `MainLayout` component, which provides the unif
 | `/containers` | ContainerManagement | MainLayout |
 | `/batches` | BatchManagement | MainLayout |
 | `/results` | ResultsManagement | MainLayout |
+| `/clients` | ClientsManagement | MainLayout |
 | `/client-projects` | ClientProjects | MainLayout |
 | `/help` | HelpPage | MainLayout |
 | `/admin` | AdminOverview | MainLayout |
@@ -197,7 +221,7 @@ hasPermission('sample:create')  // Accessioning menu
 hasPermission('sample:update')  // Containers menu
 hasPermission('batch:manage')   // Batches menu
 hasPermission('result:enter')   // Results menu
-hasPermission('project:manage') // Client Projects menu
+hasPermission('project:manage') // Client section (accordion) - includes Clients and Client Projects
 hasPermission('config:edit')    // Admin section (accordion)
 // Help menu: No permission required - always visible to all users
 ```
@@ -274,10 +298,16 @@ Navigation relies on `UserContext` for:
 
 ### Desktop Adaptations
 
-- **Sidebar**: Permanent drawer always visible (240px width)
-- **Content Offset**: Main content area offset by sidebar width
+- **Sidebar**: Permanent drawer always visible (240px width expanded, 56px collapsed)
+- **Collapsible Sidebar**: Toggle button in AppBar allows collapsing to icon-only mode
+  - Collapsed state: 56px width, icons only with tooltips on hover
+  - Expanded state: 240px width, full text labels
+  - State persists to localStorage across sessions
+  - Accordions auto-collapse when sidebar is collapsed
+  - Accordions auto-expand on item click if sidebar is collapsed
+- **Content Offset**: Main content area offset by sidebar width (adjusts dynamically)
 - **User Info**: Full username and role displayed in AppBar
-- **No Toggle**: Hamburger menu hidden on desktop
+- **Toggle Button**: ChevronLeft/ChevronRight icon in AppBar for sidebar collapse/expand
 
 ## 8. Navigation Flow Examples
 
@@ -391,7 +421,7 @@ Potential navigation improvements for future iterations:
 - **Quick Search/Command Palette**: Keyboard shortcut (Cmd/Ctrl+K) to open command palette for quick navigation
 - **Recent Pages History**: Show recently visited pages in sidebar or quick access menu
 - **Keyboard Shortcuts**: Navigate using keyboard shortcuts (e.g., `g d` for dashboard, `g a` for admin)
-- **Collapsible Core Sections**: Allow collapsing core features section for users who primarily use one feature
+- **Collapsible Core Sections**: Allow collapsing core features section for users who primarily use one feature (partially implemented via sidebar collapse)
 - **Customizable Sidebar**: Allow users to pin/favorite frequently used items
 - **Contextual Navigation**: Show related items based on current page context
 - **Search Within Navigation**: Filter navigation items by search term
@@ -403,13 +433,16 @@ Potential navigation improvements for future iterations:
 **Props:**
 - `mobileOpen: boolean` - Controls mobile drawer visibility
 - `onMobileClose: () => void` - Callback to close mobile drawer
+- `collapsed?: boolean` - Controls desktop sidebar collapsed state (default: false)
 
 **Features:**
 - Permission-based item filtering
 - Active state detection (exact and prefix matching)
 - Responsive drawer variants (permanent/temporary)
-- Accordion for admin section
-- User info display at bottom
+- Collapsible on desktop (icon-only mode with tooltips)
+- Accordions for Client and Admin sections
+- Auto-expand accordions on navigation when collapsed
+- User info display at bottom (hidden when collapsed)
 
 ### MainLayout Component (`frontend/src/layouts/MainLayout.tsx`)
 
@@ -420,9 +453,10 @@ Potential navigation improvements for future iterations:
 - Unified layout wrapper for all routes
 - Top AppBar with dynamic title
 - Mobile drawer toggle
+- Desktop sidebar collapse toggle (with localStorage persistence)
 - Back button for nested routes
 - Logout functionality
-- Responsive content area offset
+- Responsive content area offset (adjusts for collapsed sidebar)
 
 ### Integration
 

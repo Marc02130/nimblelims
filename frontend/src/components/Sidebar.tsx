@@ -15,6 +15,7 @@ import {
   useTheme,
   useMediaQuery,
   Toolbar,
+  Tooltip,
 } from '@mui/material';
 import {
   Dashboard as DashboardIcon,
@@ -23,11 +24,13 @@ import {
   ViewList as ViewListIcon,
   Assessment as AssessmentIcon,
   Settings as SettingsIcon,
+  SettingsApplications as SettingsApplicationsIcon,
   ExpandMore,
   People,
   Security,
   Biotech,
   BatteryChargingFull,
+  Business as BusinessIcon,
   Tune as TuneIcon,
   Help as HelpIcon,
 } from '@mui/icons-material';
@@ -36,10 +39,12 @@ import { useUser } from '../contexts/UserContext';
 import Logo from './Logo';
 
 const DRAWER_WIDTH = 240;
+const DRAWER_WIDTH_COLLAPSED = 56;
 
 interface SidebarProps {
   mobileOpen: boolean;
   onMobileClose: () => void;
+  collapsed?: boolean;
 }
 
 interface NavItem {
@@ -57,7 +62,7 @@ interface AdminNavItem {
   exact?: boolean;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onMobileClose }) => {
+const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onMobileClose, collapsed = false }) => {
   const { user, hasPermission } = useUser();
   const navigate = useNavigate();
   const location = useLocation();
@@ -67,6 +72,17 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onMobileClose }) => {
   const [adminExpanded, setAdminExpanded] = useState(
     location.pathname.startsWith('/admin')
   );
+  const [clientExpanded, setClientExpanded] = useState(
+    location.pathname.startsWith('/clients') || location.pathname.startsWith('/client-projects')
+  );
+
+  // Collapse accordions when sidebar collapses
+  React.useEffect(() => {
+    if (collapsed) {
+      setAdminExpanded(false);
+      setClientExpanded(false);
+    }
+  }, [collapsed]);
 
   // Core Features navigation items
   const coreItems: NavItem[] = [
@@ -101,16 +117,24 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onMobileClose }) => {
       permission: 'result:enter',
     },
     {
-      text: 'Client Projects',
-      path: '/client-projects',
-      icon: <ViewListIcon />,
-      permission: 'project:manage',
-    },
-    {
       text: 'Help',
       path: '/help',
       icon: <HelpIcon />,
       // No permission required - visible to all users
+    },
+  ];
+
+  // Client navigation items
+  const clientItems: AdminNavItem[] = [
+    {
+      text: 'Clients',
+      path: '/clients',
+      icon: <People />,
+    },
+    {
+      text: 'Client Projects',
+      path: '/client-projects',
+      icon: <ViewListIcon />,
     },
   ];
 
@@ -174,6 +198,14 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onMobileClose }) => {
     if (isMobile) {
       onMobileClose();
     }
+    // Auto-expand accordions if collapsed sidebar and navigating to accordion item
+    if (collapsed) {
+      if (path.startsWith('/admin')) {
+        setAdminExpanded(true);
+      } else if (path.startsWith('/clients') || path.startsWith('/client-projects')) {
+        setClientExpanded(true);
+      }
+    }
   };
 
   // Logout is handled in MainLayout AppBar
@@ -186,10 +218,14 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onMobileClose }) => {
   };
 
   const hasAdminAccess = hasPermission('config:edit');
+  const hasClientAccess = hasPermission('project:manage');
 
-  // Update admin accordion expanded state when route changes
+  // Update accordion expanded states when route changes
   React.useEffect(() => {
     setAdminExpanded(location.pathname.startsWith('/admin'));
+    setClientExpanded(
+      location.pathname.startsWith('/clients') || location.pathname.startsWith('/client-projects')
+    );
   }, [location.pathname]);
 
   const drawerContent = (
@@ -211,13 +247,16 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onMobileClose }) => {
             alignItems: 'center',
             cursor: 'pointer',
             '&:hover': { opacity: 0.8 },
+            justifyContent: collapsed ? 'center' : 'flex-start',
           }}
           aria-label="Navigate to dashboard"
         >
-          <Logo sx={{ mr: 1, fontSize: 32 }} />
-          <Typography variant="h6" noWrap component="div">
-            NimbleLIMS
-          </Typography>
+          <Logo sx={{ mr: collapsed ? 0 : 1, fontSize: 32 }} />
+          {!collapsed && (
+            <Typography variant="h6" noWrap component="div">
+              NimbleLIMS
+            </Typography>
+          )}
         </Box>
       </Toolbar>
       <Divider />
@@ -228,36 +267,53 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onMobileClose }) => {
         aria-label="core features navigation"
         sx={{ flexGrow: 1, overflow: 'auto' }}
       >
-        <ListItem disablePadding>
-          <Typography
-            variant="overline"
-            sx={{ px: 2, py: 1, fontWeight: 600, color: 'text.secondary' }}
-          >
-            Core Features
-          </Typography>
-        </ListItem>
+        {!collapsed && (
+          <ListItem disablePadding>
+            <Typography
+              variant="overline"
+              sx={{ px: 2, py: 1, fontWeight: 600, color: 'text.secondary' }}
+            >
+              Core Features
+            </Typography>
+          </ListItem>
+        )}
         {coreItems
           .filter((item) => !item.permission || hasPermission(item.permission))
           .map((item) => {
             const active = isActive(item.path, item.exact);
+            const listItemButton = (
+              <ListItemButton
+                selected={active}
+                onClick={() => handleNavigation(item.path)}
+                aria-label={`Navigate to ${item.text}`}
+                aria-current={active ? 'page' : undefined}
+                sx={{
+                  justifyContent: collapsed ? 'center' : 'flex-start',
+                  minHeight: 48,
+                }}
+              >
+                <ListItemIcon
+                  sx={{
+                    color: active ? 'primary.main' : 'inherit',
+                    minWidth: collapsed ? 0 : 40,
+                    justifyContent: 'center',
+                  }}
+                >
+                  {item.icon}
+                </ListItemIcon>
+                {!collapsed && <ListItemText primary={item.text} />}
+              </ListItemButton>
+            );
+            
             return (
               <ListItem key={item.text} disablePadding>
-                <ListItemButton
-                  selected={active}
-                  onClick={() => handleNavigation(item.path)}
-                  aria-label={`Navigate to ${item.text}`}
-                  aria-current={active ? 'page' : undefined}
-                >
-                  <ListItemIcon
-                    sx={{
-                      color: active ? 'primary.main' : 'inherit',
-                      minWidth: 40,
-                    }}
-                  >
-                    {item.icon}
-                  </ListItemIcon>
-                  <ListItemText primary={item.text} />
-                </ListItemButton>
+                {collapsed ? (
+                  <Tooltip title={item.text} placement="right" arrow>
+                    {listItemButton}
+                  </Tooltip>
+                ) : (
+                  listItemButton
+                )}
               </ListItem>
             );
           })}
@@ -268,6 +324,94 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onMobileClose }) => {
               No items available
             </Typography>
           </ListItem>
+        )}
+
+        {/* Client Section */}
+        {hasClientAccess && (
+          <>
+            <Divider sx={{ my: 1 }} />
+            <Accordion
+              expanded={clientExpanded}
+              onChange={(_, expanded) => setClientExpanded(expanded)}
+              sx={{
+                boxShadow: 'none',
+                '&:before': { display: 'none' },
+                '&.Mui-expanded': { margin: 0 },
+              }}
+            >
+              <AccordionSummary
+                expandIcon={!collapsed ? <ExpandMore /> : null}
+                aria-label="Client section"
+                aria-controls="client-navigation-content"
+                sx={{
+                  px: 2,
+                  justifyContent: collapsed ? 'center' : 'flex-start',
+                  '& .MuiAccordionSummary-content': {
+                    my: 0,
+                    justifyContent: collapsed ? 'center' : 'flex-start',
+                  },
+                }}
+              >
+                <ListItemIcon sx={{ minWidth: collapsed ? 0 : 40, justifyContent: 'center' }}>
+                  <SettingsApplicationsIcon
+                    color={
+                      location.pathname.startsWith('/clients') || location.pathname.startsWith('/client-projects')
+                        ? 'primary'
+                        : 'inherit'
+                    }
+                  />
+                </ListItemIcon>
+                {!collapsed && (
+                  <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                    Client
+                  </Typography>
+                )}
+              </AccordionSummary>
+              <AccordionDetails sx={{ p: 0 }}>
+                <List component="nav" aria-label="client navigation">
+                  {clientItems.map((item) => {
+                    const active = isActive(item.path, item.exact);
+                    const listItemButton = (
+                      <ListItemButton
+                        selected={active}
+                        onClick={() => handleNavigation(item.path)}
+                        sx={{ 
+                          pl: collapsed ? 2 : 4,
+                          justifyContent: collapsed ? 'center' : 'flex-start',
+                          minHeight: 48,
+                        }}
+                        aria-label={`Navigate to ${item.text}`}
+                        aria-current={active ? 'page' : undefined}
+                      >
+                        <ListItemIcon
+                          sx={{
+                            color: active ? 'primary.main' : 'inherit',
+                            minWidth: collapsed ? 0 : 40,
+                            justifyContent: 'center',
+                          }}
+                        >
+                          {item.icon}
+                        </ListItemIcon>
+                        {!collapsed && <ListItemText primary={item.text} />}
+                      </ListItemButton>
+                    );
+                    
+                    return (
+                      <ListItem key={item.text} disablePadding>
+                        {collapsed ? (
+                          <Tooltip title={item.text} placement="right" arrow>
+                            {listItemButton}
+                          </Tooltip>
+                        ) : (
+                          listItemButton
+                        )}
+                      </ListItem>
+                    );
+                  })}
+                </List>
+              </AccordionDetails>
+            </Accordion>
+          </>
         )}
 
         {/* Admin Section */}
@@ -284,48 +428,67 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onMobileClose }) => {
               }}
             >
               <AccordionSummary
-                expandIcon={<ExpandMore />}
+                expandIcon={!collapsed ? <ExpandMore /> : null}
                 aria-label="Admin section"
                 aria-controls="admin-navigation-content"
                 sx={{
                   px: 2,
+                  justifyContent: collapsed ? 'center' : 'flex-start',
                   '& .MuiAccordionSummary-content': {
                     my: 0,
+                    justifyContent: collapsed ? 'center' : 'flex-start',
                   },
                 }}
               >
-                <ListItemIcon sx={{ minWidth: 40 }}>
+                <ListItemIcon sx={{ minWidth: collapsed ? 0 : 40, justifyContent: 'center' }}>
                   <SettingsIcon
                     color={location.pathname.startsWith('/admin') ? 'primary' : 'inherit'}
                   />
                 </ListItemIcon>
-                <Typography variant="body1" sx={{ fontWeight: 600 }}>
-                  Admin
-                </Typography>
+                {!collapsed && (
+                  <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                    Admin
+                  </Typography>
+                )}
               </AccordionSummary>
               <AccordionDetails sx={{ p: 0 }}>
                 <List component="nav" aria-label="admin navigation">
                   {adminItems.map((item) => {
                     const active = isActive(item.path, item.exact);
+                    const listItemButton = (
+                      <ListItemButton
+                        selected={active}
+                        onClick={() => handleNavigation(item.path)}
+                        sx={{ 
+                          pl: collapsed ? 2 : 4,
+                          justifyContent: collapsed ? 'center' : 'flex-start',
+                          minHeight: 48,
+                        }}
+                        aria-label={`Navigate to ${item.text}`}
+                        aria-current={active ? 'page' : undefined}
+                      >
+                        <ListItemIcon
+                          sx={{
+                            color: active ? 'primary.main' : 'inherit',
+                            minWidth: collapsed ? 0 : 40,
+                            justifyContent: 'center',
+                          }}
+                        >
+                          {item.icon}
+                        </ListItemIcon>
+                        {!collapsed && <ListItemText primary={item.text} />}
+                      </ListItemButton>
+                    );
+                    
                     return (
                       <ListItem key={item.text} disablePadding>
-                        <ListItemButton
-                          selected={active}
-                          onClick={() => handleNavigation(item.path)}
-                          sx={{ pl: 4 }}
-                          aria-label={`Navigate to ${item.text}`}
-                          aria-current={active ? 'page' : undefined}
-                        >
-                          <ListItemIcon
-                            sx={{
-                              color: active ? 'primary.main' : 'inherit',
-                              minWidth: 40,
-                            }}
-                          >
-                            {item.icon}
-                          </ListItemIcon>
-                          <ListItemText primary={item.text} />
-                        </ListItemButton>
+                        {collapsed ? (
+                          <Tooltip title={item.text} placement="right" arrow>
+                            {listItemButton}
+                          </Tooltip>
+                        ) : (
+                          listItemButton
+                        )}
                       </ListItem>
                     );
                   })}
@@ -339,14 +502,16 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onMobileClose }) => {
       <Divider />
 
       {/* User Info Section */}
-      <Box sx={{ p: 2 }}>
-        <Typography
-          variant="body2"
-          sx={{ color: 'text.secondary', fontWeight: 500 }}
-        >
-          {user?.username} ({user?.role})
-        </Typography>
-      </Box>
+      {!collapsed && (
+        <Box sx={{ p: 2 }}>
+          <Typography
+            variant="body2"
+            sx={{ color: 'text.secondary', fontWeight: 500 }}
+          >
+            {user?.username} ({user?.role})
+          </Typography>
+        </Box>
+      )}
     </Box>
   );
 
@@ -382,7 +547,12 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onMobileClose }) => {
           display: { xs: 'none', sm: 'block' },
           '& .MuiDrawer-paper': {
             boxSizing: 'border-box',
-            width: DRAWER_WIDTH,
+            width: collapsed ? DRAWER_WIDTH_COLLAPSED : DRAWER_WIDTH,
+            overflowX: 'hidden',
+            transition: theme.transitions.create('width', {
+              easing: theme.transitions.easing.sharp,
+              duration: theme.transitions.duration.enteringScreen,
+            }),
           },
         }}
         open

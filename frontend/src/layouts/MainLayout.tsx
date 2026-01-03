@@ -13,12 +13,15 @@ import {
   Menu as MenuIcon,
   ArrowBack,
   Logout,
+  ChevronLeft,
+  ChevronRight,
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useUser } from '../contexts/UserContext';
 import Sidebar from '../components/Sidebar';
 
 const DRAWER_WIDTH = 240;
+const DRAWER_WIDTH_COLLAPSED = 56;
 
 interface MainLayoutProps {
   children: React.ReactNode;
@@ -32,6 +35,7 @@ const getRouteTitle = (pathname: string): string => {
     '/containers': 'Containers',
     '/batches': 'Batches',
     '/results': 'Results',
+    '/clients': 'Clients',
     '/client-projects': 'Client Projects',
     '/admin': 'Admin Dashboard',
     '/admin/lists': 'Lists Management',
@@ -88,9 +92,28 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   // Mobile breakpoint: <600px (sm breakpoint)
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [mobileOpen, setMobileOpen] = useState(false);
+  
+  // Sidebar collapsed state with localStorage persistence
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    const saved = localStorage.getItem('sidebarCollapsed');
+    return saved ? JSON.parse(saved) : false;
+  });
 
   const handleDrawerToggle = () => {
-    setMobileOpen(!mobileOpen);
+    if (isMobile) {
+      setMobileOpen(!mobileOpen);
+    } else {
+      // Desktop: toggle collapsed state
+      const newCollapsed = !sidebarCollapsed;
+      setSidebarCollapsed(newCollapsed);
+      localStorage.setItem('sidebarCollapsed', JSON.stringify(newCollapsed));
+    }
+  };
+
+  const handleSidebarToggle = () => {
+    const newCollapsed = !sidebarCollapsed;
+    setSidebarCollapsed(newCollapsed);
+    localStorage.setItem('sidebarCollapsed', JSON.stringify(newCollapsed));
   };
 
   const handleLogout = () => {
@@ -105,29 +128,44 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
 
   const pageTitle = getRouteTitle(location.pathname);
   const showBackButton = shouldShowBackButton(location.pathname);
+  
+  // Calculate drawer width based on collapsed state (desktop only)
+  const drawerWidth = isMobile ? DRAWER_WIDTH : (sidebarCollapsed ? DRAWER_WIDTH_COLLAPSED : DRAWER_WIDTH);
 
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh' }}>
       {/* Sidebar */}
-      <Sidebar mobileOpen={mobileOpen} onMobileClose={() => setMobileOpen(false)} />
+      <Sidebar 
+        mobileOpen={mobileOpen} 
+        onMobileClose={() => setMobileOpen(false)}
+        collapsed={!isMobile && sidebarCollapsed}
+      />
 
       {/* Main content area */}
       <Box
         component="main"
         sx={{
           flexGrow: 1,
-          width: { sm: `calc(100% - ${DRAWER_WIDTH}px)` },
+          width: { sm: `calc(100% - ${drawerWidth}px)` },
           display: 'flex',
           flexDirection: 'column',
+          transition: theme.transitions.create(['width', 'margin'], {
+            easing: theme.transitions.easing.sharp,
+            duration: theme.transitions.duration.enteringScreen,
+          }),
         }}
       >
         {/* Top AppBar */}
         <AppBar
           position="fixed"
           sx={{
-            width: { sm: `calc(100% - ${DRAWER_WIDTH}px)` },
-            ml: { sm: `${DRAWER_WIDTH}px` },
+            width: { sm: `calc(100% - ${drawerWidth}px)` },
+            ml: { sm: `${drawerWidth}px` },
             zIndex: (theme) => theme.zIndex.drawer + 1,
+            transition: theme.transitions.create(['width', 'margin'], {
+              easing: theme.transitions.easing.sharp,
+              duration: theme.transitions.duration.enteringScreen,
+            }),
           }}
         >
           <Toolbar>
@@ -141,6 +179,19 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
             >
               <MenuIcon />
             </IconButton>
+
+            {/* Desktop sidebar toggle */}
+            {!isMobile && (
+              <IconButton
+                color="inherit"
+                aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+                edge="start"
+                onClick={handleSidebarToggle}
+                sx={{ mr: 2, display: { xs: 'none', sm: 'flex' } }}
+              >
+                {sidebarCollapsed ? <ChevronRight /> : <ChevronLeft />}
+              </IconButton>
+            )}
 
             {/* Back button (for nested routes) */}
             {showBackButton && (

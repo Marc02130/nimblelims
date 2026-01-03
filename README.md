@@ -218,11 +218,13 @@ docker exec lims-backend python run_migrations.py
 
 NimbleLIMS uses a unified sidebar navigation system that provides consistent access to all features:
 
-- **Unified Sidebar**: Persistent left sidebar (240px) on all authenticated routes
+- **Unified Sidebar**: Persistent left sidebar (240px expanded, 56px collapsed) on all authenticated routes
+- **Collapsible**: Desktop sidebar can be collapsed to icon-only mode with tooltips on hover
 - **Permission-Based**: Menu items dynamically shown/hidden based on user roles and permissions
-- **Admin Accordion**: Collapsible admin section with submenu items
+- **Client & Admin Accordions**: Collapsible sections for Client and Admin submenu items
 - **Responsive**: Permanent drawer on desktop, temporary drawer on mobile
-- **Top AppBar**: Dynamic page titles, back button for nested routes, user info, and logout
+- **State Persistence**: Sidebar collapsed state saved to localStorage
+- **Top AppBar**: Dynamic page titles, sidebar toggle, back button for nested routes, user info, and logout
 
 See [`.docs/navigation.md`](.docs/navigation.md) for complete navigation documentation.
 
