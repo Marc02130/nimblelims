@@ -1,5 +1,5 @@
 """
-Analyses router for LIMS MVP
+Analyses router for NimbleLims
 """
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status

@@ -1,4 +1,4 @@
-# Technical Document for LIMS MVP
+# Technical Document for NimbleLims
 
 ## 1. Introduction
 

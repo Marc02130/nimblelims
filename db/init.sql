@@ -1,4 +1,4 @@
--- LIMS MVP Database Initialization Script
+-- NimbleLims Database Initialization Script
 -- This script sets up the initial database structure and configurations
 -- Note: This script runs automatically when the container is first created
 -- The database and user are already created by POSTGRES_* environment variables

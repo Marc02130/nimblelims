@@ -1,5 +1,5 @@
 """
-Containers router for LIMS MVP
+Containers router for NimbleLims
 """
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Query

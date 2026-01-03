@@ -1,5 +1,5 @@
 """
-Unit conversion utilities for LIMS MVP
+Unit conversion utilities for NimbleLims
 """
 from decimal import Decimal
 from typing import Optional, Tuple

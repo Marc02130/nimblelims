@@ -1,5 +1,5 @@
 """
-Aliquots and derivatives router for LIMS MVP
+Aliquots and derivatives router for NimbleLims
 """
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Query

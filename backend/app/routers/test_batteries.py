@@ -1,5 +1,5 @@
 """
-Test Batteries router for LIMS MVP
+Test Batteries router for NimbleLims
 """
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Query

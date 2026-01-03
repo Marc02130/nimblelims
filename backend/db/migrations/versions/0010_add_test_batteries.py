@@ -1,4 +1,4 @@
-"""Add test batteries to LIMS MVP schema
+"""Add test batteries to NimbleLims schema
 
 Revision ID: 0010
 Revises: 0009

@@ -1,5 +1,5 @@
 ---
-description: Laboratory workflow standards for LIMS MVP
+description: Laboratory workflow standards for NimbleLims
 globs: **/*.{py,js,jsx,ts,tsx}
 ---
 

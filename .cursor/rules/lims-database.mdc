@@ -1,5 +1,5 @@
 ---
-description: Database and SQLAlchemy standards for LIMS MVP
+description: Database and SQLAlchemy standards for NimbleLims
 globs: **/*.py
 ---
 

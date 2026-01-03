@@ -1,6 +1,6 @@
 ### Setting Up the Dev Environment on macOS
 
-Based on our planning discussions and the LIMS MVP documents (PRD, User Stories, and Technical Document), the dev environment is designed to be containerized using Docker for consistency across the DB (Postgres), backend (Python/FastAPI), and frontend (React). This aligns with the tech stack in Section 1.3 of the Technical Document and the Docker configuration in Prompt 1 from the Prompts document.
+Based on our planning discussions and the NimbleLims documents (PRD, User Stories, and Technical Document), the dev environment is designed to be containerized using Docker for consistency across the DB (Postgres), backend (Python/FastAPI), and frontend (React). This aligns with the tech stack in Section 1.3 of the Technical Document and the Docker configuration in Prompt 1 from the Prompts document.
 
 Since you have Cursor (for AI-assisted code generation), Docker, and Python already installed, we'll leverage Cursor to generate the initial project structure via Prompt 1. This will create the folder structure, docker-compose.yml, and basic setup files without writing code yet. We'll use a Python virtual environment on your host machine for any local backend tinkering (e.g., running tests outside Docker), as you mentioned.
 
@@ -83,7 +83,7 @@ Note: This venv is optional for pure Docker dev but aligns with your request.
 - In Cursor, create a new file or open the Composer pane (Cmd+K or the AI prompt interface).
 - Copy and paste **Prompt 1** from the Prompts document directly into Cursor's AI prompt:
   ```
-  Create the initial project structure for the LIMS MVP based on the Technical Document (sections 1.3, 2.1, 7.2). Include:
+  Create the initial project structure for the NimbleLims based on the Technical Document (sections 1.3, 2.1, 7.2). Include:
   - Root folder with subfolders: backend (Python/FastAPI), frontend (React), db (Postgres migrations/scripts).
   - Docker setup with three containers: 
     - DB: PostgreSQL 15+ (official image, persistent volume for data, env vars for credentials).

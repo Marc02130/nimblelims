@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document describes the complete workflow from sample accessioning through results reporting in the LIMS MVP. The workflow covers the lifecycle of a sample from initial receipt to final reporting, including test assignment, results entry, review, and status management.
+This document describes the complete workflow from sample accessioning through results reporting in the NimbleLims. The workflow covers the lifecycle of a sample from initial receipt to final reporting, including test assignment, results entry, review, and status management.
 
 ## Workflow Stages
 

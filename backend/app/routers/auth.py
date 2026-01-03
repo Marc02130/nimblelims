@@ -1,5 +1,5 @@
 """
-Authentication router for LIMS MVP
+Authentication router for NimbleLims
 """
 from datetime import timedelta
 from fastapi import APIRouter, Depends, HTTPException, status

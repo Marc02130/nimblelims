@@ -1,4 +1,4 @@
-"""Initial LIMS MVP schema
+"""Initial NimbleLims schema
 
 Revision ID: 0001
 Revises: 
