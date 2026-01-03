@@ -21,6 +21,7 @@ The MVP focuses on core functionality using PostgreSQL for data storage, Python 
 - Version 1.3: Incorporated refinements for containers (admin pre-setup for types, dynamic instance creation during workflows, no pre-created instances in MVP) and lists (full admin-editable CRUD with normalized naming and API support) based on iterative planning (December 21, 2025).
 - Version 1.4: Added test batteries feature (test_batteries table, battery_analyses junction with sequence/optional flags, integration with accessioning workflow) - December 2025.
 - Version 1.5: Added EAV (Entity-Attribute-Value) model for configurability - custom attributes support for samples, tests, results, projects, client_projects, and batches (December 2025).
+- Version 1.6: Added client help system with role-filtered help content, Client role seeding, and help API endpoints (January 2025).
 
 ## 2. System Architecture
 
@@ -38,6 +39,7 @@ The MVP focuses on core functionality using PostgreSQL for data storage, Python 
 - API requests include JWT in headers; backend validates role/permissions.
 - Workflows (e.g., accessioning): Frontend forms submit to API → Backend processes, updates DB → Returns updated data.
 - Queries filter by user context (e.g., client_id for clients).
+- **Help Flow**: User accesses /help → Frontend checks user role → If Client, fetches role-filtered help entries via GET /help?role=Client → Backend RLS filters entries by role_filter matching user's role OR role_filter=NULL (public) → Returns filtered help entries → Frontend displays in accordion format. Non-Client users see generic help message without API call.
 
 ## 3. Database Schema
 
@@ -183,6 +185,13 @@ All tables include standard fields: `id` (UUID PK), `name` (varchar unique), `de
   - `role_id` (FK roles.id)
   - `client_id` (FK clients.id, nullable)
   - `last_login` (timestamp, nullable)
+
+- **Help_Entries**:
+  - `section` (varchar, NOT NULL): Help section name (e.g., 'Viewing Projects')
+  - `content` (text, NOT NULL): Help content text
+  - `role_filter` (varchar, nullable): Role name for filtering (NULL = public, visible to all roles)
+  - Standard audit fields (id, name, description, active, created_at, created_by, modified_at, modified_by)
+  - Notes: Role-filtered help content system. Users see entries where role_filter matches their role OR role_filter is NULL (public). RLS enforces filtering at database level. Name field uses section value (not unique).
 
 - **Roles**:
   - No additional fields.
@@ -350,6 +359,12 @@ WHERE custom_attributes @> '{"ph_level": 7.5}'::jsonb;
   - All entity create/update endpoints (samples, tests, results, projects, client_projects, batches) accept `custom_attributes` in request body
   - List endpoints support filtering via query parameters: `?custom.attr_name=value`
   - Validation occurs server-side against active configs for the entity type
+- **Help Endpoints**:
+  - GET /help: List help entries filtered by current user's role (or ?role= for admins). Supports pagination and section filtering. Returns entries where role_filter matches user's role OR role_filter is NULL (public).
+  - GET /help/contextual?section=: Get contextual help for a specific section, filtered by user's role.
+  - POST /help/admin/help: Create help entry (requires `config:edit` permission).
+  - PATCH /help/admin/help/{id}: Update help entry (requires `config:edit` permission).
+  - DELETE /help/admin/help/{id}: Soft-delete help entry (requires `config:edit` permission).
 - Error Handling: Standard HTTP codes; JSON {error, detail}.
 
 ### 4.3 Validation

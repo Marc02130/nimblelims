@@ -18,6 +18,7 @@ import AnalytesManagement from './pages/admin/AnalytesManagement';
 import AnalysisAnalytesConfig from './pages/admin/AnalysisAnalytesConfig';
 import CustomFieldsManagement from './pages/admin/CustomFieldsManagement';
 import ClientProjects from './pages/ClientProjects';
+import HelpPage from './pages/HelpPage';
 import { useUser } from './contexts/UserContext';
 
 function AppRoutes() {
@@ -81,6 +82,7 @@ function AppRoutes() {
             )
           }
         />
+        <Route path="/help" element={<HelpPage />} />
 
         {/* Admin Routes */}
         <Route

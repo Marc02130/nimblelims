@@ -29,6 +29,7 @@ import {
   Biotech,
   BatteryChargingFull,
   Tune as TuneIcon,
+  Help as HelpIcon,
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useUser } from '../contexts/UserContext';
@@ -104,6 +105,12 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onMobileClose }) => {
       path: '/client-projects',
       icon: <ViewListIcon />,
       permission: 'project:manage',
+    },
+    {
+      text: 'Help',
+      path: '/help',
+      icon: <HelpIcon />,
+      // No permission required - visible to all users
     },
   ];
 

@@ -629,6 +629,28 @@ class ApiService {
     const response: AxiosResponse = await this.api.delete(`/admin/custom-attributes/${id}`);
     return response.data;
   }
+
+  // Help endpoints
+  async getHelp(filters?: {
+    role?: string;
+    section?: string;
+    page?: number;
+    size?: number;
+  }) {
+    const config: any = {};
+    if (filters && Object.keys(filters).length > 0) {
+      config.params = filters;
+    }
+    const response: AxiosResponse = await this.api.get('/help', config);
+    return response.data;
+  }
+
+  async getContextualHelp(section: string) {
+    const response: AxiosResponse = await this.api.get('/help/contextual', {
+      params: { section },
+    });
+    return response.data;
+  }
 }
 
 export const apiService = new ApiService();

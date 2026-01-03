@@ -35,6 +35,16 @@ This document describes the user interface components and interactions for the a
 - `AliquotDerivativeDialog.tsx`: Dialog for creating aliquots/derivatives
 - `CustomAttributeField.tsx`: Reusable component for rendering custom attribute fields dynamically based on data type (text, number, date, boolean, select)
 
+### Help Components
+- `ClientHelpSection.tsx`: Role-filtered help content component for Client users
+  - Displays help entries in accordion format (Material-UI Accordion)
+  - Fetches help entries via GET /help?role=Client API endpoint
+  - Shows loading state while fetching
+  - Handles errors gracefully with user-friendly messages
+  - Displays empty state when no help content available
+  - Used in `HelpPage.tsx` with conditional rendering based on user role
+  - Plain language content focused on 3-5 key topics for Client users
+
 ### Admin Components
 - `CustomFieldsManagement.tsx`: Admin page for managing custom attribute configurations
   - Lists custom fields by entity type with filtering
@@ -488,6 +498,23 @@ This document describes the user interface components and interactions for the a
    - Review all results
    - Approve test (sets status to "Complete")
 
+### Help Access Workflow
+
+1. **Navigate to Help**:
+   - Click "Help" in navigation menu (visible to all users)
+   - Help page loads based on user role
+
+2. **Client Users**:
+   - See `ClientHelpSection` component with accordion-style FAQ
+   - Help entries filtered by role (Client-specific and public entries)
+   - Sections include: "Viewing Projects", "Viewing Samples", "Viewing Results"
+   - Plain language, no technical jargon
+   - Tooltips available in components like ResultsManagement
+
+3. **Non-Client Users**:
+   - See generic help message
+   - No API call made (no role-specific help content)
+
 ---
 
 ## Error Handling
@@ -648,6 +675,8 @@ This document describes the user interface components and interactions for the a
 - `getTestsByBatch(batchId)`: Load tests for batch
 - `getAnalysisAnalytes(testId)`: Load analytes for test
 - `enterBatchResults(batchId, data)`: Save results
+- `getHelp(filters)`: Load help entries filtered by role (e.g., `{role: 'Client'}`)
+- `getContextualHelp(section)`: Load contextual help for a specific section
 
 **Error Handling**:
 - Try/catch blocks in components
@@ -699,6 +728,7 @@ frontend/src/
 ├── pages/
 │   ├── AccessioningForm.tsx
 │   ├── ResultsManagement.tsx
+│   ├── HelpPage.tsx
 │   └── admin/
 │       └── CustomFieldsManagement.tsx
 ├── components/
@@ -713,6 +743,8 @@ frontend/src/
 │   │   └── ResultsEntryTable.tsx
 │   ├── aliquots/
 │   │   └── AliquotDerivativeDialog.tsx
+│   ├── help/
+│   │   └── ClientHelpSection.tsx
 │   ├── admin/
 │   │   └── CustomFieldDialog.tsx
 │   └── common/
@@ -732,6 +764,7 @@ frontend/src/
 **Test Files**:
 - `AccessioningForm.test.tsx`
 - `ResultsEntryTable.test.tsx`
+- `HelpPage.test.tsx`
 - Component-specific test files
 
 **Test Coverage**:
@@ -739,6 +772,7 @@ frontend/src/
 - User interactions
 - API integration
 - Error handling
+- Role-based rendering (e.g., Client help vs. general help)
 
 ### UI Testing
 

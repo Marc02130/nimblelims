@@ -593,3 +593,55 @@ nimblelims_prd.md: Post-MVP Section 4.5: Custom Fields (functional reqs, e.g., a
 api_endpoints.md: Add EAV CRUD details.
 
 Generate full updated content for each file, maintaining version history (e.g., Version 1.5: Added EAV for configurability)."
+
+# Help
+## Client
+### Prompt 1: Database Migration for Client Role and User Seeding
+"Implement an Alembic migration for seeding the Client role and a sample client user in NimbleLIMS, based on Technical Document (Section 3.1) and schema_dump20260103.sql. Focus on post-MVP enhancements.
+
+Migration File: Create 0014_seed_client_role.py in backend/db/migrations.
+Role: Insert into roles: name='Client', description='Read-only access for client users'.
+Permissions: Assign to role_permissions: sample:read, test:read (view assigned tests), result:read (view results), project:read (view own projects), batch:read (view batches if relevant). Use existing 17 permissions; no new ones.
+User: Insert into users: username='client_user', password_hash=bcrypt('clientpass123'), email='client@example.com', role_id=(Client role ID), client_id=(assume seeded client ID from prior migration, e.g., first client).
+RLS: Update projects_access policy to include client_id filtering for Client role users.
+Up/Down Functions: Standard Alembic; ensure idempotent (check if exists before insert).
+Dependencies: Run after 0013 (EAV expansion).
+
+Generate the full migration file code, ensuring PEP8. Do not implement other code yet."
+
+### Prompt 2: Backend API for Role-Filtered Help
+"Add backend API endpoints for role-filtered help content in NimbleLIMS, per ui-accessioning-to-reporting.md (Help Components) and nimblelims_prd.md (Post-MVP 4.6).
+
+New Table: help_entries (id UUID PK, section varchar, content text, role_filter varchar (e.g., 'Client'), active bool, audit fields).
+Migration: Create 0015_help_entries.py to add table and seed initial entries (e.g., for Client: section='Viewing Projects', content='Step-by-step guide to access your samples and results.').
+Routers: In backend/app/routers/help.py (new file), add:
+GET /help: List entries, filter by ?role= (use current_user.role from dependency), pagination.
+GET /help/contextual?section=: Return specific help, filtered by role.
+POST/PATCH/DELETE /admin/help: CRUD for admins (require config:edit).
+
+Schemas: HelpEntryCreate, HelpEntryResponse with Pydantic.
+Security: RLS on help_entries: Users see only matching role_filter or public (role_filter=NULL).
+
+Generate full code for: migrations/0015_help_entries.py, models/help_entries.py, schemas/help.py, routers/help.py. Include basic tests in tests/test_help.py (e.g., role filtering)."
+
+### Prompt 3: Frontend UI for Client-Specific Help
+"Implement client-specific help in the NimbleLIMS frontend, based on ui-accessioning-to-reporting.md and workflow-accessioning-to-reporting.md. Gate via UserContext.role === 'Client'.
+
+New Components: ClientHelpSection.tsx (simplified FAQ list, e.g., accordions for 'Viewing Samples', 'Understanding Statuses'); integrate into HelpPage.tsx with conditional rendering.
+Tooltips: Update components like ResultsManagement.tsx to add client-friendly tooltips (e.g., 'This shows your test results—contact your lab for questions.').
+API Integration: Update apiService.ts with getHelp(filters) using ?role=client; fetch on HelpPage load.
+Sidebar: Add 'Help' link visible to all, but content filters by role.
+Simplicity: For clients, limit to 3-5 key topics; use plain language, no jargon.
+
+Generate full code for: pages/HelpPage.tsx (updates), components/help/ClientHelpSection.tsx, services/apiService.ts (updates). Ensure responsive (MUI), ESLint compliance, and tests in HelpPage.test.tsx (role-based rendering)."
+
+### Prompt 4: Integration Testing and Doc Updates
+"Add integration tests and update documentation for client help and role in NimbleLIMS.
+
+Tests: In backend/tests/test_help.py and frontend/tests/HelpPage.test.tsx, add scenarios: Client user sees filtered help; non-client sees general; unauthorized access denied.
+Docs: Update nimblelims_tech.md (Section 2.2: Add help flow); ui-accessioning-to-reporting.md (Add ClientHelpSection); api_endpoints.md (Add /help endpoints with examples).
+Seeding Verification: Add script in db/scripts/verify_seeding.sql to check Client role/user.
+
+Generate full code for test files and updated doc content (maintain version history, e.g., Version 1.6: Added client help)."
+
+## Tech
