@@ -1,0 +1,507 @@
+# UAT Scripts: Security and RBAC
+
+## Overview
+
+This document contains User Acceptance Testing (UAT) scripts for security and Role-Based Access Control (RBAC) in NimbleLIMS. These scripts validate authentication, authorization, and data isolation as defined in:
+
+- **User Stories**: US-12 (User Authentication), US-13 (Role-Based Access Control), US-14 (Project and Client Data Isolation)
+- **PRD**: Section 3.1 (Security and Auth)
+- **Technical Document**: `technical-accessioning-to-reporting.md` (RLS policies)
+- **Schema**: `role_permissions` junction table, `project_users` junction table, RLS policies
+
+## Test Environment Setup
+
+### Prerequisites
+- NimbleLIMS application running (backend and frontend)
+- Database seeded with:
+  - Roles: Administrator, Lab Manager, Lab Technician, Client
+  - Permissions: All 17 core permissions (e.g., `sample:create`, `result:enter`, `batch:manage`)
+  - Role-permission mappings via `role_permissions` junction table
+  - At least one user per role with appropriate permissions
+  - At least one client user with `client_id` set
+  - At least two projects (one accessible to client, one not)
+  - At least one sample in accessible project
+  - At least one sample in inaccessible project
+- Test user accounts:
+  - Lab Technician with `result:enter` permission but without `sample:create` permission
+  - Client user with `client_id` set, only `sample:read` and `result:read` permissions
+  - Administrator user (for comparison)
+
+---
+
+## Test Case 1: Login/Logout - JWT Token Authentication
+
+### Test Case ID
+TC-AUTH-LOGIN-001
+
+### Description
+Verify user authentication with username/password, JWT token generation, token validation, and logout functionality.
+
+### Preconditions
+
+| Item | Value |
+|------|-------|
+| **User Account Exists** | At least one user account exists in database:<br>- Username: `testuser`<br>- Password: `testpassword`<br>- Active: `true`<br>- Role assigned with permissions |
+| **Database Seeded** | Roles and permissions seeded via migrations |
+| **No Active Session** | User not currently logged in |
+
+### Test Steps
+
+| Step | Action | Expected Result |
+|------|--------|-----------------|
+| 1 | Navigate to login page (e.g., `/login`) | Login form loads with username and password fields |
+| 2 | **Enter Credentials** | |
+| 2.1 | Enter username: `testuser` | Field accepts input |
+| 2.2 | Enter password: `testpassword` | Field accepts input (password masked) |
+| 2.3 | Click "Login" button | Form submits, loading spinner shown |
+| 3 | Wait for API response | Success response received |
+| 4 | **Verify Login Response** | |
+| 4.1 | Verify JWT token received | Response contains `access_token` field (JWT string) |
+| 4.2 | Verify user information | Response contains:<br>- `user_id`: UUID<br>- `username`: "testuser"<br>- `email`: user's email<br>- `role`: role name (e.g., "Lab Technician")<br>- `permissions`: array of permission strings |
+| 4.3 | Verify token stored | Token stored in `localStorage` (key: "token") |
+| 4.4 | Verify token added to API requests | Authorization header set: `Bearer {token}` |
+| 5 | **Verify Token Validation** | |
+| 5.1 | Make authenticated API call: GET `/auth/me` | API call succeeds (HTTP 200) |
+| 5.2 | Verify user information returned | Response contains current user details |
+| 5.3 | Verify `last_login` updated | User's `last_login` field updated in database |
+| 6 | **Test Logout** | |
+| 6.1 | Click "Logout" button or navigate to logout | Logout action triggered |
+| 6.2 | Verify token removed | Token removed from `localStorage` |
+| 6.3 | Verify API token cleared | Authorization header no longer sent |
+| 6.4 | Verify redirect to login | User redirected to login page |
+| 6.5 | Attempt authenticated API call: GET `/auth/me` | API call fails (HTTP 401 Unauthorized) |
+
+### Expected Results
+
+| Category | Expected Outcome |
+|----------|------------------|
+| **API Call** | POST `/auth/login` called with:<br>```json
+{
+  "username": "testuser",
+  "password": "testpassword"
+}
+``` |
+| **Backend Processing** | 1. **User Lookup**:<br>   - Query user by username<br>   - Return 401 if user not found<br>2. **Password Verification**:<br>   - Verify password using bcrypt<br>   - Return 401 if password incorrect<br>3. **Active Check**:<br>   - Verify user is active<br>   - Return 401 if user inactive<br>4. **Permission Retrieval**:<br>   - Get user permissions via `role_permissions` junction<br>   - Query: `SELECT p.name FROM permissions p JOIN role_permissions rp ON p.id = rp.permission_id WHERE rp.role_id = {user.role_id}`<br>5. **JWT Token Creation**:<br>   - Create access token with payload:<br>     - `sub`: user.id (UUID as string)<br>     - `username`: user.username<br>     - `role`: user.role.name<br>     - `permissions`: array of permission strings<br>     - `exp`: expiration timestamp<br>   - Sign with SECRET_KEY using HS256 algorithm<br>6. **Update last_login**:<br>   - Set `user.last_login` = current timestamp<br>   - Commit to database<br>7. **Set RLS Context**:<br>   - Call `set_current_user_id(user.id, db)` for RLS |
+| **Login Response** | ```json
+{
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "token_type": "bearer",
+  "user_id": "uuid",
+  "username": "testuser",
+  "email": "test@example.com",
+  "role": "Lab Technician",
+  "permissions": ["sample:read", "result:enter", "test:assign"]
+}
+```<br>- HTTP 200 OK |
+| **Token Storage** | - Token stored in browser `localStorage` with key "token"<br>- Token added to all subsequent API requests as: `Authorization: Bearer {token}` |
+| **Token Validation** | - GET `/auth/me` endpoint validates token:<br>   - Decode JWT token<br>   - Verify signature with SECRET_KEY<br>   - Check expiration<br>   - Return user information if valid<br>   - Return 401 if invalid/expired |
+| **Logout** | - Token removed from `localStorage`<br> - API service clears Authorization header<br> - User redirected to login page<br> - Subsequent API calls return 401 |
+
+### Test Steps - Invalid Credentials (Negative Test)
+
+| Step | Action | Expected Result |
+|------|--------|-----------------|
+| 7 | **Test Invalid Username** | |
+| 7.1 | Enter username: `nonexistent` | Field accepts input |
+| 7.2 | Enter password: `testpassword` | Field accepts input |
+| 7.3 | Click "Login" | Form submits |
+| 7.4 | Verify error response | HTTP 401 Unauthorized:<br>- Error message: "Incorrect username or password" |
+| 8 | **Test Invalid Password** | |
+| 8.1 | Enter username: `testuser` | Field accepts input |
+| 8.2 | Enter password: `wrongpassword` | Field accepts input |
+| 8.3 | Click "Login" | Form submits |
+| 8.4 | Verify error response | HTTP 401 Unauthorized:<br>- Error message: "Incorrect username or password" |
+| 9 | **Test Inactive User** | |
+| 9.1 | Set user active = false in database | User deactivated |
+| 9.2 | Attempt login with valid credentials | Form submits |
+| 9.3 | Verify error response | HTTP 401 Unauthorized:<br>- Error message: "User account is inactive" |
+
+### Expected Results - Invalid Credentials
+
+| Category | Expected Outcome |
+|----------|------------------|
+| **Error Response** | - HTTP 401 Unauthorized<br>- Error message: "Incorrect username or password" or "User account is inactive"<br>- Header: `WWW-Authenticate: Bearer`<br>- No token returned |
+| **UI Feedback** | - Error message displayed on login form<br>- User remains on login page<br>- No token stored |
+
+### Pass/Fail Criteria
+
+| Criteria | Pass | Fail |
+|----------|------|------|
+| Login succeeds with valid credentials | ✓ | ✗ |
+| JWT token received in response | ✓ | ✗ |
+| Token contains user_id, username, role, permissions | ✓ | ✗ |
+| Token stored in localStorage | ✓ | ✗ |
+| Token added to API requests | ✓ | ✗ |
+| GET /auth/me succeeds with valid token | ✓ | ✗ |
+| last_login updated in database | ✓ | ✗ |
+| Logout removes token | ✓ | ✗ |
+| Invalid credentials return 401 | ✓ | ✗ |
+| Inactive user cannot login | ✓ | ✗ |
+
+### Test Result
+- [ ] **PASS** - All criteria met
+- [ ] **FAIL** - One or more criteria not met
+
+**Notes**: _________________________________________________________
+
+---
+
+## Test Case 2: Permission Denial - RBAC Enforcement
+
+### Test Case ID
+TC-RBAC-PERMISSION-002
+
+### Description
+Verify that users without required permissions are denied access to protected endpoints, with appropriate 403 Forbidden responses.
+
+### Preconditions
+
+| Item | Value |
+|------|-------|
+| **User Role** | Lab Technician |
+| **User Permissions** | User has `result:enter` permission but does NOT have `sample:create` permission |
+| **Role-Permission Mapping** | `role_permissions` junction table configured correctly:<br>- Lab Technician role has `result:enter` permission<br>- Lab Technician role does NOT have `sample:create` permission |
+| **User Logged In** | User successfully authenticated with valid JWT token |
+| **Project Exists** | At least one project exists for sample creation test |
+
+### Test Steps
+
+| Step | Action | Expected Result |
+|------|--------|-----------------|
+| 1 | Log in as Lab Technician without `sample:create` permission | User authenticated, token received |
+| 2 | **Attempt Sample Creation** | |
+| 2.1 | Navigate to sample creation page (e.g., `/samples` or `/accessioning`) | Page loads (if accessible) |
+| 2.2 | Fill in sample creation form | Form accepts input |
+| 2.3 | Click "Create" or "Submit" button | Form submits |
+| 2.4 | Wait for API response | Error response received |
+| 3 | **Verify Permission Denial** | |
+| 3.1 | Verify error response | HTTP 403 Forbidden:<br>- Error message: "Permission 'sample:create' required" |
+| 3.2 | Verify sample not created | No sample record created in database |
+| 4 | **Test Allowed Action** | |
+| 4.1 | Navigate to results entry page | Page loads (user has `result:enter` permission) |
+| 4.2 | Attempt to enter results | Action succeeds (HTTP 200) |
+| 5 | **Test API Direct Call** | |
+| 5.1 | Make direct API call: POST `/samples` with sample data | API call made with Authorization header |
+| 5.2 | Verify error response | HTTP 403 Forbidden:<br>- Error message: "Permission 'sample:create' required" |
+
+### Expected Results
+
+| Category | Expected Outcome |
+|----------|------------------|
+| **API Call** | POST `/samples` called with:<br>- Authorization header: `Bearer {token}`<br>- Request body: Sample creation data |
+| **Backend Processing** | 1. **Token Validation**:<br>   - Verify JWT token is valid<br>   - Decode token to get user information<br>2. **Permission Check**:<br>   - Endpoint uses `require_sample_create` dependency<br>   - Dependency calls `require_permission("sample:create")`<br>   - Function `get_user_permissions(user, db)` called:<br>     - Query: `SELECT p.name FROM permissions p JOIN role_permissions rp ON p.id = rp.permission_id WHERE rp.role_id = {user.role_id}`<br>     - Returns list of permission strings<br>   - Check if "sample:create" in user_permissions<br>   - If not found, raise HTTPException with 403<br>3. **Error Response**:<br>   - HTTP 403 Forbidden<br>   - Detail: "Permission 'sample:create' required" |
+| **Error Response** | ```json
+{
+  "detail": "Permission 'sample:create' required"
+}
+```<br>- HTTP 403 Forbidden<br>- No sample created |
+| **UI Feedback** | - Error message displayed to user<br>- Sample creation form shows error state<br>- User cannot proceed with sample creation |
+| **Allowed Action** | - User can access endpoints requiring `result:enter` permission<br> - Results entry succeeds (HTTP 200) |
+
+### Test Steps - Administrator Access (Positive Test)
+
+| Step | Action | Expected Result |
+|------|--------|-----------------|
+| 6 | **Test Administrator Access** | |
+| 6.1 | Log in as Administrator | User authenticated |
+| 6.2 | Verify Administrator has all permissions | Administrator role has all 17 permissions via `role_permissions` |
+| 6.3 | Attempt sample creation | Action succeeds (HTTP 200) |
+| 6.4 | Verify sample created | Sample record created in database |
+
+### Expected Results - Administrator Access
+
+| Category | Expected Outcome |
+|----------|------------------|
+| **Administrator Permissions** | - Administrator role has all permissions via `role_permissions` junction<br>- Or: Administrator bypasses permission checks (implementation detail) |
+| **Sample Creation** | - Sample creation succeeds<br>- Sample record created in database |
+
+### Pass/Fail Criteria
+
+| Criteria | Pass | Fail |
+|----------|------|------|
+| User without permission denied access | ✓ | ✗ |
+| HTTP 403 Forbidden returned | ✓ | ✗ |
+| Error message is clear and informative | ✓ | ✗ |
+| No data created/modified | ✓ | ✗ |
+| User with permission can access endpoint | ✓ | ✗ |
+| Administrator can access all endpoints | ✓ | ✗ |
+| Permission check uses role_permissions junction | ✓ | ✗ |
+
+### Test Result
+- [ ] **PASS** - All criteria met
+- [ ] **FAIL** - One or more criteria not met
+
+**Notes**: _________________________________________________________
+
+---
+
+## Test Case 3: Client Isolation - RLS on Projects
+
+### Test Case ID
+TC-RLS-CLIENT-ISOLATION-003
+
+### Description
+Verify that client users can only access their own projects, samples, and results via Row-Level Security (RLS) policies, with data isolation enforced at the database level.
+
+### Preconditions
+
+| Item | Value |
+|------|-------|
+| **User Role** | Client |
+| **User client_id** | Client user has `client_id` set (e.g., "Client Alpha" UUID) |
+| **User Permissions** | Client user has `sample:read` and `result:read` permissions |
+| **Projects Exist** | At least two projects exist:<br>- Project Alpha: `client_id` = Client Alpha UUID (accessible)<br>- Project Beta: `client_id` = Client Beta UUID (inaccessible) |
+| **Samples Exist** | At least one sample in Project Alpha (accessible)<br>At least one sample in Project Beta (inaccessible) |
+| **RLS Enabled** | RLS policies enabled on `samples`, `projects`, `tests`, `results` tables |
+| **User Logged In** | Client user successfully authenticated with valid JWT token |
+
+### Test Steps
+
+| Step | Action | Expected Result |
+|------|--------|-----------------|
+| 1 | Log in as Client user | User authenticated, token received |
+| 2 | **Verify Project Access** | |
+| 2.1 | Navigate to `/projects` route | Projects list page loads |
+| 2.2 | Verify projects displayed | Only Project Alpha visible (client's project)<br>Project Beta NOT visible |
+| 2.3 | Click on Project Alpha | Project details view opens |
+| 2.4 | Attempt to access Project Beta directly: GET `/projects/{project_beta_uuid}` | API call made |
+| 2.5 | Verify access denied | HTTP 403 Forbidden or 404 Not Found (RLS hides record) |
+| 3 | **Verify Sample Access** | |
+| 3.1 | Navigate to `/samples` route | Samples Management page loads |
+| 3.2 | Verify samples displayed | Only samples from Project Alpha visible<br>Samples from Project Beta NOT visible |
+| 3.3 | Click on sample from Project Alpha | Sample details view opens |
+| 3.4 | Attempt to access sample from Project Beta directly: GET `/samples/{sample_beta_uuid}` | API call made |
+| 3.5 | Verify access denied | HTTP 403 Forbidden or 404 Not Found |
+| 4 | **Verify RLS Enforcement** | |
+| 4.1 | Make API call: GET `/samples` | API call succeeds (HTTP 200) |
+| 4.2 | Verify response filtered | Response contains only samples from accessible projects |
+| 4.3 | Verify database query | Database query automatically filtered by RLS policy:<br>- `samples_access` policy checks `has_project_access(project_id)`<br>- Policy returns only rows where user has access |
+
+### Expected Results
+
+| Category | Expected Outcome |
+|----------|------------------|
+| **RLS Policies** | RLS policies enabled on tables:<br>1. **samples_access policy**:<br>   ```sql
+   CREATE POLICY samples_access ON samples
+   FOR ALL
+   USING (
+       is_admin() OR has_project_access(project_id)
+   );
+   ```<br>2. **projects_access policy**:<br>   ```sql
+   CREATE POLICY projects_access ON projects
+   FOR ALL
+   USING (
+       is_admin() OR has_project_access(id)
+   );
+   ```<br>3. **tests_access policy**:<br>   - Checks access via sample's project<br>4. **results_access policy**:<br>   - Checks access via test → sample → project |
+| **has_project_access() Function** | Function checks client access:<br>```sql
+CREATE OR REPLACE FUNCTION has_project_access(project_uuid UUID)
+RETURNS BOOLEAN AS $$
+DECLARE
+    project_client_id UUID;
+    user_client_id UUID;
+BEGIN
+    -- Admin users can access all projects
+    IF is_admin() THEN
+        RETURN TRUE;
+    END IF;
+    
+    -- Get the project's client_id
+    SELECT p.client_id INTO project_client_id
+    FROM projects p
+    WHERE p.id = project_uuid;
+    
+    -- Get user's client_id
+    SELECT u.client_id INTO user_client_id
+    FROM users u
+    WHERE u.id = current_user_id();
+    
+    -- Check if user's client_id matches project's client_id
+    IF user_client_id IS NOT NULL AND project_client_id = user_client_id THEN
+        RETURN TRUE;
+    END IF;
+    
+    -- Fall back to project_users check (for lab technicians)
+    RETURN EXISTS (
+        SELECT 1 FROM project_users pu
+        WHERE pu.project_id = project_uuid
+        AND pu.user_id = current_user_id()
+    );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+``` |
+| **Database Queries** | - All queries automatically filtered by RLS:<br>  - `SELECT * FROM samples` → Returns only accessible samples<br>  - `SELECT * FROM projects` → Returns only accessible projects<br>  - `SELECT * FROM tests` → Returns only tests for accessible samples<br>  - `SELECT * FROM results` → Returns only results for accessible tests |
+| **API Responses** | - GET `/projects`: Returns only accessible projects<br>- GET `/samples`: Returns only samples from accessible projects<br>- GET `/samples/{id}`: Returns 403 or 404 for inaccessible samples<br>- GET `/tests`: Returns only tests for accessible samples<br>- GET `/results`: Returns only results for accessible tests |
+| **UI Display** | - Projects list shows only accessible projects<br>- Samples list shows only accessible samples<br>- Inaccessible data not visible in UI<br>- Direct access attempts show error message |
+
+### Test Steps - Lab Technician Access (Comparison)
+
+| Step | Action | Expected Result |
+|------|--------|-----------------|
+| 5 | **Test Lab Technician Access** | |
+| 5.1 | Log in as Lab Technician | User authenticated |
+| 5.2 | Verify Lab Technician has project access via `project_users` | Lab Technician has entry in `project_users` junction for Project Alpha |
+| 5.3 | Navigate to `/projects` route | Projects list loads |
+| 5.4 | Verify projects displayed | Project Alpha visible (via `project_users`)<br>Project Beta NOT visible (no `project_users` entry) |
+| 5.5 | Verify RLS enforcement | RLS uses `project_users` check for lab technicians |
+
+### Expected Results - Lab Technician Access
+
+| Category | Expected Outcome |
+|----------|------------------|
+| **project_users Junction** | - Lab Technician has entry in `project_users` table:<br>  - `project_id` = Project Alpha UUID<br>  - `user_id` = Lab Technician UUID |
+| **RLS Access** | - `has_project_access()` function checks `project_users` junction for lab technicians<br>- Lab Technician can access Project Alpha<br>- Lab Technician cannot access Project Beta (no junction entry) |
+
+### Pass/Fail Criteria
+
+| Criteria | Pass | Fail |
+|----------|------|------|
+| Client user sees only own projects | ✓ | ✗ |
+| Client user sees only own samples | ✓ | ✗ |
+| RLS policies enabled on tables | ✓ | ✗ |
+| has_project_access() function works correctly | ✓ | ✗ |
+| Database queries filtered by RLS | ✓ | ✗ |
+| Direct access to inaccessible data returns 403/404 | ✓ | ✗ |
+| Lab Technician access via project_users works | ✓ | ✗ |
+| Administrator can access all data | ✓ | ✗ |
+
+### Test Result
+- [ ] **PASS** - All criteria met
+- [ ] **FAIL** - One or more criteria not met
+
+**Notes**: _________________________________________________________
+
+---
+
+## Reference Documentation
+
+### User Story US-12 (User Authentication)
+- **As any** user
+- **I want** to log in with username/password and verify email
+- **So that** access is secure
+- **Acceptance Criteria**:
+  - No default access; admin grants roles/permissions
+  - JWT token on login; last_login tracked
+  - API: POST `/auth/login`, `/verify-email`
+
+### User Story US-13 (Role-Based Access Control)
+- **As an** Administrator
+- **I want** to manage roles and granular permissions
+- **So that** access is controlled
+- **Acceptance Criteria**:
+  - 17 permissions (e.g., sample:create, result:review, batch:manage) via junctions
+  - Roles: Admin (all), Lab Manager (review/manage), Technician (create/enter), Client (read own)
+  - API: CRUD `/roles`, `/permissions` (admin-only)
+  - Note: `test:configure` is referenced in code but not yet in database; endpoints use `config:edit` as fallback
+
+### User Story US-14 (Project and Client Data Isolation)
+- **As a** Client
+- **I want** to view only my projects/samples/results
+- **So that** data privacy is maintained
+- **Acceptance Criteria**:
+  - Project_users junction for access grants
+  - Filters: client_id on users; RLS in DB
+  - API: All queries scoped by user context
+
+### PRD Section 3.1 (Security and Auth)
+- **RBAC**: 17 permissions (e.g., sample:create, result:enter, batch:manage)
+- **User auth**: Username/password + email verification
+- **Client isolation**: View own projects/samples only; project_users junction for access
+
+### Technical Document (RLS Policies)
+- **RLS Enabled Tables**: `samples`, `projects`, `tests`, `results`, `batches`, `client_projects`
+- **RLS Functions**:
+  - `is_admin()`: Checks if current user is Administrator
+  - `has_project_access(project_uuid)`: Checks if user has access to project
+    - For client users: Checks if `user.client_id` matches `project.client_id`
+    - For lab technicians: Checks `project_users` junction table
+    - For administrators: Always returns TRUE
+- **RLS Policies**:
+  - `samples_access`: `is_admin() OR has_project_access(project_id)`
+  - `projects_access`: `is_admin() OR has_project_access(id)`
+  - `tests_access`: Checks access via sample's project
+  - `results_access`: Checks access via test → sample → project
+
+### Schema
+- **`role_permissions` junction table**:
+  - `role_id`: UUID FK to `roles.id` (primary key)
+  - `permission_id`: UUID FK to `permissions.id` (primary key)
+  - Composite primary key: (role_id, permission_id)
+- **`project_users` junction table**:
+  - `project_id`: UUID FK to `projects.id` (primary key)
+  - `user_id`: UUID FK to `users.id` (primary key)
+  - `access_level`: UUID FK to `list_entries.id` (nullable)
+  - `granted_at`: DateTime
+  - `granted_by`: UUID FK to `users.id` (nullable)
+  - Composite primary key: (project_id, user_id)
+- **`users` table**:
+  - `client_id`: UUID FK to `clients.id` (nullable)
+  - `role_id`: UUID FK to `roles.id`
+  - `password_hash`: String (bcrypt hashed)
+  - `last_login`: DateTime (nullable)
+  - `active`: Boolean
+- **`roles` table**:
+  - `name`: String (unique)
+  - `description`: Text (nullable)
+- **`permissions` table**:
+  - `name`: String (unique)
+  - `description`: Text (nullable)
+
+### API Endpoints
+- **POST `/auth/login`**: Authenticate user and return JWT token
+  - Request: `{username, password}`
+  - Response: `{access_token, token_type, user_id, username, email, role, permissions}`
+- **GET `/auth/me`**: Get current user information (requires valid token)
+- **POST `/samples`**: Create sample (requires `sample:create` permission)
+- **GET `/samples`**: List samples (requires `sample:read` permission, filtered by RLS)
+- **GET `/projects`**: List projects (requires `project:read` permission, filtered by RLS)
+
+### Core Permissions (17 total)
+```
+sample:create, sample:read, sample:update, sample:delete
+test:assign, test:update
+result:enter, result:review, result:read, result:update, result:delete
+batch:manage, batch:read, batch:update, batch:delete
+project:manage, project:read
+user:manage, role:manage, config:edit
+```
+
+---
+
+## Test Execution Log
+
+| Test Case | Tester | Date | Result | Notes |
+|-----------|--------|------|--------|-------|
+| TC-AUTH-LOGIN-001 | | | | |
+| TC-RBAC-PERMISSION-002 | | | | |
+| TC-RLS-CLIENT-ISOLATION-003 | | | | |
+
+---
+
+## Appendix: Sample Test Data
+
+### Users
+- `testuser` (Lab Technician, without `sample:create` permission)
+- `clientuser` (Client, with `client_id` set)
+- `adminuser` (Administrator, with all permissions)
+
+### Roles
+- `Administrator` (all permissions)
+- `Lab Manager` (review/manage permissions)
+- `Lab Technician` (create/enter permissions)
+- `Client` (read-only permissions)
+
+### Projects
+- `Project Alpha` (`client_id` = Client Alpha UUID)
+- `Project Beta` (`client_id` = Client Beta UUID)
+
+### Samples
+- `SAMPLE-ALPHA-001` (in Project Alpha, accessible to Client Alpha)
+- `SAMPLE-BETA-001` (in Project Beta, not accessible to Client Alpha)
+
+### Permissions
+- `sample:create` (required for sample creation)
+- `sample:read` (required for viewing samples)
+- `result:enter` (required for entering results)
+- `result:review` (required for reviewing results)
+
