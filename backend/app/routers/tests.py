@@ -10,6 +10,7 @@ from app.database import get_db
 from models.test import Test
 from models.sample import Sample
 from models.user import User
+from models.project import Project, ProjectUser
 from app.schemas.test import (
     TestCreate, TestUpdate, TestResponse, TestListResponse,
     TestAssignmentRequest, TestStatusUpdateRequest, TestReviewRequest
@@ -48,12 +49,11 @@ async def get_tests(
     if current_user.role.name != "Administrator":
         if current_user.client_id:
             # Client users can only see tests for their own samples
-            query = query.join(Sample).filter(
-                Sample.project.has(client_id=current_user.client_id)
+            query = query.join(Sample).join(Project).filter(
+                Project.client_id == current_user.client_id
             )
         else:
             # Lab users can see tests for samples in projects they have access to
-            from models.project import ProjectUser
             accessible_projects = db.query(ProjectUser.project_id).filter(
                 ProjectUser.user_id == current_user.id
             ).subquery()

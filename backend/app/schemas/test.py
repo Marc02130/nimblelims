@@ -13,7 +13,6 @@ class TestBase(BaseModel):
     description: Optional[str] = None
     sample_id: UUID = Field(..., description="ID of sample")
     analysis_id: UUID = Field(..., description="ID of analysis")
-    battery_id: Optional[UUID] = Field(None, description="ID of test battery (optional)")
     status: UUID = Field(..., description="ID of status from list_entries")
     review_date: Optional[datetime] = None
     test_date: Optional[datetime] = None
@@ -38,7 +37,6 @@ class TestUpdate(BaseModel):
     description: Optional[str] = None
     sample_id: Optional[UUID] = None
     analysis_id: Optional[UUID] = None
-    battery_id: Optional[UUID] = None
     status: Optional[UUID] = None
     review_date: Optional[datetime] = None
     test_date: Optional[datetime] = None

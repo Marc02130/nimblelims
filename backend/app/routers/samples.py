@@ -72,7 +72,6 @@ def _create_tests_for_sample(
                 name=f"{sample.name}_test_{battery_analysis.analysis_id}",
                 sample_id=sample.id,
                 analysis_id=battery_analysis.analysis_id,
-                battery_id=battery_id,
                 status=in_process_status_id,
                 technician_id=current_user_id,
                 created_by=current_user_id,
@@ -95,7 +94,6 @@ def _create_tests_for_sample(
                     name=f"{sample.name}_test_{analysis_id}",
                     sample_id=sample.id,
                     analysis_id=analysis_id,
-                    battery_id=None,  # Individual assignment, not from battery
                     status=in_process_status_id,
                     technician_id=current_user_id,
                     created_by=current_user_id,
