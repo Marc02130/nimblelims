@@ -13,7 +13,9 @@ import {
   Alert,
   CircularProgress,
 } from '@mui/material';
-import { DataGrid, GridColDef } from '@mui/x-data-grid';
+import { DataGrid, GridColDef, GridActionsCellItem } from '@mui/x-data-grid';
+import EditIcon from '@mui/icons-material/Edit';
+import { Tooltip } from '@mui/material';
 import ContainerForm from '../components/containers/ContainerForm';
 import ContainerDetails from '../components/containers/ContainerDetails';
 import { apiService } from '../services/apiService';
@@ -108,8 +110,18 @@ const ContainerManagement: React.FC = () => {
     setShowDetails(true);
   };
 
+  const handleEdit = async (containerId: string) => {
+    try {
+      const container = await apiService.getContainer(containerId);
+      setSelectedContainer(container);
+      setShowForm(true);
+    } catch (err: any) {
+      setError(err.response?.data?.detail || 'Failed to load container');
+    }
+  };
+
   const columns: GridColDef[] = [
-    { field: 'name', headerName: 'Name', width: 200 },
+    { field: 'name', headerName: 'Name', width: 200, flex: 1 },
     { 
       field: 'type', 
       headerName: 'Type', 
@@ -120,13 +132,13 @@ const ContainerManagement: React.FC = () => {
       field: 'concentration', 
       headerName: 'Concentration', 
       width: 150,
-      valueGetter: (value, row) => `${row.concentration} ${row.concentration_units}`
+      valueGetter: (value, row) => row.concentration ? `${row.concentration} ${row.concentration_units || ''}` : 'N/A'
     },
     { 
       field: 'amount', 
       headerName: 'Amount', 
       width: 150,
-      valueGetter: (value, row) => `${row.amount} ${row.amount_units}`
+      valueGetter: (value, row) => row.amount ? `${row.amount} ${row.amount_units || ''}` : 'N/A'
     },
     { 
       field: 'contents_count', 
@@ -135,10 +147,28 @@ const ContainerManagement: React.FC = () => {
       valueGetter: (value, row) => row.contents?.length || 0
     },
     { 
-      field: 'created_at', 
-      headerName: 'Created', 
+      field: 'modified_at', 
+      headerName: 'Last Modified', 
       width: 150,
-      valueGetter: (value, row) => new Date(row.created_at).toLocaleDateString()
+      valueGetter: (value, row) => row.modified_at ? new Date(row.modified_at).toLocaleDateString() : new Date(row.created_at).toLocaleDateString()
+    },
+    {
+      field: 'actions',
+      type: 'actions',
+      headerName: 'Actions',
+      width: 100,
+      getActions: (params) => [
+        <GridActionsCellItem
+          icon={
+            <Tooltip title="Edit container">
+              <EditIcon />
+            </Tooltip>
+          }
+          label="Edit"
+          onClick={() => handleEdit(params.id as string)}
+          aria-label={`Edit container ${params.row.name}`}
+        />,
+      ],
     },
   ];
 
@@ -176,13 +206,14 @@ const ContainerManagement: React.FC = () => {
             rows={containers}
             columns={columns}
             onRowClick={handleRowClick}
-            pageSizeOptions={[10, 25, 50]}
+            pageSizeOptions={[10, 25, 50, 100]}
             initialState={{
               pagination: {
-                paginationModel: { page: 0, pageSize: 10 },
+                paginationModel: { page: 0, pageSize: 25 },
               },
             }}
             sx={{ height: 600 }}
+            disableRowSelectionOnClick
           />
         </CardContent>
       </Card>
@@ -195,7 +226,7 @@ const ContainerManagement: React.FC = () => {
         fullWidth
       >
         <DialogTitle>
-          {selectedContainer ? 'Edit Container' : 'Create Container'}
+          {selectedContainer ? `Edit Container: ${selectedContainer.name}` : 'Create Container'}
         </DialogTitle>
         <DialogContent>
           <ContainerForm

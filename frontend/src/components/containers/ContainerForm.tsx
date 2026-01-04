@@ -24,14 +24,17 @@ interface ContainerFormProps {
   onCancel: () => void;
 }
 
-const validationSchema = Yup.object({
-  name: Yup.string().required('Container name is required'),
-  type_id: Yup.string().required('Container type is required'),
-  concentration: Yup.number().min(0, 'Concentration must be positive'),
-  amount: Yup.number().min(0, 'Amount must be positive'),
-  concentration_units: Yup.string().required('Concentration units are required'),
-  amount_units: Yup.string().required('Amount units are required'),
-});
+const getValidationSchema = (isEditMode: boolean) => {
+  const baseSchema: any = {
+    name: Yup.string().min(1, 'Container name is required').max(255, 'Name must be less than 255 characters'),
+    type_id: isEditMode ? Yup.string().nullable() : Yup.string().required('Container type is required'),
+    concentration: Yup.number().nullable().min(0, 'Concentration must be positive or zero'),
+    amount: Yup.number().nullable().min(0, 'Amount must be positive or zero'),
+    concentration_units: Yup.string().nullable(),
+    amount_units: Yup.string().nullable(),
+  };
+  return Yup.object(baseSchema);
+};
 
 const ContainerForm: React.FC<ContainerFormProps> = ({
   container,
@@ -40,12 +43,13 @@ const ContainerForm: React.FC<ContainerFormProps> = ({
   onCancel,
 }) => {
   const [loading, setLoading] = useState(false);
+  const isEditMode = !!container;
 
   const initialValues = {
     name: container?.name || '',
     type_id: container?.type_id || '',
-    concentration: container?.concentration || 0,
-    amount: container?.amount || 0,
+    concentration: container?.concentration || null,
+    amount: container?.amount || null,
     concentration_units: container?.concentration_units || '',
     amount_units: container?.amount_units || '',
     parent_container_id: container?.parent_container_id || '',
@@ -54,9 +58,24 @@ const ContainerForm: React.FC<ContainerFormProps> = ({
   const handleSubmit = async (values: any) => {
     setLoading(true);
     try {
-      await onSubmit(values);
+      // Prepare update data (only include fields that are set)
+      const updateData: any = {};
+      if (values.name !== undefined) updateData.name = values.name;
+      if (values.type_id) updateData.type_id = values.type_id;
+      if (values.concentration !== null && values.concentration !== undefined) {
+        updateData.concentration = values.concentration;
+        if (values.concentration_units) updateData.concentration_units = values.concentration_units;
+      }
+      if (values.amount !== null && values.amount !== undefined) {
+        updateData.amount = values.amount;
+        if (values.amount_units) updateData.amount_units = values.amount_units;
+      }
+      if (values.parent_container_id) updateData.parent_container_id = values.parent_container_id;
+
+      await onSubmit(isEditMode ? updateData : values);
     } catch (error) {
       // Error handling is done in parent component
+      throw error;
     } finally {
       setLoading(false);
     }
@@ -66,8 +85,9 @@ const ContainerForm: React.FC<ContainerFormProps> = ({
     <Box sx={{ p: 2 }}>
       <Formik
         initialValues={initialValues}
-        validationSchema={validationSchema}
+        validationSchema={getValidationSchema(isEditMode)}
         onSubmit={handleSubmit}
+        enableReinitialize
       >
         {({ values, errors, touched, setFieldValue, isValid }) => (
           <Form>
@@ -88,13 +108,14 @@ const ContainerForm: React.FC<ContainerFormProps> = ({
               </Grid>
 
               <Grid size={{ xs: 12, sm: 6 }}>
-                <FormControl fullWidth required>
+                <FormControl fullWidth required={!isEditMode}>
                   <InputLabel>Container Type</InputLabel>
                   <Select
-                    value={values.type_id}
+                    value={values.type_id || ''}
                     onChange={(e) => setFieldValue('type_id', e.target.value)}
                     error={touched.type_id && !!errors.type_id}
                   >
+                    <MenuItem value="">None</MenuItem>
                     {lookupData.containerTypes.map((type) => (
                       <MenuItem key={type.id} value={type.id}>
                         {type.name} ({type.material}, {type.dimensions})
@@ -127,13 +148,14 @@ const ContainerForm: React.FC<ContainerFormProps> = ({
               </Grid>
 
               <Grid size={{ xs: 12, sm: 6 }}>
-                <FormControl fullWidth required>
+                <FormControl fullWidth>
                   <InputLabel>Concentration Units</InputLabel>
                   <Select
-                    value={values.concentration_units}
-                    onChange={(e) => setFieldValue('concentration_units', e.target.value)}
+                    value={values.concentration_units || ''}
+                    onChange={(e) => setFieldValue('concentration_units', e.target.value || null)}
                     error={touched.concentration_units && !!errors.concentration_units}
                   >
+                    <MenuItem value="">None</MenuItem>
                     {lookupData.units
                       .filter((unit) => unit.type === 'concentration')
                       .map((unit) => (
@@ -161,13 +183,14 @@ const ContainerForm: React.FC<ContainerFormProps> = ({
               </Grid>
 
               <Grid size={{ xs: 12, sm: 6 }}>
-                <FormControl fullWidth required>
+                <FormControl fullWidth>
                   <InputLabel>Amount Units</InputLabel>
                   <Select
-                    value={values.amount_units}
-                    onChange={(e) => setFieldValue('amount_units', e.target.value)}
+                    value={values.amount_units || ''}
+                    onChange={(e) => setFieldValue('amount_units', e.target.value || null)}
                     error={touched.amount_units && !!errors.amount_units}
                   >
+                    <MenuItem value="">None</MenuItem>
                     {lookupData.units
                       .filter((unit) => unit.type === 'mass' || unit.type === 'volume')
                       .map((unit) => (

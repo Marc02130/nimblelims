@@ -552,17 +552,6 @@ const AccessioningForm: React.FC = () => {
         <Typography variant="h4">
           Sample Accessioning
         </Typography>
-        <FormControlLabel
-          control={
-            <Switch
-              checked={false}
-              onChange={(e) => {
-                // Will be handled in Formik
-              }}
-            />
-          }
-          label="Bulk Mode"
-        />
       </Box>
       
       {error && (

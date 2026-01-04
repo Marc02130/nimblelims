@@ -773,3 +773,97 @@ Docs: Update nimblelims_tech.md (Section 2.2: Admin flow with CRUD); ui-accessio
 Verification: Add db/scripts/verify_admin_help.sql.
 
 Generate full code for test updates and doc content (Version 1.9: Added admin help with editing)."
+
+# Navigation Update
+## Prompt 1: Create New Clients Management Page
+"Implement the ClientsManagement page for NimbleLIMS in the frontend, based on ui-accessioning-to-reporting.md (Component Architecture) and nimblelims_tech.md (Section 2.1, frontend with React/MUI). This page handles CRUD for clients (organizations) and is accessible via /clients.
+
+Use MUI DataGrid for listing clients (columns: name, description, active, created_at; with filtering/sorting/pagination).
+Include Add/Edit dialogs (Formik/Yup) with fields: name (required, unique), description (optional), active (toggle).
+API Integration: Use apiService for CRUD (getClients(filters), createClient(data), updateClient(id, data), deleteClient(id) - soft-delete via active=false).
+Gate access with hasPermission('project:manage') from UserContext; redirect to dashboard if lacking.
+Responsive: Use MUI Grid/useMediaQuery for layout adaptations (e.g., 1-column on mobile).
+
+Generate full code for: pages/ClientsManagement.tsx, components/clients/ClientDialog.tsx (for CRUD), and services/apiService.ts updates (new methods). Ensure ESLint compliance and add tests in ClientsManagement.test.tsx (render, form validation, API mocks with MSW). Reference User Stories (US-25) for client project grouping context, but do not implement client projects here."
+
+## Prompt 2: Update Sidebar to Add Client Accordion Section
+"Update the Sidebar component in NimbleLIMS to add a new 'Client' accordion section, based on navigation.md (Unified Sidebar Architecture, Accordion Usage) and ui-accessioning-to-reporting.md (Sidebar.tsx props). This section is collapsible like Admin and requires 'project:manage' permission to view.
+
+Structure: Add Accordion below Core Features, with header 'Client' and SettingsApplicationsIcon (or similar).
+Sub-items (nested List):
+'Clients' linking to /clients (PeopleIcon, highlights on /clients routes).
+'Client Projects' linking to /client-projects (ViewListIcon, highlights on /client-projects routes) - move this from Core Features section.
+
+Behavior: Auto-expands on /clients or /client-projects routes; manual toggle; active state (primary color icon) on any client route.
+Permission: Hide entire accordion if lacking 'project:manage'.
+Nested styling: Indent sub-items (pl: 4) for hierarchy.
+Accessibility: ARIA labels for accordion and items.
+
+Generate full updated code for: components/Sidebar.tsx. Include refinements to remove 'Client Projects' from Core Features. Add tests in Sidebar.test.tsx for accordion rendering, expansion, and permission hiding. Ensure responsive variants (permanent/temporary) remain unchanged."
+
+## Prompt 3: Make Entire Sidebar Collapsible on Desktop
+"Enhance the MainLayout and Sidebar in NimbleLIMS to make the entire sidebar collapsible on desktop, based on navigation.md (Unified Sidebar Navigation, MainLayout.tsx) and nimblelims_tech.md (responsive design). Retain permanent drawer on desktop (>=600px) and temporary on mobile, but add a collapse toggle.
+
+In MainLayout.tsx: Add state for sidebarCollapsed (boolean, default false); toggle button in AppBar (e.g., ChevronLeftIcon when expanded, ChevronRightIcon when collapsed, next to hamburger on mobile).
+In Sidebar.tsx: Support collapsed prop; when collapsed, use MUI Drawer miniVariant (show icons only, reduced width ~56px; tooltips on hover for items).
+Behavior: Toggle persists across routes (use localStorage or context); auto-expand on item click if collapsed; accordions (Admin, Client) collapse when sidebar collapses.
+Mobile: Toggle acts as open/close for temporary drawer (existing behavior).
+Accessibility: ARIA labels for toggle button (e.g., 'Collapse sidebar'); focus management on toggle.
+
+Generate full updated code for: layouts/MainLayout.tsx (state, toggle button, pass collapsed prop to Sidebar) and components/Sidebar.tsx (handle collapsed: conditional rendering for text/labels, mini width). Add tests in MainLayout.test.tsx for toggle functionality and responsive states. Ensure integration with UserContext for permissions."
+
+# Add edit to accessioning 
+## Prompt 1: Database Migration for Edit Support (Audit Indexes and Permissions)
+"Extend the PostgreSQL database schema for NimbleLIMS to support editing of samples, tests, and containers, based on Technical Document (section 3) and User Stories (US-1, US-7, US-5). Focus on adding indexes for efficient editing and ensuring 'test:update' permission exists.
+Migration File: Create 0020_edit_support.py in backend/db/migrations (follows 0019_admin_help_seeds).
+
+Add indexes: On modified_at and modified_by in samples, tests, containers (if not present).
+Seed 'test:update' permission if missing (name='test:update', description='Update existing tests').
+Idempotency: ON CONFLICT DO NOTHING for permission seeding.
+RLS: No changes (leverages existing policies for access during edits).
+Up/Down: Standard Alembic; downgrade drops indexes if added.
+
+Generate full migration file code, ensuring PEP8."
+
+## Prompt 2: Backend API for Sample/Test/Container Editing
+"Implement backend API endpoints for editing samples, tests, and containers in NimbleLIMS, based on api_endpoints.md and Technical Document (section 4.1, 5). Build on existing schemas; require appropriate update permissions.
+Routers: Update/add in backend/app/routers/samples.py, tests.py, containers.py (full files if new):
+
+PATCH /samples/{id}: Partial update (e.g., name, description, status, custom_attributes); validate custom attributes; update audit fields; return updated sample.
+PATCH /tests/{id}: Partial update (e.g., status, technician_id); RBAC: test:update.
+PATCH /containers/{id}: Partial update (e.g., name, type_id, concentration); RBAC: sample:update (since containers link to samples).
+For all: 404 if not found; 403 if no access (via RLS); atomic transaction.
+Add examples in docstrings (e.g., update sample status to 'Reviewed').
+
+Schemas: Add SampleUpdate, TestUpdate, ContainerUpdate (partial, optional fields with validation).
+Tests: Add to tests/test_samples.py, test_tests.py, test_containers.py (scenarios: successful update, permission denial, invalid data, RLS-denied).
+Generate full code for routers/samples.py (updates), routers/tests.py (new/full), routers/containers.py (updates), schemas/samples.py (additions), schemas/tests.py (additions), schemas/containers.py (additions), and test files (extensions). Ensure compatibility with existing create endpoints."
+
+## Prompt 3: Frontend UI for Sample/Test/Container Editing and Management Pages
+"Implement editing UI for samples, tests, and containers in frontend, based on ui-accessioning-to-reporting.md and workflow-accessioning-to-reporting.md. Reuse/modify existing forms for both create/edit modes; add management list pages for browsing and navigating to edits.
+Components:
+
+SampleForm.tsx: Reuse/modify AccessioningForm.tsx to handle edit mode (if id prop, fetch via GET /samples/{id}, pre-fill, use PATCH; simplify wizard for edits by skipping creation-only steps like initial test assignment).
+TestForm.tsx (new): Reusable form for test details (status, technician); handles create/edit modes.
+ContainerForm.tsx (new): Reusable form for container details (name, type, concentration); handles create/edit modes.
+Management Pages: SamplesManagement.tsx (MUI DataGrid list of samples with edit buttons linking to /samples/{id}), TestsManagement.tsx (similar for tests), ContainersManagement.tsx (similar for containers, enhances existing /containers).
+Updates: apiService.ts for PATCH endpoints and GET /{entity}/{id}.
+Custom Fields: Ensure dynamic rendering/validation in forms for edits (reuse CustomAttributeField.tsx).
+Tooltips/Help: Add contextual tooltips in forms (e.g., 'Edit status: Requires sample:update permission').
+
+Navigation Updates: Update components/Sidebar.tsx (full file) to add/enhance Core Features:
+
+Add 'Samples' (/samples) if missing; 'Tests' (/tests).
+Enhance 'Containers' (/containers) with list/edit support.
+Auto-expand accordions for /samples/, /tests/ routes.
+Permission-gating: Show based on sample:update, test:update.
+
+Routes: Update App.tsx or routes file to add /samples, /samples/{id}, /tests, /tests/{id}, /containers/{id}.
+Generate full code for components/samples/SampleForm.tsx (updates to AccessioningForm), components/tests/TestForm.tsx (new), components/containers/ContainerForm.tsx (new), pages/SamplesManagement.tsx (new), pages/TestsManagement.tsx (new), pages/ContainersManagement.tsx (updates), apiService.ts (updates), components/Sidebar.tsx (updates). Ensure MUI responsive, ESLint, ARIA (e.g., aria-labels for edit buttons), tests in SamplesManagement.test.tsx (new), etc."
+
+## Prompt 4: Integration Testing and Doc Updates
+"Add tests and docs for sample/test/container editing in NimbleLIMS.
+Tests: Extend test_samples.py, test_tests.py, test_containers.py (PATCH scenarios, RBAC, audit updates); add SamplesManagement.test.tsx, TestsManagement.test.tsx, ContainersManagement.test.tsx (list rendering, edit navigation, form modes, ARIA, permission hiding).
+Docs: Update nimblelims_tech.md (Section 2.2: Add edit flows); ui-accessioning-to-reporting.md (Add SampleForm, management pages); api_endpoints.md (Add PATCH details with examples); navigation.md (Update Structure table with new/enhanced items like 'Samples', 'Tests'); workflow-accessioning-to-reporting.md (Add edit stages post-accessioning).
+Verification: Add db/scripts/verify_edits.sql (check audit fields after update).
+Generate full code for test updates and doc content (Version 2.0: Added editing for samples/tests/containers)."

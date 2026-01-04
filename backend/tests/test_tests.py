@@ -529,6 +529,285 @@ class TestTestPermissions:
             json={"description": "Updated"}
         )
         assert response.status_code == 401  # Unauthorized
+    
+    def test_update_test_with_custom_attributes(self, client: TestClient, test_admin_user, test_data, db_session: Session):
+        """Test updating test with custom attributes"""
+        # Create a test
+        test = Test(
+            name="TEST-CUSTOM-001",
+            description="Test test for custom attributes",
+            sample_id=test_data["sample"].id,
+            analysis_id=test_data["analysis"].id,
+            status=test_data["test_status"].id,
+            technician_id=test_admin_user.id,
+            created_by=test_admin_user.id,
+            modified_by=test_admin_user.id
+        )
+        db_session.add(test)
+        db_session.commit()
+        
+        auth_response = client.post(
+            "/auth/login",
+            json={"username": "admin", "password": "adminpassword"}
+        )
+        token = auth_response.json()["access_token"]
+        
+        # Update test with custom attributes
+        update_data = {
+            "custom_attributes": {
+                "instrument": "GC-MS-001",
+                "run_number": "2025-001"
+            }
+        }
+        
+        response = client.patch(
+            f"/tests/{test.id}",
+            json=update_data,
+            headers={"Authorization": f"Bearer {token}"}
+        )
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert "custom_attributes" in data
+        assert data["custom_attributes"]["instrument"] == "GC-MS-001"
+        assert data["custom_attributes"]["run_number"] == "2025-001"
+    
+    def test_update_test_not_found(self, client: TestClient, test_admin_user):
+        """Test updating non-existent test"""
+        auth_response = client.post(
+            "/auth/login",
+            json={"username": "admin", "password": "adminpassword"}
+        )
+        token = auth_response.json()["access_token"]
+        
+        response = client.patch(
+            f"/tests/{uuid4()}",
+            json={"description": "Updated"},
+            headers={"Authorization": f"Bearer {token}"}
+        )
+        
+        assert response.status_code == 404
+        assert "Test not found" in response.json()["detail"]
+    
+    def test_update_test_status_example(self, client: TestClient, test_admin_user, test_data, db_session: Session):
+        """Test updating test status (example from docstring)"""
+        # Create complete status
+        from models.list import List, ListEntry
+        test_status_list = db_session.query(List).filter(List.name == "Test Status").first()
+        if not test_status_list:
+            test_status_list = List(
+                name="Test Status",
+                description="Test status values"
+            )
+            db_session.add(test_status_list)
+            db_session.flush()
+        
+        complete_status = ListEntry(
+            list_id=test_status_list.id,
+            name="Complete",
+            description="Test complete"
+        )
+        db_session.add(complete_status)
+        db_session.flush()
+        
+        # Create a test
+        test = Test(
+            name="TEST-STATUS-001",
+            description="Test test for status update",
+            sample_id=test_data["sample"].id,
+            analysis_id=test_data["analysis"].id,
+            status=test_data["test_status"].id,
+            technician_id=test_admin_user.id,
+            created_by=test_admin_user.id,
+            modified_by=test_admin_user.id
+        )
+        db_session.add(test)
+        db_session.commit()
+        
+        auth_response = client.post(
+            "/auth/login",
+            json={"username": "admin", "password": "adminpassword"}
+        )
+        token = auth_response.json()["access_token"]
+        
+        # Update status
+        update_data = {
+            "status": str(complete_status.id)
+        }
+        
+        response = client.patch(
+            f"/tests/{test.id}",
+            json=update_data,
+            headers={"Authorization": f"Bearer {token}"}
+        )
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == str(complete_status.id)
+    
+    def test_update_test_technician_assignment(self, client: TestClient, test_admin_user, test_data, db_session: Session):
+        """Test updating technician assignment (example from docstring)"""
+        # Create a test
+        test = Test(
+            name="TEST-TECH-001",
+            description="Test test for technician update",
+            sample_id=test_data["sample"].id,
+            analysis_id=test_data["analysis"].id,
+            status=test_data["test_status"].id,
+            technician_id=test_admin_user.id,
+            created_by=test_admin_user.id,
+            modified_by=test_admin_user.id
+        )
+        db_session.add(test)
+        db_session.commit()
+        
+        auth_response = client.post(
+            "/auth/login",
+            json={"username": "admin", "password": "adminpassword"}
+        )
+        token = auth_response.json()["access_token"]
+        
+        # Update technician and test date
+        update_data = {
+            "technician_id": str(test_admin_user.id),
+            "test_date": datetime.utcnow().isoformat()
+        }
+        
+        response = client.patch(
+            f"/tests/{test.id}",
+            json=update_data,
+            headers={"Authorization": f"Bearer {token}"}
+        )
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert data["technician_id"] == str(test_admin_user.id)
+        assert data["test_date"] is not None
+
+
+class TestTestEditRBAC:
+    """Test RBAC for test editing operations"""
+    
+    def test_update_test_requires_update_permission(self, client: TestClient, test_user, test_data, db_session: Session):
+        """Test that updating tests requires test:update permission"""
+        # Create a test
+        test = Test(
+            name="TEST-RBAC-001",
+            description="Test test for RBAC",
+            sample_id=test_data["sample"].id,
+            analysis_id=test_data["analysis"].id,
+            status=test_data["test_status"].id,
+            technician_id=test_user.id,
+            created_by=test_user.id,
+            modified_by=test_user.id
+        )
+        db_session.add(test)
+        db_session.commit()
+        
+        # Login as user without update permission
+        auth_response = client.post(
+            "/auth/login",
+            json={"username": "testuser", "password": "testpassword"}
+        )
+        token = auth_response.json()["access_token"]
+        
+        # Try to update test
+        update_data = {"description": "Updated description"}
+        response = client.patch(
+            f"/tests/{test.id}",
+            json=update_data,
+            headers={"Authorization": f"Bearer {token}"}
+        )
+        
+        # Should fail with 403 Forbidden
+        assert response.status_code == 403
+    
+    def test_update_test_audit_fields(self, client: TestClient, test_admin_user, test_data, db_session: Session):
+        """Test that audit fields (modified_at, modified_by) are updated on PATCH"""
+        # Create a test
+        original_modified_at = datetime.utcnow() - timedelta(hours=1)
+        test = Test(
+            name="TEST-AUDIT-001",
+            description="Test test for audit",
+            sample_id=test_data["sample"].id,
+            analysis_id=test_data["analysis"].id,
+            status=test_data["test_status"].id,
+            technician_id=test_admin_user.id,
+            created_by=test_admin_user.id,
+            modified_by=test_admin_user.id,
+            modified_at=original_modified_at
+        )
+        db_session.add(test)
+        db_session.commit()
+        original_modified_at_db = test.modified_at
+        
+        auth_response = client.post(
+            "/auth/login",
+            json={"username": "admin", "password": "adminpassword"}
+        )
+        token = auth_response.json()["access_token"]
+        
+        # Update test
+        update_data = {"description": "Updated description for audit test"}
+        response = client.patch(
+            f"/tests/{test.id}",
+            json=update_data,
+            headers={"Authorization": f"Bearer {token}"}
+        )
+        
+        assert response.status_code == 200
+        data = response.json()
+        
+        # Verify modified_by is updated
+        assert data["modified_by"] == str(test_admin_user.id)
+        
+        # Verify modified_at is updated (should be more recent)
+        db_session.refresh(test)
+        assert test.modified_at > original_modified_at_db
+        assert test.modified_by == test_admin_user.id
+    
+    def test_update_test_atomic_transaction(self, client: TestClient, test_admin_user, test_data, db_session: Session):
+        """Test that test updates are atomic (all or nothing)"""
+        # Create a test
+        test = Test(
+            name="TEST-ATOMIC-001",
+            description="Test test for atomic transaction",
+            sample_id=test_data["sample"].id,
+            analysis_id=test_data["analysis"].id,
+            status=test_data["test_status"].id,
+            technician_id=test_admin_user.id,
+            created_by=test_admin_user.id,
+            modified_by=test_admin_user.id
+        )
+        db_session.add(test)
+        db_session.commit()
+        original_description = test.description
+        
+        auth_response = client.post(
+            "/auth/login",
+            json={"username": "admin", "password": "adminpassword"}
+        )
+        token = auth_response.json()["access_token"]
+        
+        # Try to update with invalid data (future date)
+        future_date = (datetime.utcnow() + timedelta(days=1)).isoformat()
+        update_data = {
+            "description": "Updated description",
+            "test_date": future_date  # Invalid: future date
+        }
+        
+        response = client.patch(
+            f"/tests/{test.id}",
+            json=update_data,
+            headers={"Authorization": f"Bearer {token}"}
+        )
+        
+        # Should fail validation
+        assert response.status_code == 422
+        
+        # Verify test was not updated (atomic transaction)
+        db_session.refresh(test)
+        assert test.description == original_description
 
 
 class TestTestValidation:

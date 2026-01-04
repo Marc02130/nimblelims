@@ -13,6 +13,7 @@
 - `/projects` → Fixed
 - `/batches` → Fixed
 - `/containers` → Fixed
+- `/tests` → Fixed
 
 ### Issue 2: Empty String Query Parameters
 
@@ -209,6 +210,7 @@ docker exec lims-backend curl http://localhost:8000/samples \
 - `GET /projects` - List projects
 - `GET /batches` - List batches with filtering (requires `batch:read` permission)
 - `GET /containers` - List containers
+- `GET /tests` - List tests with filtering (requires authentication, scoped by RLS)
 - `GET /analyses` - List analyses
 - `GET /units` - List units
 - `GET /lists/{list_name}/entries` - Get list entries (uses normalized names like `sample_status`)

@@ -3,6 +3,8 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import MainLayout from './layouts/MainLayout';
 import Dashboard from './pages/Dashboard';
 import AccessioningForm from './pages/AccessioningForm';
+import SamplesManagement from './pages/SamplesManagement';
+import TestsManagement from './pages/TestsManagement';
 import ContainerManagement from './pages/ContainerManagement';
 import BatchManagement from './pages/BatchManagement';
 import ResultsManagement from './pages/ResultsManagement';
@@ -45,7 +47,57 @@ function AppRoutes() {
           }
         />
         <Route
+          path="/samples"
+          element={
+            hasPermission('sample:read') ? (
+              <SamplesManagement />
+            ) : (
+              <Navigate to="/dashboard" replace />
+            )
+          }
+        />
+        <Route
+          path="/samples/:id"
+          element={
+            hasPermission('sample:update') ? (
+              <SamplesManagement />
+            ) : (
+              <Navigate to="/dashboard" replace />
+            )
+          }
+        />
+        <Route
+          path="/tests"
+          element={
+            hasPermission('test:update') ? (
+              <TestsManagement />
+            ) : (
+              <Navigate to="/dashboard" replace />
+            )
+          }
+        />
+        <Route
+          path="/tests/:id"
+          element={
+            hasPermission('test:update') ? (
+              <TestsManagement />
+            ) : (
+              <Navigate to="/dashboard" replace />
+            )
+          }
+        />
+        <Route
           path="/containers"
+          element={
+            hasPermission('sample:update') ? (
+              <ContainerManagement />
+            ) : (
+              <Navigate to="/dashboard" replace />
+            )
+          }
+        />
+        <Route
+          path="/containers/:id"
           element={
             hasPermission('sample:update') ? (
               <ContainerManagement />

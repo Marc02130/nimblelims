@@ -679,8 +679,38 @@ async def update_sample(
     db: Session = Depends(get_db)
 ):
     """
-    Update a sample.
-    Requires sample:update permission.
+    Partially update a sample.
+    
+    Requires sample:update permission. Updates only the fields provided in the request.
+    Validates custom attributes against EAV configuration. Updates audit fields (modified_at, modified_by).
+    
+    **Example: Update sample status to 'Reviewed'**
+    ```json
+    {
+        "status": "uuid-of-reviewed-status"
+    }
+    ```
+    
+    **Example: Update sample name and description**
+    ```json
+    {
+        "name": "SAMPLE-001-UPDATED",
+        "description": "Updated sample description"
+    }
+    ```
+    
+    **Example: Update custom attributes**
+    ```json
+    {
+        "custom_attributes": {
+            "ph_level": 7.2,
+            "notes": "Sample appears normal"
+        }
+    }
+    ```
+    
+    Returns 404 if sample not found, 403 if user lacks access (RLS enforced).
+    All updates are performed in a single atomic transaction.
     """
     sample = db.query(Sample).filter(
         Sample.id == sample_id,

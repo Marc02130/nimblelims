@@ -43,6 +43,7 @@ class TestUpdate(BaseModel):
     review_date: Optional[datetime] = None
     test_date: Optional[datetime] = None
     technician_id: Optional[UUID] = None
+    custom_attributes: Optional[Dict[str, Any]] = Field(None, description="Custom attributes as JSON")
 
     @validator('review_date', 'test_date')
     def validate_dates(cls, v):

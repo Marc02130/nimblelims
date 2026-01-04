@@ -78,6 +78,11 @@ class ApiService {
     return response.data.samples || response.data;
   }
 
+  async getSample(id: string) {
+    const response: AxiosResponse = await this.api.get(`/samples/${id}`);
+    return response.data;
+  }
+
   async createSample(sampleData: any) {
     const response: AxiosResponse = await this.api.post('/samples', sampleData);
     return response.data;
@@ -122,6 +127,11 @@ class ApiService {
     return response.data;
   }
 
+  async getTest(id: string) {
+    const response: AxiosResponse = await this.api.get(`/tests/${id}`);
+    return response.data;
+  }
+
   async getTestsByBatch(batchId: string) {
     const response: AxiosResponse = await this.api.get(`/batches/${batchId}/tests`);
     return response.data;
@@ -147,6 +157,11 @@ class ApiService {
     const response: AxiosResponse = await this.api.get('/containers', {
       params,
     });
+    return response.data;
+  }
+
+  async getContainer(id: string) {
+    const response: AxiosResponse = await this.api.get(`/containers/${id}`);
     return response.data;
   }
 
