@@ -251,16 +251,23 @@ async def delete_test_battery(
             detail="Test battery not found"
         )
     
-    # Check if battery is referenced by any tests
+    # Check if battery is referenced by any tests via battery_analyses
+    # Note: Tests don't directly reference batteries, but we check if any analyses
+    # in this battery are used by active tests
+    from models.test_battery import BatteryAnalysis
+    battery_analysis_ids = db.query(BatteryAnalysis.analysis_id).filter(
+        BatteryAnalysis.battery_id == battery_id
+    ).subquery()
+    
     tests_count = db.query(Test).filter(
-        Test.battery_id == battery_id,
+        Test.analysis_id.in_(battery_analysis_ids),
         Test.active == True
     ).count()
     
     if tests_count > 0:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=f"Cannot delete test battery: {tests_count} test(s) reference this battery"
+            detail=f"Cannot delete test battery: {tests_count} test(s) use analyses from this battery"
         )
     
     battery.active = False

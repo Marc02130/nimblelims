@@ -13,7 +13,6 @@ class TestBattery(BaseModel):
     
     # Relationships
     battery_analyses = relationship("BatteryAnalysis", back_populates="battery", cascade="all, delete-orphan")
-    tests = relationship("Test", back_populates="battery")
     creator = relationship("User", foreign_keys="TestBattery.created_by", back_populates="created_test_batteries")
     modifier = relationship("User", foreign_keys="TestBattery.modified_by", back_populates="modified_test_batteries")
 
