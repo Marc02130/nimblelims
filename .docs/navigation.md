@@ -64,7 +64,9 @@ All items are permission-gated and only visible to users with the required permi
 |-----------|-------|------|---------------------|-------------|
 | **Dashboard** | `/dashboard` | Dashboard | Always visible | Main dashboard with sample overview and statistics |
 | **Accessioning** | `/accessioning` | Science | `sample:create` | Sample accessioning form for receiving new samples |
-| **Containers** | `/containers` | Inventory | `sample:update` | Container management interface |
+| **Samples** | `/samples` | Science | `sample:read` | Sample management interface with list and edit functionality |
+| **Tests** | `/tests` | Biotech | `test:update` | Test management interface with list and edit functionality |
+| **Containers** | `/containers` | Inventory | `sample:update` | Container management interface with list, create, and edit functionality |
 | **Batches** | `/batches` | ViewList | `batch:manage` | Batch creation and management |
 | **Results** | `/results` | Assessment | `result:enter` | Results entry interface |
 | **Help** | `/help` | Help | Always visible | Role-filtered help content and documentation |
@@ -156,7 +158,12 @@ The AppBar title is automatically determined from the current route:
 |-------|-------|
 | `/dashboard` | Dashboard |
 | `/accessioning` | Accessioning |
+| `/samples` | Samples Management |
+| `/samples/:id` | Edit Sample |
+| `/tests` | Tests Management |
+| `/tests/:id` | Edit Test |
 | `/containers` | Containers |
+| `/containers/:id` | Edit Container |
 | `/batches` | Batches |
 | `/results` | Results |
 | `/clients` | Clients |

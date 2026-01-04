@@ -73,6 +73,123 @@ This document describes the complete workflow from sample accessioning through r
 - Optional: Create aliquots/derivatives from parent sample
 - Sample becomes available for testing workflow
 
+### Stage 1.5: Sample/Test/Container Editing (Post-Accessioning)
+
+**Purpose**: Edit existing samples, tests, and containers to update metadata, status, and custom attributes after initial accessioning.
+
+**Actors**: Lab Technician, Lab Manager (with appropriate permissions)
+
+**Sample Editing**:
+
+1. **Navigate to Samples Management**
+   - User navigates to `/samples` route
+   - Frontend displays DataGrid with all accessible samples (filtered by RLS)
+   - Columns: name, description, status, project, created_at, etc.
+
+2. **Open Edit Dialog**
+   - User clicks "Edit" button on a sample row
+   - Frontend calls GET /samples/{id} to fetch sample details
+   - SampleForm dialog opens with pre-filled data
+
+3. **Edit Sample Details**
+   - User can modify:
+     - Name (unique validation)
+     - Description
+     - Status (dropdown from list_entries)
+     - Custom attributes (validated against active configs)
+   - Form validates changes in real-time
+   - Custom attribute fields dynamically rendered based on configs
+
+4. **Submit Changes**
+   - User clicks "Save" button
+   - Frontend calls PATCH /samples/{id} with only changed fields (partial update)
+   - Backend validates:
+     - Permission: `sample:update` required
+     - RLS: User must have access to sample's project
+     - Custom attributes: Validated against active configurations
+   - Backend updates audit fields: `modified_at` (current timestamp), `modified_by` (current user)
+   - Returns updated sample
+   - Frontend refreshes DataGrid
+
+**Test Editing**:
+
+1. **Navigate to Tests Management**
+   - User navigates to `/tests` route
+   - Frontend displays DataGrid with all accessible tests (filtered by RLS)
+   - Columns: name, status, sample, analysis, technician, created_at, etc.
+
+2. **Open Edit Dialog**
+   - User clicks "Edit" button on a test row
+   - Frontend calls GET /tests/{id} to fetch test details
+   - TestForm dialog opens with pre-filled data
+
+3. **Edit Test Details**
+   - User can modify:
+     - Status (dropdown from list_entries)
+     - Technician assignment (dropdown from users)
+     - Test date (timestamp)
+     - Custom attributes (validated against active configs)
+   - Form validates changes in real-time
+
+4. **Submit Changes**
+   - User clicks "Save" button
+   - Frontend calls PATCH /tests/{id} with only changed fields
+   - Backend validates:
+     - Permission: `test:update` required
+     - RLS: User must have access to test's sample's project
+     - Custom attributes: Validated against active configurations
+   - Backend updates audit fields: `modified_at`, `modified_by`
+   - Returns updated test
+   - Frontend refreshes DataGrid
+
+**Container Editing**:
+
+1. **Navigate to Container Management**
+   - User navigates to `/containers` route
+   - Frontend displays DataGrid with all accessible containers (filtered by RLS)
+   - Columns: name, type, concentration, created_at, etc.
+
+2. **Open Edit Dialog**
+   - User clicks "Edit" button on a container row
+   - Frontend calls GET /containers/{id} to fetch container details
+   - ContainerForm dialog opens with pre-filled data
+
+3. **Edit Container Details**
+   - User can modify:
+     - Name (unique validation)
+     - Container type (dropdown from container_types)
+     - Concentration and units
+     - Amount and units
+     - Custom attributes (validated against active configs)
+   - Form validates changes in real-time
+
+4. **Submit Changes**
+   - User clicks "Save" button
+   - Frontend calls PATCH /containers/{id} with only changed fields
+   - Backend validates:
+     - Permission: `sample:update` required (containers link to samples)
+     - Container type: Must exist and be active
+     - Custom attributes: Validated against active configurations
+   - Backend updates audit fields: `modified_at`, `modified_by`
+   - Returns updated container
+   - Frontend refreshes DataGrid
+
+**Status Transitions**:
+- Sample status can be updated (e.g., "Received" → "Reviewed" → "In Testing")
+- Test status can be updated (e.g., "In Process" → "Complete")
+- Container metadata can be updated (name, type, concentration)
+
+**Error Handling**:
+- 404: Entity not found (doesn't exist or RLS denies access)
+- 403: Permission denied (no update permission)
+- 422: Validation error (invalid data, custom attributes don't match config)
+- 400: Invalid foreign key (e.g., container type doesn't exist)
+
+**Audit Trail**:
+- All edits update `modified_at` and `modified_by` fields
+- Database indexes on `modified_at` and `modified_by` for efficient querying
+- Full history maintained in database (no data loss on edits)
+
 **Variation B: Bulk Sample Accessioning** (US-24)
 
 **Steps**:

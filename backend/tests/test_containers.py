@@ -367,6 +367,343 @@ class TestContainersCRUD:
         data = response.json()
         assert data["description"] == "Updated container"
         assert data["concentration"] == 7.5
+    
+    def test_update_container_name_and_concentration(self, client: TestClient, test_admin_user, test_data, db_session: Session):
+        """Test updating container name and concentration (example from docstring)"""
+        # Create container type and container
+        container_type = ContainerType(
+            name="Test Container Type",
+            description="Test container type",
+            capacity=10.0,
+            material="Glass",
+            dimensions="15x100",
+            preservative="None",
+            created_by=test_admin_user.id,
+            modified_by=test_admin_user.id
+        )
+        db_session.add(container_type)
+        db_session.flush()
+        
+        container = Container(
+            name="CONTAINER-EXAMPLE-001",
+            description="Test container for example update",
+            row=1,
+            column=1,
+            concentration=10.0,
+            concentration_units=test_data["unit"].id,
+            amount=5.0,
+            amount_units=test_data["unit"].id,
+            type_id=container_type.id,
+            created_by=test_admin_user.id,
+            modified_by=test_admin_user.id
+        )
+        db_session.add(container)
+        db_session.commit()
+        
+        auth_response = client.post(
+            "/auth/login",
+            json={"username": "admin", "password": "adminpassword"}
+        )
+        token = auth_response.json()["access_token"]
+        
+        # Update name and concentration
+        update_data = {
+            "name": "CONTAINER-001-UPDATED",
+            "concentration": 15.5,
+            "concentration_units": str(test_data["unit"].id)
+        }
+        
+        response = client.patch(
+            f"/containers/{container.id}",
+            json=update_data,
+            headers={"Authorization": f"Bearer {token}"}
+        )
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert data["name"] == "CONTAINER-001-UPDATED"
+        assert data["concentration"] == 15.5
+    
+    def test_update_container_not_found(self, client: TestClient, test_admin_user):
+        """Test updating non-existent container"""
+        auth_response = client.post(
+            "/auth/login",
+            json={"username": "admin", "password": "adminpassword"}
+        )
+        token = auth_response.json()["access_token"]
+        
+        response = client.patch(
+            f"/containers/{uuid4()}",
+            json={"description": "Updated"},
+            headers={"Authorization": f"Bearer {token}"}
+        )
+        
+        assert response.status_code == 404
+        assert "Container not found" in response.json()["detail"]
+    
+    def test_update_container_invalid_type(self, client: TestClient, test_admin_user, test_data, db_session: Session):
+        """Test updating container with invalid type ID"""
+        # Create container type and container
+        container_type = ContainerType(
+            name="Test Container Type",
+            description="Test container type",
+            capacity=10.0,
+            material="Glass",
+            dimensions="15x100",
+            preservative="None",
+            created_by=test_admin_user.id,
+            modified_by=test_admin_user.id
+        )
+        db_session.add(container_type)
+        db_session.flush()
+        
+        container = Container(
+            name="CONTAINER-INVALID-001",
+            description="Test container for invalid type",
+            row=1,
+            column=1,
+            type_id=container_type.id,
+            created_by=test_admin_user.id,
+            modified_by=test_admin_user.id
+        )
+        db_session.add(container)
+        db_session.commit()
+        
+        auth_response = client.post(
+            "/auth/login",
+            json={"username": "admin", "password": "adminpassword"}
+        )
+        token = auth_response.json()["access_token"]
+        
+        # Try to update with invalid type ID
+        update_data = {
+            "type_id": str(uuid4())  # Non-existent type
+        }
+        
+        response = client.patch(
+            f"/containers/{container.id}",
+            json=update_data,
+            headers={"Authorization": f"Bearer {token}"}
+        )
+        
+        assert response.status_code == 400
+        assert "Invalid container type ID" in response.json()["detail"]
+    
+    def test_update_container_invalid_parent(self, client: TestClient, test_admin_user, test_data, db_session: Session):
+        """Test updating container with invalid parent container ID"""
+        # Create container type and container
+        container_type = ContainerType(
+            name="Test Container Type",
+            description="Test container type",
+            capacity=10.0,
+            material="Glass",
+            dimensions="15x100",
+            preservative="None",
+            created_by=test_admin_user.id,
+            modified_by=test_admin_user.id
+        )
+        db_session.add(container_type)
+        db_session.flush()
+        
+        container = Container(
+            name="CONTAINER-INVALID-PARENT-001",
+            description="Test container for invalid parent",
+            row=1,
+            column=1,
+            type_id=container_type.id,
+            created_by=test_admin_user.id,
+            modified_by=test_admin_user.id
+        )
+        db_session.add(container)
+        db_session.commit()
+        
+        auth_response = client.post(
+            "/auth/login",
+            json={"username": "admin", "password": "adminpassword"}
+        )
+        token = auth_response.json()["access_token"]
+        
+        # Try to update with invalid parent ID
+        update_data = {
+            "parent_container_id": str(uuid4())  # Non-existent parent
+        }
+        
+        response = client.patch(
+            f"/containers/{container.id}",
+            json=update_data,
+            headers={"Authorization": f"Bearer {token}"}
+        )
+        
+        assert response.status_code == 400
+        assert "Invalid parent container ID" in response.json()["detail"]
+    
+    def test_update_container_requires_permission(self, client: TestClient):
+        """Test that updating containers requires authentication"""
+        response = client.patch(
+            f"/containers/{uuid4()}",
+            json={"description": "Updated"}
+        )
+        assert response.status_code == 401  # Unauthorized
+
+
+class TestContainerEditRBAC:
+    """Test RBAC for container editing operations"""
+    
+    def test_update_container_requires_update_permission(self, client: TestClient, test_user, test_data, db_session: Session):
+        """Test that updating containers requires sample:update permission"""
+        # Create container type and container
+        container_type = ContainerType(
+            name="Test Container Type",
+            description="Test container type",
+            capacity=10.0,
+            material="Glass",
+            dimensions="15x100",
+            preservative="None",
+            created_by=test_user.id,
+            modified_by=test_user.id
+        )
+        db_session.add(container_type)
+        db_session.flush()
+        
+        container = Container(
+            name="CONTAINER-RBAC-001",
+            description="Test container for RBAC",
+            row=1,
+            column=1,
+            type_id=container_type.id,
+            created_by=test_user.id,
+            modified_by=test_user.id
+        )
+        db_session.add(container)
+        db_session.commit()
+        
+        # Login as user without update permission
+        auth_response = client.post(
+            "/auth/login",
+            json={"username": "testuser", "password": "testpassword"}
+        )
+        token = auth_response.json()["access_token"]
+        
+        # Try to update container
+        update_data = {"description": "Updated description"}
+        response = client.patch(
+            f"/containers/{container.id}",
+            json=update_data,
+            headers={"Authorization": f"Bearer {token}"}
+        )
+        
+        # Should fail with 403 Forbidden
+        assert response.status_code == 403
+    
+    def test_update_container_audit_fields(self, client: TestClient, test_admin_user, test_data, db_session: Session):
+        """Test that audit fields (modified_at, modified_by) are updated on PATCH"""
+        # Create container type and container
+        container_type = ContainerType(
+            name="Test Container Type",
+            description="Test container type",
+            capacity=10.0,
+            material="Glass",
+            dimensions="15x100",
+            preservative="None",
+            created_by=test_admin_user.id,
+            modified_by=test_admin_user.id
+        )
+        db_session.add(container_type)
+        db_session.flush()
+        
+        original_modified_at = datetime.utcnow() - timedelta(hours=1)
+        container = Container(
+            name="CONTAINER-AUDIT-001",
+            description="Test container for audit",
+            row=1,
+            column=1,
+            type_id=container_type.id,
+            created_by=test_admin_user.id,
+            modified_by=test_admin_user.id,
+            modified_at=original_modified_at
+        )
+        db_session.add(container)
+        db_session.commit()
+        original_modified_at_db = container.modified_at
+        
+        auth_response = client.post(
+            "/auth/login",
+            json={"username": "admin", "password": "adminpassword"}
+        )
+        token = auth_response.json()["access_token"]
+        
+        # Update container
+        update_data = {"description": "Updated description for audit test"}
+        response = client.patch(
+            f"/containers/{container.id}",
+            json=update_data,
+            headers={"Authorization": f"Bearer {token}"}
+        )
+        
+        assert response.status_code == 200
+        data = response.json()
+        
+        # Verify modified_by is updated
+        assert data["modified_by"] == str(test_admin_user.id)
+        
+        # Verify modified_at is updated (should be more recent)
+        db_session.refresh(container)
+        assert container.modified_at > original_modified_at_db
+        assert container.modified_by == test_admin_user.id
+    
+    def test_update_container_atomic_transaction(self, client: TestClient, test_admin_user, test_data, db_session: Session):
+        """Test that container updates are atomic (all or nothing)"""
+        # Create container type and container
+        container_type = ContainerType(
+            name="Test Container Type",
+            description="Test container type",
+            capacity=10.0,
+            material="Glass",
+            dimensions="15x100",
+            preservative="None",
+            created_by=test_admin_user.id,
+            modified_by=test_admin_user.id
+        )
+        db_session.add(container_type)
+        db_session.flush()
+        
+        container = Container(
+            name="CONTAINER-ATOMIC-001",
+            description="Test container for atomic transaction",
+            row=1,
+            column=1,
+            type_id=container_type.id,
+            created_by=test_admin_user.id,
+            modified_by=test_admin_user.id
+        )
+        db_session.add(container)
+        db_session.commit()
+        original_description = container.description
+        
+        auth_response = client.post(
+            "/auth/login",
+            json={"username": "admin", "password": "adminpassword"}
+        )
+        token = auth_response.json()["access_token"]
+        
+        # Try to update with invalid data (invalid type_id)
+        update_data = {
+            "description": "Updated description",
+            "type_id": str(uuid4())  # Invalid: non-existent type
+        }
+        
+        response = client.patch(
+            f"/containers/{container.id}",
+            json=update_data,
+            headers={"Authorization": f"Bearer {token}"}
+        )
+        
+        # Should fail validation
+        assert response.status_code == 400
+        
+        # Verify container was not updated (atomic transaction)
+        db_session.refresh(container)
+        assert container.description == original_description
 
 
 class TestContentsManagement:

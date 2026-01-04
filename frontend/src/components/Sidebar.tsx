@@ -75,6 +75,13 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onMobileClose, collapsed 
   const [clientExpanded, setClientExpanded] = useState(
     location.pathname.startsWith('/clients') || location.pathname.startsWith('/client-projects')
   );
+  
+  // Auto-expand accordions for /samples/ and /tests/ routes
+  React.useEffect(() => {
+    if (location.pathname.startsWith('/samples') || location.pathname.startsWith('/tests')) {
+      // These are in core items, no accordion needed
+    }
+  }, [location.pathname]);
 
   // Collapse accordions when sidebar collapses
   React.useEffect(() => {
@@ -97,6 +104,18 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onMobileClose, collapsed 
       path: '/accessioning',
       icon: <ScienceIcon />,
       permission: 'sample:create',
+    },
+    {
+      text: 'Samples',
+      path: '/samples',
+      icon: <ScienceIcon />,
+      permission: 'sample:read',
+    },
+    {
+      text: 'Tests',
+      path: '/tests',
+      icon: <Biotech />,
+      permission: 'test:update',
     },
     {
       text: 'Containers',

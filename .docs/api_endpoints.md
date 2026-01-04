@@ -128,6 +128,204 @@ Bulk accession multiple samples with common fields and unique per-sample data (U
 
 **Note:** Creates all samples, containers, contents, and tests atomically in a single transaction.
 
+### GET /samples/{id}
+Get a specific sample by ID.
+
+**Requires:** `sample:read` permission
+
+**Response:** Sample object with all fields
+
+### PATCH /samples/{id}
+Partially update a sample (edit mode).
+
+**Requires:** `sample:update` permission
+
+**Request (all fields optional, partial update):**
+```json
+{
+  "name": "SAMPLE-001-UPDATED",
+  "description": "Updated description",
+  "status": "uuid",
+  "custom_attributes": {
+    "ph_level": 7.2,
+    "notes": "Sample appears normal"
+  }
+}
+```
+
+**Example: Update sample status to 'Reviewed'**
+```json
+{
+  "status": "reviewed-status-uuid"
+}
+```
+
+**Response:** Updated sample object
+
+**Features:**
+- Partial updates: Only send fields that need to change
+- Custom attributes validation: Validated against active configurations for 'samples' entity type
+- Audit fields: Automatically updates `modified_at` and `modified_by` with current user and timestamp
+- Atomic transaction: All updates succeed or fail together
+- RLS enforcement: User must have access to sample's project (enforced by RLS policies)
+
+**Error Responses:**
+- `404`: Sample not found
+- `403`: Permission denied (no `sample:update` permission) or RLS denies access
+- `422`: Validation error (invalid data, custom attributes don't match config)
+
+## Tests
+
+### GET /tests
+List tests with filtering and pagination.
+
+**Query Parameters:**
+- `sample_id` (optional, UUID): Filter by sample ID
+- `analysis_id` (optional, UUID): Filter by analysis ID
+- `status` (optional, UUID): Filter by status ID
+- `technician_id` (optional, UUID): Filter by technician ID
+- `page` (optional, int, default=1): Page number
+- `size` (optional, int, default=10): Page size
+
+**Requires:** Authentication (scoped by user access via RLS)
+
+**Response:**
+```json
+{
+  "tests": [...],
+  "total": 50,
+  "page": 1,
+  "size": 10,
+  "pages": 5
+}
+```
+
+### GET /tests/{id}
+Get a specific test by ID.
+
+**Requires:** Authentication (scoped by user access via RLS)
+
+**Response:** Test object with all fields
+
+### PATCH /tests/{id}
+Partially update a test (edit mode).
+
+**Requires:** `test:update` permission
+
+**Request (all fields optional, partial update):**
+```json
+{
+  "status": "uuid",
+  "technician_id": "uuid",
+  "test_date": "2025-01-15T10:00:00",
+  "custom_attributes": {
+    "instrument": "GC-MS-001",
+    "run_number": "2025-001"
+  }
+}
+```
+
+**Example: Update test status to 'Complete'**
+```json
+{
+  "status": "complete-status-uuid"
+}
+```
+
+**Example: Update technician assignment**
+```json
+{
+  "technician_id": "technician-uuid",
+  "test_date": "2025-01-15T10:00:00"
+}
+```
+
+**Response:** Updated test object
+
+**Features:**
+- Partial updates: Only send fields that need to change
+- Custom attributes validation: Validated against active configurations for 'tests' entity type
+- Audit fields: Automatically updates `modified_at` and `modified_by` with current user and timestamp
+- Atomic transaction: All updates succeed or fail together
+- RLS enforcement: User must have access to test's sample's project (enforced by RLS policies)
+
+**Error Responses:**
+- `404`: Test not found
+- `403`: Permission denied (no `test:update` permission) or RLS denies access
+- `422`: Validation error (invalid data, custom attributes don't match config)
+
+## Containers
+
+### GET /containers
+List containers with filtering and pagination.
+
+**Query Parameters:**
+- `type_id` (optional, UUID): Filter by container type ID
+- `page` (optional, int, default=1): Page number
+- `size` (optional, int, default=10): Page size
+
+**Requires:** `sample:read` permission (containers link to samples)
+
+**Response:**
+```json
+{
+  "containers": [...],
+  "total": 50,
+  "page": 1,
+  "size": 10,
+  "pages": 5
+}
+```
+
+### GET /containers/{id}
+Get a specific container by ID.
+
+**Requires:** `sample:read` permission
+
+**Response:** Container object with all fields
+
+### PATCH /containers/{id}
+Partially update a container (edit mode).
+
+**Requires:** `sample:update` permission (since containers link to samples)
+
+**Request (all fields optional, partial update):**
+```json
+{
+  "name": "CONTAINER-001-UPDATED",
+  "type_id": "uuid",
+  "concentration": 15.5,
+  "concentration_units": "uuid",
+  "custom_attributes": {
+    "storage_location": "Freezer A-1"
+  }
+}
+```
+
+**Example: Update container name and concentration**
+```json
+{
+  "name": "CONTAINER-001-UPDATED",
+  "concentration": 15.5,
+  "concentration_units": "unit-uuid"
+}
+```
+
+**Response:** Updated container object
+
+**Features:**
+- Partial updates: Only send fields that need to change
+- Custom attributes validation: Validated against active configurations for 'containers' entity type
+- Audit fields: Automatically updates `modified_at` and `modified_by` with current user and timestamp
+- Atomic transaction: All updates succeed or fail together
+- Container type validation: Validates that `type_id` exists and is active
+
+**Error Responses:**
+- `404`: Container not found
+- `403`: Permission denied (no `sample:update` permission) or RLS denies access
+- `400`: Invalid container type ID or parent container ID
+- `422`: Validation error (invalid data, custom attributes don't match config)
+
 ## Projects
 
 ### GET /projects

@@ -25,7 +25,7 @@ from uuid import UUID
 router = APIRouter()
 
 
-@router.get("/", response_model=TestListResponse)
+@router.get("", response_model=TestListResponse)
 async def get_tests(
     request: Request,
     sample_id: Optional[UUID] = Query(None, description="Filter by sample ID"),
@@ -300,8 +300,38 @@ async def update_test(
     db: Session = Depends(get_db)
 ):
     """
-    Update a test.
-    Requires test:update permission.
+    Partially update a test.
+    
+    Requires test:update permission. Updates only the fields provided in the request.
+    Validates custom attributes against EAV configuration. Updates audit fields (modified_at, modified_by).
+    
+    **Example: Update test status**
+    ```json
+    {
+        "status": "uuid-of-complete-status"
+    }
+    ```
+    
+    **Example: Update technician assignment**
+    ```json
+    {
+        "technician_id": "uuid-of-technician",
+        "test_date": "2025-01-03T10:00:00Z"
+    }
+    ```
+    
+    **Example: Update custom attributes**
+    ```json
+    {
+        "custom_attributes": {
+            "instrument": "GC-MS-001",
+            "run_number": "2025-001"
+        }
+    }
+    ```
+    
+    Returns 404 if test not found, 403 if user lacks access (RLS enforced).
+    All updates are performed in a single atomic transaction.
     """
     test = db.query(Test).filter(
         Test.id == test_id,

@@ -20,6 +20,9 @@ This document describes the user interface components and interactions for the a
 ### Page Components
 - `AccessioningForm.tsx`: Main accessioning page with multi-step wizard
 - `ResultsManagement.tsx`: Results management page with batch selection
+- `SamplesManagement.tsx`: Sample management page with DataGrid listing and edit functionality
+- `TestsManagement.tsx`: Test management page with DataGrid listing and edit functionality
+- `ContainerManagement.tsx`: Container management page with DataGrid listing, create, and edit functionality
 
 ### Step Components (Accessioning)
 - `SampleDetailsStep.tsx`: Sample and container information entry
@@ -34,6 +37,24 @@ This document describes the user interface components and interactions for the a
 ### Supporting Components
 - `AliquotDerivativeDialog.tsx`: Dialog for creating aliquots/derivatives
 - `CustomAttributeField.tsx`: Reusable component for rendering custom attribute fields dynamically based on data type (text, number, date, boolean, select)
+- `SampleForm.tsx`: Reusable form component for editing sample details (name, description, status, custom_attributes)
+  - Handles edit mode: fetches existing sample via GET /samples/{id}, pre-fills form, uses PATCH for updates
+  - Simplified wizard for edits (skips creation-only steps like initial test assignment)
+  - Formik/Yup validation with custom attribute validation
+  - Permission-gated for sample:update
+  - Tooltips for user guidance (e.g., "Edit status: Requires sample:update permission")
+- `TestForm.tsx`: Reusable form component for test details (status, technician_id, custom_attributes)
+  - Handles both create and edit modes based on `test` prop
+  - Fetches lookup data (analyses, statuses, users) for dropdowns
+  - Dynamically renders custom attribute fields using `CustomAttributeField`
+  - Permission-gated for test:update
+  - Tooltips for user guidance
+- `ContainerForm.tsx`: Reusable form component for container details (name, type_id, concentration, custom_attributes)
+  - Handles both create and edit modes based on `container` prop
+  - Fetches lookup data (container types, units) for dropdowns
+  - Dynamically renders custom attribute fields
+  - Permission-gated for sample:update (since containers link to samples)
+  - Tooltips for user guidance
 
 ### Help Components
 - `ClientHelpSection.tsx`: Role-filtered help content component for Client users

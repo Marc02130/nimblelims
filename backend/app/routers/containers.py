@@ -241,7 +241,29 @@ async def update_container(
     db: Session = Depends(get_db)
 ):
     """
-    Update a container.
+    Partially update a container.
+    
+    Requires sample:update permission (containers link to samples via contents).
+    Updates only the fields provided in the request. Updates audit fields (modified_at, modified_by).
+    
+    **Example: Update container name and concentration**
+    ```json
+    {
+        "name": "CONTAINER-001-UPDATED",
+        "concentration": 15.5,
+        "concentration_units": "uuid-of-units"
+    }
+    ```
+    
+    **Example: Update container type**
+    ```json
+    {
+        "type_id": "uuid-of-new-container-type"
+    }
+    ```
+    
+    Returns 404 if container not found, 403 if user lacks access (RLS enforced).
+    All updates are performed in a single atomic transaction.
     """
     container = db.query(Container).filter(
         Container.id == container_id,
@@ -253,6 +275,32 @@ async def update_container(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Container not found"
         )
+    
+    # Validate container type if being updated
+    if container_data.type_id is not None:
+        container_type = db.query(ContainerType).filter(
+            ContainerType.id == container_data.type_id,
+            ContainerType.active == True
+        ).first()
+        
+        if not container_type:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid container type ID"
+            )
+    
+    # Validate parent container if being updated
+    if container_data.parent_container_id is not None:
+        parent = db.query(Container).filter(
+            Container.id == container_data.parent_container_id,
+            Container.active == True
+        ).first()
+        
+        if not parent:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid parent container ID"
+            )
     
     # Update fields
     update_data = container_data.dict(exclude_unset=True)
