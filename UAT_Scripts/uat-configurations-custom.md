@@ -173,7 +173,7 @@ Create a new custom attribute configuration for the 'samples' entity type via th
   "active": true
 }
 ``` |
-| **Backend Processing** | 1. **Access Control**:<br>   - Verify user has `config:edit` permission<br>2. **Validation**:<br>   - Validate `entity_type` is one of: samples, tests, results, projects, client_projects, batches<br>   - Validate `attr_name` format (alphanumeric, underscores, hyphens)<br>   - Validate `data_type` is one of: text, number, date, boolean, select<br>   - Validate `validation_rules` match data_type:<br>     - Number: `min`, `max` (numbers)<br>     - Text: `max_length`, `min_length` (integers)<br>     - Select: `options` (array of strings)<br>3. **Uniqueness Check**:<br>   - Check unique constraint: (entity_type, attr_name) must be unique<br>   - Query: `SELECT * FROM custom_attributes_config WHERE entity_type = 'samples' AND attr_name = 'ph_level'`<br>   - Return 400 if configuration already exists<br>4. **Configuration Creation**:<br>   - Create `CustomAttributeConfig` record:<br>     - `entity_type` = "samples"<br>     - `attr_name` = "ph_level"<br>     - `data_type` = "number"<br>     - `validation_rules` = {"min": 0, "max": 14}<br>     - `description` = "pH level of the sample (0-14 scale)"<br>     - `active` = true<br>     - `created_by` = current user UUID<br>     - `modified_by` = current user UUID<br>5. **Commit**:<br>   - Commit to database<br>   - Return created configuration |
+| **Backend Processing** | 1. **Access Control**:<br>   - Verify user has `config:edit` permission<br>2. **Validation**:<br>   - Validate `entity_type` is one of: samples, tests, results, projects, client_projects, batches<br>   - Validate `attr_name` format (alphanumeric, underscores, hyphens)<br>   - Validate `data_type` is one of: text, number, date, boolean, select<br>   - Validate `validation_rules` match data_type:<br>     - Number: `min`, `max` (numbers, min must be <= max)<br>     - Text: `max_length`, `min_length` (integers)<br>     - Date: `min_date`, `max_date` (ISO date strings YYYY-MM-DD, min_date must be <= max_date)<br>     - Select: `options` (array of strings, non-empty)<br>3. **Uniqueness Check**:<br>   - Check unique constraint: (entity_type, attr_name) must be unique<br>   - Query: `SELECT * FROM custom_attributes_config WHERE entity_type = 'samples' AND attr_name = 'ph_level'`<br>   - Return 400 if configuration already exists<br>4. **Configuration Creation**:<br>   - Create `CustomAttributeConfig` record:<br>     - `entity_type` = "samples"<br>     - `attr_name` = "ph_level"<br>     - `data_type` = "number"<br>     - `validation_rules` = {"min": 0, "max": 14}<br>     - `description` = "pH level of the sample (0-14 scale)"<br>     - `active` = true<br>     - `created_by` = current user UUID<br>     - `modified_by` = current user UUID<br>5. **Commit**:<br>   - Commit to database<br>   - Return created configuration |
 | **Configuration Record** | - Configuration created in `custom_attributes_config` table:<br>  - `entity_type` = "samples"<br>  - `attr_name` = "ph_level"<br>  - `data_type` = "number"<br>  - `validation_rules` = {"min": 0, "max": 14} (JSONB)<br>  - `description` = "pH level of the sample (0-14 scale)"<br>  - `active` = true<br>  - Audit fields set |
 | **UI Feedback** | - Success message: "Custom field created successfully"<br>- Configuration appears in DataGrid<br>- Configuration visible when filtering by entity_type='samples' |
 
@@ -249,9 +249,9 @@ Verify that custom fields are dynamically rendered in forms and validated agains
 | 5 | **Test Validation Errors** | |
 | 5.1 | Start new sample creation | Form loads |
 | 5.2 | Enter ph_level: `15.0` (exceeds max of 14) | Field accepts input |
-| 5.3 | Verify validation error | Real-time validation error displayed:<br>- Error message: "Value must be less than or equal to 14"<br>- Field highlighted in red |
+| 5.3 | Verify validation error | Real-time validation error displayed:<br>- Error message: "Value must be at most 14"<br>- Field highlighted in red<br>- Error appears on blur (when field loses focus) and on change |
 | 5.4 | Enter ph_level: `-1.0` (below min of 0) | Field accepts input |
-| 5.5 | Verify validation error | Real-time validation error displayed:<br>- Error message: "Value must be greater than or equal to 0" |
+| 5.5 | Verify validation error | Real-time validation error displayed:<br>- Error message: "Value must be at least 0"<br>- Error appears on blur and on change |
 | 5.6 | Fix value to `7.5` | Error message disappears |
 | 5.7 | Submit form | Form submits successfully |
 
@@ -261,7 +261,7 @@ Verify that custom fields are dynamically rendered in forms and validated agains
 |----------|------------------|
 | **Custom Fields Loading** | - Frontend fetches active custom attribute configurations:<br>  - API call: GET `/admin/custom-attributes?entity_type=samples&active=true`<br>  - Returns configurations for 'samples' entity type<br>- Dynamic rendering based on `data_type`:<br>  - `text` → TextField<br>  - `number` → NumberField<br>  - `date` → DatePicker<br>  - `boolean` → Checkbox<br>  - `select` → Select dropdown with options from `validation_rules.options` |
 | **Form Integration** | - Custom fields included in Formik form values<br>- Custom fields included in form submission<br>- Yup validation schema generated from `validation_rules` |
-| **Client-Side Validation** | - Real-time validation using Yup:<br>  - Number: `min()`, `max()` validators<br>  - Text: `maxLength()`, `minLength()` validators<br>  - Select: `oneOf()` validator<br>- Error messages displayed inline |
+| **Client-Side Validation** | - Real-time validation using Yup:<br>  - Number: `min()`, `max()` validators with transforms to handle NaN and empty strings<br>  - Text: `maxLength()`, `minLength()` validators<br>  - Date: `min_date`, `max_date` validators with string-to-Date transforms<br>  - Select: `oneOf()` validator<br>- Validation triggers: `validateOnChange` and `validateOnBlur` enabled<br>- Error messages displayed inline with specific messages:<br>  - Number: "Value must be at least {min}" or "Value must be at most {max}"<br>  - Date: "Date must be on or after {min_date}" or "Date must be on or before {max_date}"<br>  - Text: "Minimum length is {min_length}" or "Maximum length is {max_length}" |
 | **API Call** | POST `/samples` or PATCH `/samples/{id}` called with:<br>```json
 {
   "name": "SAMPLE-001",
@@ -411,11 +411,14 @@ Verify that custom fields are dynamically rendered in forms and validated agains
 ### Validation
 - **Server-Side**: `app.core.custom_attributes.validate_custom_attributes()`
   - Validates against active `custom_attributes_config` for entity type
-  - Checks data type, validation rules (min/max, length, options)
+  - Checks data type, validation rules (min/max for numbers, min_length/max_length for text, min_date/max_date for dates, options for select)
   - Returns validated dict or raises HTTPException with detailed errors
 - **Client-Side**: Yup validation schema generated from `validation_rules`
-  - Real-time validation in forms
-  - Error messages displayed inline
+  - Schema structure: `{ custom_attributes: Yup.object().shape({ attr_name: fieldSchema }).noUnknown(true).nullable() }`
+  - Uses `useMemo` to ensure schema updates when configs change
+  - Real-time validation in forms with `validateOnChange` and `validateOnBlur` enabled
+  - Transforms for number fields (handle NaN, empty strings) and date fields (string-to-Date conversion)
+  - Error messages displayed inline with specific messages for each validation rule
 
 ### Schema
 - **`custom_attributes_config` table**:
@@ -471,7 +474,8 @@ Verify that custom fields are dynamically rendered in forms and validated agains
 - `select` (Select dropdown)
 
 ### Validation Rules Examples
-- **Number**: `{"min": 0, "max": 14}`
+- **Number**: `{"min": 0, "max": 14}` (min must be <= max)
 - **Text**: `{"min_length": 1, "max_length": 255}`
-- **Select**: `{"options": ["Option 1", "Option 2", "Option 3"]}`
+- **Date**: `{"min_date": "2023-01-01", "max_date": "2023-12-31"}` (ISO format YYYY-MM-DD, min_date must be <= max_date)
+- **Select**: `{"options": ["Option 1", "Option 2", "Option 3"]}` (non-empty array)
 

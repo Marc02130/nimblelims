@@ -846,13 +846,35 @@ class AnalysisAnalyte(Base):
 - Entity `custom_attributes` JSONB columns are subject to existing entity-level RLS policies
 
 ### Custom Attributes Validation
-- Server-side validation in `app.core.custom_attributes.validate_custom_attributes()`
+
+**Server-Side Validation:**
+- Validation function: `app.core.custom_attributes.validate_custom_attributes()`
 - Validates against active `custom_attributes_config` for entity type
 - Type checking: Ensures values match `data_type` (text, number, date, boolean, select)
-- Rule validation: Applies `validation_rules` (min/max, length, options)
+- Rule validation: Applies `validation_rules`:
+  - Number: `min`, `max` (numbers, min must be <= max)
+  - Text: `min_length`, `max_length` (integers)
+  - Date: `min_date`, `max_date` (ISO date strings YYYY-MM-DD, min_date must be <= max_date)
+  - Select: `options` (array of strings, non-empty)
 - Returns 400 error with detailed message if validation fails
 - Unknown attributes (not in config) are rejected
 - Inactive configs are ignored (attributes using inactive configs are rejected)
+
+**Client-Side Validation:**
+- Yup validation schema generated dynamically from `validation_rules`
+- Schema structure: `{ custom_attributes: Yup.object().shape({ attr_name: fieldSchema }).noUnknown(true).nullable() }`
+  - Nested object structure allows proper path validation (e.g., `custom_attributes.ph_level`)
+  - `.noUnknown(true)` allows fields not in schema (e.g., inactive fields) without errors
+  - `.nullable()` allows empty/null custom_attributes object
+- Schema wrapped in `useMemo` to update when `customAttributeConfigs` change
+- Validation triggers: `validateOnChange` and `validateOnBlur` enabled in Formik
+- Transforms:
+  - Number: Converts empty strings to null, handles NaN
+  - Date: Converts ISO date strings to Date objects for validation
+- Error messages:
+  - Number: "Value must be at least {min}" or "Value must be at most {max}"
+  - Date: "Date must be on or after {min_date}" or "Date must be on or before {max_date}"
+  - Text: "Minimum length is {min_length}" or "Maximum length is {max_length}"
 
 ---
 

@@ -534,9 +534,10 @@ This document describes the user interface components and interactions for the a
   - Sample type verification: Required if double entry enabled
 
 **Validation Timing**:
-- On blur (field loses focus)
+- On blur (field loses focus) - `validateOnBlur` enabled
+- On change (as user types) - `validateOnChange` enabled
 - On submit
-- Real-time for some fields (e.g., numeric inputs)
+- Real-time validation for all custom attribute fields
 
 ---
 
@@ -571,6 +572,7 @@ This document describes the user interface components and interactions for the a
 - `config`: CustomAttributeConfig object with data_type and validation_rules
 - `value`: Current field value
 - `onChange`: Callback function for value changes
+- `onBlur`: Callback function for blur events (triggers validation)
 - `error`: Boolean indicating validation error
 - `helperText`: Error message or description
 - `fullWidth`: Boolean for full-width layout
@@ -578,14 +580,24 @@ This document describes the user interface components and interactions for the a
 
 **Rendering Logic**:
 - **Text**: Renders TextField with max_length/min_length validation
-- **Number**: Renders NumberField with min/max validation
-- **Date**: Renders DatePicker (MUI X)
+- **Number**: Renders NumberField with min/max validation, handles NaN and empty strings
+- **Date**: Renders DatePicker (MUI X) with min_date/max_date validation, converts ISO strings to Date objects
 - **Boolean**: Renders Checkbox with FormControlLabel
 - **Select**: Renders Select dropdown with options from validation_rules
 
+**Validation Integration**:
+- Fields integrated into Formik forms with Yup validation
+- Validation schema structure: `{ custom_attributes: Yup.object().shape({ attr_name: fieldSchema }).noUnknown(true).nullable() }`
+  - Nested object structure allows proper path validation (e.g., `custom_attributes.ph_level`)
+  - `.noUnknown(true)` allows fields not in schema (e.g., inactive fields) without errors
+- Schema wrapped in `useMemo` to update when `customAttributeConfigs` change
+- Validation triggers: `validateOnChange` and `validateOnBlur` enabled
+- Error messages displayed inline below field
+- Transforms for number fields (handle NaN, empty strings) and date fields (string-to-Date conversion)
+
 **Integration**:
 - Used in `SampleDetailsStep.tsx` for sample custom fields
-- Can be extended to other forms (client projects, batches, etc.)
+- Used in `SampleForm.tsx`, `TestForm.tsx`, `BatchForm.tsx`, `ClientProjectForm.tsx`
 - Integrated with Formik for form state management
 - Real-time validation using Yup schema generated from validation_rules
 
