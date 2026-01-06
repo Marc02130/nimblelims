@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Box,
   Grid,
@@ -54,7 +54,8 @@ const buildCustomAttributesValidation = (configs: CustomAttributeConfig[]): Reco
   configs.forEach((config) => {
     if (!config.active) return;
     
-    const fieldPath = `custom_attributes.${config.attr_name}`;
+    // Use the attribute name directly (not the full path)
+    const fieldName = config.attr_name;
     let fieldSchema: any = null;
     
     switch (config.data_type) {
@@ -69,17 +70,76 @@ const buildCustomAttributesValidation = (configs: CustomAttributeConfig[]): Reco
         break;
       
       case 'number':
-        fieldSchema = Yup.number().nullable();
+        fieldSchema = Yup.number()
+          .nullable()
+          .transform((value, originalValue) => {
+            // Handle empty strings
+            if (originalValue === '' || originalValue === null || originalValue === undefined) {
+              return null;
+            }
+            // Parse number
+            const parsed = typeof originalValue === 'string' ? parseFloat(originalValue) : originalValue;
+            // Return null for NaN instead of NaN
+            return isNaN(parsed) ? null : parsed;
+          })
+          .test('is-number', 'Must be a valid number', (value) => {
+            if (value === null || value === undefined) return true; // Allow null/undefined
+            return typeof value === 'number' && !isNaN(value);
+          });
         if (config.validation_rules?.min !== undefined) {
-          fieldSchema = fieldSchema.min(config.validation_rules.min);
+          fieldSchema = fieldSchema.min(
+            config.validation_rules.min,
+            `Value must be at least ${config.validation_rules.min}`
+          );
         }
         if (config.validation_rules?.max !== undefined) {
-          fieldSchema = fieldSchema.max(config.validation_rules.max);
+          fieldSchema = fieldSchema.max(
+            config.validation_rules.max,
+            `Value must be at most ${config.validation_rules.max}`
+          );
         }
         break;
       
       case 'date':
-        fieldSchema = Yup.date().nullable();
+        // Date values come as ISO strings, so we need to transform them
+        fieldSchema = Yup.mixed()
+          .nullable()
+          .transform((value, originalValue) => {
+            // If it's already a Date, return it
+            if (value instanceof Date) return value;
+            // If it's a string (ISO format), convert to Date
+            if (typeof value === 'string' && value) {
+              const date = new Date(value);
+              return isNaN(date.getTime()) ? null : date;
+            }
+            return null;
+          })
+          .test('is-date', 'Must be a valid date', (value) => {
+            if (value === null || value === undefined) return true; // Allow null/undefined
+            return value instanceof Date && !isNaN(value.getTime());
+          });
+        if (config.validation_rules?.min_date) {
+          fieldSchema = fieldSchema.test(
+            'min-date',
+            `Date must be on or after ${config.validation_rules.min_date}`,
+            function(value: any) {
+              if (!value) return true; // Allow null/undefined
+              const minDate = new Date(config.validation_rules.min_date);
+              return value >= minDate;
+            }
+          );
+        }
+        if (config.validation_rules?.max_date) {
+          fieldSchema = fieldSchema.test(
+            'max-date',
+            `Date must be on or before ${config.validation_rules.max_date}`,
+            function(value: any) {
+              if (!value) return true; // Allow null/undefined
+              const maxDate = new Date(config.validation_rules.max_date);
+              return value <= maxDate;
+            }
+          );
+        }
         break;
       
       case 'boolean':
@@ -96,11 +156,15 @@ const buildCustomAttributesValidation = (configs: CustomAttributeConfig[]): Reco
     }
     
     if (fieldSchema) {
-      customAttrsSchema[fieldPath] = fieldSchema;
+      customAttrsSchema[fieldName] = fieldSchema;
     }
   });
   
-  return customAttrsSchema;
+  // Return as a nested object structure for custom_attributes
+  // Use noUnknown(true) to allow fields not in the schema (e.g., inactive fields)
+  return {
+    custom_attributes: Yup.object().shape(customAttrsSchema).noUnknown(true).nullable()
+  };
 };
 
 const SampleForm: React.FC<SampleFormProps> = ({
@@ -138,7 +202,7 @@ const SampleForm: React.FC<SampleFormProps> = ({
     }
   };
 
-  const validationSchema = Yup.object({
+  const validationSchema = useMemo(() => Yup.object({
     name: Yup.string().min(1, 'Sample name is required').max(255, 'Name must be less than 255 characters'),
     description: Yup.string().nullable(),
     due_date: Yup.date().nullable().max(new Date(), 'Due date cannot be in the future'),
@@ -150,7 +214,7 @@ const SampleForm: React.FC<SampleFormProps> = ({
     temperature: Yup.number().nullable().min(-273.15, 'Temperature must be at least -273.15°C').max(1000, 'Temperature must be at most 1000°C'),
     qc_type: Yup.string().nullable(),
     ...buildCustomAttributesValidation(customAttributeConfigs),
-  });
+  }), [customAttributeConfigs]);
 
   const initialValues = {
     name: sample?.name || '',
@@ -221,8 +285,10 @@ const SampleForm: React.FC<SampleFormProps> = ({
         validationSchema={validationSchema}
         onSubmit={handleSubmit}
         enableReinitialize
+        validateOnChange={true}
+        validateOnBlur={true}
       >
-        {({ values, errors, touched, setFieldValue, isValid }) => (
+        {({ values, errors, touched, setFieldValue, setFieldTouched, validateField, isValid }) => (
           <Form>
             <Grid container spacing={3}>
               <Grid size={12}>
@@ -445,10 +511,22 @@ const SampleForm: React.FC<SampleFormProps> = ({
                             } else {
                               newCustomAttrs[config.attr_name] = value;
                             }
+                            const fieldPath = `custom_attributes.${config.attr_name}`;
                             setFieldValue('custom_attributes', newCustomAttrs);
+                            // Mark field as touched and trigger validation
+                            setFieldTouched(fieldPath, true);
+                            // Trigger validation immediately
+                            setTimeout(() => {
+                              validateField(fieldPath);
+                            }, 0);
+                          }}
+                          onBlur={() => {
+                            const fieldPath = `custom_attributes.${config.attr_name}`;
+                            setFieldTouched(fieldPath, true);
+                            validateField(fieldPath);
                           }}
                           error={fieldTouched && !!fieldError}
-                          helperText={fieldTouched && fieldError ? String(fieldError) : undefined}
+                          helperText={fieldTouched && fieldError ? String(fieldError) : config.description}
                         />
                       </Grid>
                     );

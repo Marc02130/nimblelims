@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Box,
   Paper,
@@ -121,12 +121,13 @@ const buildCustomAttributesValidation = (configs: any[]): Record<string, any> =>
   configs.forEach((config) => {
     if (!config.active) return;
     
-    const fieldPath = `custom_attributes.${config.attr_name}`;
+    // Use the attribute name directly (not the full path)
+    const fieldName = config.attr_name;
     let fieldSchema: any = null;
     
     switch (config.data_type) {
       case 'text':
-        fieldSchema = Yup.string();
+        fieldSchema = Yup.string().nullable();
         if (config.validation_rules?.max_length) {
           fieldSchema = fieldSchema.max(config.validation_rules.max_length, `Maximum length is ${config.validation_rules.max_length}`);
         }
@@ -136,17 +137,70 @@ const buildCustomAttributesValidation = (configs: any[]): Record<string, any> =>
         break;
       
       case 'number':
-        fieldSchema = Yup.number().nullable();
+        fieldSchema = Yup.number()
+          .nullable()
+          .transform((value, originalValue) => {
+            // Handle empty strings
+            if (originalValue === '' || originalValue === null || originalValue === undefined) {
+              return null;
+            }
+            // Parse number
+            const parsed = typeof originalValue === 'string' ? parseFloat(originalValue) : originalValue;
+            // Return null for NaN instead of NaN
+            return isNaN(parsed) ? null : parsed;
+          })
+          .test('is-number', 'Must be a valid number', (value) => {
+            if (value === null || value === undefined) return true; // Allow null/undefined
+            return typeof value === 'number' && !isNaN(value);
+          });
         if (config.validation_rules?.min !== undefined) {
-          fieldSchema = fieldSchema.min(config.validation_rules.min, `Minimum value is ${config.validation_rules.min}`);
+          fieldSchema = fieldSchema.min(config.validation_rules.min, `Value must be at least ${config.validation_rules.min}`);
         }
         if (config.validation_rules?.max !== undefined) {
-          fieldSchema = fieldSchema.max(config.validation_rules.max, `Maximum value is ${config.validation_rules.max}`);
+          fieldSchema = fieldSchema.max(config.validation_rules.max, `Value must be at most ${config.validation_rules.max}`);
         }
         break;
       
       case 'date':
-        fieldSchema = Yup.date().nullable();
+        // Date values come as ISO strings, so we need to transform them
+        fieldSchema = Yup.mixed()
+          .nullable()
+          .transform((value, originalValue) => {
+            // If it's already a Date, return it
+            if (value instanceof Date) return value;
+            // If it's a string (ISO format), convert to Date
+            if (typeof value === 'string' && value) {
+              const date = new Date(value);
+              return isNaN(date.getTime()) ? null : date;
+            }
+            return null;
+          })
+          .test('is-date', 'Must be a valid date', (value) => {
+            if (value === null || value === undefined) return true; // Allow null/undefined
+            return value instanceof Date && !isNaN(value.getTime());
+          });
+        if (config.validation_rules?.min_date) {
+          fieldSchema = fieldSchema.test(
+            'min-date',
+            `Date must be on or after ${config.validation_rules.min_date}`,
+            function(value: any) {
+              if (!value) return true; // Allow null/undefined
+              const minDate = new Date(config.validation_rules.min_date);
+              return value >= minDate;
+            }
+          );
+        }
+        if (config.validation_rules?.max_date) {
+          fieldSchema = fieldSchema.test(
+            'max-date',
+            `Date must be on or before ${config.validation_rules.max_date}`,
+            function(value: any) {
+              if (!value) return true; // Allow null/undefined
+              const maxDate = new Date(config.validation_rules.max_date);
+              return value <= maxDate;
+            }
+          );
+        }
         break;
       
       case 'boolean':
@@ -162,12 +216,16 @@ const buildCustomAttributesValidation = (configs: any[]): Record<string, any> =>
         fieldSchema = Yup.mixed().nullable();
     }
     
-    if (fieldSchema) {
-      customAttrsSchema[fieldPath] = fieldSchema;
-    }
-  });
+      if (fieldSchema) {
+        customAttrsSchema[fieldName] = fieldSchema;
+      }
+    });
   
-  return customAttrsSchema;
+  // Return as a nested object structure for custom_attributes
+  // Use noUnknown(true) to allow fields not in the schema (e.g., inactive fields)
+  return {
+    custom_attributes: Yup.object().shape(customAttrsSchema).noUnknown(true).nullable()
+  };
 };
 
 const getValidationSchema = (bulkMode: boolean, customAttributeConfigs: any[] = []) => {
@@ -215,7 +273,8 @@ const getValidationSchema = (bulkMode: boolean, customAttributeConfigs: any[] = 
     customAttributeConfigs.forEach((config) => {
       if (!config.active) return;
       
-      const fieldPath = `custom_attributes.${config.attr_name}`;
+      // Use the attribute name directly (not the full path) since we're already inside custom_attributes
+      const fieldName = config.attr_name;
       let fieldSchema: any = null;
       
       switch (config.data_type) {
@@ -231,14 +290,32 @@ const getValidationSchema = (bulkMode: boolean, customAttributeConfigs: any[] = 
         case 'number':
           fieldSchema = Yup.number().nullable();
           if (config.validation_rules?.min !== undefined) {
-            fieldSchema = fieldSchema.min(config.validation_rules.min);
+            fieldSchema = fieldSchema.min(
+              config.validation_rules.min,
+              `Value must be at least ${config.validation_rules.min}`
+            );
           }
           if (config.validation_rules?.max !== undefined) {
-            fieldSchema = fieldSchema.max(config.validation_rules.max);
+            fieldSchema = fieldSchema.max(
+              config.validation_rules.max,
+              `Value must be at most ${config.validation_rules.max}`
+            );
           }
           break;
         case 'date':
           fieldSchema = Yup.date().nullable();
+          if (config.validation_rules?.min_date) {
+            fieldSchema = fieldSchema.min(
+              new Date(config.validation_rules.min_date),
+              `Date must be on or after ${config.validation_rules.min_date}`
+            );
+          }
+          if (config.validation_rules?.max_date) {
+            fieldSchema = fieldSchema.max(
+              new Date(config.validation_rules.max_date),
+              `Date must be on or before ${config.validation_rules.max_date}`
+            );
+          }
           break;
         case 'boolean':
           fieldSchema = Yup.boolean().nullable();
@@ -252,7 +329,7 @@ const getValidationSchema = (bulkMode: boolean, customAttributeConfigs: any[] = 
       }
       
       if (fieldSchema) {
-        bulkUniqueCustomAttrsValidation[fieldPath] = fieldSchema;
+        bulkUniqueCustomAttrsValidation[fieldName] = fieldSchema;
       }
     });
 
@@ -266,7 +343,7 @@ const getValidationSchema = (bulkMode: boolean, customAttributeConfigs: any[] = 
           temperature: Yup.number(),
           anomalies: Yup.string(),
           description: Yup.string(),
-          custom_attributes: Yup.object().shape(bulkUniqueCustomAttrsValidation),
+          custom_attributes: Yup.object().shape(bulkUniqueCustomAttrsValidation).noUnknown(true).nullable(),
         })
       )
       .min(1, 'At least one sample is required')
@@ -510,13 +587,15 @@ const AccessioningForm: React.FC = () => {
     }
   };
 
-  const renderStepContent = (step: number, values: SampleFormData, setFieldValue: any, errors?: any, touched?: any) => {
+  const renderStepContent = (step: number, values: SampleFormData, setFieldValue: any, setFieldTouched?: any, validateField?: any, errors?: any, touched?: any) => {
     switch (step) {
       case 0:
         return (
           <SampleDetailsStep
             values={values}
             setFieldValue={setFieldValue}
+            setFieldTouched={setFieldTouched}
+            validateField={validateField}
             lookupData={lookupData}
             bulkMode={values.bulk_mode}
             errors={errors}
@@ -577,11 +656,13 @@ const AccessioningForm: React.FC = () => {
 
         <Formik
           initialValues={initialValues}
-          validationSchema={getValidationSchema(initialValues.bulk_mode, customAttributeConfigs)}
+          validationSchema={useMemo(() => getValidationSchema(initialValues.bulk_mode, customAttributeConfigs), [initialValues.bulk_mode, customAttributeConfigs])}
           onSubmit={handleSubmit}
           enableReinitialize
+          validateOnChange={true}
+          validateOnBlur={true}
         >
-          {({ values, setFieldValue, isValid, errors, touched, setValues }) => {
+          {({ values, setFieldValue, setFieldTouched, validateField, isValid, errors, touched, setValues }) => {
             const bulkMode = values.bulk_mode;
 
             return (
@@ -620,7 +701,7 @@ const AccessioningForm: React.FC = () => {
 
                 <Divider sx={{ mb: 3 }} />
 
-                {renderStepContent(activeStep, values, setFieldValue, errors, touched)}
+                {renderStepContent(activeStep, values, setFieldValue, setFieldTouched, validateField, errors, touched)}
 
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 3 }}>
                   <Button

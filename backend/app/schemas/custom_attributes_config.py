@@ -56,6 +56,15 @@ class CustomAttributeConfigBase(BaseModel):
             if 'min' in v and 'max' in v:
                 if v['min'] > v['max']:
                     raise ValueError("min must be less than or equal to max")
+        elif data_type == DataType.DATE:
+            if 'min_date' in v and 'max_date' in v:
+                try:
+                    min_date = datetime.fromisoformat(v['min_date']) if isinstance(v['min_date'], str) else v['min_date']
+                    max_date = datetime.fromisoformat(v['max_date']) if isinstance(v['max_date'], str) else v['max_date']
+                    if min_date > max_date:
+                        raise ValueError("min_date must be less than or equal to max_date")
+                except (ValueError, TypeError, AttributeError):
+                    raise ValueError("min_date and max_date must be valid ISO date strings (YYYY-MM-DD)")
         elif data_type == DataType.SELECT:
             if 'options' not in v or not isinstance(v['options'], list):
                 raise ValueError("select data type requires 'options' list in validation_rules")
@@ -115,6 +124,15 @@ class CustomAttributeConfigUpdate(BaseModel):
             if 'min' in v and 'max' in v:
                 if v['min'] > v['max']:
                     raise ValueError("min must be less than or equal to max")
+        elif data_type == DataType.DATE:
+            if 'min_date' in v and 'max_date' in v:
+                try:
+                    min_date = datetime.fromisoformat(v['min_date']) if isinstance(v['min_date'], str) else v['min_date']
+                    max_date = datetime.fromisoformat(v['max_date']) if isinstance(v['max_date'], str) else v['max_date']
+                    if min_date > max_date:
+                        raise ValueError("min_date must be less than or equal to max_date")
+                except (ValueError, TypeError, AttributeError):
+                    raise ValueError("min_date and max_date must be valid ISO date strings (YYYY-MM-DD)")
         elif data_type == DataType.SELECT:
             if 'options' not in v or not isinstance(v['options'], list):
                 raise ValueError("select data type requires 'options' list in validation_rules")

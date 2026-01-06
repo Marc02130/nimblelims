@@ -14,7 +14,7 @@ import {
   Select,
   Typography,
   FormControlLabel,
-  Switch,
+  Checkbox,
 } from '@mui/material';
 import { Formik, Form, Field } from 'formik';
 import * as Yup from 'yup';
@@ -226,13 +226,15 @@ const HelpEntryDialog: React.FC<HelpEntryDialogProps> = ({
                 {isEdit && (
                   <FormControlLabel
                     control={
-                      <Switch
+                      <Checkbox
                         checked={values.active}
                         onChange={(e) => setFieldValue('active', e.target.checked)}
                         name="active"
+                        color="primary"
                       />
                     }
                     label="Active"
+                    sx={{ mt: 2 }}
                   />
                 )}
               </Box>

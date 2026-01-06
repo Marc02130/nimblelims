@@ -28,6 +28,7 @@ interface CustomAttributeFieldProps {
   config: CustomAttributeConfig;
   value: any;
   onChange: (value: any) => void;
+  onBlur?: () => void;
   error?: boolean;
   helperText?: string;
   fullWidth?: boolean;
@@ -39,6 +40,7 @@ const CustomAttributeField: React.FC<CustomAttributeFieldProps> = ({
   config,
   value,
   onChange,
+  onBlur,
   error,
   helperText,
   fullWidth = true,
@@ -58,6 +60,7 @@ const CustomAttributeField: React.FC<CustomAttributeFieldProps> = ({
             label={displayLabel}
             value={value || ''}
             onChange={(e) => onChange(e.target.value)}
+            onBlur={onBlur}
             error={error}
             helperText={helperText || config.description}
             inputProps={{
@@ -74,11 +77,12 @@ const CustomAttributeField: React.FC<CustomAttributeFieldProps> = ({
             size={size}
             type="number"
             label={displayLabel}
-            value={value || ''}
+            value={value ?? ''}
             onChange={(e) => {
               const numValue = e.target.value === '' ? null : parseFloat(e.target.value);
               onChange(numValue);
             }}
+            onBlur={onBlur}
             error={error}
             helperText={helperText || config.description}
             inputProps={{
@@ -90,6 +94,8 @@ const CustomAttributeField: React.FC<CustomAttributeFieldProps> = ({
         );
 
       case 'date':
+        const minDate = rules.min_date ? new Date(rules.min_date) : undefined;
+        const maxDate = rules.max_date ? new Date(rules.max_date) : undefined;
         return (
           <LocalizationProvider dateAdapter={AdapterDateFns}>
             <DatePicker
@@ -98,12 +104,21 @@ const CustomAttributeField: React.FC<CustomAttributeFieldProps> = ({
               onChange={(date) => {
                 onChange(date ? date.toISOString().split('T')[0] : null);
               }}
+              onClose={() => {
+                // Trigger validation when date picker closes
+                if (onBlur) {
+                  onBlur();
+                }
+              }}
+              minDate={minDate}
+              maxDate={maxDate}
               slotProps={{
                 textField: {
                   fullWidth,
                   size,
                   error,
                   helperText: helperText || config.description,
+                  onBlur: onBlur,
                 },
               }}
             />

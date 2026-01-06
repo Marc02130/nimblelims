@@ -38,6 +38,8 @@ interface CustomAttributeConfig {
 interface SampleDetailsStepProps {
   values: any;
   setFieldValue: (field: string, value: any) => void;
+  setFieldTouched?: (field: string, touched: boolean) => void;
+  validateField?: (field: string) => void;
   lookupData: {
     sampleTypes: any[];
     statuses: any[];
@@ -57,6 +59,8 @@ interface SampleDetailsStepProps {
 const SampleDetailsStep: React.FC<SampleDetailsStepProps> = ({
   values,
   setFieldValue,
+  setFieldTouched,
+  validateField,
   lookupData,
   bulkMode = false,
   errors,
@@ -100,10 +104,34 @@ const SampleDetailsStep: React.FC<SampleDetailsStepProps> = ({
 
   const handleCustomAttributeChange = (attrName: string, value: any) => {
     const currentAttrs = values.custom_attributes || {};
-    setFieldValue('custom_attributes', {
+    const newAttrs = {
       ...currentAttrs,
       [attrName]: value,
-    });
+    };
+    // Remove the key if value is null/undefined/empty
+    if (value === null || value === undefined || value === '') {
+      delete newAttrs[attrName];
+    }
+    setFieldValue('custom_attributes', newAttrs);
+    // Mark field as touched to trigger validation
+    if (setFieldTouched) {
+      const fieldPath = `custom_attributes.${attrName}`;
+      setFieldTouched(fieldPath, true);
+      // Trigger validation immediately
+      if (validateField) {
+        setTimeout(() => {
+          validateField(fieldPath);
+        }, 0);
+      }
+    }
+  };
+
+  const handleCustomAttributeBlur = (attrName: string) => {
+    if (setFieldTouched && validateField) {
+      const fieldPath = `custom_attributes.${attrName}`;
+      setFieldTouched(fieldPath, true);
+      validateField(fieldPath);
+    }
   };
 
   const handleDoubleEntryToggle = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -338,6 +366,7 @@ const SampleDetailsStep: React.FC<SampleDetailsStepProps> = ({
                         config={config}
                         value={fieldValue}
                         onChange={(value) => handleCustomAttributeChange(config.attr_name, value)}
+                        onBlur={() => handleCustomAttributeBlur(config.attr_name)}
                         error={fieldTouched && !!fieldError}
                         helperText={fieldTouched && fieldError ? String(fieldError) : undefined}
                       />

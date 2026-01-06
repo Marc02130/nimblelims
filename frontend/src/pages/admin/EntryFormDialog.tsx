@@ -8,6 +8,8 @@ import {
   TextField,
   Box,
   Alert,
+  FormControlLabel,
+  Checkbox,
 } from '@mui/material';
 import { Formik, Form, Field } from 'formik';
 import * as Yup from 'yup';
@@ -19,10 +21,11 @@ interface EntryFormDialogProps {
     id: string;
     name: string;
     description?: string;
+    active?: boolean;
   } | null;
   existingNames: string[];
   onClose: () => void;
-  onSubmit: (data: { name: string; description?: string }) => Promise<void>;
+  onSubmit: (data: { name: string; description?: string; active: boolean }) => Promise<void>;
 }
 
 const validationSchema = Yup.object({
@@ -49,9 +52,10 @@ const EntryFormDialog: React.FC<EntryFormDialogProps> = ({
   const initialValues = {
     name: entry?.name || '',
     description: entry?.description || '',
+    active: entry?.active !== undefined ? entry.active : true,
   };
 
-  const handleSubmit = async (values: { name: string; description?: string }) => {
+  const handleSubmit = async (values: { name: string; description?: string; active: boolean }) => {
     setLoading(true);
     setError(null);
 
@@ -66,6 +70,7 @@ const EntryFormDialog: React.FC<EntryFormDialogProps> = ({
       await onSubmit({
         name: values.name,
         description: values.description || undefined,
+        active: values.active,
       });
       onClose();
     } catch (err: any) {
@@ -124,6 +129,22 @@ const EntryFormDialog: React.FC<EntryFormDialogProps> = ({
                       margin="normal"
                       helperText={meta.touched && meta.error ? meta.error : 'Optional description for this entry'}
                       error={meta.touched && !!meta.error}
+                    />
+                  )}
+                </Field>
+
+                <Field name="active">
+                  {({ field }: any) => (
+                    <FormControlLabel
+                      control={
+                        <Checkbox
+                          {...field}
+                          checked={field.value}
+                          color="primary"
+                        />
+                      }
+                      label="Active"
+                      sx={{ mt: 2 }}
                     />
                   )}
                 </Field>

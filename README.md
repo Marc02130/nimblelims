@@ -1,6 +1,6 @@
 # NimbleLIMS - Laboratory Information Management System
 
-A modern, API-first Laboratory Information Management System built with FastAPI, React, and PostgreSQL. NimbleLIMS provides a unified sidebar navigation system for consistent access to all features across the application.
+A modern, API-first Laboratory Information Management System (LIMS) built with FastAPI, React, and PostgreSQL. NimbleLIMS provides a unified sidebar navigation system for consistent access to all features across the application.
 
 ## License
 

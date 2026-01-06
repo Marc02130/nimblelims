@@ -129,13 +129,13 @@ const ListsManagement: React.FC = () => {
     }
   };
 
-  const handleCreateEntry = async (data: { name: string; description?: string }) => {
+  const handleCreateEntry = async (data: { name: string; description?: string; active: boolean }) => {
     if (!selectedList) return;
     await apiService.createListEntry(selectedList.name, data);
     await loadLists();
   };
 
-  const handleUpdateEntry = async (data: { name: string; description?: string }) => {
+  const handleUpdateEntry = async (data: { name: string; description?: string; active: boolean }) => {
     if (!selectedList || !selectedEntry) return;
     await apiService.updateListEntry(selectedList.name, selectedEntry.id, data);
     await loadLists();
@@ -270,6 +270,19 @@ const ListsManagement: React.FC = () => {
       headerName: 'Description',
       width: 250,
       flex: 1,
+    },
+    {
+      field: 'active',
+      headerName: 'Active',
+      width: 100,
+      type: 'boolean',
+      renderCell: (params) => (
+        <Chip
+          label={params.value ? 'Active' : 'Inactive'}
+          size="small"
+          color={params.value ? 'success' : 'default'}
+        />
+      ),
     },
     {
       field: 'actions',

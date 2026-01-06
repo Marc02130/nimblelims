@@ -14,6 +14,8 @@ import {
   Select,
   Typography,
   Chip,
+  FormControlLabel,
+  Checkbox,
 } from '@mui/material';
 import { Formik, Form, Field } from 'formik';
 import * as Yup from 'yup';
@@ -58,7 +60,8 @@ const validationSchema = Yup.object({
   data_type: Yup.string()
     .required('Data type is required')
     .oneOf(['text', 'number', 'date', 'boolean', 'select'], 'Invalid data type'),
-  validation_rules: Yup.string().test(
+  validation_rules: Yup.string()
+    .test(
     'is-valid-json',
     'Validation rules must be valid JSON',
     (value) => {
@@ -70,6 +73,102 @@ const validationSchema = Yup.object({
         return false;
       }
     }
+    )
+    .test(
+      'validate-number-rules',
+      function (value) {
+        const { data_type } = this.parent;
+        if (!value || value.trim() === '' || data_type !== 'number') return true;
+        try {
+          const parsed = JSON.parse(value);
+          if (parsed.min !== undefined && parsed.max !== undefined) {
+            if (parsed.min > parsed.max) {
+              return this.createError({
+                message: 'Minimum value must be less than or equal to maximum value',
+              });
+            }
+          }
+          if (parsed.min !== undefined && typeof parsed.min !== 'number') {
+            return this.createError({
+              message: 'Minimum value must be a number',
+            });
+          }
+          if (parsed.max !== undefined && typeof parsed.max !== 'number') {
+            return this.createError({
+              message: 'Maximum value must be a number',
+            });
+          }
+          return true;
+        } catch {
+          return true; // JSON parsing error is handled by is-valid-json test
+        }
+      }
+    )
+    .test(
+      'validate-date-rules',
+      function (value) {
+        const { data_type } = this.parent;
+        if (!value || value.trim() === '' || data_type !== 'date') return true;
+        try {
+          const parsed = JSON.parse(value);
+          if (parsed.min_date !== undefined && parsed.max_date !== undefined) {
+            const minDate = new Date(parsed.min_date);
+            const maxDate = new Date(parsed.max_date);
+            if (isNaN(minDate.getTime()) || isNaN(maxDate.getTime())) {
+              return this.createError({
+                message: 'min_date and max_date must be valid ISO date strings (YYYY-MM-DD)',
+              });
+            }
+            if (minDate > maxDate) {
+              return this.createError({
+                message: 'Minimum date must be less than or equal to maximum date',
+              });
+            }
+          }
+          if (parsed.min_date !== undefined) {
+            const minDate = new Date(parsed.min_date);
+            if (isNaN(minDate.getTime())) {
+              return this.createError({
+                message: 'min_date must be a valid ISO date string (YYYY-MM-DD)',
+              });
+            }
+          }
+          if (parsed.max_date !== undefined) {
+            const maxDate = new Date(parsed.max_date);
+            if (isNaN(maxDate.getTime())) {
+              return this.createError({
+                message: 'max_date must be a valid ISO date string (YYYY-MM-DD)',
+              });
+            }
+          }
+          return true;
+        } catch {
+          return true; // JSON parsing error is handled by is-valid-json test
+        }
+      }
+    )
+    .test(
+      'validate-select-rules',
+      function (value) {
+        const { data_type } = this.parent;
+        if (!value || value.trim() === '' || data_type !== 'select') return true;
+        try {
+          const parsed = JSON.parse(value);
+          if (!parsed.options || !Array.isArray(parsed.options)) {
+            return this.createError({
+              message: 'Select data type requires an "options" array in validation rules',
+            });
+          }
+          if (parsed.options.length === 0) {
+            return this.createError({
+              message: 'Options array cannot be empty',
+            });
+          }
+          return true;
+        } catch {
+          return true; // JSON parsing error is handled by is-valid-json test
+        }
+      }
   ),
   description: Yup.string().max(500, 'Description must be less than 500 characters'),
   active: Yup.boolean(),
@@ -95,11 +194,11 @@ const CustomFieldDialog: React.FC<CustomFieldDialogProps> = ({
     entity_type: config?.entity_type || '',
     attr_name: config?.attr_name || '',
     data_type: config?.data_type || 'text',
+    active: config?.active !== undefined ? config.active : true,
     validation_rules: config?.validation_rules
       ? JSON.stringify(config.validation_rules, null, 2)
       : '',
     description: config?.description || '',
-    active: config?.active ?? true,
   };
 
   const handleSubmit = async (values: {
@@ -159,6 +258,29 @@ const CustomFieldDialog: React.FC<CustomFieldDialogProps> = ({
         }
       }
 
+      if (values.data_type === 'date') {
+        if (parsedRules.min_date !== undefined && parsedRules.max_date !== undefined) {
+          try {
+            const minDate = new Date(parsedRules.min_date);
+            const maxDate = new Date(parsedRules.max_date);
+            if (isNaN(minDate.getTime()) || isNaN(maxDate.getTime())) {
+              setError('min_date and max_date must be valid ISO date strings (YYYY-MM-DD)');
+              setLoading(false);
+              return;
+            }
+            if (minDate > maxDate) {
+              setError('Minimum date must be less than or equal to maximum date');
+              setLoading(false);
+              return;
+            }
+          } catch (err) {
+            setError('Invalid date format. Use ISO date strings (YYYY-MM-DD)');
+            setLoading(false);
+            return;
+          }
+        }
+      }
+
       const submitData: any = {
         entity_type: values.entity_type,
         attr_name: values.attr_name,
@@ -208,17 +330,34 @@ const CustomFieldDialog: React.FC<CustomFieldDialogProps> = ({
   const getValidationRulesHelperText = (dataType: string): string => {
     switch (dataType) {
       case 'text':
-        return 'JSON object with optional: max_length (number), min_length (number). Example: {"max_length": 100, "min_length": 1}';
+        return 'JSON object with optional rules: max_length (number), min_length (number). Example: {"max_length": 100, "min_length": 1}';
       case 'number':
-        return 'JSON object with optional: min (number), max (number). Example: {"min": 0, "max": 100}';
+        return 'JSON object with optional rules: min (number), max (number). Example: {"min": 0, "max": 100}';
       case 'date':
-        return 'JSON object (currently no validation rules for dates). Example: {}';
+        return 'JSON object with optional: min_date (ISO date string), max_date (ISO date string). Example: {"min_date": "2024-01-01", "max_date": "2024-12-31"}';
       case 'boolean':
-        return 'JSON object (currently no validation rules for booleans). Example: {}';
+        return 'JSON object (no validation rules currently supported for booleans). Example: {}';
       case 'select':
         return 'JSON object with required: options (array of strings). Example: {"options": ["option1", "option2"]}';
       default:
         return 'Enter validation rules as JSON object';
+    }
+  };
+
+  const getValidationRulesHelpNote = (dataType: string): string => {
+    switch (dataType) {
+      case 'text':
+        return 'Available validation rules:\n• min_length (number): Minimum character length\n• max_length (number): Maximum character length\n\nExample: {"min_length": 1, "max_length": 255}';
+      case 'number':
+        return 'Available validation rules:\n• min (number): Minimum allowed value\n• max (number): Maximum allowed value\n\nNote: min must be ≤ max\nExample: {"min": 0, "max": 14}';
+      case 'date':
+        return 'Available validation rules:\n• min_date (ISO date string): Minimum allowed date (YYYY-MM-DD)\n• max_date (ISO date string): Maximum allowed date (YYYY-MM-DD)\n\nNote: min_date must be ≤ max_date\nExample: {"min_date": "2024-01-01", "max_date": "2024-12-31"}';
+      case 'boolean':
+        return 'No validation rules are currently supported for boolean fields.\nLeave empty or use: {}';
+      case 'select':
+        return 'Required validation rule:\n• options (array of strings): List of selectable options\n\nExample: {"options": ["Option 1", "Option 2", "Option 3"]}';
+      default:
+        return 'Enter validation rules as a JSON object based on the selected data type.';
     }
   };
 
@@ -230,7 +369,7 @@ const CustomFieldDialog: React.FC<CustomFieldDialogProps> = ({
         onSubmit={handleSubmit}
         enableReinitialize
       >
-        {({ values, errors, touched, isValid, setFieldValue }) => (
+        {({ values, errors, touched, isValid, setFieldValue, setFieldTouched }) => (
           <Form>
             <DialogTitle>{isEdit ? 'Edit Custom Field' : 'Create New Custom Field'}</DialogTitle>
             <DialogContent>
@@ -329,9 +468,21 @@ const CustomFieldDialog: React.FC<CustomFieldDialogProps> = ({
                 </FormControl>
 
                 <Field name="validation_rules">
-                  {({ field, meta }: any) => (
+                  {({ field, meta }: any) => {
+                    // Parse and validate on change for real-time feedback
+                    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+                      field.onChange(e);
+                      // Trigger validation after a short delay
+                      setTimeout(() => {
+                        setFieldTouched('validation_rules', true);
+                      }, 300);
+                    };
+
+                    return (
+                      <Box>
                     <TextField
                       {...field}
+                          onChange={handleChange}
                       label="Validation Rules"
                       fullWidth
                       multiline
@@ -345,7 +496,25 @@ const CustomFieldDialog: React.FC<CustomFieldDialogProps> = ({
                       error={meta.touched && !!meta.error}
                       placeholder='{"min": 0, "max": 100}'
                     />
-                  )}
+                        <Box
+                          sx={{
+                            mt: 1,
+                            p: 1.5,
+                            bgcolor: 'info.light',
+                            borderRadius: 1,
+                            border: '1px solid',
+                            borderColor: 'info.main',
+                          }}
+                        >
+                          <Typography variant="caption" component="div" sx={{ whiteSpace: 'pre-line', color: 'text.primary' }}>
+                            <strong>Validation Rules Help:</strong>
+                            <br />
+                            {getValidationRulesHelpNote(values.data_type)}
+                          </Typography>
+                        </Box>
+                      </Box>
+                    );
+                  }}
                 </Field>
 
                 <Field name="description">
@@ -363,22 +532,21 @@ const CustomFieldDialog: React.FC<CustomFieldDialogProps> = ({
                   )}
                 </Field>
 
-                <FormControl fullWidth margin="normal">
-                  <InputLabel>Status</InputLabel>
                   <Field name="active">
-                    {({ field, meta }: any) => (
-                      <Select
+                  {({ field }: any) => (
+                    <FormControlLabel
+                      control={
+                        <Checkbox
                         {...field}
-                        label="Status"
-                        value={field.value ? 'true' : 'false'}
-                        onChange={(e) => field.onChange(e.target.value === 'true')}
-                      >
-                        <MenuItem value="true">Active</MenuItem>
-                        <MenuItem value="false">Inactive</MenuItem>
-                      </Select>
+                          checked={field.value !== undefined ? field.value : true}
+                          color="primary"
+                        />
+                      }
+                      label="Active"
+                      sx={{ mt: 2 }}
+                    />
                     )}
                   </Field>
-                </FormControl>
               </Box>
             </DialogContent>
             <DialogActions>

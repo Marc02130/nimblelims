@@ -118,21 +118,39 @@ def _validate_attribute_value(
             try:
                 # Try parsing ISO format
                 parsed = datetime.fromisoformat(value.replace('Z', '+00:00'))
-                return parsed.date().isoformat()  # Return as ISO string for JSONB storage
+                date_value = parsed.date()
             except (ValueError, AttributeError):
                 try:
                     # Try parsing date-only format
                     from datetime import date
-                    parsed = date.fromisoformat(value)
-                    return parsed.isoformat()
+                    date_value = date.fromisoformat(value)
                 except (ValueError, AttributeError):
                     return None
         elif isinstance(value, datetime):
-            return value.date().isoformat()
+            date_value = value.date()
         elif hasattr(value, 'date'):  # date object
-            return value.isoformat()
+            date_value = value
         else:
             return None
+        
+        # Validate min_date and max_date if provided
+        if 'min_date' in validation_rules:
+            try:
+                min_date = datetime.fromisoformat(validation_rules['min_date']).date() if isinstance(validation_rules['min_date'], str) else validation_rules['min_date']
+                if date_value < min_date:
+                    return None
+            except (ValueError, AttributeError, TypeError):
+                pass  # Invalid min_date format, skip validation
+        
+        if 'max_date' in validation_rules:
+            try:
+                max_date = datetime.fromisoformat(validation_rules['max_date']).date() if isinstance(validation_rules['max_date'], str) else validation_rules['max_date']
+                if date_value > max_date:
+                    return None
+            except (ValueError, AttributeError, TypeError):
+                pass  # Invalid max_date format, skip validation
+        
+        return date_value.isoformat()
     
     elif data_type == "boolean":
         if isinstance(value, bool):

@@ -21,6 +21,20 @@ class ListEntryResponse(BaseModel):
         from_attributes = True
 
 
+class ListEntryCreate(BaseModel):
+    """Schema for creating a list entry"""
+    name: str
+    description: Optional[str] = None
+    active: bool = True
+
+
+class ListEntryUpdate(BaseModel):
+    """Schema for updating a list entry"""
+    name: Optional[str] = None
+    description: Optional[str] = None
+    active: Optional[bool] = None
+
+
 class ListResponse(BaseModel):
     """Schema for list response"""
     id: UUID
