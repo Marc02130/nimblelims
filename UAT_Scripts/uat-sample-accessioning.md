@@ -60,7 +60,7 @@ Complete single sample accessioning workflow with all required fields, container
 | 3.4 | Select Received Date: `2025-01-15` (defaults to today) | Date selected, displayed correctly |
 | 3.5 | Select Sample Type: `Blood` (from dropdown) | Option selected from `sample_types` list |
 | 3.6 | Verify Status: `Received` (pre-selected or selectable) | Status available from `sample_status` list |
-| 3.7 | Select Matrix: `Serum` (from dropdown) | Option selected from `matrix_types` list |
+| 3.7 | Select Matrix: `Soil` (from dropdown) | Option selected from `matrix_types` list |
 | 3.8 | Enter Temperature: `4.0` | Field accepts numeric input, validated range (-273.15 to 1000) |
 | 3.9 | Select Project: `Project Alpha` (from filtered dropdown) | Only projects user has access to are shown |
 | 3.10 | Select QC Type: `Sample` (optional, from dropdown) | Option selected from `qc_types` list |
@@ -349,8 +349,11 @@ Verify Row-Level Security (RLS) prevents sample accessioning when user lacks pro
 - `Urine`
 
 ### Matrix Types
-- `Serum`
-- `Plasma`
+- `Sludge`
+- `Ground Water`
+- `Soil`
+- `Air`
+- `Drinking Water`
 
 ### Analyses
 - `EPA Method 8080`

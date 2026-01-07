@@ -144,9 +144,11 @@ Defines types of samples:
 
 Defines sample matrix categories:
 
-- **Human**: Human-derived matrix
-- **Environmental**: Environmental matrix
-- **Food**: Food matrix
+- **Sludge**: Sludge matrix
+- **Ground Water**: Ground Water matrix
+- **Soil**: Soil matrix
+- **Air**: Air matrix
+- **Drinking Water**: Drinking Water matrix
 
 **Usage**:
 - `samples.matrix` FK to list_entries.id
