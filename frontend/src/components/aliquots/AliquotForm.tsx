@@ -122,8 +122,8 @@ const AliquotForm: React.FC<AliquotFormProps> = ({ parentSampleId, onSuccess, on
     }
   };
 
-  const concentrationUnits = units.filter(unit => unit.type === 'concentration');
-  const amountUnits = units.filter(unit => unit.type === 'mass' || unit.type === 'volume');
+  const concentrationUnits = units.filter(unit => unit.type_name === 'concentration');
+  const amountUnits = units.filter(unit => unit.type_name === 'mass' || unit.type_name === 'volume');
 
   return (
     <LocalizationProvider dateAdapter={AdapterDateFns}>

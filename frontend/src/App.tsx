@@ -12,6 +12,7 @@ import Login from './pages/Login';
 import AdminOverview from './pages/admin/AdminOverview';
 import ListsManagement from './pages/admin/ListsManagement';
 import ContainerTypesManagement from './pages/admin/ContainerTypesManagement';
+import UnitsManagement from './pages/admin/UnitsManagement';
 import UsersManagement from './pages/admin/UsersManagement';
 import RolesManagement from './pages/admin/RolesManagement';
 import AnalysesManagement from './pages/admin/AnalysesManagement';
@@ -174,6 +175,16 @@ function AppRoutes() {
           element={
             hasPermission('config:edit') ? (
               <ContainerTypesManagement />
+            ) : (
+              <Navigate to="/dashboard" replace />
+            )
+          }
+        />
+        <Route
+          path="/admin/units"
+          element={
+            hasPermission('config:edit') ? (
+              <UnitsManagement />
             ) : (
               <Navigate to="/dashboard" replace />
             )

@@ -33,6 +33,7 @@ import {
   Business as BusinessIcon,
   Tune as TuneIcon,
   Help as HelpIcon,
+  Straighten as StraightenIcon,
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useUser } from '../contexts/UserContext';
@@ -174,6 +175,11 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onMobileClose, collapsed 
       text: 'Container Types',
       path: '/admin/container-types',
       icon: <InventoryIcon />,
+    },
+    {
+      text: 'Units Management',
+      path: '/admin/units',
+      icon: <StraightenIcon />,
     },
     {
       text: 'Users Management',

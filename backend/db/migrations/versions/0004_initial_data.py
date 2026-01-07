@@ -74,9 +74,11 @@ def upgrade() -> None:
         {'list_id': '55555555-5555-5555-5555-555555555555', 'name': 'Water', 'description': 'Water sample'},
         
         # Matrix Types
-        {'list_id': '66666666-6666-6666-6666-666666666666', 'name': 'Human', 'description': 'Human matrix'},
-        {'list_id': '66666666-6666-6666-6666-666666666666', 'name': 'Environmental', 'description': 'Environmental matrix'},
-        {'list_id': '66666666-6666-6666-6666-666666666666', 'name': 'Food', 'description': 'Food matrix'},
+        {'list_id': '66666666-6666-6666-6666-666666666666', 'name': 'Sludge', 'description':  'Sludge'},
+        {'list_id': '66666666-6666-6666-6666-666666666666', 'name': 'Ground Water', 'description': 'Ground Water'},
+        {'list_id': '66666666-6666-6666-6666-666666666666', 'name': 'Soil', 'description': 'Soil'},
+        {'list_id': '66666666-6666-6666-6666-666666666666', 'name': 'Air', 'description': 'Air'},
+        {'list_id': '66666666-6666-6666-6666-666666666666', 'name': 'Drinking Water', 'description': 'Drinking Water'},
         
         # QC Types
         {'list_id': '77777777-7777-7777-7777-777777777777', 'name': 'Sample', 'description': 'Regular sample'},
