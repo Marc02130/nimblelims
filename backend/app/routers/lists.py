@@ -8,7 +8,7 @@ from app.database import get_db
 from models.list import List as ListModel, ListEntry
 from models.user import User
 from app.schemas.list import ListEntryResponse, ListResponse, ListEntryCreate, ListEntryUpdate
-from app.core.security import get_current_user
+from app.core.security import get_current_user, get_user_permissions
 from app.core.rbac import require_config_edit
 from datetime import datetime
 from uuid import UUID
@@ -23,14 +23,26 @@ async def get_lists(
 ):
     """
     Get all active lists with their entries.
+    For users with config:edit permission, returns all entries (active and inactive).
+    For other users, returns only active entries.
     """
+    # Check if user has config:edit permission
+    user_permissions = get_user_permissions(current_user, db)
+    has_config_edit = "config:edit" in user_permissions
+    
     lists = db.query(ListModel).filter(ListModel.active == True).all()
     result = []
     for list_obj in lists:
-        entries = db.query(ListEntry).filter(
-            ListEntry.list_id == list_obj.id,
-            ListEntry.active == True
-        ).all()
+        # If user has config:edit permission, show all entries; otherwise, only active
+        if has_config_edit:
+            entries = db.query(ListEntry).filter(
+                ListEntry.list_id == list_obj.id
+            ).all()
+        else:
+            entries = db.query(ListEntry).filter(
+                ListEntry.list_id == list_obj.id,
+                ListEntry.active == True
+            ).all()
         list_response = ListResponse(
             id=list_obj.id,
             name=list_obj.name,
@@ -52,8 +64,13 @@ async def get_list_entries(
 ):
     """
     Get all entries for a specific list by list name.
-    Returns only active entries.
+    For users with config:edit permission, returns all entries (active and inactive).
+    For other users, returns only active entries.
     """
+    # Check if user has config:edit permission
+    user_permissions = get_user_permissions(current_user, db)
+    has_config_edit = "config:edit" in user_permissions
+    
     # Find the list by name
     list_obj = db.query(ListModel).filter(
         ListModel.name == list_name,
@@ -66,11 +83,16 @@ async def get_list_entries(
             detail=f"List '{list_name}' not found"
         )
     
-    # Get all active entries for this list
-    entries = db.query(ListEntry).filter(
-        ListEntry.list_id == list_obj.id,
-        ListEntry.active == True
-    ).order_by(ListEntry.name).all()
+    # If user has config:edit permission, show all entries; otherwise, only active
+    if has_config_edit:
+        entries = db.query(ListEntry).filter(
+            ListEntry.list_id == list_obj.id
+        ).order_by(ListEntry.name).all()
+    else:
+        entries = db.query(ListEntry).filter(
+            ListEntry.list_id == list_obj.id,
+            ListEntry.active == True
+        ).order_by(ListEntry.name).all()
     
     return [ListEntryResponse.from_orm(entry) for entry in entries]
 

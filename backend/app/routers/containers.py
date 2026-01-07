@@ -16,7 +16,7 @@ from app.core.rbac import (
     require_sample_create, require_sample_read, require_sample_update,
     require_config_edit
 )
-from app.core.security import get_current_user
+from app.core.security import get_current_user, get_user_permissions
 from datetime import datetime
 from uuid import UUID
 
@@ -31,8 +31,18 @@ async def get_container_types(
 ):
     """
     Get all container types.
+    For users with config:edit permission, returns all container types (active and inactive).
+    For other users, returns only active container types.
     """
-    container_types = db.query(ContainerType).filter(ContainerType.active == True).all()
+    # Check if user has config:edit permission
+    user_permissions = get_user_permissions(current_user, db)
+    has_config_edit = "config:edit" in user_permissions
+    
+    # If user has config:edit permission, show all container types; otherwise, only active
+    if has_config_edit:
+        container_types = db.query(ContainerType).all()
+    else:
+        container_types = db.query(ContainerType).filter(ContainerType.active == True).all()
     return [ContainerTypeResponse.from_orm(ct) for ct in container_types]
 
 
