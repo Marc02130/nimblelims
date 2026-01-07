@@ -15,7 +15,7 @@ from app.schemas.analysis import (
     AnalyteRuleCreate,
     AnalyteRuleUpdate,
 )
-from app.core.security import get_current_user
+from app.core.security import get_current_user, get_user_permissions
 from app.core.rbac import require_any_permission
 from uuid import UUID
 
@@ -28,9 +28,19 @@ async def get_analyses(
     db: Session = Depends(get_db)
 ):
     """
-    Get all active analyses.
+    Get all analyses.
+    For users with config:edit permission, returns all analyses (active and inactive).
+    For other users, returns only active analyses.
     """
-    analyses = db.query(Analysis).filter(Analysis.active == True).order_by(Analysis.name).all()
+    # Check if user has config:edit permission
+    user_permissions = get_user_permissions(current_user, db)
+    has_config_edit = "config:edit" in user_permissions
+    
+    # If user has config:edit permission, show all analyses; otherwise, only active
+    if has_config_edit:
+        analyses = db.query(Analysis).order_by(Analysis.name).all()
+    else:
+        analyses = db.query(Analysis).filter(Analysis.active == True).order_by(Analysis.name).all()
     return [AnalysisResponse.from_orm(analysis) for analysis in analyses]
 
 
