@@ -421,6 +421,14 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
   - `projects_access`: `is_admin() OR has_project_access(id)`
   - `tests_access`: Checks access via sample's project
   - `results_access`: Checks access via test → sample → project
+  - `client_projects_access`: 
+    - Administrators: All client projects
+    - Client users: Client projects matching their `client_id`
+    - Lab Technicians and Lab Managers: All active client projects (for sample creation workflows)
+- **SQLAlchemy RLS Implementation Note**: 
+  - SQLAlchemy's `query.count()` wraps queries in subqueries which can break RLS evaluation
+  - For Lab Technician/Manager roles accessing `client_projects`, the implementation uses `func.count()` directly instead of `query.count()` to avoid subquery wrapping
+  - This ensures RLS policies are properly evaluated at the database level
 
 ### Schema
 - **`role_permissions` junction table**:

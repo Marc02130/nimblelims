@@ -137,6 +137,10 @@ Copyright (c) 2025 Marc Breneiser
 
 #### Client Projects
 - `GET /client-projects` - List client projects
+  - Administrators: All client projects
+  - Client users: Client projects matching their `client_id` (RLS enforced)
+  - Lab Technicians and Lab Managers: All active client projects (RLS enforced, for sample creation workflows)
+  - **Implementation Note**: For Lab Technician/Manager roles, uses `func.count()` directly instead of `query.count()` to avoid SQLAlchemy subquery wrapping that can interfere with RLS evaluation
 - `POST /client-projects` - Create client project (requires project:manage)
 - `GET /client-projects/{id}` - Get client project details
 - `PATCH /client-projects/{id}` - Update client project

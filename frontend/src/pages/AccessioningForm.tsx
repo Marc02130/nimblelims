@@ -441,8 +441,6 @@ const AccessioningForm: React.FC = () => {
         apiService.getUnits(),
       ]);
 
-      console.log('Client projects loaded:', clientProjectsArray.length, clientProjectsArray);
-
       setLookupData({
         sampleTypes,
         statuses,
