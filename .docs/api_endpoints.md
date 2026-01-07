@@ -1020,6 +1020,14 @@ Remove analysis from battery.
 ### GET /client-projects
 List client projects accessible to the current user.
 
+**Access Control:**
+- Administrators: See all client projects
+- Client users: See only client projects matching their `client_id` (enforced by RLS)
+- Lab Technicians and Lab Managers: See all active client projects (enforced by RLS, for sample creation workflows)
+
+**Implementation Note:** 
+For Lab Technician and Lab Manager roles, the endpoint uses `func.count()` directly instead of `query.count()` to avoid SQLAlchemy subquery wrapping that can interfere with RLS evaluation. This ensures PostgreSQL RLS policies are properly applied at the database level.
+
 **Requires:** `project:manage` permission
 
 ### POST /client-projects

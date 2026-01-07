@@ -350,6 +350,16 @@ WHERE custom_attributes @> '{"ph_level": 7.5}'::jsonb;
   - GET /containers/{id}: Retrieve with hierarchy/contents.
 - **Projects**:
   - GET /projects: List projects accessible to user (RBAC enforced).
+- **Client Projects**:
+  - GET /client-projects: List client projects accessible to user (RLS enforced).
+    - Administrators: All client projects
+    - Client users: Client projects matching their `client_id`
+    - Lab Technicians and Lab Managers: All active client projects (for sample creation workflows)
+  - POST /client-projects: Create client project (requires project:manage).
+  - GET /client-projects/{id}: Get client project details.
+  - PATCH /client-projects/{id}: Update client project.
+  - DELETE /client-projects/{id}: Soft-delete client project.
+  - **Implementation Note**: For Lab Technician/Manager roles, the GET endpoint uses `func.count()` directly instead of `query.count()` to avoid SQLAlchemy subquery wrapping that can interfere with RLS evaluation. This ensures PostgreSQL RLS policies are properly applied.
 - **Users**:
   - GET /users: List users (admin, requires user:manage or config:edit).
   - POST /users: Create user (admin).

@@ -139,7 +139,7 @@ WHERE p.client_project_id = '{client_project_uuid}'
 AND s.active = true
 ```<br>Returns samples from all linked projects |
 | **Aggregation Results** | - Total samples: Sum of samples from all linked projects<br>- Reported samples: Count of samples with status "Reported" across all projects<br>- Status breakdown: Aggregated counts per status |
-| **RLS Access** | - User can access samples from all linked projects<br>  - Via `has_project_access()` function checking `client_project_id`<br>  - Or via direct `project_users` access to each project |
+| **RLS Access** | - User can access samples from all linked projects<br>  - Via `has_project_access()` function checking `client_project_id`<br>  - Or via direct `project_users` access to each project<br>- **Client Projects RLS**: Lab Technicians and Lab Managers can access all active client projects via RLS policy `client_projects_access` |
 | **UI Display** | - Client project details show linked projects count<br>- Reporting view aggregates data across linked projects<br>- Sample list includes samples from all linked projects when filtered by client project |
 
 ### Test Steps - Create Client Project Link (Optional)
