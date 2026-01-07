@@ -8,6 +8,7 @@ import hashlib
 from fastapi import HTTPException, status, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 from app.database import get_db
 from models.user import User, Role, Permission
 from app.schemas.auth import TokenData
@@ -102,6 +103,9 @@ def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
     
+    # Set the user ID in the database session for RLS policies
+    set_current_user_id(str(user.id), db)
+    
     return user
 
 def get_user_permissions(user: User, db: Session) -> List[str]:
@@ -130,6 +134,8 @@ def require_permission(permission: str):
 
 def set_current_user_id(user_id: str, db: Session):
     """Set current user ID in database session for RLS"""
-    # This would be used to set the current_user_id for Row Level Security
-    # Implementation depends on your RLS setup
-    pass
+    # Set the PostgreSQL session variable that RLS policies use
+    # Use SET (session-level) not SET LOCAL (transaction-level)
+    # This persists for the entire database session/connection
+    db.execute(text(f"SET app.current_user_id = '{user_id}'"))
+    # No commit needed - SET is immediate and session-scoped

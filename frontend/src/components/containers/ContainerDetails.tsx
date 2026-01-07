@@ -271,7 +271,7 @@ const ContainerDetails: React.FC<ContainerDetailsProps> = ({
                         error={touched.concentration_units && !!errors.concentration_units}
                       >
                         {lookupData.units
-                          .filter((unit) => unit.type === 'concentration')
+                          .filter((unit) => unit.type_name === 'concentration')
                           .map((unit) => (
                             <MenuItem key={unit.id} value={unit.id}>
                               {unit.name}
@@ -305,7 +305,7 @@ const ContainerDetails: React.FC<ContainerDetailsProps> = ({
                         error={touched.amount_units && !!errors.amount_units}
                       >
                         {lookupData.units
-                          .filter((unit) => unit.type === 'mass' || unit.type === 'volume')
+                          .filter((unit) => unit.type_name === 'mass' || unit.type_name === 'volume')
                           .map((unit) => (
                             <MenuItem key={unit.id} value={unit.id}>
                               {unit.name}

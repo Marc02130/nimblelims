@@ -157,7 +157,7 @@ const ContainerForm: React.FC<ContainerFormProps> = ({
                   >
                     <MenuItem value="">None</MenuItem>
                     {lookupData.units
-                      .filter((unit) => unit.type === 'concentration')
+                      .filter((unit) => unit.type_name === 'concentration')
                       .map((unit) => (
                         <MenuItem key={unit.id} value={unit.id}>
                           {unit.name}
@@ -192,7 +192,7 @@ const ContainerForm: React.FC<ContainerFormProps> = ({
                   >
                     <MenuItem value="">None</MenuItem>
                     {lookupData.units
-                      .filter((unit) => unit.type === 'mass' || unit.type === 'volume')
+                      .filter((unit) => unit.type_name === 'mass' || unit.type_name === 'volume')
                       .map((unit) => (
                         <MenuItem key={unit.id} value={unit.id}>
                           {unit.name}

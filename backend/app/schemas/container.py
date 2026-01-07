@@ -37,9 +37,9 @@ class ContainerTypeResponse(ContainerTypeBase):
     id: UUID
     active: bool
     created_at: datetime
-    created_by: UUID
+    created_by: Optional[UUID] = None
     modified_at: datetime
-    modified_by: UUID
+    modified_by: Optional[UUID] = None
 
     class Config:
         from_attributes = True
@@ -95,9 +95,9 @@ class ContainerResponse(ContainerBase):
     id: UUID
     active: bool
     created_at: datetime
-    created_by: UUID
+    created_by: Optional[UUID] = None
     modified_at: datetime
-    modified_by: UUID
+    modified_by: Optional[UUID] = None
 
     class Config:
         from_attributes = True

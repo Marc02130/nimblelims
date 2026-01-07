@@ -51,6 +51,7 @@ interface SampleFormData {
   temperature: number;
   anomalies: string;
   project_id: string;
+  client_id: string;
   client_project_id: string;
   qc_type: string;
   
@@ -66,10 +67,6 @@ interface SampleFormData {
   container_name: string;
   container_row: number;
   container_column: number;
-  container_concentration: number | null;
-  container_concentration_units: string;
-  container_amount: number | null;
-  container_amount_units: string;
   
   // Bulk mode specific
   bulk_uniques: BulkUnique[];
@@ -94,6 +91,7 @@ const initialValues: SampleFormData = {
   temperature: 0,
   anomalies: '',
   project_id: '',
+  client_id: '',
   client_project_id: '',
   qc_type: '',
   custom_attributes: {},
@@ -103,10 +101,6 @@ const initialValues: SampleFormData = {
   container_name: '',
   container_row: 1,
   container_column: 1,
-  container_concentration: null,
-  container_concentration_units: '',
-  container_amount: null,
-  container_amount_units: '',
   bulk_uniques: [{ id: '1', container_name: '', custom_attributes: {} }],
   auto_name_prefix: '',
   auto_name_start: 1,
@@ -237,18 +231,6 @@ const getValidationSchema = (bulkMode: boolean, customAttributeConfigs: any[] = 
     matrix: Yup.string().required('Matrix is required'),
     project_id: Yup.string().required('Project is required'),
     container_type_id: Yup.string().required('Container type is required'),
-    container_concentration: Yup.number().nullable().min(0, 'Concentration must be positive or zero'),
-    container_amount: Yup.number().nullable().min(0, 'Amount must be positive or zero'),
-    container_concentration_units: Yup.string().when('container_concentration', {
-      is: (val: number | null) => val !== null && val !== undefined && val > 0,
-      then: (schema: any) => schema.required('Concentration units are required when concentration is specified'),
-      otherwise: (schema: any) => schema.notRequired(),
-    }),
-    container_amount_units: Yup.string().when('container_amount', {
-      is: (val: number | null) => val !== null && val !== undefined && val > 0,
-      then: (schema: any) => schema.required('Amount units are required when amount is specified'),
-      otherwise: (schema: any) => schema.notRequired(),
-    }),
   };
 
   if (!bulkMode) {
@@ -369,12 +351,25 @@ const AccessioningForm: React.FC = () => {
   const [success, setSuccess] = useState<string | null>(null);
   const [aliquotDialogOpen, setAliquotDialogOpen] = useState(false);
   const [createdSample, setCreatedSample] = useState<any>(null);
-  const [lookupData, setLookupData] = useState({
+  const [lookupData, setLookupData] = useState<{
+    sampleTypes: any[];
+    statuses: any[];
+    matrices: any[];
+    qcTypes: any[];
+    projects: any[];
+    clients: any[];
+    clientProjects: any[];
+    analyses: any[];
+    batteries: any[];
+    containerTypes: any[];
+    units: any[];
+  }>({
     sampleTypes: [],
     statuses: [],
     matrices: [],
     qcTypes: [],
     projects: [],
+    clients: [],
     clientProjects: [],
     analyses: [],
     batteries: [],
@@ -392,13 +387,42 @@ const AccessioningForm: React.FC = () => {
 
   const loadLookupData = async () => {
     try {
+      // Helper function to fetch all client projects (handles pagination)
+      const fetchAllClientProjects = async () => {
+        let allProjects: any[] = [];
+        let page = 1;
+        const pageSize = 100;
+        let hasMore = true;
+
+        while (hasMore) {
+          try {
+            const response = await apiService.getClientProjects({ page, size: pageSize });
+            const projects = response.client_projects || response || [];
+            allProjects = [...allProjects, ...projects];
+            
+            // Check if there are more pages
+            if (response.pages && page < response.pages) {
+              page++;
+            } else {
+              hasMore = false;
+            }
+          } catch (err) {
+            console.error('Error fetching client projects:', err);
+            hasMore = false;
+          }
+        }
+        
+        return allProjects;
+      };
+
       const [
         sampleTypes,
         statuses,
         matrices,
         qcTypes,
         projects,
-        clientProjects,
+        clients,
+        clientProjectsArray,
         analyses,
         batteries,
         containerTypes,
@@ -409,12 +433,15 @@ const AccessioningForm: React.FC = () => {
         apiService.getListEntries('matrix_types'),
         apiService.getListEntries('qc_types'),
         apiService.getProjects(),
-        apiService.getClientProjects().catch(() => ({ client_projects: [] })),
+        apiService.getClients().catch(() => []),
+        fetchAllClientProjects().catch(() => []),
         apiService.getAnalyses(),
         apiService.getTestBatteries().catch(() => ({ batteries: [] })),
         apiService.getContainerTypes(),
         apiService.getUnits(),
       ]);
+
+      console.log('Client projects loaded:', clientProjectsArray.length, clientProjectsArray);
 
       setLookupData({
         sampleTypes,
@@ -422,7 +449,8 @@ const AccessioningForm: React.FC = () => {
         matrices,
         qcTypes,
         projects,
-        clientProjects: clientProjects.client_projects || clientProjects || [],
+        clients: Array.isArray(clients) ? clients : [],
+        clientProjects: Array.isArray(clientProjectsArray) ? clientProjectsArray : [],
         analyses,
         batteries: batteries.batteries || batteries || [],
         containerTypes,
@@ -506,20 +534,6 @@ const AccessioningForm: React.FC = () => {
           column: values.container_column || 1,
         };
 
-        if (values.container_concentration !== null && values.container_concentration !== undefined) {
-          containerData.concentration = values.container_concentration;
-          if (values.container_concentration_units) {
-            containerData.concentration_units = values.container_concentration_units;
-          }
-        }
-
-        if (values.container_amount !== null && values.container_amount !== undefined) {
-          containerData.amount = values.container_amount;
-          if (values.container_amount_units) {
-            containerData.amount_units = values.container_amount_units;
-          }
-        }
-
         const container = await apiService.createContainer(containerData);
 
         // Step 2: Create sample
@@ -550,20 +564,6 @@ const AccessioningForm: React.FC = () => {
           container_id: container.id,
           sample_id: sample.id,
         };
-
-        if (values.container_concentration !== null && values.container_concentration !== undefined) {
-          contentData.concentration = values.container_concentration;
-          if (values.container_concentration_units) {
-            contentData.concentration_units = values.container_concentration_units;
-          }
-        }
-
-        if (values.container_amount !== null && values.container_amount !== undefined) {
-          contentData.amount = values.container_amount;
-          if (values.container_amount_units) {
-            contentData.amount_units = values.container_amount_units;
-          }
-        }
 
         await apiService.createContent(contentData);
 

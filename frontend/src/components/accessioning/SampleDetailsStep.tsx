@@ -46,6 +46,7 @@ interface SampleDetailsStepProps {
     matrices: any[];
     qcTypes: any[];
     projects: any[];
+    clients: any[];
     clientProjects: any[];
     containerTypes: any[];
     units: any[];
@@ -271,23 +272,9 @@ const SampleDetailsStep: React.FC<SampleDetailsStepProps> = ({
           )}
           
           <Grid size={{ xs: 12, sm: 6 }}>
+            <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
             <FormControl fullWidth>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
                 <InputLabel id="qc-type-label">QC Type</InputLabel>
-                <Tooltip
-                  title="QC: Blank—US-4. Quality control samples are used to ensure test accuracy. Blank samples contain no analyte and are used to verify the absence of contamination."
-                  arrow
-                  placement="top"
-                >
-                  <IconButton
-                    size="small"
-                    aria-label="QC Type help"
-                    sx={{ p: 0.5 }}
-                  >
-                    <HelpOutlineIcon fontSize="small" />
-                  </IconButton>
-                </Tooltip>
-              </Box>
               <Select
                 value={values.qc_type || ''}
                 onChange={(e) => setFieldValue('qc_type', e.target.value)}
@@ -302,6 +289,20 @@ const SampleDetailsStep: React.FC<SampleDetailsStepProps> = ({
                 ))}
               </Select>
             </FormControl>
+              <Tooltip
+                title="QC: Blank—US-4. Quality control samples are used to ensure test accuracy. Blank samples contain no analyte and are used to verify the absence of contamination."
+                arrow
+                placement="top"
+              >
+                <IconButton
+                  size="small"
+                  aria-label="QC Type help"
+                  sx={{ mt: 1.5, p: 0.5 }}
+                >
+                  <HelpOutlineIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            </Box>
           </Grid>
           
           <Grid size={{ xs: 12, sm: 6 }}>
@@ -316,6 +317,59 @@ const SampleDetailsStep: React.FC<SampleDetailsStepProps> = ({
                     {project.name}
                   </MenuItem>
                 ))}
+              </Select>
+            </FormControl>
+          </Grid>
+          
+          <Grid size={{ xs: 12, sm: 6 }}>
+            <FormControl fullWidth>
+              <InputLabel>Client</InputLabel>
+              <Select
+                value={values.client_id || ''}
+                onChange={(e) => {
+                  setFieldValue('client_id', e.target.value || undefined);
+                  // Clear client project when client changes
+                  setFieldValue('client_project_id', undefined);
+                }}
+                label="Client"
+              >
+                <MenuItem value="">None</MenuItem>
+                {lookupData.clients && lookupData.clients.length > 0 ? (
+                  lookupData.clients.map((client: any) => (
+                    <MenuItem key={client.id} value={client.id}>
+                      {client.name}
+                    </MenuItem>
+                  ))
+                ) : (
+                  <MenuItem disabled>No clients available</MenuItem>
+                )}
+              </Select>
+            </FormControl>
+          </Grid>
+          
+          <Grid size={{ xs: 12, sm: 6 }}>
+            <FormControl fullWidth>
+              <InputLabel>Client Project</InputLabel>
+              <Select
+                value={values.client_project_id || ''}
+                onChange={(e) => setFieldValue('client_project_id', e.target.value || undefined)}
+                label="Client Project"
+                disabled={!values.client_id}
+              >
+                <MenuItem value="">None</MenuItem>
+                {values.client_id && lookupData.clientProjects && lookupData.clientProjects.length > 0 ? (
+                  lookupData.clientProjects
+                    .filter((clientProject: any) => clientProject.client_id === values.client_id)
+                    .map((clientProject: any) => (
+                      <MenuItem key={clientProject.id} value={clientProject.id}>
+                        {clientProject.name}
+                      </MenuItem>
+                    ))
+                ) : (
+                  <MenuItem disabled>
+                    {!values.client_id ? 'Select a client first' : 'No client projects available'}
+                  </MenuItem>
+                )}
               </Select>
             </FormControl>
           </Grid>
@@ -447,75 +501,6 @@ const SampleDetailsStep: React.FC<SampleDetailsStepProps> = ({
             />
           </Grid>
 
-          <Grid size={{ xs: 12, sm: 6 }}>
-            <TextField
-              name="container_concentration"
-              label="Concentration"
-              type="number"
-              fullWidth
-              value={values.container_concentration || ''}
-              onChange={(e) => setFieldValue('container_concentration', e.target.value ? parseFloat(e.target.value) : null)}
-              inputProps={{ min: 0, step: 0.01 }}
-              helperText="Optional concentration value"
-            />
-          </Grid>
-
-          <Grid size={{ xs: 12, sm: 6 }}>
-            <FormControl fullWidth>
-              <InputLabel>Concentration Units</InputLabel>
-              <Select
-                value={values.container_concentration_units || ''}
-                onChange={(e) => setFieldValue('container_concentration_units', e.target.value)}
-              >
-                <MenuItem value="">None</MenuItem>
-                {lookupData.units
-                  .filter((unit) => {
-                    const unitType = unit.type?.name || unit.type;
-                    return unitType === 'concentration';
-                  })
-                  .map((unit) => (
-                    <MenuItem key={unit.id} value={unit.id}>
-                      {unit.name}
-                    </MenuItem>
-                  ))}
-              </Select>
-            </FormControl>
-          </Grid>
-
-          <Grid size={{ xs: 12, sm: 6 }}>
-            <TextField
-              name="container_amount"
-              label="Amount"
-              type="number"
-              fullWidth
-              value={values.container_amount || ''}
-              onChange={(e) => setFieldValue('container_amount', e.target.value ? parseFloat(e.target.value) : null)}
-              inputProps={{ min: 0, step: 0.01 }}
-              helperText="Optional amount value"
-            />
-          </Grid>
-
-          <Grid size={{ xs: 12, sm: 6 }}>
-            <FormControl fullWidth>
-              <InputLabel>Amount Units</InputLabel>
-              <Select
-                value={values.container_amount_units || ''}
-                onChange={(e) => setFieldValue('container_amount_units', e.target.value)}
-              >
-                <MenuItem value="">None</MenuItem>
-                {lookupData.units
-                  .filter((unit) => {
-                    const unitType = unit.type?.name || unit.type;
-                    return unitType === 'mass' || unitType === 'volume';
-                  })
-                  .map((unit) => (
-                    <MenuItem key={unit.id} value={unit.id}>
-                      {unit.name}
-                    </MenuItem>
-                  ))}
-              </Select>
-            </FormControl>
-          </Grid>
         </Grid>
           </>
         )}

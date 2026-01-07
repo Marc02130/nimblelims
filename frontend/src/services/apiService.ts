@@ -257,6 +257,21 @@ class ApiService {
     return response.data;
   }
 
+  async createUnit(unitData: any) {
+    const response: AxiosResponse = await this.api.post('/units', unitData);
+    return response.data;
+  }
+
+  async updateUnit(id: string, unitData: any) {
+    const response: AxiosResponse = await this.api.patch(`/units/${id}`, unitData);
+    return response.data;
+  }
+
+  async deleteUnit(id: string) {
+    const response: AxiosResponse = await this.api.delete(`/units/${id}`);
+    return response.data;
+  }
+
   // Container types endpoints
   async getContainerTypes() {
     const response: AxiosResponse = await this.api.get('/containers/types');
