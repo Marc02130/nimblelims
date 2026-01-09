@@ -839,11 +839,13 @@ class AnalysisAnalyte(Base):
 - Lab users: Can access projects they're assigned to
 
 ### Row-Level Security
-- PostgreSQL RLS policies enforce data isolation
+- PostgreSQL RLS policies enforce data isolation at the database level
 - Client users see only their own data
-- Lab users see data for accessible projects
+- Lab users see data for accessible projects (via `project_users` junction table)
 - `custom_attributes_config` table has RLS policy: admins see all, others see only active configs
 - Entity `custom_attributes` JSONB columns are subject to existing entity-level RLS policies
+- **Samples Endpoint Implementation**: The `GET /samples` endpoint relies entirely on RLS for access control - no Python-level filtering is applied. The RLS policy `samples_access` uses `has_project_access(project_id)` to automatically filter samples based on user's project access.
+- **Session Variable**: The `app.current_user_id` session variable is set via `set_current_user_id()` in the `get_current_user()` dependency to enable RLS evaluation. This ensures RLS policies can identify the current user for access control checks.
 
 ### Custom Attributes Validation
 

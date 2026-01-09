@@ -9,7 +9,7 @@ from uuid import UUID
 
 class BatchBase(BaseModel):
     """Base schema for batch data"""
-    name: str = Field(..., min_length=1, max_length=255)
+    name: Optional[str] = Field(None, min_length=1, max_length=255, description="Batch name (auto-generated if not provided)")
     description: Optional[str] = None
     type: Optional[UUID] = Field(None, description="ID of batch type from list_entries")
     status: UUID = Field(..., description="ID of status from list_entries")
@@ -98,7 +98,7 @@ class BatchListResponse(BaseModel):
 
 class BatchCreateWithContainersRequest(BaseModel):
     """Schema for creating batch with containers"""
-    name: str = Field(..., min_length=1, max_length=255)
+    name: Optional[str] = Field(None, min_length=1, max_length=255, description="Batch name (auto-generated if not provided)")
     description: Optional[str] = None
     type: Optional[UUID] = None
     status: UUID = Field(..., description="ID of status from list_entries")

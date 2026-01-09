@@ -328,6 +328,7 @@ class TestSampleAccessioning:
             "sample_type": str(test_data["sample_type"].id),
             "matrix": str(test_data["matrix"].id),
             "temperature": 25.0,
+            "client_id": str(test_data["client"].id),
             "project_id": str(test_data["project"].id),
             "anomalies": "No anomalies observed",
             "double_entry_required": False,
@@ -376,6 +377,7 @@ class TestSampleAccessioning:
             "sample_type": str(test_data["sample_type"].id),
             "matrix": str(test_data["matrix"].id),
             "temperature": 25.0,
+            "client_id": str(test_data["client"].id),
             "project_id": str(test_data["project"].id),
             "anomalies": "No anomalies observed",
             "double_entry_required": False,
@@ -391,6 +393,188 @@ class TestSampleAccessioning:
         assert response.status_code == 201
         data = response.json()
         assert data["name"] == "SAMPLE-008"
+    
+    def test_accession_sample_with_auto_project_creation(self, client: TestClient, test_admin_user, test_data, db_session: Session):
+        """Test sample accessioning with automatic project creation"""
+        auth_response = client.post(
+            "/auth/login",
+            json={"username": "admin", "password": "adminpassword"}
+        )
+        token = auth_response.json()["access_token"]
+        
+        # Accession sample without project_id (should auto-create project)
+        accession_data = {
+            "name": "SAMPLE-AUTO-001",
+            "description": "Test sample with auto-created project",
+            "due_date": (datetime.utcnow() + timedelta(days=7)).isoformat(),
+            "received_date": datetime.utcnow().isoformat(),
+            "sample_type": str(test_data["sample_type"].id),
+            "matrix": str(test_data["matrix"].id),
+            "temperature": 25.0,
+            "client_id": str(test_data["client"].id),
+            "assigned_tests": []
+        }
+        
+        response = client.post(
+            "/samples/accession",
+            json=accession_data,
+            headers={"Authorization": f"Bearer {token}"}
+        )
+        
+        assert response.status_code == 201
+        data = response.json()
+        assert data["name"] == "SAMPLE-AUTO-001"
+        # Verify project was created
+        assert "project_id" in data
+        project_id = data["project_id"]
+        
+        # Verify project exists and belongs to client
+        from models.project import Project
+        project = db_session.query(Project).filter(Project.id == project_id).first()
+        assert project is not None
+        assert project.client_id == test_data["client"].id
+        assert project.status is not None  # Should have Active status
+    
+    def test_accession_sample_with_client_project(self, client: TestClient, test_admin_user, test_data, db_session: Session):
+        """Test sample accessioning with client_project_id"""
+        from models.client import ClientProject
+        
+        # Create a client project
+        client_project = ClientProject(
+            name="Test Client Project",
+            description="Test client project for accessioning",
+            client_id=test_data["client"].id,
+            created_by=test_admin_user.id,
+            modified_by=test_admin_user.id
+        )
+        db_session.add(client_project)
+        db_session.commit()
+        db_session.refresh(client_project)
+        
+        auth_response = client.post(
+            "/auth/login",
+            json={"username": "admin", "password": "adminpassword"}
+        )
+        token = auth_response.json()["access_token"]
+        
+        # Accession sample with client_project_id
+        accession_data = {
+            "name": "SAMPLE-CP-001",
+            "description": "Test sample with client project",
+            "due_date": (datetime.utcnow() + timedelta(days=7)).isoformat(),
+            "received_date": datetime.utcnow().isoformat(),
+            "sample_type": str(test_data["sample_type"].id),
+            "matrix": str(test_data["matrix"].id),
+            "temperature": 25.0,
+            "client_id": str(test_data["client"].id),
+            "client_project_id": str(client_project.id),
+            "assigned_tests": []
+        }
+        
+        response = client.post(
+            "/samples/accession",
+            json=accession_data,
+            headers={"Authorization": f"Bearer {token}"}
+        )
+        
+        assert response.status_code == 201
+        data = response.json()
+        assert data["name"] == "SAMPLE-CP-001"
+        
+        # Verify project was created and linked to client_project
+        from models.project import Project
+        project = db_session.query(Project).filter(Project.id == data["project_id"]).first()
+        assert project is not None
+        assert project.client_project_id == client_project.id
+    
+    def test_accession_sample_invalid_client(self, client: TestClient, test_admin_user, test_data):
+        """Test sample accessioning with invalid client_id"""
+        from uuid import uuid4
+        
+        auth_response = client.post(
+            "/auth/login",
+            json={"username": "admin", "password": "adminpassword"}
+        )
+        token = auth_response.json()["access_token"]
+        
+        # Accession sample with non-existent client_id
+        accession_data = {
+            "name": "SAMPLE-INVALID",
+            "description": "Test sample with invalid client",
+            "due_date": (datetime.utcnow() + timedelta(days=7)).isoformat(),
+            "received_date": datetime.utcnow().isoformat(),
+            "sample_type": str(test_data["sample_type"].id),
+            "matrix": str(test_data["matrix"].id),
+            "temperature": 25.0,
+            "client_id": str(uuid4()),
+            "assigned_tests": []
+        }
+        
+        response = client.post(
+            "/samples/accession",
+            json=accession_data,
+            headers={"Authorization": f"Bearer {token}"}
+        )
+        
+        assert response.status_code == 403
+        assert "Client not found" in response.json()["detail"]
+    
+    def test_accession_sample_invalid_client_project_linkage(self, client: TestClient, test_admin_user, test_data, db_session: Session):
+        """Test sample accessioning with client_project_id that doesn't belong to client"""
+        from models.client import Client, ClientProject
+        
+        # Create another client
+        other_client = Client(
+            name="Other Test Client",
+            description="Another test client",
+            billing_info={},
+            created_by=test_admin_user.id,
+            modified_by=test_admin_user.id
+        )
+        db_session.add(other_client)
+        db_session.commit()
+        db_session.refresh(other_client)
+        
+        # Create a client project for the other client
+        client_project = ClientProject(
+            name="Other Client Project",
+            description="Client project for other client",
+            client_id=other_client.id,
+            created_by=test_admin_user.id,
+            modified_by=test_admin_user.id
+        )
+        db_session.add(client_project)
+        db_session.commit()
+        db_session.refresh(client_project)
+        
+        auth_response = client.post(
+            "/auth/login",
+            json={"username": "admin", "password": "adminpassword"}
+        )
+        token = auth_response.json()["access_token"]
+        
+        # Try to accession sample with client_project_id from different client
+        accession_data = {
+            "name": "SAMPLE-INVALID-CP",
+            "description": "Test sample with invalid client project",
+            "due_date": (datetime.utcnow() + timedelta(days=7)).isoformat(),
+            "received_date": datetime.utcnow().isoformat(),
+            "sample_type": str(test_data["sample_type"].id),
+            "matrix": str(test_data["matrix"].id),
+            "temperature": 25.0,
+            "client_id": str(test_data["client"].id),
+            "client_project_id": str(client_project.id),  # Belongs to other_client, not test_data["client"]
+            "assigned_tests": []
+        }
+        
+        response = client.post(
+            "/samples/accession",
+            json=accession_data,
+            headers={"Authorization": f"Bearer {token}"}
+        )
+        
+        assert response.status_code == 400
+        assert "does not belong to the specified client" in response.json()["detail"]
 
 
 class TestSampleStatusManagement:

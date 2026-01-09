@@ -907,3 +907,56 @@ Generate full code for test updates and doc content (Version 2.0: Added editing 
 
 ## Prompt 13: UAT for Navigation and UI Responsiveness
 "Generate short UAT scripts for navigation and UI responsiveness in NimbleLIMS, based on navigation.md (unified sidebar, accordions), ui-accessioning-to-reporting.md (responsive adaptations), and PRD (Section 5.4 Usability). Create 2-3 focused test cases: one sidebar navigation (permission gating, auto-expand), one mobile drawer, one accessibility (keyboard nav, ARIA). Each script: Preconditions (logged in), steps (resize browser), expected results (no layout breaks, tooltips), pass/fail. Use Markdown tables; reference docs. Output as uat-navigation-ui.md."
+
+# Prompts for Configurable Names/IDs
+## Prompt A: Database Schema and Migration for Configurable Name Templates
+"Based on the NimbleLIMS planning documents (PRD Section 5.3 for configurations, Technical Document Section 2.1 for data models, and User Stories US-1 for sample accessioning), add support for admin-configurable name/ID templates for entities like samples, projects, batches, analyses, and containers. Templates should use placeholders (e.g., '{CLIENT}-{YYYYMMDD}-{SEQ}', where SEQ is an auto-incrementing sequence per entity type, YYYYMMDD is date, CLIENT is from linked client).
+Create a new table 'name_templates' with columns: id (UUID), entity_type (str, e.g., 'sample', 'project'), template (str), description (text), active (bool, default true), created_at/by, modified_at/by. Unique constraint on entity_type for active templates.
+Add a sequence column or use PostgreSQL sequences for SEQ per entity_type.
+Generate an Alembic migration script (revision '0023', down_revision '0022') to create this table, add indexes (e.g., idx_name_templates_entity_type), enable RLS (admins can manage all, others view active), and seed initial templates (e.g., for sample: 'SAMPLE-{YYYY}-{SEQ}', for project: 'PROJ-{CLIENT}-{YYYYMMDD}-{SEQ}').
+Update existing models (e.g., in backend/models/) to reference this during creation. Ensure idempotency in seeds.
+Output as: migration file (0023_configurable_names.py), updated schema_dump.sql snippet for the new table/RLS, and any model changes. No frontend yet."
+
+## Prompt B: API Endpoints for Configurable Names
+"Extend the NimbleLIMS backend based on the new name_templates table from previous prompt (Technical Document Section 3.1 for APIs, api_endpoints.md for patterns). Add admin endpoints for managing templates: GET /admin/name-templates (list with filters), POST /admin/name-templates (create with validation for placeholders), PATCH /admin/name-templates/{id} (update), DELETE /admin/name-templates/{id} (soft delete via active=false).
+Require config:edit permission (from 0004_initial_data.py).
+Integrate auto-generation into create endpoints: For POST /samples, /projects, /batches, etc., if name is not provided, fetch active template for entity_type, replace placeholders (e.g., SEQ via DB sequence, CLIENT from client_id, date from received_date or NOW()), and generate unique name. If template missing, fallback to UUID.
+Handle sequences transactionally to avoid gaps.
+Add validation: Ensure generated names are unique (retry with next SEQ if conflict).
+Update schemas (e.g., SampleCreate to make name optional).
+Output as: updated routers/admin.py with new endpoints, core/name_generator.py for logic, schemas/name_template.py, and tests/test_name_templates.py with cases for generation and uniqueness."
+
+## Prompt C: UI for Configurable Names Management
+"Update the NimbleLIMS frontend for configurable names based on new API endpoints (ui-accessioning-to-reporting.md for admin components, navigation.md for Admin accordion). Add a new admin page CustomNamesManagement.tsx under Admin > Configurations (or similar), with DataGrid for listing templates (columns: entity_type, template, description, active), and dialogs for create/edit (fields: entity_type select from allowed types, template text with placeholder examples, description).
+Use MUI components, Formik/Yup for validation (e.g., template must include {SEQ} for uniqueness).
+In accessioning forms (e.g., AccessioningForm.tsx, SampleDetailsStep.tsx), make name field optional with a toggle for 'Auto-Generate Name' (default on), showing preview based on template and current form values (fetch template via GET /admin/name-templates?entity_type=sample).
+For bulk mode, apply to all uniques.
+Output as: new CustomNamesManagement.tsx (full file), updates to AccessioningForm.tsx (full file with changes), and integration in MainLayout.tsx for nav."
+Prompts for Project/Client Projects/Client Re-Work
+
+## Prompt D: Database Migration for Project Auto-Creation Re-Work
+"Refine the NimbleLIMS schema for project auto-creation during accessioning, based on recent planning (workflow-accessioning-to-reporting.md Stage 1, User Stories US-1/US-25, migrations like 0011_add_client_projects.py). Ensure projects.client_id is required (alter if needed), projects.client_project_id optional but encouraged.
+No new tables, but add indexes if missing (e.g., idx_projects_client_id).
+Generate Alembic migration (revision '0024', down_revision '0023') for any alterations, and update RLS policies (e.g., in projects_access and client_projects_access from 0022_fix_client_projects_rls.py) to allow auto-creation checks.
+Seed example data if needed (e.g., link existing projects to clients).
+Output as: migration file (0024_project_rework.py), updated schema_dump.sql snippets for RLS/policies."
+
+## Prompt E: API Updates for Auto-Creation and Selection
+"Implement backend changes for project auto-creation in accessioning (api_endpoints.md POST /samples/accession, Technical Document Section 3.1). Update endpoint to: Require client_id (fetch accessible via RLS), then optional client_project_id (validated against client).
+If no project_id provided, auto-create project: name via template (from new name_templates), client_id from selection, client_project_id if provided, status default 'Active', created_by current user.
+Assign new project_id to sample(s). Transactional for bulk.
+Add cascading fetch: GET /client-projects?client_id={id} for filtering.
+Enforce permissions: sample:create implies project:create if auto.
+Update schemas: SampleAccessioningRequest add client_id (required), client_project_id (optional), make project_id optional.
+Handle errors: 403 if client inaccessible, 400 if invalid linkage.
+Output as: updated routers/samples.py, schemas/sample.py, and tests/test_accessioning.py with auto-creation cases."
+
+## Prompt F: UI Updates for Client Selection and Auto-Creation
+"Revamp the accessioning UI for client-first selection and project auto-creation (ui-accessioning-to-reporting.md SampleDetailsStep.tsx, AccessioningForm.tsx full file provided). In SampleDetailsStep: Add MUI Select/Autocomplete for client_id (fetch via apiService.get('/clients')), onChange fetch and filter client_project_id options (apiService.get('/client-projects', { params: { client_id } }))).
+Remove project_id field/dropdown entirely.
+In form schema (Yup), make client_id required, client_project_id optional.
+In ReviewStep, display 'Project: Auto-Created' with preview name (if templates integrated, fetch preview via API).
+For bulk mode, share client/client_project across uniques.
+Add tooltips/help for cascade (e.g., 'Select client to filter projects').
+Ensure RBAC: Clients pre-select their client_id (from UserContext).
+Output as: updated AccessioningForm.tsx (full file), SampleDetailsStep.tsx (full file), ReviewStep.tsx (full file with preview), and any context updates."

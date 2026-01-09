@@ -47,7 +47,7 @@ class ContainerTypeResponse(ContainerTypeBase):
 
 class ContainerBase(BaseModel):
     """Base schema for container data"""
-    name: str = Field(..., min_length=1, max_length=255)
+    name: Optional[str] = Field(None, min_length=1, max_length=255, description="Container name (auto-generated if not provided)")
     description: Optional[str] = None
     row: int = Field(1, ge=1, description="Row position (1-based)")
     column: int = Field(1, ge=1, description="Column position (1-based)")

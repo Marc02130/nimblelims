@@ -20,6 +20,7 @@ import TestBatteriesManagement from './pages/admin/TestBatteriesManagement';
 import AnalytesManagement from './pages/admin/AnalytesManagement';
 import AnalysisAnalytesConfig from './pages/admin/AnalysisAnalytesConfig';
 import CustomFieldsManagement from './pages/admin/CustomFieldsManagement';
+import CustomNamesManagement from './pages/admin/CustomNamesManagement';
 import HelpManagement from './pages/admin/HelpManagement';
 import ClientProjects from './pages/ClientProjects';
 import ClientsManagement from './pages/ClientsManagement';
@@ -255,6 +256,16 @@ function AppRoutes() {
           element={
             hasPermission('config:edit') ? (
               <CustomFieldsManagement />
+            ) : (
+              <Navigate to="/dashboard" replace />
+            )
+          }
+        />
+        <Route
+          path="/admin/custom-names"
+          element={
+            hasPermission('config:edit') ? (
+              <CustomNamesManagement />
             ) : (
               <Navigate to="/dashboard" replace />
             )

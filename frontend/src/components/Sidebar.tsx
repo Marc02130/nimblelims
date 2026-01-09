@@ -212,6 +212,11 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onMobileClose, collapsed 
       icon: <TuneIcon />,
     },
     {
+      text: 'Custom Names',
+      path: '/admin/custom-names',
+      icon: <TuneIcon />,
+    },
+    {
       text: 'Help Management',
       path: '/admin/help',
       icon: <HelpIcon />,

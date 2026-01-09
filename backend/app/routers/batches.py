@@ -250,6 +250,20 @@ async def create_batch(
     Supports cross-project batching with compatibility validation.
     Requires batch:manage permission.
     """
+    # Generate name if not provided
+    batch_name = batch_data.name
+    if not batch_name:
+        from app.core.name_generation import generate_name_for_batch
+        try:
+            batch_name = generate_name_for_batch(
+                db=db,
+                start_date=batch_data.start_date
+            )
+        except Exception as e:
+            # Fallback to UUID if generation fails
+            import uuid
+            batch_name = str(uuid.uuid4())
+    
     # Auto-detect cross-project if container_ids provided
     is_cross_project = batch_data.cross_project
     if batch_data.container_ids:
@@ -414,7 +428,7 @@ async def create_batch(
     
     # Create batch
     batch = Batch(
-        name=batch_data.name,
+        name=batch_name,
         description=batch_data.description,
         type=batch_data.type,
         status=batch_data.status,
@@ -598,9 +612,23 @@ async def create_batch_with_containers(
     Create a new batch with containers.
     Implements US-11: Create and Manage Batches.
     """
+    # Generate name if not provided
+    batch_name = batch_data.name
+    if not batch_name:
+        from app.core.name_generation import generate_name_for_batch
+        try:
+            batch_name = generate_name_for_batch(
+                db=db,
+                start_date=batch_data.start_date
+            )
+        except Exception as e:
+            # Fallback to UUID if generation fails
+            import uuid
+            batch_name = str(uuid.uuid4())
+    
     # Create batch
     batch = Batch(
-        name=batch_data.name,
+        name=batch_name,
         description=batch_data.description,
         type=batch_data.type,
         status=batch_data.status,

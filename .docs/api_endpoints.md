@@ -50,6 +50,14 @@ List samples with filtering and pagination.
 }
 ```
 
+**Access Control:**
+- Access control is enforced entirely by Row-Level Security (RLS) policies at the database level
+- No Python-level filtering is applied - RLS automatically filters samples based on project access
+- Lab Technicians and Lab Managers see samples from projects they have access to via the `project_users` junction table
+- Client users see samples from projects belonging to their `client_id`
+- Administrators see all samples
+- The RLS policy `samples_access` uses `has_project_access(project_id)` to determine visibility
+
 **Note:** Empty string query parameters are automatically converted to `None`.
 
 ### POST /samples

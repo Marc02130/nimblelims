@@ -54,8 +54,19 @@ async def create_analysis(
     Create a new analysis.
     Requires config:edit or test:configure permission.
     """
+    # Generate name if not provided
+    analysis_name = analysis_data.name
+    if not analysis_name:
+        from app.core.name_generation import generate_name_for_analysis
+        try:
+            analysis_name = generate_name_for_analysis(db=db)
+        except Exception as e:
+            # Fallback to UUID if generation fails
+            import uuid
+            analysis_name = str(uuid.uuid4())
+    
     # Check for unique name
-    existing_analysis = db.query(Analysis).filter(Analysis.name == analysis_data.name).first()
+    existing_analysis = db.query(Analysis).filter(Analysis.name == analysis_name).first()
     if existing_analysis:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -63,7 +74,7 @@ async def create_analysis(
         )
     
     new_analysis = Analysis(
-        name=analysis_data.name,
+        name=analysis_name,
         description=analysis_data.description,
         method=analysis_data.method,
         turnaround_time=analysis_data.turnaround_time,

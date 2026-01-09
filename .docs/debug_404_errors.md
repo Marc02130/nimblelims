@@ -206,8 +206,8 @@ docker exec lims-backend curl http://localhost:8000/samples \
 ## API Endpoints Summary
 
 ### Working Endpoints
-- `GET /samples` - List samples with filtering (accepts UUID query params)
-- `GET /projects` - List projects
+- `GET /samples` - List samples with filtering (accepts UUID query params). **Access control enforced entirely by RLS - no Python-level filtering applied.**
+- `GET /projects` - List projects (RLS enforced, uses eager loading for client relationship)
 - `GET /batches` - List batches with filtering (requires `batch:read` permission)
 - `GET /containers` - List containers
 - `GET /tests` - List tests with filtering (requires authentication, scoped by RLS)

@@ -75,12 +75,16 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
       
       localStorage.setItem('token', access_token);
       apiService.setAuthToken(access_token);
+      
+      // Fetch full user data including client_id
+      const userData = await apiService.getCurrentUser();
       setUser({
-        id: user_id,
-        username: username_resp,
-        email,
-        role,
-        permissions,
+        id: userData.id,
+        username: userData.username,
+        email: userData.email,
+        role: userData.role,
+        permissions: userData.permissions,
+        client_id: userData.client_id,
       });
     } catch (error: any) {
       throw error;
