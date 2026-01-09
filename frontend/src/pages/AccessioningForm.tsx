@@ -19,7 +19,6 @@ import SampleDetailsStep from '../components/accessioning/SampleDetailsStep';
 import TestAssignmentStep from '../components/accessioning/TestAssignmentStep';
 import ReviewStep from '../components/accessioning/ReviewStep';
 import BulkUniquesTable from '../components/accessioning/BulkUniquesTable';
-import AliquotDerivativeDialog from '../components/aliquots/AliquotDerivativeDialog';
 import { apiService } from '../services/apiService';
 import { useUser } from '../contexts/UserContext';
 
@@ -50,7 +49,6 @@ interface SampleFormData {
   matrix: string;
   temperature: number;
   anomalies: string;
-  project_id: string;
   client_id: string;
   client_project_id: string;
   qc_type: string;
@@ -73,13 +71,16 @@ interface SampleFormData {
   auto_name_prefix: string;
   auto_name_start: number;
   
+  // Auto-generation
+  auto_generate_name: boolean;
+  
   // Double entry validation
   double_entry_enabled: boolean;
   name_verification: string;
   sample_type_verification: string;
 }
 
-const initialValues: SampleFormData = {
+const getInitialValues = (userClientId?: string): SampleFormData => ({
   bulk_mode: false,
   name: '',
   description: '',
@@ -90,8 +91,7 @@ const initialValues: SampleFormData = {
   matrix: '',
   temperature: 0,
   anomalies: '',
-  project_id: '',
-  client_id: '',
+  client_id: userClientId || '',
   client_project_id: '',
   qc_type: '',
   custom_attributes: {},
@@ -104,10 +104,11 @@ const initialValues: SampleFormData = {
   bulk_uniques: [{ id: '1', container_name: '', custom_attributes: {} }],
   auto_name_prefix: '',
   auto_name_start: 1,
+  auto_generate_name: true,
   double_entry_enabled: false,
   name_verification: '',
   sample_type_verification: '',
-};
+});
 
 const buildCustomAttributesValidation = (configs: any[]): Record<string, any> => {
   const customAttrsSchema: Record<string, any> = {};
@@ -229,12 +230,16 @@ const getValidationSchema = (bulkMode: boolean, customAttributeConfigs: any[] = 
     sample_type: Yup.string().required('Sample type is required'),
     status: Yup.string().required('Status is required'),
     matrix: Yup.string().required('Matrix is required'),
-    project_id: Yup.string().required('Project is required'),
+    client_id: Yup.string().required('Client is required'),
     container_type_id: Yup.string().required('Container type is required'),
   };
 
   if (!bulkMode) {
-    baseSchema.name = Yup.string().required('Sample name is required');
+    baseSchema.name = Yup.string().when('auto_generate_name', {
+      is: false,
+      then: (schema: any) => schema.required('Sample name is required'),
+      otherwise: (schema: any) => schema.notRequired(),
+    });
     baseSchema.temperature = Yup.number().required('Temperature is required');
     baseSchema.container_name = Yup.string().required('Container name/barcode is required');
     baseSchema.container_row = Yup.number().min(1, 'Row must be at least 1').required();
@@ -349,8 +354,6 @@ const AccessioningForm: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [aliquotDialogOpen, setAliquotDialogOpen] = useState(false);
-  const [createdSample, setCreatedSample] = useState<any>(null);
   const [lookupData, setLookupData] = useState<{
     sampleTypes: any[];
     statuses: any[];
@@ -420,7 +423,6 @@ const AccessioningForm: React.FC = () => {
         statuses,
         matrices,
         qcTypes,
-        projects,
         clients,
         clientProjectsArray,
         analyses,
@@ -432,7 +434,6 @@ const AccessioningForm: React.FC = () => {
         apiService.getListEntries('sample_status'),
         apiService.getListEntries('matrix_types'),
         apiService.getListEntries('qc_types'),
-        apiService.getProjects(),
         apiService.getClients().catch(() => []),
         fetchAllClientProjects().catch(() => []),
         apiService.getAnalyses(),
@@ -446,7 +447,7 @@ const AccessioningForm: React.FC = () => {
         statuses,
         matrices,
         qcTypes,
-        projects,
+        projects: [], // Projects are auto-created, no need to fetch
         clients: Array.isArray(clients) ? clients : [],
         clientProjects: Array.isArray(clientProjectsArray) ? clientProjectsArray : [],
         analyses,
@@ -471,8 +472,19 @@ const AccessioningForm: React.FC = () => {
     }
   };
 
-  const handleNext = () => {
-    setActiveStep((prevActiveStep) => prevActiveStep + 1);
+  const handleNext = (e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    console.log('=== HANDLE NEXT CLICKED ===');
+    console.log('Current step:', activeStep);
+    console.log('Next step will be:', activeStep + 1);
+    setActiveStep((prevActiveStep) => {
+      const nextStep = prevActiveStep + 1;
+      console.log('Setting active step to:', nextStep);
+      return nextStep;
+    });
   };
 
   const handleBack = () => {
@@ -480,19 +492,32 @@ const AccessioningForm: React.FC = () => {
   };
 
   const handleSubmit = async (values: SampleFormData) => {
+    // Prevent duplicate submissions
+    if (loading) {
+      return;
+    }
+    
+    console.log('=== FORM SUBMISSION STARTED ===');
+    console.log('Form values:', JSON.stringify(values, null, 2));
+    console.log('Selected analyses:', values.selected_analyses);
+    console.log('Battery ID:', values.battery_id);
+    console.log('Container type ID:', values.container_type_id);
+    console.log('Container name:', values.container_name);
+    
     setLoading(true);
     setError(null);
     setSuccess(null);
 
     try {
       if (values.bulk_mode) {
+        console.log('=== BULK ACCESSIONING MODE ===');
         // Bulk accessioning
         const bulkData = {
           due_date: values.due_date,
           received_date: values.received_date,
           sample_type: values.sample_type,
           matrix: values.matrix,
-          project_id: values.project_id,
+          client_id: values.client_id,
           client_project_id: values.client_project_id || undefined,
           qc_type: values.qc_type || undefined,
           assigned_tests: values.selected_analyses,
@@ -517,37 +542,60 @@ const AccessioningForm: React.FC = () => {
           auto_name_start: values.auto_name_start || undefined,
         };
 
+        console.log('=== BULK ACCESSION DATA ===');
+        console.log('Bulk data being sent:', JSON.stringify(bulkData, null, 2));
+        console.log('Number of uniques:', bulkData.uniques.length);
+        console.log('Assigned tests:', bulkData.assigned_tests);
+        console.log('Battery ID:', bulkData.battery_id);
+
         const results = await apiService.bulkAccessionSamples(bulkData);
+        console.log('=== BULK ACCESSION RESPONSE ===');
+        console.log('Results received:', JSON.stringify(results, null, 2));
+        console.log('Number of samples created:', results.length);
+        
         setSuccess(`Successfully accessioned ${results.length} sample(s)!`);
-        setCreatedSample(results[0]); // Use first sample for aliquot dialog
-        setAliquotDialogOpen(true);
         setActiveStep(0);
       } else {
+        console.log('=== SINGLE SAMPLE ACCESSIONING MODE ===');
         // Single sample accessioning (existing flow)
         // Step 1: Create container instance
+        // Make container name unique by appending timestamp if name is provided
+        let containerName = values.container_name;
+        if (containerName) {
+          // Append timestamp to make it unique
+          const timestamp = Date.now().toString().slice(-6); // Last 6 digits of timestamp
+          containerName = `${containerName}-${timestamp}`;
+        }
+        
         const containerData: any = {
-          name: values.container_name,
+          name: containerName,
           type_id: values.container_type_id,
           row: values.container_row || 1,
           column: values.container_column || 1,
         };
 
+        console.log('=== STEP 1: CREATE CONTAINER ===');
+        console.log('Container data being sent:', JSON.stringify(containerData, null, 2));
+        
         const container = await apiService.createContainer(containerData);
+        console.log('Container created successfully:', JSON.stringify(container, null, 2));
+        console.log('Container ID:', container.id);
 
-        // Step 2: Create sample
+        // Step 2: Accession sample (uses /samples/accession endpoint which supports project auto-creation)
         const sampleData: any = {
-          name: values.name,
+          name: values.auto_generate_name ? undefined : values.name,
           description: values.description,
           due_date: values.due_date,
           received_date: values.received_date,
           sample_type: values.sample_type,
-          status: values.status,
           matrix: values.matrix,
           temperature: values.temperature,
           anomalies: values.anomalies,
-          project_id: values.project_id,
+          client_id: values.client_id,
           client_project_id: values.client_project_id || undefined,
           qc_type: values.qc_type || undefined,
+          assigned_tests: values.selected_analyses,
+          battery_id: values.battery_id || undefined,
         };
 
         // Include custom_attributes if present
@@ -555,7 +603,18 @@ const AccessioningForm: React.FC = () => {
           sampleData.custom_attributes = values.custom_attributes;
         }
 
-        const sample = await apiService.createSample(sampleData);
+        console.log('=== STEP 2: ACCESSION SAMPLE ===');
+        console.log('Sample data being sent:', JSON.stringify(sampleData, null, 2));
+        console.log('Assigned tests array:', sampleData.assigned_tests);
+        console.log('Assigned tests length:', sampleData.assigned_tests?.length || 0);
+        console.log('Battery ID:', sampleData.battery_id);
+        console.log('Client ID:', sampleData.client_id);
+        console.log('Client project ID:', sampleData.client_project_id);
+
+        const sample = await apiService.accessionSample(sampleData);
+        console.log('Sample accessioned successfully:', JSON.stringify(sample, null, 2));
+        console.log('Sample ID:', sample.id);
+        console.log('Sample name:', sample.name);
 
         // Step 3: Link sample to container via contents
         const contentData: any = {
@@ -563,23 +622,56 @@ const AccessioningForm: React.FC = () => {
           sample_id: sample.id,
         };
 
-        await apiService.createContent(contentData);
+        console.log('=== STEP 3: CREATE CONTENTS (LINK SAMPLE TO CONTAINER) ===');
+        console.log('Content data being sent:', JSON.stringify(contentData, null, 2));
+        console.log('Container ID:', container.id);
+        console.log('Sample ID:', sample.id);
 
-        // Step 4: Create tests for selected analyses
-        for (const analysisId of values.selected_analyses) {
-          await apiService.createTest({
-            sample_id: sample.id,
-            analysis_id: analysisId,
-          });
-        }
+        await apiService.createContent(container.id, contentData);
+        console.log('Content created successfully - sample linked to container');
 
+        // Tests are already created by the accession endpoint
+        console.log('=== FORM SUBMISSION COMPLETED SUCCESSFULLY ===');
         setSuccess('Sample accessioned successfully!');
-        setCreatedSample(sample);
-        setAliquotDialogOpen(true);
         setActiveStep(0);
       }
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to accession sample(s)');
+      console.error('=== FORM SUBMISSION ERROR ===');
+      console.error('Error object:', err);
+      console.error('Error response:', err.response);
+      console.error('Error response data:', err.response?.data);
+      console.error('Error response status:', err.response?.status);
+      console.error('Error response headers:', err.response?.headers);
+      console.error('Error message:', err.message);
+      console.error('Error stack:', err.stack);
+      
+      // Handle FastAPI errors (400, 422, etc.)
+      let errorMessage = 'Failed to accession sample(s)';
+      if (err.response?.data) {
+        const errorData = err.response.data;
+        console.error('Error data detail:', errorData.detail);
+        if (errorData.detail) {
+          if (Array.isArray(errorData.detail)) {
+            // Multiple validation errors (422)
+            errorMessage = errorData.detail
+              .map((e: any) => `${e.loc?.join('.')}: ${e.msg}`)
+              .join(', ');
+            console.error('Validation errors:', errorData.detail);
+          } else if (typeof errorData.detail === 'string') {
+            // Single error message (400, etc.)
+            errorMessage = errorData.detail;
+            console.error('Error detail:', errorData.detail);
+          }
+        } else if (errorData.message) {
+          errorMessage = errorData.message;
+          console.error('Error message:', errorData.message);
+        }
+      } else if (err.message) {
+        errorMessage = err.message;
+        console.error('Error message:', err.message);
+      }
+      console.error('Final error message to display:', errorMessage);
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -653,14 +745,14 @@ const AccessioningForm: React.FC = () => {
         </Stepper>
 
         <Formik
-          initialValues={initialValues}
-          validationSchema={useMemo(() => getValidationSchema(initialValues.bulk_mode, customAttributeConfigs), [initialValues.bulk_mode, customAttributeConfigs])}
+          initialValues={getInitialValues(user?.client_id)}
+          validationSchema={useMemo(() => getValidationSchema(false, customAttributeConfigs), [customAttributeConfigs])}
           onSubmit={handleSubmit}
           enableReinitialize
           validateOnChange={true}
           validateOnBlur={true}
         >
-          {({ values, setFieldValue, setFieldTouched, validateField, isValid, errors, touched, setValues }) => {
+          {({ values, setFieldValue, setFieldTouched, validateField, isValid, errors, touched, setValues, setFieldError }) => {
             const bulkMode = values.bulk_mode;
 
             return (
@@ -680,11 +772,6 @@ const AccessioningForm: React.FC = () => {
                               setFieldValue('bulk_uniques', [{ id: '1', container_name: '', custom_attributes: {} }]);
                             }
                           }
-                          // Re-validate with new schema
-                          setTimeout(() => {
-                            // Force re-validation by touching a field
-                            setFieldValue('bulk_mode', newBulkMode);
-                          }, 0);
                         }}
                       />
                     }
@@ -720,6 +807,7 @@ const AccessioningForm: React.FC = () => {
                     </Button>
                   ) : (
                     <Button
+                      type="button"
                       variant="contained"
                       onClick={handleNext}
                       disabled={!isValid}
@@ -733,23 +821,6 @@ const AccessioningForm: React.FC = () => {
           }}
         </Formik>
       </Paper>
-
-      {createdSample && (
-        <AliquotDerivativeDialog
-          open={aliquotDialogOpen}
-          onClose={() => {
-            setAliquotDialogOpen(false);
-            setCreatedSample(null);
-          }}
-          parentSampleId={createdSample.id}
-          parentSampleName={createdSample.name}
-          onSuccess={(result) => {
-            setSuccess(`Aliquot/Derivative created successfully: ${result.name}`);
-            setAliquotDialogOpen(false);
-            setCreatedSample(null);
-          }}
-        />
-      )}
     </Box>
   );
 };

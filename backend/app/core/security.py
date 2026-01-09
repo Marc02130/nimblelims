@@ -137,5 +137,7 @@ def set_current_user_id(user_id: str, db: Session):
     # Set the PostgreSQL session variable that RLS policies use
     # Use SET (session-level) not SET LOCAL (transaction-level)
     # This persists for the entire database session/connection
-    db.execute(text(f"SET app.current_user_id = '{user_id}'"))
     # No commit needed - SET is immediate and session-scoped
+    db.execute(text(f"SET app.current_user_id = '{user_id}'"))
+    # Flush to ensure the statement is executed on the connection
+    db.flush()

@@ -163,10 +163,10 @@ Copyright (c) 2025 Marc Breneiser
 
 ### Architecture
 - **FastAPI** - Modern Python web framework
-- **SQLAlchemy** - ORM for database interactions
+- **SQLAlchemy** - ORM for database interactions with eager loading support
 - **PostgreSQL** - Database with Row-Level Security (RLS)
 - **Alembic** - Database migrations
-- **Pydantic** - Data validation and serialization
+- **Pydantic v2** - Data validation and serialization (uses `model_validate()` instead of `from_orm()`)
 - **PyJWT** - JWT token handling
 - **Passlib** - Password hashing (bcrypt)
 
@@ -176,14 +176,17 @@ Copyright (c) 2025 Marc Breneiser
 - Row-Level Security (RLS) for data isolation
 - Audit trails on all tables
 - Soft deletion via `active` flag
+- Eager loading of relationships using SQLAlchemy `joinedload()` for optimal performance
 
 ### Security
 - JWT token-based authentication
 - Role-Based Access Control (RBAC)
 - ~15 granular permissions
 - Password hashing with bcrypt
-- Row-Level Security policies
+- Row-Level Security policies enforced at database level
 - Project-based data isolation
+- Session variable `app.current_user_id` set via `set_current_user_id()` for RLS evaluation
+- **Samples Endpoint**: Relies entirely on RLS for access control - no Python-level filtering applied
 
 ### API Design
 - RESTful API design

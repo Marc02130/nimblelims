@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Box,
   Grid,
@@ -15,6 +15,8 @@ import {
   CircularProgress,
   Tooltip,
   IconButton,
+  Paper,
+  Autocomplete,
 } from '@mui/material';
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
@@ -24,6 +26,7 @@ import { useField } from 'formik';
 import BulkUniquesTable from './BulkUniquesTable';
 import CustomAttributeField from '../common/CustomAttributeField';
 import { apiService } from '../../services/apiService';
+import { useUser } from '../../contexts/UserContext';
 
 interface CustomAttributeConfig {
   id: string;
@@ -68,6 +71,7 @@ const SampleDetailsStep: React.FC<SampleDetailsStepProps> = ({
   touched,
   customAttributeConfigs: propsCustomAttributeConfigs,
 }) => {
+  const { user } = useUser();
   const [nameField, nameMeta] = useField('name');
   const [nameVerificationField, nameVerificationMeta] = useField('name_verification');
   const [sampleTypeField, sampleTypeMeta] = useField('sample_type');
@@ -77,6 +81,20 @@ const SampleDetailsStep: React.FC<SampleDetailsStepProps> = ({
   const [customAttributeConfigs, setCustomAttributeConfigs] = useState<CustomAttributeConfig[]>([]);
   const [loadingConfigs, setLoadingConfigs] = useState(false);
   const [configsError, setConfigsError] = useState<string | null>(null);
+  const [nameTemplate, setNameTemplate] = useState<any>(null);
+  const [loadingTemplate, setLoadingTemplate] = useState(false);
+  const [autoGenerateNameField] = useField('auto_generate_name');
+  const [clientProjects, setClientProjects] = useState<any[]>([]);
+  const [loadingClientProjects, setLoadingClientProjects] = useState(false);
+  const [projectPreview, setProjectPreview] = useState<string | null>(null);
+  const [loadingProjectPreview, setLoadingProjectPreview] = useState(false);
+
+  // Pre-select client_id from user context if available
+  useEffect(() => {
+    if (user?.client_id && !values.client_id) {
+      setFieldValue('client_id', user.client_id);
+    }
+  }, [user?.client_id, values.client_id, setFieldValue]);
 
   useEffect(() => {
     if (propsCustomAttributeConfigs) {
@@ -85,6 +103,130 @@ const SampleDetailsStep: React.FC<SampleDetailsStepProps> = ({
       loadCustomAttributeConfigs();
     }
   }, [propsCustomAttributeConfigs]);
+
+  useEffect(() => {
+    if (!bulkMode && autoGenerateNameField.value) {
+      loadNameTemplate();
+    }
+  }, [bulkMode, autoGenerateNameField.value]);
+
+  // Load client projects when client_id changes
+  useEffect(() => {
+    if (values.client_id) {
+      loadClientProjects(values.client_id);
+      // Clear client_project_id when client changes
+      if (values.client_project_id) {
+        const currentClientProject = clientProjects.find(cp => cp.id === values.client_project_id);
+        if (!currentClientProject || currentClientProject.client_id !== values.client_id) {
+          setFieldValue('client_project_id', '');
+        }
+      }
+    } else {
+      setClientProjects([]);
+      setFieldValue('client_project_id', '');
+    }
+  }, [values.client_id]);
+
+  // Load project name preview when client_id or received_date changes
+  useEffect(() => {
+    if (values.client_id && values.received_date) {
+      loadProjectPreview();
+    } else {
+      setProjectPreview(null);
+    }
+  }, [values.client_id, values.received_date]);
+
+  const loadClientProjects = async (clientId: string) => {
+    try {
+      setLoadingClientProjects(true);
+      const response = await apiService.getClientProjects({ client_id: clientId });
+      const projects = response.client_projects || response || [];
+      setClientProjects(Array.isArray(projects) ? projects : []);
+    } catch (err: any) {
+      console.error('Error loading client projects:', err);
+      setClientProjects([]);
+    } finally {
+      setLoadingClientProjects(false);
+    }
+  };
+
+  const loadProjectPreview = async () => {
+    try {
+      setLoadingProjectPreview(true);
+      // Format date as YYYY-MM-DD if it's a Date object
+      let dateStr = values.received_date;
+      if (dateStr instanceof Date) {
+        dateStr = dateStr.toISOString().split('T')[0];
+      } else if (dateStr && typeof dateStr === 'string') {
+        // Ensure it's in YYYY-MM-DD format
+        const date = new Date(dateStr);
+        if (!isNaN(date.getTime())) {
+          dateStr = date.toISOString().split('T')[0];
+        }
+      }
+      // Fetch project name preview from API
+      const response = await apiService.getGeneratedNamePreview('project', values.client_id, dateStr);
+      setProjectPreview(response || null);
+    } catch (err: any) {
+      console.error('Error loading project preview:', err);
+      setProjectPreview(null);
+    } finally {
+      setLoadingProjectPreview(false);
+    }
+  };
+
+  const loadNameTemplate = async () => {
+    try {
+      setLoadingTemplate(true);
+      const response = await apiService.getNameTemplates({
+        entity_type: 'sample',
+        active: true,
+      });
+      if (response.templates && response.templates.length > 0) {
+        setNameTemplate(response.templates[0]);
+      } else {
+        setNameTemplate(null);
+      }
+    } catch (err: any) {
+      console.error('Error loading name template:', err);
+      setNameTemplate(null);
+    } finally {
+      setLoadingTemplate(false);
+    }
+  };
+
+  const generateNamePreview = useMemo(() => {
+    if (!nameTemplate || !autoGenerateNameField.value) return null;
+    
+    let preview = nameTemplate.template;
+    // Use received_date if available, otherwise use current date
+    const dateToUse = values.received_date ? new Date(values.received_date) : new Date();
+    
+    // Replace date placeholders
+    preview = preview.replace(/{YYYY}/g, String(dateToUse.getFullYear()));
+    preview = preview.replace(/{MM}/g, String(dateToUse.getMonth() + 1).padStart(2, '0'));
+    preview = preview.replace(/{DD}/g, String(dateToUse.getDate()).padStart(2, '0'));
+    preview = preview.replace(/{YYYYMMDD}/g, dateToUse.toISOString().split('T')[0].replace(/-/g, ''));
+    
+    // Replace CLIENT placeholder if client is selected
+    if (values.client_id && lookupData.clients) {
+      const client = lookupData.clients.find((c: any) => c.id === values.client_id);
+      if (client) {
+        const clientName = client.name || 'UNKNOWN';
+        const clientCode = clientName.toUpperCase().replace(/[^A-Z0-9]/g, '').substring(0, 10);
+        preview = preview.replace(/{CLIENT}/g, clientCode);
+      } else {
+        preview = preview.replace(/{CLIENT}/g, 'UNKNOWN');
+      }
+    } else {
+      preview = preview.replace(/{CLIENT}/g, 'UNKNOWN');
+    }
+    
+    // Replace SEQ with example
+    preview = preview.replace(/{SEQ}/g, '001');
+    
+    return preview;
+  }, [nameTemplate, autoGenerateNameField.value, values.client_id, values.received_date, lookupData.clients]);
 
   const loadCustomAttributeConfigs = async () => {
     try {
@@ -144,6 +286,11 @@ const SampleDetailsStep: React.FC<SampleDetailsStepProps> = ({
     }
   };
 
+  const handleClientChange = (clientId: string) => {
+    setFieldValue('client_id', clientId);
+    setFieldValue('client_project_id', ''); // Clear client project when client changes
+  };
+
   return (
     <LocalizationProvider dateAdapter={AdapterDateFns}>
       <Box>
@@ -158,14 +305,53 @@ const SampleDetailsStep: React.FC<SampleDetailsStepProps> = ({
         
         <Grid container spacing={3}>
           {!bulkMode && (
+            <Grid size={{ xs: 12 }}>
+              <Box sx={{ mb: 2 }}>
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={autoGenerateNameField.value}
+                      onChange={(e) => {
+                        setFieldValue('auto_generate_name', e.target.checked);
+                        if (!e.target.checked) {
+                          setFieldValue('name', '');
+                        }
+                      }}
+                    />
+                  }
+                  label="Auto-Generate Name"
+                />
+                {autoGenerateNameField.value && nameTemplate && (
+                  <Box sx={{ mt: 1 }}>
+                    <Paper sx={{ p: 1.5, bgcolor: 'info.light', border: '1px solid', borderColor: 'info.main' }}>
+                      <Typography variant="caption" component="div">
+                        <strong>Preview:</strong> {generateNamePreview || 'Loading...'}
+                      </Typography>
+                      {loadingTemplate && (
+                        <CircularProgress size={16} sx={{ ml: 1 }} />
+                      )}
+                    </Paper>
+                  </Box>
+                )}
+              </Box>
+            </Grid>
+          )}
+          {!bulkMode && (
             <Grid size={{ xs: 12, sm: 6 }}>
               <TextField
                 {...nameField}
                 label="Sample Name"
                 fullWidth
-                required
+                required={!autoGenerateNameField.value}
+                disabled={autoGenerateNameField.value}
                 error={nameMeta.touched && !!nameMeta.error}
-                helperText={nameMeta.touched && nameMeta.error}
+                helperText={
+                  autoGenerateNameField.value
+                    ? 'Name will be auto-generated based on template'
+                    : nameMeta.touched && nameMeta.error
+                    ? nameMeta.error
+                    : 'Enter a custom sample name'
+                }
               />
             </Grid>
           )}
@@ -305,35 +491,17 @@ const SampleDetailsStep: React.FC<SampleDetailsStepProps> = ({
             </Box>
           </Grid>
           
+          {/* Client Selection - Required */}
           <Grid size={{ xs: 12, sm: 6 }}>
-            <FormControl fullWidth required>
-              <InputLabel>Project</InputLabel>
-              <Select
-                value={values.project_id}
-                onChange={(e) => setFieldValue('project_id', e.target.value)}
-              >
-                {lookupData.projects.map((project) => (
-                  <MenuItem key={project.id} value={project.id}>
-                    {project.name}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Grid>
-          
-          <Grid size={{ xs: 12, sm: 6 }}>
-            <FormControl fullWidth>
+            <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
+              <FormControl fullWidth required error={touched?.client_id && !!errors?.client_id}>
               <InputLabel>Client</InputLabel>
               <Select
                 value={values.client_id || ''}
-                onChange={(e) => {
-                  setFieldValue('client_id', e.target.value || undefined);
-                  // Clear client project when client changes
-                  setFieldValue('client_project_id', undefined);
-                }}
+                  onChange={(e) => handleClientChange(e.target.value)}
                 label="Client"
+                  disabled={user?.role === 'Client' && !!user?.client_id} // Disable only for Client role users with a pre-selected client_id
               >
-                <MenuItem value="">None</MenuItem>
                 {lookupData.clients && lookupData.clients.length > 0 ? (
                   lookupData.clients.map((client: any) => (
                     <MenuItem key={client.id} value={client.id}>
@@ -345,22 +513,38 @@ const SampleDetailsStep: React.FC<SampleDetailsStepProps> = ({
                 )}
               </Select>
             </FormControl>
+              <Tooltip
+                title="Select a client to create a project for. The project will be auto-created during accessioning."
+                arrow
+                placement="top"
+              >
+                <IconButton
+                  size="small"
+                  aria-label="Client help"
+                  sx={{ mt: 1.5, p: 0.5 }}
+                >
+                  <HelpOutlineIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            </Box>
           </Grid>
           
+          {/* Client Project Selection - Optional, cascades from client */}
           <Grid size={{ xs: 12, sm: 6 }}>
+            <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
             <FormControl fullWidth>
-              <InputLabel>Client Project</InputLabel>
+                <InputLabel>Client Project (Optional)</InputLabel>
               <Select
                 value={values.client_project_id || ''}
                 onChange={(e) => setFieldValue('client_project_id', e.target.value || undefined)}
-                label="Client Project"
-                disabled={!values.client_id}
+                  label="Client Project (Optional)"
+                  disabled={!values.client_id || loadingClientProjects}
               >
                 <MenuItem value="">None</MenuItem>
-                {values.client_id && lookupData.clientProjects && lookupData.clientProjects.length > 0 ? (
-                  lookupData.clientProjects
-                    .filter((clientProject: any) => clientProject.client_id === values.client_id)
-                    .map((clientProject: any) => (
+                  {loadingClientProjects ? (
+                    <MenuItem disabled>Loading...</MenuItem>
+                  ) : clientProjects.length > 0 ? (
+                    clientProjects.map((clientProject: any) => (
                       <MenuItem key={clientProject.id} value={clientProject.id}>
                         {clientProject.name}
                       </MenuItem>
@@ -372,7 +556,44 @@ const SampleDetailsStep: React.FC<SampleDetailsStepProps> = ({
                 )}
               </Select>
             </FormControl>
+              <Tooltip
+                title="Optionally select a client project to group related samples. This filters based on the selected client."
+                arrow
+                placement="top"
+              >
+                <IconButton
+                  size="small"
+                  aria-label="Client Project help"
+                  sx={{ mt: 1.5, p: 0.5 }}
+                >
+                  <HelpOutlineIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            </Box>
           </Grid>
+
+          {/* Project Auto-Creation Preview */}
+          {values.client_id && (
+            <Grid size={{ xs: 12 }}>
+              <Paper sx={{ p: 2, bgcolor: 'info.light', border: '1px solid', borderColor: 'info.main' }}>
+                <Typography variant="body2" component="div">
+                  <strong>Project:</strong> Will be auto-created
+                  {projectPreview && (
+                    <>
+                      {' '}
+                      <Typography component="span" variant="body2" sx={{ fontStyle: 'italic' }}>
+                        (Preview: {projectPreview})
+                      </Typography>
+                    </>
+                  )}
+                  {loadingProjectPreview && <CircularProgress size={14} sx={{ ml: 1 }} />}
+                </Typography>
+                <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
+                  A new project will be automatically created for this client during accessioning.
+                </Typography>
+              </Paper>
+            </Grid>
+          )}
           
           <Grid size={12}>
             <TextField

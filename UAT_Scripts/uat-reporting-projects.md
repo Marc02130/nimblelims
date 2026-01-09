@@ -251,7 +251,7 @@ Verify that lab users can access projects and their data via the `project_users`
 
 | Category | Expected Outcome |
 |----------|------------------|
-| **RLS Enforcement** | - `has_project_access()` returns FALSE for inaccessible project<br>- Database queries filtered by RLS return no rows<br>- API endpoints return 403 or empty results |
+| **RLS Enforcement** | - `has_project_access()` returns FALSE for inaccessible project<br>- Database queries filtered by RLS return no rows<br>- API endpoints return 403 or empty results<br>- **Samples Endpoint**: Relies entirely on RLS for access control - no Python-level filtering applied |
 | **Error Response** | - HTTP 403 Forbidden with message: "Access denied: insufficient project permissions"<br>- Or HTTP 404 Not Found (if RLS hides record) |
 | **UI Behavior** | - Inaccessible projects not visible in UI<br>- Inaccessible samples not visible in UI<br>- Error message displayed if direct access attempted |
 

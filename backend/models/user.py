@@ -53,6 +53,8 @@ class User(BaseModel):
     entered_results = relationship("Result", foreign_keys="Result.entered_by", back_populates="entered_by_user")
     created_custom_attribute_configs = relationship("CustomAttributeConfig", foreign_keys="CustomAttributeConfig.created_by", back_populates="creator")
     modified_custom_attribute_configs = relationship("CustomAttributeConfig", foreign_keys="CustomAttributeConfig.modified_by", back_populates="modifier")
+    created_name_templates = relationship("NameTemplate", foreign_keys="NameTemplate.created_by", back_populates="creator")
+    modified_name_templates = relationship("NameTemplate", foreign_keys="NameTemplate.modified_by", back_populates="modifier")
 
 
 class Role(BaseModel):

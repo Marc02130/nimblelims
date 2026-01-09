@@ -60,7 +60,7 @@ const ContainerDetails: React.FC<ContainerDetailsProps> = ({
     setError(null);
     
     try {
-      await apiService.createContent({
+      await apiService.createContent(container.id, {
         container_id: container.id,
         ...contentData,
       });

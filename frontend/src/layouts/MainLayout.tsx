@@ -45,6 +45,7 @@ const getRouteTitle = (pathname: string): string => {
     '/admin/analyses': 'Analyses Management',
     '/admin/analytes': 'Analytes Management',
     '/admin/test-batteries': 'Test Batteries',
+    '/admin/custom-names': 'Custom Names Management',
   };
 
   // Check for nested routes (e.g., /admin/analyses/:id/analytes)

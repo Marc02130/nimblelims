@@ -9,7 +9,7 @@ from uuid import UUID
 
 class ProjectBase(BaseModel):
     """Base schema for project data"""
-    name: str
+    name: Optional[str] = Field(None, min_length=1, max_length=255, description="Project name (auto-generated if not provided)")
     description: Optional[str] = None
     start_date: datetime
     client_id: UUID

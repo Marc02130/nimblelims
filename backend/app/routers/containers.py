@@ -150,42 +150,10 @@ async def get_containers(
             query = query.filter(Container.id.in_(container_ids))
     
     containers = query.all()
-    return [ContainerResponse.from_orm(container) for container in containers]
+    return [ContainerResponse.model_validate(container) for container in containers]
 
 
-@router.get("/{container_id}", response_model=ContainerWithContentsResponse)
-async def get_container(
-    container_id: UUID,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """
-    Get a specific container with its contents.
-    """
-    container = db.query(Container).filter(
-        Container.id == container_id,
-        Container.active == True
-    ).first()
-    
-    if not container:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Container not found"
-        )
-    
-    # Get contents
-    contents = db.query(Contents).filter(Contents.container_id == container_id).all()
-    
-    container_response = ContainerResponse.from_orm(container)
-    contents_response = [ContentsResponse.from_orm(content) for content in contents]
-    
-    return ContainerWithContentsResponse(
-        **container_response.dict(),
-        contents=contents_response
-    )
-
-
-@router.post("/", response_model=ContainerResponse)
+@router.post("", response_model=ContainerResponse)
 async def create_container(
     container_data: ContainerCreate,
     current_user: User = Depends(require_sample_create),
@@ -220,9 +188,20 @@ async def create_container(
                 detail="Invalid parent container ID"
             )
     
+    # Generate name if not provided
+    container_name = container_data.name
+    if not container_name:
+        from app.core.name_generation import generate_name_for_container
+        try:
+            container_name = generate_name_for_container(db=db)
+        except Exception as e:
+            # Fallback to UUID if generation fails
+            import uuid
+            container_name = str(uuid.uuid4())
+    
     # Create container
     container = Container(
-        name=container_data.name,
+        name=container_name,
         description=container_data.description,
         row=container_data.row,
         column=container_data.column,
@@ -237,10 +216,53 @@ async def create_container(
     )
     
     db.add(container)
-    db.commit()
-    db.refresh(container)
+    try:
+        db.commit()
+        db.refresh(container)
+    except Exception as e:
+        db.rollback()
+        # Check if it's a unique constraint violation (duplicate name)
+        if "duplicate key value violates unique constraint" in str(e).lower() or "unique" in str(e).lower():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Container with name '{container_name}' already exists. Please use a different name."
+            )
+        # Re-raise other exceptions
+        raise
     
-    return ContainerResponse.from_orm(container)
+    return ContainerResponse.model_validate(container)
+
+
+@router.get("/{container_id}", response_model=ContainerWithContentsResponse)
+async def get_container(
+    container_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get a specific container with its contents.
+    """
+    container = db.query(Container).filter(
+        Container.id == container_id,
+        Container.active == True
+    ).first()
+    
+    if not container:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Container not found"
+        )
+    
+    # Get contents
+    contents = db.query(Contents).filter(Contents.container_id == container_id).all()
+    
+    container_response = ContainerResponse.model_validate(container)
+    contents_response = [ContentsResponse.from_orm(content) for content in contents]
+    
+    return ContainerWithContentsResponse(
+        **container_response.dict(),
+        contents=contents_response
+    )
 
 
 @router.patch("/{container_id}", response_model=ContainerResponse)
@@ -323,7 +345,7 @@ async def update_container(
     db.commit()
     db.refresh(container)
     
-    return ContainerResponse.from_orm(container)
+    return ContainerResponse.model_validate(container)
 
 
 # Contents endpoints

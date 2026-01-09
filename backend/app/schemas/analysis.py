@@ -1,7 +1,7 @@
 """
 Pydantic schemas for analyses and analysis-analyte rules
 """
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional, List
 from datetime import datetime
 from uuid import UUID
@@ -26,7 +26,7 @@ class AnalysisResponse(BaseModel):
 
 class AnalysisCreate(BaseModel):
     """Schema for creating an analysis"""
-    name: str
+    name: Optional[str] = Field(None, min_length=1, max_length=255, description="Analysis name (auto-generated if not provided)")
     description: Optional[str] = None
     method: Optional[str] = None
     turnaround_time: Optional[int] = None

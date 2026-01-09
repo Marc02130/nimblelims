@@ -429,6 +429,13 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
   - SQLAlchemy's `query.count()` wraps queries in subqueries which can break RLS evaluation
   - For Lab Technician/Manager roles accessing `client_projects`, the implementation uses `func.count()` directly instead of `query.count()` to avoid subquery wrapping
   - This ensures RLS policies are properly evaluated at the database level
+- **Samples Endpoint Access Control**:
+  - The `GET /samples` endpoint relies entirely on RLS policies for access control
+  - No Python-level filtering is applied - RLS automatically filters samples based on `has_project_access(project_id)`
+  - Lab Technicians and Lab Managers see samples from projects they have access to via the `project_users` junction table
+  - Client users see samples from projects belonging to their `client_id`
+  - Administrators see all samples
+  - The session variable `app.current_user_id` is set via `set_current_user_id()` in `get_current_user()` dependency to enable RLS evaluation
 
 ### Schema
 - **`role_permissions` junction table**:

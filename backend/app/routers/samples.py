@@ -140,23 +140,16 @@ async def get_samples(
         except (ValueError, AttributeError):
             pass
     
-    # Build query with filters
-    query = db.query(Sample).filter(Sample.active == True)
+    # Build query with filters - eagerly load project relationship for SampleResponse
+    # RLS policies handle access control at the database level, so we don't need Python-level filtering
+    from sqlalchemy.orm import joinedload
+    query = db.query(Sample).options(joinedload(Sample.project)).filter(Sample.active == True)
     
-    # Apply project access control
-    if current_user.role.name != "Administrator":
-        if current_user.client_id:
-            # Client users can only see their own projects
-            query = query.join(Project).filter(
-                Project.client_id == current_user.client_id
-            )
-        else:
-            # Lab users can see projects they have access to
-            from models.project import ProjectUser
-            accessible_projects = db.query(ProjectUser.project_id).filter(
-                ProjectUser.user_id == current_user.id
-            ).subquery()
-            query = query.filter(Sample.project_id.in_(accessible_projects))
+    # Note: RLS policy samples_access handles access control via has_project_access(project_id)
+    # No need for Python-level filtering - RLS will automatically filter based on:
+    # - Admin users: see all samples
+    # - Lab users: see samples from projects in project_users table
+    # - Client users: see samples from their client's projects
     
     # Apply filters
     if project_id_uuid:
@@ -199,7 +192,7 @@ async def get_samples(
     pages = (total + size - 1) // size
     
     return SampleListResponse(
-        samples=[SampleResponse.from_orm(sample) for sample in samples],
+        samples=[SampleResponse.model_validate(sample) for sample in samples],
         total=total,
         page=page,
         size=size,
@@ -236,7 +229,7 @@ async def get_sample(
                 detail="Access denied: insufficient project permissions"
             )
     
-    return SampleResponse.from_orm(sample)
+    return SampleResponse.model_validate(sample)
 
 
 @router.post("/", response_model=SampleResponse)
@@ -273,9 +266,24 @@ async def create_sample(
             custom_attributes=sample_data.custom_attributes
         )
     
+    # Generate name if not provided
+    sample_name = sample_data.name
+    if not sample_name:
+        from app.core.name_generation import generate_name_for_sample
+        try:
+            sample_name = generate_name_for_sample(
+                db=db,
+                project_id=sample_data.project_id,
+                received_date=sample_data.received_date
+            )
+        except Exception as e:
+            # Fallback to UUID if generation fails
+            import uuid
+            sample_name = str(uuid.uuid4())
+    
     # Create sample
     sample = Sample(
-        name=sample_data.name,
+        name=sample_name,
         description=sample_data.description,
         due_date=sample_data.due_date,
         received_date=sample_data.received_date,
@@ -296,7 +304,7 @@ async def create_sample(
     db.commit()
     db.refresh(sample)
     
-    return SampleResponse.from_orm(sample)
+    return SampleResponse.model_validate(sample)
 
 
 @router.post("/accession", response_model=SampleResponse)
@@ -308,111 +316,241 @@ async def accession_sample(
     """
     Accession a new sample with test assignment.
     Implements US-1: Sample Accessioning workflow.
+    Supports project auto-creation if project_id is not provided.
     """
-    # Check project access
-    if current_user.role.name != "Administrator":
-        from models.project import ProjectUser
-        project_access = db.query(ProjectUser).filter(
-            ProjectUser.project_id == accession_data.project_id,
-            ProjectUser.user_id == current_user.id
-        ).first()
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    try:
+        logger.info(f"Accessioning sample for user {current_user.id}, client_id={accession_data.client_id}, client_project_id={accession_data.client_project_id}")
         
-        if not project_access:
+        from models.client import Client, ClientProject
+        from models.list import List, ListEntry
+        from models.project import ProjectUser
+        from app.core.name_generation import generate_name_for_sample, generate_name_for_project
+        
+        # Validate client_id is accessible (via RLS)
+        client = db.query(Client).filter(Client.id == accession_data.client_id).first()
+        if not client:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Access denied: insufficient project permissions"
+                detail="Client not found or inaccessible"
             )
+        
+        # Verify client_project_id if provided (validate against client)
+        if accession_data.client_project_id:
+            client_project = db.query(ClientProject).filter(
+                ClientProject.id == accession_data.client_project_id,
+                ClientProject.active == True
+            ).first()
+            
+            if not client_project:
+                logger.warning(f"Client project {accession_data.client_project_id} not found or inactive")
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Client project not found or inactive"
+                )
+            
+            # Verify client_project belongs to the specified client
+            if client_project.client_id != accession_data.client_id:
+                logger.warning(f"Client project {accession_data.client_project_id} belongs to client {client_project.client_id}, but request specified {accession_data.client_id}")
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Client project does not belong to the specified client"
+                )
+        
+        # Determine project_id - either use provided or auto-create
+        project_id = accession_data.project_id
     
-    # Get initial status (e.g., "Received")
-    from models.list import ListEntry
-    received_status = db.query(ListEntry).filter(
-        ListEntry.list_id == "sample_status",  # Assuming this list exists
-        ListEntry.name == "Received"
-    ).first()
+        if not project_id:
+            logger.info("Auto-creating project")
+            # Auto-create project
+            # Get "Active" status for projects
+            project_status_list = db.query(List).filter(List.name == "project_status").first()
+            if not project_status_list:
+                logger.error("Project status list not found")
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Project status list not found in configuration"
+                )
+            
+            active_status = db.query(ListEntry).filter(
+                ListEntry.list_id == project_status_list.id,
+                ListEntry.name == "Active"
+            ).first()
+            
+            if not active_status:
+                logger.error("Project status 'Active' not found")
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Project status 'Active' not found in configuration"
+                )
+            
+            # Generate project name
+            project_name = generate_name_for_project(
+                db=db,
+                client_id=str(accession_data.client_id),
+                start_date=accession_data.received_date
+            )
+            logger.info(f"Generated project name: {project_name}")
+            
+            # Create new project
+            new_project = Project(
+                name=project_name,
+                description=None,
+                start_date=accession_data.received_date,
+                client_id=accession_data.client_id,
+                client_project_id=accession_data.client_project_id,
+                status=active_status.id,
+                created_by=current_user.id,
+                modified_by=current_user.id
+            )
+            db.add(new_project)
+            db.flush()  # Get the ID without committing
+            project_id = new_project.id
+            logger.info(f"Created project {project_id}")
+            
+            # Grant current user access to the new project
+            project_user = ProjectUser(
+                project_id=project_id,
+                user_id=current_user.id
+            )
+            db.add(project_user)
+        else:
+            # Verify project exists and user has access
+            project = db.query(Project).filter(Project.id == project_id).first()
+            if not project:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Project not found"
+                )
+            
+            # Check project access (unless admin)
+            if current_user.role.name != "Administrator":
+                project_access = db.query(ProjectUser).filter(
+                    ProjectUser.project_id == project_id,
+                    ProjectUser.user_id == current_user.id
+                ).first()
+                
+                if not project_access:
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail="Access denied: insufficient project permissions"
+                    )
+            
+            # Verify project belongs to the specified client
+            if project.client_id != accession_data.client_id:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                            detail="Project does not belong to the specified client"
+                )
     
-    if not received_status:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Sample status 'Received' not found in configuration"
-        )
-    
-    # Verify client_project_id if provided
-    if accession_data.client_project_id:
-        from models.client import ClientProject
-        client_project = db.query(ClientProject).filter(
-            ClientProject.id == accession_data.client_project_id,
-            ClientProject.active == True
+        # Link project to client_project if provided
+        if accession_data.client_project_id and not project.client_project_id:
+            project.client_project_id = accession_data.client_project_id
+        
+        # Get initial status (e.g., "Received")
+        sample_status_list = db.query(List).filter(List.name == "sample_status").first()
+        if not sample_status_list:
+            logger.error("Sample status list not found")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Sample status list not found in configuration"
+            )
+        
+        received_status = db.query(ListEntry).filter(
+            ListEntry.list_id == sample_status_list.id,
+            ListEntry.name == "Received"
         ).first()
         
-        if not client_project:
+        if not received_status:
+            logger.error("Sample status 'Received' not found")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Client project not found or inactive"
+                detail="Sample status 'Received' not found in configuration"
             )
         
-        # Verify client_project belongs to the same client as the project
-        project = db.query(Project).filter(Project.id == accession_data.project_id).first()
-        if project and project.client_id != client_project.client_id:
+        # Generate sample name if not provided
+        sample_name = accession_data.name
+        if not sample_name:
+            sample_name = generate_name_for_sample(
+                db=db,
+                project_id=str(project_id),
+                received_date=accession_data.received_date
+            )
+            logger.info(f"Generated sample name: {sample_name}")
+    
+        # Create sample
+        sample = Sample(
+                name=sample_name,
+            description=accession_data.description,
+            due_date=accession_data.due_date,
+            received_date=accession_data.received_date,
+            sample_type=accession_data.sample_type,
+            status=received_status.id,
+            matrix=accession_data.matrix,
+            temperature=accession_data.temperature,
+                project_id=project_id,
+            qc_type=accession_data.qc_type,
+                custom_attributes=accession_data.custom_attributes or {},
+            created_by=current_user.id,
+            modified_by=current_user.id
+        )
+        
+        db.add(sample)
+        db.flush()  # Get the ID without committing
+        
+        # Get "In Process" status for tests
+        test_status_list = db.query(List).filter(List.name == "test_status").first()
+        if not test_status_list:
+            logger.error("Test status list not found")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Client project does not belong to the same client as the project"
+                detail="Test status list not found in configuration"
             )
-    
-    # Create sample
-    sample = Sample(
-        name=accession_data.name,
-        description=accession_data.description,
-        due_date=accession_data.due_date,
-        received_date=accession_data.received_date,
-        sample_type=accession_data.sample_type,
-        status=received_status.id,
-        matrix=accession_data.matrix,
-        temperature=accession_data.temperature,
-        project_id=accession_data.project_id,
-        qc_type=accession_data.qc_type,
-        created_by=current_user.id,
-        modified_by=current_user.id
-    )
-    
-    # Link project to client_project if provided
-    if accession_data.client_project_id:
-        project = db.query(Project).filter(Project.id == accession_data.project_id).first()
-        if project:
-            project.client_project_id = accession_data.client_project_id
-    
-    db.add(sample)
-    db.flush()  # Get the ID without committing
-    
-    # Get "In Process" status for tests
-    from models.test import Test
-    from models.list import ListEntry
-    from models.test_battery import TestBattery, BatteryAnalysis
-    
-    in_process_status = db.query(ListEntry).filter(
-        ListEntry.list_id == "test_status",  # Assuming this list exists
-        ListEntry.name == "In Process"
-    ).first()
-    
-    if not in_process_status:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Test status 'In Process' not found in configuration"
+        
+        in_process_status = db.query(ListEntry).filter(
+                ListEntry.list_id == test_status_list.id,
+            ListEntry.name == "In Process"
+        ).first()
+        
+        if not in_process_status:
+            logger.error("Test status 'In Process' not found")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Test status 'In Process' not found in configuration"
+            )
+        
+        # Create tests using shared helper function
+        _create_tests_for_sample(
+            db=db,
+            sample=sample,
+            battery_id=accession_data.battery_id,
+            assigned_tests=accession_data.assigned_tests,
+            in_process_status_id=in_process_status.id,
+            current_user_id=current_user.id
         )
+        
+        db.commit()
+        db.refresh(sample)
+        
+        # Eagerly load project relationship to populate client_id in response
+        from sqlalchemy.orm import joinedload
+        sample = db.query(Sample).options(joinedload(Sample.project)).filter(Sample.id == sample.id).first()
+        
+        logger.info(f"Successfully accessioned sample {sample.id}")
+        return SampleResponse.model_validate(sample)
     
-    # Create tests using shared helper function
-    _create_tests_for_sample(
-        db=db,
-        sample=sample,
-        battery_id=accession_data.battery_id,
-        assigned_tests=accession_data.assigned_tests,
-        in_process_status_id=in_process_status.id,
-        current_user_id=current_user.id
-    )
-    
-    db.commit()
-    db.refresh(sample)
-    
-    return SampleResponse.from_orm(sample)
+    except HTTPException:
+        # Re-raise HTTP exceptions as-is
+        raise
+    except Exception as e:
+        logger.error(f"Error during sample accession: {str(e)}", exc_info=True)
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Internal server error during sample accession: {str(e)}"
+        )
 
 
 @router.post("/bulk-accession", response_model=List[SampleResponse])
@@ -425,37 +563,24 @@ async def bulk_accession_samples(
     Bulk accession multiple samples with test assignment.
     Implements US-24: Bulk Sample Accessioning.
     Creates samples, containers, contents, and tests in a single transaction.
+    Supports project auto-creation if project_id is not provided.
     """
-    # Check project access
-    if current_user.role.name != "Administrator":
-        from models.project import ProjectUser
-        project_access = db.query(ProjectUser).filter(
-            ProjectUser.project_id == bulk_data.project_id,
-            ProjectUser.user_id == current_user.id
-        ).first()
-        
-        if not project_access:
+    from models.client import Client, ClientProject
+    from models.list import List, ListEntry
+    from models.project import ProjectUser
+    from models.container import ContainerType
+    from app.core.name_generation import generate_name_for_sample, generate_name_for_project
+    
+    # Validate client_id is accessible (via RLS)
+    client = db.query(Client).filter(Client.id == bulk_data.client_id).first()
+    if not client:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Access denied: insufficient project permissions"
-            )
-    
-    # Validate container type exists
-    from models.container import ContainerType
-    container_type = db.query(ContainerType).filter(
-        ContainerType.id == bulk_data.container_type_id,
-        ContainerType.active == True
-    ).first()
-    
-    if not container_type:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid container type ID"
+            detail="Client not found or inaccessible"
         )
     
-    # Verify client_project_id if provided
+    # Verify client_project_id if provided (validate against client)
     if bulk_data.client_project_id:
-        from models.client import ClientProject
         client_project = db.query(ClientProject).filter(
             ClientProject.id == bulk_data.client_project_id,
             ClientProject.active == True
@@ -467,13 +592,109 @@ async def bulk_accession_samples(
                 detail="Client project not found or inactive"
             )
         
-        # Verify client_project belongs to the same client as the project
-        project = db.query(Project).filter(Project.id == bulk_data.project_id).first()
-        if project and project.client_id != client_project.client_id:
+        # Verify client_project belongs to the specified client
+        if client_project.client_id != bulk_data.client_id:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Client project does not belong to the same client as the project"
+                detail="Client project does not belong to the specified client"
             )
+    
+    # Validate container type exists
+    container_type = db.query(ContainerType).filter(
+        ContainerType.id == bulk_data.container_type_id,
+        ContainerType.active == True
+    ).first()
+    
+    if not container_type:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid container type ID"
+        )
+    
+    # Determine project_id - either use provided or auto-create
+    project_id = bulk_data.project_id
+    
+    if not project_id:
+        # Auto-create project
+        # Get "Active" status for projects
+        project_status_list = db.query(List).filter(List.name == "project_status").first()
+        if not project_status_list:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Project status list not found in configuration"
+            )
+        
+        active_status = db.query(ListEntry).filter(
+            ListEntry.list_id == project_status_list.id,
+            ListEntry.name == "Active"
+        ).first()
+        
+        if not active_status:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Project status 'Active' not found in configuration"
+            )
+        
+        # Generate project name
+        project_name = generate_name_for_project(
+            db=db,
+            client_id=str(bulk_data.client_id),
+            start_date=bulk_data.received_date
+            )
+        
+        # Create new project
+        new_project = Project(
+            name=project_name,
+            description=None,
+            start_date=bulk_data.received_date,
+            client_id=bulk_data.client_id,
+            client_project_id=bulk_data.client_project_id,
+            status=active_status.id,
+            created_by=current_user.id,
+            modified_by=current_user.id
+        )
+        db.add(new_project)
+        db.flush()  # Get the ID without committing
+        project_id = new_project.id
+        
+        # Grant current user access to the new project
+        project_user = ProjectUser(
+            project_id=project_id,
+            user_id=current_user.id
+        )
+        db.add(project_user)
+    else:
+        # Verify project exists and user has access
+        project = db.query(Project).filter(Project.id == project_id).first()
+        if not project:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Project not found"
+            )
+        
+        # Check project access (unless admin)
+        if current_user.role.name != "Administrator":
+            project_access = db.query(ProjectUser).filter(
+                ProjectUser.project_id == project_id,
+                ProjectUser.user_id == current_user.id
+            ).first()
+            
+            if not project_access:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Access denied: insufficient project permissions"
+                )
+        
+        # Verify project belongs to the specified client
+        if project.client_id != bulk_data.client_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Project does not belong to the specified client"
+            )
+        
+        # Link project to client_project if provided
+        if bulk_data.client_project_id and not project.client_project_id:
+            project.client_project_id = bulk_data.client_project_id
     
     # Get initial status (e.g., "Received")
     from models.list import List, ListEntry
@@ -529,9 +750,11 @@ async def bulk_accession_samples(
             sample_name = f"{bulk_data.auto_name_prefix}{auto_name_counter}"
             auto_name_counter += 1
         else:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Sample name required or auto_name_prefix must be provided"
+            # Use name generation if no prefix provided
+            sample_name = generate_name_for_sample(
+                db=db,
+                project_id=str(project_id),
+                received_date=bulk_data.received_date
             )
         
         sample_names.append(sample_name)
@@ -590,9 +813,16 @@ async def bulk_accession_samples(
             # Generate name if not provided
             if unique.name:
                 sample_name = unique.name
-            else:
+            elif bulk_data.auto_name_prefix:
                 sample_name = f"{bulk_data.auto_name_prefix}{auto_name_counter}"
                 auto_name_counter += 1
+            else:
+                # Use name generation if no prefix provided
+                sample_name = generate_name_for_sample(
+                    db=db,
+                    project_id=str(project_id),
+                    received_date=bulk_data.received_date
+                )
             
             # Create sample
             sample = Sample(
@@ -604,7 +834,7 @@ async def bulk_accession_samples(
                 status=received_status.id,
                 matrix=bulk_data.matrix,
                 temperature=unique.temperature if unique.temperature is not None else None,
-                project_id=bulk_data.project_id,
+                project_id=project_id,
                 qc_type=bulk_data.qc_type,
                 client_sample_id=unique.client_sample_id,
                 created_by=current_user.id,
@@ -613,11 +843,7 @@ async def bulk_accession_samples(
             db.add(sample)
             db.flush()  # Get the ID without committing
             
-            # Link project to client_project if provided (only need to do this once)
-            if bulk_data.client_project_id and idx == 0:
-                project = db.query(Project).filter(Project.id == bulk_data.project_id).first()
-                if project:
-                    project.client_project_id = bulk_data.client_project_id
+            # Project is already linked to client_project if auto-created or updated above
             
             # Create container
             container = Container(
@@ -658,7 +884,7 @@ async def bulk_accession_samples(
         for sample in created_samples:
             db.refresh(sample)
         
-        return [SampleResponse.from_orm(sample) for sample in created_samples]
+        return [SampleResponse.model_validate(sample) for sample in created_samples]
         
     except Exception as e:
         # Rollback on any error
@@ -750,7 +976,7 @@ async def update_sample(
     db.commit()
     db.refresh(sample)
     
-    return SampleResponse.from_orm(sample)
+    return SampleResponse.model_validate(sample)
 
 
 @router.delete("/{sample_id}")
@@ -843,4 +1069,4 @@ async def update_sample_status(
     db.commit()
     db.refresh(sample)
     
-    return SampleResponse.from_orm(sample)
+    return SampleResponse.model_validate(sample)

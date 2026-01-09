@@ -88,12 +88,17 @@ class ApiService {
     return response.data;
   }
 
+  async accessionSample(sampleData: any) {
+    const response: AxiosResponse = await this.api.post('/samples/accession', sampleData);
+    return response.data;
+  }
+
   async bulkAccessionSamples(bulkData: {
     due_date: string;
     received_date: string;
     sample_type: string;
     matrix: string;
-    project_id: string;
+    client_id: string;
     client_project_id?: string;
     qc_type?: string;
     assigned_tests: string[];
@@ -176,8 +181,8 @@ class ApiService {
   }
 
   // Contents endpoints
-  async createContent(contentData: any) {
-    const response: AxiosResponse = await this.api.post('/contents', contentData);
+  async createContent(containerId: string, contentData: any) {
+    const response: AxiosResponse = await this.api.post(`/containers/${containerId}/contents`, contentData);
     return response.data;
   }
 
@@ -685,6 +690,64 @@ class ApiService {
   async deleteCustomAttributeConfig(id: string) {
     const response: AxiosResponse = await this.api.delete(`/admin/custom-attributes/${id}`);
     return response.data;
+  }
+
+  // Name Templates endpoints
+  async getNameTemplates(filters?: {
+    entity_type?: string;
+    active?: boolean;
+    page?: number;
+    size?: number;
+  }) {
+    const response: AxiosResponse = await this.api.get('/admin/name-templates', {
+      params: filters,
+    });
+    return response.data;
+  }
+
+  async getNameTemplate(id: string) {
+    const response: AxiosResponse = await this.api.get(`/admin/name-templates/${id}`);
+    return response.data;
+  }
+
+  async createNameTemplate(templateData: {
+    entity_type: string;
+    template: string;
+    description?: string;
+    active?: boolean;
+  }) {
+    const response: AxiosResponse = await this.api.post('/admin/name-templates', templateData);
+    return response.data;
+  }
+
+  async updateNameTemplate(
+    id: string,
+    templateData: {
+      entity_type?: string;
+      template?: string;
+      description?: string;
+      active?: boolean;
+    }
+  ) {
+    const response: AxiosResponse = await this.api.patch(`/admin/name-templates/${id}`, templateData);
+    return response.data;
+  }
+
+  async deleteNameTemplate(id: string) {
+    const response: AxiosResponse = await this.api.delete(`/admin/name-templates/${id}`);
+    return response.data;
+  }
+
+  async getGeneratedNamePreview(entity_type: string, client_id?: string, reference_date?: string) {
+    try {
+      const response: AxiosResponse = await this.api.get('/admin/name-templates/preview', {
+        params: { entity_type, client_id, reference_date },
+      });
+      return response.data.preview;
+    } catch (err) {
+      // If endpoint doesn't exist, return null
+      return null;
+    }
   }
 
   // Help endpoints

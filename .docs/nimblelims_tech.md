@@ -290,7 +290,7 @@ WHERE custom_attributes @> '{"ph_level": 7.5}'::jsonb;
 
 ### 4.2 Key Endpoints
 - **Samples**: 
-  - GET /samples?project_id=...&status=...: List filtered by user access (query params accept UUIDs, empty strings converted to None).
+  - GET /samples?project_id=...&status=...: List filtered by user access (query params accept UUIDs, empty strings converted to None). **Access control is enforced entirely by Row-Level Security (RLS) policies at the database level - no Python-level filtering is applied.** The RLS policy `samples_access` uses `has_project_access(project_id)` to automatically filter samples. Lab Technicians and Lab Managers see samples from projects they have access to via the `project_users` junction table. Client users see samples from projects belonging to their `client_id`. Administrators see all samples.
   - POST /samples: Create sample (requires sample:create).
   - POST /samples/accession: Accession sample with test assignment (requires sample:create). Supports test batteries and individual analyses.
   - PATCH /samples/{id}: Update status/container (requires sample:update).
@@ -349,7 +349,7 @@ WHERE custom_attributes @> '{"ph_level": 7.5}'::jsonb;
   - POST /containers: Create instance dynamically (requires sample:create).
   - GET /containers/{id}: Retrieve with hierarchy/contents.
 - **Projects**:
-  - GET /projects: List projects accessible to user (RBAC enforced).
+  - GET /projects: List projects accessible to user (RLS enforced). Uses eager loading (`joinedload(Project.client)`) to avoid lazy loading issues. Access control is enforced by RLS policy `projects_access` which uses `has_project_access(id)`. Returns projects with client information included.
 - **Client Projects**:
   - GET /client-projects: List client projects accessible to user (RLS enforced).
     - Administrators: All client projects
@@ -391,7 +391,8 @@ WHERE custom_attributes @> '{"ph_level": 7.5}'::jsonb;
 - Error Handling: Standard HTTP codes; JSON {error, detail}.
 
 ### 4.3 Validation
-- Backend: Use Pydantic for request schemas; custom validators for analyte rules.
+- Backend: Use Pydantic v2 for request schemas; custom validators for analyte rules.
+- **Pydantic v2 Compatibility**: All response models use `model_validate()` instead of `from_orm()` for Pydantic v2 compatibility. This ensures proper serialization of SQLAlchemy models to Pydantic response schemas.
 - **Custom Attributes Validation**:
   - Server-side validation in `app.core.custom_attributes.validate_custom_attributes()`
   - Validates against active `custom_attributes_config` for entity type
