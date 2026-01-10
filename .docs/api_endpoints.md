@@ -337,23 +337,127 @@ Partially update a container (edit mode).
 ## Projects
 
 ### GET /projects
-List projects accessible to the current user.
+List projects accessible to the current user with optional filtering and pagination.
+
+**Access Control:**
+- Access control is enforced entirely by Row-Level Security (RLS) policies at the database level
+- No Python-level filtering is applied - RLS automatically filters projects based on `projects_access` policy
+- Administrators see all projects
+- Lab Technicians and Lab Managers see all active projects (per RLS policy in migration 0024)
+- Client users see only projects for their client_id (RLS enforced)
+- Lab users with project_users entries see those specific projects (via `has_project_access` function)
+- The session variable `app.current_user_id` is set via `set_current_user_id()` in `get_current_user()` dependency
+
+**Query Parameters:**
+- `status` (optional, UUID): Filter by status ID
+- `client_id` (optional, UUID): Filter by client ID
+- `page` (optional, int, default=1): Page number
+- `size` (optional, int, default=10, max=100): Page size
 
 **Response:**
 ```json
-[
-  {
-    "id": "...",
-    "name": "...",
-    "client": {...}
-  }
-]
+{
+  "projects": [
+    {
+      "id": "uuid",
+      "name": "Project Name",
+      "description": "Project description",
+      "start_date": "2025-01-01T00:00:00Z",
+      "client_id": "uuid",
+      "client_project_id": "uuid",
+      "status": "uuid",
+      "active": true,
+      "created_at": "2025-01-01T00:00:00Z",
+      "modified_at": "2025-01-01T00:00:00Z",
+      "client": {
+        "id": "uuid",
+        "name": "Client Name"
+      },
+      "client_project": {
+        "id": "uuid",
+        "name": "Client Project Name"
+      },
+      "custom_attributes": {}
+    }
+  ],
+  "total": 50,
+  "page": 1,
+  "size": 10,
+  "pages": 5
+}
 ```
 
-**RBAC:**
-- Administrators see all projects
-- Lab users see projects they have access to via `project_users`
-- Client users see only their client's projects
+### GET /projects/{id}
+Get a single project by ID.
+
+**Access Control:** RLS enforced via `projects_access` policy. Returns 404 if project not found or user doesn't have access.
+
+**Response:** Project object (same structure as in list response)
+
+### POST /projects
+Create a new project.
+
+**Requires:** `project:manage` permission
+
+**Request:**
+```json
+{
+  "name": "Project Name",
+  "description": "Project description",
+  "start_date": "2025-01-01T00:00:00Z",
+  "client_id": "uuid",
+  "client_project_id": "uuid",
+  "status": "uuid",
+  "custom_attributes": {
+    "contract_number": "CONTRACT-123"
+  }
+}
+```
+
+**Note:** 
+- `name` is optional - if not provided, auto-generated using client name + timestamp
+- `client_project_id` is optional - if provided, must belong to the specified `client_id`
+- `custom_attributes` are validated against active configurations for 'projects' entity type
+- Sets audit fields (`created_by`, `modified_by`)
+
+**Response:** 201 Created with project object
+
+### PATCH /projects/{id}
+Update a project (partial update).
+
+**Requires:** `project:manage` permission
+
+**Request:** (all fields optional)
+```json
+{
+  "name": "Updated Project Name",
+  "description": "Updated description",
+  "start_date": "2025-01-02T00:00:00Z",
+  "client_id": "uuid",
+  "client_project_id": "uuid",
+  "status": "uuid",
+  "active": false,
+  "custom_attributes": {
+    "contract_number": "CONTRACT-456"
+  }
+}
+```
+
+**Note:**
+- Validates `client_project_id` belongs to `client_id` if both provided
+- Updates audit fields (`modified_by`, `modified_at`)
+- Custom attributes validated against active configurations
+
+**Response:** Updated project object
+
+### DELETE /projects/{id}
+Soft delete a project (sets active=false).
+
+**Requires:** `project:manage` permission
+
+**Response:** 204 No Content
+
+**Note:** Updates audit fields (`modified_by`, `modified_at`)
 
 ## Batches
 

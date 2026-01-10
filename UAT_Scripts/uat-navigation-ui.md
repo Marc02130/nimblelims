@@ -15,7 +15,7 @@ This document contains User Acceptance Testing (UAT) scripts for navigation and 
 - Browser with developer tools (for responsive testing)
 - Test user accounts:
   - Administrator with `config:edit` permission (for Admin accordion test)
-  - Lab Manager with `project:manage` permission (for Client accordion test)
+  - Lab Manager with `project:manage` permission (for Lab Mgmt accordion test)
   - Lab Technician with `sample:create` permission (for permission gating test)
 - Browser window resizable (for responsive testing)
 
@@ -45,15 +45,15 @@ Verify that sidebar navigation correctly gates menu items by permissions, auto-e
 | 1 | Log in as Administrator | User authenticated, dashboard loads |
 | 2 | **Verify Sidebar Structure** | |
 | 2.1 | Verify sidebar visible | Sidebar visible on left side (240px width) |
-| 2.2 | Verify Core Features section | Core Features section visible with items: Dashboard, Accessioning, Samples, Tests, Containers, Batches, Results, Help |
+| 2.2 | Verify Core Features section | Core Features section visible with items: Dashboard, Help, Accessioning, Samples, Tests, Containers, Batches, Results (in order) |
 | 2.3 | Verify Admin accordion visible | Admin accordion visible (requires `config:edit` permission) |
-| 2.4 | Verify Client accordion visible (if user has `project:manage`) | Client accordion visible if user has `project:manage` permission |
+| 2.4 | Verify Lab Mgmt accordion visible (if user has `project:manage`) | Lab Mgmt accordion visible if user has `project:manage` permission |
 | 3 | **Test Permission Gating** | |
 | 3.1 | Verify all core items visible | All core items visible (Administrator sees all items) |
 | 3.2 | Verify Admin accordion visible | Admin accordion visible (user has `config:edit`) |
 | 3.3 | Log out and log in as Lab Technician (no `config:edit`) | User authenticated |
 | 3.4 | Verify Admin accordion NOT visible | Admin accordion NOT visible (user lacks `config:edit`) |
-| 3.5 | Verify Client accordion NOT visible (if no `project:manage`) | Client accordion NOT visible if user lacks `project:manage` |
+| 3.5 | Verify Lab Mgmt accordion NOT visible (if no `project:manage`) | Lab Mgmt accordion NOT visible if user lacks `project:manage` |
 | 4 | **Test Auto-Expand Accordion** | |
 | 4.1 | Log in as Administrator | User authenticated |
 | 4.2 | Navigate to `/dashboard` | Dashboard loads, Admin accordion collapsed (not on admin route) |
@@ -65,12 +65,15 @@ Verify that sidebar navigation correctly gates menu items by permissions, auto-e
 | 4.8 | Verify "Lists Management" item highlighted | "Lists Management" item shows active state |
 | 4.9 | Navigate to `/dashboard` | Dashboard loads |
 | 4.10 | Verify Admin accordion collapsed | Admin accordion collapsed (not on admin route) |
-| 5 | **Test Client Accordion Auto-Expand** | |
+| 5 | **Test Lab Mgmt Accordion Auto-Expand** | |
 | 5.1 | Log in as user with `project:manage` permission | User authenticated |
-| 5.2 | Navigate to `/clients` | Clients page loads |
-| 5.3 | Verify Client accordion auto-expanded | Client accordion expanded automatically |
-| 5.4 | Navigate to `/client-projects` | Client Projects page loads |
-| 5.5 | Verify Client accordion still expanded | Client accordion remains expanded |
+| 5.2 | Navigate to `/projects` | Projects page loads |
+| 5.3 | Verify Lab Mgmt accordion auto-expanded | Lab Mgmt accordion expanded automatically |
+| 5.4 | Verify "Projects" item highlighted | "Projects" item shows active state (primary color icon) |
+| 5.5 | Navigate to `/clients` | Clients page loads |
+| 5.6 | Verify Lab Mgmt accordion still expanded | Lab Mgmt accordion remains expanded |
+| 5.7 | Navigate to `/client-projects` | Client Projects page loads |
+| 5.8 | Verify Lab Mgmt accordion still expanded | Lab Mgmt accordion remains expanded |
 | 6 | **Test Manual Accordion Toggle** | |
 | 6.1 | Navigate to `/admin` | Admin Dashboard loads, Admin accordion expanded |
 | 6.2 | Click Admin accordion header | Accordion collapses |
@@ -84,9 +87,9 @@ Verify that sidebar navigation correctly gates menu items by permissions, auto-e
 
 | Category | Expected Outcome |
 |----------|------------------|
-| **Sidebar Structure** | - Sidebar visible on left (240px width expanded)<br>- Core Features section with navigation items<br>- Admin accordion visible (if `config:edit` permission)<br>- Client accordion visible (if `project:manage` permission) |
-| **Permission Gating** | - Menu items visible only if user has required permission<br>- Admin accordion hidden if no `config:edit` permission<br>- Client accordion hidden if no `project:manage` permission<br>- Core items filtered by permissions |
-| **Auto-Expand Accordion** | - Admin accordion auto-expands when navigating to `/admin/*` routes<br>- Client accordion auto-expands when navigating to `/clients` or `/client-projects` routes<br>- Accordions remain expanded while on related routes<br>- Accordions collapse when navigating away |
+| **Sidebar Structure** | - Sidebar visible on left (240px width expanded)<br>- Core Features section with navigation items (Dashboard, Help at top, then workflow items)<br>- Admin accordion visible (if `config:edit` permission)<br>- Lab Mgmt accordion visible (if `project:manage` permission) |
+| **Permission Gating** | - Menu items visible only if user has required permission<br>- Admin accordion hidden if no `config:edit` permission<br>- Lab Mgmt accordion hidden if no `project:manage` permission<br>- Core items filtered by permissions |
+| **Auto-Expand Accordion** | - Admin accordion auto-expands when navigating to `/admin/*` routes<br>- Lab Mgmt accordion auto-expands when navigating to `/projects`, `/clients`, or `/client-projects` routes<br>- Accordions remain expanded while on related routes<br>- Accordions collapse when navigating away |
 | **Manual Toggle** | - Accordions can be manually collapsed/expanded by clicking header<br>- Toggle state persists during navigation within section |
 | **Active State** | - Current page item highlighted with primary color icon<br>- Selected state applied to active item<br>- Other items show default styling |
 
@@ -99,7 +102,7 @@ Verify that sidebar navigation correctly gates menu items by permissions, auto-e
 | 8.2 | Click sidebar toggle button | Sidebar collapses to icon-only mode (56px width) |
 | 8.3 | Verify icons only visible | Only icons visible, text labels hidden |
 | 8.4 | Verify tooltips on hover | Tooltips appear on hover for each icon |
-| 8.5 | Verify accordions collapsed | Admin and Client accordions auto-collapsed |
+| 8.5 | Verify accordions collapsed | Admin and Lab Mgmt accordions auto-collapsed |
 | 8.6 | Click sidebar toggle button again | Sidebar expands to full width (240px) |
 | 8.7 | Verify text labels visible | Text labels visible again |
 | 8.8 | Refresh page | Sidebar state persists (from localStorage) |
@@ -117,7 +120,7 @@ Verify that sidebar navigation correctly gates menu items by permissions, auto-e
 | Sidebar visible and properly structured | ✓ | ✗ |
 | Permission gating works correctly | ✓ | ✗ |
 | Admin accordion auto-expands on admin routes | ✓ | ✗ |
-| Client accordion auto-expands on client routes | ✓ | ✗ |
+| Lab Mgmt accordion auto-expands on lab management routes | ✓ | ✗ |
 | Manual accordion toggle works | ✓ | ✗ |
 | Active state highlighting works | ✓ | ✗ |
 | Sidebar collapse/expand works | ✓ | ✗ |
@@ -276,8 +279,9 @@ Verify that navigation is accessible via keyboard navigation, has proper ARIA la
 | 3.2 | Verify main navigation ARIA label | `aria-label="main navigation"` on sidebar container |
 | 3.3 | Verify navigation item ARIA labels | Each navigation item has `aria-label` (e.g., "Navigate to Dashboard") |
 | 3.4 | Verify active item ARIA current | Active item has `aria-current="page"` |
-| 3.5 | Verify accordion ARIA attributes | Accordion has:<br>- `aria-label="Admin section"` or `aria-label="Client section"`<br>- `aria-controls` pointing to content<br>- `aria-expanded` (true/false) |
+| 3.5 | Verify accordion ARIA attributes | Accordion has:<br>- `aria-label="Admin section"` or `aria-label="Lab Management section"`<br>- `aria-controls` pointing to content<br>- `aria-expanded` (true/false) |
 | 3.6 | Verify admin sub-navigation ARIA label | Admin sub-items have `aria-label="admin navigation"` |
+| 3.7 | Verify Lab Mgmt accordion ARIA attributes | Lab Mgmt accordion has:<br>- `aria-label="Lab Management section"`<br>- `aria-controls="lab-mgmt-navigation-content"`<br>- `aria-expanded` (true/false) |
 | 4 | **Test Sidebar Toggle ARIA** | |
 | 4.1 | Locate sidebar toggle button in AppBar | Toggle button visible |
 | 4.2 | Verify ARIA label | Toggle button has `aria-label="Collapse sidebar"` or `aria-label="Expand sidebar"` |
@@ -309,7 +313,7 @@ Verify that navigation is accessible via keyboard navigation, has proper ARIA la
 | Category | Expected Outcome |
 |----------|------------------|
 | **Keyboard Navigation** | - Tab key moves focus through navigation items<br>- Enter key activates focused item<br>- Focus indicator visible<br>- Focus order follows visual flow<br>- Escape key closes accordions (if supported) |
-| **ARIA Labels** | - Main navigation: `aria-label="main navigation"`<br>- Navigation items: `aria-label="Navigate to [page]"`<br>- Active items: `aria-current="page"`<br>- Accordions: `aria-label="[Section] section"`, `aria-controls`, `aria-expanded`<br>- Sub-navigation: `aria-label="admin navigation"` or `aria-label="client navigation"` |
+| **ARIA Labels** | - Main navigation: `aria-label="main navigation"`<br>- Navigation items: `aria-label="Navigate to [page]"`<br>- Active items: `aria-current="page"`<br>- Accordions: `aria-label="[Section] section"`, `aria-controls`, `aria-expanded`<br>- Sub-navigation: `aria-label="admin navigation"` or `aria-label="lab management navigation"`<br>- Lab Mgmt items: "Projects" (aria-label: "Internal Projects"), "Clients", "Client Proj" (aria-label: "Client Projects") |
 | **Toggle Buttons** | - Sidebar toggle: `aria-label="Collapse sidebar"` / `aria-label="Expand sidebar"`<br>- Mobile menu toggle: `aria-label="open drawer"` |
 | **Logo** | - Logo: `aria-label="Navigate to dashboard"` |
 | **Focus Management** | - Focus moves correctly through navigation<br>- Focus moves to page content after navigation<br>- No focus traps |
@@ -321,7 +325,7 @@ Verify that navigation is accessible via keyboard navigation, has proper ARIA la
 |------|--------|-----------------|
 | 9 | **Test Tab Order** | |
 | 9.1 | Press Tab from page start | Focus moves to Logo |
-| 9.2 | Continue pressing Tab | Focus moves through: Logo → Dashboard → Accessioning → Samples → ... → Help → Admin accordion → (if expanded) Admin items → Sidebar toggle → Page content |
+| 9.2 | Continue pressing Tab | Focus moves through: Logo → Dashboard → Help → Accessioning → Samples → Tests → ... → Batches → Results → Lab Mgmt accordion → (if expanded) Lab Mgmt items → Admin accordion → (if expanded) Admin items → Sidebar toggle → Page content |
 | 9.3 | Verify logical order | Tab order follows visual flow (top to bottom, left to right) |
 
 ### Expected Results - Tab Order
@@ -380,7 +384,7 @@ Verify that navigation is accessible via keyboard navigation, has proper ARIA la
   - Active state detection (exact and prefix matching)
   - Responsive drawer variants (permanent/temporary)
   - Collapsible on desktop (icon-only mode with tooltips)
-  - Accordions for Client and Admin sections
+  - Accordions for Lab Mgmt and Admin sections
   - Auto-expand accordions on navigation
 - **MainLayout Component** (`frontend/src/layouts/MainLayout.tsx`):
   - Unified layout wrapper for all routes
@@ -411,12 +415,13 @@ Verify that navigation is accessible via keyboard navigation, has proper ARIA la
 ### Permission-Based Navigation
 - **Core Features**: Permission-gated (e.g., `sample:create` for Accessioning)
 - **Admin Section**: Requires `config:edit` permission
-- **Client Section**: Requires `project:manage` permission
+- **Lab Mgmt Section**: Requires `project:manage` permission
 - **Help**: Always visible (no permission required)
 
 ### Auto-Expand Behavior
 - **Admin Accordion**: Auto-expands when navigating to `/admin/*` routes
-- **Client Accordion**: Auto-expands when navigating to `/clients` or `/client-projects` routes
+- **Lab Mgmt Accordion**: Auto-expands when navigating to `/projects`, `/clients`, or `/client-projects` routes
+- **Lab Mgmt Items Order**: Projects (first), Clients (second), Client Proj (third)
 - **Auto-Collapse**: Accordions collapse when navigating away from related routes
 
 ### Sidebar Collapse (Desktop)

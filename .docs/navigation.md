@@ -2,7 +2,7 @@
 
 ## Overview
 
-NimbleLIMS uses a unified sidebar navigation system that provides consistent navigation across all application routes. The sidebar is a persistent left-side drawer that contains all navigation items, organized into sections with collapsible accordions for submenus (e.g., Admin section).
+NimbleLIMS uses a unified sidebar navigation system that provides consistent navigation across all application routes. The sidebar is a persistent left-side drawer that contains all navigation items, organized into sections with collapsible accordions for submenus (e.g., Lab Mgmt, Admin sections).
 
 Navigation is permission-based, with menu items and routes dynamically shown/hidden based on user roles and permissions.
 
@@ -26,16 +26,19 @@ Navigation is permission-based, with menu items and routes dynamically shown/hid
 │ Features    │
 ├─────────────┤
 │ Dashboard   │
+│ Help        │
 │ Accessioning│
+│ Samples     │
+│ Tests       │
 │ Containers  │
 │ Batches     │
 │ Results     │
-│ Help        │
 ├─────────────┤
-│ ▼ Client    │ ← Accordion (collapsible, requires project:manage)
+│ ▼ Lab Mgmt  │ ← Accordion (collapsible, requires project:manage)
 │   Clients   │
+│   Int Projs │
 │   Client    │
-│   Projects  │
+│   Projs     │
 ├─────────────┤
 │ ▼ Admin     │ ← Accordion (collapsible)
 │   Overview  │
@@ -58,32 +61,41 @@ Navigation is permission-based, with menu items and routes dynamically shown/hid
 ### Navigation Sections
 
 #### Core Features Section
-All items are permission-gated and only visible to users with the required permissions:
+Core features are organized with Dashboard and Help at the top, followed by workflow items. All items are permission-gated and only visible to users with the required permissions:
 
 | Menu Item | Route | Icon | Permission Required | Description |
 |-----------|-------|------|---------------------|-------------|
 | **Dashboard** | `/dashboard` | Dashboard | Always visible | Main dashboard with sample overview and statistics |
+| **Help** | `/help` | Help | Always visible | Role-filtered help content and documentation |
 | **Accessioning** | `/accessioning` | Science | `sample:create` | Sample accessioning form for receiving new samples |
 | **Samples** | `/samples` | Science | `sample:read` | Sample management interface with list and edit functionality |
 | **Tests** | `/tests` | Biotech | `test:update` | Test management interface with list and edit functionality |
 | **Containers** | `/containers` | Inventory | `sample:update` | Container management interface with list, create, and edit functionality |
 | **Batches** | `/batches` | ViewList | `batch:manage` | Batch creation and management |
 | **Results** | `/results` | Assessment | `result:enter` | Results entry interface |
-| **Help** | `/help` | Help | Always visible | Role-filtered help content and documentation |
 
-#### Client Section (Accordion)
-The Client section uses a Material-UI Accordion component for collapsible submenu functionality. It is only visible to users with `project:manage` permission.
+#### Lab Mgmt Section (Accordion)
+The Lab Mgmt section uses a Material-UI Accordion component for collapsible submenu functionality. It is only visible to users with `project:manage` permission. This section consolidates laboratory management functions including client and project management (see User Story US-25 for client projects distinction).
 
 **Accordion Behavior:**
-- Auto-expands when user navigates to any `/clients` or `/client-projects` route
+- Auto-expands when user navigates to any `/clients`, `/projects`, or `/client-projects` route
 - Can be manually collapsed/expanded by clicking the accordion header
-- Shows active state (primary color icon) when on any client route
-- Contains client-related sub-items in a nested list structure
+- Shows active state (primary color icon) when on any lab management route
+- Contains lab management sub-items in a nested list structure
+- Header displays "Lab Mgmt" with tooltip "Lab Management" for accessibility
+- ARIA labels: `aria-label="Lab Management section"`, `aria-controls="lab-mgmt-navigation-content"`
 
-| Menu Item | Route | Icon | Description |
-|-----------|-------|------|-------------|
-| **Clients** | `/clients` | People | Client (organization) management (CRUD) |
-| **Client Projects** | `/client-projects` | ViewList | Client project management (CRUD) |
+**Sub-items:**
+
+| Menu Item | Route | Icon | Tooltip | Description |
+|-----------|-------|------|---------|-------------|
+| **Projects** | `/projects` | Folder | Internal Projects | Core NimbleLIMS projects list/edit interface |
+| **Clients** | `/clients` | People | - | Client (organization) management (CRUD) |
+| **Client Proj** | `/client-projects` | ViewList | Client Projects | Client project groupings for tracking multiple projects under client initiatives (US-25) |
+
+**Client Projects Distinction (US-25):**
+- **Internal Projects** (`/projects`): Core NimbleLIMS projects used for sample tracking and workflow management
+- **Client Projects** (`/client-projects`): Groupings that link multiple internal projects under a client initiative for holistic tracking and reporting aggregation
 
 #### Admin Section (Accordion)
 The Admin section uses a Material-UI Accordion component for collapsible submenu functionality. It is only visible to users with `config:edit` permission.
@@ -93,18 +105,21 @@ The Admin section uses a Material-UI Accordion component for collapsible submenu
 - Can be manually collapsed/expanded by clicking the accordion header
 - Shows active state (primary color icon) when on any admin route
 - Contains all admin sub-items in a nested list structure
+- ARIA labels: `aria-label="Admin section"`, `aria-controls="admin-navigation-content"`
 
 | Menu Item | Route | Icon | Description |
 |-----------|-------|------|-------------|
 | **Overview** | `/admin` | DashboardIcon | Admin dashboard with statistics |
 | **Lists Management** | `/admin/lists` | ViewList | Manage configurable lists and entries |
 | **Container Types** | `/admin/container-types` | Inventory | Manage container type definitions |
+| **Units Management** | `/admin/units` | Straighten | Manage unit definitions with multipliers |
 | **Users Management** | `/admin/users` | People | User CRUD operations |
 | **Roles & Permissions** | `/admin/roles` | Security | Role and permission management |
 | **Analyses Management** | `/admin/analyses` | Science | Test analysis configuration |
 | **Analytes Management** | `/admin/analytes` | Biotech | Analyte definitions |
 | **Test Batteries** | `/admin/test-batteries` | BatteryChargingFull | Test battery configuration |
 | **Custom Fields** | `/admin/custom-fields` | Tune | Manage custom attribute configurations (Post-MVP) |
+| **Custom Names** | `/admin/custom-names` | Tune | Manage name template configurations |
 | **Help Management** | `/admin/help` | Help | Manage help entries (CRUD) - requires `config:edit` permission |
 
 ### Visual States
@@ -112,8 +127,8 @@ The Admin section uses a Material-UI Accordion component for collapsible submenu
 - **Active State**: Current page highlighted with Material-UI `selected` prop and primary color icon
 - **Inactive State**: Default styling
 - **Hidden**: Menu items not shown if user lacks required permission
-- **Accordion Expanded**: Admin section expands automatically when on admin routes
-- **Accordion Collapsed**: Admin section can be manually collapsed when not needed
+- **Accordion Expanded**: Lab Mgmt and Admin sections expand automatically when on related routes
+- **Accordion Collapsed**: Accordions can be manually collapsed when not needed
 
 ### User Info Section
 
@@ -167,6 +182,7 @@ The AppBar title is automatically determined from the current route:
 | `/batches` | Batches |
 | `/results` | Results |
 | `/clients` | Clients |
+| `/projects` | Projects |
 | `/client-projects` | Client Projects |
 | `/help` | Help |
 | `/admin` | Admin Dashboard |
@@ -178,6 +194,9 @@ The AppBar title is automatically determined from the current route:
 | `/admin/analyses/:id/analytes` | Analysis Analytes Configuration |
 | `/admin/analytes` | Analytes Management |
 | `/admin/test-batteries` | Test Batteries |
+| `/admin/units` | Units Management |
+| `/admin/custom-fields` | Custom Fields Management |
+| `/admin/custom-names` | Custom Names Management |
 | `/admin/help` | Help Management |
 | Unknown routes | NimbleLIMS (default) |
 
@@ -192,10 +211,13 @@ All authenticated routes use the `MainLayout` component, which provides the unif
 | `/` | Redirect to `/dashboard` | MainLayout |
 | `/dashboard` | Dashboard | MainLayout |
 | `/accessioning` | AccessioningForm | MainLayout |
+| `/samples` | SamplesManagement | MainLayout |
+| `/tests` | TestsManagement | MainLayout |
 | `/containers` | ContainerManagement | MainLayout |
 | `/batches` | BatchManagement | MainLayout |
 | `/results` | ResultsManagement | MainLayout |
 | `/clients` | ClientsManagement | MainLayout |
+| `/projects` | ProjectsManagement | MainLayout |
 | `/client-projects` | ClientProjects | MainLayout |
 | `/help` | HelpPage | MainLayout |
 | `/admin` | AdminOverview | MainLayout |
@@ -207,14 +229,19 @@ All authenticated routes use the `MainLayout` component, which provides the unif
 | `/admin/analyses/:analysisId/analytes` | AnalysisAnalytesConfig | MainLayout |
 | `/admin/analytes` | AnalytesManagement | MainLayout |
 | `/admin/test-batteries` | TestBatteriesManagement | MainLayout |
+| `/admin/units` | UnitsManagement | MainLayout |
+| `/admin/custom-fields` | CustomFieldsManagement | MainLayout |
+| `/admin/custom-names` | CustomNamesManagement | MainLayout |
 | `/admin/help` | HelpManagement | MainLayout |
 
 ### Route Protection
 
 - **Authentication**: All routes require user authentication (redirects to `/login` if not authenticated)
 - **Permission-Based Routes**: Routes check permissions and redirect to `/dashboard` if unauthorized
-  - Admin routes require `config:edit` or specific permissions (e.g., `user:manage` for users/roles)
-  - Core feature routes require respective permissions (e.g., `sample:create` for accessioning)
+  - Admin routes require `config:edit` or specific permissions (e.g., `user:manage` for users/roles, `test:configure` for analyses/analytes/batteries)
+  - Core feature routes require respective permissions (e.g., `sample:create` for accessioning, `sample:read` for samples list, `sample:update` for sample/edit/containers)
+  - Lab Mgmt routes (`/clients`, `/projects`, `/client-projects`) require `project:manage` permission
+  - Edit routes (`/samples/:id`, `/tests/:id`, `/containers/:id`) require `sample:update` or `test:update` permissions respectively
 - **Permission-Based Visibility**: Sidebar items hidden if user lacks required permission
 
 ## 4. Permission-Based Navigation
@@ -228,19 +255,19 @@ hasPermission('sample:create')  // Accessioning menu
 hasPermission('sample:update')  // Containers menu
 hasPermission('batch:manage')   // Batches menu
 hasPermission('result:enter')   // Results menu
-hasPermission('project:manage') // Client section (accordion) - includes Clients and Client Projects
+hasPermission('project:manage') // Lab Mgmt section (accordion) - includes Clients, Int Projects, Client Projs
 hasPermission('config:edit')    // Admin section (accordion)
 // Help menu: No permission required - always visible to all users
 ```
 
 ### Role-Based Access
 
-| Role | Visible Sidebar Items | Admin Access |
-|------|---------------------|--------------|
-| **Administrator** | All items (including Help) | Full access (accordion visible, including Help Management) |
-| **Lab Manager** | Dashboard, Batches, Results, Help | No access (accordion hidden) |
-| **Lab Technician** | Dashboard, Accessioning, Containers, Batches, Results, Help | No access (accordion hidden) |
-| **Client** | Dashboard, Help (read-only) | No access (accordion hidden) |
+| Role | Visible Sidebar Items | Lab Mgmt Access | Admin Access |
+|------|---------------------|-----------------|--------------|
+| **Administrator** | All items (including Help) | Full access (accordion visible) | Full access (accordion visible, including Help Management) |
+| **Lab Manager** | Dashboard, Samples (if `sample:read`), Tests (if `test:update`), Batches (if `batch:manage`), Results (if `result:enter`), Help | Full access if `project:manage` | No access (accordion hidden) |
+| **Lab Technician** | Dashboard, Accessioning (if `sample:create`), Samples (if `sample:read`), Tests (if `test:update`), Containers (if `sample:update`), Batches (if `batch:manage`), Results (if `result:enter`), Help | No access (accordion hidden) | No access (accordion hidden) |
+| **Client** | Dashboard, Samples (if `sample:read`), Help (read-only) | No access (accordion hidden) | No access (accordion hidden) |
 
 ### Edge Cases
 
@@ -258,6 +285,7 @@ Uses React Router's `useNavigate()` hook:
 const navigate = useNavigate();
 navigate('/dashboard');
 navigate('/admin/lists');
+navigate('/projects');
 ```
 
 ### Active Route Detection
@@ -270,13 +298,14 @@ const location = useLocation();
 const isActive = location.pathname === '/dashboard';
 // Prefix match for other routes
 const isActive = location.pathname.startsWith('/admin/lists');
+const isActive = location.pathname.startsWith('/projects');
 ```
 
 ### Navigation from Components
 
 - **Logo click**: Navigates to `/dashboard`
 - **Sidebar item clicks**: Navigate to respective routes
-- **Accordion expansion**: Auto-expands when navigating to admin routes
+- **Accordion expansion**: Auto-expands when navigating to lab management or admin routes
 - **Mobile drawer**: Auto-closes after navigation on mobile devices
 - **Back button**: Navigates to parent route for nested routes
 
@@ -302,6 +331,7 @@ Navigation relies on `UserContext` for:
 - **User Info**: Text hidden on mobile (only logout icon visible)
 - **Auto-Close**: Sidebar drawer closes automatically after navigation on mobile
 - **Full-Screen**: Temporary drawer takes full screen width on mobile
+- **Accordions**: Lab Mgmt and Admin accordions function normally on mobile, auto-expand on route navigation
 
 ### Desktop Adaptations
 
@@ -325,6 +355,16 @@ Navigation relies on `UserContext` for:
 3. Sidebar highlights "Accessioning" as active
 4. AppBar title updates to "Accessioning"
 5. AccessioningForm component renders in main content area
+
+### Accessing Lab Mgmt Section
+
+1. User clicks "Lab Mgmt" accordion header in sidebar (requires `project:manage`)
+2. Accordion expands (if collapsed) or remains expanded
+3. User clicks "Int Projects" sub-item
+4. Route changes to `/projects`
+5. Sidebar highlights "Int Projects" as active
+6. AppBar title updates to "Projects"
+7. ProjectsManagement component renders in main content area
 
 ### Accessing Admin Section
 
@@ -391,34 +431,54 @@ The navigation system was refactored from a dual approach (top Navbar + separate
 - Top AppBar provides context (page title, back button, user actions)
 - No layout switching between admin and non-admin sections
 
-### Accordion Usage for Admin Section
+### Accordion Usage for Lab Mgmt and Admin Sections
 
-The Admin section uses Material-UI's Accordion component to provide collapsible submenu functionality:
+Both Lab Mgmt and Admin sections use Material-UI's Accordion component to provide collapsible submenu functionality:
 
 **Features:**
-- **Auto-Expansion**: Accordion automatically expands when user navigates to any `/admin/*` route
-- **Manual Toggle**: Users can collapse/expand the accordion by clicking the header
-- **Active State**: Admin icon shows primary color when on any admin route
-- **Nested Structure**: Admin sub-items are indented (pl: 4) to show hierarchy
-- **Accessibility**: Proper ARIA labels for screen readers
+- **Auto-Expansion**: Accordions automatically expand when user navigates to related routes
+  - Lab Mgmt: Expands on `/clients`, `/projects`, or `/client-projects` routes
+  - Admin: Expands on any `/admin/*` route
+- **Manual Toggle**: Users can collapse/expand accordions by clicking the header
+- **Active State**: Accordion icons show primary color when on related routes
+- **Nested Structure**: Sub-items are indented (pl: 4) to show hierarchy
+- **Accessibility**: Proper ARIA labels and tooltips for screen readers
+  - Lab Mgmt header: `aria-label="Lab Management section"` with tooltip "Lab Management"
+  - Admin header: `aria-label="Admin section"`
+  - Sub-items have descriptive tooltips where needed (e.g., "Internal Projects", "Client Projects")
 
 **Technical Implementation:**
 ```typescript
 <Accordion
-  expanded={adminExpanded}
-  onChange={(_, expanded) => setAdminExpanded(expanded)}
+  expanded={labMgmtExpanded}
+  onChange={(_, expanded) => setLabMgmtExpanded(expanded)}
 >
-  <AccordionSummary expandIcon={<ExpandMore />}>
-    <SettingsIcon color={isAdminRoute ? 'primary' : 'inherit'} />
-    <Typography>Admin</Typography>
+  <AccordionSummary 
+    expandIcon={<ExpandMore />}
+    aria-label="Lab Management section"
+    aria-controls="lab-mgmt-navigation-content"
+  >
+    <Tooltip title="Lab Management">
+      <SettingsApplicationsIcon color={isLabMgmtRoute ? 'primary' : 'inherit'} />
+    </Tooltip>
+    <Typography>Lab Mgmt</Typography>
   </AccordionSummary>
   <AccordionDetails>
     <List>
-      {/* Admin sub-items */}
+      {/* Lab Mgmt sub-items */}
     </List>
   </AccordionDetails>
 </Accordion>
 ```
+
+### Brevity Principles
+
+Navigation follows brevity principles for compact display:
+- **Headers**: Keep accordion headers under 10 characters where possible (e.g., "Lab Mgmt", "Admin")
+- **Menu Items**: Use concise labels (e.g., "Int Projs", "Client Projs")
+- **Accessibility**: Full descriptions provided via tooltips and ARIA labels
+- **Tooltips**: Tooltips provide full context (e.g., "Lab Management", "Internal Projects", "Client Projects")
+- **ARIA Labels**: Descriptive ARIA labels ensure screen reader accessibility
 
 ### Future Enhancements
 
@@ -427,11 +487,12 @@ Potential navigation improvements for future iterations:
 - **Breadcrumb Navigation**: Show breadcrumb trail for deep nested routes (e.g., Admin > Analyses > Analysis Details > Analytes)
 - **Quick Search/Command Palette**: Keyboard shortcut (Cmd/Ctrl+K) to open command palette for quick navigation
 - **Recent Pages History**: Show recently visited pages in sidebar or quick access menu
-- **Keyboard Shortcuts**: Navigate using keyboard shortcuts (e.g., `g d` for dashboard, `g a` for admin)
+- **Keyboard Shortcuts**: Navigate using keyboard shortcuts (e.g., `g d` for dashboard, `g a` for admin, `g l` for lab mgmt)
 - **Collapsible Core Sections**: Allow collapsing core features section for users who primarily use one feature (partially implemented via sidebar collapse)
 - **Customizable Sidebar**: Allow users to pin/favorite frequently used items
 - **Contextual Navigation**: Show related items based on current page context
 - **Search Within Navigation**: Filter navigation items by search term
+- **Enhanced Mobile Accordions**: Consider swipe gestures for accordion expansion on mobile devices
 
 ## 11. Component Architecture
 
@@ -447,9 +508,10 @@ Potential navigation improvements for future iterations:
 - Active state detection (exact and prefix matching)
 - Responsive drawer variants (permanent/temporary)
 - Collapsible on desktop (icon-only mode with tooltips)
-- Accordions for Client and Admin sections
+- Accordions for Lab Mgmt and Admin sections
 - Auto-expand accordions on navigation when collapsed
 - User info display at bottom (hidden when collapsed)
+- ARIA labels and tooltips for accessibility
 
 ### MainLayout Component (`frontend/src/layouts/MainLayout.tsx`)
 

@@ -222,7 +222,7 @@ NimbleLIMS uses a unified sidebar navigation system that provides consistent acc
 - **Unified Sidebar**: Persistent left sidebar (240px expanded, 56px collapsed) on all authenticated routes
 - **Collapsible**: Desktop sidebar can be collapsed to icon-only mode with tooltips on hover
 - **Permission-Based**: Menu items dynamically shown/hidden based on user roles and permissions
-- **Client & Admin Accordions**: Collapsible sections for Client and Admin submenu items
+- **Lab Mgmt & Admin Accordions**: Collapsible sections for Lab Management (Projects, Clients, Client Projects) and Admin submenu items
 - **Responsive**: Permanent drawer on desktop, temporary drawer on mobile
 - **State Persistence**: Sidebar collapsed state saved to localStorage
 - **Top AppBar**: Dynamic page titles, sidebar toggle, back button for nested routes, user info, and logout

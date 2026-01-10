@@ -349,7 +349,11 @@ WHERE custom_attributes @> '{"ph_level": 7.5}'::jsonb;
   - POST /containers: Create instance dynamically (requires sample:create).
   - GET /containers/{id}: Retrieve with hierarchy/contents.
 - **Projects**:
-  - GET /projects: List projects accessible to user (RLS enforced). Uses eager loading (`joinedload(Project.client)`) to avoid lazy loading issues. Access control is enforced by RLS policy `projects_access` which uses `has_project_access(id)`. Returns projects with client information included.
+  - GET /projects: List projects accessible to user (RLS enforced). Access control is enforced entirely by Row-Level Security (RLS) policies at the database level. No Python-level filtering is applied - RLS automatically filters projects based on `projects_access` policy. Uses eager loading (`joinedload(Project.client, Project.client_project)`) to avoid lazy loading issues. Supports filtering by `status` and `client_id`, and pagination (`page`, `size`). Returns paginated response with projects, total, page, size, and pages.
+  - GET /projects/{id}: Get single project by ID (RLS enforced).
+  - POST /projects: Create new project (requires `project:manage` permission). Validates `client_id` and `client_project_id` if provided. Auto-generates name if not provided. Sets audit fields.
+  - PATCH /projects/{id}: Update project (partial update, requires `project:manage` permission). Validates relationships. Updates audit fields.
+  - DELETE /projects/{id}: Soft delete project (sets active=false, requires `project:manage` permission). Updates audit fields.
 - **Client Projects**:
   - GET /client-projects: List client projects accessible to user (RLS enforced).
     - Administrators: All client projects
