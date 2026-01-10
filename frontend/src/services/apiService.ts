@@ -335,8 +335,49 @@ class ApiService {
   }
 
   // Project endpoints
-  async getProjects() {
-    const response: AxiosResponse = await this.api.get('/projects');
+  async getProjects(filters?: { status?: string; client_id?: string; page?: number; size?: number }) {
+    const response: AxiosResponse = await this.api.get('/projects', {
+      params: filters,
+    });
+    // API returns ProjectListResponse with {projects, total, page, size, pages}
+    // Return the full response for pagination support
+    return response.data;
+  }
+
+  async getProject(id: string) {
+    const response: AxiosResponse = await this.api.get(`/projects/${id}`);
+    return response.data;
+  }
+
+  async createProject(projectData: {
+    name: string;
+    description?: string;
+    start_date: string;
+    client_id: string;
+    client_project_id?: string;
+    status: string;
+    custom_attributes?: Record<string, any>;
+  }) {
+    const response: AxiosResponse = await this.api.post('/projects', projectData);
+    return response.data;
+  }
+
+  async updateProject(id: string, projectData: {
+    name?: string;
+    description?: string;
+    start_date?: string;
+    client_id?: string;
+    client_project_id?: string;
+    status?: string;
+    custom_attributes?: Record<string, any>;
+    active?: boolean;
+  }) {
+    const response: AxiosResponse = await this.api.patch(`/projects/${id}`, projectData);
+    return response.data;
+  }
+
+  async deleteProject(id: string) {
+    const response: AxiosResponse = await this.api.delete(`/projects/${id}`);
     return response.data;
   }
 

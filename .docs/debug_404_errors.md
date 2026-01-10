@@ -203,6 +203,65 @@ docker exec lims-backend curl http://localhost:8000/samples \
 4. **Response Format**: Frontend extracts arrays from paginated responses
 5. **Permissions**: Added `batch:read` permission to migrations
 
+### Issue 6: Python-Level Filtering Interfering with RLS
+
+**Problem:** Lab Managers and Lab Technicians cannot see projects/samples even though RLS policies should allow them access. Admin users can see everything, but lab roles see nothing.
+
+**Root Cause:** Python-level filtering in the router is interfering with Row-Level Security (RLS) policies. The router code was applying additional filters (e.g., checking `project_users` junction table) which conflicted with the RLS policy that already handles access control at the database level.
+
+**Solution:** Remove all Python-level access control filtering and rely entirely on RLS policies. RLS policies are evaluated at the database level and automatically filter results based on `has_project_access()` function and role-based policies.
+
+**Pattern to Follow:**
+1. **DO NOT** add Python-level filtering for access control on RLS-enabled tables
+2. **DO** rely entirely on RLS policies for access control
+3. **DO** ensure `app.current_user_id` session variable is set via `set_current_user_id()` in `get_current_user()` dependency
+4. **DO** use eager loading (`joinedload`) for relationships to avoid lazy loading issues
+5. **DO** document in the endpoint docstring that access control is handled by RLS
+
+**Example Fix (Projects Router):**
+```python
+# ❌ BAD - Python-level filtering interferes with RLS
+query = db.query(Project).filter(Project.active == True)
+if current_user.role.name == "Administrator":
+    pass
+elif current_user.client_id:
+    query = query.filter(Project.client_id == current_user.client_id)
+else:
+    # This subquery breaks RLS evaluation!
+    accessible_project_ids = db.query(ProjectUser.project_id).filter(
+        ProjectUser.user_id == current_user.id
+    ).subquery()
+    query = query.filter(Project.id.in_(accessible_project_ids))
+
+# ✅ GOOD - Rely entirely on RLS
+query = db.query(Project).options(
+    joinedload(Project.client),
+    joinedload(Project.client_project)
+).filter(Project.active == True)
+# RLS automatically filters based on projects_access policy
+```
+
+**Affected Endpoints:**
+- `GET /samples` → Fixed (removed Python-level filtering)
+- `GET /projects` → Fixed (removed Python-level filtering)
+
+**How to Identify This Issue:**
+1. Admin users can see data, but lab roles (Lab Manager, Lab Technician) cannot
+2. RLS policies are correctly defined in migrations
+3. `project_users` entries exist for the user
+4. The router has Python-level filtering based on user role or `project_users` table
+
+**Verification:**
+- Check that the router doesn't filter by `project_users` or user role
+- Verify RLS policies are active: `SELECT * FROM pg_policies WHERE tablename = 'projects';`
+- Check that `app.current_user_id` is set: Add logging in `set_current_user_id()` function
+- Test with different user roles to ensure RLS is working
+
+**Key Principle:** If a table has RLS enabled, let RLS handle ALL access control. Python-level filtering should only be used for:
+- Business logic filters (e.g., `active == True`, status filters)
+- User-provided query parameters (e.g., `?status=uuid`, `?client_id=uuid`)
+- NOT for access control based on user role or project access
+
 ## API Endpoints Summary
 
 ### Working Endpoints

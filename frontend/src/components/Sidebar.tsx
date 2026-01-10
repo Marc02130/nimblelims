@@ -34,6 +34,7 @@ import {
   Tune as TuneIcon,
   Help as HelpIcon,
   Straighten as StraightenIcon,
+  Folder as FolderIcon,
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useUser } from '../contexts/UserContext';
@@ -73,8 +74,10 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onMobileClose, collapsed 
   const [adminExpanded, setAdminExpanded] = useState(
     location.pathname.startsWith('/admin')
   );
-  const [clientExpanded, setClientExpanded] = useState(
-    location.pathname.startsWith('/clients') || location.pathname.startsWith('/client-projects')
+  const [labMgmtExpanded, setLabMgmtExpanded] = useState(
+    location.pathname.startsWith('/clients') || 
+    location.pathname.startsWith('/projects') || 
+    location.pathname.startsWith('/client-projects')
   );
   
   // Auto-expand accordions for /samples/ and /tests/ routes
@@ -88,17 +91,23 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onMobileClose, collapsed 
   React.useEffect(() => {
     if (collapsed) {
       setAdminExpanded(false);
-      setClientExpanded(false);
+      setLabMgmtExpanded(false);
     }
   }, [collapsed]);
 
-  // Core Features navigation items
+  // Core Features navigation items (Dashboard and Help at top)
   const coreItems: NavItem[] = [
     {
       text: 'Dashboard',
       path: '/dashboard',
       icon: <DashboardIcon />,
       exact: true,
+    },
+    {
+      text: 'Help',
+      path: '/help',
+      icon: <HelpIcon />,
+      // No permission required - visible to all users
     },
     {
       text: 'Accessioning',
@@ -136,25 +145,37 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onMobileClose, collapsed 
       icon: <AssessmentIcon />,
       permission: 'result:enter',
     },
-    {
-      text: 'Help',
-      path: '/help',
-      icon: <HelpIcon />,
-      // No permission required - visible to all users
-    },
   ];
 
-  // Client navigation items
-  const clientItems: AdminNavItem[] = [
+  // Lab Mgmt navigation items
+  interface LabMgmtNavItem {
+    text: string;
+    path: string;
+    icon: React.ReactNode;
+    tooltip?: string;
+    ariaLabel?: string;
+    exact?: boolean;
+  }
+
+  const labMgmtItems: LabMgmtNavItem[] = [
+    {
+      text: 'Projects',
+      path: '/projects',
+      icon: <FolderIcon />,
+      tooltip: 'Internal Projects',
+      ariaLabel: 'Internal Projects',
+    },
     {
       text: 'Clients',
       path: '/clients',
       icon: <People />,
     },
     {
-      text: 'Client Projects',
+      text: 'Client Proj',
       path: '/client-projects',
       icon: <ViewListIcon />,
+      tooltip: 'Client Projects',
+      ariaLabel: 'Client Projects',
     },
   ];
 
@@ -232,8 +253,8 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onMobileClose, collapsed 
     if (collapsed) {
       if (path.startsWith('/admin')) {
         setAdminExpanded(true);
-      } else if (path.startsWith('/clients') || path.startsWith('/client-projects')) {
-        setClientExpanded(true);
+      } else if (path.startsWith('/clients') || path.startsWith('/projects') || path.startsWith('/client-projects')) {
+        setLabMgmtExpanded(true);
       }
     }
   };
@@ -248,13 +269,15 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onMobileClose, collapsed 
   };
 
   const hasAdminAccess = hasPermission('config:edit');
-  const hasClientAccess = hasPermission('project:manage');
+  const hasLabMgmtAccess = hasPermission('project:manage');
 
   // Update accordion expanded states when route changes
   React.useEffect(() => {
     setAdminExpanded(location.pathname.startsWith('/admin'));
-    setClientExpanded(
-      location.pathname.startsWith('/clients') || location.pathname.startsWith('/client-projects')
+    setLabMgmtExpanded(
+      location.pathname.startsWith('/clients') || 
+      location.pathname.startsWith('/projects') || 
+      location.pathname.startsWith('/client-projects')
     );
   }, [location.pathname]);
 
@@ -356,13 +379,13 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onMobileClose, collapsed 
           </ListItem>
         )}
 
-        {/* Client Section */}
-        {hasClientAccess && (
+        {/* Lab Mgmt Section */}
+        {hasLabMgmtAccess && (
           <>
             <Divider sx={{ my: 1 }} />
             <Accordion
-              expanded={clientExpanded}
-              onChange={(_, expanded) => setClientExpanded(expanded)}
+              expanded={labMgmtExpanded}
+              onChange={(_, expanded) => setLabMgmtExpanded(expanded)}
               sx={{
                 boxShadow: 'none',
                 '&:before': { display: 'none' },
@@ -371,8 +394,8 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onMobileClose, collapsed 
             >
               <AccordionSummary
                 expandIcon={!collapsed ? <ExpandMore /> : null}
-                aria-label="Client section"
-                aria-controls="client-navigation-content"
+                aria-label="Lab Management section"
+                aria-controls="lab-mgmt-navigation-content"
                 sx={{
                   px: 2,
                   justifyContent: collapsed ? 'center' : 'flex-start',
@@ -383,24 +406,45 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onMobileClose, collapsed 
                 }}
               >
                 <ListItemIcon sx={{ minWidth: collapsed ? 0 : 40, justifyContent: 'center' }}>
-                  <SettingsApplicationsIcon
-                    color={
-                      location.pathname.startsWith('/clients') || location.pathname.startsWith('/client-projects')
-                        ? 'primary'
-                        : 'inherit'
-                    }
-                  />
+                  {collapsed ? (
+                    <Tooltip title="Lab Management" placement="right" arrow>
+                      <SettingsApplicationsIcon
+                        color={
+                          location.pathname.startsWith('/clients') || 
+                          location.pathname.startsWith('/projects') || 
+                          location.pathname.startsWith('/client-projects')
+                            ? 'primary'
+                            : 'inherit'
+                        }
+                      />
+                    </Tooltip>
+                  ) : (
+                    <SettingsApplicationsIcon
+                      color={
+                        location.pathname.startsWith('/clients') || 
+                        location.pathname.startsWith('/projects') || 
+                        location.pathname.startsWith('/client-projects')
+                          ? 'primary'
+                          : 'inherit'
+                      }
+                    />
+                  )}
                 </ListItemIcon>
                 {!collapsed && (
-                  <Typography variant="body1" sx={{ fontWeight: 600 }}>
-                    Client
-                  </Typography>
+                  <Tooltip title="Lab Management" placement="right" arrow>
+                    <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                      Lab Mgmt
+                    </Typography>
+                  </Tooltip>
                 )}
               </AccordionSummary>
               <AccordionDetails sx={{ p: 0 }}>
-                <List component="nav" aria-label="client navigation">
-                  {clientItems.map((item) => {
+                <List component="nav" aria-label="lab management navigation">
+                  {labMgmtItems.map((item) => {
                     const active = isActive(item.path, item.exact);
+                    const displayText = item.text;
+                    const tooltipText = item.tooltip || item.text;
+                    const ariaLabelText = item.ariaLabel || `Navigate to ${item.text}`;
                     const listItemButton = (
                       <ListItemButton
                         selected={active}
@@ -410,7 +454,7 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onMobileClose, collapsed 
                           justifyContent: collapsed ? 'center' : 'flex-start',
                           minHeight: 48,
                         }}
-                        aria-label={`Navigate to ${item.text}`}
+                        aria-label={ariaLabelText}
                         aria-current={active ? 'page' : undefined}
                       >
                         <ListItemIcon
@@ -422,14 +466,18 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onMobileClose, collapsed 
                         >
                           {item.icon}
                         </ListItemIcon>
-                        {!collapsed && <ListItemText primary={item.text} />}
+                        {!collapsed && <ListItemText primary={displayText} />}
                       </ListItemButton>
                     );
                     
                     return (
-                      <ListItem key={item.text} disablePadding>
+                      <ListItem key={item.path} disablePadding>
                         {collapsed ? (
-                          <Tooltip title={item.text} placement="right" arrow>
+                          <Tooltip title={tooltipText} placement="right" arrow>
+                            {listItemButton}
+                          </Tooltip>
+                        ) : item.tooltip ? (
+                          <Tooltip title={tooltipText} placement="right" arrow>
                             {listItemButton}
                           </Tooltip>
                         ) : (

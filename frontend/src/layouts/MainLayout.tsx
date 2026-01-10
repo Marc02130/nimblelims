@@ -32,25 +32,43 @@ const getRouteTitle = (pathname: string): string => {
   const routeMap: Record<string, string> = {
     '/dashboard': 'Dashboard',
     '/accessioning': 'Accessioning',
+    '/samples': 'Samples Management',
+    '/tests': 'Tests Management',
     '/containers': 'Containers',
     '/batches': 'Batches',
     '/results': 'Results',
     '/clients': 'Clients',
+    '/projects': 'Projects',
     '/client-projects': 'Client Projects',
+    '/help': 'Help',
     '/admin': 'Admin Dashboard',
     '/admin/lists': 'Lists Management',
     '/admin/container-types': 'Container Types',
+    '/admin/units': 'Units Management',
     '/admin/users': 'Users Management',
     '/admin/roles': 'Roles & Permissions',
     '/admin/analyses': 'Analyses Management',
     '/admin/analytes': 'Analytes Management',
     '/admin/test-batteries': 'Test Batteries',
+    '/admin/custom-fields': 'Custom Fields Management',
     '/admin/custom-names': 'Custom Names Management',
+    '/admin/help': 'Help Management',
   };
 
   // Check for nested routes (e.g., /admin/analyses/:id/analytes)
   if (pathname.startsWith('/admin/analyses/') && pathname.includes('/analytes')) {
     return 'Analysis Analytes Configuration';
+  }
+
+  // Check for edit routes
+  if (pathname.match(/^\/samples\/[^/]+$/)) {
+    return 'Edit Sample';
+  }
+  if (pathname.match(/^\/tests\/[^/]+$/)) {
+    return 'Edit Test';
+  }
+  if (pathname.match(/^\/containers\/[^/]+$/)) {
+    return 'Edit Container';
   }
 
   // Check exact match first

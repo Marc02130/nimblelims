@@ -960,3 +960,45 @@ For bulk mode, share client/client_project across uniques.
 Add tooltips/help for cascade (e.g., 'Select client to filter projects').
 Ensure RBAC: Clients pre-select their client_id (from UserContext).
 Output as: updated AccessioningForm.tsx (full file), SampleDetailsStep.tsx (full file), ReviewStep.tsx (full file with preview), and any context updates."
+
+# Navigation update and projects
+## Prompt A: Update Navigation Documentation
+"Update the NimbleLIMS navigation documentation based on recent planning refinements (navigation.md full structure, ui-accessioning-to-reporting.md for component architecture). Incorporate:
+
+New 'Lab Mgmt' accordion (header: 'Lab Mgmt' with tooltip 'Lab Management'; requires project:manage permission; auto-expands on related routes).
+Sub-items under 'Lab Mgmt': 'Projects' (route: /projects, icon: Folder, tooltip: 'Internal Projects' for core NimbleLIMS projects list/edit), 'Clients' (route: /clients, icon: People), 'Client Proj' (route: /client-projects, icon: ViewList, tooltip: 'Client Projects' for groupings).
+Integrate with existing structure: Place after 'Sample Mgmt' accordion; maintain Core Features (Dashboard, Help) at top.
+Update sections on accordion behavior, RBAC (e.g., project:manage for visibility), mobile adaptations, and future enhancements.
+Ensure brevity principles: Headers <10 chars where possible, with ARIA labels/tooltips for accessibility.
+Reference User Stories US-25 for client projects distinction. Output as: updated navigation.md (full file)."
+
+## Prompt B: Update Sidebar and MainLayout Components
+"Implement frontend navigation updates for NimbleLIMS using React/MUI, based on refined navigation.md. Include:
+
+In Sidebar.tsx: Add 'Lab Mgmt' Accordion (expanded state managed via useState/useEffect for route matching; icon: SettingsApplications or similar; permission: project:manage via UserContext).
+Sub-items: 'Projects' (ListItem to /projects, tooltip: 'Internal Projects'), 'Clients' (ListItem to /clients), 'Client Proj' (ListItem to /client-projects, tooltip: 'Client Projects'); use ListItemButton with icons, tooltips (MUI Tooltip), and active states (primary color on match).
+Shortened labels with tooltips (e.g., 'Projects' aria-label='Internal Projects', 'Client Proj' aria-label='Client Projects'); indent sub-items (pl: 4).
+Integrate with existing accordions (e.g., Sample Mgmt); ensure collapsed mode shows icons/tooltips only.
+In MainLayout.tsx: Update route matching for auto-expand (e.g., if location.pathname.startsWith('/projects') || '/clients' || '/client-projects', expand Lab Mgmt).
+Responsive: Permanent drawer on desktop, temporary on mobile; persist collapse state in localStorage.
+RBAC: Hide accordion if !hasPermission('project:manage').
+Ensure ESLint compliance; use TypeScript. Output as: updated Sidebar.tsx (full file), MainLayout.tsx (full file with changes)."
+
+## Prompt C: Database and API for Internal Projects (If Needed; Assumes Existing Schema)
+"Refine the NimbleLIMS backend for internal projects management, aligning with Technical Document Section 3 (projects table) and User Stories US-25 (distinction from client_projects). No schema changes needed (use existing projects table with client_project_id FK).
+
+Add/ensure API endpoints: GET /projects (list with filters: status, client_id; pagination; RLS via projects_access policy), GET /projects/{id}, POST /projects (create with name, status, client_id, client_project_id optional), PATCH /projects/{id} (partial update), DELETE /projects/{id} (soft delete via active=false).
+RBAC: Require project:manage for create/update/delete; read via RLS (has_project_access or admin).
+Integration: Link to samples/tests via project_id; validate client_project_id if provided.
+Use SQLAlchemy for queries; Pydantic schemas: ProjectBase, ProjectCreate, ProjectResponse (include custom_attributes if configured).
+Output as: updated routers/projects.py (full file, assuming existing router), schemas/project.py (full file), and tests/test_projects.py (new cases for list/edit)."
+
+## Prompt D: UI for Internal Projects Management
+"Create the frontend UI for internal projects management in NimbleLIMS, based on ui-accessioning-to-reporting.md (page components like SamplesManagement.tsx) and navigation.md (new route /projects under Lab Mgmt).
+
+New page: ProjectsManagement.tsx (route: /projects; MUI DataGrid for list: columns id, name, status, client_id, client_project_id, created_at; filters via GridToolbar).
+Edit/Create: Dialogs with Formik/Yup (fields: name unique, status select from list_entries, client_id autocomplete from /clients, client_project_id from /client-projects?client_id={selected}; custom_attributes dynamic via CustomAttributeField.tsx).
+RBAC: Page visible with project:manage (hide/edit buttons accordingly); use apiService for CRUD (/projects endpoints).
+Integration: Link to related samples (e.g., button to /samples?project_id={id}); tooltips for guidance (e.g., 'Internal Projects: Core lab tracking units').
+Responsive: DataGrid with horizontal scroll on mobile; use useMemo for configs.
+Ensure ESLint/TypeScript compliance. Output as: new ProjectsManagement.tsx (full file), updates to apiService.ts (add project methods), and integration in App.tsx for routing (changes only)."

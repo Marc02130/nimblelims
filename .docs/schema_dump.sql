@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict r8FsVHrqzGwu3d0cFWBYSV9EMg95PI6pfwELktmWIWysT7sOAUBrSACIBspLfck
+\restrict Z4TPlRAC00dvzwOQSSp9rU5VOUB37LIsnFUFkRvWiwrtWXwhvgnRLgNOlXFWDoM
 
 -- Dumped from database version 15.15
 -- Dumped by pg_dump version 15.15
@@ -1599,9 +1599,9 @@ c0ea753c-1065-402f-b0f9-0822e20e5100	mmol/L	Millimoles per liter	t	2026-01-07 04
 
 COPY public.users (id, name, description, active, created_at, created_by, modified_at, modified_by, username, password_hash, email, role_id, client_id, last_login) FROM stdin;
 fb1b4245-52a1-425c-ae78-f732d1be04a1	Client User	\N	t	2026-01-07 04:47:11.200146	\N	2026-01-07 04:47:11.200146	\N	client	186474c1f2c2f735a54c2cf82ee8e87f2a5cd30940e280029363fecedfc5328c	client@example.com	dddddddd-dddd-dddd-dddd-dddddddddddd	00000000-0000-0000-0000-000000000001	\N
-00000000-0000-0000-0000-000000000001	System Administrator	\N	t	2026-01-07 04:47:11.200146	\N	2026-01-09 19:34:29.645537	\N	admin	240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9	admin@lims.local	aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa	00000000-0000-0000-0000-000000000001	2026-01-09 19:34:29.645537
-00000000-0000-0000-0000-000000000002	Lab Manager	\N	t	2026-01-07 04:47:11.200146	\N	2026-01-09 19:35:00.974664	\N	lab-manager	7dd63afe29407aa45af7fdd4388b71195b552688c2750abd42bdf3b231c13b69	lab-manager@lims.local	bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb	00000000-0000-0000-0000-000000000001	2026-01-09 19:35:00.974664
-00000000-0000-0000-0000-000000000003	Lab Technician	\N	t	2026-01-07 04:47:11.200146	\N	2026-01-09 19:40:21.845633	\N	lab-tech	d81968c60a8a41bdafcb3c5825bf8bc4a76dccc932d673e3f9a7b71ce4538596	lab-tech@lims.local	cccccccc-cccc-cccc-cccc-cccccccccccc	00000000-0000-0000-0000-000000000001	2026-01-09 19:40:21.845633
+00000000-0000-0000-0000-000000000001	System Administrator	\N	t	2026-01-07 04:47:11.200146	\N	2026-01-10 15:55:07.235107	\N	admin	240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9	admin@lims.local	aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa	00000000-0000-0000-0000-000000000001	2026-01-10 15:55:07.235107
+00000000-0000-0000-0000-000000000003	Lab Technician	\N	t	2026-01-07 04:47:11.200146	\N	2026-01-10 19:23:32.308377	\N	lab-tech	d81968c60a8a41bdafcb3c5825bf8bc4a76dccc932d673e3f9a7b71ce4538596	lab-tech@lims.local	cccccccc-cccc-cccc-cccc-cccccccccccc	00000000-0000-0000-0000-000000000001	2026-01-10 19:23:32.308377
+00000000-0000-0000-0000-000000000002	Lab Manager	\N	t	2026-01-07 04:47:11.200146	\N	2026-01-10 19:23:43.392201	\N	lab-manager	7dd63afe29407aa45af7fdd4388b71195b552688c2750abd42bdf3b231c13b69	lab-manager@lims.local	bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb	00000000-0000-0000-0000-000000000001	2026-01-10 19:23:43.392201
 \.
 
 
@@ -3717,5 +3717,5 @@ CREATE POLICY tests_access ON public.tests USING ((public.is_admin() OR (EXISTS 
 -- PostgreSQL database dump complete
 --
 
-\unrestrict r8FsVHrqzGwu3d0cFWBYSV9EMg95PI6pfwELktmWIWysT7sOAUBrSACIBspLfck
+\unrestrict Z4TPlRAC00dvzwOQSSp9rU5VOUB37LIsnFUFkRvWiwrtWXwhvgnRLgNOlXFWDoM
 

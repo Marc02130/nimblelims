@@ -24,6 +24,7 @@ import CustomNamesManagement from './pages/admin/CustomNamesManagement';
 import HelpManagement from './pages/admin/HelpManagement';
 import ClientProjects from './pages/ClientProjects';
 import ClientsManagement from './pages/ClientsManagement';
+import ProjectsManagement from './pages/ProjectsManagement';
 import HelpPage from './pages/HelpPage';
 import { useUser } from './contexts/UserContext';
 
@@ -143,6 +144,16 @@ function AppRoutes() {
           element={
             hasPermission('project:manage') ? (
               <ClientsManagement />
+            ) : (
+              <Navigate to="/dashboard" replace />
+            )
+          }
+        />
+        <Route
+          path="/projects"
+          element={
+            hasPermission('project:manage') ? (
+              <ProjectsManagement />
             ) : (
               <Navigate to="/dashboard" replace />
             )
