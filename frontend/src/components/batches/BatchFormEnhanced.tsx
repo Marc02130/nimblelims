@@ -132,11 +132,13 @@ const BatchFormEnhanced: React.FC<BatchFormEnhancedProps> = ({ onSuccess, onCanc
   useEffect(() => {
     const loadProjects = async () => {
       try {
-        const projectsData = await apiService.getProjects();
-        setProjects(projectsData || []);
+        const projectsResponse = await apiService.getProjects();
+        // Extract projects array from paginated response
+        const projectsArray = projectsResponse.projects || projectsResponse || [];
+        setProjects(Array.isArray(projectsArray) ? projectsArray : []);
         // Auto-select all accessible projects for cross-project batching
-        if (projectsData && projectsData.length > 0) {
-          setSelectedProjects(projectsData.map((p: Project) => p.id));
+        if (projectsArray && Array.isArray(projectsArray) && projectsArray.length > 0) {
+          setSelectedProjects(projectsArray.map((p: Project) => p.id));
         }
       } catch (err) {
         console.error('Failed to load projects:', err);
@@ -526,14 +528,15 @@ const BatchFormEnhanced: React.FC<BatchFormEnhancedProps> = ({ onSuccess, onCanc
                 />
               </Grid>
 
-              <Grid size={{ xs: 12, sm: 6 }}>
+              {/* End date is not available when creating a batch - only set when batch is completed */}
+              {/* <Grid size={{ xs: 12, sm: 6 }}>
                 <DatePicker
                   label="End Date"
                   value={formData.end_date}
                   onChange={(date) => handleInputChange('end_date', date)}
                   slotProps={{ textField: { fullWidth: true } }}
                 />
-              </Grid>
+              </Grid> */}
 
               <Grid size={12}>
                 <Divider sx={{ my: 2 }} />

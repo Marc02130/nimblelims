@@ -76,6 +76,7 @@ def upgrade() -> None:
         # Matrix Types
         {'list_id': '66666666-6666-6666-6666-666666666666', 'name': 'Sludge', 'description':  'Sludge'},
         {'list_id': '66666666-6666-6666-6666-666666666666', 'name': 'Ground Water', 'description': 'Ground Water'},
+        {'list_id': '66666666-6666-6666-6666-666666666666', 'name': 'Surface Water', 'description': 'Surface Water'},
         {'list_id': '66666666-6666-6666-6666-666666666666', 'name': 'Soil', 'description': 'Soil'},
         {'list_id': '66666666-6666-6666-6666-666666666666', 'name': 'Air', 'description': 'Air'},
         {'list_id': '66666666-6666-6666-6666-666666666666', 'name': 'Drinking Water', 'description': 'Drinking Water'},

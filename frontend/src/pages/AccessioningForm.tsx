@@ -80,12 +80,20 @@ interface SampleFormData {
   sample_type_verification: string;
 }
 
-const getInitialValues = (userClientId?: string): SampleFormData => ({
-  bulk_mode: false,
-  name: '',
-  description: '',
-  due_date: '',
-  received_date: new Date().toISOString().split('T')[0],
+const getInitialValues = (userClientId?: string): SampleFormData => {
+  // Get today's date in local timezone as YYYY-MM-DD
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, '0');
+  const day = String(today.getDate()).padStart(2, '0');
+  const todayStr = `${year}-${month}-${day}`;
+
+  return {
+    bulk_mode: false,
+    name: '',
+    description: '',
+    due_date: '',
+    received_date: todayStr,
   sample_type: '',
   status: '',
   matrix: '',
@@ -108,7 +116,8 @@ const getInitialValues = (userClientId?: string): SampleFormData => ({
   double_entry_enabled: false,
   name_verification: '',
   sample_type_verification: '',
-});
+  };
+};
 
 const buildCustomAttributesValidation = (configs: any[]): Record<string, any> => {
   const customAttrsSchema: Record<string, any> = {};
@@ -354,6 +363,7 @@ const AccessioningForm: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [formKey, setFormKey] = useState(0); // Key to force form reset
   const [lookupData, setLookupData] = useState<{
     sampleTypes: any[];
     statuses: any[];
@@ -477,14 +487,7 @@ const AccessioningForm: React.FC = () => {
       e.preventDefault();
       e.stopPropagation();
     }
-    console.log('=== HANDLE NEXT CLICKED ===');
-    console.log('Current step:', activeStep);
-    console.log('Next step will be:', activeStep + 1);
-    setActiveStep((prevActiveStep) => {
-      const nextStep = prevActiveStep + 1;
-      console.log('Setting active step to:', nextStep);
-      return nextStep;
-    });
+    setActiveStep((prevActiveStep) => prevActiveStep + 1);
   };
 
   const handleBack = () => {
@@ -497,20 +500,12 @@ const AccessioningForm: React.FC = () => {
       return;
     }
     
-    console.log('=== FORM SUBMISSION STARTED ===');
-    console.log('Form values:', JSON.stringify(values, null, 2));
-    console.log('Selected analyses:', values.selected_analyses);
-    console.log('Battery ID:', values.battery_id);
-    console.log('Container type ID:', values.container_type_id);
-    console.log('Container name:', values.container_name);
-    
     setLoading(true);
     setError(null);
     setSuccess(null);
 
     try {
       if (values.bulk_mode) {
-        console.log('=== BULK ACCESSIONING MODE ===');
         // Bulk accessioning
         const bulkData = {
           due_date: values.due_date,
@@ -542,21 +537,12 @@ const AccessioningForm: React.FC = () => {
           auto_name_start: values.auto_name_start || undefined,
         };
 
-        console.log('=== BULK ACCESSION DATA ===');
-        console.log('Bulk data being sent:', JSON.stringify(bulkData, null, 2));
-        console.log('Number of uniques:', bulkData.uniques.length);
-        console.log('Assigned tests:', bulkData.assigned_tests);
-        console.log('Battery ID:', bulkData.battery_id);
-
         const results = await apiService.bulkAccessionSamples(bulkData);
-        console.log('=== BULK ACCESSION RESPONSE ===');
-        console.log('Results received:', JSON.stringify(results, null, 2));
-        console.log('Number of samples created:', results.length);
-        
         setSuccess(`Successfully accessioned ${results.length} sample(s)!`);
+        // Reset form to prevent double submission
+        setFormKey(prev => prev + 1); // Force form re-initialization
         setActiveStep(0);
       } else {
-        console.log('=== SINGLE SAMPLE ACCESSIONING MODE ===');
         // Single sample accessioning (existing flow)
         // Step 1: Create container instance
         // Make container name unique by appending timestamp if name is provided
@@ -574,12 +560,7 @@ const AccessioningForm: React.FC = () => {
           column: values.container_column || 1,
         };
 
-        console.log('=== STEP 1: CREATE CONTAINER ===');
-        console.log('Container data being sent:', JSON.stringify(containerData, null, 2));
-        
         const container = await apiService.createContainer(containerData);
-        console.log('Container created successfully:', JSON.stringify(container, null, 2));
-        console.log('Container ID:', container.id);
 
         // Step 2: Accession sample (uses /samples/accession endpoint which supports project auto-creation)
         const sampleData: any = {
@@ -603,18 +584,7 @@ const AccessioningForm: React.FC = () => {
           sampleData.custom_attributes = values.custom_attributes;
         }
 
-        console.log('=== STEP 2: ACCESSION SAMPLE ===');
-        console.log('Sample data being sent:', JSON.stringify(sampleData, null, 2));
-        console.log('Assigned tests array:', sampleData.assigned_tests);
-        console.log('Assigned tests length:', sampleData.assigned_tests?.length || 0);
-        console.log('Battery ID:', sampleData.battery_id);
-        console.log('Client ID:', sampleData.client_id);
-        console.log('Client project ID:', sampleData.client_project_id);
-
         const sample = await apiService.accessionSample(sampleData);
-        console.log('Sample accessioned successfully:', JSON.stringify(sample, null, 2));
-        console.log('Sample ID:', sample.id);
-        console.log('Sample name:', sample.name);
 
         // Step 3: Link sample to container via contents
         const contentData: any = {
@@ -622,55 +592,35 @@ const AccessioningForm: React.FC = () => {
           sample_id: sample.id,
         };
 
-        console.log('=== STEP 3: CREATE CONTENTS (LINK SAMPLE TO CONTAINER) ===');
-        console.log('Content data being sent:', JSON.stringify(contentData, null, 2));
-        console.log('Container ID:', container.id);
-        console.log('Sample ID:', sample.id);
-
         await apiService.createContent(container.id, contentData);
-        console.log('Content created successfully - sample linked to container');
 
         // Tests are already created by the accession endpoint
-        console.log('=== FORM SUBMISSION COMPLETED SUCCESSFULLY ===');
         setSuccess('Sample accessioned successfully!');
+        // Reset form to prevent double submission
+        setFormKey(prev => prev + 1); // Force form re-initialization
         setActiveStep(0);
       }
     } catch (err: any) {
-      console.error('=== FORM SUBMISSION ERROR ===');
-      console.error('Error object:', err);
-      console.error('Error response:', err.response);
-      console.error('Error response data:', err.response?.data);
-      console.error('Error response status:', err.response?.status);
-      console.error('Error response headers:', err.response?.headers);
-      console.error('Error message:', err.message);
-      console.error('Error stack:', err.stack);
-      
       // Handle FastAPI errors (400, 422, etc.)
       let errorMessage = 'Failed to accession sample(s)';
       if (err.response?.data) {
         const errorData = err.response.data;
-        console.error('Error data detail:', errorData.detail);
         if (errorData.detail) {
           if (Array.isArray(errorData.detail)) {
             // Multiple validation errors (422)
             errorMessage = errorData.detail
               .map((e: any) => `${e.loc?.join('.')}: ${e.msg}`)
               .join(', ');
-            console.error('Validation errors:', errorData.detail);
           } else if (typeof errorData.detail === 'string') {
             // Single error message (400, etc.)
             errorMessage = errorData.detail;
-            console.error('Error detail:', errorData.detail);
           }
         } else if (errorData.message) {
           errorMessage = errorData.message;
-          console.error('Error message:', errorData.message);
         }
       } else if (err.message) {
         errorMessage = err.message;
-        console.error('Error message:', err.message);
       }
-      console.error('Final error message to display:', errorMessage);
       setError(errorMessage);
     } finally {
       setLoading(false);
@@ -745,6 +695,7 @@ const AccessioningForm: React.FC = () => {
         </Stepper>
 
         <Formik
+          key={formKey} // Force re-initialization when key changes
           initialValues={getInitialValues(user?.client_id)}
           validationSchema={useMemo(() => getValidationSchema(false, customAttributeConfigs), [customAttributeConfigs])}
           onSubmit={handleSubmit}

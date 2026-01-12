@@ -238,7 +238,7 @@ async def validate_batch_compatibility(
     }
 
 
-@router.post("/", response_model=BatchResponse)
+@router.post("", response_model=BatchResponse, status_code=status.HTTP_201_CREATED)
 async def create_batch(
     batch_data: BatchCreate,
     current_user: User = Depends(require_batch_manage),
@@ -426,6 +426,18 @@ async def create_batch(
                 detail="Cannot create QC samples: no samples found in containers to inherit project/sample properties. Provide container_ids with samples."
             )
     
+    # Validate status exists and is active
+    if batch_data.status:
+        status_entry = db.query(ListEntry).filter(
+            ListEntry.id == batch_data.status,
+            ListEntry.active == True
+        ).first()
+        if not status_entry:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid batch status ID: {batch_data.status}"
+            )
+    
     # Create batch
     batch = Batch(
         name=batch_name,
@@ -491,6 +503,7 @@ async def create_batch(
             )
             db.add(received_status)
             db.flush()
+            db.refresh(received_status)  # Ensure ID is available
         
         # Get default container type for QC samples (use first container's type or a default)
         default_container_type = None
@@ -530,6 +543,28 @@ async def create_batch(
             
             # Generate QC sample name
             qc_sample_name = f"QC-{batch.name}-{qc_idx + 1}"
+            
+            # Validate all required fields are present
+            if not first_sample.sample_type:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Cannot create QC sample: first sample has no sample_type"
+                )
+            if not first_sample.matrix:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Cannot create QC sample: first sample has no matrix"
+                )
+            if not first_sample.project_id:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Cannot create QC sample: first sample has no project_id"
+                )
+            if not received_status or not received_status.id:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Cannot create QC sample: received status not found or invalid"
+                )
             
             # Create QC sample (inherit from first sample)
             qc_sample = Sample(
@@ -587,6 +622,13 @@ async def create_batch(
         db.refresh(batch)
     except Exception as e:
         db.rollback()
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error creating batch: {str(e)}", exc_info=True)
+        logger.error(f"Error type: {type(e).__name__}")
+        logger.error(f"Batch data: name={batch_name}, type={batch_data.type}, status={batch_data.status}")
+        logger.error(f"Container IDs: {batch_data.container_ids}")
+        logger.error(f"QC additions: {batch_data.qc_additions}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to create batch: {str(e)}"

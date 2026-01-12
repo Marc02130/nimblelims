@@ -111,7 +111,7 @@ async def update_container_type(
 
 
 # Containers endpoints
-@router.get("", response_model=List[ContainerResponse])
+@router.get("", response_model=List[ContainerWithContentsResponse])
 async def get_containers(
     type_id: Optional[UUID] = Query(None, description="Filter by container type"),
     parent_id: Optional[UUID] = Query(None, description="Filter by parent container"),
@@ -120,10 +120,12 @@ async def get_containers(
     db: Session = Depends(get_db)
 ):
     """
-    Get containers with filtering.
+    Get containers with filtering and contents.
     Supports cross-project filtering via project_ids parameter.
+    Returns containers with their associated samples (contents).
     """
     from models.sample import Sample
+    from sqlalchemy.orm import joinedload
     
     query = db.query(Container).filter(Container.active == True)
     
@@ -150,7 +152,55 @@ async def get_containers(
             query = query.filter(Container.id.in_(container_ids))
     
     containers = query.all()
-    return [ContainerResponse.model_validate(container) for container in containers]
+    
+    # Get all container IDs
+    container_ids = [c.id for c in containers]
+    
+    # Load all contents for these containers with sample relationship
+    contents_map = {}
+    if container_ids:
+        contents_list = db.query(Contents).options(
+            joinedload(Contents.sample)
+        ).filter(Contents.container_id.in_(container_ids)).all()
+        
+        # Group contents by container_id
+        for content in contents_list:
+            if content.container_id not in contents_map:
+                contents_map[content.container_id] = []
+            contents_map[content.container_id].append(content)
+    
+    # Build response with contents
+    result = []
+    for container in containers:
+        container_response = ContainerResponse.model_validate(container)
+        
+        # Get contents for this container
+        container_contents = contents_map.get(container.id, [])
+        
+        # Build contents response with sample data
+        contents_response = []
+        for content in container_contents:
+            content_dict = {
+                "container_id": content.container_id,
+                "sample_id": content.sample_id,
+                "concentration": content.concentration,
+                "concentration_units": content.concentration_units,
+                "amount": content.amount,
+                "amount_units": content.amount_units,
+            }
+            # Include sample data if available
+            if content.sample:
+                from app.schemas.sample import SampleResponse
+                content_dict["sample"] = SampleResponse.model_validate(content.sample)
+            contents_response.append(ContentsResponse(**content_dict))
+        
+        # Create ContainerWithContentsResponse
+        result.append(ContainerWithContentsResponse(
+            **container_response.dict(),
+            contents=contents_response
+        ))
+    
+    return result
 
 
 @router.post("", response_model=ContainerResponse)
@@ -253,11 +303,30 @@ async def get_container(
             detail="Container not found"
         )
     
-    # Get contents
-    contents = db.query(Contents).filter(Contents.container_id == container_id).all()
+    # Get contents with sample relationship eagerly loaded
+    from sqlalchemy.orm import joinedload
+    from models.sample import Sample
+    contents = db.query(Contents).options(
+        joinedload(Contents.sample)
+    ).filter(Contents.container_id == container_id).all()
     
     container_response = ContainerResponse.model_validate(container)
-    contents_response = [ContentsResponse.from_orm(content) for content in contents]
+    # Build contents response with sample data
+    contents_response = []
+    for content in contents:
+        content_dict = {
+            "container_id": content.container_id,
+            "sample_id": content.sample_id,
+            "concentration": content.concentration,
+            "concentration_units": content.concentration_units,
+            "amount": content.amount,
+            "amount_units": content.amount_units,
+        }
+        # Include sample data if available
+        if content.sample:
+            from app.schemas.sample import SampleResponse
+            content_dict["sample"] = SampleResponse.model_validate(content.sample)
+        contents_response.append(ContentsResponse(**content_dict))
     
     return ContainerWithContentsResponse(
         **container_response.dict(),
@@ -372,17 +441,38 @@ async def get_container_contents(
             detail="Container not found"
         )
     
-    # Get contents with pagination
-    query = db.query(Contents).filter(Contents.container_id == container_id)
+    # Get contents with pagination and sample relationship eagerly loaded
+    from sqlalchemy.orm import joinedload
+    from models.sample import Sample
+    query = db.query(Contents).options(
+        joinedload(Contents.sample)
+    ).filter(Contents.container_id == container_id)
     total = query.count()
-    
+
     offset = (page - 1) * size
     contents = query.offset(offset).limit(size).all()
-    
+
     pages = (total + size - 1) // size
-    
+
+    # Build contents response with sample data
+    contents_response = []
+    for content in contents:
+        content_dict = {
+            "container_id": content.container_id,
+            "sample_id": content.sample_id,
+            "concentration": content.concentration,
+            "concentration_units": content.concentration_units,
+            "amount": content.amount,
+            "amount_units": content.amount_units,
+        }
+        # Include sample data if available
+        if content.sample:
+            from app.schemas.sample import SampleResponse
+            content_dict["sample"] = SampleResponse.model_validate(content.sample)
+        contents_response.append(ContentsResponse(**content_dict))
+
     return ContentsListResponse(
-        contents=[ContentsResponse.from_orm(content) for content in contents],
+        contents=contents_response,
         total=total,
         page=page,
         size=size,
@@ -439,20 +529,125 @@ async def add_sample_to_container(
         )
     
     # Create contents
-    contents = Contents(
-        container_id=container_id,
-        sample_id=contents_data.sample_id,
-        concentration=contents_data.concentration,
-        concentration_units=contents_data.concentration_units,
-        amount=contents_data.amount,
-        amount_units=contents_data.amount_units
-    )
-    
-    db.add(contents)
-    db.commit()
-    db.refresh(contents)
-    
-    return ContentsResponse.from_orm(contents)
+    try:
+        # Use path parameter container_id (ignore body container_id to prevent mismatch)
+        final_container_id = container_id
+        final_sample_id = contents_data.sample_id
+        
+        contents = Contents(
+            container_id=final_container_id,
+            sample_id=final_sample_id,
+            concentration=contents_data.concentration,
+            concentration_units=contents_data.concentration_units,
+            amount=contents_data.amount,
+            amount_units=contents_data.amount_units
+        )
+        
+        db.add(contents)
+        
+        # Flush to get any database errors immediately (foreign key violations, etc.)
+        try:
+            db.flush()
+        except Exception as flush_error:
+            db.rollback()
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error during flush: {str(flush_error)}", exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Database error while creating contents: {str(flush_error)}"
+            )
+        
+        # Commit the transaction
+        try:
+            db.commit()
+        except Exception as commit_error:
+            db.rollback()
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error during commit: {str(commit_error)}", exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Database error while committing contents: {str(commit_error)}"
+            )
+        
+        # Verify contents exists after commit using direct SQL query (bypasses session cache)
+        from sqlalchemy import text
+        verify_sql = text("""
+            SELECT container_id, sample_id 
+            FROM contents 
+            WHERE container_id = :container_id AND sample_id = :sample_id
+        """)
+        verify_result = db.execute(verify_sql, {
+            "container_id": str(final_container_id),
+            "sample_id": str(final_sample_id)
+        }).first()
+        
+        if not verify_result:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Contents was not found in database after commit. container_id={final_container_id}, sample_id={final_sample_id}"
+            )
+        
+        # Also verify using ORM query
+        verify_contents = db.query(Contents).filter(
+            Contents.container_id == final_container_id,
+            Contents.sample_id == final_sample_id
+        ).first()
+        
+        if not verify_contents:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Contents was not found via ORM query after commit"
+            )
+        
+        db.refresh(verify_contents)
+        
+        # Eagerly load sample relationship for response
+        from sqlalchemy.orm import joinedload
+        from models.sample import Sample
+        contents = db.query(Contents).options(
+            joinedload(Contents.sample)
+        ).filter(
+            Contents.container_id == final_container_id,
+            Contents.sample_id == final_sample_id
+        ).first()
+        
+        if not contents:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Contents not found after creation"
+            )
+        
+        # Build response with sample data
+        content_dict = {
+            "container_id": contents.container_id,
+            "sample_id": contents.sample_id,
+            "concentration": contents.concentration,
+            "concentration_units": contents.concentration_units,
+            "amount": contents.amount,
+            "amount_units": contents.amount_units,
+        }
+        if contents.sample:
+            from app.schemas.sample import SampleResponse
+            content_dict["sample"] = SampleResponse.model_validate(contents.sample)
+        
+        return ContentsResponse(**content_dict)
+    except HTTPException:
+        # Re-raise HTTP exceptions as-is (don't rollback, they're already handled)
+        raise
+    except Exception as e:
+        db.rollback()
+        # Log the error for debugging
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Unexpected error creating contents: {str(e)}", exc_info=True)
+        logger.error(f"Error type: {type(e).__name__}")
+        logger.error(f"Error args: {e.args}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to link sample to container: {str(e)}"
+        )
 
 
 @router.patch("/{container_id}/contents/{sample_id}", response_model=ContentsResponse)

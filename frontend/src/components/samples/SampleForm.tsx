@@ -205,7 +205,7 @@ const SampleForm: React.FC<SampleFormProps> = ({
   const validationSchema = useMemo(() => Yup.object({
     name: Yup.string().min(1, 'Sample name is required').max(255, 'Name must be less than 255 characters'),
     description: Yup.string().nullable(),
-    due_date: Yup.date().nullable().max(new Date(), 'Due date cannot be in the future'),
+    due_date: Yup.date().nullable(), // Due dates can be in the future (scheduled) or past (late samples)
     received_date: Yup.date().nullable().max(new Date(), 'Received date cannot be in the future'),
     report_date: Yup.date().nullable().max(new Date(), 'Report date cannot be in the future'),
     sample_type: Yup.string().nullable(),
@@ -335,8 +335,26 @@ const SampleForm: React.FC<SampleFormProps> = ({
                 <LocalizationProvider dateAdapter={AdapterDateFns}>
                   <DatePicker
                     label="Due Date"
-                    value={values.due_date ? new Date(values.due_date) : null}
-                    onChange={(date) => setFieldValue('due_date', date ? date.toISOString() : null)}
+                    value={values.due_date ? (() => {
+                      // Parse date string in local timezone (YYYY-MM-DD format)
+                      const dateStr = values.due_date;
+                      if (dateStr && typeof dateStr === 'string' && dateStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
+                        const [year, month, day] = dateStr.split('-').map(Number);
+                        return new Date(year, month - 1, day);
+                      }
+                      return new Date(dateStr);
+                    })() : null}
+                    onChange={(date) => {
+                      if (date) {
+                        // Format date in local timezone as YYYY-MM-DD
+                        const year = date.getFullYear();
+                        const month = String(date.getMonth() + 1).padStart(2, '0');
+                        const day = String(date.getDate()).padStart(2, '0');
+                        setFieldValue('due_date', `${year}-${month}-${day}`);
+                      } else {
+                        setFieldValue('due_date', null);
+                      }
+                    }}
                     slotProps={{
                       textField: {
                         fullWidth: true,
@@ -353,8 +371,26 @@ const SampleForm: React.FC<SampleFormProps> = ({
                 <LocalizationProvider dateAdapter={AdapterDateFns}>
                   <DatePicker
                     label="Received Date"
-                    value={values.received_date ? new Date(values.received_date) : null}
-                    onChange={(date) => setFieldValue('received_date', date ? date.toISOString() : null)}
+                    value={values.received_date ? (() => {
+                      // Parse date string in local timezone (YYYY-MM-DD format)
+                      const dateStr = values.received_date;
+                      if (dateStr && typeof dateStr === 'string' && dateStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
+                        const [year, month, day] = dateStr.split('-').map(Number);
+                        return new Date(year, month - 1, day);
+                      }
+                      return new Date(dateStr);
+                    })() : null}
+                    onChange={(date) => {
+                      if (date) {
+                        // Format date in local timezone as YYYY-MM-DD
+                        const year = date.getFullYear();
+                        const month = String(date.getMonth() + 1).padStart(2, '0');
+                        const day = String(date.getDate()).padStart(2, '0');
+                        setFieldValue('received_date', `${year}-${month}-${day}`);
+                      } else {
+                        setFieldValue('received_date', null);
+                      }
+                    }}
                     slotProps={{
                       textField: {
                         fullWidth: true,
@@ -542,7 +578,7 @@ const SampleForm: React.FC<SampleFormProps> = ({
               <Button
                 type="submit"
                 variant="contained"
-                disabled={!isValid || loading || !canUpdate}
+                disabled={loading || !canUpdate}
                 aria-label={isEditMode ? 'Update sample' : 'Create sample'}
               >
                 {loading ? 'Saving...' : isEditMode ? 'Update' : 'Create'}

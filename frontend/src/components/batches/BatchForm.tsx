@@ -168,12 +168,14 @@ const BatchForm: React.FC<BatchFormProps> = ({ onSuccess, onCancel }) => {
   useEffect(() => {
     const loadData = async () => {
       try {
-        const [batchStatuses] = await Promise.all([
+        const [batchStatuses, batchTypes] = await Promise.all([
           apiService.getListEntries('batch_status'),
+          apiService.getListEntries('batch_types').catch(() => []), // Handle 404 if not seeded yet
         ]);
 
         setListEntries({
           batch_statuses: batchStatuses,
+          batch_types: batchTypes,
         });
       } catch (err) {
         setError('Failed to load form data');
@@ -360,7 +362,8 @@ const BatchForm: React.FC<BatchFormProps> = ({ onSuccess, onCancel }) => {
                 />
               </Grid>
 
-              <Grid size={{ xs: 12, sm: 6 }}>
+              {/* End date is not available when creating a batch - only set when batch is completed */}
+              {/* <Grid size={{ xs: 12, sm: 6 }}>
                 <DatePicker
                   label="End Date"
                       value={values.end_date}
@@ -376,7 +379,7 @@ const BatchForm: React.FC<BatchFormProps> = ({ onSuccess, onCancel }) => {
                         },
                       }}
                 />
-              </Grid>
+              </Grid> */}
 
                   {/* Custom Attributes */}
                   {customAttributeConfigs.length > 0 && (

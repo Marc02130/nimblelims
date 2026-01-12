@@ -54,6 +54,7 @@ const TestsManagement: React.FC = () => {
   });
 
   const canUpdate = hasPermission('test:update');
+  const canManageUsers = hasPermission('user:manage');
 
   useEffect(() => {
     loadData();
@@ -67,12 +68,15 @@ const TestsManagement: React.FC = () => {
         apiService.getListEntries('test_status'),
       ]);
       
-      // Try to get users, but don't fail if endpoint doesn't exist
+      // Only try to get users if user has permission
       let users: any[] = [];
-      try {
-        users = await apiService.getUsers();
-      } catch (err) {
-        console.warn('Users endpoint not available');
+      if (canManageUsers) {
+        try {
+          users = await apiService.getUsers();
+        } catch (err) {
+          // Silently fail if users endpoint is not available
+          console.warn('Users endpoint not available or access denied');
+        }
       }
 
       // Enrich tests with names for display
