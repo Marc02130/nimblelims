@@ -20,6 +20,128 @@
   - OR: Create container and sample in a single transaction (use bulk accession endpoint)
   - OR: Validate all steps before committing any changes
 
+## How Containers Are Associated with Samples
+
+### Database Schema
+
+The association between containers and samples is implemented using a **junction table** called `contents`:
+
+```sql
+CREATE TABLE contents (
+    container_id UUID NOT NULL REFERENCES containers(id),
+    sample_id UUID NOT NULL REFERENCES samples(id),
+    concentration NUMERIC(15,6),
+    concentration_units UUID REFERENCES units(id),
+    amount NUMERIC(15,6),
+    amount_units UUID REFERENCES units(id),
+    PRIMARY KEY (container_id, sample_id)
+);
+```
+
+**Key Points:**
+- The `contents` table is a **many-to-many junction table** that links containers to samples
+- **Composite Primary Key**: `(container_id, sample_id)` ensures a sample can only appear once per container
+- **Multiple samples per container**: A container can contain multiple samples (pooled samples)
+- **Sample-specific measurements**: Each contents record can store concentration and amount specific to that sample-container pair
+- **No RLS on contents**: The `contents` table does NOT have Row-Level Security enabled, so all contents are visible to all users
+
+### Data Model Relationships
+
+**Container Model** (`backend/models/container.py`):
+```python
+class Container(BaseModel):
+    # ... container fields ...
+    contents = relationship("Contents", back_populates="container")
+```
+
+**Contents Model** (`backend/models/container.py`):
+```python
+class Contents(Base):
+    __tablename__ = 'contents'
+    container_id = Column(PostgresUUID(as_uuid=True), ForeignKey('containers.id'), primary_key=True)
+    sample_id = Column(PostgresUUID(as_uuid=True), ForeignKey('samples.id'), primary_key=True)
+    # ... other fields ...
+    container = relationship("Container", back_populates="contents")
+    sample = relationship("Sample", back_populates="contents")
+```
+
+**Sample Model** (`backend/models/sample.py`):
+```python
+class Sample(BaseModel):
+    # ... sample fields ...
+    contents = relationship("Contents", back_populates="sample")
+```
+
+### Association Process During Accessioning
+
+The association happens in **three sequential API calls**:
+
+#### Step 1: Create Container
+- **Endpoint**: `POST /api/containers`
+- **Location**: `frontend/src/pages/AccessioningForm.tsx:555-558`
+- **Backend**: `backend/app/routers/containers.py:156` - `create_container()`
+- **What it does**: Creates a container record with name, type, row, column
+- **Returns**: `ContainerResponse` with container `id`
+
+#### Step 2: Accession Sample
+- **Endpoint**: `POST /api/samples/accession`
+- **Location**: `frontend/src/pages/AccessioningForm.tsx:626`
+- **Backend**: `backend/app/routers/samples.py:351` - `accession_sample()`
+- **What it does**: 
+  - Creates sample record
+  - Auto-creates project if needed
+  - Creates tests for the sample
+  - Commits transaction
+- **Returns**: `SampleResponse` with sample `id`
+
+#### Step 3: Link Sample to Container (Create Contents)
+- **Endpoint**: `POST /api/containers/{container_id}/contents`
+- **Location**: `frontend/src/pages/AccessioningForm.tsx:642`
+- **Backend**: `backend/app/routers/containers.py:433` - `add_sample_to_container()`
+- **What it does**:
+  1. Verifies container exists and is active
+  2. Verifies sample exists and is active
+  3. Checks if contents already exists (prevents duplicates)
+  4. Creates `Contents` record with `container_id` and `sample_id`
+  5. Commits to database
+  6. Eagerly loads sample relationship
+  7. Returns `ContentsResponse` with sample data included
+- **Request Body**:
+  ```json
+  {
+    "container_id": "uuid",
+    "sample_id": "uuid"
+  }
+  ```
+- **Returns**: `ContentsResponse` with sample relationship included
+
+### Current Implementation Status
+
+**✅ What Works:**
+1. **Contents are being created**: Backend logs show successful creation (lines 432-433 in backend.logs)
+2. **Database records exist**: `schema_data.sql` shows contents records (lines 271-274)
+3. **API returns 200 OK**: Both frontend and backend logs confirm successful API calls
+
+**❌ What Doesn't Work:**
+1. **List endpoint doesn't include contents**: `GET /containers` returns `List[ContainerResponse]` which does NOT include contents
+2. **Frontend expects contents in list**: `ContainerManagement.tsx:147` tries to access `row.contents?.length` but contents aren't in the response
+3. **Contents only available in detail view**: `GET /containers/{container_id}` returns `ContainerWithContentsResponse` with contents, but this is only called when viewing a single container
+
+### The Problem
+
+**Root Cause**: The `GET /containers` list endpoint does not include contents in the response, so the UI cannot display which samples are in each container.
+
+**Evidence**:
+- `backend/app/routers/containers.py:114-153`: `get_containers()` returns `List[ContainerResponse]`
+- `ContainerResponse` schema does NOT include contents field
+- `ContainerWithContentsResponse` (which includes contents) is only used in `get_container()` single-item endpoint
+- Frontend `ContainerManagement.tsx:147` expects `row.contents?.length` but gets `undefined`
+
+**Impact**:
+- Container list shows "0 Samples" for all containers even when they have contents
+- Users cannot see which samples are in containers without clicking into each container
+- The association exists in the database but is not visible in the UI
+
 ## Form Submit Flow (Single Sample Mode)
 
 ### Expected Flow:
@@ -30,7 +152,7 @@
 5. **Step 2**: Accession sample via `POST /api/samples/accession`
 6. **Step 3**: Link sample to container via `POST /api/containers/{container_id}/contents`
 
-### Actual Code Flow (lines 537-597):
+### Actual Code Flow (lines 555-650):
 
 ```typescript
 // Step 1: Create container
@@ -42,6 +164,7 @@ const containerData = {
 };
 const container = await apiService.createContainer(containerData);
 // ENDPOINT: POST /api/containers
+// Returns: ContainerResponse with container.id
 
 // Step 2: Accession sample
 const sampleData = {
@@ -62,14 +185,16 @@ const sampleData = {
 };
 const sample = await apiService.accessionSample(sampleData);
 // ENDPOINT: POST /api/samples/accession
+// Returns: SampleResponse with sample.id
 
 // Step 3: Link sample to container
 const contentData = {
   container_id: container.id,
   sample_id: sample.id,
 };
-await apiService.createContent(container.id, contentData);
+const contentResult = await apiService.createContent(container.id, contentData);
 // ENDPOINT: POST /api/containers/{container_id}/contents
+// Returns: ContentsResponse with sample relationship included
 
 // Success handling
 setSuccess('Sample accessioned successfully!');
@@ -92,6 +217,7 @@ setActiveStep(0);
   ```
 - **Backend Route**: `backend/app/routers/containers.py:156` - `create_container()`
 - **Expected Response**: `ContainerResponse` with container ID
+- **Transaction**: Commits immediately, container exists even if later steps fail
 
 ### 2. Accession Sample
 - **Endpoint**: `POST /api/samples/accession`
@@ -115,13 +241,16 @@ setActiveStep(0);
     "custom_attributes": {}
   }
   ```
-- **Backend Route**: `backend/app/routers/samples.py:317` - `accession_sample()`
+- **Backend Route**: `backend/app/routers/samples.py:351` - `accession_sample()`
 - **Expected Response**: `SampleResponse` with sample ID
 - **What it does**:
-  - Creates sample
-  - Auto-creates project if `project_id` not provided
+  - Validates client and project access
+  - Auto-creates project if `project_id` not provided (fixes "local variable 'project' referenced before assignment" error)
+  - Creates sample record
   - Creates tests based on `assigned_tests` or `battery_id`
+  - Commits transaction
   - Returns sample with ID
+- **Transaction**: Commits immediately, sample exists even if Step 3 fails
 
 ### 3. Create Contents (Link Sample to Container)
 - **Endpoint**: `POST /api/containers/{container_id}/contents`
@@ -134,8 +263,111 @@ setActiveStep(0);
     "sample_id": "uuid"
   }
   ```
-- **Backend Route**: `backend/app/routers/containers.py:393` - `add_sample_to_container()`
-- **Expected Response**: `ContentsResponse`
+- **Backend Route**: `backend/app/routers/containers.py:433` - `add_sample_to_container()`
+- **What it does**:
+  1. Verifies container exists and is active (404 if not found)
+  2. Verifies sample exists and is active (404 if not found)
+  3. Checks if contents already exists (400 if duplicate)
+  4. Creates `Contents` record:
+     ```python
+     contents = Contents(
+         container_id=container_id,
+         sample_id=contents_data.sample_id,
+         concentration=contents_data.concentration,  # Optional
+         concentration_units=contents_data.concentration_units,  # Optional
+         amount=contents_data.amount,  # Optional
+         amount_units=contents_data.amount_units  # Optional
+     )
+     ```
+  5. Commits to database
+  6. Eagerly loads sample relationship using `joinedload(Contents.sample)`
+  7. Builds response with sample data included
+  8. Returns `ContentsResponse` with sample relationship
+- **Expected Response**: `ContentsResponse` with sample data:
+  ```json
+  {
+    "container_id": "uuid",
+    "sample_id": "uuid",
+    "concentration": null,
+    "concentration_units": null,
+    "amount": null,
+    "amount_units": null,
+    "sample": {
+      "id": "uuid",
+      "name": "SAMPLE-2026-004",
+      "description": "...",
+      // ... full sample data
+    }
+  }
+  ```
+- **Transaction**: Commits immediately, contents record exists in database
+
+## Retrieving Container-Sample Associations
+
+### Single Container (With Contents)
+- **Endpoint**: `GET /api/containers/{container_id}`
+- **Backend**: `backend/app/routers/containers.py:236` - `get_container()`
+- **Response Model**: `ContainerWithContentsResponse`
+- **What it does**:
+  1. Queries container by ID
+  2. Queries all contents for that container with sample relationship eagerly loaded:
+     ```python
+     contents = db.query(Contents).options(
+         joinedload(Contents.sample)
+     ).filter(Contents.container_id == container_id).all()
+     ```
+  3. Builds response with sample data for each content
+  4. Returns container with contents array
+- **Response Structure**:
+  ```json
+  {
+    "id": "uuid",
+    "name": "container-name",
+    // ... container fields ...
+    "contents": [
+      {
+        "container_id": "uuid",
+        "sample_id": "uuid",
+        "sample": {
+          "id": "uuid",
+          "name": "SAMPLE-2026-004",
+          // ... full sample data
+        }
+      }
+    ]
+  }
+  ```
+
+### Container List (Without Contents) ⚠️ **PROBLEM**
+- **Endpoint**: `GET /api/containers`
+- **Backend**: `backend/app/routers/containers.py:114` - `get_containers()`
+- **Response Model**: `List[ContainerResponse]` (does NOT include contents)
+- **What it does**:
+  1. Queries all active containers
+  2. Applies filters (type_id, parent_id, project_ids)
+  3. Returns list of containers WITHOUT contents
+- **Response Structure**:
+  ```json
+  [
+    {
+      "id": "uuid",
+      "name": "container-name",
+      // ... container fields ...
+      // NO "contents" field!
+    }
+  ]
+  ```
+- **Problem**: Frontend expects `contents` array but it's not in the response
+
+### Container Contents (Pagination)
+- **Endpoint**: `GET /api/containers/{container_id}/contents?page=1&size=10`
+- **Backend**: `backend/app/routers/containers.py:352` - `get_container_contents()`
+- **Response Model**: `ContentsListResponse`
+- **What it does**:
+  1. Verifies container exists
+  2. Queries contents with pagination and sample relationship eagerly loaded
+  3. Returns paginated list of contents with sample data
+- **Use Case**: For containers with many samples, get contents in pages
 
 ## Identified Problems
 
@@ -154,6 +386,36 @@ setActiveStep(0);
 3. **Error handling**: If Step 2 or Step 3 throws an error, the catch block (line 598) executes, but container already exists
 
 **Root Cause**: **No rollback mechanism for containers**. If sample accession fails after container creation, the container remains orphaned.
+
+### Problem 3: Contents Not Visible in Container List ⚠️ **CURRENT ISSUE**
+**Root Cause**: The `GET /containers` endpoint returns `List[ContainerResponse]` which does NOT include the `contents` field.
+
+**Evidence**:
+- `backend/app/routers/containers.py:152`: Returns `[ContainerResponse.model_validate(container) for container in containers]`
+- `ContainerResponse` schema (`backend/app/schemas/container.py:93`) does NOT have a `contents` field
+- Only `ContainerWithContentsResponse` (used in `get_container()`) includes contents
+- Frontend `ContainerManagement.tsx:147` tries to access `row.contents?.length` but gets `undefined`
+
+**Impact**:
+- Container list always shows "0 Samples" even when containers have contents
+- Users cannot see which samples are in containers without clicking into each container
+- The association exists in the database (verified in `schema_data.sql`) but is not visible in the UI
+
+**Solution Options**:
+1. **Option A**: Modify `GET /containers` to return `List[ContainerWithContentsResponse]` (include contents in list)
+   - Pros: Frontend gets all data in one call
+   - Cons: May be slow for containers with many samples, increases response size
+2. **Option B**: Add a separate endpoint to get contents counts: `GET /containers?include_counts=true`
+   - Pros: Lightweight, only returns counts not full sample data
+   - Cons: Requires additional API call or query parameter
+3. **Option C**: Frontend fetches contents separately for each container
+   - Pros: No backend changes needed
+   - Cons: N+1 query problem, many API calls
+4. **Option D**: Add `contents_count` field to `ContainerResponse` (computed field, not relationship)
+   - Pros: Lightweight, shows count without full contents
+   - Cons: Still doesn't show which samples are in container
+
+**Recommended Solution**: **Option A** - Include contents in list response, but limit to essential fields to keep response size manageable.
 
 ## Error Handling Flow
 
@@ -314,6 +576,12 @@ After sample is created, frontend should:
 - **Issue**: If sample is created but not yet visible in database (transaction not committed), content creation might fail
 - **Result**: Sample exists but content creation fails
 
+**Problem 7: Contents Not Included in List Response** ⚠️ **CURRENT ISSUE**
+- **Location**: `GET /containers` endpoint returns containers without contents
+- **Issue**: Frontend expects `contents` array but `ContainerResponse` doesn't include it
+- **Result**: UI shows "0 Samples" even when containers have contents
+- **Fix**: Modify `GET /containers` to include contents or add `contents_count` field
+
 ## Root Cause Summary
 
 ### Tests Not Created
@@ -335,14 +603,67 @@ After sample is created, frontend should:
 3. **Wrong IDs** - Container ID or sample ID is wrong/undefined
 4. **No rollback** - If content creation fails, container and sample remain orphaned
 5. **Race condition** - Sample not yet committed when content creation is attempted
+6. **Contents not in list response** - `GET /containers` doesn't include contents, so UI can't display them ⚠️ **CURRENT ISSUE**
+
+## Current Status (Based on Logs)
+
+### What's Working ✅
+1. **Container creation**: `POST /containers` returns 200 OK (line 412 in backend.logs)
+2. **Sample accession**: `POST /samples/accession` returns 200 OK (line 426 in backend.logs)
+3. **Contents creation**: `POST /containers/{id}/contents` returns 200 OK (line 436 in backend.logs)
+4. **Backend logging**: Shows "Creating contents" and "Successfully created contents" (lines 432-433)
+5. **Database records**: `schema_data.sql` shows contents records exist (lines 271-274)
+
+### What's Not Working ❌
+1. **Container list doesn't show contents**: `GET /containers` returns containers without contents array
+2. **UI shows "0 Samples"**: Frontend tries to access `row.contents?.length` but gets `undefined`
+3. **Contents only visible in detail view**: Must click into container to see contents
 
 ## Recommendations
 
-1. **Validate test assignment before submission**: Ensure at least one analysis or battery is selected
-2. **Better error messages**: Display specific validation errors from backend
-3. **Add rollback for containers**: If sample creation fails, delete the container that was created
-4. **Use single transaction**: Consider using bulk accession endpoint which creates container, sample, and content in one transaction
-5. **Validate all steps before committing**: Check that container, sample, and content can all be created before starting
-6. **Better logging**: Log each step's success/failure to identify where the flow breaks
-7. **Check database state**: Verify that required configuration data (status lists, status entries) exists
-8. **Handle empty arrays properly**: Check if `assigned_tests` is empty and `battery_id` is missing, show error to user
+1. **Fix container list endpoint**: Modify `GET /containers` to include contents (or at least contents_count)
+   - **Option A**: Return `List[ContainerWithContentsResponse]` with full contents
+   - **Option B**: Add `contents_count` computed field to `ContainerResponse`
+   - **Option C**: Add query parameter `?include_contents=true` to optionally include contents
+2. **Validate test assignment before submission**: Ensure at least one analysis or battery is selected
+3. **Better error messages**: Display specific validation errors from backend
+4. **Add rollback for containers**: If sample creation fails, delete the container that was created
+5. **Use single transaction**: Consider using bulk accession endpoint which creates container, sample, and content in one transaction
+6. **Validate all steps before committing**: Check that container, sample, and content can all be created before starting
+7. **Better logging**: Log each step's success/failure to identify where the flow breaks
+8. **Check database state**: Verify that required configuration data (status lists, status entries) exists
+9. **Handle empty arrays properly**: Check if `assigned_tests` is empty and `battery_id` is missing, show error to user
+
+## Database Verification
+
+To verify contents are being created, query the database:
+
+```sql
+-- Check all contents records
+SELECT c.container_id, c.sample_id, s.name as sample_name, cont.name as container_name
+FROM contents c
+JOIN samples s ON c.sample_id = s.id
+JOIN containers cont ON c.container_id = cont.id
+WHERE s.active = true AND cont.active = true;
+
+-- Check contents for a specific container
+SELECT c.*, s.name as sample_name
+FROM contents c
+JOIN samples s ON c.sample_id = s.id
+WHERE c.container_id = 'bc3fdae6-f2c4-40f0-ace9-6ff82ab975d0';
+
+-- Count samples per container
+SELECT cont.id, cont.name, COUNT(c.sample_id) as sample_count
+FROM containers cont
+LEFT JOIN contents c ON cont.id = c.container_id
+WHERE cont.active = true
+GROUP BY cont.id, cont.name;
+```
+
+Based on `schema_data.sql`, the following contents records exist:
+- Container `1477fa9b-d946-4ffc-a084-d9728774def9` → Sample `913ec796-f56c-44da-9b81-c6bee5275cc3`
+- Container `b5479921-83af-49e4-9ca4-efea13d85a27` → Sample `5d38f989-a658-4ece-956b-43b089e3adff`
+- Container `5461535c-b6c5-4810-b8c5-c524f7dccffe` → Sample `e003579c-0126-4dda-b0ad-325447f5e782`
+- Container `bc3fdae6-f2c4-40f0-ace9-6ff82ab975d0` → Sample `cd9fa678-53ce-4311-a327-b7d5835270f3`
+
+**Conclusion**: The contents records ARE being created successfully. The issue is that the `GET /containers` list endpoint doesn't return them, so the UI cannot display the associations.

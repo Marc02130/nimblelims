@@ -17,11 +17,8 @@ class BatchBase(BaseModel):
     end_date: Optional[datetime] = None
     custom_attributes: Dict[str, Any] = Field(default_factory=dict, description="Custom attributes as JSON")
 
-    @validator('start_date', 'end_date')
-    def validate_dates(cls, v):
-        if v and v > datetime.now():
-            raise ValueError('Date cannot be in the future')
-        return v
+    # Removed date validation - dates can be in the future for scheduling
+    # End dates are typically set when batch is completed, not during creation
 
 
 class QCAddition(BaseModel):
@@ -48,11 +45,8 @@ class BatchUpdate(BaseModel):
     end_date: Optional[datetime] = None
     custom_attributes: Optional[Dict[str, Any]] = Field(None, description="Custom attributes as JSON")
 
-    @validator('start_date', 'end_date')
-    def validate_dates(cls, v):
-        if v and v > datetime.now():
-            raise ValueError('Date cannot be in the future')
-        return v
+    # Removed date validation - dates can be in the future for scheduling
+    # End dates are typically set when batch is completed, not during creation
 
 
 class BatchContainerRequest(BaseModel):
@@ -106,8 +100,5 @@ class BatchCreateWithContainersRequest(BaseModel):
     end_date: Optional[datetime] = None
     containers: List[BatchContainerRequest] = Field(default_factory=list, description="Containers to add to batch")
 
-    @validator('start_date', 'end_date')
-    def validate_dates(cls, v):
-        if v and v > datetime.now():
-            raise ValueError('Date cannot be in the future')
-        return v
+    # Removed date validation - dates can be in the future for scheduling
+    # End dates are typically set when batch is completed, not during creation

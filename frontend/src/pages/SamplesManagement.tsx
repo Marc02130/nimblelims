@@ -16,7 +16,7 @@ import {
 } from '@mui/material';
 import { DataGrid, GridColDef, GridActionsCellItem } from '@mui/x-data-grid';
 import EditIcon from '@mui/icons-material/Edit';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import SampleForm from '../components/samples/SampleForm';
 import { apiService } from '../services/apiService';
 import { useUser } from '../contexts/UserContext';
@@ -42,6 +42,7 @@ interface Sample {
 const SamplesManagement: React.FC = () => {
   const { hasPermission } = useUser();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [samples, setSamples] = useState<Sample[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -59,19 +60,34 @@ const SamplesManagement: React.FC = () => {
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [searchParams]);
 
   const loadData = async () => {
     try {
       setLoading(true);
-      const [samplesData, sampleTypes, statuses, matrices, qcTypes, projects] = await Promise.all([
-        apiService.getSamples(),
+      // Get project_id from URL query parameters
+      const projectId = searchParams.get('project_id') || undefined;
+      
+      // Build filters object
+      const filters: { project_id?: string } = {};
+      if (projectId) {
+        filters.project_id = projectId;
+      }
+
+      const [samplesResponse, sampleTypes, statuses, matrices, qcTypes, projectsResponse] = await Promise.all([
+        apiService.getSamples(filters),
         apiService.getListEntries('sample_types'),
         apiService.getListEntries('sample_status'),
         apiService.getListEntries('matrix_types'),
         apiService.getListEntries('qc_types'),
         apiService.getProjects(),
       ]);
+
+      // Handle paginated response - extract samples array
+      const samplesData = Array.isArray(samplesResponse) ? samplesResponse : (samplesResponse.samples || []);
+      
+      // Handle paginated projects response
+      const projects = projectsResponse.projects || projectsResponse || [];
 
       // Enrich samples with names for display
       const enrichedSamples = samplesData.map((sample: any) => ({

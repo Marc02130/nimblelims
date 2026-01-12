@@ -81,10 +81,13 @@ const Dashboard: React.FC = () => {
 
   const loadData = async () => {
     try {
-      const [statuses, projects] = await Promise.all([
+      const [statuses, projectsResponse] = await Promise.all([
         apiService.getListEntries('sample_status'),  // Use normalized slug format
         apiService.getProjects(),
       ]);
+
+      // Extract projects array from paginated response
+      const projects = projectsResponse.projects || projectsResponse || [];
 
       setLookupData({ statuses, projects });
     } catch (err: any) {

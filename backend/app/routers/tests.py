@@ -40,24 +40,15 @@ async def get_tests(
 ):
     """
     Get tests with filtering and pagination.
-    Scoped by user access.
+    Scoped by user access via RLS policies.
+    RLS policy tests_access automatically filters based on has_project_access(sample.project_id)
     """
-    # Build query with filters
+    # Build query with filters - RLS will automatically filter based on project access
+    # No need for manual Python-level filtering - RLS handles:
+    # - Admin users: see all tests
+    # - Lab users: see tests for samples in projects they have access to via project_users
+    # - Client users: see tests for samples from their client's projects
     query = db.query(Test).filter(Test.active == True)
-    
-    # Apply user access control
-    if current_user.role.name != "Administrator":
-        if current_user.client_id:
-            # Client users can only see tests for their own samples
-            query = query.join(Sample).join(Project).filter(
-                Project.client_id == current_user.client_id
-            )
-        else:
-            # Lab users can see tests for samples in projects they have access to
-            accessible_projects = db.query(ProjectUser.project_id).filter(
-                ProjectUser.user_id == current_user.id
-            ).subquery()
-            query = query.join(Sample).filter(Sample.project_id.in_(accessible_projects))
     
     # Apply filters
     if sample_id:
@@ -131,9 +122,14 @@ async def get_test(
             detail="Test not found"
         )
     
-    # Check access control
+    # Check access control using has_project_access function (handles admin, client, and lab tech access)
     if current_user.role.name != "Administrator":
-        if current_user.client_id and test.sample.project.client_id != current_user.client_id:
+        from sqlalchemy import text
+        result = db.execute(
+            text("SELECT has_project_access(:project_id)"),
+            {"project_id": str(test.sample.project_id)}
+        ).scalar()
+        if not result:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Access denied: insufficient project permissions"

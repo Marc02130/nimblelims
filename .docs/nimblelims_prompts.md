@@ -1002,3 +1002,6 @@ RBAC: Page visible with project:manage (hide/edit buttons accordingly); use apiS
 Integration: Link to related samples (e.g., button to /samples?project_id={id}); tooltips for guidance (e.g., 'Internal Projects: Core lab tracking units').
 Responsive: DataGrid with horizontal scroll on mobile; use useMemo for configs.
 Ensure ESLint/TypeScript compliance. Output as: new ProjectsManagement.tsx (full file), updates to apiService.ts (add project methods), and integration in App.tsx for routing (changes only)."
+
+
+# 

@@ -102,7 +102,15 @@ const CustomAttributeField: React.FC<CustomAttributeFieldProps> = ({
               label={displayLabel}
               value={value ? new Date(value) : null}
               onChange={(date) => {
-                onChange(date ? date.toISOString().split('T')[0] : null);
+                if (date) {
+                  // Format date in local timezone as YYYY-MM-DD
+                  const year = date.getFullYear();
+                  const month = String(date.getMonth() + 1).padStart(2, '0');
+                  const day = String(date.getDate()).padStart(2, '0');
+                  onChange(`${year}-${month}-${day}`);
+                } else {
+                  onChange(null);
+                }
               }}
               onClose={() => {
                 // Trigger validation when date picker closes

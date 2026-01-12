@@ -347,8 +347,26 @@ const TestForm: React.FC<TestFormProps> = ({
                 <LocalizationProvider dateAdapter={AdapterDateFns}>
                   <DatePicker
                     label="Test Date"
-                    value={values.test_date ? new Date(values.test_date) : null}
-                    onChange={(date) => setFieldValue('test_date', date ? date.toISOString() : null)}
+                    value={values.test_date ? (() => {
+                      // Parse date string in local timezone (YYYY-MM-DD format)
+                      const dateStr = values.test_date;
+                      if (dateStr && typeof dateStr === 'string' && dateStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
+                        const [year, month, day] = dateStr.split('-').map(Number);
+                        return new Date(year, month - 1, day);
+                      }
+                      return new Date(dateStr);
+                    })() : null}
+                    onChange={(date) => {
+                      if (date) {
+                        // Format date in local timezone as YYYY-MM-DD
+                        const year = date.getFullYear();
+                        const month = String(date.getMonth() + 1).padStart(2, '0');
+                        const day = String(date.getDate()).padStart(2, '0');
+                        setFieldValue('test_date', `${year}-${month}-${day}`);
+                      } else {
+                        setFieldValue('test_date', null);
+                      }
+                    }}
                     slotProps={{
                       textField: {
                         fullWidth: true,

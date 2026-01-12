@@ -2,9 +2,12 @@
 Pydantic schemas for containers and contents
 """
 from pydantic import BaseModel, Field, validator
-from typing import Optional, List
+from typing import Optional, List, TYPE_CHECKING
 from datetime import datetime
 from uuid import UUID
+
+if TYPE_CHECKING:
+    from app.schemas.sample import SampleResponse
 
 
 class ContainerTypeBase(BaseModel):
@@ -142,6 +145,7 @@ class ContentsResponse(ContentsBase):
     """Schema for contents response"""
     container_id: UUID
     sample_id: UUID
+    sample: Optional['SampleResponse'] = None  # Include sample relationship
 
     class Config:
         from_attributes = True

@@ -79,19 +79,21 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onMobileClose, collapsed 
     location.pathname.startsWith('/projects') || 
     location.pathname.startsWith('/client-projects')
   );
-  
-  // Auto-expand accordions for /samples/ and /tests/ routes
-  React.useEffect(() => {
-    if (location.pathname.startsWith('/samples') || location.pathname.startsWith('/tests')) {
-      // These are in core items, no accordion needed
-    }
-  }, [location.pathname]);
+  const [sampleMgmtExpanded, setSampleMgmtExpanded] = useState(
+    location.pathname.startsWith('/accessioning') || 
+    location.pathname.startsWith('/samples') || 
+    location.pathname.startsWith('/tests') || 
+    location.pathname.startsWith('/containers') || 
+    location.pathname.startsWith('/batches') || 
+    location.pathname.startsWith('/results')
+  );
 
   // Collapse accordions when sidebar collapses
   React.useEffect(() => {
     if (collapsed) {
       setAdminExpanded(false);
       setLabMgmtExpanded(false);
+      setSampleMgmtExpanded(false);
     }
   }, [collapsed]);
 
@@ -109,6 +111,17 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onMobileClose, collapsed 
       icon: <HelpIcon />,
       // No permission required - visible to all users
     },
+  ]
+
+  // Lab Mgmt navigation items
+  interface SampleMgmtNavItem {
+    text: string;
+    path: string;
+    icon: React.ReactNode;
+    permission?: string;
+  }
+
+  const SampleMgmtItems: SampleMgmtNavItem[] = [
     {
       text: 'Accessioning',
       path: '/accessioning',
@@ -255,6 +268,8 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onMobileClose, collapsed 
         setAdminExpanded(true);
       } else if (path.startsWith('/clients') || path.startsWith('/projects') || path.startsWith('/client-projects')) {
         setLabMgmtExpanded(true);
+      } else if (path.startsWith('/accessioning') || path.startsWith('/samples') || path.startsWith('/tests') || path.startsWith('/containers') || path.startsWith('/batches') || path.startsWith('/results')) {
+        setSampleMgmtExpanded(true);
       }
     }
   };
@@ -270,6 +285,13 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onMobileClose, collapsed 
 
   const hasAdminAccess = hasPermission('config:edit');
   const hasLabMgmtAccess = hasPermission('project:manage');
+  const hasSampleMgmtAccess = 
+    hasPermission('sample:create') ||
+    hasPermission('sample:read') ||
+    hasPermission('sample:update') ||
+    hasPermission('test:update') ||
+    hasPermission('batch:manage') ||
+    hasPermission('result:enter');
 
   // Update accordion expanded states when route changes
   React.useEffect(() => {
@@ -279,6 +301,14 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onMobileClose, collapsed 
       location.pathname.startsWith('/projects') || 
       location.pathname.startsWith('/client-projects')
     );
+    setSampleMgmtExpanded(
+      location.pathname.startsWith('/accessioning') || 
+      location.pathname.startsWith('/samples') || 
+      location.pathname.startsWith('/tests') || 
+      location.pathname.startsWith('/containers') || 
+      location.pathname.startsWith('/batches') || 
+      location.pathname.startsWith('/results')
+    );  
   }, [location.pathname]);
 
   const drawerContent = (
@@ -377,6 +407,118 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onMobileClose, collapsed 
               No items available
             </Typography>
           </ListItem>
+        )}
+
+        {/* Sample Management Section */}
+        {hasSampleMgmtAccess && (
+          <>
+            <Divider sx={{ my: 1 }} />
+            <Accordion
+              expanded={sampleMgmtExpanded}
+              onChange={(_, expanded) => setSampleMgmtExpanded(expanded)}
+              sx={{
+                boxShadow: 'none',
+                '&:before': { display: 'none' },
+                '&.Mui-expanded': { margin: 0 },
+              }}
+            >
+              <AccordionSummary
+                expandIcon={!collapsed ? <ExpandMore /> : null}
+                aria-label="Sample Management section"
+                aria-controls="sample-mgmt-navigation-content"
+                sx={{
+                  px: 2,
+                  justifyContent: collapsed ? 'center' : 'flex-start',
+                  '& .MuiAccordionSummary-content': {
+                    my: 0,
+                    justifyContent: collapsed ? 'center' : 'flex-start',
+                  },
+                }}
+              >
+                <ListItemIcon sx={{ minWidth: collapsed ? 0 : 40, justifyContent: 'center' }}>
+                  {collapsed ? (
+                    <Tooltip title="Sample Management" placement="right" arrow>
+                      <ScienceIcon
+                        color={
+                          location.pathname.startsWith('/accessioning') || 
+                          location.pathname.startsWith('/samples') || 
+                          location.pathname.startsWith('/tests') || 
+                          location.pathname.startsWith('/containers') || 
+                          location.pathname.startsWith('/batches') || 
+                          location.pathname.startsWith('/results')
+                            ? 'primary'
+                            : 'inherit'
+                        }
+                      />
+                    </Tooltip>
+                  ) : (
+                    <ScienceIcon
+                      color={
+                        location.pathname.startsWith('/accessioning') || 
+                        location.pathname.startsWith('/samples') || 
+                        location.pathname.startsWith('/tests') || 
+                        location.pathname.startsWith('/containers') || 
+                        location.pathname.startsWith('/batches') || 
+                        location.pathname.startsWith('/results')
+                          ? 'primary'
+                          : 'inherit'
+                      }
+                    />
+                  )}
+                </ListItemIcon>
+                {!collapsed && (
+                  <Tooltip title="Sample Management" placement="right" arrow>
+                    <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                      Sample Mgmt
+                    </Typography>
+                  </Tooltip>
+                )}
+              </AccordionSummary>
+              <AccordionDetails sx={{ p: 0 }}>
+                <List component="nav" aria-label="sample management navigation">
+                  {SampleMgmtItems.filter((item) => !item.permission || hasPermission(item.permission)).map((item) => {
+                    const active = isActive(item.path);
+                    const listItemButton = (
+                      <ListItemButton
+                        selected={active}
+                        onClick={() => handleNavigation(item.path)}
+                        sx={{ 
+                          pl: collapsed ? 2 : 4,
+                          justifyContent: collapsed ? 'center' : 'flex-start',
+                          minHeight: 48,
+                        }}
+                        aria-label={`Navigate to ${item.text}`}
+                        aria-current={active ? 'page' : undefined}
+                      >
+                        <ListItemIcon
+                          sx={{
+                            color: active ? 'primary.main' : 'inherit',
+                            minWidth: collapsed ? 0 : 40,
+                            justifyContent: 'center',
+                          }}
+                        >
+                          {item.icon}
+                        </ListItemIcon>
+                        {!collapsed && <ListItemText primary={item.text} />}
+                      </ListItemButton>
+                    );
+                    
+                    return (
+                      <ListItem key={item.path} disablePadding>
+                        {collapsed ? (
+                          <Tooltip title={item.text} placement="right" arrow>
+                            {listItemButton}
+                          </Tooltip>
+                        ) : (
+                          listItemButton
+                        )}
+                      </ListItem>
+                    );
+                  })}
+                </List>
+              </AccordionDetails>
+            </Accordion>
+          </>
         )}
 
         {/* Lab Mgmt Section */}

@@ -129,7 +129,9 @@ class SampleUpdate(BaseModel):
     qc_type: Optional[UUID] = None
     custom_attributes: Optional[Dict[str, Any]] = Field(None, description="Custom attributes as JSON")
 
-    @validator('due_date', 'received_date', 'report_date')
+    # Removed future date validation for due_date - due dates can be in the future (scheduled) or past (late samples)
+    # received_date and report_date still cannot be in the future
+    @validator('received_date', 'report_date')
     def validate_dates(cls, v):
         if v and v > datetime.now():
             raise ValueError('Date cannot be in the future')

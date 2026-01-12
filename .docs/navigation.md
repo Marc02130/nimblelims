@@ -27,12 +27,15 @@ Navigation is permission-based, with menu items and routes dynamically shown/hid
 ├─────────────┤
 │ Dashboard   │
 │ Help        │
-│ Accessioning│
-│ Samples     │
-│ Tests       │
-│ Containers  │
-│ Batches     │
-│ Results     │
+├─────────────┤
+│ ▼ Sample    │ ← Accordion (collapsible, requires sample/test/batch/result permissions)
+│   Mgmt      │
+│   Accessioning│
+│   Samples   │
+│   Tests     │
+│   Containers│
+│   Batches   │
+│   Results   │
 ├─────────────┤
 │ ▼ Lab Mgmt  │ ← Accordion (collapsible, requires project:manage)
 │   Clients   │
@@ -61,12 +64,28 @@ Navigation is permission-based, with menu items and routes dynamically shown/hid
 ### Navigation Sections
 
 #### Core Features Section
-Core features are organized with Dashboard and Help at the top, followed by workflow items. All items are permission-gated and only visible to users with the required permissions:
+Core features are organized with Dashboard and Help at the top. These items are always visible to authenticated users:
 
 | Menu Item | Route | Icon | Permission Required | Description |
 |-----------|-------|------|---------------------|-------------|
 | **Dashboard** | `/dashboard` | Dashboard | Always visible | Main dashboard with sample overview and statistics |
 | **Help** | `/help` | Help | Always visible | Role-filtered help content and documentation |
+
+#### Sample Management Section (Accordion)
+The Sample Management section uses a Material-UI Accordion component for collapsible submenu functionality. It is only visible to users with at least one of the following permissions: `sample:create`, `sample:read`, `sample:update`, `test:update`, `batch:manage`, or `result:enter`. This section consolidates all sample-related workflow functions.
+
+**Accordion Behavior:**
+- Auto-expands when user navigates to any `/accessioning`, `/samples`, `/tests`, `/containers`, `/batches`, or `/results` route
+- Can be manually collapsed/expanded by clicking the accordion header
+- Shows active state (primary color icon) when on any sample management route
+- Contains sample management sub-items in a nested list structure
+- Header displays "Sample Mgmt" with tooltip "Sample Management" for accessibility
+- ARIA labels: `aria-label="Sample Management section"`, `aria-controls="sample-mgmt-navigation-content"`
+
+**Sub-items:**
+
+| Menu Item | Route | Icon | Permission Required | Description |
+|-----------|-------|------|---------------------|-------------|
 | **Accessioning** | `/accessioning` | Science | `sample:create` | Sample accessioning form for receiving new samples |
 | **Samples** | `/samples` | Science | `sample:read` | Sample management interface with list and edit functionality |
 | **Tests** | `/tests` | Biotech | `test:update` | Test management interface with list and edit functionality |
@@ -251,10 +270,7 @@ All authenticated routes use the `MainLayout` component, which provides the unif
 Navigation visibility is controlled by the `hasPermission()` function from `UserContext`:
 
 ```typescript
-hasPermission('sample:create')  // Accessioning menu
-hasPermission('sample:update')  // Containers menu
-hasPermission('batch:manage')   // Batches menu
-hasPermission('result:enter')   // Results menu
+hasPermission('sample:create') || hasPermission('sample:read') || hasPermission('sample:update') || hasPermission('test:update') || hasPermission('batch:manage') || hasPermission('result:enter')  // Sample Mgmt section (accordion) - visible if user has any sample/test/batch/result permission
 hasPermission('project:manage') // Lab Mgmt section (accordion) - includes Clients, Int Projects, Client Projs
 hasPermission('config:edit')    // Admin section (accordion)
 // Help menu: No permission required - always visible to all users
@@ -262,12 +278,12 @@ hasPermission('config:edit')    // Admin section (accordion)
 
 ### Role-Based Access
 
-| Role | Visible Sidebar Items | Lab Mgmt Access | Admin Access |
-|------|---------------------|-----------------|--------------|
-| **Administrator** | All items (including Help) | Full access (accordion visible) | Full access (accordion visible, including Help Management) |
-| **Lab Manager** | Dashboard, Samples (if `sample:read`), Tests (if `test:update`), Batches (if `batch:manage`), Results (if `result:enter`), Help | Full access if `project:manage` | No access (accordion hidden) |
-| **Lab Technician** | Dashboard, Accessioning (if `sample:create`), Samples (if `sample:read`), Tests (if `test:update`), Containers (if `sample:update`), Batches (if `batch:manage`), Results (if `result:enter`), Help | No access (accordion hidden) | No access (accordion hidden) |
-| **Client** | Dashboard, Samples (if `sample:read`), Help (read-only) | No access (accordion hidden) | No access (accordion hidden) |
+| Role | Visible Sidebar Items | Sample Mgmt Access | Lab Mgmt Access | Admin Access |
+|------|---------------------|-------------------|-----------------|--------------|
+| **Administrator** | All items (including Help) | Full access (accordion visible, all items) | Full access (accordion visible) | Full access (accordion visible, including Help Management) |
+| **Lab Manager** | Dashboard, Help, Sample Mgmt items (filtered by permissions), Lab Mgmt (if `project:manage`) | Visible if has any sample/test/batch/result permission (items filtered by individual permissions) | Full access if `project:manage` | No access (accordion hidden) |
+| **Lab Technician** | Dashboard, Help, Sample Mgmt items (filtered by permissions) | Visible if has any sample/test/batch/result permission (items filtered by individual permissions) | No access (accordion hidden) | No access (accordion hidden) |
+| **Client** | Dashboard, Help, Sample Mgmt items (filtered by permissions, typically only Samples if `sample:read`) | Visible if has any sample/test/batch/result permission (items filtered by individual permissions) | No access (accordion hidden) | No access (accordion hidden) |
 
 ### Edge Cases
 
@@ -305,7 +321,7 @@ const isActive = location.pathname.startsWith('/projects');
 
 - **Logo click**: Navigates to `/dashboard`
 - **Sidebar item clicks**: Navigate to respective routes
-- **Accordion expansion**: Auto-expands when navigating to lab management or admin routes
+- **Accordion expansion**: Auto-expands when navigating to sample management, lab management, or admin routes
 - **Mobile drawer**: Auto-closes after navigation on mobile devices
 - **Back button**: Navigates to parent route for nested routes
 
@@ -431,18 +447,20 @@ The navigation system was refactored from a dual approach (top Navbar + separate
 - Top AppBar provides context (page title, back button, user actions)
 - No layout switching between admin and non-admin sections
 
-### Accordion Usage for Lab Mgmt and Admin Sections
+### Accordion Usage for Sample Mgmt, Lab Mgmt, and Admin Sections
 
-Both Lab Mgmt and Admin sections use Material-UI's Accordion component to provide collapsible submenu functionality:
+Sample Mgmt, Lab Mgmt, and Admin sections use Material-UI's Accordion component to provide collapsible submenu functionality:
 
 **Features:**
 - **Auto-Expansion**: Accordions automatically expand when user navigates to related routes
+  - Sample Mgmt: Expands on `/accessioning`, `/samples`, `/tests`, `/containers`, `/batches`, or `/results` routes
   - Lab Mgmt: Expands on `/clients`, `/projects`, or `/client-projects` routes
   - Admin: Expands on any `/admin/*` route
 - **Manual Toggle**: Users can collapse/expand accordions by clicking the header
 - **Active State**: Accordion icons show primary color when on related routes
 - **Nested Structure**: Sub-items are indented (pl: 4) to show hierarchy
 - **Accessibility**: Proper ARIA labels and tooltips for screen readers
+  - Sample Mgmt header: `aria-label="Sample Management section"` with tooltip "Sample Management"
   - Lab Mgmt header: `aria-label="Lab Management section"` with tooltip "Lab Management"
   - Admin header: `aria-label="Admin section"`
   - Sub-items have descriptive tooltips where needed (e.g., "Internal Projects", "Client Projects")

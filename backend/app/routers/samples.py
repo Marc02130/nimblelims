@@ -4,7 +4,7 @@ Samples router for NimbleLims
 from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, or_
+from sqlalchemy import and_, or_, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy import cast
 from app.database import get_db
@@ -160,18 +160,53 @@ async def get_samples(
         query = query.filter(Sample.qc_type == qc_type_uuid)
     
     # Parse and apply custom_attributes filters (e.g., ?custom.ph_level=7.0)
+    # Note: Attribute names are case-sensitive and must match exactly as stored in database
+    # To find the correct attribute name, check the custom_attributes_config table
     custom_filters = {}
+    # Load all custom attribute configs once for efficient lookup
+    from models.custom_attributes_config import CustomAttributeConfig
+    attr_configs = db.query(CustomAttributeConfig).filter(
+        CustomAttributeConfig.entity_type == 'samples',
+        CustomAttributeConfig.active == True
+    ).all()
+    # Create a case-insensitive lookup map
+    attr_name_map = {config.attr_name.lower(): config.attr_name for config in attr_configs}
+    
     for key, value in request.query_params.items():
         if key.startswith('custom.'):
             attr_name = key[7:]  # Remove 'custom.' prefix
+            # Try to find matching attribute name in configs (case-insensitive lookup)
+            # Also handle partial matches (e.g., "ph" matching "pH" or "ph_level")
+            actual_attr_name = None
+            
+            # First try exact case-insensitive match
+            if attr_name.lower() in attr_name_map:
+                actual_attr_name = attr_name_map[attr_name.lower()]
+            else:
+                # Try partial match - check if any config attr_name contains the filter name (case-insensitive)
+                # This handles "ph" matching "pH" or "ph_level"
+                for config in attr_configs:
+                    config_name_lower = config.attr_name.lower()
+                    filter_name_lower = attr_name.lower()
+                    # Check if filter name is a prefix or exact match (case-insensitive)
+                    if (config_name_lower == filter_name_lower or 
+                        config_name_lower.startswith(filter_name_lower) or
+                        filter_name_lower.startswith(config_name_lower.replace('_', '').replace('-', ''))):
+                        actual_attr_name = config.attr_name
+                        break
+            
+            # If no match found, use the provided name as-is
+            if actual_attr_name is None:
+                actual_attr_name = attr_name
+            
             # Try to parse as number, otherwise keep as string
             try:
                 if '.' in value:
-                    custom_filters[attr_name] = float(value)
+                    custom_filters[actual_attr_name] = float(value)
                 else:
-                    custom_filters[attr_name] = int(value)
+                    custom_filters[actual_attr_name] = int(value)
             except ValueError:
-                custom_filters[attr_name] = value
+                custom_filters[actual_attr_name] = value
     
     # Apply custom_attributes JSONB filters
     if custom_filters:
@@ -210,6 +245,8 @@ async def get_sample(
     Get a specific sample by ID.
     Scoped by user access.
     """
+    from sqlalchemy import text
+    
     sample = db.query(Sample).filter(
         Sample.id == sample_id,
         Sample.active == True
@@ -221,9 +258,13 @@ async def get_sample(
             detail="Sample not found"
         )
     
-    # Check project access
+    # Check project access using has_project_access function (handles admin, client, and lab tech access)
     if current_user.role.name != "Administrator":
-        if current_user.client_id and sample.project.client_id != current_user.client_id:
+        result = db.execute(
+            text("SELECT has_project_access(:project_id)"),
+            {"project_id": str(sample.project_id)}
+        ).scalar()
+        if not result:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Access denied: insufficient project permissions"
@@ -408,6 +449,7 @@ async def accession_sample(
             db.add(new_project)
             db.flush()  # Get the ID without committing
             project_id = new_project.id
+            project = new_project  # Set project variable for use later
             logger.info(f"Created project {project_id}")
             
             # Grant current user access to the new project
@@ -947,9 +989,14 @@ async def update_sample(
             detail="Sample not found"
         )
     
-    # Check project access
+    # Check project access using has_project_access function (handles admin, client, and lab tech access)
     if current_user.role.name != "Administrator":
-        if current_user.client_id and sample.project.client_id != current_user.client_id:
+        from sqlalchemy import text
+        result = db.execute(
+            text("SELECT has_project_access(:project_id)"),
+            {"project_id": str(sample.project_id)}
+        ).scalar()
+        if not result:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Access denied: insufficient project permissions"
@@ -1000,9 +1047,14 @@ async def delete_sample(
             detail="Sample not found"
         )
     
-    # Check project access
+    # Check project access using has_project_access function (handles admin, client, and lab tech access)
     if current_user.role.name != "Administrator":
-        if current_user.client_id and sample.project.client_id != current_user.client_id:
+        from sqlalchemy import text
+        result = db.execute(
+            text("SELECT has_project_access(:project_id)"),
+            {"project_id": str(sample.project_id)}
+        ).scalar()
+        if not result:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Access denied: insufficient project permissions"
@@ -1040,9 +1092,14 @@ async def update_sample_status(
             detail="Sample not found"
         )
     
-    # Check project access
+    # Check project access using has_project_access function (handles admin, client, and lab tech access)
     if current_user.role.name != "Administrator":
-        if current_user.client_id and sample.project.client_id != current_user.client_id:
+        from sqlalchemy import text
+        result = db.execute(
+            text("SELECT has_project_access(:project_id)"),
+            {"project_id": str(sample.project_id)}
+        ).scalar()
+        if not result:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Access denied: insufficient project permissions"

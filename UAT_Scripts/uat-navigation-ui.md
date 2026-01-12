@@ -45,15 +45,18 @@ Verify that sidebar navigation correctly gates menu items by permissions, auto-e
 | 1 | Log in as Administrator | User authenticated, dashboard loads |
 | 2 | **Verify Sidebar Structure** | |
 | 2.1 | Verify sidebar visible | Sidebar visible on left side (240px width) |
-| 2.2 | Verify Core Features section | Core Features section visible with items: Dashboard, Help, Accessioning, Samples, Tests, Containers, Batches, Results (in order) |
-| 2.3 | Verify Admin accordion visible | Admin accordion visible (requires `config:edit` permission) |
-| 2.4 | Verify Lab Mgmt accordion visible (if user has `project:manage`) | Lab Mgmt accordion visible if user has `project:manage` permission |
+| 2.2 | Verify Core Features section | Core Features section visible with items: Dashboard, Help (in order) |
+| 2.3 | Verify Sample Mgmt accordion visible (if user has sample/test/batch/result permissions) | Sample Mgmt accordion visible if user has any sample/test/batch/result permission |
+| 2.4 | Verify Admin accordion visible | Admin accordion visible (requires `config:edit` permission) |
+| 2.5 | Verify Lab Mgmt accordion visible (if user has `project:manage`) | Lab Mgmt accordion visible if user has `project:manage` permission |
 | 3 | **Test Permission Gating** | |
-| 3.1 | Verify all core items visible | All core items visible (Administrator sees all items) |
-| 3.2 | Verify Admin accordion visible | Admin accordion visible (user has `config:edit`) |
-| 3.3 | Log out and log in as Lab Technician (no `config:edit`) | User authenticated |
-| 3.4 | Verify Admin accordion NOT visible | Admin accordion NOT visible (user lacks `config:edit`) |
-| 3.5 | Verify Lab Mgmt accordion NOT visible (if no `project:manage`) | Lab Mgmt accordion NOT visible if user lacks `project:manage` |
+| 3.1 | Verify all core items visible | All core items visible (Dashboard, Help - always visible) |
+| 3.2 | Verify Sample Mgmt accordion visible (if has permissions) | Sample Mgmt accordion visible if user has any sample/test/batch/result permission |
+| 3.3 | Verify Admin accordion visible | Admin accordion visible (user has `config:edit`) |
+| 3.4 | Log out and log in as Lab Technician (no `config:edit`) | User authenticated |
+| 3.5 | Verify Admin accordion NOT visible | Admin accordion NOT visible (user lacks `config:edit`) |
+| 3.6 | Verify Sample Mgmt accordion visible (if has sample permissions) | Sample Mgmt accordion visible if user has any sample/test/batch/result permission |
+| 3.7 | Verify Lab Mgmt accordion NOT visible (if no `project:manage`) | Lab Mgmt accordion NOT visible if user lacks `project:manage` |
 | 4 | **Test Auto-Expand Accordion** | |
 | 4.1 | Log in as Administrator | User authenticated |
 | 4.2 | Navigate to `/dashboard` | Dashboard loads, Admin accordion collapsed (not on admin route) |
@@ -65,7 +68,19 @@ Verify that sidebar navigation correctly gates menu items by permissions, auto-e
 | 4.8 | Verify "Lists Management" item highlighted | "Lists Management" item shows active state |
 | 4.9 | Navigate to `/dashboard` | Dashboard loads |
 | 4.10 | Verify Admin accordion collapsed | Admin accordion collapsed (not on admin route) |
-| 5 | **Test Lab Mgmt Accordion Auto-Expand** | |
+| 5 | **Test Sample Mgmt Accordion Auto-Expand** | |
+| 5.1 | Log in as user with sample/test/batch/result permissions | User authenticated |
+| 5.2 | Navigate to `/accessioning` | Accessioning page loads |
+| 5.3 | Verify Sample Mgmt accordion auto-expanded | Sample Mgmt accordion expanded automatically |
+| 5.4 | Verify "Accessioning" item highlighted | "Accessioning" item shows active state (primary color icon) |
+| 5.5 | Navigate to `/samples` | Samples page loads |
+| 5.6 | Verify Sample Mgmt accordion still expanded | Sample Mgmt accordion remains expanded |
+| 5.7 | Verify "Samples" item highlighted | "Samples" item shows active state |
+| 5.8 | Navigate to `/tests` | Tests page loads |
+| 5.9 | Verify Sample Mgmt accordion still expanded | Sample Mgmt accordion remains expanded |
+| 5.10 | Navigate to `/dashboard` | Dashboard loads |
+| 5.11 | Verify Sample Mgmt accordion collapsed | Sample Mgmt accordion collapsed (not on sample management route) |
+| 6 | **Test Lab Mgmt Accordion Auto-Expand** | |
 | 5.1 | Log in as user with `project:manage` permission | User authenticated |
 | 5.2 | Navigate to `/projects` | Projects page loads |
 | 5.3 | Verify Lab Mgmt accordion auto-expanded | Lab Mgmt accordion expanded automatically |
@@ -74,22 +89,28 @@ Verify that sidebar navigation correctly gates menu items by permissions, auto-e
 | 5.6 | Verify Lab Mgmt accordion still expanded | Lab Mgmt accordion remains expanded |
 | 5.7 | Navigate to `/client-projects` | Client Projects page loads |
 | 5.8 | Verify Lab Mgmt accordion still expanded | Lab Mgmt accordion remains expanded |
-| 6 | **Test Manual Accordion Toggle** | |
-| 6.1 | Navigate to `/admin` | Admin Dashboard loads, Admin accordion expanded |
-| 6.2 | Click Admin accordion header | Accordion collapses |
-| 6.3 | Click Admin accordion header again | Accordion expands |
-| 7 | **Test Active State** | |
-| 7.1 | Navigate to `/admin/lists` | Lists Management page loads |
-| 7.2 | Verify "Lists Management" item highlighted | Item shows primary color icon and selected state |
-| 7.3 | Verify other admin items not highlighted | Other admin items show default styling |
+| 7 | **Test Manual Accordion Toggle** | |
+| 7.1 | Navigate to `/admin` | Admin Dashboard loads, Admin accordion expanded |
+| 7.2 | Click Admin accordion header | Accordion collapses |
+| 7.3 | Click Admin accordion header again | Accordion expands |
+| 7.4 | Navigate to `/samples` | Samples page loads, Sample Mgmt accordion expanded |
+| 7.5 | Click Sample Mgmt accordion header | Accordion collapses |
+| 7.6 | Click Sample Mgmt accordion header again | Accordion expands |
+| 8 | **Test Active State** | |
+| 8.1 | Navigate to `/admin/lists` | Lists Management page loads |
+| 8.2 | Verify "Lists Management" item highlighted | Item shows primary color icon and selected state |
+| 8.3 | Verify other admin items not highlighted | Other admin items show default styling |
+| 8.4 | Navigate to `/samples` | Samples page loads |
+| 8.5 | Verify "Samples" item highlighted | Item shows primary color icon and selected state |
+| 8.6 | Verify other sample mgmt items not highlighted | Other sample mgmt items show default styling |
 
 ### Expected Results
 
 | Category | Expected Outcome |
 |----------|------------------|
-| **Sidebar Structure** | - Sidebar visible on left (240px width expanded)<br>- Core Features section with navigation items (Dashboard, Help at top, then workflow items)<br>- Admin accordion visible (if `config:edit` permission)<br>- Lab Mgmt accordion visible (if `project:manage` permission) |
-| **Permission Gating** | - Menu items visible only if user has required permission<br>- Admin accordion hidden if no `config:edit` permission<br>- Lab Mgmt accordion hidden if no `project:manage` permission<br>- Core items filtered by permissions |
-| **Auto-Expand Accordion** | - Admin accordion auto-expands when navigating to `/admin/*` routes<br>- Lab Mgmt accordion auto-expands when navigating to `/projects`, `/clients`, or `/client-projects` routes<br>- Accordions remain expanded while on related routes<br>- Accordions collapse when navigating away |
+| **Sidebar Structure** | - Sidebar visible on left (240px width expanded)<br>- Core Features section with items: Dashboard, Help<br>- Sample Mgmt accordion visible (if user has any sample/test/batch/result permission)<br>- Admin accordion visible (if `config:edit` permission)<br>- Lab Mgmt accordion visible (if `project:manage` permission) |
+| **Permission Gating** | - Menu items visible only if user has required permission<br>- Sample Mgmt accordion visible if user has any sample/test/batch/result permission (items filtered by individual permissions)<br>- Admin accordion hidden if no `config:edit` permission<br>- Lab Mgmt accordion hidden if no `project:manage` permission<br>- Core items (Dashboard, Help) always visible |
+| **Auto-Expand Accordion** | - Sample Mgmt accordion auto-expands when navigating to `/accessioning`, `/samples`, `/tests`, `/containers`, `/batches`, or `/results` routes<br>- Admin accordion auto-expands when navigating to `/admin/*` routes<br>- Lab Mgmt accordion auto-expands when navigating to `/projects`, `/clients`, or `/client-projects` routes<br>- Accordions remain expanded while on related routes<br>- Accordions collapse when navigating away |
 | **Manual Toggle** | - Accordions can be manually collapsed/expanded by clicking header<br>- Toggle state persists during navigation within section |
 | **Active State** | - Current page item highlighted with primary color icon<br>- Selected state applied to active item<br>- Other items show default styling |
 
@@ -97,21 +118,21 @@ Verify that sidebar navigation correctly gates menu items by permissions, auto-e
 
 | Step | Action | Expected Result |
 |------|--------|-----------------|
-| 8 | **Test Sidebar Collapse** | |
-| 8.1 | Verify sidebar toggle button in AppBar | ChevronLeft icon visible in AppBar (sidebar expanded) |
-| 8.2 | Click sidebar toggle button | Sidebar collapses to icon-only mode (56px width) |
-| 8.3 | Verify icons only visible | Only icons visible, text labels hidden |
-| 8.4 | Verify tooltips on hover | Tooltips appear on hover for each icon |
-| 8.5 | Verify accordions collapsed | Admin and Lab Mgmt accordions auto-collapsed |
-| 8.6 | Click sidebar toggle button again | Sidebar expands to full width (240px) |
-| 8.7 | Verify text labels visible | Text labels visible again |
-| 8.8 | Refresh page | Sidebar state persists (from localStorage) |
+| 9 | **Test Sidebar Collapse** | |
+| 9.1 | Verify sidebar toggle button in AppBar | ChevronLeft icon visible in AppBar (sidebar expanded) |
+| 9.2 | Click sidebar toggle button | Sidebar collapses to icon-only mode (56px width) |
+| 9.3 | Verify icons only visible | Only icons visible, text labels hidden |
+| 9.4 | Verify tooltips on hover | Tooltips appear on hover for each icon |
+| 9.5 | Verify accordions collapsed | Sample Mgmt, Admin, and Lab Mgmt accordions auto-collapsed |
+| 9.6 | Click sidebar toggle button again | Sidebar expands to full width (240px) |
+| 9.7 | Verify text labels visible | Text labels visible again |
+| 9.8 | Refresh page | Sidebar state persists (from localStorage) |
 
 ### Expected Results - Sidebar Collapse
 
 | Category | Expected Outcome |
 |----------|------------------|
-| **Collapse Functionality** | - Sidebar collapses to 56px width (icon-only mode)<br>- Text labels hidden when collapsed<br>- Tooltips appear on hover for icons<br>- Accordions auto-collapse when sidebar collapses<br>- State persists to localStorage |
+| **Collapse Functionality** | - Sidebar collapses to 56px width (icon-only mode)<br>- Text labels hidden when collapsed<br>- Tooltips appear on hover for icons<br>- Sample Mgmt, Admin, and Lab Mgmt accordions auto-collapse when sidebar collapses<br>- State persists to localStorage |
 
 ### Pass/Fail Criteria
 
@@ -119,6 +140,7 @@ Verify that sidebar navigation correctly gates menu items by permissions, auto-e
 |----------|------|------|
 | Sidebar visible and properly structured | ✓ | ✗ |
 | Permission gating works correctly | ✓ | ✗ |
+| Sample Mgmt accordion auto-expands on sample management routes | ✓ | ✗ |
 | Admin accordion auto-expands on admin routes | ✓ | ✗ |
 | Lab Mgmt accordion auto-expands on lab management routes | ✓ | ✗ |
 | Manual accordion toggle works | ✓ | ✗ |
@@ -384,7 +406,7 @@ Verify that navigation is accessible via keyboard navigation, has proper ARIA la
   - Active state detection (exact and prefix matching)
   - Responsive drawer variants (permanent/temporary)
   - Collapsible on desktop (icon-only mode with tooltips)
-  - Accordions for Lab Mgmt and Admin sections
+  - Accordions for Sample Mgmt, Lab Mgmt, and Admin sections
   - Auto-expand accordions on navigation
 - **MainLayout Component** (`frontend/src/layouts/MainLayout.tsx`):
   - Unified layout wrapper for all routes
@@ -413,12 +435,14 @@ Verify that navigation is accessible via keyboard navigation, has proper ARIA la
 - **Logo**: `aria-label="Navigate to dashboard"`
 
 ### Permission-Based Navigation
-- **Core Features**: Permission-gated (e.g., `sample:create` for Accessioning)
+- **Core Features**: Dashboard and Help always visible (no permission required)
+- **Sample Mgmt Section**: Visible if user has any of: `sample:create`, `sample:read`, `sample:update`, `test:update`, `batch:manage`, or `result:enter` permissions (items filtered by individual permissions)
 - **Admin Section**: Requires `config:edit` permission
 - **Lab Mgmt Section**: Requires `project:manage` permission
 - **Help**: Always visible (no permission required)
 
 ### Auto-Expand Behavior
+- **Sample Mgmt Accordion**: Auto-expands when navigating to `/accessioning`, `/samples`, `/tests`, `/containers`, `/batches`, or `/results` routes
 - **Admin Accordion**: Auto-expands when navigating to `/admin/*` routes
 - **Lab Mgmt Accordion**: Auto-expands when navigating to `/projects`, `/clients`, or `/client-projects` routes
 - **Lab Mgmt Items Order**: Projects (first), Clients (second), Client Proj (third)
