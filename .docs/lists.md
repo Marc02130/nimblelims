@@ -198,35 +198,6 @@ Contact method types:
 
 ## API Endpoints
 
-### GET /lists/{list_name}/entries
-
-Get all active entries for a specific list.
-
-**Path Parameters**:
-- `list_name` (string): Normalized list name (e.g., `sample_status`, `sample_types`)
-
-**Authentication**: Required (JWT token)
-
-**Response**: Array of ListEntryResponse
-```json
-[
-  {
-    "id": "uuid",
-    "name": "Received",
-    "description": "Sample received",
-    "active": true,
-    "created_at": "2024-01-01T00:00:00",
-    "modified_at": "2024-01-01T00:00:00",
-    "list_id": "uuid"
-  }
-]
-```
-
-**Error Responses**:
-- **404 Not Found**: List name not found
-
-**Implementation**: `backend/app/routers/lists.py::get_list_entries()`
-
 ### GET /lists
 
 Get all active lists with their entries.
@@ -259,6 +230,120 @@ Get all active lists with their entries.
 ```
 
 **Implementation**: `backend/app/routers/lists.py::get_lists()`
+
+### POST /lists
+
+Create a new list.
+
+**Authentication**: Required (JWT token)
+
+**Requires**: `config:edit` permission
+
+**Request Body**:
+```json
+{
+  "name": "custom_list",
+  "description": "A custom list for specific workflow"
+}
+```
+
+**Response**: ListResponse (HTTP 201 Created)
+```json
+{
+  "id": "uuid",
+  "name": "custom_list",
+  "description": "A custom list for specific workflow",
+  "active": true,
+  "created_at": "2024-01-01T00:00:00",
+  "modified_at": "2024-01-01T00:00:00",
+  "entries": []
+}
+```
+
+**Error Responses**:
+- **400 Bad Request**: List with same name already exists
+- **403 Forbidden**: User lacks `config:edit` permission
+
+**Implementation**: `backend/app/routers/lists.py::create_list()`
+
+### PATCH /lists/{list_id}
+
+Update an existing list.
+
+**Path Parameters**:
+- `list_id` (UUID): The list ID
+
+**Authentication**: Required (JWT token)
+
+**Requires**: `config:edit` permission
+
+**Request Body** (all fields optional):
+```json
+{
+  "name": "updated_list_name",
+  "description": "Updated description",
+  "active": false
+}
+```
+
+**Response**: ListResponse
+
+**Error Responses**:
+- **404 Not Found**: List not found
+- **400 Bad Request**: List with new name already exists
+- **403 Forbidden**: User lacks `config:edit` permission
+
+**Implementation**: `backend/app/routers/lists.py::update_list()`
+
+### DELETE /lists/{list_id}
+
+Soft-delete a list (sets active=false).
+
+**Path Parameters**:
+- `list_id` (UUID): The list ID
+
+**Authentication**: Required (JWT token)
+
+**Requires**: `config:edit` permission
+
+**Response**: HTTP 204 No Content
+
+**Error Responses**:
+- **404 Not Found**: List not found
+- **403 Forbidden**: User lacks `config:edit` permission
+
+**Note**: This is a soft delete. The list is marked as inactive but not removed from the database. Inactive lists are not returned by GET /lists.
+
+**Implementation**: `backend/app/routers/lists.py::delete_list()`
+
+### GET /lists/{list_name}/entries
+
+Get all active entries for a specific list.
+
+**Path Parameters**:
+- `list_name` (string): Normalized list name (e.g., `sample_status`, `sample_types`)
+
+**Authentication**: Required (JWT token)
+
+**Response**: Array of ListEntryResponse
+```json
+[
+  {
+    "id": "uuid",
+    "name": "Received",
+    "description": "Sample received",
+    "active": true,
+    "created_at": "2024-01-01T00:00:00",
+    "modified_at": "2024-01-01T00:00:00",
+    "list_id": "uuid"
+  }
+]
+```
+
+**Error Responses**:
+- **404 Not Found**: List name not found
+
+**Implementation**: `backend/app/routers/lists.py::get_list_entries()`
 
 ## Request/Response Schemas
 
@@ -446,11 +531,17 @@ Lists are used extensively in sample management:
 
 ### Write Access
 
-- **config:edit permission**: Required to create/update lists and entries
+- **config:edit permission**: Required to create/update/delete lists and entries
 - Typically restricted to Administrators
 - Allows system customization without code changes
 
-**Note**: List management endpoints (POST, PATCH, DELETE) are not yet implemented in the MVP but are planned for post-MVP.
+**Available Operations**:
+- **Create List**: POST `/lists` - Create new lists
+- **Update List**: PATCH `/lists/{list_id}` - Update list name, description, or active status
+- **Delete List**: DELETE `/lists/{list_id}` - Soft-delete a list
+- **Create Entry**: POST `/lists/{list_name}/entries` - Add entries to a list
+- **Update Entry**: PATCH `/lists/{list_name}/entries/{entry_id}` - Update an entry
+- **Delete Entry**: DELETE `/lists/{list_name}/entries/{entry_id}` - Soft-delete an entry
 
 ## Best Practices
 
@@ -573,18 +664,40 @@ try {
 - `frontend/src/pages/AccessioningForm.tsx`: Example usage in forms
 - `frontend/src/components/accessioning/SampleDetailsStep.tsx`: Dropdown population
 
+## Frontend Lists Management
+
+The Lists Management page (`/admin/lists`) provides a full administrative interface for managing lists and their entries.
+
+### Features
+
+- **DataGrid View**: All lists displayed in a searchable, sortable grid
+- **Expandable Rows**: Click the expand arrow to view and manage entries for any list (works for both empty and populated lists)
+- **Search**: Filter lists and entries by name or description
+- **Create List**: Add new lists with name and description
+- **Edit List**: Update list name, description, or active status
+- **Delete List**: Soft-delete lists (with confirmation dialog)
+- **Add Entries**: Expand any list and click "Add Entry" to add new entries
+- **Edit Entries**: Update entry name, description, or active status
+- **Delete Entries**: Soft-delete entries (with confirmation dialog)
+
+### Access Control
+
+- **View**: All authenticated users can view the Lists Management page
+- **Edit**: Only users with `config:edit` permission can create, update, or delete lists and entries
+
+**Implementation**: `frontend/src/pages/admin/ListsManagement.tsx`
+
 ## Future Enhancements
 
-Potential improvements for post-MVP:
+Potential improvements:
 
-1. **List Management UI**: Admin interface for creating/editing lists
-2. **List Entry Ordering**: Display order for entries
-3. **List Entry Hierarchies**: Nested/categorized entries
-4. **List Validation Rules**: Custom validation for list entries
-5. **List Dependencies**: Relationships between lists
-6. **List Versioning**: Track changes to lists over time
-7. **List Import/Export**: Bulk import/export of lists
-8. **List Templates**: Pre-configured list sets for different lab types
-9. **List Permissions**: Restrict list access by role
-10. **List Caching**: Client-side caching for improved performance
+1. **List Entry Ordering**: Display order for entries
+2. **List Entry Hierarchies**: Nested/categorized entries
+3. **List Validation Rules**: Custom validation for list entries
+4. **List Dependencies**: Relationships between lists
+5. **List Versioning**: Track changes to lists over time
+6. **List Import/Export**: Bulk import/export of lists
+7. **List Templates**: Pre-configured list sets for different lab types
+8. **List Permissions**: Restrict list access by role
+9. **List Caching**: Client-side caching for improved performance
 

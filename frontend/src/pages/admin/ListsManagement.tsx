@@ -177,9 +177,9 @@ const ListsManagement: React.FC = () => {
       renderCell: (params) => {
         const list = params.row as List;
         const isExpanded = expandedRows.has(list.id);
-        if (list.entries.length === 0 && !isExpanded) return null;
+        // Always show expand button so users can add entries to empty lists
         return (
-          <Tooltip title={isExpanded ? 'Collapse entries' : 'Expand entries'}>
+          <Tooltip title={isExpanded ? 'Collapse entries' : (list.entries.length === 0 ? 'Expand to add entries' : 'Expand entries')}>
             <IconButton
               size="small"
               onClick={(e) => {

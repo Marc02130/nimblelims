@@ -24,6 +24,78 @@ This document contains User Acceptance Testing (UAT) scripts for configurations 
 
 ---
 
+## Test Case 0: List Creation - Create New List
+
+### Test Case ID
+TC-LIST-CREATE-000
+
+### Description
+Create a new list via the admin interface.
+
+### Preconditions
+
+| Item | Value |
+|------|-------|
+| **User Role** | Administrator |
+| **Required Permission** | `config:edit` |
+| **List Management UI** | Lists Management page accessible at `/admin/lists` |
+
+### Test Steps
+
+| Step | Action | Expected Result |
+|------|--------|-----------------|
+| 1 | Log in as Administrator | User authenticated with `config:edit` permission |
+| 2 | Navigate to Lists Management page (e.g., `/admin/lists`) | Lists Management page loads with DataGrid of existing lists |
+| 3 | **Create New List** | |
+| 3.1 | Click "Create List" button | List creation dialog opens |
+| 3.2 | Enter list name: `priority_levels` | Field accepts input |
+| 3.3 | Enter description: `Priority levels for samples` | Field accepts input |
+| 3.4 | Click "Create" or "Save" button | Form submits, loading spinner shown |
+| 4 | Wait for API response | Success message displayed |
+| 5 | **Verify List Created** | |
+| 5.1 | Verify list appears in DataGrid | New list `priority_levels` visible in list table |
+| 5.2 | Verify list shows 0 entries | Entries count shows "0" |
+| 5.3 | Click expand arrow on new list | Entries panel opens (shows "No entries in this list" message and "Add Entry" button) |
+| 6 | **Add Entry to New List** | |
+| 6.1 | Click "Add Entry" button | Entry creation dialog opens |
+| 6.2 | Enter entry name: `High` | Field accepts input |
+| 6.3 | Enter description: `High priority sample` | Field accepts input |
+| 6.4 | Click "Save" button | Form submits |
+| 7 | Verify entry created | Entry "High" appears in entries list |
+
+### Expected Results
+
+| Category | Expected Outcome |
+|----------|------------------|
+| **API Call** | POST `/lists` called with:<br>```json
+{
+  "name": "priority_levels",
+  "description": "Priority levels for samples"
+}
+``` |
+| **Backend Processing** | 1. **Access Control**:<br>   - Verify user has `config:edit` permission<br>2. **Uniqueness Check**:<br>   - Check if list name already exists<br>   - Return 400 if duplicate<br>3. **List Creation**:<br>   - Create `List` record with name and description<br>   - Set `created_by` and `modified_by` to current user<br>4. **Commit**:<br>   - Commit to database<br>   - Return created list |
+| **List Record** | - List created in `lists` table:<br>  - `name` = "priority_levels"<br>  - `description` = "Priority levels for samples"<br>  - `active` = true<br>  - Audit fields set |
+| **UI Feedback** | - Success message displayed<br>- List appears in DataGrid<br>- Expand arrow visible to add entries |
+
+### Pass/Fail Criteria
+
+| Criteria | Pass | Fail |
+|----------|------|------|
+| List created successfully | ✓ | ✗ |
+| List name unique constraint enforced | ✓ | ✗ |
+| List visible in DataGrid | ✓ | ✗ |
+| Empty list shows expand arrow | ✓ | ✗ |
+| Entries can be added to new list | ✓ | ✗ |
+| Audit fields set correctly | ✓ | ✗ |
+
+### Test Result
+- [ ] **PASS** - All criteria met
+- [ ] **FAIL** - One or more criteria not met
+
+**Notes**: _________________________________________________________
+
+---
+
 ## Test Case 1: List Editing - Add Status Entry
 
 ### Test Case ID
@@ -49,10 +121,10 @@ Add a new entry to an existing list (e.g., sample status) via the admin interfac
 | 2 | Navigate to Lists Management page (e.g., `/admin/lists`) | Lists Management page loads |
 | 3 | **Locate List** | |
 | 3.1 | Locate list: `sample_status` | List visible in list table or expandable view |
-| 3.2 | Click on list or "View Entries" button | List entries view opens |
+| 3.2 | Click expand arrow on list row | List entries panel opens below the row |
 | 3.3 | Verify existing entries displayed | Current entries visible (e.g., "Received", "Available for Testing", "Reviewed") |
 | 4 | **Add New Entry** | |
-| 4.1 | Click "Add Entry" or "Create Entry" button | Entry creation dialog/form opens |
+| 4.1 | Click "Add Entry" button | Entry creation dialog opens |
 | 4.2 | Enter entry name: `On Hold` | Field accepts input |
 | 4.3 | Enter description (optional): `Sample is on hold pending additional information` | Field accepts input |
 | 4.4 | Verify active checkbox: `true` (checked) | Checkbox checked by default |
@@ -392,6 +464,8 @@ Verify that custom fields are dynamically rendered in forms and validated agains
 - **Indexes**: `idx_custom_attributes_config_entity_type`, `idx_custom_attributes_config_active`
 
 ### API Endpoints
+
+**Custom Attributes:**
 - **GET `/admin/custom-attributes`**: List custom attribute configurations with filtering (entity_type, active, pagination)
   - Requires: `config:edit` permission
 - **POST `/admin/custom-attributes`**: Create new custom attribute configuration
@@ -403,6 +477,16 @@ Verify that custom fields are dynamically rendered in forms and validated agains
   - Requires: `config:edit` permission
 - **DELETE `/admin/custom-attributes/{id}`**: Soft-delete configuration (sets active=false)
   - Requires: `config:edit` permission
+
+**Lists (Full CRUD):**
+- **GET `/lists`**: Get all active lists with their entries
+- **POST `/lists`**: Create a new list (requires `config:edit`)
+  - Request: `{name, description}`
+- **PATCH `/lists/{list_id}`**: Update a list (requires `config:edit`)
+  - Request: `{name?, description?, active?}`
+- **DELETE `/lists/{list_id}`**: Soft-delete a list (requires `config:edit`)
+
+**List Entries:**
 - **GET `/lists/{list_name}/entries`**: Get entries for a list
 - **POST `/lists/{list_name}/entries`**: Add entry to list (requires `config:edit`)
 - **PATCH `/lists/{list_name}/entries/{entry_id}`**: Update entry (requires `config:edit`)
@@ -439,6 +523,7 @@ Verify that custom fields are dynamically rendered in forms and validated agains
 
 | Test Case | Tester | Date | Result | Notes |
 |-----------|--------|------|--------|-------|
+| TC-LIST-CREATE-000 | | | | |
 | TC-LIST-EDIT-001 | | | | |
 | TC-CUSTOM-FIELD-CREATE-002 | | | | |
 | TC-CUSTOM-FIELD-USAGE-003 | | | | |
