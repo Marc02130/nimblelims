@@ -69,7 +69,7 @@ class ApiService {
   }
 
   // Sample endpoints
-  async getSamples(filters?: { project_id?: string; status?: string }) {
+  async getSamples(filters?: Record<string, string | undefined>) {
     const response: AxiosResponse = await this.api.get('/samples', {
       params: filters,
     });

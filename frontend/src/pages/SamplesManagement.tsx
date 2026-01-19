@@ -68,11 +68,23 @@ const SamplesManagement: React.FC = () => {
       // Get project_id from URL query parameters
       const projectId = searchParams.get('project_id') || undefined;
       
-      // Build filters object
-      const filters: { project_id?: string } = {};
+      // Build filters object - supports project_id, status, qc_type, and custom.* attributes
+      const filters: Record<string, string | undefined> = {};
       if (projectId) {
         filters.project_id = projectId;
       }
+      
+      // Pass through all custom.* parameters for JSONB filtering
+      // Backend supports: ?custom.ph_level=7.5, ?custom.notes=test, etc.
+      searchParams.forEach((value, key) => {
+        if (key.startsWith('custom.')) {
+          filters[key] = value;
+        }
+        // Also support status and qc_type filters
+        if (key === 'status' || key === 'qc_type') {
+          filters[key] = value;
+        }
+      });
 
       const [samplesResponse, sampleTypes, statuses, matrices, qcTypes, projectsResponse] = await Promise.all([
         apiService.getSamples(filters),
