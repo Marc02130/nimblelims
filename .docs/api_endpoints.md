@@ -692,20 +692,30 @@ Soft-delete a result.
 
 ## Lists
 
-### GET /lists/{list_name}/entries
-Get all entries for a specific list.
-
-**Path Parameters:**
-- `list_name` (string): Normalized list name (e.g., `sample_status`, `batch_status`)
+### GET /lists
+Get all active lists with their entries.
 
 **Response:**
 ```json
 [
   {
-    "id": "...",
-    "name": "...",
-    "description": "...",
-    "active": true
+    "id": "uuid",
+    "name": "sample_status",
+    "description": "Sample status values",
+    "active": true,
+    "created_at": "2024-01-01T00:00:00",
+    "modified_at": "2024-01-01T00:00:00",
+    "entries": [
+      {
+        "id": "uuid",
+        "name": "Received",
+        "description": "Sample received",
+        "active": true,
+        "created_at": "2024-01-01T00:00:00",
+        "modified_at": "2024-01-01T00:00:00",
+        "list_id": "uuid"
+      }
+    ]
   }
 ]
 ```
@@ -723,8 +733,93 @@ Get all entries for a specific list.
 
 **Note:** List names are normalized to lowercase slug format (e.g., "Sample Status" → `sample_status`).
 
-### GET /lists
-Get all lists with their entries.
+### POST /lists
+Create a new list.
+
+**Requires:** `config:edit` permission
+
+**Request:**
+```json
+{
+  "name": "custom_list",
+  "description": "A custom list for specific workflow"
+}
+```
+
+**Response:** 201 Created
+```json
+{
+  "id": "uuid",
+  "name": "custom_list",
+  "description": "A custom list for specific workflow",
+  "active": true,
+  "created_at": "2024-01-01T00:00:00",
+  "modified_at": "2024-01-01T00:00:00",
+  "entries": []
+}
+```
+
+**Error Responses:**
+- `400`: List with same name already exists
+- `403`: User lacks `config:edit` permission
+
+### PATCH /lists/{list_id}
+Update an existing list.
+
+**Requires:** `config:edit` permission
+
+**Path Parameters:**
+- `list_id` (UUID): The list ID
+
+**Request (all fields optional):**
+```json
+{
+  "name": "updated_list_name",
+  "description": "Updated description",
+  "active": false
+}
+```
+
+**Response:** Updated list object
+
+**Error Responses:**
+- `404`: List not found
+- `400`: List with new name already exists
+- `403`: User lacks `config:edit` permission
+
+### DELETE /lists/{list_id}
+Soft-delete a list (sets active=false).
+
+**Requires:** `config:edit` permission
+
+**Path Parameters:**
+- `list_id` (UUID): The list ID
+
+**Response:** 204 No Content
+
+**Error Responses:**
+- `404`: List not found
+- `403`: User lacks `config:edit` permission
+
+**Note:** Soft delete - list is marked inactive but not removed from database.
+
+### GET /lists/{list_name}/entries
+Get all entries for a specific list.
+
+**Path Parameters:**
+- `list_name` (string): Normalized list name (e.g., `sample_status`, `batch_status`)
+
+**Response:**
+```json
+[
+  {
+    "id": "...",
+    "name": "...",
+    "description": "...",
+    "active": true
+  }
+]
+```
 
 ## Analyses
 

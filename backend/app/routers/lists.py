@@ -7,13 +7,57 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from models.list import List as ListModel, ListEntry
 from models.user import User
-from app.schemas.list import ListEntryResponse, ListResponse, ListEntryCreate, ListEntryUpdate
+from app.schemas.list import ListEntryResponse, ListResponse, ListEntryCreate, ListEntryUpdate, ListCreate, ListUpdate
 from app.core.security import get_current_user, get_user_permissions
 from app.core.rbac import require_config_edit
 from datetime import datetime
 from uuid import UUID
 
 router = APIRouter()
+
+
+@router.post("", response_model=ListResponse, status_code=status.HTTP_201_CREATED)
+async def create_list(
+    list_data: ListCreate,
+    current_user: User = Depends(require_config_edit),
+    db: Session = Depends(get_db)
+):
+    """
+    Create a new list.
+    Requires config:edit permission.
+    """
+    # Check if list with same name already exists
+    existing_list = db.query(ListModel).filter(
+        ListModel.name == list_data.name
+    ).first()
+    
+    if existing_list:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"List with name '{list_data.name}' already exists"
+        )
+    
+    # Create new list
+    new_list = ListModel(
+        name=list_data.name,
+        description=list_data.description,
+        created_by=current_user.id,
+        modified_by=current_user.id
+    )
+    
+    db.add(new_list)
+    db.commit()
+    db.refresh(new_list)
+    
+    return ListResponse(
+        id=new_list.id,
+        name=new_list.name,
+        description=new_list.description,
+        active=new_list.active,
+        created_at=new_list.created_at,
+        modified_at=new_list.modified_at,
+        entries=[]
+    )
 
 
 @router.get("", response_model=List[ListResponse])
@@ -54,6 +98,93 @@ async def get_lists(
         )
         result.append(list_response)
     return result
+
+
+@router.patch("/{list_id}", response_model=ListResponse)
+async def update_list(
+    list_id: UUID,
+    list_data: ListUpdate,
+    current_user: User = Depends(require_config_edit),
+    db: Session = Depends(get_db)
+):
+    """
+    Update a list.
+    Requires config:edit permission.
+    """
+    # Find the list
+    list_obj = db.query(ListModel).filter(ListModel.id == list_id).first()
+    
+    if not list_obj:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="List not found"
+        )
+    
+    # Check for name conflict if name is being updated
+    if list_data.name and list_data.name != list_obj.name:
+        existing_list = db.query(ListModel).filter(
+            ListModel.name == list_data.name,
+            ListModel.id != list_id
+        ).first()
+        
+        if existing_list:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"List with name '{list_data.name}' already exists"
+            )
+    
+    # Update fields
+    update_data = list_data.dict(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(list_obj, field, value)
+    
+    list_obj.modified_by = current_user.id
+    list_obj.modified_at = datetime.utcnow()
+    
+    db.commit()
+    db.refresh(list_obj)
+    
+    # Get entries for response
+    entries = db.query(ListEntry).filter(ListEntry.list_id == list_obj.id).all()
+    
+    return ListResponse(
+        id=list_obj.id,
+        name=list_obj.name,
+        description=list_obj.description,
+        active=list_obj.active,
+        created_at=list_obj.created_at,
+        modified_at=list_obj.modified_at,
+        entries=[ListEntryResponse.from_orm(entry) for entry in entries]
+    )
+
+
+@router.delete("/{list_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_list(
+    list_id: UUID,
+    current_user: User = Depends(require_config_edit),
+    db: Session = Depends(get_db)
+):
+    """
+    Soft delete a list (set active=False).
+    Requires config:edit permission.
+    """
+    # Find the list
+    list_obj = db.query(ListModel).filter(ListModel.id == list_id).first()
+    
+    if not list_obj:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="List not found"
+        )
+    
+    # Soft delete
+    list_obj.active = False
+    list_obj.modified_by = current_user.id
+    list_obj.modified_at = datetime.utcnow()
+    
+    db.commit()
+    
+    return None
 
 
 @router.get("/{list_name}/entries", response_model=List[ListEntryResponse])

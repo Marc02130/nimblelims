@@ -148,13 +148,13 @@ nimblelims/
 - **Units Integration**: Concentration and amount with unit conversions
 
 ### Configuration Management
-- **Lists Management**: Admin-editable lists for statuses, types, matrices, QC types, etc. (full CRUD)
+- **Lists Management**: Full CRUD for lists and list entries via admin interface - create new lists, add/edit/delete entries for statuses, types, matrices, QC types, etc. Empty lists display expand arrows to add entries.
 - **Container Types**: Admin-managed container type definitions (CRUD operations)
 - **Analyses Management**: Create and manage analyses with methods, turnaround times, and costs (CRUD)
 - **Analytes Management**: Create and manage analytes (CRUD)
 - **Analysis-Analyte Configuration**: Configure validation rules (data types, ranges, significant figures, required flags)
 - **Test Batteries Management**: Group multiple analyses into reusable test batteries with sequence ordering and optional flags (CRUD)
-- **Custom Fields Management** (Post-MVP): Define custom attributes for samples, tests, results, projects, client_projects, and batches without schema changes (CRUD)
+- **Custom Fields Management**: Define custom attributes for samples, tests, results, projects, client_projects, and batches without schema changes (CRUD)
 - **Client Projects Management**: Group multiple LIMS projects under client projects for holistic tracking (CRUD)
 - **Users Management**: Create and manage users with role assignments (CRUD)
 - **Roles & Permissions**: Manage roles and assign permissions (CRUD)

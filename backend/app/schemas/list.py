@@ -48,3 +48,16 @@ class ListResponse(BaseModel):
     class Config:
         from_attributes = True
 
+
+class ListCreate(BaseModel):
+    """Schema for creating a list"""
+    name: str
+    description: Optional[str] = None
+
+
+class ListUpdate(BaseModel):
+    """Schema for updating a list"""
+    name: Optional[str] = None
+    description: Optional[str] = None
+    active: Optional[bool] = None
+
