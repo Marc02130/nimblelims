@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Box,
   Card,
@@ -26,17 +26,27 @@ import {
   Checkbox,
   FormControlLabel,
   IconButton,
+  Tooltip,
+  Stepper,
+  Step,
+  StepLabel,
+  Paper,
 } from '@mui/material';
 import {
   Delete as DeleteIcon,
   Add as AddIcon,
   Warning as WarningIcon,
   CheckCircle as CheckCircleIcon,
+  Error as ErrorIcon,
+  Schedule as ScheduleIcon,
+  ArrowForward as ArrowForwardIcon,
+  ArrowBack as ArrowBackIcon,
 } from '@mui/icons-material';
+import { DataGrid, GridColDef, GridRenderCellParams, GridSortModel, GridRowSelectionModel } from '@mui/x-data-grid';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
-import { apiService } from '../../services/apiService';
+import { apiService, EligibleSample, BatchCompatibilityResult, BatchCompatibilityWarning } from '../../services/apiService';
 import { useUser } from '../../contexts/UserContext';
 
 interface BatchFormEnhancedProps {
@@ -84,18 +94,11 @@ interface BatchFormData {
   qc_additions: QCAddition[];
 }
 
-interface CompatibilityResult {
-  compatible: boolean;
-  error?: string;
-  details?: {
-    projects: string[];
-    analyses: string[];
-    suggestion?: string;
-  };
-}
+const STEPS = ['Batch Details', 'Select Eligible Samples', 'QC Samples', 'Review & Create'];
 
 const BatchFormEnhanced: React.FC<BatchFormEnhancedProps> = ({ onSuccess, onCancel }) => {
   const { user } = useUser();
+  const [activeStep, setActiveStep] = useState(0);
   const [formData, setFormData] = useState<BatchFormData>({
     name: '',
     description: '',
@@ -113,7 +116,8 @@ const BatchFormEnhanced: React.FC<BatchFormEnhancedProps> = ({ onSuccess, onCanc
   const [validating, setValidating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [validationError, setValidationError] = useState<string | null>(null);
-  const [compatibilityResult, setCompatibilityResult] = useState<CompatibilityResult | null>(null);
+  const [compatibilityResult, setCompatibilityResult] = useState<BatchCompatibilityResult | null>(null);
+  const [compatibilityWarnings, setCompatibilityWarnings] = useState<BatchCompatibilityWarning[]>([]);
   
   const [listEntries, setListEntries] = useState<any>({});
   const [projects, setProjects] = useState<Project[]>([]);
@@ -127,6 +131,17 @@ const BatchFormEnhanced: React.FC<BatchFormEnhancedProps> = ({ onSuccess, onCanc
   const [qcTypes, setQcTypes] = useState<any[]>([]);
   const [qcRequired, setQcRequired] = useState(false);
   const [requireQcForBatchTypes, setRequireQcForBatchTypes] = useState<string[]>([]);
+  
+  // Eligible samples state for Step 2
+  const [eligibleSamples, setEligibleSamples] = useState<EligibleSample[]>([]);
+  const [eligibleSamplesLoading, setEligibleSamplesLoading] = useState(false);
+  const [eligibleSamplesWarnings, setEligibleSamplesWarnings] = useState<string[]>([]);
+  const [selectedSampleIds, setSelectedSampleIds] = useState<GridRowSelectionModel>({ type: 'include', ids: new Set() });
+  const [includeExpired, setIncludeExpired] = useState(false);
+  const [sortModel, setSortModel] = useState<GridSortModel>([
+    { field: 'days_until_expiration', sort: 'asc' },
+    { field: 'days_until_due', sort: 'asc' },
+  ]);
 
   // Load accessible projects from UserContext
   useEffect(() => {
@@ -207,6 +222,36 @@ const BatchFormEnhanced: React.FC<BatchFormEnhancedProps> = ({ onSuccess, onCanc
     loadData();
   }, []);
 
+  // Load eligible samples when entering Step 2
+  const loadEligibleSamples = useCallback(async () => {
+    setEligibleSamplesLoading(true);
+    try {
+      // Get analysis IDs from selected batch type if available
+      const testIds = analyses.length > 0 ? analyses.map(a => a.id).join(',') : undefined;
+      
+      const response = await apiService.getEligibleSamples({
+        project_id: selectedProjects.length === 1 ? selectedProjects[0] : undefined,
+        include_expired: includeExpired,
+        size: 100, // Load more for better selection
+      });
+      
+      setEligibleSamples(response.samples);
+      setEligibleSamplesWarnings(response.warnings);
+    } catch (err) {
+      console.error('Failed to load eligible samples:', err);
+      setError('Failed to load eligible samples');
+    } finally {
+      setEligibleSamplesLoading(false);
+    }
+  }, [selectedProjects, includeExpired, analyses]);
+
+  // Load eligible samples when step changes to Step 2
+  useEffect(() => {
+    if (activeStep === 1) {
+      loadEligibleSamples();
+    }
+  }, [activeStep, loadEligibleSamples]);
+
   // Auto-detect cross-project if containers from multiple projects
   useEffect(() => {
     if (selectedContainers.length > 0) {
@@ -246,6 +291,44 @@ const BatchFormEnhanced: React.FC<BatchFormEnhancedProps> = ({ onSuccess, onCanc
     }
   }, [formData.type, requireQcForBatchTypes, formData.qc_additions.length]);
 
+  // Validate compatibility when moving to next step after sample selection
+  const handleValidateOnStepChange = async () => {
+    if (selectedContainers.length < 2) {
+      return; // Skip validation if less than 2 containers
+    }
+
+    setValidating(true);
+    setCompatibilityWarnings([]);
+
+    try {
+      const result = await apiService.validateBatchCompatibility({
+        container_ids: selectedContainers.map(c => c.id),
+      });
+      setCompatibilityResult(result);
+      
+      // Handle warnings for expired/expiring samples
+      if (result.warnings && result.warnings.length > 0) {
+        setCompatibilityWarnings(result.warnings);
+      }
+      
+      if (!result.compatible) {
+        setValidationError(result.error || 'Containers are not compatible for cross-project batching');
+        return false;
+      }
+      return true;
+    } catch (err: any) {
+      const errorDetail = err.response?.data?.detail;
+      setValidationError(
+        typeof errorDetail === 'string'
+          ? errorDetail
+          : errorDetail?.error || 'Failed to validate compatibility'
+      );
+      return false;
+    } finally {
+      setValidating(false);
+    }
+  };
+
   // Suggest QC based on batch size and type
   const suggestQC = () => {
     const containerCount = selectedContainers.length;
@@ -283,19 +366,6 @@ const BatchFormEnhanced: React.FC<BatchFormEnhancedProps> = ({ onSuccess, onCanc
     }
   };
 
-  // Auto-suggest QC when containers are added
-  useEffect(() => {
-    if (selectedContainers.length >= 2 && formData.qc_additions.length === 0 && qcTypes.length > 0) {
-      // Only suggest if user hasn't manually added QC
-      // This is a one-time suggestion
-      const shouldSuggest = !localStorage.getItem(`qc_suggested_${formData.name || 'new'}`);
-      if (shouldSuggest && selectedContainers.length >= 2) {
-        suggestQC();
-        localStorage.setItem(`qc_suggested_${formData.name || 'new'}`, 'true');
-      }
-    }
-  }, [selectedContainers.length, qcTypes.length]);
-
   const handleInputChange = (field: keyof BatchFormData, value: any) => {
     setFormData(prev => ({
       ...prev,
@@ -312,12 +382,19 @@ const BatchFormEnhanced: React.FC<BatchFormEnhancedProps> = ({ onSuccess, onCanc
     setValidating(true);
     setValidationError(null);
     setCompatibilityResult(null);
+    setCompatibilityWarnings([]);
 
     try {
       const result = await apiService.validateBatchCompatibility({
         container_ids: selectedContainers.map(c => c.id),
       });
       setCompatibilityResult(result);
+      
+      // Handle warnings for expired/expiring samples
+      if (result.warnings && result.warnings.length > 0) {
+        setCompatibilityWarnings(result.warnings);
+      }
+      
       if (!result.compatible) {
         setValidationError(result.error || 'Containers are not compatible for cross-project batching');
       }
@@ -348,6 +425,7 @@ const BatchFormEnhanced: React.FC<BatchFormEnhancedProps> = ({ onSuccess, onCanc
   const handleRemoveContainer = (containerId: string) => {
     setSelectedContainers(prev => prev.filter(c => c.id !== containerId));
     setCompatibilityResult(null);
+    setCompatibilityWarnings([]);
     setValidationError(null);
   };
 
@@ -401,6 +479,175 @@ const BatchFormEnhanced: React.FC<BatchFormEnhancedProps> = ({ onSuccess, onCanc
     );
   }, [containers, containerSearchTerm]);
 
+  // DataGrid columns for eligible samples with prioritization
+  const eligibleSamplesColumns: GridColDef[] = useMemo(() => [
+    {
+      field: 'name',
+      headerName: 'Sample Name',
+      flex: 1,
+      minWidth: 150,
+    },
+    {
+      field: 'project_name',
+      headerName: 'Project',
+      flex: 1,
+      minWidth: 120,
+    },
+    {
+      field: 'days_until_expiration',
+      headerName: 'Days to Expiration',
+      width: 150,
+      type: 'number',
+      sortable: true,
+      renderHeader: () => (
+        <Tooltip title="Days until sample expires based on date_sampled + shelf_life. Sorted by expiration priority.">
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }} aria-label="Sorted by expiration priority">
+            <ScheduleIcon fontSize="small" />
+            <span>Days to Expiration</span>
+          </Box>
+        </Tooltip>
+      ),
+      renderCell: (params: GridRenderCellParams) => {
+        const days = params.value as number | null;
+        const isExpired = params.row.is_expired;
+        
+        if (days === null || days === undefined) {
+          return <Typography color="text.secondary">—</Typography>;
+        }
+        
+        const isNegative = days < 0;
+        const isUrgent = days <= 3 && days >= 0;
+        
+        return (
+          <Tooltip 
+            title={isExpired ? 'Expired: Testing invalid' : (isUrgent ? 'Expiring soon' : '')}
+            aria-label={isExpired ? 'Sample expired - testing invalid' : (isUrgent ? 'Sample expiring soon' : `${days} days until expiration`)}
+          >
+            <Box
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 0.5,
+                color: isNegative ? 'error.main' : (isUrgent ? 'warning.main' : 'text.primary'),
+                fontWeight: isNegative || isUrgent ? 'bold' : 'normal',
+                bgcolor: isNegative ? 'error.light' : (isUrgent ? 'warning.light' : 'transparent'),
+                px: 1,
+                py: 0.5,
+                borderRadius: 1,
+              }}
+            >
+              {isNegative && <ErrorIcon fontSize="small" />}
+              {isUrgent && !isNegative && <WarningIcon fontSize="small" />}
+              <span>{days}</span>
+            </Box>
+          </Tooltip>
+        );
+      },
+    },
+    {
+      field: 'days_until_due',
+      headerName: 'Days to Due',
+      width: 130,
+      type: 'number',
+      sortable: true,
+      renderHeader: () => (
+        <Tooltip title="Days until due date (sample or project). Negative means overdue.">
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }} aria-label="Days until due date">
+            <ScheduleIcon fontSize="small" />
+            <span>Days to Due</span>
+          </Box>
+        </Tooltip>
+      ),
+      renderCell: (params: GridRenderCellParams) => {
+        const days = params.value as number | null;
+        const isOverdue = params.row.is_overdue;
+        
+        if (days === null || days === undefined) {
+          return <Typography color="text.secondary">—</Typography>;
+        }
+        
+        const isNegative = days < 0;
+        const isUrgent = days <= 3 && days >= 0;
+        
+        return (
+          <Tooltip 
+            title={isOverdue ? 'Overdue' : (isUrgent ? 'Due soon' : '')}
+            aria-label={isOverdue ? 'Sample overdue' : (isUrgent ? 'Sample due soon' : `${days} days until due`)}
+          >
+            <Box
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 0.5,
+                color: isNegative ? 'error.main' : (isUrgent ? 'warning.main' : 'text.primary'),
+                fontWeight: isNegative || isUrgent ? 'bold' : 'normal',
+                bgcolor: isNegative ? 'error.light' : (isUrgent ? 'warning.light' : 'transparent'),
+                px: 1,
+                py: 0.5,
+                borderRadius: 1,
+              }}
+            >
+              {isNegative && <ErrorIcon fontSize="small" />}
+              {isUrgent && !isNegative && <WarningIcon fontSize="small" />}
+              <span>{days}</span>
+            </Box>
+          </Tooltip>
+        );
+      },
+    },
+    {
+      field: 'analysis_name',
+      headerName: 'Analysis',
+      flex: 1,
+      minWidth: 120,
+      renderCell: (params: GridRenderCellParams) => params.value || '—',
+    },
+    {
+      field: 'shelf_life',
+      headerName: 'Shelf Life (days)',
+      width: 120,
+      type: 'number',
+      renderCell: (params: GridRenderCellParams) => params.value ?? '—',
+    },
+    {
+      field: 'expiration_warning',
+      headerName: 'Warning',
+      width: 180,
+      renderCell: (params: GridRenderCellParams) => {
+        const warning = params.value as string | null;
+        if (!warning) return null;
+        
+        const isExpired = params.row.is_expired;
+        return (
+          <Chip
+            size="small"
+            icon={isExpired ? <ErrorIcon /> : <WarningIcon />}
+            label={warning}
+            color={isExpired ? 'error' : 'warning'}
+            sx={{ maxWidth: '100%' }}
+          />
+        );
+      },
+    },
+  ], []);
+
+  const handleNext = async () => {
+    // Validate on step 1 -> 2 transition if containers are selected
+    if (activeStep === 1 && selectedContainers.length >= 2) {
+      const isValid = await handleValidateOnStepChange();
+      if (!isValid) {
+        // Show validation error but don't prevent navigation if compatible
+        // User can still proceed with warnings
+      }
+    }
+    
+    setActiveStep(prev => Math.min(prev + 1, STEPS.length - 1));
+  };
+
+  const handleBack = () => {
+    setActiveStep(prev => Math.max(prev - 1, 0));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -452,109 +699,210 @@ const BatchFormEnhanced: React.FC<BatchFormEnhancedProps> = ({ onSuccess, onCanc
     }
   };
 
-  return (
-    <LocalizationProvider dateAdapter={AdapterDateFns}>
-      <Card>
-        <CardContent>
-          <Typography variant="h6" gutterBottom>
-            Create New Batch
-          </Typography>
-          <Divider sx={{ mb: 2 }} />
+  // Render step content
+  const renderStepContent = (step: number) => {
+    switch (step) {
+      case 0: // Batch Details
+        return (
+          <Grid container spacing={3}>
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <TextField
+                fullWidth
+                label="Batch Name"
+                value={formData.name}
+                onChange={(e) => handleInputChange('name', e.target.value)}
+                required
+                inputProps={{ 'aria-label': 'Batch name' }}
+              />
+            </Grid>
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <TextField
+                fullWidth
+                label="Description"
+                value={formData.description}
+                onChange={(e) => handleInputChange('description', e.target.value)}
+                inputProps={{ 'aria-label': 'Batch description' }}
+              />
+            </Grid>
 
-          {error && (
-            <Alert severity="error" sx={{ mb: 2 }}>
-              {error}
-            </Alert>
-          )}
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <FormControl fullWidth>
+                <InputLabel id="batch-type-label">Batch Type</InputLabel>
+                <Select
+                  labelId="batch-type-label"
+                  value={formData.type}
+                  onChange={(e) => handleInputChange('type', e.target.value)}
+                  label="Batch Type"
+                  inputProps={{ 'aria-label': 'Batch type' }}
+                >
+                  {listEntries.batch_types?.map((entry: any) => (
+                    <MenuItem key={entry.id} value={entry.id}>
+                      {entry.name}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
 
-          <form onSubmit={handleSubmit}>
-            <Grid container spacing={3}>
-              <Grid size={{ xs: 12, sm: 6 }}>
-                <TextField
-                  fullWidth
-                  label="Batch Name"
-                  value={formData.name}
-                  onChange={(e) => handleInputChange('name', e.target.value)}
-                  required
-                />
-              </Grid>
-              <Grid size={{ xs: 12, sm: 6 }}>
-                <TextField
-                  fullWidth
-                  label="Description"
-                  value={formData.description}
-                  onChange={(e) => handleInputChange('description', e.target.value)}
-                />
-              </Grid>
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <FormControl fullWidth required>
+                <InputLabel id="batch-status-label">Status</InputLabel>
+                <Select
+                  labelId="batch-status-label"
+                  value={formData.status}
+                  onChange={(e) => handleInputChange('status', e.target.value)}
+                  label="Status"
+                  inputProps={{ 'aria-label': 'Batch status' }}
+                >
+                  {listEntries.batch_statuses?.map((entry: any) => (
+                    <MenuItem key={entry.id} value={entry.id}>
+                      {entry.name}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
 
-              <Grid size={{ xs: 12, sm: 6 }}>
-                <FormControl fullWidth>
-                  <InputLabel>Batch Type</InputLabel>
-                  <Select
-                    value={formData.type}
-                    onChange={(e) => handleInputChange('type', e.target.value)}
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <DatePicker
+                label="Start Date"
+                value={formData.start_date}
+                onChange={(date) => handleInputChange('start_date', date)}
+                slotProps={{ textField: { fullWidth: true, inputProps: { 'aria-label': 'Start date' } } }}
+              />
+            </Grid>
+          </Grid>
+        );
+
+      case 1: // Select Eligible Samples
+        return (
+          <Box>
+            <Typography variant="h6" gutterBottom>
+              Eligible Samples
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              Samples are sorted by expiration priority (most urgent first), then by due date.
+              Expired samples are highlighted in red.
+            </Typography>
+
+            {/* Warnings for expired/overdue samples */}
+            {eligibleSamplesWarnings.length > 0 && (
+              <Box sx={{ mb: 2 }}>
+                {eligibleSamplesWarnings.map((warning, idx) => (
+                  <Alert key={idx} severity="warning" sx={{ mb: 1 }} icon={<WarningIcon />}>
+                    {warning}
+                  </Alert>
+                ))}
+              </Box>
+            )}
+
+            {/* Compatibility warnings */}
+            {compatibilityWarnings.length > 0 && (
+              <Box sx={{ mb: 2 }}>
+                {compatibilityWarnings.map((warning, idx) => (
+                  <Alert
+                    key={idx}
+                    severity={warning.type === 'expired_samples' ? 'error' : 'warning'}
+                    sx={{ mb: 1 }}
+                    icon={warning.type === 'expired_samples' ? <ErrorIcon /> : <WarningIcon />}
                   >
-                    {listEntries.batch_types?.map((entry: any) => (
-                      <MenuItem key={entry.id} value={entry.id}>
-                        {entry.name}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Grid>
+                    <Typography variant="subtitle2">{warning.message}</Typography>
+                    {warning.samples && warning.samples.length > 0 && (
+                      <Box sx={{ mt: 1 }}>
+                        <Typography variant="body2">
+                          Affected samples: {warning.samples.map((s: any) => s.sample_name).join(', ')}
+                        </Typography>
+                      </Box>
+                    )}
+                  </Alert>
+                ))}
+              </Box>
+            )}
 
-              <Grid size={{ xs: 12, sm: 6 }}>
-                <FormControl fullWidth required>
-                  <InputLabel>Status</InputLabel>
-                  <Select
-                    value={formData.status}
-                    onChange={(e) => handleInputChange('status', e.target.value)}
-                  >
-                    {listEntries.batch_statuses?.map((entry: any) => (
-                      <MenuItem key={entry.id} value={entry.id}>
-                        {entry.name}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Grid>
+            <Box sx={{ mb: 2, display: 'flex', gap: 2, alignItems: 'center' }}>
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={includeExpired}
+                    onChange={(e) => setIncludeExpired(e.target.checked)}
+                    inputProps={{ 'aria-label': 'Include expired samples' }}
+                  />
+                }
+                label="Include expired samples"
+              />
+              <Button
+                variant="outlined"
+                size="small"
+                onClick={loadEligibleSamples}
+                disabled={eligibleSamplesLoading}
+              >
+                Refresh
+              </Button>
+            </Box>
 
-              <Grid size={{ xs: 12, sm: 6 }}>
-                <DatePicker
-                  label="Start Date"
-                  value={formData.start_date}
-                  onChange={(date) => handleInputChange('start_date', date)}
-                  slotProps={{ textField: { fullWidth: true } }}
-                />
-              </Grid>
+            <Paper sx={{ height: 400, width: '100%' }}>
+              <DataGrid
+                rows={eligibleSamples}
+                columns={eligibleSamplesColumns}
+                loading={eligibleSamplesLoading}
+                checkboxSelection
+                disableRowSelectionOnClick
+                rowSelectionModel={selectedSampleIds}
+                onRowSelectionModelChange={(newSelection) => {
+                  setSelectedSampleIds(newSelection);
+                }}
+                sortModel={sortModel}
+                onSortModelChange={(model) => setSortModel(model)}
+                initialState={{
+                  sorting: {
+                    sortModel: [
+                      { field: 'days_until_expiration', sort: 'asc' },
+                    ],
+                  },
+                }}
+                pageSizeOptions={[10, 25, 50]}
+                getRowClassName={(params) => {
+                  if (params.row.is_expired) return 'expired-row';
+                  if (params.row.is_overdue) return 'overdue-row';
+                  return '';
+                }}
+                sx={{
+                  '& .expired-row': {
+                    bgcolor: 'error.light',
+                    '&:hover': {
+                      bgcolor: 'error.main',
+                    },
+                  },
+                  '& .overdue-row': {
+                    bgcolor: 'warning.light',
+                    '&:hover': {
+                      bgcolor: 'warning.main',
+                    },
+                  },
+                }}
+                aria-label="Eligible samples grid sorted by expiration priority"
+              />
+            </Paper>
 
-              {/* End date is not available when creating a batch - only set when batch is completed */}
-              {/* <Grid size={{ xs: 12, sm: 6 }}>
-                <DatePicker
-                  label="End Date"
-                  value={formData.end_date}
-                  onChange={(date) => handleInputChange('end_date', date)}
-                  slotProps={{ textField: { fullWidth: true } }}
-                />
-              </Grid> */}
+            <Divider sx={{ my: 3 }} />
 
-              <Grid size={12}>
-                <Divider sx={{ my: 2 }} />
-                <Typography variant="h6" gutterBottom>
-                  Cross-Project Container Selection
-                </Typography>
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                  Select containers from multiple projects for cross-project batching. Containers must share compatible analyses.
-                </Typography>
-              </Grid>
+            <Typography variant="h6" gutterBottom>
+              Cross-Project Container Selection
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              Select containers from multiple projects for cross-project batching. Containers must share compatible analyses.
+            </Typography>
 
+            <Grid container spacing={2}>
               <Grid size={12}>
                 <FormControl fullWidth>
-                  <InputLabel>Filter by Projects</InputLabel>
+                  <InputLabel id="filter-projects-label">Filter by Projects</InputLabel>
                   <Select
+                    labelId="filter-projects-label"
                     multiple
                     value={selectedProjects}
                     onChange={(e) => setSelectedProjects(e.target.value as string[])}
+                    label="Filter by Projects"
                     renderValue={(selected) => (
                       <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
                         {(selected as string[]).map((projectId) => {
@@ -593,6 +941,10 @@ const BatchFormEnhanced: React.FC<BatchFormEnhancedProps> = ({ onSuccess, onCanc
                       {...params}
                       label="Search and Add Containers"
                       placeholder="Type to search containers..."
+                      inputProps={{
+                        ...params.inputProps,
+                        'aria-label': 'Search containers',
+                      }}
                     />
                   )}
                   renderOption={(props, option) => (
@@ -609,204 +961,327 @@ const BatchFormEnhanced: React.FC<BatchFormEnhancedProps> = ({ onSuccess, onCanc
                   )}
                 />
               </Grid>
+            </Grid>
 
-              {selectedContainers.length > 0 && (
-                <Grid size={12}>
-                  <Box sx={{ mb: 2 }}>
-                    <Typography variant="subtitle2" gutterBottom>
-                      Selected Containers ({selectedContainers.length})
-                    </Typography>
-                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                      {selectedContainers.map((container) => (
-                        <Chip
-                          key={container.id}
-                          label={`${container.name}${container.sample ? ` (${container.sample.project?.name})` : ''}`}
-                          onDelete={() => handleRemoveContainer(container.id)}
-                          deleteIcon={<DeleteIcon />}
-                        />
-                      ))}
-                    </Box>
-                  </Box>
+            {selectedContainers.length > 0 && (
+              <Box sx={{ mt: 2 }}>
+                <Typography variant="subtitle2" gutterBottom>
+                  Selected Containers ({selectedContainers.length})
+                </Typography>
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                  {selectedContainers.map((container) => (
+                    <Chip
+                      key={container.id}
+                      label={`${container.name}${container.sample ? ` (${container.sample.project?.name})` : ''}`}
+                      onDelete={() => handleRemoveContainer(container.id)}
+                      deleteIcon={<DeleteIcon />}
+                    />
+                  ))}
+                </Box>
 
-                  {formData.cross_project && (
-                    <Alert severity="info" sx={{ mb: 2 }}>
-                      Cross-project batch detected: Containers from multiple projects selected.
-                    </Alert>
-                  )}
-
-                  <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
-                    <Button
-                      variant="outlined"
-                      onClick={handleValidateCompatibility}
-                      disabled={validating || selectedContainers.length < 2}
-                      startIcon={validating ? <CircularProgress size={20} /> : <CheckCircleIcon />}
-                    >
-                      Validate Compatibility
-                    </Button>
-                    <Button
-                      variant="outlined"
-                      onClick={handleOpenSubBatchDialog}
-                      startIcon={<AddIcon />}
-                    >
-                      Create Sub-Batches
-                    </Button>
-                  </Box>
-
-                  {compatibilityResult && (
-                    <Alert
-                      severity={compatibilityResult.compatible ? 'success' : 'warning'}
-                      icon={compatibilityResult.compatible ? <CheckCircleIcon /> : <WarningIcon />}
-                      sx={{ mb: 2 }}
-                    >
-                      {compatibilityResult.compatible ? (
-                        'Containers are compatible for cross-project batching'
-                      ) : (
-                        <Box>
-                          <Typography variant="body2" fontWeight="bold">
-                            {compatibilityResult.error || 'Containers are not compatible'}
-                          </Typography>
-                          {compatibilityResult.details && (
-                            <Box sx={{ mt: 1 }}>
-                              {compatibilityResult.details.projects && (
-                                <Typography variant="body2">
-                                  Projects: {compatibilityResult.details.projects.join(', ')}
-                                </Typography>
-                              )}
-                              {compatibilityResult.details.analyses && (
-                                <Typography variant="body2">
-                                  Analyses: {compatibilityResult.details.analyses.join(', ')}
-                                </Typography>
-                              )}
-                              {compatibilityResult.details.suggestion && (
-                                <Typography variant="body2" sx={{ mt: 1, fontStyle: 'italic' }}>
-                                  {compatibilityResult.details.suggestion}
-                                </Typography>
-                              )}
-                            </Box>
-                          )}
-                        </Box>
-                      )}
-                    </Alert>
-                  )}
-
-                  {validationError && !compatibilityResult && (
-                    <Alert severity="error" sx={{ mb: 2 }}>
-                      {validationError}
-                    </Alert>
-                  )}
-                </Grid>
-              )}
-
-              {formData.divergent_analyses.length > 0 && (
-                <Grid size={12}>
-                  <Alert severity="info" sx={{ mb: 2 }}>
-                    Sub-batches will be created for divergent analyses: {formData.divergent_analyses.length} selected
+                {formData.cross_project && (
+                  <Alert severity="info" sx={{ mt: 2 }}>
+                    Cross-project batch detected: Containers from multiple projects selected.
                   </Alert>
-                </Grid>
-              )}
+                )}
 
-              <Grid size={12}>
-                <Divider sx={{ my: 2 }} />
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                  <Typography variant="h6" gutterBottom>
-                    QC Samples
-                  </Typography>
+                <Box sx={{ display: 'flex', gap: 2, mt: 2 }}>
                   <Button
                     variant="outlined"
-                    size="small"
-                    startIcon={<AddIcon />}
-                    onClick={handleAddQC}
+                    onClick={handleValidateCompatibility}
+                    disabled={validating || selectedContainers.length < 2}
+                    startIcon={validating ? <CircularProgress size={20} /> : <CheckCircleIcon />}
                   >
-                    Add QC
+                    Validate Compatibility
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    onClick={handleOpenSubBatchDialog}
+                    startIcon={<AddIcon />}
+                  >
+                    Create Sub-Batches
                   </Button>
                 </Box>
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                  Add QC samples to be auto-generated with this batch. QC samples will inherit properties from the first sample in the batch.
-                  {selectedContainers.length >= 2 && (
-                    <Button
-                      size="small"
-                      variant="outlined"
-                      onClick={suggestQC}
-                      sx={{ ml: 2 }}
-                      startIcon={<AddIcon />}
-                    >
-                      Suggest QC ({selectedContainers.length} containers)
-                    </Button>
-                  )}
-                </Typography>
 
-                {qcRequired && formData.qc_additions.length === 0 && (
-                  <Alert severity="warning" sx={{ mb: 2 }}>
-                    QC samples are required for batch type "{listEntries.batch_types?.find((t: any) => t.id === formData.type)?.name || formData.type}". Please add at least one QC sample.
+                {compatibilityResult && !compatibilityWarnings.length && (
+                  <Alert
+                    severity={compatibilityResult.compatible ? 'success' : 'warning'}
+                    icon={compatibilityResult.compatible ? <CheckCircleIcon /> : <WarningIcon />}
+                    sx={{ mt: 2 }}
+                  >
+                    {compatibilityResult.compatible ? (
+                      'Containers are compatible for cross-project batching'
+                    ) : (
+                      <Box>
+                        <Typography variant="body2" fontWeight="bold">
+                          {compatibilityResult.error || 'Containers are not compatible'}
+                        </Typography>
+                        {compatibilityResult.details && (
+                          <Box sx={{ mt: 1 }}>
+                            {compatibilityResult.details.projects && (
+                              <Typography variant="body2">
+                                Projects: {compatibilityResult.details.projects.join(', ')}
+                              </Typography>
+                            )}
+                            {compatibilityResult.details.analyses && (
+                              <Typography variant="body2">
+                                Analyses: {compatibilityResult.details.analyses.join(', ')}
+                              </Typography>
+                            )}
+                            {compatibilityResult.details.suggestion && (
+                              <Typography variant="body2" sx={{ mt: 1, fontStyle: 'italic' }}>
+                                {compatibilityResult.details.suggestion}
+                              </Typography>
+                            )}
+                          </Box>
+                        )}
+                      </Box>
+                    )}
                   </Alert>
                 )}
 
-                {formData.qc_additions.map((qc, index) => (
-                  <Box
-                    key={index}
-                    sx={{
-                      p: 2,
-                      mb: 2,
-                      border: '1px solid',
-                      borderColor: 'divider',
-                      borderRadius: 1,
-                      bgcolor: 'background.paper',
-                    }}
-                  >
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
-                      <Typography variant="subtitle2">
-                        QC Sample {index + 1}
-                      </Typography>
-                      <IconButton
-                        size="small"
-                        onClick={() => handleRemoveQC(index)}
-                        color="error"
-                      >
-                        <DeleteIcon />
-                      </IconButton>
-                    </Box>
-                    <Grid container spacing={2}>
-                      <Grid size={{ xs: 12, sm: 6 }}>
-                        <FormControl fullWidth required>
-                          <InputLabel>QC Type</InputLabel>
-                          <Select
-                            value={qc.qc_type}
-                            onChange={(e) => handleQCChange(index, 'qc_type', e.target.value)}
-                            label="QC Type"
-                          >
-                            {qcTypes.map((qcType) => (
-                              <MenuItem key={qcType.id} value={qcType.id}>
-                                {qcType.name}
-                              </MenuItem>
-                            ))}
-                          </Select>
-                        </FormControl>
-                      </Grid>
-                      <Grid size={{ xs: 12, sm: 6 }}>
-                        <TextField
-                          fullWidth
-                          label="Notes (Optional)"
-                          value={qc.notes || ''}
-                          onChange={(e) => handleQCChange(index, 'notes', e.target.value)}
-                          placeholder="Additional notes for this QC sample"
-                        />
-                      </Grid>
-                    </Grid>
-                  </Box>
-                ))}
-
-                {formData.qc_additions.length === 0 && !qcRequired && (
-                  <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>
-                    No QC samples added. Click "Add QC" to add QC samples to this batch.
-                  </Typography>
+                {validationError && !compatibilityResult && (
+                  <Alert severity="error" sx={{ mt: 2 }}>
+                    {validationError}
+                  </Alert>
                 )}
-              </Grid>
+              </Box>
+            )}
 
-              <Grid size={12}>
-                <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end', mt: 2 }}>
-                  <Button onClick={onCancel} disabled={loading}>
-                    Cancel
+            {formData.divergent_analyses.length > 0 && (
+              <Alert severity="info" sx={{ mt: 2 }}>
+                Sub-batches will be created for divergent analyses: {formData.divergent_analyses.length} selected
+              </Alert>
+            )}
+          </Box>
+        );
+
+      case 2: // QC Samples
+        return (
+          <Box>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+              <Typography variant="h6">QC Samples</Typography>
+              <Button
+                variant="outlined"
+                size="small"
+                startIcon={<AddIcon />}
+                onClick={handleAddQC}
+              >
+                Add QC
+              </Button>
+            </Box>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              Add QC samples to be auto-generated with this batch. QC samples will inherit properties from the first sample in the batch.
+              {selectedContainers.length >= 2 && (
+                <Button
+                  size="small"
+                  variant="outlined"
+                  onClick={suggestQC}
+                  sx={{ ml: 2 }}
+                  startIcon={<AddIcon />}
+                >
+                  Suggest QC ({selectedContainers.length} containers)
+                </Button>
+              )}
+            </Typography>
+
+            {qcRequired && formData.qc_additions.length === 0 && (
+              <Alert severity="warning" sx={{ mb: 2 }}>
+                QC samples are required for batch type "{listEntries.batch_types?.find((t: any) => t.id === formData.type)?.name || formData.type}". Please add at least one QC sample.
+              </Alert>
+            )}
+
+            {formData.qc_additions.map((qc, index) => (
+              <Box
+                key={index}
+                sx={{
+                  p: 2,
+                  mb: 2,
+                  border: '1px solid',
+                  borderColor: 'divider',
+                  borderRadius: 1,
+                  bgcolor: 'background.paper',
+                }}
+              >
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
+                  <Typography variant="subtitle2">QC Sample {index + 1}</Typography>
+                  <IconButton size="small" onClick={() => handleRemoveQC(index)} color="error" aria-label={`Remove QC sample ${index + 1}`}>
+                    <DeleteIcon />
+                  </IconButton>
+                </Box>
+                <Grid container spacing={2}>
+                  <Grid size={{ xs: 12, sm: 6 }}>
+                    <FormControl fullWidth required>
+                      <InputLabel id={`qc-type-label-${index}`}>QC Type</InputLabel>
+                      <Select
+                        labelId={`qc-type-label-${index}`}
+                        value={qc.qc_type}
+                        onChange={(e) => handleQCChange(index, 'qc_type', e.target.value)}
+                        label="QC Type"
+                        inputProps={{ 'aria-label': `QC type for sample ${index + 1}` }}
+                      >
+                        {qcTypes.map((qcType) => (
+                          <MenuItem key={qcType.id} value={qcType.id}>
+                            {qcType.name}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                  </Grid>
+                  <Grid size={{ xs: 12, sm: 6 }}>
+                    <TextField
+                      fullWidth
+                      label="Notes (Optional)"
+                      value={qc.notes || ''}
+                      onChange={(e) => handleQCChange(index, 'notes', e.target.value)}
+                      placeholder="Additional notes for this QC sample"
+                      inputProps={{ 'aria-label': `Notes for QC sample ${index + 1}` }}
+                    />
+                  </Grid>
+                </Grid>
+              </Box>
+            ))}
+
+            {formData.qc_additions.length === 0 && !qcRequired && (
+              <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>
+                No QC samples added. Click "Add QC" to add QC samples to this batch.
+              </Typography>
+            )}
+          </Box>
+        );
+
+      case 3: // Review & Create
+        return (
+          <Box>
+            <Typography variant="h6" gutterBottom>Review Batch</Typography>
+            
+            <Paper sx={{ p: 2, mb: 2 }}>
+              <Typography variant="subtitle2" color="text.secondary">Batch Details</Typography>
+              <Grid container spacing={2} sx={{ mt: 1 }}>
+                <Grid size={{ xs: 6 }}>
+                  <Typography variant="body2"><strong>Name:</strong> {formData.name || '—'}</Typography>
+                </Grid>
+                <Grid size={{ xs: 6 }}>
+                  <Typography variant="body2"><strong>Status:</strong> {listEntries.batch_statuses?.find((s: any) => s.id === formData.status)?.name || '—'}</Typography>
+                </Grid>
+                <Grid size={{ xs: 6 }}>
+                  <Typography variant="body2"><strong>Type:</strong> {listEntries.batch_types?.find((t: any) => t.id === formData.type)?.name || '—'}</Typography>
+                </Grid>
+                <Grid size={{ xs: 6 }}>
+                  <Typography variant="body2"><strong>Start Date:</strong> {formData.start_date?.toLocaleDateString() || '—'}</Typography>
+                </Grid>
+              </Grid>
+            </Paper>
+
+            <Paper sx={{ p: 2, mb: 2 }}>
+              <Typography variant="subtitle2" color="text.secondary">Containers ({selectedContainers.length})</Typography>
+              {selectedContainers.length > 0 ? (
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1 }}>
+                  {selectedContainers.map((c) => (
+                    <Chip key={c.id} label={c.name} size="small" />
+                  ))}
+                </Box>
+              ) : (
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>No containers selected</Typography>
+              )}
+              {formData.cross_project && (
+                <Alert severity="info" sx={{ mt: 1 }} icon={<CheckCircleIcon />}>
+                  Cross-project batch
+                </Alert>
+              )}
+            </Paper>
+
+            <Paper sx={{ p: 2, mb: 2 }}>
+              <Typography variant="subtitle2" color="text.secondary">QC Samples ({formData.qc_additions.length})</Typography>
+              {formData.qc_additions.length > 0 ? (
+                <Box sx={{ mt: 1 }}>
+                  {formData.qc_additions.map((qc, idx) => {
+                    const qcTypeName = qcTypes.find((t) => t.id === qc.qc_type)?.name || 'Unknown';
+                    return (
+                      <Chip key={idx} label={`${qcTypeName}${qc.notes ? `: ${qc.notes}` : ''}`} size="small" sx={{ mr: 1, mb: 1 }} />
+                    );
+                  })}
+                </Box>
+              ) : (
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>No QC samples</Typography>
+              )}
+            </Paper>
+
+            {/* Show any compatibility warnings in review */}
+            {compatibilityWarnings.length > 0 && (
+              <Box sx={{ mb: 2 }}>
+                {compatibilityWarnings.map((warning, idx) => (
+                  <Alert
+                    key={idx}
+                    severity={warning.type === 'expired_samples' ? 'error' : 'warning'}
+                    sx={{ mb: 1 }}
+                  >
+                    <Typography variant="subtitle2">{warning.message}</Typography>
+                  </Alert>
+                ))}
+              </Box>
+            )}
+          </Box>
+        );
+
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <LocalizationProvider dateAdapter={AdapterDateFns}>
+      <Card>
+        <CardContent>
+          <Typography variant="h6" gutterBottom>
+            Create New Batch
+          </Typography>
+          
+          <Stepper activeStep={activeStep} sx={{ mb: 4 }}>
+            {STEPS.map((label) => (
+              <Step key={label}>
+                <StepLabel>{label}</StepLabel>
+              </Step>
+            ))}
+          </Stepper>
+
+          <Divider sx={{ mb: 3 }} />
+
+          {error && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {error}
+            </Alert>
+          )}
+
+          <form onSubmit={handleSubmit}>
+            {renderStepContent(activeStep)}
+
+            <Box sx={{ display: 'flex', gap: 2, justifyContent: 'space-between', mt: 4 }}>
+              <Box>
+                <Button onClick={onCancel} disabled={loading}>
+                  Cancel
+                </Button>
+              </Box>
+              <Box sx={{ display: 'flex', gap: 2 }}>
+                {activeStep > 0 && (
+                  <Button
+                    onClick={handleBack}
+                    disabled={loading}
+                    startIcon={<ArrowBackIcon />}
+                  >
+                    Back
                   </Button>
+                )}
+                {activeStep < STEPS.length - 1 ? (
+                  <Button
+                    variant="contained"
+                    onClick={handleNext}
+                    disabled={loading || (activeStep === 0 && (!formData.name || !formData.status))}
+                    endIcon={<ArrowForwardIcon />}
+                  >
+                    Next
+                  </Button>
+                ) : (
                   <Button
                     type="submit"
                     variant="contained"
@@ -815,9 +1290,9 @@ const BatchFormEnhanced: React.FC<BatchFormEnhancedProps> = ({ onSuccess, onCanc
                   >
                     Create Batch
                   </Button>
-                </Box>
-              </Grid>
-            </Grid>
+                )}
+              </Box>
+            </Box>
           </form>
 
           {/* Sub-Batch Creation Dialog */}
@@ -872,4 +1347,3 @@ const BatchFormEnhanced: React.FC<BatchFormEnhancedProps> = ({ onSuccess, onCanc
 };
 
 export default BatchFormEnhanced;
-

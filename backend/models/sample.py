@@ -12,6 +12,7 @@ class Sample(BaseModel):
     due_date = Column(DateTime)
     received_date = Column(DateTime)
     report_date = Column(DateTime)
+    date_sampled = Column(DateTime, nullable=True)  # When sample was collected (for expiration calc)
     sample_type = Column(PostgresUUID(as_uuid=True), ForeignKey('list_entries.id'), nullable=False)
     status = Column(PostgresUUID(as_uuid=True), ForeignKey('list_entries.id'), nullable=False)
     matrix = Column(PostgresUUID(as_uuid=True), ForeignKey('list_entries.id'), nullable=False)

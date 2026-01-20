@@ -11,6 +11,7 @@ class Project(BaseModel):
     
     # Project-specific fields
     start_date = Column(DateTime, nullable=False)
+    due_date = Column(DateTime, nullable=True)  # Project-level turnaround; samples inherit if their due_date is null
     client_id = Column(PostgresUUID(as_uuid=True), ForeignKey('clients.id'), nullable=False)
     client_project_id = Column(PostgresUUID(as_uuid=True), ForeignKey('client_projects.id'), nullable=True)
     status = Column(PostgresUUID(as_uuid=True), ForeignKey('list_entries.id'), nullable=False)

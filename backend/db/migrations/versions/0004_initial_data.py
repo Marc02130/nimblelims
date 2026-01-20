@@ -263,7 +263,7 @@ def upgrade() -> None:
     connection.execute(
         sa.text("""
             INSERT INTO users (id, name, username, email, password_hash, role_id, client_id, active, created_at, modified_at) 
-            VALUES ('00000000-0000-0000-0000-000000000001', 'System Administrator', 'admin', 'admin@lims.local', '***REMOVED***', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '00000000-0000-0000-0000-000000000001', true, NOW(), NOW())
+            VALUES ('00000000-0000-0000-0000-000000000001', 'System Administrator', 'admin', 'admin@lims.example.com', '***REMOVED***', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '00000000-0000-0000-0000-000000000001', true, NOW(), NOW())
             ON CONFLICT (username) DO NOTHING
         """)
     )
@@ -272,7 +272,7 @@ def upgrade() -> None:
     connection.execute(
         sa.text("""
             INSERT INTO users (id, name, username, email, password_hash, role_id, client_id, active, created_at, modified_at) 
-            VALUES ('00000000-0000-0000-0000-000000000002', 'Lab Manager', 'lab-manager', 'lab-manager@lims.local', '***REMOVED***', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', '00000000-0000-0000-0000-000000000001', true, NOW(), NOW())
+            VALUES ('00000000-0000-0000-0000-000000000002', 'Lab Manager', 'lab-manager', 'lab-manager@lims.example.com', '***REMOVED***', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', '00000000-0000-0000-0000-000000000001', true, NOW(), NOW())
             ON CONFLICT (username) DO NOTHING
         """)
     )
@@ -281,7 +281,7 @@ def upgrade() -> None:
     connection.execute(
         sa.text("""
             INSERT INTO users (id, name, username, email, password_hash, role_id, client_id, active, created_at, modified_at) 
-            VALUES ('00000000-0000-0000-0000-000000000003', 'Lab Technician', 'lab-tech', 'lab-tech@lims.local', '***REMOVED***', 'cccccccc-cccc-cccc-cccc-cccccccccccc', '00000000-0000-0000-0000-000000000001', true, NOW(), NOW())
+            VALUES ('00000000-0000-0000-0000-000000000003', 'Lab Technician', 'lab-tech', 'lab-tech@lims.example.com', '***REMOVED***', 'cccccccc-cccc-cccc-cccc-cccccccccccc', '00000000-0000-0000-0000-000000000001', true, NOW(), NOW())
             ON CONFLICT (username) DO NOTHING
         """)
     )

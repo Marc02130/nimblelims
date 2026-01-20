@@ -32,6 +32,13 @@ import {
 } from '@mui/icons-material';
 import { apiService } from '../../services/apiService';
 
+interface BatchContainer {
+  batch_id: string;
+  container_id: string;
+  position?: string;
+  notes?: string;
+}
+
 interface Batch {
   id: string;
   name: string;
@@ -41,7 +48,7 @@ interface Batch {
   start_date: string;
   end_date: string;
   created_at: string;
-  container_count?: number;
+  containers?: BatchContainer[];
 }
 
 interface BatchListProps {
@@ -83,12 +90,14 @@ const BatchList: React.FC<BatchListProps> = ({ onViewBatch, onEditBatch, onCreat
 
   const loadListEntries = async () => {
     try {
-      const [batchStatuses] = await Promise.all([
-        apiService.getListEntries('batch_status'),  // Use normalized slug format
+      const [batchStatuses, batchTypes] = await Promise.all([
+        apiService.getListEntries('batch_status'),
+        apiService.getListEntries('batch_types'),
       ]);
 
       setListEntries({
         batch_statuses: batchStatuses,
+        batch_types: batchTypes,
       });
     } catch (err) {
       console.error('Failed to load list entries:', err);
@@ -244,7 +253,7 @@ const BatchList: React.FC<BatchListProps> = ({ onViewBatch, onEditBatch, onCreat
                     </TableCell>
                     <TableCell>{batch.start_date ? formatDate(batch.start_date) : '-'}</TableCell>
                     <TableCell>{batch.end_date ? formatDate(batch.end_date) : '-'}</TableCell>
-                    <TableCell>{batch.container_count || 0}</TableCell>
+                    <TableCell>{batch.containers?.length || 0}</TableCell>
                     <TableCell align="right">
                       <IconButton
                         onClick={(e) => handleMenuOpen(e, batch)}

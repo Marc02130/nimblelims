@@ -19,6 +19,7 @@ class AnalysisResponse(BaseModel):
     method: Optional[str] = None
     turnaround_time: Optional[int] = None
     cost: Optional[Decimal] = None
+    shelf_life: Optional[int] = Field(None, description="Days until expiration (expiration = date_sampled + shelf_life)")
 
     class Config:
         from_attributes = True
@@ -31,6 +32,7 @@ class AnalysisCreate(BaseModel):
     method: Optional[str] = None
     turnaround_time: Optional[int] = None
     cost: Optional[Decimal] = None
+    shelf_life: Optional[int] = Field(None, ge=1, description="Days until expiration (expiration = date_sampled + shelf_life)")
 
 
 class AnalysisUpdate(BaseModel):
@@ -40,6 +42,7 @@ class AnalysisUpdate(BaseModel):
     method: Optional[str] = None
     turnaround_time: Optional[int] = None
     cost: Optional[Decimal] = None
+    shelf_life: Optional[int] = Field(None, ge=1, description="Days until expiration (expiration = date_sampled + shelf_life)")
     active: Optional[bool] = None
 
 

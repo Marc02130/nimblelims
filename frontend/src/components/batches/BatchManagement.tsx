@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Card,
@@ -48,6 +48,35 @@ const BatchManagement: React.FC<BatchManagementProps> = ({ onBack }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState(0);
+  const [listEntries, setListEntries] = useState<any>({});
+
+  useEffect(() => {
+    const loadListEntries = async () => {
+      try {
+        const [batchStatuses, batchTypes] = await Promise.all([
+          apiService.getListEntries('batch_status'),
+          apiService.getListEntries('batch_types').catch(() => []),
+        ]);
+        setListEntries({
+          batch_statuses: batchStatuses,
+          batch_types: batchTypes,
+        });
+      } catch (err) {
+        console.error('Failed to load list entries:', err);
+      }
+    };
+    loadListEntries();
+  }, []);
+
+  const getTypeName = (typeId: string) => {
+    if (!typeId) return 'Not set';
+    return listEntries.batch_types?.find((t: any) => t.id === typeId)?.name || typeId;
+  };
+
+  const getStatusName = (statusId: string) => {
+    if (!statusId) return 'Not set';
+    return listEntries.batch_statuses?.find((s: any) => s.id === statusId)?.name || statusId;
+  };
 
   const handleCreateBatch = () => {
     setView('create');
@@ -145,10 +174,11 @@ const BatchManagement: React.FC<BatchManagementProps> = ({ onBack }) => {
         <Card>
           <CardContent>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-              <Typography variant="h5">Edit Batch</Typography>
+              <Typography variant="h5">Edit Batch: {selectedBatch.name}</Typography>
               <Button onClick={handleBackToList}>Back to List</Button>
             </Box>
             <BatchForm
+              batch={selectedBatch}
               onSuccess={handleBatchUpdated}
               onCancel={handleBackToList}
             />
@@ -211,10 +241,10 @@ const BatchManagement: React.FC<BatchManagementProps> = ({ onBack }) => {
                 <Typography variant="h6">Batch Details</Typography>
                 <Box sx={{ mt: 2 }}>
                   <Typography variant="body2">
-                    <strong>Type:</strong> {selectedBatch.type}
+                    <strong>Type:</strong> {getTypeName(selectedBatch.type)}
                   </Typography>
                   <Typography variant="body2">
-                    <strong>Status:</strong> {selectedBatch.status}
+                    <strong>Status:</strong> {getStatusName(selectedBatch.status)}
                   </Typography>
                   <Typography variant="body2">
                     <strong>Start Date:</strong> {selectedBatch.start_date ? new Date(selectedBatch.start_date).toLocaleDateString() : 'Not set'}

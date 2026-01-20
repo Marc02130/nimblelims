@@ -3,27 +3,259 @@ Samples router for NimbleLims
 """
 from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
-from sqlalchemy.orm import Session
-from sqlalchemy import and_, or_, func
+from sqlalchemy.orm import Session, joinedload
+from sqlalchemy import and_, or_, func, case, text, literal_column
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy import cast
 from app.database import get_db
 from models.sample import Sample
 from models.project import Project
 from models.user import User
+from models.test import Test
+from models.analysis import Analysis
 from app.schemas.sample import (
     SampleCreate, SampleUpdate, SampleResponse, SampleListResponse,
-    SampleAccessioningRequest, BulkSampleAccessioningRequest
+    SampleAccessioningRequest, BulkSampleAccessioningRequest,
+    EligibleSampleResponse, EligibleSamplesResponse
 )
 from app.core.rbac import (
     require_sample_create, require_sample_read, require_sample_update,
     require_sample_delete, require_project_access
 )
 from app.core.security import get_current_user
-from datetime import datetime
+from datetime import datetime, timedelta
 from uuid import UUID
 
 router = APIRouter()
+
+
+@router.get("/eligible", response_model=EligibleSamplesResponse)
+async def get_eligible_samples(
+    request: Request,
+    test_ids: Optional[str] = Query(None, description="Comma-separated list of test/analysis IDs to filter by"),
+    project_id: Optional[str] = Query(None, description="Filter by project ID"),
+    include_expired: bool = Query(False, description="Include expired samples in results"),
+    page: int = Query(1, ge=1, description="Page number"),
+    size: int = Query(10, ge=1, le=100, description="Page size"),
+    current_user: User = Depends(require_sample_read),
+    db: Session = Depends(get_db)
+):
+    """
+    Get samples eligible for testing with prioritization based on expiration and due dates.
+    
+    Returns samples sorted by:
+    1. days_until_expiration ASC NULLS LAST (most urgent first)
+    2. days_until_due ASC NULLS LAST (earliest due first)
+    
+    Computes:
+    - days_until_expiration = (date_sampled + shelf_life) - now
+    - days_until_due = coalesce(sample.due_date, project.due_date) - now
+    - is_expired = days_until_expiration < 0
+    - is_overdue = days_until_due < 0
+    
+    Query Parameters:
+    - test_ids: Comma-separated analysis IDs to filter samples that have tests for these analyses
+    - project_id: Filter by specific project
+    - include_expired: If False (default), excludes samples with days_until_expiration < 0
+    - page/size: Pagination
+    
+    RLS enforces access via has_project_access.
+    """
+    # Parse test_ids (analysis IDs)
+    analysis_ids = []
+    if test_ids and test_ids.strip():
+        try:
+            analysis_ids = [UUID(tid.strip()) for tid in test_ids.split(",") if tid.strip()]
+        except (ValueError, AttributeError):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid test_ids format. Expected comma-separated UUIDs."
+            )
+    
+    # Parse project_id
+    project_id_uuid = None
+    if project_id and project_id.strip():
+        try:
+            project_id_uuid = UUID(project_id)
+        except (ValueError, AttributeError):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid project_id format. Expected UUID."
+            )
+    
+    # Build base query with project join for due_date inheritance
+    # We need to join with tests and analyses to get shelf_life for expiration calculation
+    now = datetime.utcnow()
+    
+    # Subquery to get the minimum shelf_life analysis for each sample
+    # This ensures we use the most restrictive (shortest) shelf_life
+    if analysis_ids:
+        # Filter by specific analyses
+        shelf_life_subq = (
+            db.query(
+                Test.sample_id,
+                func.min(Analysis.shelf_life).label('min_shelf_life'),
+                func.min(Analysis.id).label('analysis_id'),
+                func.min(Analysis.name).label('analysis_name')
+            )
+            .join(Analysis, Test.analysis_id == Analysis.id)
+            .filter(Test.active == True)
+            .filter(Analysis.active == True)
+            .filter(Test.analysis_id.in_(analysis_ids))
+            .group_by(Test.sample_id)
+            .subquery()
+        )
+    else:
+        # All analyses
+        shelf_life_subq = (
+            db.query(
+                Test.sample_id,
+                func.min(Analysis.shelf_life).label('min_shelf_life'),
+                func.min(Analysis.id).label('analysis_id'),
+                func.min(Analysis.name).label('analysis_name')
+            )
+            .join(Analysis, Test.analysis_id == Analysis.id)
+            .filter(Test.active == True)
+            .filter(Analysis.active == True)
+            .group_by(Test.sample_id)
+            .subquery()
+        )
+    
+    # Main query with computed prioritization fields
+    query = (
+        db.query(
+            Sample,
+            Project.name.label('project_name'),
+            Project.due_date.label('project_due_date'),
+            shelf_life_subq.c.min_shelf_life.label('shelf_life'),
+            shelf_life_subq.c.analysis_id.label('analysis_id'),
+            shelf_life_subq.c.analysis_name.label('analysis_name'),
+        )
+        .join(Project, Sample.project_id == Project.id)
+        .outerjoin(shelf_life_subq, Sample.id == shelf_life_subq.c.sample_id)
+        .filter(Sample.active == True)
+    )
+    
+    # Apply project filter
+    if project_id_uuid:
+        query = query.filter(Sample.project_id == project_id_uuid)
+    
+    # If analysis_ids provided, filter to samples that have tests for those analyses
+    if analysis_ids:
+        sample_ids_with_tests = (
+            db.query(Test.sample_id)
+            .filter(Test.analysis_id.in_(analysis_ids))
+            .filter(Test.active == True)
+            .distinct()
+            .subquery()
+        )
+        query = query.filter(Sample.id.in_(db.query(sample_ids_with_tests.c.sample_id)))
+    
+    # Get all results for processing (RLS handles access control)
+    all_results = query.all()
+    
+    # Process results and compute prioritization fields
+    eligible_samples = []
+    warnings = []
+    expired_count = 0
+    overdue_count = 0
+    
+    for row in all_results:
+        sample = row[0]  # Sample object
+        project_name = row.project_name
+        project_due_date = row.project_due_date
+        shelf_life = row.shelf_life
+        analysis_id = row.analysis_id
+        analysis_name = row.analysis_name
+        
+        # Compute effective due date (sample > project)
+        effective_due_date = sample.due_date if sample.due_date else project_due_date
+        
+        # Compute days_until_due
+        days_until_due = None
+        is_overdue = False
+        if effective_due_date:
+            delta = effective_due_date - now
+            days_until_due = delta.days
+            is_overdue = days_until_due < 0
+            if is_overdue:
+                overdue_count += 1
+        
+        # Compute days_until_expiration
+        days_until_expiration = None
+        is_expired = False
+        expiration_warning = None
+        
+        if sample.date_sampled and shelf_life:
+            expiration_date = sample.date_sampled + timedelta(days=shelf_life)
+            delta = expiration_date - now
+            days_until_expiration = delta.days
+            is_expired = days_until_expiration < 0
+            
+            if is_expired:
+                expired_count += 1
+                expiration_warning = f"Sample expired {abs(days_until_expiration)} days ago"
+            elif days_until_expiration <= 3:
+                expiration_warning = f"Sample expires in {days_until_expiration} days"
+        
+        # Skip expired samples if not including them
+        if is_expired and not include_expired:
+            continue
+        
+        eligible_samples.append({
+            'id': sample.id,
+            'name': sample.name,
+            'description': sample.description,
+            'due_date': sample.due_date,
+            'received_date': sample.received_date,
+            'date_sampled': sample.date_sampled,
+            'sample_type': sample.sample_type,
+            'status': sample.status,
+            'matrix': sample.matrix,
+            'project_id': sample.project_id,
+            'qc_type': sample.qc_type,
+            'days_until_expiration': days_until_expiration,
+            'days_until_due': days_until_due,
+            'is_expired': is_expired,
+            'is_overdue': is_overdue,
+            'expiration_warning': expiration_warning,
+            'analysis_id': analysis_id,
+            'analysis_name': analysis_name,
+            'shelf_life': shelf_life,
+            'project_name': project_name,
+            'project_due_date': project_due_date,
+            'effective_due_date': effective_due_date,
+        })
+    
+    # Sort by days_until_expiration ASC NULLS LAST, then days_until_due ASC NULLS LAST
+    def sort_key(s):
+        # None values should sort last (use a large number)
+        exp = s['days_until_expiration'] if s['days_until_expiration'] is not None else float('inf')
+        due = s['days_until_due'] if s['days_until_due'] is not None else float('inf')
+        return (exp, due)
+    
+    eligible_samples.sort(key=sort_key)
+    
+    # Add warnings
+    if expired_count > 0:
+        warnings.append(f"{expired_count} expired sample(s) found")
+    if overdue_count > 0:
+        warnings.append(f"{overdue_count} overdue sample(s) found")
+    
+    # Apply pagination
+    total = len(eligible_samples)
+    offset = (page - 1) * size
+    paginated_samples = eligible_samples[offset:offset + size]
+    pages = (total + size - 1) // size if total > 0 else 1
+    
+    return EligibleSamplesResponse(
+        samples=[EligibleSampleResponse(**s) for s in paginated_samples],
+        total=total,
+        page=page,
+        size=size,
+        pages=pages,
+        warnings=warnings
+    )
 
 
 def _create_tests_for_sample(
