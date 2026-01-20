@@ -4,9 +4,9 @@ docker system prune -a
 docker-compose up -d --build
 
 # Export container logs
-docker-compose logs backend > ./.docs/backend.logs
-docker-compose logs frontend > ./.docs/frontend.logs
-docker-compose logs db > ./.docs/db.logs
+docker-compose logs backend > ./.docs/container-logs/backend.logs
+docker-compose logs frontend > ./.docs/container-logs/frontend.logs
+docker-compose logs db > ./.docs/container-logs/db.logs
 
 # Dump everything
 docker exec lims-db pg_dump -U lims_user -d lims_db \

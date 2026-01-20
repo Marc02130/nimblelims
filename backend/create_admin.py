@@ -53,7 +53,7 @@ def create_admin():
         admin_user = User(
             name="System Administrator",
             username="admin",
-            email="admin@lims.local",
+            email="admin@lims.example.com",
             password_hash=get_password_hash("admin123"),
             role_id=admin_role.id,
             active=True
@@ -67,7 +67,7 @@ def create_admin():
         print("=" * 50)
         print(f"Username: admin")
         print(f"Password: admin123")
-        print(f"Email: admin@lims.local")
+        print(f"Email: admin@lims.example.com")
         print("=" * 50)
         print("⚠️  CHANGE THE PASSWORD IMMEDIATELY!")
         print("=" * 50)

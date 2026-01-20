@@ -12,6 +12,7 @@ class ProjectBase(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=255, description="Project name (auto-generated if not provided)")
     description: Optional[str] = None
     start_date: datetime
+    due_date: Optional[datetime] = Field(None, description="Project-level turnaround; samples inherit if their due_date is null")
     client_id: UUID
     client_project_id: Optional[UUID] = Field(None, description="Optional client project ID for grouping (US-25)")
     status: UUID
@@ -23,6 +24,7 @@ class ProjectCreate(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=255, description="Project name (auto-generated if not provided)")
     description: Optional[str] = None
     start_date: datetime
+    due_date: Optional[datetime] = Field(None, description="Project-level turnaround; samples inherit if their due_date is null")
     client_id: UUID
     client_project_id: Optional[UUID] = Field(None, description="Optional client project ID for grouping (US-25)")
     status: UUID
@@ -34,6 +36,7 @@ class ProjectUpdate(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=255)
     description: Optional[str] = None
     start_date: Optional[datetime] = None
+    due_date: Optional[datetime] = Field(None, description="Project-level turnaround; samples inherit if their due_date is null")
     client_id: Optional[UUID] = None
     client_project_id: Optional[UUID] = Field(None, description="Optional client project ID for grouping (US-25)")
     status: Optional[UUID] = None
@@ -52,6 +55,7 @@ class ProjectResponse(BaseModel):
     created_by: Optional[UUID] = None
     modified_by: Optional[UUID] = None
     start_date: datetime
+    due_date: Optional[datetime] = Field(None, description="Project-level turnaround; samples inherit if their due_date is null")
     client_id: UUID
     client_project_id: Optional[UUID] = None
     status: UUID

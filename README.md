@@ -134,6 +134,7 @@ nimblelims/
 - **Test Ordering**: Assign individual analyses or test batteries to samples with status tracking
 - **Results Entry**: Batch-based results entry with validation and QC checks
 - **Batch Management**: Create and manage batches with cross-project support and automatic QC generation
+- **Sample Prioritization** (US-11): Sort samples by expiration and due date priority during batch creation
 - **Aliquots/Derivatives**: Create child samples with inheritance
 - **Bulk Accessioning** (US-24): Accession multiple samples with common fields and unique per-sample data
 - **Cross-Project Batching** (US-26): Batch samples from multiple projects with compatibility validation
@@ -234,18 +235,19 @@ See [`.docs/navigation.md`](.docs/navigation.md) for complete navigation documen
 Comprehensive documentation is available in the `.docs/` directory:
 
 - **Navigation**: `.docs/navigation.md` - Complete site navigation documentation
-- **Product Requirements**: `.docs/lims_mvp_prd.md` - Product requirements document
-- **Technical Specifications**: `.docs/lims_mvp_tech.md` - Technical architecture and implementation details
-- **User Stories**: `.docs/lims_mvp_user.md` - User stories and acceptance criteria
+- **Product Requirements**: `.docs/nimblelims_prd.md` - Product requirements document
+- **Technical Specifications**: `.docs/nimblelims_tech.md` - Technical architecture and implementation details
+- **User Stories**: `.docs/nimblelims_user.md` - User stories and acceptance criteria
 - **Workflow Documentation**:
   - `.docs/accessioning_workflow.md` - Sample accessioning process and workflow (includes test battery assignment)
+  - `.docs/batches.md` - Batch management, QC generation, and sample prioritization
   - `.docs/containers.md` - Container management, usage, and workflows
   - `.docs/lists.md` - Configurable lists system and administration
   - `.docs/technical-accessioning-to-reporting.md` - Technical implementation details for accessioning through reporting
   - `.docs/ui-accessioning-to-reporting.md` - UI components and interactions for accessioning through reporting
   - `.docs/workflow-accessioning-to-reporting.md` - Complete workflow from accessioning through reporting
 - **Setup Guides**:
-  - `.docs/lims_mvp_dev_setup.md` - Development environment setup
+  - `.docs/nimblelims_dev_setup.md` - Development environment setup
   - `.docs/admin_setup.md` - Admin user configuration
 - **API Reference**: `.docs/api_endpoints.md` - Complete API endpoints documentation
 

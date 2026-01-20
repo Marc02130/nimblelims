@@ -4,11 +4,12 @@
 
 This document contains User Acceptance Testing (UAT) scripts for batch creation and management in NimbleLIMS. These scripts validate the batch workflows as defined in:
 
-- **User Stories**: US-9 (Batch-Based Results Entry), US-10 (Results Review), US-26 (Cross-Project Batching), US-27 (Add QC Samples at Batch Creation)
+- **User Stories**: US-9 (Batch-Based Results Entry), US-10 (Results Review), US-11 (Create and Manage Batches with Prioritization), US-26 (Cross-Project Batching), US-27 (Add QC Samples at Batch Creation)
 - **PRD**: Section 3.1 (Batches/Plates)
 - **Workflow Document**: `workflow-accessioning-to-reporting.md` (Stage 2: Batch Creation and Organization)
 - **UI Document**: `ui-accessioning-to-reporting.md` (ResultsManagement.tsx, BatchFormEnhanced.tsx)
 - **Technical Document**: `technical-accessioning-to-reporting.md` (POST /batches)
+- **Batches Documentation**: `batches.md` (Sample Prioritization section)
 
 ## Test Environment Setup
 
@@ -20,7 +21,9 @@ This document contains User Acceptance Testing (UAT) scripts for batch creation 
   - QC types: Blank, Positive Control, Negative Control, Matrix Spike, Duplicate
   - At least two containers with samples (for basic batch)
   - Containers from multiple projects (for cross-project test)
-  - At least one analysis (for compatibility validation)
+  - At least one analysis with `shelf_life` configured (for prioritization validation)
+  - Samples with `date_sampled` values (for expiration calculation)
+  - Projects with `due_date` values (for due date inheritance)
 - Test user accounts:
   - Lab Technician with `batch:manage` permission and access to multiple projects
 
@@ -259,6 +262,278 @@ Create a batch with QC samples auto-generated during batch creation.
 
 ---
 
+## Test Case 4: Sample Prioritization - Eligible Samples Display
+
+### Test Case ID
+TC-BATCH-PRIORITY-004
+
+### Description
+Verify that eligible samples are displayed with prioritization information (expiration, due dates) and sorted correctly in the batch creation wizard.
+
+### Preconditions
+
+| Item | Value |
+|------|-------|
+| **User Role** | Lab Technician or Lab Manager |
+| **Required Permission** | `batch:manage`, `sample:read` |
+| **Project Access** | User has access to at least one project |
+| **Samples Available** | At least 3 samples with varying `date_sampled` values |
+| **Analysis Configuration** | At least one analysis with `shelf_life` set (e.g., 14 days) |
+| **Project Due Date** | Project has `due_date` set |
+
+### Test Data Setup
+
+Create samples with the following characteristics:
+
+| Sample Name | date_sampled | shelf_life (analysis) | Expected days_until_expiration |
+|-------------|--------------|----------------------|-------------------------------|
+| SAMPLE-URGENT | 12 days ago | 14 days | ~2 days (urgent) |
+| SAMPLE-EXPIRED | 20 days ago | 14 days | ~-6 days (expired) |
+| SAMPLE-NORMAL | 4 days ago | 14 days | ~10 days |
+| SAMPLE-NO-EXP | NULL | 14 days | NULL (no expiration) |
+
+### Test Steps
+
+| Step | Action | Expected Result |
+|------|--------|-----------------|
+| 1 | Navigate to batch creation page | Batch creation wizard loads |
+| 2 | **Step 1: Enter Batch Details** | |
+| 2.1 | Enter Batch Name: `BATCH-PRIORITY-001` | Field accepts input |
+| 2.2 | Select Status: `Created` | Status selected |
+| 2.3 | Click "Next" button | Navigates to Step 2: Eligible Samples |
+| 3 | **Step 2: Eligible Samples DataGrid** | |
+| 3.1 | Verify DataGrid columns | Columns visible: Sample Name, Project, Days to Expiration, Days to Due, Analysis, Shelf Life, Warning |
+| 3.2 | Verify prioritization column headers | "Days to Expiration" header has schedule icon with tooltip explaining the sort |
+| 3.3 | Verify default sort order | Samples sorted by days_until_expiration ASC (most urgent first) |
+| 3.4 | Verify SAMPLE-URGENT position | SAMPLE-URGENT appears near top (2 days to expiration) |
+| 3.5 | Verify SAMPLE-NORMAL position | SAMPLE-NORMAL appears after urgent samples |
+| 3.6 | Verify SAMPLE-NO-EXP position | SAMPLE-NO-EXP appears last (NULLS LAST sorting) |
+| 4 | **Verify Visual Indicators** | |
+| 4.1 | Check "Include expired samples" checkbox | Checkbox is unchecked by default |
+| 4.2 | Click "Include expired samples" checkbox | SAMPLE-EXPIRED now visible in grid |
+| 4.3 | Verify SAMPLE-EXPIRED styling | Row has red background (error.light), shows error icon |
+| 4.4 | Verify SAMPLE-URGENT styling | Row has orange background (warning.light), shows warning icon |
+| 4.5 | Verify SAMPLE-NORMAL styling | Row has normal background (no special styling) |
+| 5 | **Verify Tooltips** | |
+| 5.1 | Hover over SAMPLE-EXPIRED expiration cell | Tooltip shows "Expired: Testing invalid" |
+| 5.2 | Hover over SAMPLE-URGENT expiration cell | Tooltip shows "Expiring soon" |
+| 6 | **Verify Expiration Warning Chips** | |
+| 6.1 | Check Warning column for SAMPLE-EXPIRED | Red error chip with warning message |
+| 6.2 | Check Warning column for SAMPLE-NORMAL | No warning chip (empty) |
+
+### Expected Results
+
+| Category | Expected Outcome |
+|----------|------------------|
+| **API Call** | GET `/samples/eligible` called with `include_expired=false` by default |
+| **Sorting** | Samples sorted: SAMPLE-URGENT (2 days) < SAMPLE-NORMAL (10 days) < SAMPLE-NO-EXP (null) |
+| **Expired Exclusion** | SAMPLE-EXPIRED hidden until "Include expired" checked |
+| **Visual Highlighting** | - Expired: Red background, error icon<br>- Urgent (≤3 days): Orange background, warning icon |
+| **ARIA Labels** | Grid has `aria-label="Eligible samples grid sorted by expiration priority"` |
+| **Tooltips** | Priority cells show tooltips on hover |
+
+### Pass/Fail Criteria
+
+| Criteria | Pass | Fail |
+|----------|------|------|
+| Prioritization columns displayed | ✓ | ✗ |
+| Default sort by expiration ASC | ✓ | ✗ |
+| NULLS LAST for samples without expiration | ✓ | ✗ |
+| Expired samples hidden by default | ✓ | ✗ |
+| Red highlighting for expired samples | ✓ | ✗ |
+| Orange highlighting for urgent samples | ✓ | ✗ |
+| Tooltips show correct messages | ✓ | ✗ |
+| ARIA labels for accessibility | ✓ | ✗ |
+
+### Test Result
+- [ ] **PASS** - All criteria met
+- [ ] **FAIL** - One or more criteria not met
+
+**Notes**: _________________________________________________________
+
+---
+
+## Test Case 5: Sample Prioritization - Due Date Inheritance
+
+### Test Case ID
+TC-BATCH-PRIORITY-DUE-005
+
+### Description
+Verify that due dates are correctly inherited from projects when samples don't have their own due dates, and that sample due dates override project due dates.
+
+### Preconditions
+
+| Item | Value |
+|------|-------|
+| **User Role** | Lab Technician or Lab Manager |
+| **Required Permission** | `batch:manage`, `sample:read` |
+| **Project Setup** | Project with `due_date` set to 10 days from now |
+| **Samples Available** | Samples with and without individual due_date values |
+
+### Test Data Setup
+
+| Sample Name | sample.due_date | project.due_date | Expected effective_due_date |
+|-------------|-----------------|------------------|---------------------------|
+| SAMPLE-INHERIT | NULL | +10 days | +10 days (inherited) |
+| SAMPLE-OVERRIDE | +3 days | +10 days | +3 days (sample override) |
+
+### Test Steps
+
+| Step | Action | Expected Result |
+|------|--------|-----------------|
+| 1 | Navigate to batch creation, Step 2 | Eligible Samples DataGrid loads |
+| 2 | Locate SAMPLE-INHERIT in grid | Sample visible |
+| 3 | Check "Days to Due" column | Shows ~10 (inherited from project) |
+| 4 | Locate SAMPLE-OVERRIDE in grid | Sample visible |
+| 5 | Check "Days to Due" column | Shows ~3 (sample's own due_date) |
+| 6 | Verify sort order | SAMPLE-OVERRIDE appears before SAMPLE-INHERIT (3 < 10) |
+
+### Expected Results
+
+| Category | Expected Outcome |
+|----------|------------------|
+| **Due Date Calculation** | `COALESCE(sample.due_date, project.due_date)` used |
+| **Inheritance** | Samples without due_date inherit project's due_date |
+| **Override** | Samples with due_date use their own, not project's |
+| **Sorting** | Secondary sort by days_until_due ASC NULLS LAST |
+
+### Pass/Fail Criteria
+
+| Criteria | Pass | Fail |
+|----------|------|------|
+| Due date inheritance from project | ✓ | ✗ |
+| Sample due date overrides project | ✓ | ✗ |
+| Correct days_until_due calculation | ✓ | ✗ |
+| Overdue samples flagged (is_overdue=true) | ✓ | ✗ |
+
+### Test Result
+- [ ] **PASS** - All criteria met
+- [ ] **FAIL** - One or more criteria not met
+
+**Notes**: _________________________________________________________
+
+---
+
+## Test Case 6: Compatibility Validation with Expiration Warnings
+
+### Test Case ID
+TC-BATCH-PRIORITY-WARN-006
+
+### Description
+Verify that the compatibility validation endpoint returns warnings for expired and expiring-soon samples.
+
+### Preconditions
+
+| Item | Value |
+|------|-------|
+| **User Role** | Lab Technician or Lab Manager |
+| **Required Permission** | `batch:manage` |
+| **Containers Available** | Container with expired sample<br>Container with sample expiring in 2 days<br>Container with normal sample |
+
+### Test Steps
+
+| Step | Action | Expected Result |
+|------|--------|-----------------|
+| 1 | Navigate to batch creation, Step 2 | Eligible Samples section loads |
+| 2 | **Select Containers** | |
+| 2.1 | Add container with expired sample | Container added to selection |
+| 2.2 | Add container with expiring-soon sample | Container added to selection |
+| 2.3 | Add container with normal sample | Container added to selection |
+| 3 | Click "Validate Compatibility" button | Validation runs |
+| 4 | **Verify Warnings Displayed** | |
+| 4.1 | Check for expired samples alert | Red MUI Alert with "Expired samples cannot be tested validly" |
+| 4.2 | Check expired samples list | Alert lists affected sample names |
+| 4.3 | Check for expiring-soon alert | Orange MUI Alert with "Some samples are expiring soon" |
+| 4.4 | Check expiring samples list | Alert lists affected sample names |
+| 5 | **Verify Compatibility Result** | |
+| 5.1 | Check compatibility status | "compatible: true" (warnings don't block compatibility) |
+| 5.2 | Verify warnings are informational | User can still proceed with batch creation |
+
+### Expected Results
+
+| Category | Expected Outcome |
+|----------|------------------|
+| **API Call** | POST `/batches/validate-compatibility` called |
+| **Response Structure** | Response includes `warnings` array with typed warnings |
+| **Expired Warning** | `type: "expired_samples"` with list of expired samples |
+| **Expiring Warning** | `type: "expiring_soon"` with list of samples (≤3 days) |
+| **UI Display** | MUI Alerts shown for each warning type |
+| **Non-Blocking** | Warnings don't prevent batch creation |
+
+### Pass/Fail Criteria
+
+| Criteria | Pass | Fail |
+|----------|------|------|
+| Expired samples warning displayed | ✓ | ✗ |
+| Expiring-soon warning displayed | ✓ | ✗ |
+| Warning includes sample names | ✓ | ✗ |
+| Warnings are informational (non-blocking) | ✓ | ✗ |
+| Alert severity matches warning type | ✓ | ✗ |
+
+### Test Result
+- [ ] **PASS** - All criteria met
+- [ ] **FAIL** - One or more criteria not met
+
+**Notes**: _________________________________________________________
+
+---
+
+## Test Case 7: Multi-Step Batch Wizard Navigation
+
+### Test Case ID
+TC-BATCH-WIZARD-007
+
+### Description
+Verify the multi-step batch creation wizard navigation with all four steps.
+
+### Test Steps
+
+| Step | Action | Expected Result |
+|------|--------|-----------------|
+| 1 | Navigate to batch creation | Wizard loads at Step 1 |
+| 2 | Verify stepper shows all steps | Steps: "Batch Details", "Select Eligible Samples", "QC Samples", "Review & Create" |
+| 3 | **Step 1: Batch Details** | |
+| 3.1 | Enter Batch Name: `BATCH-WIZARD-001` | Field accepts input |
+| 3.2 | Click "Next" without name | Button disabled or validation error |
+| 3.3 | Enter name and select status | Form valid |
+| 3.4 | Click "Next" | Navigates to Step 2 |
+| 4 | **Step 2: Eligible Samples** | |
+| 4.1 | Verify eligible samples load | DataGrid populated with prioritized samples |
+| 4.2 | Optionally add containers | Containers added to selection |
+| 4.3 | Click "Next" | Navigates to Step 3, triggers validation if containers selected |
+| 5 | **Step 3: QC Samples** | |
+| 5.1 | Verify QC section visible | "Add QC" button available |
+| 5.2 | Optionally add QC samples | QC additions in list |
+| 5.3 | Click "Next" | Navigates to Step 4 |
+| 6 | **Step 4: Review & Create** | |
+| 6.1 | Verify batch summary | Name, status, containers, QC samples displayed |
+| 6.2 | Verify warnings shown | Any compatibility warnings displayed |
+| 6.3 | Click "Create Batch" | Batch created successfully |
+| 7 | **Navigation Controls** | |
+| 7.1 | Click "Back" on Step 4 | Returns to Step 3 |
+| 7.2 | Click "Back" on Step 3 | Returns to Step 2 |
+| 7.3 | Click "Cancel" | Calls onCancel, closes wizard |
+
+### Pass/Fail Criteria
+
+| Criteria | Pass | Fail |
+|----------|------|------|
+| All 4 steps visible in stepper | ✓ | ✗ |
+| Step 1 validation enforced | ✓ | ✗ |
+| Step 2 loads eligible samples | ✓ | ✗ |
+| Step 3 allows QC configuration | ✓ | ✗ |
+| Step 4 shows review summary | ✓ | ✗ |
+| Back navigation works | ✓ | ✗ |
+| Cancel closes wizard | ✓ | ✗ |
+
+### Test Result
+- [ ] **PASS** - All criteria met
+- [ ] **FAIL** - One or more criteria not met
+
+**Notes**: _________________________________________________________
+
+---
+
 ## Reference Documentation
 
 ### User Story US-9 (Batch-Based Results Entry)
@@ -281,6 +556,21 @@ Create a batch with QC samples auto-generated during batch creation.
   - Record review_date
   - API: PATCH `/tests/{id}/review`; RBAC: `result:review`
 
+### User Story US-11 (Create and Manage Batches with Prioritization)
+- **As a** Lab Technician
+- **I want** to create batches of containers with sample prioritization
+- **So that** group processing focuses on the most urgent samples first
+- **Acceptance Criteria**:
+  - Samples sorted by expiration priority (`days_until_expiration ASC NULLS LAST`)
+  - Secondary sort by due date priority (`days_until_due ASC NULLS LAST`)
+  - Expiration calculation: `date_sampled + analysis.shelf_life - now()`
+  - Due date inheritance: `COALESCE(sample.due_date, project.due_date)`
+  - Flag expired samples (`is_expired=true`) and overdue samples (`is_overdue=true`)
+  - Display warning: "Expired: Testing invalid" for expired samples
+  - Visual indicators: Red background for expired, orange for expiring soon (≤3 days)
+  - ARIA labels for accessibility
+  - API: GET `/samples/eligible` for prioritized list
+
 ### User Story US-26 (Cross-Project Batching)
 - **As a** Lab Technician
 - **I want** to batch samples from multiple NimbleLIMS projects together if they have compatible test types
@@ -290,7 +580,9 @@ Create a batch with QC samples auto-generated during batch creation.
   - Validation for compatibility (e.g., shared prep analysis like "EPA Method 8080 Prep")
   - Option to split into sub-batches for divergent steps
   - RLS enforces access to all included samples
-  - API: POST `/batches` with cross-project container_ids; RBAC: `batch:manage`
+  - Expiration validation: Validate-compatibility endpoint warns about expired/expiring samples
+  - Priority sorting: Eligible samples from all projects sorted by expiration then due date
+  - API: POST `/batches` with cross-project container_ids; POST `/batches/validate-compatibility` with expiration warnings; RBAC: `batch:manage`
 
 ### User Story US-27 (Add QC Samples at Batch Creation)
 - **As a** Lab Technician
@@ -365,6 +657,10 @@ Create a batch with QC samples auto-generated during batch creation.
 | TC-BATCH-BASIC-001 | | | | |
 | TC-BATCH-CROSS-PROJECT-002 | | | | |
 | TC-BATCH-QC-003 | | | | |
+| TC-BATCH-PRIORITY-004 | | | | Sample prioritization display |
+| TC-BATCH-PRIORITY-DUE-005 | | | | Due date inheritance |
+| TC-BATCH-PRIORITY-WARN-006 | | | | Expiration warnings |
+| TC-BATCH-WIZARD-007 | | | | Multi-step wizard navigation |
 
 ---
 
@@ -399,4 +695,12 @@ Create a batch with QC samples auto-generated during batch creation.
 ### Analyses
 - `EPA Method 8080 Prep` (shared prep method for compatibility)
 - `EPA Method 8080 Analytical` (analytical method)
+
+### Prioritization Test Data
+- **SAMPLE-URGENT**: `date_sampled` = 12 days ago, `shelf_life` = 14 days → 2 days until expiration
+- **SAMPLE-EXPIRED**: `date_sampled` = 20 days ago, `shelf_life` = 14 days → -6 days (expired)
+- **SAMPLE-NORMAL**: `date_sampled` = 4 days ago, `shelf_life` = 14 days → 10 days until expiration
+- **SAMPLE-NO-EXP**: `date_sampled` = NULL → no expiration calculation
+- **SAMPLE-INHERIT**: `sample.due_date` = NULL, `project.due_date` = +10 days → inherits project due date
+- **SAMPLE-OVERRIDE**: `sample.due_date` = +3 days, `project.due_date` = +10 days → uses sample due date
 

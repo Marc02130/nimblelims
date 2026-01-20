@@ -30,6 +30,32 @@ from uuid import UUID
 router = APIRouter()
 
 
+def build_batch_response(batch: Batch, batch_containers: list) -> BatchResponse:
+    """
+    Build a BatchResponse from a Batch model and its BatchContainer records.
+    
+    This helper is needed because the Batch model has a 'containers' relationship
+    that points to Container objects (via secondary table), but BatchResponse.containers
+    expects BatchContainerResponse objects. Using from_orm() directly would fail.
+    """
+    return BatchResponse(
+        id=batch.id,
+        name=batch.name,
+        description=batch.description,
+        type=batch.type,
+        status=batch.status,
+        start_date=batch.start_date,
+        end_date=batch.end_date,
+        custom_attributes=batch.custom_attributes or {},
+        active=batch.active,
+        created_at=batch.created_at,
+        created_by=batch.created_by,
+        modified_at=batch.modified_at,
+        modified_by=batch.modified_by,
+        containers=[BatchContainerResponse.from_orm(bc) for bc in batch_containers] if batch_containers else []
+    )
+
+
 @router.get("", response_model=BatchListResponse)
 async def get_batches(
     type: Optional[UUID] = Query(None, description="Filter by batch type ID"),
@@ -68,9 +94,7 @@ async def get_batches(
         batch_containers = db.query(BatchContainer).filter(
             BatchContainer.batch_id == batch.id
         ).all()
-        batch_response = BatchResponse.from_orm(batch)
-        batch_response.containers = [BatchContainerResponse.from_orm(bc) for bc in batch_containers] if batch_containers else []
-        batch_responses.append(batch_response)
+        batch_responses.append(build_batch_response(batch, batch_containers))
     
     return BatchListResponse(
         batches=batch_responses,
@@ -106,9 +130,7 @@ async def get_batch(
         BatchContainer.batch_id == batch.id
     ).all()
     
-    batch_response = BatchResponse.from_orm(batch)
-    batch_response.containers = [BatchContainerResponse.from_orm(bc) for bc in batch_containers] if batch_containers else []
-    return batch_response
+    return build_batch_response(batch, batch_containers)
 
 
 @router.post("/validate-compatibility")
@@ -120,7 +142,15 @@ async def validate_batch_compatibility(
     """
     Validate compatibility of containers for cross-project batching.
     Returns compatibility status and details.
+    
+    Includes checks for:
+    - Container existence and access
+    - Shared analyses across samples
+    - Expired samples (warns if any have days_until_expiration < 0)
     """
+    from datetime import timedelta
+    from models.analysis import Analysis
+    
     container_ids = data.get("container_ids", [])
     
     if not container_ids or len(container_ids) < 2:
@@ -191,12 +221,12 @@ async def validate_batch_compatibility(
             "error": "No tests found for samples in the specified containers"
         }
     
-    # Get analysis names
-    from models.analysis import Analysis
+    # Get analysis objects (need shelf_life for expiration check)
     analyses = db.query(Analysis).filter(
         Analysis.id.in_(analysis_ids),
         Analysis.active == True
     ).all()
+    analysis_map = {a.id: a for a in analyses}
     
     # Group tests by sample to find common analyses
     sample_analyses = {}
@@ -222,19 +252,83 @@ async def validate_batch_compatibility(
                     "suggestion": "Samples must share at least one common analysis (e.g., prep method) for cross-project batching"
                 }
             }
-        else:
-            common_analysis_names = {a.name for a in analyses if a.id in common_analyses}
-            return {
-                "compatible": True,
-                "details": {
-                    "projects": [str(p) for p in project_ids],
-                    "common_analyses": list(common_analysis_names)
-                }
-            }
+    else:
+        return {
+            "compatible": False,
+            "error": "Unable to determine compatibility"
+        }
+    
+    # Check for expired samples based on date_sampled + shelf_life
+    now = datetime.utcnow()
+    expired_samples = []
+    expiring_soon_samples = []
+    
+    # Get samples with their date_sampled
+    samples = db.query(Sample).filter(
+        Sample.id.in_(sample_ids),
+        Sample.active == True
+    ).all()
+    
+    for sample in samples:
+        if not sample.date_sampled:
+            continue
+        
+        # Get the minimum shelf_life from analyses assigned to this sample
+        sample_analysis_ids = sample_analyses.get(sample.id, set())
+        min_shelf_life = None
+        for aid in sample_analysis_ids:
+            analysis = analysis_map.get(aid)
+            if analysis and analysis.shelf_life:
+                if min_shelf_life is None or analysis.shelf_life < min_shelf_life:
+                    min_shelf_life = analysis.shelf_life
+        
+        if min_shelf_life is None:
+            continue
+        
+        # Compute expiration date and days until expiration
+        expiration_date = sample.date_sampled + timedelta(days=min_shelf_life)
+        days_until_expiration = (expiration_date - now).days
+        
+        if days_until_expiration < 0:
+            expired_samples.append({
+                "sample_id": str(sample.id),
+                "sample_name": sample.name,
+                "days_expired": abs(days_until_expiration),
+                "expiration_date": expiration_date.isoformat()
+            })
+        elif days_until_expiration <= 3:
+            expiring_soon_samples.append({
+                "sample_id": str(sample.id),
+                "sample_name": sample.name,
+                "days_until_expiration": days_until_expiration,
+                "expiration_date": expiration_date.isoformat()
+            })
+    
+    # Build response
+    common_analysis_names = {a.name for a in analyses if a.id in common_analyses}
+    warnings = []
+    
+    if expired_samples:
+        warnings.append({
+            "type": "expired_samples",
+            "message": "Expired samples cannot be tested validly",
+            "samples": expired_samples
+        })
+    
+    if expiring_soon_samples:
+        warnings.append({
+            "type": "expiring_soon",
+            "message": "Some samples are expiring soon",
+            "samples": expiring_soon_samples
+        })
     
     return {
-        "compatible": False,
-        "error": "Unable to determine compatibility"
+        "compatible": True,
+        "details": {
+            "projects": [str(p) for p in project_ids],
+            "common_analyses": list(common_analysis_names)
+        },
+        "warnings": warnings if warnings else None
     }
 
 
@@ -460,9 +554,7 @@ async def create_batch(
                 batch_id=batch.id,
                 container_id=container_id,
                 position=None,  # Can be set later if needed
-                notes=None,
-                created_by=current_user.id,
-                modified_by=current_user.id
+                notes=None
             )
             db.add(batch_container)
     
@@ -609,9 +701,7 @@ async def create_batch(
                 batch_id=batch.id,
                 container_id=qc_container.id,
                 position=None,
-                notes=qc_addition.notes,
-                created_by=current_user.id,
-                modified_by=current_user.id
+                notes=qc_addition.notes
             )
             db.add(qc_batch_container)
     
@@ -639,9 +729,7 @@ async def create_batch(
         BatchContainer.batch_id == batch.id
     ).all()
     
-    batch_response = BatchResponse.from_orm(batch)
-    batch_response.containers = [BatchContainerResponse.from_orm(bc) for bc in batch_containers] if batch_containers else []
-    return batch_response
+    return build_batch_response(batch, batch_containers)
 
 
 @router.post("/with-containers", response_model=BatchResponse)
@@ -701,16 +789,19 @@ async def create_batch_with_containers(
             batch_id=batch.id,
             container_id=container_req.container_id,
             position=container_req.position,
-            notes=container_req.notes,
-            created_by=current_user.id,
-            modified_by=current_user.id
+            notes=container_req.notes
         )
         db.add(batch_container)
     
     db.commit()
     db.refresh(batch)
     
-    return BatchResponse.from_orm(batch)
+    # Load batch containers for response
+    batch_containers = db.query(BatchContainer).filter(
+        BatchContainer.batch_id == batch.id
+    ).all()
+    
+    return build_batch_response(batch, batch_containers)
 
 
 @router.post("/{batch_id}/containers", response_model=BatchContainerResponse)
@@ -764,9 +855,7 @@ async def add_container_to_batch(
         batch_id=batch_id,
         container_id=container_data.container_id,
         position=container_data.position,
-        notes=container_data.notes,
-        created_by=current_user.id,
-        modified_by=current_user.id
+        notes=container_data.notes
     )
     
     db.add(batch_container)
@@ -823,7 +912,12 @@ async def update_batch(
     db.commit()
     db.refresh(batch)
     
-    return BatchResponse.from_orm(batch)
+    # Load batch containers for response
+    batch_containers = db.query(BatchContainer).filter(
+        BatchContainer.batch_id == batch.id
+    ).all()
+    
+    return build_batch_response(batch, batch_containers)
 
 
 @router.patch("/{batch_id}/status", response_model=BatchResponse)
@@ -874,7 +968,12 @@ async def update_batch_status(
     db.commit()
     db.refresh(batch)
     
-    return BatchResponse.from_orm(batch)
+    # Load batch containers for response
+    batch_containers = db.query(BatchContainer).filter(
+        BatchContainer.batch_id == batch.id
+    ).all()
+    
+    return build_batch_response(batch, batch_containers)
 
 
 @router.delete("/{batch_id}")

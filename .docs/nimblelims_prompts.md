@@ -1004,4 +1004,40 @@ Responsive: DataGrid with horizontal scroll on mobile; use useMemo for configs.
 Ensure ESLint/TypeScript compliance. Output as: new ProjectsManagement.tsx (full file), updates to apiService.ts (add project methods), and integration in App.tsx for routing (changes only)."
 
 
-# 
+# Batch by test changes
+## Prompt 1: Database Schema Updates for Prioritization Fields
+"Refine the NimbleLIMS PostgreSQL schema to support sample prioritization based on expiration and due dates, referencing schema_dump.sql (samples/analyses/projects tables), nimblelims_tech.md (Section 3 Data Model), and nimblelims_user.md (US-11 for batches).
+
+Add to samples: date_sampled (datetime optional, for expiration calc).
+Add to analyses: shelf_life (integer optional, days for expiration = date_sampled + shelf_life).
+Add to projects: due_date (datetime optional, for project-level turnaround; samples inherit if due_date null).
+RLS: No changes needed, as access remains via has_project_access.
+Indexes: Add on samples.date_sampled and analyses.shelf_life for query perf.
+Migrations: Alembic script to add columns with defaults (null).
+Output as: Updated schema_ddl.sql (full file with new columns), Alembic migration script (new file: migration_prioritization_fields.py)."
+
+## Prompt 2: API and Backend Updates for Prioritization Logic
+"Implement backend updates for sample prioritization in NimbleLIMS, based on api_endpoints.md (Samples/Batches sections), technical-accessioning-to-reporting.md (API Endpoints), and batches.md (Batch creation with QC).
+
+Update GET /samples/eligible?test_ids=uuid1,uuid2: Compute days_until_expiration = (samples.date_sampled + analyses.shelf_life - now()).days (via SQLAlchemy interval); days_until_due = (coalesce(samples.due_date, projects.due_date) - now()).days; sort results by days_until_expiration ASC NULLS LAST, then days_until_due ASC NULLS LAST; include these fields in response; flag negatives (expired/overdue) with a boolean/warning message.
+Update POST /batches/validate-compatibility: Add checks for expired samples (warn if any days_until_expiration < 0: 'Expired samples cannot be tested validly').
+Schemas: Update EligibleSamplesResponse to include days_until_expiration (int nullable), days_until_due (int nullable), is_expired (bool).
+Handle inheritance: Use coalesce for due_date (sample > project).
+RBAC: No changes.
+Output as: Updated routers/samples.py (add eligible endpoint logic), routers/batches.py (validation updates), schemas/sample.py (full file with changes)."
+
+## Prompt 3: Frontend UI Updates for Prioritization Display
+"Update the NimbleLIMS frontend to display and sort by sample prioritization, referencing ui-accessioning-to-reporting.md (BatchFormEnhanced.tsx), workflow-accessioning-to-reporting.md (Batch flow), and navigation.md (Batches).
+
+In BatchFormEnhanced.tsx (Step 2: Eligible samples DataGrid): Add columns for days_until_expiration, days_until_due; default sort by days_until_expiration ASC, then days_until_due ASC; highlight negatives (red text/cell) with tooltip 'Expired: Testing invalid' or 'Overdue'.
+On step change, call /batches/validate-compatibility and show warnings (MUI Alert) for expired/overdue samples.
+apiService: Update getEligibleSamples to parse new fields; add sorting params if needed (but handle server-side).
+Accessibility: ARIA labels for sorted columns (e.g., 'Sorted by expiration priority').
+Output as: Updated components/batches/BatchFormEnhanced.tsx (full file), services/apiService.ts (method updates)."
+
+## Prompt 4: Documentation and Testing Updates
+"Update docs and add tests for sample prioritization in NimbleLIMS, aligning with nimblelims_user.md (US-11/26/27), batches.md (Overview/API), and nimblelims_tech.md (Workflows).
+
+Docs: In batches.md, add Prioritization section (explain calcs, sorting); update US-11 in nimblelims_user.md (add criteria: prioritize by expiration > due, flag expired).
+Tests: Pytest for eligible endpoint (mock dates, assert sorting/flags); Jest for UI (render DataGrid with priorities, check highlights/tooltips).
+Output as: Updated batches.md (full file), nimblelims_user.md (US sections only), new tests/test_samples.py (eligible/prioritization cases)."

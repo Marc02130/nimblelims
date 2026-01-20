@@ -13,6 +13,9 @@ import {
   DialogContent,
   DialogContentText,
   DialogActions,
+  Chip,
+  FormControlLabel,
+  Switch,
 } from '@mui/material';
 import {
   Add,
@@ -20,6 +23,8 @@ import {
   Delete,
   Search,
   Clear,
+  CheckCircle,
+  Cancel,
 } from '@mui/icons-material';
 import { DataGrid, GridColDef, GridActionsCellItem, GridRowParams } from '@mui/x-data-grid';
 import { useUser } from '../../contexts/UserContext';
@@ -54,6 +59,7 @@ const UsersManagement: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [showInactive, setShowInactive] = useState(true);
   const [formOpen, setFormOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -63,7 +69,7 @@ const UsersManagement: React.FC = () => {
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [showInactive]);
 
   const loadData = async () => {
     try {
@@ -71,7 +77,7 @@ const UsersManagement: React.FC = () => {
       setError(null);
       
       const [usersData, rolesData, clientsData] = await Promise.all([
-        apiService.getUsers(),
+        apiService.getUsers({ include_inactive: showInactive }),
         apiService.getRoles(),
         apiService.getClients(),
       ]);
@@ -119,6 +125,7 @@ const UsersManagement: React.FC = () => {
     password?: string;
     role_id: string;
     client_id?: string;
+    active?: boolean;
   }) => {
     if (!selectedUser) return;
     await apiService.updateUser(selectedUser.id, data);
@@ -191,6 +198,22 @@ const UsersManagement: React.FC = () => {
       valueGetter: (value, row) => formatDate((row as User).last_login),
     },
     {
+      field: 'active',
+      headerName: 'Status',
+      width: 100,
+      renderCell: (params) => {
+        const userRow = params.row as User;
+        return (
+          <Chip
+            icon={userRow.active ? <CheckCircle /> : <Cancel />}
+            label={userRow.active ? 'Active' : 'Inactive'}
+            color={userRow.active ? 'success' : 'default'}
+            size="small"
+          />
+        );
+      },
+    },
+    {
       field: 'actions',
       type: 'actions',
       headerName: 'Actions',
@@ -259,9 +282,9 @@ const UsersManagement: React.FC = () => {
         </Alert>
       )}
 
-      <Box sx={{ mb: 2 }}>
+      <Box sx={{ mb: 2, display: 'flex', gap: 2, alignItems: 'center' }}>
         <TextField
-          fullWidth
+          sx={{ flex: 1 }}
           placeholder="Search users..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
@@ -279,6 +302,16 @@ const UsersManagement: React.FC = () => {
               </InputAdornment>
             ),
           }}
+        />
+        <FormControlLabel
+          control={
+            <Switch
+              checked={showInactive}
+              onChange={(e) => setShowInactive(e.target.checked)}
+              color="primary"
+            />
+          }
+          label="Show inactive"
         />
       </Box>
 

@@ -14,7 +14,7 @@ The UAT scripts should be run in the following order based on their dependencies
 | 6 | `uat-sample-accessioning` | uat-configurations-custom, uat-container-management | Single sample accessioning with containers and tests |
 | 7 | `uat-test-ordering` | uat-sample-accessioning | Test assignment, test batteries, status management |
 | 8 | `uat-sample-status-editing` | uat-sample-accessioning | Sample editing, status transitions |
-| 9 | `uat-batch-management` | uat-sample-accessioning, uat-container-management | Batch creation, cross-project batching, QC generation |
+| 9 | `uat-batch-management` | uat-sample-accessioning, uat-container-management | Batch creation, cross-project batching, QC generation, **sample prioritization** |
 | 10 | `uat-aliquots-qc` | uat-sample-accessioning | Aliquot creation, QC sample workflows |
 | 11 | `uat-results-entry-review` | uat-batch-management | Results entry, validation, review workflow |
 | 12 | `uat-bulk-enhancements` | uat-sample-accessioning, uat-batch-management | Bulk accessioning, batch operations |
@@ -52,7 +52,7 @@ After completing `uat-configurations-custom`, the recommended next scripts are:
 | Date | Script | Status | Tester | Notes |
 |------|--------|--------|--------|-------|
 | 2026-01-19 | uat-configurations-custom | ✅ Complete | | Lists CRUD, custom fields, list creation with empty list expand |
-| | uat-security-rbac | ⬜ Pending | | |
+| 2026-01-19 | uat-security-rbac | ✅ Updated | | Fixed role permissions to match actual migration data; Lab Tech HAS sample:create |
 | | uat-navigation-ui | ⬜ Pending | | |
 | | uat-help-system | ⬜ Pending | | |
 | | uat-container-management | ⬜ Pending | | |

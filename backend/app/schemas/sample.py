@@ -14,6 +14,7 @@ class SampleBase(BaseModel):
     due_date: Optional[datetime] = None
     received_date: Optional[datetime] = None
     report_date: Optional[datetime] = None
+    date_sampled: Optional[datetime] = Field(None, description="When sample was collected (for expiration calculation)")
     sample_type: UUID = Field(..., description="ID of sample type from list_entries")
     status: UUID = Field(..., description="ID of status from list_entries")
     matrix: UUID = Field(..., description="ID of matrix from list_entries")
@@ -120,6 +121,7 @@ class SampleUpdate(BaseModel):
     due_date: Optional[datetime] = None
     received_date: Optional[datetime] = None
     report_date: Optional[datetime] = None
+    date_sampled: Optional[datetime] = Field(None, description="When sample was collected (for expiration calculation)")
     sample_type: Optional[UUID] = None
     status: Optional[UUID] = None
     matrix: Optional[UUID] = None
@@ -250,6 +252,48 @@ class SampleListResponse(BaseModel):
     page: int
     size: int
     pages: int
+
+
+class EligibleSampleResponse(BaseModel):
+    """Schema for eligible sample response with prioritization fields"""
+    id: UUID
+    name: str
+    description: Optional[str] = None
+    due_date: Optional[datetime] = None
+    received_date: Optional[datetime] = None
+    date_sampled: Optional[datetime] = Field(None, description="When sample was collected")
+    sample_type: UUID
+    status: UUID
+    matrix: UUID
+    project_id: UUID
+    qc_type: Optional[UUID] = None
+    # Prioritization fields
+    days_until_expiration: Optional[int] = Field(None, description="Days until sample expires (negative = expired)")
+    days_until_due: Optional[int] = Field(None, description="Days until due date (negative = overdue)")
+    is_expired: bool = Field(False, description="True if sample is expired (days_until_expiration < 0)")
+    is_overdue: bool = Field(False, description="True if sample is overdue (days_until_due < 0)")
+    expiration_warning: Optional[str] = Field(None, description="Warning message for expired/expiring samples")
+    # Analysis context
+    analysis_id: Optional[UUID] = Field(None, description="Analysis ID used for shelf_life calculation")
+    analysis_name: Optional[str] = Field(None, description="Analysis name")
+    shelf_life: Optional[int] = Field(None, description="Shelf life in days from analysis")
+    # Project context
+    project_name: Optional[str] = Field(None, description="Project name")
+    project_due_date: Optional[datetime] = Field(None, description="Project-level due date")
+    effective_due_date: Optional[datetime] = Field(None, description="Effective due date (sample or project)")
+
+    class Config:
+        from_attributes = True
+
+
+class EligibleSamplesResponse(BaseModel):
+    """Schema for eligible samples list response with pagination"""
+    samples: List[EligibleSampleResponse]
+    total: int
+    page: int
+    size: int
+    pages: int
+    warnings: List[str] = Field(default_factory=list, description="Warnings about expired/expiring samples")
 
 
 class SampleAccessioningRequest(BaseModel):

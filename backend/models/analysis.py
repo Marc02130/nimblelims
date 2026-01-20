@@ -12,6 +12,7 @@ class Analysis(BaseModel):
     method = Column(String(255), nullable=True)
     turnaround_time = Column(Integer, nullable=True)  # in days
     cost = Column(Numeric(10, 2), nullable=True)
+    shelf_life = Column(Integer, nullable=True)  # Days until expiration = date_sampled + shelf_life
     
     # Relationships
     analytes = relationship("Analyte", secondary="analysis_analytes", back_populates="analyses")

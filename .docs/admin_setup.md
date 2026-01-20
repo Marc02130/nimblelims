@@ -6,7 +6,7 @@ After starting the application with `docker-compose up -d --build`, Alembic migr
 
 - **Username**: `admin`
 - **Password**: `admin123`
-- **Email**: `admin@lims.local`
+- **Email**: `admin@lims.example.com`
 
 ## ⚠️ SECURITY WARNING
 

@@ -21,6 +21,7 @@ import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { Formik, Form } from 'formik';
 import * as Yup from 'yup';
 import CustomAttributeField from '../common/CustomAttributeField';
+import ContainerGrid from './ContainerGrid';
 import { apiService } from '../../services/apiService';
 
 interface CustomAttributeConfig {
@@ -33,7 +34,36 @@ interface CustomAttributeConfig {
   active: boolean;
 }
 
+interface Container {
+  id: string;
+  name: string;
+  type: string;
+  type_id?: string;
+  row: number;
+  column: number;
+  samples?: any[];
+  contents?: any[];
+}
+
+interface Batch {
+  id: string;
+  name: string;
+  description: string;
+  type: string;
+  status: string;
+  start_date: string | null;
+  end_date: string | null;
+  custom_attributes?: Record<string, any>;
+  containers?: Array<{
+    batch_id: string;
+    container_id: string;
+    position?: string;
+    notes?: string;
+  }>;
+}
+
 interface BatchFormProps {
+  batch?: Batch;  // Optional - if provided, form is in edit mode
   onSuccess: (batch: any) => void;
   onCancel: () => void;
 }
@@ -157,13 +187,44 @@ const buildCustomAttributesValidation = (configs: CustomAttributeConfig[]): Reco
   };
 };
 
-const BatchForm: React.FC<BatchFormProps> = ({ onSuccess, onCancel }) => {
+const BatchForm: React.FC<BatchFormProps> = ({ batch, onSuccess, onCancel }) => {
+  const isEdit = !!batch;
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [listEntries, setListEntries] = useState<any>({});
   const [customAttributeConfigs, setCustomAttributeConfigs] = useState<CustomAttributeConfig[]>([]);
   const [configsError, setConfigsError] = useState<string | null>(null);
   const [loadingConfigs, setLoadingConfigs] = useState(false);
+  const [batchContainers, setBatchContainers] = useState<Container[]>([]);
+  const [loadingContainers, setLoadingContainers] = useState(false);
+
+  // Load full container details when editing
+  useEffect(() => {
+    const loadContainers = async () => {
+      if (isEdit && batch?.containers && batch.containers.length > 0) {
+        setLoadingContainers(true);
+        try {
+          // Fetch full container details for each container in the batch
+          const containerPromises = batch.containers.map(async (bc) => {
+            try {
+              const container = await apiService.getContainer(bc.container_id);
+              return container;
+            } catch (err) {
+              console.error(`Failed to load container ${bc.container_id}:`, err);
+              return null;
+            }
+          });
+          const containers = await Promise.all(containerPromises);
+          setBatchContainers(containers.filter((c): c is Container => c !== null));
+        } catch (err) {
+          console.error('Failed to load batch containers:', err);
+        } finally {
+          setLoadingContainers(false);
+        }
+      }
+    };
+    loadContainers();
+  }, [isEdit, batch?.id]);
 
   useEffect(() => {
     const loadData = async () => {
@@ -213,15 +274,28 @@ const BatchForm: React.FC<BatchFormProps> = ({ onSuccess, onCancel }) => {
     ...buildCustomAttributesValidation(customAttributeConfigs),
   }), [customAttributeConfigs]);
 
-  const getInitialValues = () => ({
-    name: '',
-    description: '',
-    type: '',
-    status: listEntries.batch_statuses?.find((s: any) => s.name === 'Created')?.id || '',
-    start_date: null as Date | null,
-    end_date: null as Date | null,
-    custom_attributes: {} as Record<string, any>,
-  });
+  const getInitialValues = () => {
+    if (isEdit && batch) {
+      return {
+        name: batch.name || '',
+        description: batch.description || '',
+        type: batch.type || '',
+        status: batch.status || '',
+        start_date: batch.start_date ? new Date(batch.start_date) : null,
+        end_date: batch.end_date ? new Date(batch.end_date) : null,
+        custom_attributes: batch.custom_attributes || {},
+      };
+    }
+    return {
+      name: '',
+      description: '',
+      type: '',
+      status: listEntries.batch_statuses?.find((s: any) => s.name === 'Created')?.id || '',
+      start_date: null as Date | null,
+      end_date: null as Date | null,
+      custom_attributes: {} as Record<string, any>,
+    };
+  };
 
   const handleSubmit = async (values: any) => {
     setLoading(true);
@@ -231,17 +305,22 @@ const BatchForm: React.FC<BatchFormProps> = ({ onSuccess, onCancel }) => {
       const batchData = {
         name: values.name,
         description: values.description,
-        type: values.type,
+        type: values.type || null,
         status: values.status,
-        start_date: values.start_date?.toISOString(),
-        end_date: values.end_date?.toISOString(),
+        start_date: values.start_date?.toISOString() || null,
+        end_date: values.end_date?.toISOString() || null,
         custom_attributes: values.custom_attributes,
       };
 
-      const result = await apiService.createBatch(batchData);
+      let result;
+      if (isEdit && batch) {
+        result = await apiService.updateBatch(batch.id, batchData);
+      } else {
+        result = await apiService.createBatch(batchData);
+      }
       onSuccess(result);
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to create batch');
+      setError(err.response?.data?.detail || `Failed to ${isEdit ? 'update' : 'create'} batch`);
     } finally {
       setLoading(false);
     }
@@ -252,7 +331,7 @@ const BatchForm: React.FC<BatchFormProps> = ({ onSuccess, onCancel }) => {
       <Card>
         <CardContent>
           <Typography variant="h6" gutterBottom>
-            Create New Batch
+            {isEdit ? 'Edit Batch' : 'Create New Batch'}
           </Typography>
           <Divider sx={{ mb: 2 }} />
 
@@ -449,7 +528,7 @@ const BatchForm: React.FC<BatchFormProps> = ({ onSuccess, onCancel }) => {
                         disabled={loading || !isValid}
                     startIcon={loading && <CircularProgress size={20} />}
                   >
-                    Create Batch
+                    {isEdit ? 'Update Batch' : 'Create Batch'}
                   </Button>
                 </Box>
               </Grid>
@@ -457,6 +536,29 @@ const BatchForm: React.FC<BatchFormProps> = ({ onSuccess, onCancel }) => {
               </Form>
             )}
           </Formik>
+
+          {/* Container Management - only shown when editing */}
+          {isEdit && batch && (
+            <>
+              <Divider sx={{ my: 3 }} />
+              <Typography variant="h6" gutterBottom>
+                Containers in Batch
+              </Typography>
+              {loadingContainers ? (
+                <Box display="flex" justifyContent="center" p={3}>
+                  <CircularProgress />
+                </Box>
+              ) : (
+                <ContainerGrid
+                  batchId={batch.id}
+                  containers={batchContainers}
+                  onContainersChange={(updatedContainers) => {
+                    setBatchContainers(updatedContainers);
+                  }}
+                />
+              )}
+            </>
+          )}
         </CardContent>
       </Card>
     </LocalizationProvider>

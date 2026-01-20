@@ -15,7 +15,7 @@ This document contains User Acceptance Testing (UAT) scripts for security and Ro
 - NimbleLIMS application running (backend and frontend)
 - Database seeded with:
   - Roles: Administrator, Lab Manager, Lab Technician, Client
-  - Permissions: All 17 core permissions (e.g., `sample:create`, `result:enter`, `batch:manage`)
+  - Permissions: All 13 core permissions (see Reference Documentation for full list)
   - Role-permission mappings via `role_permissions` junction table
   - At least one user per role with appropriate permissions
   - At least one client user with `client_id` set
@@ -23,9 +23,9 @@ This document contains User Acceptance Testing (UAT) scripts for security and Ro
   - At least one sample in accessible project
   - At least one sample in inaccessible project
 - Test user accounts:
-  - Lab Technician with `result:enter` permission but without `sample:create` permission
-  - Client user with `client_id` set, only `sample:read` and `result:read` permissions
+  - Client user with `client_id` set, only `sample:read` permission
   - Administrator user (for comparison)
+  - Lab Technician user (seeded as `lab-tech` with full lab technician permissions)
 
 ---
 
@@ -90,7 +90,7 @@ Verify user authentication with username/password, JWT token generation, token v
   "username": "testuser",
   "email": "test@example.com",
   "role": "Lab Technician",
-  "permissions": ["sample:read", "result:enter", "test:assign"]
+  "permissions": ["sample:create", "sample:read", "sample:update", "test:assign", "test:update", "result:enter", "batch:manage", "batch:read"]
 }
 ```<br>- HTTP 200 OK |
 | **Token Storage** | - Token stored in browser `localStorage` with key "token"<br>- Token added to all subsequent API requests as: `Authorization: Bearer {token}` |
@@ -159,44 +159,40 @@ Verify that users without required permissions are denied access to protected en
 | Item | Value |
 |------|-------|
 | **User Role** | Lab Technician |
-| **User Permissions** | User has `result:enter` permission but does NOT have `sample:create` permission |
-| **Role-Permission Mapping** | `role_permissions` junction table configured correctly:<br>- Lab Technician role has `result:enter` permission<br>- Lab Technician role does NOT have `sample:create` permission |
+| **User Permissions** | Lab Technician has: `sample:create`, `sample:read`, `sample:update`, `test:assign`, `test:update`, `result:enter`, `batch:manage`, `batch:read`<br>Lab Technician does NOT have: `config:edit`, `result:review`, `user:manage`, `role:manage`, `project:manage` |
+| **Role-Permission Mapping** | `role_permissions` junction table configured correctly per migration 0004 |
 | **User Logged In** | User successfully authenticated with valid JWT token |
-| **Project Exists** | At least one project exists for sample creation test |
+| **List Exists** | At least one list exists for configuration edit test |
 
 ### Test Steps
 
 | Step | Action | Expected Result |
 |------|--------|-----------------|
-| 1 | Log in as Lab Technician without `sample:create` permission | User authenticated, token received |
-| 2 | **Attempt Sample Creation** | |
-| 2.1 | Navigate to sample creation page (e.g., `/samples` or `/accessioning`) | Page loads (if accessible) |
-| 2.2 | Fill in sample creation form | Form accepts input |
-| 2.3 | Click "Create" or "Submit" button | Form submits |
-| 2.4 | Wait for API response | Error response received |
-| 3 | **Verify Permission Denial** | |
-| 3.1 | Verify error response | HTTP 403 Forbidden:<br>- Error message: "Permission 'sample:create' required" |
-| 3.2 | Verify sample not created | No sample record created in database |
-| 4 | **Test Allowed Action** | |
-| 4.1 | Navigate to results entry page | Page loads (user has `result:enter` permission) |
-| 4.2 | Attempt to enter results | Action succeeds (HTTP 200) |
-| 5 | **Test API Direct Call** | |
-| 5.1 | Make direct API call: POST `/samples` with sample data | API call made with Authorization header |
-| 5.2 | Verify error response | HTTP 403 Forbidden:<br>- Error message: "Permission 'sample:create' required" |
+| 1 | Log in as Lab Technician (`lab-tech` user) | User authenticated, token received with Lab Technician permissions |
+| 2 | **Verify Route Protection (UI Redirect)** | |
+| 2.1 | Navigate directly to `/admin/lists` via URL bar | User is redirected to `/dashboard` (route requires `config:edit`) |
+| 2.2 | Navigate directly to `/admin` via URL bar | User is redirected to `/dashboard` |
+| 2.3 | Verify sidebar does not show Admin section | Admin accordion not visible (no `config:edit` permission) |
+| 3 | **Test Allowed Action (Sample Creation)** | |
+| 3.1 | Navigate to accessioning page (`/accessioning`) | Page loads (user has `sample:create` permission) |
+| 3.2 | Fill in sample creation form with valid data | Form accepts input |
+| 3.3 | Submit the form | Action succeeds (HTTP 201 Created) |
+| 3.4 | Verify sample created | Sample appears in samples list |
+| 4 | **Test API Permission Denial (Browser DevTools)** | |
+| 4.1 | Open browser DevTools (F12) → Network tab | DevTools opens |
+| 4.2 | Copy the Authorization header from any successful request | Bearer token obtained |
+| 4.3 | Open DevTools Console and run:<br>`fetch('/api/lists', {method: 'POST', headers: {'Authorization': 'Bearer YOUR_TOKEN', 'Content-Type': 'application/json'}, body: JSON.stringify({name: 'test_denied', description: 'test'})}).then(r => console.log(r.status))` | API call made |
+| 4.4 | Verify response status | HTTP 403 Forbidden returned |
 
 ### Expected Results
 
 | Category | Expected Outcome |
 |----------|------------------|
-| **API Call** | POST `/samples` called with:<br>- Authorization header: `Bearer {token}`<br>- Request body: Sample creation data |
-| **Backend Processing** | 1. **Token Validation**:<br>   - Verify JWT token is valid<br>   - Decode token to get user information<br>2. **Permission Check**:<br>   - Endpoint uses `require_sample_create` dependency<br>   - Dependency calls `require_permission("sample:create")`<br>   - Function `get_user_permissions(user, db)` called:<br>     - Query: `SELECT p.name FROM permissions p JOIN role_permissions rp ON p.id = rp.permission_id WHERE rp.role_id = {user.role_id}`<br>     - Returns list of permission strings<br>   - Check if "sample:create" in user_permissions<br>   - If not found, raise HTTPException with 403<br>3. **Error Response**:<br>   - HTTP 403 Forbidden<br>   - Detail: "Permission 'sample:create' required" |
-| **Error Response** | ```json
-{
-  "detail": "Permission 'sample:create' required"
-}
-```<br>- HTTP 403 Forbidden<br>- No sample created |
-| **UI Feedback** | - Error message displayed to user<br>- Sample creation form shows error state<br>- User cannot proceed with sample creation |
-| **Allowed Action** | - User can access endpoints requiring `result:enter` permission<br> - Results entry succeeds (HTTP 200) |
+| **Route Protection** | - Frontend routes check `hasPermission('config:edit')` before rendering admin pages<br>- Users without permission are automatically redirected to `/dashboard`<br>- No error message shown (seamless redirect) |
+| **Sidebar Visibility** | - Admin section hidden from users without `config:edit` permission<br>- Lab Technician sees: Dashboard, Accessioning, Samples, Tests, Containers, Batches, Results, Help |
+| **Allowed Action** | - User can access `/accessioning` (requires `sample:create`)<br>- Sample creation succeeds (HTTP 201)<br>- Sample appears in samples list |
+| **API Permission Denial** | - Direct API call to POST `/lists` returns HTTP 403<br>- Response body: `{"detail": "Permission 'config:edit' required"}`<br>- Backend correctly blocks unauthorized actions even if UI is bypassed |
+| **Backend Processing** | 1. **Token Validation**: JWT verified and decoded<br>2. **Permission Check**: `require_permission("config:edit")` queries user's role permissions<br>3. **Denial**: Permission not found → HTTPException 403 raised |
 
 ### Test Steps - Administrator Access (Positive Test)
 
@@ -204,26 +200,26 @@ Verify that users without required permissions are denied access to protected en
 |------|--------|-----------------|
 | 6 | **Test Administrator Access** | |
 | 6.1 | Log in as Administrator | User authenticated |
-| 6.2 | Verify Administrator has all permissions | Administrator role has all 17 permissions via `role_permissions` |
-| 6.3 | Attempt sample creation | Action succeeds (HTTP 200) |
-| 6.4 | Verify sample created | Sample record created in database |
+| 6.2 | Verify Administrator has all permissions | Administrator role has all 13 permissions via `role_permissions` |
+| 6.3 | Attempt list creation | Action succeeds (HTTP 201) |
+| 6.4 | Verify list created | List record created in database |
 
 ### Expected Results - Administrator Access
 
 | Category | Expected Outcome |
 |----------|------------------|
-| **Administrator Permissions** | - Administrator role has all permissions via `role_permissions` junction<br>- Or: Administrator bypasses permission checks (implementation detail) |
-| **Sample Creation** | - Sample creation succeeds<br>- Sample record created in database |
+| **Administrator Permissions** | - Administrator role has all permissions via `role_permissions` junction<br>- Includes `config:edit` permission |
+| **List Creation** | - List creation succeeds<br>- List record created in database |
 
 ### Pass/Fail Criteria
 
 | Criteria | Pass | Fail |
 |----------|------|------|
-| User without permission denied access | ✓ | ✗ |
+| Lab Technician denied access to config:edit endpoint | ✓ | ✗ |
 | HTTP 403 Forbidden returned | ✓ | ✗ |
 | Error message is clear and informative | ✓ | ✗ |
-| No data created/modified | ✓ | ✗ |
-| User with permission can access endpoint | ✓ | ✗ |
+| No data created/modified by unauthorized user | ✓ | ✗ |
+| Lab Technician can create samples (has sample:create) | ✓ | ✗ |
 | Administrator can access all endpoints | ✓ | ✗ |
 | Permission check uses role_permissions junction | ✓ | ✗ |
 
@@ -249,7 +245,7 @@ Verify that client users can only access their own projects, samples, and result
 |------|-------|
 | **User Role** | Client |
 | **User client_id** | Client user has `client_id` set (e.g., "Client Alpha" UUID) |
-| **User Permissions** | Client user has `sample:read` and `result:read` permissions |
+| **User Permissions** | Client user has only `sample:read` permission (per migration 0004) |
 | **Projects Exist** | At least two projects exist:<br>- Project Alpha: `client_id` = Client Alpha UUID (accessible)<br>- Project Beta: `client_id` = Client Beta UUID (inaccessible) |
 | **Samples Exist** | At least one sample in Project Alpha (accessible)<br>At least one sample in Project Beta (inaccessible) |
 | **RLS Enabled** | RLS policies enabled on `samples`, `projects`, `tests`, `results` tables |
@@ -389,8 +385,8 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 - **I want** to manage roles and granular permissions
 - **So that** access is controlled
 - **Acceptance Criteria**:
-  - 17 permissions (e.g., sample:create, result:review, batch:manage) via junctions
-  - Roles: Admin (all), Lab Manager (review/manage), Technician (create/enter), Client (read own)
+  - 13 permissions seeded via migrations (see Core Permissions below)
+  - Roles: Admin (all), Lab Manager (review/manage/create), Lab Technician (create/enter/manage batches), Client (sample:read only)
   - API: CRUD `/roles`, `/permissions` (admin-only)
   - Note: `test:configure` is referenced in code but not yet in database; endpoints use `config:edit` as fallback
 
@@ -471,15 +467,32 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 - **GET `/samples`**: List samples (requires `sample:read` permission, filtered by RLS)
 - **GET `/projects`**: List projects (requires `project:read` permission, filtered by RLS)
 
-### Core Permissions (17 total)
+### Core Permissions (13 seeded in migration 0004)
 ```
-sample:create, sample:read, sample:update, sample:delete
+user:manage, role:manage, config:edit, project:manage
+sample:create, sample:read, sample:update
 test:assign, test:update
-result:enter, result:review, result:read, result:update, result:delete
-batch:manage, batch:read, batch:update, batch:delete
-project:manage, project:read
-user:manage, role:manage, config:edit
+result:enter, result:review
+batch:manage, batch:read
 ```
+
+### Role-Permission Matrix
+
+| Permission | Administrator | Lab Manager | Lab Technician | Client |
+|------------|--------------|-------------|----------------|--------|
+| user:manage | ✓ | | | |
+| role:manage | ✓ | | | |
+| config:edit | ✓ | | | |
+| project:manage | ✓ | ✓ | | |
+| sample:create | ✓ | ✓ | ✓ | |
+| sample:read | ✓ | ✓ | ✓ | ✓ |
+| sample:update | ✓ | ✓ | ✓ | |
+| test:assign | ✓ | ✓ | ✓ | |
+| test:update | ✓ | ✓ | ✓ | |
+| result:enter | ✓ | ✓ | ✓ | |
+| result:review | ✓ | ✓ | | |
+| batch:manage | ✓ | ✓ | ✓ | |
+| batch:read | ✓ | ✓ | ✓ | |
 
 ---
 
@@ -495,16 +508,18 @@ user:manage, role:manage, config:edit
 
 ## Appendix: Sample Test Data
 
-### Users
-- `testuser` (Lab Technician, without `sample:create` permission)
-- `clientuser` (Client, with `client_id` set)
-- `adminuser` (Administrator, with all permissions)
+### Seeded Users (from migration 0004)
+- `admin` (Administrator, password: `admin123`, all permissions)
+- `lab-manager` (Lab Manager, password: `labmanager123`, review/manage permissions)
+- `lab-tech` (Lab Technician, password: `labtech123`, create/enter/manage permissions)
 
-### Roles
-- `Administrator` (all permissions)
-- `Lab Manager` (review/manage permissions)
-- `Lab Technician` (create/enter permissions)
-- `Client` (read-only permissions)
+### Roles and Permissions Summary
+| Role | Permissions |
+|------|-------------|
+| **Administrator** | All 13 permissions |
+| **Lab Manager** | `project:manage`, `sample:create`, `sample:read`, `sample:update`, `test:assign`, `test:update`, `result:enter`, `result:review`, `batch:manage`, `batch:read` |
+| **Lab Technician** | `sample:create`, `sample:read`, `sample:update`, `test:assign`, `test:update`, `result:enter`, `batch:manage`, `batch:read` |
+| **Client** | `sample:read` only |
 
 ### Projects
 - `Project Alpha` (`client_id` = Client Alpha UUID)
@@ -514,9 +529,15 @@ user:manage, role:manage, config:edit
 - `SAMPLE-ALPHA-001` (in Project Alpha, accessible to Client Alpha)
 - `SAMPLE-BETA-001` (in Project Beta, not accessible to Client Alpha)
 
-### Permissions
-- `sample:create` (required for sample creation)
-- `sample:read` (required for viewing samples)
-- `result:enter` (required for entering results)
-- `result:review` (required for reviewing results)
+### Key Permissions for Testing
+| Permission | Used For | Required By |
+|------------|----------|-------------|
+| `sample:create` | Creating samples | Accessioning workflow |
+| `sample:read` | Viewing samples | All sample views |
+| `sample:update` | Editing samples | Sample editing workflow |
+| `config:edit` | Lists, custom fields, analyses | Admin configuration |
+| `result:enter` | Entering test results | Results entry workflow |
+| `result:review` | Reviewing/approving results | Lab Manager review |
+| `batch:manage` | Creating/managing batches | Batch workflow |
+| `project:manage` | Managing projects | Project configuration |
 

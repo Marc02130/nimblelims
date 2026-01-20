@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict SMvgTun09VXD80Tdod5iIxCoWYUgYgLPj2QG8VJFJkTyYoDI6f6IpyinhylCrzU
+\restrict MmXINgySsbS6iCgNZFC0gEFsayjBHXwLqbAOtfSAhpVkawbz8yREHQCHYthHipX
 
 -- Dumped from database version 15.15
 -- Dumped by pg_dump version 15.15
@@ -151,6 +151,8 @@ DROP INDEX IF EXISTS public.idx_tests_analysis_id;
 DROP INDEX IF EXISTS public.idx_test_batteries_name;
 DROP INDEX IF EXISTS public.idx_samples_status;
 DROP INDEX IF EXISTS public.idx_samples_sample_type;
+DROP INDEX IF EXISTS public.idx_samples_date_sampled;
+DROP INDEX IF EXISTS public.idx_samples_prioritization;
 DROP INDEX IF EXISTS public.idx_samples_qc_type;
 DROP INDEX IF EXISTS public.idx_samples_project_id_status;
 DROP INDEX IF EXISTS public.idx_samples_project_id_sample_type;
@@ -175,6 +177,7 @@ DROP INDEX IF EXISTS public.idx_results_custom_attributes_gin;
 DROP INDEX IF EXISTS public.idx_results_created_by;
 DROP INDEX IF EXISTS public.idx_results_analyte_id;
 DROP INDEX IF EXISTS public.idx_projects_status;
+DROP INDEX IF EXISTS public.idx_projects_due_date;
 DROP INDEX IF EXISTS public.idx_projects_name_unique;
 DROP INDEX IF EXISTS public.idx_projects_custom_attributes_gin;
 DROP INDEX IF EXISTS public.idx_projects_client_project_id;
@@ -230,6 +233,7 @@ DROP INDEX IF EXISTS public.idx_analysis_analytes_list_id;
 DROP INDEX IF EXISTS public.idx_analysis_analytes_analyte_id;
 DROP INDEX IF EXISTS public.idx_analysis_analytes_analysis_id;
 DROP INDEX IF EXISTS public.idx_analyses_name_unique;
+DROP INDEX IF EXISTS public.idx_analyses_shelf_life;
 ALTER TABLE IF EXISTS ONLY public.users DROP CONSTRAINT IF EXISTS users_username_key;
 ALTER TABLE IF EXISTS ONLY public.users DROP CONSTRAINT IF EXISTS users_pkey;
 ALTER TABLE IF EXISTS ONLY public.users DROP CONSTRAINT IF EXISTS users_name_key;
@@ -498,7 +502,8 @@ CREATE TABLE public.analyses (
     modified_by uuid,
     method character varying(255),
     turnaround_time integer,
-    cost numeric(10,2)
+    cost numeric(10,2),
+    shelf_life integer
 );
 
 
@@ -940,6 +945,7 @@ CREATE TABLE public.projects (
     modified_at timestamp without time zone DEFAULT now() NOT NULL,
     modified_by uuid,
     start_date timestamp without time zone NOT NULL,
+    due_date timestamp without time zone,
     client_id uuid NOT NULL,
     status uuid NOT NULL,
     client_project_id uuid,
@@ -1014,6 +1020,7 @@ CREATE TABLE public.samples (
     due_date timestamp without time zone,
     received_date timestamp without time zone,
     report_date timestamp without time zone,
+    date_sampled timestamp without time zone,
     sample_type uuid NOT NULL,
     status uuid NOT NULL,
     matrix uuid NOT NULL,
@@ -1161,6 +1168,9 @@ a0000004-a000-a000-a000-a00000000005	Initial Volume	Sample volume extracted	t	20
 --
 
 COPY public.batch_containers (batch_id, container_id, "position", notes) FROM stdin;
+cdec0d47-951c-422e-b029-177d2c8102bf	1477fa9b-d946-4ffc-a084-d9728774def9	\N	\N
+cdec0d47-951c-422e-b029-177d2c8102bf	b5479921-83af-49e4-9ca4-efea13d85a27	\N	\N
+cdec0d47-951c-422e-b029-177d2c8102bf	33d60dc0-c823-4880-8d2b-a790efb6e0ed	\N	Auto-suggested for small batch
 \.
 
 
@@ -1169,6 +1179,7 @@ COPY public.batch_containers (batch_id, container_id, "position", notes) FROM st
 --
 
 COPY public.batches (id, name, description, active, created_at, created_by, modified_at, modified_by, type, status, start_date, end_date, custom_attributes) FROM stdin;
+cdec0d47-951c-422e-b029-177d2c8102bf	B20261901-01		t	2026-01-19 21:26:23.113949	00000000-0000-0000-0000-000000000003	2026-01-19 21:26:23.113949	00000000-0000-0000-0000-000000000003	a2a733ce-7666-4e8c-933b-8dc3cd288f2d	d79d1692-9331-49bd-94e1-1a014783f447	2026-01-19 05:00:00	\N	{}
 \.
 
 
@@ -1230,6 +1241,8 @@ b5479921-83af-49e4-9ca4-efea13d85a27	T879721678-042308	\N	t	2026-01-11 21:47:22.
 5461535c-b6c5-4810-b8c5-c524f7dccffe	T678563726-147192	\N	t	2026-01-11 22:22:27.204975	00000000-0000-0000-0000-000000000001	2026-01-11 22:22:27.204975	00000000-0000-0000-0000-000000000001	1	1	\N	\N	\N	\N	33333333-3333-3333-3333-333333333333	\N
 bc3fdae6-f2c4-40f0-ace9-6ff82ab975d0	F643780267-875567	\N	t	2026-01-11 23:41:15.577757	00000000-0000-0000-0000-000000000001	2026-01-11 23:41:15.577757	00000000-0000-0000-0000-000000000001	1	1	\N	\N	\N	\N	33333333-3333-3333-3333-333333333333	\N
 beda05a0-c1b6-44a4-bfe0-5b2ae6d53bac	T7897979-976909	\N	t	2026-01-11 23:59:36.922327	00000000-0000-0000-0000-000000000001	2026-01-11 23:59:36.922327	00000000-0000-0000-0000-000000000001	1	1	\N	\N	\N	\N	33333333-3333-3333-3333-333333333333	\N
+a992455b-5872-498b-aace-d5ff36ba7e7d	B6780867-359436	\N	t	2026-01-19 17:39:19.448364	00000000-0000-0000-0000-000000000003	2026-01-19 17:39:19.448364	00000000-0000-0000-0000-000000000003	1	1	\N	\N	\N	\N	33333333-3333-3333-3333-333333333333	\N
+33d60dc0-c823-4880-8d2b-a790efb6e0ed	QC-B20261901-01-1-Container	Container for QC sample QC-B20261901-01-1	t	2026-01-19 21:26:23.113949	00000000-0000-0000-0000-000000000003	2026-01-19 21:26:23.113949	00000000-0000-0000-0000-000000000003	1	1	\N	\N	\N	\N	33333333-3333-3333-3333-333333333333	\N
 \.
 
 
@@ -1243,6 +1256,8 @@ b5479921-83af-49e4-9ca4-efea13d85a27	5d38f989-a658-4ece-956b-43b089e3adff	\N	\N	
 5461535c-b6c5-4810-b8c5-c524f7dccffe	e003579c-0126-4dda-b0ad-325447f5e782	\N	\N	\N	\N
 bc3fdae6-f2c4-40f0-ace9-6ff82ab975d0	cd9fa678-53ce-4311-a327-b7d5835270f3	\N	\N	\N	\N
 beda05a0-c1b6-44a4-bfe0-5b2ae6d53bac	c2de8d20-1039-46cb-a790-836f203d7724	\N	\N	\N	\N
+a992455b-5872-498b-aace-d5ff36ba7e7d	1866b029-1550-4fa5-ada3-3af72283f41b	\N	\N	\N	\N
+33d60dc0-c823-4880-8d2b-a790efb6e0ed	f450cdb5-016a-4ad3-baea-8c07d4e7cad6	\N	\N	\N	\N
 \.
 
 
@@ -1337,6 +1352,9 @@ ae24a6f8-138e-493c-b60c-b387bfd09fb2	Analysis	For instrument runs (e.g., GC-MS, 
 22360493-5ef3-4bd0-96b7-de4ae6ad57b5	QC Only	For batches dedicated to quality control samples. No standard samples; all QC.	t	2026-01-11 15:22:31.521024	\N	2026-01-11 15:22:31.521024	\N	aaaaaaaa-0000-0000-0000-000000000001
 f343f8dc-b83b-4cf2-bf21-7e5bd7ebf65a	Custom	A catch-all for lab-specific processes (admins can rename/refine).	t	2026-01-11 15:22:31.521024	\N	2026-01-11 15:22:31.521024	\N	aaaaaaaa-0000-0000-0000-000000000001
 2bc99aba-c038-4b53-bc98-65745d3ee4ad	Surface Water	Surface Water	t	2026-01-11 23:38:04.480521	00000000-0000-0000-0000-000000000001	2026-01-11 23:38:04.480521	00000000-0000-0000-0000-000000000001	66666666-6666-6666-6666-666666666666
+96787009-9664-4b74-b0cb-b365cb8249bd	Good	\N	t	2026-01-19 15:23:30.428159	00000000-0000-0000-0000-000000000001	2026-01-19 15:23:30.428159	00000000-0000-0000-0000-000000000001	454031c8-ec5f-4774-b327-9a9f5451f198
+842dc08a-6044-4a88-a775-10d22b4fef47	Fair	\N	t	2026-01-19 15:23:41.548317	00000000-0000-0000-0000-000000000001	2026-01-19 15:23:41.548317	00000000-0000-0000-0000-000000000001	454031c8-ec5f-4774-b327-9a9f5451f198
+12967eb1-cea8-4b0b-82a3-c06dd9fe413c	Poor	\N	t	2026-01-19 15:23:49.009143	00000000-0000-0000-0000-000000000001	2026-01-19 15:23:49.009143	00000000-0000-0000-0000-000000000001	454031c8-ec5f-4774-b327-9a9f5451f198
 \.
 
 
@@ -1355,6 +1373,7 @@ COPY public.lists (id, name, description, active, created_at, created_by, modifi
 88888888-8888-8888-8888-888888888888	unit_types	Unit type values	t	2026-01-10 19:32:31.030314	\N	2026-01-10 19:32:31.030314	\N
 99999999-9999-9999-9999-999999999999	contact_types	Contact method types	t	2026-01-10 19:32:31.030314	\N	2026-01-10 19:32:31.030314	\N
 aaaaaaaa-0000-0000-0000-000000000001	batch_types	Batch type values for categorizing batches	t	2026-01-11 15:22:31.521024	\N	2026-01-11 15:22:31.521024	\N
+454031c8-ec5f-4774-b327-9a9f5451f198	container_condition	Container condition at receipt	t	2026-01-19 15:19:15.511069	00000000-0000-0000-0000-000000000001	2026-01-19 15:19:15.511069	00000000-0000-0000-0000-000000000001
 \.
 
 
@@ -1430,6 +1449,16 @@ COPY public.project_users (project_id, user_id, access_level, granted_at, grante
 924664eb-9ed0-48ef-982f-56cb26a3ff13	00000000-0000-0000-0000-000000000001	\N	2026-01-11 22:22:27.234559	\N
 71d6b564-5cb2-4ed1-b953-6470f90f292a	00000000-0000-0000-0000-000000000001	\N	2026-01-11 23:41:15.603047	\N
 5791eaa1-5365-4482-8bce-55dfb262c83f	00000000-0000-0000-0000-000000000001	\N	2026-01-11 23:59:36.955813	\N
+990e0bdc-4ff7-4cd9-b455-f18f7946329d	00000000-0000-0000-0000-000000000002	\N	2026-01-19 14:18:54.950773	\N
+26ba8b0a-b563-4258-ae86-5ded32a36a54	00000000-0000-0000-0000-000000000002	\N	2026-01-19 14:18:54.950773	\N
+924664eb-9ed0-48ef-982f-56cb26a3ff13	00000000-0000-0000-0000-000000000002	\N	2026-01-19 14:18:54.950773	\N
+71d6b564-5cb2-4ed1-b953-6470f90f292a	00000000-0000-0000-0000-000000000002	\N	2026-01-19 14:18:54.950773	\N
+5791eaa1-5365-4482-8bce-55dfb262c83f	00000000-0000-0000-0000-000000000002	\N	2026-01-19 14:18:54.950773	\N
+26ba8b0a-b563-4258-ae86-5ded32a36a54	00000000-0000-0000-0000-000000000003	\N	2026-01-19 14:18:54.950773	\N
+924664eb-9ed0-48ef-982f-56cb26a3ff13	00000000-0000-0000-0000-000000000003	\N	2026-01-19 14:18:54.950773	\N
+71d6b564-5cb2-4ed1-b953-6470f90f292a	00000000-0000-0000-0000-000000000003	\N	2026-01-19 14:18:54.950773	\N
+5791eaa1-5365-4482-8bce-55dfb262c83f	00000000-0000-0000-0000-000000000003	\N	2026-01-19 14:18:54.950773	\N
+9cbdb8ce-b277-4af4-89c7-b4fa4390f138	00000000-0000-0000-0000-000000000003	\N	2026-01-19 17:39:19.477079	\N
 \.
 
 
@@ -1443,6 +1472,7 @@ COPY public.projects (id, name, description, active, created_at, created_by, mod
 924664eb-9ed0-48ef-982f-56cb26a3ff13	PROJ-UATTESTCLI-20260111-004	\N	t	2026-01-11 22:22:27.234559	00000000-0000-0000-0000-000000000001	2026-01-11 22:22:27.234559	00000000-0000-0000-0000-000000000001	2026-01-11 00:00:00	11111111-1111-1111-1111-111111111111	795d9f88-cd74-4982-b6d0-ed6b783c6e0c	22222222-2222-2222-2222-222222222222	{}
 71d6b564-5cb2-4ed1-b953-6470f90f292a	PROJ-UATTESTCLI-20260111-005	\N	t	2026-01-11 23:41:15.603047	00000000-0000-0000-0000-000000000001	2026-01-11 23:41:15.603047	00000000-0000-0000-0000-000000000001	2026-01-11 00:00:00	11111111-1111-1111-1111-111111111111	795d9f88-cd74-4982-b6d0-ed6b783c6e0c	22222222-2222-2222-2222-222222222222	{}
 5791eaa1-5365-4482-8bce-55dfb262c83f	PROJ-UATTESTCLI-20260111-006	\N	t	2026-01-11 23:59:36.955813	00000000-0000-0000-0000-000000000001	2026-01-11 23:59:36.955813	00000000-0000-0000-0000-000000000001	2026-01-11 00:00:00	11111111-1111-1111-1111-111111111111	795d9f88-cd74-4982-b6d0-ed6b783c6e0c	22222222-2222-2222-2222-222222222222	{}
+9cbdb8ce-b277-4af4-89c7-b4fa4390f138	PROJ-SYSTEM-20260119-007	\N	t	2026-01-19 17:39:19.477079	00000000-0000-0000-0000-000000000003	2026-01-19 17:39:19.477079	00000000-0000-0000-0000-000000000003	2026-01-19 00:00:00	00000000-0000-0000-0000-000000000001	795d9f88-cd74-4982-b6d0-ed6b783c6e0c	\N	{}
 \.
 
 
@@ -1515,11 +1545,13 @@ dddddddd-dddd-dddd-dddd-dddddddddddd	Client	Client user	t	2026-01-10 19:32:31.03
 --
 
 COPY public.samples (id, name, description, active, created_at, created_by, modified_at, modified_by, due_date, received_date, report_date, sample_type, status, matrix, temperature, parent_sample_id, project_id, qc_type, client_sample_id, custom_attributes) FROM stdin;
-913ec796-f56c-44da-9b81-c6bee5275cc3	SAMPLE-2026-001	no	t	2026-01-10 20:56:44.686537	00000000-0000-0000-0000-000000000003	2026-01-11 20:30:01.284924	00000000-0000-0000-0000-000000000003	2026-01-31 00:00:00	2026-01-10 00:00:00	\N	6d8597b9-bf13-4d31-a643-ffa28b748ae0	e14af09a-6f40-4e71-b92a-3b61a12a988b	19c5dad9-8e35-4183-868e-4d0409178b07	4.00	\N	990e0bdc-4ff7-4cd9-b455-f18f7946329d	3fbab49c-0277-44e8-8e56-67ca4777ac4e	\N	{"pH": 7, "Sample_Color": "Green"}
-5d38f989-a658-4ece-956b-43b089e3adff	SAMPLE-2026-002	another test	t	2026-01-11 21:47:22.343166	00000000-0000-0000-0000-000000000001	2026-01-11 21:47:22.343166	00000000-0000-0000-0000-000000000001	2026-01-31 00:00:00	2026-01-11 00:00:00	\N	6d8597b9-bf13-4d31-a643-ffa28b748ae0	e14af09a-6f40-4e71-b92a-3b61a12a988b	08ca1ed0-a10b-4c09-848e-e4c93bbe0dd1	4.00	\N	26ba8b0a-b563-4258-ae86-5ded32a36a54	3fbab49c-0277-44e8-8e56-67ca4777ac4e	\N	{"pH": 6.7, "Sample_Color": "clear"}
 e003579c-0126-4dda-b0ad-325447f5e782	SAMPLE-2026-003		t	2026-01-11 22:22:27.234559	00000000-0000-0000-0000-000000000001	2026-01-11 22:22:27.234559	00000000-0000-0000-0000-000000000001	2026-01-31 00:00:00	2026-01-11 00:00:00	\N	6d8597b9-bf13-4d31-a643-ffa28b748ae0	e14af09a-6f40-4e71-b92a-3b61a12a988b	08ca1ed0-a10b-4c09-848e-e4c93bbe0dd1	4.00	\N	924664eb-9ed0-48ef-982f-56cb26a3ff13	3fbab49c-0277-44e8-8e56-67ca4777ac4e	\N	{"pH": 6.8, "Sample_Color": "Clear"}
 cd9fa678-53ce-4311-a327-b7d5835270f3	SAMPLE-2026-004	yet another test	t	2026-01-11 23:41:15.603047	00000000-0000-0000-0000-000000000001	2026-01-11 23:41:15.603047	00000000-0000-0000-0000-000000000001	2026-01-31 00:00:00	2026-01-11 00:00:00	\N	6d8597b9-bf13-4d31-a643-ffa28b748ae0	e14af09a-6f40-4e71-b92a-3b61a12a988b	2bc99aba-c038-4b53-bc98-65745d3ee4ad	0.00	\N	71d6b564-5cb2-4ed1-b953-6470f90f292a	3fbab49c-0277-44e8-8e56-67ca4777ac4e	\N	{"pH": 5.9, "Sample_Color": "green"}
-c2de8d20-1039-46cb-a790-836f203d7724	SAMPLE-2026-005	testing	t	2026-01-11 23:59:36.955813	00000000-0000-0000-0000-000000000001	2026-01-11 23:59:36.955813	00000000-0000-0000-0000-000000000001	2026-01-23 00:00:00	2026-01-11 00:00:00	\N	6d8597b9-bf13-4d31-a643-ffa28b748ae0	e14af09a-6f40-4e71-b92a-3b61a12a988b	08ca1ed0-a10b-4c09-848e-e4c93bbe0dd1	4.00	\N	5791eaa1-5365-4482-8bce-55dfb262c83f	3fbab49c-0277-44e8-8e56-67ca4777ac4e	\N	{"pH": 7.3, "Sample_Color": "reddish"}
+5d38f989-a658-4ece-956b-43b089e3adff	SAMPLE-2026-002	another test	t	2026-01-11 21:47:22.343166	00000000-0000-0000-0000-000000000001	2026-01-19 13:52:40.689704	00000000-0000-0000-0000-000000000001	2026-01-31 00:00:00	2026-01-11 00:00:00	\N	6d8597b9-bf13-4d31-a643-ffa28b748ae0	e14af09a-6f40-4e71-b92a-3b61a12a988b	08ca1ed0-a10b-4c09-848e-e4c93bbe0dd1	4.00	\N	26ba8b0a-b563-4258-ae86-5ded32a36a54	3fbab49c-0277-44e8-8e56-67ca4777ac4e	\N	{"pH": 6.8, "Sample_Color": "clear"}
+913ec796-f56c-44da-9b81-c6bee5275cc3	SAMPLE-2026-001	no	t	2026-01-10 20:56:44.686537	00000000-0000-0000-0000-000000000003	2026-01-19 14:46:45.099247	00000000-0000-0000-0000-000000000003	2026-01-31 00:00:00	2026-01-10 00:00:00	\N	6d8597b9-bf13-4d31-a643-ffa28b748ae0	e14af09a-6f40-4e71-b92a-3b61a12a988b	19c5dad9-8e35-4183-868e-4d0409178b07	4.00	\N	990e0bdc-4ff7-4cd9-b455-f18f7946329d	3fbab49c-0277-44e8-8e56-67ca4777ac4e	\N	{"pH": 7, "Sample_Color": "Green"}
+c2de8d20-1039-46cb-a790-836f203d7724	SAMPLE-2026-005	testing	t	2026-01-11 23:59:36.955813	00000000-0000-0000-0000-000000000001	2026-01-19 14:51:45.54208	00000000-0000-0000-0000-000000000002	2026-01-23 00:00:00	2026-01-11 00:00:00	\N	6d8597b9-bf13-4d31-a643-ffa28b748ae0	e14af09a-6f40-4e71-b92a-3b61a12a988b	08ca1ed0-a10b-4c09-848e-e4c93bbe0dd1	4.00	\N	5791eaa1-5365-4482-8bce-55dfb262c83f	3fbab49c-0277-44e8-8e56-67ca4777ac4e	\N	{"pH": 7, "Sample_Color": "reddish"}
+1866b029-1550-4fa5-ada3-3af72283f41b	SAMPLE-2026-006	a test	t	2026-01-19 17:39:19.477079	00000000-0000-0000-0000-000000000003	2026-01-19 17:39:19.477079	00000000-0000-0000-0000-000000000003	2026-02-04 00:00:00	2026-01-19 00:00:00	\N	6d8597b9-bf13-4d31-a643-ffa28b748ae0	e14af09a-6f40-4e71-b92a-3b61a12a988b	2bc99aba-c038-4b53-bc98-65745d3ee4ad	4.00	\N	9cbdb8ce-b277-4af4-89c7-b4fa4390f138	3fbab49c-0277-44e8-8e56-67ca4777ac4e	\N	{"pH": 8, "Sample_Color": "Brown"}
+f450cdb5-016a-4ad3-baea-8c07d4e7cad6	QC-B20261901-01-1	QC sample (Blank): Auto-suggested for small batch	t	2026-01-19 21:26:23.113949	00000000-0000-0000-0000-000000000003	2026-01-19 21:26:23.113949	00000000-0000-0000-0000-000000000003	2026-01-31 00:00:00	2026-01-19 21:26:23.173441	\N	6d8597b9-bf13-4d31-a643-ffa28b748ae0	e14af09a-6f40-4e71-b92a-3b61a12a988b	19c5dad9-8e35-4183-868e-4d0409178b07	4.00	\N	990e0bdc-4ff7-4cd9-b455-f18f7946329d	cbb3b907-e048-4f7d-9d44-db5262a895c0	\N	{}
 \.
 
 
@@ -1550,6 +1582,7 @@ c1004633-0943-471c-bf23-170d6a89af6d	SAMPLE-2026-004_test_b0000002-b000-b000-b00
 6e0e8946-141d-4140-80cf-910e1a731fd2	SAMPLE-2026-005_test_b0000002-b000-b000-b000-b00000000004	\N	t	2026-01-11 23:59:36.955813	00000000-0000-0000-0000-000000000001	2026-01-11 23:59:36.955813	00000000-0000-0000-0000-000000000001	c2de8d20-1039-46cb-a790-836f203d7724	b0000002-b000-b000-b000-b00000000004	26c14af3-745d-4ede-acc0-1d263e10ace4	\N	\N	00000000-0000-0000-0000-000000000001	{}
 15e394dc-c602-4275-a268-8b097e253c03	SAMPLE-2026-005_test_b0000002-b000-b000-b000-b00000000002	\N	t	2026-01-11 23:59:36.955813	00000000-0000-0000-0000-000000000001	2026-01-11 23:59:36.955813	00000000-0000-0000-0000-000000000001	c2de8d20-1039-46cb-a790-836f203d7724	b0000002-b000-b000-b000-b00000000002	26c14af3-745d-4ede-acc0-1d263e10ace4	\N	\N	00000000-0000-0000-0000-000000000001	{}
 148626b9-0a95-40da-8c52-631fecb681f5	SAMPLE-2026-005_test_b0000001-b000-b000-b000-b00000000001	\N	t	2026-01-11 23:59:36.955813	00000000-0000-0000-0000-000000000001	2026-01-11 23:59:36.955813	00000000-0000-0000-0000-000000000001	c2de8d20-1039-46cb-a790-836f203d7724	b0000001-b000-b000-b000-b00000000001	26c14af3-745d-4ede-acc0-1d263e10ace4	\N	\N	00000000-0000-0000-0000-000000000001	{}
+ec1edfa9-7b78-41bd-a938-140540ec4909	SAMPLE-2026-006_test_b0000003-b000-b000-b000-b00000000003	\N	t	2026-01-19 17:39:19.477079	00000000-0000-0000-0000-000000000003	2026-01-19 17:39:19.477079	00000000-0000-0000-0000-000000000003	1866b029-1550-4fa5-ada3-3af72283f41b	b0000003-b000-b000-b000-b00000000003	26c14af3-745d-4ede-acc0-1d263e10ace4	\N	\N	00000000-0000-0000-0000-000000000003	{}
 \.
 
 
@@ -1582,10 +1615,10 @@ c0bc1fa2-c28e-4854-87db-cb233b7afb99	ppb	Parts per billion	t	2026-01-10 19:32:31
 --
 
 COPY public.users (id, name, description, active, created_at, created_by, modified_at, modified_by, username, password_hash, email, role_id, client_id, last_login) FROM stdin;
-00000000-0000-0000-0000-000000000002	Lab Manager	\N	t	2026-01-10 19:32:31.030314	\N	2026-01-10 19:32:31.030314	\N	lab-manager	7dd63afe29407aa45af7fdd4388b71195b552688c2750abd42bdf3b231c13b69	lab-manager@lims.local	bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb	00000000-0000-0000-0000-000000000001	\N
 9be3a004-7d2c-4910-a142-03f38a99305c	Client User	\N	t	2026-01-10 19:32:31.030314	\N	2026-01-10 19:32:31.030314	\N	client	186474c1f2c2f735a54c2cf82ee8e87f2a5cd30940e280029363fecedfc5328c	client@example.com	dddddddd-dddd-dddd-dddd-dddddddddddd	00000000-0000-0000-0000-000000000001	\N
-00000000-0000-0000-0000-000000000003	Lab Technician	\N	t	2026-01-10 19:32:31.030314	\N	2026-01-11 20:29:33.570908	\N	lab-tech	d81968c60a8a41bdafcb3c5825bf8bc4a76dccc932d673e3f9a7b71ce4538596	lab-tech@lims.local	cccccccc-cccc-cccc-cccc-cccccccccccc	00000000-0000-0000-0000-000000000001	2026-01-11 20:29:33.570908
-00000000-0000-0000-0000-000000000001	System Administrator	\N	t	2026-01-10 19:32:31.030314	\N	2026-01-11 23:37:13.44646	\N	admin	240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9	admin@lims.local	aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa	00000000-0000-0000-0000-000000000001	2026-01-11 23:37:13.44646
+00000000-0000-0000-0000-000000000001	System Administrator	\N	t	2026-01-10 19:32:31.030314	\N	2026-01-19 21:26:48.950503	\N	admin	240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9	admin@lims.example.com	aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa	00000000-0000-0000-0000-000000000001	2026-01-19 21:26:48.950503
+00000000-0000-0000-0000-000000000003	Lab Technician	\N	t	2026-01-10 19:32:31.030314	\N	2026-01-19 22:08:07.240569	00000000-0000-0000-0000-000000000001	lab-tech	d81968c60a8a41bdafcb3c5825bf8bc4a76dccc932d673e3f9a7b71ce4538596	lab-tech@lims.example.com	cccccccc-cccc-cccc-cccc-cccccccccccc	00000000-0000-0000-0000-000000000001	2026-01-19 22:08:07.240569
+00000000-0000-0000-0000-000000000002	Lab Manager	\N	t	2026-01-10 19:32:31.030314	\N	2026-01-19 18:04:13.20176	\N	lab-manager	7dd63afe29407aa45af7fdd4388b71195b552688c2750abd42bdf3b231c13b69	lab-manager@lims.example.com	bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb	00000000-0000-0000-0000-000000000001	2026-01-19 14:51:04.344358
 \.
 
 
@@ -1614,14 +1647,14 @@ SELECT pg_catalog.setval('public.name_template_seq_container', 1, false);
 -- Name: name_template_seq_project; Type: SEQUENCE SET; Schema: public; Owner: -
 --
 
-SELECT pg_catalog.setval('public.name_template_seq_project', 6, true);
+SELECT pg_catalog.setval('public.name_template_seq_project', 7, true);
 
 
 --
 -- Name: name_template_seq_sample; Type: SEQUENCE SET; Schema: public; Owner: -
 --
 
-SELECT pg_catalog.setval('public.name_template_seq_sample', 5, true);
+SELECT pg_catalog.setval('public.name_template_seq_sample', 6, true);
 
 
 --
@@ -2072,6 +2105,13 @@ CREATE UNIQUE INDEX idx_analyses_name_unique ON public.analyses USING btree (nam
 
 
 --
+-- Name: idx_analyses_shelf_life; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_analyses_shelf_life ON public.analyses USING btree (shelf_life) WHERE (shelf_life IS NOT NULL);
+
+
+--
 -- Name: idx_analysis_analytes_analysis_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2457,6 +2497,13 @@ CREATE INDEX idx_projects_status ON public.projects USING btree (status);
 
 
 --
+-- Name: idx_projects_due_date; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_projects_due_date ON public.projects USING btree (due_date) WHERE (due_date IS NOT NULL);
+
+
+--
 -- Name: idx_results_analyte_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2629,6 +2676,20 @@ CREATE INDEX idx_samples_sample_type ON public.samples USING btree (sample_type)
 --
 
 CREATE INDEX idx_samples_status ON public.samples USING btree (status);
+
+
+--
+-- Name: idx_samples_date_sampled; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_samples_date_sampled ON public.samples USING btree (date_sampled) WHERE (date_sampled IS NOT NULL);
+
+
+--
+-- Name: idx_samples_prioritization; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_samples_prioritization ON public.samples USING btree (project_id, due_date, date_sampled) WHERE (active = true);
 
 
 --
@@ -3701,5 +3762,5 @@ CREATE POLICY tests_access ON public.tests USING ((public.is_admin() OR (EXISTS 
 -- PostgreSQL database dump complete
 --
 
-\unrestrict SMvgTun09VXD80Tdod5iIxCoWYUgYgLPj2QG8VJFJkTyYoDI6f6IpyinhylCrzU
+\unrestrict MmXINgySsbS6iCgNZFC0gEFsayjBHXwLqbAOtfSAhpVkawbz8yREHQCHYthHipX
 

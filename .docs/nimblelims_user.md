@@ -101,13 +101,25 @@ User stories are written in Agile format: "As a [role], I want [feature] so that
 ## 4. Batches and Plates
 
 - **US-11: Create and Manage Batches**  
-  As a Lab Technician, I want to create batches of containers so that group processing is supported.  
+  As a Lab Technician, I want to create batches of containers with sample prioritization so that group processing focuses on the most urgent samples first.  
   *Acceptance Criteria*:  
   - Add containers; statuses: Created, In Process, Completed.  
   - Workflow: Created → In Process (analysis) → Completed (review).  
   - Plates: As containers with wells (row/column).  
-  - API: POST /batches; add via /batch-containers; RBAC: batch:manage.  
-  *Priority*: Medium | *Estimate*: 5 points
+  - **Prioritization Criteria**:  
+    - Samples sorted by expiration priority (days_until_expiration ASC NULLS LAST).  
+    - Secondary sort by due date priority (days_until_due ASC NULLS LAST).  
+    - Expiration calculation: `date_sampled + analysis.shelf_life - now()`.  
+    - Due date inheritance: `COALESCE(sample.due_date, project.due_date)`.  
+  - **Expired Sample Flagging**:  
+    - Flag samples with `is_expired=true` when `days_until_expiration < 0`.  
+    - Flag samples with `is_overdue=true` when `days_until_due < 0`.  
+    - Display warning: "Expired: Testing invalid" for expired samples.  
+    - Visual indicators: Red background for expired, orange for expiring soon (≤3 days).  
+  - **Validation on batch creation**: Warn if batch contains expired/expiring samples.  
+  - API: POST /batches; add via /batch-containers; GET /samples/eligible for prioritized list; RBAC: batch:manage.  
+  - UI: Multi-step wizard with DataGrid showing prioritization columns, tooltips, ARIA labels.  
+  *Priority*: Medium | *Estimate*: 8 points (increased for prioritization features)
 
 ## 5. Security and Authentication
 
@@ -261,20 +273,23 @@ Priority: Medium | Estimate: 5 points
 ### US-26: Cross-Project Batching
 As a Lab Technician, I want to batch samples from multiple NimbleLIMS projects together if they have compatible test types so that shared processing steps like prep can be efficient.
 Acceptance Criteria:
-Batch creation allows selection across accessible projects.
-Validation for compatibility (e.g., shared prep analysis like "EPA Method 8080 Prep").
-Option to split into sub-batches for divergent steps (e.g., cleanup/instrument runs).
-RLS enforces access to all included samples.
-API: POST /batches with cross-project container_ids; RBAC: batch:manage.
+- Batch creation allows selection across accessible projects.
+- Validation for compatibility (e.g., shared prep analysis like "EPA Method 8080 Prep").
+- Option to split into sub-batches for divergent steps (e.g., cleanup/instrument runs).
+- RLS enforces access to all included samples.
+- **Expiration validation**: Validate-compatibility endpoint warns about expired/expiring samples.
+- **Priority sorting**: Eligible samples from all projects sorted by expiration then due date.
+- API: POST /batches with cross-project container_ids; POST /batches/validate-compatibility with expiration warnings; RBAC: batch:manage.
 Priority: Medium | Estimate: 5 points
 
 ### US-27: Add QC Samples at Batch Creation
 As a Lab Technician, I want to add QC samples directly during batch creation so that controls are integrated contextually.
 Acceptance Criteria:
-Select qc_type (e.g., Blank, Blank Spike, Duplicate, Matrix Spike) and auto-generate QC sample/container.
-Link to batch with inherited project_id.
-Required for certain batch types (configurable).
-API: POST /batches with qc_additions list; RBAC: batch:manage.
+- Select qc_type (e.g., Blank, Blank Spike, Duplicate, Matrix Spike) and auto-generate QC sample/container.
+- Link to batch with inherited project_id.
+- Required for certain batch types (configurable).
+- QC samples inherit `date_sampled` from parent sample for expiration tracking.
+- API: POST /batches with qc_additions list; RBAC: batch:manage.
 Priority: Medium | Estimate: 5 points
 
 

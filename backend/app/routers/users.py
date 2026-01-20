@@ -24,6 +24,7 @@ router = APIRouter()
 async def get_users(
     role_id: Optional[UUID] = Query(None, description="Filter by role ID"),
     client_id: Optional[UUID] = Query(None, description="Filter by client ID"),
+    include_inactive: bool = Query(False, description="Include inactive users"),
     current_user: User = Depends(require_any_permission(["user:manage", "config:edit"])),
     db: Session = Depends(get_db)
 ):
@@ -31,7 +32,9 @@ async def get_users(
     Get all users with optional filtering.
     Requires user:manage or config:edit permission.
     """
-    query = db.query(User).filter(User.active == True)
+    query = db.query(User)
+    if not include_inactive:
+        query = query.filter(User.active == True)
     
     if role_id:
         query = query.filter(User.role_id == role_id)

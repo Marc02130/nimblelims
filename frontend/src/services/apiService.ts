@@ -4,6 +4,77 @@ import axios, { AxiosInstance, AxiosResponse } from 'axios';
 // This avoids CORS issues and works in Docker
 const API_BASE_URL = process.env.REACT_APP_API_URL || '/api';
 
+// Types for eligible samples with prioritization
+export interface EligibleSample {
+  id: string;
+  name: string;
+  description?: string;
+  due_date?: string;
+  received_date?: string;
+  date_sampled?: string;
+  sample_type: string;
+  status: string;
+  matrix: string;
+  project_id: string;
+  qc_type?: string;
+  // Prioritization fields
+  days_until_expiration?: number;
+  days_until_due?: number;
+  is_expired: boolean;
+  is_overdue: boolean;
+  expiration_warning?: string;
+  // Analysis context
+  analysis_id?: string;
+  analysis_name?: string;
+  shelf_life?: number;
+  // Project context
+  project_name?: string;
+  project_due_date?: string;
+  effective_due_date?: string;
+}
+
+export interface EligibleSamplesResponse {
+  samples: EligibleSample[];
+  total: number;
+  page: number;
+  size: number;
+  pages: number;
+  warnings: string[];
+}
+
+// Types for batch compatibility validation with expiration warnings
+export interface ExpiredSampleWarning {
+  sample_id: string;
+  sample_name: string;
+  days_expired: number;
+  expiration_date: string;
+}
+
+export interface ExpiringSoonSampleWarning {
+  sample_id: string;
+  sample_name: string;
+  days_until_expiration: number;
+  expiration_date: string;
+}
+
+export interface BatchCompatibilityWarning {
+  type: 'expired_samples' | 'expiring_soon';
+  message: string;
+  samples: ExpiredSampleWarning[] | ExpiringSoonSampleWarning[];
+}
+
+export interface BatchCompatibilityResult {
+  compatible: boolean;
+  error?: string;
+  details?: {
+    projects: string[];
+    common_analyses?: string[];
+    analyses?: string[];
+    suggestion?: string;
+  };
+  warnings?: BatchCompatibilityWarning[];
+}
+
 class ApiService {
   private api: AxiosInstance;
 
@@ -121,6 +192,33 @@ class ApiService {
 
   async updateSample(id: string, sampleData: any) {
     const response: AxiosResponse = await this.api.patch(`/samples/${id}`, sampleData);
+    return response.data;
+  }
+
+  /**
+   * Get eligible samples with prioritization based on expiration and due dates.
+   * 
+   * Returns samples sorted by:
+   * 1. days_until_expiration ASC NULLS LAST (most urgent first)
+   * 2. days_until_due ASC NULLS LAST (earliest due first)
+   * 
+   * @param filters - Optional filters for eligible samples
+   * @param filters.test_ids - Comma-separated analysis IDs to filter by
+   * @param filters.project_id - Filter by specific project
+   * @param filters.include_expired - If true, includes expired samples (default: false)
+   * @param filters.page - Page number (default: 1)
+   * @param filters.size - Page size (default: 10)
+   */
+  async getEligibleSamples(filters?: {
+    test_ids?: string;
+    project_id?: string;
+    include_expired?: boolean;
+    page?: number;
+    size?: number;
+  }): Promise<EligibleSamplesResponse> {
+    const response: AxiosResponse = await this.api.get('/samples/eligible', {
+      params: filters,
+    });
     return response.data;
   }
 
@@ -412,7 +510,7 @@ class ApiService {
     return response.data;
   }
 
-  async validateBatchCompatibility(data: { container_ids: string[] }) {
+  async validateBatchCompatibility(data: { container_ids: string[] }): Promise<BatchCompatibilityResult> {
     const response: AxiosResponse = await this.api.post('/batches/validate-compatibility', data);
     return response.data;
   }
@@ -538,7 +636,7 @@ class ApiService {
   }
 
   // Users endpoints (admin CRUD)
-  async getUsers(filters?: { role_id?: string; client_id?: string }) {
+  async getUsers(filters?: { role_id?: string; client_id?: string; include_inactive?: boolean }) {
     const response: AxiosResponse = await this.api.get('/users', {
       params: filters,
     });
