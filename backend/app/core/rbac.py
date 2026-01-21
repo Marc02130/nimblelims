@@ -198,6 +198,8 @@ require_project_read = require_permission("project:read")
 require_user_manage = require_permission("user:manage")
 require_config_edit = require_permission("config:edit")
 
+require_analysis_manage = require_permission("analysis:manage")
+
 # Role-based dependencies
 require_admin = require_role("Administrator")
 require_lab_manager = require_any_role(["Administrator", "Lab Manager"])

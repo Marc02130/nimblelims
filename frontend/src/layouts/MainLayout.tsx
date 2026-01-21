@@ -40,6 +40,8 @@ const getRouteTitle = (pathname: string): string => {
     '/clients': 'Clients',
     '/projects': 'Projects',
     '/client-projects': 'Client Projects',
+    '/analyses': 'Analyses',
+    '/analytes': 'Analytes',
     '/help': 'Help',
     '/admin': 'Admin Dashboard',
     '/admin/lists': 'Lists Management',

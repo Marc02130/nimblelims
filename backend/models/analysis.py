@@ -1,5 +1,5 @@
 from sqlalchemy import Column, String, DateTime, ForeignKey, Boolean, Numeric, Integer
-from sqlalchemy.dialects.postgresql import UUID as PostgresUUID
+from sqlalchemy.dialects.postgresql import UUID as PostgresUUID, JSONB
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from .base import BaseModel
@@ -13,6 +13,7 @@ class Analysis(BaseModel):
     turnaround_time = Column(Integer, nullable=True)  # in days
     cost = Column(Numeric(10, 2), nullable=True)
     shelf_life = Column(Integer, nullable=True)  # Days until expiration = date_sampled + shelf_life
+    custom_attributes = Column(JSONB, nullable=True, default={})  # Custom attributes as JSON
     
     # Relationships
     analytes = relationship("Analyte", secondary="analysis_analytes", back_populates="analyses")
@@ -26,10 +27,17 @@ class Analysis(BaseModel):
 class Analyte(BaseModel):
     __tablename__ = 'analytes'
     
+    # Analyte-specific fields
+    cas_number = Column(String(50), nullable=True)  # CAS registry number
+    units_default = Column(PostgresUUID(as_uuid=True), ForeignKey('units.id'), nullable=True)
+    data_type = Column(String(20), nullable=True)  # numeric, text, date, boolean
+    custom_attributes = Column(JSONB, nullable=True, default={})  # Custom attributes as JSON
+    
     # Relationships
     analyses = relationship("Analysis", secondary="analysis_analytes", back_populates="analytes")
     results = relationship("Result", back_populates="analyte")
     analysis_analytes = relationship("AnalysisAnalyte", back_populates="analyte")
+    default_unit = relationship("Unit", foreign_keys=[units_default])
     creator = relationship("User", foreign_keys="Analyte.created_by", back_populates="created_analytes")
     modifier = relationship("User", foreign_keys="Analyte.modified_by", back_populates="modified_analytes")
 

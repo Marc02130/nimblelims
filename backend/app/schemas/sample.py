@@ -274,9 +274,7 @@ class EligibleSampleResponse(BaseModel):
     is_overdue: bool = Field(False, description="True if sample is overdue (days_until_due < 0)")
     expiration_warning: Optional[str] = Field(None, description="Warning message for expired/expiring samples")
     # Analysis context
-    analysis_id: Optional[UUID] = Field(None, description="Analysis ID used for shelf_life calculation")
-    analysis_name: Optional[str] = Field(None, description="Analysis name")
-    shelf_life: Optional[int] = Field(None, description="Shelf life in days from analysis")
+    shelf_life: Optional[int] = Field(None, description="Shelf life in days from analysis (minimum across all assigned analyses)")
     # Project context
     project_name: Optional[str] = Field(None, description="Project name")
     project_due_date: Optional[datetime] = Field(None, description="Project-level due date")

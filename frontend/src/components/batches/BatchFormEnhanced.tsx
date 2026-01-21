@@ -78,6 +78,8 @@ interface Project {
 
 interface QCAddition {
   qc_type: string;
+  container_type_id: string;
+  matrix_id: string;
   notes?: string;
 }
 
@@ -129,6 +131,8 @@ const BatchFormEnhanced: React.FC<BatchFormEnhancedProps> = ({ onSuccess, onCanc
   const [analyses, setAnalyses] = useState<any[]>([]);
   const [selectedDivergentAnalyses, setSelectedDivergentAnalyses] = useState<string[]>([]);
   const [qcTypes, setQcTypes] = useState<any[]>([]);
+  const [containerTypes, setContainerTypes] = useState<any[]>([]);
+  const [matrixTypes, setMatrixTypes] = useState<any[]>([]);
   const [qcRequired, setQcRequired] = useState(false);
   const [requireQcForBatchTypes, setRequireQcForBatchTypes] = useState<string[]>([]);
   
@@ -138,6 +142,7 @@ const BatchFormEnhanced: React.FC<BatchFormEnhancedProps> = ({ onSuccess, onCanc
   const [eligibleSamplesWarnings, setEligibleSamplesWarnings] = useState<string[]>([]);
   const [selectedSampleIds, setSelectedSampleIds] = useState<GridRowSelectionModel>({ type: 'include', ids: new Set() });
   const [includeExpired, setIncludeExpired] = useState(false);
+  const [selectedAnalysisIds, setSelectedAnalysisIds] = useState<string[]>([]);
   const [sortModel, setSortModel] = useState<GridSortModel>([
     { field: 'days_until_expiration', sort: 'asc' },
     { field: 'days_until_due', sort: 'asc' },
@@ -186,19 +191,25 @@ const BatchFormEnhanced: React.FC<BatchFormEnhancedProps> = ({ onSuccess, onCanc
   useEffect(() => {
     const loadData = async () => {
       try {
-        const [batchStatuses, batchTypes, analysesData, qcTypesData] = await Promise.all([
+        const [batchStatuses, batchTypes, analysesResponse, qcTypesData, containerTypesData, matrixTypesData] = await Promise.all([
           apiService.getListEntries('batch_status'),
           apiService.getListEntries('batch_types').catch(() => []),
-          apiService.getAnalyses().catch(() => []),
+          apiService.getAnalyses().catch(() => ({ analyses: [] })),
           apiService.getListEntries('qc_types').catch(() => []),
+          apiService.getContainerTypes().catch(() => []),
+          apiService.getListEntries('matrix_types').catch(() => []),
         ]);
 
         setListEntries({
           batch_statuses: batchStatuses,
           batch_types: batchTypes,
         });
-        setAnalyses(analysesData || []);
+        // API returns paginated response {analyses, total, page, size, pages}
+        setAnalyses(analysesResponse?.analyses || []);
         setQcTypes(qcTypesData || []);
+        // Container types may also be paginated
+        setContainerTypes(containerTypesData?.container_types || containerTypesData || []);
+        setMatrixTypes(matrixTypesData || []);
 
         // Load QC requirement config from environment or API
         // For now, check if REQUIRE_QC_FOR_BATCH_TYPES env var is set
@@ -226,10 +237,11 @@ const BatchFormEnhanced: React.FC<BatchFormEnhancedProps> = ({ onSuccess, onCanc
   const loadEligibleSamples = useCallback(async () => {
     setEligibleSamplesLoading(true);
     try {
-      // Get analysis IDs from selected batch type if available
-      const testIds = analyses.length > 0 ? analyses.map(a => a.id).join(',') : undefined;
+      // Only fetch samples that have the selected analyses/tests assigned
+      const testIds = selectedAnalysisIds.length > 0 ? selectedAnalysisIds.join(',') : undefined;
       
       const response = await apiService.getEligibleSamples({
+        test_ids: testIds,
         project_id: selectedProjects.length === 1 ? selectedProjects[0] : undefined,
         include_expired: includeExpired,
         size: 100, // Load more for better selection
@@ -243,14 +255,18 @@ const BatchFormEnhanced: React.FC<BatchFormEnhancedProps> = ({ onSuccess, onCanc
     } finally {
       setEligibleSamplesLoading(false);
     }
-  }, [selectedProjects, includeExpired, analyses]);
+  }, [selectedProjects, includeExpired, selectedAnalysisIds]);
 
-  // Load eligible samples when step changes to Step 2
+  // Load eligible samples when step changes to Step 2 and analyses are selected
   useEffect(() => {
-    if (activeStep === 1) {
+    if (activeStep === 1 && selectedAnalysisIds.length > 0) {
       loadEligibleSamples();
+    } else if (activeStep === 1 && selectedAnalysisIds.length === 0) {
+      // Clear samples when no analyses selected
+      setEligibleSamples([]);
+      setEligibleSamplesWarnings([]);
     }
-  }, [activeStep, loadEligibleSamples]);
+  }, [activeStep, selectedAnalysisIds, loadEligibleSamples]);
 
   // Auto-detect cross-project if containers from multiple projects
   useEffect(() => {
@@ -341,20 +357,20 @@ const BatchFormEnhanced: React.FC<BatchFormEnhancedProps> = ({ onSuccess, onCanc
       const blankSpikeType = qcTypes.find(qt => qt.name.toLowerCase().includes('blank spike'));
       const matrixSpikeType = qcTypes.find(qt => qt.name.toLowerCase().includes('matrix spike'));
 
-      if (blankType) suggestions.push({ qc_type: blankType.id, notes: 'Auto-suggested for large batch' });
-      if (blankSpikeType) suggestions.push({ qc_type: blankSpikeType.id, notes: 'Auto-suggested for large batch' });
-      if (matrixSpikeType) suggestions.push({ qc_type: matrixSpikeType.id, notes: 'Auto-suggested for large batch' });
+      if (blankType) suggestions.push({ qc_type: blankType.id, container_type_id: '', matrix_id: '', notes: 'Auto-suggested for large batch' });
+      if (blankSpikeType) suggestions.push({ qc_type: blankSpikeType.id, container_type_id: '', matrix_id: '', notes: 'Auto-suggested for large batch' });
+      if (matrixSpikeType) suggestions.push({ qc_type: matrixSpikeType.id, container_type_id: '', matrix_id: '', notes: 'Auto-suggested for large batch' });
     } else if (containerCount >= 5) {
       // Medium batches: suggest Blank and Matrix Spike
       const blankType = qcTypes.find(qt => qt.name.toLowerCase().includes('blank') && !qt.name.toLowerCase().includes('spike'));
       const matrixSpikeType = qcTypes.find(qt => qt.name.toLowerCase().includes('matrix spike'));
 
-      if (blankType) suggestions.push({ qc_type: blankType.id, notes: 'Auto-suggested for medium batch' });
-      if (matrixSpikeType) suggestions.push({ qc_type: matrixSpikeType.id, notes: 'Auto-suggested for medium batch' });
+      if (blankType) suggestions.push({ qc_type: blankType.id, container_type_id: '', matrix_id: '', notes: 'Auto-suggested for medium batch' });
+      if (matrixSpikeType) suggestions.push({ qc_type: matrixSpikeType.id, container_type_id: '', matrix_id: '', notes: 'Auto-suggested for medium batch' });
     } else if (containerCount >= 2) {
       // Small batches: suggest Blank
       const blankType = qcTypes.find(qt => qt.name.toLowerCase().includes('blank') && !qt.name.toLowerCase().includes('spike'));
-      if (blankType) suggestions.push({ qc_type: blankType.id, notes: 'Auto-suggested for small batch' });
+      if (blankType) suggestions.push({ qc_type: blankType.id, container_type_id: '', matrix_id: '', notes: 'Auto-suggested for small batch' });
     }
 
     // Add suggestions if not already present
@@ -448,7 +464,7 @@ const BatchFormEnhanced: React.FC<BatchFormEnhancedProps> = ({ onSuccess, onCanc
   const handleAddQC = () => {
     setFormData(prev => ({
       ...prev,
-      qc_additions: [...prev.qc_additions, { qc_type: '', notes: '' }],
+      qc_additions: [...prev.qc_additions, { qc_type: '', container_type_id: '', matrix_id: '', notes: '' }],
     }));
   };
 
@@ -660,13 +676,28 @@ const BatchFormEnhanced: React.FC<BatchFormEnhancedProps> = ({ onSuccess, onCanc
       return;
     }
 
-    // Validate QC additions have qc_type
-    const invalidQC = formData.qc_additions.some(qc => !qc.qc_type);
-    if (formData.qc_additions.length > 0 && invalidQC) {
+    // Validate QC additions have qc_type and container_id
+    const invalidQCType = formData.qc_additions.some(qc => !qc.qc_type);
+    if (formData.qc_additions.length > 0 && invalidQCType) {
       setError('All QC additions must have a QC type selected.');
       setLoading(false);
       return;
     }
+
+    const invalidQCContainerType = formData.qc_additions.some(qc => !qc.container_type_id);
+    if (formData.qc_additions.length > 0 && invalidQCContainerType) {
+      setError('All QC additions must have a container type selected.');
+      setLoading(false);
+      return;
+    }
+
+    const invalidQCMatrix = formData.qc_additions.some(qc => !qc.matrix_id);
+    if (formData.qc_additions.length > 0 && invalidQCMatrix) {
+      setError('All QC additions must have a matrix selected.');
+      setLoading(false);
+      return;
+    }
+
 
     try {
       const batchData = {
@@ -681,6 +712,8 @@ const BatchFormEnhanced: React.FC<BatchFormEnhancedProps> = ({ onSuccess, onCanc
         divergent_analyses: formData.divergent_analyses.length > 0 ? formData.divergent_analyses : undefined,
         qc_additions: formData.qc_additions.length > 0 ? formData.qc_additions.map(qc => ({
           qc_type: qc.qc_type,
+          container_type_id: qc.container_type_id,
+          matrix_id: qc.matrix_id,
           notes: qc.notes || undefined,
         })) : undefined,
       };
@@ -781,9 +814,52 @@ const BatchFormEnhanced: React.FC<BatchFormEnhancedProps> = ({ onSuccess, onCanc
               Eligible Samples
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              Select the test(s)/analysis(es) to batch, then choose samples that have those tests assigned.
               Samples are sorted by expiration priority (most urgent first), then by due date.
-              Expired samples are highlighted in red.
             </Typography>
+
+            {/* Analysis/Test Filter */}
+            <Box sx={{ mb: 3 }}>
+              <Autocomplete
+                multiple
+                id="analysis-filter"
+                options={analyses}
+                getOptionLabel={(option) => option.name || ''}
+                value={analyses.filter(a => selectedAnalysisIds.includes(a.id))}
+                onChange={(_, newValue) => {
+                  setSelectedAnalysisIds(newValue.map(a => a.id));
+                }}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="Filter by Test/Analysis"
+                    placeholder="Select tests to batch..."
+                    helperText={selectedAnalysisIds.length === 0 
+                      ? "Select one or more tests to see samples with those tests assigned" 
+                      : `Showing samples with ${selectedAnalysisIds.length} selected test(s)`}
+                  />
+                )}
+                renderTags={(value, getTagProps) =>
+                  value.map((option, index) => (
+                    <Chip
+                      label={option.name}
+                      {...getTagProps({ index })}
+                      key={option.id}
+                      color="primary"
+                      size="small"
+                    />
+                  ))
+                }
+                sx={{ minWidth: 300 }}
+              />
+            </Box>
+
+            {/* Info message when no analyses selected */}
+            {selectedAnalysisIds.length === 0 && (
+              <Alert severity="info" sx={{ mb: 2 }}>
+                Please select at least one test/analysis above to view eligible samples.
+              </Alert>
+            )}
 
             {/* Warnings for expired/overdue samples */}
             {eligibleSamplesWarnings.length > 0 && (
@@ -834,7 +910,7 @@ const BatchFormEnhanced: React.FC<BatchFormEnhancedProps> = ({ onSuccess, onCanc
                 variant="outlined"
                 size="small"
                 onClick={loadEligibleSamples}
-                disabled={eligibleSamplesLoading}
+                disabled={eligibleSamplesLoading || selectedAnalysisIds.length === 0}
               >
                 Refresh
               </Button>
@@ -1091,6 +1167,12 @@ const BatchFormEnhanced: React.FC<BatchFormEnhancedProps> = ({ onSuccess, onCanc
               </Alert>
             )}
 
+            {formData.qc_additions.length > 0 && (
+              <Alert severity="info" sx={{ mb: 2 }}>
+                QC samples will be assigned to the system "Laboratory QC" project and shared across all samples in this batch.
+              </Alert>
+            )}
+
             {formData.qc_additions.map((qc, index) => (
               <Box
                 key={index}
@@ -1110,7 +1192,7 @@ const BatchFormEnhanced: React.FC<BatchFormEnhancedProps> = ({ onSuccess, onCanc
                   </IconButton>
                 </Box>
                 <Grid container spacing={2}>
-                  <Grid size={{ xs: 12, sm: 6 }}>
+                  <Grid size={{ xs: 12, sm: 4 }}>
                     <FormControl fullWidth required>
                       <InputLabel id={`qc-type-label-${index}`}>QC Type</InputLabel>
                       <Select
@@ -1128,7 +1210,43 @@ const BatchFormEnhanced: React.FC<BatchFormEnhancedProps> = ({ onSuccess, onCanc
                       </Select>
                     </FormControl>
                   </Grid>
-                  <Grid size={{ xs: 12, sm: 6 }}>
+                  <Grid size={{ xs: 12, sm: 4 }}>
+                    <FormControl fullWidth required>
+                      <InputLabel id={`qc-container-type-label-${index}`}>Container Type</InputLabel>
+                      <Select
+                        labelId={`qc-container-type-label-${index}`}
+                        value={qc.container_type_id}
+                        onChange={(e) => handleQCChange(index, 'container_type_id', e.target.value)}
+                        label="Container Type"
+                        inputProps={{ 'aria-label': `Container type for QC sample ${index + 1}` }}
+                      >
+                        {containerTypes.map((containerType: any) => (
+                          <MenuItem key={containerType.id} value={containerType.id}>
+                            {containerType.name}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                  </Grid>
+                  <Grid size={{ xs: 12, sm: 4 }}>
+                    <FormControl fullWidth required>
+                      <InputLabel id={`qc-matrix-label-${index}`}>Matrix</InputLabel>
+                      <Select
+                        labelId={`qc-matrix-label-${index}`}
+                        value={qc.matrix_id}
+                        onChange={(e) => handleQCChange(index, 'matrix_id', e.target.value)}
+                        label="Matrix"
+                        inputProps={{ 'aria-label': `Matrix for QC sample ${index + 1}` }}
+                      >
+                        {matrixTypes.map((matrix: any) => (
+                          <MenuItem key={matrix.id} value={matrix.id}>
+                            {matrix.name}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                  </Grid>
+                  <Grid size={{ xs: 12, sm: 4 }}>
                     <TextField
                       fullWidth
                       label="Notes (Optional)"
