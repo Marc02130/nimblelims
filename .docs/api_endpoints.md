@@ -824,25 +824,56 @@ Get all entries for a specific list.
 ## Analyses
 
 ### GET /analyses
-List all active analyses.
+List analyses with optional filtering, search, and pagination.
+
+**Query Parameters:**
+- `search` (optional, string): Search by name or method (case-insensitive)
+- `active` (optional, boolean): Filter by active status (default: only active for non-admin users)
+- `page` (optional, int, default=1): Page number
+- `size` (optional, int, default=10, max=100): Page size
 
 **Response:**
 ```json
-[
-  {
-    "id": "...",
-    "name": "...",
-    "method": "...",
-    "turnaround_time": 5,
-    "cost": 100.00
-  }
-]
+{
+  "analyses": [
+    {
+      "id": "uuid",
+      "name": "EPA 8080",
+      "description": "Organochlorine pesticides analysis",
+      "method": "EPA 8080",
+      "turnaround_time": 5,
+      "cost": 100.00,
+      "shelf_life": 14,
+      "active": true,
+      "created_at": "2026-01-01T00:00:00Z",
+      "modified_at": "2026-01-01T00:00:00Z",
+      "created_by": "uuid",
+      "modified_by": "uuid",
+      "custom_attributes": {},
+      "analytes": [
+        {"id": "uuid", "name": "Aldrin", "description": "Organochlorine pesticide"}
+      ]
+    }
+  ],
+  "total": 50,
+  "page": 1,
+  "size": 10,
+  "pages": 5
+}
 ```
+
+### GET /analyses/{id}
+Get a single analysis by ID with linked analytes.
+
+**Response:** AnalysisResponse (same structure as in list response)
+
+**Error Responses:**
+- `404`: Analysis not found
 
 ### POST /analyses
 Create a new analysis.
 
-**Requires:** `config:edit` or `test:configure` permission
+**Requires:** `config:edit`, `test:configure`, or `analysis:manage` permission
 
 **Request:**
 ```json
@@ -851,29 +882,71 @@ Create a new analysis.
   "description": "pH analysis",
   "method": "Electrometric",
   "turnaround_time": 1,
-  "cost": 10.00
+  "cost": 10.00,
+  "shelf_life": 30,
+  "custom_attributes": {
+    "instrument_type": "meter"
+  }
 }
 ```
 
-### PATCH /analyses/{id}
-Update an analysis.
+**Note:** 
+- `name` is optional - auto-generated if not provided
+- `method` is required
 
-**Requires:** `config:edit` or `test:configure` permission
+**Response:** AnalysisResponse (HTTP 201 Created)
+
+**Error Responses:**
+- `400`: Analysis name already exists
+
+### PATCH /analyses/{id}
+Update an analysis (partial update).
+
+**Requires:** `config:edit`, `test:configure`, or `analysis:manage` permission
+
+**Request (all fields optional):**
+```json
+{
+  "name": "Updated Analysis Name",
+  "method": "Updated Method",
+  "turnaround_time": 7,
+  "cost": 150.00,
+  "active": false,
+  "custom_attributes": {"notes": "Updated"}
+}
+```
+
+**Response:** Updated AnalysisResponse
+
+**Error Responses:**
+- `404`: Analysis not found
+- `400`: Analysis name already exists (if changing name)
 
 ### DELETE /analyses/{id}
-Soft-delete an analysis.
+Soft-delete an analysis (sets active=false).
 
-**Requires:** `config:edit` or `test:configure` permission
+**Requires:** `config:edit`, `test:configure`, or `analysis:manage` permission
 
-**Note:** Cannot delete if referenced by any tests.
+**Response:** HTTP 204 No Content
+
+**Error Responses:**
+- `404`: Analysis not found
+- `400`: Cannot delete - active tests reference this analysis
 
 ### GET /analyses/{id}/analytes
-Get all analytes assigned to an analysis.
+Get all analytes linked to an analysis.
 
-### PUT /analyses/{id}/analytes
-Update analyte assignment for an analysis.
+**Response:**
+```json
+[
+  {"id": "uuid", "name": "pH", "description": "pH value"}
+]
+```
 
-**Requires:** `config:edit` or `test:configure` permission
+### POST /analyses/{id}/analytes
+Link analytes to an analysis.
+
+**Requires:** `config:edit`, `test:configure`, or `analysis:manage` permission
 
 **Request:**
 ```json
@@ -882,6 +955,38 @@ Update analyte assignment for an analysis.
 }
 ```
 
+**Note:** Idempotent - skips analytes already linked. Validates analyte IDs exist and are active.
+
+**Response:** List of all linked analytes (HTTP 201 Created)
+
+**Error Responses:**
+- `404`: Analysis not found
+- `400`: Invalid or inactive analyte IDs
+
+### PUT /analyses/{id}/analytes
+Replace all analyte assignments for an analysis (full replacement).
+
+**Requires:** `config:edit`, `test:configure`, or `analysis:manage` permission
+
+**Request:**
+```json
+{
+  "analyte_ids": ["uuid1", "uuid2"]
+}
+```
+
+**Response:** List of linked analytes
+
+### DELETE /analyses/{id}/analytes/{analyte_id}
+Unlink a single analyte from an analysis.
+
+**Requires:** `config:edit`, `test:configure`, or `analysis:manage` permission
+
+**Response:** HTTP 204 No Content
+
+**Error Responses:**
+- `404`: Analysis not found or analyte not linked to this analysis
+
 ### GET /analyses/{id}/analyte-rules
 Get all validation rules for analytes in an analysis.
 
@@ -889,13 +994,18 @@ Get all validation rules for analytes in an analysis.
 ```json
 [
   {
-    "analyte_id": "...",
+    "analyte_id": "uuid",
     "analyte_name": "pH",
     "data_type": "numeric",
+    "list_id": null,
     "high_value": 14.0,
     "low_value": 0.0,
     "significant_figures": 2,
-    "is_required": true
+    "calculation": null,
+    "reported_name": null,
+    "display_order": 1,
+    "is_required": true,
+    "default_value": null
   }
 ]
 ```
@@ -903,58 +1013,142 @@ Get all validation rules for analytes in an analysis.
 ### POST /analyses/{id}/analyte-rules
 Create a validation rule for an analyte in an analysis.
 
-**Requires:** `config:edit` or `test:configure` permission
+**Requires:** `config:edit`, `test:configure`, or `analysis:manage` permission
+
+**Request:**
+```json
+{
+  "analyte_id": "uuid",
+  "data_type": "numeric",
+  "high_value": 14.0,
+  "low_value": 0.0,
+  "significant_figures": 2,
+  "is_required": true
+}
+```
+
+**Response:** AnalyteRuleResponse (HTTP 201 Created)
+
+**Error Responses:**
+- `404`: Analysis not found
+- `400`: Analyte rule already exists, invalid analyte_id, or low_value > high_value
 
 ### PATCH /analyses/{id}/analyte-rules/{analyte_id}
 Update a validation rule for an analyte.
 
-**Requires:** `config:edit` or `test:configure` permission
+**Requires:** `config:edit`, `test:configure`, or `analysis:manage` permission
 
 ### DELETE /analyses/{id}/analyte-rules/{analyte_id}
 Delete a validation rule for an analyte.
 
-**Requires:** `config:edit` or `test:configure` permission
+**Requires:** `config:edit`, `test:configure`, or `analysis:manage` permission
 
 ## Analytes
 
 ### GET /analytes
-List all active analytes.
+List analytes with optional filtering, search, and pagination.
+
+**Query Parameters:**
+- `search` (optional, string): Search by name or CAS number (case-insensitive)
+- `active` (optional, boolean): Filter by active status (default: only active for non-admin users)
+- `page` (optional, int, default=1): Page number
+- `size` (optional, int, default=10, max=100): Page size
 
 **Response:**
 ```json
-[
-  {
-    "id": "...",
-    "name": "pH",
-    "description": "pH value"
-  }
-]
+{
+  "analytes": [
+    {
+      "id": "uuid",
+      "name": "pH",
+      "description": "pH value",
+      "cas_number": null,
+      "units_default": "uuid",
+      "data_type": "numeric",
+      "active": true,
+      "created_at": "2026-01-01T00:00:00Z",
+      "modified_at": "2026-01-01T00:00:00Z",
+      "created_by": "uuid",
+      "modified_by": "uuid",
+      "custom_attributes": {}
+    }
+  ],
+  "total": 50,
+  "page": 1,
+  "size": 10,
+  "pages": 5
+}
 ```
+
+### GET /analytes/{id}
+Get a single analyte by ID.
+
+**Response:** AnalyteResponse (same structure as in list response)
+
+**Error Responses:**
+- `404`: Analyte not found
 
 ### POST /analytes
 Create a new analyte.
 
-**Requires:** `config:edit` or `test:configure` permission
+**Requires:** `config:edit`, `test:configure`, or `analysis:manage` permission
 
 **Request:**
 ```json
 {
   "name": "pH",
-  "description": "pH value"
+  "description": "pH value",
+  "cas_number": "7732-18-5",
+  "units_default": "uuid",
+  "data_type": "numeric",
+  "custom_attributes": {}
 }
 ```
 
-### PATCH /analytes/{id}
-Update an analyte.
+**Note:** 
+- `name` is required and must be unique
+- `data_type` options: `numeric`, `text`, `date`, `boolean`
+- `units_default` must reference a valid, active unit
 
-**Requires:** `config:edit` or `test:configure` permission
+**Response:** AnalyteResponse (HTTP 201 Created)
+
+**Error Responses:**
+- `400`: Analyte name already exists or invalid units_default
+
+### PATCH /analytes/{id}
+Update an analyte (partial update).
+
+**Requires:** `config:edit`, `test:configure`, or `analysis:manage` permission
+
+**Request (all fields optional):**
+```json
+{
+  "name": "Updated Name",
+  "description": "Updated description",
+  "cas_number": "7732-18-5",
+  "units_default": "uuid",
+  "data_type": "text",
+  "active": false,
+  "custom_attributes": {"notes": "Updated"}
+}
+```
+
+**Response:** Updated AnalyteResponse
+
+**Error Responses:**
+- `404`: Analyte not found
+- `400`: Analyte name already exists (if changing name) or invalid units_default
 
 ### DELETE /analytes/{id}
-Soft-delete an analyte.
+Soft-delete an analyte (sets active=false).
 
-**Requires:** `config:edit` or `test:configure` permission
+**Requires:** `config:edit`, `test:configure`, or `analysis:manage` permission
 
-**Note:** Cannot delete if referenced by any analyses.
+**Response:** HTTP 204 No Content
+
+**Error Responses:**
+- `404`: Analyte not found
+- `400`: Cannot delete - analyses reference this analyte
 
 ## Units
 

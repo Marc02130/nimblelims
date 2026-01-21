@@ -2,7 +2,7 @@ from sqlalchemy import Column, String, DateTime, ForeignKey, Boolean, Numeric, I
 from sqlalchemy.dialects.postgresql import UUID as PostgresUUID, JSONB
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
-from .base import BaseModel
+from .base import BaseModel, Base
 
 
 class Analysis(BaseModel):
@@ -42,7 +42,12 @@ class Analyte(BaseModel):
     modifier = relationship("User", foreign_keys="Analyte.modified_by", back_populates="modified_analytes")
 
 
-class AnalysisAnalyte(BaseModel):
+class AnalysisAnalyte(Base):
+    """
+    Junction table for Analysis-Analyte many-to-many relationship.
+    Uses composite primary key (analysis_id, analyte_id) - no separate id column.
+    Does NOT extend BaseModel since this is a pure junction table without audit fields.
+    """
     __tablename__ = 'analysis_analytes'
     
     analysis_id = Column(PostgresUUID(as_uuid=True), ForeignKey('analyses.id'), primary_key=True)
