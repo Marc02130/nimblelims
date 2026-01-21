@@ -499,11 +499,30 @@ async def create_batch(
             detail=f"QC samples are required for batch type {batch_data.type}. Please provide qc_additions."
         )
     
-    # Get first sample for QC inheritance (project_id, sample_type, matrix, status)
+    # Get Laboratory QC project for QC samples - all batch QC samples go to this system project
+    # This ensures QC samples are batch-level controls shared across all client projects
+    LAB_QC_PROJECT_ID = UUID('00000000-0000-0000-0000-000000000002')
+    qc_project_id = None
     first_sample = None
+    
     if batch_data.qc_additions:
+        # Verify the Laboratory QC project exists
+        from models.project import Project
+        lab_qc_project = db.query(Project).filter(
+            Project.id == LAB_QC_PROJECT_ID,
+            Project.active == True
+        ).first()
+        
+        if not lab_qc_project:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Laboratory QC project not found. Please run database migrations."
+            )
+        
+        qc_project_id = LAB_QC_PROJECT_ID
+        
+        # Optionally get first sample from containers for inheriting sample_type/matrix
         if batch_data.container_ids:
-            # Get first sample from first container
             first_container_id = batch_data.container_ids[0]
             first_contents = db.query(Contents).filter(
                 Contents.container_id == first_container_id
@@ -514,11 +533,12 @@ async def create_batch(
                     Sample.active == True
                 ).first()
         
-        if not first_sample:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Cannot create QC samples: no samples found in containers to inherit project/sample properties. Provide container_ids with samples."
-            )
+        # Try to get first sample from sample_ids if not from containers
+        if not first_sample and batch_data.sample_ids:
+            first_sample = db.query(Sample).filter(
+                Sample.id == batch_data.sample_ids[0],
+                Sample.active == True
+            ).first()
     
     # Validate status exists and is active
     if batch_data.status:
@@ -560,7 +580,7 @@ async def create_batch(
     
     # Create QC samples if provided (US-27)
     # All QC creation happens atomically within the batch creation transaction
-    if batch_data.qc_additions and first_sample:
+    if batch_data.qc_additions and qc_project_id:
         # Get "Received" status for QC samples
         from models.list import List
         sample_status_list = db.query(List).filter(
@@ -597,29 +617,7 @@ async def create_batch(
             db.flush()
             db.refresh(received_status)  # Ensure ID is available
         
-        # Get default container type for QC samples (use first container's type or a default)
-        default_container_type = None
-        if batch_data.container_ids:
-            first_container = db.query(Container).filter(
-                Container.id == batch_data.container_ids[0]
-            ).first()
-            if first_container:
-                default_container_type = first_container.type_id
-        
-        if not default_container_type:
-            # Get first active container type as fallback
-            default_container_type_obj = db.query(ContainerType).filter(
-                ContainerType.active == True
-            ).first()
-            if default_container_type_obj:
-                default_container_type = default_container_type_obj.id
-            else:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Cannot create QC samples: no container type available"
-                )
-        
-        # Create QC samples
+        # Create QC samples - each QC addition specifies its own container
         for qc_idx, qc_addition in enumerate(batch_data.qc_additions):
             # Validate QC type exists
             qc_type_entry = db.query(ListEntry).filter(
@@ -636,39 +634,85 @@ async def create_batch(
             # Generate QC sample name
             qc_sample_name = f"QC-{batch.name}-{qc_idx + 1}"
             
-            # Validate all required fields are present
-            if not first_sample.sample_type:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Cannot create QC sample: first sample has no sample_type"
-                )
-            if not first_sample.matrix:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Cannot create QC sample: first sample has no matrix"
-                )
-            if not first_sample.project_id:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Cannot create QC sample: first sample has no project_id"
-                )
+            # Validate received status exists
             if not received_status or not received_status.id:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Cannot create QC sample: received status not found or invalid"
                 )
             
-            # Create QC sample (inherit from first sample)
+            # Get sample_type for QC - inherit from first_sample or get default "QC" type
+            qc_sample_type = None
+            qc_due_date = first_sample.due_date if first_sample else None
+            
+            # Use the matrix provided by the user
+            qc_matrix = qc_addition.matrix_id
+            
+            # Validate the matrix exists
+            matrix_entry = db.query(ListEntry).filter(
+                ListEntry.id == qc_matrix,
+                ListEntry.active == True
+            ).first()
+            if not matrix_entry:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Invalid matrix ID for QC sample: {qc_matrix}"
+                )
+            
+            if first_sample:
+                # Inherit sample_type from existing sample
+                qc_sample_type = first_sample.sample_type
+            else:
+                # Get or create default QC sample type - list name is "Sample Types"
+                sample_type_list = db.query(List).filter(
+                    List.name.in_(["Sample Types", "sample_type", "sample_types"])
+                ).first()
+                if sample_type_list:
+                    qc_sample_type_entry = db.query(ListEntry).filter(
+                        ListEntry.list_id == sample_type_list.id,
+                        ListEntry.name.in_(["QC", "Quality Control"]),
+                        ListEntry.active == True
+                    ).first()
+                    if qc_sample_type_entry:
+                        qc_sample_type = qc_sample_type_entry.id
+                    else:
+                        # Get first sample type as fallback
+                        first_type = db.query(ListEntry).filter(
+                            ListEntry.list_id == sample_type_list.id,
+                            ListEntry.active == True
+                        ).first()
+                        if first_type:
+                            qc_sample_type = first_type.id
+                
+                # If sample_type is still None, raise an error since it's a required field
+                if not qc_sample_type:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Cannot create QC sample: No sample type found. Please configure a 'QC' or 'Quality Control' sample type in the Sample Types list."
+                    )
+            
+            # Validate that the provided container type exists
+            container_type = db.query(ContainerType).filter(
+                ContainerType.id == qc_addition.container_type_id,
+                ContainerType.active == True
+            ).first()
+            if not container_type:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Container type not found for QC sample: {qc_addition.container_type_id}"
+                )
+            
+            # Create QC sample
             qc_sample = Sample(
                 name=qc_sample_name,
                 description=f"QC sample ({qc_type_entry.name})" + (f": {qc_addition.notes}" if qc_addition.notes else ""),
-                due_date=first_sample.due_date,
+                due_date=qc_due_date,
                 received_date=datetime.utcnow(),
-                sample_type=first_sample.sample_type,  # Inherit sample type
+                sample_type=qc_sample_type,  # Use inherited or default sample type
                 status=received_status.id,
-                matrix=first_sample.matrix,  # Inherit matrix
-                temperature=first_sample.temperature,  # Inherit temperature
-                project_id=first_sample.project_id,  # Inherit project
+                matrix=qc_matrix,  # Use inherited or default matrix
+                temperature=first_sample.temperature if first_sample else None,  # Inherit temperature if available
+                project_id=qc_project_id,  # Use determined project ID
                 qc_type=qc_addition.qc_type,  # Set QC type
                 created_by=current_user.id,
                 modified_by=current_user.id
@@ -676,20 +720,20 @@ async def create_batch(
             db.add(qc_sample)
             db.flush()  # Get the ID without committing
             
-            # Create container for QC sample
+            # Create a new container for the QC sample
             qc_container = Container(
-                name=f"QC-{batch.name}-{qc_idx + 1}-Container",
+                name=f"QC-{batch.name}-{qc_idx + 1}",
                 description=f"Container for QC sample {qc_sample_name}",
-                type_id=default_container_type,
+                type_id=qc_addition.container_type_id,
                 row=1,
                 column=1,
                 created_by=current_user.id,
                 modified_by=current_user.id
             )
             db.add(qc_container)
-            db.flush()  # Get the ID without committing
+            db.flush()  # Get the container ID
             
-            # Link QC sample to container via Contents
+            # Link QC sample to the new container via Contents
             qc_contents = Contents(
                 container_id=qc_container.id,
                 sample_id=qc_sample.id

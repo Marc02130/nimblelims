@@ -24,15 +24,18 @@ class BatchBase(BaseModel):
 class QCAddition(BaseModel):
     """Schema for QC sample addition during batch creation"""
     qc_type: UUID = Field(..., description="ID of QC type from list_entries (e.g., Blank, Blank Spike, Duplicate, Matrix Spike)")
+    container_type_id: UUID = Field(..., description="Container type ID - a new container of this type will be created for the QC sample")
+    matrix_id: UUID = Field(..., description="Matrix ID from list_entries for the QC sample")
     notes: Optional[str] = Field(None, description="Optional notes for the QC sample")
 
 
 class BatchCreate(BatchBase):
     """Schema for creating a new batch"""
     container_ids: Optional[List[UUID]] = Field(None, description="List of container IDs for cross-project batching")
+    sample_ids: Optional[List[UUID]] = Field(None, description="List of sample IDs to include in the batch (for sample-based batching)")
     cross_project: Optional[bool] = Field(None, description="Flag to indicate cross-project batching (auto-detected if container_ids provided)")
     divergent_analyses: Optional[List[UUID]] = Field(None, description="List of analysis IDs that require separate sub-batches (future: child_batch_id FK)")
-    qc_additions: Optional[List[QCAddition]] = Field(None, description="List of QC samples to auto-create and add to batch (US-27)")
+    qc_additions: Optional[List[QCAddition]] = Field(None, description="List of QC samples to auto-create and add to batch (US-27). QC samples are automatically assigned to the system Laboratory QC project.")
 
 
 class BatchUpdate(BaseModel):

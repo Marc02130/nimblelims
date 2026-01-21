@@ -87,39 +87,52 @@ async def get_eligible_samples(
     # We need to join with tests and analyses to get shelf_life for expiration calculation
     now = datetime.utcnow()
     
+    # Get completed and cancelled test status IDs to exclude
+    from models.list import List, ListEntry
+    test_status_list = db.query(List).filter(List.name == "test_status").first()
+    excluded_status_ids = []
+    if test_status_list:
+        excluded_statuses = db.query(ListEntry.id).filter(
+            ListEntry.list_id == test_status_list.id,
+            ListEntry.name.in_(["Complete", "Completed", "Cancelled", "Canceled"]),
+            ListEntry.active == True
+        ).all()
+        excluded_status_ids = [s.id for s in excluded_statuses]
+    
     # Subquery to get the minimum shelf_life analysis for each sample
     # This ensures we use the most restrictive (shortest) shelf_life
+    # Only includes tests that are NOT completed or cancelled
     if analysis_ids:
         # Filter by specific analyses
-        shelf_life_subq = (
+        shelf_life_subq_query = (
             db.query(
                 Test.sample_id,
                 func.min(Analysis.shelf_life).label('min_shelf_life'),
-                func.min(Analysis.id).label('analysis_id'),
-                func.min(Analysis.name).label('analysis_name')
             )
             .join(Analysis, Test.analysis_id == Analysis.id)
             .filter(Test.active == True)
             .filter(Analysis.active == True)
             .filter(Test.analysis_id.in_(analysis_ids))
-            .group_by(Test.sample_id)
-            .subquery()
         )
+        # Exclude completed/cancelled tests
+        if excluded_status_ids:
+            shelf_life_subq_query = shelf_life_subq_query.filter(~Test.status.in_(excluded_status_ids))
+        shelf_life_subq = shelf_life_subq_query.group_by(Test.sample_id).subquery()
     else:
         # All analyses
-        shelf_life_subq = (
+        shelf_life_subq_query = (
             db.query(
                 Test.sample_id,
                 func.min(Analysis.shelf_life).label('min_shelf_life'),
-                func.min(Analysis.id).label('analysis_id'),
-                func.min(Analysis.name).label('analysis_name')
             )
             .join(Analysis, Test.analysis_id == Analysis.id)
             .filter(Test.active == True)
             .filter(Analysis.active == True)
-            .group_by(Test.sample_id)
-            .subquery()
         )
+        # Exclude completed/cancelled tests
+        if excluded_status_ids:
+            shelf_life_subq_query = shelf_life_subq_query.filter(~Test.status.in_(excluded_status_ids))
+        shelf_life_subq = shelf_life_subq_query.group_by(Test.sample_id).subquery()
     
     # Main query with computed prioritization fields
     query = (
@@ -128,8 +141,6 @@ async def get_eligible_samples(
             Project.name.label('project_name'),
             Project.due_date.label('project_due_date'),
             shelf_life_subq.c.min_shelf_life.label('shelf_life'),
-            shelf_life_subq.c.analysis_id.label('analysis_id'),
-            shelf_life_subq.c.analysis_name.label('analysis_name'),
         )
         .join(Project, Sample.project_id == Project.id)
         .outerjoin(shelf_life_subq, Sample.id == shelf_life_subq.c.sample_id)
@@ -141,14 +152,17 @@ async def get_eligible_samples(
         query = query.filter(Sample.project_id == project_id_uuid)
     
     # If analysis_ids provided, filter to samples that have tests for those analyses
+    # Only include samples with tests that are NOT completed or cancelled
     if analysis_ids:
-        sample_ids_with_tests = (
+        sample_ids_with_tests_query = (
             db.query(Test.sample_id)
             .filter(Test.analysis_id.in_(analysis_ids))
             .filter(Test.active == True)
-            .distinct()
-            .subquery()
         )
+        # Exclude completed/cancelled tests
+        if excluded_status_ids:
+            sample_ids_with_tests_query = sample_ids_with_tests_query.filter(~Test.status.in_(excluded_status_ids))
+        sample_ids_with_tests = sample_ids_with_tests_query.distinct().subquery()
         query = query.filter(Sample.id.in_(db.query(sample_ids_with_tests.c.sample_id)))
     
     # Get all results for processing (RLS handles access control)
@@ -165,8 +179,6 @@ async def get_eligible_samples(
         project_name = row.project_name
         project_due_date = row.project_due_date
         shelf_life = row.shelf_life
-        analysis_id = row.analysis_id
-        analysis_name = row.analysis_name
         
         # Compute effective due date (sample > project)
         effective_due_date = sample.due_date if sample.due_date else project_due_date
@@ -219,8 +231,6 @@ async def get_eligible_samples(
             'is_expired': is_expired,
             'is_overdue': is_overdue,
             'expiration_warning': expiration_warning,
-            'analysis_id': analysis_id,
-            'analysis_name': analysis_name,
             'shelf_life': shelf_life,
             'project_name': project_name,
             'project_due_date': project_due_date,

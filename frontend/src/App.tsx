@@ -15,9 +15,9 @@ import ContainerTypesManagement from './pages/admin/ContainerTypesManagement';
 import UnitsManagement from './pages/admin/UnitsManagement';
 import UsersManagement from './pages/admin/UsersManagement';
 import RolesManagement from './pages/admin/RolesManagement';
-import AnalysesManagement from './pages/admin/AnalysesManagement';
+import AdminAnalysesManagement from './pages/admin/AnalysesManagement';
 import TestBatteriesManagement from './pages/admin/TestBatteriesManagement';
-import AnalytesManagement from './pages/admin/AnalytesManagement';
+import AdminAnalytesManagement from './pages/admin/AnalytesManagement';
 import AnalysisAnalytesConfig from './pages/admin/AnalysisAnalytesConfig';
 import CustomFieldsManagement from './pages/admin/CustomFieldsManagement';
 import CustomNamesManagement from './pages/admin/CustomNamesManagement';
@@ -25,6 +25,8 @@ import HelpManagement from './pages/admin/HelpManagement';
 import ClientProjects from './pages/ClientProjects';
 import ClientsManagement from './pages/ClientsManagement';
 import ProjectsManagement from './pages/ProjectsManagement';
+import AnalysesManagement from './pages/AnalysesManagement';
+import AnalytesManagement from './pages/AnalytesManagement';
 import HelpPage from './pages/HelpPage';
 import { useUser } from './contexts/UserContext';
 
@@ -159,6 +161,26 @@ function AppRoutes() {
             )
           }
         />
+        <Route
+          path="/analyses"
+          element={
+            hasPermission('analysis:manage') ? (
+              <AnalysesManagement />
+            ) : (
+              <Navigate to="/dashboard" replace />
+            )
+          }
+        />
+        <Route
+          path="/analytes"
+          element={
+            hasPermission('analysis:manage') ? (
+              <AnalytesManagement />
+            ) : (
+              <Navigate to="/dashboard" replace />
+            )
+          }
+        />
         <Route path="/help" element={<HelpPage />} />
 
         {/* Admin Routes */}
@@ -226,7 +248,7 @@ function AppRoutes() {
           path="/admin/analyses"
           element={
             hasPermission('config:edit') || hasPermission('test:configure') ? (
-              <AnalysesManagement />
+              <AdminAnalysesManagement />
             ) : (
               <Navigate to="/dashboard" replace />
             )
@@ -246,7 +268,7 @@ function AppRoutes() {
           path="/admin/analytes"
           element={
             hasPermission('config:edit') || hasPermission('test:configure') ? (
-              <AnalytesManagement />
+              <AdminAnalytesManagement />
             ) : (
               <Navigate to="/dashboard" replace />
             )

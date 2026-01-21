@@ -1041,3 +1041,173 @@ Output as: Updated components/batches/BatchFormEnhanced.tsx (full file), service
 Docs: In batches.md, add Prioritization section (explain calcs, sorting); update US-11 in nimblelims_user.md (add criteria: prioritize by expiration > due, flag expired).
 Tests: Pytest for eligible endpoint (mock dates, assert sorting/flags); Jest for UI (render DataGrid with priorities, check highlights/tooltips).
 Output as: Updated batches.md (full file), nimblelims_user.md (US sections only), new tests/test_samples.py (eligible/prioritization cases)."
+
+# Analysis Management
+## Prompt 1 – Backend foundation: Analyses & Analytes CRUD endpoints
+
+Implement complete CRUD API support for Analyses and Analytes in NimbleLIMS backend (FastAPI + SQLAlchemy), aligning with the existing style in routers/projects.py, routers/samples.py etc.
+
+Requirements:
+
+1. Analyses (table already exists: analyses)
+   • Fields: id, name (unique), method (varchar), turnaround_time (int days), cost (numeric nullable), description (text nullable), active (bool), custom_attributes (jsonb), audit fields
+   • Endpoints (router: /analyses):
+     • GET    /analyses              → list with ?search= & ?active=true & pagination
+     • GET    /analyses/{id}
+     • POST   /analyses              → create (name unique, method required)
+     • PATCH  /analyses/{id}         → partial update
+     • DELETE /analyses/{id}         → soft delete (active=false)
+
+2. Analytes (table already exists: analytes)
+   • Fields: id, name (unique), cas_number (varchar nullable), units_default (FK units.id nullable), data_type (enum: numeric/text/date/boolean), description (text), active (bool), custom_attributes (jsonb), audit fields
+
+   • Endpoints (router: /analytes):
+     • GET    /analytes              → list + ?search= & ?active=true & pagination
+     • GET    /analytes/{id}
+     • POST   /analytes              → create (name unique)
+     • PATCH  /analytes/{id}         → partial update
+     • DELETE /analytes/{id}         → soft delete (active=false)
+
+3. Analysis-Analyte relationship (junction table analysis_analytes already exists)
+   • Add endpoints under /analyses/{analysis_id}/analytes
+     • GET    /analyses/{analysis_id}/analytes          → list linked analytes
+     • POST   /analyses/{analysis_id}/analytes          → link existing analyte(s)  { "analyte_ids": ["uuid1", "uuid2"] }
+     • DELETE /analyses/{analysis_id}/analytes/{analyte_id} → unlink one
+
+4. Use existing patterns:
+   • Pydantic schemas: AnalysisBase, AnalysisCreate, AnalysisUpdate, AnalysisResponse (include linked analytes in Response if small)
+   • RBAC: require_permission("analysis:manage") for create/update/delete
+   • RLS: assume analyses & analytes are global / admin-only → no project-based RLS needed
+   • Audit: set created_by / modified_by automatically
+
+5. Add basic search (ilike on name + method / cas_number)
+
+Output full files (replace or append as needed):
+• routers/analyses.py          (complete router)
+• routers/analytes.py          (complete router)
+• schemas/analysis.py          (all schemas)
+• schemas/analyte.py           (all schemas)
+• dependencies.py              (add analysis:manage permission check if missing)
+
+## Prompt 2 – Navigation updates (add menu items under Lab Mgmt)
+
+Update the NimbleLIMS sidebar navigation to include Analyses and Analytes management pages under the "Lab Mgmt" accordion (which already contains Clients, Int Projs, Client Projs).
+
+Follow the exact style from navigation.md and Sidebar.tsx:
+
+• Add two new ListItemButton entries inside the Lab Mgmt Accordion → after "Client Projs"
+  - "Analyses"   → route: /analyses    icon: Biotech     tooltip: "Analysis Methods"
+  - "Analytes"   → route: /analytes    icon: Science     tooltip: "Measurable Analytes"
+
+• Permission: show both items only if user has "analysis:manage" permission (use hasPermission from UserContext)
+
+• Auto-expand "Lab Mgmt" accordion when location.pathname starts with "/analyses" or "/analytes"
+
+• Keep labels short ("Analyses", "Analytes") + tooltip for clarity
+
+• Update active route highlighting (primary color when matched)
+
+Output full updated files:
+• components/Sidebar.tsx                 (complete file with changes)
+• layouts/MainLayout.tsx                 (only changes related to auto-expand logic)
+
+## Prompt 3 – Analyses management page (list + create/edit dialog)
+
+Create the Analyses management page for NimbleLIMS frontend (React + MUI + TypeScript).
+
+Page: src/pages/AnalysesManagement.tsx
+Route: /analyses (add to App.tsx routing)
+
+Features (mirror SamplesManagement.tsx style):
+
+• MUI DataGrid (premium if licensed, else free)
+  Columns: name, method, turnaround_time (days), cost, active (chip), created_at
+  Features: sort, filter (Toolbar), pagination, search on name/method
+
+• FAB (+) → opens Create Dialog
+• Edit icon per row → opens Edit Dialog (pre-filled)
+
+• Dialog (Formik + Yup):
+  Fields:
+  - name            (required, unique check via API on blur if possible)
+  - method          (required)
+  - turnaround_time (number, min 0)
+  - cost            (number, min 0, nullable)
+  - description     (multiline)
+  - active          (switch)
+  - Custom attributes (dynamic via CustomAttributeField.tsx — entity_type="analyses")
+
+• RBAC: hide FAB & edit buttons if !hasPermission("analysis:manage")
+
+• API integration via apiService.ts:
+  - getAnalyses(params)
+  - createAnalysis(data)
+  - updateAnalysis(id, data)
+
+• Loading state, error snackbar, success toast
+
+• Responsive: horizontal scroll on mobile
+
+Output:
+• pages/AnalysesManagement.tsx          (full new file)
+• services/apiService.ts                (append new methods: getAnalyses, createAnalysis, updateAnalysis)
+• App.tsx                               (only routing changes)
+
+## Prompt 4 – Analytes management page (similar structure)
+
+Create the Analytes management page for NimbleLIMS (very similar to AnalysesManagement.tsx).
+
+Page: src/pages/AnalytesManagement.tsx
+Route: /analytes
+
+Features:
+
+• MUI DataGrid
+  Columns: name, cas_number, units_default (name from units), data_type (chip: Numeric/Text/Date/Boolean), active, created_at
+
+• Create / Edit Dialog (Formik + Yup):
+  - name            (required, unique)
+  - cas_number      (optional)
+  - units_default   (Autocomplete – fetch from /units)
+  - data_type       (Select: numeric | text | date | boolean)
+  - description     (multiline)
+  - active          (switch)
+  - Custom attributes (entity_type="analytes")
+
+• RBAC: analysis:manage controls visibility of create/edit
+
+• apiService methods needed:
+  - getAnalytes(params)
+  - createAnalyte(data)
+  - updateAnalyte(id, data)
+
+Output:
+• pages/AnalytesManagement.tsx          (full new file)
+• services/apiService.ts                (append getAnalytes, createAnalyte, updateAnalyte)
+• App.tsx                               (routing changes only)
+
+## Prompt 5 – Optional: Link analytes to analysis (nice-to-have next step)
+
+Add the ability to manage which analytes belong to each analysis (many-to-many via analysis_analytes junction).
+
+Enhance AnalysesManagement.tsx:
+
+When editing an Analysis, add a new tab or expandable section "Linked Analytes"
+
+• MUI DataGrid showing currently linked analytes (name, cas_number, data_type)
+• Button "Add Analyte" → Autocomplete search from all analytes (GET /analytes?search=)
+• Remove icon per row → unlink
+
+API calls:
+• POST   /analyses/{id}/analytes       { "analyte_ids": [...] }
+• DELETE /analyses/{id}/analytes/{analyteId}
+
+Backend already has these endpoints from earlier prompt.
+
+Frontend:
+• Use apiService.createAnalysisAnalytes(analysisId, {analyte_ids})
+• apiService.deleteAnalysisAnalyte(analysisId, analyteId)
+
+Output: updated AnalysesManagement.tsx (full file with analyte linking section)
+
+#

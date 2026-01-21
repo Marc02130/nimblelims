@@ -24,8 +24,6 @@ export interface EligibleSample {
   is_overdue: boolean;
   expiration_warning?: string;
   // Analysis context
-  analysis_id?: string;
-  analysis_name?: string;
   shelf_life?: number;
   // Project context
   project_name?: string;
@@ -295,8 +293,16 @@ class ApiService {
   }
 
   // Analysis endpoints
-  async getAnalyses() {
-    const response: AxiosResponse = await this.api.get('/analyses');
+  async getAnalyses(filters?: { search?: string; active?: boolean; page?: number; size?: number }) {
+    const response: AxiosResponse = await this.api.get('/analyses', {
+      params: filters,
+    });
+    // API returns AnalysisListResponse with {analyses, total, page, size, pages}
+    return response.data;
+  }
+
+  async getAnalysis(id: string) {
+    const response: AxiosResponse = await this.api.get(`/analyses/${id}`);
     return response.data;
   }
 
@@ -324,6 +330,18 @@ class ApiService {
     const response: AxiosResponse = await this.api.put(`/analyses/${analysisId}/analytes`, {
       analyte_ids: analyteIds,
     });
+    return response.data;
+  }
+
+  async linkAnalytesToAnalysis(analysisId: string, analyteIds: string[]) {
+    const response: AxiosResponse = await this.api.post(`/analyses/${analysisId}/analytes`, {
+      analyte_ids: analyteIds,
+    });
+    return response.data;
+  }
+
+  async unlinkAnalyteFromAnalysis(analysisId: string, analyteId: string) {
+    const response: AxiosResponse = await this.api.delete(`/analyses/${analysisId}/analytes/${analyteId}`);
     return response.data;
   }
 
@@ -567,8 +585,16 @@ class ApiService {
   }
 
   // Analyte endpoints
-  async getAnalytes() {
-    const response: AxiosResponse = await this.api.get('/analytes');
+  async getAnalytes(filters?: { search?: string; active?: boolean; page?: number; size?: number }) {
+    const response: AxiosResponse = await this.api.get('/analytes', {
+      params: filters,
+    });
+    // API returns AnalyteListResponse with {analytes, total, page, size, pages}
+    return response.data;
+  }
+
+  async getAnalyte(id: string) {
+    const response: AxiosResponse = await this.api.get(`/analytes/${id}`);
     return response.data;
   }
 

@@ -64,6 +64,15 @@ interface AdminNavItem {
   exact?: boolean;
 }
 
+// Helper to check if current path is in Lab Mgmt section
+const isLabMgmtRoute = (pathname: string): boolean => {
+  return pathname.startsWith('/clients') || 
+    pathname.startsWith('/projects') || 
+    pathname.startsWith('/client-projects') ||
+    pathname.startsWith('/analyses') ||
+    pathname.startsWith('/analytes');
+};
+
 const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onMobileClose, collapsed = false }) => {
   const { user, hasPermission } = useUser();
   const navigate = useNavigate();
@@ -75,9 +84,7 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onMobileClose, collapsed 
     location.pathname.startsWith('/admin')
   );
   const [labMgmtExpanded, setLabMgmtExpanded] = useState(
-    location.pathname.startsWith('/clients') || 
-    location.pathname.startsWith('/projects') || 
-    location.pathname.startsWith('/client-projects')
+    isLabMgmtRoute(location.pathname)
   );
   const [sampleMgmtExpanded, setSampleMgmtExpanded] = useState(
     location.pathname.startsWith('/accessioning') || 
@@ -168,6 +175,7 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onMobileClose, collapsed 
     tooltip?: string;
     ariaLabel?: string;
     exact?: boolean;
+    permission?: string;
   }
 
   const labMgmtItems: LabMgmtNavItem[] = [
@@ -189,6 +197,22 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onMobileClose, collapsed 
       icon: <ViewListIcon />,
       tooltip: 'Client Projects',
       ariaLabel: 'Client Projects',
+    },
+    {
+      text: 'Analyses',
+      path: '/analyses',
+      icon: <Biotech />,
+      tooltip: 'Analysis Methods',
+      ariaLabel: 'Analysis Methods',
+      permission: 'analysis:manage',
+    },
+    {
+      text: 'Analytes',
+      path: '/analytes',
+      icon: <ScienceIcon />,
+      tooltip: 'Measurable Analytes',
+      ariaLabel: 'Measurable Analytes',
+      permission: 'analysis:manage',
     },
   ];
 
@@ -266,7 +290,7 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onMobileClose, collapsed 
     if (collapsed) {
       if (path.startsWith('/admin')) {
         setAdminExpanded(true);
-      } else if (path.startsWith('/clients') || path.startsWith('/projects') || path.startsWith('/client-projects')) {
+      } else if (isLabMgmtRoute(path)) {
         setLabMgmtExpanded(true);
       } else if (path.startsWith('/accessioning') || path.startsWith('/samples') || path.startsWith('/tests') || path.startsWith('/containers') || path.startsWith('/batches') || path.startsWith('/results')) {
         setSampleMgmtExpanded(true);
@@ -284,7 +308,7 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onMobileClose, collapsed 
   };
 
   const hasAdminAccess = hasPermission('config:edit');
-  const hasLabMgmtAccess = hasPermission('project:manage');
+  const hasLabMgmtAccess = hasPermission('project:manage') || hasPermission('analysis:manage');
   const hasSampleMgmtAccess = 
     hasPermission('sample:create') ||
     hasPermission('sample:read') ||
@@ -296,11 +320,7 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onMobileClose, collapsed 
   // Update accordion expanded states when route changes
   React.useEffect(() => {
     setAdminExpanded(location.pathname.startsWith('/admin'));
-    setLabMgmtExpanded(
-      location.pathname.startsWith('/clients') || 
-      location.pathname.startsWith('/projects') || 
-      location.pathname.startsWith('/client-projects')
-    );
+    setLabMgmtExpanded(isLabMgmtRoute(location.pathname));
     setSampleMgmtExpanded(
       location.pathname.startsWith('/accessioning') || 
       location.pathname.startsWith('/samples') || 
@@ -551,24 +571,12 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onMobileClose, collapsed 
                   {collapsed ? (
                     <Tooltip title="Lab Management" placement="right" arrow>
                       <SettingsApplicationsIcon
-                        color={
-                          location.pathname.startsWith('/clients') || 
-                          location.pathname.startsWith('/projects') || 
-                          location.pathname.startsWith('/client-projects')
-                            ? 'primary'
-                            : 'inherit'
-                        }
+                        color={isLabMgmtRoute(location.pathname) ? 'primary' : 'inherit'}
                       />
                     </Tooltip>
                   ) : (
                     <SettingsApplicationsIcon
-                      color={
-                        location.pathname.startsWith('/clients') || 
-                        location.pathname.startsWith('/projects') || 
-                        location.pathname.startsWith('/client-projects')
-                          ? 'primary'
-                          : 'inherit'
-                      }
+                      color={isLabMgmtRoute(location.pathname) ? 'primary' : 'inherit'}
                     />
                   )}
                 </ListItemIcon>
@@ -582,52 +590,54 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onMobileClose, collapsed 
               </AccordionSummary>
               <AccordionDetails sx={{ p: 0 }}>
                 <List component="nav" aria-label="lab management navigation">
-                  {labMgmtItems.map((item) => {
-                    const active = isActive(item.path, item.exact);
-                    const displayText = item.text;
-                    const tooltipText = item.tooltip || item.text;
-                    const ariaLabelText = item.ariaLabel || `Navigate to ${item.text}`;
-                    const listItemButton = (
-                      <ListItemButton
-                        selected={active}
-                        onClick={() => handleNavigation(item.path)}
-                        sx={{ 
-                          pl: collapsed ? 2 : 4,
-                          justifyContent: collapsed ? 'center' : 'flex-start',
-                          minHeight: 48,
-                        }}
-                        aria-label={ariaLabelText}
-                        aria-current={active ? 'page' : undefined}
-                      >
-                        <ListItemIcon
-                          sx={{
-                            color: active ? 'primary.main' : 'inherit',
-                            minWidth: collapsed ? 0 : 40,
-                            justifyContent: 'center',
+                  {labMgmtItems
+                    .filter((item) => !item.permission || hasPermission(item.permission))
+                    .map((item) => {
+                      const active = isActive(item.path, item.exact);
+                      const displayText = item.text;
+                      const tooltipText = item.tooltip || item.text;
+                      const ariaLabelText = item.ariaLabel || `Navigate to ${item.text}`;
+                      const listItemButton = (
+                        <ListItemButton
+                          selected={active}
+                          onClick={() => handleNavigation(item.path)}
+                          sx={{ 
+                            pl: collapsed ? 2 : 4,
+                            justifyContent: collapsed ? 'center' : 'flex-start',
+                            minHeight: 48,
                           }}
+                          aria-label={ariaLabelText}
+                          aria-current={active ? 'page' : undefined}
                         >
-                          {item.icon}
-                        </ListItemIcon>
-                        {!collapsed && <ListItemText primary={displayText} />}
-                      </ListItemButton>
-                    );
-                    
-                    return (
-                      <ListItem key={item.path} disablePadding>
-                        {collapsed ? (
-                          <Tooltip title={tooltipText} placement="right" arrow>
-                            {listItemButton}
-                          </Tooltip>
-                        ) : item.tooltip ? (
-                          <Tooltip title={tooltipText} placement="right" arrow>
-                            {listItemButton}
-                          </Tooltip>
-                        ) : (
-                          listItemButton
-                        )}
-                      </ListItem>
-                    );
-                  })}
+                          <ListItemIcon
+                            sx={{
+                              color: active ? 'primary.main' : 'inherit',
+                              minWidth: collapsed ? 0 : 40,
+                              justifyContent: 'center',
+                            }}
+                          >
+                            {item.icon}
+                          </ListItemIcon>
+                          {!collapsed && <ListItemText primary={displayText} />}
+                        </ListItemButton>
+                      );
+                      
+                      return (
+                        <ListItem key={item.path} disablePadding>
+                          {collapsed ? (
+                            <Tooltip title={tooltipText} placement="right" arrow>
+                              {listItemButton}
+                            </Tooltip>
+                          ) : item.tooltip ? (
+                            <Tooltip title={tooltipText} placement="right" arrow>
+                              {listItemButton}
+                            </Tooltip>
+                          ) : (
+                            listItemButton
+                          )}
+                        </ListItem>
+                      );
+                    })}
                 </List>
               </AccordionDetails>
             </Accordion>
@@ -784,4 +794,3 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onMobileClose, collapsed 
 };
 
 export default Sidebar;
-
