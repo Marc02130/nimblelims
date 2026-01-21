@@ -94,10 +94,10 @@ The Sample Management section uses a Material-UI Accordion component for collaps
 | **Results** | `/results` | Assessment | `result:enter` | Results entry interface |
 
 #### Lab Mgmt Section (Accordion)
-The Lab Mgmt section uses a Material-UI Accordion component for collapsible submenu functionality. It is only visible to users with `project:manage` permission. This section consolidates laboratory management functions including client and project management (see User Story US-25 for client projects distinction).
+The Lab Mgmt section uses a Material-UI Accordion component for collapsible submenu functionality. It is only visible to users with `project:manage` or `analysis:manage` permission. This section consolidates laboratory management functions including client and project management (see User Story US-25 for client projects distinction), as well as analyses and analytes configuration.
 
 **Accordion Behavior:**
-- Auto-expands when user navigates to any `/clients`, `/projects`, or `/client-projects` route
+- Auto-expands when user navigates to any `/clients`, `/projects`, `/client-projects`, `/analyses`, or `/analytes` route
 - Can be manually collapsed/expanded by clicking the accordion header
 - Shows active state (primary color icon) when on any lab management route
 - Contains lab management sub-items in a nested list structure
@@ -106,15 +106,21 @@ The Lab Mgmt section uses a Material-UI Accordion component for collapsible subm
 
 **Sub-items:**
 
-| Menu Item | Route | Icon | Tooltip | Description |
-|-----------|-------|------|---------|-------------|
-| **Projects** | `/projects` | Folder | Internal Projects | Core NimbleLIMS projects list/edit interface |
-| **Clients** | `/clients` | People | - | Client (organization) management (CRUD) |
-| **Client Proj** | `/client-projects` | ViewList | Client Projects | Client project groupings for tracking multiple projects under client initiatives (US-25) |
+| Menu Item | Route | Icon | Tooltip | Permission | Description |
+|-----------|-------|------|---------|------------|-------------|
+| **Projects** | `/projects` | Folder | Internal Projects | `project:manage` | Core NimbleLIMS projects list/edit interface |
+| **Clients** | `/clients` | People | - | `project:manage` | Client (organization) management (CRUD) |
+| **Client Proj** | `/client-projects` | ViewList | Client Projects | `project:manage` | Client project groupings for tracking multiple projects under client initiatives (US-25) |
+| **Analyses** | `/analyses` | Biotech | Analysis Methods | `analysis:manage` | Analyses management with expandable linked analytes grid |
+| **Analytes** | `/analytes` | Science | Measurable Analytes | `analysis:manage` | Analytes management (name, CAS number, data type, units) |
 
 **Client Projects Distinction (US-25):**
 - **Internal Projects** (`/projects`): Core NimbleLIMS projects used for sample tracking and workflow management
 - **Client Projects** (`/client-projects`): Groupings that link multiple internal projects under a client initiative for holistic tracking and reporting aggregation
+
+**Analyses and Analytes Management:**
+- **Analyses** (`/analyses`): CRUD management for analysis methods with expandable detail rows showing linked analytes. Users can link/unlink analytes directly from the main grid via the expand icon.
+- **Analytes** (`/analytes`): CRUD management for analytes with fields for name, CAS number, default units, data type, and custom attributes.
 
 #### Admin Section (Accordion)
 The Admin section uses a Material-UI Accordion component for collapsible submenu functionality. It is only visible to users with `config:edit` permission.
@@ -203,6 +209,8 @@ The AppBar title is automatically determined from the current route:
 | `/clients` | Clients |
 | `/projects` | Projects |
 | `/client-projects` | Client Projects |
+| `/analyses` | Analyses |
+| `/analytes` | Analytes |
 | `/help` | Help |
 | `/admin` | Admin Dashboard |
 | `/admin/lists` | Lists Management |
@@ -238,6 +246,8 @@ All authenticated routes use the `MainLayout` component, which provides the unif
 | `/clients` | ClientsManagement | MainLayout |
 | `/projects` | ProjectsManagement | MainLayout |
 | `/client-projects` | ClientProjects | MainLayout |
+| `/analyses` | AnalysesManagement | MainLayout |
+| `/analytes` | AnalytesManagement | MainLayout |
 | `/help` | HelpPage | MainLayout |
 | `/admin` | AdminOverview | MainLayout |
 | `/admin/lists` | ListsManagement | MainLayout |
@@ -454,7 +464,7 @@ Sample Mgmt, Lab Mgmt, and Admin sections use Material-UI's Accordion component 
 **Features:**
 - **Auto-Expansion**: Accordions automatically expand when user navigates to related routes
   - Sample Mgmt: Expands on `/accessioning`, `/samples`, `/tests`, `/containers`, `/batches`, or `/results` routes
-  - Lab Mgmt: Expands on `/clients`, `/projects`, or `/client-projects` routes
+  - Lab Mgmt: Expands on `/clients`, `/projects`, `/client-projects`, `/analyses`, or `/analytes` routes
   - Admin: Expands on any `/admin/*` route
 - **Manual Toggle**: Users can collapse/expand accordions by clicking the header
 - **Active State**: Accordion icons show primary color when on related routes

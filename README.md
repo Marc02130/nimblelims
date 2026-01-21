@@ -151,8 +151,9 @@ nimblelims/
 ### Configuration Management
 - **Lists Management**: Full CRUD for lists and list entries via admin interface - create new lists, add/edit/delete entries for statuses, types, matrices, QC types, etc. Empty lists display expand arrows to add entries.
 - **Container Types**: Admin-managed container type definitions (CRUD operations)
-- **Analyses Management**: Create and manage analyses with methods, turnaround times, and costs (CRUD)
-- **Analytes Management**: Create and manage analytes (CRUD)
+- **Analyses Management**: Create and manage analyses with methods, turnaround times, costs, and custom attributes. Features expandable grid rows to view and manage linked analytes directly from the main list (CRUD). Available in both Admin section and Lab Mgmt accordion.
+- **Analytes Management**: Create and manage analytes with CAS numbers, default units, data types, and custom attributes (CRUD). Available in both Admin section and Lab Mgmt accordion.
+- **Analysis-Analyte Linking**: Link/unlink analytes to analyses via expandable detail panels with inline autocomplete search
 - **Analysis-Analyte Configuration**: Configure validation rules (data types, ranges, significant figures, required flags)
 - **Test Batteries Management**: Group multiple analyses into reusable test batteries with sequence ordering and optional flags (CRUD)
 - **Custom Fields Management**: Define custom attributes for samples, tests, results, projects, client_projects, and batches without schema changes (CRUD)
@@ -223,7 +224,7 @@ NimbleLIMS uses a unified sidebar navigation system that provides consistent acc
 - **Unified Sidebar**: Persistent left sidebar (240px expanded, 56px collapsed) on all authenticated routes
 - **Collapsible**: Desktop sidebar can be collapsed to icon-only mode with tooltips on hover
 - **Permission-Based**: Menu items dynamically shown/hidden based on user roles and permissions
-- **Accordion Sections**: Collapsible sections for Sample Management (Accessioning, Samples, Tests, Containers, Batches, Results), Lab Management (Projects, Clients, Client Projects), and Admin submenu items
+- **Accordion Sections**: Collapsible sections for Sample Management (Accessioning, Samples, Tests, Containers, Batches, Results), Lab Management (Projects, Clients, Client Projects, Analyses, Analytes), and Admin submenu items
 - **Responsive**: Permanent drawer on desktop, temporary drawer on mobile
 - **State Persistence**: Sidebar collapsed state saved to localStorage
 - **Top AppBar**: Dynamic page titles, sidebar toggle, back button for nested routes, user info, and logout
