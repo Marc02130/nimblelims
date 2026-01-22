@@ -1210,4 +1210,73 @@ Frontend:
 
 Output: updated AnalysesManagement.tsx (full file with analyte linking section)
 
-#
+# Client Isolation
+## Prompt 1: Schema Update for System Client Handling
+"Based on the NimbleLIMS Technical Document (Section 3: Security and RBAC) and schema in schema_ddl.sql, enhance the database schema to support a 'System' client for lab employees. Ensure all users require a non-null client_id for better integrity.
+Steps:
+
+Add a CHECK constraint to users table: client_id NOT NULL (to prevent forgotten assignments).
+Update seed data in migrations to include a 'System' client (name: 'System', active: true) if not already present.
+Set lab employee users (e.g., admin, lab-manager, lab-tech) to have client_id referencing the System client.
+For client users, client_id references their specific client.
+No changes to projects.client_id—projects still belong to specific clients, but access logic will special-case System.
+
+Output:
+
+Updated db/migrations/versions/xxxx_add_system_client.py (full Alembic migration file with up/down functions).
+Updated schema_ddl.sql (full file with new CHECK).
+Note: Run this after existing migrations to avoid conflicts."
+
+## Prompt 2: Enhance RLS Policies for Client Isolation
+"Implement enhanced Row-Level Security (RLS) policies to limit data access for client users to only their own data, using the System client for lab employees. Reference Technical Document (Section 3: RLS Policies) and PRD (Section 3.1: Data Isolation). Assume System client exists (from prior migration).
+Key Logic in has_project_access function:
+
+Get current_user.client_id.
+If user.client_id == System_client_id (hardcode or query by name='System'), return TRUE (full access for lab staff).
+Else (regular client), check if project.client_id == user.client_id.
+Fallback to project_users junction for granular grants (e.g., lab staff assigned to specific projects, though System should cover most).
+Apply to policies: projects_access, samples_access, tests_access, results_access, client_projects_access, batches_access.
+For containers_access: Via samples (since containers link to samples.projects).
+Enable RLS on all relevant tables if not already.
+
+Output:
+
+Updated schema_functions.sql (full file with modified has_project_access).
+Updated schema_rls.sql (full file with CREATE POLICY statements).
+Updated db/migrations/versions/xxxx_enhance_rls_for_clients.py (full Alembic file to apply policies)."
+
+## Prompt 3: API Endpoint Adjustments for Access Control
+"Update FastAPI endpoints to enforce client data isolation at the API layer, complementing RLS. Based on api_endpoints.md and Technical Document (Section 4: API Endpoints). With System client, ensure queries for non-System clients auto-filter via RLS (no Python changes needed), but add permission checks.
+Steps:
+
+In routers (e.g., projects.py, samples.py), use depends(get_current_user) to fetch user.
+For list endpoints (GET /projects, /samples, etc.), rely on RLS for filtering—no manual SQL filters.
+Add explicit checks: If user.role != 'Administrator' and user.client_id != System_client_id, ensure no broad access (but RLS handles this).
+For create/update (POST/PATCH), validate project.client_id matches user.client_id if not System/Admin.
+Error: 403 if mismatch.
+Update schemas to include client_id validation where needed.
+
+Output:
+
+Updated backend/app/routers/projects.py (full file with checks).
+Updated backend/app/routers/samples.py (full file).
+Similarly for tests.py, results.py, client_projects.py, batches.py (full files).
+Updated api_endpoints.md (full file with new notes on isolation)."
+
+## Prompt 4: Frontend UI Adjustments for Visibility
+"Modify React frontend to respect client data isolation, ensuring client users only see their data in UI components. Reference ui-accessioning-to-reporting.md and navigation.md. With System client, lab users (System client_id) see all; clients see only theirs.
+Steps:
+
+In apiService.ts, add client_id to query params for list fetches if user.client_id != System (but rely on backend RLS).
+In pages like ProjectsManagement.tsx, SamplesManagement.tsx: Use UserContext to check if user.client_id is System; if not, display filtered DataGrid (API returns filtered).
+Hide admin/lab mgmt sections for non-System clients via permission gating (already in Sidebar.tsx).
+Add loading/error states for access denied.
+Update UAT scripts to test: Client sees only their projects/samples.
+
+Output:
+
+Updated frontend/src/services/apiService.ts (full file with conditional params).
+Updated frontend/src/pages/ProjectsManagement.tsx (full file).
+Updated frontend/src/pages/SamplesManagement.tsx (full file).
+Similarly for other management pages (full files).
+Updated uat-security-rbac.md (full file with new test cases for client isolation)."
