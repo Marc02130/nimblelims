@@ -23,7 +23,8 @@ from app.schemas.result import (
 from app.schemas.batch import BatchResponse, BatchContainerResponse
 from app.core.rbac import (
     require_result_enter, require_result_read, require_result_update,
-    require_result_delete, require_result_review, require_permission
+    require_result_delete, require_result_review, require_permission,
+    validate_client_access
 )
 from app.core.security import get_current_user
 from datetime import datetime
@@ -45,28 +46,18 @@ async def get_results(
 ):
     """
     Get results with filtering and pagination.
-    Scoped by user access.
+    Access control is enforced entirely by Row-Level Security (RLS) policies at the database level.
+    No Python-level filtering is applied - RLS automatically filters results based on project access.
     """
     from sqlalchemy.dialects.postgresql import JSONB
     from sqlalchemy import cast
     
-    # Build query with filters
+    # Build query with filters - RLS will automatically filter based on project access
+    # No need for manual Python-level filtering - RLS handles:
+    # - Admin users: see all results
+    # - System client users (lab employees): see all results
+    # - Client users: see results for tests from their client's projects
     query = db.query(Result).filter(Result.active == True)
-    
-    # Apply user access control
-    if current_user.role.name != "Administrator":
-        if current_user.client_id:
-            # Client users can only see results for their own samples
-            query = query.join(Test).join(Sample).filter(
-                Sample.project.has(client_id=current_user.client_id)
-            )
-        else:
-            # Lab users can see results for samples in projects they have access to
-            from models.project import ProjectUser
-            accessible_projects = db.query(ProjectUser.project_id).filter(
-                ProjectUser.user_id == current_user.id
-            ).subquery()
-            query = query.join(Test).join(Sample).filter(Sample.project_id.in_(accessible_projects))
     
     # Apply filters
     if test_id:
@@ -138,13 +129,9 @@ async def get_result(
             detail="Result not found"
         )
     
-    # Check access control
-    if current_user.role.name != "Administrator":
-        if current_user.client_id and result.test.sample.project.client_id != current_user.client_id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Access denied: insufficient project permissions"
-            )
+    # Validate client access: non-System/Admin users can only view results for their own client's projects
+    # RLS also enforces this, but we add explicit check for API layer validation
+    validate_client_access(current_user, result.test.sample.project.client_id)
     
     return ResultResponse.from_orm(result)
 
@@ -171,13 +158,8 @@ async def create_result(
             detail="Test not found"
         )
     
-    # Check project access
-    if current_user.role.name != "Administrator":
-        if current_user.client_id and test.sample.project.client_id != current_user.client_id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Access denied: insufficient project permissions"
-            )
+    # Validate client access: non-System/Admin users can only create results for their own client's projects
+    validate_client_access(current_user, test.sample.project.client_id)
     
     # Validate custom_attributes if provided
     validated_custom_attributes = {}
@@ -678,13 +660,8 @@ async def update_result(
             detail="Result not found"
         )
     
-    # Check access control
-    if current_user.role.name != "Administrator":
-        if current_user.client_id and result.test.sample.project.client_id != current_user.client_id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Access denied: insufficient project permissions"
-            )
+    # Validate client access: non-System/Admin users can only update results for their own client's projects
+    validate_client_access(current_user, result.test.sample.project.client_id)
     
     # Validate custom_attributes if provided
     update_data = result_data.dict(exclude_unset=True)

@@ -16,7 +16,7 @@ import { DataGrid, GridColDef, GridActionsCellItem } from '@mui/x-data-grid';
 import EditIcon from '@mui/icons-material/Edit';
 import { useNavigate } from 'react-router-dom';
 import TestForm from '../components/tests/TestForm';
-import { apiService } from '../services/apiService';
+import { apiService, addClientFilterIfNeeded } from '../services/apiService';
 import { useUser } from '../contexts/UserContext';
 
 interface Test {
@@ -38,7 +38,7 @@ interface Test {
 }
 
 const TestsManagement: React.FC = () => {
-  const { hasPermission } = useUser();
+  const { hasPermission, user, isSystemClient, isAdmin } = useUser();
   const navigate = useNavigate();
   const [tests, setTests] = useState<Test[]>([]);
   const [loading, setLoading] = useState(true);
@@ -63,8 +63,17 @@ const TestsManagement: React.FC = () => {
   const loadData = async () => {
     try {
       setLoading(true);
+      
+      // Build filters - RLS will automatically filter, but we can add client_id for non-System clients
+      const filters: Record<string, string | undefined> = {};
+      const filteredFilters = addClientFilterIfNeeded(
+        filters,
+        user?.client_id,
+        user?.role
+      );
+      
       const [testsData, statuses] = await Promise.all([
-        apiService.getTests(),
+        apiService.getTests(filteredFilters),
         apiService.getListEntries('test_status'),
       ]);
       
@@ -91,7 +100,13 @@ const TestsManagement: React.FC = () => {
       setTests(enrichedTests);
       setLookupData({ statuses, users });
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to load tests');
+      if (err.response?.status === 403) {
+        setError('Access denied: You do not have permission to view these tests. Client users can only view tests for samples from their own client\'s projects.');
+      } else if (err.response?.status === 404) {
+        setError('No tests found. This may be due to access restrictions.');
+      } else {
+        setError(err.response?.data?.detail || 'Failed to load tests');
+      }
     } finally {
       setLoading(false);
     }
@@ -200,6 +215,12 @@ const TestsManagement: React.FC = () => {
       {error && (
         <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
           {error}
+        </Alert>
+      )}
+
+      {!isSystemClient() && !isAdmin() && user?.client_id && (
+        <Alert severity="info" sx={{ mb: 2 }}>
+          Showing tests for samples from your client's projects only. System users and administrators see all tests.
         </Alert>
       )}
 

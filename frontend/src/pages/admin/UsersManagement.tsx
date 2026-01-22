@@ -33,6 +33,8 @@ import UserFormDialog from './UserFormDialog';
 
 interface User {
   id: string;
+  name: string;
+  description?: string;
   username: string;
   email: string;
   role_id: string;
@@ -109,6 +111,8 @@ const UsersManagement: React.FC = () => {
   }, [users, searchTerm]);
 
   const handleCreate = async (data: {
+    name?: string;
+    description?: string;
     username: string;
     email: string;
     password?: string;
@@ -120,6 +124,8 @@ const UsersManagement: React.FC = () => {
   };
 
   const handleUpdate = async (data: {
+    name?: string;
+    description?: string;
     username: string;
     email: string;
     password?: string;
@@ -349,6 +355,7 @@ const UsersManagement: React.FC = () => {
         user={selectedUser}
         existingUsernames={users.map((u) => u.username)}
         existingEmails={users.map((u) => u.email)}
+        existingNames={users.map((u) => u.name)}
         roles={roles}
         clients={clients}
         onClose={() => {

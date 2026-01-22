@@ -47,6 +47,8 @@ async def get_users(
     for user in users:
         user_dict = {
             "id": user.id,
+            "name": user.name,
+            "description": user.description,
             "username": user.username,
             "email": user.email,
             "role_id": user.role_id,
@@ -99,6 +101,14 @@ async def create_user(
             detail="Email already exists"
         )
     
+    # Check for unique name
+    existing_name = db.query(User).filter(User.name == user_data.name).first()
+    if existing_name:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Name already exists"
+        )
+    
     # Verify role exists
     role = db.query(Role).filter(Role.id == user_data.role_id, Role.active == True).first()
     if not role:
@@ -119,6 +129,8 @@ async def create_user(
     # Create user
     password_hash = get_password_hash(user_data.password)
     new_user = User(
+        name=user_data.name,
+        description=user_data.description,
         username=user_data.username,
         email=user_data.email,
         password_hash=password_hash,
@@ -172,6 +184,20 @@ async def update_user(
                 detail="Email already exists"
             )
         user.email = user_data.email
+    
+    # Update name if provided
+    if user_data.name and user_data.name != user.name:
+        existing_name = db.query(User).filter(User.name == user_data.name).first()
+        if existing_name:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Name already exists"
+            )
+        user.name = user_data.name
+    
+    # Update description if provided
+    if user_data.description is not None:
+        user.description = user_data.description
     
     # Update password if provided
     if user_data.password:

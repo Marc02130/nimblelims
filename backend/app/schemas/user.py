@@ -72,10 +72,12 @@ class RolePermissionsUpdate(BaseModel):
 class UserResponse(BaseModel):
     """Schema for user response"""
     id: UUID
+    name: str
+    description: Optional[str] = None
     username: str
     email: str
     role_id: UUID
-    client_id: Optional[UUID] = None
+    client_id: UUID
     last_login: Optional[datetime] = None
     active: bool
     created_at: datetime
@@ -93,19 +95,23 @@ class UserWithRelationsResponse(UserResponse):
 
 class UserCreate(BaseModel):
     """Schema for creating a user"""
+    name: str
+    description: Optional[str] = None
     username: str
     email: EmailStr
     password: str
     role_id: UUID
-    client_id: Optional[UUID] = None
+    client_id: UUID
 
 
 class UserUpdate(BaseModel):
     """Schema for updating a user"""
+    name: Optional[str] = None
+    description: Optional[str] = None
     username: Optional[str] = None
     email: Optional[EmailStr] = None
     password: Optional[str] = None
     role_id: Optional[UUID] = None
-    client_id: Optional[UUID] = None
+    client_id: Optional[UUID] = None  # Optional in update to allow partial updates, but must be non-null in DB
     active: Optional[bool] = None
 

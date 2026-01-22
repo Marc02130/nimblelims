@@ -16,7 +16,7 @@ from app.schemas.client_project import (
     ClientProjectListResponse,
 )
 from app.core.security import get_current_user
-from app.core.rbac import require_permission
+from app.core.rbac import require_permission, validate_client_access
 from uuid import UUID
 
 logger = logging.getLogger(__name__)
@@ -34,49 +34,32 @@ async def get_client_projects(
 ):
     """
     Get all accessible client projects with optional filtering and pagination.
-    - Administrators see all client projects
-    - Client users see only their own client's projects (via RLS)
-    - Lab Technicians and Lab Managers see all active client projects (via RLS)
+    Access control is enforced entirely by Row-Level Security (RLS) policies at the database level.
+    - Administrators: see all client projects
+    - System client users (lab employees): see all active client projects
+    - Client users: see only their own client's projects (via RLS)
     """
     
+    # Build query - RLS will automatically filter based on client_projects_access policy
+    # No Python-level filtering needed - RLS handles all access control
     query = db.query(ClientProject).filter(ClientProject.active == True)
     
-    # Apply access control based on user role
-    if current_user.role.name == "Administrator":
-        # Administrators can see all client projects
-        pass
-    elif current_user.client_id:
-        # Client users can only see their own client's projects
-        # RLS will also enforce this, but we filter here for efficiency
-        query = query.filter(ClientProject.client_id == current_user.client_id)
-    # Lab Technicians and Lab Managers: RLS policy allows them to see all active client projects
-    # No additional filtering needed - RLS handles access control
-    
-    # Apply client_id filter if provided
+    # Apply client_id filter if provided (this is a user-requested filter, not access control)
     if client_id:
         query = query.filter(ClientProject.client_id == client_id)
     
-    # Get total count and results
-    # For Lab Technician/Manager, use func.count() directly instead of query.count()
-    # to avoid RLS issues with subquery wrapping
-    if current_user.role.name in ["Lab Technician", "Lab Manager"]:
-        # Use func.count() directly to avoid subquery wrapping
-        total = db.query(func.count(ClientProject.id)).filter(ClientProject.active == True).scalar()
-        
-        # Use direct query for results to ensure RLS is respected
-        offset = (page - 1) * size
-        results_query = db.query(ClientProject).filter(ClientProject.active == True)
-        
-        # Apply client_id filter if provided
-        if client_id:
-            results_query = results_query.filter(ClientProject.client_id == client_id)
-        
-        client_projects = results_query.order_by(ClientProject.name).offset(offset).limit(size).all()
-    else:
-        total = query.count()
-        # Apply pagination
-        offset = (page - 1) * size
-        client_projects = query.order_by(ClientProject.name).offset(offset).limit(size).all()
+    # Get total count - RLS will automatically filter
+    # Use func.count() directly to avoid subquery wrapping that can interfere with RLS
+    total = db.query(func.count(ClientProject.id)).filter(
+        ClientProject.active == True,
+        ClientProject.client_id == client_id if client_id else True
+    ).scalar() if client_id else db.query(func.count(ClientProject.id)).filter(
+        ClientProject.active == True
+    ).scalar()
+    
+    # Apply pagination
+    offset = (page - 1) * size
+    client_projects = query.order_by(ClientProject.name).offset(offset).limit(size).all()
     
     # Calculate pages
     pages = (total + size - 1) // size if total > 0 else 0
@@ -126,13 +109,9 @@ async def get_client_project(
             detail="Client project not found"
         )
     
-    # RLS will enforce access control, but we can add explicit check here for clarity
-    if current_user.role.name != "Administrator":
-        if current_user.client_id and client_project.client_id != current_user.client_id:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Client project not found"
-            )
+    # Validate client access: non-System/Admin users can only view their own client's projects
+    # RLS also enforces this, but we add explicit check for API layer validation
+    validate_client_access(current_user, client_project.client_id)
     
     return ClientProjectResponse(
         id=client_project.id,
@@ -176,6 +155,9 @@ async def create_client_project(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Client not found"
         )
+    
+    # Validate client access: non-System/Admin users can only create client projects for their own client
+    validate_client_access(current_user, client_project_data.client_id)
     
     # Validate custom_attributes if provided
     validated_custom_attributes = {}
@@ -228,6 +210,9 @@ async def update_client_project(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Client project not found"
         )
+    
+    # Validate client access: non-System/Admin users can only update their own client's projects
+    validate_client_access(current_user, client_project.client_id)
     
     # Check for unique name if updating
     if client_project_data.name and client_project_data.name != client_project.name:
@@ -290,6 +275,9 @@ async def delete_client_project(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Client project not found"
         )
+    
+    # Validate client access: non-System/Admin users can only delete their own client's projects
+    validate_client_access(current_user, client_project.client_id)
     
     # Soft delete
     client_project.active = False

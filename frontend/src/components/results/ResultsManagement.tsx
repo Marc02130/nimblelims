@@ -32,7 +32,7 @@ import {
   Warning as WarningIcon,
 } from '@mui/icons-material';
 import BatchResultsView from './BatchResultsView';
-import { apiService } from '../../services/apiService';
+import { apiService, addClientFilterIfNeeded } from '../../services/apiService';
 import { useUser } from '../../contexts/UserContext';
 
 interface Batch {
@@ -59,7 +59,7 @@ interface ResultsManagementProps {
 }
 
 const ResultsManagement: React.FC<ResultsManagementProps> = ({ onBack }) => {
-  const { user } = useUser();
+  const { user, isSystemClient, isAdmin } = useUser();
   const isClient = user?.role === 'Client';
   const isLabManager = user?.role === 'Lab Manager' || user?.role === 'lab-manager';
   const [view, setView] = useState<'list' | 'entry'>('list');
@@ -127,13 +127,26 @@ const ResultsManagement: React.FC<ResultsManagementProps> = ({ onBack }) => {
   const loadBatches = async () => {
     try {
       setLoading(true);
-      const filters: any = {};
+      const filters: Record<string, string | undefined> = {};
       if (statusFilter) filters.status = statusFilter;
 
-      const data = await apiService.getBatches(filters);
+      // Add client_id filter for non-System clients (though RLS will also enforce this)
+      const filteredFilters = addClientFilterIfNeeded(
+        filters,
+        user?.client_id,
+        user?.role
+      );
+
+      const data = await apiService.getBatches(filteredFilters);
       setBatches(data);
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to load batches');
+      if (err.response?.status === 403) {
+        setError('Access denied: You do not have permission to view these batches. Client users can only view batches containing samples from their own client\'s projects.');
+      } else if (err.response?.status === 404) {
+        setError('No batches found. This may be due to access restrictions.');
+      } else {
+        setError(err.response?.data?.detail || 'Failed to load batches');
+      }
     } finally {
       setLoading(false);
     }
@@ -190,6 +203,12 @@ const ResultsManagement: React.FC<ResultsManagementProps> = ({ onBack }) => {
       {error && (
         <Alert severity="error" sx={{ mb: 2 }}>
           {error}
+        </Alert>
+      )}
+
+      {!isSystemClient() && !isAdmin() && user?.client_id && view === 'list' && (
+        <Alert severity="info" sx={{ mb: 2 }}>
+          Showing batches containing samples from your client's projects only. System users and administrators see all batches.
         </Alert>
       )}
 

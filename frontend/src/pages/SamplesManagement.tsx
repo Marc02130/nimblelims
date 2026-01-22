@@ -18,7 +18,7 @@ import { DataGrid, GridColDef, GridActionsCellItem } from '@mui/x-data-grid';
 import EditIcon from '@mui/icons-material/Edit';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import SampleForm from '../components/samples/SampleForm';
-import { apiService } from '../services/apiService';
+import { apiService, addClientFilterIfNeeded } from '../services/apiService';
 import { useUser } from '../contexts/UserContext';
 
 interface Sample {
@@ -40,7 +40,7 @@ interface Sample {
 }
 
 const SamplesManagement: React.FC = () => {
-  const { hasPermission } = useUser();
+  const { hasPermission, user, isSystemClient, isAdmin } = useUser();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [samples, setSamples] = useState<Sample[]>([]);
@@ -86,8 +86,15 @@ const SamplesManagement: React.FC = () => {
         }
       });
 
+      // Add client_id filter for non-System clients (though RLS will also enforce this)
+      const filteredFilters = addClientFilterIfNeeded(
+        filters,
+        user?.client_id,
+        user?.role
+      );
+
       const [samplesResponse, sampleTypes, statuses, matrices, qcTypes, projectsResponse] = await Promise.all([
-        apiService.getSamples(filters),
+        apiService.getSamples(filteredFilters),
         apiService.getListEntries('sample_types'),
         apiService.getListEntries('sample_status'),
         apiService.getListEntries('matrix_types'),
@@ -113,7 +120,13 @@ const SamplesManagement: React.FC = () => {
       setSamples(enrichedSamples);
       setLookupData({ sampleTypes, statuses, matrices, qcTypes, projects });
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to load samples');
+      if (err.response?.status === 403) {
+        setError('Access denied: You do not have permission to view these samples. Client users can only view samples from their own client\'s projects.');
+      } else if (err.response?.status === 404) {
+        setError('No samples found. This may be due to access restrictions.');
+      } else {
+        setError(err.response?.data?.detail || 'Failed to load samples');
+      }
     } finally {
       setLoading(false);
     }
@@ -223,6 +236,12 @@ const SamplesManagement: React.FC = () => {
       {error && (
         <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
           {error}
+        </Alert>
+      )}
+
+      {!isSystemClient() && !isAdmin() && user?.client_id && (
+        <Alert severity="info" sx={{ mb: 2 }}>
+          Showing samples from your client's projects only. System users and administrators see all samples.
         </Alert>
       )}
 

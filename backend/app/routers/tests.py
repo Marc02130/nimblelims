@@ -17,7 +17,7 @@ from app.schemas.test import (
 )
 from app.core.rbac import (
     require_test_assign, require_test_update, require_result_review,
-    require_result_read
+    require_result_read, validate_client_access
 )
 from app.core.security import get_current_user
 from datetime import datetime
@@ -122,18 +122,9 @@ async def get_test(
             detail="Test not found"
         )
     
-    # Check access control using has_project_access function (handles admin, client, and lab tech access)
-    if current_user.role.name != "Administrator":
-        from sqlalchemy import text
-        result = db.execute(
-            text("SELECT has_project_access(:project_id)"),
-            {"project_id": str(test.sample.project_id)}
-        ).scalar()
-        if not result:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Access denied: insufficient project permissions"
-            )
+    # Validate client access: non-System/Admin users can only view tests for their own client's projects
+    # RLS also enforces this, but we add explicit check for API layer validation
+    validate_client_access(current_user, test.sample.project.client_id)
     
     return TestResponse.from_orm(test)
 
@@ -160,13 +151,8 @@ async def create_test(
             detail="Sample not found"
         )
     
-    # Check project access
-    if current_user.role.name != "Administrator":
-        if current_user.client_id and sample.project.client_id != current_user.client_id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Access denied: insufficient project permissions"
-            )
+    # Validate client access: non-System/Admin users can only create tests for their own client's projects
+    validate_client_access(current_user, sample.project.client_id)
     
     # Verify analysis exists
     from models.analysis import Analysis
@@ -235,13 +221,8 @@ async def assign_test_to_sample(
             detail="Sample not found"
         )
     
-    # Check project access
-    if current_user.role.name != "Administrator":
-        if current_user.client_id and sample.project.client_id != current_user.client_id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Access denied: insufficient project permissions"
-            )
+    # Validate client access: non-System/Admin users can only assign tests for their own client's projects
+    validate_client_access(current_user, sample.project.client_id)
     
     # Verify analysis exists
     from models.analysis import Analysis
@@ -340,13 +321,8 @@ async def update_test(
             detail="Test not found"
         )
     
-    # Check access control
-    if current_user.role.name != "Administrator":
-        if current_user.client_id and test.sample.project.client_id != current_user.client_id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Access denied: insufficient project permissions"
-            )
+    # Validate client access: non-System/Admin users can only update tests for their own client's projects
+    validate_client_access(current_user, test.sample.project.client_id)
     
     # Validate and update custom_attributes if provided
     if test_data.custom_attributes is not None:

@@ -21,7 +21,7 @@ class User(BaseModel):
     password_hash = Column(String(255), nullable=False)
     email = Column(String(255), unique=True, nullable=False)
     role_id = Column(PostgresUUID(as_uuid=True), ForeignKey('roles.id'), nullable=False)
-    client_id = Column(PostgresUUID(as_uuid=True), ForeignKey('clients.id'), nullable=True)
+    client_id = Column(PostgresUUID(as_uuid=True), ForeignKey('clients.id'), nullable=False)
     last_login = Column(DateTime)
     
     # Relationships - explicitly specify foreign keys
