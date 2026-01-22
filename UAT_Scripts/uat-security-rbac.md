@@ -23,9 +23,10 @@ This document contains User Acceptance Testing (UAT) scripts for security and Ro
   - At least one sample in accessible project
   - At least one sample in inaccessible project
 - Test user accounts:
-  - Client user with `client_id` set, only `sample:read` permission
+  - Client user with `client_id` set to specific client (not System), only `sample:read` permission
   - Administrator user (for comparison)
-  - Lab Technician user (seeded as `lab-tech` with full lab technician permissions)
+  - Lab Technician user (seeded as `lab-tech` with `client_id = System_client_id`, full lab technician permissions)
+  - Lab Manager user (seeded as `lab-manager` with `client_id = System_client_id`)
 
 ---
 
@@ -290,15 +291,29 @@ Verify that client users can only access their own projects, samples, and result
        is_admin() OR has_project_access(id)
    );
    ```<br>3. **tests_access policy**:<br>   - Checks access via sample's project<br>4. **results_access policy**:<br>   - Checks access via test → sample → project |
-| **has_project_access() Function** | Function checks client access:<br>```sql
+| **has_project_access() Function** | Function checks client access with System client support:<br>```sql
 CREATE OR REPLACE FUNCTION has_project_access(project_uuid UUID)
 RETURNS BOOLEAN AS $$
 DECLARE
     project_client_id UUID;
     user_client_id UUID;
+    system_client_id UUID;
 BEGIN
     -- Admin users can access all projects
     IF is_admin() THEN
+        RETURN TRUE;
+    END IF;
+    
+    -- System client ID: '00000000-0000-0000-0000-000000000001'
+    system_client_id := '00000000-0000-0000-0000-000000000001'::UUID;
+    
+    -- Get user's client_id
+    SELECT u.client_id INTO user_client_id
+    FROM users u
+    WHERE u.id = current_user_id();
+    
+    -- If user is associated with System client, grant full access (lab employees)
+    IF user_client_id = system_client_id THEN
         RETURN TRUE;
     END IF;
     
@@ -307,17 +322,12 @@ BEGIN
     FROM projects p
     WHERE p.id = project_uuid;
     
-    -- Get user's client_id
-    SELECT u.client_id INTO user_client_id
-    FROM users u
-    WHERE u.id = current_user_id();
-    
     -- Check if user's client_id matches project's client_id
     IF user_client_id IS NOT NULL AND project_client_id = user_client_id THEN
         RETURN TRUE;
     END IF;
     
-    -- Fall back to project_users check (for lab technicians)
+    -- Fall back to project_users check (for granular grants)
     RETURN EXISTS (
         SELECT 1 FROM project_users pu
         WHERE pu.project_id = project_uuid
@@ -409,28 +419,40 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 - **RLS Functions**:
   - `is_admin()`: Checks if current user is Administrator
   - `has_project_access(project_uuid)`: Checks if user has access to project
-    - For client users: Checks if `user.client_id` matches `project.client_id`
-    - For lab technicians: Checks `project_users` junction table
-    - For administrators: Always returns TRUE
+    - **System client users** (`client_id = System_client_id`): Always returns TRUE (full access)
+    - **Regular client users**: Checks if `user.client_id` matches `project.client_id`
+    - **Lab technicians** (with System client): Full access via System client check
+    - **Administrators**: Always returns TRUE
+    - Falls back to `project_users` junction table for granular grants
 - **RLS Policies**:
   - `samples_access`: `is_admin() OR has_project_access(project_id)`
   - `projects_access`: `is_admin() OR has_project_access(id)`
   - `tests_access`: Checks access via sample's project
   - `results_access`: Checks access via test → sample → project
+  - `batches_access`: Checks access via batch_containers → containers → contents → samples → projects
+  - `containers_access`: Checks access via contents → samples → projects
   - `client_projects_access`: 
-    - Administrators: All client projects
-    - Client users: Client projects matching their `client_id`
-    - Lab Technicians and Lab Managers: All active client projects (for sample creation workflows)
+    - **Administrators**: All client projects
+    - **System client users** (lab employees): All active client projects (for sample creation workflows)
+    - **Regular client users**: Client projects matching their `client_id`
 - **SQLAlchemy RLS Implementation Note**: 
   - SQLAlchemy's `query.count()` wraps queries in subqueries which can break RLS evaluation
   - For Lab Technician/Manager roles accessing `client_projects`, the implementation uses `func.count()` directly instead of `query.count()` to avoid subquery wrapping
   - This ensures RLS policies are properly evaluated at the database level
+- **Client Data Isolation**:
+  - **System Client Users** (`client_id = '00000000-0000-0000-0000-000000000001'`): Full access to all data (lab employees)
+  - **Regular Client Users**: Only data where `project.client_id = user.client_id`
+  - **Administrators**: Full access regardless of client_id
+  - **API Layer Validation**: Create/update operations validate `project.client_id` matches `user.client_id` (unless System/Admin)
+  - **Frontend**: Conditionally adds `client_id` to query params for non-System clients (though RLS enforces this)
+  - **Error Response**: `403 Forbidden` with message "Access denied: insufficient client permissions"
+  
 - **Samples Endpoint Access Control**:
   - The `GET /samples` endpoint relies entirely on RLS policies for access control
   - No Python-level filtering is applied - RLS automatically filters samples based on `has_project_access(project_id)`
-  - Lab Technicians and Lab Managers see samples from projects they have access to via the `project_users` junction table
-  - Client users see samples from projects belonging to their `client_id`
-  - Administrators see all samples
+  - **System client users** (lab employees): See all samples (full access)
+  - **Client users**: See samples from projects where `project.client_id = user.client_id`
+  - **Administrators**: See all samples
   - The session variable `app.current_user_id` is set via `set_current_user_id()` in `get_current_user()` dependency to enable RLS evaluation
 
 ### Schema
@@ -503,6 +525,8 @@ batch:manage, batch:read
 | TC-AUTH-LOGIN-001 | | | | |
 | TC-RBAC-PERMISSION-002 | | | | |
 | TC-RLS-CLIENT-ISOLATION-003 | | | | |
+| TC-RLS-SYSTEM-CLIENT-004 | | | | |
+| TC-FRONTEND-CLIENT-ISOLATION-005 | | | | |
 
 ---
 
