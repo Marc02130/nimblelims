@@ -28,7 +28,7 @@ import {
 } from '@mui/icons-material';
 import { DataGrid, GridColDef, GridActionsCellItem, GridRowParams } from '@mui/x-data-grid';
 import { useUser } from '../contexts/UserContext';
-import { apiService } from '../services/apiService';
+import { apiService, addClientFilterIfNeeded } from '../services/apiService';
 import ClientProjectForm from '../components/client-projects/ClientProjectForm';
 
 interface Client {
@@ -48,7 +48,7 @@ interface ClientProject {
 }
 
 const ClientProjects: React.FC = () => {
-  const { user, hasPermission } = useUser();
+  const { user, hasPermission, isSystemClient, isAdmin } = useUser();
   const [clientProjects, setClientProjects] = useState<ClientProject[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
@@ -85,13 +85,25 @@ const ClientProjects: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
-      const filters: { client_id?: string; page?: number; size?: number } = {
-        page: paginationModel.page + 1,
-        size: paginationModel.pageSize,
+      const filters: Record<string, string | undefined> = {
+        page: String(paginationModel.page + 1),
+        size: String(paginationModel.pageSize),
       };
       if (clientFilter) {
         filters.client_id = clientFilter;
       }
+      
+      // Add client_id filter for non-System clients (though RLS will also enforce this)
+      // Only if no explicit clientFilter is set
+      if (!clientFilter) {
+        const filteredFilters = addClientFilterIfNeeded(
+          filters,
+          user?.client_id,
+          user?.role
+        );
+        Object.assign(filters, filteredFilters);
+      }
+      
       const response = await apiService.getClientProjects(filters);
       
       // Handle both paginated and non-paginated responses
@@ -104,7 +116,9 @@ const ClientProjects: React.FC = () => {
       }
     } catch (err: any) {
       if (err.response?.status === 403) {
-        setError('You do not have permission to view client projects');
+        setError('Access denied: You do not have permission to view these client projects. Client users can only view client projects for their own client.');
+      } else if (err.response?.status === 404) {
+        setError('No client projects found. This may be due to access restrictions.');
       } else {
         setError(err.response?.data?.detail || 'Failed to load client projects');
       }
@@ -266,6 +280,12 @@ const ClientProjects: React.FC = () => {
       {error && (
         <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
           {error}
+        </Alert>
+      )}
+
+      {!isSystemClient() && !isAdmin() && user?.client_id && (
+        <Alert severity="info" sx={{ mb: 2 }}>
+          Showing client projects for your client only. System users and administrators see all client projects.
         </Alert>
       )}
 
