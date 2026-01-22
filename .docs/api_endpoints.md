@@ -1,5 +1,38 @@
 # API Endpoints Reference
 
+## Client Data Isolation
+
+**Important:** All endpoints enforce client data isolation at both the database (RLS) and API layers:
+
+### System Client Users (Lab Employees)
+- Users with `client_id = System client ID` (`00000000-0000-0000-0000-000000000001`) have **full access** to all data
+- This includes Lab Technicians, Lab Managers, and any other lab employees
+- No client_id restrictions apply
+
+### Regular Client Users
+- Users with a specific `client_id` can only access data where `project.client_id = user.client_id`
+- API layer validates this in create/update operations
+- Returns `403 Forbidden` if attempting to access/modify data from other clients
+
+### Administrators
+- Administrators have full access to all data regardless of client_id
+
+### Implementation Details
+- **List endpoints (GET)**: RLS policies automatically filter results - no Python-level filtering needed
+- **Create/Update endpoints (POST/PATCH)**: API layer validates `project.client_id` matches `user.client_id` (unless System/Admin)
+- **RLS Policies**: Enforce access at database level using `has_project_access()` function
+- **Error Response**: `403 Forbidden` with message "Access denied: insufficient client permissions"
+
+### Access Control Flow
+1. User authenticates → `get_current_user()` sets `app.current_user_id` session variable
+2. RLS policies evaluate using `current_user_id()` function
+3. `has_project_access()` checks:
+   - If user is Administrator → return TRUE
+   - If `user.client_id == System_client_id` → return TRUE (full access)
+   - If `project.client_id == user.client_id` → return TRUE
+   - Fallback to `project_users` junction for granular grants
+4. API layer adds explicit validation for create/update operations
+
 ## Authentication
 
 ### POST /auth/login
@@ -53,10 +86,11 @@ List samples with filtering and pagination.
 **Access Control:**
 - Access control is enforced entirely by Row-Level Security (RLS) policies at the database level
 - No Python-level filtering is applied - RLS automatically filters samples based on project access
-- Lab Technicians and Lab Managers see samples from projects they have access to via the `project_users` junction table
-- Client users see samples from projects belonging to their `client_id`
-- Administrators see all samples
+- **System client users (lab employees)**: See all samples (full access)
+- **Client users**: See samples from projects where `project.client_id = user.client_id`
+- **Administrators**: See all samples
 - The RLS policy `samples_access` uses `has_project_access(project_id)` to determine visibility
+- **Create/Update operations**: API layer validates `project.client_id` matches `user.client_id` (unless System/Admin)
 
 **Note:** Empty string query parameters are automatically converted to `None`.
 
@@ -64,6 +98,10 @@ List samples with filtering and pagination.
 Create a new sample.
 
 **Requires:** `sample:create` permission
+
+**Client Isolation:**
+- Non-System/Admin users can only create samples for projects where `project.client_id = user.client_id`
+- Returns `403 Forbidden` if attempting to create sample for another client's project
 
 ### POST /samples/accession
 Accession a new sample with test assignment.
@@ -196,6 +234,13 @@ List tests with filtering and pagination.
 - `size` (optional, int, default=10): Page size
 
 **Requires:** Authentication (scoped by user access via RLS)
+
+**Access Control:**
+- Access control is enforced entirely by Row-Level Security (RLS) policies at the database level
+- **System client users**: See all tests (full access)
+- **Client users**: See tests for samples from their client's projects
+- **Administrators**: See all tests
+- RLS policy `tests_access` uses `has_project_access()` via sample's project
 
 **Response:**
 ```json
@@ -390,7 +435,12 @@ List projects accessible to the current user with optional filtering and paginat
 ### GET /projects/{id}
 Get a single project by ID.
 
-**Access Control:** RLS enforced via `projects_access` policy. Returns 404 if project not found or user doesn't have access.
+**Access Control:** 
+- RLS enforced via `projects_access` policy
+- **System client users**: See all projects (full access)
+- **Client users**: See projects where `project.client_id = user.client_id`
+- **Administrators**: See all projects
+- Returns 404 if project not found or user doesn't have access
 
 **Response:** Project object (same structure as in list response)
 
@@ -398,6 +448,10 @@ Get a single project by ID.
 Create a new project.
 
 **Requires:** `project:manage` permission
+
+**Client Isolation:**
+- Non-System/Admin users can only create projects for their own client (`project.client_id = user.client_id`)
+- Returns `403 Forbidden` if attempting to create project for another client
 
 **Request:**
 ```json
@@ -426,6 +480,11 @@ Create a new project.
 Update a project (partial update).
 
 **Requires:** `project:manage` permission
+
+**Client Isolation:**
+- Non-System/Admin users can only update projects where `project.client_id = user.client_id`
+- If updating `client_id`, the new `client_id` must match `user.client_id` (unless System/Admin)
+- Returns `403 Forbidden` if attempting to update another client's project
 
 **Request:** (all fields optional)
 ```json
@@ -473,6 +532,13 @@ List batches with filtering and pagination.
 
 **Requires:** `batch:read` permission
 
+**Access Control:**
+- Access control is enforced entirely by Row-Level Security (RLS) policies at the database level
+- **System client users**: See all batches (full access)
+- **Client users**: See batches containing samples from their client's projects
+- **Administrators**: See all batches
+- RLS policy `batches_access` uses `has_project_access()` via containers → contents → samples → projects chain
+
 **Response:**
 ```json
 {
@@ -488,6 +554,11 @@ List batches with filtering and pagination.
 Create a new batch with cross-project support and QC sample generation (US-26, US-27).
 
 **Requires:** `batch:manage` permission
+
+**Client Isolation:**
+- Non-System/Admin users can only create batches with containers from their own client's projects
+- API validates access to all projects in the batch before creation
+- Returns `403 Forbidden` if attempting to create batch with containers from another client's projects
 
 **Request:**
 ```json
@@ -585,6 +656,13 @@ List results with filtering and pagination.
 - `size` (optional, int, default=10): Page size
 
 **Requires:** `result:read` permission
+
+**Access Control:**
+- Access control is enforced entirely by Row-Level Security (RLS) policies at the database level
+- **System client users**: See all results (full access)
+- **Client users**: See results for tests from their client's projects
+- **Administrators**: See all results
+- RLS policy `results_access` uses `has_project_access()` via test → sample → project chain
 
 ### GET /results/{id}
 Get a specific result by ID.
@@ -1422,9 +1500,10 @@ Remove analysis from battery.
 List client projects accessible to the current user.
 
 **Access Control:**
-- Administrators: See all client projects
-- Client users: See only client projects matching their `client_id` (enforced by RLS)
-- Lab Technicians and Lab Managers: See all active client projects (enforced by RLS, for sample creation workflows)
+- **Administrators**: See all client projects
+- **System client users (lab employees)**: See all active client projects (enforced by RLS, for sample creation workflows)
+- **Client users**: See only client projects matching their `client_id` (enforced by RLS)
+- RLS policy `client_projects_access` automatically filters based on client_id
 
 **Implementation Note:** 
 For Lab Technician and Lab Manager roles, the endpoint uses `func.count()` directly instead of `query.count()` to avoid SQLAlchemy subquery wrapping that can interfere with RLS evaluation. This ensures PostgreSQL RLS policies are properly applied at the database level.
@@ -1435,6 +1514,10 @@ For Lab Technician and Lab Manager roles, the endpoint uses `func.count()` direc
 Create a new client project.
 
 **Requires:** `project:manage` permission
+
+**Client Isolation:**
+- Non-System/Admin users can only create client projects for their own client (`client_project.client_id = user.client_id`)
+- Returns `403 Forbidden` if attempting to create client project for another client
 
 **Request:**
 ```json

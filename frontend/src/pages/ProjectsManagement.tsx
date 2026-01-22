@@ -18,7 +18,7 @@ import {
 import { DataGrid, GridColDef, GridActionsCellItem, GridRowParams, GridToolbar } from '@mui/x-data-grid';
 import { useNavigate } from 'react-router-dom';
 import { useUser } from '../contexts/UserContext';
-import { apiService } from '../services/apiService';
+import { apiService, addClientFilterIfNeeded } from '../services/apiService';
 import ProjectForm from '../components/projects/ProjectForm';
 
 interface Client {
@@ -50,7 +50,7 @@ interface Project {
 }
 
 const ProjectsManagement: React.FC = () => {
-  const { hasPermission } = useUser();
+  const { hasPermission, user, isSystemClient, isAdmin } = useUser();
   const navigate = useNavigate();
   const [projects, setProjects] = useState<Project[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
@@ -91,10 +91,21 @@ const ProjectsManagement: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
-      const response = await apiService.getProjects({
-        page: paginationModel.page + 1,
-        size: paginationModel.pageSize,
-      });
+      
+      // Build filters - RLS will automatically filter, but we can add client_id for non-System clients
+      const filters: Record<string, string | undefined> = {
+        page: String(paginationModel.page + 1),
+        size: String(paginationModel.pageSize),
+      };
+      
+      // Add client_id filter for non-System clients (though RLS will also enforce this)
+      const filteredFilters = addClientFilterIfNeeded(
+        filters,
+        user?.client_id,
+        user?.role
+      );
+      
+      const response = await apiService.getProjects(filteredFilters);
 
       // Handle paginated response
       if (response.projects) {
@@ -116,7 +127,9 @@ const ProjectsManagement: React.FC = () => {
       }
     } catch (err: any) {
       if (err.response?.status === 403) {
-        setError('You do not have permission to view projects');
+        setError('Access denied: You do not have permission to view these projects. Client users can only view projects for their own client.');
+      } else if (err.response?.status === 404) {
+        setError('No projects found. This may be due to access restrictions.');
       } else {
         setError(err.response?.data?.detail || 'Failed to load projects');
       }
@@ -329,6 +342,12 @@ const ProjectsManagement: React.FC = () => {
       {error && (
         <Alert severity="error" onClose={() => setError(null)} sx={{ mb: 2 }}>
           {error}
+        </Alert>
+      )}
+
+      {!isSystemClient() && !isAdmin() && user?.client_id && (
+        <Alert severity="info" sx={{ mb: 2 }}>
+          Showing projects for your client only. System users and administrators see all projects.
         </Alert>
       )}
 

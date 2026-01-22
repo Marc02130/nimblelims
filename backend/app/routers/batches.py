@@ -21,7 +21,7 @@ from app.schemas.batch import (
 )
 from app.core.rbac import (
     require_batch_manage, require_batch_read, require_batch_update,
-    require_batch_delete, require_project_access
+    require_batch_delete, require_project_access, validate_client_access
 )
 from app.core.security import get_current_user
 from datetime import datetime
@@ -67,9 +67,14 @@ async def get_batches(
 ):
     """
     Get batches with filtering and pagination.
-    Scoped by user access.
+    Access control is enforced entirely by Row-Level Security (RLS) policies at the database level.
+    No Python-level filtering is applied - RLS automatically filters batches based on project access.
     """
-    # Build query with filters
+    # Build query with filters - RLS will automatically filter based on batches_access policy
+    # No need for manual Python-level filtering - RLS handles:
+    # - Admin users: see all batches
+    # - System client users (lab employees): see all batches
+    # - Client users: see batches containing samples from their client's projects
     query = db.query(Batch).filter(Batch.active == True)
     
     # Apply filters
@@ -124,6 +129,39 @@ async def get_batch(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Batch not found"
         )
+    
+    # Validate client access: check access to all projects in the batch
+    # Get all containers in batch
+    batch_containers = db.query(BatchContainer).filter(
+        BatchContainer.batch_id == batch.id
+    ).all()
+    container_ids = [bc.container_id for bc in batch_containers]
+    
+    if container_ids:
+        # Get all samples from batch containers
+        contents = db.query(Contents).filter(
+            Contents.container_id.in_(container_ids)
+        ).all()
+        sample_ids = [c.sample_id for c in contents if c.sample_id]
+        
+        if sample_ids:
+            # Get all unique projects for these samples
+            projects = db.query(Sample.project_id).filter(
+                Sample.id.in_(sample_ids),
+                Sample.active == True
+            ).distinct().all()
+            project_ids = [p[0] for p in projects]
+            
+            # Validate client access for all projects
+            projects_objs = db.query(Project).filter(Project.id.in_(project_ids)).all()
+            for project in projects_objs:
+                try:
+                    validate_client_access(current_user, project.client_id)
+                except HTTPException:
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail=f"Access denied: insufficient client permissions for batch"
+                    )
     
     # Load containers for response
     batch_containers = db.query(BatchContainer).filter(
@@ -393,11 +431,11 @@ async def create_batch(
             )
         
         # Get all projects for these samples
-        projects = db.query(Sample.project_id).filter(
+        projects = db.query(Project).join(Sample, Project.id == Sample.project_id).filter(
             Sample.id.in_(sample_ids),
             Sample.active == True
         ).distinct().all()
-        project_ids = [p[0] for p in projects]
+        project_ids = [p.id for p in projects]
         
         # Check RLS access for all projects using SQL function
         # This handles admin, project_users, client_id, and client_projects
@@ -416,6 +454,17 @@ async def create_batch(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=f"Access denied: insufficient permissions for projects: {inaccessible_projects}"
             )
+        
+        # Additional client isolation check: validate user has access to all projects' client_ids
+        # For non-System/Admin users, ensure all projects belong to their client
+        for project in projects:
+            try:
+                validate_client_access(current_user, project.client_id)
+            except HTTPException:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=f"Access denied: insufficient client permissions for project {project.id}"
+                )
         
         # Validate compatibility: check if samples share a common analysis
         # Get all tests for these samples
@@ -870,6 +919,29 @@ async def add_container_to_batch(
             detail="Batch not found"
         )
     
+    # Validate client access: check access to the container's sample's project
+    container = db.query(Container).filter(
+        Container.id == container_data.container_id,
+        Container.active == True
+    ).first()
+    
+    if container:
+        # Get sample from container
+        content = db.query(Contents).filter(
+            Contents.container_id == container.id
+        ).first()
+        
+        if content:
+            sample = db.query(Sample).filter(
+                Sample.id == content.sample_id,
+                Sample.active == True
+            ).first()
+            
+            if sample:
+                project = db.query(Project).filter(Project.id == sample.project_id).first()
+                if project:
+                    validate_client_access(current_user, project.client_id)
+    
     # Verify container exists
     container = db.query(Container).filter(
         Container.id == container_data.container_id,
@@ -930,6 +1002,40 @@ async def update_batch(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Batch not found"
         )
+    
+    # Validate client access: check access to all projects in the batch
+    # Get all containers in batch
+    batch_containers = db.query(BatchContainer).filter(
+        BatchContainer.batch_id == batch.id
+    ).all()
+    container_ids = [bc.container_id for bc in batch_containers]
+    
+    if container_ids:
+        # Get all samples from batch containers
+        contents = db.query(Contents).filter(
+            Contents.container_id.in_(container_ids)
+        ).all()
+        sample_ids = [c.sample_id for c in contents if c.sample_id]
+        
+        if sample_ids:
+            # Get all unique projects for these samples
+            projects = db.query(Sample.project_id).filter(
+                Sample.id.in_(sample_ids),
+                Sample.active == True
+            ).distinct().all()
+            project_ids = [p[0] for p in projects]
+            
+            # Validate client access for all projects
+            from models.project import Project
+            projects_objs = db.query(Project).filter(Project.id.in_(project_ids)).all()
+            for project in projects_objs:
+                try:
+                    validate_client_access(current_user, project.client_id)
+                except HTTPException:
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail=f"Access denied: insufficient client permissions for batch"
+                    )
     
     # Validate and update custom_attributes if provided
     update_data = batch_data.dict(exclude_unset=True)

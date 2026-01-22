@@ -10,12 +10,17 @@ export interface User {
   permissions: string[];
 }
 
+// System client ID constant (matches backend)
+const SYSTEM_CLIENT_ID = '00000000-0000-0000-0000-000000000001';
+
 interface UserContextType {
   user: User | null;
   loading: boolean;
   login: (username: string, password: string) => Promise<void>;
   logout: () => void;
   hasPermission: (permission: string) => boolean;
+  isSystemClient: () => boolean;
+  isAdmin: () => boolean;
 }
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
@@ -102,12 +107,24 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     return user.permissions.includes(permission) || user.role === 'Administrator';
   };
 
+  const isSystemClient = (): boolean => {
+    if (!user) return false;
+    return user.client_id === SYSTEM_CLIENT_ID;
+  };
+
+  const isAdmin = (): boolean => {
+    if (!user) return false;
+    return user.role === 'Administrator';
+  };
+
   const value: UserContextType = {
     user,
     loading,
     login,
     logout,
     hasPermission,
+    isSystemClient,
+    isAdmin,
   };
 
   return (

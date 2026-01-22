@@ -16,7 +16,7 @@ from app.schemas.project import (
     ProjectUpdate,
 )
 from app.core.security import get_current_user
-from app.core.rbac import require_permission
+from app.core.rbac import require_permission, validate_client_access
 from uuid import UUID
 import logging
 
@@ -227,6 +227,9 @@ async def create_project(
                     detail="Client project does not belong to the specified client"
                 )
         
+        # Validate client access: non-System/Admin users can only create projects for their own client
+        validate_client_access(current_user, project_data.client_id)
+        
         # Validate custom_attributes if provided
         validated_custom_attributes = {}
         if project_data.custom_attributes:
@@ -369,7 +372,12 @@ async def update_project(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Client not found"
                 )
+            # Validate client access: non-System/Admin users can only update projects for their own client
+            validate_client_access(current_user, project_data.client_id)
             project.client_id = project_data.client_id
+        else:
+            # If not updating client_id, validate access to existing project's client_id
+            validate_client_access(current_user, project.client_id)
         
         if project_data.client_project_id is not None:
             if project_data.client_project_id:

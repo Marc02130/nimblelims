@@ -4,6 +4,41 @@ import axios, { AxiosInstance, AxiosResponse } from 'axios';
 // This avoids CORS issues and works in Docker
 const API_BASE_URL = process.env.REACT_APP_API_URL || '/api';
 
+// System client ID constant (matches backend)
+const SYSTEM_CLIENT_ID = '00000000-0000-0000-0000-000000000001';
+
+/**
+ * Helper function to conditionally add client_id to query params.
+ * For non-System clients, adds client_id filter (backend RLS will also enforce this).
+ * For System clients and Admins, relies entirely on backend RLS (no client_id filter).
+ * 
+ * @param filters - Existing filters object
+ * @param userClientId - Current user's client_id
+ * @param userRole - Current user's role
+ * @returns Filters object with client_id added if needed
+ */
+export function addClientFilterIfNeeded(
+  filters: Record<string, string | undefined> = {},
+  userClientId?: string,
+  userRole?: string
+): Record<string, string | undefined> {
+  // Admins and System client users see all data (rely on RLS)
+  if (userRole === 'Administrator' || userClientId === SYSTEM_CLIENT_ID) {
+    return filters;
+  }
+  
+  // Regular client users: add client_id filter (though RLS will also enforce this)
+  // This is optional but can help with UI clarity and performance hints
+  if (userClientId) {
+    // Only add if not already present (don't override explicit filters)
+    if (!filters.client_id) {
+      filters.client_id = userClientId;
+    }
+  }
+  
+  return filters;
+}
+
 // Types for eligible samples with prioritization
 export interface EligibleSample {
   id: string;

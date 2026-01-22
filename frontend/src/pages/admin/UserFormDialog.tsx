@@ -23,18 +23,24 @@ interface UserFormDialogProps {
   open: boolean;
   user?: {
     id: string;
+    name?: string;
+    description?: string;
     username: string;
     email: string;
     role_id: string;
     client_id?: string;
     active?: boolean;
+    last_login?: string;
   } | null;
   existingUsernames: string[];
   existingEmails: string[];
+  existingNames: string[];
   roles: Array<{ id: string; name: string }>;
   clients: Array<{ id: string; name: string }>;
   onClose: () => void;
   onSubmit: (data: {
+    name?: string;
+    description?: string;
     username: string;
     email: string;
     password?: string;
@@ -45,6 +51,11 @@ interface UserFormDialogProps {
 }
 
 const createValidationSchema = (isEdit: boolean) => Yup.object({
+  name: Yup.string()
+    .required('Name is required')
+    .max(255, 'Name must be less than 255 characters'),
+  description: Yup.string()
+    .max(1000, 'Description must be less than 1000 characters'),
   username: Yup.string()
     .required('Username is required')
     .min(3, 'Username must be at least 3 characters')
@@ -67,6 +78,7 @@ const UserFormDialog: React.FC<UserFormDialogProps> = ({
   user,
   existingUsernames,
   existingEmails,
+  existingNames,
   roles,
   clients,
   onClose,
@@ -78,6 +90,8 @@ const UserFormDialog: React.FC<UserFormDialogProps> = ({
   const isEdit = !!user;
 
   const initialValues = {
+    name: user?.name || '',
+    description: user?.description || '',
     username: user?.username || '',
     email: user?.email || '',
     password: '',
@@ -87,6 +101,8 @@ const UserFormDialog: React.FC<UserFormDialogProps> = ({
   };
 
   const handleSubmit = async (values: {
+    name: string;
+    description: string;
     username: string;
     email: string;
     password?: string;
@@ -99,14 +115,20 @@ const UserFormDialog: React.FC<UserFormDialogProps> = ({
 
     try {
       // Check for uniqueness (excluding current user if editing)
-      if (existingUsernames.includes(values.username) && (!isEdit || values.username !== user.username)) {
+      if (existingUsernames.includes(values.username) && (!isEdit || values.username !== user?.username)) {
         setError('A user with this username already exists');
         setLoading(false);
         return;
       }
 
-      if (existingEmails.includes(values.email) && (!isEdit || values.email !== user.email)) {
+      if (existingEmails.includes(values.email) && (!isEdit || values.email !== user?.email)) {
         setError('A user with this email already exists');
+        setLoading(false);
+        return;
+      }
+
+      if (existingNames.includes(values.name) && (!isEdit || values.name !== user?.name)) {
+        setError('A user with this name already exists');
         setLoading(false);
         return;
       }
@@ -115,6 +137,12 @@ const UserFormDialog: React.FC<UserFormDialogProps> = ({
 
       if (isEdit) {
         // For updates, only include fields that have changed
+        if (values.name !== user?.name) {
+          submitData.name = values.name;
+        }
+        if (values.description !== (user?.description || '')) {
+          submitData.description = values.description || null;
+        }
         if (values.username !== user?.username) {
           submitData.username = values.username;
         }
@@ -132,6 +160,8 @@ const UserFormDialog: React.FC<UserFormDialogProps> = ({
         }
       } else {
         // For creation, include all required fields
+        submitData.name = values.name;
+        submitData.description = values.description || null;
         submitData.username = values.username;
         submitData.email = values.email;
         submitData.role_id = values.role_id;
@@ -185,6 +215,22 @@ const UserFormDialog: React.FC<UserFormDialogProps> = ({
               <Box sx={{ pt: 2 }}>
                 <Grid container spacing={2}>
                   <Grid size={{ xs: 12, sm: 6 }}>
+                    <Field name="name">
+                      {({ field, meta }: any) => (
+                        <TextField
+                          {...field}
+                          label="Name"
+                          fullWidth
+                          required
+                          margin="normal"
+                          helperText={meta.touched && meta.error ? meta.error : 'Display name for the user'}
+                          error={meta.touched && !!meta.error}
+                        />
+                      )}
+                    </Field>
+                  </Grid>
+
+                  <Grid size={{ xs: 12, sm: 6 }}>
                     <Field name="username">
                       {({ field, meta }: any) => (
                         <TextField
@@ -194,6 +240,23 @@ const UserFormDialog: React.FC<UserFormDialogProps> = ({
                           required
                           margin="normal"
                           helperText={meta.touched && meta.error ? meta.error : 'Unique username for login'}
+                          error={meta.touched && !!meta.error}
+                        />
+                      )}
+                    </Field>
+                  </Grid>
+
+                  <Grid size={12}>
+                    <Field name="description">
+                      {({ field, meta }: any) => (
+                        <TextField
+                          {...field}
+                          label="Description"
+                          fullWidth
+                          multiline
+                          rows={3}
+                          margin="normal"
+                          helperText={meta.touched && meta.error ? meta.error : 'Optional description for the user'}
                           error={meta.touched && !!meta.error}
                         />
                       )}
@@ -216,6 +279,19 @@ const UserFormDialog: React.FC<UserFormDialogProps> = ({
                       )}
                     </Field>
                   </Grid>
+
+                  {isEdit && (
+                    <Grid size={{ xs: 12, sm: 6 }}>
+                      <TextField
+                        label="Last Login"
+                        value={user?.last_login ? new Date(user.last_login).toLocaleString() : 'Never'}
+                        fullWidth
+                        margin="normal"
+                        disabled
+                        helperText="Last login time (read-only)"
+                      />
+                    </Grid>
+                  )}
 
                   {!isEdit && (
                     <Grid size={12}>

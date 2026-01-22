@@ -7,6 +7,48 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from models.user import User, Role, Permission
 from app.core.security import get_current_user, get_user_permissions
+from uuid import UUID
+
+# System client ID (hardcoded for consistency with migrations)
+SYSTEM_CLIENT_ID = UUID('00000000-0000-0000-0000-000000000001')
+
+
+def is_system_client_or_admin(user: User) -> bool:
+    """
+    Check if user is Administrator or associated with System client (lab employees).
+    System client users and Administrators have full access to all data.
+    """
+    if user.role.name == "Administrator":
+        return True
+    if user.client_id == SYSTEM_CLIENT_ID:
+        return True
+    return False
+
+
+def validate_client_access(user: User, project_client_id: Optional[UUID]) -> None:
+    """
+    Validate that user has access to a project based on client_id.
+    Raises HTTPException 403 if access is denied.
+    
+    Rules:
+    - Administrators: Full access
+    - System client users (lab employees): Full access
+    - Regular client users: Only if project.client_id == user.client_id
+    """
+    if is_system_client_or_admin(user):
+        return  # Full access granted
+    
+    if project_client_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied: project client_id is required"
+        )
+    
+    if user.client_id != project_client_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied: insufficient client permissions"
+        )
 
 
 def require_permission(permission: str):

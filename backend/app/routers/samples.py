@@ -20,7 +20,7 @@ from app.schemas.sample import (
 )
 from app.core.rbac import (
     require_sample_create, require_sample_read, require_sample_update,
-    require_sample_delete, require_project_access
+    require_sample_delete, require_project_access, validate_client_access
 )
 from app.core.security import get_current_user
 from datetime import datetime, timedelta
@@ -524,20 +524,18 @@ async def create_sample(
     """
     Create a new sample.
     Requires sample:create permission.
+    RLS enforces access control, but we validate client_id for non-System/Admin users.
     """
-    # Check project access
-    if current_user.role.name != "Administrator":
-        from models.project import ProjectUser
-        project_access = db.query(ProjectUser).filter(
-            ProjectUser.project_id == sample_data.project_id,
-            ProjectUser.user_id == current_user.id
-        ).first()
-        
-        if not project_access:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Access denied: insufficient project permissions"
-            )
+    # Get project to check client_id
+    project = db.query(Project).filter(Project.id == sample_data.project_id).first()
+    if not project:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Project not found"
+        )
+    
+    # Validate client access: non-System/Admin users can only create samples for their own client's projects
+    validate_client_access(current_user, project.client_id)
     
     # Validate custom_attributes if provided
     validated_custom_attributes = {}
@@ -677,6 +675,9 @@ async def accession_sample(
             )
             logger.info(f"Generated project name: {project_name}")
             
+            # Validate client access: non-System/Admin users can only create projects for their own client
+            validate_client_access(current_user, accession_data.client_id)
+            
             # Create new project
             new_project = Project(
                 name=project_name,
@@ -709,18 +710,8 @@ async def accession_sample(
                     detail="Project not found"
                 )
             
-            # Check project access (unless admin)
-            if current_user.role.name != "Administrator":
-                project_access = db.query(ProjectUser).filter(
-                    ProjectUser.project_id == project_id,
-                    ProjectUser.user_id == current_user.id
-                ).first()
-                
-                if not project_access:
-                    raise HTTPException(
-                        status_code=status.HTTP_403_FORBIDDEN,
-                        detail="Access denied: insufficient project permissions"
-                    )
+            # Validate client access: non-System/Admin users can only access projects for their own client
+            validate_client_access(current_user, project.client_id)
             
             # Verify project belongs to the specified client
             if project.client_id != accession_data.client_id:
@@ -1231,18 +1222,11 @@ async def update_sample(
             detail="Sample not found"
         )
     
-    # Check project access using has_project_access function (handles admin, client, and lab tech access)
-    if current_user.role.name != "Administrator":
-        from sqlalchemy import text
-        result = db.execute(
-            text("SELECT has_project_access(:project_id)"),
-            {"project_id": str(sample.project_id)}
-        ).scalar()
-        if not result:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Access denied: insufficient project permissions"
-            )
+    # Validate client access: non-System/Admin users can only update samples from their own client's projects
+    # RLS also enforces this, but we add explicit check for API layer validation
+    project = db.query(Project).filter(Project.id == sample.project_id).first()
+    if project:
+        validate_client_access(current_user, project.client_id)
     
     # Validate and update custom_attributes if provided
     if sample_data.custom_attributes is not None:
