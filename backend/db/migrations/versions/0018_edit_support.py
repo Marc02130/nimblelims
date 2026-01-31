@@ -1,7 +1,7 @@
 """Add edit support indexes and ensure test:update permission
 
-Revision ID: 0020
-Revises: 0019
+Revision ID: 0018
+Revises: 0017
 Create Date: 2025-01-03 21:00:00.000000
 
 """
@@ -9,8 +9,8 @@ from alembic import op
 import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
-revision = '0020'
-down_revision = '0019'
+revision = '0018'
+down_revision = '0017'
 branch_labels = None
 depends_on = None
 

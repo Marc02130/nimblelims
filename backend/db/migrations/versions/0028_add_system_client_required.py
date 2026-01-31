@@ -1,7 +1,7 @@
 """Add System client requirement for users
 
-Revision ID: 0029
-Revises: 0028
+Revision ID: 0028
+Revises: 0027
 Create Date: 2026-01-22 12:00:00.000000
 
 Enhances database schema to support a 'System' client for lab employees.
@@ -20,8 +20,8 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision = '0029'
-down_revision = '0028'
+revision = '0028'
+down_revision = '0027'
 branch_labels = None
 depends_on = None
 
