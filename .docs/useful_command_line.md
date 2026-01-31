@@ -1,6 +1,6 @@
 # Clean Restart Containers 
 docker-compose down
-docker system prune -a
+docker system prune -af
 docker-compose up -d --build
 
 # Export container logs
