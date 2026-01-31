@@ -129,17 +129,39 @@ def upgrade() -> None:
         """)
     )
     
-    # Create UAT test container type
+    # Create container types
     connection.execute(
         sa.text("""
             INSERT INTO container_types (id, name, description, capacity, material, dimensions, preservative, active, created_at, modified_at)
             VALUES (
                 '33333333-3333-3333-3333-333333333333',
                 'Test Tube (15mL)',
-                'Standard 15mL test tube for UAT testing',
+                'Standard 15mL test tube',
                 15.0,
                 'polypropylene',
                 '15x100mm',
+                NULL,
+                true,
+                NOW(),
+                NOW()
+            ),(
+                '33333333-3333-3333-3333-433333333333',
+                '1 Liter Amber Glass Bottle (1L)',
+                '1 Liter Amber Glass Bottle',
+                1,
+                'glass',
+                '95x225mm',
+                NULL,
+                true,
+                NOW(),
+                NOW()
+            ),(
+                '33333333-3333-3333-3333-533333333333',
+                '1 Plastic Bottle (1L)',
+                '1 Plastic Bottle',
+                1,
+                'HDPE',
+                '91x205mm',
                 NULL,
                 true,
                 NOW(),
@@ -166,7 +188,7 @@ def downgrade() -> None:
     
     # Remove container type
     connection.execute(
-        sa.text("DELETE FROM container_types WHERE id = '33333333-3333-3333-3333-333333333333'")
+        sa.text("DELETE FROM container_types WHERE id in ('33333333-3333-3333-3333-333333333333', '33333333-3333-3333-3333-433333333333', '33333333-3333-3333-3333-533333333333')")
     )
     
     # Remove client project

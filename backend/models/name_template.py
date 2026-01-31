@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Text, Boolean
+from sqlalchemy import Column, String, Text, Boolean, Integer
 from sqlalchemy.dialects.postgresql import UUID as PostgresUUID
 from sqlalchemy.orm import relationship
 from .base import BaseModel
@@ -12,6 +12,8 @@ class NameTemplate(BaseModel):
     template = Column(String(500), nullable=False)
     description = Column(Text, nullable=True)
     active = Column(Boolean, default=True, nullable=False)
+    # Number of digits for {SEQ} padding (default 1 = no padding, e.g. 3 -> '001', '010', '100')
+    seq_padding_digits = Column(Integer, default=1, nullable=False, server_default='1')
     
     # Relationships
     creator = relationship("User", foreign_keys="NameTemplate.created_by", back_populates="created_name_templates")

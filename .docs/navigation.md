@@ -6,10 +6,16 @@ NimbleLIMS uses a unified sidebar navigation system that provides consistent nav
 
 Navigation is permission-based, with menu items and routes dynamically shown/hidden based on user roles and permissions.
 
+### MainNav and routing
+- **MainNav** (`frontend/src/components/MainNav.tsx`) defines the central navigation structure and exports the **Admin** section items (including sub-links to `/admin/name-templates`, `/admin/custom-attributes`, `/admin/lists`). The Sidebar imports `adminNavItems` from MainNav for the Admin accordion.
+- **React Router** is used for routing (`react-router-dom`); routes are declared in `frontend/src/App.tsx`.
+- **Admin routes** are protected with an authentication guard: routes under `/admin/*` require `hasPermission('config:edit')` (or other role-specific permissions). Users without access are redirected to `/dashboard`.
+
 ## 1. Unified Sidebar Navigation
 
 ### Location
-- Component: `frontend/src/components/Sidebar.tsx`
+- Component: `frontend/src/components/Sidebar.tsx` (uses `adminNavItems` from `frontend/src/components/MainNav.tsx` for Admin section)
+- MainNav: `frontend/src/components/MainNav.tsx`
 - Layout Component: `frontend/src/layouts/MainLayout.tsx`
 - Display: Persistent left sidebar (240px width expanded, 56px collapsed) on all authenticated routes
 - Layout: Permanent drawer on desktop (≥600px), temporary drawer on mobile (<600px)
@@ -123,7 +129,7 @@ The Lab Mgmt section uses a Material-UI Accordion component for collapsible subm
 - **Analytes** (`/analytes`): CRUD management for analytes with fields for name, CAS number, default units, data type, and custom attributes.
 
 #### Admin Section (Accordion)
-The Admin section uses a Material-UI Accordion component for collapsible submenu functionality. It is only visible to users with `config:edit` permission.
+The Admin section uses a Material-UI Accordion component for collapsible submenu functionality. It is only visible to users with `config:edit` permission. The navigation structure is driven by **MainNav** (`frontend/src/components/MainNav.tsx`), which exports `adminNavItems`; the Sidebar imports these items so the Admin sub-links are defined in one place.
 
 **Accordion Behavior:**
 - Auto-expands when user navigates to any `/admin/*` route
@@ -132,10 +138,14 @@ The Admin section uses a Material-UI Accordion component for collapsible submenu
 - Contains all admin sub-items in a nested list structure
 - ARIA labels: `aria-label="Admin section"`, `aria-controls="admin-navigation-content"`
 
+**Primary Admin sub-links (Name Templates, Custom Attributes, Lists):**
+
 | Menu Item | Route | Icon | Description |
 |-----------|-------|------|-------------|
 | **Overview** | `/admin` | DashboardIcon | Admin dashboard with statistics |
-| **Lists Management** | `/admin/lists` | ViewList | Manage configurable lists and entries |
+| **Name Templates** | `/admin/name-templates` | Tune | Manage name templates (entity naming) |
+| **Custom Attributes** | `/admin/custom-attributes` | Tune | Manage custom attribute configurations (EAV) |
+| **Lists** | `/admin/lists` | ViewList | Manage configurable lists and list entries |
 | **Container Types** | `/admin/container-types` | Inventory | Manage container type definitions |
 | **Units Management** | `/admin/units` | Straighten | Manage unit definitions with multipliers |
 | **Users Management** | `/admin/users` | People | User CRUD operations |
@@ -143,9 +153,11 @@ The Admin section uses a Material-UI Accordion component for collapsible submenu
 | **Analyses Management** | `/admin/analyses` | Science | Test analysis configuration |
 | **Analytes Management** | `/admin/analytes` | Biotech | Analyte definitions |
 | **Test Batteries** | `/admin/test-batteries` | BatteryChargingFull | Test battery configuration |
-| **Custom Fields** | `/admin/custom-fields` | Tune | Manage custom attribute configurations (Post-MVP) |
-| **Custom Names** | `/admin/custom-names` | Tune | Manage name template configurations |
+| **Custom Fields** | `/admin/custom-fields` | Tune | Manage custom attribute configurations (EAV) |
+| **Custom Names** | `/admin/custom-names` | Tune | Manage name template configurations (alternate) |
 | **Help Management** | `/admin/help` | Help | Manage help entries (CRUD) - requires `config:edit` permission |
+
+Admin routes are protected in `App.tsx` with `hasPermission('config:edit')` (or role-specific permissions); unauthenticated or unauthorized users are redirected to `/dashboard`.
 
 ### Visual States
 
@@ -214,6 +226,8 @@ The AppBar title is automatically determined from the current route:
 | `/help` | Help |
 | `/admin` | Admin Dashboard |
 | `/admin/lists` | Lists Management |
+| `/admin/name-templates` | Name Templates |
+| `/admin/custom-attributes` | Custom Attributes |
 | `/admin/container-types` | Container Types |
 | `/admin/users` | Users Management |
 | `/admin/roles` | Roles & Permissions |
