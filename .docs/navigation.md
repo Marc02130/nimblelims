@@ -264,7 +264,9 @@ All authenticated routes use the `MainLayout` component, which provides the unif
 | `/analytes` | AnalytesManagement | MainLayout |
 | `/help` | HelpPage | MainLayout |
 | `/admin` | AdminOverview | MainLayout |
-| `/admin/lists` | ListsManagement | MainLayout |
+| `/admin/name-templates` | NameTemplatesAdmin | MainLayout |
+| `/admin/custom-attributes` | CustomAttributesAdmin | MainLayout |
+| `/admin/lists` | ListsAdmin | MainLayout |
 | `/admin/container-types` | ContainerTypesManagement | MainLayout |
 | `/admin/users` | UsersManagement | MainLayout |
 | `/admin/roles` | RolesManagement | MainLayout |

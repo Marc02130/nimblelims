@@ -174,6 +174,7 @@ Verify that users without required permissions are denied access to protected en
 | 2.1 | Navigate directly to `/admin/lists` via URL bar | User is redirected to `/dashboard` (route requires `config:edit`) |
 | 2.1a | Navigate directly to `/admin/name-templates` via URL bar (no `config:edit`) | User is redirected to `/dashboard` |
 | 2.1b | Navigate directly to `/admin/custom-attributes` via URL bar (no `config:edit`) | User is redirected to `/dashboard` |
+| 2.1c | Call POST `/admin/sequences/sample/start` with body `{"start_value": 1}` without admin token | HTTP 401 or 403 (sequence start requires `config:edit`) |
 | 2.2 | Navigate directly to `/admin` via URL bar | User is redirected to `/dashboard` |
 | 2.3 | Verify sidebar does not show Admin section | Admin accordion not visible (no `config:edit` permission) |
 | 3 | **Test Allowed Action (Sample Creation)** | |

@@ -149,6 +149,8 @@ nimblelims/
 - **Units Integration**: Concentration and amount with unit conversions
 
 ### Configuration Management
+- **Name Templates**: Configurable entity naming (sample, project, batch, etc.) with placeholders ({SEQ}, {YYYY}, {YY}, seq_padding_digits) and sequence start API (admin interface at `/admin/name-templates`)
+- **Custom Attributes Config**: Define and manage custom attribute definitions per entity type (admin interface at `/admin/custom-attributes`)
 - **Lists Management**: Full CRUD for lists and list entries via admin interface - create new lists, add/edit/delete entries for statuses, types, matrices, QC types, etc. Empty lists display expand arrows to add entries.
 - **Container Types**: Admin-managed container type definitions (CRUD operations)
 - **Analyses Management**: Create and manage analyses with methods, turnaround times, costs, and custom attributes. Features expandable grid rows to view and manage linked analytes directly from the main list (CRUD). Available in both Admin section and Lab Mgmt accordion.
