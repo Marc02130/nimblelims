@@ -34,6 +34,7 @@ interface CustomAttributeFieldProps {
   fullWidth?: boolean;
   size?: 'small' | 'medium';
   label?: string;
+  disabled?: boolean;
 }
 
 const CustomAttributeField: React.FC<CustomAttributeFieldProps> = ({
@@ -46,6 +47,7 @@ const CustomAttributeField: React.FC<CustomAttributeFieldProps> = ({
   fullWidth = true,
   size = 'medium',
   label,
+  disabled = false,
 }) => {
   const rules = config.validation_rules || {};
   const displayLabel = label || config.attr_name.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase());
@@ -63,6 +65,7 @@ const CustomAttributeField: React.FC<CustomAttributeFieldProps> = ({
             onBlur={onBlur}
             error={error}
             helperText={helperText || config.description}
+            disabled={disabled}
             inputProps={{
               maxLength: rules.max_length,
               minLength: rules.min_length,
@@ -85,6 +88,7 @@ const CustomAttributeField: React.FC<CustomAttributeFieldProps> = ({
             onBlur={onBlur}
             error={error}
             helperText={helperText || config.description}
+            disabled={disabled}
             inputProps={{
               min: rules.min,
               max: rules.max,
@@ -120,6 +124,7 @@ const CustomAttributeField: React.FC<CustomAttributeFieldProps> = ({
               }}
               minDate={minDate}
               maxDate={maxDate}
+              disabled={disabled}
               slotProps={{
                 textField: {
                   fullWidth,
@@ -140,6 +145,7 @@ const CustomAttributeField: React.FC<CustomAttributeFieldProps> = ({
               <Checkbox
                 checked={value === true || value === 'true'}
                 onChange={(e) => onChange(e.target.checked)}
+                disabled={disabled}
               />
             }
             label={
@@ -158,12 +164,13 @@ const CustomAttributeField: React.FC<CustomAttributeFieldProps> = ({
       case 'select':
         const options = rules.options || [];
         return (
-          <FormControl fullWidth={fullWidth} size={size} error={error}>
+          <FormControl fullWidth={fullWidth} size={size} error={error} disabled={disabled}>
             <InputLabel>{displayLabel}</InputLabel>
             <Select
               value={value || ''}
               onChange={(e) => onChange(e.target.value)}
               label={displayLabel}
+              disabled={disabled}
             >
               <MenuItem value="">None</MenuItem>
               {options.map((option: string) => (
@@ -195,6 +202,7 @@ const CustomAttributeField: React.FC<CustomAttributeFieldProps> = ({
             onChange={(e) => onChange(e.target.value)}
             error={error}
             helperText={helperText || config.description}
+            disabled={disabled}
           />
         );
     }

@@ -1,17 +1,20 @@
 """
 Clients router for NimbleLims
 """
+import logging
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 from app.database import get_db
 from models.client import Client
 from models.user import User
 from app.schemas.client import ClientResponse, ClientCreate, ClientUpdate
-from app.core.security import get_current_user
-from app.core.rbac import require_permission
+from app.core.security import get_current_user, set_current_user_id
+from app.core.rbac import require_permission, is_system_client_or_admin
 from uuid import UUID
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
@@ -21,9 +24,36 @@ async def get_clients(
     db: Session = Depends(get_db)
 ):
     """
-    Get all active clients.
+    Get all accessible clients.
+    Access control: application-level filter (is_system_client_or_admin + client_id) is primary;
+    RLS (clients_access) provides defense-in-depth when app.current_user_id is set.
+    - Administrators: see all clients
+    - System client users (lab employees): see all clients
+    - Client users: see only their own client record
     """
-    clients = db.query(Client).filter(Client.active == True).order_by(Client.name).all()
+    # Set current user for RLS so DB policies can evaluate
+    set_current_user_id(str(current_user.id), db)
+    # Verify the same connection has app.current_user_id set (for RLS and diagnostics)
+    row = db.execute(text("SELECT current_setting('app.current_user_id', true)")).fetchone()
+    rv = row[0] if row else None
+    logger.info(
+        "GET /clients: user_id=%s role=%s client_id=%s db_app_current_user_id=%s",
+        current_user.id,
+        getattr(current_user.role, "name", None),
+        current_user.client_id,
+        rv,
+    )
+    # Application-level filter is the primary enforcement: client users see only their client.
+    # RLS (clients_access policy) provides defense-in-depth when app.current_user_id is set.
+    if not is_system_client_or_admin(current_user):
+        # Regular client user: only their own client (role is eager-loaded in get_current_user)
+        if current_user.client_id is None:
+            return []
+        clients_query = db.query(Client).filter(Client.active == True, Client.id == current_user.client_id)
+    else:
+        clients_query = db.query(Client).filter(Client.active == True)
+    
+    clients = clients_query.order_by(Client.name).all()
     return [ClientResponse.from_orm(client) for client in clients]
 
 

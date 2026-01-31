@@ -23,6 +23,7 @@ import {
   Delete,
   Search,
   Clear,
+  Visibility,
 } from '@mui/icons-material';
 import { DataGrid, GridColDef, GridActionsCellItem, GridRowParams } from '@mui/x-data-grid';
 import { useUser } from '../contexts/UserContext';
@@ -52,16 +53,19 @@ const ClientsManagement: React.FC = () => {
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Client | null>(null);
+  const [viewMode, setViewMode] = useState(false);
 
-  const canManage = hasPermission('project:manage');
+  // Create/Edit/Delete client require config:edit (backend uses require_permission('config:edit'))
+  const canEditClients = hasPermission('config:edit');
+  const canRead = hasPermission('sample:read') || hasPermission('project:manage') || canEditClients;
 
   useEffect(() => {
-    if (!canManage) {
+    if (!canRead) {
       navigate('/dashboard');
       return;
     }
     loadData();
-  }, [canManage, navigate]);
+  }, [canRead, navigate]);
 
   const loadData = async () => {
     try {
@@ -109,6 +113,12 @@ const ClientsManagement: React.FC = () => {
     await apiService.updateClient(selectedClient.id, data);
     await loadData();
     setSelectedClient(null);
+  };
+
+  const handleView = (client: Client) => {
+    setSelectedClient(client);
+    setViewMode(true);
+    setFormOpen(true);
   };
 
   const handleDelete = async () => {
@@ -175,13 +185,24 @@ const ClientsManagement: React.FC = () => {
         const clientRow = params.row as Client;
         const actions = [];
 
-        if (canManage) {
+        // View button - available to all users
+        actions.push(
+          <GridActionsCellItem
+            icon={<Visibility />}
+            label="View"
+            onClick={() => handleView(clientRow)}
+          />
+        );
+
+        // Edit and Delete - only for users with config:edit (same as backend create/update/delete client)
+        if (canEditClients) {
           actions.push(
             <GridActionsCellItem
               icon={<Edit />}
               label="Edit"
               onClick={() => {
                 setSelectedClient(clientRow);
+                setViewMode(false);
                 setFormOpen(true);
               }}
             />,
@@ -201,7 +222,7 @@ const ClientsManagement: React.FC = () => {
     },
   ];
 
-  if (!canManage) {
+  if (!canRead) {
     return null; // Will redirect via useEffect
   }
 
@@ -218,7 +239,7 @@ const ClientsManagement: React.FC = () => {
         }}
       >
         <Typography variant="h4">Clients Management</Typography>
-        {canManage && (
+        {canEditClients && (
           <Button
             variant="contained"
             startIcon={<Add />}
@@ -298,8 +319,10 @@ const ClientsManagement: React.FC = () => {
         onClose={() => {
           setFormOpen(false);
           setSelectedClient(null);
+          setViewMode(false);
         }}
         onSubmit={selectedClient ? handleUpdate : handleCreate}
+        readOnly={viewMode}
       />
 
       {/* Delete Confirmation Dialog */}

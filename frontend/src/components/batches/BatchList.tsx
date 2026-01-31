@@ -200,12 +200,6 @@ const BatchList: React.FC<BatchListProps> = ({ onViewBatch, onEditBatch, onCreat
         </Alert>
       )}
 
-      {!isSystemClient() && !isAdmin() && user?.client_id && (
-        <Alert severity="info" sx={{ mb: 2 }}>
-          Showing batches containing samples from your client's projects only. System users and administrators see all batches.
-        </Alert>
-      )}
-
       <Card>
         <CardContent>
           <Grid container spacing={2} sx={{ mb: 2 }}>
