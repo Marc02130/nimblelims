@@ -7,7 +7,7 @@ import jwt
 import hashlib
 from fastapi import HTTPException, status, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import text
 from app.database import get_db
 from models.user import User, Role, Permission
@@ -95,7 +95,13 @@ def get_current_user(
     token = credentials.credentials
     token_data = verify_token(token)
     
-    user = db.query(User).filter(User.id == token_data.user_id).first()
+    # Eager-load role so RLS/rbac helpers (e.g. is_system_client_or_admin) have reliable data
+    user = (
+        db.query(User)
+        .options(joinedload(User.role))
+        .filter(User.id == token_data.user_id)
+        .first()
+    )
     if user is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

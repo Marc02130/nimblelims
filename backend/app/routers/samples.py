@@ -22,7 +22,7 @@ from app.core.rbac import (
     require_sample_create, require_sample_read, require_sample_update,
     require_sample_delete, require_project_access, validate_client_access
 )
-from app.core.security import get_current_user
+from app.core.security import get_current_user, set_current_user_id
 from datetime import datetime, timedelta
 from uuid import UUID
 
@@ -357,8 +357,9 @@ async def get_samples(
 ):
     """
     Get samples with filtering and pagination.
-    Scoped by user access (clients see only their projects).
+    Scoped by user access via RLS (samples_access policy).
     """
+    set_current_user_id(str(current_user.id), db)
     # Convert empty strings to None and parse UUIDs
     project_id_uuid = None
     status_uuid = None
@@ -458,8 +459,28 @@ async def get_samples(
                 Sample.custom_attributes.op("@>")(cast(filter_dict, JSONB))
             )
     
-    # Get total count
-    total = query.count()
+    # Get total count - use func.count() directly to avoid subquery wrapping that can interfere with RLS
+    # Build a count query that mirrors the main query filters (without joinedload)
+    from sqlalchemy import func
+    count_query = db.query(func.count(Sample.id)).filter(Sample.active == True)
+    
+    # Apply the same filters to count query
+    if project_id_uuid:
+        count_query = count_query.filter(Sample.project_id == project_id_uuid)
+    if status_uuid:
+        count_query = count_query.filter(Sample.status == status_uuid)
+    if qc_type_uuid:
+        count_query = count_query.filter(Sample.qc_type == qc_type_uuid)
+    
+    # Apply custom_attributes JSONB filters to count query
+    if custom_filters:
+        for attr_name, attr_value in custom_filters.items():
+            filter_dict = {attr_name: attr_value}
+            count_query = count_query.filter(
+                Sample.custom_attributes.op("@>")(cast(filter_dict, JSONB))
+            )
+    
+    total = count_query.scalar()
     
     # Apply pagination
     offset = (page - 1) * size
@@ -485,33 +506,19 @@ async def get_sample(
 ):
     """
     Get a specific sample by ID.
-    Scoped by user access.
+    Access is enforced by RLS (samples_access policy via has_project_access(project_id)).
+    Set app.current_user_id so RLS applies; if the user has no access, the query returns no row -> 404.
     """
-    from sqlalchemy import text
-    
+    set_current_user_id(str(current_user.id), db)
     sample = db.query(Sample).filter(
         Sample.id == sample_id,
         Sample.active == True
     ).first()
-    
     if not sample:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Sample not found"
         )
-    
-    # Check project access using has_project_access function (handles admin, client, and lab tech access)
-    if current_user.role.name != "Administrator":
-        result = db.execute(
-            text("SELECT has_project_access(:project_id)"),
-            {"project_id": str(sample.project_id)}
-        ).scalar()
-        if not result:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Access denied: insufficient project permissions"
-            )
-    
     return SampleResponse.model_validate(sample)
 
 

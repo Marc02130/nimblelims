@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict WjpMhC6cOuW5jZtKCYZdcHglvmjB8nAlQcb9al2cGe7XZ8c7Uqloi41rYIENGip
+\restrict HPRxj1RvajGqsyHEhAAQqIK4XuNNcu1m1OeThIh1Z3JjonkxWErG7ZKedRiel9A
 
 -- Dumped from database version 15.15
 -- Dumped by pg_dump version 15.15
@@ -26,6 +26,7 @@ DROP POLICY IF EXISTS name_templates_access ON public.name_templates;
 DROP POLICY IF EXISTS help_entries_access ON public.help_entries;
 DROP POLICY IF EXISTS custom_attributes_config_access ON public.custom_attributes_config;
 DROP POLICY IF EXISTS containers_access ON public.containers;
+DROP POLICY IF EXISTS clients_access ON public.clients;
 DROP POLICY IF EXISTS client_projects_access ON public.client_projects;
 DROP POLICY IF EXISTS batches_access ON public.batches;
 ALTER TABLE IF EXISTS ONLY public.users DROP CONSTRAINT IF EXISTS users_role_id_fkey;
@@ -382,9 +383,23 @@ CREATE FUNCTION public.has_project_access(project_uuid uuid) RETURNS boolean
             project_client_project_id UUID;
             project_client_id UUID;
             user_client_id UUID;
+            system_client_id UUID;
         BEGIN
             -- Admin users can access all projects
             IF is_admin() THEN
+                RETURN TRUE;
+            END IF;
+            
+            -- Get System client ID (hardcoded for performance)
+            system_client_id := '00000000-0000-0000-0000-000000000001'::UUID;
+            
+            -- Get user's client_id
+            SELECT u.client_id INTO user_client_id
+            FROM users u
+            WHERE u.id = current_user_id();
+            
+            -- If user is associated with System client, grant full access (lab employees)
+            IF user_client_id = system_client_id THEN
                 RETURN TRUE;
             END IF;
             
@@ -395,11 +410,6 @@ CREATE FUNCTION public.has_project_access(project_uuid uuid) RETURNS boolean
             
             -- If project has a client_project_id, check access via client_projects
             IF project_client_project_id IS NOT NULL THEN
-                -- Get user's client_id
-                SELECT u.client_id INTO user_client_id
-                FROM users u
-                WHERE u.id = current_user_id();
-                
                 -- Check if user's client_id matches the client_project's client_id
                 IF user_client_id IS NOT NULL THEN
                     IF EXISTS (
@@ -412,7 +422,15 @@ CREATE FUNCTION public.has_project_access(project_uuid uuid) RETURNS boolean
                 END IF;
             END IF;
             
-            -- Fall back to direct project access check (for lab technicians or direct grants)
+            -- For regular client users: check if project.client_id matches user.client_id
+            IF project_client_id IS NOT NULL AND user_client_id IS NOT NULL THEN
+                IF project_client_id = user_client_id THEN
+                    RETURN TRUE;
+                END IF;
+            END IF;
+            
+            -- Fall back to direct project access check (for granular grants via project_users junction)
+            -- This allows lab staff to be assigned to specific projects even if not System client
             RETURN EXISTS (
                 SELECT 1 FROM project_users pu
                 WHERE pu.project_id = project_uuid
@@ -627,6 +645,8 @@ CREATE TABLE public.clients (
     modified_by uuid,
     billing_info jsonb NOT NULL
 );
+
+ALTER TABLE ONLY public.clients FORCE ROW LEVEL SECURITY;
 
 
 --
@@ -1113,8 +1133,9 @@ CREATE TABLE public.users (
     password_hash character varying(255) NOT NULL,
     email character varying(255) NOT NULL,
     role_id uuid NOT NULL,
-    client_id uuid,
-    last_login timestamp without time zone
+    client_id uuid NOT NULL,
+    last_login timestamp without time zone,
+    CONSTRAINT users_client_id_not_null_check CHECK ((client_id IS NOT NULL))
 );
 
 
@@ -1123,7 +1144,7 @@ CREATE TABLE public.users (
 --
 
 COPY public.alembic_version (version_num) FROM stdin;
-0028
+0034
 \.
 
 
@@ -1221,7 +1242,8 @@ c0000001-c000-c000-c000-c00000000001	b0000002-b000-b000-b000-b00000000004	1	f
 --
 
 COPY public.client_projects (id, name, description, client_id, active, created_at, created_by, modified_at, modified_by, custom_attributes) FROM stdin;
-22222222-2222-2222-2222-222222222222	UAT Test Project	Test client project for UAT testing	11111111-1111-1111-1111-111111111111	t	2026-01-10 19:32:31.030314	\N	2026-01-10 19:32:31.030314	\N	{}
+a1f0e9d6-9a96-4c13-85df-c8b68387e50c	Admin Project	\N	00000000-0000-0000-0000-000000000001	t	2026-01-25 20:42:38.865988	00000000-0000-0000-0000-000000000001	2026-01-25 20:42:38.865988	00000000-0000-0000-0000-000000000001	{}
+22222222-2222-2222-2222-222222222222	UAT Test Project	Test client project for UAT testing	11111111-1111-1111-1111-111111111111	t	2026-01-10 19:32:31.030314	\N	2026-01-25 22:30:04.393686	00000000-0000-0000-0000-000000000001	{}
 \.
 
 
@@ -1230,8 +1252,8 @@ COPY public.client_projects (id, name, description, client_id, active, created_a
 --
 
 COPY public.clients (id, name, description, active, created_at, created_by, modified_at, modified_by, billing_info) FROM stdin;
-00000000-0000-0000-0000-000000000001	System	System client for admin users	t	2026-01-10 19:32:31.030314	\N	2026-01-10 19:32:31.030314	\N	{}
-11111111-1111-1111-1111-111111111111	UAT Test Client	Test client for UAT testing	t	2026-01-10 19:32:31.030314	\N	2026-01-10 19:32:31.030314	\N	{"zip": "12345", "city": "Test City", "state": "TS", "address": "123 Test St"}
+11111111-1111-1111-1111-111111111111	UAT Test Client	Test client for UAT testing	t	2026-01-10 19:32:31.030314	\N	2026-01-25 22:30:09.37705	00000000-0000-0000-0000-000000000001	{"zip": "12345", "city": "Test City", "state": "TS", "address": "123 Test St"}
+00000000-0000-0000-0000-000000000001	System	System client for admin users	t	2026-01-10 19:32:31.030314	\N	2026-01-25 22:30:13.490272	00000000-0000-0000-0000-000000000001	{}
 \.
 
 
@@ -1267,6 +1289,7 @@ beda05a0-c1b6-44a4-bfe0-5b2ae6d53bac	T7897979-976909	\N	t	2026-01-11 23:59:36.92
 a992455b-5872-498b-aace-d5ff36ba7e7d	B6780867-359436	\N	t	2026-01-19 17:39:19.448364	00000000-0000-0000-0000-000000000003	2026-01-19 17:39:19.448364	00000000-0000-0000-0000-000000000003	1	1	\N	\N	\N	\N	33333333-3333-3333-3333-333333333333	\N
 33d60dc0-c823-4880-8d2b-a790efb6e0ed	QC-B20261901-01-1-Container	Container for QC sample QC-B20261901-01-1	t	2026-01-19 21:26:23.113949	00000000-0000-0000-0000-000000000003	2026-01-19 21:26:23.113949	00000000-0000-0000-0000-000000000003	1	1	\N	\N	\N	\N	33333333-3333-3333-3333-333333333333	\N
 9d6eee9e-9745-4340-a238-05be09399073	QC-B767-1	Container for QC sample QC-B767-1	t	2026-01-21 02:27:36.3619	00000000-0000-0000-0000-000000000003	2026-01-21 02:27:36.3619	00000000-0000-0000-0000-000000000003	1	1	\N	\N	\N	\N	33333333-3333-3333-3333-333333333333	\N
+30daf486-948d-484a-b161-a480c2e2c13f	437678M890-509963	\N	t	2026-01-25 20:38:29.980199	00000000-0000-0000-0000-000000000001	2026-01-25 20:38:29.980199	00000000-0000-0000-0000-000000000001	1	1	\N	\N	\N	\N	33333333-3333-3333-3333-333333333333	\N
 \.
 
 
@@ -1283,6 +1306,7 @@ beda05a0-c1b6-44a4-bfe0-5b2ae6d53bac	c2de8d20-1039-46cb-a790-836f203d7724	\N	\N	
 a992455b-5872-498b-aace-d5ff36ba7e7d	1866b029-1550-4fa5-ada3-3af72283f41b	\N	\N	\N	\N
 33d60dc0-c823-4880-8d2b-a790efb6e0ed	f450cdb5-016a-4ad3-baea-8c07d4e7cad6	\N	\N	\N	\N
 9d6eee9e-9745-4340-a238-05be09399073	77575273-50e9-4ac0-afde-04233490e56b	\N	\N	\N	\N
+30daf486-948d-484a-b161-a480c2e2c13f	c14344e6-d536-45ca-9b23-3c11b2ea2266	\N	\N	\N	\N
 \.
 
 
@@ -1485,6 +1509,7 @@ COPY public.project_users (project_id, user_id, access_level, granted_at, grante
 71d6b564-5cb2-4ed1-b953-6470f90f292a	00000000-0000-0000-0000-000000000003	\N	2026-01-19 14:18:54.950773	\N
 5791eaa1-5365-4482-8bce-55dfb262c83f	00000000-0000-0000-0000-000000000003	\N	2026-01-19 14:18:54.950773	\N
 9cbdb8ce-b277-4af4-89c7-b4fa4390f138	00000000-0000-0000-0000-000000000003	\N	2026-01-19 17:39:19.477079	\N
+64d0a595-bbbf-42f6-82e9-00b5b2707132	00000000-0000-0000-0000-000000000001	\N	2026-01-25 20:38:30.010799	\N
 \.
 
 
@@ -1500,6 +1525,7 @@ COPY public.projects (id, name, description, active, created_at, created_by, mod
 5791eaa1-5365-4482-8bce-55dfb262c83f	PROJ-UATTESTCLI-20260111-006	\N	t	2026-01-11 23:59:36.955813	00000000-0000-0000-0000-000000000001	2026-01-11 23:59:36.955813	00000000-0000-0000-0000-000000000001	2026-01-11 00:00:00	11111111-1111-1111-1111-111111111111	795d9f88-cd74-4982-b6d0-ed6b783c6e0c	22222222-2222-2222-2222-222222222222	{}	\N
 9cbdb8ce-b277-4af4-89c7-b4fa4390f138	PROJ-SYSTEM-20260119-007	\N	t	2026-01-19 17:39:19.477079	00000000-0000-0000-0000-000000000003	2026-01-19 17:39:19.477079	00000000-0000-0000-0000-000000000003	2026-01-19 00:00:00	00000000-0000-0000-0000-000000000001	795d9f88-cd74-4982-b6d0-ed6b783c6e0c	\N	{}	\N
 00000000-0000-0000-0000-000000000002	Laboratory QC	System project for batch QC samples. All QC samples created during batch creation are associated with this project to serve as batch-level quality controls shared across all client projects in the batch.	t	2026-01-21 01:21:44.054529	\N	2026-01-21 01:21:44.054529	\N	2026-01-21 01:21:44.054529	00000000-0000-0000-0000-000000000001	795d9f88-cd74-4982-b6d0-ed6b783c6e0c	\N	{}	\N
+64d0a595-bbbf-42f6-82e9-00b5b2707132	PROJ-SYSTEM-20260125-008	\N	t	2026-01-25 20:38:30.010799	00000000-0000-0000-0000-000000000001	2026-01-25 20:38:30.010799	00000000-0000-0000-0000-000000000001	2026-01-25 00:00:00	00000000-0000-0000-0000-000000000001	795d9f88-cd74-4982-b6d0-ed6b783c6e0c	\N	{}	\N
 \.
 
 
@@ -1580,6 +1606,7 @@ c2de8d20-1039-46cb-a790-836f203d7724	SAMPLE-2026-005	testing	t	2026-01-11 23:59:
 1866b029-1550-4fa5-ada3-3af72283f41b	SAMPLE-2026-006	a test	t	2026-01-19 17:39:19.477079	00000000-0000-0000-0000-000000000003	2026-01-19 17:39:19.477079	00000000-0000-0000-0000-000000000003	2026-02-04 00:00:00	2026-01-19 00:00:00	\N	6d8597b9-bf13-4d31-a643-ffa28b748ae0	e14af09a-6f40-4e71-b92a-3b61a12a988b	2bc99aba-c038-4b53-bc98-65745d3ee4ad	4.00	\N	9cbdb8ce-b277-4af4-89c7-b4fa4390f138	3fbab49c-0277-44e8-8e56-67ca4777ac4e	\N	{"pH": 8, "Sample_Color": "Brown"}	\N
 f450cdb5-016a-4ad3-baea-8c07d4e7cad6	QC-B20261901-01-1	QC sample (Blank): Auto-suggested for small batch	t	2026-01-19 21:26:23.113949	00000000-0000-0000-0000-000000000003	2026-01-19 21:26:23.113949	00000000-0000-0000-0000-000000000003	2026-01-31 00:00:00	2026-01-19 21:26:23.173441	\N	6d8597b9-bf13-4d31-a643-ffa28b748ae0	e14af09a-6f40-4e71-b92a-3b61a12a988b	19c5dad9-8e35-4183-868e-4d0409178b07	4.00	\N	990e0bdc-4ff7-4cd9-b455-f18f7946329d	cbb3b907-e048-4f7d-9d44-db5262a895c0	\N	{}	\N
 77575273-50e9-4ac0-afde-04233490e56b	QC-B767-1	QC sample (Blank)	t	2026-01-21 02:27:36.3619	00000000-0000-0000-0000-000000000003	2026-01-21 02:27:36.3619	00000000-0000-0000-0000-000000000003	\N	2026-01-21 02:27:36.391795	\N	7a8f9cd7-a71d-4420-9738-5a77c972b215	e14af09a-6f40-4e71-b92a-3b61a12a988b	08ca1ed0-a10b-4c09-848e-e4c93bbe0dd1	\N	\N	00000000-0000-0000-0000-000000000002	cbb3b907-e048-4f7d-9d44-db5262a895c0	\N	{}	\N
+c14344e6-d536-45ca-9b23-3c11b2ea2266	SAMPLE-2026-007		t	2026-01-25 20:38:30.010799	00000000-0000-0000-0000-000000000001	2026-01-25 20:38:30.010799	00000000-0000-0000-0000-000000000001	2026-02-14 00:00:00	2026-01-25 00:00:00	\N	6d8597b9-bf13-4d31-a643-ffa28b748ae0	e14af09a-6f40-4e71-b92a-3b61a12a988b	2bc99aba-c038-4b53-bc98-65745d3ee4ad	0.00	\N	64d0a595-bbbf-42f6-82e9-00b5b2707132	3fbab49c-0277-44e8-8e56-67ca4777ac4e	\N	{"pH": 8.1, "Sample_Color": "clear"}	\N
 \.
 
 
@@ -1611,6 +1638,10 @@ c1004633-0943-471c-bf23-170d6a89af6d	SAMPLE-2026-004_test_b0000002-b000-b000-b00
 15e394dc-c602-4275-a268-8b097e253c03	SAMPLE-2026-005_test_b0000002-b000-b000-b000-b00000000002	\N	t	2026-01-11 23:59:36.955813	00000000-0000-0000-0000-000000000001	2026-01-11 23:59:36.955813	00000000-0000-0000-0000-000000000001	c2de8d20-1039-46cb-a790-836f203d7724	b0000002-b000-b000-b000-b00000000002	26c14af3-745d-4ede-acc0-1d263e10ace4	\N	\N	00000000-0000-0000-0000-000000000001	{}
 148626b9-0a95-40da-8c52-631fecb681f5	SAMPLE-2026-005_test_b0000001-b000-b000-b000-b00000000001	\N	t	2026-01-11 23:59:36.955813	00000000-0000-0000-0000-000000000001	2026-01-11 23:59:36.955813	00000000-0000-0000-0000-000000000001	c2de8d20-1039-46cb-a790-836f203d7724	b0000001-b000-b000-b000-b00000000001	26c14af3-745d-4ede-acc0-1d263e10ace4	\N	\N	00000000-0000-0000-0000-000000000001	{}
 ec1edfa9-7b78-41bd-a938-140540ec4909	SAMPLE-2026-006_test_b0000003-b000-b000-b000-b00000000003	\N	t	2026-01-19 17:39:19.477079	00000000-0000-0000-0000-000000000003	2026-01-19 17:39:19.477079	00000000-0000-0000-0000-000000000003	1866b029-1550-4fa5-ada3-3af72283f41b	b0000003-b000-b000-b000-b00000000003	26c14af3-745d-4ede-acc0-1d263e10ace4	\N	\N	00000000-0000-0000-0000-000000000003	{}
+a1ee1eaa-07b9-4f5e-8e91-0ad75600256e	SAMPLE-2026-007_test_b0000002-b000-b000-b000-b00000000004	\N	t	2026-01-25 20:38:30.010799	00000000-0000-0000-0000-000000000001	2026-01-25 20:38:30.010799	00000000-0000-0000-0000-000000000001	c14344e6-d536-45ca-9b23-3c11b2ea2266	b0000002-b000-b000-b000-b00000000004	26c14af3-745d-4ede-acc0-1d263e10ace4	\N	\N	00000000-0000-0000-0000-000000000001	{}
+cc3d183c-8914-4f44-8ac7-ec32dae83e76	SAMPLE-2026-007_test_b0000002-b000-b000-b000-b00000000002	\N	t	2026-01-25 20:38:30.010799	00000000-0000-0000-0000-000000000001	2026-01-25 20:38:30.010799	00000000-0000-0000-0000-000000000001	c14344e6-d536-45ca-9b23-3c11b2ea2266	b0000002-b000-b000-b000-b00000000002	26c14af3-745d-4ede-acc0-1d263e10ace4	\N	\N	00000000-0000-0000-0000-000000000001	{}
+e6408839-b7dc-4b36-b449-4e3dd5d883ed	SAMPLE-2026-007_test_b0000001-b000-b000-b000-b00000000001	\N	t	2026-01-25 20:38:30.010799	00000000-0000-0000-0000-000000000001	2026-01-25 20:38:30.010799	00000000-0000-0000-0000-000000000001	c14344e6-d536-45ca-9b23-3c11b2ea2266	b0000001-b000-b000-b000-b00000000001	26c14af3-745d-4ede-acc0-1d263e10ace4	\N	\N	00000000-0000-0000-0000-000000000001	{}
+80a8d0e8-e0bc-4117-a102-5d4b92adf63d	SAMPLE-2026-007_test_b0000003-b000-b000-b000-b00000000003	\N	t	2026-01-25 20:38:30.010799	00000000-0000-0000-0000-000000000001	2026-01-25 20:38:30.010799	00000000-0000-0000-0000-000000000001	c14344e6-d536-45ca-9b23-3c11b2ea2266	b0000003-b000-b000-b000-b00000000003	26c14af3-745d-4ede-acc0-1d263e10ace4	\N	\N	00000000-0000-0000-0000-000000000001	{}
 \.
 
 
@@ -1643,10 +1674,10 @@ c0bc1fa2-c28e-4854-87db-cb233b7afb99	ppb	Parts per billion	t	2026-01-10 19:32:31
 --
 
 COPY public.users (id, name, description, active, created_at, created_by, modified_at, modified_by, username, password_hash, email, role_id, client_id, last_login) FROM stdin;
-00000000-0000-0000-0000-000000000003	Lab Technician	\N	t	2026-01-10 19:32:31.030314	\N	2026-01-21 02:19:04.198855	00000000-0000-0000-0000-000000000001	lab-tech	d81968c60a8a41bdafcb3c5825bf8bc4a76dccc932d673e3f9a7b71ce4538596	lab-tech@lims.example.com	cccccccc-cccc-cccc-cccc-cccccccccccc	00000000-0000-0000-0000-000000000001	2026-01-21 02:19:04.198855
-9be3a004-7d2c-4910-a142-03f38a99305c	Client User	\N	t	2026-01-10 19:32:31.030314	\N	2026-01-22 01:46:16.584652	\N	client	186474c1f2c2f735a54c2cf82ee8e87f2a5cd30940e280029363fecedfc5328c	client@example.com	dddddddd-dddd-dddd-dddd-dddddddddddd	00000000-0000-0000-0000-000000000001	2026-01-22 01:46:16.584652
-00000000-0000-0000-0000-000000000001	System Administrator	\N	t	2026-01-10 19:32:31.030314	\N	2026-01-22 01:47:03.619247	\N	admin	240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9	admin@lims.example.com	aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa	00000000-0000-0000-0000-000000000001	2026-01-22 01:47:03.619247
+00000000-0000-0000-0000-000000000003	Lab Technician	\N	t	2026-01-10 19:32:31.030314	\N	2026-01-25 20:27:39.185134	00000000-0000-0000-0000-000000000001	lab-tech	d81968c60a8a41bdafcb3c5825bf8bc4a76dccc932d673e3f9a7b71ce4538596	lab-tech@lims.example.com	cccccccc-cccc-cccc-cccc-cccccccccccc	00000000-0000-0000-0000-000000000001	2026-01-25 20:27:39.185134
+00000000-0000-0000-0000-000000000001	System Administrator	\N	t	2026-01-10 19:32:31.030314	\N	2026-01-25 22:29:49.883731	\N	admin	240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9	admin@lims.example.com	aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa	00000000-0000-0000-0000-000000000001	2026-01-25 22:29:49.883731
 00000000-0000-0000-0000-000000000002	Lab Manager	\N	t	2026-01-10 19:32:31.030314	\N	2026-01-19 18:04:13.20176	\N	lab-manager	7dd63afe29407aa45af7fdd4388b71195b552688c2750abd42bdf3b231c13b69	lab-manager@lims.example.com	bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb	00000000-0000-0000-0000-000000000001	2026-01-19 14:51:04.344358
+9be3a004-7d2c-4910-a142-03f38a99305c	Client User	\N	t	2026-01-10 19:32:31.030314	\N	2026-01-25 22:31:54.550503	00000000-0000-0000-0000-000000000001	client	186474c1f2c2f735a54c2cf82ee8e87f2a5cd30940e280029363fecedfc5328c	client@example.com	dddddddd-dddd-dddd-dddd-dddddddddddd	11111111-1111-1111-1111-111111111111	2026-01-25 22:31:54.550503
 \.
 
 
@@ -1675,14 +1706,14 @@ SELECT pg_catalog.setval('public.name_template_seq_container', 1, false);
 -- Name: name_template_seq_project; Type: SEQUENCE SET; Schema: public; Owner: -
 --
 
-SELECT pg_catalog.setval('public.name_template_seq_project', 7, true);
+SELECT pg_catalog.setval('public.name_template_seq_project', 8, true);
 
 
 --
 -- Name: name_template_seq_sample; Type: SEQUENCE SET; Schema: public; Owner: -
 --
 
-SELECT pg_catalog.setval('public.name_template_seq_sample', 6, true);
+SELECT pg_catalog.setval('public.name_template_seq_sample', 7, true);
 
 
 --
@@ -3668,9 +3699,25 @@ ALTER TABLE public.client_projects ENABLE ROW LEVEL SECURITY;
 CREATE POLICY client_projects_access ON public.client_projects USING ((public.is_admin() OR (EXISTS ( SELECT 1
    FROM public.users u
   WHERE ((u.id = public.current_user_id()) AND (u.client_id = client_projects.client_id)))) OR (EXISTS ( SELECT 1
-   FROM (public.users u
-     JOIN public.roles r ON ((u.role_id = r.id)))
-  WHERE ((u.id = public.current_user_id()) AND ((r.name)::text = ANY ((ARRAY['Lab Technician'::character varying, 'Lab Manager'::character varying])::text[])) AND (client_projects.active = true))))));
+   FROM public.users u
+  WHERE ((u.id = public.current_user_id()) AND (u.client_id = '00000000-0000-0000-0000-000000000001'::uuid) AND (client_projects.active = true))))));
+
+
+--
+-- Name: clients; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.clients ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: clients clients_access; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY clients_access ON public.clients AS RESTRICTIVE USING ((public.is_admin() OR (EXISTS ( SELECT 1
+   FROM public.users u
+  WHERE ((u.id = public.current_user_id()) AND (u.client_id = '00000000-0000-0000-0000-000000000001'::uuid)))) OR (EXISTS ( SELECT 1
+   FROM public.users u
+  WHERE ((u.id = public.current_user_id()) AND (u.client_id = clients.id))))));
 
 
 --
@@ -3741,13 +3788,7 @@ ALTER TABLE public.projects ENABLE ROW LEVEL SECURITY;
 -- Name: projects projects_access; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY projects_access ON public.projects USING ((public.is_admin() OR public.has_project_access(id) OR (EXISTS ( SELECT 1
-   FROM (public.users u
-     JOIN public.roles r ON ((u.role_id = r.id)))
-  WHERE ((u.id = public.current_user_id()) AND ((r.name)::text = 'Client'::text) AND (u.client_id IS NOT NULL) AND (projects.client_id = u.client_id)))) OR (EXISTS ( SELECT 1
-   FROM (public.users u
-     JOIN public.roles r ON ((u.role_id = r.id)))
-  WHERE ((u.id = public.current_user_id()) AND ((r.name)::text = ANY ((ARRAY['Lab Technician'::character varying, 'Lab Manager'::character varying])::text[])) AND (projects.active = true))))));
+CREATE POLICY projects_access ON public.projects USING ((public.is_admin() OR public.has_project_access(id)));
 
 
 --
@@ -3798,5 +3839,5 @@ CREATE POLICY tests_access ON public.tests USING ((public.is_admin() OR (EXISTS 
 -- PostgreSQL database dump complete
 --
 
-\unrestrict WjpMhC6cOuW5jZtKCYZdcHglvmjB8nAlQcb9al2cGe7XZ8c7Uqloi41rYIENGip
+\unrestrict HPRxj1RvajGqsyHEhAAQqIK4XuNNcu1m1OeThIh1Z3JjonkxWErG7ZKedRiel9A
 

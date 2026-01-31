@@ -25,6 +25,7 @@ import {
   Delete,
   Search,
   Clear,
+  Visibility,
 } from '@mui/icons-material';
 import { DataGrid, GridColDef, GridActionsCellItem, GridRowParams } from '@mui/x-data-grid';
 import { useUser } from '../contexts/UserContext';
@@ -59,6 +60,7 @@ const ClientProjects: React.FC = () => {
   const [selectedClientProject, setSelectedClientProject] = useState<ClientProject | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<ClientProject | null>(null);
+  const [viewMode, setViewMode] = useState(false);
   const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 10 });
   const [total, setTotal] = useState(0);
 
@@ -163,6 +165,12 @@ const ClientProjects: React.FC = () => {
     setSelectedClientProject(null);
   };
 
+  const handleView = (clientProject: ClientProject) => {
+    setSelectedClientProject(clientProject);
+    setViewMode(true);
+    setFormOpen(true);
+  };
+
   const handleDelete = async () => {
     if (!deleteTarget) return;
     try {
@@ -223,6 +231,16 @@ const ClientProjects: React.FC = () => {
         const cp = params.row as ClientProject;
         const actions = [];
 
+        // View button - available to all users
+        actions.push(
+          <GridActionsCellItem
+            icon={<Visibility />}
+            label="View"
+            onClick={() => handleView(cp)}
+          />
+        );
+
+        // Edit and Delete buttons - only for users with manage permission
         if (canManage) {
           actions.push(
             <GridActionsCellItem
@@ -230,6 +248,7 @@ const ClientProjects: React.FC = () => {
               label="Edit"
               onClick={() => {
                 setSelectedClientProject(cp);
+                setViewMode(false);
                 setFormOpen(true);
               }}
             />,
@@ -280,12 +299,6 @@ const ClientProjects: React.FC = () => {
       {error && (
         <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
           {error}
-        </Alert>
-      )}
-
-      {!isSystemClient() && !isAdmin() && user?.client_id && (
-        <Alert severity="info" sx={{ mb: 2 }}>
-          Showing client projects for your client only. System users and administrators see all client projects.
         </Alert>
       )}
 
@@ -363,8 +376,10 @@ const ClientProjects: React.FC = () => {
         onClose={() => {
           setFormOpen(false);
           setSelectedClientProject(null);
+          setViewMode(false);
         }}
         onSubmit={selectedClientProject ? handleUpdate : handleCreate}
+        readOnly={viewMode}
       />
 
       <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)}>

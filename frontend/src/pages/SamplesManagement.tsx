@@ -16,6 +16,7 @@ import {
 } from '@mui/material';
 import { DataGrid, GridColDef, GridActionsCellItem } from '@mui/x-data-grid';
 import EditIcon from '@mui/icons-material/Edit';
+import VisibilityIcon from '@mui/icons-material/Visibility';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import SampleForm from '../components/samples/SampleForm';
 import { apiService, addClientFilterIfNeeded } from '../services/apiService';
@@ -48,6 +49,7 @@ const SamplesManagement: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [selectedSample, setSelectedSample] = useState<Sample | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const [viewMode, setViewMode] = useState(false);
   const [lookupData, setLookupData] = useState({
     sampleTypes: [],
     statuses: [],
@@ -132,10 +134,24 @@ const SamplesManagement: React.FC = () => {
     }
   };
 
-  const handleEdit = async (sampleId: string) => {
+  const handleView = async (sampleId: string) => {
     try {
+      setError(null);
       const sample = await apiService.getSample(sampleId);
       setSelectedSample(sample);
+      setViewMode(true);
+      setShowForm(true);
+    } catch (err: any) {
+      setError(err.response?.data?.detail || 'Failed to load sample');
+    }
+  };
+
+  const handleEdit = async (sampleId: string) => {
+    try {
+      setError(null);
+      const sample = await apiService.getSample(sampleId);
+      setSelectedSample(sample);
+      setViewMode(false);
       setShowForm(true);
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Failed to load sample');
@@ -193,8 +209,18 @@ const SamplesManagement: React.FC = () => {
       field: 'actions',
       type: 'actions',
       headerName: 'Actions',
-      width: 100,
+      width: 150,
       getActions: (params) => [
+        <GridActionsCellItem
+          icon={
+            <Tooltip title="View sample">
+              <VisibilityIcon />
+            </Tooltip>
+          }
+          label="View"
+          onClick={() => handleView(params.id as string)}
+          aria-label={`View sample ${params.row.name}`}
+        />,
         <GridActionsCellItem
           icon={
             <Tooltip title="Edit sample">
@@ -239,12 +265,6 @@ const SamplesManagement: React.FC = () => {
         </Alert>
       )}
 
-      {!isSystemClient() && !isAdmin() && user?.client_id && (
-        <Alert severity="info" sx={{ mb: 2 }}>
-          Showing samples from your client's projects only. System users and administrators see all samples.
-        </Alert>
-      )}
-
       {!canUpdate && (
         <Alert severity="info" sx={{ mb: 2 }}>
           You have read-only access. Contact your administrator for update permissions.
@@ -274,13 +294,14 @@ const SamplesManagement: React.FC = () => {
         onClose={() => {
           setShowForm(false);
           setSelectedSample(null);
+          setViewMode(false);
         }}
         maxWidth="md"
         fullWidth
         aria-labelledby="sample-form-dialog-title"
       >
         <DialogTitle id="sample-form-dialog-title">
-          Edit Sample: {selectedSample?.name}
+          {viewMode ? `View Sample: ${selectedSample?.name}` : canUpdate ? `Edit Sample: ${selectedSample?.name}` : `View Sample: ${selectedSample?.name}`}
         </DialogTitle>
         <DialogContent>
           <SampleForm
@@ -290,7 +311,9 @@ const SamplesManagement: React.FC = () => {
             onCancel={() => {
               setShowForm(false);
               setSelectedSample(null);
+              setViewMode(false);
             }}
+            readOnly={viewMode}
           />
         </DialogContent>
       </Dialog>

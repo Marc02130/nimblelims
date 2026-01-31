@@ -30,6 +30,7 @@ interface ClientDialogProps {
     description?: string;
     active: boolean;
   }) => Promise<void>;
+  readOnly?: boolean;
 }
 
 const createValidationSchema = (isEdit: boolean, existingNames: string[], currentName?: string) => Yup.object({
@@ -53,6 +54,7 @@ const ClientDialog: React.FC<ClientDialogProps> = ({
   existingNames,
   onClose,
   onSubmit,
+  readOnly = false,
 }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -114,7 +116,7 @@ const ClientDialog: React.FC<ClientDialogProps> = ({
       >
         {({ values, errors, touched, setFieldValue, isValid }) => (
           <Form>
-            <DialogTitle>{isEdit ? 'Edit Client' : 'Create New Client'}</DialogTitle>
+            <DialogTitle>{readOnly ? 'View Client' : (isEdit ? 'Edit Client' : 'Create New Client')}</DialogTitle>
             <DialogContent>
               {error && (
                 <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
@@ -133,6 +135,7 @@ const ClientDialog: React.FC<ClientDialogProps> = ({
                           fullWidth
                           required
                           margin="normal"
+                          disabled={readOnly}
                           helperText={meta.touched && meta.error ? meta.error : 'Unique name for the client organization'}
                           error={meta.touched && !!meta.error}
                         />
@@ -150,6 +153,7 @@ const ClientDialog: React.FC<ClientDialogProps> = ({
                           multiline
                           rows={3}
                           margin="normal"
+                          disabled={readOnly}
                           helperText={meta.touched && meta.error ? meta.error : 'Optional description for this client'}
                           error={meta.touched && !!meta.error}
                         />
@@ -164,6 +168,7 @@ const ClientDialog: React.FC<ClientDialogProps> = ({
                           checked={values.active}
                           onChange={(e) => setFieldValue('active', e.target.checked)}
                           color="primary"
+                          disabled={readOnly}
                         />
                       }
                       label="Active"
@@ -174,11 +179,13 @@ const ClientDialog: React.FC<ClientDialogProps> = ({
             </DialogContent>
             <DialogActions>
               <Button onClick={onClose} disabled={loading}>
-                Cancel
+                {readOnly ? 'Close' : 'Cancel'}
               </Button>
-              <Button type="submit" variant="contained" disabled={loading || !isValid}>
-                {loading ? 'Saving...' : isEdit ? 'Update' : 'Create'}
-              </Button>
+              {!readOnly && (
+                <Button type="submit" variant="contained" disabled={loading || !isValid}>
+                  {loading ? 'Saving...' : isEdit ? 'Update' : 'Create'}
+                </Button>
+              )}
             </DialogActions>
           </Form>
         )}
