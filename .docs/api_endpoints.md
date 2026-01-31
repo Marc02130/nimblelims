@@ -2092,3 +2092,74 @@ DELETE /help/admin/help/123e4567-e89b-12d3-a456-426614174000
 Authorization: Bearer <admin_token>
 ```
 
+---
+
+## Admin - Name Templates
+
+Name templates define how auto-generated entity names (e.g. sample, project, batch) are built. Placeholders: `{SEQ}` (padded by `seq_padding_digits`), `{YYYY}`, `{YY}` (two-digit year, e.g. '24'), `{MM}`, `{DD}`, `{YYYYMMDD}`, `{CLIENT}`.
+
+### GET /admin/name-templates
+List name templates with filtering and pagination.
+
+**Requires:** `get_current_user`; full list for admins, active-only for others.
+
+**Query Parameters:**
+- `entity_type` (optional): Filter by entity type (sample, project, batch, analysis, container)
+- `active` (optional, bool): Filter by active status
+- `page` (optional, int, default=1)
+- `size` (optional, int, default=10)
+
+**Response:** `{ templates, total, page, size, pages }` — each template includes `id`, `entity_type`, `template`, `description`, `active`, `seq_padding_digits`, `created_at`, `modified_at`.
+
+### POST /admin/name-templates
+Create a new name template.
+
+**Requires:** `config:edit` permission
+
+**Request:** `{ entity_type, template, description?, active?, seq_padding_digits? }` — `seq_padding_digits` (int, default 1) controls zero-padding for `{SEQ}` (e.g. 3 → 001, 010, 100).
+
+### PATCH /admin/name-templates/{template_id}
+Update a name template.
+
+**Requires:** `config:edit` permission
+
+**Request:** `{ entity_type?, template?, description?, active?, seq_padding_digits? }`
+
+### DELETE /admin/name-templates/{template_id}
+Soft-delete a name template (sets active=false).
+
+**Requires:** `config:edit` permission
+
+### GET /admin/name-templates/preview
+Preview a generated name without consuming a sequence value.
+
+**Query Parameters:** `entity_type` (required), `client_id?`, `reference_date?` (YYYY-MM-DD)
+
+**Response:** `{ preview: string }`
+
+---
+
+## Admin - Sequences (Name Template SEQ)
+
+Set the starting value for an entity type's name sequence (used by `{SEQ}` in name templates).
+
+### POST /admin/sequences/{entity_type}/start
+Set the next value for the sequence `name_template_seq_{entity_type}`.
+
+**Requires:** `config:edit` permission
+
+**Path Parameters:**
+- `entity_type` (required): One of `sample`, `project`, `batch`, `analysis`, `container`
+
+**Request:**
+```json
+{
+  "start_value": 100
+}
+```
+- `start_value` (int, required, >= 1): The next `nextval()` for this sequence will return this value.
+
+**Response:** `{ entity_type, start_value, message }`
+
+**Example:** `POST /admin/sequences/sample/start` with `{ "start_value": 100 }` — next generated sample name using `{SEQ}` will use 100 (then 101, 102, …).
+

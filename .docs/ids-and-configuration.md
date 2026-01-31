@@ -158,7 +158,7 @@ The "IDs" here primarily refer to the configurable human-readable `name` fields 
   - Create/Edit form: Fields for `entity_type` (select from predefined types), `template` (text input with placeholder examples, including {YY} and {SEQ}), `seq_padding_digits` (number input, e.g., 3 for zero-padding), `description` (optional).
   - Validation: Ensure only one active template per entity_type; warn if activating a new one would deactivate others.
   - Actions: Activate/Deactivate, Delete (with confirmation, only if not active). Additional action: Set sequence starting value (e.g., input field to ALTER SEQUENCE).
-- **API Integration**: Uses CRUD endpoints from `backend/app/routers/admin.py` (e.g., GET/POST/PATCH/DELETE `/admin/name-templates`). Add endpoint for setting sequence start (e.g., POST `/admin/sequences/{entity_type}/start`).
+- **API Integration**: Uses CRUD endpoints from `backend/app/routers/admin.py` (e.g., GET/POST/PATCH/DELETE `/admin/name-templates`). Sequence start: **POST `/admin/sequences/{entity_type}/start`** (body: `{ "start_value": integer }`) — sets the next value for `name_template_seq_{entity_type}` via `setval()`; `entity_type` must be one of: sample, project, batch, analysis, container. Requires `config:edit`.
 - **Permissions**: Restricted to admin roles; use auth checks in the frontend and backend.
 
 ### 2. Custom Attributes Config Admin Page
@@ -203,9 +203,10 @@ These pages build on the existing backend APIs. If the frontend framework is Rea
 ## Reference: Key Files
 
 - **Base model (UUID** `id`**,** `name`**)**: `backend/models/base.py`
-- **Name templates model**: `backend/models/name_template.py`
-- **Name generation**: `backend/app/core/name_generation.py` — `get_active_template()`, `get_next_sequence()`, `generate_name()`, `generate_name_for_sample()`, `generate_name_for_project()`, etc.
-- **Migration (name_templates + sequences + seeds)**: `backend/db/migrations/versions/0021_configurable_names.py`
+- **Name templates model**: `backend/models/name_template.py` (includes `seq_padding_digits`).
+- **Name generation**: `backend/app/core/name_generation.py` — `get_active_template()`, `get_next_sequence()`, `generate_name()`, `generate_name_for_sample()`, `generate_name_for_project()`, etc. Placeholders: `{SEQ}` (padding from `seq_padding_digits`), `{YYYY}`, `{YY}` (two-digit year), `{MM}`, `{DD}`, `{YYYYMMDD}`, `{CLIENT}`.
+- **Migration (name_templates + sequences + seeds)**: `backend/db/migrations/versions/0021_configurable_names.py`. **Migration 0031**: `backend/db/migrations/versions/0031_add_seq_padding_digits.py` adds `seq_padding_digits` column (default 1).
+- **Sequence start API**: `backend/app/routers/sequences.py` — POST `/admin/sequences/{entity_type}/start` (body: `{ "start_value": int }`); requires `config:edit`.
 - **Custom attributes config model**: `backend/models/custom_attributes_config.py`
 - **Custom attributes validation**: `backend/app/core/custom_attributes.py` — `validate_custom_attributes()` with **entity_type**
 - **Use in APIs**: e.g. `backend/app/routers/samples.py` (accession uses `generate_name_for_sample` / `generate_name_for_project`; custom attribute validation uses `entity_type='samples'`), `backend/app/routers/admin.py` (name template CRUD)

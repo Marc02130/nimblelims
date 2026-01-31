@@ -17,6 +17,7 @@ Copyright (c) 2025 Marc Breneiser
 - **Batch Management**: Create and manage batches with container tracking
 - **Container Management**: Container types (admin-managed) and dynamic instance creation
 - **Lists Management**: Configurable lists and entries (admin-editable, full CRUD)
+- **Name Templates**: Configurable entity naming with placeholders ({SEQ}, {YYYY}, {YY}, etc.) and seq_padding_digits; sequence start via POST /admin/sequences/{entity_type}/start
 - **Analyses Management**: CRUD operations for analyses (admin-only)
 - **Analytes Management**: CRUD operations for analytes (admin-only)
 - **Analysis-Analyte Configuration**: Configure validation rules for analytes in analyses (admin-only)
@@ -80,6 +81,14 @@ Copyright (c) 2025 Marc Breneiser
 - `POST /lists/{list_name}/entries` - Add entry to list (admin)
 - `PATCH /lists/{list_name}/entries/{entry_id}` - Update entry (admin)
 - `DELETE /lists/{list_name}/entries/{entry_id}` - Delete entry (admin)
+
+#### Admin - Name Templates and Sequences
+- `GET /admin/name-templates` - List name templates (filter by entity_type, active)
+- `POST /admin/name-templates` - Create name template (admin, requires config:edit)
+- `PATCH /admin/name-templates/{template_id}` - Update name template (admin)
+- `DELETE /admin/name-templates/{template_id}` - Delete name template (admin)
+- `GET /admin/name-templates/preview` - Preview generated name (entity_type, optional client_id, reference_date)
+- `POST /admin/sequences/{entity_type}/start` - Set sequence start value for entity type (admin, requires config:edit). Body: `{ "start_value": int }`. Entity types: sample, project, batch, analysis, container.
 
 #### Analyses
 - `GET /analyses` - List all active analyses
