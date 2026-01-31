@@ -121,11 +121,11 @@ def generate_name(
             replacements['{DD}'] = f"{now.day:02d}"
         if '{YYYYMMDD}' in template:
             replacements['{YYYYMMDD}'] = now.strftime('%Y%m%d')
-        # Sequence placeholder - get next sequence transactionally, pad using template.seq_padding_digits
+        # Sequence placeholder: get seq_padding_digits from the template, fetch seq, then format
         if '{SEQ}' in template:
+            seq_padding_digits = template_obj.seq_padding_digits or 1
             seq = get_next_sequence(db, entity_type)
-            padding = getattr(template_obj, 'seq_padding_digits', 1) or 1
-            formatted_seq = str(seq).zfill(padding)
+            formatted_seq = str(seq).zfill(seq_padding_digits)
             replacements['{SEQ}'] = formatted_seq
         
         # Client placeholder
