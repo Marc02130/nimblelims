@@ -3,7 +3,7 @@ FastAPI application for NimbleLims
 """
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routers import auth, samples, tests, containers, batches, results, aliquots, lists, projects, analyses, analytes, units, users, roles, permissions, clients, test_batteries, client_projects, custom_attributes, help, admin
+from app.routers import auth, samples, tests, containers, batches, results, aliquots, lists, projects, analyses, analytes, units, users, roles, permissions, clients, test_batteries, client_projects, custom_attributes, help, admin, sequences
 import os
 import logging
 
@@ -86,6 +86,7 @@ app.include_router(client_projects.router, prefix="/client-projects", tags=["cli
 app.include_router(custom_attributes.router, tags=["custom-attributes"])
 app.include_router(help.router, prefix="/help", tags=["help"])
 app.include_router(admin.router, tags=["admin"])
+app.include_router(sequences.router, tags=["admin"])
 logger.info("All routers registered")
 
 @app.get("/")

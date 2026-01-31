@@ -2,8 +2,9 @@
 Utility functions for generating entity names from configurable templates.
 
 Templates support placeholders:
-- {SEQ}: Auto-incrementing sequence per entity type
+- {SEQ}: Auto-incrementing sequence per entity type (padded by template.seq_padding_digits)
 - {YYYY}: 4-digit year
+- {YY}: 2-digit year (e.g. '24' for 2024)
 - {MM}: 2-digit month
 - {DD}: 2-digit day
 - {YYYYMMDD}: Date in YYYYMMDD format
@@ -112,21 +113,20 @@ def generate_name(
         # Date placeholders
         if '{YYYY}' in template:
             replacements['{YYYY}'] = str(now.year)
-        
+        if '{YY}' in template:
+            replacements['{YY}'] = str(now.year % 100).zfill(2)
         if '{MM}' in template:
             replacements['{MM}'] = f"{now.month:02d}"
-        
         if '{DD}' in template:
             replacements['{DD}'] = f"{now.day:02d}"
-        
         if '{YYYYMMDD}' in template:
             replacements['{YYYYMMDD}'] = now.strftime('%Y%m%d')
-        
-        # Sequence placeholder - get next sequence transactionally
+        # Sequence placeholder - get next sequence transactionally, pad using template.seq_padding_digits
         if '{SEQ}' in template:
             seq = get_next_sequence(db, entity_type)
-            # Format with leading zeros (3 digits minimum, e.g., 001, 002, ...)
-            replacements['{SEQ}'] = f"{seq:03d}"
+            padding = getattr(template_obj, 'seq_padding_digits', 1) or 1
+            formatted_seq = str(seq).zfill(padding)
+            replacements['{SEQ}'] = formatted_seq
         
         # Client placeholder
         if '{CLIENT}' in template:

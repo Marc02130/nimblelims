@@ -54,6 +54,8 @@ const getRouteTitle = (pathname: string): string => {
     '/admin/test-batteries': 'Test Batteries',
     '/admin/custom-fields': 'Custom Fields Management',
     '/admin/custom-names': 'Custom Names Management',
+    '/admin/custom-attributes': 'Custom Attributes',
+    '/admin/name-templates': 'Name Templates',
     '/admin/help': 'Help Management',
   };
 

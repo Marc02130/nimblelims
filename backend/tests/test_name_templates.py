@@ -53,7 +53,33 @@ class TestNameTemplatesCRUD:
         assert data["entity_type"] == "sample"
         assert data["template"] == "TEST-{YYYY}-{SEQ}"
         assert data["active"] is True
+        assert data.get("seq_padding_digits", 1) == 1
     
+    def test_create_name_template_with_seq_padding_digits(self, client: TestClient, test_admin_user, db_session: Session):
+        """Test creating a name template with seq_padding_digits (active=False to avoid conflicting with seed)"""
+        auth_response = client.post(
+            "/auth/login",
+            json={"username": "admin", "password": "adminpassword"}
+        )
+        token = auth_response.json()["access_token"]
+        template_data = {
+            "entity_type": "analysis",
+            "template": "AN-{YY}-{SEQ}",
+            "description": "Analysis with YY and padding",
+            "active": False,
+            "seq_padding_digits": 3
+        }
+        response = client.post(
+            "/admin/name-templates",
+            json=template_data,
+            headers={"Authorization": f"Bearer {token}"}
+        )
+        assert response.status_code == 201
+        data = response.json()
+        assert data["entity_type"] == "analysis"
+        assert data["template"] == "AN-{YY}-{SEQ}"
+        assert data["seq_padding_digits"] == 3
+
     def test_create_name_template_duplicate_active(self, client: TestClient, test_admin_user, db_session: Session):
         """Test that only one active template per entity_type is allowed"""
         # Get auth token
@@ -424,6 +450,89 @@ class TestNameGeneration:
         # Check uniqueness
         assert check_name_uniqueness(db_session, "sample", "EXISTING-SAMPLE-001") is False
         assert check_name_uniqueness(db_session, "sample", "NEW-SAMPLE-001") is True
+
+    def test_generate_name_with_yy_placeholder(self, db_session: Session, test_admin_user):
+        """Test generating a name with {YY} (two-digit year) placeholder"""
+        template = NameTemplate(
+            id=uuid4(),
+            name="test_template",
+            entity_type="sample",
+            template="S-{YY}-{SEQ}",
+            active=True,
+            seq_padding_digits=1,
+            created_by=test_admin_user.id,
+            modified_by=test_admin_user.id
+        )
+        db_session.add(template)
+        db_session.commit()
+        name = generate_name(db_session, "sample")
+        assert name.startswith("S-")
+        assert str(datetime.now().year % 100).zfill(2) in name
+
+    def test_generate_name_seq_padding_digits(self, db_session: Session, test_admin_user):
+        """Test that {SEQ} is padded to seq_padding_digits"""
+        template = NameTemplate(
+            id=uuid4(),
+            name="test_template",
+            entity_type="sample",
+            template="PAD-{SEQ}",
+            active=True,
+            seq_padding_digits=4,
+            created_by=test_admin_user.id,
+            modified_by=test_admin_user.id
+        )
+        db_session.add(template)
+        db_session.commit()
+        name = generate_name(db_session, "sample")
+        assert name.startswith("PAD-")
+        seq_part = name.replace("PAD-", "")
+        assert len(seq_part) == 4
+        assert seq_part.isdigit()
+
+
+class TestSequenceStartEndpoint:
+    """Test POST /admin/sequences/{entity_type}/start"""
+
+    def test_set_sequence_start_success(self, client: TestClient, test_admin_user, db_session: Session):
+        """Test setting sequence start value"""
+        auth_response = client.post(
+            "/auth/login",
+            json={"username": "admin", "password": "adminpassword"}
+        )
+        token = auth_response.json()["access_token"]
+        response = client.post(
+            "/admin/sequences/sample/start",
+            json={"start_value": 100},
+            headers={"Authorization": f"Bearer {token}"}
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["entity_type"] == "sample"
+        assert data["start_value"] == 100
+        assert "restarted" in data["message"].lower() or "100" in data["message"]
+
+    def test_set_sequence_start_invalid_entity_type(self, client: TestClient, test_admin_user):
+        """Test that invalid entity_type returns 400"""
+        auth_response = client.post(
+            "/auth/login",
+            json={"username": "admin", "password": "adminpassword"}
+        )
+        token = auth_response.json()["access_token"]
+        response = client.post(
+            "/admin/sequences/invalid/start",
+            json={"start_value": 1},
+            headers={"Authorization": f"Bearer {token}"}
+        )
+        assert response.status_code == 400
+        assert "entity_type" in response.json()["detail"].lower()
+
+    def test_set_sequence_start_requires_admin(self, client: TestClient):
+        """Test that sequence start requires config:edit (admin)"""
+        response = client.post(
+            "/admin/sequences/sample/start",
+            json={"start_value": 1},
+        )
+        assert response.status_code in (401, 403)
 
 
 class TestNameGenerationIntegration:

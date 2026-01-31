@@ -6,9 +6,11 @@ This document contains User Acceptance Testing (UAT) scripts for configurations 
 
 - **User Stories**: US-15 (Configurable Lists), US-16 to US-23 (Configurations), Post-MVP Custom Fields
 - **PRD**: Section 4.5 (Custom Fields)
-- **UI Document**: `ui-accessioning-to-reporting.md` (CustomFieldsManagement.tsx, ListsManagement.tsx)
+- **UI Document**: `ui-accessioning-to-reporting.md` (CustomFieldsManagement, CustomAttributesAdmin, ListsAdmin)
+- **Navigation**: Admin sub-links (Name Templates, Custom Attributes, Lists) from MainNav at `/admin/name-templates`, `/admin/custom-attributes`, `/admin/lists`
 - **Technical Document**: `technical-accessioning-to-reporting.md` (custom_attributes_config table)
-- **API Document**: `api_endpoints.md` (CRUD `/admin/custom-attributes`, `/lists`)
+- **API Document**: `api_endpoints.md` (CRUD `/admin/custom-attributes`, `/lists`, name templates and sequences)
+- **Name generation**: Placeholders include `{YY}` (two-digit year), `{SEQ}` (padded by `seq_padding_digits`). API: POST `/admin/sequences/{entity_type}/start` with `{ "start_value": int }` to set sequence start (requires `config:edit`). See `.docs/ids-and-configuration.md`.
 
 ## Test Environment Setup
 

@@ -10,7 +10,7 @@ import BatchManagement from './pages/BatchManagement';
 import ResultsManagement from './pages/ResultsManagement';
 import Login from './pages/Login';
 import AdminOverview from './pages/admin/AdminOverview';
-import ListsManagement from './pages/admin/ListsManagement';
+import ListsAdmin from './pages/admin/ListsAdmin';
 import ContainerTypesManagement from './pages/admin/ContainerTypesManagement';
 import UnitsManagement from './pages/admin/UnitsManagement';
 import UsersManagement from './pages/admin/UsersManagement';
@@ -20,7 +20,9 @@ import TestBatteriesManagement from './pages/admin/TestBatteriesManagement';
 import AdminAnalytesManagement from './pages/admin/AnalytesManagement';
 import AnalysisAnalytesConfig from './pages/admin/AnalysisAnalytesConfig';
 import CustomFieldsManagement from './pages/admin/CustomFieldsManagement';
+import CustomAttributesAdmin from './pages/admin/CustomAttributesAdmin';
 import CustomNamesManagement from './pages/admin/CustomNamesManagement';
+import NameTemplatesAdmin from './pages/admin/NameTemplatesAdmin';
 import HelpManagement from './pages/admin/HelpManagement';
 import ClientProjects from './pages/ClientProjects';
 import ClientsManagement from './pages/ClientsManagement';
@@ -198,7 +200,7 @@ function AppRoutes() {
           path="/admin/lists"
           element={
             hasPermission('config:edit') ? (
-              <ListsManagement />
+              <ListsAdmin />
             ) : (
               <Navigate to="/dashboard" replace />
             )
@@ -295,10 +297,30 @@ function AppRoutes() {
           }
         />
         <Route
+          path="/admin/custom-attributes"
+          element={
+            hasPermission('config:edit') ? (
+              <CustomAttributesAdmin />
+            ) : (
+              <Navigate to="/dashboard" replace />
+            )
+          }
+        />
+        <Route
           path="/admin/custom-names"
           element={
             hasPermission('config:edit') ? (
               <CustomNamesManagement />
+            ) : (
+              <Navigate to="/dashboard" replace />
+            )
+          }
+        />
+        <Route
+          path="/admin/name-templates"
+          element={
+            hasPermission('config:edit') ? (
+              <NameTemplatesAdmin />
             ) : (
               <Navigate to="/dashboard" replace />
             )

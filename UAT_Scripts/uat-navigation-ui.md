@@ -63,9 +63,13 @@ Verify that sidebar navigation correctly gates menu items by permissions, auto-e
 | 4.3 | Navigate to `/admin` | Admin Dashboard loads |
 | 4.4 | Verify Admin accordion auto-expanded | Admin accordion expanded automatically (shows sub-items) |
 | 4.5 | Verify "Overview" item highlighted | "Overview" item shows active state (primary color icon) |
-| 4.6 | Navigate to `/admin/lists` | Lists Management page loads |
+| 4.6 | Navigate to `/admin/lists` | Lists page loads |
 | 4.7 | Verify Admin accordion still expanded | Admin accordion remains expanded |
-| 4.8 | Verify "Lists Management" item highlighted | "Lists Management" item shows active state |
+| 4.8 | Verify "Lists" item highlighted | "Lists" item shows active state |
+| 4.8a | Navigate to `/admin/name-templates` | Name Templates page loads |
+| 4.8b | Verify "Name Templates" item highlighted | "Name Templates" item shows active state |
+| 4.8c | Navigate to `/admin/custom-attributes` | Custom Attributes page loads |
+| 4.8d | Verify "Custom Attributes" item highlighted | "Custom Attributes" item shows active state |
 | 4.9 | Navigate to `/dashboard` | Dashboard loads |
 | 4.10 | Verify Admin accordion collapsed | Admin accordion collapsed (not on admin route) |
 | 5 | **Test Sample Mgmt Accordion Auto-Expand** | |
@@ -97,7 +101,7 @@ Verify that sidebar navigation correctly gates menu items by permissions, auto-e
 | 7.5 | Click Sample Mgmt accordion header | Accordion collapses |
 | 7.6 | Click Sample Mgmt accordion header again | Accordion expands |
 | 8 | **Test Active State** | |
-| 8.1 | Navigate to `/admin/lists` | Lists Management page loads |
+| 8.1 | Navigate to `/admin/lists` | Lists page loads (Admin sub-link from MainNav) |
 | 8.2 | Verify "Lists Management" item highlighted | Item shows primary color icon and selected state |
 | 8.3 | Verify other admin items not highlighted | Other admin items show default styling |
 | 8.4 | Navigate to `/samples` | Samples page loads |
@@ -207,7 +211,7 @@ Verify that sidebar converts to temporary drawer on mobile devices (<600px), wit
 | 5.4 | Verify Admin accordion visible | Admin accordion visible in drawer |
 | 5.5 | Click Admin accordion header | Accordion expands |
 | 5.6 | Verify sub-items visible | Admin sub-items visible (Overview, Lists, etc.) |
-| 5.7 | Click "Lists Management" | Route changes to `/admin/lists` |
+| 5.7 | Click "Lists" (Admin sub-link) | Route changes to `/admin/lists` |
 | 5.8 | Verify drawer auto-closes | Drawer closes automatically |
 | 6 | **Test Responsive Breakpoint** | |
 | 6.1 | Resize browser from mobile (<600px) to desktop (≥600px) | Viewport width ≥600px |
@@ -321,7 +325,7 @@ Verify that navigation is accessible via keyboard navigation, has proper ARIA la
 | 6.3 | Press Tab to focus Logo | Focus moves to Logo |
 | 6.4 | Press Enter | Navigates to `/dashboard` |
 | 7 | **Test Focus Management** | |
-| 7.1 | Navigate to `/admin/lists` | Lists Management page loads |
+| 7.1 | Navigate to `/admin/lists` | Lists page loads |
 | 7.2 | Verify focus management | Focus moves to page content (not stuck in navigation) |
 | 7.3 | Press Tab | Focus moves through page content elements |
 | 8 | **Test Screen Reader Announcements** (if screen reader available) | |
