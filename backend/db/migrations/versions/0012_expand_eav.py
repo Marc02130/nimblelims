@@ -1,7 +1,7 @@
 """Expand EAV (Entity-Attribute-Value) support to results, projects, client_projects, and batches
 
-Revision ID: 0014
-Revises: 0013
+Revision ID: 0012
+Revises: 0011
 Create Date: 2025-12-29 14:00:00.000000
 
 """
@@ -10,8 +10,8 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision = '0014'
-down_revision = '0013'
+revision = '0012'
+down_revision = '0011'
 branch_labels = None
 depends_on = None
 

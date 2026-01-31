@@ -1,7 +1,7 @@
 """Fix client_projects RLS to allow lab technicians and managers
 
-Revision ID: 0022
-Revises: 0021
+Revision ID: 0020
+Revises: 0019
 Create Date: 2026-01-07 12:00:00.000000
 
 """
@@ -9,8 +9,8 @@ from alembic import op
 import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
-revision = '0022'
-down_revision = '0021'
+revision = '0020'
+down_revision = '0019'
 branch_labels = None
 depends_on = None
 

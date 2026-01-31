@@ -1,7 +1,7 @@
 """Enhance RLS policies for client data isolation
 
-Revision ID: 0030
-Revises: 0029
+Revision ID: 0029
+Revises: 0028
 Create Date: 2026-01-22 14:00:00.000000
 
 Enhances Row-Level Security (RLS) policies to limit data access for client users
@@ -22,8 +22,8 @@ from alembic import op
 import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
-revision = '0030'
-down_revision = '0029'
+revision = '0029'
+down_revision = '0028'
 branch_labels = None
 depends_on = None
 

@@ -1,7 +1,7 @@
 """Seed Lab Technician help entries
 
-Revision ID: 0017
-Revises: 0016
+Revision ID: 0015
+Revises: 0014
 Create Date: 2025-01-03 18:00:00.000000
 
 """
@@ -10,8 +10,8 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision = '0017'
-down_revision = '0016'
+revision = '0015'
+down_revision = '0014'
 branch_labels = None
 depends_on = None
 

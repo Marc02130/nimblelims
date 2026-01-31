@@ -40,6 +40,12 @@ interface Sample {
   project_name?: string;
 }
 
+interface LookupItem {
+  id: string;
+  name: string;
+  [key: string]: unknown;
+}
+
 const SamplesManagement: React.FC = () => {
   const { hasPermission, user, isSystemClient, isAdmin } = useUser();
   const navigate = useNavigate();
@@ -50,7 +56,13 @@ const SamplesManagement: React.FC = () => {
   const [selectedSample, setSelectedSample] = useState<Sample | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [viewMode, setViewMode] = useState(false);
-  const [lookupData, setLookupData] = useState({
+  const [lookupData, setLookupData] = useState<{
+    sampleTypes: LookupItem[];
+    statuses: LookupItem[];
+    matrices: LookupItem[];
+    qcTypes: LookupItem[];
+    projects: LookupItem[];
+  }>({
     sampleTypes: [],
     statuses: [],
     matrices: [],
@@ -95,7 +107,7 @@ const SamplesManagement: React.FC = () => {
         user?.role
       );
 
-      const [samplesResponse, sampleTypes, statuses, matrices, qcTypes, projectsResponse] = await Promise.all([
+      const [samplesResponse, sampleTypesRaw, statusesRaw, matricesRaw, qcTypesRaw, projectsResponse] = await Promise.all([
         apiService.getSamples(filteredFilters),
         apiService.getListEntries('sample_types'),
         apiService.getListEntries('sample_status'),
@@ -105,10 +117,17 @@ const SamplesManagement: React.FC = () => {
       ]);
 
       // Handle paginated response - extract samples array
-      const samplesData = Array.isArray(samplesResponse) ? samplesResponse : (samplesResponse.samples || []);
-      
-      // Handle paginated projects response
-      const projects = projectsResponse.projects || projectsResponse || [];
+      const samplesData = Array.isArray(samplesResponse) ? samplesResponse : (samplesResponse?.samples ?? []);
+      // Ensure all lookup data are arrays so .map() never runs on non-arrays
+      const sampleTypes = Array.isArray(sampleTypesRaw) ? sampleTypesRaw : [];
+      const statuses = Array.isArray(statusesRaw) ? statusesRaw : [];
+      const matrices = Array.isArray(matricesRaw) ? matricesRaw : [];
+      const qcTypes = Array.isArray(qcTypesRaw) ? qcTypesRaw : [];
+      const projects = Array.isArray(projectsResponse?.projects)
+        ? projectsResponse.projects
+        : Array.isArray(projectsResponse)
+          ? projectsResponse
+          : [];
 
       // Enrich samples with names for display
       const enrichedSamples = samplesData.map((sample: any) => ({

@@ -81,13 +81,18 @@ const Dashboard: React.FC = () => {
 
   const loadData = async () => {
     try {
-      const [statuses, projectsResponse] = await Promise.all([
+      const [statusesRaw, projectsResponse] = await Promise.all([
         apiService.getListEntries('sample_status'),  // Use normalized slug format
         apiService.getProjects(),
       ]);
 
-      // Extract projects array from paginated response
-      const projects = projectsResponse.projects || projectsResponse || [];
+      // Ensure arrays for .map() – API may return objects or paginated shape
+      const statuses = Array.isArray(statusesRaw) ? statusesRaw : [];
+      const projects = Array.isArray(projectsResponse?.projects)
+        ? projectsResponse.projects
+        : Array.isArray(projectsResponse)
+          ? projectsResponse
+          : [];
 
       setLookupData({ statuses, projects });
     } catch (err: any) {
@@ -98,8 +103,9 @@ const Dashboard: React.FC = () => {
   const loadSamples = async () => {
     try {
       setLoading(true);
-      const samplesData = await apiService.getSamples(filters);
-      setSamples(samplesData);
+      const raw = await apiService.getSamples(filters);
+      const samplesData = Array.isArray(raw) ? raw : (raw?.samples ?? []);
+      setSamples(Array.isArray(samplesData) ? samplesData : []);
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Failed to load samples');
     } finally {
