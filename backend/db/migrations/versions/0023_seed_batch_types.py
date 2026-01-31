@@ -1,7 +1,7 @@
 """Seed batch types list and entries
 
-Revision ID: 0025
-Revises: 0024
+Revision ID: 0023
+Revises: 0022
 Create Date: 2026-01-31 00:00:00.000000
 
 """
@@ -10,8 +10,8 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision = '0025'
-down_revision = '0024'
+revision = '0023'
+down_revision = '0022'
 branch_labels = None
 depends_on = None
 

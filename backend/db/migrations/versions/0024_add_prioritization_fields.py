@@ -1,7 +1,7 @@
 """Add sample prioritization fields
 
-Revision ID: 0026
-Revises: 0025
+Revision ID: 0024
+Revises: 0023
 Create Date: 2026-01-19 00:00:00.000000
 
 Adds columns to support sample prioritization based on expiration and due dates:
@@ -15,8 +15,8 @@ from alembic import op
 import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
-revision = '0026'
-down_revision = '0025'
+revision = '0024'
+down_revision = '0023'
 branch_labels = None
 depends_on = None
 

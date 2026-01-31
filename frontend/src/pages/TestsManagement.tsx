@@ -72,30 +72,33 @@ const TestsManagement: React.FC = () => {
         user?.role
       );
       
-      const [testsData, statuses] = await Promise.all([
+      const [testsData, statusesRaw] = await Promise.all([
         apiService.getTests(filteredFilters),
         apiService.getListEntries('test_status'),
       ]);
-      
+      const statuses = Array.isArray(statusesRaw) ? statusesRaw : [];
+
       // Only try to get users if user has permission
       let users: any[] = [];
       if (canManageUsers) {
         try {
-          users = await apiService.getUsers();
+          const usersData = await apiService.getUsers();
+          users = Array.isArray(usersData) ? usersData : (usersData?.users ?? []);
         } catch (err) {
           // Silently fail if users endpoint is not available
           console.warn('Users endpoint not available or access denied');
         }
       }
 
-      // Enrich tests with names for display
-      const enrichedTests = testsData.tests?.map((test: any) => ({
+      // Enrich tests with names for display – ensure we map over an array
+      const testsList = Array.isArray(testsData?.tests) ? testsData.tests : [];
+      const enrichedTests = testsList.map((test: any) => ({
         ...test,
         status_name: statuses.find((s: any) => s.id === test.status)?.name || 'Unknown',
         sample_name: test.sample?.name || 'Unknown',
         analysis_name: test.analysis?.name || 'Unknown',
         technician_name: test.technician ? (test.technician.name || test.technician.username) : 'Unassigned',
-      })) || [];
+      }));
 
       setTests(enrichedTests);
       setLookupData({ statuses, users });

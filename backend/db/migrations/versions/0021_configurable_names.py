@@ -1,7 +1,7 @@
 """Add configurable name/ID templates for entities
 
-Revision ID: 0023
-Revises: 0022
+Revision ID: 0021
+Revises: 0020
 Create Date: 2026-01-08 12:00:00.000000
 
 """
@@ -10,8 +10,8 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision = '0023'
-down_revision = '0022'
+revision = '0021'
+down_revision = '0020'
 branch_labels = None
 depends_on = None
 

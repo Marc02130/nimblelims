@@ -221,6 +221,12 @@ def upgrade() -> None:
         {'name': 'µL', 'description': 'Microliters', 'multiplier': 0.000001, 'type': 'volume'},
         {'name': 'mol/L', 'description': 'Moles per liter', 'multiplier': 1.0, 'type': 'molar'},
         {'name': 'mmol/L', 'description': 'Millimoles per liter', 'multiplier': 0.001, 'type': 'molar'},
+        {'name': 'ng/L', 'description': 'nanograms per liter', 'multiplier': 0.0000000010, 'type': 'concentration'},
+        {'name': 'ppb', 'description': 'Parts per billion', 'multiplier': 0.0000000010, 'type': 'concentration'},
+        {'name': 'ppm', 'description': 'Parts per million', 'multiplier': 0.000001, 'type': 'concentration'},
+        {'name': 'kg', 'description': 'Kilograms', 'multiplier': 1000.0000000000, 'type': 'mass'},
+        {'name': 'ng', 'description': 'Nanograms', 'multiplier': 0.0000000010, 'type': 'mass'},
+        {'name': 'cfu', 'description': 'Colony Forming Units', 'multiplier': 1.0, 'type': 'mass'},
     ]
     
     for unit_data in units_data:

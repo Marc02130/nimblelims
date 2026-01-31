@@ -1,7 +1,7 @@
 """Add test batteries to NimbleLims schema
 
-Revision ID: 0010
-Revises: 0009
+Revision ID: 0009
+Revises: 0008
 Create Date: 2025-12-22 12:00:00.000000
 
 """
@@ -10,8 +10,8 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision = '0010'
-down_revision = '0009'
+revision = '0009'
+down_revision = '0008'
 branch_labels = None
 depends_on = None
 
@@ -58,67 +58,7 @@ def upgrade() -> None:
     # Index on test_batteries name for lookups
     op.create_index('idx_test_batteries_name', 'test_batteries', ['name'])
     
-    # Seed initial test battery data
-    connection = op.get_bind()
-    
-    # Create 'EPA 8080 Full' battery
-    # This battery groups the EPA Method 8080 analytical analysis
-    # Note: Prep analyses can be added to batteries via admin interface
-    battery_data = {
-        'id': 'c0000001-c000-c000-c000-c00000000001',
-        'name': 'EPA 8080 Full',
-        'description': 'Complete EPA Method 8080 test battery for Organochlorine Pesticides and PCBs',
-        'active': True
-    }
-    
-    connection.execute(
-        sa.text("""
-            INSERT INTO test_batteries (id, name, description, active, created_at, modified_at)
-            VALUES (:id, :name, :description, :active, NOW(), NOW())
-            ON CONFLICT (id) DO NOTHING
-        """),
-        battery_data
-    )
-    
-    # Link EPA Method 8080 analysis to the battery
-    # Using the analysis ID from migration 0009: 'b0000002-b000-b000-b000-b00000000002'
-    battery_analysis_data = [{
-        'battery_id': 'c0000001-c000-c000-c000-c00000000001',
-        'analysis_id': 'b0000002-b000-b000-b000-b00000000002',
-        'sequence': 2,
-        'optional': False
-    }, {
-        'battery_id': 'c0000001-c000-c000-c000-c00000000001',
-        'analysis_id': 'b0000002-b000-b000-b000-b00000000004',
-        'sequence': 1,
-        'optional': False
-    }]
-
-    for battery_analysis in battery_analysis_data:
-        connection.execute(
-            sa.text("""
-                INSERT INTO battery_analyses (battery_id, analysis_id, sequence, optional)
-                VALUES (:battery_id, :analysis_id, :sequence, :optional)
-                ON CONFLICT (battery_id, analysis_id) DO NOTHING
-            """),
-            battery_analysis
-        )
-
-
 def downgrade() -> None:
-    # Remove seed data first
-    connection = op.get_bind()
-    
-    # Delete battery_analyses junctions
-    connection.execute(
-        sa.text("DELETE FROM battery_analyses WHERE battery_id = 'c0000001-c000-c000-c000-c00000000001'")
-    )
-    
-    # Delete test batteries
-    connection.execute(
-        sa.text("DELETE FROM test_batteries WHERE id = 'c0000001-c000-c000-c000-c00000000001'")
-    )
-    
     # Drop indexes
     op.drop_index('idx_battery_analyses_sequence', table_name='battery_analyses')
     op.drop_index('idx_battery_analyses_battery_analysis', table_name='battery_analyses')
