@@ -39,6 +39,7 @@ import {
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useUser } from '../contexts/UserContext';
 import Logo from './Logo';
+import { adminNavItems as adminNavItemsFromMainNav } from './MainNav';
 
 const DRAWER_WIDTH = 240;
 const DRAWER_WIDTH_COLLAPSED = 56;
@@ -216,70 +217,8 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onMobileClose, collapsed 
     },
   ];
 
-  // Admin navigation items
-  const adminItems: AdminNavItem[] = [
-    {
-      text: 'Overview',
-      path: '/admin',
-      icon: <DashboardIcon />,
-      exact: true,
-    },
-    {
-      text: 'Lists Management',
-      path: '/admin/lists',
-      icon: <ViewListIcon />,
-    },
-    {
-      text: 'Container Types',
-      path: '/admin/container-types',
-      icon: <InventoryIcon />,
-    },
-    {
-      text: 'Units Management',
-      path: '/admin/units',
-      icon: <StraightenIcon />,
-    },
-    {
-      text: 'Users Management',
-      path: '/admin/users',
-      icon: <People />,
-    },
-    {
-      text: 'Roles & Permissions',
-      path: '/admin/roles',
-      icon: <Security />,
-    },
-    {
-      text: 'Analyses Management',
-      path: '/admin/analyses',
-      icon: <ScienceIcon />,
-    },
-    {
-      text: 'Analytes Management',
-      path: '/admin/analytes',
-      icon: <Biotech />,
-    },
-    {
-      text: 'Test Batteries',
-      path: '/admin/test-batteries',
-      icon: <BatteryChargingFull />,
-    },
-    {
-      text: 'Custom Fields',
-      path: '/admin/custom-fields',
-      icon: <TuneIcon />,
-    },
-    {
-      text: 'Custom Names',
-      path: '/admin/custom-names',
-      icon: <TuneIcon />,
-    },
-    {
-      text: 'Help Management',
-      path: '/admin/help',
-      icon: <HelpIcon />,
-    },
-  ];
+  // Admin navigation items from MainNav (includes Name Templates, Custom Attributes, Lists)
+  const adminItems: AdminNavItem[] = adminNavItemsFromMainNav;
 
   const handleNavigation = (path: string) => {
     navigate(path);
@@ -711,7 +650,7 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onMobileClose, collapsed 
                     );
                     
                     return (
-                      <ListItem key={item.text} disablePadding>
+                      <ListItem key={item.path} disablePadding>
                         {collapsed ? (
                           <Tooltip title={item.text} placement="right" arrow>
                             {listItemButton}

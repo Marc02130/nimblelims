@@ -115,6 +115,7 @@ async def create_name_template(
         template=template_data.template,
         description=template_data.description,
         active=template_data.active,
+        seq_padding_digits=template_data.seq_padding_digits,
         created_by=current_user.id,
         modified_by=current_user.id,
     )
@@ -208,20 +209,19 @@ async def preview_generated_name(
         # Date placeholders
         if '{YYYY}' in template:
             replacements['{YYYY}'] = str(now.year)
+        if '{YY}' in template:
+            replacements['{YY}'] = str(now.year % 100).zfill(2)
         if '{MM}' in template:
             replacements['{MM}'] = f"{now.month:02d}"
         if '{DD}' in template:
             replacements['{DD}'] = f"{now.day:02d}"
         if '{YYYYMMDD}' in template:
             replacements['{YYYYMMDD}'] = now.strftime('%Y%m%d')
-        
-        # Sequence placeholder - use next value for preview (will show what the next generated name would be)
+        # Sequence placeholder - use next value for preview, pad with template.seq_padding_digits
         if '{SEQ}' in template:
             from sqlalchemy import text
             sequence_name = f'name_template_seq_{entity_type_lower}'
-            # Get the current value for preview (without actually incrementing)
             try:
-                # Try to get the last value from the sequence using pg_sequences
                 result = db.execute(text("""
                     SELECT last_value 
                     FROM pg_sequences 
@@ -229,16 +229,13 @@ async def preview_generated_name(
                 """), {'seq_name': sequence_name})
                 row = result.first()
                 if row:
-                    # Next value will be last_value + 1
                     seq = row[0] + 1
                 else:
-                    # Sequence might not exist or be initialized, use 1
                     seq = 1
-            except Exception as e:
-                # If query fails, try a simpler approach - just use 1 for preview
-                # In production, the actual generation will use the real sequence
+            except Exception:
                 seq = 1
-            replacements['{SEQ}'] = f"{seq:03d}"
+            padding = getattr(template_obj, 'seq_padding_digits', 1) or 1
+            replacements['{SEQ}'] = str(seq).zfill(padding)
         
         # Client placeholder
         if '{CLIENT}' in template:
@@ -346,6 +343,8 @@ async def update_name_template(
         template.description = template_data.description
     if template_data.active is not None:
         template.active = template_data.active
+    if template_data.seq_padding_digits is not None:
+        template.seq_padding_digits = template_data.seq_padding_digits
     
     template.modified_by = current_user.id
     db.commit()
