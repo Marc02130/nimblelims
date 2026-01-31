@@ -50,12 +50,10 @@ async def get_client_projects(
     
     # Get total count - RLS will automatically filter
     # Use func.count() directly to avoid subquery wrapping that can interfere with RLS
-    total = db.query(func.count(ClientProject.id)).filter(
-        ClientProject.active == True,
-        ClientProject.client_id == client_id if client_id else True
-    ).scalar() if client_id else db.query(func.count(ClientProject.id)).filter(
-        ClientProject.active == True
-    ).scalar()
+    count_query = db.query(func.count(ClientProject.id)).filter(ClientProject.active == True)
+    if client_id:
+        count_query = count_query.filter(ClientProject.client_id == client_id)
+    total = count_query.scalar()
     
     # Apply pagination
     offset = (page - 1) * size

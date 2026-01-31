@@ -345,12 +345,6 @@ const ProjectsManagement: React.FC = () => {
         </Alert>
       )}
 
-      {!isSystemClient() && !isAdmin() && user?.client_id && (
-        <Alert severity="info" sx={{ mb: 2 }}>
-          Showing projects for your client only. System users and administrators see all projects.
-        </Alert>
-      )}
-
       <Box sx={{ width: '100%', overflowX: 'auto' }}>
         <DataGrid
           rows={projects}

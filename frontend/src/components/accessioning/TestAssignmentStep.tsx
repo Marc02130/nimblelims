@@ -45,7 +45,7 @@ const TestAssignmentStep: React.FC<TestAssignmentStepProps> = ({
     }
   };
 
-  const selectedAnalyses = lookupData.analyses.filter(analysis => 
+  const selectedAnalyses = (Array.isArray(lookupData.analyses) ? lookupData.analyses : []).filter(analysis => 
     values.selected_analyses?.includes(analysis.id)
   );
 
@@ -84,7 +84,7 @@ const TestAssignmentStep: React.FC<TestAssignmentStepProps> = ({
       )}
 
       <Grid container spacing={2}>
-        {lookupData.analyses.map((analysis) => (
+        {(Array.isArray(lookupData.analyses) ? lookupData.analyses : []).map((analysis) => (
           <Grid size={{ xs: 12, sm: 6, md: 4 }} key={analysis.id}>
             <Card 
               sx={{ 
@@ -167,7 +167,7 @@ const TestAssignmentStep: React.FC<TestAssignmentStepProps> = ({
         </Box>
       )}
 
-      {lookupData.analyses.length === 0 && (
+      {(!Array.isArray(lookupData.analyses) || lookupData.analyses.length === 0) && (
         <Box sx={{ textAlign: 'center', py: 4 }}>
           <Typography variant="body1" color="text.secondary">
             No analyses available. Please contact your administrator.

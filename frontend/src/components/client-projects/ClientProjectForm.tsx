@@ -55,6 +55,7 @@ interface ClientProjectFormProps {
     custom_attributes?: Record<string, any>;
   }) => Promise<void>;
   existingNames?: string[];
+  readOnly?: boolean;
 }
 
 const buildCustomAttributesValidation = (configs: CustomAttributeConfig[]): Record<string, any> => {
@@ -182,6 +183,7 @@ const ClientProjectForm: React.FC<ClientProjectFormProps> = ({
   onClose,
   onSubmit,
   existingNames = [],
+  readOnly = false,
 }) => {
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(false);
@@ -284,7 +286,7 @@ const ClientProjectForm: React.FC<ClientProjectFormProps> = ({
     <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
       <form onSubmit={formik.handleSubmit}>
         <DialogTitle>
-          {clientProject ? 'Edit Client Project' : 'Create Client Project'}
+          {readOnly ? 'View Client Project' : (clientProject ? 'Edit Client Project' : 'Create Client Project')}
         </DialogTitle>
         <DialogContent>
           {error && (
@@ -304,7 +306,7 @@ const ClientProjectForm: React.FC<ClientProjectFormProps> = ({
               error={formik.touched.name && Boolean(formik.errors.name)}
               helperText={formik.touched.name && formik.errors.name}
               required
-              disabled={loading}
+              disabled={loading || readOnly}
             />
 
             <TextField
@@ -318,14 +320,14 @@ const ClientProjectForm: React.FC<ClientProjectFormProps> = ({
               helperText={formik.touched.description && formik.errors.description}
               multiline
               rows={3}
-              disabled={loading}
+              disabled={loading || readOnly}
             />
 
             <FormControl
               fullWidth
               required
               error={formik.touched.client_id && Boolean(formik.errors.client_id)}
-              disabled={loading || loadingClients}
+              disabled={loading || loadingClients || readOnly}
             >
               <InputLabel>Client</InputLabel>
               <Select
@@ -402,6 +404,7 @@ const ClientProjectForm: React.FC<ClientProjectFormProps> = ({
                           }}
                           error={fieldTouched && !!fieldError}
                           helperText={fieldTouched && fieldError ? String(fieldError) : config.description}
+                          disabled={readOnly}
                         />
                       </Grid>
                     );
@@ -413,16 +416,18 @@ const ClientProjectForm: React.FC<ClientProjectFormProps> = ({
         </DialogContent>
         <DialogActions>
           <Button onClick={handleClose} disabled={loading}>
-            Cancel
+            {readOnly ? 'Close' : 'Cancel'}
           </Button>
-          <Button
-            type="submit"
-            variant="contained"
-            disabled={loading || loadingClients}
-            startIcon={loading && <CircularProgress size={20} />}
-          >
-            {clientProject ? 'Update' : 'Create'}
-          </Button>
+          {!readOnly && (
+            <Button
+              type="submit"
+              variant="contained"
+              disabled={loading || loadingClients}
+              startIcon={loading && <CircularProgress size={20} />}
+            >
+              {clientProject ? 'Update' : 'Create'}
+            </Button>
+          )}
         </DialogActions>
       </form>
     </Dialog>
