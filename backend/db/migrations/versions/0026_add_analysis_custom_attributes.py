@@ -1,7 +1,7 @@
 """Add custom_attributes column to analyses and analytes tables
 
-Revision ID: 0028
-Revises: 0027
+Revision ID: 0026
+Revises: 0025
 Create Date: 2026-01-21
 
 Adds JSONB custom_attributes column to analyses and analytes tables to support
@@ -12,8 +12,8 @@ import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import JSONB
 
 # revision identifiers, used by Alembic.
-revision = '0028'
-down_revision = '0027'
+revision = '0026'
+down_revision = '0025'
 branch_labels = None
 depends_on = None
 

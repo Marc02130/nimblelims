@@ -1,7 +1,7 @@
 """Add Laboratory QC system project for batch QC samples
 
-Revision ID: 0027
-Revises: 0026
+Revision ID: 0025
+Revises: 0024
 Create Date: 2026-01-21
 
 This migration creates a system-level "Laboratory QC" project that all batch QC samples
@@ -14,8 +14,8 @@ from alembic import op
 import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
-revision = '0027'
-down_revision = '0026'
+revision = '0025'
+down_revision = '0024'
 branch_labels = None
 depends_on = None
 

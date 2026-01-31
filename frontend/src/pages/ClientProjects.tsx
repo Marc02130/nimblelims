@@ -77,7 +77,8 @@ const ClientProjects: React.FC = () => {
   const loadClients = async () => {
     try {
       const clientsData = await apiService.getClients();
-      setClients(clientsData || []);
+      const list = Array.isArray(clientsData) ? clientsData : (clientsData?.clients ?? []);
+      setClients(Array.isArray(list) ? list : []);
     } catch (err: any) {
       console.error('Failed to load clients:', err);
     }
@@ -108,14 +109,14 @@ const ClientProjects: React.FC = () => {
       
       const response = await apiService.getClientProjects(filters);
       
-      // Handle both paginated and non-paginated responses
-      if (response.client_projects) {
-        setClientProjects(response.client_projects || []);
-        setTotal(response.total || 0);
-      } else {
-        setClientProjects(response || []);
-        setTotal(response?.length || 0);
-      }
+      // Handle both paginated and non-paginated – ensure we always set an array
+      const list = Array.isArray(response?.client_projects)
+        ? response.client_projects
+        : Array.isArray(response)
+          ? response
+          : [];
+      setClientProjects(list);
+      setTotal(response?.total ?? list.length);
     } catch (err: any) {
       if (err.response?.status === 403) {
         setError('Access denied: You do not have permission to view these client projects. Client users can only view client projects for their own client.');

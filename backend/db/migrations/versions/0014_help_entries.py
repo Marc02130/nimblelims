@@ -1,7 +1,7 @@
 """Add help_entries table for role-filtered help content
 
-Revision ID: 0016
-Revises: 0015
+Revision ID: 0014
+Revises: 0013
 Create Date: 2025-01-03 14:00:00.000000
 
 """
@@ -10,8 +10,8 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision = '0016'
-down_revision = '0015'
+revision = '0014'
+down_revision = '0013'
 branch_labels = None
 depends_on = None
 

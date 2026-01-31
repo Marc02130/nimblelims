@@ -1,7 +1,7 @@
 """Refine project schema for auto-creation during accessioning
 
-Revision ID: 0024
-Revises: 0023
+Revision ID: 0022
+Revises: 0021
 Create Date: 2026-01-08 14:00:00.000000
 
 """
@@ -10,8 +10,8 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision = '0024'
-down_revision = '0023'
+revision = '0022'
+down_revision = '0021'
 branch_labels = None
 depends_on = None
 

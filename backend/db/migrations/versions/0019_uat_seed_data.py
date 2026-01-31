@@ -1,7 +1,7 @@
 """Add UAT seed data for units, clients, client projects, and container types
 
-Revision ID: 0021
-Revises: 0020
+Revision ID: 0019
+Revises: 0018
 Create Date: 2025-01-04 00:00:00.000000
 
 """
@@ -10,8 +10,8 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision = '0021'
-down_revision = '0020'
+revision = '0019'
+down_revision = '0018'
 branch_labels = None
 depends_on = None
 
@@ -117,6 +117,18 @@ def upgrade() -> None:
         """)
     )
     
+    # Assign the seeded "client" user (from 0013) to UAT Test Client instead of System client.
+    # 0013 picks the first client by created_at, which was only System at that time, so the
+    # client user incorrectly had client_id = System and could see everything. Fix that here.
+    connection.execute(
+        sa.text("""
+            UPDATE users
+            SET client_id = '11111111-1111-1111-1111-111111111111'
+            WHERE username = 'client'
+            AND client_id = '00000000-0000-0000-0000-000000000001'
+        """)
+    )
+    
     # Create UAT test container type
     connection.execute(
         sa.text("""
@@ -141,6 +153,16 @@ def upgrade() -> None:
 def downgrade() -> None:
     """Remove UAT seed data."""
     connection = op.get_bind()
+    
+    # Revert "client" user back to System client before removing UAT client (FK)
+    connection.execute(
+        sa.text("""
+            UPDATE users
+            SET client_id = '00000000-0000-0000-0000-000000000001'
+            WHERE username = 'client'
+            AND client_id = '11111111-1111-1111-1111-111111111111'
+        """)
+    )
     
     # Remove container type
     connection.execute(

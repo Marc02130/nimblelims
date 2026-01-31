@@ -1,7 +1,7 @@
 """Add client projects to LIMS schema
 
-Revision ID: 0012
-Revises: 0010
+Revision ID: 0010
+Revises: 0009
 Create Date: 2025-12-28 12:00:00.000000
 
 """
@@ -10,8 +10,8 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision = '0012'
-down_revision = '0010'
+revision = '0010'
+down_revision = '0009'
 branch_labels = None
 depends_on = None
 

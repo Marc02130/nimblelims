@@ -117,8 +117,13 @@ const ProjectsManagement: React.FC = () => {
         setProjects(enrichedProjects);
         setTotal(response.total || 0);
       } else {
-        // Handle non-paginated response
-        const enrichedProjects = (response || []).map((project: any) => ({
+        // Handle non-paginated response – ensure we have an array
+        const list = Array.isArray(response?.projects)
+          ? response.projects
+          : Array.isArray(response)
+            ? response
+            : [];
+        const enrichedProjects = list.map((project: any) => ({
           ...project,
           status_name: statuses.find((s: any) => s.id === project.status)?.name || 'Unknown',
         }));
