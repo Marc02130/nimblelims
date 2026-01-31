@@ -96,8 +96,8 @@ So “where configuration is stored” for these dropdowns is **lists** and **li
    - Backend calls the appropriate generator (e.g. `generate_name_for_sample()`, `generate_name_for_project()`) in `backend/app/core/name_generation.py`.
    - Generator:
      - Loads the **active template** for that entity type from **name_templates`, including `seq_padding_digits`.
-     - Gets the next **sequence** value for that entity type.
-     - Resolves placeholders (e.g. year as {YYYY} or {YY}, date, client code) and formats {SEQ} with padding (e.g., str(seq).zfill(seq_padding_digits)).
+     - Gets the next **sequence** value for that entity type via `get_next_sequence(entity_type)`.
+     - **Placeholder resolution**: `{YY}` = `str(now.year % 100).zfill(2)`; for `{SEQ}`, `seq_padding_digits` is read from the template row, then `formatted_seq = str(seq).zfill(template.seq_padding_digits)`; other placeholders (e.g. {YYYY}, {MM}, {DD}, {YYYYMMDD}, {CLIENT}) as defined in `name_generation.py`.
      - Checks **uniqueness** against the entity table (e.g. `samples.name`, `projects.name`).
      - Returns the name; the row is inserted with this `name` and a new UUID `id`.
 
@@ -204,7 +204,7 @@ These pages build on the existing backend APIs. If the frontend framework is Rea
 
 - **Base model (UUID** `id`**,** `name`**)**: `backend/models/base.py`
 - **Name templates model**: `backend/models/name_template.py` (includes `seq_padding_digits`).
-- **Name generation**: `backend/app/core/name_generation.py` — `get_active_template()`, `get_next_sequence()`, `generate_name()`, `generate_name_for_sample()`, `generate_name_for_project()`, etc. Placeholders: `{SEQ}` (padding from `seq_padding_digits`), `{YYYY}`, `{YY}` (two-digit year), `{MM}`, `{DD}`, `{YYYYMMDD}`, `{CLIENT}`.
+- **Name generation**: `backend/app/core/name_generation.py` — `get_active_template()`, `get_next_sequence()`, `generate_name()`, `generate_name_for_sample()`, `generate_name_for_project()`, etc. Placeholder resolution: `{YY}` = `str(now.year % 100).zfill(2)`; for `{SEQ}`, `seq_padding_digits` from the template, then `formatted_seq = str(seq).zfill(template.seq_padding_digits)`. Other placeholders: `{YYYY}`, `{MM}`, `{DD}`, `{YYYYMMDD}`, `{CLIENT}`.
 - **Migration (name_templates + sequences + seeds)**: `backend/db/migrations/versions/0021_configurable_names.py`. **Migration 0031**: `backend/db/migrations/versions/0031_add_seq_padding_digits.py` adds `seq_padding_digits` column (default 1).
 - **Sequence start API**: `backend/app/routers/sequences.py` — POST `/admin/sequences/{entity_type}/start` (body: `{ "start_value": int }`); requires `config:edit`.
 - **Custom attributes config model**: `backend/models/custom_attributes_config.py`

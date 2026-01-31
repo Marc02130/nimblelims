@@ -98,6 +98,61 @@ Create a new list via the admin interface.
 
 ---
 
+## Test Case 0a: Name Template - Preview with {YY} and seq_padding_digits
+
+### Test Case ID
+TC-NAME-TEMPLATE-PREVIEW-0a
+
+### Description
+Verify name template admin page and preview use placeholder {YY} (two-digit year) and seq_padding_digits for {SEQ} formatting.
+
+### Preconditions
+
+| Item | Value |
+|------|-------|
+| **User Role** | Administrator |
+| **Required Permission** | `config:edit` |
+| **Name Templates UI** | Name Templates page accessible at `/admin/name-templates` |
+
+### Test Steps
+
+| Step | Action | Expected Result |
+|------|--------|-----------------|
+| 1 | Log in as Administrator | User authenticated with `config:edit` permission |
+| 2 | Navigate to Name Templates page (`/admin/name-templates`) | Name Templates page loads with DataGrid of templates |
+| 3 | **Create or edit a template with {YY} and seq_padding_digits** | |
+| 3.1 | Click "Create" or edit an existing sample template | Form opens with entity_type, template, seq_padding_digits, etc. |
+| 3.2 | Set template to `SAMPLE-{YY}-{SEQ}` and seq_padding_digits to `3` | Fields accept input |
+| 3.3 | Save (or cancel if only verifying preview) | Template saved or form closed |
+| 4 | **Verify preview** | |
+| 4.1 | Open create/edit form and enter template `SAMPLE-{YY}-{SEQ}` and seq_padding_digits `3` | Preview (client-side or via GET `/admin/name-templates/preview`) shows example like `SAMPLE-25-001` (two-digit year, zero-padded sequence) |
+| 4.2 | Confirm {YY} resolves to current two-digit year (e.g. 25 for 2025) | Preview year segment matches `str(now.year % 100).zfill(2)` |
+| 4.3 | Confirm {SEQ} is zero-padded to 3 digits (e.g. 001, 002) | Preview sequence segment uses template.seq_padding_digits |
+
+### Expected Results
+
+| Category | Expected Outcome |
+|----------|------------------|
+| **Placeholder resolution** | Backend `name_generation.py`: `{YY}` = `str(now.year % 100).zfill(2)`; for `{SEQ}`, `seq_padding_digits` from template, then `formatted_seq = str(seq).zfill(template.seq_padding_digits)`. See `.docs/ids-and-configuration.md`. |
+| **Preview API** | GET `/admin/name-templates/preview?entity_type=sample` returns `{ "preview": "SAMPLE-25-001" }` (or similar) when template uses {YY} and seq_padding_digits=3. |
+
+### Pass/Fail Criteria
+
+| Criteria | Pass | Fail |
+|----------|------|------|
+| Name Templates page loads | ✓ | ✗ |
+| Template form includes seq_padding_digits | ✓ | ✗ |
+| Preview shows {YY} as two-digit year | ✓ | ✗ |
+| Preview shows {SEQ} zero-padded per seq_padding_digits | ✓ | ✗ |
+
+### Test Result
+- [ ] **PASS** - All criteria met
+- [ ] **FAIL** - One or more criteria not met
+
+**Notes**: _________________________________________________________
+
+---
+
 ## Test Case 1: List Editing - Add Status Entry
 
 ### Test Case ID

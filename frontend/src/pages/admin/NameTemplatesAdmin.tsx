@@ -38,23 +38,27 @@ interface NameTemplate {
   template: string;
   description?: string;
   active: boolean;
+  seq_padding_digits?: number;
   created_at: string;
   modified_at: string;
 }
 
 const ENTITY_TYPES = ['sample', 'project', 'batch', 'analysis', 'container'];
-const VALID_PLACEHOLDERS = ['{SEQ}', '{YYYY}', '{MM}', '{DD}', '{YYYYMMDD}', '{CLIENT}'];
+const VALID_PLACEHOLDERS = ['{SEQ}', '{YYYY}', '{YY}', '{MM}', '{DD}', '{YYYYMMDD}', '{CLIENT}'];
 
-/** Generate example preview from template string (client-side). */
-function previewFromTemplate(template: string): string {
+/** Generate example preview from template string (client-side). seqPaddingDigits pads {SEQ} (e.g. 3 → 001). */
+function previewFromTemplate(template: string, seqPaddingDigits: number = 1): string {
   if (!template || !template.trim()) return '';
   const now = new Date();
+  const seqExample = String(1).padStart(Math.max(1, seqPaddingDigits), '0');
+  const yy = String(now.getFullYear() % 100).padStart(2, '0');
   let out = template
     .replace(/\{YYYY\}/g, String(now.getFullYear()))
+    .replace(/\{YY\}/g, yy)
     .replace(/\{MM\}/g, String(now.getMonth() + 1).padStart(2, '0'))
     .replace(/\{DD\}/g, String(now.getDate()).padStart(2, '0'))
     .replace(/\{YYYYMMDD\}/g, now.toISOString().slice(0, 10).replace(/-/g, ''))
-    .replace(/\{SEQ\}/g, '001')
+    .replace(/\{SEQ\}/g, seqExample)
     .replace(/\{CLIENT\}/g, 'ACME');
   const invalidPlaceholders = out.match(/\{[^}]+\}/g);
   if (invalidPlaceholders?.length) return out;
@@ -88,9 +92,13 @@ const NameTemplatesAdmin: React.FC = () => {
     template: '',
     description: '',
     active: true,
+    seq_padding_digits: 1,
   });
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
+  const [seqStartEntityType, setSeqStartEntityType] = useState<string>('sample');
+  const [seqStartValue, setSeqStartValue] = useState<number>(1);
+  const [seqStartSubmitting, setSeqStartSubmitting] = useState(false);
 
   const canEdit = hasPermission('config:edit');
   const isAdmin = hasPermission('config:edit');
@@ -134,6 +142,7 @@ const NameTemplatesAdmin: React.FC = () => {
       template: template?.template ?? '',
       description: template?.description ?? '',
       active: template?.active ?? true,
+      seq_padding_digits: template?.seq_padding_digits ?? 1,
     });
     setFormErrors({});
     setFormOpen(true);
@@ -175,6 +184,7 @@ const NameTemplatesAdmin: React.FC = () => {
         template: formValues.template.trim(),
         description: formValues.description.trim() || undefined,
         active: formValues.active,
+        seq_padding_digits: Math.max(1, Number(formValues.seq_padding_digits) || 1),
       });
       setSnackbar({ open: true, message: 'Template created', severity: 'success' });
       setFormOpen(false);
@@ -208,6 +218,7 @@ const NameTemplatesAdmin: React.FC = () => {
         template: formValues.template.trim(),
         description: formValues.description.trim() || undefined,
         active: formValues.active,
+        seq_padding_digits: Math.max(1, Number(formValues.seq_padding_digits) || 1),
       });
       setSnackbar({ open: true, message: 'Template updated', severity: 'success' });
       setFormOpen(false);
@@ -270,6 +281,27 @@ const NameTemplatesAdmin: React.FC = () => {
     setDeleteDialogOpen(true);
   };
 
+  const handleSetSequenceStart = async () => {
+    const value = Math.max(1, Number(seqStartValue) || 1);
+    setSeqStartSubmitting(true);
+    try {
+      await apiService.setSequenceStart(seqStartEntityType, value);
+      setSnackbar({
+        open: true,
+        message: `Sequence for "${seqStartEntityType}" set to start at ${value}. Next generated name will use this value.`,
+        severity: 'success',
+      });
+    } catch (err: any) {
+      setSnackbar({
+        open: true,
+        message: err.response?.data?.detail || 'Failed to set sequence start',
+        severity: 'error',
+      });
+    } finally {
+      setSeqStartSubmitting(false);
+    }
+  };
+
   const handleDeleteConfirm = async () => {
     if (!deleteTarget) return;
     if (deleteTarget.active) {
@@ -305,8 +337,8 @@ const NameTemplatesAdmin: React.FC = () => {
   };
 
   const previewExample = useMemo(
-    () => previewFromTemplate(formValues.template),
-    [formValues.template]
+    () => previewFromTemplate(formValues.template, formValues.seq_padding_digits),
+    [formValues.template, formValues.seq_padding_digits]
   );
 
   const columns: GridColDef[] = useMemo(
@@ -320,6 +352,13 @@ const NameTemplatesAdmin: React.FC = () => {
         ),
       },
       { field: 'template', headerName: 'Template', flex: 1, minWidth: 200 },
+      {
+        field: 'seq_padding_digits',
+        headerName: 'Pad',
+        width: 70,
+        type: 'number',
+        valueGetter: (value: number) => value ?? 1,
+      },
       {
         field: 'active',
         headerName: 'Is Active',
@@ -421,7 +460,7 @@ const NameTemplatesAdmin: React.FC = () => {
         </Alert>
       )}
 
-      <Box sx={{ mb: 2, display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+      <Box sx={{ mb: 2, display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
         <FormControl sx={{ minWidth: 200 }}>
           <InputLabel>Entity Type</InputLabel>
           <Select
@@ -440,6 +479,40 @@ const NameTemplatesAdmin: React.FC = () => {
             ))}
           </Select>
         </FormControl>
+        {canEdit && (
+          <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
+            <Typography variant="body2" color="text.secondary">Set sequence start:</Typography>
+            <FormControl size="small" sx={{ minWidth: 120 }}>
+              <InputLabel>Entity</InputLabel>
+              <Select
+                value={seqStartEntityType}
+                label="Entity"
+                onChange={(e) => setSeqStartEntityType(e.target.value)}
+              >
+                {ENTITY_TYPES.map((type) => (
+                  <MenuItem key={type} value={type}>{type}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <TextField
+              size="small"
+              type="number"
+              inputProps={{ min: 1 }}
+              label="Start value"
+              value={seqStartValue}
+              onChange={(e) => setSeqStartValue(Math.max(1, parseInt(e.target.value, 10) || 1))}
+              sx={{ width: 100 }}
+            />
+            <Button
+              variant="outlined"
+              size="small"
+              onClick={handleSetSequenceStart}
+              disabled={seqStartSubmitting}
+            >
+              {seqStartSubmitting ? 'Setting...' : 'Set start'}
+            </Button>
+          </Box>
+        )}
       </Box>
 
       {loading ? (
@@ -505,8 +578,19 @@ const NameTemplatesAdmin: React.FC = () => {
             value={formValues.template}
             onChange={(e) => setFormValues((v) => ({ ...v, template: e.target.value }))}
             error={!!formErrors.template}
-            helperText={formErrors.template || 'e.g. SAMPLE-{YYYY}-{SEQ}'}
-            placeholder="SAMPLE-{YYYY}-{SEQ}"
+            helperText={formErrors.template || 'Valid placeholders: {SEQ}, {YYYY}, {YY}, {MM}, {DD}, {YYYYMMDD}, {CLIENT}'}
+            placeholder="SAMPLE-{YY}-{SEQ}"
+          />
+
+          <TextField
+            fullWidth
+            margin="normal"
+            type="number"
+            inputProps={{ min: 1, max: 10 }}
+            label="Sequence padding (digits)"
+            value={formValues.seq_padding_digits}
+            onChange={(e) => setFormValues((v) => ({ ...v, seq_padding_digits: Math.max(1, parseInt(e.target.value, 10) || 1) }))}
+            helperText="Number of digits for {SEQ} (e.g. 3 → 001, 002)"
           />
 
           <TextField

@@ -17,7 +17,7 @@ Copyright (c) 2025 Marc Breneiser
 - **Batch Management**: Create and manage batches with container tracking
 - **Container Management**: Container types (admin-managed) and dynamic instance creation
 - **Lists Management**: Configurable lists and entries (admin-editable, full CRUD)
-- **Name Templates**: Configurable entity naming with placeholders ({SEQ}, {YYYY}, {YY}, etc.) and seq_padding_digits; sequence start via POST /admin/sequences/{entity_type}/start
+- **Name Templates**: Configurable entity naming; placeholder resolution: {YY} = str(now.year % 100).zfill(2), {SEQ} = str(seq).zfill(template.seq_padding_digits); sequence start via POST /admin/sequences/{entity_type}/start (see `app/core/name_generation.py`, `.docs/ids-and-configuration.md`)
 - **Analyses Management**: CRUD operations for analyses (admin-only)
 - **Analytes Management**: CRUD operations for analytes (admin-only)
 - **Analysis-Analyte Configuration**: Configure validation rules for analytes in analyses (admin-only)
