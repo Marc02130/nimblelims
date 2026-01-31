@@ -915,6 +915,7 @@ class ApiService {
     template: string;
     description?: string;
     active?: boolean;
+    seq_padding_digits?: number;
   }) {
     const response: AxiosResponse = await this.api.post('/admin/name-templates', templateData);
     return response.data;
@@ -927,6 +928,7 @@ class ApiService {
       template?: string;
       description?: string;
       active?: boolean;
+      seq_padding_digits?: number;
     }
   ) {
     const response: AxiosResponse = await this.api.patch(`/admin/name-templates/${id}`, templateData);
@@ -948,6 +950,15 @@ class ApiService {
       // If endpoint doesn't exist, return null
       return null;
     }
+  }
+
+  /** Set the next value for an entity type's name sequence (e.g. sample, project). Requires config:edit. */
+  async setSequenceStart(entity_type: string, start_value: number) {
+    const response: AxiosResponse = await this.api.post(
+      `/admin/sequences/${encodeURIComponent(entity_type)}/start`,
+      { start_value }
+    );
+    return response.data;
   }
 
   // Help endpoints

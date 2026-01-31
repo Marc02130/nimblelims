@@ -254,6 +254,7 @@ Comprehensive documentation is available in the `.docs/` directory:
 - **Setup Guides**:
   - `.docs/nimblelims_dev_setup.md` - Development environment setup
   - `.docs/admin_setup.md` - Admin user configuration
+  - `.docs/useful_command_line.md` - Useful command-line snippets (containers, dumps, RLS)
 - **API Reference**: `.docs/api_endpoints.md` - Complete API endpoints documentation
 - **IDs and Configuration**: `.docs/ids-and-configuration.md` - How sample/project IDs and names work, where configuration is stored (name_templates, custom_attributes_config), and flow from configuration through use
 

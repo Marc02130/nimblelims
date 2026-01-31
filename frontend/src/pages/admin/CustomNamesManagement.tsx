@@ -50,7 +50,7 @@ interface NameTemplate {
 }
 
 const ENTITY_TYPES = ['sample', 'project', 'batch', 'analysis', 'container'];
-const VALID_PLACEHOLDERS = ['{SEQ}', '{YYYY}', '{MM}', '{DD}', '{YYYYMMDD}', '{CLIENT}'];
+const VALID_PLACEHOLDERS = ['{SEQ}', '{YYYY}', '{YY}', '{MM}', '{DD}', '{YYYYMMDD}', '{CLIENT}'];
 
 const validationSchema = Yup.object({
   entity_type: Yup.string()
@@ -70,7 +70,7 @@ const validationSchema = Yup.object({
     )
     .test(
       'valid-placeholders',
-      'Template contains invalid placeholders. Valid placeholders: {SEQ}, {YYYY}, {MM}, {DD}, {YYYYMMDD}, {CLIENT}',
+      'Template contains invalid placeholders. Valid placeholders: {SEQ}, {YYYY}, {YY}, {MM}, {DD}, {YYYYMMDD}, {CLIENT}',
       (value) => {
         if (!value) return true;
         const matches = value.match(/\{[^}]+\}/g);
@@ -458,7 +458,7 @@ const CustomNamesManagement: React.FC = () => {
                     helperText={
                       touched.template && errors.template
                         ? errors.template
-                        : 'Use placeholders: {SEQ}, {YYYY}, {MM}, {DD}, {YYYYMMDD}, {CLIENT}. Example: SAMPLE-{YYYY}-{SEQ}'
+                        : 'Use placeholders: {SEQ}, {YYYY}, {YY}, {MM}, {DD}, {YYYYMMDD}, {CLIENT}. Example: SAMPLE-{YY}-{SEQ}'
                     }
                     placeholder="SAMPLE-{YYYY}-{SEQ}"
                   />
