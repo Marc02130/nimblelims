@@ -206,12 +206,6 @@ const ResultsManagement: React.FC<ResultsManagementProps> = ({ onBack }) => {
         </Alert>
       )}
 
-      {!isSystemClient() && !isAdmin() && user?.client_id && view === 'list' && (
-        <Alert severity="info" sx={{ mb: 2 }}>
-          Showing batches containing samples from your client's projects only. System users and administrators see all batches.
-        </Alert>
-      )}
-
       {view === 'list' && (
         <Box>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>

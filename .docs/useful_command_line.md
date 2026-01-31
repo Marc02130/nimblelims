@@ -1,3 +1,7 @@
+# Fix alembic_version after removing migrations 0032–0034 (DB already ran them)
+# Run once so Alembic head matches DB; use from project root.
+docker exec -i lims-db psql -U lims_user -d lims_db -c "UPDATE alembic_version SET version_num = '0031' WHERE version_num IN ('0034','0033','0032');"
+
 # Clean Restart Containers 
 docker-compose down
 docker system prune -a

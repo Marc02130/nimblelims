@@ -46,6 +46,8 @@ interface SampleFormProps {
   };
   onSubmit: (data: any) => Promise<void>;
   onCancel: () => void;
+  /** When true, form is read-only (view mode). Overrides permission for display. */
+  readOnly?: boolean;
 }
 
 const buildCustomAttributesValidation = (configs: CustomAttributeConfig[]): Record<string, any> => {
@@ -172,6 +174,7 @@ const SampleForm: React.FC<SampleFormProps> = ({
   lookupData,
   onSubmit,
   onCancel,
+  readOnly: readOnlyProp = false,
 }) => {
   const { hasPermission } = useUser();
   const [loading, setLoading] = useState(false);
@@ -180,6 +183,8 @@ const SampleForm: React.FC<SampleFormProps> = ({
   const [loadingConfigs, setLoadingConfigs] = useState(false);
   const isEditMode = !!sample;
   const canUpdate = hasPermission('sample:update');
+  /** View mode: explicitly read-only, or no update permission */
+  const isViewMode = readOnlyProp || !canUpdate;
 
   useEffect(() => {
     loadCustomAttributeConfigs();
@@ -268,9 +273,9 @@ const SampleForm: React.FC<SampleFormProps> = ({
 
   return (
     <Box sx={{ p: 2 }}>
-      {!canUpdate && (
-        <Alert severity="warning" sx={{ mb: 2 }}>
-          You do not have permission to update samples. Contact your administrator.
+      {isViewMode && sample && (
+        <Alert severity="info" sx={{ mb: 2 }}>
+          View-only. You do not have permission to update this sample, or opened in view mode.
         </Alert>
       )}
 
@@ -308,7 +313,7 @@ const SampleForm: React.FC<SampleFormProps> = ({
                       required
                       error={meta.touched && !!meta.error}
                       helperText={meta.touched && meta.error}
-                      disabled={!canUpdate}
+                      disabled={isViewMode}
                     />
                   )}
                 </Field>
@@ -325,7 +330,7 @@ const SampleForm: React.FC<SampleFormProps> = ({
                       rows={2}
                       error={meta.touched && !!meta.error}
                       helperText={meta.touched && meta.error}
-                      disabled={!canUpdate}
+                      disabled={isViewMode}
                     />
                   )}
                 </Field>
@@ -360,7 +365,7 @@ const SampleForm: React.FC<SampleFormProps> = ({
                         fullWidth: true,
                         error: touched.due_date && !!errors.due_date,
                         helperText: touched.due_date && errors.due_date ? String(errors.due_date) : undefined,
-                        disabled: !canUpdate,
+                        disabled: isViewMode,
                       },
                     }}
                   />
@@ -396,7 +401,7 @@ const SampleForm: React.FC<SampleFormProps> = ({
                         fullWidth: true,
                         error: touched.received_date && !!errors.received_date,
                         helperText: touched.received_date && errors.received_date ? String(errors.received_date) : undefined,
-                        disabled: !canUpdate,
+                        disabled: isViewMode,
                       },
                     }}
                   />
@@ -414,7 +419,7 @@ const SampleForm: React.FC<SampleFormProps> = ({
                         fullWidth: true,
                         error: touched.report_date && !!errors.report_date,
                         helperText: touched.report_date && errors.report_date ? String(errors.report_date) : undefined,
-                        disabled: !canUpdate,
+                        disabled: isViewMode,
                       },
                     }}
                   />
@@ -428,7 +433,7 @@ const SampleForm: React.FC<SampleFormProps> = ({
                     value={values.sample_type || ''}
                     onChange={(e) => setFieldValue('sample_type', e.target.value)}
                     error={touched.sample_type && !!errors.sample_type}
-                    disabled={!canUpdate}
+                    disabled={isViewMode}
                   >
                     <MenuItem value="">None</MenuItem>
                     {lookupData.sampleTypes.map((type) => (
@@ -447,7 +452,7 @@ const SampleForm: React.FC<SampleFormProps> = ({
                     value={values.status || ''}
                     onChange={(e) => setFieldValue('status', e.target.value)}
                     error={touched.status && !!errors.status}
-                    disabled={!canUpdate}
+                    disabled={isViewMode}
                   >
                     <MenuItem value="">None</MenuItem>
                     {lookupData.statuses.map((status) => (
@@ -471,7 +476,7 @@ const SampleForm: React.FC<SampleFormProps> = ({
                     value={values.matrix || ''}
                     onChange={(e) => setFieldValue('matrix', e.target.value)}
                     error={touched.matrix && !!errors.matrix}
-                    disabled={!canUpdate}
+                    disabled={isViewMode}
                   >
                     <MenuItem value="">None</MenuItem>
                     {lookupData.matrices.map((matrix) => (
@@ -493,7 +498,7 @@ const SampleForm: React.FC<SampleFormProps> = ({
                       fullWidth
                       error={meta.touched && !!meta.error}
                       helperText={meta.touched && meta.error}
-                      disabled={!canUpdate}
+                      disabled={isViewMode}
                     />
                   )}
                 </Field>
@@ -506,7 +511,7 @@ const SampleForm: React.FC<SampleFormProps> = ({
                     value={values.qc_type || ''}
                     onChange={(e) => setFieldValue('qc_type', e.target.value || null)}
                     error={touched.qc_type && !!errors.qc_type}
-                    disabled={!canUpdate}
+                    disabled={isViewMode}
                   >
                     <MenuItem value="">None</MenuItem>
                     {lookupData.qcTypes.map((qcType) => (
@@ -573,16 +578,18 @@ const SampleForm: React.FC<SampleFormProps> = ({
 
             <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2, mt: 3 }}>
               <Button onClick={onCancel} disabled={loading}>
-                Cancel
+                {isViewMode && sample ? 'Close' : 'Cancel'}
               </Button>
-              <Button
-                type="submit"
-                variant="contained"
-                disabled={loading || !canUpdate}
-                aria-label={isEditMode ? 'Update sample' : 'Create sample'}
-              >
-                {loading ? 'Saving...' : isEditMode ? 'Update' : 'Create'}
-              </Button>
+              {!isViewMode && (
+                <Button
+                  type="submit"
+                  variant="contained"
+                  disabled={loading}
+                  aria-label={isEditMode ? 'Update sample' : 'Create sample'}
+                >
+                  {loading ? 'Saving...' : isEditMode ? 'Update' : 'Create'}
+                </Button>
+              )}
             </Box>
           </Form>
         )}

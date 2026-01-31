@@ -460,7 +460,7 @@ const AccessioningForm: React.FC = () => {
         projects: [], // Projects are auto-created, no need to fetch
         clients: Array.isArray(clients) ? clients : [],
         clientProjects: Array.isArray(clientProjectsArray) ? clientProjectsArray : [],
-        analyses,
+        analyses: analyses?.analyses || (Array.isArray(analyses) ? analyses : []),
         batteries: batteries.batteries || batteries || [],
         containerTypes,
         units,

@@ -218,12 +218,6 @@ const TestsManagement: React.FC = () => {
         </Alert>
       )}
 
-      {!isSystemClient() && !isAdmin() && user?.client_id && (
-        <Alert severity="info" sx={{ mb: 2 }}>
-          Showing tests for samples from your client's projects only. System users and administrators see all tests.
-        </Alert>
-      )}
-
       {!canUpdate && (
         <Alert severity="info" sx={{ mb: 2 }}>
           You have read-only access. Contact your administrator for update permissions.
