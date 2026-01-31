@@ -7,12 +7,16 @@ from uuid import UUID
 from datetime import datetime
 
 
+VALID_PLACEHOLDERS = ['{SEQ}', '{YYYY}', '{YY}', '{MM}', '{DD}', '{YYYYMMDD}', '{CLIENT}']
+
+
 class NameTemplateBase(BaseModel):
     """Base schema for name template data"""
     entity_type: str = Field(..., min_length=1, max_length=50, description="Entity type (sample, project, batch, analysis, container)")
     template: str = Field(..., min_length=1, max_length=500, description="Template string with placeholders")
     description: Optional[str] = Field(None, description="Description of the template")
     active: bool = Field(True, description="Whether the template is active")
+    seq_padding_digits: int = Field(1, ge=1, description="Number of digits for {SEQ} padding (1 = no padding)")
 
     @validator('entity_type')
     def validate_entity_type(cls, v):
@@ -25,7 +29,7 @@ class NameTemplateBase(BaseModel):
     @validator('template')
     def validate_template(cls, v):
         """Validate template contains valid placeholders"""
-        valid_placeholders = ['{SEQ}', '{YYYY}', '{MM}', '{DD}', '{YYYYMMDD}', '{CLIENT}']
+        valid_placeholders = VALID_PLACEHOLDERS
         # Check if template contains at least one valid placeholder or is a simple string
         if not any(ph in v for ph in valid_placeholders) and '{' in v:
             # Contains invalid placeholder
@@ -51,6 +55,7 @@ class NameTemplateUpdate(BaseModel):
     template: Optional[str] = Field(None, min_length=1, max_length=500)
     description: Optional[str] = None
     active: Optional[bool] = None
+    seq_padding_digits: Optional[int] = Field(None, ge=1)
 
     @validator('entity_type')
     def validate_entity_type(cls, v):
@@ -67,7 +72,7 @@ class NameTemplateUpdate(BaseModel):
         """Validate template contains valid placeholders"""
         if v is None:
             return v
-        valid_placeholders = ['{SEQ}', '{YYYY}', '{MM}', '{DD}', '{YYYYMMDD}', '{CLIENT}']
+        valid_placeholders = VALID_PLACEHOLDERS
         if not any(ph in v for ph in valid_placeholders) and '{' in v:
             import re
             matches = re.findall(r'\{[^}]+\}', v)

@@ -685,7 +685,7 @@ The Lists Management page (`/admin/lists`) provides a full administrative interf
 - **View**: All authenticated users can view the Lists Management page
 - **Edit**: Only users with `config:edit` permission can create, update, or delete lists and entries
 
-**Implementation**: `frontend/src/pages/admin/ListsManagement.tsx`
+**Implementation**: `frontend/src/pages/admin/ListsAdmin.tsx`
 
 ## Future Enhancements
 

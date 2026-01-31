@@ -149,6 +149,8 @@ nimblelims/
 - **Units Integration**: Concentration and amount with unit conversions
 
 ### Configuration Management
+- **Name Templates**: Configurable entity naming (sample, project, batch, etc.) with placeholders ({SEQ}, {YYYY}, {YY}, seq_padding_digits) and sequence start API (admin interface at `/admin/name-templates`)
+- **Custom Attributes Config**: Define and manage custom attribute definitions per entity type (admin interface at `/admin/custom-attributes`)
 - **Lists Management**: Full CRUD for lists and list entries via admin interface - create new lists, add/edit/delete entries for statuses, types, matrices, QC types, etc. Empty lists display expand arrows to add entries.
 - **Container Types**: Admin-managed container type definitions (CRUD operations)
 - **Analyses Management**: Create and manage analyses with methods, turnaround times, costs, and custom attributes. Features expandable grid rows to view and manage linked analytes directly from the main list (CRUD). Available in both Admin section and Lab Mgmt accordion.
@@ -222,6 +224,8 @@ docker exec lims-backend python run_migrations.py
 NimbleLIMS uses a unified sidebar navigation system that provides consistent access to all features:
 
 - **Unified Sidebar**: Persistent left sidebar (240px expanded, 56px collapsed) on all authenticated routes
+- **MainNav**: Admin section and sub-links are defined in `frontend/src/components/MainNav.tsx`; the Sidebar uses these for the Admin accordion (including **Name Templates** `/admin/name-templates`, **Custom Attributes** `/admin/custom-attributes`, **Lists** `/admin/lists`)
+- **React Router**: All routes are declared in `frontend/src/App.tsx`; admin routes are protected with `hasPermission('config:edit')` (or role-specific permissions)—unauthorized users are redirected to `/dashboard`
 - **Collapsible**: Desktop sidebar can be collapsed to icon-only mode with tooltips on hover
 - **Permission-Based**: Menu items dynamically shown/hidden based on user roles and permissions
 - **Accordion Sections**: Collapsible sections for Sample Management (Accessioning, Samples, Tests, Containers, Batches, Results), Lab Management (Projects, Clients, Client Projects, Analyses, Analytes), and Admin submenu items
@@ -251,6 +255,7 @@ Comprehensive documentation is available in the `.docs/` directory:
   - `.docs/nimblelims_dev_setup.md` - Development environment setup
   - `.docs/admin_setup.md` - Admin user configuration
 - **API Reference**: `.docs/api_endpoints.md` - Complete API endpoints documentation
+- **IDs and Configuration**: `.docs/ids-and-configuration.md` - How sample/project IDs and names work, where configuration is stored (name_templates, custom_attributes_config), and flow from configuration through use
 
 ## Support
 

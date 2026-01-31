@@ -119,8 +119,10 @@ Copyright (c) 2025 Marc Breneiser
 
 ### Admin Components
 - `AdminOverview` - Main admin dashboard with statistics (admin-only)
+- `NameTemplatesAdmin` - Manage name templates for entity naming (admin-only)
+- `CustomAttributesAdmin` - Manage custom attribute configurations (admin-only)
+- `ListsAdmin` - Manage lists and list entries (admin-only)
 - `ContainerTypesManagement` - Manage container types (admin-only)
-- `ListsManagement` - Manage lists and list entries (admin-only)
 - `AnalysesManagement` - Manage analyses (CRUD operations, admin-only)
 - `AnalysisAnalytesConfig` - Configure analyte rules and validation for analyses (admin-only)
 - `AnalytesManagement` - Manage analytes (CRUD operations, admin-only)
