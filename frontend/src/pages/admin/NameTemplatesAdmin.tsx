@@ -44,7 +44,7 @@ interface NameTemplate {
 }
 
 const ENTITY_TYPES = ['sample', 'project', 'batch', 'analysis', 'container'];
-const VALID_PLACEHOLDERS = ['{SEQ}', '{YYYY}', '{YY}', '{MM}', '{DD}', '{YYYYMMDD}', '{CLIENT}'];
+const VALID_PLACEHOLDERS = ['{SEQ}', '{YYYY}', '{YY}', '{MM}', '{DD}', '{YYYYMMDD}', '{CLIENT}', '{CLIABV}', '{BATCH}', '{PROJECT}'];
 
 /** Generate example preview from template string (client-side). seqPaddingDigits pads {SEQ} (e.g. 3 → 001). */
 function previewFromTemplate(template: string, seqPaddingDigits: number = 1): string {
@@ -59,7 +59,10 @@ function previewFromTemplate(template: string, seqPaddingDigits: number = 1): st
     .replace(/\{DD\}/g, String(now.getDate()).padStart(2, '0'))
     .replace(/\{YYYYMMDD\}/g, now.toISOString().slice(0, 10).replace(/-/g, ''))
     .replace(/\{SEQ\}/g, seqExample)
-    .replace(/\{CLIENT\}/g, 'ACME');
+    .replace(/\{CLIENT\}/g, 'ACME')
+    .replace(/\{CLIABV\}/g, 'ACME')
+    .replace(/\{BATCH\}/g, 'BATCH-001')
+    .replace(/\{PROJECT\}/g, 'PROJ-001');
   const invalidPlaceholders = out.match(/\{[^}]+\}/g);
   if (invalidPlaceholders?.length) return out;
   return out;
@@ -578,7 +581,7 @@ const NameTemplatesAdmin: React.FC = () => {
             value={formValues.template}
             onChange={(e) => setFormValues((v) => ({ ...v, template: e.target.value }))}
             error={!!formErrors.template}
-            helperText={formErrors.template || 'Valid placeholders: {SEQ}, {YYYY}, {YY}, {MM}, {DD}, {YYYYMMDD}, {CLIENT}'}
+            helperText={formErrors.template || `Valid placeholders: ${VALID_PLACEHOLDERS.join(', ')}`}
             placeholder="SAMPLE-{YY}-{SEQ}"
           />
 

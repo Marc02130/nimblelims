@@ -46,9 +46,11 @@ async def set_sequence_start(
             detail=f"entity_type must be one of: {', '.join(ALLOWED_ENTITY_TYPES)}"
         )
     sequence_name = f"name_template_seq_{entity_type_lower}"
+    # Ensure sequence exists (lazy creation) before setval
+    from app.core.name_generation import _ensure_sequence_exists
+    _ensure_sequence_exists(db, entity_type_lower)
     # Use setval so we can pass start_value as a bind parameter (ALTER SEQUENCE RESTART WITH doesn't support params).
     # setval(seq, value, is_called=False) means the next nextval() will return value.
-    # Sequence name is safe: built from validated entity_type_lower (allowed list only).
     try:
         db.execute(
             text(f"SELECT setval('{sequence_name}'::regclass, :start_value, false)"),

@@ -2096,7 +2096,7 @@ Authorization: Bearer <admin_token>
 
 ## Admin - Name Templates
 
-Name templates define how auto-generated entity names (e.g. sample, project, batch) are built. Placeholders: `{SEQ}` (padded by `seq_padding_digits` from the template: `formatted_seq = str(seq).zfill(template.seq_padding_digits)`), `{YYYY}`, `{YY}` (two-digit year: `str(now.year % 100).zfill(2)`), `{MM}`, `{DD}`, `{YYYYMMDD}`, `{CLIENT}`. See `backend/app/core/name_generation.py` and `.docs/ids-and-configuration.md`.
+Name templates define how auto-generated entity names (e.g. sample, project, batch) are built. Placeholders: `{SEQ}` (padded by `seq_padding_digits`; **scoped by “name without SEQ”** so e.g. template `{PROJECT}-{SEQ}` gives per-project sequences—first sample in each project is `…-01`), `{YYYY}`, `{YY}`, `{MM}`, `{DD}`, `{YYYYMMDD}`, `{CLIENT}` / `{CLIABV}` (client abbreviation when set, else client name), `{BATCH}` (batch name), `{PROJECT}` (project name). See `backend/app/core/name_generation.py` and `.docs/ids-and-configuration.md`.
 
 ### GET /admin/name-templates
 List name templates with filtering and pagination.
@@ -2141,10 +2141,10 @@ Preview a generated name without consuming a sequence value.
 
 ## Admin - Sequences (Name Template SEQ)
 
-Set the starting value for an entity type's name sequence (used by `{SEQ}` in name templates).
+Set the starting value for the **global** name sequence for an entity type (used when the template has no context; per-context sequences, e.g. per project, start at 1 when first used).
 
 ### POST /admin/sequences/{entity_type}/start
-Set the next value for the sequence `name_template_seq_{entity_type}`.
+Set the next value for the global sequence `name_template_seq_{entity_type}`.
 
 **Requires:** `config:edit` permission
 

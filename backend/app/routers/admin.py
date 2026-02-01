@@ -135,8 +135,10 @@ class NamePreviewResponse(BaseModel):
 @router.get("/preview", response_model=NamePreviewResponse)
 async def preview_generated_name(
     entity_type: str = Query(..., description="Entity type (sample, project, batch, analysis, container)"),
-    client_id: Optional[str] = Query(None, description="Client ID for {CLIENT} placeholder (UUID string)"),
+    client_id: Optional[str] = Query(None, description="Client ID for {CLIENT} placeholder (uses abbreviation if set)"),
     reference_date: Optional[str] = Query(None, description="Reference date in YYYY-MM-DD format for date placeholders"),
+    batch_name: Optional[str] = Query(None, description="Batch name for {BATCH} placeholder"),
+    project_name: Optional[str] = Query(None, description="Project name for {PROJECT} placeholder"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -177,7 +179,7 @@ async def preview_generated_name(
                     detail="reference_date must be in YYYY-MM-DD format"
                 )
         
-        # Get client name if client_id provided
+        # Get client abbreviation or name if client_id provided
         client_name = None
         if parsed_client_id:
             from models.client import Client
@@ -187,7 +189,7 @@ async def preview_generated_name(
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail="Client not found"
                 )
-            client_name = client.name
+            client_name = getattr(client, 'abbreviation', None) or client.name
         
         # Generate preview (this will use the current sequence value but not increment it)
         # We'll use a special preview mode that doesn't consume sequences
@@ -237,13 +239,23 @@ async def preview_generated_name(
             padding = getattr(template_obj, 'seq_padding_digits', 1) or 1
             replacements['{SEQ}'] = str(seq).zfill(padding)
         
-        # Client placeholder
-        if '{CLIENT}' in template:
+        # Client placeholder (abbreviation or name); {CLIENT} and {CLIABV} are synonyms
+        if '{CLIENT}' in template or '{CLIABV}' in template:
             if client_name:
                 client_code = client_name.upper().replace(' ', '').replace('-', '')[:10]
                 replacements['{CLIENT}'] = client_code
+                replacements['{CLIABV}'] = client_code
             else:
                 replacements['{CLIENT}'] = 'UNKNOWN'
+                replacements['{CLIABV}'] = 'UNKNOWN'
+        
+        # Batch placeholder
+        if '{BATCH}' in template:
+            replacements['{BATCH}'] = (batch_name and batch_name.strip()) or 'UNKNOWN'
+        
+        # Project placeholder
+        if '{PROJECT}' in template:
+            replacements['{PROJECT}'] = (project_name and project_name.strip()) or 'UNKNOWN'
         
         # Apply replacements
         preview = template

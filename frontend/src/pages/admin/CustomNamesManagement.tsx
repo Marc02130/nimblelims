@@ -50,7 +50,7 @@ interface NameTemplate {
 }
 
 const ENTITY_TYPES = ['sample', 'project', 'batch', 'analysis', 'container'];
-const VALID_PLACEHOLDERS = ['{SEQ}', '{YYYY}', '{YY}', '{MM}', '{DD}', '{YYYYMMDD}', '{CLIENT}'];
+const VALID_PLACEHOLDERS = ['{SEQ}', '{YYYY}', '{YY}', '{MM}', '{DD}', '{YYYYMMDD}', '{CLIENT}', '{CLIABV}', '{BATCH}', '{PROJECT}'];
 
 const validationSchema = Yup.object({
   entity_type: Yup.string()
@@ -70,7 +70,7 @@ const validationSchema = Yup.object({
     )
     .test(
       'valid-placeholders',
-      'Template contains invalid placeholders. Valid placeholders: {SEQ}, {YYYY}, {YY}, {MM}, {DD}, {YYYYMMDD}, {CLIENT}',
+      'Template contains invalid placeholders. Valid placeholders: {SEQ}, {YYYY}, {YY}, {MM}, {DD}, {YYYYMMDD}, {CLIENT}, {CLIABV}, {BATCH}, {PROJECT}',
       (value) => {
         if (!value) return true;
         const matches = value.match(/\{[^}]+\}/g);
@@ -458,7 +458,7 @@ const CustomNamesManagement: React.FC = () => {
                     helperText={
                       touched.template && errors.template
                         ? errors.template
-                        : 'Use placeholders: {SEQ}, {YYYY}, {YY}, {MM}, {DD}, {YYYYMMDD}, {CLIENT}. Example: SAMPLE-{YY}-{SEQ}'
+                        : 'Use placeholders: {SEQ}, {YYYY}, {YY}, {MM}, {DD}, {YYYYMMDD}, {CLIENT}, {CLIABV}, {BATCH}, {PROJECT}. Example: SAMPLE-{YY}-{SEQ}'
                     }
                     placeholder="SAMPLE-{YYYY}-{SEQ}"
                   />
@@ -486,7 +486,11 @@ const CustomNamesManagement: React.FC = () => {
                       <br />
                       • {'{YYYYMMDD}'} - Date in YYYYMMDD format
                       <br />
-                      • {'{CLIENT}'} - Client name/code (from linked client)
+                      • {'{CLIENT}'} / {'{CLIABV}'} - Client abbreviation or name (from linked client)
+                      <br />
+                      • {'{BATCH}'} - Batch name (e.g. when generating sample names in batch context)
+                      <br />
+                      • {'{PROJECT}'} - Project name (e.g. when generating sample names in project context)
                     </Typography>
                   </Box>
 
