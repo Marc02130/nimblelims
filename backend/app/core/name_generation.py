@@ -8,15 +8,34 @@ Templates support placeholders:
 - {MM}: 2-digit month
 - {DD}: 2-digit day
 - {YYYYMMDD}: Date in YYYYMMDD format
-- {CLIENT}: Client name/code (from linked client)
+- {CLIENT} / {CLIABV}: Client abbreviation if set, else client name (from linked client); both placeholders are synonyms
+- {BATCH}: Batch name (e.g. when generating sample names in batch context)
+- {PROJECT}: Project name (e.g. when generating sample names in project context)
 """
 from datetime import datetime
 from typing import Optional, Dict, Any
+import re
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 from models.name_template import NameTemplate
 import uuid
+
+# Max length for sequence_key suffix in sequence name (PostgreSQL identifier safe).
+SEQ_KEY_MAX_LEN = 50
+
+
+def _sanitize_sequence_key(key: str) -> Optional[str]:
+    """
+    Sanitize a string for use as part of a PostgreSQL sequence name.
+    Returns alphanumeric + underscore only, truncated to SEQ_KEY_MAX_LEN; or None if empty.
+    """
+    if not key or not key.strip():
+        return None
+    # Replace non-alphanumeric with underscore, collapse multiple underscores
+    safe = re.sub(r'[^a-zA-Z0-9_]', '_', key.strip())
+    safe = re.sub(r'_+', '_', safe).strip('_')
+    return safe[:SEQ_KEY_MAX_LEN] if safe else None
 
 
 def get_active_template(db: Session, entity_type: str) -> Optional[NameTemplate]:
@@ -27,12 +46,48 @@ def get_active_template(db: Session, entity_type: str) -> Optional[NameTemplate]
     ).first()
 
 
-def get_next_sequence(db: Session, entity_type: str) -> int:
+# Entity types that have a name-template sequence (sequence created on first use).
+ALLOWED_ENTITY_TYPES_FOR_SEQ = ('sample', 'project', 'batch', 'analysis', 'container')
+
+
+def _sequence_name(entity_type: str, sequence_key: Optional[str] = None) -> str:
+    """Build the PostgreSQL sequence name for entity_type and optional context key."""
+    if sequence_key:
+        return f'name_template_seq_{entity_type}_{sequence_key}'
+    return f'name_template_seq_{entity_type}'
+
+
+def _ensure_sequence_exists(db: Session, entity_type: str, sequence_key: Optional[str] = None) -> None:
     """
-    Get the next sequence number for an entity type.
-    Uses PostgreSQL sequences transactionally to avoid gaps.
+    Create the sequence for entity_type (and optional sequence_key) if it does not exist.
+    Sequences are created on first use, not in migrations.
+    When sequence_key is set (e.g. project name), the sequence is per-context (e.g. per project for samples).
     """
-    sequence_name = f'name_template_seq_{entity_type}'
+    if entity_type not in ALLOWED_ENTITY_TYPES_FOR_SEQ:
+        return
+    safe_key = _sanitize_sequence_key(sequence_key) if sequence_key else None
+    sequence_name = _sequence_name(entity_type, safe_key)
+    # Sequence name is safe: entity_type from allowed list, safe_key is sanitized alphanumeric + underscore
+    db.execute(text(f"""
+        CREATE SEQUENCE IF NOT EXISTS {sequence_name}
+        START WITH 1
+        INCREMENT BY 1
+        NO MINVALUE
+        NO MAXVALUE
+        CACHE 1
+    """))
+
+
+def get_next_sequence(db: Session, entity_type: str, sequence_key: Optional[str] = None) -> int:
+    """
+    Get the next sequence number for an entity type, optionally scoped by sequence_key.
+    When sequence_key is provided (e.g. resolved "name without {SEQ}" like project name),
+    the sequence is per-context so e.g. each project gets its own sample sequence (01, 02, ...).
+    Creates the sequence if it does not exist (lazy creation), then uses nextval.
+    """
+    safe_key = _sanitize_sequence_key(sequence_key) if sequence_key else None
+    _ensure_sequence_exists(db, entity_type, safe_key)
+    sequence_name = _sequence_name(entity_type, safe_key)
     result = db.execute(text(f"SELECT nextval('{sequence_name}')"))
     return result.scalar()
 
@@ -107,7 +162,7 @@ def generate_name(
     
     # Retry loop for uniqueness
     for attempt in range(max_retries):
-        # Build replacement dictionary
+        # Build replacement dictionary (non-SEQ first so we can compute sequence_key from "name without SEQ")
         replacements: Dict[str, str] = {}
         
         # Date placeholders
@@ -121,21 +176,40 @@ def generate_name(
             replacements['{DD}'] = f"{now.day:02d}"
         if '{YYYYMMDD}' in template:
             replacements['{YYYYMMDD}'] = now.strftime('%Y%m%d')
-        # Sequence placeholder: get seq_padding_digits from the template, fetch seq, then format
-        if '{SEQ}' in template:
-            seq_padding_digits = template_obj.seq_padding_digits or 1
-            seq = get_next_sequence(db, entity_type)
-            formatted_seq = str(seq).zfill(seq_padding_digits)
-            replacements['{SEQ}'] = formatted_seq
         
-        # Client placeholder
-        if '{CLIENT}' in template:
+        # Client placeholder (client_name is typically client.abbreviation or client.name from caller)
+        # {CLIENT} and {CLIABV} are synonyms (CLIABV = client abbreviation)
+        if '{CLIENT}' in template or '{CLIABV}' in template:
             if client_name:
-                # Use first 10 characters of client name, uppercase, no spaces
                 client_code = client_name.upper().replace(' ', '').replace('-', '')[:10]
                 replacements['{CLIENT}'] = client_code
+                replacements['{CLIABV}'] = client_code
             else:
                 replacements['{CLIENT}'] = 'UNKNOWN'
+                replacements['{CLIABV}'] = 'UNKNOWN'
+        
+        # Batch placeholder (e.g. sample names in batch context)
+        if '{BATCH}' in template:
+            batch_name = kwargs.get('batch_name') or kwargs.get('BATCH')
+            replacements['{BATCH}'] = (batch_name and str(batch_name).strip()) or 'UNKNOWN'
+        
+        # Project placeholder (e.g. sample names in project context)
+        if '{PROJECT}' in template:
+            project_name = kwargs.get('project_name') or kwargs.get('PROJECT')
+            replacements['{PROJECT}'] = (project_name and str(project_name).strip()) or 'UNKNOWN'
+        
+        # Sequence placeholder: scope by "name without SEQ" so e.g. each project gets its own sequence (01, 02, ...)
+        if '{SEQ}' in template:
+            seq_padding_digits = template_obj.seq_padding_digits or 1
+            # Compute sequence_key = resolved template with {SEQ} removed (e.g. "UTC2600001-" for {PROJECT}-{SEQ})
+            prefix = template
+            for ph, val in replacements.items():
+                prefix = prefix.replace(ph, val)
+            prefix = prefix.replace('{SEQ}', '').strip()
+            sequence_key = _sanitize_sequence_key(prefix) if prefix else None
+            seq = get_next_sequence(db, entity_type, sequence_key=sequence_key)
+            formatted_seq = str(seq).zfill(seq_padding_digits)
+            replacements['{SEQ}'] = formatted_seq
         
         # Apply replacements
         result = template
@@ -164,26 +238,45 @@ def generate_name_for_sample(
     db: Session,
     project_id: Optional[str] = None,
     received_date: Optional[datetime] = None,
+    batch_id: Optional[str] = None,
+    batch_name: Optional[str] = None,
     **kwargs
 ) -> str:
     """
-    Generate a name for a sample, optionally using project's client.
+    Generate a name for a sample, optionally using project's client, project name, and batch name.
     
     Args:
         db: Database session
-        project_id: Optional project ID to get client name from
+        project_id: Optional project ID to get client (abbreviation or name) and project name for {PROJECT}
         received_date: Optional received date to use for date placeholders
+        batch_id: Optional batch ID to resolve batch name for {BATCH}
+        batch_name: Optional batch name for {BATCH} (used if batch_id not provided)
         **kwargs: Additional context for template placeholders
     
     Returns:
         Generated sample name
     """
     client_name = None
+    project_name = None
     if project_id:
         from models.project import Project
         project = db.query(Project).filter(Project.id == project_id).first()
-        if project and project.client:
-            client_name = project.client.name
+        if project:
+            if project.client:
+                # Prefer client abbreviation (CLIABV) for {CLIENT}, else client name
+                client_name = getattr(project.client, 'abbreviation', None) or project.client.name
+            project_name = project.name
+    if project_name is not None:
+        kwargs = {**kwargs, 'project_name': project_name}
+    
+    # Resolve batch name for {BATCH} if batch_id given
+    if batch_id and not batch_name:
+        from models.batch import Batch
+        batch = db.query(Batch).filter(Batch.id == batch_id).first()
+        if batch:
+            batch_name = batch.name
+    if batch_name is not None:
+        kwargs = {**kwargs, 'batch_name': batch_name}
     
     return generate_name(
         db, 
@@ -217,7 +310,7 @@ def generate_name_for_project(
         from models.client import Client
         client = db.query(Client).filter(Client.id == client_id).first()
         if client:
-            client_name = client.name
+            client_name = getattr(client, 'abbreviation', None) or client.name
     
     return generate_name(
         db, 

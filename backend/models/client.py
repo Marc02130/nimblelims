@@ -10,6 +10,7 @@ class Client(BaseModel):
     __tablename__ = 'clients'
     
     # Client-specific fields
+    abbreviation = Column(String(50), unique=True, nullable=True)  # Optional, unique; used for {CLIENT} in naming
     billing_info = Column(JSONB, default={})
     
     # Relationships - explicitly specify foreign keys

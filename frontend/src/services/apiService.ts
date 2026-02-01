@@ -784,6 +784,7 @@ class ApiService {
   async createClient(clientData: {
     name: string;
     description?: string;
+    abbreviation?: string;
     billing_info?: Record<string, any>;
   }) {
     const response: AxiosResponse = await this.api.post('/clients', clientData);
@@ -793,6 +794,7 @@ class ApiService {
   async updateClient(id: string, clientData: {
     name?: string;
     description?: string;
+    abbreviation?: string;
     billing_info?: Record<string, any>;
     active?: boolean;
   }) {

@@ -12,6 +12,7 @@ class ClientResponse(BaseModel):
     id: UUID
     name: str
     description: Optional[str] = None
+    abbreviation: Optional[str] = None
     billing_info: Optional[Dict[str, Any]] = None
     active: bool
     created_at: datetime
@@ -25,6 +26,7 @@ class ClientCreate(BaseModel):
     """Schema for creating a client"""
     name: str
     description: Optional[str] = None
+    abbreviation: Optional[str] = None
     billing_info: Optional[Dict[str, Any]] = None
 
 
@@ -32,6 +34,7 @@ class ClientUpdate(BaseModel):
     """Schema for updating a client"""
     name: Optional[str] = None
     description: Optional[str] = None
+    abbreviation: Optional[str] = None
     billing_info: Optional[Dict[str, Any]] = None
     active: Optional[bool] = None
 
