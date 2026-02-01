@@ -74,10 +74,20 @@ async def create_client(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Client name already exists"
         )
+    # Check for unique abbreviation if provided
+    if client_data.abbreviation and client_data.abbreviation.strip():
+        abbr = client_data.abbreviation.strip()
+        existing = db.query(Client).filter(Client.abbreviation == abbr).first()
+        if existing:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Client abbreviation already exists"
+            )
     
     new_client = Client(
         name=client_data.name,
         description=client_data.description,
+        abbreviation=client_data.abbreviation.strip() if client_data.abbreviation and client_data.abbreviation.strip() else None,
         billing_info=client_data.billing_info or {},
         created_by=current_user.id,
         modified_by=current_user.id,
@@ -120,6 +130,17 @@ async def update_client(
     
     if client_data.description is not None:
         client.description = client_data.description
+    
+    if client_data.abbreviation is not None:
+        abbr = client_data.abbreviation.strip() if client_data.abbreviation else None
+        if abbr:
+            existing = db.query(Client).filter(Client.abbreviation == abbr, Client.id != client_id).first()
+            if existing:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Client abbreviation already exists"
+                )
+        client.abbreviation = abbr or None
     
     if client_data.billing_info is not None:
         client.billing_info = client_data.billing_info

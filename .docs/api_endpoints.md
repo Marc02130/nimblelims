@@ -2096,7 +2096,7 @@ Authorization: Bearer <admin_token>
 
 ## Admin - Name Templates
 
-Name templates define how auto-generated entity names (e.g. sample, project, batch) are built. Placeholders: `{SEQ}` (padded by `seq_padding_digits` from the template: `formatted_seq = str(seq).zfill(template.seq_padding_digits)`), `{YYYY}`, `{YY}` (two-digit year: `str(now.year % 100).zfill(2)`), `{MM}`, `{DD}`, `{YYYYMMDD}`, `{CLIENT}`. See `backend/app/core/name_generation.py` and `.docs/ids-and-configuration.md`.
+Name templates define how auto-generated entity names (e.g. sample, project, batch) are built. Placeholders: `{SEQ}` (padded by `seq_padding_digits`), `{YYYY}`, `{YY}`, `{MM}`, `{DD}`, `{YYYYMMDD}`, `{CLIENT}` (client abbreviation when set, else client name), `{BATCH}` (batch name), `{PROJECT}` (project name; e.g. when generating sample names). See `backend/app/core/name_generation.py` and `.docs/ids-and-configuration.md`.
 
 ### GET /admin/name-templates
 List name templates with filtering and pagination.

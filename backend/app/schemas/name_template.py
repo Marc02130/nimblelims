@@ -7,7 +7,7 @@ from uuid import UUID
 from datetime import datetime
 
 
-VALID_PLACEHOLDERS = ['{SEQ}', '{YYYY}', '{YY}', '{MM}', '{DD}', '{YYYYMMDD}', '{CLIENT}']
+VALID_PLACEHOLDERS = ['{SEQ}', '{YYYY}', '{YY}', '{MM}', '{DD}', '{YYYYMMDD}', '{CLIENT}', '{CLIABV}', '{BATCH}', '{PROJECT}']
 
 
 class NameTemplateBase(BaseModel):

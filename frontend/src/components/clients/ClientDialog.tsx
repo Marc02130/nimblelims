@@ -21,19 +21,28 @@ interface ClientDialogProps {
     id: string;
     name: string;
     description?: string;
+    abbreviation?: string;
     active: boolean;
   } | null;
   existingNames: string[];
+  existingAbbreviations: string[];
   onClose: () => void;
   onSubmit: (data: {
     name: string;
     description?: string;
+    abbreviation?: string;
     active: boolean;
   }) => Promise<void>;
   readOnly?: boolean;
 }
 
-const createValidationSchema = (isEdit: boolean, existingNames: string[], currentName?: string) => Yup.object({
+const createValidationSchema = (
+  isEdit: boolean,
+  existingNames: string[],
+  existingAbbreviations: string[],
+  currentName?: string,
+  currentAbbreviation?: string
+) => Yup.object({
   name: Yup.string()
     .required('Name is required')
     .min(1, 'Name must be at least 1 character')
@@ -45,6 +54,16 @@ const createValidationSchema = (isEdit: boolean, existingNames: string[], curren
     }),
   description: Yup.string()
     .max(1000, 'Description must be less than 1000 characters'),
+  abbreviation: Yup.string()
+    .max(50, 'Abbreviation must be 50 characters or less')
+    .nullable()
+    .transform((v) => (v === '' ? undefined : v))
+    .test('unique', 'This abbreviation is already used', (value) => {
+      if (!value || !value.trim()) return true;
+      const abbr = value.trim();
+      if (isEdit && abbr === currentAbbreviation) return true;
+      return !existingAbbreviations.includes(abbr);
+    }),
   active: Yup.boolean(),
 });
 
@@ -52,6 +71,7 @@ const ClientDialog: React.FC<ClientDialogProps> = ({
   open,
   client,
   existingNames,
+  existingAbbreviations,
   onClose,
   onSubmit,
   readOnly = false,
@@ -64,21 +84,28 @@ const ClientDialog: React.FC<ClientDialogProps> = ({
   const initialValues = {
     name: client?.name || '',
     description: client?.description || '',
+    abbreviation: client?.abbreviation || '',
     active: client?.active ?? true,
   };
 
   const handleSubmit = async (values: {
     name: string;
     description?: string;
+    abbreviation?: string;
     active: boolean;
   }) => {
     setLoading(true);
     setError(null);
 
     try {
-      // Check for uniqueness (excluding current client if editing)
-      if (existingNames.includes(values.name) && (!isEdit || values.name !== client.name)) {
+      if (existingNames.includes(values.name) && (!isEdit || values.name !== client!.name)) {
         setError('A client with this name already exists');
+        setLoading(false);
+        return;
+      }
+      const abbr = values.abbreviation?.trim();
+      if (abbr && existingAbbreviations.includes(abbr) && (!isEdit || abbr !== client!.abbreviation)) {
+        setError('This abbreviation is already used');
         setLoading(false);
         return;
       }
@@ -86,16 +113,14 @@ const ClientDialog: React.FC<ClientDialogProps> = ({
       const submitData: {
         name: string;
         description?: string;
+        abbreviation?: string;
         active: boolean;
       } = {
         name: values.name,
         active: values.active,
       };
-
-      // Include description if provided
-      if (values.description) {
-        submitData.description = values.description;
-      }
+      if (values.description) submitData.description = values.description;
+      if (abbr) submitData.abbreviation = abbr;
 
       await onSubmit(submitData);
       onClose();
@@ -110,7 +135,7 @@ const ClientDialog: React.FC<ClientDialogProps> = ({
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
       <Formik
         initialValues={initialValues}
-        validationSchema={createValidationSchema(isEdit, existingNames, client?.name)}
+        validationSchema={createValidationSchema(isEdit, existingNames, existingAbbreviations, client?.name, client?.abbreviation)}
         onSubmit={handleSubmit}
         enableReinitialize
       >
@@ -137,6 +162,22 @@ const ClientDialog: React.FC<ClientDialogProps> = ({
                           margin="normal"
                           disabled={readOnly}
                           helperText={meta.touched && meta.error ? meta.error : 'Unique name for the client organization'}
+                          error={meta.touched && !!meta.error}
+                        />
+                      )}
+                    </Field>
+                  </Grid>
+
+                  <Grid size={{ xs: 12 }}>
+                    <Field name="abbreviation">
+                      {({ field, meta }: any) => (
+                        <TextField
+                          {...field}
+                          label="Client abbreviation (CLIABV)"
+                          fullWidth
+                          margin="normal"
+                          disabled={readOnly}
+                          helperText={meta.touched && meta.error ? meta.error : 'Optional, unique. Used for {CLIENT} in name templates.'}
                           error={meta.touched && !!meta.error}
                         />
                       )}
