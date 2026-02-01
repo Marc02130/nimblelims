@@ -33,15 +33,15 @@ Configuration that depends on entity type (sample, project, etc.) is stored in a
 | What | Where stored | How entity type is used |
 | --- | --- | --- |
 | Template string and metadata | Table `name_templates` | Column `entity_type` (e.g. `'sample'`, `'project'`, `'batch'`, `'analysis'`, `'container'`). Only **one active** template per `entity_type` (unique partial index). |
-| Next sequence number for `{SEQ}` | PostgreSQL sequences | One sequence per entity type: `name_template_seq_sample`, `name_template_seq_project`, etc. **Created on first use** in `name_generation.get_next_sequence()` (not in migrations). |
-| Sequence starting value | PostgreSQL sequences (via POST `/admin/sequences/{entity_type}/start`) | Admins set the next value; the sequence is created if it does not exist. |
+| Next sequence number for `{SEQ}` | PostgreSQL sequences | **Scoped by “name without {SEQ}”** (sequence_key): e.g. template `{PROJECT}-{SEQ}` gives one sequence per project (`name_template_seq_sample_UTC2600001`, `name_template_seq_sample_UTC2600002`), so the first sample in each project is `…-01`. If the template has no context (e.g. `SAMPLE-{SEQ}`), a single global sequence per entity type is used. **Created on first use** in `name_generation.get_next_sequence()` (not in migrations). |
+| Sequence starting value | PostgreSQL sequences (via POST `/admin/sequences/{entity_type}/start`) | Admins set the next value for the **global** sequence (no key); the sequence is created if it does not exist. Per-context sequences (e.g. per project) start at 1 when first used. |
 | Padding digits for `{SEQ}` | Table `name_templates` (new column: `seq_padding_digits`) | Defaults to 1 (no padding); e.g., 3 for zero-padding to 3 digits (001, 002, ...). |
 | Code for `{CLIENT}` (CLIABV) | Table `clients` (column `abbreviation`) | Optional, unique; when set, used for {CLIENT} in naming; else client name is used. |
 
 So “where configuration is stored” for naming is:
 
 - **name_templates**: one row per logical entity type (and only one active per type). The row’s `entity_type` selects which template (and thus which sequence) is used when generating a name for that kind of entity. Now includes `seq_padding_digits` for controlling {SEQ} formatting.
-- **Sequences**: created lazily when the first name is generated for an entity type (or when an admin sets a sequence start). Migrations do not create or drop them; see “Sequences and migrations” below.
+- **Sequences**: created lazily when the first name is generated (or when an admin sets a sequence start). When the template includes context (e.g. `{PROJECT}`), the sequence is **per-context** (e.g. per project), so each project gets its own sample sequence (01, 02, …). Migrations do not create or drop them; see “Sequences and migrations” below.
 
 **Default templates** (seeded in migration 0021):
 
@@ -88,7 +88,7 @@ So “where configuration is stored” for these dropdowns is **lists** and **li
 
    - Admin creates or updates rows in **name_templates** (e.g. `entity_type = 'sample'`, `template = 'SAMPLE-{YYYY}-{SEQ}'`, `seq_padding_digits = 3`).
    - Only one active template per `entity_type`.
-   - Sequences `name_template_seq_*` are created by migration and incremented when `{SEQ}` is used. Admins can set starting values (e.g., ALTER SEQUENCE name_template_seq_sample RESTART WITH 100;).
+   - Sequences are created on first use (not in migrations). When the template has context (e.g. `{PROJECT}-{SEQ}`), the sequence is **per-context** (e.g. per project): each project gets its own sequence so the first sample in project A is `A-01`, the first in project B is `B-01`. Admins can set the global sequence start via POST `/admin/sequences/{entity_type}/start`.
    - Padding is applied to {SEQ} (e.g., with seq_padding_digits=3, 1 becomes '001').
 
 2. **At create time (e.g. accession)**
@@ -97,8 +97,8 @@ So “where configuration is stored” for these dropdowns is **lists** and **li
    - Backend calls the appropriate generator (e.g. `generate_name_for_sample()`, `generate_name_for_project()`) in `backend/app/core/name_generation.py`.
    - Generator:
      - Loads the **active template** for that entity type from **name_templates`, including `seq_padding_digits`.
-     - Gets the next **sequence** value for that entity type via `get_next_sequence(entity_type)`.
-     - **Placeholder resolution**: `{YY}` = `str(now.year % 100).zfill(2)`; for `{SEQ}`, `seq_padding_digits` is read from the template row, then `formatted_seq = str(seq).zfill(template.seq_padding_digits)`; other placeholders (e.g. {YYYY}, {MM}, {DD}, {YYYYMMDD}, {CLIENT}) as defined in `name_generation.py`.
+     - Gets the next **sequence** value: the “name without {SEQ}” (e.g. resolved `{PROJECT}`) is used as a sequence_key so the sequence is per-context (e.g. per project). `get_next_sequence(db, entity_type, sequence_key=…)`; then `formatted_seq = str(seq).zfill(template.seq_padding_digits)`.
+     - **Placeholder resolution**: `{YY}` = `str(now.year % 100).zfill(2)`; for `{SEQ}`, sequence_key = resolved template with {SEQ} removed (so e.g. per-project); other placeholders (e.g. {YYYY}, {CLIENT}, {CLIABV}, {PROJECT}) as defined in `name_generation.py`.
      - Checks **uniqueness** against the entity table (e.g. `samples.name`, `projects.name`).
      - Returns the name; the row is inserted with this `name` and a new UUID `id`.
 
@@ -212,7 +212,7 @@ Name-template sequences (`name_template_seq_sample`, etc.) are **not** created o
 
 - **Base model (UUID** `id`**,** `name`**)**: `backend/models/base.py`
 - **Name templates model**: `backend/models/name_template.py` (includes `seq_padding_digits`).
-- **Name generation**: `backend/app/core/name_generation.py` — `get_active_template()`, `get_next_sequence()`, `generate_name()`, `generate_name_for_sample()`, `generate_name_for_project()`, etc. Placeholder resolution: `{YY}` = `str(now.year % 100).zfill(2)`; for `{SEQ}`, `seq_padding_digits` from the template, then `formatted_seq = str(seq).zfill(template.seq_padding_digits)`. Other placeholders: `{YYYY}`, `{MM}`, `{DD}`, `{YYYYMMDD}`, `{CLIENT}`.
+- **Name generation**: `backend/app/core/name_generation.py` — `get_active_template()`, `get_next_sequence(db, entity_type, sequence_key=…)`, `generate_name()`, etc. For `{SEQ}`, the sequence is scoped by “name without {SEQ}” (sequence_key), so e.g. template `{PROJECT}-{SEQ}` gives per-project sequences (each project gets 01, 02, …). Placeholders: `{CLIENT}`, `{CLIABV}`, `{PROJECT}`, `{BATCH}`, date placeholders.
 - **Migration (name_templates table + seeds only; no sequences)**: `backend/db/migrations/versions/0021_configurable_names.py`. Sequences are created at runtime by `name_generation.get_next_sequence()`. **Migration 0031**: adds `seq_padding_digits` column (default 1) if present.
 - **Sequence start API**: `backend/app/routers/sequences.py` — POST `/admin/sequences/{entity_type}/start` (body: `{ "start_value": int }`); requires `config:edit`.
 - **Custom attributes config model**: `backend/models/custom_attributes_config.py`

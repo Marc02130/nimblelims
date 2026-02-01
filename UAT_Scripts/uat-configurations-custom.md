@@ -153,6 +153,56 @@ Verify name template admin page and preview use placeholder {YY} (two-digit year
 
 ---
 
+## Test Case 0b: Per-Project Sample Sequence ({PROJECT}-{SEQ})
+
+### Test Case ID
+TC-NAME-TEMPLATE-PER-PROJECT-0b
+
+### Description
+Verify that when the sample name template includes `{PROJECT}-{SEQ}` (or similar), the sequence is **per project**: the first sample in each project gets `01`, the second `02`, etc. So project UTC2600001 has samples UTC2600001-01, UTC2600001-02; project UTC2600002 has UTC2600002-01, UTC2600002-02 (not UTC2600002-02 as the second sample overall).
+
+### Preconditions
+
+| Item | Value |
+|------|-------|
+| **User Role** | Administrator |
+| **Sample template** | Active template for entity_type `sample` uses `{PROJECT}-{SEQ}` (or `{CLIABV}{YY}{SEQ}-{SEQ}` with project context). |
+| **Two projects** | At least two projects exist (e.g. UTC2600001, UTC2600002). |
+
+### Test Steps
+
+| Step | Action | Expected Result |
+|------|--------|-----------------|
+| 1 | Log in as Administrator | User authenticated |
+| 2 | Accession a sample in project A (e.g. UTC2600001) without supplying name | Sample name generated: e.g. `UTC2600001-01` |
+| 3 | Accession a sample in project B (e.g. UTC2600002) without supplying name | Sample name generated: e.g. `UTC2600002-01` (sequence 01 for this project, not 02) |
+| 4 | Accession another sample in project A without name | Sample name: e.g. `UTC2600001-02` |
+| 5 | Accession another sample in project B without name | Sample name: e.g. `UTC2600002-02` |
+
+### Expected Results
+
+| Category | Expected Outcome |
+|----------|------------------|
+| **Per-project sequence** | Backend uses “name without {SEQ}” (e.g. project name) as sequence_key in `get_next_sequence(db, 'sample', sequence_key=…)`. Each project has its own sequence (e.g. `name_template_seq_sample_UTC2600001`, `name_template_seq_sample_UTC2600002`). See `.docs/ids-and-configuration.md`. |
+| **Sample IDs** | First sample in project A: `A-01`; first sample in project B: `B-01`; second in A: `A-02`; second in B: `B-02`. |
+
+### Pass/Fail Criteria
+
+| Criteria | Pass | Fail |
+|----------|------|------|
+| First sample in project A has suffix 01 | ✓ | ✗ |
+| First sample in project B has suffix 01 | ✓ | ✗ |
+| Second sample in project A has suffix 02 | ✓ | ✗ |
+| Second sample in project B has suffix 02 | ✓ | ✗ |
+
+### Test Result
+- [ ] **PASS** - All criteria met
+- [ ] **FAIL** - One or more criteria not met
+
+**Notes**: _________________________________________________________
+
+---
+
 ## Test Case 1: List Editing - Add Status Entry
 
 ### Test Case ID
