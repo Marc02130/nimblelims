@@ -23,6 +23,7 @@ def upgrade() -> None:
         sa.Column('entity_type', sa.String(50), nullable=False),
         sa.Column('template', sa.String(500), nullable=False),
         sa.Column('description', sa.Text, nullable=True),
+        sa.Column('seq_padding_digits', sa.Integer(), nullable=False, server_default='1'),
         sa.Column('active', sa.Boolean(), nullable=False, server_default='true'),
         sa.Column('created_at', sa.DateTime(), nullable=False, server_default=sa.text('NOW()')),
         sa.Column('created_by', postgresql.UUID(as_uuid=True), nullable=True),
@@ -43,18 +44,8 @@ def upgrade() -> None:
         WHERE active = true
     """)
     
-    # Create PostgreSQL sequences for SEQ placeholder per entity type
-    entity_types = ['sample', 'project', 'batch', 'analysis', 'container']
-    for entity_type in entity_types:
-        sequence_name = f'name_template_seq_{entity_type}'
-        op.execute(f"""
-            CREATE SEQUENCE IF NOT EXISTS {sequence_name}
-            START WITH 1
-            INCREMENT BY 1
-            NO MINVALUE
-            NO MAXVALUE
-            CACHE 1
-        """)
+    # Sequences for {SEQ} are created on first use in name_generation.get_next_sequence()
+    # (CREATE SEQUENCE IF NOT EXISTS). Not created here so migrations stay free of sequence lifecycle.
     
     # Enable RLS on name_templates
     op.execute("ALTER TABLE name_templates ENABLE ROW LEVEL SECURITY;")
@@ -96,36 +87,41 @@ def upgrade() -> None:
         {
             'id': 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1',
             'entity_type': 'sample',
-            'template': 'SAMPLE-{YYYY}-{SEQ}',
-            'description': 'Default sample naming template: SAMPLE-YYYY-SEQ (e.g., SAMPLE-2024-001)',
+            'template': '{PROJECT}-{SEQ}',
+            'description': 'Default sample naming template: PROJECT-SEQ (e.g., PROJECT-001)',
+            'seq_padding_digits': 2,
             'active': True
         },
         {
             'id': 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa2',
             'entity_type': 'project',
-            'template': 'PROJ-{CLIENT}-{YYYYMMDD}-{SEQ}',
-            'description': 'Default project naming template: PROJ-CLIENT-YYYYMMDD-SEQ (e.g., PROJ-ACME-20240108-001)',
+            'template': '{CLIABV}{YY}{SEQ}',
+            'description': 'Default project naming template: CLIABVYY-SEQ (e.g., ACME2400001)',
+            'seq_padding_digits': 5,
             'active': True
         },
         {
             'id': 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa3',
             'entity_type': 'batch',
-            'template': 'BATCH-{YYYYMMDD}-{SEQ}',
-            'description': 'Default batch naming template: BATCH-YYYYMMDD-SEQ (e.g., BATCH-20240108-001)',
+            'template': 'B{YY}{SEQ}',
+            'description': 'Default batch naming template: BYYSEQ (e.g., B2400001)',
+            'seq_padding_digits': 5,
             'active': True
         },
         {
             'id': 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa4',
             'entity_type': 'analysis',
             'template': 'ANALYSIS-{SEQ}',
-            'description': 'Default analysis naming template: ANALYSIS-SEQ (e.g., ANALYSIS-001)',
+            'description': 'Default analysis naming template: ANALYSIS-SEQ (e.g., ANALYSIS-0001)',
+            'seq_padding_digits': 4,
             'active': True
         },
         {
             'id': 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa5',
             'entity_type': 'container',
-            'template': 'CONT-{YYYYMMDD}-{SEQ}',
-            'description': 'Default container naming template: CONT-YYYYMMDD-SEQ (e.g., CONT-20240108-001)',
+            'template': '{YYMM}-{SEQ}',
+            'description': 'Default container naming template: YYMM-SEQ (e.g., CONT-20240108-001)',
+            'seq_padding_digits': 6,
             'active': True
         },
     ]
@@ -133,12 +129,13 @@ def upgrade() -> None:
     for template_data in initial_templates:
         connection.execute(
             sa.text("""
-                INSERT INTO name_templates (id, entity_type, template, description, active, created_at, modified_at, created_by, modified_by)
-                VALUES (:id, :entity_type, :template, :description, :active, NOW(), NOW(), :created_by, :modified_by)
+                INSERT INTO name_templates (id, entity_type, template, description, seq_padding_digits, active, created_at, modified_at, created_by, modified_by)
+                VALUES (:id, :entity_type, :template, :description, :seq_padding_digits, :active, NOW(), NOW(), :created_by, :modified_by)
                 ON CONFLICT (id) DO UPDATE SET
                     entity_type = EXCLUDED.entity_type,
                     template = EXCLUDED.template,
                     description = EXCLUDED.description,
+                    seq_padding_digits = EXCLUDED.seq_padding_digits,
                     active = EXCLUDED.active,
                     modified_at = NOW(),
                     modified_by = EXCLUDED.modified_by
@@ -149,6 +146,7 @@ def upgrade() -> None:
                 'template': template_data['template'],
                 'description': template_data['description'],
                 'active': template_data['active'],
+                'seq_padding_digits': template_data['seq_padding_digits'],
                 'created_by': admin_id,
                 'modified_by': admin_id
             }
@@ -167,11 +165,9 @@ def downgrade() -> None:
     op.drop_index('idx_name_templates_entity_type_active_unique', table_name='name_templates')
     op.drop_index('idx_name_templates_entity_type', table_name='name_templates')
     
-    # Drop sequences
-    entity_types = ['sample', 'project', 'batch', 'analysis', 'container']
-    for entity_type in entity_types:
-        sequence_name = f'name_template_seq_{entity_type}'
-        op.execute(f"DROP SEQUENCE IF EXISTS {sequence_name};")
+    # Sequences (if any) were created at runtime by name_generation; optionally drop them in downgrade:
+    # for entity_type in ('sample', 'project', 'batch', 'analysis', 'container'):
+    #     op.execute(f"DROP SEQUENCE IF EXISTS name_template_seq_{entity_type};")
     
     # Drop table
     op.drop_table('name_templates')

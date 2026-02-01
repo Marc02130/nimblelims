@@ -8,7 +8,9 @@ Templates support placeholders:
 - {MM}: 2-digit month
 - {DD}: 2-digit day
 - {YYYYMMDD}: Date in YYYYMMDD format
-- {CLIENT}: Client name/code (from linked client)
+- {CLIENT} / {CLIABV}: Client abbreviation if set, else client name (from linked client); both placeholders are synonyms
+- {BATCH}: Batch name (e.g. when generating sample names in batch context)
+- {PROJECT}: Project name (e.g. when generating sample names in project context)
 """
 from datetime import datetime
 from typing import Optional, Dict, Any
@@ -27,11 +29,34 @@ def get_active_template(db: Session, entity_type: str) -> Optional[NameTemplate]
     ).first()
 
 
+# Entity types that have a name-template sequence (sequence created on first use).
+ALLOWED_ENTITY_TYPES_FOR_SEQ = ('sample', 'project', 'batch', 'analysis', 'container')
+
+
+def _ensure_sequence_exists(db: Session, entity_type: str) -> None:
+    """
+    Create the sequence for entity_type if it does not exist.
+    Sequences are created on first use, not in migrations.
+    """
+    if entity_type not in ALLOWED_ENTITY_TYPES_FOR_SEQ:
+        return
+    sequence_name = f'name_template_seq_{entity_type}'
+    db.execute(text(f"""
+        CREATE SEQUENCE IF NOT EXISTS {sequence_name}
+        START WITH 1
+        INCREMENT BY 1
+        NO MINVALUE
+        NO MAXVALUE
+        CACHE 1
+    """))
+
+
 def get_next_sequence(db: Session, entity_type: str) -> int:
     """
     Get the next sequence number for an entity type.
-    Uses PostgreSQL sequences transactionally to avoid gaps.
+    Creates the sequence if it does not exist (lazy creation), then uses nextval.
     """
+    _ensure_sequence_exists(db, entity_type)
     sequence_name = f'name_template_seq_{entity_type}'
     result = db.execute(text(f"SELECT nextval('{sequence_name}')"))
     return result.scalar()
@@ -128,14 +153,26 @@ def generate_name(
             formatted_seq = str(seq).zfill(seq_padding_digits)
             replacements['{SEQ}'] = formatted_seq
         
-        # Client placeholder
-        if '{CLIENT}' in template:
+        # Client placeholder (client_name is typically client.abbreviation or client.name from caller)
+        # {CLIENT} and {CLIABV} are synonyms (CLIABV = client abbreviation)
+        if '{CLIENT}' in template or '{CLIABV}' in template:
             if client_name:
-                # Use first 10 characters of client name, uppercase, no spaces
                 client_code = client_name.upper().replace(' ', '').replace('-', '')[:10]
                 replacements['{CLIENT}'] = client_code
+                replacements['{CLIABV}'] = client_code
             else:
                 replacements['{CLIENT}'] = 'UNKNOWN'
+                replacements['{CLIABV}'] = 'UNKNOWN'
+        
+        # Batch placeholder (e.g. sample names in batch context)
+        if '{BATCH}' in template:
+            batch_name = kwargs.get('batch_name') or kwargs.get('BATCH')
+            replacements['{BATCH}'] = (batch_name and str(batch_name).strip()) or 'UNKNOWN'
+        
+        # Project placeholder (e.g. sample names in project context)
+        if '{PROJECT}' in template:
+            project_name = kwargs.get('project_name') or kwargs.get('PROJECT')
+            replacements['{PROJECT}'] = (project_name and str(project_name).strip()) or 'UNKNOWN'
         
         # Apply replacements
         result = template
@@ -164,26 +201,45 @@ def generate_name_for_sample(
     db: Session,
     project_id: Optional[str] = None,
     received_date: Optional[datetime] = None,
+    batch_id: Optional[str] = None,
+    batch_name: Optional[str] = None,
     **kwargs
 ) -> str:
     """
-    Generate a name for a sample, optionally using project's client.
+    Generate a name for a sample, optionally using project's client, project name, and batch name.
     
     Args:
         db: Database session
-        project_id: Optional project ID to get client name from
+        project_id: Optional project ID to get client (abbreviation or name) and project name for {PROJECT}
         received_date: Optional received date to use for date placeholders
+        batch_id: Optional batch ID to resolve batch name for {BATCH}
+        batch_name: Optional batch name for {BATCH} (used if batch_id not provided)
         **kwargs: Additional context for template placeholders
     
     Returns:
         Generated sample name
     """
     client_name = None
+    project_name = None
     if project_id:
         from models.project import Project
         project = db.query(Project).filter(Project.id == project_id).first()
-        if project and project.client:
-            client_name = project.client.name
+        if project:
+            if project.client:
+                # Prefer client abbreviation (CLIABV) for {CLIENT}, else client name
+                client_name = getattr(project.client, 'abbreviation', None) or project.client.name
+            project_name = project.name
+    if project_name is not None:
+        kwargs = {**kwargs, 'project_name': project_name}
+    
+    # Resolve batch name for {BATCH} if batch_id given
+    if batch_id and not batch_name:
+        from models.batch import Batch
+        batch = db.query(Batch).filter(Batch.id == batch_id).first()
+        if batch:
+            batch_name = batch.name
+    if batch_name is not None:
+        kwargs = {**kwargs, 'batch_name': batch_name}
     
     return generate_name(
         db, 
@@ -217,7 +273,7 @@ def generate_name_for_project(
         from models.client import Client
         client = db.query(Client).filter(Client.id == client_id).first()
         if client:
-            client_name = client.name
+            client_name = getattr(client, 'abbreviation', None) or client.name
     
     return generate_name(
         db, 

@@ -34,6 +34,7 @@ interface Client {
   id: string;
   name: string;
   description?: string;
+  abbreviation?: string;
   active: boolean;
   created_at: string;
   modified_at: string;
@@ -91,7 +92,8 @@ const ClientsManagement: React.FC = () => {
     return clients.filter(
       (client) =>
         client.name.toLowerCase().includes(term) ||
-        (client.description && client.description.toLowerCase().includes(term))
+        (client.description && client.description.toLowerCase().includes(term)) ||
+        (client.abbreviation && client.abbreviation.toLowerCase().includes(term))
     );
   }, [clients, searchTerm]);
 
@@ -158,6 +160,13 @@ const ClientsManagement: React.FC = () => {
       flex: 1,
       minWidth: 200,
       valueGetter: (value) => value || 'N/A',
+    },
+    {
+      field: 'abbreviation',
+      headerName: 'Abbreviation',
+      width: 120,
+      valueGetter: (value) => value || '—',
+      description: 'Used for {CLIENT} in name templates (CLIABV)',
     },
     {
       field: 'active',
@@ -316,6 +325,7 @@ const ClientsManagement: React.FC = () => {
         open={formOpen}
         client={selectedClient}
         existingNames={clients.map((c) => c.name)}
+        existingAbbreviations={clients.map((c) => c.abbreviation).filter((a): a is string => !!a)}
         onClose={() => {
           setFormOpen(false);
           setSelectedClient(null);

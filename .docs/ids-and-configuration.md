@@ -33,14 +33,15 @@ Configuration that depends on entity type (sample, project, etc.) is stored in a
 | What | Where stored | How entity type is used |
 | --- | --- | --- |
 | Template string and metadata | Table `name_templates` | Column `entity_type` (e.g. `'sample'`, `'project'`, `'batch'`, `'analysis'`, `'container'`). Only **one active** template per `entity_type` (unique partial index). |
-| Next sequence number for `{SEQ}` | PostgreSQL sequences | One sequence per entity type: `name_template_seq_sample`, `name_template_seq_project`, etc. (see migration `0021_configurable_names.py`). |
-| Sequence starting value | PostgreSQL sequences (configurable via ALTER SEQUENCE) | Admins can set the starting value for each sequence (e.g., via SQL or admin tools). |
+| Next sequence number for `{SEQ}` | PostgreSQL sequences | One sequence per entity type: `name_template_seq_sample`, `name_template_seq_project`, etc. **Created on first use** in `name_generation.get_next_sequence()` (not in migrations). |
+| Sequence starting value | PostgreSQL sequences (via POST `/admin/sequences/{entity_type}/start`) | Admins set the next value; the sequence is created if it does not exist. |
 | Padding digits for `{SEQ}` | Table `name_templates` (new column: `seq_padding_digits`) | Defaults to 1 (no padding); e.g., 3 for zero-padding to 3 digits (001, 002, ...). |
+| Code for `{CLIENT}` (CLIABV) | Table `clients` (column `abbreviation`) | Optional, unique; when set, used for {CLIENT} in naming; else client name is used. |
 
 So “where configuration is stored” for naming is:
 
 - **name_templates**: one row per logical entity type (and only one active per type). The row’s `entity_type` selects which template (and thus which sequence) is used when generating a name for that kind of entity. Now includes `seq_padding_digits` for controlling {SEQ} formatting.
-- **Sequences**: live in the DB; name generation uses the sequence whose name matches the entity type. Starting values can be set via ALTER SEQUENCE commands.
+- **Sequences**: created lazily when the first name is generated for an entity type (or when an admin sets a sequence start). Migrations do not create or drop them; see “Sequences and migrations” below.
 
 **Default templates** (seeded in migration 0021):
 
@@ -50,7 +51,7 @@ So “where configuration is stored” for naming is:
 - **analysis**: `ANALYSIS-{SEQ}`
 - **container**: `CONT-{YYYYMMDD}-{SEQ}`
 
-Placeholders: `{SEQ}` (supports padding via `seq_padding_digits`, e.g., {SEQ} with 3 digits becomes 001), `{YYYY}`, `{YY}` (two-digit year), `{MM}`, `{DD}`, `{YYYYMMDD}`, `{CLIENT}` (see `backend/app/core/name_generation.py`).
+Placeholders: `{SEQ}` (supports padding via `seq_padding_digits`), `{YYYY}`, `{YY}` (two-digit year), `{MM}`, `{DD}`, `{YYYYMMDD}`, `{CLIENT}` (client abbreviation (CLIABV) from `clients.abbreviation` when set, else client name), `{BATCH}` (batch name; used when generating names in batch context), `{PROJECT}` (project name; used when generating sample names in project context). See `backend/app/core/name_generation.py`.
 
 **Resulting data**: The generated string is stored in the entity’s `name` column (e.g. `samples.name`, `projects.name`). So name **configuration** is in `name_templates` (+ sequences); name **data** is in the entity table.
 
@@ -198,6 +199,13 @@ These pages build on the existing backend APIs. If the frontend framework is Rea
 
 ---
 
+## Sequences and migrations
+
+Name-template sequences (`name_template_seq_sample`, etc.) are **not** created or dropped in migrations:
+
+- **Creation**: The first time a name is generated for an entity type (or an admin calls POST `/admin/sequences/{entity_type}/start`), `name_generation._ensure_sequence_exists()` runs `CREATE SEQUENCE IF NOT EXISTS ...`. So sequences are created on first use.
+- **Removal**: Migrations do not drop sequences. If you downgrade the configurable-names migration (0021), the `name_templates` table is dropped but sequences are left in place. To remove sequences manually (e.g. after downgrade), run for each entity type: `DROP SEQUENCE IF EXISTS name_template_seq_sample;` (and similarly for `project`, `batch`, `analysis`, `container`). Keeping sequences on downgrade avoids breaking other objects that might reference them; drop them only if you want a full cleanup.
+
 ---
 
 ## Reference: Key Files
@@ -205,7 +213,7 @@ These pages build on the existing backend APIs. If the frontend framework is Rea
 - **Base model (UUID** `id`**,** `name`**)**: `backend/models/base.py`
 - **Name templates model**: `backend/models/name_template.py` (includes `seq_padding_digits`).
 - **Name generation**: `backend/app/core/name_generation.py` — `get_active_template()`, `get_next_sequence()`, `generate_name()`, `generate_name_for_sample()`, `generate_name_for_project()`, etc. Placeholder resolution: `{YY}` = `str(now.year % 100).zfill(2)`; for `{SEQ}`, `seq_padding_digits` from the template, then `formatted_seq = str(seq).zfill(template.seq_padding_digits)`. Other placeholders: `{YYYY}`, `{MM}`, `{DD}`, `{YYYYMMDD}`, `{CLIENT}`.
-- **Migration (name_templates + sequences + seeds)**: `backend/db/migrations/versions/0021_configurable_names.py`. **Migration 0031**: `backend/db/migrations/versions/0031_add_seq_padding_digits.py` adds `seq_padding_digits` column (default 1).
+- **Migration (name_templates table + seeds only; no sequences)**: `backend/db/migrations/versions/0021_configurable_names.py`. Sequences are created at runtime by `name_generation.get_next_sequence()`. **Migration 0031**: adds `seq_padding_digits` column (default 1) if present.
 - **Sequence start API**: `backend/app/routers/sequences.py` — POST `/admin/sequences/{entity_type}/start` (body: `{ "start_value": int }`); requires `config:edit`.
 - **Custom attributes config model**: `backend/models/custom_attributes_config.py`
 - **Custom attributes validation**: `backend/app/core/custom_attributes.py` — `validate_custom_attributes()` with **entity_type**
