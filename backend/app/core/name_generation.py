@@ -14,11 +14,28 @@ Templates support placeholders:
 """
 from datetime import datetime
 from typing import Optional, Dict, Any
+import re
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 from models.name_template import NameTemplate
 import uuid
+
+# Max length for sequence_key suffix in sequence name (PostgreSQL identifier safe).
+SEQ_KEY_MAX_LEN = 50
+
+
+def _sanitize_sequence_key(key: str) -> Optional[str]:
+    """
+    Sanitize a string for use as part of a PostgreSQL sequence name.
+    Returns alphanumeric + underscore only, truncated to SEQ_KEY_MAX_LEN; or None if empty.
+    """
+    if not key or not key.strip():
+        return None
+    # Replace non-alphanumeric with underscore, collapse multiple underscores
+    safe = re.sub(r'[^a-zA-Z0-9_]', '_', key.strip())
+    safe = re.sub(r'_+', '_', safe).strip('_')
+    return safe[:SEQ_KEY_MAX_LEN] if safe else None
 
 
 def get_active_template(db: Session, entity_type: str) -> Optional[NameTemplate]:
@@ -33,14 +50,24 @@ def get_active_template(db: Session, entity_type: str) -> Optional[NameTemplate]
 ALLOWED_ENTITY_TYPES_FOR_SEQ = ('sample', 'project', 'batch', 'analysis', 'container')
 
 
-def _ensure_sequence_exists(db: Session, entity_type: str) -> None:
+def _sequence_name(entity_type: str, sequence_key: Optional[str] = None) -> str:
+    """Build the PostgreSQL sequence name for entity_type and optional context key."""
+    if sequence_key:
+        return f'name_template_seq_{entity_type}_{sequence_key}'
+    return f'name_template_seq_{entity_type}'
+
+
+def _ensure_sequence_exists(db: Session, entity_type: str, sequence_key: Optional[str] = None) -> None:
     """
-    Create the sequence for entity_type if it does not exist.
+    Create the sequence for entity_type (and optional sequence_key) if it does not exist.
     Sequences are created on first use, not in migrations.
+    When sequence_key is set (e.g. project name), the sequence is per-context (e.g. per project for samples).
     """
     if entity_type not in ALLOWED_ENTITY_TYPES_FOR_SEQ:
         return
-    sequence_name = f'name_template_seq_{entity_type}'
+    safe_key = _sanitize_sequence_key(sequence_key) if sequence_key else None
+    sequence_name = _sequence_name(entity_type, safe_key)
+    # Sequence name is safe: entity_type from allowed list, safe_key is sanitized alphanumeric + underscore
     db.execute(text(f"""
         CREATE SEQUENCE IF NOT EXISTS {sequence_name}
         START WITH 1
@@ -51,13 +78,16 @@ def _ensure_sequence_exists(db: Session, entity_type: str) -> None:
     """))
 
 
-def get_next_sequence(db: Session, entity_type: str) -> int:
+def get_next_sequence(db: Session, entity_type: str, sequence_key: Optional[str] = None) -> int:
     """
-    Get the next sequence number for an entity type.
+    Get the next sequence number for an entity type, optionally scoped by sequence_key.
+    When sequence_key is provided (e.g. resolved "name without {SEQ}" like project name),
+    the sequence is per-context so e.g. each project gets its own sample sequence (01, 02, ...).
     Creates the sequence if it does not exist (lazy creation), then uses nextval.
     """
-    _ensure_sequence_exists(db, entity_type)
-    sequence_name = f'name_template_seq_{entity_type}'
+    safe_key = _sanitize_sequence_key(sequence_key) if sequence_key else None
+    _ensure_sequence_exists(db, entity_type, safe_key)
+    sequence_name = _sequence_name(entity_type, safe_key)
     result = db.execute(text(f"SELECT nextval('{sequence_name}')"))
     return result.scalar()
 
@@ -132,7 +162,7 @@ def generate_name(
     
     # Retry loop for uniqueness
     for attempt in range(max_retries):
-        # Build replacement dictionary
+        # Build replacement dictionary (non-SEQ first so we can compute sequence_key from "name without SEQ")
         replacements: Dict[str, str] = {}
         
         # Date placeholders
@@ -146,12 +176,6 @@ def generate_name(
             replacements['{DD}'] = f"{now.day:02d}"
         if '{YYYYMMDD}' in template:
             replacements['{YYYYMMDD}'] = now.strftime('%Y%m%d')
-        # Sequence placeholder: get seq_padding_digits from the template, fetch seq, then format
-        if '{SEQ}' in template:
-            seq_padding_digits = template_obj.seq_padding_digits or 1
-            seq = get_next_sequence(db, entity_type)
-            formatted_seq = str(seq).zfill(seq_padding_digits)
-            replacements['{SEQ}'] = formatted_seq
         
         # Client placeholder (client_name is typically client.abbreviation or client.name from caller)
         # {CLIENT} and {CLIABV} are synonyms (CLIABV = client abbreviation)
@@ -173,6 +197,19 @@ def generate_name(
         if '{PROJECT}' in template:
             project_name = kwargs.get('project_name') or kwargs.get('PROJECT')
             replacements['{PROJECT}'] = (project_name and str(project_name).strip()) or 'UNKNOWN'
+        
+        # Sequence placeholder: scope by "name without SEQ" so e.g. each project gets its own sequence (01, 02, ...)
+        if '{SEQ}' in template:
+            seq_padding_digits = template_obj.seq_padding_digits or 1
+            # Compute sequence_key = resolved template with {SEQ} removed (e.g. "UTC2600001-" for {PROJECT}-{SEQ})
+            prefix = template
+            for ph, val in replacements.items():
+                prefix = prefix.replace(ph, val)
+            prefix = prefix.replace('{SEQ}', '').strip()
+            sequence_key = _sanitize_sequence_key(prefix) if prefix else None
+            seq = get_next_sequence(db, entity_type, sequence_key=sequence_key)
+            formatted_seq = str(seq).zfill(seq_padding_digits)
+            replacements['{SEQ}'] = formatted_seq
         
         # Apply replacements
         result = template
