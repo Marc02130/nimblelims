@@ -52,23 +52,23 @@ class AliquotResponse(BaseModel):
     """Schema for aliquot response"""
     id: UUID
     name: str
-    description: Optional[str]
-    parent_sample_id: UUID
+    description: Optional[str] = None
+    parent_sample_id: Optional[UUID] = None
     project_id: UUID
-    client_id: UUID
-    container_id: UUID
-    concentration: Optional[float]
-    concentration_units: Optional[UUID]
-    amount: Optional[float]
-    amount_units: Optional[UUID]
-    temperature: Optional[float]
-    qc_type: Optional[UUID]
-    status: UUID
+    client_id: Optional[UUID] = None
+    container_id: Optional[UUID] = None
+    concentration: Optional[float] = None
+    concentration_units: Optional[UUID] = None
+    amount: Optional[float] = None
+    amount_units: Optional[UUID] = None
+    temperature: Optional[float] = None
+    qc_type: Optional[UUID] = None
+    status: Optional[UUID] = None
     active: bool
     created_at: datetime
-    created_by: UUID
+    created_by: Optional[UUID] = None
     modified_at: datetime
-    modified_by: UUID
+    modified_by: Optional[UUID] = None
 
     class Config:
         from_attributes = True
@@ -78,24 +78,24 @@ class DerivativeResponse(BaseModel):
     """Schema for derivative response"""
     id: UUID
     name: str
-    description: Optional[str]
-    parent_sample_id: UUID
+    description: Optional[str] = None
+    parent_sample_id: Optional[UUID] = None
     project_id: UUID
-    client_id: UUID
-    sample_type: UUID
-    container_id: UUID
-    concentration: Optional[float]
-    concentration_units: Optional[UUID]
-    amount: Optional[float]
-    amount_units: Optional[UUID]
-    temperature: Optional[float]
-    qc_type: Optional[UUID]
-    status: UUID
+    client_id: Optional[UUID] = None
+    sample_type: Optional[UUID] = None
+    container_id: Optional[UUID] = None
+    concentration: Optional[float] = None
+    concentration_units: Optional[UUID] = None
+    amount: Optional[float] = None
+    amount_units: Optional[UUID] = None
+    temperature: Optional[float] = None
+    qc_type: Optional[UUID] = None
+    status: Optional[UUID] = None
     active: bool
     created_at: datetime
-    created_by: UUID
+    created_by: Optional[UUID] = None
     modified_at: datetime
-    modified_by: UUID
+    modified_by: Optional[UUID] = None
 
     class Config:
         from_attributes = True
