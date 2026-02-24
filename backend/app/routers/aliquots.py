@@ -69,11 +69,14 @@ async def create_aliquot(
         )
     
     # Get "Available for Testing" status
-    from models.list import ListEntry
-    available_status = db.query(ListEntry).filter(
-        ListEntry.list_id == "sample_status",  # Assuming this list exists
-        ListEntry.name == "Available for Testing"
-    ).first()
+    from models.list import ListEntry, List as ListModel
+    sample_status_list = db.query(ListModel).filter(ListModel.name == "sample_status").first()
+    available_status = None
+    if sample_status_list:
+        available_status = db.query(ListEntry).filter(
+            ListEntry.list_id == sample_status_list.id,
+            ListEntry.name == "Available for Testing"
+        ).first()
     
     if not available_status:
         raise HTTPException(
@@ -81,8 +84,6 @@ async def create_aliquot(
             detail="Sample status 'Available for Testing' not found in configuration"
         )
     
-    # Create aliquot (same sample_id, new container_id)
-    # For aliquots, we create a new sample record but link it to the parent
     aliquot = Sample(
         name=aliquot_data.name,
         description=aliquot_data.description,
@@ -110,8 +111,6 @@ async def create_aliquot(
         concentration_units=aliquot_data.concentration_units,
         amount=aliquot_data.amount,
         amount_units=aliquot_data.amount_units,
-        created_by=current_user.id,
-        modified_by=current_user.id
     )
     
     db.add(contents)
@@ -174,11 +173,14 @@ async def create_derivative(
         )
     
     # Get "Available for Testing" status
-    from models.list import ListEntry
-    available_status = db.query(ListEntry).filter(
-        ListEntry.list_id == "sample_status",  # Assuming this list exists
-        ListEntry.name == "Available for Testing"
-    ).first()
+    from models.list import ListEntry, List as ListModel
+    sample_status_list = db.query(ListModel).filter(ListModel.name == "sample_status").first()
+    available_status = None
+    if sample_status_list:
+        available_status = db.query(ListEntry).filter(
+            ListEntry.list_id == sample_status_list.id,
+            ListEntry.name == "Available for Testing"
+        ).first()
     
     if not available_status:
         raise HTTPException(
@@ -214,8 +216,6 @@ async def create_derivative(
         concentration_units=derivative_data.concentration_units,
         amount=derivative_data.amount,
         amount_units=derivative_data.amount_units,
-        created_by=current_user.id,
-        modified_by=current_user.id
     )
     
     db.add(contents)
@@ -322,8 +322,6 @@ async def pool_samples(
             concentration_units=pooling_data.concentration_units[i],
             amount=pooling_data.amounts[i],
             amount_units=pooling_data.amount_units[i],
-            created_by=current_user.id,
-            modified_by=current_user.id
         )
         db.add(contents)
     
