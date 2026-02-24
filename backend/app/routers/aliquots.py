@@ -26,7 +26,7 @@ from decimal import Decimal
 router = APIRouter()
 
 
-@router.post("/aliquot", response_model=AliquotResponse)
+@router.post("", response_model=AliquotResponse)
 async def create_aliquot(
     aliquot_data: AliquotCreateRequest,
     current_user: User = Depends(require_sample_create),
@@ -119,6 +119,16 @@ async def create_aliquot(
     db.refresh(aliquot)
     
     return AliquotResponse.from_orm(aliquot)
+
+
+@router.post("/aliquot", response_model=AliquotResponse, include_in_schema=False)
+async def create_aliquot_legacy(
+    aliquot_data: AliquotCreateRequest,
+    current_user: User = Depends(require_sample_create),
+    db: Session = Depends(get_db)
+):
+    """Legacy path alias for create_aliquot."""
+    return await create_aliquot(aliquot_data, current_user, db)
 
 
 @router.post("/derivative", response_model=DerivativeResponse)
