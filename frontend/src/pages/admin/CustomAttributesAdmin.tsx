@@ -488,9 +488,10 @@ const CustomAttributesAdmin: React.FC = () => {
           <CircularProgress />
         </Box>
       ) : (
-        <Box sx={{ height: 600, width: '100%' }}>
+        <Box sx={{ height: configs.length === 0 ? 'auto' : 600, minHeight: 220, width: '100%' }}>
           <DataGrid
             rows={configs}
+            autoHeight={configs.length === 0}
             columns={columns}
             getRowId={(row) => row.id}
             pageSizeOptions={[10, 25, 50]}

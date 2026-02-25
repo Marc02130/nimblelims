@@ -144,6 +144,7 @@ def upgrade() -> None:
         {'id': 'c1c1c1c1-c1c1-c1c1-c1c1-c1c1c1c1c1c1', 'name': 'result:review', 'description': 'Review results'},
         {'id': 'd1d1d1d1-d1d1-d1d1-d1d1-d1d1d1d1d1d1', 'name': 'batch:manage', 'description': 'Manage batches'},
         {'id': 'e1e1e1e1-e1e1-e1e1-e1e1-e1e1e1e1e1e1', 'name': 'batch:read', 'description': 'Read batches'},
+        {'id': 'f2f2f2f2-f2f2-f2f2-f2f2-f2f2f2f2f2f2', 'name': 'workflow:execute', 'description': 'Execute workflow templates'},
     ]
     
     for perm_data in permissions_data:
@@ -172,6 +173,7 @@ def upgrade() -> None:
         ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'c1c1c1c1-c1c1-c1c1-c1c1-c1c1c1c1c1c1'),
         ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'd1d1d1d1-d1d1-d1d1-d1d1-d1d1d1d1d1d1'),
         ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'e1e1e1e1-e1e1-e1e1-e1e1-e1e1e1e1e1e1'),
+        ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'f2f2f2f2-f2f2-f2f2-f2f2-f2f2f2f2f2f2'),  # workflow:execute
         
         # Lab Manager permissions
         ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'b0b0b0b0-b0b0-b0b0-b0b0-b0b0b0b0b0b0'),
@@ -184,6 +186,7 @@ def upgrade() -> None:
         ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'c1c1c1c1-c1c1-c1c1-c1c1-c1c1c1c1c1c1'),
         ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'e1e1e1e1-e1e1-e1e1-e1e1-e1e1e1e1e1e1'),  # batch:read
         ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'd1d1d1d1-d1d1-d1d1-d1d1-d1d1d1d1d1d1'),
+        ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'f2f2f2f2-f2f2-f2f2-f2f2-f2f2f2f2f2f2'),  # workflow:execute
         
         # Lab Technician permissions
         ('cccccccc-cccc-cccc-cccc-cccccccccccc', 'c0c0c0c0-c0c0-c0c0-c0c0-c0c0c0c0c0c0'),
@@ -193,6 +196,7 @@ def upgrade() -> None:
         ('cccccccc-cccc-cccc-cccc-cccccccccccc', 'a1a1a1a1-a1a1-a1a1-a1a1-a1a1a1a1a1a1'),
         ('cccccccc-cccc-cccc-cccc-cccccccccccc', 'b1b1b1b1-b1b1-b1b1-b1b1-b1b1b1b1b1b1'),
         ('cccccccc-cccc-cccc-cccc-cccccccccccc', 'd1d1d1d1-d1d1-d1d1-d1d1-d1d1d1d1d1d1'),
+        ('cccccccc-cccc-cccc-cccc-cccccccccccc', 'f2f2f2f2-f2f2-f2f2-f2f2-f2f2f2f2f2f2'),  # workflow:execute
         
         # Client permissions
         ('dddddddd-dddd-dddd-dddd-dddddddddddd', 'd0d0d0d0-d0d0-d0d0-d0d0-d0d0d0d0d0d0'),

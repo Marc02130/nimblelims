@@ -331,7 +331,8 @@ const Dashboard: React.FC = () => {
                 paginationModel: { page: 0, pageSize: 10 },
               },
             }}
-            sx={{ height: 600 }}
+            sx={{ height: samples.length === 0 ? 'auto' : 600, minHeight: 220 }}
+            autoHeight={samples.length === 0}
           />
         </CardContent>
       </Card>

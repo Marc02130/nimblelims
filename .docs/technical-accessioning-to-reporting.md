@@ -645,6 +645,36 @@ This document provides technical implementation details for the accessioning thr
 
 ---
 
+### Workflow Templates and Execution
+
+#### Admin: Workflow template CRUD (config:edit)
+
+- **GET /admin/workflow-templates**  
+  List workflow templates. Query: `active` (optional boolean). Returns list of WorkflowTemplateRead. Implementation: `backend/app/routers/workflows.py::list_workflow_templates()`.
+
+- **POST /admin/workflow-templates**  
+  Create template. Body: WorkflowTemplateCreate (name, description, active, template_definition). template_definition must be a JSON object with `steps` array; each step: `action` (string, one of VALID_WORKFLOW_ACTIONS), optional `params` (object). Duplicate name returns 400. Returns WorkflowTemplateRead. Implementation: `create_workflow_template()`.
+
+- **GET /admin/workflow-templates/{template_id}**  
+  Get template by ID. 404 if not found. Implementation: `get_workflow_template()`.
+
+- **PATCH /admin/workflow-templates/{template_id}**  
+  Partial update (name, description, active, template_definition). Name uniqueness enforced. Implementation: `update_workflow_template()`.
+
+- **DELETE /admin/workflow-templates/{template_id}**  
+  Soft-deactivate (sets active=false). 204 No Content. Implementation: `delete_workflow_template()`.
+
+#### Execute workflow (workflow:execute)
+
+- **POST /workflows/execute/{template_id}**  
+  Execute an active workflow template. Body: WorkflowExecuteRequest (optional name, optional context dict e.g. batch_id, sample_id, test_id). Template must exist and be active (404 otherwise). Steps run in order; each step action must be in VALID_WORKFLOW_ACTIONS (400 if invalid). Step execution runs in same transaction; on any non-HTTPException failure, transaction rolls back and no WorkflowInstance is created (500 returned). On success, one WorkflowInstance is created with runtime_state containing context, steps_run (step_index, action, status), and completed=true. Returns WorkflowInstanceRead. Implementation: `execute_workflow()`.
+
+**Valid actions**: update_status, validate_custom, create_qc, assign_tests, create_batch, enter_results, send_notification, accession_sample, link_container, review_result. (Stub implementations in router; extend per action as needed.)
+
+**Frontend**: WorkflowTemplatesManagement.tsx (admin list/create/edit/delete/execute dialog); Apply Template dropdown + Apply on AccessioningForm, BatchManagement details, ResultsEntryTable with context as above; permission gating via hasPermission('workflow:execute').
+
+---
+
 ## Data Models
 
 ### Sample
@@ -746,6 +776,32 @@ class BatchContainer(Base):
     notes: Optional[str]
     # Composite primary key: (batch_id, container_id)
 ```
+
+### WorkflowTemplate
+```python
+class WorkflowTemplate(BaseModel):
+    id: UUID
+    name: str  # Unique
+    description: Optional[str]
+    active: bool
+    template_definition: dict  # JSONB: steps array with action/params, e.g. [{"action": str, "params": dict}]
+    # Standard fields: created_at, created_by, modified_at, modified_by
+```
+Indexes: `idx_workflow_templates_active`, GIN on `template_definition`. RLS: role-based (`has_workflow_template_access()`: Administrator, Lab Manager, Lab Technician). Audit triggers: `set_audit_timestamps`, `update_modified_at_column`.
+
+### WorkflowInstance
+```python
+class WorkflowInstance(BaseModel):
+    id: UUID
+    name: str  # Unique
+    description: Optional[str]
+    active: bool
+    workflow_template_id: UUID  # FK to workflow_templates
+    runtime_state: dict  # JSONB: instance runtime state
+    status_id: Optional[UUID]  # FK to list_entries
+    # Standard fields: created_at, created_by, modified_at, modified_by
+```
+Indexes: `idx_workflow_instances_template_id`, `idx_workflow_instances_status_id`, `idx_workflow_instances_created_by`, GIN on `runtime_state`. RLS: `is_admin() OR created_by = current_user_id()`. Audit triggers: same as workflow_templates.
 
 ### AnalysisAnalyte (Junction)
 ```python

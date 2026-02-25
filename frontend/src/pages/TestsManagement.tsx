@@ -238,7 +238,8 @@ const TestsManagement: React.FC = () => {
                 paginationModel: { page: 0, pageSize: 25 },
               },
             }}
-            sx={{ height: 600 }}
+            sx={{ height: tests.length === 0 ? 'auto' : 600, minHeight: 220 }}
+            autoHeight={tests.length === 0}
             disableRowSelectionOnClick
           />
         </CardContent>

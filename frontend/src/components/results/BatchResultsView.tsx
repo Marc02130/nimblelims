@@ -273,6 +273,7 @@ const BatchResultsView: React.FC<BatchResultsViewProps> = ({ batchId, onBack }) 
               samples={samples}
               test={tests.find((t) => t.id === selectedTest)}
               onResultsSaved={handleResultsSaved}
+              onTemplateApplied={loadBatchData}
             />
           )}
 
