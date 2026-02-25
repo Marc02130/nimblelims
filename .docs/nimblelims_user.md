@@ -328,4 +328,37 @@ Total Estimate: ~31 points.
   - API: CRUD /admin/custom-attributes; RBAC: config:edit.  
   *Status*: Implemented (Post-MVP) | *Estimate*: 13 points
 
+### US-29: Workflow Templates and Execution
+
+As a Lab Technician or Lab Manager, I want to run predefined workflow templates from accessioning, batch details, or results entry so that repeatable process steps can be applied consistently with minimal clicks.
+
+As an Administrator, I want to create and manage workflow templates (steps with actions and params) so that the lab can standardize and automate common workflows.
+
+**Acceptance Criteria**:
+
+- **Template management** (Administrator, config:edit):
+  - Create workflow template: name (unique), description, active, template_definition (JSON with `steps` array).
+  - Each step: `action` (one of update_status, validate_custom, create_qc, assign_tests, create_batch, enter_results, send_notification, accession_sample, link_container, review_result), optional `params` object.
+  - Edit and soft-deactivate (delete sets active=false) templates.
+  - List/filter templates by active status.
+  - API: GET/POST /admin/workflow-templates, GET/PATCH/DELETE /admin/workflow-templates/{id}.
+
+- **Execution** (workflow:execute):
+  - Execute an active template with optional context (e.g. {} for accessioning, { batch_id } for batch, { batch_id, test_id } for results entry).
+  - Execution runs all steps in order in a single transaction; invalid step action returns 400; step failure returns 500 and rolls back (no workflow instance created).
+  - Successful run creates one workflow_instance with runtime_state (context, steps_run, completed).
+  - API: POST /workflows/execute/{template_id} with body { name?, context? }.
+
+- **UI**:
+  - Admin: Workflow Templates page (DataGrid, Add/Edit/Deactivate, Execute-on-Entity dialog with context JSON).
+  - Accessioning form: Apply Template dropdown + Apply (context {}); on success refresh lookup data and show success message.
+  - Batch details view: Apply Template dropdown + Apply (context { batch_id }); on success refresh batch details.
+  - Results entry: Apply Template dropdown + Apply (context { batch_id, test_id }); on success parent refreshes batch data.
+  - Apply Template controls visible only when user has workflow:execute permission.
+  - Loading states and error/success alerts for apply action.
+
+- **RBAC**: config:edit required for template CRUD; workflow:execute required for execute. Unauthorized users receive 403.
+
+*Priority*: Medium | *Estimate*: 8 points | *Status*: Implemented (Post-MVP)
+
 Future: Instrument integration, automated calculations.

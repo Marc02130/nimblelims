@@ -552,9 +552,10 @@ const BatchResultsEntryTable: React.FC<BatchResultsEntryTableProps> = ({
 
       <Card>
         <CardContent>
-          <Box sx={{ height: 600, width: '100%' }}>
+          <Box sx={{ height: rows.length === 0 ? 'auto' : 600, minHeight: 220, width: '100%' }}>
             <DataGrid
               rows={rows}
+              autoHeight={rows.length === 0}
               columns={columns}
               pageSizeOptions={[10, 25, 50, 100]}
               initialState={{

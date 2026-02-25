@@ -14,6 +14,10 @@ import {
   Tabs,
   Tab,
   Divider,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
 } from '@mui/material';
 import {
   ArrowBack as ArrowBackIcon,
@@ -24,6 +28,7 @@ import BatchForm from './BatchForm';
 import BatchFormEnhanced from './BatchFormEnhanced';
 import ContainerGrid from './ContainerGrid';
 import { apiService } from '../../services/apiService';
+import { useUser } from '../../contexts/UserContext';
 
 interface Batch {
   id: string;
@@ -42,6 +47,7 @@ interface BatchManagementProps {
 }
 
 const BatchManagement: React.FC<BatchManagementProps> = ({ onBack }) => {
+  const { hasPermission } = useUser();
   const [view, setView] = useState<'list' | 'create' | 'edit' | 'details'>('list');
   const [selectedBatch, setSelectedBatch] = useState<Batch | null>(null);
   const [batches, setBatches] = useState<Batch[]>([]);
@@ -49,6 +55,13 @@ const BatchManagement: React.FC<BatchManagementProps> = ({ onBack }) => {
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState(0);
   const [listEntries, setListEntries] = useState<any>({});
+  const [workflowTemplates, setWorkflowTemplates] = useState<{ id: string; name: string }[]>([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
+  const [applyTemplateLoading, setApplyTemplateLoading] = useState(false);
+  const [applyTemplateError, setApplyTemplateError] = useState<string | null>(null);
+  const [applyTemplateSuccess, setApplyTemplateSuccess] = useState<string | null>(null);
+
+  const canExecuteWorkflow = hasPermission('workflow:execute');
 
   useEffect(() => {
     const loadListEntries = async () => {
@@ -67,6 +80,33 @@ const BatchManagement: React.FC<BatchManagementProps> = ({ onBack }) => {
     };
     loadListEntries();
   }, []);
+
+  useEffect(() => {
+    if (canExecuteWorkflow) {
+      apiService.getWorkflowTemplates({ active: true })
+        .then((list) => setWorkflowTemplates(Array.isArray(list) ? list : []))
+        .catch((err) => console.error('Failed to load workflow templates:', err));
+    }
+  }, [canExecuteWorkflow]);
+
+  const handleApplyTemplate = async () => {
+    if (!selectedBatch || !selectedTemplateId || !canExecuteWorkflow) return;
+    setApplyTemplateLoading(true);
+    setApplyTemplateError(null);
+    setApplyTemplateSuccess(null);
+    try {
+      await apiService.executeWorkflow(selectedTemplateId, {
+        context: { batch_id: selectedBatch.id },
+      });
+      setApplyTemplateSuccess('Workflow executed successfully.');
+      setSelectedTemplateId('');
+      await handleViewBatch(selectedBatch.id);
+    } catch (err: any) {
+      setApplyTemplateError(err.response?.data?.detail || err.message || 'Failed to execute workflow');
+    } finally {
+      setApplyTemplateLoading(false);
+    }
+  };
 
   const getTypeName = (typeId: string) => {
     if (!typeId) return 'Not set';
@@ -189,9 +229,50 @@ const BatchManagement: React.FC<BatchManagementProps> = ({ onBack }) => {
       {view === 'details' && selectedBatch && (
         <Card>
           <CardContent>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+            {applyTemplateError && (
+              <Alert severity="error" sx={{ mb: 2 }} onClose={() => setApplyTemplateError(null)}>
+                {applyTemplateError}
+              </Alert>
+            )}
+            {applyTemplateSuccess && (
+              <Alert severity="success" sx={{ mb: 2 }} onClose={() => setApplyTemplateSuccess(null)}>
+                {applyTemplateSuccess}
+              </Alert>
+            )}
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2, mb: 2 }}>
               <Typography variant="h5">{selectedBatch.name}</Typography>
-              <Box>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                {canExecuteWorkflow && workflowTemplates.length > 0 && (
+                  <>
+                    <FormControl size="small" sx={{ minWidth: 200 }}>
+                      <InputLabel id="batch-apply-template-label">Apply Template</InputLabel>
+                      <Select
+                        labelId="batch-apply-template-label"
+                        value={selectedTemplateId}
+                        label="Apply Template"
+                        onChange={(e) => setSelectedTemplateId(e.target.value)}
+                        disabled={applyTemplateLoading}
+                      >
+                        <MenuItem value="">
+                          <em>Select workflow...</em>
+                        </MenuItem>
+                        {workflowTemplates.map((t) => (
+                          <MenuItem key={t.id} value={t.id}>
+                            {t.name}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                    <Button
+                      variant="outlined"
+                      onClick={handleApplyTemplate}
+                      disabled={!selectedTemplateId || applyTemplateLoading}
+                      startIcon={applyTemplateLoading ? <CircularProgress size={18} /> : null}
+                    >
+                      {applyTemplateLoading ? 'Running...' : 'Apply'}
+                    </Button>
+                  </>
+                )}
                 <Button
                   startIcon={<EditIcon />}
                   onClick={() => setView('edit')}

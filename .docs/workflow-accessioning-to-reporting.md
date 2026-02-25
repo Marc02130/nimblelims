@@ -652,6 +652,27 @@ Sample
 
 ---
 
+## Workflow Templates (Apply Template)
+
+**Purpose**: Run predefined workflow templates from key screens with optional context (e.g. batch_id, test_id) to apply repeatable process steps without re-entering each action.
+
+**Actors**: Lab Technician, Lab Manager (with workflow:execute); Administrator (with config:edit for template CRUD).
+
+**Template definition**: Each template has a unique name, description, active flag, and `template_definition` (JSON). The definition contains a `steps` array; each step has an `action` (from a fixed list) and optional `params`. Valid actions include: update_status, validate_custom, create_qc, assign_tests, create_batch, enter_results, send_notification, accession_sample, link_container, review_result.
+
+**Where to apply**:
+- **Accessioning**: Apply Template dropdown and Apply button in the page header. Context is empty `{}`. On success, lookup data (and optional custom attribute configs) are refreshed; success message shown.
+- **Batch details**: When viewing a batch (view === details), Apply Template dropdown and Apply in the batch card. Context is `{ batch_id: selectedBatch.id }`. On success, batch details are re-fetched and success message shown.
+- **Results entry**: In the Results Entry toolbar (next to Save Results), Apply Template dropdown and Apply. Context is `{ batch_id, test_id }`. On success, optional callback (e.g. loadBatchData) runs to refresh batch/tests/results; success message shown.
+
+**Permissions**: Apply Template UI is shown only when the user has `workflow:execute`. Template list/create/edit/delete (admin) requires `config:edit`.
+
+**Execution behavior**: Steps run in order in a single transaction. If any step fails or an invalid action is used, the transaction rolls back and no workflow instance is created. Successful run creates one workflow_instance record with runtime_state (context, steps_run, completed).
+
+**Admin management**: Administrators with config:edit can open Workflow Templates from the Admin section: list templates, create (name, description, active, JSON definition), edit, soft-deactivate (delete), and run "Execute on Entity" with optional context JSON for testing.
+
+---
+
 ## Audit Trail
 
 All workflow steps maintain audit information:

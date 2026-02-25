@@ -942,6 +942,45 @@ class ApiService {
     return response.data;
   }
 
+  // Workflow templates (admin) and execute
+  async getWorkflowTemplates(params?: { active?: boolean }) {
+    const response: AxiosResponse = await this.api.get('/admin/workflow-templates', { params });
+    return response.data;
+  }
+
+  async getWorkflowTemplate(id: string) {
+    const response: AxiosResponse = await this.api.get(`/admin/workflow-templates/${id}`);
+    return response.data;
+  }
+
+  async createWorkflowTemplate(data: {
+    name: string;
+    description?: string;
+    active?: boolean;
+    template_definition: Record<string, unknown>;
+  }) {
+    const response: AxiosResponse = await this.api.post('/admin/workflow-templates', data);
+    return response.data;
+  }
+
+  async updateWorkflowTemplate(
+    id: string,
+    data: { name?: string; description?: string; active?: boolean; template_definition?: Record<string, unknown> }
+  ) {
+    const response: AxiosResponse = await this.api.patch(`/admin/workflow-templates/${id}`, data);
+    return response.data;
+  }
+
+  async deleteWorkflowTemplate(id: string) {
+    const response: AxiosResponse = await this.api.delete(`/admin/workflow-templates/${id}`);
+    return response.data;
+  }
+
+  async executeWorkflow(templateId: string, body?: { name?: string; context?: Record<string, unknown> }) {
+    const response: AxiosResponse = await this.api.post(`/workflows/execute/${templateId}`, body ?? {});
+    return response.data;
+  }
+
   async getGeneratedNamePreview(entity_type: string, client_id?: string, reference_date?: string) {
     try {
       const response: AxiosResponse = await this.api.get('/admin/name-templates/preview', {

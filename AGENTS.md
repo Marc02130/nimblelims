@@ -13,7 +13,11 @@ Start all services: `sudo docker compose up -d --build` from the repo root. Serv
 - **Backend** (lims-backend): FastAPI + Uvicorn, port 8000. API docs at `http://localhost:8000/docs`.
 - **Frontend** (lims-frontend): React 18 built via `react-scripts`, served by Nginx, port 3000.
 
-Default admin login: `admin` / `***REMOVED***`.
+Default logins (development/UAT):
+- **Admin**: `admin` / `***REMOVED***`
+- **Lab Technician**: `lab-tech` / `***REMOVED***`
+- **Lab Manager**: `lab-manager` / `***REMOVED***`
+- **Client**: `client` / `***REMOVED***`
 
 ### Important Gotchas
 

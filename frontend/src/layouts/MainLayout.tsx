@@ -58,6 +58,7 @@ const getRouteTitle = (pathname: string): string => {
     '/admin/custom-names': 'Custom Names Management',
     '/admin/custom-attributes': 'Custom Attributes',
     '/admin/name-templates': 'Name Templates',
+    '/admin/workflow-templates': 'Workflow Templates',
     '/admin/help': 'Help Management',
   };
 

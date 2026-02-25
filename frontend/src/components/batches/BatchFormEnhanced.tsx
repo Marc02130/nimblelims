@@ -916,9 +916,10 @@ const BatchFormEnhanced: React.FC<BatchFormEnhancedProps> = ({ onSuccess, onCanc
               </Button>
             </Box>
 
-            <Paper sx={{ height: 400, width: '100%' }}>
+            <Paper sx={{ height: eligibleSamples.length === 0 ? 'auto' : 400, minHeight: 200, width: '100%' }}>
               <DataGrid
                 rows={eligibleSamples}
+                autoHeight={eligibleSamples.length === 0}
                 columns={eligibleSamplesColumns}
                 loading={eligibleSamplesLoading}
                 checkboxSelection

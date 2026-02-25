@@ -302,6 +302,31 @@ Tabular entry; QC flags/blocks.
 - Validation: Server-side validation in `app.core.custom_attributes.validate_custom_attributes()`
 - UI: `CustomFieldsManagement.tsx` for admin management, `CustomAttributeField.tsx` for dynamic rendering
 
+### 4.6 Workflow Templates (Post-MVP)
+
+**Purpose**: Allow administrators to define reusable workflow templates and authorized users to execute them with context (e.g. sample, batch, test) to automate repeatable steps.
+
+**Functional Requirements**:
+
+1. **Template Management** (requires config:edit):
+   - CRUD for workflow templates (name, description, active, template_definition).
+   - template_definition: JSON with `steps` array; each step has `action` (from a fixed list) and optional `params`.
+   - Valid actions: update_status, validate_custom, create_qc, assign_tests, create_batch, enter_results, send_notification, accession_sample, link_container, review_result.
+   - Soft-deactivate on delete (active=false).
+   - Unique template names.
+
+2. **Execution** (requires workflow:execute):
+   - Execute an active template with optional context (e.g. batch_id, sample_id, test_id).
+   - Steps run in order in a single transaction; on step failure, transaction rolls back and no workflow instance is created.
+   - One workflow_instance record per successful run with runtime_state (context, steps_run, completed).
+   - Inactive or missing template returns 404.
+
+3. **UI Integration**:
+   - Admin: Workflow Templates management page (list, create, edit, deactivate, execute-from-list with context dialog).
+   - Apply Template dropdown + Apply button on Accessioning (context {}), Batch details (context batch_id), and Results Entry (context batch_id, test_id); success refreshes relevant data.
+
+**Permissions**: config:edit for template CRUD; workflow:execute for execution. See US-29.
+
 ## 5. Non-Functional Requirements
 ### 5.1 Security
 

@@ -416,9 +416,10 @@ const ListsAdmin: React.FC = () => {
             No entries in this list. {canEdit && 'Click "Add Entry" to create one.'}
           </Typography>
         ) : (
-          <Box sx={{ height: 500, width: '100%' }}>
+          <Box sx={{ height: selectedList.entries.length === 0 ? 'auto' : 500, minHeight: 200, width: '100%' }}>
             <DataGrid
               rows={selectedList.entries}
+              autoHeight={selectedList.entries.length === 0}
               columns={entryColumns}
               getRowId={(row) => row.id}
               pageSizeOptions={[10, 25, 50]}
@@ -495,9 +496,10 @@ const ListsAdmin: React.FC = () => {
           <CircularProgress />
         </Box>
       ) : (
-        <Box sx={{ height: 560, width: '100%' }}>
+        <Box sx={{ height: lists.length === 0 ? 'auto' : 560, minHeight: 220, width: '100%' }}>
           <DataGrid
             rows={lists}
+            autoHeight={lists.length === 0}
             columns={listColumns}
             getRowId={(row) => row.id}
             pageSizeOptions={[10, 25, 50]}
