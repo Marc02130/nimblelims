@@ -338,9 +338,10 @@ const AnalysisAnalytesConfig: React.FC = () => {
         />
       </Box>
 
-      <Box sx={{ height: 600, width: '100%' }}>
+      <Box sx={{ height: filteredRules.length === 0 ? 'auto' : 600, minHeight: 220, width: '100%' }}>
         <DataGrid
           rows={filteredRules}
+          autoHeight={filteredRules.length === 0}
           columns={columns}
           getRowId={(row) => row.analyte_id}
           pageSizeOptions={[10, 25, 50]}

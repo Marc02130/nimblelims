@@ -523,9 +523,10 @@ const NameTemplatesAdmin: React.FC = () => {
           <CircularProgress />
         </Box>
       ) : (
-        <Box sx={{ height: 600, width: '100%' }}>
+        <Box sx={{ height: templates.length === 0 ? 'auto' : 600, minHeight: 220, width: '100%' }}>
           <DataGrid
             rows={templates}
+            autoHeight={templates.length === 0}
             columns={columns}
             getRowId={(row) => row.id}
             pageSizeOptions={[10, 25, 50]}

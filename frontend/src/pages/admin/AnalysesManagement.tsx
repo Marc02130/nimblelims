@@ -370,9 +370,10 @@ const AnalysesManagement: React.FC = () => {
         </Box>
       ) : (
         <>
-          <Box sx={{ height: 600, width: '100%', mb: 2 }}>
+          <Box sx={{ height: filteredAnalyses.length === 0 ? 'auto' : 600, minHeight: 220, width: '100%', mb: 2 }}>
             <DataGrid
               rows={filteredAnalyses}
+              autoHeight={filteredAnalyses.length === 0}
               columns={columns}
               getRowId={(row) => row.id}
               pageSizeOptions={[10, 25, 50]}

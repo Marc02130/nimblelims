@@ -24,6 +24,7 @@ import CustomAttributesAdmin from './pages/admin/CustomAttributesAdmin';
 import CustomNamesManagement from './pages/admin/CustomNamesManagement';
 import NameTemplatesAdmin from './pages/admin/NameTemplatesAdmin';
 import HelpManagement from './pages/admin/HelpManagement';
+import WorkflowTemplatesManagement from './pages/admin/WorkflowTemplatesManagement';
 import ClientProjects from './pages/ClientProjects';
 import ClientsManagement from './pages/ClientsManagement';
 import ProjectsManagement from './pages/ProjectsManagement';
@@ -331,6 +332,16 @@ function AppRoutes() {
           element={
             hasPermission('config:edit') ? (
               <HelpManagement />
+            ) : (
+              <Navigate to="/dashboard" replace />
+            )
+          }
+        />
+        <Route
+          path="/admin/workflow-templates"
+          element={
+            hasPermission('config:edit') ? (
+              <WorkflowTemplatesManagement />
             ) : (
               <Navigate to="/dashboard" replace />
             )

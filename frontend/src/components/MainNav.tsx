@@ -78,6 +78,7 @@ export const adminNavItems: AdminNavItem[] = [
   { text: 'Test Batteries', path: '/admin/test-batteries', icon: <BatteryChargingFull /> },
   { text: 'Custom Fields', path: '/admin/custom-fields', icon: <TuneIcon /> },
   { text: 'Custom Names', path: '/admin/custom-names', icon: <TuneIcon /> },
+  { text: 'Workflow Templates', path: '/admin/workflow-templates', icon: <TuneIcon /> },
   { text: 'Help Management', path: '/admin/help', icon: <HelpIcon /> },
 ];
 
