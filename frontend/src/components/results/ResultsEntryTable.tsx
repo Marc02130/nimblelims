@@ -32,6 +32,7 @@ import {
   Check as CheckIcon,
 } from '@mui/icons-material';
 import { apiService } from '../../services/apiService';
+import { useUser } from '../../contexts/UserContext';
 
 interface CustomAttributeConfig {
   id: string;
@@ -88,6 +89,7 @@ interface ResultsEntryTableProps {
   samples: Sample[];
   test?: Test;
   onResultsSaved: (results: Result[]) => void;
+  onTemplateApplied?: () => void;
 }
 
 const ResultsEntryTable: React.FC<ResultsEntryTableProps> = ({
@@ -96,7 +98,9 @@ const ResultsEntryTable: React.FC<ResultsEntryTableProps> = ({
   samples,
   test,
   onResultsSaved,
+  onTemplateApplied,
 }) => {
+  const { hasPermission } = useUser();
   const [analytes, setAnalytes] = useState<Analyte[]>([]);
   const [results, setResults] = useState<Result[]>([]);
   const [loading, setLoading] = useState(false);
@@ -106,6 +110,13 @@ const ResultsEntryTable: React.FC<ResultsEntryTableProps> = ({
   const [qualifiers, setQualifiers] = useState<any[]>([]);
   const [customAttributeConfigs, setCustomAttributeConfigs] = useState<CustomAttributeConfig[]>([]);
   const [loadingConfigs, setLoadingConfigs] = useState(false);
+  const [workflowTemplates, setWorkflowTemplates] = useState<{ id: string; name: string }[]>([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
+  const [applyTemplateLoading, setApplyTemplateLoading] = useState(false);
+  const [applyTemplateError, setApplyTemplateError] = useState<string | null>(null);
+  const [applyTemplateSuccess, setApplyTemplateSuccess] = useState<string | null>(null);
+
+  const canExecuteWorkflow = hasPermission('workflow:execute');
 
   useEffect(() => {
     loadAnalytes();
@@ -113,6 +124,13 @@ const ResultsEntryTable: React.FC<ResultsEntryTableProps> = ({
     loadCustomAttributeConfigs();
     initializeResults();
   }, [testId, samples]);
+
+  useEffect(() => {
+    if (!canExecuteWorkflow) return;
+    apiService.getWorkflowTemplates({ active: true })
+      .then((list) => setWorkflowTemplates(Array.isArray(list) ? list : []))
+      .catch((err) => console.error('Failed to load workflow templates:', err));
+  }, [canExecuteWorkflow]);
 
   const loadCustomAttributeConfigs = async () => {
     try {
@@ -246,6 +264,25 @@ const ResultsEntryTable: React.FC<ResultsEntryTableProps> = ({
     }
   };
 
+  const handleApplyTemplate = async () => {
+    if (!selectedTemplateId || !canExecuteWorkflow) return;
+    setApplyTemplateLoading(true);
+    setApplyTemplateError(null);
+    setApplyTemplateSuccess(null);
+    try {
+      await apiService.executeWorkflow(selectedTemplateId, {
+        context: { batch_id: batchId, test_id: testId },
+      });
+      setApplyTemplateSuccess('Workflow executed successfully.');
+      setSelectedTemplateId('');
+      onTemplateApplied?.();
+    } catch (err: any) {
+      setApplyTemplateError(err.response?.data?.detail || err.message || 'Failed to execute workflow');
+    } finally {
+      setApplyTemplateLoading(false);
+    }
+  };
+
   const getResultForSample = (sampleId: string, analyteId: string): Result | undefined => {
     return results.find(r => r.analyte_id === analyteId);
   };
@@ -269,18 +306,61 @@ const ResultsEntryTable: React.FC<ResultsEntryTableProps> = ({
 
   return (
     <Box>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2, mb: 2 }}>
         <Typography variant="h6">Results Entry</Typography>
-        <Button
-          variant="contained"
-          startIcon={saving ? <CircularProgress size={20} /> : <SaveIcon />}
-          onClick={handleSaveResults}
-          disabled={saving}
-        >
-          Save Results
-        </Button>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+          {canExecuteWorkflow && workflowTemplates.length > 0 && (
+            <>
+              <FormControl size="small" sx={{ minWidth: 200 }}>
+                <InputLabel id="results-apply-template-label">Apply Template</InputLabel>
+                <Select
+                  labelId="results-apply-template-label"
+                  value={selectedTemplateId}
+                  label="Apply Template"
+                  onChange={(e) => setSelectedTemplateId(e.target.value)}
+                  disabled={applyTemplateLoading}
+                >
+                  <MenuItem value="">
+                    <em>Select workflow...</em>
+                  </MenuItem>
+                  {workflowTemplates.map((t) => (
+                    <MenuItem key={t.id} value={t.id}>
+                      {t.name}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              <Button
+                variant="outlined"
+                onClick={handleApplyTemplate}
+                disabled={!selectedTemplateId || applyTemplateLoading}
+                startIcon={applyTemplateLoading ? <CircularProgress size={18} /> : null}
+              >
+                {applyTemplateLoading ? 'Running...' : 'Apply'}
+              </Button>
+            </>
+          )}
+          <Button
+            variant="contained"
+            startIcon={saving ? <CircularProgress size={20} /> : <SaveIcon />}
+            onClick={handleSaveResults}
+            disabled={saving}
+          >
+            Save Results
+          </Button>
+        </Box>
       </Box>
 
+      {applyTemplateError && (
+        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setApplyTemplateError(null)}>
+          {applyTemplateError}
+        </Alert>
+      )}
+      {applyTemplateSuccess && (
+        <Alert severity="success" sx={{ mb: 2 }} onClose={() => setApplyTemplateSuccess(null)}>
+          {applyTemplateSuccess}
+        </Alert>
+      )}
       {error && (
         <Alert severity="error" sx={{ mb: 2 }}>
           {error}

@@ -26,6 +26,7 @@ The MVP focuses on core functionality using PostgreSQL for data storage, Python 
 - Version 1.8: Added lab manager help system with role-filtered help content (lab-manager slug format), LabManagerHelpSection component, tooltips in results management and batch results view, comprehensive test coverage including ARIA accessibility and RLS enforcement, and verification scripts (January 2025).
 - Version 1.9: Added admin help system with role-filtered help content (administrator slug format), AdminHelpSection component, HelpManagement CRUD page for editing help entries (requires config:edit permission), role_filter validation against existing roles, comprehensive test coverage including CRUD and RBAC tests, tooltip in CustomFieldsManagement, and verification scripts (January 2025).
 - Version 2.0: Added editing for samples, tests, and containers with PATCH endpoints, management pages (SamplesManagement, TestsManagement, enhanced ContainerManagement), reusable form components (SampleForm, TestForm, ContainerForm), RBAC enforcement (sample:update, test:update permissions), audit field updates (modified_at, modified_by), comprehensive test coverage (backend PATCH scenarios, RBAC, audit updates; frontend list rendering, edit navigation, form modes, ARIA, permission hiding), and database indexes for efficient editing (January 2025).
+- Version 2.1: Added workflow templates and execution: workflow_templates and workflow_instances tables, template CRUD under /admin/workflow-templates (config:edit), execute under POST /workflows/execute/{template_id} (workflow:execute), valid actions list and step validation, transaction rollback on step failure, RBAC and tests (test_workflows.py, WorkflowTemplatesManagement Jest tests) (February 2025).
 
 ## 2. System Architecture
 
@@ -205,6 +206,18 @@ All tables include standard fields: `id` (UUID PK), `name` (varchar unique), `de
   - `role_filter` (varchar, nullable): Role name for filtering (NULL = public, visible to all roles)
   - Standard audit fields (id, name, description, active, created_at, created_by, modified_at, modified_by)
   - Notes: Role-filtered help content system. Users see entries where role_filter matches their role OR role_filter is NULL (public). RLS enforces filtering at database level. Name field uses section value (not unique).
+
+- **Workflow_Templates**:
+  - `template_definition` (JSONB, NOT NULL, default '{}'): JSON object with `steps` array; each step has `action` (string, one of valid actions) and optional `params` (object).
+  - Standard audit fields (id, name, description, active, created_at, created_by, modified_at, modified_by)
+  - Notes: Admin-managed templates for repeatable workflow runs. Soft-delete via active=false. Valid actions: update_status, validate_custom, create_qc, assign_tests, create_batch, enter_results, send_notification, accession_sample, link_container, review_result.
+
+- **Workflow_Instances**:
+  - `workflow_template_id` (FK workflow_templates.id, NOT NULL)
+  - `runtime_state` (JSONB, NOT NULL, default '{}'): Context and steps_run from execution
+  - `status_id` (FK list_entries.id, nullable)
+  - Standard audit fields (id, name, description, active, created_at, created_by, modified_at, modified_by)
+  - Notes: One record per workflow run; created by execute endpoint in a single transaction; no instance created if a step fails (rollback).
 
 - **Roles**:
   - No additional fields.
@@ -392,6 +405,14 @@ WHERE custom_attributes @> '{"ph_level": 7.5}'::jsonb;
   - POST /help/admin/help: Create help entry (requires `config:edit` permission).
   - PATCH /help/admin/help/{id}: Update help entry (requires `config:edit` permission).
   - DELETE /help/admin/help/{id}: Soft-delete help entry (requires `config:edit` permission).
+- **Workflow Templates** (admin, requires config:edit):
+  - GET /admin/workflow-templates: List workflow templates (optional ?active=true|false).
+  - POST /admin/workflow-templates: Create template (name, description, active, template_definition with steps array).
+  - GET /admin/workflow-templates/{template_id}: Get template by ID.
+  - PATCH /admin/workflow-templates/{template_id}: Update template (partial).
+  - DELETE /admin/workflow-templates/{template_id}: Soft-deactivate template (sets active=false).
+- **Workflow Execution** (requires workflow:execute):
+  - POST /workflows/execute/{template_id}: Execute a workflow template. Body: optional name, optional context (e.g. batch_id, sample_id, test_id). Template must be active. Steps run in order; invalid action returns 400; step failure returns 500 and transaction rolls back (no workflow_instance created). Returns WorkflowInstanceRead with runtime_state (context, steps_run, completed).
 - Error Handling: Standard HTTP codes; JSON {error, detail}.
 
 ### 4.3 Validation
@@ -479,6 +500,7 @@ WHERE custom_attributes @> '{"ph_level": 7.5}'::jsonb;
 ## 9. Appendices
 - References: FastAPI docs, SQLAlchemy guide, React best practices, Docker documentation.
 - Glossary: Aligns with PRD.
+- **Workflow Tests**: Backend `backend/tests/test_workflows.py` (pytest) covers template CRUD, execute with valid/invalid steps, transaction rollback on step failure, and RBAC (config:edit for templates, workflow:execute for execute). Frontend `frontend/src/__tests__/WorkflowTemplatesManagement.test.tsx` (Jest) covers list, create, edit, delete, execute dialog, permission warning, loading and error states.
 
 
 # Post-MVP Technical Document for LIMS

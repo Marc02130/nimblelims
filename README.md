@@ -140,6 +140,7 @@ nimblelims/
 - **Cross-Project Batching** (US-26): Batch samples from multiple projects with compatibility validation
 - **QC at Batch Creation** (US-27): Automatically generate QC samples when creating batches
 - **Batch Results Entry** (US-28): Enter results for multiple tests/samples in a batch atomically
+- **Workflow Templates** (US-29): Define reusable workflow templates (steps with actions) and run them from Accessioning, Batch details, or Results Entry with context (e.g. batch_id, test_id). Requires config:edit for template CRUD and workflow:execute for execution. Failed steps roll back the transaction (no instance created).
 
 ### Container System
 - **Container Types**: Pre-setup by administrators (CRUD via admin interface)
@@ -163,6 +164,7 @@ nimblelims/
 - **Users Management**: Create and manage users with role assignments (CRUD)
 - **Roles & Permissions**: Manage roles and assign permissions (CRUD)
 - **Units Management**: Unit definitions with multipliers for conversions
+- **Workflow Templates Management**: Create, edit, and deactivate workflow templates (JSON steps with actions). Execute templates from the admin list with optional context, or use "Apply Template" on Accessioning (context empty), Batch details (context batch_id), and Results Entry (context batch_id, test_id). Visible only with config:edit (admin) and workflow:execute (apply).
 
 ### Security & Access
 - **Authentication**: JWT token-based authentication
@@ -250,7 +252,8 @@ Comprehensive documentation is available in the `.docs/` directory:
   - `.docs/lists.md` - Configurable lists system and administration
   - `.docs/technical-accessioning-to-reporting.md` - Technical implementation details for accessioning through reporting
   - `.docs/ui-accessioning-to-reporting.md` - UI components and interactions for accessioning through reporting
-  - `.docs/workflow-accessioning-to-reporting.md` - Complete workflow from accessioning through reporting
+  - `.docs/workflow-accessioning-to-reporting.md` - Complete workflow from accessioning through reporting (includes Workflow Templates section)
+  - `UAT_Scripts/uat-workflow-templates.md` - UAT test cases for workflow templates (creation, execution, RBAC, rollback)
 - **Setup Guides**:
   - `.docs/nimblelims_dev_setup.md` - Development environment setup
   - `.docs/admin_setup.md` - Admin user configuration

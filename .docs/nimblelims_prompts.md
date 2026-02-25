@@ -1181,3 +1181,34 @@ Export the component as default."
 ## 4. Prompt for General Admin Dashboard Integration
 "Update the React App.js file to include admin routes. Add a navigation section for 'Admin' with sub-links to '/admin/name-templates', '/admin/custom-attributes', '/admin/lists'. Use React Router for routing. Assume components NameTemplatesAdmin, CustomAttributesAdmin, ListsAdmin are in '/components/admin'. Include authentication guard for admin routes. Use a MainNav component for the navigation bar.
 Update the .docs, uat test scripts and readme files when code is complete"
+
+# Work Flows
+## Prompt 19: Database Schema & Migration for Workflow Templates
+Create Alembic migration and SQLAlchemy models for workflow_templates and workflow_instances tables. Include JSONB fields for template definition (steps array with action/params) and instance runtime state. Add indexes, RLS policy (role-based), and audit triggers. Extend existing BaseModel. Update technical-accessioning-to-reporting.md schema section inline. Output only the new migration file and updated models/init.py.
+
+## Prompt 20: Backend Pydantic Schemas for Workflow Templates
+Create full schemas/workflow.py with WorkflowTemplateCreate, WorkflowTemplateRead, WorkflowTemplateUpdate, WorkflowExecuteRequest, and WorkflowInstanceRead. Include validators for template_json structure (steps must contain valid actions: update_status, validate_custom, create_qc, etc.). Output the complete new file only.
+
+## Prompt 21: Backend API Routers & CRUD + Execute Logic for Workflows
+Implement routers/workflows.py with full CRUD for /admin/workflow-templates (RBAC config:edit) and POST /workflows/execute/{template_id} that parses steps, runs actions in a single transaction, and creates workflow_instance record. Add new permission workflow:execute to seed data. Output the complete new router file and any updated dependencies.
+
+## Prompt 22: Update RBAC, Permissions & Seed Data
+Add workflow:execute permission to roles table seed, update role_permissions for Administrator and Lab Manager, extend RBAC decorator and RLS policy. Update auth/dependencies.py and any permission lists. Output full updated files only.
+
+## Prompt 23: Frontend Workflow Templates Admin Page
+Create pages/admin/WorkflowTemplatesManagement.tsx with DataGrid for list, dialog with JSON editor (using Monaco or CodeMirror) for create/edit, and “Execute on Entity” button. Follow existing Material-UI patterns and permission gating from other admin pages. Output the complete new file.
+Prompt 24: Integrate Workflow Templates into Existing MVP Forms
+Update AccessioningForm.tsx, BatchManagement.tsx, and ResultsEntryTable.tsx to include “Apply Template” dropdown that calls the execute endpoint and refreshes data. Add loading states and error handling. Output each full updated file.
+
+## Prompt 25: Unit & Integration Tests for Workflow Feature
+Add backend tests/test_workflows.py (pytest) covering template CRUD, execute with valid/invalid steps, transaction rollback on failure, and RBAC. Add frontend tests for WorkflowTemplatesManagement.tsx (Jest). Output the complete new test files.
+
+## Prompt 26: Final Integration, Docs, UAT & README Update (Required Last Prompt)
+After all prior prompts are complete and manually verified:
+
+Update nimblelims_tech.md (schema, API, appendix), nimblelims_prd.md (post-MVP section), nimblelims_user.md (US-29 details), workflow-accessioning-to-reporting.md and technical-accessioning-to-reporting.md (templated workflow sections).
+Create uat-workflow-templates.md with 12 test cases (creation, execution on sample/batch, conditional actions, permission denial, etc.) and add it to uat-testing-log.md dependency table.
+Update README.md with new feature overview and usage.
+Ensure all changes follow PEP8/ESLint.
+Output every updated or new file in full.
+

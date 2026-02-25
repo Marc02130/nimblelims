@@ -12,6 +12,10 @@ import {
   FormControlLabel,
   Switch,
   Divider,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
 } from '@mui/material';
 import { Formik, Form } from 'formik';
 import * as Yup from 'yup';
@@ -390,13 +394,30 @@ const AccessioningForm: React.FC = () => {
     units: [],
   });
   const [customAttributeConfigs, setCustomAttributeConfigs] = useState<any[]>([]);
+  const [workflowTemplates, setWorkflowTemplates] = useState<{ id: string; name: string }[]>([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
+  const [applyTemplateLoading, setApplyTemplateLoading] = useState(false);
+  const [applyTemplateError, setApplyTemplateError] = useState<string | null>(null);
+  const [applyTemplateSuccess, setApplyTemplateSuccess] = useState<string | null>(null);
 
-  const { user } = useUser();
+  const { user, hasPermission } = useUser();
+  const canExecuteWorkflow = hasPermission('workflow:execute');
 
   useEffect(() => {
     loadLookupData();
     loadCustomAttributeConfigs();
+    loadWorkflowTemplates();
   }, []);
+
+  const loadWorkflowTemplates = async () => {
+    if (!canExecuteWorkflow) return;
+    try {
+      const list = await apiService.getWorkflowTemplates({ active: true });
+      setWorkflowTemplates(Array.isArray(list) ? list : []);
+    } catch (err) {
+      console.error('Failed to load workflow templates:', err);
+    }
+  };
 
   const loadLookupData = async () => {
     try {
@@ -627,6 +648,24 @@ const AccessioningForm: React.FC = () => {
     }
   };
 
+  const handleApplyTemplate = async () => {
+    if (!selectedTemplateId || !canExecuteWorkflow) return;
+    setApplyTemplateLoading(true);
+    setApplyTemplateError(null);
+    setApplyTemplateSuccess(null);
+    try {
+      await apiService.executeWorkflow(selectedTemplateId, { context: {} });
+      setApplyTemplateSuccess('Workflow executed successfully.');
+      await loadLookupData();
+      await loadCustomAttributeConfigs();
+      setSelectedTemplateId('');
+    } catch (err: any) {
+      setApplyTemplateError(err.response?.data?.detail || err.message || 'Failed to execute workflow');
+    } finally {
+      setApplyTemplateLoading(false);
+    }
+  };
+
   const renderStepContent = (step: number, values: SampleFormData, setFieldValue: any, setFieldTouched?: any, validateField?: any, errors?: any, touched?: any) => {
     switch (step) {
       case 0:
@@ -667,11 +706,54 @@ const AccessioningForm: React.FC = () => {
 
   return (
     <Box sx={{ maxWidth: 1200, margin: '0 auto', p: 3 }}>
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+      <Box display="flex" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={2} mb={2}>
         <Typography variant="h4">
           Sample Accessioning
         </Typography>
+        {canExecuteWorkflow && workflowTemplates.length > 0 && (
+          <Box display="flex" alignItems="center" gap={1}>
+            <FormControl size="small" sx={{ minWidth: 220 }}>
+              <InputLabel id="accessioning-apply-template-label">Apply Template</InputLabel>
+              <Select
+                labelId="accessioning-apply-template-label"
+                id="accessioning-apply-template"
+                value={selectedTemplateId}
+                label="Apply Template"
+                onChange={(e) => setSelectedTemplateId(e.target.value)}
+                disabled={applyTemplateLoading}
+              >
+                <MenuItem value="">
+                  <em>Select workflow...</em>
+                </MenuItem>
+                {workflowTemplates.map((t) => (
+                  <MenuItem key={t.id} value={t.id}>
+                    {t.name}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <Button
+              variant="outlined"
+              onClick={handleApplyTemplate}
+              disabled={!selectedTemplateId || applyTemplateLoading}
+              startIcon={applyTemplateLoading ? <CircularProgress size={18} /> : null}
+            >
+              {applyTemplateLoading ? 'Running...' : 'Apply'}
+            </Button>
+          </Box>
+        )}
       </Box>
+
+      {applyTemplateError && (
+        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setApplyTemplateError(null)}>
+          {applyTemplateError}
+        </Alert>
+      )}
+      {applyTemplateSuccess && (
+        <Alert severity="success" sx={{ mb: 2 }} onClose={() => setApplyTemplateSuccess(null)}>
+          {applyTemplateSuccess}
+        </Alert>
+      )}
       
       {error && (
         <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
