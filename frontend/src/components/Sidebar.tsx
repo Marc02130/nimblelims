@@ -687,7 +687,14 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onMobileClose, collapsed 
   return (
     <Box
       component="nav"
-      sx={{ width: { sm: DRAWER_WIDTH }, flexShrink: { sm: 0 } }}
+      sx={{
+        width: { sm: collapsed ? DRAWER_WIDTH_COLLAPSED : DRAWER_WIDTH },
+        flexShrink: { sm: 0 },
+        transition: theme.transitions.create('width', {
+          easing: theme.transitions.easing.sharp,
+          duration: theme.transitions.duration.enteringScreen,
+        }),
+      }}
       aria-label="main navigation"
     >
       {/* Mobile drawer */}

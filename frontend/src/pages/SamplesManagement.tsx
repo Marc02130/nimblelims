@@ -301,7 +301,7 @@ const SamplesManagement: React.FC = () => {
                 paginationModel: { page: 0, pageSize: 25 },
               },
             }}
-            sx={{ height: 600 }}
+            autoHeight
             disableRowSelectionOnClick
           />
         </CardContent>
