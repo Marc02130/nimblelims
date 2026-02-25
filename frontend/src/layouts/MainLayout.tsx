@@ -22,6 +22,8 @@ import Sidebar from '../components/Sidebar';
 
 const DRAWER_WIDTH = 240;
 const DRAWER_WIDTH_COLLAPSED = 56;
+/** Height reserved for fixed AppBar (Toolbar) + main content padding (p: 3 = 24px × 2) */
+const MAIN_CONTENT_OFFSET = 64 + 24 * 2; // 112px
 
 interface MainLayoutProps {
   children: React.ReactNode;
@@ -156,7 +158,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   const drawerWidth = isMobile ? DRAWER_WIDTH : (sidebarCollapsed ? DRAWER_WIDTH_COLLAPSED : DRAWER_WIDTH);
 
   return (
-    <Box sx={{ display: 'flex', minHeight: '100vh' }}>
+    <Box sx={{ display: 'flex', height: '100vh', minHeight: 0 }}>
       {/* Sidebar */}
       <Sidebar 
         mobileOpen={mobileOpen} 
@@ -169,9 +171,11 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
         component="main"
         sx={{
           flexGrow: 1,
+          minWidth: 0,
           width: { sm: `calc(100% - ${drawerWidth}px)` },
           display: 'flex',
           flexDirection: 'column',
+          minHeight: 0,
           transition: theme.transitions.create(['width', 'margin'], {
             easing: theme.transitions.easing.sharp,
             duration: theme.transitions.duration.enteringScreen,
@@ -249,18 +253,35 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
           </Toolbar>
         </AppBar>
 
-        {/* Main content */}
+        {/* Spacer for fixed AppBar (Toolbar default height 64px) */}
+        <Toolbar sx={{ flexShrink: 0 }} />
+
+        {/* Main content: padding wrapper; scroll area has explicit height so it never over-reserves */}
         <Box
-          component="main"
           sx={{
-            flexGrow: 1,
+            flex: '1 1 0',
+            minHeight: 0,
             p: 3,
-            mt: '64px',
-            width: '100%',
-            overflow: 'auto',
+            boxSizing: 'border-box',
+            display: 'flex',
+            flexDirection: 'column',
           }}
         >
-          {children}
+          {/* Single scroll container: height = viewport minus app bar and padding; scrollbar only when content overflows */}
+          <Box
+            className="main-content-scroll"
+            sx={{
+              height: `calc(100vh - ${MAIN_CONTENT_OFFSET}px)`,
+              maxHeight: `calc(100vh - ${MAIN_CONTENT_OFFSET}px)`,
+              minHeight: 0,
+              minWidth: 0,
+              overflowX: 'auto',
+              overflowY: 'auto',
+              width: '100%',
+            }}
+          >
+            {children}
+          </Box>
         </Box>
       </Box>
     </Box>
