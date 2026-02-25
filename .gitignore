@@ -23,6 +23,7 @@ share/python-wheels/
 *.egg
 MANIFEST
 .docs/container-logs/
+.docs/private/
 
 # PyInstaller
 *.manifest
