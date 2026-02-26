@@ -14,16 +14,71 @@ import {
   IconButton,
   Alert,
   CircularProgress,
+  List,
+  ListItem,
+  ListItemText,
 } from '@mui/material';
+import ScienceIcon from '@mui/icons-material/Science';
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { Formik, Form, Field } from 'formik';
 import * as Yup from 'yup';
+import { useNavigate } from 'react-router-dom';
 import CustomAttributeField from '../common/CustomAttributeField';
 import { apiService } from '../../services/apiService';
 import { useUser } from '../../contexts/UserContext';
+
+/** Shows experiments this sample participated in (view-only, used in SampleForm when readOnly). */
+function SampleExperimentsSection({ sampleId }: { sampleId: string }) {
+  const navigate = useNavigate();
+  const [experiments, setExperiments] = useState<{ execution_id: string; experiment_id: string; experiment_name: string; replicate_number: number }[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    apiService
+      .getSampleExperiments(sampleId)
+      .then((res: { experiments?: { execution_id: string; experiment_id: string; experiment_name: string; replicate_number: number }[] }) => {
+        if (!cancelled) setExperiments(res?.experiments ?? []);
+      })
+      .catch(() => {
+        if (!cancelled) setExperiments([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [sampleId]);
+
+  if (loading) return <Box sx={{ mt: 2 }}><CircularProgress size={24} /></Box>;
+  if (experiments.length === 0) return null;
+
+  return (
+    <Box sx={{ mt: 3 }}>
+      <Divider sx={{ my: 2 }} />
+      <Typography variant="subtitle1" fontWeight={600} gutterBottom>
+        Participated in these Experiments / Processes
+      </Typography>
+      <List dense disablePadding>
+        {experiments.map((ex) => (
+          <ListItem key={ex.execution_id} disablePadding>
+            <Button
+              size="small"
+              startIcon={<ScienceIcon />}
+              onClick={() => navigate(`/experiments/${ex.experiment_id}`)}
+              sx={{ textTransform: 'none', justifyContent: 'flex-start' }}
+            >
+              {ex.experiment_name}
+              {ex.replicate_number > 1 ? ` (replicate ${ex.replicate_number})` : ''}
+            </Button>
+          </ListItem>
+        ))}
+      </List>
+    </Box>
+  );
+}
 
 interface CustomAttributeConfig {
   id: string;
@@ -575,6 +630,8 @@ const SampleForm: React.FC<SampleFormProps> = ({
                 </>
               )}
             </Grid>
+
+            {isViewMode && sample?.id && <SampleExperimentsSection sampleId={sample.id} />}
 
             <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2, mt: 3 }}>
               <Button onClick={onCancel} disabled={loading}>

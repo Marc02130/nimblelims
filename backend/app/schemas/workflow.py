@@ -18,7 +18,25 @@ VALID_WORKFLOW_ACTIONS = [
     "accession_sample",
     "link_container",
     "review_result",
+    # Experiment actions (context carries experiment_id, execution_id for downstream steps)
+    "create_experiment",
+    "create_experiment_from_template",
+    "link_sample_to_experiment",
+    "add_experiment_detail_step",
+    "link_experiments",
+    "update_experiment_status",
 ]
+
+# Params hints for workflow builder UI: action -> list of param keys (required/optional).
+# experiment_id can come from context (set by create_experiment / create_experiment_from_template).
+WORKFLOW_EXPERIMENT_ACTION_PARAMS = {
+    "create_experiment": ["name (required)", "description", "experiment_template_id", "status_id", "custom_attributes"],
+    "create_experiment_from_template": ["experiment_template_id (required)", "name", "description", "status_id"],
+    "link_sample_to_experiment": ["experiment_id (or from context)", "sample_id (required)", "role_in_experiment_id", "processing_conditions", "replicate_number", "test_id", "result_id"],
+    "add_experiment_detail_step": ["experiment_id (or from context)", "detail_type (required)", "content", "sort_order"],
+    "link_experiments": ["experiment_id (or from context)", "linked_experiment_id (required)"],
+    "update_experiment_status": ["experiment_id (or from context)", "status_id (required)"],
+}
 
 
 def validate_template_definition(v: Any) -> Dict[str, Any]:
@@ -106,7 +124,12 @@ class WorkflowExecuteRequest(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=255, description="Optional instance name (auto-generated if omitted)")
     context: Optional[Dict[str, Any]] = Field(
         default_factory=dict,
-        description="Initial context passed to the workflow (e.g. sample_id, batch_id)",
+        description=(
+            "Initial context passed to the workflow. May contain: sample_id, batch_id, etc. "
+            "Experiment actions set/use: experiment_id (UUID str, set by create_experiment/create_experiment_from_template), "
+            "execution_id (UUID str, set by link_sample_to_experiment for the experiment_sample_execution id). "
+            "Later steps can reference context.experiment_id or params.experiment_id."
+        ),
     )
 
 

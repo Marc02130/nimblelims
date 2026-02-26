@@ -386,7 +386,7 @@ const WorkflowTemplatesManagement: React.FC = () => {
             error={!!formJsonError}
             helperText={
               formJsonError ||
-              'Must have "steps" array; each step: { "action": "update_status" | "validate_custom" | "create_qc" | ... , "params": {} }'
+              'Must have "steps" array. action: update_status | validate_custom | create_qc | assign_tests | create_batch | enter_results | send_notification | accession_sample | link_container | review_result | create_experiment | create_experiment_from_template | link_sample_to_experiment | add_experiment_detail_step | link_experiments | update_experiment_status. params: {} or e.g. { "name": "...", "experiment_template_id": "uuid", "sample_id": "uuid" }. Context can carry experiment_id, execution_id.'
             }
             multiline
             minRows={10}
@@ -439,7 +439,7 @@ const WorkflowTemplatesManagement: React.FC = () => {
         <DialogTitle>Execute on Entity</DialogTitle>
         <DialogContent>
           <DialogContentText sx={{ mb: 2 }}>
-            Run template <strong>{executeTarget?.name}</strong>. Optionally pass context (e.g. sample_id, batch_id) as JSON.
+            Run template <strong>{executeTarget?.name}</strong>. Pass context as JSON (e.g. sample_id, batch_id). For experiment actions use experiment_id (set by create_experiment / create_experiment_from_template) or experiment_template_id, sample_id in params.
           </DialogContentText>
           <TextField
             fullWidth

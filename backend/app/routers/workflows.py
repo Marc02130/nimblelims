@@ -1,5 +1,9 @@
 """
 Workflow templates (admin CRUD) and workflow execution.
+
+Experiment actions use ExperimentService with auto_commit=False so the whole
+workflow runs in one transaction. Context carries experiment_id and execution_id
+for downstream steps.
 """
 from typing import Any, Dict, List, Optional
 from uuid import UUID, uuid4
@@ -11,6 +15,14 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.core.rbac import require_config_edit, require_workflow_execute
+from app.services.experiment_service import ExperimentService
+from app.schemas.experiment import (
+    ExperimentCreate,
+    AddExperimentDetailStepRequest,
+    LinkSampleToExperimentRequest,
+    LinkExperimentsRequest,
+    ExperimentUpdate,
+)
 from models.user import User
 from models.workflow import WorkflowTemplate, WorkflowInstance
 from app.schemas.workflow import (
@@ -23,6 +35,30 @@ from app.schemas.workflow import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _uuid_from_context_or_params(context: Dict[str, Any], params: Dict[str, Any], key: str) -> Optional[UUID]:
+    """Resolve a UUID from context or params (string or UUID)."""
+    raw = params.get(key) or context.get(key)
+    if raw is None:
+        return None
+    if isinstance(raw, UUID):
+        return raw
+    try:
+        return UUID(str(raw))
+    except (ValueError, TypeError):
+        return None
+
+
+def _get_experiment_id(context: Dict[str, Any], params: Dict[str, Any], action: str, step_index: int) -> UUID:
+    """Get experiment_id from context or params; raise if missing (required for experiment steps)."""
+    eid = _uuid_from_context_or_params(context, params, "experiment_id")
+    if eid is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Step {step_index} action '{action}' requires experiment_id in context or params (set by create_experiment or create_experiment_from_template)",
+        )
+    return eid
 
 # Admin CRUD under /admin/workflow-templates (prefix added in main)
 workflow_templates_router = APIRouter(
@@ -39,16 +75,18 @@ workflows_router = APIRouter(
 
 def _run_action(
     db: Session,
+    current_user: User,
     action: str,
     params: Dict[str, Any],
     context: Dict[str, Any],
     step_index: int,
 ) -> Dict[str, Any]:
     """
-    Run a single workflow action. Stub implementations; each action
-    can be extended to call real services. Returns updated context.
+    Run a single workflow action. Experiment actions use ExperimentService
+    with auto_commit=False. Returns updated context (experiment_id, execution_id set when relevant).
     """
-    # Stub runners: no-op for now; integrate with real services as needed
+    ctx = dict(context)
+
     if action == "update_status":
         pass  # e.g. update sample/test status from params
     elif action == "validate_custom":
@@ -69,7 +107,114 @@ def _run_action(
         pass  # link container to sample
     elif action == "review_result":
         pass  # review result
-    return dict(context)
+
+    # ---------- Experiment actions (service with auto_commit=False) ----------
+    elif action == "create_experiment":
+        name = params.get("name") or (context.get("name") and str(context["name"]))
+        if not name:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Step {step_index} action 'create_experiment' requires 'name' in params",
+            )
+        data = ExperimentCreate(
+            name=str(name).strip()[:255],
+            description=params.get("description"),
+            experiment_template_id=_uuid_from_context_or_params(context, params, "experiment_template_id"),
+            status_id=_uuid_from_context_or_params(context, params, "status_id"),
+            started_at=None,
+            completed_at=None,
+            custom_attributes=params.get("custom_attributes") or context.get("custom_attributes") or {},
+        )
+        svc = ExperimentService(db, current_user=current_user, auto_commit=False)
+        exp = svc.create_experiment(data)
+        ctx["experiment_id"] = str(exp.id)
+
+    elif action == "create_experiment_from_template":
+        template_id = _uuid_from_context_or_params(context, params, "experiment_template_id")
+        if template_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Step {step_index} action 'create_experiment_from_template' requires 'experiment_template_id' in params",
+            )
+        name = params.get("name") or context.get("name")
+        if not name:
+            name = f"Experiment_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}"
+        data = ExperimentCreate(
+            name=str(name).strip()[:255],
+            description=params.get("description"),
+            experiment_template_id=template_id,
+            status_id=_uuid_from_context_or_params(context, params, "status_id"),
+            started_at=None,
+            completed_at=None,
+            custom_attributes=params.get("custom_attributes") or {},
+        )
+        svc = ExperimentService(db, current_user=current_user, auto_commit=False)
+        exp = svc.create_experiment(data)
+        ctx["experiment_id"] = str(exp.id)
+
+    elif action == "link_sample_to_experiment":
+        experiment_id = _get_experiment_id(ctx, params, action, step_index)
+        sample_id = _uuid_from_context_or_params(ctx, params, "sample_id")
+        if sample_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Step {step_index} action 'link_sample_to_experiment' requires 'sample_id' in context or params",
+            )
+        link_data = LinkSampleToExperimentRequest(
+            sample_id=sample_id,
+            role_in_experiment_id=_uuid_from_context_or_params(ctx, params, "role_in_experiment_id"),
+            processing_conditions=params.get("processing_conditions") or {},
+            replicate_number=int(params.get("replicate_number") or 1),
+            test_id=_uuid_from_context_or_params(ctx, params, "test_id"),
+            result_id=_uuid_from_context_or_params(ctx, params, "result_id"),
+            custom_attributes=params.get("custom_attributes") or {},
+        )
+        svc = ExperimentService(db, current_user=current_user, auto_commit=False)
+        ex = svc.link_sample_to_experiment(experiment_id, link_data)
+        ctx["execution_id"] = str(ex.id)
+
+    elif action == "add_experiment_detail_step":
+        experiment_id = _get_experiment_id(ctx, params, action, step_index)
+        detail_type = params.get("detail_type") or params.get("detailType")
+        if not detail_type:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Step {step_index} action 'add_experiment_detail_step' requires 'detail_type' in params",
+            )
+        step_data = AddExperimentDetailStepRequest(
+            detail_type=str(detail_type).strip()[:255],
+            content=params.get("content") or {},
+            sort_order=params.get("sort_order") if params.get("sort_order") is not None else None,
+        )
+        svc = ExperimentService(db, current_user=current_user, auto_commit=False)
+        svc.add_experiment_detail_step(experiment_id, step_data)
+
+    elif action == "link_experiments":
+        experiment_id = _get_experiment_id(ctx, params, action, step_index)
+        linked_id = _uuid_from_context_or_params(ctx, params, "linked_experiment_id")
+        if linked_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Step {step_index} action 'link_experiments' requires 'linked_experiment_id' in params",
+            )
+        link_data = LinkExperimentsRequest(linked_experiment_id=linked_id)
+        svc = ExperimentService(db, current_user=current_user, auto_commit=False)
+        svc.link_experiments(experiment_id, link_data)
+
+    elif action == "update_experiment_status":
+        experiment_id = _get_experiment_id(ctx, params, action, step_index)
+        status_id = _uuid_from_context_or_params(ctx, params, "status_id")
+        if status_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Step {step_index} action 'update_experiment_status' requires 'status_id' in params",
+            )
+        svc = ExperimentService(db, current_user=current_user, auto_commit=False)
+        svc.update_experiment(experiment_id, ExperimentUpdate(status_id=status_id))
+
+    else:
+        pass  # unknown action no-op
+    return ctx
 
 
 # --- Admin workflow-templates CRUD (config:edit) ---
@@ -242,7 +387,7 @@ def execute_workflow(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail=f"Invalid action '{action}' at step {i}; must be one of: {', '.join(VALID_WORKFLOW_ACTIONS)}",
                 )
-            context = _run_action(db, action, params, context, i)
+            context = _run_action(db, current_user, action, params, context, i)
             steps_run.append({
                 "step_index": i,
                 "action": action,

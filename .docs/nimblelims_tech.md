@@ -27,13 +27,14 @@ The MVP focuses on core functionality using PostgreSQL for data storage, Python 
 - Version 1.9: Added admin help system with role-filtered help content (administrator slug format), AdminHelpSection component, HelpManagement CRUD page for editing help entries (requires config:edit permission), role_filter validation against existing roles, comprehensive test coverage including CRUD and RBAC tests, tooltip in CustomFieldsManagement, and verification scripts (January 2025).
 - Version 2.0: Added editing for samples, tests, and containers with PATCH endpoints, management pages (SamplesManagement, TestsManagement, enhanced ContainerManagement), reusable form components (SampleForm, TestForm, ContainerForm), RBAC enforcement (sample:update, test:update permissions), audit field updates (modified_at, modified_by), comprehensive test coverage (backend PATCH scenarios, RBAC, audit updates; frontend list rendering, edit navigation, form modes, ARIA, permission hiding), and database indexes for efficient editing (January 2025).
 - Version 2.1: Added workflow templates and execution: workflow_templates and workflow_instances tables, template CRUD under /admin/workflow-templates (config:edit), execute under POST /workflows/execute/{template_id} (workflow:execute), valid actions list and step validation, transaction rollback on step failure, RBAC and tests (test_workflows.py, WorkflowTemplatesManagement Jest tests) (February 2025).
+- Version 2.2: Added Experiment Management (Chunk 1): experiment_templates, experiments, experiment_details, experiment_sample_executions tables; API under /v1/experiments and /v1/experiment-templates (CRUD, link_sample_to_experiment, add_experiment_detail_step, link_experiments, get_experiment_lineage, get_sample_experiments, list with mine=true); permission experiment:manage; workflow actions (create_experiment, create_experiment_from_template, link_sample_to_experiment, add_experiment_detail_step, link_experiments, update_experiment_status). Frontend: dedicated Experiments accordion in sidebar (All Experiments, Experiment Templates; Templates gated by config:edit or experiment_template:manage); routes /experiments, /experiments/:id, /experiments/templates; ExperimentsManagement list/detail, My Experiments filter (?mine=true), bidirectional sample↔experiment links, lineage view; back button for experiment detail. See .docs/experiment-planning.md and .docs/navigation.md (February 2025).
 
 ## 2. System Architecture
 
 ### 2.1 High-Level Overview
 - **Backend**: FastAPI for API server; SQLAlchemy ORM for DB interactions; JWT (PyJWT) for auth.
 - **Database**: PostgreSQL with normalized schema; Row-Level Security (RLS) for data isolation.
-- **Frontend**: React app with Axios for API calls; React Router for navigation; Material-UI or similar for components.
+- **Frontend**: React app with Axios for API calls; React Router for navigation; Material-UI or similar for components. Sidebar navigation: unified accordions (Core, Sample Mgmt, **Experiments**, Lab Mgmt, Admin); Experiments section has sub-items All Experiments and Experiment Templates (Templates gated by config:edit or experiment_template:manage).
 - **Communication**: RESTful APIs over HTTPS; JSON payloads.
 - **Security**: JWT tokens; bcrypt for password hashing; RLS policies in Postgres.
 - **Scalability**: UUID primary keys; indexing on foreign keys; async endpoints where applicable.
@@ -603,3 +604,9 @@ No new permissions.
 
 Add bulk/cross-project tests.
 Docker: No changes needed.
+
+---
+
+## Summary — Documentation Update (Experiment Management & Navigation)
+
+**This file (`.docs/nimblelims_tech.md`) modified:** Version history 2.2 added for Experiment Management (Chunk 1) and Experiments accordion; Frontend architecture bullet updated to mention Experiments sidebar section. No other sections changed.

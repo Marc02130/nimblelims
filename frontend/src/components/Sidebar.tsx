@@ -65,13 +65,18 @@ interface AdminNavItem {
   exact?: boolean;
 }
 
-// Helper to check if current path is in Lab Mgmt section
+// Helper to check if current path is in Lab Mgmt section (excludes Experiments - has its own accordion)
 const isLabMgmtRoute = (pathname: string): boolean => {
-  return pathname.startsWith('/clients') || 
-    pathname.startsWith('/projects') || 
+  return pathname.startsWith('/clients') ||
+    pathname.startsWith('/projects') ||
     pathname.startsWith('/client-projects') ||
     pathname.startsWith('/analyses') ||
     pathname.startsWith('/analytes');
+};
+
+// Helper to check if current path is in Experiments section
+const isExperimentsRoute = (pathname: string): boolean => {
+  return pathname.startsWith('/experiments');
 };
 
 const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onMobileClose, collapsed = false }) => {
@@ -87,6 +92,9 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onMobileClose, collapsed 
   const [labMgmtExpanded, setLabMgmtExpanded] = useState(
     isLabMgmtRoute(location.pathname)
   );
+  const [experimentsExpanded, setExperimentsExpanded] = useState(
+    isExperimentsRoute(location.pathname)
+  );
   const [sampleMgmtExpanded, setSampleMgmtExpanded] = useState(
     location.pathname.startsWith('/accessioning') || 
     location.pathname.startsWith('/samples') || 
@@ -101,6 +109,7 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onMobileClose, collapsed 
     if (collapsed) {
       setAdminExpanded(false);
       setLabMgmtExpanded(false);
+      setExperimentsExpanded(false);
       setSampleMgmtExpanded(false);
     }
   }, [collapsed]);
@@ -217,6 +226,20 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onMobileClose, collapsed 
     },
   ];
 
+  // Experiments section: own accordion (experiment:manage). Templates sub-item: experiment_template:manage OR config:edit
+  interface ExperimentsNavItem {
+    text: string;
+    path: string;
+    icon: React.ReactNode;
+    tooltip?: string;
+    /** If set, item is shown when hasPermission('experiment_template:manage') || hasPermission('config:edit') */
+    templatesOnly?: boolean;
+  }
+  const experimentItems: ExperimentsNavItem[] = [
+    { text: 'All Experiments', path: '/experiments', icon: <Biotech />, tooltip: 'Experiments & Processes' },
+    { text: 'Experiment Templates', path: '/experiments/templates', icon: <ViewListIcon />, tooltip: 'Experiment template definitions', templatesOnly: true },
+  ];
+
   // Admin navigation items from MainNav (includes Name Templates, Custom Attributes, Lists)
   const adminItems: AdminNavItem[] = adminNavItemsFromMainNav;
 
@@ -231,6 +254,8 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onMobileClose, collapsed 
         setAdminExpanded(true);
       } else if (isLabMgmtRoute(path)) {
         setLabMgmtExpanded(true);
+      } else if (isExperimentsRoute(path)) {
+        setExperimentsExpanded(true);
       } else if (path.startsWith('/accessioning') || path.startsWith('/samples') || path.startsWith('/tests') || path.startsWith('/containers') || path.startsWith('/batches') || path.startsWith('/results')) {
         setSampleMgmtExpanded(true);
       }
@@ -247,7 +272,12 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onMobileClose, collapsed 
   };
 
   const hasAdminAccess = hasPermission('config:edit');
-  const hasLabMgmtAccess = hasPermission('project:manage') || hasPermission('analysis:manage');
+  const hasLabMgmtAccess =
+    hasPermission('project:manage') ||
+    hasPermission('analysis:manage');
+  const hasExperimentsAccess = hasPermission('experiment:manage');
+  const hasExperimentTemplatesAccess =
+    hasPermission('experiment_template:manage') || hasPermission('config:edit');
   const hasSampleMgmtAccess = 
     hasPermission('sample:create') ||
     hasPermission('sample:read') ||
@@ -256,10 +286,20 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onMobileClose, collapsed 
     hasPermission('batch:manage') ||
     hasPermission('result:enter');
 
+  /*
+   * Permission / role visibility (sidebar sections):
+   * - Core Features: all authenticated (Dashboard, Help).
+   * - Sample Mgmt: any of sample:create, sample:read, sample:update, test:update, batch:manage, result:enter.
+   * - Experiments: experiment:manage (section); Templates sub-item also requires experiment_template:manage OR config:edit.
+   * - Lab Mgmt: any of project:manage, analysis:manage.
+   * - Admin: config:edit.
+   */
+
   // Update accordion expanded states when route changes
   React.useEffect(() => {
     setAdminExpanded(location.pathname.startsWith('/admin'));
     setLabMgmtExpanded(isLabMgmtRoute(location.pathname));
+    setExperimentsExpanded(isExperimentsRoute(location.pathname));
     setSampleMgmtExpanded(
       location.pathname.startsWith('/accessioning') || 
       location.pathname.startsWith('/samples') || 
@@ -474,6 +514,106 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onMobileClose, collapsed 
                       </ListItem>
                     );
                   })}
+                </List>
+              </AccordionDetails>
+            </Accordion>
+          </>
+        )}
+
+        {/* Experiments Section (own accordion: experiment:manage; Templates sub-item: experiment_template:manage OR config:edit) */}
+        {hasExperimentsAccess && (
+          <>
+            <Divider sx={{ my: 1 }} />
+            <Accordion
+              expanded={experimentsExpanded}
+              onChange={(_, expanded) => setExperimentsExpanded(expanded)}
+              sx={{
+                boxShadow: 'none',
+                '&:before': { display: 'none' },
+                '&.Mui-expanded': { margin: 0 },
+              }}
+            >
+              <AccordionSummary
+                expandIcon={!collapsed ? <ExpandMore /> : null}
+                aria-label="Experiments section"
+                aria-controls="experiments-navigation-content"
+                sx={{
+                  px: 2,
+                  justifyContent: collapsed ? 'center' : 'flex-start',
+                  '& .MuiAccordionSummary-content': {
+                    my: 0,
+                    justifyContent: collapsed ? 'center' : 'flex-start',
+                  },
+                }}
+              >
+                <ListItemIcon sx={{ minWidth: collapsed ? 0 : 40, justifyContent: 'center' }}>
+                  {collapsed ? (
+                    <Tooltip title="Experiments" placement="right" arrow>
+                      <Biotech
+                        color={isExperimentsRoute(location.pathname) ? 'primary' : 'inherit'}
+                      />
+                    </Tooltip>
+                  ) : (
+                    <Biotech
+                      color={isExperimentsRoute(location.pathname) ? 'primary' : 'inherit'}
+                    />
+                  )}
+                </ListItemIcon>
+                {!collapsed && (
+                  <Tooltip title="Experiments & Processes" placement="right" arrow>
+                    <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                      Experiments
+                    </Typography>
+                  </Tooltip>
+                )}
+              </AccordionSummary>
+              <AccordionDetails sx={{ p: 0 }}>
+                <List component="nav" aria-label="experiments navigation">
+                  {experimentItems
+                    .filter((item) => !item.templatesOnly || hasExperimentTemplatesAccess)
+                    .map((item) => {
+                      const active = item.path === '/experiments'
+                        ? (location.pathname === '/experiments' || (location.pathname.startsWith('/experiments/') && !location.pathname.startsWith('/experiments/templates')))
+                        : location.pathname.startsWith(item.path);
+                      const tooltipText = item.tooltip || item.text;
+                      const listItemButton = (
+                        <ListItemButton
+                          selected={active}
+                          onClick={() => handleNavigation(item.path)}
+                          sx={{
+                            pl: collapsed ? 2 : 4,
+                            justifyContent: collapsed ? 'center' : 'flex-start',
+                            minHeight: 48,
+                          }}
+                          aria-label={tooltipText}
+                          aria-current={active ? 'page' : undefined}
+                        >
+                          <ListItemIcon
+                            sx={{
+                              color: active ? 'primary.main' : 'inherit',
+                              minWidth: collapsed ? 0 : 40,
+                              justifyContent: 'center',
+                            }}
+                          >
+                            {item.icon}
+                          </ListItemIcon>
+                          {!collapsed && <ListItemText primary={item.text} />}
+                        </ListItemButton>
+                      );
+                      return (
+                        <ListItem key={item.path} disablePadding>
+                          {collapsed ? (
+                            <Tooltip title={tooltipText} placement="right" arrow>
+                              {listItemButton}
+                            </Tooltip>
+                          ) : (
+                            <Tooltip title={tooltipText} placement="right" arrow>
+                              {listItemButton}
+                            </Tooltip>
+                          )}
+                        </ListItem>
+                      );
+                    })}
                 </List>
               </AccordionDetails>
             </Accordion>
