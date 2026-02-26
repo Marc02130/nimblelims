@@ -1028,6 +1028,122 @@ class ApiService {
     return response.data;
   }
 
+  // Experiment endpoints (v1 API)
+  async getExperiments(params?: {
+    experiment_template_id?: string;
+    status_id?: string;
+    active?: boolean;
+    mine?: boolean;
+    page?: number;
+    size?: number;
+  }) {
+    const response: AxiosResponse = await this.api.get('v1/experiments', { params });
+    return response.data;
+  }
+
+  async getExperiment(id: string) {
+    const response: AxiosResponse = await this.api.get(`v1/experiments/${id}`);
+    return response.data;
+  }
+
+  async createExperiment(data: {
+    name: string;
+    description?: string;
+    experiment_template_id?: string;
+    status_id?: string;
+    started_at?: string;
+    completed_at?: string;
+    custom_attributes?: Record<string, unknown>;
+  }) {
+    const response: AxiosResponse = await this.api.post('v1/experiments', data);
+    return response.data;
+  }
+
+  async updateExperiment(id: string, data: {
+    name?: string;
+    description?: string;
+    active?: boolean;
+    experiment_template_id?: string;
+    status_id?: string;
+    started_at?: string;
+    completed_at?: string;
+    custom_attributes?: Record<string, unknown>;
+  }) {
+    const response: AxiosResponse = await this.api.patch(`v1/experiments/${id}`, data);
+    return response.data;
+  }
+
+  async getExperimentLineage(id: string) {
+    const response: AxiosResponse = await this.api.get(`v1/experiments/${id}/lineage`);
+    return response.data;
+  }
+
+  async getSampleExperiments(sampleId: string) {
+    const response: AxiosResponse = await this.api.get(`v1/experiments/by-sample/${sampleId}`);
+    return response.data;
+  }
+
+  async linkSampleToExperiment(experimentId: string, data: {
+    sample_id: string;
+    role_in_experiment_id?: string;
+    processing_conditions?: Record<string, unknown>;
+    replicate_number?: number;
+    test_id?: string;
+    result_id?: string;
+    custom_attributes?: Record<string, unknown>;
+  }) {
+    const response: AxiosResponse = await this.api.post(`v1/experiments/${experimentId}/samples`, data);
+    return response.data;
+  }
+
+  async addExperimentDetailStep(experimentId: string, data: {
+    detail_type: string;
+    content?: Record<string, unknown>;
+    sort_order?: number;
+  }) {
+    const response: AxiosResponse = await this.api.post(`v1/experiments/${experimentId}/details`, data);
+    return response.data;
+  }
+
+  async linkExperiments(experimentId: string, linkedExperimentId: string) {
+    const response: AxiosResponse = await this.api.post(`v1/experiments/${experimentId}/links`, {
+      linked_experiment_id: linkedExperimentId,
+    });
+    return response.data;
+  }
+
+  // Experiment templates (v1 API)
+  async getExperimentTemplates(params?: { active?: boolean; page?: number; size?: number }) {
+    const response: AxiosResponse = await this.api.get('v1/experiment-templates', { params });
+    return response.data;
+  }
+
+  async getExperimentTemplate(id: string) {
+    const response: AxiosResponse = await this.api.get(`v1/experiment-templates/${id}`);
+    return response.data;
+  }
+
+  async createExperimentTemplate(data: {
+    name: string;
+    description?: string;
+    template_definition?: Record<string, unknown>;
+    custom_attributes?: Record<string, unknown>;
+  }) {
+    const response: AxiosResponse = await this.api.post('v1/experiment-templates', data);
+    return response.data;
+  }
+
+  async updateExperimentTemplate(id: string, data: {
+    name?: string;
+    description?: string;
+    active?: boolean;
+    template_definition?: Record<string, unknown>;
+    custom_attributes?: Record<string, unknown>;
+  }) {
+    const response: AxiosResponse = await this.api.patch(`v1/experiment-templates/${id}`, data);
+    return response.data;
+  }
+
   // Admin Help CRUD endpoints
   async createHelpEntry(data: {
     section: string;

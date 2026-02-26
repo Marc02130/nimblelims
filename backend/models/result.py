@@ -25,3 +25,8 @@ class Result(BaseModel):
     entered_by_user = relationship("User", foreign_keys=[entered_by], back_populates="entered_results")
     creator = relationship("User", foreign_keys="Result.created_by", back_populates="created_results")
     modifier = relationship("User", foreign_keys="Result.modified_by", back_populates="modified_results")
+    experiment_sample_executions = relationship(
+        "ExperimentSampleExecution",
+        back_populates="result",
+        foreign_keys="ExperimentSampleExecution.result_id",
+    )

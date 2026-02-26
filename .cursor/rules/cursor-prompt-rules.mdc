@@ -1,0 +1,43 @@
+---
+description: Rules for Cursor — include in every prompt (full code, project patterns, stack standards)
+alwaysApply: true
+---
+
+# Cursor Prompt Rules
+
+Apply these in every prompt when creating or modifying NimbleLIMS code.
+
+## 1. Full code only
+
+- **Always** generate the **full** contents of every file you create or modify.
+- **Never** respond with snippets, partial files, or "here's the relevant part" — emit complete, runnable files.
+
+## 2. Follow existing project patterns
+
+Match the codebase exactly for:
+
+- **Folder structure and naming** (e.g. `backend/`, `frontend/src/`, routes, services, models).
+- **EAV / custom fields** — use existing patterns for entity–attribute–value and custom field handling.
+- **Permissions** — use project RBAC and permission checks (e.g. `require_permission`, permission hooks).
+- **Pagination** — use existing pagination patterns for list endpoints and UI tables.
+- **Error handling** — use project conventions (e.g. HTTPException, logging, client error handling).
+
+## 3. Python (backend)
+
+- **PEP 8** for style.
+- **Type hints** on function parameters and return types.
+- **SQLAlchemy 2.0** style (e.g. `select()`, `update()`, async sessions, no legacy `Query` patterns).
+- Use **FastAPI**, **Alembic**, and **Postgres** as in the rest of the project.
+
+## 4. React / TypeScript (frontend)
+
+- **ESLint**: code must pass project ESLint rules.
+- **Existing UI components**: reuse MUI and project components; do not introduce one-off patterns.
+- **TanStack Table** for tables/data grids where the project uses it.
+- **Permission hooks** and **API client patterns**: use the same hooks and client usage as elsewhere in the app.
+- **React Router v6** for routing.
+
+## 5. Sample-centric and bidirectional
+
+- Keep features **sample-centric**: samples are the core entity; relate new behavior to samples where relevant.
+- Keep flows **bidirectional** where applicable (e.g. list ↔ detail, create ↔ edit, backend ↔ frontend) so create/read/update and navigation are consistent.
