@@ -44,6 +44,7 @@ CORE_PERMISSIONS = [
     "user:manage",
     "config:edit",
     "workflow:execute",
+    "experiment:manage",
 ]
 
 

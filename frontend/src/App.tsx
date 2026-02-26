@@ -30,6 +30,7 @@ import ClientsManagement from './pages/ClientsManagement';
 import ProjectsManagement from './pages/ProjectsManagement';
 import AnalysesManagement from './pages/AnalysesManagement';
 import AnalytesManagement from './pages/AnalytesManagement';
+import ExperimentsManagement from './pages/ExperimentsManagement';
 import HelpPage from './pages/HelpPage';
 import { useUser } from './contexts/UserContext';
 
@@ -179,6 +180,37 @@ function AppRoutes() {
           element={
             hasPermission('analysis:manage') ? (
               <AnalytesManagement />
+            ) : (
+              <Navigate to="/dashboard" replace />
+            )
+          }
+        />
+        {/* Experiments section: experiment:manage for list/detail; experiment_template:manage or config:edit for templates */}
+        <Route
+          path="/experiments/templates"
+          element={
+            hasPermission('experiment_template:manage') || hasPermission('config:edit') ? (
+              <ExperimentsManagement />
+            ) : (
+              <Navigate to="/dashboard" replace />
+            )
+          }
+        />
+        <Route
+          path="/experiments/:id"
+          element={
+            hasPermission('experiment:manage') ? (
+              <ExperimentsManagement />
+            ) : (
+              <Navigate to="/dashboard" replace />
+            )
+          }
+        />
+        <Route
+          path="/experiments"
+          element={
+            hasPermission('experiment:manage') ? (
+              <ExperimentsManagement />
             ) : (
               <Navigate to="/dashboard" replace />
             )

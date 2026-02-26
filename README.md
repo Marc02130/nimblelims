@@ -142,6 +142,15 @@ nimblelims/
 - **Batch Results Entry** (US-28): Enter results for multiple tests/samples in a batch atomically
 - **Workflow Templates** (US-29): Define reusable workflow templates (steps with actions) and run them from Accessioning, Batch details, or Results Entry with context (e.g. batch_id, test_id). Requires config:edit for template CRUD and workflow:execute for execution. Failed steps roll back the transaction (no instance created).
 
+### Experiment Management (Chunk 1)
+- **Experiments**: Full CRUD for experiments and experiment templates; list/detail UI with tabs (Overview, Sample Executions, Details/Steps, Lineage, Linked Processes). Permission: `experiment:manage` (Administrator, Lab Manager, Lab Technician).
+- **Experiment Templates**: Reusable template definitions; route `/experiments/templates` gated by `experiment_template:manage` OR `config:edit` (admins only until per-role template permission is added).
+- **Sidebar**: Dedicated **Experiments** accordion (between Sample Mgmt and Lab Mgmt) with sub-items **All Experiments** and **Experiment Templates**; Templates sub-item hidden from non-admins.
+- **Sample ↔ experiment linking**: Link samples to experiments (roles, processing conditions, replicate); bidirectional UI: experiment detail links to samples (`/samples?highlight=id`); sample detail shows "Participated in these Experiments" with links to experiments.
+- **Lineage**: Experiment lineage view (template + linked experiment IDs); loading and error states.
+- **My Experiments filter**: List page supports `?mine=true` to show only experiments created by the current user (no extra route).
+- **Workflow integration**: Workflow actions `create_experiment`, `create_experiment_from_template`, `link_sample_to_experiment`, `add_experiment_detail_step`, `link_experiments`, `update_experiment_status`; context carries `experiment_id` and `execution_id` for downstream steps. Template builder helper text documents these actions.
+
 ### Container System
 - **Container Types**: Pre-setup by administrators (CRUD via admin interface)
 - **Container Instances**: Created dynamically during workflows (accessioning, aliquoting)
@@ -230,12 +239,12 @@ NimbleLIMS uses a unified sidebar navigation system that provides consistent acc
 - **React Router**: All routes are declared in `frontend/src/App.tsx`; admin routes are protected with `hasPermission('config:edit')` (or role-specific permissions)—unauthorized users are redirected to `/dashboard`
 - **Collapsible**: Desktop sidebar can be collapsed to icon-only mode with tooltips on hover
 - **Permission-Based**: Menu items dynamically shown/hidden based on user roles and permissions
-- **Accordion Sections**: Collapsible sections for Sample Management (Accessioning, Samples, Tests, Containers, Batches, Results), Lab Management (Projects, Clients, Client Projects, Analyses, Analytes), and Admin submenu items
+- **Accordion Sections**: Collapsible sections for Sample Management (Accessioning, Samples, Tests, Containers, Batches, Results), **Experiments** (All Experiments, Experiment Templates — Templates gated by config:edit or experiment_template:manage), Lab Management (Projects, Clients, Client Projects, Analyses, Analytes), and Admin submenu items
 - **Responsive**: Permanent drawer on desktop, temporary drawer on mobile
 - **State Persistence**: Sidebar collapsed state saved to localStorage
-- **Top AppBar**: Dynamic page titles, sidebar toggle, back button for nested routes, user info, and logout
+- **Top AppBar**: Dynamic page titles, sidebar toggle, back button for nested routes (e.g. experiment detail → list, admin analysis analytes → analyses), user info, and logout
 
-See [`.docs/navigation.md`](.docs/navigation.md) for complete navigation documentation.
+See [`.docs/navigation.md`](.docs/navigation.md) for complete navigation documentation (includes Experiments accordion refactor v2.1 and permission gating).
 
 ## Documentation
 
@@ -264,3 +273,15 @@ Comprehensive documentation is available in the `.docs/` directory:
 ## Support
 
 Refer to the technical documentation in `.docs/` for detailed implementation specifications.
+
+---
+
+## Summary — Experiment Management & Navigation Documentation (Chunk 1)
+
+**Features added:** Experiment Management (CRUD, templates, sidebar Experiments accordion, sample↔experiment linking, lineage, My Experiments filter, workflow actions). Navigation refactor: Experiments as own accordion; Templates gated by config:edit or experiment_template:manage.
+
+**Files created:** `.docs/experiment-planning.md` (Chunk 1 completion and implementation notes).
+
+**Files modified (code):** `frontend/src/components/Sidebar.tsx`, `frontend/src/App.tsx`, `frontend/src/layouts/MainLayout.tsx`, `frontend/src/pages/ExperimentsManagement.tsx`, `frontend/src/services/apiService.ts`; `backend/app/routers/experiments.py`, `backend/app/services/experiment_service.py`, `backend/app/repositories/experiment_repository.py` (and existing experiment models, migrations, schemas).
+
+**Files modified (documentation):** `README.md` (this file — Experiment Management section, Navigation overview), `.docs/navigation.md` (Experiments accordion, routes, permissions, summary), `UAT_Scripts/uat-testing-log.md` (UAT scripts for Experiments navigation and Experiment management).

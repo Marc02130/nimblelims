@@ -22,3 +22,8 @@ class Test(BaseModel):
     analysis = relationship("Analysis", back_populates="tests")
     technician = relationship("User", foreign_keys=[technician_id])
     results = relationship("Result", back_populates="test")
+    experiment_sample_executions = relationship(
+        "ExperimentSampleExecution",
+        back_populates="test",
+        foreign_keys="ExperimentSampleExecution.test_id",
+    )
