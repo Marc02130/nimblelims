@@ -1,10 +1,18 @@
-# Site Navigation Documentation
+# Sidebar Navigation Documentation
 
 ## Overview
 
-NimbleLIMS uses a unified sidebar navigation system that provides consistent navigation across all application routes. The sidebar is a persistent left-side drawer that contains all navigation items, organized into sections with collapsible accordions for submenus (e.g., Lab Mgmt, Admin sections).
+NimbleLIMS uses a **unified sidebar navigation** (left drawer) for all authenticated routes. Items are grouped into:
 
-Navigation is permission-based, with menu items and routes dynamically shown/hidden based on user roles and permissions.
+| Section | Visibility | Contents |
+|--------|------------|----------|
+| **Core Features** | All users | Dashboard, Help |
+| **Sample Mgmt** | Any of: sample:create, sample:read, sample:update, test:update, batch:manage, result:enter | Accessioning, Samples, Tests, Containers, Batches, Results |
+| **Experiments** | experiment:manage | All Experiments (/experiments), Experiment Templates (/experiments/templates; sub-item also requires experiment_template:manage OR config:edit) |
+| **Lab Mgmt** | Any of: project:manage, analysis:manage | Projects, Clients, Client Proj, Analyses, Analytes |
+| **Admin** | config:edit | Overview, Name Templates, Custom Attributes, Lists, Container Types, Units, Users, Roles, Analyses, Analytes, Test Batteries, Custom Fields, Custom Names, Workflow Templates, Help Management |
+
+The sidebar is a persistent left-side drawer (240px expanded, 56px collapsed on desktop; temporary overlay on mobile). Navigation is permission-based: menu items and routes are shown or hidden by role/permissions.
 
 ### MainNav and routing
 - **MainNav** (`frontend/src/components/MainNav.tsx`) defines the central navigation structure and exports the **Admin** section items (including sub-links to `/admin/name-templates`, `/admin/custom-attributes`, `/admin/lists`). The Sidebar imports `adminNavItems` from MainNav for the Admin accordion.
@@ -43,11 +51,19 @@ Navigation is permission-based, with menu items and routes dynamically shown/hid
 │   Batches   │
 │   Results   │
 ├─────────────┤
-│ ▼ Lab Mgmt  │ ← Accordion (collapsible, requires project:manage)
+│ ▼ Experiments│ ← Accordion (experiment:manage; Templates sub-item: experiment_template:manage OR config:edit)
+│   All       │
+│   Experiments│
+│   Experiment │
+│   Templates  │
+├─────────────┤
+│ ▼ Lab Mgmt  │ ← Accordion (collapsible, requires project:manage | analysis:manage)
+│   Projects  │
 │   Clients   │
-│   Int Projs │
 │   Client    │
-│   Projs     │
+│     Proj    │
+│   Analyses  │
+│   Analytes  │
 ├─────────────┤
 │ ▼ Admin     │ ← Accordion (collapsible)
 │   Overview  │
@@ -99,8 +115,27 @@ The Sample Management section uses a Material-UI Accordion component for collaps
 | **Batches** | `/batches` | ViewList | `batch:manage` | Batch creation and management |
 | **Results** | `/results` | Assessment | `result:enter` | Results entry interface |
 
+#### Experiments Section (Accordion) — Navigation Refactor v2.1
+The **Experiments** section is its own top-level accordion, placed immediately after Sample Mgmt and before Lab Mgmt. It is only visible to users with `experiment:manage` permission (assigned to Administrator, Lab Manager, and Lab Technician). The section has two sub-items; the second is additionally gated so only admins (or users with a future `experiment_template:manage` permission) see it.
+
+**Accordion Behavior:**
+- Auto-expands when user navigates to any `/experiments` route (e.g. `/experiments`, `/experiments/:id`, `/experiments/templates`)
+- Can be manually collapsed/expanded by clicking the accordion header
+- Shows active state (primary color icon) when on any experiments route
+- Header displays "Experiments" with tooltip "Experiments & Processes"
+- ARIA labels: `aria-label="Experiments section"`, `aria-controls="experiments-navigation-content"`
+
+**Sub-items:**
+
+| Menu Item | Route | Icon | Tooltip | Permission | Description |
+|-----------|-------|------|---------|------------|-------------|
+| **All Experiments** | `/experiments` | Biotech | Experiments & Processes | (section) `experiment:manage` | List and detail of experiments; sample executions, lineage, linked processes |
+| **Experiment Templates** | `/experiments/templates` | ViewList | Experiment template definitions | Section + `experiment_template:manage` **OR** `config:edit` | Template definitions (admin-only until `experiment_template:manage` is introduced) |
+
+**Templates gating:** The "Experiment Templates" sub-item is hidden from users who have only `experiment:manage` (e.g. Lab Technician, Lab Manager). It is visible to users with `config:edit` (Administrator) or, when implemented, `experiment_template:manage`.
+
 #### Lab Mgmt Section (Accordion)
-The Lab Mgmt section uses a Material-UI Accordion component for collapsible submenu functionality. It is only visible to users with `project:manage` or `analysis:manage` permission. This section consolidates laboratory management functions including client and project management (see User Story US-25 for client projects distinction), as well as analyses and analytes configuration.
+The Lab Mgmt section uses a Material-UI Accordion component for collapsible submenu functionality. It is only visible to users with `project:manage` or `analysis:manage` permission. **Experiments are not in Lab Mgmt;** they have their own Experiments accordion (see above).
 
 **Accordion Behavior:**
 - Auto-expands when user navigates to any `/clients`, `/projects`, `/client-projects`, `/analyses`, or `/analytes` route
@@ -155,6 +190,7 @@ The Admin section uses a Material-UI Accordion component for collapsible submenu
 | **Test Batteries** | `/admin/test-batteries` | BatteryChargingFull | Test battery configuration |
 | **Custom Fields** | `/admin/custom-fields` | Tune | Manage custom attribute configurations (EAV) |
 | **Custom Names** | `/admin/custom-names` | Tune | Manage name template configurations (alternate) |
+| **Workflow Templates** | `/admin/workflow-templates` | Tune | Define and manage workflow templates (steps, actions) |
 | **Help Management** | `/admin/help` | Help | Manage help entries (CRUD) - requires `config:edit` permission |
 
 Admin routes are protected in `App.tsx` with `hasPermission('config:edit')` (or role-specific permissions); unauthenticated or unauthorized users are redirected to `/dashboard`.
@@ -164,7 +200,7 @@ Admin routes are protected in `App.tsx` with `hasPermission('config:edit')` (or 
 - **Active State**: Current page highlighted with Material-UI `selected` prop and primary color icon
 - **Inactive State**: Default styling
 - **Hidden**: Menu items not shown if user lacks required permission
-- **Accordion Expanded**: Lab Mgmt and Admin sections expand automatically when on related routes
+- **Accordion Expanded**: Experiments, Lab Mgmt, and Admin sections expand automatically when on related routes
 - **Accordion Collapsed**: Accordions can be manually collapsed when not needed
 
 ### User Info Section
@@ -197,7 +233,7 @@ Located at the bottom of the sidebar:
   - ChevronRight icon when collapsed (expands sidebar to full width)
   - ARIA labels: "Collapse sidebar" / "Expand sidebar"
   - State persists to localStorage
-- **Back Button** (arrow icon): Visible only for nested routes (e.g., `/admin/analyses/:id/analytes`), navigates to parent route
+- **Back Button** (arrow icon): Visible for nested routes (e.g. `/admin/analyses/:id/analytes` → `/admin/analyses`) and for experiment detail (`/experiments/:id` → `/experiments`). Navigates to parent route.
 - **Page Title**: Dynamically set based on current route (e.g., "Dashboard", "Admin Dashboard", "Lists Management", "Clients")
 - **User Info**: `{username} ({role})` - visible on desktop, hidden on mobile
 - **Logout Button**: Logout icon button, calls logout function and navigates to `/login`
@@ -223,6 +259,9 @@ The AppBar title is automatically determined from the current route:
 | `/client-projects` | Client Projects |
 | `/analyses` | Analyses |
 | `/analytes` | Analytes |
+| `/experiments` | Experiments |
+| `/experiments/:id` | Experiment Detail |
+| `/experiments/templates` | Experiment Templates |
 | `/help` | Help |
 | `/admin` | Admin Dashboard |
 | `/admin/lists` | Lists Management |
@@ -238,6 +277,7 @@ The AppBar title is automatically determined from the current route:
 | `/admin/units` | Units Management |
 | `/admin/custom-fields` | Custom Fields Management |
 | `/admin/custom-names` | Custom Names Management |
+| `/admin/workflow-templates` | Workflow Templates |
 | `/admin/help` | Help Management |
 | Unknown routes | NimbleLIMS (default) |
 
@@ -262,6 +302,9 @@ All authenticated routes use the `MainLayout` component, which provides the unif
 | `/client-projects` | ClientProjects | MainLayout |
 | `/analyses` | AnalysesManagement | MainLayout |
 | `/analytes` | AnalytesManagement | MainLayout |
+| `/experiments` | ExperimentsManagement | MainLayout |
+| `/experiments/:id` | ExperimentsManagement (detail view) | MainLayout |
+| `/experiments/templates` | ExperimentsManagement (templates view) | MainLayout |
 | `/help` | HelpPage | MainLayout |
 | `/admin` | AdminOverview | MainLayout |
 | `/admin/name-templates` | NameTemplatesAdmin | MainLayout |
@@ -277,6 +320,7 @@ All authenticated routes use the `MainLayout` component, which provides the unif
 | `/admin/units` | UnitsManagement | MainLayout |
 | `/admin/custom-fields` | CustomFieldsManagement | MainLayout |
 | `/admin/custom-names` | CustomNamesManagement | MainLayout |
+| `/admin/workflow-templates` | WorkflowTemplatesManagement | MainLayout |
 | `/admin/help` | HelpManagement | MainLayout |
 
 ### Route Protection
@@ -285,7 +329,8 @@ All authenticated routes use the `MainLayout` component, which provides the unif
 - **Permission-Based Routes**: Routes check permissions and redirect to `/dashboard` if unauthorized
   - Admin routes require `config:edit` or specific permissions (e.g., `user:manage` for users/roles, `test:configure` for analyses/analytes/batteries)
   - Core feature routes require respective permissions (e.g., `sample:create` for accessioning, `sample:read` for samples list, `sample:update` for sample/edit/containers)
-  - Lab Mgmt routes (`/clients`, `/projects`, `/client-projects`) require `project:manage` permission
+  - Experiments routes: `/experiments` and `/experiments/:id` require `experiment:manage`; `/experiments/templates` requires `experiment_template:manage` OR `config:edit`
+  - Lab Mgmt routes: `/clients`, `/projects`, `/client-projects` require `project:manage`; `/analyses`, `/analytes` require `analysis:manage`
   - Edit routes (`/samples/:id`, `/tests/:id`, `/containers/:id`) require `sample:update` or `test:update` permissions respectively
 - **Permission-Based Visibility**: Sidebar items hidden if user lacks required permission
 
@@ -297,19 +342,20 @@ Navigation visibility is controlled by the `hasPermission()` function from `User
 
 ```typescript
 hasPermission('sample:create') || hasPermission('sample:read') || hasPermission('sample:update') || hasPermission('test:update') || hasPermission('batch:manage') || hasPermission('result:enter')  // Sample Mgmt section (accordion) - visible if user has any sample/test/batch/result permission
-hasPermission('project:manage') // Lab Mgmt section (accordion) - includes Clients, Int Projects, Client Projs
+hasPermission('experiment:manage')  // Experiments section (accordion) - All Experiments + (if experiment_template:manage || config:edit) Experiment Templates
+hasPermission('project:manage') || hasPermission('analysis:manage')  // Lab Mgmt section (accordion) - Projects, Clients, Client Proj, Analyses, Analytes
 hasPermission('config:edit')    // Admin section (accordion)
 // Help menu: No permission required - always visible to all users
 ```
 
 ### Role-Based Access
 
-| Role | Visible Sidebar Items | Sample Mgmt Access | Lab Mgmt Access | Admin Access |
-|------|---------------------|-------------------|-----------------|--------------|
-| **Administrator** | All items (including Help) | Full access (accordion visible, all items) | Full access (accordion visible) | Full access (accordion visible, including Help Management) |
-| **Lab Manager** | Dashboard, Help, Sample Mgmt items (filtered by permissions), Lab Mgmt (if `project:manage`) | Visible if has any sample/test/batch/result permission (items filtered by individual permissions) | Full access if `project:manage` | No access (accordion hidden) |
-| **Lab Technician** | Dashboard, Help, Sample Mgmt items (filtered by permissions) | Visible if has any sample/test/batch/result permission (items filtered by individual permissions) | No access (accordion hidden) | No access (accordion hidden) |
-| **Client** | Dashboard, Help, Sample Mgmt items (filtered by permissions, typically only Samples if `sample:read`) | Visible if has any sample/test/batch/result permission (items filtered by individual permissions) | No access (accordion hidden) | No access (accordion hidden) |
+| Role | Visible Sidebar Items | Sample Mgmt Access | Experiments Access | Lab Mgmt Access | Admin Access |
+|------|---------------------|-------------------|--------------------|-----------------|--------------|
+| **Administrator** | All items (including Help) | Full access (accordion visible, all items) | Full access (accordion visible; sees All Experiments + Experiment Templates via config:edit) | Full access (accordion visible) | Full access (accordion visible, including Help Management) |
+| **Lab Manager** | Dashboard, Help, Sample Mgmt (filtered), Experiments (All Experiments only), Lab Mgmt (if project/analysis) | Visible if has any sample/test/batch/result permission | Visible if has `experiment:manage`; sees only "All Experiments" (Templates hidden unless config:edit) | Visible if has `project:manage` or `analysis:manage` | No access (accordion hidden) |
+| **Lab Technician** | Dashboard, Help, Sample Mgmt (filtered), Experiments (All Experiments only) | Visible if has any sample/test/batch/result permission | Visible if has `experiment:manage`; sees only "All Experiments" (Templates hidden) | No access (accordion hidden) | No access (accordion hidden) |
+| **Client** | Dashboard, Help, Sample Mgmt (filtered, typically only Samples) | Visible if has any sample/test/batch/result permission | No access (accordion hidden) | No access (accordion hidden) | No access (accordion hidden) |
 
 ### Edge Cases
 
@@ -398,9 +444,19 @@ Navigation relies on `UserContext` for:
 4. AppBar title updates to "Accessioning"
 5. AccessioningForm component renders in main content area
 
+### Accessing Experiments Section
+
+1. User clicks "Experiments" accordion header in sidebar (requires `experiment:manage`)
+2. Accordion expands (if collapsed) or remains expanded
+3. User clicks "All Experiments" or "Experiment Templates" (Templates visible only with config:edit or experiment_template:manage)
+4. Route changes to `/experiments` or `/experiments/templates`
+5. Sidebar highlights the chosen sub-item as active
+6. AppBar title updates to "Experiments" or "Experiment Templates"
+7. ExperimentsManagement component renders (list, detail, or templates view). From list, "My Experiments" filter works via query param `?mine=true`.
+
 ### Accessing Lab Mgmt Section
 
-1. User clicks "Lab Mgmt" accordion header in sidebar (requires `project:manage`)
+1. User clicks "Lab Mgmt" accordion header in sidebar (requires `project:manage` or `analysis:manage`)
 2. Accordion expands (if collapsed) or remains expanded
 3. User clicks "Int Projects" sub-item
 4. Route changes to `/projects`
@@ -480,6 +536,7 @@ Sample Mgmt, Lab Mgmt, and Admin sections use Material-UI's Accordion component 
 **Features:**
 - **Auto-Expansion**: Accordions automatically expand when user navigates to related routes
   - Sample Mgmt: Expands on `/accessioning`, `/samples`, `/tests`, `/containers`, `/batches`, or `/results` routes
+  - Experiments: Expands on any `/experiments` route (list, detail, templates)
   - Lab Mgmt: Expands on `/clients`, `/projects`, `/client-projects`, `/analyses`, or `/analytes` routes
   - Admin: Expands on any `/admin/*` route
 - **Manual Toggle**: Users can collapse/expand accordions by clicking the header
@@ -552,7 +609,7 @@ Potential navigation improvements for future iterations:
 - Active state detection (exact and prefix matching)
 - Responsive drawer variants (permanent/temporary)
 - Collapsible on desktop (icon-only mode with tooltips)
-- Accordions for Lab Mgmt and Admin sections
+- Accordions for Experiments, Lab Mgmt, and Admin sections
 - Auto-expand accordions on navigation when collapsed
 - User info display at bottom (hidden when collapsed)
 - ARIA labels and tooltips for accessibility
@@ -578,3 +635,20 @@ Both components work together:
 - `Sidebar` handles navigation rendering and permission checks
 - Both use `UserContext` for user information and permissions
 - Both use React Router hooks for navigation and location
+
+---
+
+## Summary — Navigation Refactor (v2.1) and Experiment Management
+
+**Navigation refactor (v2.1):** Experiments were moved out of the Lab Mgmt accordion into their own top-level **Experiments** accordion, placed immediately after Sample Mgmt. The section is visible to users with `experiment:manage` (Administrator, Lab Manager, Lab Technician). Sub-items: **All Experiments** (`/experiments`) and **Experiment Templates** (`/experiments/templates`). The Templates sub-item is visible only when the user has `experiment_template:manage` OR `config:edit` (currently only admins). Lab Mgmt no longer includes Experiments. Auto-expansion, active states, collapsed mode, tooltips, ARIA, and mobile drawer behavior match Sample Mgmt and Lab Mgmt. Back button in MainLayout shows for experiment detail (`/experiments/:id` → back to `/experiments`).
+
+**Files created/modified (navigation refactor and experiment integration):**
+- `frontend/src/components/Sidebar.tsx` — Experiments accordion, isExperimentsRoute, experimentItems, hasExperimentsAccess, hasExperimentTemplatesAccess; removed Experiments from labMgmtItems; collapse/expand and permission comments.
+- `frontend/src/App.tsx` — Routes: `/experiments`, `/experiments/:id`, `/experiments/templates` (protection: experiment:manage for list/detail; experiment_template:manage or config:edit for templates).
+- `frontend/src/layouts/MainLayout.tsx` — getRouteTitle: Experiments, Experiment Detail, Experiment Templates; shouldShowBackButton and getBackButtonTarget for `/experiments/:id`.
+- `frontend/src/pages/ExperimentsManagement.tsx` — "My Experiments" filter via `?mine=true` (useSearchParams, mineFilter, chip, API param).
+- `frontend/src/services/apiService.ts` — getExperiments accepts `mine` param.
+- `backend/app/routers/experiments.py` — list_experiments: `mine` query param, current_user, created_by passed to service.
+- `backend/app/services/experiment_service.py` — list_experiments accepts created_by.
+- `backend/app/repositories/experiment_repository.py` — list_experiments filters by created_by when provided.
+- `.docs/navigation.md` — This file: full documentation of Experiments accordion, Lab Mgmt without Experiments, routes, permissions, role table, back button, and summary.

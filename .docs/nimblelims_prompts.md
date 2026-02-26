@@ -1212,3 +1212,104 @@ Update README.md with new feature overview and usage.
 Ensure all changes follow PEP8/ESLint.
 Output every updated or new file in full.
 
+# Experiments 
+## Chunk 1
+### Prompt 1/5 – Database Models & Alembic Migration
+Implement the complete database layer for Chunk 1 of Experiment Management exactly as described in experiment-planning.md v4.0.
+Create or update SQLAlchemy models for:
+
+experiments
+experiment_templates
+experiment_details
+experiment_sample_executions (rich junction with role_in_experiment, processing_conditions JSONB, replicate_number, etc.)
+Add optional FKs to existing models (samples, aliquots, tests, results) only where beneficial for direct linking.
+Include proper relationships, indexes (especially on sample_id + experiment_id), constraints, and EAV compatibility via custom_attributes JSONB.
+Generate a new Alembic migration file with full upgrade/downgrade. Update models/init.py and any base model references.
+Do not touch API, workflow, or frontend code yet. After completion, confirm all tables are correctly related bidirectionally.
+
+### Prompt 2/5 – Backend Services, Schemas & API Endpoints
+Implement the full backend layer for Experiments using the models just created.
+Create:
+
+Repository and Service classes (follow exact patterns from sample/batch/result services)
+Complete Pydantic schemas (create, read, update, list, filter) with JSONB handling
+FastAPI router under /api/v1/experiments and /api/v1/experiment-templates
+Full CRUD endpoints plus: link_sample_to_experiment, add_experiment_detail_step, link_experiments, get_experiment_lineage, get_sample_experiments
+Proper permission dependencies (new scope experiment:manage)
+All endpoints must reuse existing auth, pagination, and response wrappers.
+No frontend or workflow changes yet.
+
+### Prompt 3/5 – Workflow Templates & Action System Extension
+Extend the existing workflow/action system to fully support Experiments as defined in experiment-planning.md v4.0.
+Add these exact new actions to the valid_actions list and implement their handlers: create_experiment, create_experiment_from_template, link_sample_to_experiment, add_experiment_detail_step, link_experiments, update_experiment_status.
+Update Workflow execution context to carry experiment_id and execution_id seamlessly.
+Update WorkflowTemplate validation, execution engine, and any builder UI hooks so users can drop these actions into templates (including referencing experiment_templates).
+Follow the exact patterns used for existing actions (e.g. enter_results, create_batch).
+Ensure templates can now act as the higher-level “Process” that reuses Experiments.
+### Prompt 4/5 – Frontend: Navigation, List Page & Detail Page
+Add the React/TypeScript UI for Experiments exactly as scoped in experiment-planning.md v4.0.
+
+Add “Experiments” item to the Lab Management accordion in the sidebar (respect existing RBAC/permission gating).
+Create full Experiments list page (table with filters, search, status, type, project, actions; “New Experiment” button).
+Create full Experiment detail page with tabs: Overview, Sample Executions (rich table showing processing_conditions), Details/Steps, Lineage (simple expandable tree/list), Linked Workflow Instances/Processes.
+Update Sample detail page to include a new “Participated in these Experiments / Processes” section (bidirectional view).
+Use only existing UI components, tables, forms, and API hooks. No new external libraries.
+
+### Prompt 5/5 – Final Integration, Polish & Documentation Update (MANDATORY LAST PROMPT)
+Complete all remaining integration work for Chunk 1:
+
+Wire frontend pages to new backend endpoints
+Add permission checks (experiment:manage) everywhere required
+Ensure full bidirectional linking works (sample ↔ experiment)
+Add basic loading/error states and confirm lineage view displays correctly
+Verify new workflow actions appear and function in the template builder and runtime execution
+
+### Final Directive (must be executed):
+After all code changes are complete and tested locally, update the following files with full details of what was implemented in Chunk 1:
+
+experiment-planning.md (mark Chunk 1 as completed, add implementation notes)
+uat-testing-log.md (add new UAT scripts for experiment CRUD, linking, workflow integration, and lineage)
+README.md (add Experiment Management section to the features overview)
+Any other affected documentation (schema, architecture, etc.)
+Provide a clear summary at the end of every updated file listing all files created/modified.
+
+## Sidebar refactor
+### Prompt 1/3 – Sidebar & MainNav Updates
+Refactor the sidebar navigation to move Experiments to its own top-level accordion immediately after Sample Mgmt, exactly as described in navigation.md v2.1.
+Update frontend/src/components/Sidebar.tsx and frontend/src/components/MainNav.tsx (if needed):
+
+Remove “Experiments” from Lab Mgmt accordion.
+Add new “Experiments” accordion with sub-items: “All Experiments” (/experiments) and “Experiment Templates” (/experiments/templates).
+Implement permission gating for the whole Experiments section (experiment:manage) and for Templates sub-item (experiment_template:manage OR config:edit).
+Keep auto-expansion, active-state, collapsed-mode, tooltips, ARIA labels, and mobile drawer behavior identical to Sample Mgmt / Lab Mgmt.
+Update the permission check logic and role table in comments.
+Do not touch App.tsx, routes, or any experiment pages yet.
+
+### Prompt 2/3 – App.tsx, Routing & AppBar Updates
+Update routing and layout to support the new top-level Experiments section exactly as described in navigation.md v2.1.
+In frontend/src/App.tsx:
+
+Ensure /experiments and /experiments/templates and /experiments/:id routes use MainLayout and are protected with experiment:manage (or experiment_template:manage for templates route).
+Update dynamic page title mapping in MainLayout.tsx / AppBar for the new section (e.g., “Experiments”, “Experiment Detail”, “Experiment Templates”).
+Add auto-expansion logic for the new Experiments accordion (expand on any /experiments* route).
+Update any permission-based visibility arrays or helper functions that reference Lab Mgmt / experiment routes.
+Confirm Lab Mgmt accordion no longer includes Experiments.
+Do not touch Sidebar.tsx (already updated) or experiment page components.
+
+### Prompt 3/3 – Final Integration, Polish & Documentation Update (MANDATORY LAST PROMPT)
+Complete all remaining integration work for the navigation refactor:
+
+Verify new Experiments accordion appears correctly for Lab Tech / Lab Manager / Admin roles.
+Confirm “Experiment Templates” sub-item is hidden from non-admins.
+Confirm “My Experiments” filter works via query param on the list page (no extra route).
+Test auto-expansion, active states, collapsed mode, mobile drawer, back button, and permission redirects.
+Ensure no breakage to Sample Mgmt, Lab Mgmt, or Admin sections.
+
+### Final Directive (must be executed):
+After all code changes are complete and tested locally, update the following files with full details of the navigation refactor:
+
+navigation.md (mark as v2.1, add implementation notes and updated structure tables)
+uat-testing-log.md (add new UAT script for sidebar navigation – Experiments section visibility & Templates gating)
+README.md (update features / navigation overview section)
+Any other affected documentation (e.g., architecture notes)
+Provide a clear summary at the end of every updated file listing all files created/modified.

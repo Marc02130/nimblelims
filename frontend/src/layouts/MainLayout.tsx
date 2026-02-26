@@ -29,7 +29,7 @@ interface MainLayoutProps {
   children: React.ReactNode;
 }
 
-// Route title mapping
+// Route title mapping (Experiments section is separate from Lab Mgmt)
 const getRouteTitle = (pathname: string): string => {
   const routeMap: Record<string, string> = {
     '/dashboard': 'Dashboard',
@@ -44,6 +44,8 @@ const getRouteTitle = (pathname: string): string => {
     '/client-projects': 'Client Projects',
     '/analyses': 'Analyses',
     '/analytes': 'Analytes',
+    '/experiments': 'Experiments',
+    '/experiments/templates': 'Experiment Templates',
     '/help': 'Help',
     '/admin': 'Admin Dashboard',
     '/admin/lists': 'Lists Management',
@@ -65,6 +67,11 @@ const getRouteTitle = (pathname: string): string => {
   // Check for nested routes (e.g., /admin/analyses/:id/analytes)
   if (pathname.startsWith('/admin/analyses/') && pathname.includes('/analytes')) {
     return 'Analysis Analytes Configuration';
+  }
+
+  // Experiments section: detail (exclude /experiments/templates)
+  if (pathname.startsWith('/experiments/') && !pathname.startsWith('/experiments/templates')) {
+    return 'Experiment Detail';
   }
 
   // Check for edit routes
@@ -99,6 +106,10 @@ const shouldShowBackButton = (pathname: string): boolean => {
   if (pathname.match(/\/admin\/analyses\/[^/]+\/analytes/)) {
     return true;
   }
+  // Experiment detail: back to list
+  if (pathname.match(/^\/experiments\/[^/]+$/) && !pathname.startsWith('/experiments/templates')) {
+    return true;
+  }
   return false;
 };
 
@@ -106,6 +117,9 @@ const shouldShowBackButton = (pathname: string): boolean => {
 const getBackButtonTarget = (pathname: string): string => {
   if (pathname.match(/\/admin\/analyses\/[^/]+\/analytes/)) {
     return '/admin/analyses';
+  }
+  if (pathname.match(/^\/experiments\/[^/]+$/) && !pathname.startsWith('/experiments/templates')) {
+    return '/experiments';
   }
   return '/dashboard';
 };

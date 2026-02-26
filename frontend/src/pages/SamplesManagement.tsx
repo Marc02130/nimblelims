@@ -140,6 +140,19 @@ const SamplesManagement: React.FC = () => {
 
       setSamples(enrichedSamples);
       setLookupData({ sampleTypes, statuses, matrices, qcTypes, projects });
+
+      // Bidirectional link from Experiments: open sample view when ?highlight=<sample_id>
+      const highlightId = searchParams.get('highlight');
+      if (highlightId && highlightId.trim()) {
+        try {
+          const sample = await apiService.getSample(highlightId.trim());
+          setSelectedSample(sample);
+          setViewMode(true);
+          setShowForm(true);
+        } catch {
+          // Sample may not exist or no access; ignore
+        }
+      }
     } catch (err: any) {
       if (err.response?.status === 403) {
         setError('Access denied: You do not have permission to view these samples. Client users can only view samples from their own client\'s projects.');

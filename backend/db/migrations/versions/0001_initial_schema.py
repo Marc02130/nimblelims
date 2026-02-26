@@ -14,7 +14,7 @@ revision = '0001'
 down_revision = None
 branch_labels = None
 depends_on = None
-
+schema = 'lims'
 
 def upgrade() -> None:
     # Enable UUID extension

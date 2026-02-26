@@ -242,6 +242,7 @@ require_config_edit = require_permission("config:edit")
 require_workflow_execute = require_permission("workflow:execute")
 
 require_analysis_manage = require_permission("analysis:manage")
+require_experiment_manage = require_permission("experiment:manage")
 
 # Role-based dependencies
 require_admin = require_role("Administrator")

@@ -29,5 +29,10 @@ class Sample(BaseModel):
     child_samples = relationship("Sample", primaryjoin="Sample.id == Sample.parent_sample_id")
     tests = relationship("Test", back_populates="sample")
     contents = relationship("Contents", back_populates="sample")
+    experiment_sample_executions = relationship(
+        "ExperimentSampleExecution",
+        back_populates="sample",
+        foreign_keys="ExperimentSampleExecution.sample_id",
+    )
     creator = relationship("User", foreign_keys="Sample.created_by", back_populates="created_samples")
     modifier = relationship("User", foreign_keys="Sample.modified_by", back_populates="modified_samples")
