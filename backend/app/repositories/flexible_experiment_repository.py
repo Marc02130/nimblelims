@@ -66,21 +66,37 @@ class ExperimentRunRepository:
         self.db.add(run)
         return run
 
+    def get_by_name_for_client(self, name: str, client_id: uuid.UUID) -> Optional[ExperimentRun]:
+        """Return the run with `name` that belongs to the given client's templates.
+
+        Multi-tenant boundary: joins through experiment_templates.client_id so
+        two different orgs can create runs with identical names without collision.
+
+        ExperimentRun → experiment_template_id → ExperimentTemplate.client_id
+        """
+        from models.experiment import ExperimentTemplate
+        return (
+            self.db.query(ExperimentRun)
+            .join(ExperimentTemplate, ExperimentRun.experiment_template_id == ExperimentTemplate.id)
+            .filter(ExperimentRun.name == name, ExperimentTemplate.client_id == client_id)
+            .first()
+        )
+
     def update_status(
         self,
         run: ExperimentRun,
         new_status: ExperimentRunStatus,
         modified_by: Optional[uuid.UUID],
     ) -> ExperimentRun:
-        from datetime import datetime
+        from datetime import datetime, timezone
         run.status = new_status
         run.modified_by = modified_by
         if new_status == ExperimentRunStatus.running and not run.started_at:
-            run.started_at = datetime.utcnow()
+            run.started_at = datetime.now(timezone.utc)
         elif new_status == ExperimentRunStatus.complete and not run.completed_at:
-            run.completed_at = datetime.utcnow()
+            run.completed_at = datetime.now(timezone.utc)
         elif new_status == ExperimentRunStatus.published and not run.published_at:
-            run.published_at = datetime.utcnow()
+            run.published_at = datetime.now(timezone.utc)
         return run
 
 

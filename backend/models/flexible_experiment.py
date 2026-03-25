@@ -69,7 +69,9 @@ class ExperimentRun(Base):
     __tablename__ = 'experiment_runs'
 
     id = Column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    name = Column(String(255), nullable=False, unique=True)
+    # name is unique per client (enforced at the service layer via get_by_name_for_client),
+    # NOT globally unique — two client orgs may use identical run names.
+    name = Column(String(255), nullable=False, index=True)
     description = Column(Text, nullable=True)
     experiment_template_id = Column(
         PostgresUUID(as_uuid=True),

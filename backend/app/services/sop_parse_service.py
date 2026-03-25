@@ -272,6 +272,7 @@ class SOPParseService:
                 message = client.messages.create(
                     model="claude-opus-4-5-20251101",
                     max_tokens=4096,
+                    timeout=120.0,  # prevent connection-pool starvation on slow responses
                     system=_EXTRACTION_SYSTEM_PROMPT,
                     messages=[{"role": "user", "content": user_message}],
                 )
@@ -286,6 +287,9 @@ class SOPParseService:
                 repo.mark_complete(job, result)
                 db.commit()
 
+            except anthropic.APITimeoutError as e:
+                repo.mark_failed(job, f"Anthropic API timeout (>120s): {str(e)}")
+                db.commit()
             except anthropic.APIError as e:
                 repo.mark_failed(job, f"Anthropic API error: {str(e)}")
                 db.commit()

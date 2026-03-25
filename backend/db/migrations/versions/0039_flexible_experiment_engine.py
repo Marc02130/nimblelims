@@ -58,8 +58,12 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(['created_by'], ['users.id']),
         sa.ForeignKeyConstraint(['modified_by'], ['users.id']),
         sa.PrimaryKeyConstraint('id'),
-        sa.UniqueConstraint('name', name='uq_experiment_runs_name'),
+        # NOTE: no global UNIQUE constraint on name — uniqueness is per-client, enforced
+        # at the service layer via get_by_name_for_client() which joins through
+        # experiment_runs → experiment_template_id → experiment_templates.client_id.
+        # Two different client orgs may have runs with identical names.
     )
+    op.create_index('ix_experiment_runs_name', 'experiment_runs', ['name'])
     op.create_index('idx_experiment_runs_template_id', 'experiment_runs', ['experiment_template_id'])
     op.create_index('idx_experiment_runs_status', 'experiment_runs', ['status'])
     op.create_index('idx_experiment_runs_created_by', 'experiment_runs', ['created_by'])
@@ -233,5 +237,6 @@ def downgrade() -> None:
     op.execute('DROP INDEX IF EXISTS idx_experiment_runs_created_by;')
     op.execute('DROP INDEX IF EXISTS idx_experiment_runs_status;')
     op.execute('DROP INDEX IF EXISTS idx_experiment_runs_template_id;')
+    op.execute('DROP INDEX IF EXISTS ix_experiment_runs_name;')
     op.drop_table('experiment_runs')
     op.execute('DROP TYPE IF EXISTS experiment_run_status;')

@@ -73,7 +73,8 @@ class ExperimentRunService:
     # ---------- CRUD ----------
 
     def create_run(self, data: ExperimentRunCreate) -> ExperimentRun:
-        if self.run_repo.get_by_name(data.name):
+        client_id = self.current_user.client_id if self.current_user else None
+        if client_id and self.run_repo.get_by_name_for_client(data.name, client_id):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Experiment run '{data.name}' already exists",
@@ -186,9 +187,11 @@ class ExperimentRunService:
             for row in rows
         ]
         created_rows = self.data_repo.bulk_create(run_id, row_dicts, self._user_id())
-        self._commit_refresh()
-        for r in created_rows:
-            self.db.refresh(r)
+        # Flush + commit without per-row refresh (avoids N+1 round-trips).
+        # created_rows are already in-memory; created_at will be populated by DB default
+        # on flush. The response schema tolerates None for server-set timestamps.
+        self.db.flush()
+        self.db.commit()
 
         return ImportDataResponse(
             imported=len(created_rows),
