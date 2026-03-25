@@ -23,6 +23,7 @@ def upgrade() -> None:
         sa.text("""
             INSERT INTO permissions (id, name, description, active, created_at, modified_at)
             VALUES (gen_random_uuid(), :name, :description, true, NOW(), NOW())
+            ON CONFLICT (name) DO NOTHING
         """),
         {'name': 'workflow:execute', 'description': 'Execute workflow templates'}
     )
