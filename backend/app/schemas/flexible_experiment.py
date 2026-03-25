@@ -129,6 +129,14 @@ class ExperimentDataRead(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class ExperimentDataListResponse(BaseModel):
+    rows: List[ExperimentDataRead]
+    total: int
+    page: int
+    size: int
+    pages: int
+
+
 class ImportDataRequest(BaseModel):
     """Body for POST /experiment-runs/{id}/import."""
     rows: List[ExperimentDataRow] = Field(..., min_length=1)
