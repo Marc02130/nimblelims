@@ -23,7 +23,7 @@ from models.flexible_experiment import (
     InstrumentParser,
     RobotWorklistConfig,
 )
-from models.user import User, Role, Permission, RolePermission
+from models.user import User, Role, Permission  # noqa: F401
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -219,7 +219,7 @@ class TestExperimentRunCreate:
             "/v1/experiment-runs",
             json={"name": "X", "experiment_template_id": experiment_template},
         )
-        assert r.status_code == 401
+        assert r.status_code == 403  # FastAPI HTTPBearer returns 403 for missing credentials
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -499,6 +499,7 @@ class TestSopParseJobs:
         SessionFactory = self._make_session_factory(db_engine)
 
         with patch("app.database.SessionLocal", SessionFactory), \
+             patch("app.services.sop_parse_service.ANTHROPIC_API_KEY", "fake-key"), \
              patch("anthropic.Anthropic") as mock_cls:
             mock_instance = MagicMock()
             mock_instance.messages.create.return_value = mock_response
@@ -536,6 +537,7 @@ class TestSopParseJobs:
             message = "rate limit exceeded"
 
         with patch("app.database.SessionLocal", SessionFactory), \
+             patch("app.services.sop_parse_service.ANTHROPIC_API_KEY", "fake-key"), \
              patch("anthropic.Anthropic") as mock_cls:
             mock_instance = MagicMock()
             mock_instance.messages.create.side_effect = _FakeAPIError()
@@ -570,6 +572,7 @@ class TestSopParseJobs:
         bad_response.content[0].text = "This is definitely not JSON }{{"
 
         with patch("app.database.SessionLocal", SessionFactory), \
+             patch("app.services.sop_parse_service.ANTHROPIC_API_KEY", "fake-key"), \
              patch("anthropic.Anthropic") as mock_cls:
             mock_instance = MagicMock()
             mock_instance.messages.create.return_value = bad_response
@@ -778,6 +781,6 @@ class TestInstrumentDataService:
     def test_parse_utf8_bom(self):
         """UTF-8 BOM prefix should be silently stripped."""
         svc = self._make_service()
-        bom_csv = "\xef\xbb\xbfWell,Viability\nA1,92.3\n"
+        bom_csv = "\ufeffWell,Viability\nA1,92.3\n"
         rows, _ = svc.parse(bom_csv.encode("utf-8"))
         assert rows[0].well_position == "A1"
