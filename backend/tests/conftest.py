@@ -2,6 +2,7 @@
 Pytest configuration and fixtures.
 Uses testcontainers-python (PostgreSQL 15) to prevent SQLite/JSONB divergence.
 """
+import os
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, text
@@ -36,6 +37,83 @@ def db_engine(pg_container):
     Base.metadata.create_all(bind=engine)
     yield engine
     # Drop via raw SQL to avoid CircularDependencyError from clients↔roles↔users FKs
+    with engine.connect() as conn:
+        conn.execute(text("DROP SCHEMA public CASCADE"))
+        conn.execute(text("CREATE SCHEMA public"))
+        conn.commit()
+    engine.dispose()
+
+
+@pytest.fixture(scope="session")
+def migrated_pg_container():
+    """Dedicated PostgreSQL 15 container for migration-based RLS tests.
+
+    A separate container from pg_container is required because db_engine uses
+    Base.metadata.create_all() (no migrations) while migrated_engine needs the
+    real Alembic chain. Sharing one container would create schema conflicts.
+    """
+    with PostgresContainer(POSTGRES_IMAGE) as pg:
+        yield pg
+
+
+@pytest.fixture(scope="session")
+def migrated_engine(migrated_pg_container):
+    """Engine with full Alembic migration chain applied (RLS policies active).
+
+    Unlike db_engine (which uses Base.metadata.create_all and skips migrations),
+    this fixture runs the real Alembic upgrade so RLS policies, SECURITY DEFINER
+    functions, and FORCE ROW LEVEL SECURITY are all in effect.
+
+    A non-superuser role (app_test_role) is created so that RLS is enforced on
+    queries — PostgreSQL superusers bypass RLS regardless of FORCE settings.
+    Tests must SET ROLE app_test_role before querying to activate enforcement.
+    """
+    from alembic import command
+    from alembic.config import Config
+
+    url = migrated_pg_container.get_connection_url()
+    engine = create_engine(url)
+
+    # Migration 0003 GRANTs privileges to lims_user. Create it in the testcontainer
+    # before running migrations so the GRANTs don't fail with "role does not exist".
+    with engine.connect() as conn:
+        conn.execute(text(
+            "CREATE ROLE lims_user NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT LOGIN PASSWORD 'lims_password'"
+        ))
+        conn.commit()
+
+    # env.py reads DATABASE_URL env var instead of config.get_main_option("sqlalchemy.url").
+    # Override it here so Alembic migrations hit the testcontainer, not the Docker DB.
+    # Use try/finally so DATABASE_URL is always cleared even if upgrade() raises.
+    os.environ["DATABASE_URL"] = url
+    try:
+        alembic_cfg = Config("alembic.ini")
+        alembic_cfg.set_main_option("sqlalchemy.url", url)
+        command.upgrade(alembic_cfg, "head")
+    finally:
+        os.environ.pop("DATABASE_URL", None)
+
+    # Create a non-superuser role so RLS is actually enforced.
+    # Superusers and roles with BYPASSRLS skip RLS even with FORCE ROW LEVEL SECURITY.
+    with engine.connect() as conn:
+        conn.execute(text(
+            "CREATE ROLE app_test_role NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT LOGIN PASSWORD 'test'"
+        ))
+        conn.execute(text("GRANT CONNECT ON DATABASE postgres TO app_test_role"))
+        conn.execute(text("GRANT USAGE ON SCHEMA public TO app_test_role"))
+        conn.execute(text(
+            "GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO app_test_role"
+        ))
+        conn.execute(text(
+            "GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO app_test_role"
+        ))
+        conn.execute(text(
+            "GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO app_test_role"
+        ))
+        conn.commit()
+
+    yield engine
+
     with engine.connect() as conn:
         conn.execute(text("DROP SCHEMA public CASCADE"))
         conn.execute(text("CREATE SCHEMA public"))
