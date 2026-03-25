@@ -16,34 +16,16 @@
 
 ---
 
-## Paginate GET /experiment-runs/{id}/data
+## ~~Paginate GET /experiment-runs/{id}/data~~
 
-**What:** Add `limit`/`offset` parameters to `ExperimentDataRepository.list_for_run()` and expose them on the `GET /experiment-runs/{id}/data` route.
+**Completed:** v0.0.0 (2026-03-25) — commit `e97e93c` on branch `Paginate-Experiment-Runs`
 
-**Why:** Currently returns all rows unbounded. A 384-well plate with multiple imports could produce thousands of rows loaded into memory at once, causing latency spikes and OOM risk under concurrent load.
-
-**Pros:** Protects against memory spikes; standard REST pagination pattern already used on `list_runs`.
-
-**Cons:** Minor breaking change to API consumers (need to handle paginated response); adds a page/size response envelope.
-
-**Priority:** P2
-
-**Context:** Surfaced during `/plan-eng-review` on `flexible-experiment-engine` branch. The worklist export (`export_worklist_csv`) reads all rows intentionally — that's fine since it's generating a full CSV. Only the list-data API endpoint needs pagination. The fix is ~10 lines: add limit/offset to the query, add page/size/total to the response schema.
-
-**Depends on / blocked by:** Nothing — independent change.
+`GET /experiment-runs/{id}/data` now accepts `page`/`size` query params and returns an `ExperimentDataListResponse` envelope (rows/total/page/size/pages). Worklist export path uses `list_all_for_run` (unbounded) — intentional.
 
 ---
 
-## Background task connection pool: release DB before API call
+## ~~Background task connection pool: release DB before API call~~
 
-**What:** In `SOPParseService.run_extraction_background()`, release the SQLAlchemy connection before calling the Anthropic API, then re-acquire after to write the result.
+**Completed:** v0.0.0 (2026-03-25) — commit `56410e2` on branch `Paginate-Experiment-Runs`
 
-**Why:** The background task opens a `SessionLocal()` and holds it open for 90–120s while waiting for Claude. Under concurrent SOP parse jobs, this exhausts the connection pool. The DB is not needed during the Claude API call — it's a pure wait.
-
-**Pros:** Eliminates connection pool pressure from long-running background tasks; more correct resource management.
-
-**Cons:** Requires restructuring the background task to use two DB sessions (one to mark processing, one to write result), or to use `db.close()` + `db.bind.connect()` pattern.
-
-**Priority:** P3
-
-**Context:** Surfaced during `/plan-eng-review` on `flexible-experiment-engine` branch. Acceptable at current scale (few concurrent parse jobs). Revisit when SOP parse jobs become a high-throughput operation.
+`run_extraction_background` now uses two short-lived sessions: Session 1 marks the job as processing and closes, the Anthropic API call runs with no DB connection held, then Session 2 writes the result.
