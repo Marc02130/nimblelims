@@ -9,7 +9,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import List, Optional
 
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from models.experiment_process import ExperimentProcess, ProcessStep, ProcessStepStatus
 
@@ -45,6 +45,7 @@ class ExperimentProcessRepository:
     def list_for_run(self, run_id: uuid.UUID) -> List[ExperimentProcess]:
         return (
             self.db.query(ExperimentProcess)
+            .options(selectinload(ExperimentProcess.steps))
             .filter(ExperimentProcess.experiment_run_id == run_id)
             .order_by(ExperimentProcess.sort_order)
             .all()
