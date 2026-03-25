@@ -11,7 +11,8 @@ from testcontainers.postgres import PostgresContainer
 from app.main import app
 from app.database import get_db
 from models.base import Base
-from models.user import User, Role, Permission, RolePermission
+from models.user import User, Role, Permission, role_permissions
+from models.client import Client
 from app.core.security import get_password_hash
 
 # Import all models so Base.metadata is fully populated
@@ -34,7 +35,11 @@ def db_engine(pg_container):
     engine = create_engine(pg_container.get_connection_url())
     Base.metadata.create_all(bind=engine)
     yield engine
-    Base.metadata.drop_all(bind=engine)
+    # Drop via raw SQL to avoid CircularDependencyError from clients↔roles↔users FKs
+    with engine.connect() as conn:
+        conn.execute(text("DROP SCHEMA public CASCADE"))
+        conn.execute(text("CREATE SCHEMA public"))
+        conn.commit()
     engine.dispose()
 
 
@@ -69,7 +74,16 @@ def client(db_session):
 
 
 @pytest.fixture(scope="function")
-def test_user(db_session):
+def test_org(db_session):
+    """Create a test client org (required FK on User.client_id)."""
+    org = Client(name="Test Lab")
+    db_session.add(org)
+    db_session.flush()
+    return org
+
+
+@pytest.fixture(scope="function")
+def test_user(db_session, test_org):
     """Create a test user with role and permissions."""
     test_role = Role(name="test_role", description="Test role for authentication")
     db_session.add(test_role)
@@ -85,7 +99,7 @@ def test_user(db_session):
     db_session.flush()
 
     for perm in permissions:
-        db_session.add(RolePermission(role_id=test_role.id, permission_id=perm.id))
+        db_session.execute(role_permissions.insert().values(role_id=test_role.id, permission_id=perm.id))
 
     user = User(
         name="Test User",
@@ -93,6 +107,7 @@ def test_user(db_session):
         email="test@example.com",
         password_hash=get_password_hash("testpassword"),
         role_id=test_role.id,
+        client_id=test_org.id,
     )
     db_session.add(user)
     db_session.commit()
@@ -100,7 +115,7 @@ def test_user(db_session):
 
 
 @pytest.fixture(scope="function")
-def test_admin_user(db_session):
+def test_admin_user(db_session, test_org):
     """Create a test admin user with all permissions."""
     admin_role = Role(name="Administrator", description="Administrator role")
     db_session.add(admin_role)
@@ -121,7 +136,7 @@ def test_admin_user(db_session):
     db_session.flush()
 
     for perm in permissions:
-        db_session.add(RolePermission(role_id=admin_role.id, permission_id=perm.id))
+        db_session.execute(role_permissions.insert().values(role_id=admin_role.id, permission_id=perm.id))
 
     admin_user = User(
         name="Admin User",
@@ -129,6 +144,7 @@ def test_admin_user(db_session):
         email="admin@example.com",
         password_hash=get_password_hash("adminpassword"),
         role_id=admin_role.id,
+        client_id=test_org.id,
     )
     db_session.add(admin_user)
     db_session.commit()
@@ -142,8 +158,8 @@ def admin_token(test_admin_user, db_session):
 
     permissions = (
         db_session.query(Permission)
-        .join(RolePermission, Permission.id == RolePermission.permission_id)
-        .filter(RolePermission.role_id == test_admin_user.role_id)
+        .join(role_permissions, Permission.id == role_permissions.c.permission_id)
+        .filter(role_permissions.c.role_id == test_admin_user.role_id)
         .all()
     )
     perm_names = [p.name for p in permissions]
@@ -157,7 +173,7 @@ def admin_token(test_admin_user, db_session):
 
 
 @pytest.fixture(scope="function")
-def client_user_token(db_session):
+def client_user_token(db_session, test_org):
     """Create a JWT token for a client user."""
     from app.core.security import create_access_token
 
@@ -175,7 +191,7 @@ def client_user_token(db_session):
     db_session.flush()
 
     for perm in client_permissions:
-        db_session.add(RolePermission(role_id=client_role.id, permission_id=perm.id))
+        db_session.execute(role_permissions.insert().values(role_id=client_role.id, permission_id=perm.id))
 
     client_user = User(
         name="Client User",
@@ -183,6 +199,7 @@ def client_user_token(db_session):
         email="client@example.com",
         password_hash=get_password_hash("clientpass123"),
         role_id=client_role.id,
+        client_id=test_org.id,
     )
     db_session.add(client_user)
     db_session.commit()
