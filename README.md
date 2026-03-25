@@ -179,8 +179,9 @@ nimblelims/
 - **Authentication**: JWT token-based authentication
 - **Authorization**: Role-Based Access Control (RBAC) with 17 granular permissions
 - **Data Isolation**: Client-specific data access controls via project_users junction table
-- **Row-Level Security**: PostgreSQL RLS policies for data protection at the database level
+- **Row-Level Security**: PostgreSQL RLS policies for data protection at the database level. `FORCE ROW LEVEL SECURITY` is applied so enforcement holds even for the table owner role (no bypass on direct DB connections).
 - **Samples Access Control**: The `GET /samples` endpoint relies entirely on RLS for access control - no Python-level filtering is applied. Lab Technicians and Lab Managers see samples from projects they have access to via the `project_users` table. Client users see samples from their client's projects. Administrators see all samples.
+- **Experiment Engine Isolation**: The 5 flexible experiment engine tables (`experiment_runs`, `experiment_data`, `instrument_parsers`, `robot_worklist_configs`, `sop_parse_jobs`) use client-scoped RLS: users only see rows created by members of their own client organization. Admins see all. Enforced at the database layer regardless of the API code path.
 
 ## API Documentation
 
