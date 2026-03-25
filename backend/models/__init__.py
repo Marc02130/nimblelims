@@ -23,3 +23,13 @@ from .experiment import (
     ExperimentDetail,
     ExperimentSampleExecution,
 )
+from .flexible_experiment import (
+    ExperimentRun,
+    ExperimentRunStatus,
+    ExperimentData,
+    InstrumentParser,
+    RobotWorklistConfig,
+    SopParseJob,
+    SopParseJobStatus,
+    VALID_TRANSITIONS,
+)
