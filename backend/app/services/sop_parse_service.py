@@ -244,35 +244,47 @@ class SOPParseService:
     ) -> None:
         """
         Background task: call Claude API, parse result, update job status.
-        Uses its own SessionLocal() — never shares a session with the HTTP layer.
+
+        Uses two short-lived DB sessions to avoid holding a connection open
+        during the Anthropic API call (which can take 90–120 s):
+          Session 1: mark job as processing, then release connection.
+          [Claude API call — no DB connection held]
+          Session 2: write result (complete or failed), then release connection.
         """
         from app.database import SessionLocal
+
+        # ── Session 1: mark processing ──────────────────────────────────────
         db = SessionLocal()
         try:
             repo = SopParseJobRepository(db)
             job = repo.get_by_id(job_id)
             if not job:
                 return
-
             repo.mark_processing(job)
-            db.flush()
+            db.commit()
+        except Exception:
+            db.rollback()
+            return
+        finally:
+            db.close()
 
-            if not ANTHROPIC_API_KEY:
-                repo.mark_failed(job, "ANTHROPIC_API_KEY is not configured")
-                db.commit()
-                return
+        # ── Anthropic API call — no DB connection held ───────────────────────
+        error_message: Optional[str] = None
+        result: Optional[dict] = None
 
+        if not ANTHROPIC_API_KEY:
+            error_message = "ANTHROPIC_API_KEY is not configured"
+        else:
             client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
             user_message = (
                 f"SOP content:\n\n{sop_text}\n\n"
                 f"Example instrument output:\n\n{instrument_text}"
             )
-
             try:
                 message = client.messages.create(
                     model="claude-opus-4-5-20251101",
                     max_tokens=4096,
-                    timeout=120.0,  # prevent connection-pool starvation on slow responses
+                    timeout=120.0,
                     system=_EXTRACTION_SYSTEM_PROMPT,
                     messages=[{"role": "user", "content": user_message}],
                 )
@@ -284,27 +296,29 @@ class SOPParseService:
                     raw_text = raw_text.rsplit("```", 1)[0]
 
                 result = json.loads(raw_text)
-                repo.mark_complete(job, result)
-                db.commit()
 
             except anthropic.APITimeoutError as e:
-                repo.mark_failed(job, f"Anthropic API timeout (>120s): {str(e)}")
-                db.commit()
+                error_message = f"Anthropic API timeout (>120s): {str(e)}"
             except anthropic.APIError as e:
-                repo.mark_failed(job, f"Anthropic API error: {str(e)}")
-                db.commit()
+                error_message = f"Anthropic API error: {str(e)}"
             except (json.JSONDecodeError, ValueError, KeyError) as e:
-                repo.mark_failed(job, f"Claude returned malformed JSON: {str(e)}")
-                db.commit()
+                error_message = f"Claude returned malformed JSON: {str(e)}"
+            except Exception as e:
+                error_message = f"Unexpected error: {str(e)}"
 
-        except Exception as e:
-            try:
-                repo = SopParseJobRepository(db)
-                job = repo.get_by_id(job_id)
-                if job:
-                    repo.mark_failed(job, f"Unexpected error: {str(e)}")
-                    db.commit()
-            except Exception:
-                pass
+        # ── Session 2: write result ──────────────────────────────────────────
+        db = SessionLocal()
+        try:
+            repo = SopParseJobRepository(db)
+            job = repo.get_by_id(job_id)
+            if not job:
+                return
+            if error_message:
+                repo.mark_failed(job, error_message)
+            else:
+                repo.mark_complete(job, result)
+            db.commit()
+        except Exception:
+            db.rollback()
         finally:
             db.close()
