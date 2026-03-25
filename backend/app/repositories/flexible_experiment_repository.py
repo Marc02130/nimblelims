@@ -104,7 +104,23 @@ class ExperimentDataRepository:
     def __init__(self, db: Session) -> None:
         self.db = db
 
-    def list_for_run(self, run_id: uuid.UUID) -> List[ExperimentData]:
+    def list_for_run(
+        self,
+        run_id: uuid.UUID,
+        page: int = 1,
+        size: int = 100,
+    ) -> Tuple[List[ExperimentData], int]:
+        q = (
+            self.db.query(ExperimentData)
+            .filter(ExperimentData.experiment_run_id == run_id)
+            .order_by(ExperimentData.created_at)
+        )
+        total = q.count()
+        items = q.offset((page - 1) * size).limit(size).all()
+        return items, total
+
+    def list_all_for_run(self, run_id: uuid.UUID) -> List[ExperimentData]:
+        """Return all rows without pagination — for worklist export."""
         return (
             self.db.query(ExperimentData)
             .filter(ExperimentData.experiment_run_id == run_id)

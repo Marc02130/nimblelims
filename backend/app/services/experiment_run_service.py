@@ -199,9 +199,14 @@ class ExperimentRunService:
             rows=[ExperimentDataRead.model_validate(r) for r in created_rows],
         )
 
-    def get_data_rows(self, run_id: uuid.UUID) -> List[ExperimentData]:
+    def get_data_rows(
+        self,
+        run_id: uuid.UUID,
+        page: int = 1,
+        size: int = 100,
+    ) -> Tuple[List[ExperimentData], int]:
         self.get_run(run_id)  # 404 guard
-        return self.data_repo.list_for_run(run_id)
+        return self.data_repo.list_for_run(run_id, page=page, size=size)
 
     # ---------- Worklist export ----------
 
@@ -232,7 +237,7 @@ class ExperimentRunService:
                 ),
             )
 
-        data_rows = self.data_repo.list_for_run(run_id)
+        data_rows = self.data_repo.list_all_for_run(run_id)
         if not data_rows:
             # Empty run: return headers-only CSV
             return "source_well,dest_well,volume\n"
