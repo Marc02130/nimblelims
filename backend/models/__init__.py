@@ -33,3 +33,9 @@ from .flexible_experiment import (
     SopParseJobStatus,
     VALID_TRANSITIONS,
 )
+from .experiment_process import (
+    ExperimentProcess,
+    ProcessStep,
+    ProcessStepStatus,
+    VALID_STEP_TRANSITIONS,
+)
