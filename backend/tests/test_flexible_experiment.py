@@ -784,3 +784,37 @@ class TestInstrumentDataService:
         bom_csv = "\ufeffWell,Viability\nA1,92.3\n"
         rows, _ = svc.parse(bom_csv.encode("utf-8"))
         assert rows[0].well_position == "A1"
+
+    def test_parse_skip_rows_greater_than_zero(self):
+        """
+        Regression: parser_config with skip_rows > 0 must skip that many
+        leading non-header rows before the column header line.
+
+        CSV layout with skip_rows=2:
+          row 0: instrument metadata  (skipped)
+          row 1: more metadata        (skipped)
+          row 2: Well,Viability       (header)
+          row 3+: data rows
+        """
+        from app.services.instrument_data_service import InstrumentDataService
+
+        skip_config = {
+            "columns": VALID_PARSER_CONFIG["columns"],
+            "well_col": VALID_PARSER_CONFIG["well_col"],
+            "skip_rows": 2,
+        }
+        svc = InstrumentDataService(skip_config)
+
+        csv_with_preamble = (
+            "Instrument: PlateReader v3\n"          # row 0 — skipped
+            "Date: 2026-01-01\n"                    # row 1 — skipped
+            "Well,Viability\n"                      # row 2 — header
+            "A1,88.5\n"
+            "A2,91.0\n"
+        )
+        rows, warnings = svc.parse(csv_with_preamble.encode())
+        assert len(rows) == 2, f"Expected 2 data rows, got {len(rows)}"
+        assert rows[0].well_position == "A1"
+        assert rows[0].row_data["viability_pct"] == 88.5
+        assert rows[1].well_position == "A2"
+        assert warnings == []

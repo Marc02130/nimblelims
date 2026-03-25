@@ -67,18 +67,18 @@ class ExperimentRunRepository:
         return run
 
     def get_by_name_for_client(self, name: str, client_id: uuid.UUID) -> Optional[ExperimentRun]:
-        """Return the run with `name` that belongs to the given client's templates.
+        """Return the run with `name` that belongs to the given client.
 
-        Multi-tenant boundary: joins through experiment_templates.client_id so
+        Multi-tenant boundary: joins through created_by → User.client_id so
         two different orgs can create runs with identical names without collision.
 
-        ExperimentRun → experiment_template_id → ExperimentTemplate.client_id
+        ExperimentRun.created_by → User.id → User.client_id
         """
-        from models.experiment import ExperimentTemplate
+        from models.user import User
         return (
             self.db.query(ExperimentRun)
-            .join(ExperimentTemplate, ExperimentRun.experiment_template_id == ExperimentTemplate.id)
-            .filter(ExperimentRun.name == name, ExperimentTemplate.client_id == client_id)
+            .join(User, ExperimentRun.created_by == User.id)
+            .filter(ExperimentRun.name == name, User.client_id == client_id)
             .first()
         )
 
