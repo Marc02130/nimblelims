@@ -17,8 +17,11 @@ After:
         is_admin() OR (
             has_experiment_access() AND
             created_by IN (
-                SELECT id FROM users
-                WHERE client_id = (SELECT client_id FROM users WHERE id = current_user_id())
+                SELECT u.id FROM users u
+                WHERE u.client_id = (
+                    SELECT u2.client_id FROM users u2
+                    WHERE u2.id = current_user_id()
+                )
             )
         )
     )
@@ -86,6 +89,12 @@ def upgrade() -> None:
             USING ({_CLIENT_POLICY});
         """)
 
+        # Ensure RLS applies even to the table owner (e.g. the postgres role
+        # used by the migration runner). Without FORCE, the table owner bypasses
+        # RLS entirely on direct connections — defeating the isolation guarantee.
+        # Pattern mirrors migration 0030 (clients table).
+        op.execute(f'ALTER TABLE {table} FORCE ROW LEVEL SECURITY;')
+
 
 def downgrade() -> None:
     for table in _TABLES:
@@ -97,3 +106,7 @@ def downgrade() -> None:
             FOR ALL
             USING (has_experiment_access());
         """)
+
+        # Revert FORCE — restore the pre-0041 state where owner bypass was
+        # not explicitly prevented (matching migration 0039's behaviour).
+        op.execute(f'ALTER TABLE {table} NO FORCE ROW LEVEL SECURITY;')
