@@ -17,6 +17,9 @@ DATABASE_URL = os.getenv(
     "postgresql://lims_user:lims_password@localhost:5432/lims_db"
 )
 
+# Anthropic API
+ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
+
 # CORS Configuration
 CORS_ORIGINS = [
     "http://localhost:3000",
