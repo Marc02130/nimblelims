@@ -30,6 +30,7 @@ from app.schemas.flexible_experiment import (
     ImportDataRequest,
     ImportDataResponse,
     ExperimentDataRead,
+    ExperimentDataListResponse,
 )
 from models.flexible_experiment import ExperimentRunStatus
 from models.user import User
@@ -130,14 +131,23 @@ def import_data(
     return service.import_data(run_id, data.rows)
 
 
-@router.get("/{run_id}/data", response_model=list[ExperimentDataRead])
+@router.get("/{run_id}/data", response_model=ExperimentDataListResponse)
 def get_data_rows(
     run_id: UUID,
+    page: int = Query(1, ge=1),
+    size: int = Query(100, ge=1, le=1000),
     service: ExperimentRunService = Depends(_run_service),
 ):
-    """List all imported data rows for a run."""
-    rows = service.get_data_rows(run_id)
-    return [ExperimentDataRead.model_validate(r) for r in rows]
+    """List imported data rows for a run (paginated)."""
+    rows, total = service.get_data_rows(run_id, page=page, size=size)
+    pages = (total + size - 1) // size if size else 0
+    return ExperimentDataListResponse(
+        rows=[ExperimentDataRead.model_validate(r) for r in rows],
+        total=total,
+        page=page,
+        size=size,
+        pages=pages,
+    )
 
 
 @router.get("/{run_id}/worklist")
