@@ -161,6 +161,7 @@ public
 # Temporary folders
 tmp/
 temp/
+manuals/
 
 # Logs
 logs
