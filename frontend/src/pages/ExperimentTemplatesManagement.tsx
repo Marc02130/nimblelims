@@ -30,7 +30,8 @@ import {
   useMediaQuery,
   Tooltip,
 } from '@mui/material';
-import { Add, Edit, Delete, RateReview } from '@mui/icons-material';
+import { Add, Edit, Delete, RateReview, Upload } from '@mui/icons-material';
+import LinearProgress from '@mui/material/LinearProgress';
 import { DataGrid, GridColDef, GridActionsCellItem, GridRowParams } from '@mui/x-data-grid';
 import { useUser } from '../contexts/UserContext';
 import { apiService } from '../services/apiService';
@@ -140,6 +141,17 @@ const ExperimentTemplatesManagement: React.FC = () => {
   const [signoffConfirmed, setSignoffConfirmed] = useState<Set<number>>(new Set());
   const [signoffSubmitting, setSignoffSubmitting] = useState(false);
   const [signoffCloseWarning, setSignoffCloseWarning] = useState(false);
+
+  // SOP upload dialog state
+  const [sopUploadOpen, setSopUploadOpen] = useState(false);
+  const [sopFile, setSopFile] = useState<File | null>(null);
+  const [instrumentFile, setInstrumentFile] = useState<File | null>(null);
+  const [sopUploadError, setSopUploadError] = useState<string | null>(null);
+  const [sopJobId, setSopJobId] = useState<string | null>(null);
+  // phase: 'idle' | 'uploading' | 'polling' | 'applying' | 'done' | 'timeout'
+  const [sopPhase, setSopPhase] = useState<'idle' | 'uploading' | 'polling' | 'applying' | 'done' | 'timeout'>('idle');
+  const [sopElapsedSeconds, setSopElapsedSeconds] = useState(0);
+  const [sopFromExtraction, setSopFromExtraction] = useState(false);
 
   // ── Data loading ─────────────────────────────────────────────────────────
 
@@ -362,6 +374,134 @@ const ExperimentTemplatesManagement: React.FC = () => {
     }
   };
 
+  // ── SOP upload ────────────────────────────────────────────────────────────
+
+  const openSopUpload = () => {
+    setSopFile(null);
+    setInstrumentFile(null);
+    setSopUploadError(null);
+    setSopJobId(null);
+    setSopPhase('idle');
+    setSopElapsedSeconds(0);
+    setSopUploadOpen(true);
+  };
+
+  const handleSopSubmit = async () => {
+    if (!sopFile || !instrumentFile) {
+      setSopUploadError('Both files are required.');
+      return;
+    }
+    setSopUploadError(null);
+    setSopPhase('uploading');
+
+    let jobId: string;
+    try {
+      const job = await apiService.createSopParseJob(sopFile, instrumentFile);
+      jobId = job.id;
+      setSopJobId(jobId);
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { detail?: string } }; message?: string };
+      setSopUploadError(e.response?.data?.detail || e.message || 'Upload failed');
+      setSopPhase('idle');
+      return;
+    }
+
+    // Poll
+    setSopPhase('polling');
+    let elapsed = 0;
+    const MAX_WAIT = 120;
+    const POLL_INTERVAL = 2000;
+
+    const poll = async (): Promise<void> => {
+      elapsed += POLL_INTERVAL / 1000;
+      setSopElapsedSeconds(elapsed);
+
+      if (elapsed >= MAX_WAIT) {
+        setSopPhase('timeout');
+        return;
+      }
+
+      try {
+        const job = await apiService.getSopParseJob(jobId);
+        if (job.status === 'complete') {
+          setSopPhase('applying');
+          try {
+            const applied = await apiService.applySopParseJob(jobId);
+            await loadTemplates();
+            // Fetch the newly created template and open edit dialog for review
+            const newTemplate = await apiService.getExperimentTemplate(applied.experiment_template_id);
+            setSopUploadOpen(false);
+            setSopFromExtraction(true);
+            openEdit(newTemplate as ExperimentTemplateRow);
+          } catch (applyErr: unknown) {
+            const e = applyErr as { response?: { status?: number; data?: { detail?: string } }; message?: string };
+            if (e.response?.status === 409) {
+              // Already applied — just reload and close
+              await loadTemplates();
+              setSopUploadOpen(false);
+            } else {
+              setSopUploadError(e.response?.data?.detail || e.message || 'Apply failed');
+              setSopPhase('idle');
+            }
+          }
+          return;
+        }
+        if (job.status === 'failed') {
+          setSopUploadError('SOP extraction failed. Please fill in the template manually.');
+          setSopPhase('idle');
+          return;
+        }
+        // Still pending/processing — keep polling
+        setTimeout(poll, POLL_INTERVAL);
+      } catch {
+        setSopUploadError('Lost connection while polling. Please try again.');
+        setSopPhase('idle');
+      }
+    };
+
+    setTimeout(poll, POLL_INTERVAL);
+  };
+
+  const handleSopKeepWaiting = () => {
+    setSopPhase('polling');
+    setSopElapsedSeconds(0);
+    if (sopJobId) {
+      // Resume polling from current job
+      const poll = async (): Promise<void> => {
+        setSopElapsedSeconds((s) => s + 2);
+        if (!sopJobId) return;
+        try {
+          const job = await apiService.getSopParseJob(sopJobId);
+          if (job.status === 'complete') {
+            setSopPhase('applying');
+            const applied = await apiService.applySopParseJob(sopJobId);
+            await loadTemplates();
+            const newTemplate = await apiService.getExperimentTemplate(applied.experiment_template_id);
+            setSopUploadOpen(false);
+            setSopFromExtraction(true);
+            openEdit(newTemplate as ExperimentTemplateRow);
+            return;
+          }
+          if (job.status === 'failed') {
+            setSopUploadError('SOP extraction failed.');
+            setSopPhase('idle');
+            return;
+          }
+          setTimeout(poll, 2000);
+        } catch {
+          setSopUploadError('Connection lost.');
+          setSopPhase('idle');
+        }
+      };
+      setTimeout(poll, 2000);
+    }
+  };
+
+  const handleSopFillManually = () => {
+    setSopUploadOpen(false);
+    openCreate();
+  };
+
   // ── DataGrid columns ──────────────────────────────────────────────────────
 
   const columns: GridColDef[] = [
@@ -514,9 +654,14 @@ const ExperimentTemplatesManagement: React.FC = () => {
       >
         <Typography variant="h5">Experiment Templates</Typography>
         {canManage && (
-          <Button variant="contained" startIcon={<Add />} onClick={openCreate}>
-            New Template
-          </Button>
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            <Button variant="contained" startIcon={<Upload />} onClick={openSopUpload}>
+              Upload SOP
+            </Button>
+            <Button variant="outlined" startIcon={<Add />} onClick={openCreate}>
+              New Template
+            </Button>
+          </Box>
         )}
       </Box>
 
@@ -562,11 +707,17 @@ const ExperimentTemplatesManagement: React.FC = () => {
       )}
 
       {/* ── Create/Edit Dialog ───────────────────────────────────────────── */}
-      <Dialog open={formOpen} onClose={() => setFormOpen(false)} maxWidth="lg" fullWidth>
+      <Dialog open={formOpen} onClose={() => { setFormOpen(false); setSopFromExtraction(false); }} maxWidth="lg" fullWidth>
         <DialogTitle>
           {selectedTemplate ? `Edit Template: ${selectedTemplate.name}` : 'Create Experiment Template'}
         </DialogTitle>
         <DialogContent>
+          {/* SOP extraction banner */}
+          {sopFromExtraction && (
+            <Alert severity="info" sx={{ mb: 2 }} onClose={() => setSopFromExtraction(false)}>
+              This template was filled from your SOP. Review all fields before activating.
+            </Alert>
+          )}
           {/* Tab-level error summary */}
           {tabErrors.some(Boolean) && (
             <Alert severity="error" sx={{ mb: 2 }}>
@@ -852,7 +1003,7 @@ const ExperimentTemplatesManagement: React.FC = () => {
           )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setFormOpen(false)} disabled={formSubmitting}>
+          <Button onClick={() => { setFormOpen(false); setSopFromExtraction(false); }} disabled={formSubmitting}>
             Cancel
           </Button>
           <Button
@@ -862,6 +1013,124 @@ const ExperimentTemplatesManagement: React.FC = () => {
           >
             {formSubmitting ? 'Saving...' : selectedTemplate ? 'Update' : 'Create'}
           </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ── SOP Upload Dialog ───────────────────────────────────────────── */}
+      <Dialog
+        open={sopUploadOpen}
+        onClose={() => { if (sopPhase !== 'uploading' && sopPhase !== 'polling' && sopPhase !== 'applying') setSopUploadOpen(false); }}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Upload SOP to Create Template</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Upload your SOP document and an example instrument CSV. Claude will extract the template
+            definition automatically. You can review and edit all fields before activating.
+          </Typography>
+
+          {sopUploadError && (
+            <Alert severity="error" sx={{ mb: 2 }} onClose={() => setSopUploadError(null)}>
+              {sopUploadError}
+            </Alert>
+          )}
+
+          {/* Idle / file selection */}
+          {(sopPhase === 'idle') && (
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <Box>
+                <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 0.5 }}>
+                  SOP Document (PDF, DOCX, or TXT) *
+                </Typography>
+                <Button variant="outlined" component="label" fullWidth>
+                  {sopFile ? sopFile.name : 'Choose SOP file...'}
+                  <input
+                    type="file"
+                    hidden
+                    accept=".pdf,.docx,.txt,.doc"
+                    onChange={(e) => setSopFile(e.target.files?.[0] ?? null)}
+                  />
+                </Button>
+              </Box>
+              <Box>
+                <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 0.5 }}>
+                  Instrument CSV (example output from the instrument) *
+                </Typography>
+                <Button variant="outlined" component="label" fullWidth>
+                  {instrumentFile ? instrumentFile.name : 'Choose instrument CSV...'}
+                  <input
+                    type="file"
+                    hidden
+                    accept=".csv,.txt"
+                    onChange={(e) => setInstrumentFile(e.target.files?.[0] ?? null)}
+                  />
+                </Button>
+              </Box>
+            </Box>
+          )}
+
+          {/* Uploading */}
+          {sopPhase === 'uploading' && (
+            <Box sx={{ textAlign: 'center', py: 3 }}>
+              <CircularProgress size={40} />
+              <Typography variant="body2" sx={{ mt: 2 }}>Uploading files...</Typography>
+            </Box>
+          )}
+
+          {/* Polling */}
+          {sopPhase === 'polling' && (
+            <Box sx={{ py: 2 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
+                <CircularProgress size={24} />
+                <Typography variant="body2">
+                  Claude is reading your SOP... {sopElapsedSeconds}s
+                </Typography>
+              </Box>
+              <LinearProgress variant="determinate" value={Math.min((sopElapsedSeconds / 120) * 100, 99)} />
+              <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                Usually takes 15–60 seconds for most SOPs.
+              </Typography>
+            </Box>
+          )}
+
+          {/* Applying */}
+          {sopPhase === 'applying' && (
+            <Box sx={{ textAlign: 'center', py: 3 }}>
+              <CircularProgress size={40} />
+              <Typography variant="body2" sx={{ mt: 2 }}>Creating template from extraction...</Typography>
+            </Box>
+          )}
+
+          {/* Timeout */}
+          {sopPhase === 'timeout' && (
+            <Box sx={{ py: 2 }}>
+              <Alert severity="warning" sx={{ mb: 2 }}>
+                This is taking longer than expected ({sopElapsedSeconds}s). The extraction may still be running.
+              </Alert>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          {/* Close only when not actively processing */}
+          {(sopPhase === 'idle' || sopPhase === 'timeout') && (
+            <Button onClick={() => setSopUploadOpen(false)}>Cancel</Button>
+          )}
+          {sopPhase === 'timeout' && (
+            <>
+              <Button onClick={handleSopKeepWaiting} variant="outlined">Keep Waiting</Button>
+              <Button onClick={handleSopFillManually} variant="outlined">Fill in Manually</Button>
+            </>
+          )}
+          {sopPhase === 'idle' && (
+            <Button
+              variant="contained"
+              onClick={handleSopSubmit}
+              disabled={!sopFile || !instrumentFile}
+            >
+              Extract from SOP
+            </Button>
+          )}
         </DialogActions>
       </Dialog>
 
