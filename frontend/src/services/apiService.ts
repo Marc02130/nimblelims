@@ -1144,6 +1144,10 @@ class ApiService {
     return response.data;
   }
 
+  async deleteExperimentTemplate(id: string) {
+    await this.api.delete(`v1/experiment-templates/${id}`);
+  }
+
   // Admin Help CRUD endpoints
   async createHelpEntry(data: {
     section: string;
