@@ -160,7 +160,7 @@ const ExperimentTemplatesManagement: React.FC = () => {
       setLoading(true);
       setError(null);
       const data = await apiService.getExperimentTemplates();
-      setRows(Array.isArray(data) ? data : (data?.items ?? []));
+      setRows(Array.isArray(data) ? data : (data?.templates ?? data?.items ?? []));
     } catch (err: unknown) {
       const e = err as { response?: { status?: number; data?: { detail?: string } }; message?: string };
       if (e.response?.status === 403) {

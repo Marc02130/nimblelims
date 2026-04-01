@@ -2,47 +2,64 @@
 
 ## Chunk 1 — Completed
 
-**Status:** Completed and tested locally.
+**Status:** Completed.
 
-**Scope:** Backend and frontend for experiments and experiment templates; sidebar navigation refactor (Experiments as own accordion); sample↔experiment linking; workflow integration; lineage; My Experiments filter.
+**Scope:** Backend and frontend for experiments and experiment templates API; sidebar navigation refactor (Experiments as own accordion); sample↔experiment linking; workflow integration; lineage; My Experiments filter.
 
-### Implementation Notes
+### Implementation Notes (Chunk 1)
 
 - **Backend**
-  - **Models:** `experiment_templates`, `experiments`, `experiment_details`, `experiment_sample_executions` (with role_in_experiment, processing_conditions JSONB, replicate_number, optional test_id/result_id). Migrations: `0036` (tables, RLS, audit triggers), `0037` (permission `experiment:manage` for Administrator, Lab Manager, Lab Technician), `0038` (seed list `experiment_status`).
-  - **API:** `/v1/experiments` and `/v1/experiment-templates` (mounted under `/v1` so nginx proxy `/api/v1/*` → `/v1/*`). CRUD plus: `link_sample_to_experiment`, `add_experiment_detail_step`, `link_experiments`, `get_experiment_lineage`, `get_sample_experiments`. List experiments supports `mine=true` (filter by `created_by` = current user).
-  - **Permissions:** `experiment:manage` required for all experiment/template endpoints. No separate `experiment_template:manage` yet; Templates sub-item in UI is gated by `config:edit` (admins only).
-  - **Workflow:** Actions `create_experiment`, `create_experiment_from_template`, `link_sample_to_experiment`, `add_experiment_detail_step`, `link_experiments`, `update_experiment_status`. Context carries `experiment_id` and `execution_id`; workflow execution uses `ExperimentService` with `auto_commit=False` in same transaction.
+  - **Models:** `experiment_templates`, `experiments`, `experiment_details`, `experiment_sample_executions` (with role_in_experiment, processing_conditions JSONB, replicate_number, optional test_id/result_id). Migrations through `0038`+; client RLS on experiment engine tables in `0041`/`0042`.
+  - **API:** `/v1/experiments` and `/v1/experiment-templates`. CRUD plus: `link_sample_to_experiment`, `add_experiment_detail_step`, `link_experiments`, `get_experiment_lineage`, `get_sample_experiments`. List experiments supports `mine=true`.
+  - **Permissions:** `experiment:manage` for experiment and template endpoints.
+  - **Workflow:** Actions `create_experiment`, `create_experiment_from_template`, `link_sample_to_experiment`, `add_experiment_detail_step`, `link_experiments`, `update_experiment_status`. Context carries `experiment_id` and `execution_id`.
 
 - **Frontend**
-  - **Sidebar (refactor v2.1):** Experiments removed from Lab Mgmt. New top-level **Experiments** accordion (after Sample Mgmt) with sub-items: **All Experiments** (`/experiments`), **Experiment Templates** (`/experiments/templates`). Section visible with `experiment:manage`; Templates sub-item visible only with `experiment_template:manage` OR `config:edit`.
-  - **Routes:** `/experiments`, `/experiments/:id`, `/experiments/templates` (MainLayout; list/detail protected by `experiment:manage`; templates by `experiment_template:manage` or `config:edit`).
-  - **Pages:** ExperimentsManagement — list (filters, pagination, My Experiments chip via `?mine=true`), detail (tabs: Overview, Sample Executions, Details/Steps, Lineage, Linked Processes), create dialog. Sample detail shows "Participated in these Experiments"; experiment detail links to `/samples?highlight=<id>`; Samples list opens sample view when `?highlight=<id>` in URL.
-  - **AppBar:** Titles "Experiments", "Experiment Detail", "Experiment Templates"; back button on experiment detail → `/experiments`.
+  - **Sidebar:** **Experiments** accordion after Sample Mgmt: **All Experiments** (`/experiments`), **Experiment Templates** (`/experiments/templates`). Section and both sub-items require `experiment:manage`.
+  - **Routes:** `/experiments`, `/experiments/:id`, `/experiments/templates` — all `experiment:manage`.
+  - **Pages:** `ExperimentsManagement` — list, detail, My Experiments (`?mine=true`), tabs, sample links, lineage. Sample detail “Participated in these Experiments”.
 
-- **Integration**
-  - **Bidirectional linking:** Sample ↔ experiment via API and UI links; lineage view with loading/error states.
-  - **Workflow builder:** Helper text in Workflow Templates admin lists experiment actions and context params.
+---
+
+## Chunk 2 — Experiment Templates UI & SOP (AI) — Completed
+
+**Status:** Shipped in app (`ExperimentTemplatesManagement.tsx`, `sop_parse` router).
+
+**Scope:**
+
+- Dedicated **Experiment Templates** page (not reused experiments list).
+- Manual template authoring: MUI DataGrid + large dialog with tabs (basic info, protocol steps, transfer steps with “requires sign-off before activation”, result columns as key/value rows).
+- **Upload SOP:** Two files (SOP + instrument CSV) → `POST /v1/sop-parse` → poll `GET /v1/sop-parse/{job_id}` → `POST /v1/sop-parse/{job_id}/apply`. UI shows progress, timeout handling, “fill in manually” escape hatch.
+- **Sign-off:** For templates with `mandatory_review_count > 0`, chip opens stepper dialog; each mandatory transfer step confirmed individually (no “confirm all”); then PATCH clears `mandatory_review` flags and count.
+- **Activation:** Active toggle disabled until sign-offs complete; tooltip explains why.
+- **Delete:** `DELETE /v1/experiment-templates/{id}` wired in `apiService`.
+- **SOP-filled fields:** Visual highlight + “from extraction” affordance in edit form after apply.
+
+**Backend:** `backend/app/routers/sop_parse.py`, `SOPParseService` (Claude via `ANTHROPIC_API_KEY`), models `sop_parse_jobs` and related flexible experiment tables.
+
+**Docs / plan:** See `.claude/plans/experiment-template-ui.md` for the original UI spec (implementation aligns with Phases 1–2; permission for templates is **`experiment:manage`** in code, not `config:edit`).
 
 ### UAT
 
-- **uat-experiments-navigation:** Sidebar Experiments section visibility and Experiment Templates gating (admin vs Lab Tech/Manager); permission redirects.
-- **uat-experiment-management:** Experiment CRUD, list/filters (including My Experiments), sample↔experiment linking, lineage, workflow actions, back button and titles.
-
-See `UAT_Scripts/uat-testing-log.md` for full UAT script steps.
+- `UAT_Scripts/uat-experiment-templates.md` — template CRUD, SOP flow (with/without API key), sign-off, activation, RBAC.
+- `UAT_Scripts/uat-testing-log.md` — dependency order and experiments navigation script (aligned with `experiment:manage` for templates).
 
 ---
 
-## Chunk 2+ (Future)
+## Future (optional)
 
-- Optional: Add permission `experiment_template:manage` and assign to Lab Manager (or others) so Templates sub-item and `/experiments/templates` route can be granted without full `config:edit`.
-- Dedicated Experiment Templates management page (e.g. CRUD for templates at `/experiments/templates`) if needed beyond current ExperimentsManagement reuse.
-- Further workflow actions or reporting tied to experiments.
+- Permission `experiment_template:manage` for template-only access without full experiment workflows.
+- Audit trail for sign-off (who/when).
+- User manual generator from template schema (deferred).
 
 ---
 
-## Summary — Files Created/Modified (Experiment Planning)
+## Summary — Files Touched (high level)
 
-**This file (`.docs/experiment-planning.md`):** Created. Contains Chunk 1 completion status and implementation notes.
+**Planning doc:** `.docs/experiment-planning.md` (this file).
 
-**Related code/docs:** See `.docs/navigation.md` (navigation refactor summary), `README.md` (Experiment Management section and summary), `UAT_Scripts/uat-testing-log.md` (UAT scripts and dependency table).
+**Related:** `.docs/navigation.md`, `.docs/api_endpoints.md`, `README.md`, `backend/README.md`, `frontend/README.md`, `.claude/plans/experiment-template-ui.md`, `UAT_Scripts/uat-experiment-templates.md`, `UAT_Scripts/uat-testing-log.md`.
+
+**Frontend:** `frontend/src/pages/ExperimentTemplatesManagement.tsx`, `ExperimentsManagement.tsx`, `Sidebar.tsx`, `App.tsx`, `MainLayout.tsx`, `apiService.ts`.
+
+**Backend:** `app/routers/experiments.py`, `app/routers/sop_parse.py`, `app/services/sop_parse_service.py`, `app/services/experiment_service.py`, flexible experiment models/migrations.

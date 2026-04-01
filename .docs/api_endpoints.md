@@ -1701,6 +1701,42 @@ All entity create/update endpoints support `custom_attributes` in the request bo
 - Multiple custom filters: `?custom.attr1=value1&custom.attr2=value2`
 - Uses PostgreSQL JSONB `@>` operator for efficient querying
 
+## Experiments
+
+Base path (with nginx): `/api/v1/experiments`. Requires authentication and **`experiment:manage`**.
+
+Typical operations (see OpenAPI `/docs` for full schemas):
+
+- `GET /experiments` — List experiments (pagination, filters, optional `mine=true` for current user’s experiments).
+- `POST /experiments` — Create experiment.
+- `GET /experiments/{id}` — Detail.
+- `PATCH /experiments/{id}` — Update.
+- Additional endpoints: link sample, add detail step, link experiments, lineage, sample↔experiment listings (see `backend/app/routers/experiments.py`).
+
+## Experiment templates
+
+Base path: `/api/v1/experiment-templates`. Requires **`experiment:manage`**.
+
+- `GET /experiment-templates` — List templates (`active`, `page`, `size` query params).
+- `GET /experiment-templates/{template_id}` — Get one template.
+- `POST /experiment-templates` — Create (body: `name`, optional `description`, `template_definition` JSON, optional `custom_attributes`).
+- `PATCH /experiment-templates/{template_id}` — Partial update (including `active` and nested `template_definition`).
+- `DELETE /experiment-templates/{template_id}` — Soft-delete (204).
+
+`template_definition` includes fields such as `experiment_name`, `protocol_steps`, `transfer_steps`, `result_columns`, `plate_layout`, `acceptance_criteria`, `mandatory_review_count`, etc. (see Pydantic schemas in `backend/app/schemas/experiment.py`).
+
+## SOP parse (AI-assisted template creation)
+
+Base path: `/api/v1/sop-parse`. Requires **`experiment:manage`**. Used to upload an SOP and example instrument output, run **Claude**-based extraction in a background job, then apply results to create `experiment_templates` and related parser/worklist rows.
+
+- `POST /sop-parse` — **Multipart form-data** with two required files: `sop_file` (SOP document), `instrument_file` (example CSV). Returns **202** with job metadata (`SopParseJobRead`); poll with GET.
+- `GET /sop-parse/{job_id}` — Job status: `pending`, `processing`, `complete`, `failed`; when complete, `result` contains extracted JSON (`template_definition`, parser/worklist fragments as produced by the service).
+- `POST /sop-parse/{job_id}/apply` — After status is `complete`, creates template (and related records) in one transaction. **409** if already applied (idempotent retry safe).
+
+**Configuration:** Set environment variable **`ANTHROPIC_API_KEY`** on the backend. If unset, extraction fails with a clear error on the job record.
+
+**RLS:** `sop_parse_jobs` and related experiment-engine tables use client-scoped RLS (see migrations 0041/0042 and `.docs/experiment-planning.md`).
+
 ## Permissions Reference
 
 Endpoints require specific permissions. The system currently has 17 permissions:
@@ -1728,6 +1764,9 @@ Endpoints require specific permissions. The system currently has 17 permissions:
 
 **Project Permissions:**
 - `project:manage` - Manage projects
+
+**Experiment permissions:**
+- `experiment:manage` - Experiments and experiment templates CRUD, SOP parse upload/apply (lab roles in seed data: Administrator, Lab Manager, Lab Technician)
 
 **System Permissions:**
 - `user:manage` - Manage users

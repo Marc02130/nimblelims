@@ -226,7 +226,7 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onMobileClose, collapsed 
     },
   ];
 
-  // Experiments section: own accordion (experiment:manage). Templates sub-item: experiment_template:manage OR config:edit
+  // Experiments section: own accordion (experiment:manage). Templates sub-item: same permission (experiment:manage)
   interface ExperimentsNavItem {
     text: string;
     path: string;
@@ -289,7 +289,7 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onMobileClose, collapsed 
    * Permission / role visibility (sidebar sections):
    * - Core Features: all authenticated (Dashboard, Help).
    * - Sample Mgmt: any of sample:create, sample:read, sample:update, test:update, batch:manage, result:enter.
-   * - Experiments: experiment:manage (section); Templates sub-item also requires experiment_template:manage OR config:edit.
+   * - Experiments: experiment:manage (section + All Experiments + Experiment Templates sub-items).
    * - Lab Mgmt: any of project:manage, analysis:manage.
    * - Admin: config:edit.
    */
@@ -519,7 +519,7 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onMobileClose, collapsed 
           </>
         )}
 
-        {/* Experiments Section (own accordion: experiment:manage; Templates sub-item: experiment_template:manage OR config:edit) */}
+        {/* Experiments Section (experiment:manage; includes Experiment Templates) */}
         {hasExperimentsAccess && (
           <>
             <Divider sx={{ my: 1 }} />
