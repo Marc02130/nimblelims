@@ -1144,6 +1144,31 @@ class ApiService {
     return response.data;
   }
 
+  async deleteExperimentTemplate(id: string) {
+    await this.api.delete(`v1/experiment-templates/${id}`);
+  }
+
+  // SOP parse jobs (v1 API)
+  async createSopParseJob(sopFile: File, instrumentFile: File) {
+    const form = new FormData();
+    form.append('sop_file', sopFile);
+    form.append('instrument_file', instrumentFile);
+    const response: AxiosResponse = await this.api.post('v1/sop-parse', form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data as { id: string; status: string };
+  }
+
+  async getSopParseJob(jobId: string) {
+    const response: AxiosResponse = await this.api.get(`v1/sop-parse/${jobId}`);
+    return response.data as { id: string; status: string; result?: Record<string, unknown> };
+  }
+
+  async applySopParseJob(jobId: string) {
+    const response: AxiosResponse = await this.api.post(`v1/sop-parse/${jobId}/apply`);
+    return response.data as { job_id: string; experiment_template_id: string };
+  }
+
   // Admin Help CRUD endpoints
   async createHelpEntry(data: {
     section: string;
