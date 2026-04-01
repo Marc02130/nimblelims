@@ -194,7 +194,9 @@ Copyright (c) 2025 Marc Breneiser
 - Password hashing with bcrypt
 - Row-Level Security policies enforced at database level with `FORCE ROW LEVEL SECURITY` (no owner bypass)
 - Project-based data isolation for core LIMS tables (samples, batches, etc.)
-- Client-scoped isolation for experiment engine tables (`experiment_runs`, `experiment_data`, `instrument_parsers`, `robot_worklist_configs`, `sop_parse_jobs`): users see only rows created by members of their own client org; admins see all
+- Client-scoped isolation for experiment engine tables: users see only rows created by members of their own client org; admins see all. Covers all 9 experiment tables:
+  - Migration 0041: `experiment_runs`, `experiment_data`, `instrument_parsers`, `robot_worklist_configs`, `sop_parse_jobs`
+  - Migration 0042: `experiment_templates`, `experiments`, `experiment_details`, `experiment_sample_executions`
 - Session variable `app.current_user_id` set via `set_current_user_id()` for RLS evaluation
 - **Samples Endpoint**: Relies entirely on RLS for access control - no Python-level filtering applied
 - **RLS Tests**: `tests/test_rls_experiment_isolation.py` verifies tenant isolation end-to-end using a real Alembic migration chain (not `create_all`)

@@ -1,20 +1,8 @@
 # TODOS
 
-## Client-scoped RLS for experiment_templates and pre-0039 tables
+## ~~Client-scoped RLS for experiment_templates and pre-0039 tables~~
 
-**Priority:** P2
-
-**What:** Extend client-scoped RLS (pattern from migration 0041) to `experiment_templates` and any other tables added before migration 0039 that still use role-only `has_experiment_access()` policies.
-
-**Why:** Migration 0041 closes the isolation gap for the 5 tables from migration 0039 (`experiment_runs`, `experiment_data`, `instrument_parsers`, `robot_worklist_configs`, `sop_parse_jobs`). But `experiment_templates` (migration 0036) is still globally readable by any Lab Tech at any client org. A complete demo of data isolation requires `experiment_templates` to also be client-scoped.
-
-**Pros:** Full data isolation for the experiment engine. Closes the partial-fix gap. Required for a credible "no, Client B cannot see Client A's data" demo claim.
-
-**Cons:** Templates may be intentionally shared across orgs as "global templates" in a future product direction. Adding `created_by`-based scoping now would prevent that without a schema change. Decide the sharing model before implementing.
-
-**Context:** Noted during adversarial review of migration 0041 (multi-tenancy branch). The design doc for 0041 explicitly deferred this. The pattern is identical to 0041 — add an Alembic migration that drops the role-only policy and creates `is_admin() OR (has_experiment_access() AND created_by IN (...))` with `FORCE ROW LEVEL SECURITY`.
-
-**Depends on / blocked by:** Decision on whether `experiment_templates` will ever support cross-org sharing.
+**Completed:** experiment-template-isolation branch — migration 0042 applies client-scoped RLS + FORCE ROW LEVEL SECURITY to all four 0036 tables (`experiment_templates`, `experiments`, `experiment_details`, `experiment_sample_executions`). Decision: private by default (no cross-org sharing). Tests in `backend/tests/test_rls_experiment_isolation.py`.
 
 ---
 
