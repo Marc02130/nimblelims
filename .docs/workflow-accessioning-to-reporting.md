@@ -4,6 +4,8 @@
 
 This document describes the complete workflow from sample accessioning through results reporting in NimbleLIMS. The workflow covers the lifecycle of a sample from initial receipt to final reporting, including test assignment, results entry, review, and status management.
 
+**Experiment templates and experiments** (see [Experiment templates and experiments](#experiment-templates-and-experiments) below) run alongside this path: labs define reusable **experiment templates** (manually or via SOP-assisted extraction), create **experiments** from those definitions, and **link samples** to experiments. That does not replace tests or results entry; it adds a process/lineage layer that workflow templates can automate (e.g. `create_experiment_from_template`, `link_sample_to_experiment`). Navigation: **Experiments** → **All Experiments** (`/experiments`) and **Experiment Templates** (`/experiments/templates`); permission **`experiment:manage`**.
+
 ## Workflow Stages
 
 ### Stage 1: Sample Accessioning
@@ -561,6 +563,31 @@ Created → In Process → Completed
 
 ---
 
+## Experiment templates and experiments
+
+**Purpose**: Define reusable experiment/process definitions (**experiment templates**), instantiate **experiments**, link **samples** to those experiments (roles, processing conditions, replicates), and track lineage. This complements the sample→test→result line: a sample can both have tests/results and participate in one or more experiments.
+
+**Actors**: Users with **`experiment:manage`** (default seed: Administrator, Lab Manager, Lab Technician).
+
+**Where in the UI**:
+- **Experiment Templates** — `/experiments/templates` (`ExperimentTemplatesManagement`): grid of templates; **New Template** (tabbed dialog: basic info, protocol steps, transfer steps with optional mandatory review, result columns); **Upload SOP** (SOP file + example instrument CSV → `POST /v1/sop-parse`, poll job, **Apply** → `POST /v1/sop-parse/{job_id}/apply` creates template and related parser/worklist records when extraction succeeds). Backend extraction uses Claude; set **`ANTHROPIC_API_KEY`** on the API server or jobs fail with a configuration error.
+- **Mandatory review / activation** — Transfer steps can require sign-off before the template is treated as ready; the UI blocks **active** until sign-offs are completed (per-step confirmation, no “confirm all”). After sign-off, managers can activate the template.
+- **All Experiments** — `/experiments`, `/experiments/:id`: list (filters, optional **My Experiments** via `?mine=true`), detail tabs (Overview, Sample Executions, Details/Steps, Lineage, Linked Processes). Sample detail shows experiments the sample participated in; experiment detail links back to samples.
+
+**API (summary)** — see `.docs/api_endpoints.md` for detail:
+- `/v1/experiment-templates` — CRUD (requires `experiment:manage`).
+- `/v1/experiments` — CRUD plus link sample, detail steps, link experiments, lineage, etc.
+- `/v1/sop-parse` — multipart upload, job status, apply (requires `experiment:manage`).
+
+**Relationship to accessioning → reporting**:
+1. Samples are still accessioned and tested as in [Stage 1](#stage-1-sample-accessioning); experiment linkage is additional.
+2. A **workflow template** (Admin → Workflow Templates) can include experiment actions so a single “Apply Template” run creates or updates experiments and links samples using shared context (`experiment_id`, `execution_id` after `link_sample_to_experiment`). See [Workflow Templates (Apply Template)](#workflow-templates-apply-template).
+3. **RLS**: Experiment-engine tables (including `sop_parse_jobs`, `experiment_templates`, `experiments`, …) use client-scoped policies where applicable; admins see all.
+
+**Further reading**: `.docs/experiment-planning.md`, `.docs/navigation.md`.
+
+---
+
 ## Workflow Variations
 
 ### Variation 1: Aliquot/Derivative Creation
@@ -584,6 +611,12 @@ Created → In Process → Completed
 - Concentration/amount calculations using units multipliers
 - Volume calculated from concentration and amount
 
+### Variation 5: Experiments and experiment templates
+- **Configure templates** at `/experiments/templates` before or during operations: manual authoring, or SOP + instrument CSV upload with AI extraction (when `ANTHROPIC_API_KEY` is set).
+- **Create experiments** from the list page or via workflow actions (`create_experiment`, `create_experiment_from_template` with `experiment_template_id` in params).
+- **Link samples** to experiments from the experiment detail UI or via `link_sample_to_experiment` in a workflow template (after accessioning, context may carry `sample_id`).
+- **Lineage** on experiment detail shows template source and linked experiments; samples list/detail remain the primary place for test/result workflow.
+
 ---
 
 ## Permissions Required
@@ -605,11 +638,21 @@ Created → In Process → Completed
 - `sample:update`: Update sample status
 - Typically restricted to Lab Manager or Administrator
 
+### Experiments and experiment templates
+- `experiment:manage`: Experiment and experiment-template CRUD, SOP parse upload/apply, sample↔experiment linking via API
+- Distinct from **`config:edit`** (admin configuration) and **`workflow:execute`** (apply workflow template)
+
 ---
 
 ## Data Relationships
 
 ```
+ExperimentTemplate (definition: protocol_steps, transfer_steps, …)
+  └─ Experiment (instance; may reference template)
+       ├─ ExperimentDetail (steps / notes)
+       ├─ ExperimentSampleExecution (junction: sample, role, processing_conditions, …)
+       └─ Links to other experiments (lineage)
+
 Sample
   ├─ Container (via Contents junction)
   ├─ Project
@@ -618,7 +661,8 @@ Sample
   │   ├─ Results
   │   │   └─ Analyte
   │   └─ Test Battery (optional)
-  └─ Status (from lists)
+  ├─ Status (from lists)
+  └─ ExperimentSampleExecution (optional: sample participates in experiments)
 ```
 
 **Key Relationships**:
@@ -628,6 +672,9 @@ Sample
 - Test → Analysis: Many-to-one
 - Result → Analyte: Many-to-one
 - Batch → Containers: Many-to-many via BatchContainers
+- ExperimentTemplate → Experiment: One-to-many (optional FK on experiment)
+- Experiment ↔ Sample: Many-to-many via `experiment_sample_executions`
+- SOP parse job → can create ExperimentTemplate (+ parser/worklist artifacts) after **Apply**
 
 ---
 
@@ -658,7 +705,19 @@ Sample
 
 **Actors**: Lab Technician, Lab Manager (with workflow:execute); Administrator (with config:edit for template CRUD).
 
-**Template definition**: Each template has a unique name, description, active flag, and `template_definition` (JSON). The definition contains a `steps` array; each step has an `action` (from a fixed list) and optional `params`. Valid actions include: update_status, validate_custom, create_qc, assign_tests, create_batch, enter_results, send_notification, accession_sample, link_container, review_result.
+**Template definition**: Each template has a unique name, description, active flag, and `template_definition` (JSON). The definition contains a `steps` array; each step has an `action` (from a fixed list) and optional `params`.
+
+**Valid actions** (non-experiment): `update_status`, `validate_custom`, `create_qc`, `assign_tests`, `create_batch`, `enter_results`, `send_notification`, `accession_sample`, `link_container`, `review_result`.
+
+**Experiment actions** (orchestrate experiments alongside samples/batches/tests; execution context may carry `experiment_id` after create steps, and `execution_id` after `link_sample_to_experiment`):
+- `create_experiment` — params: `name` (required), optional `description`, `experiment_template_id`, `status_id`, `custom_attributes`
+- `create_experiment_from_template` — params: `experiment_template_id` (required), optional `name`, `description`, `status_id`
+- `link_sample_to_experiment` — params: `sample_id` (required); `experiment_id` from context or params; optional role/processing/replicate/test/result refs
+- `add_experiment_detail_step` — params: `detail_type` (required), optional `content`, `sort_order`
+- `link_experiments` — params: `linked_experiment_id` (required)
+- `update_experiment_status` — params: `status_id` (required)
+
+Requires **experiment templates** (and activated, signed-off templates where applicable) to exist if steps reference `experiment_template_id`. Those templates are maintained under **Experiments → Experiment Templates**, not under Admin Workflow Templates.
 
 **Where to apply**:
 - **Accessioning**: Apply Template dropdown and Apply button in the page header. Context is empty `{}`. On success, lookup data (and optional custom attribute configs) are refreshed; success message shown.
@@ -698,4 +757,5 @@ All workflow steps maintain audit information:
 - Analysis-analyte rules must be configured for validation
 - Units must be configured for concentration/amount conversions
 - Project access is enforced at all workflow stages
+- **Experiment templates** are configured under Experiments (not Admin); use **`experiment:manage`**. SOP-assisted creation needs **`ANTHROPIC_API_KEY`** on the backend. Workflow templates that call `create_experiment_from_template` depend on valid template UUIDs from `/v1/experiment-templates`.
 

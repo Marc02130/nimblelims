@@ -1280,7 +1280,7 @@ Update frontend/src/components/Sidebar.tsx and frontend/src/components/MainNav.t
 
 Remove “Experiments” from Lab Mgmt accordion.
 Add new “Experiments” accordion with sub-items: “All Experiments” (/experiments) and “Experiment Templates” (/experiments/templates).
-Implement permission gating for the whole Experiments section (experiment:manage) and for Templates sub-item (experiment_template:manage OR config:edit).
+Implement permission gating for the whole Experiments section (experiment:manage) and for the Templates sub-item. **As implemented in repo:** both sub-items use `experiment:manage` (see `Sidebar.tsx`, `App.tsx`). Optional future: `experiment_template:manage` for template-only access.
 Keep auto-expansion, active-state, collapsed-mode, tooltips, ARIA labels, and mobile drawer behavior identical to Sample Mgmt / Lab Mgmt.
 Update the permission check logic and role table in comments.
 Do not touch App.tsx, routes, or any experiment pages yet.
@@ -1289,7 +1289,7 @@ Do not touch App.tsx, routes, or any experiment pages yet.
 Update routing and layout to support the new top-level Experiments section exactly as described in navigation.md v2.1.
 In frontend/src/App.tsx:
 
-Ensure /experiments and /experiments/templates and /experiments/:id routes use MainLayout and are protected with experiment:manage (or experiment_template:manage for templates route).
+Ensure /experiments, /experiments/templates, and /experiments/:id routes use MainLayout and are protected with experiment:manage (templates route uses the same permission; renders ExperimentTemplatesManagement).
 Update dynamic page title mapping in MainLayout.tsx / AppBar for the new section (e.g., “Experiments”, “Experiment Detail”, “Experiment Templates”).
 Add auto-expansion logic for the new Experiments accordion (expand on any /experiments* route).
 Update any permission-based visibility arrays or helper functions that reference Lab Mgmt / experiment routes.
@@ -1300,7 +1300,7 @@ Do not touch Sidebar.tsx (already updated) or experiment page components.
 Complete all remaining integration work for the navigation refactor:
 
 Verify new Experiments accordion appears correctly for Lab Tech / Lab Manager / Admin roles.
-Confirm “Experiment Templates” sub-item is hidden from non-admins.
+Confirm “Experiment Templates” sub-item visibility matches `experiment:manage` (visible to Lab Manager and Lab Technician when that permission is granted, not admin-only).
 Confirm “My Experiments” filter works via query param on the list page (no extra route).
 Test auto-expansion, active states, collapsed mode, mobile drawer, back button, and permission redirects.
 Ensure no breakage to Sample Mgmt, Lab Mgmt, or Admin sections.
