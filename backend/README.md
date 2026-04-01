@@ -27,6 +27,8 @@ Copyright (c) 2025 Marc Breneiser
 - **Roles & Permissions Management**: CRUD operations for roles and permission assignments (admin-only)
 - **Authentication**: JWT-based authentication with RBAC
 - **Authorization**: Role-based access control with granular permissions
+- **Experiments & templates**: CRUD under `/v1/experiments` and `/v1/experiment-templates` (`experiment:manage`)
+- **SOP parse (AI)**: `/v1/sop-parse` multipart upload, job polling, apply — creates template + parser/worklist data via Claude when `ANTHROPIC_API_KEY` is set
 
 ### API Endpoints
 
@@ -133,17 +135,6 @@ Copyright (c) 2025 Marc Breneiser
 - `PATCH /test-batteries/{id}/analyses/{analysis_id}` - Update sequence/optional (admin)
 - `DELETE /test-batteries/{id}/analyses/{analysis_id}` - Remove analysis from battery (admin)
 
-#### Test Batteries
-- `GET /test-batteries` - List test batteries with filtering
-- `GET /test-batteries/{id}` - Get battery with analyses
-- `POST /test-batteries` - Create battery (admin, requires config:edit or test:configure)
-- `PATCH /test-batteries/{id}` - Update battery (admin)
-- `DELETE /test-batteries/{id}` - Soft-delete battery (admin, 409 if referenced)
-- `GET /test-batteries/{id}/analyses` - List analyses in battery
-- `POST /test-batteries/{id}/analyses` - Add analysis to battery (admin)
-- `PATCH /test-batteries/{id}/analyses/{analysis_id}` - Update sequence/optional (admin)
-- `DELETE /test-batteries/{id}/analyses/{analysis_id}` - Remove analysis from battery (admin)
-
 #### Client Projects
 - `GET /client-projects` - List client projects
   - Administrators: All client projects
@@ -163,6 +154,25 @@ Copyright (c) 2025 Marc Breneiser
 - `DELETE /admin/custom-attributes/{id}` - Soft-delete config (requires config:edit)
 
 **Note**: All entity endpoints (samples, tests, results, projects, client_projects, batches) support `custom_attributes` in request bodies and filtering via `?custom.attr_name=value` query parameters.
+
+#### Experiments (requires experiment:manage)
+- `GET /v1/experiments` - List experiments (filters, pagination, optional `mine=true`)
+- `POST /v1/experiments` - Create experiment
+- `GET /v1/experiments/{id}` - Get experiment
+- `PATCH /v1/experiments/{id}` - Update experiment
+- Plus: link sample, detail steps, link experiments, lineage, sample experiments (see router)
+
+#### Experiment templates (requires experiment:manage)
+- `GET /v1/experiment-templates` - List templates
+- `GET /v1/experiment-templates/{id}` - Get template
+- `POST /v1/experiment-templates` - Create template
+- `PATCH /v1/experiment-templates/{id}` - Update template (including `active`, `template_definition`)
+- `DELETE /v1/experiment-templates/{id}` - Soft-delete template
+
+#### SOP parse — AI-assisted template extraction (requires experiment:manage)
+- `POST /v1/sop-parse` - Multipart: `sop_file`, `instrument_file` — returns 202, job id for polling
+- `GET /v1/sop-parse/{job_id}` - Job status and result when complete
+- `POST /v1/sop-parse/{job_id}/apply` - Persist template + parser/worklist (201; 409 if already applied)
 
 #### Other
 - `GET /units` - List units
@@ -257,6 +267,7 @@ Required environment variables (see `env.example`):
 Optional environment variables:
 - `REQUIRE_QC_FOR_BATCH_TYPES` - Comma-separated list of batch type UUIDs that require QC samples
 - `FAIL_QC_BLOCKS_BATCH` - Set to `true` to block batch completion on QC failures (default: `false`)
+- `ANTHROPIC_API_KEY` - API key for Claude; required for SOP parse extraction (`/v1/sop-parse`) to succeed. If empty, jobs fail with a configuration error.
 
 ### Database Migrations
 
@@ -320,8 +331,9 @@ backend/
 
 ## Permissions
 
-The system uses granular permissions (17 total):
+The system uses granular permissions (includes among others):
 
+- `experiment:manage` - Experiments CRUD, experiment templates CRUD, SOP parse upload/apply
 - `user:manage` - Manage users
 - `role:manage` - Manage roles
 - `config:edit` - Edit system configuration (lists, container types, custom attributes)
@@ -384,6 +396,7 @@ The `start.sh` script:
 ## Related Documentation
 
 - [API Endpoints Reference](../.docs/api_endpoints.md)
+- [Experiment planning & templates UI](../.docs/experiment-planning.md)
 - [Authentication Implementation](../.docs/backend-auth.md)
 - [Technical Specifications](../.docs/lims_mvp_tech.md)
 - [Accessioning Workflow](../.docs/accessioning_workflow.md)
