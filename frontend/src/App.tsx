@@ -31,6 +31,7 @@ import ProjectsManagement from './pages/ProjectsManagement';
 import AnalysesManagement from './pages/AnalysesManagement';
 import AnalytesManagement from './pages/AnalytesManagement';
 import ExperimentsManagement from './pages/ExperimentsManagement';
+import ExperimentTemplatesManagement from './pages/ExperimentTemplatesManagement';
 import HelpPage from './pages/HelpPage';
 import { useUser } from './contexts/UserContext';
 
@@ -185,12 +186,12 @@ function AppRoutes() {
             )
           }
         />
-        {/* Experiments section: experiment:manage for list/detail; experiment_template:manage or config:edit for templates */}
+        {/* Experiments section: experiment:manage for list/detail and templates */}
         <Route
           path="/experiments/templates"
           element={
-            hasPermission('experiment_template:manage') || hasPermission('config:edit') ? (
-              <ExperimentsManagement />
+            hasPermission('experiment:manage') ? (
+              <ExperimentTemplatesManagement />
             ) : (
               <Navigate to="/dashboard" replace />
             )
