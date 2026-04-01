@@ -276,8 +276,7 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onMobileClose, collapsed 
     hasPermission('project:manage') ||
     hasPermission('analysis:manage');
   const hasExperimentsAccess = hasPermission('experiment:manage');
-  const hasExperimentTemplatesAccess =
-    hasPermission('experiment_template:manage') || hasPermission('config:edit');
+  const hasExperimentTemplatesAccess = hasPermission('experiment:manage');
   const hasSampleMgmtAccess = 
     hasPermission('sample:create') ||
     hasPermission('sample:read') ||
