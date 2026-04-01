@@ -7,6 +7,19 @@
 **Design review:** NEEDS_CHANGES 6.5/10 — addressed below
 **Eng review:** NEEDS_CHANGES 6/10 — critical schema fixes applied below
 
+## Implementation status (shipped)
+
+The following are implemented in the repo:
+
+- **`frontend/src/pages/ExperimentTemplatesManagement.tsx`** — Phase 1 + 2: DataGrid, tabbed create/edit, delete, active toggle with sign-off guard, SOP + instrument CSV upload dialog, job polling/timeout, apply, per-step sign-off dialog, SOP-field highlighting.
+- **`frontend/src/services/apiService.ts`** — `get/create/update/delete` experiment templates; `createSopParseJob`, `getSopParseJob`, `applySopParseJob`.
+- **`frontend/src/App.tsx`** — `/experiments/templates` → `ExperimentTemplatesManagement`, gated by **`experiment:manage`** (same as list/detail).
+- **`frontend/src/components/Sidebar.tsx`** — Experiment Templates sub-item visible when **`experiment:manage`** (not `config:edit`-only).
+
+**Doc alignment:** README, `.docs/navigation.md`, `.docs/api_endpoints.md`, `.docs/experiment-planning.md`, backend/frontend READMEs, and `UAT_Scripts/uat-experiment-templates.md` describe the shipped behavior.
+
+**Operational note:** SOP extraction requires **`ANTHROPIC_API_KEY`** on the backend (`app/core/config.py`).
+
 ---
 
 ## Problem
@@ -142,11 +155,7 @@ import ExperimentTemplatesManagement from './pages/ExperimentTemplatesManagement
 
 **1c. Fix `Sidebar.tsx`**
 
-```tsx
-// Update hasExperimentTemplatesAccess variable (around line 280):
-const hasExperimentTemplatesAccess = hasPermission('experiment:manage');
-// Also check line 523 and any other usage site — grep for hasExperimentTemplatesAccess
-```
+**Shipped:** `hasExperimentTemplatesAccess = hasPermission('experiment:manage')` so Lab Manager and Lab Technician see **Experiment Templates** whenever they have experiment access (matches `App.tsx` route guard).
 
 Also confirm: `experiment_name` is editable on edit (unlike WorkflowTemplates pattern where name is disabled). Experiment templates can legitimately be renamed (e.g., "PCR v1" → "PCR v2"). If made non-editable, show tooltip: "Name cannot be changed after creation."
 
@@ -164,7 +173,7 @@ Upload flow:
 - Two file inputs: "SOP Document (PDF/DOCX/TXT)" and "Instrument CSV"
 - POST as multipart/form-data to `/v1/sop-parse`
 - Poll GET `/v1/sop-parse/{job_id}` every 2s
-  - `SopParseJobStatus` values: `pending`, `running`, `complete`, `failed`
+  - `SopParseJobStatus` values: `pending`, `processing`, `complete`, `failed`
   - Show spinner + elapsed time counter while polling
   - Max 120s — after timeout: "This is taking longer than expected" with "Keep Waiting" and "Fill in Manually" buttons
   - On `failed`: show error message with "Fill in Manually" button

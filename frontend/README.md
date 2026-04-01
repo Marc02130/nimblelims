@@ -67,6 +67,10 @@ Copyright (c) 2025 Marc Breneiser
 - Summary statistics
 - Real-time status updates
 
+### Experiments & experiment templates
+- **Experiments** (`/experiments`, `/experiments/:id`): List with filters and “My Experiments” (`?mine=true`); detail tabs (Overview, Sample Executions, Details/Steps, Lineage, Linked Processes); bidirectional links with samples. Requires `experiment:manage`.
+- **Experiment Templates** (`/experiments/templates`): `ExperimentTemplatesManagement` — DataGrid; **New Template** (tabbed dialog: basic info, protocol steps, transfer steps with mandatory review toggles, result columns); **Upload SOP** (SOP file + instrument CSV, poll job, apply); sign-off dialog for mandatory transfer steps; active toggle when sign-offs complete; delete. Same permission: `experiment:manage`.
+
 ## Technical Implementation
 
 ### Architecture
@@ -99,6 +103,8 @@ Copyright (c) 2025 Marc Breneiser
 
 ### Pages
 - `Dashboard` - Main overview with sample listing and filtering
+- `ExperimentsManagement` - Experiments list, detail, create (`/experiments`, `/experiments/:id`)
+- `ExperimentTemplatesManagement` - Experiment templates CRUD, SOP upload, sign-off (`/experiments/templates`)
 - `AccessioningForm` - Multi-step sample accessioning wizard
 - `ContainerManagement` - Container instance creation and management
 - `BatchManagement` - Batch creation and management
@@ -173,6 +179,9 @@ Copyright (c) 2025 Marc Breneiser
 - `POST /results/batch` - Enter batch results
 - `GET /test-batteries` - List test batteries
 - `GET /client-projects` - List client projects
+- `GET/POST/PATCH/DELETE /v1/experiment-templates` - Experiment templates (requires `experiment:manage`)
+- `GET/POST/PATCH /v1/experiments` - Experiments (requires `experiment:manage`)
+- `POST /v1/sop-parse`, `GET /v1/sop-parse/{job_id}`, `POST /v1/sop-parse/{job_id}/apply` - SOP extraction jobs (requires `experiment:manage`)
 - `GET /admin/custom-attributes` - List custom attribute configs (admin)
 - `POST /admin/custom-attributes` - Create custom attribute config (admin)
 - `PATCH /admin/custom-attributes/{id}` - Update custom attribute config (admin)

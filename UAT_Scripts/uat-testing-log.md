@@ -21,8 +21,9 @@ The UAT scripts should be run in the following order based on their dependencies
 | 13 | `uat-bulk-enhancements` | uat-sample-accessioning, uat-batch-management | Bulk accessioning, batch operations |
 | 14 | `uat-reporting-projects` | uat-results-entry-review | Reporting, project management, client views |
 | 15 | `uat-workflow-templates` | uat-security-rbac | Workflow template CRUD, execute (accessioning/batch/results), RBAC, rollback |
-| 16 | `uat-experiments-navigation` | uat-security-rbac | Sidebar Experiments accordion visibility, Experiment Templates gating (admin vs Lab Tech/Manager) |
+| 16 | `uat-experiments-navigation` | uat-security-rbac | Sidebar Experiments accordion visibility; Experiment Templates visible to all roles with `experiment:manage` |
 | 17 | `uat-experiment-management` | uat-security-rbac, uat-sample-accessioning (optional for link) | Experiment CRUD, list/detail, linking sample↔experiment, workflow integration, lineage, My Experiments filter |
+| 18 | `uat-experiment-templates` | uat-security-rbac | Experiment Templates page: CRUD, sign-off/activation, SOP upload (optional API key), RBAC |
 
 ## Dependency Diagram
 
@@ -43,8 +44,9 @@ uat-security-rbac (Foundation)
     │           └── uat-results-entry-review
     │               └── uat-reporting-projects
     └── uat-bulk-enhancements (requires sample-accessioning + batch-management)
-├── uat-experiments-navigation (Experiments accordion, Templates gating)
-└── uat-experiment-management (Experiment CRUD, linking, workflow, lineage; optional: uat-sample-accessioning)
+├── uat-experiments-navigation (Experiments accordion, templates visibility)
+├── uat-experiment-management (Experiment CRUD, linking, workflow, lineage; optional: uat-sample-accessioning)
+└── uat-experiment-templates (Template CRUD, SOP/AI, sign-off; see uat-experiment-templates.md)
 ```
 
 ## Recommended Next Script
@@ -81,31 +83,34 @@ After completing `uat-configurations-custom`, the recommended next scripts are:
 | 2026-02-24 | uat-bulk-enhancements | ✅ Complete | | 1/1 passed; bulk endpoint |
 | 2026-02-24 | uat-reporting-projects | ✅ Complete | | 6/6 passed; projects, client-projects, clients, units, roles, permissions |
 | | uat-workflow-templates | ⬜ Pending | | Template CRUD, execute, RBAC, rollback (see UAT_Scripts/uat-workflow-templates.md) |
-| | uat-experiments-navigation | ⬜ Pending | | Sidebar Experiments section visibility & Templates gating (see below) |
+| | uat-experiments-navigation | ⬜ Pending | | Sidebar Experiments section & templates visibility (`experiment:manage`) — see script below |
 | | uat-experiment-management | ⬜ Pending | | Experiment CRUD, linking, workflow integration, lineage (see below) |
+| | uat-experiment-templates | ⬜ Pending | | Template CRUD, SOP/AI, sign-off — see `uat-experiment-templates.md` |
 
 ---
 
-## UAT Script: Sidebar Navigation — Experiments Section Visibility & Templates Gating
+## UAT Script: Sidebar Navigation — Experiments Section Visibility & Experiment Templates
 
 **Prerequisites:** uat-security-rbac (roles and permissions). Default logins: admin/admin123, lab-tech/labtech123, lab-manager/labmanager123, client/client123.
 
-**Objective:** Verify the Experiments accordion appears for the correct roles and that "Experiment Templates" is hidden from non-admins.
+**Objective:** Verify the Experiments accordion appears for the correct roles and that **Experiment Templates** is visible to every role that has **`experiment:manage`** (Administrator, Lab Manager, Lab Technician in default seed).
 
 | Step | Action | Expected Result |
 |------|--------|-----------------|
 | 1 | Log in as **Administrator** | Sidebar shows **Experiments** accordion (between Sample Mgmt and Lab Mgmt). |
 | 2 | Expand Experiments | Sub-items: **All Experiments**, **Experiment Templates**. |
 | 3 | Click "All Experiments" | Navigate to `/experiments`; list page loads; AppBar title "Experiments". |
-| 4 | Click "Experiment Templates" | Navigate to `/experiments/templates`; AppBar title "Experiment Templates". |
+| 4 | Click "Experiment Templates" | Navigate to `/experiments/templates`; AppBar title "Experiment Templates"; template management page loads. |
 | 5 | Log in as **Lab Manager** | Sidebar shows **Experiments** accordion. |
-| 6 | Expand Experiments | Only **All Experiments** visible; **Experiment Templates** not shown. |
-| 7 | Log in as **Lab Technician** | Same as Lab Manager: Experiments accordion with only "All Experiments". |
+| 6 | Expand Experiments | **All Experiments** and **Experiment Templates** both visible. |
+| 7 | Log in as **Lab Technician** | Same as Lab Manager: both sub-items visible. |
 | 8 | Log in as **Client** | **Experiments** accordion not visible in sidebar. |
 | 9 | As Client, navigate directly to `/experiments` | Redirect to `/dashboard` (permission redirect). |
-| 10 | As Lab Tech, navigate to `/experiments/templates` | Redirect to `/dashboard` (no config:edit or experiment_template:manage). |
+| 10 | As Client, navigate directly to `/experiments/templates` | Redirect to `/dashboard` (permission redirect). |
 
-**Pass criteria:** Admins see both sub-items; Lab Manager and Lab Technician see only "All Experiments"; Client does not see Experiments section; direct URL access respects permission redirects.
+**Pass criteria:** Admin, Lab Manager, and Lab Technician see both sub-items and can open `/experiments/templates`; Client does not see Experiments section and cannot open experiment routes by URL.
+
+**Detailed template/SOP/sign-off cases:** See `UAT_Scripts/uat-experiment-templates.md`.
 
 ---
 
@@ -180,6 +185,7 @@ After completing `uat-configurations-custom`, the recommended next scripts are:
 - Added script dependency rows for `uat-experiments-navigation` and `uat-experiment-management`.
 - Updated dependency diagram to include both scripts.
 - Added Completion Log rows (pending) for both.
-- Added full **UAT Script: Sidebar Navigation — Experiments Section Visibility & Templates Gating** (steps 1–10).
+- Added full **UAT Script: Sidebar Navigation — Experiments Section Visibility & Experiment Templates** (steps 1–10; aligned with `experiment:manage` for templates).
 - Added full **UAT Script: Experiment Management (CRUD, Linking, Workflow, Lineage)** (steps 1–17 across list/filters, CRUD, sample↔experiment linking, lineage, workflow integration, back button & titles).
-- Added this Summary: the only file modified for the UAT log and script content is `UAT_Scripts/uat-testing-log.md`.
+- Added dependency row **uat-experiment-templates** and script file `UAT_Scripts/uat-experiment-templates.md`.
+- Added this Summary: files touched include `UAT_Scripts/uat-testing-log.md` and `UAT_Scripts/uat-experiment-templates.md`.

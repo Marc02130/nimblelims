@@ -142,10 +142,10 @@ nimblelims/
 - **Batch Results Entry** (US-28): Enter results for multiple tests/samples in a batch atomically
 - **Workflow Templates** (US-29): Define reusable workflow templates (steps with actions) and run them from Accessioning, Batch details, or Results Entry with context (e.g. batch_id, test_id). Requires config:edit for template CRUD and workflow:execute for execution. Failed steps roll back the transaction (no instance created).
 
-### Experiment Management (Chunk 1)
-- **Experiments**: Full CRUD for experiments and experiment templates; list/detail UI with tabs (Overview, Sample Executions, Details/Steps, Lineage, Linked Processes). Permission: `experiment:manage` (Administrator, Lab Manager, Lab Technician).
-- **Experiment Templates**: Reusable template definitions; route `/experiments/templates` gated by `experiment_template:manage` OR `config:edit` (admins only until per-role template permission is added).
-- **Sidebar**: Dedicated **Experiments** accordion (between Sample Mgmt and Lab Mgmt) with sub-items **All Experiments** and **Experiment Templates**; Templates sub-item hidden from non-admins.
+### Experiment Management
+- **Experiments**: Full CRUD for experiments; list/detail UI with tabs (Overview, Sample Executions, Details/Steps, Lineage, Linked Processes). Permission: `experiment:manage` (Administrator, Lab Manager, Lab Technician).
+- **Experiment Templates**: Dedicated page at `/experiments/templates` (`ExperimentTemplatesManagement`): DataGrid of templates, tabbed create/edit dialog (basic info, protocol steps, transfer steps with mandatory review, result columns), delete with confirmation, **active** toggle (disabled until mandatory sign-offs are cleared). **Upload SOP**: multipart upload of SOP file + instrument CSV → background Claude extraction (`POST /v1/sop-parse`) → poll job → **Apply** creates template and related records (`POST /v1/sop-parse/{id}/apply`). Fields filled from extraction are highlighted in the form. **Sign-off**: steps marked mandatory review require per-step confirmation in a dialog before `mandatory_review_count` can be cleared and the template activated. Same permission as experiments: `experiment:manage`.
+- **Sidebar**: Dedicated **Experiments** accordion (between Sample Mgmt and Lab Mgmt) with sub-items **All Experiments** and **Experiment Templates** (both require `experiment:manage`).
 - **Sample ↔ experiment linking**: Link samples to experiments (roles, processing conditions, replicate); bidirectional UI: experiment detail links to samples (`/samples?highlight=id`); sample detail shows "Participated in these Experiments" with links to experiments.
 - **Lineage**: Experiment lineage view (template + linked experiment IDs); loading and error states.
 - **My Experiments filter**: List page supports `?mine=true` to show only experiments created by the current user (no extra route).
@@ -240,12 +240,12 @@ NimbleLIMS uses a unified sidebar navigation system that provides consistent acc
 - **React Router**: All routes are declared in `frontend/src/App.tsx`; admin routes are protected with `hasPermission('config:edit')` (or role-specific permissions)—unauthorized users are redirected to `/dashboard`
 - **Collapsible**: Desktop sidebar can be collapsed to icon-only mode with tooltips on hover
 - **Permission-Based**: Menu items dynamically shown/hidden based on user roles and permissions
-- **Accordion Sections**: Collapsible sections for Sample Management (Accessioning, Samples, Tests, Containers, Batches, Results), **Experiments** (All Experiments, Experiment Templates — Templates gated by config:edit or experiment_template:manage), Lab Management (Projects, Clients, Client Projects, Analyses, Analytes), and Admin submenu items
+- **Accordion Sections**: Collapsible sections for Sample Management (Accessioning, Samples, Tests, Containers, Batches, Results), **Experiments** (All Experiments, Experiment Templates — both use `experiment:manage`), Lab Management (Projects, Clients, Client Projects, Analyses, Analytes), and Admin submenu items
 - **Responsive**: Permanent drawer on desktop, temporary drawer on mobile
 - **State Persistence**: Sidebar collapsed state saved to localStorage
 - **Top AppBar**: Dynamic page titles, sidebar toggle, back button for nested routes (e.g. experiment detail → list, admin analysis analytes → analyses), user info, and logout
 
-See [`.docs/navigation.md`](.docs/navigation.md) for complete navigation documentation (includes Experiments accordion refactor v2.1 and permission gating).
+See [`.docs/navigation.md`](.docs/navigation.md) for complete navigation documentation (includes Experiments accordion refactor v2.1, experiment templates route, and permission gating).
 
 ## Documentation
 
@@ -264,6 +264,7 @@ Comprehensive documentation is available in the `.docs/` directory:
   - `.docs/ui-accessioning-to-reporting.md` - UI components and interactions for accessioning through reporting
   - `.docs/workflow-accessioning-to-reporting.md` - Complete workflow from accessioning through reporting (includes Workflow Templates section)
   - `UAT_Scripts/uat-workflow-templates.md` - UAT test cases for workflow templates (creation, execution, RBAC, rollback)
+  - `UAT_Scripts/uat-experiment-templates.md` - UAT test cases for experiment templates (CRUD, SOP/AI upload, sign-off, activation, RBAC)
 - **Setup Guides**:
   - `.docs/nimblelims_dev_setup.md` - Development environment setup
   - `.docs/admin_setup.md` - Admin user configuration
@@ -277,12 +278,14 @@ Refer to the technical documentation in `.docs/` for detailed implementation spe
 
 ---
 
-## Summary — Experiment Management & Navigation Documentation (Chunk 1)
+## Summary — Experiment Management & Navigation Documentation
 
-**Features added:** Experiment Management (CRUD, templates, sidebar Experiments accordion, sample↔experiment linking, lineage, My Experiments filter, workflow actions). Navigation refactor: Experiments as own accordion; Templates gated by config:edit or experiment_template:manage.
+**Chunk 1 — Experiments core:** CRUD, sidebar Experiments accordion, sample↔experiment linking, lineage, My Experiments filter, workflow actions. **Chunk 2 — Experiment Templates UI:** `ExperimentTemplatesManagement` at `/experiments/templates`, SOP + instrument CSV upload with Claude extraction (`/v1/sop-parse`), apply job, mandatory review sign-off, activation guard. Templates navigation and route use **`experiment:manage`** (same as All Experiments).
 
-**Files created:** `.docs/experiment-planning.md` (Chunk 1 completion and implementation notes).
+**Key files (frontend):** `frontend/src/pages/ExperimentTemplatesManagement.tsx`, `frontend/src/pages/ExperimentsManagement.tsx`, `frontend/src/components/Sidebar.tsx`, `frontend/src/App.tsx`, `frontend/src/layouts/MainLayout.tsx`, `frontend/src/services/apiService.ts`.
 
-**Files modified (code):** `frontend/src/components/Sidebar.tsx`, `frontend/src/App.tsx`, `frontend/src/layouts/MainLayout.tsx`, `frontend/src/pages/ExperimentsManagement.tsx`, `frontend/src/services/apiService.ts`; `backend/app/routers/experiments.py`, `backend/app/services/experiment_service.py`, `backend/app/repositories/experiment_repository.py` (and existing experiment models, migrations, schemas).
+**Key files (backend):** `backend/app/routers/experiments.py`, `backend/app/routers/sop_parse.py`, `backend/app/services/sop_parse_service.py`, `backend/app/services/experiment_service.py`, flexible experiment models/migrations.
 
-**Files modified (documentation):** `README.md` (this file — Experiment Management section, Navigation overview), `.docs/navigation.md` (Experiments accordion, routes, permissions, summary), `UAT_Scripts/uat-testing-log.md` (UAT scripts for Experiments navigation and Experiment management).
+**Documentation:** `.docs/experiment-planning.md`, `.docs/navigation.md`, `.docs/api_endpoints.md` (Experiments, experiment-templates, sop-parse), `UAT_Scripts/uat-experiment-templates.md`, `UAT_Scripts/uat-testing-log.md`.
+
+**Optional env:** `ANTHROPIC_API_KEY` on the backend for SOP extraction (see `backend/app/core/config.py`).
