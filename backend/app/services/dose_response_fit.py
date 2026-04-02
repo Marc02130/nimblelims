@@ -57,16 +57,19 @@ class DoseResponseFitService:
 
     # ── Public API ────────────────────────────────────────────────────────────
 
+    _FITTABLE_STATUSES = {"running", "results_received", "complete"}  # ExperimentRunStatus is str,Enum
+
     def trigger_fit(self, run_id: uuid.UUID) -> Dict:
         """
         Main entry point. Fits all non-control compounds in the run.
         Returns {"fitted": N, "failed": N, "results": [...]}.
 
         Raises 409 if fit_in_progress for this run.
-        Raises 422 if controls are missing or degenerate.
+        Raises 422 if run is not in a fittable status, controls are missing, or normalization is invalid.
         Raises 503 on R service failure.
         """
         run = self._get_run_or_404(run_id)
+        self._check_run_status(run)
         self._check_not_in_progress(run)
         self._set_fit_in_progress(run, True)
 
@@ -78,6 +81,7 @@ class DoseResponseFitService:
     def trigger_refit(self, run_id: uuid.UUID, sample_id: uuid.UUID) -> Dict:
         """Re-fit a single compound after knockout. Creates a new result row."""
         run = self._get_run_or_404(run_id)
+        self._check_run_status(run)
         self._check_not_in_progress(run)
         self._set_fit_in_progress(run, True)
         try:
@@ -88,10 +92,22 @@ class DoseResponseFitService:
     # ── Internal ──────────────────────────────────────────────────────────────
 
     def _get_run_or_404(self, run_id: uuid.UUID) -> ExperimentRun:
-        run = self.db.query(ExperimentRun).filter(ExperimentRun.id == run_id).first()
+        run = (
+            self.db.query(ExperimentRun)
+            .filter(ExperimentRun.id == run_id)
+            .with_for_update()
+            .first()
+        )
         if not run:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Experiment run not found")
         return run
+
+    def _check_run_status(self, run: ExperimentRun) -> None:
+        if run.status not in self._FITTABLE_STATUSES:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"Cannot fit: run status is '{run.status}'. Must be running, results_received, or complete.",
+            )
 
     def _check_not_in_progress(self, run: ExperimentRun) -> None:
         if run.fit_in_progress:
@@ -296,12 +312,11 @@ class DoseResponseFitService:
             # Check excluded replicates for 10% rule
             # Count all reps for this compound (including excluded)
             all_reps_for_compound = sum(
-                len(v)
+                1
                 for row2 in test_data_rows
                 if row2.sample_id == sid
                 for v in [well_def_by_pos.get(row2.well_position or "")]
                 if v and v.concentration_value is not None
-                for _ in [True]
             )
             excluded_for_compound = sum(
                 1 for row2 in test_data_rows

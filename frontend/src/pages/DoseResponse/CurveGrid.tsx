@@ -1,5 +1,5 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { Box, Typography, Alert, CircularProgress } from '@mui/material';
+import React, { useEffect, useState, useCallback } from 'react';
+import { Box, Typography, Alert, CircularProgress, Pagination } from '@mui/material';
 import { FixedSizeGrid } from 'react-window';
 import { apiService } from '../../services/apiService';
 import CurveThumbnail from './CurveThumbnail';
@@ -31,7 +31,7 @@ interface Props {
 
 const CELL_WIDTH = 216; // 200px card + padding
 const CELL_HEIGHT = 196; // 180px card + padding
-const PAGE_SIZE = 100;
+const PAGE_SIZE = 50;
 
 const CurveGrid: React.FC<Props> = ({
   runId,
@@ -46,19 +46,22 @@ const CurveGrid: React.FC<Props> = ({
   const [results, setResults] = useState<CurveResult[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
 
   const colCount = Math.max(1, Math.floor(containerWidth / CELL_WIDTH));
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (pageNum: number) => {
     setLoading(true);
     setError(null);
     try {
       const res = await apiService.getDoseResponseResults(runId, {
         category,
-        page: 1,
+        page: pageNum,
         size: PAGE_SIZE,
       });
       setResults(res?.results ?? []);
+      setTotalPages(res?.pages ?? 1);
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Failed to load curves');
     } finally {
@@ -67,8 +70,12 @@ const CurveGrid: React.FC<Props> = ({
   }, [runId, category]);
 
   useEffect(() => {
-    load();
-  }, [load, refreshKey]);
+    setPage(1);
+  }, [category, refreshKey]);
+
+  useEffect(() => {
+    load(page);
+  }, [load, page, refreshKey]);
 
   const handleReview = async (result: CurveResult, status: 'approved' | 'rejected' | 'flagged') => {
     try {
@@ -124,18 +131,33 @@ const CurveGrid: React.FC<Props> = ({
     );
   }
 
+  const gridHeight = Math.max(CELL_HEIGHT, containerHeight - (totalPages > 1 ? 52 : 0));
+
   return (
-    <FixedSizeGrid
-      columnCount={colCount}
-      columnWidth={CELL_WIDTH}
-      rowCount={rowCount}
-      rowHeight={CELL_HEIGHT}
-      width={containerWidth}
-      height={containerHeight}
-      itemData={results}
-    >
-      {Cell}
-    </FixedSizeGrid>
+    <Box sx={{ display: 'flex', flexDirection: 'column', height: containerHeight }}>
+      <FixedSizeGrid
+        columnCount={colCount}
+        columnWidth={CELL_WIDTH}
+        rowCount={rowCount}
+        rowHeight={CELL_HEIGHT}
+        width={containerWidth}
+        height={gridHeight}
+        itemData={results}
+      >
+        {Cell}
+      </FixedSizeGrid>
+      {totalPages > 1 && (
+        <Box sx={{ display: 'flex', justifyContent: 'center', pt: 1 }}>
+          <Pagination
+            count={totalPages}
+            page={page}
+            onChange={(_, v) => setPage(v)}
+            size="small"
+            siblingCount={1}
+          />
+        </Box>
+      )}
+    </Box>
   );
 };
 

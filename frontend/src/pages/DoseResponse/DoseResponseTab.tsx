@@ -117,7 +117,7 @@ const DoseResponseTab: React.FC<Props> = ({ runId, runStatus }) => {
     );
   }
 
-  const canFit = runStatus === 'running' || runStatus === 'complete';
+  const canFit = runStatus === 'running' || runStatus === 'results_received' || runStatus === 'complete';
 
   return (
     <Box sx={{ mt: 2 }}>

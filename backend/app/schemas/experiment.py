@@ -18,6 +18,7 @@ class ExperimentTemplateBase(BaseModel):
     description: Optional[str] = None
     template_definition: Dict[str, Any] = Field(default_factory=dict, description="JSONB: structure/params")
     custom_attributes: Dict[str, Any] = Field(default_factory=dict, description="EAV / custom attributes JSONB")
+    lifecycle_type: str = Field(default="standard", description="'standard' or 'cro'")
 
 
 class ExperimentTemplateCreate(ExperimentTemplateBase):
@@ -32,6 +33,7 @@ class ExperimentTemplateUpdate(BaseModel):
     active: Optional[bool] = None
     template_definition: Optional[Dict[str, Any]] = None
     custom_attributes: Optional[Dict[str, Any]] = None
+    lifecycle_type: Optional[str] = Field(None, description="'standard' or 'cro'")
 
 
 class ExperimentTemplateRead(ExperimentTemplateBase):
