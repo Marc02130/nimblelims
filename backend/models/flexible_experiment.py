@@ -13,7 +13,7 @@ is left intact.
 """
 import uuid
 import enum
-from sqlalchemy import Column, String, Text, DateTime, ForeignKey, Enum as SAEnum
+from sqlalchemy import Column, String, Text, DateTime, ForeignKey, Enum as SAEnum, Boolean
 from sqlalchemy.dialects.postgresql import UUID as PostgresUUID, JSONB
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -84,6 +84,7 @@ class ExperimentRun(Base):
         nullable=False,
         default=ExperimentRunStatus.draft,
     )
+    fit_in_progress = Column(Boolean, nullable=False, server_default='false', default=False)
     started_at = Column(DateTime, nullable=True)
     completed_at = Column(DateTime, nullable=True)
     published_at = Column(DateTime, nullable=True)
