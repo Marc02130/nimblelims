@@ -115,11 +115,48 @@ promote_run_results       # write ExperimentData/DoseResponseResult back to Test
 
 Without these, the Workflow engine orchestrates the ELN side only. Instrument-driven steps must be done manually outside the workflow and results linked back by hand.
 
-### Configurable run lifecycle (CRO use case)
+### Configurable run lifecycle — CONCRETE REQUIREMENT (CRO use case)
 
-The `ExperimentRun` lifecycle (`draft → running → complete → published | failed`) is hardcoded in a Python enum (`ExperimentRunStatus`) and a Postgres ENUM column. Adding states (e.g., `ordered → running → results_received → complete` for CRO experiments) requires a Python enum change + `ALTER TYPE` migration.
+**Customer context:** Virtually every early-stage biotech startup uses CROs (Contract Research Organizations) — lab equipment is expensive and most startups have no lab of their own. Companies like Nimbus Therapeutics operate entirely through CROs. NimbleLIMS must support the CRO lifecycle as a first-class citizen alongside the standard in-house lifecycle.
 
-The right solution is a `lifecycle_config` JSONB field on `ExperimentTemplate` defining allowed states and valid transitions per template type. The service layer reads transitions at runtime instead of from `VALID_TRANSITIONS`. The DB column changes from Postgres ENUM to `VARCHAR`. Non-trivial migration — deferred until there is a concrete CRO customer requirement.
+**Standard (in-house) lifecycle:**
+```
+draft → running → complete → published | failed
+```
+
+**CRO lifecycle:**
+```
+draft → ordered → running → results_received → complete → published | failed
+```
+
+- `ordered` — experiment sent to CRO, awaiting confirmation they have started
+- `running` — CRO has confirmed the experiment is in progress
+- `results_received` — CRO has returned the instrument data file; ready to import
+- Data import must be allowed in `results_received` state (not just `running`)
+
+**Current state:** The lifecycle is hardcoded in two places that must change together:
+1. `ExperimentRunStatus` Python enum (`models/flexible_experiment.py`) — 5 fixed values
+2. `VALID_TRANSITIONS` dict — hardcoded state machine
+3. DB column is a Postgres `ENUM` type — requires `ALTER TYPE` migration to add values
+4. `import_data()` in `experiment_run_service.py` gates import on `status == running` only
+
+**Implementation options:**
+
+*Option A — Two built-in lifecycles (pragmatic, low risk):*
+Add `ordered` and `results_received` to the Postgres ENUM and Python enum. Add a `lifecycle_type` field (`standard` | `cro`) to `ExperimentTemplate`. Service layer selects `VALID_TRANSITIONS` based on `lifecycle_type`. Import gating allows `running` OR `results_received`. UI shows appropriate transition button labels per lifecycle type ("Start Run" vs "Mark as Ordered" vs "Mark Results Received"). Covers the concrete requirement with minimal new surface area.
+
+*Option B — JSONB lifecycle config (flexible, higher complexity):*
+`lifecycle_config` JSONB on `ExperimentTemplate` defines allowed states and transitions per template. DB column changes from Postgres ENUM to `VARCHAR`. Service reads transitions at runtime. UI renders state machine dynamically from config. Fully arbitrary — supports any future lifecycle without code changes. Significantly more implementation work; config validation needed.
+
+**Recommendation:** Ship Option A now to unblock CRO customers. Build Option B when a third lifecycle variant emerges that can't be covered by the two built-in types.
+
+**Files to change (Option A):**
+- `backend/db/migrations/versions/` — new migration: `ALTER TYPE experiment_run_status ADD VALUE 'ordered'; ALTER TYPE experiment_run_status ADD VALUE 'results_received';`
+- `backend/models/flexible_experiment.py` — add enum values; add `VALID_TRANSITIONS_CRO`
+- `backend/models/experiment.py` (ExperimentTemplate) — add `lifecycle_type` column
+- `backend/app/services/experiment_run_service.py` — select transitions by lifecycle_type; update import gate
+- `frontend/src/pages/ExperimentRunDetail.tsx` — dynamic action button labels
+- `frontend/src/pages/RunsManagement.tsx` — status badge labels for new states
 
 ### ExperimentProcess / ProcessStep — not surfaced in UI
 
