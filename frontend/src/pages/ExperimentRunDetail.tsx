@@ -187,7 +187,7 @@ const ExperimentRunDetail: React.FC = () => {
       </Box>
 
       <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-        <Tabs value={activeTab} onChange={(_, v) => setActiveTab(v)}>
+        <Tabs value={activeTab} onChange={(_, v) => setActiveTab(v)} variant="scrollable" scrollButtons="auto">
           <Tab label="Overview" />
           <Tab label="Data" />
           <Tab label="Dose Response" />
