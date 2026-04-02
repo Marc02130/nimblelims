@@ -1220,8 +1220,18 @@ class ApiService {
     return response.data;
   }
 
+  async orderExperimentRun(id: string) {
+    const response: AxiosResponse = await this.api.patch(`/v1/experiment-runs/${id}/order`);
+    return response.data;
+  }
+
   async startExperimentRun(id: string) {
     const response: AxiosResponse = await this.api.patch(`/v1/experiment-runs/${id}/start`);
+    return response.data;
+  }
+
+  async markResultsReceived(id: string) {
+    const response: AxiosResponse = await this.api.patch(`/v1/experiment-runs/${id}/results-received`);
     return response.data;
   }
 
@@ -1232,6 +1242,11 @@ class ApiService {
 
   async publishExperimentRun(id: string) {
     const response: AxiosResponse = await this.api.patch(`/v1/experiment-runs/${id}/complete`);
+    return response.data;
+  }
+
+  async cancelExperimentRun(id: string) {
+    const response: AxiosResponse = await this.api.patch(`/v1/experiment-runs/${id}/cancel`);
     return response.data;
   }
 

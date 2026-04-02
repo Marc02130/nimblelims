@@ -206,9 +206,20 @@ def get_result_svg(
     if not result:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Result not found")
 
-    # Reconstruct the fit parameters for the R service
     from models.sample import Sample
+    from models.list import ListEntry
+    from models.template_well import TemplateWellDefinition
+    from app.services.dose_response_fit import DoseResponseFitService
+
     sample = db.query(Sample).filter(Sample.id == result.sample_id).first()
+    run = _get_run(run_id, db)
+
+    well_defs = {
+        wd.well_position: wd
+        for wd in db.query(TemplateWellDefinition)
+        .filter(TemplateWellDefinition.template_id == run.experiment_template_id)
+        .all()
+    }
 
     # Load the original data points (non-excluded) from experiment_data
     excluded_ids = {
@@ -226,23 +237,61 @@ def get_result_svg(
         )
         .all()
     )
-    from models.template_well import TemplateWellDefinition
-    run = _get_run(run_id, db)
-    well_defs = {
-        wd.well_position: wd
-        for wd in db.query(TemplateWellDefinition)
-        .filter(TemplateWellDefinition.template_id == run.experiment_template_id)
+
+    # Compute % inhibition normalization from run's control wells
+    template_def = (run.experiment_template.template_definition or {})
+    dr_config = template_def.get("dose_response_config", {})
+    result_col = dr_config.get("result_column")
+
+    all_run_rows = (
+        db.query(ExperimentData)
+        .filter(ExperimentData.experiment_run_id == run_id)
         .all()
-    }
+    )
+    all_sample_ids = {r.sample_id for r in all_run_rows if r.sample_id}
+    samples_map = {s.id: s for s in db.query(Sample).filter(Sample.id.in_(all_sample_ids)).all()} if all_sample_ids else {}
+    qc_entries = db.query(ListEntry).filter(ListEntry.name.in_(["positive_control", "negative_control"])).all()
+    qc_by_id = {e.id: e.name for e in qc_entries}
+
+    pos_signals: list = []
+    neg_signals: list = []
+    for r in all_run_rows:
+        if not r.sample_id:
+            continue
+        s = samples_map.get(r.sample_id)
+        if not s:
+            continue
+        sig = DoseResponseFitService._extract_signal(r, result_col)
+        if sig is None:
+            continue
+        qc_name = qc_by_id.get(s.qc_type)
+        if qc_name == "positive_control":
+            pos_signals.append(sig)
+        elif qc_name == "negative_control":
+            neg_signals.append(sig)
+
+    if pos_signals and neg_signals:
+        pos_mean = sum(pos_signals) / len(pos_signals)
+        neg_mean = sum(neg_signals) / len(neg_signals)
+        if pos_mean != neg_mean:
+            def _norm(sig: float) -> float:
+                return (sig - neg_mean) / (pos_mean - neg_mean) * 100.0
+        else:
+            def _norm(sig: float) -> float:
+                return sig
+    else:
+        def _norm(sig: float) -> float:
+            return sig
 
     points = []
     for row in data_rows:
         wd = well_defs.get(row.well_position or "")
         if not wd or wd.concentration_value is None:
             continue
+        sig = DoseResponseFitService._extract_signal(row, result_col)
         points.append({
             "conc": float(wd.concentration_value),
-            "response": 0.0,  # Plotly uses fit params; SVG endpoint uses raw points
+            "response": _norm(sig) if sig is not None else 0.0,
             "point_id": str(row.id),
         })
 
@@ -334,6 +383,7 @@ def review_result(
         .filter(
             DoseResponseResult.id == result_id,
             DoseResponseResult.experiment_run_id == run_id,
+            DoseResponseResult.superseded_by.is_(None),
         )
         .first()
     )
@@ -405,7 +455,11 @@ def exclude_data_point(
     Unique constraint prevents double-exclusion.
     Reverse by calling DELETE /data/{data_id}/exclude.
     """
-    data_row = db.query(ExperimentData).filter(ExperimentData.id == data_id).first()
+    data_row = (
+        db.query(ExperimentData)
+        .filter(ExperimentData.id == data_id, ExperimentData.client_id == current_user.client_id)
+        .first()
+    )
     if not data_row:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Experiment data not found")
 
@@ -442,7 +496,11 @@ def unexclude_data_point(
     current_user: User = Depends(require_experiment_manage),
 ):
     """Deletes the exclusion row. Hard reversal — no soft-delete."""
-    data_row = db.query(ExperimentData).filter(ExperimentData.id == data_id).first()
+    data_row = (
+        db.query(ExperimentData)
+        .filter(ExperimentData.id == data_id, ExperimentData.client_id == current_user.client_id)
+        .first()
+    )
     if not data_row:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Experiment data not found")
 

@@ -115,48 +115,28 @@ promote_run_results       # write ExperimentData/DoseResponseResult back to Test
 
 Without these, the Workflow engine orchestrates the ELN side only. Instrument-driven steps must be done manually outside the workflow and results linked back by hand.
 
-### Configurable run lifecycle — CONCRETE REQUIREMENT (CRO use case)
+### ~~Configurable run lifecycle — CRO use case~~ COMPLETED (dose-response branch, 2026-04-02)
 
-**Customer context:** Virtually every early-stage biotech startup uses CROs (Contract Research Organizations) — lab equipment is expensive and most startups have no lab of their own. Companies like Nimbus Therapeutics operate entirely through CROs. NimbleLIMS must support the CRO lifecycle as a first-class citizen alongside the standard in-house lifecycle.
+**Customer context:** Virtually every early-stage biotech startup uses CROs (Contract Research Organizations). Companies like Nimbus Therapeutics operate entirely through CROs. Option A (two built-in lifecycles) was shipped.
 
-**Standard (in-house) lifecycle:**
-```
-draft → running → complete → published | failed
-```
+**Standard lifecycle:** `draft → running → complete → published | failed | canceled`
 
-**CRO lifecycle:**
-```
-draft → ordered → running → results_received → complete → published | failed
-```
+**CRO lifecycle:** `draft → ordered → running → results_received → complete → published | failed | canceled`
 
-- `ordered` — experiment sent to CRO, awaiting confirmation they have started
-- `running` — CRO has confirmed the experiment is in progress
-- `results_received` — CRO has returned the instrument data file; ready to import
-- Data import must be allowed in `results_received` state (not just `running`)
+`canceled` is a terminal state reachable from any non-terminal state in both lifecycles.
 
-**Current state:** The lifecycle is hardcoded in two places that must change together:
-1. `ExperimentRunStatus` Python enum (`models/flexible_experiment.py`) — 5 fixed values
-2. `VALID_TRANSITIONS` dict — hardcoded state machine
-3. DB column is a Postgres `ENUM` type — requires `ALTER TYPE` migration to add values
-4. `import_data()` in `experiment_run_service.py` gates import on `status == running` only
+**Shipped in migration 0044 + dose-response branch:**
+- `experiment_run_status` ENUM extended: `ordered`, `results_received`, `canceled` added (AUTOCOMMIT pattern — `COMMIT` before `ALTER TYPE`, then `BEGIN` to resume)
+- `experiment_runs.canceled_at` — timestamp set when run is canceled
+- `experiment_templates.lifecycle_type` — `'standard'` (default) or `'cro'`
+- `backend/models/flexible_experiment.py` — `VALID_TRANSITIONS` (standard), `VALID_TRANSITIONS_CRO`, `LIFECYCLE_TRANSITIONS` registry
+- `backend/app/services/experiment_run_service.py` — `_lifecycle_transitions(run)` reads lifecycle_type from template; `order_run()`, `mark_results_received()`, `cancel_run()` added; import gate allows `running` OR `results_received`
+- `backend/app/routers/experiment_runs.py` — `PATCH /{run_id}/order`, `/results-received`, `/cancel`
+- `frontend/src/pages/ExperimentRunDetail.tsx` — dynamic action buttons conditional on status + lifecycle_type; Cancel Run shown for all non-terminal states
+- `frontend/src/pages/RunsManagement.tsx` — STATUS_COLORS and STATUS_LABELS for all 8 statuses
+- `frontend/src/services/apiService.ts` — `orderExperimentRun`, `markResultsReceived`, `cancelExperimentRun`
 
-**Implementation options:**
-
-*Option A — Two built-in lifecycles (pragmatic, low risk):*
-Add `ordered` and `results_received` to the Postgres ENUM and Python enum. Add a `lifecycle_type` field (`standard` | `cro`) to `ExperimentTemplate`. Service layer selects `VALID_TRANSITIONS` based on `lifecycle_type`. Import gating allows `running` OR `results_received`. UI shows appropriate transition button labels per lifecycle type ("Start Run" vs "Mark as Ordered" vs "Mark Results Received"). Covers the concrete requirement with minimal new surface area.
-
-*Option B — JSONB lifecycle config (flexible, higher complexity):*
-`lifecycle_config` JSONB on `ExperimentTemplate` defines allowed states and transitions per template. DB column changes from Postgres ENUM to `VARCHAR`. Service reads transitions at runtime. UI renders state machine dynamically from config. Fully arbitrary — supports any future lifecycle without code changes. Significantly more implementation work; config validation needed.
-
-**Recommendation:** Ship Option A now to unblock CRO customers. Build Option B when a third lifecycle variant emerges that can't be covered by the two built-in types.
-
-**Files to change (Option A):**
-- `backend/db/migrations/versions/` — new migration: `ALTER TYPE experiment_run_status ADD VALUE 'ordered'; ALTER TYPE experiment_run_status ADD VALUE 'results_received';`
-- `backend/models/flexible_experiment.py` — add enum values; add `VALID_TRANSITIONS_CRO`
-- `backend/models/experiment.py` (ExperimentTemplate) — add `lifecycle_type` column
-- `backend/app/services/experiment_run_service.py` — select transitions by lifecycle_type; update import gate
-- `frontend/src/pages/ExperimentRunDetail.tsx` — dynamic action button labels
-- `frontend/src/pages/RunsManagement.tsx` — status badge labels for new states
+**Remaining:** Add `lifecycle_type` selector to the ExperimentTemplate editor UI so users can set CRO vs standard on a template (currently defaults to standard; must be set directly in DB or via API).
 
 ### ExperimentProcess / ProcessStep — not surfaced in UI
 
@@ -165,6 +145,146 @@ Add `ordered` and `results_received` to the Postgres ENUM and Python enum. Add a
 ### Experiment linking is a linked list, not a DAG
 
 Experiments are chained via `ExperimentDetail` rows (`detail_type = "experiment_link"`), not a parent FK or adjacency table. Lineage traversal requires sequential lookups. There is no enforced ordering, no gate preventing Experiment 3 from starting before Experiment 2 completes, and no automated data promotion between steps. A scientist must wire the chain and promote values manually. A proper process graph (adjacency table with status gates) would be needed for strict pipeline enforcement.
+
+---
+
+---
+
+## Experiment Run — What is implemented (as of dose-response branch, 2026-04-02)
+
+This section is a retrospective reference. It documents what is fully shipped.
+
+### Data model
+
+| Table | Key columns |
+|-------|-------------|
+| `experiment_templates` | `id`, `name`, `lifecycle_type` (standard\|cro), `template_definition` JSONB, `active` |
+| `experiment_runs` | `id`, `name`, `experiment_template_id`, `status` (ENUM), `lifecycle_type`, `started_at`, `completed_at`, `published_at`, `canceled_at` |
+| `experiment_data` | `id`, `run_id`, `well_position`, `sample_id`, `row_data` JSONB — one row per imported instrument row |
+| `template_well_definitions` | `id`, `template_id`, `well_position`, `qc_type`, `concentration`, `compound_id` |
+| `dose_response_results` | `id`, `run_id`, `compound_id`, curve parameters, fit quality, `approved_at`, `rejected_at` |
+| `experiment_processes` | `id`, `run_id` — sub-process tracking within a run (not yet wired to UI) |
+| `process_steps` | `id`, `process_id`, step name, status — step-level checklist (not yet wired to UI) |
+
+### Status state machine
+
+**Standard:** `draft → running → complete → published | failed | canceled`
+
+**CRO:** `draft → ordered → running → results_received → complete → published | failed | canceled`
+
+`canceled` is terminal and reachable from any non-terminal state in both lifecycles.
+
+### API surface (`/v1/experiment-runs`)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/` | List runs (paginated, filter by status) |
+| POST | `/` | Create run from template |
+| GET | `/{run_id}` | Get run detail |
+| PATCH | `/{run_id}/order` | CRO: draft → ordered |
+| PATCH | `/{run_id}/start` | Start run (ordered→running or draft→running) |
+| PATCH | `/{run_id}/results-received` | CRO: running → results_received |
+| PATCH | `/{run_id}/review` | running or results_received → complete |
+| PATCH | `/{run_id}/complete` | alias for review |
+| PATCH | `/{run_id}/cancel` | Any non-terminal → canceled |
+| POST | `/{run_id}/import` | Import instrument CSV (allowed in running or results_received) |
+| GET | `/{run_id}/data` | List imported data rows (paginated) |
+| GET | `/{run_id}/worklist` | Export robot worklist CSV |
+| POST | `/{run_id}/dose-response/fit` | Trigger curve fitting (R service) |
+| GET | `/{run_id}/dose-response/results` | List dose response results |
+| PATCH | `/{run_id}/dose-response/results/{result_id}/approve` | Approve curve |
+| PATCH | `/{run_id}/dose-response/results/{result_id}/reject` | Reject curve |
+| POST | `/{run_id}/dose-response/batch-approve` | Batch approve all curves |
+
+### Frontend pages
+
+- **RunsManagement** (`/runs`) — paginated list, filter by status, name search, "New Run" dialog
+- **ExperimentRunDetail** (`/runs/:runId`) — three tabs: Overview, Data, Dose Response
+  - Dynamic action buttons driven by `status` + `lifecycle_type`
+  - Dose Response tab: Curve Grid (SVG thumbnails), per-curve approve/reject, batch approve, fit status
+
+### Key implementation files
+
+| File | Purpose |
+|------|---------|
+| `backend/models/flexible_experiment.py` | ORM models + state machine dicts |
+| `backend/app/services/experiment_run_service.py` | All lifecycle transitions + data import |
+| `backend/app/routers/experiment_runs.py` | API router |
+| `backend/app/schemas/flexible_experiment.py` | Pydantic schemas |
+| `backend/app/services/dose_response_fit.py` | Curve fitting orchestration |
+| `backend/services/r_calculator_client.py` | HTTP client for R Plumber service |
+| `frontend/src/pages/ExperimentRunDetail.tsx` | Run detail page + action buttons |
+| `frontend/src/pages/RunsManagement.tsx` | Run list page |
+| `frontend/src/pages/DoseResponse/DoseResponseTab.tsx` | Dose response tab |
+| `frontend/src/services/apiService.ts` | All API calls |
+
+### Known gaps / deferred
+
+- `experiment_processes` and `process_steps` tables exist but are not wired to any UI
+- No workflow engine actions for ExperimentRun (see Workflow Engine section below)
+- `lifecycle_type` on ExperimentTemplate has no UI selector — must be set via API/admin
+- Dose response end-to-end not validated with real instrument data (see separate TODO)
+
+---
+
+## Workflow Engine — What is implemented (as of 2026-04-02)
+
+This section is a retrospective reference for the ELN workflow orchestration layer.
+
+### Concept
+
+A `WorkflowTemplate` defines a named sequence of actions stored as JSONB steps. When executed, the engine runs each step in a single database transaction, threading a `context` dict (carrying `experiment_id`, `execution_id`, etc.) across steps. A `WorkflowInstance` record captures the runtime state and context after completion.
+
+### API surface
+
+| Method | Path | Requires |
+|--------|------|----------|
+| GET | `/admin/workflow-templates` | config:edit |
+| POST | `/admin/workflow-templates` | config:edit |
+| GET | `/admin/workflow-templates/{id}` | config:edit |
+| PATCH | `/admin/workflow-templates/{id}` | config:edit |
+| DELETE | `/admin/workflow-templates/{id}` | config:edit (soft delete) |
+| POST | `/workflows/execute/{template_id}` | workflow:execute |
+
+### Implemented actions (fully functional)
+
+| Action | What it does |
+|--------|-------------|
+| `create_experiment` | Creates an Experiment; sets `context["experiment_id"]` |
+| `create_experiment_from_template` | Creates an Experiment from an ExperimentTemplate; sets `context["experiment_id"]` |
+| `link_sample_to_experiment` | Links a sample to the experiment in context; sets `context["execution_id"]` |
+| `add_experiment_detail_step` | Adds a detail row (free-form step) to the experiment in context |
+| `link_experiments` | Links two experiments via `ExperimentDetail(detail_type="experiment_link")` |
+| `update_experiment_status` | Updates the `status_id` FK on an experiment |
+
+### Stub actions (defined in VALID_WORKFLOW_ACTIONS but no-op bodies)
+
+`update_status`, `validate_custom`, `create_qc`, `assign_tests`, `create_batch`, `enter_results`, `send_notification`, `accession_sample`, `link_container`, `review_result`
+
+These are recognized as valid action names (no 400 error) but execute `pass` — they are placeholders for future implementation.
+
+### Key implementation files
+
+| File | Purpose |
+|------|---------|
+| `backend/models/workflow.py` | WorkflowTemplate + WorkflowInstance ORM models |
+| `backend/app/routers/workflows.py` | Admin CRUD + execute endpoint + `_run_action()` dispatcher |
+| `backend/app/schemas/workflow.py` | Pydantic schemas + `VALID_WORKFLOW_ACTIONS` list |
+
+### Architectural gap — no ExperimentRun actions
+
+The workflow engine has zero actions for System 2 (ExperimentRun / instrument-driven assays). A scientist running an NGS pipeline that includes a plate-reader QC step cannot include that Run inside a Workflow. The two systems are separate silos.
+
+**Missing workflow actions needed to bridge the gap:**
+
+```python
+create_experiment_run     # create ExperimentRun from template_id; store run_id in context
+import_run_data           # attach + parse instrument file for run in context
+await_run_complete        # block next step until run reaches 'complete'
+promote_run_results       # write DoseResponseResult back to Test/Result pattern
+```
+
+This is the primary architectural gap for a future milestone — not a blocker for current CRO or dose-response work.
 
 ---
 

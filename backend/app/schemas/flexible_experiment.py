@@ -90,6 +90,7 @@ class ExperimentRunRead(BaseModel):
     started_at: Optional[datetime]
     completed_at: Optional[datetime]
     published_at: Optional[datetime]
+    canceled_at: Optional[datetime]
     created_at: datetime
     created_by: Optional[uuid.UUID]
     modified_at: datetime

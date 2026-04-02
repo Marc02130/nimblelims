@@ -2,15 +2,18 @@
 Experiment Runs API — /api/v1/experiment-runs
 
 Routes:
-    GET    /experiment-runs                  — list runs
-    POST   /experiment-runs                  — create run (draft)
-    GET    /experiment-runs/{id}             — get run detail
-    PATCH  /experiment-runs/{id}/start       — draft → running
-    PATCH  /experiment-runs/{id}/review      — running → complete ("Ready for Review")
-    PATCH  /experiment-runs/{id}/complete    — complete → published (requires experiment:publish)
-    POST   /experiment-runs/{id}/import      — import instrument data CSV (running only)
-    GET    /experiment-runs/{id}/data        — list imported data rows
-    GET    /experiment-runs/{id}/worklist    — download robot worklist CSV
+    GET    /experiment-runs                          — list runs
+    POST   /experiment-runs                          — create run (draft)
+    GET    /experiment-runs/{id}                     — get run detail
+    PATCH  /experiment-runs/{id}/order               — draft → ordered         (CRO only)
+    PATCH  /experiment-runs/{id}/start               — draft → running (standard) | ordered → running (CRO)
+    PATCH  /experiment-runs/{id}/results-received    — running → results_received (CRO only)
+    PATCH  /experiment-runs/{id}/review              — running|results_received → complete
+    PATCH  /experiment-runs/{id}/complete            — complete → published (requires experiment:publish)
+    PATCH  /experiment-runs/{id}/cancel              — any non-terminal → canceled
+    POST   /experiment-runs/{id}/import              — import instrument data (running or results_received)
+    GET    /experiment-runs/{id}/data                — list imported data rows
+    GET    /experiment-runs/{id}/worklist            — download robot worklist CSV
 """
 from typing import Optional
 from uuid import UUID
@@ -89,13 +92,33 @@ def get_run(
     return ExperimentRunRead.model_validate(run)
 
 
+@router.patch("/{run_id}/order", response_model=ExperimentRunRead)
+def order_run(
+    run_id: UUID,
+    service: ExperimentRunService = Depends(_run_service),
+):
+    """Transition: draft → ordered. CRO lifecycle only — sends experiment to external lab."""
+    run = service.order_run(run_id)
+    return ExperimentRunRead.model_validate(run)
+
+
 @router.patch("/{run_id}/start", response_model=ExperimentRunRead)
 def start_run(
     run_id: UUID,
     service: ExperimentRunService = Depends(_run_service),
 ):
-    """Transition: draft → running (sets started_at)."""
+    """Transition: draft → running (standard) or ordered → running (CRO)."""
     run = service.start_run(run_id)
+    return ExperimentRunRead.model_validate(run)
+
+
+@router.patch("/{run_id}/results-received", response_model=ExperimentRunRead)
+def mark_results_received(
+    run_id: UUID,
+    service: ExperimentRunService = Depends(_run_service),
+):
+    """Transition: running → results_received. CRO lifecycle only — instrument data returned by CRO."""
+    run = service.mark_results_received(run_id)
     return ExperimentRunRead.model_validate(run)
 
 
@@ -104,7 +127,7 @@ def submit_for_review(
     run_id: UUID,
     service: ExperimentRunService = Depends(_run_service),
 ):
-    """Transition: running → complete (UI label: 'Ready for Review')."""
+    """Transition: running → complete (standard) or results_received → complete (CRO)."""
     run = service.move_to_review(run_id)
     return ExperimentRunRead.model_validate(run)
 
@@ -118,6 +141,16 @@ def publish_run(
     """Transition: complete → published (requires experiment:publish permission)."""
     service = ExperimentRunService(db, current_user=publisher)
     run = service.publish_run(run_id)
+    return ExperimentRunRead.model_validate(run)
+
+
+@router.patch("/{run_id}/cancel", response_model=ExperimentRunRead)
+def cancel_run(
+    run_id: UUID,
+    service: ExperimentRunService = Depends(_run_service),
+):
+    """Transition: any non-terminal state → canceled."""
+    run = service.cancel_run(run_id)
     return ExperimentRunRead.model_validate(run)
 
 

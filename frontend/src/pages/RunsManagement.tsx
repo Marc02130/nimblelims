@@ -37,9 +37,18 @@ interface RunListItem {
 const STATUS_COLORS: Record<string, 'success' | 'warning' | 'info' | 'default' | 'error'> = {
   published: 'success',
   running: 'warning',
+  results_received: 'warning',
+  ordered: 'info',
   complete: 'info',
   draft: 'default',
   failed: 'error',
+  canceled: 'default',
+};
+
+const STATUS_LABELS: Record<string, string> = {
+  results_received: 'Results Received',
+  ordered: 'Ordered',
+  canceled: 'Canceled',
 };
 
 const RunsManagement: React.FC = () => {
@@ -120,7 +129,7 @@ const RunsManagement: React.FC = () => {
       headerName: 'Status',
       width: 120,
       renderCell: (params) => (
-        <Chip size="small" label={params.value} color={STATUS_COLORS[params.value] ?? 'default'} />
+        <Chip size="small" label={STATUS_LABELS[params.value] ?? (params.value.charAt(0).toUpperCase() + params.value.slice(1))} color={STATUS_COLORS[params.value] ?? 'default'} />
       ),
     },
     {
@@ -180,9 +189,9 @@ const RunsManagement: React.FC = () => {
               <InputLabel>Status</InputLabel>
               <Select value={statusFilter} label="Status" onChange={(e) => setStatusFilter(e.target.value)}>
                 <MenuItem value="">All</MenuItem>
-                {['draft', 'running', 'complete', 'published'].map((s) => (
+                {['draft', 'ordered', 'running', 'results_received', 'complete', 'published', 'canceled', 'failed'].map((s) => (
                   <MenuItem key={s} value={s}>
-                    {s}
+                    {STATUS_LABELS[s] ?? s.charAt(0).toUpperCase() + s.slice(1)}
                   </MenuItem>
                 ))}
               </Select>

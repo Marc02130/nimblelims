@@ -32,19 +32,33 @@ interface RunDetail {
   description?: string;
   experiment_template_id: string;
   status: string;
+  lifecycle_type?: string;
   started_at?: string;
   completed_at?: string;
   published_at?: string;
+  canceled_at?: string;
   created_at: string;
   modified_at?: string;
 }
 
+const TERMINAL_STATUSES = new Set(['published', 'failed', 'canceled']);
+
 const statusColor = (s: string) => {
   if (s === 'published') return 'success';
   if (s === 'running') return 'warning';
+  if (s === 'results_received') return 'warning';
+  if (s === 'ordered') return 'info';
   if (s === 'complete') return 'info';
   if (s === 'failed') return 'error';
+  if (s === 'canceled') return 'default';
   return 'default';
+};
+
+const statusLabel = (s: string) => {
+  if (s === 'results_received') return 'Results Received';
+  if (s === 'ordered') return 'Ordered';
+  if (s === 'canceled') return 'Canceled';
+  return s.charAt(0).toUpperCase() + s.slice(1);
 };
 
 const ExperimentRunDetail: React.FC = () => {
@@ -94,13 +108,16 @@ const ExperimentRunDetail: React.FC = () => {
     if (activeTab === 1) loadData();
   }, [activeTab, runId]);
 
-  const handleTransition = async (action: 'start' | 'review' | 'publish') => {
+  const handleTransition = async (action: 'order' | 'start' | 'results-received' | 'review' | 'publish' | 'cancel') => {
     if (!runId) return;
     setTransitioning(true);
     try {
-      if (action === 'start') await apiService.startExperimentRun(runId);
+      if (action === 'order') await apiService.orderExperimentRun(runId);
+      else if (action === 'start') await apiService.startExperimentRun(runId);
+      else if (action === 'results-received') await apiService.markResultsReceived(runId);
       else if (action === 'review') await apiService.reviewExperimentRun(runId);
-      else await apiService.publishExperimentRun(runId);
+      else if (action === 'publish') await apiService.publishExperimentRun(runId);
+      else if (action === 'cancel') await apiService.cancelExperimentRun(runId);
       await loadRun();
     } catch (err: any) {
       setError(err.response?.data?.detail || `Failed to ${action} run`);
@@ -142,7 +159,7 @@ const ExperimentRunDetail: React.FC = () => {
 
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
         <Typography variant="h4">{run.name}</Typography>
-        <Chip label={run.status} color={statusColor(run.status) as any} />
+        <Chip label={statusLabel(run.status)} color={statusColor(run.status) as any} />
       </Box>
       {run.description && (
         <Typography variant="body1" color="text.secondary" sx={{ mb: 2 }}>
@@ -150,38 +167,61 @@ const ExperimentRunDetail: React.FC = () => {
         </Typography>
       )}
 
-      <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
-        {run.status === 'draft' && (
-          <Button
-            variant="contained"
-            color="primary"
-            size="small"
-            disabled={transitioning}
-            onClick={() => handleTransition('start')}
-          >
+      <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap' }}>
+        {/* CRO: draft → ordered */}
+        {run.status === 'draft' && run.lifecycle_type === 'cro' && (
+          <Button variant="contained" color="primary" size="small" disabled={transitioning}
+            onClick={() => handleTransition('order')}>
+            Send to CRO
+          </Button>
+        )}
+        {/* Standard: draft → running */}
+        {run.status === 'draft' && run.lifecycle_type !== 'cro' && (
+          <Button variant="contained" color="primary" size="small" disabled={transitioning}
+            onClick={() => handleTransition('start')}>
             Start Run
           </Button>
         )}
-        {run.status === 'running' && (
-          <Button
-            variant="contained"
-            color="warning"
-            size="small"
-            disabled={transitioning}
-            onClick={() => handleTransition('review')}
-          >
+        {/* CRO: ordered → running */}
+        {run.status === 'ordered' && (
+          <Button variant="contained" color="primary" size="small" disabled={transitioning}
+            onClick={() => handleTransition('start')}>
+            Mark Running
+          </Button>
+        )}
+        {/* CRO: running → results_received */}
+        {run.status === 'running' && run.lifecycle_type === 'cro' && (
+          <Button variant="contained" color="warning" size="small" disabled={transitioning}
+            onClick={() => handleTransition('results-received')}>
+            Mark Results Received
+          </Button>
+        )}
+        {/* Standard: running → complete */}
+        {run.status === 'running' && run.lifecycle_type !== 'cro' && (
+          <Button variant="contained" color="warning" size="small" disabled={transitioning}
+            onClick={() => handleTransition('review')}>
             Mark Ready for Review
           </Button>
         )}
+        {/* CRO: results_received → complete */}
+        {run.status === 'results_received' && (
+          <Button variant="contained" color="warning" size="small" disabled={transitioning}
+            onClick={() => handleTransition('review')}>
+            Mark Ready for Review
+          </Button>
+        )}
+        {/* Both: complete → published */}
         {run.status === 'complete' && (
-          <Button
-            variant="contained"
-            color="success"
-            size="small"
-            disabled={transitioning}
-            onClick={() => handleTransition('publish')}
-          >
+          <Button variant="contained" color="success" size="small" disabled={transitioning}
+            onClick={() => handleTransition('publish')}>
             Publish
+          </Button>
+        )}
+        {/* Both: any non-terminal → canceled */}
+        {!TERMINAL_STATUSES.has(run.status) && (
+          <Button variant="outlined" color="error" size="small" disabled={transitioning}
+            onClick={() => handleTransition('cancel')}>
+            Cancel Run
           </Button>
         )}
       </Box>
