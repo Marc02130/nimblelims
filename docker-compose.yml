@@ -24,6 +24,23 @@ services:
       retries: 5
       start_period: 30s
 
+  # R/Plumber curve fitting service — internal only, never exposed to host
+  r-calculator:
+    build:
+      context: ./services/r-calculator
+      dockerfile: Dockerfile
+    container_name: lims-r-calculator
+    # NOTE: No `ports:` block — this service is accessible only within lims-network.
+    # FastAPI calls it via http://r-calculator:8000. Never expose this to the host.
+    networks:
+      - lims-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s  # R package loading takes ~30s on first start
+
   # FastAPI Backend
   backend:
     build:
@@ -42,12 +59,15 @@ services:
       JWT_ACCESS_TOKEN_EXPIRE_MINUTES: 30
       DEBUG: "True"
       ENVIRONMENT: development
+      R_CALCULATOR_URL: http://r-calculator:8000
     ports:
       - "8000:8000"
     networks:
       - lims-network
     depends_on:
       db:
+        condition: service_healthy
+      r-calculator:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]

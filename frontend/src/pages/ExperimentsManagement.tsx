@@ -91,6 +91,79 @@ interface LineageResponse {
   linked_experiment_ids: string[];
 }
 
+const RunsTab: React.FC<{ experimentId: string }> = ({ experimentId }) => {
+  const navigate = useNavigate();
+  const [runs, setRuns] = React.useState<any[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    setLoading(true);
+    // Experiment runs are not yet filterable by experiment_id in the API,
+    // so list all and the user navigates to specific runs
+    apiService
+      .getExperimentRuns({ page: 1, size: 100 })
+      .then((res: any) => setRuns(res?.runs ?? []))
+      .catch((e: any) => setError(e.response?.data?.detail || 'Failed to load runs'))
+      .finally(() => setLoading(false));
+  }, [experimentId]);
+
+  const statusColor = (s: string) => {
+    if (s === 'published') return 'success';
+    if (s === 'running') return 'warning';
+    if (s === 'complete') return 'info';
+    return 'default';
+  };
+
+  if (loading) return <Box sx={{ py: 4, display: 'flex', justifyContent: 'center' }}><CircularProgress /></Box>;
+  if (error) return <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>;
+
+  return (
+    <Card variant="outlined" sx={{ mt: 2 }}>
+      <CardContent>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+          <Typography variant="h6">Experiment Runs</Typography>
+          <Button variant="contained" size="small" onClick={() => navigate('/runs')}>
+            Manage Runs
+          </Button>
+        </Box>
+        {runs.length === 0 ? (
+          <Typography color="text.secondary">No runs yet.</Typography>
+        ) : (
+          <TableContainer component={Paper} variant="outlined">
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell>Name</TableCell>
+                  <TableCell>Status</TableCell>
+                  <TableCell>Started</TableCell>
+                  <TableCell>Actions</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {runs.map((run: any) => (
+                  <TableRow key={run.id}>
+                    <TableCell>{run.name}</TableCell>
+                    <TableCell>
+                      <Chip size="small" label={run.status} color={statusColor(run.status) as any} />
+                    </TableCell>
+                    <TableCell>{run.started_at ? new Date(run.started_at).toLocaleDateString() : '—'}</TableCell>
+                    <TableCell>
+                      <Button size="small" startIcon={<VisibilityIcon />} onClick={() => navigate(`/runs/${run.id}`)}>
+                        View
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        )}
+      </CardContent>
+    </Card>
+  );
+};
+
 const ExperimentsManagement: React.FC = () => {
   const { hasPermission } = useUser();
   const navigate = useNavigate();
@@ -338,6 +411,7 @@ const ExperimentsManagement: React.FC = () => {
             <Tab label="Details / Steps" />
             <Tab label="Lineage" />
             <Tab label="Linked Processes" />
+            <Tab label="Runs" />
           </Tabs>
         </Box>
 
@@ -550,6 +624,10 @@ const ExperimentsManagement: React.FC = () => {
               </Typography>
             </CardContent>
           </Card>
+        )}
+
+        {activeTab === 5 && (
+          <RunsTab experimentId={selectedExperiment.id} />
         )}
       </Box>
     );
