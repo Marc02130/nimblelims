@@ -32,6 +32,9 @@ import AnalysesManagement from './pages/AnalysesManagement';
 import AnalytesManagement from './pages/AnalytesManagement';
 import ExperimentsManagement from './pages/ExperimentsManagement';
 import ExperimentTemplatesManagement from './pages/ExperimentTemplatesManagement';
+import RunsManagement from './pages/RunsManagement';
+import ExperimentRunDetail from './pages/ExperimentRunDetail';
+import CurveCurator from './pages/DoseResponse/CurveCurator';
 import HelpPage from './pages/HelpPage';
 import { useUser } from './contexts/UserContext';
 
@@ -212,6 +215,37 @@ function AppRoutes() {
           element={
             hasPermission('experiment:manage') ? (
               <ExperimentsManagement />
+            ) : (
+              <Navigate to="/dashboard" replace />
+            )
+          }
+        />
+        {/* Experiment Runs */}
+        <Route
+          path="/runs"
+          element={
+            hasPermission('experiment:manage') ? (
+              <RunsManagement />
+            ) : (
+              <Navigate to="/dashboard" replace />
+            )
+          }
+        />
+        <Route
+          path="/runs/:runId"
+          element={
+            hasPermission('experiment:manage') ? (
+              <ExperimentRunDetail />
+            ) : (
+              <Navigate to="/dashboard" replace />
+            )
+          }
+        />
+        <Route
+          path="/runs/:runId/dose-response"
+          element={
+            hasPermission('experiment:manage') ? (
+              <CurveCurator />
             ) : (
               <Navigate to="/dashboard" replace />
             )

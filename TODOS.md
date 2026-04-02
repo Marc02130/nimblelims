@@ -35,3 +35,25 @@
 **Completed:** v0.0.0 (2026-03-25) — commit `56410e2` on branch `Paginate-Experiment-Runs`
 
 `run_extraction_background` now uses two short-lived sessions: Session 1 marks the job as processing and closes, the Anthropic API call runs with no DB connection held, then Session 2 writes the result.
+
+---
+
+## Dose Response — Deferred items (from /autoplan 2026-04-02)
+
+### Multi-plate normalization
+Control averaging across multiple plates in a single run. Current design normalizes within a single run (one set of controls per run). Cross-plate normalization needed for large screens where controls are on a dedicated plate. Deferred to after dose-response v1 ships and is validated.
+
+### PDF report generation
+Export dose response results (curves + IC50 table) to PDF. The `POST /svg/full` endpoint on the R service is the hook — full-size SVG per compound. FastAPI needs a PDF assembly layer (e.g., WeasyPrint or ReportLab). Deferred — endpoint exists, implementation deferred.
+
+### Parallel Plumber workers (future/callr)
+R service is single-threaded by default. For multi-tenant SaaS with concurrent users on different runs, Plumber's `future`/`callr` async workers would let R handle multiple `/fit` requests simultaneously. The `fit_in_progress` boolean prevents per-run conflicts. Cross-run queuing at R is acceptable for v1. Deferred until concurrent user load requires it.
+
+### ~~Relational concentration storage~~
+**Completed (scope change 2026-04-02)**: User chose to add `template_well_definitions` table in migration 0043. Concentrations are now in a relational table from day 1.
+
+### Cross-experiment IC50 comparison / trend analysis
+Compare IC50 values for the same compound across multiple experiment runs. Requires concentration data to be queryable (see relational concentration storage above). Deferred until base dose response feature is validated with real data.
+
+### Pre-fit validation endpoint
+`GET /experiment-runs/{id}/dose-response/validate` — check that control wells are identified, concentrations are present, and template is configured before triggering a fit. Currently the validation happens inline at fit time (422 on failure). A separate validation endpoint allows the UI to show pre-flight checks before the "Fit Curves" button is clicked. Nice-to-have for v2.

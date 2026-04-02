@@ -1,0 +1,462 @@
+"""
+Dose-response curve fitting and Curve Curator review endpoints.
+
+All endpoints require experiment:manage permission.
+RLS is enforced at the DB layer via client_id on all dose-response tables.
+"""
+from __future__ import annotations
+
+import uuid
+from typing import List, Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import func
+from sqlalchemy.orm import Session, joinedload
+
+from app.core.rbac import require_experiment_manage
+from app.database import get_db
+from app.schemas.dose_response import (
+    BatchReviewRequest,
+    DoseResponseResultDetail,
+    DoseResponseResultListResponse,
+    DoseResponseResultSummary,
+    DoseResponseSummary,
+    ExcludeRequest,
+    ExclusionRead,
+    FitResponse,
+    ReviewRequest,
+)
+from app.services.dose_response_fit import DoseResponseFitService
+from app.services.r_calculator_client import RCalculatorClient
+from models.dose_response import (
+    CurveCategory,
+    DoseResponseResult,
+    ExperimentDataExclusion,
+    ReviewStatus,
+)
+from models.flexible_experiment import ExperimentData, ExperimentRun
+from models.user import User
+
+router = APIRouter(prefix="/experiment-runs", tags=["dose-response"])
+
+_r_client = RCalculatorClient()
+
+
+def _get_run(run_id: uuid.UUID, db: Session) -> ExperimentRun:
+    run = db.query(ExperimentRun).filter(ExperimentRun.id == run_id).first()
+    if not run:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Experiment run not found")
+    return run
+
+
+# ── Fit ───────────────────────────────────────────────────────────────────────
+
+@router.post(
+    "/{run_id}/dose-response/fit",
+    response_model=FitResponse,
+    summary="Fit dose-response curves for all compounds in a run",
+)
+def trigger_fit(
+    run_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_experiment_manage),
+):
+    """
+    Synchronous. Blocks until all compounds are fitted (up to 60s).
+    Returns 409 if a fit is already in progress for this run.
+    Returns 422 if controls are missing or normalization is invalid.
+    Returns 503 if the R calculation service is unavailable or times out.
+    All results are written in a single transaction — partial writes never occur.
+    """
+    svc = DoseResponseFitService(db, current_user, r_client=_r_client)
+    result = svc.trigger_fit(run_id)
+    return FitResponse(**result)
+
+
+@router.post(
+    "/{run_id}/dose-response/refit/{sample_id}",
+    response_model=FitResponse,
+    summary="Re-fit a single compound after data point knockout",
+)
+def trigger_refit(
+    run_id: uuid.UUID,
+    sample_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_experiment_manage),
+):
+    """
+    Creates a new dose_response_results row (fit_version + 1).
+    Old row: superseded_by = new row id.
+    New row: review_status = 'pending' — scientist must re-review.
+    """
+    svc = DoseResponseFitService(db, current_user, r_client=_r_client)
+    result = svc.trigger_refit(run_id, sample_id)
+    return FitResponse(**result)
+
+
+# ── Results ───────────────────────────────────────────────────────────────────
+
+@router.get(
+    "/{run_id}/dose-response/results",
+    response_model=DoseResponseResultListResponse,
+    summary="List dose-response results (Curve Curator grid)",
+)
+def list_results(
+    run_id: uuid.UUID,
+    category: Optional[CurveCategory] = Query(None),
+    review_status: Optional[ReviewStatus] = Query(None),
+    page: int = Query(1, ge=1),
+    size: int = Query(20, ge=1, le=100),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_experiment_manage),
+):
+    """
+    Returns only the latest version per compound (superseded_by IS NULL).
+    Includes thumbnail_svg for the Curve Curator grid.
+    """
+    _get_run(run_id, db)
+
+    q = (
+        db.query(DoseResponseResult)
+        .filter(
+            DoseResponseResult.experiment_run_id == run_id,
+            DoseResponseResult.superseded_by.is_(None),
+        )
+    )
+    if category:
+        q = q.filter(DoseResponseResult.curve_category == category)
+    if review_status:
+        q = q.filter(DoseResponseResult.review_status == review_status)
+
+    total = q.count()
+    rows  = q.order_by(DoseResponseResult.created_at).offset((page - 1) * size).limit(size).all()
+    pages = (total + size - 1) // size
+
+    # Attach sample names
+    from models.sample import Sample
+    sample_ids = [r.sample_id for r in rows]
+    samples_by_id = {}
+    if sample_ids:
+        for s in db.query(Sample).filter(Sample.id.in_(sample_ids)).all():
+            samples_by_id[s.id] = s
+
+    results = []
+    for row in rows:
+        sample = samples_by_id.get(row.sample_id)
+        d = DoseResponseResultSummary.from_orm(row)
+        if sample:
+            d.sample_name = sample.name
+        results.append(d)
+
+    return DoseResponseResultListResponse(
+        results=results, total=total, page=page, size=size, pages=pages
+    )
+
+
+@router.get(
+    "/{run_id}/dose-response/results/{result_id}",
+    response_model=DoseResponseResultDetail,
+    summary="Get a single result (Curve Detail view)",
+)
+def get_result(
+    run_id: uuid.UUID,
+    result_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_experiment_manage),
+):
+    """Does not include thumbnail_svg — Plotly renders client-side from fit parameters."""
+    result = (
+        db.query(DoseResponseResult)
+        .filter(
+            DoseResponseResult.id == result_id,
+            DoseResponseResult.experiment_run_id == run_id,
+        )
+        .first()
+    )
+    if not result:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Result not found")
+
+    from models.sample import Sample
+    sample = db.query(Sample).filter(Sample.id == result.sample_id).first()
+    detail = DoseResponseResultDetail.from_orm(result)
+    if sample:
+        detail.sample_name = sample.name
+    return detail
+
+
+@router.get(
+    "/{run_id}/dose-response/results/{result_id}/svg",
+    summary="Get full-size SVG for a result (PDF export hook)",
+)
+def get_result_svg(
+    run_id: uuid.UUID,
+    result_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_experiment_manage),
+):
+    """Generates a full-size SVG via the R service. Not cached — generated on demand."""
+    result = (
+        db.query(DoseResponseResult)
+        .filter(
+            DoseResponseResult.id == result_id,
+            DoseResponseResult.experiment_run_id == run_id,
+        )
+        .first()
+    )
+    if not result:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Result not found")
+
+    # Reconstruct the fit parameters for the R service
+    from models.sample import Sample
+    sample = db.query(Sample).filter(Sample.id == result.sample_id).first()
+
+    # Load the original data points (non-excluded) from experiment_data
+    excluded_ids = {
+        str(exc.experiment_data_id)
+        for exc in db.query(ExperimentDataExclusion)
+        .join(ExperimentData, ExperimentDataExclusion.experiment_data_id == ExperimentData.id)
+        .filter(ExperimentData.experiment_run_id == run_id)
+        .all()
+    }
+    data_rows = (
+        db.query(ExperimentData)
+        .filter(
+            ExperimentData.experiment_run_id == run_id,
+            ExperimentData.sample_id == result.sample_id,
+        )
+        .all()
+    )
+    from models.template_well import TemplateWellDefinition
+    run = _get_run(run_id, db)
+    well_defs = {
+        wd.well_position: wd
+        for wd in db.query(TemplateWellDefinition)
+        .filter(TemplateWellDefinition.template_id == run.experiment_template_id)
+        .all()
+    }
+
+    points = []
+    for row in data_rows:
+        wd = well_defs.get(row.well_position or "")
+        if not wd or wd.concentration_value is None:
+            continue
+        points.append({
+            "conc": float(wd.concentration_value),
+            "response": 0.0,  # Plotly uses fit params; SVG endpoint uses raw points
+            "point_id": str(row.id),
+        })
+
+    svg = _r_client.full_svg(
+        points=points,
+        model=result.model,
+        excluded_point_ids=list(excluded_ids),
+        x_label=f"Concentration",
+        y_label="% Inhibition",
+        title=sample.name if sample else str(result.sample_id),
+    )
+    from fastapi.responses import Response
+    return Response(content=svg, media_type="image/svg+xml")
+
+
+# ── Summary ───────────────────────────────────────────────────────────────────
+
+@router.get(
+    "/{run_id}/dose-response/summary",
+    response_model=DoseResponseSummary,
+    summary="Curve Curator summary (category counts, review status, IC50 range)",
+)
+def get_summary(
+    run_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_experiment_manage),
+):
+    run = _get_run(run_id, db)
+
+    # Latest results only
+    base_q = db.query(DoseResponseResult).filter(
+        DoseResponseResult.experiment_run_id == run_id,
+        DoseResponseResult.superseded_by.is_(None),
+    )
+    total = base_q.count()
+
+    by_category = {}
+    for cat in CurveCategory:
+        count = base_q.filter(DoseResponseResult.curve_category == cat).count()
+        if count > 0:
+            by_category[cat.value] = count
+
+    by_review_status = {}
+    for rs in ReviewStatus:
+        count = base_q.filter(DoseResponseResult.review_status == rs).count()
+        if count > 0:
+            by_review_status[rs.value] = count
+
+    sigmoid_rows = base_q.filter(
+        DoseResponseResult.curve_category == CurveCategory.SIGMOID,
+        DoseResponseResult.potency.isnot(None),
+    ).all()
+
+    ic50_range = None
+    if sigmoid_rows:
+        potencies = [float(r.potency) for r in sigmoid_rows if r.potency]
+        if potencies:
+            ic50_range = {"min": min(potencies), "max": max(potencies)}
+
+    r_squareds = [float(r.r_squared) for r in base_q.all() if r.r_squared is not None]
+    mean_r2 = sum(r_squareds) / len(r_squareds) if r_squareds else None
+
+    return DoseResponseSummary(
+        total=total,
+        by_category=by_category,
+        by_review_status=by_review_status,
+        ic50_range=ic50_range,
+        mean_r_squared=mean_r2,
+        fit_in_progress=run.fit_in_progress,
+    )
+
+
+# ── Review ────────────────────────────────────────────────────────────────────
+
+@router.post(
+    "/{run_id}/dose-response/results/{result_id}/review",
+    summary="Review a single result (approve / reject / flag)",
+)
+def review_result(
+    run_id: uuid.UUID,
+    result_id: uuid.UUID,
+    body: ReviewRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_experiment_manage),
+):
+    from datetime import datetime, timezone
+    result = (
+        db.query(DoseResponseResult)
+        .filter(
+            DoseResponseResult.id == result_id,
+            DoseResponseResult.experiment_run_id == run_id,
+        )
+        .first()
+    )
+    if not result:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Result not found")
+
+    result.review_status = body.status
+    result.reviewed_by   = current_user.id
+    result.reviewed_at   = datetime.now(timezone.utc)
+    result.review_notes  = body.notes
+    db.commit()
+    return {"status": "ok"}
+
+
+@router.post(
+    "/{run_id}/dose-response/results/batch-review",
+    summary="Batch-approve / batch-reject all pending results in a category",
+)
+def batch_review(
+    run_id: uuid.UUID,
+    body: BatchReviewRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_experiment_manage),
+):
+    """
+    Applies status only to 'pending' results in the given category.
+    Does NOT overwrite manually-approved or manually-rejected results.
+    """
+    from datetime import datetime, timezone
+    _get_run(run_id, db)
+
+    # Only pending, latest version, matching category
+    rows = (
+        db.query(DoseResponseResult)
+        .filter(
+            DoseResponseResult.experiment_run_id == run_id,
+            DoseResponseResult.curve_category == body.category,
+            DoseResponseResult.review_status == ReviewStatus.pending,
+            DoseResponseResult.superseded_by.is_(None),
+        )
+        .all()
+    )
+
+    now = datetime.now(timezone.utc)
+    for row in rows:
+        row.review_status = body.status
+        row.reviewed_by   = current_user.id
+        row.reviewed_at   = now
+    db.commit()
+
+    return {"updated": len(rows), "category": body.category, "status": body.status}
+
+
+# ── Knockout ──────────────────────────────────────────────────────────────────
+
+@router.post(
+    "/data/{data_id}/exclude",
+    response_model=ExclusionRead,
+    summary="Exclude a data point (soft knockout)",
+)
+def exclude_data_point(
+    data_id: uuid.UUID,
+    body: ExcludeRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_experiment_manage),
+):
+    """
+    Creates an experiment_data_exclusions row.
+    Unique constraint prevents double-exclusion.
+    Reverse by calling DELETE /data/{data_id}/exclude.
+    """
+    data_row = db.query(ExperimentData).filter(ExperimentData.id == data_id).first()
+    if not data_row:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Experiment data not found")
+
+    existing = (
+        db.query(ExperimentDataExclusion)
+        .filter(ExperimentDataExclusion.experiment_data_id == data_id)
+        .first()
+    )
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Data point is already excluded.",
+        )
+
+    exclusion = ExperimentDataExclusion(
+        experiment_data_id=data_id,
+        excluded_by=current_user.id,
+        reason=body.reason,
+        client_id=current_user.client_id,
+    )
+    db.add(exclusion)
+    db.commit()
+    db.refresh(exclusion)
+    return ExclusionRead.from_orm(exclusion)
+
+
+@router.delete(
+    "/data/{data_id}/exclude",
+    summary="Un-exclude a data point (reverse knockout)",
+)
+def unexclude_data_point(
+    data_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_experiment_manage),
+):
+    """Deletes the exclusion row. Hard reversal — no soft-delete."""
+    data_row = db.query(ExperimentData).filter(ExperimentData.id == data_id).first()
+    if not data_row:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Experiment data not found")
+
+    exclusion = (
+        db.query(ExperimentDataExclusion)
+        .filter(ExperimentDataExclusion.experiment_data_id == data_id)
+        .first()
+    )
+    if not exclusion:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="This data point has no active exclusion.",
+        )
+
+    db.delete(exclusion)
+    db.commit()
+    return {"status": "ok"}
