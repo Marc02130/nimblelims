@@ -75,6 +75,7 @@ class ExperimentService:
             name=data.name,
             description=data.description,
             active=True,
+            lifecycle_type=data.lifecycle_type,
             template_definition=data.template_definition,
             custom_attributes=data.custom_attributes,
             created_by=self._user_id(),
@@ -102,6 +103,8 @@ class ExperimentService:
             update_kwargs["template_definition"] = data.template_definition
         if data.custom_attributes is not None:
             update_kwargs["custom_attributes"] = data.custom_attributes
+        if data.lifecycle_type is not None:
+            update_kwargs["lifecycle_type"] = data.lifecycle_type
         update_kwargs["modified_by"] = self._user_id()
         self.repo.update_template(t, **update_kwargs)
         self._commit_refresh(t)
