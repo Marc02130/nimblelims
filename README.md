@@ -10,11 +10,12 @@ Copyright (c) 2025 Marc Breneiser
 
 ## Architecture
 
-This project uses a three-container Docker setup:
+This project uses a four-container Docker setup:
 
 - **Database (PostgreSQL 15+)**: Data persistence with Row-Level Security
 - **Backend (FastAPI + Python 3.10+)**: RESTful API with JWT authentication and RBAC
 - **Frontend (React 18+)**: Modern web interface with TypeScript
+- **R Calculator (Plumber API)**: Curve fitting microservice for dose-response analysis (4PL model, IC50, SVG generation)
 
 ## Quick Start
 
@@ -122,6 +123,11 @@ nimblelims/
 │   ├── accessioning_workflow.md # Sample accessioning process
 │   ├── containers.md       # Container management and usage
 │   └── lists.md            # Configurable lists system
+├── services/               # Auxiliary microservices
+│   └── r-calculator/       # Plumber R API for curve fitting
+│       ├── R/              # Curve fitting, categorization, SVG generation
+│       ├── plumber.R       # API routes
+│       └── tests/          # R unit tests
 ├── docker-compose.yml      # Multi-container orchestration
 ├── .gitignore             # Git ignore rules
 └── README.md              # This file
@@ -141,6 +147,13 @@ nimblelims/
 - **QC at Batch Creation** (US-27): Automatically generate QC samples when creating batches
 - **Batch Results Entry** (US-28): Enter results for multiple tests/samples in a batch atomically
 - **Workflow Templates** (US-29): Define reusable workflow templates (steps with actions) and run them from Accessioning, Batch details, or Results Entry with context (e.g. batch_id, test_id). Requires config:edit for template CRUD and workflow:execute for execution. Failed steps roll back the transaction (no instance created).
+
+### Dose-Response Analysis
+- **Curve Fitting**: Trigger 4-parameter logistic (4PL) curve fitting on experiment run data via R calculator microservice. Supports percent-inhibition normalization using positive/negative control wells.
+- **CRO Lifecycle**: Experiment templates support `cro` lifecycle type (alongside `standard`) for CRO-managed experiments with external ordering workflow.
+- **Curve Curator**: Tabbed review UI (`/runs/:id/dose-response`) with category sidebar (Sigmoid, Inactive, Inverse Agonist, Hook Effect, etc.), curve grid with SVG thumbnails, per-compound detail view with Plotly chart, batch approve/reject, and data point knockout (exclude individual wells with reason).
+- **IC50 Summary**: Dashboard summary of fit results by category and review status; re-fit and reset-in-progress controls.
+- **Audit Trail**: Every curve fit is versioned (`fit_version`); superseded results preserved. Data exclusions are soft (reason-tracked), control-well exclusions apply to normalization means.
 
 ### Experiment Management
 - **Experiments**: Full CRUD for experiments; list/detail UI with tabs (Overview, Sample Executions, Details/Steps, Lineage, Linked Processes). Permission: `experiment:manage` (Administrator, Lab Manager, Lab Technician).
@@ -206,6 +219,7 @@ Copy `backend/env.example` to `backend/.env` and configure:
 
 - `REQUIRE_QC_FOR_BATCH_TYPES`: Comma-separated list of batch type UUIDs that require QC samples. If a batch type is in this list, QC samples must be provided during batch creation.
 - `FAIL_QC_BLOCKS_BATCH`: Set to `true` to block batch completion if QC samples fail validation. Default: `false` (warnings only).
+- `R_CALCULATOR_URL`: URL for the R calculator microservice. Default: `http://r-calculator:8000`. Override for local R development or alternative endpoints.
 
 ## Health Checks
 
