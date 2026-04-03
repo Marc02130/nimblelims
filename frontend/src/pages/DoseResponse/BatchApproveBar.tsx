@@ -1,5 +1,15 @@
 import React, { useState } from 'react';
-import { Box, Button, CircularProgress, Alert } from '@mui/material';
+import {
+  Box,
+  Button,
+  CircularProgress,
+  Alert,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions,
+} from '@mui/material';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import { apiService } from '../../services/apiService';
 import { CATEGORY_LABELS, Category } from './CategorySidebar';
@@ -14,8 +24,10 @@ interface Props {
 const BatchApproveBar: React.FC<Props> = ({ runId, category, pendingCount, onDone }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
-  const handleBatchApprove = async () => {
+  const handleConfirm = async () => {
+    setConfirmOpen(false);
     setLoading(true);
     setError(null);
     try {
@@ -42,11 +54,27 @@ const BatchApproveBar: React.FC<Props> = ({ runId, category, pendingCount, onDon
         color="success"
         size="small"
         startIcon={loading ? <CircularProgress size={14} color="inherit" /> : <CheckCircleIcon />}
-        onClick={handleBatchApprove}
+        onClick={() => setConfirmOpen(true)}
         disabled={loading}
       >
         Approve all pending {CATEGORY_LABELS[category]} ({pendingCount})
       </Button>
+
+      <Dialog open={confirmOpen} onClose={() => setConfirmOpen(false)}>
+        <DialogTitle>Approve all pending {CATEGORY_LABELS[category]}?</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            This will approve {pendingCount} pending curve{pendingCount === 1 ? '' : 's'} in the{' '}
+            <strong>{CATEGORY_LABELS[category]}</strong> category. This cannot be undone in bulk.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfirmOpen(false)}>Cancel</Button>
+          <Button onClick={handleConfirm} color="success" variant="contained" autoFocus>
+            Approve {pendingCount}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };

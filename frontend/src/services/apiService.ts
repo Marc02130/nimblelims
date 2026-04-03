@@ -1126,6 +1126,7 @@ class ApiService {
   async createExperimentTemplate(data: {
     name: string;
     description?: string;
+    lifecycle_type?: string;
     template_definition?: Record<string, unknown>;
     custom_attributes?: Record<string, unknown>;
   }) {
@@ -1137,6 +1138,7 @@ class ApiService {
     name?: string;
     description?: string;
     active?: boolean;
+    lifecycle_type?: string;
     template_definition?: Record<string, unknown>;
     custom_attributes?: Record<string, unknown>;
   }) {

@@ -23,6 +23,10 @@ class ExcludeRequest(BaseModel):
     reason: Optional[str] = None
 
 
+class ResetFitRequest(BaseModel):
+    reason: str = Field(..., min_length=1, description="Why the fit_in_progress flag is being cleared (audit trail)")
+
+
 # ── Response schemas ───────────────────────────────────────────────────────────
 
 class DoseResponseResultSummary(BaseModel):

@@ -41,9 +41,11 @@ const CurveCurator: React.FC = () => {
     try {
       const data = await apiService.getDoseResponseSummary(runId);
       setSummary(data);
-      // Auto-select first non-empty category
+      // Auto-select by scientific priority: problems first, then actionable curves
+      const PRIORITY_ORDER: Category[] = ['CANNOT_FIT', 'NOISY', 'HOOK_EFFECT', 'SIGMOID', 'PARTIAL_HIGH', 'PARTIAL_LOW', 'INVERSE', 'INACTIVE'];
       if (!data.by_category[selectedCategory] || data.by_category[selectedCategory] === 0) {
-        const firstNonEmpty = CATEGORIES.find((c) => (data.by_category[c] ?? 0) > 0);
+        const firstNonEmpty = PRIORITY_ORDER.find((c) => (data.by_category[c] ?? 0) > 0)
+          ?? CATEGORIES.find((c) => (data.by_category[c] ?? 0) > 0);
         if (firstNonEmpty) setSelectedCategory(firstNonEmpty);
       }
     } catch (err: any) {

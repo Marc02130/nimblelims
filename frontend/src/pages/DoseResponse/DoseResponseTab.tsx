@@ -167,6 +167,20 @@ const DoseResponseTab: React.FC<Props> = ({ runId, runStatus }) => {
             Last fit: {summary.last_fit_at ? new Date(summary.last_fit_at).toLocaleString() : '—'}
           </Typography>
 
+          {(summary.by_category['CANNOT_FIT'] ?? 0) > 0 && (
+            <Alert
+              severity="error"
+              sx={{ mb: 2 }}
+              action={
+                <Button color="inherit" size="small" onClick={() => navigate(`/runs/${runId}/dose-response`)}>
+                  Review
+                </Button>
+              }
+            >
+              {summary.by_category['CANNOT_FIT']} compound{summary.by_category['CANNOT_FIT'] === 1 ? '' : 's'} could not be fitted. Open Curve Curator to investigate.
+            </Alert>
+          )}
+
           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 3 }}>
             {Object.entries(summary.by_category).map(([cat, count]) => (
               <Chip

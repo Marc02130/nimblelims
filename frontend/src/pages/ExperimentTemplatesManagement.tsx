@@ -70,6 +70,7 @@ interface ExperimentTemplateRow {
   modified_at?: string;
   created_by?: string;
   modified_by?: string;
+  lifecycle_type?: 'standard' | 'cro';
 }
 
 // ─── Tab panel helper ─────────────────────────────────────────────────────────
@@ -126,6 +127,7 @@ const ExperimentTemplatesManagement: React.FC = () => {
   const [formName, setFormName] = useState('');
   const [formDescription, setFormDescription] = useState('');
   const [formActive, setFormActive] = useState(true);
+  const [formLifecycleType, setFormLifecycleType] = useState<'standard' | 'cro'>('standard');
 
   // Form fields — template_definition
   const [formDef, setFormDef] = useState<TemplateDefinition>(blankDefinition());
@@ -185,6 +187,7 @@ const ExperimentTemplatesManagement: React.FC = () => {
     setFormName('');
     setFormDescription('');
     setFormActive(true);
+    setFormLifecycleType('standard');
     setFormDef(blankDefinition());
     setActiveTab(0);
     setTabErrors([false, false, false, false]);
@@ -197,6 +200,7 @@ const ExperimentTemplatesManagement: React.FC = () => {
     setFormName(row.name);
     setFormDescription(row.description ?? '');
     setFormActive(row.active);
+    setFormLifecycleType(row.lifecycle_type ?? 'standard');
     setFormDef({
       ...blankDefinition(),
       ...row.template_definition,
@@ -229,6 +233,7 @@ const ExperimentTemplatesManagement: React.FC = () => {
       const payload = {
         name: formName.trim(),
         description: formDescription.trim() || undefined,
+        lifecycle_type: formLifecycleType,
         template_definition: {
           ...formDef,
           mandatory_review_count: formDef.transfer_steps.filter((s) => s.mandatory_review).length,
@@ -512,6 +517,13 @@ const ExperimentTemplatesManagement: React.FC = () => {
       width: 200,
       flex: isMobile ? 0 : 1,
       valueGetter: (_: unknown, row: ExperimentTemplateRow) => row.description ?? '—',
+    },
+    {
+      field: 'lifecycle_type',
+      headerName: 'Lifecycle',
+      width: 100,
+      valueGetter: (_: unknown, row: ExperimentTemplateRow) =>
+        row.lifecycle_type === 'cro' ? 'CRO' : 'Standard',
     },
     {
       field: 'plate_layout',
@@ -802,6 +814,17 @@ const ExperimentTemplatesManagement: React.FC = () => {
               margin="normal"
               placeholder="e.g. All results must be within 10% of control values"
             />
+            <FormControl fullWidth margin="normal">
+              <InputLabel>Lifecycle Type</InputLabel>
+              <Select
+                value={formLifecycleType}
+                label="Lifecycle Type"
+                onChange={(e) => setFormLifecycleType(e.target.value as 'standard' | 'cro')}
+              >
+                <MenuItem value="standard">Standard</MenuItem>
+                <MenuItem value="cro">CRO</MenuItem>
+              </Select>
+            </FormControl>
             {selectedTemplate && (
               <FormControlLabel
                 control={
