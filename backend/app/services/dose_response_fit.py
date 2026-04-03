@@ -208,9 +208,11 @@ class DoseResponseFitService:
 
             qc_name = qc_entry_by_id.get(sample.qc_type)
             if qc_name == "positive_control":
-                pos_control_signals.append(signal)
+                if str(row.id) not in excluded_data_ids:
+                    pos_control_signals.append(signal)
             elif qc_name == "negative_control":
-                neg_control_signals.append(signal)
+                if str(row.id) not in excluded_data_ids:
+                    neg_control_signals.append(signal)
             else:
                 test_data_rows.append(row)
 
@@ -330,7 +332,9 @@ class DoseResponseFitService:
             excluded_for_compound = sum(
                 1 for row2 in test_data_rows
                 if row2.sample_id == sid and str(row2.id) in excluded_data_ids
-                and well_def_by_pos.get(row2.well_position or "") is not None
+                and (lambda v: v and v.concentration_value is not None)(
+                    well_def_by_pos.get(row2.well_position or "")
+                )
             )
             if all_reps_for_compound > 0:
                 knockout_pct = excluded_for_compound / all_reps_for_compound * 100
@@ -389,8 +393,9 @@ class DoseResponseFitService:
         new_rows = []
         for r_res in r_results:
             sid = uuid.UUID(r_res["sample_id"])
-            points_used = len(
-                compound_data[sid]["points_by_conc"]
+            points_used = sum(
+                len(reps)
+                for reps in compound_data[sid]["points_by_conc"].values()
             ) if sid in compound_data else None
 
             points_excluded = sum(

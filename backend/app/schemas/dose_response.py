@@ -97,9 +97,10 @@ class DoseResponseResultListResponse(BaseModel):
 
 
 class FitResponse(BaseModel):
-    fitted:  int
-    failed:  int
-    results: List[dict]
+    fitted:   int
+    failed:   int
+    warnings: List[str] = []
+    results:  List[dict]
 
 
 class DoseResponseSummary(BaseModel):
