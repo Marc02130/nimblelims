@@ -6,8 +6,11 @@ RLS is enforced at the DB layer via client_id on all dose-response tables.
 """
 from __future__ import annotations
 
+import logging
 import uuid
 from typing import List, Optional
+
+_logger = logging.getLogger(__name__)
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func
@@ -109,8 +112,6 @@ def reset_fit_in_progress(
     Clears fit_in_progress=True if stuck after a process crash.
     Requires a reason for audit trail. Returns 409 if already False.
     """
-    import logging
-    _logger = logging.getLogger(__name__)
     run = _get_run(run_id, db)
     if not run.fit_in_progress:
         raise HTTPException(
