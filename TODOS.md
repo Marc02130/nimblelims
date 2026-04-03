@@ -319,3 +319,15 @@ The full curve-fitting path (Fit Curves → SVG thumbnails → Curve Curator rev
 6. Approve/reject individual curves and batch-approve
 
 Blocked on having a real or realistic synthetic instrument file that matches the parser config of an existing template.
+
+## Pydantic V2 error format crash (2026-04-03)
+
+Pydantic V2 returns `detail` as an array of `{type, loc, msg, input, ctx}` objects, not a string. All frontend pages that do `setError(err.response?.data?.detail || '...')` will crash React (error #31) when the backend returns a 422 validation error.
+
+Fixed in `DoseResponseTab.tsx` and `RunsManagement.tsx` (dose-response branch QA). Still vulnerable:
+- `frontend/src/pages/ExperimentRunDetail.tsx` (2 instances)
+- `frontend/src/pages/ExperimentsManagement.tsx` (4 instances)
+- `frontend/src/pages/ProjectsManagement.tsx`, `Dashboard.tsx`, `TestsManagement.tsx`
+- All admin pages (`WorkflowTemplatesManagement.tsx`, `ContainerTypeForm.tsx`, `RolesManagement.tsx`, etc.)
+
+Fix: replace `err.response?.data?.detail` with the `apiErrorMsg()` helper pattern introduced in DoseResponseTab.tsx.
