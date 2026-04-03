@@ -249,7 +249,7 @@ const CurveDetail: React.FC<Props> = ({ runId, resultId, onClose, onRefitDone, o
                         line: { color: '#1976d2', width: 2 },
                         name: 'Fit',
                       },
-                      // Active data points
+                      // Active data points (customdata = point ID for click-to-exclude)
                       {
                         x: plotData.active.map((p) => p.concentration),
                         y: plotData.active.map((p) => p.response),
@@ -293,6 +293,13 @@ const CurveDetail: React.FC<Props> = ({ runId, resultId, onClose, onRefitDone, o
                     }}
                     config={{ displayModeBar: false, responsive: true }}
                     style={{ width: '100%' }}
+                    onClick={(event: any) => {
+                      const pt = event?.points?.[0];
+                      if (pt?.customdata && detail?.data_points) {
+                        const matched = detail.data_points.find((p) => p.id === pt.customdata);
+                        if (matched) handleToggleExclusion(matched);
+                      }
+                    }}
                   />
                 </Suspense>
               ) : (

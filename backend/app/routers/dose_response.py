@@ -24,6 +24,7 @@ from app.schemas.dose_response import (
     ExcludeRequest,
     ExclusionRead,
     FitResponse,
+    ResetFitRequest,
     ReviewRequest,
 )
 from app.services.dose_response_fit import DoseResponseFitService
@@ -92,6 +93,37 @@ def trigger_refit(
     svc = DoseResponseFitService(db, current_user, r_client=_r_client)
     result = svc.trigger_refit(run_id, sample_id)
     return FitResponse(**result)
+
+
+@router.post(
+    "/{run_id}/dose-response/fit/reset",
+    summary="Reset stale fit_in_progress flag (crash recovery)",
+)
+def reset_fit_in_progress(
+    run_id: uuid.UUID,
+    body: ResetFitRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_experiment_manage),
+):
+    """
+    Clears fit_in_progress=True if stuck after a process crash.
+    Requires a reason for audit trail. Returns 409 if already False.
+    """
+    import logging
+    _logger = logging.getLogger(__name__)
+    run = _get_run(run_id, db)
+    if not run.fit_in_progress:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="fit_in_progress is already False — nothing to reset.",
+        )
+    _logger.warning(
+        "fit_in_progress reset by user",
+        extra={"run_id": str(run_id), "user_id": str(current_user.id), "reason": body.reason},
+    )
+    run.fit_in_progress = False
+    db.commit()
+    return {"status": "ok", "run_id": str(run_id), "reason": body.reason}
 
 
 # ── Results ───────────────────────────────────────────────────────────────────
@@ -258,6 +290,8 @@ def get_result_svg(
     for r in all_run_rows:
         if not r.sample_id:
             continue
+        if str(r.id) in excluded_ids:
+            continue
         s = samples_map.get(r.sample_id)
         if not s:
             continue
@@ -321,37 +355,36 @@ def get_summary(
 ):
     run = _get_run(run_id, db)
 
-    # Latest results only
-    base_q = db.query(DoseResponseResult).filter(
-        DoseResponseResult.experiment_run_id == run_id,
-        DoseResponseResult.superseded_by.is_(None),
+    # Latest results only — load once, aggregate in Python (avoids 13 separate COUNT queries)
+    all_latest = (
+        db.query(DoseResponseResult)
+        .filter(
+            DoseResponseResult.experiment_run_id == run_id,
+            DoseResponseResult.superseded_by.is_(None),
+        )
+        .all()
     )
-    total = base_q.count()
+    total = len(all_latest)
 
-    by_category = {}
-    for cat in CurveCategory:
-        count = base_q.filter(DoseResponseResult.curve_category == cat).count()
-        if count > 0:
-            by_category[cat.value] = count
+    by_category: dict = {}
+    by_review_status: dict = {}
+    sigmoid_potencies: list = []
+    r_squareds: list = []
 
-    by_review_status = {}
-    for rs in ReviewStatus:
-        count = base_q.filter(DoseResponseResult.review_status == rs).count()
-        if count > 0:
-            by_review_status[rs.value] = count
-
-    sigmoid_rows = base_q.filter(
-        DoseResponseResult.curve_category == CurveCategory.SIGMOID,
-        DoseResponseResult.potency.isnot(None),
-    ).all()
+    for row in all_latest:
+        cat_val = row.curve_category.value if hasattr(row.curve_category, 'value') else str(row.curve_category)
+        by_category[cat_val] = by_category.get(cat_val, 0) + 1
+        rs_val = row.review_status.value if hasattr(row.review_status, 'value') else str(row.review_status)
+        by_review_status[rs_val] = by_review_status.get(rs_val, 0) + 1
+        if row.curve_category == CurveCategory.SIGMOID and row.potency is not None:
+            sigmoid_potencies.append(float(row.potency))
+        if row.r_squared is not None:
+            r_squareds.append(float(row.r_squared))
 
     ic50_range = None
-    if sigmoid_rows:
-        potencies = [float(r.potency) for r in sigmoid_rows if r.potency]
-        if potencies:
-            ic50_range = {"min": min(potencies), "max": max(potencies)}
+    if sigmoid_potencies:
+        ic50_range = {"min": min(sigmoid_potencies), "max": max(sigmoid_potencies)}
 
-    r_squareds = [float(r.r_squared) for r in base_q.all() if r.r_squared is not None]
     mean_r2 = sum(r_squareds) / len(r_squareds) if r_squareds else None
 
     return DoseResponseSummary(
@@ -457,7 +490,8 @@ def exclude_data_point(
     """
     data_row = (
         db.query(ExperimentData)
-        .filter(ExperimentData.id == data_id, ExperimentData.client_id == current_user.client_id)
+        .join(ExperimentRun, ExperimentData.experiment_run_id == ExperimentRun.id)
+        .filter(ExperimentData.id == data_id)
         .first()
     )
     if not data_row:
@@ -498,7 +532,8 @@ def unexclude_data_point(
     """Deletes the exclusion row. Hard reversal — no soft-delete."""
     data_row = (
         db.query(ExperimentData)
-        .filter(ExperimentData.id == data_id, ExperimentData.client_id == current_user.client_id)
+        .join(ExperimentRun, ExperimentData.experiment_run_id == ExperimentRun.id)
+        .filter(ExperimentData.id == data_id)
         .first()
     )
     if not data_row:

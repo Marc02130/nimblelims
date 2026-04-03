@@ -288,6 +288,25 @@ This is the primary architectural gap for a future milestone — not a blocker f
 
 ---
 
+## Dose Response — Run 3 deferred items (from /autoplan 2026-04-02)
+
+### Async fit queue
+Current curve fitting is synchronous — the HTTP request blocks until R returns (up to 60s). For large runs (>500 compounds) or concurrent users, this will hit request timeouts and exhaust the DB connection pool. The right fix is a background task queue (Celery + Redis, or pg-based like pgqueue). The `fit_in_progress` flag and the reset endpoint (`POST /fit/reset`) are already in place as stepping stones. Deferred until concurrent user load or timeout complaints from real data.
+
+### Advisory lock for true fit mutex
+~~`SELECT FOR UPDATE` on the `ExperimentRun` row reduces the race window for double-fit, but does not eliminate it.~~ **CLOSED — not a real bug.** `SELECT FOR UPDATE` + committed `fit_in_progress=True` is a correct mutex. Request B sees `True` after Request A commits and returns 409. No advisory lock needed. Reviewed 2026-04-02.
+
+### Backend integration tests (22 cases)
+**DONE (2026-04-02).** 22 integration tests written in `backend/tests/test_dose_response.py`. Coverage: status gates, fit_in_progress mutex, R failure cleanup, control validation (3 cases), normalization math (2 cases), refit supersession (2 cases), review endpoints (2 cases), batch review (2 cases), exclusion CRUD (3 cases), get_summary (2 cases), mixed units. All 22 pass. Test infrastructure (testcontainers PostgreSQL, `db_session`, `TestClient`) was already in `conftest.py`.
+
+### lifecycle_type selector in ExperimentTemplate editor UI
+**DONE (2026-04-02).** `ExperimentTemplatesManagement.tsx` now has a lifecycle_type dropdown (Standard / CRO) in the create/edit form and a column in the DataGrid list view. `apiService.ts` updated to include `lifecycle_type` in create/update payloads. Backend schema already exposed `lifecycle_type` — frontend-only change.
+
+### CSV export of IC50 results
+Scientists want to bulk-export `(compound_id, IC50, hill_slope, r_squared, review_status)` from a run to CSV. The `GET /results` endpoint has all the data; it just needs a `?format=csv` query param and a streaming response. Deferred until Curve Curator workflow is validated with real data.
+
+---
+
 ## Dose Response — End-to-end flow needs test data (2026-04-02)
 
 The full curve-fitting path (Fit Curves → SVG thumbnails → Curve Curator review → batch approve) was verified structurally during QA but not exercised with real data. To validate end-to-end:

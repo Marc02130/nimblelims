@@ -290,6 +290,15 @@ class DoseResponseFitService:
                 detail="No test wells with concentration data found after applying exclusions.",
             )
 
+        # Validate concentration unit uniformity across all compounds
+        conc_units = {cdata.get("concentration_unit") for cdata in compound_data.values()}
+        conc_units.discard(None)
+        if len(conc_units) > 1:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"Mixed concentration units detected: {sorted(conc_units)}. All template wells must use the same unit.",
+            )
+
         # ── Step 5: Build compound payloads for R ─────────────────────────────
         r_compounds = []
         warnings = []
