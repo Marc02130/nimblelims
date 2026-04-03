@@ -331,3 +331,28 @@ Fixed in `DoseResponseTab.tsx` and `RunsManagement.tsx` (dose-response branch QA
 - All admin pages (`WorkflowTemplatesManagement.tsx`, `ContainerTypeForm.tsx`, `RolesManagement.tsx`, etc.)
 
 Fix: replace `err.response?.data?.detail` with the `apiErrorMsg()` helper pattern introduced in DoseResponseTab.tsx.
+
+## Dose-response concurrency and correctness (adversarial review 2026-04-03)
+
+Found during /ship adversarial review. Low probability in a lab LIMS context but should be fixed before high-volume use:
+
+**P1 — fit_in_progress race condition** (`dose_response_fit.py:94-122`)
+SELECT FOR UPDATE lock is released when `_get_run_or_404` returns. The check (`_check_not_in_progress`) and the flag-set (`_set_fit_in_progress`) are separate transactions. Two concurrent requests can both pass the check. Fix: replace check+set with `UPDATE experiment_runs SET fit_in_progress=True WHERE id=? AND fit_in_progress=False RETURNING id` and verify a row was updated.
+
+**P1 — refit creates duplicate v2 results on concurrent calls** (`dose_response_fit.py:376-387`)
+Two concurrent refits both read `fit_version=1`, both write `fit_version=2`. Orphaned result row. Fix: apply FOR UPDATE to the old_results query, or unique-constrain `(experiment_run_id, sample_id, fit_version, superseded_by)`.
+
+**P2 — exclude_data_point doesn't verify run ownership** (`dose_response.py:490-498`)
+Any `data_id` UUID from any run can be excluded — no check that it belongs to the `current_user`'s runs. Add `ExperimentRun.client_id == current_user.client_id` filter to the join.
+
+**P2 — full_svg re-implements normalization independently** (`dose_response.py:256-338`)
+SVG endpoint re-computes `pos_mean`/`neg_mean` on each request, can diverge from the stored fit if controls are excluded after fitting. SVG should use stored normalization parameters from `DoseResponseResult`, not recompute from raw data.
+
+**P2 — R response not schema-validated before DB write** (`r_calculator_client.py:96`)
+Unknown `curve_category` string from R raises `ValueError` mid-loop with dirty session. Validate R JSON against a Pydantic schema (or at minimum check required fields) before processing.
+
+**P3 — ListEntry QC type query is global, not client-scoped** (`dose_response_fit.py:185-190`)
+`ListEntry.name.in_(["positive_control", "negative_control"])` fetches across all tenants. Confirm RLS is enabled on `list_entries`, or add `.filter(ListEntry.client_id == self.run.client_id)`.
+
+**P3 — SVG shows excluded data points** (`dose_response.py:256-338`)
+The `full_svg` endpoint does not filter excluded points from the plotted data. Excluded points appear in the SVG alongside the curve fit.
