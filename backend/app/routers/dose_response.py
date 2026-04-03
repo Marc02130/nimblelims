@@ -175,7 +175,7 @@ def list_results(
     results = []
     for row in rows:
         sample = samples_by_id.get(row.sample_id)
-        d = DoseResponseResultSummary.from_orm(row)
+        d = DoseResponseResultSummary.model_validate(row)
         if sample:
             d.sample_name = sample.name
         results.append(d)
@@ -210,7 +210,7 @@ def get_result(
 
     from models.sample import Sample
     sample = db.query(Sample).filter(Sample.id == result.sample_id).first()
-    detail = DoseResponseResultDetail.from_orm(result)
+    detail = DoseResponseResultDetail.model_validate(result)
     if sample:
         detail.sample_name = sample.name
     return detail
@@ -517,7 +517,7 @@ def exclude_data_point(
     db.add(exclusion)
     db.commit()
     db.refresh(exclusion)
-    return ExclusionRead.from_orm(exclusion)
+    return ExclusionRead.model_validate(exclusion)
 
 
 @router.delete(
