@@ -46,6 +46,7 @@ const getRouteTitle = (pathname: string): string => {
     '/analytes': 'Analytes',
     '/experiments': 'Experiments',
     '/experiments/templates': 'Experiment Templates',
+    '/runs': 'Experiment Runs',
     '/help': 'Help',
     '/admin': 'Admin Dashboard',
     '/admin/lists': 'Lists Management',
@@ -72,6 +73,12 @@ const getRouteTitle = (pathname: string): string => {
   // Experiments section: detail (exclude /experiments/templates)
   if (pathname.startsWith('/experiments/') && !pathname.startsWith('/experiments/templates')) {
     return 'Experiment Detail';
+  }
+  if (pathname.match(/^\/runs\/[^/]+\/dose-response$/)) {
+    return 'Curve Curator';
+  }
+  if (pathname.match(/^\/runs\/[^/]+$/)) {
+    return 'Run Detail';
   }
 
   // Check for edit routes

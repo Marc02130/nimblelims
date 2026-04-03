@@ -20,6 +20,10 @@ class ExperimentTemplate(BaseModel):
 
     template_definition = Column(JSONB, nullable=False, server_default='{}')
     custom_attributes = Column(JSONB, nullable=True, server_default='{}')
+    # Controls which state machine applies to ExperimentRuns created from this template.
+    # 'standard': draft → running → complete → published | failed | canceled
+    # 'cro':      draft → ordered → running → results_received → complete → published | failed | canceled
+    lifecycle_type = Column(String(32), nullable=False, server_default='standard', default='standard')
 
     experiments = relationship("Experiment", back_populates="experiment_template")
 
