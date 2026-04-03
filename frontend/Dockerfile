@@ -1,16 +1,20 @@
-# Build stage
-FROM node:18-alpine as build
+# Build stage — uses Node 18 + npm 10.x (must match package-lock.json generation for `npm ci`)
+FROM node:18-alpine AS build
 
 WORKDIR /app
 
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies
+# Install dependencies (lockfile must be in sync; if `npm ci` fails after local `npm install`
+# with npm 11+, regenerate: docker run --rm -v "$PWD:/app" -w /app node:18-alpine npm install)
 RUN npm ci
 
 # Copy source code
 COPY . .
+
+# CRA/webpack needs extra heap when bundling large deps (e.g. plotly); default ~2GB OOMs in Docker
+ENV NODE_OPTIONS="--max-old-space-size=4096"
 
 # Build the application
 RUN DISABLE_ESLINT_PLUGIN=true npm run build

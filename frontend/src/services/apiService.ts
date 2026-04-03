@@ -1126,6 +1126,7 @@ class ApiService {
   async createExperimentTemplate(data: {
     name: string;
     description?: string;
+    lifecycle_type?: string;
     template_definition?: Record<string, unknown>;
     custom_attributes?: Record<string, unknown>;
   }) {
@@ -1137,6 +1138,7 @@ class ApiService {
     name?: string;
     description?: string;
     active?: boolean;
+    lifecycle_type?: string;
     template_definition?: Record<string, unknown>;
     custom_attributes?: Record<string, unknown>;
   }) {
@@ -1194,6 +1196,130 @@ class ApiService {
 
   async deleteHelpEntry(id: string) {
     const response: AxiosResponse = await this.api.delete(`/help/admin/help/${id}`);
+    return response.data;
+  }
+
+  // ── Experiment Runs ────────────────────────────────────────────────────────
+
+  async getExperimentRuns(params?: {
+    template_id?: string;
+    status?: string;
+    mine?: boolean;
+    page?: number;
+    size?: number;
+  }) {
+    const response: AxiosResponse = await this.api.get('/v1/experiment-runs', { params });
+    return response.data;
+  }
+
+  async getExperimentRun(id: string) {
+    const response: AxiosResponse = await this.api.get(`/v1/experiment-runs/${id}`);
+    return response.data;
+  }
+
+  async createExperimentRun(data: { name: string; description?: string; experiment_template_id: string }) {
+    const response: AxiosResponse = await this.api.post('/v1/experiment-runs', data);
+    return response.data;
+  }
+
+  async orderExperimentRun(id: string) {
+    const response: AxiosResponse = await this.api.patch(`/v1/experiment-runs/${id}/order`);
+    return response.data;
+  }
+
+  async startExperimentRun(id: string) {
+    const response: AxiosResponse = await this.api.patch(`/v1/experiment-runs/${id}/start`);
+    return response.data;
+  }
+
+  async markResultsReceived(id: string) {
+    const response: AxiosResponse = await this.api.patch(`/v1/experiment-runs/${id}/results-received`);
+    return response.data;
+  }
+
+  async reviewExperimentRun(id: string, notes?: string) {
+    const response: AxiosResponse = await this.api.patch(`/v1/experiment-runs/${id}/review`, { notes });
+    return response.data;
+  }
+
+  async publishExperimentRun(id: string) {
+    const response: AxiosResponse = await this.api.patch(`/v1/experiment-runs/${id}/complete`);
+    return response.data;
+  }
+
+  async cancelExperimentRun(id: string) {
+    const response: AxiosResponse = await this.api.patch(`/v1/experiment-runs/${id}/cancel`);
+    return response.data;
+  }
+
+  async getExperimentRunData(id: string, params?: { page?: number; size?: number }) {
+    const response: AxiosResponse = await this.api.get(`/v1/experiment-runs/${id}/data`, { params });
+    return response.data;
+  }
+
+  // ── Dose Response ──────────────────────────────────────────────────────────
+
+  async triggerDoseResponseFit(runId: string) {
+    const response: AxiosResponse = await this.api.post(`/v1/experiment-runs/${runId}/dose-response/fit`);
+    return response.data;
+  }
+
+  async triggerDoseResponseRefit(runId: string, sampleId: string) {
+    const response: AxiosResponse = await this.api.post(`/v1/experiment-runs/${runId}/dose-response/refit/${sampleId}`);
+    return response.data;
+  }
+
+  async getDoseResponseSummary(runId: string) {
+    const response: AxiosResponse = await this.api.get(`/v1/experiment-runs/${runId}/dose-response/summary`);
+    return response.data;
+  }
+
+  async getDoseResponseResults(
+    runId: string,
+    params: { category?: string; review_status?: string; page?: number; size?: number }
+  ) {
+    const response: AxiosResponse = await this.api.get(
+      `/v1/experiment-runs/${runId}/dose-response/results`,
+      { params }
+    );
+    return response.data;
+  }
+
+  async getDoseResponseResult(runId: string, resultId: string) {
+    const response: AxiosResponse = await this.api.get(
+      `/v1/experiment-runs/${runId}/dose-response/results/${resultId}`
+    );
+    return response.data;
+  }
+
+  async reviewDoseResponseResult(runId: string, resultId: string, reviewStatus: string, notes?: string) {
+    const response: AxiosResponse = await this.api.post(
+      `/v1/experiment-runs/${runId}/dose-response/results/${resultId}/review`,
+      { status: reviewStatus, notes }
+    );
+    return response.data;
+  }
+
+  async batchReviewDoseResponse(runId: string, category: string, reviewStatus: string) {
+    const response: AxiosResponse = await this.api.post(
+      `/v1/experiment-runs/${runId}/dose-response/results/batch-review`,
+      { category, status: reviewStatus }
+    );
+    return response.data;
+  }
+
+  async excludeDataPoint(dataId: string, reason?: string) {
+    const response: AxiosResponse = await this.api.post(
+      `/v1/experiment-runs/data/${dataId}/exclude`,
+      { reason }
+    );
+    return response.data;
+  }
+
+  async unexcludeDataPoint(dataId: string) {
+    const response: AxiosResponse = await this.api.delete(
+      `/v1/experiment-runs/data/${dataId}/exclude`
+    );
     return response.data;
   }
 }

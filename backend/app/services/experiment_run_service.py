@@ -1,12 +1,21 @@
 """
 ExperimentRunService — business logic for experiment_runs lifecycle.
 
-Status transitions:
-    draft → running  (POST /experiment-runs/{id}/start)
-    running → complete  (POST /experiment-runs/{id}/review)  [labeled "Ready for Review" in UI]
-    complete → published  (POST /experiment-runs/{id}/complete)  [requires experiment:publish]
-    any → failed  (implicit on error paths)
+Standard lifecycle (lifecycle_type='standard'):
+    draft → running       (PATCH /start)
+    running → complete    (PATCH /review)   [labeled "Ready for Review" in UI]
+    complete → published  (PATCH /complete) [requires experiment:publish]
+    any non-terminal → canceled  (PATCH /cancel)
 
+CRO lifecycle (lifecycle_type='cro'):
+    draft → ordered              (PATCH /order)
+    ordered → running            (PATCH /start)
+    running → results_received   (PATCH /results-received)
+    results_received → complete  (PATCH /review)
+    complete → published         (PATCH /complete) [requires experiment:publish]
+    any non-terminal → canceled  (PATCH /cancel)
+
+Data import is allowed when status is 'running' OR 'results_received'.
 Worklist export and data import are also handled here.
 """
 from __future__ import annotations
@@ -36,6 +45,7 @@ from models.flexible_experiment import (
     ExperimentRunStatus,
     ExperimentData,
     VALID_TRANSITIONS,
+    LIFECYCLE_TRANSITIONS,
 )
 from models.user import User
 
@@ -113,9 +123,15 @@ class ExperimentRunService:
 
     # ---------- Status transitions ----------
 
+    def _lifecycle_transitions(self, run: ExperimentRun) -> dict:
+        """Return the correct transitions dict based on the template's lifecycle_type."""
+        lifecycle = getattr(run.experiment_template, "lifecycle_type", "standard") or "standard"
+        return LIFECYCLE_TRANSITIONS.get(lifecycle, VALID_TRANSITIONS)
+
     def _transition(self, run: ExperimentRun, new_status: ExperimentRunStatus) -> ExperimentRun:
         current = ExperimentRunStatus(run.status)
-        if new_status not in VALID_TRANSITIONS.get(current, set()):
+        transitions = self._lifecycle_transitions(run)
+        if new_status not in transitions.get(current, set()):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Cannot transition from '{current.value}' to '{new_status.value}'",
@@ -124,13 +140,23 @@ class ExperimentRunService:
         self._commit_refresh(run)
         return run
 
+    def order_run(self, run_id: uuid.UUID) -> ExperimentRun:
+        """draft → ordered (CRO lifecycle only)"""
+        run = self.get_run(run_id)
+        return self._transition(run, ExperimentRunStatus.ordered)
+
     def start_run(self, run_id: uuid.UUID) -> ExperimentRun:
-        """draft → running"""
+        """draft → running (standard) or ordered → running (CRO)"""
         run = self.get_run(run_id)
         return self._transition(run, ExperimentRunStatus.running)
 
+    def mark_results_received(self, run_id: uuid.UUID) -> ExperimentRun:
+        """running → results_received (CRO lifecycle only)"""
+        run = self.get_run(run_id)
+        return self._transition(run, ExperimentRunStatus.results_received)
+
     def move_to_review(self, run_id: uuid.UUID) -> ExperimentRun:
-        """running → complete (labeled 'Ready for Review' in the UI)"""
+        """running → complete (standard) or results_received → complete (CRO)"""
         run = self.get_run(run_id)
         return self._transition(run, ExperimentRunStatus.complete)
 
@@ -138,6 +164,11 @@ class ExperimentRunService:
         """complete → published. Caller must have verified experiment:publish permission."""
         run = self.get_run(run_id)
         return self._transition(run, ExperimentRunStatus.published)
+
+    def cancel_run(self, run_id: uuid.UUID) -> ExperimentRun:
+        """Any non-terminal state → canceled."""
+        run = self.get_run(run_id)
+        return self._transition(run, ExperimentRunStatus.canceled)
 
     # ---------- Data import ----------
 
@@ -152,10 +183,11 @@ class ExperimentRunService:
         Columns must match the template's parser_config; raises 422 if they don't.
         """
         run = self.get_run(run_id)
-        if run.status != ExperimentRunStatus.running:
+        _import_allowed = {ExperimentRunStatus.running, ExperimentRunStatus.results_received}
+        if run.status not in _import_allowed:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Data import requires status 'running'; current status is '{run.status.value}'",
+                detail=f"Data import requires status 'running' or 'results_received'; current status is '{run.status.value}'",
             )
 
         # Validate parser_config exists on template

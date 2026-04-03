@@ -13,7 +13,7 @@ is left intact.
 """
 import uuid
 import enum
-from sqlalchemy import Column, String, Text, DateTime, ForeignKey, Enum as SAEnum
+from sqlalchemy import Column, String, Text, DateTime, ForeignKey, Enum as SAEnum, Boolean
 from sqlalchemy.dialects.postgresql import UUID as PostgresUUID, JSONB
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -22,27 +22,54 @@ from .base import Base
 
 
 class ExperimentRunStatus(str, enum.Enum):
-    """6-state lifecycle for an experiment run.
+    """Lifecycle states for an experiment run.
 
-    Status diagram:
+    Standard lifecycle (lifecycle_type='standard'):
         draft ──► running ──► complete ──► published
-          │                       │
-          └───────────────────────┴──► failed
+          └──────────────────────┴──► failed | canceled
+
+    CRO lifecycle (lifecycle_type='cro'):
+        draft ──► ordered ──► running ──► results_received ──► complete ──► published
+          └──────────────────────────────────────┴──► failed | canceled
     """
     draft = "draft"
+    ordered = "ordered"                    # CRO: experiment sent to CRO
     running = "running"
+    results_received = "results_received"  # CRO: instrument data returned by CRO
     complete = "complete"
     published = "published"
     failed = "failed"
+    canceled = "canceled"
 
 
-# Valid forward transitions (service layer enforces these)
+# Standard in-house lifecycle
 VALID_TRANSITIONS: dict[ExperimentRunStatus, set[ExperimentRunStatus]] = {
-    ExperimentRunStatus.draft:     {ExperimentRunStatus.running, ExperimentRunStatus.failed},
-    ExperimentRunStatus.running:   {ExperimentRunStatus.complete, ExperimentRunStatus.failed},
-    ExperimentRunStatus.complete:  {ExperimentRunStatus.published, ExperimentRunStatus.failed},
-    ExperimentRunStatus.published: set(),   # terminal
-    ExperimentRunStatus.failed:    set(),   # terminal
+    ExperimentRunStatus.draft:            {ExperimentRunStatus.running, ExperimentRunStatus.failed, ExperimentRunStatus.canceled},
+    ExperimentRunStatus.running:          {ExperimentRunStatus.complete, ExperimentRunStatus.failed, ExperimentRunStatus.canceled},
+    ExperimentRunStatus.complete:         {ExperimentRunStatus.published, ExperimentRunStatus.failed, ExperimentRunStatus.canceled},
+    ExperimentRunStatus.published:        set(),
+    ExperimentRunStatus.failed:           set(),
+    ExperimentRunStatus.canceled:         set(),
+    ExperimentRunStatus.ordered:          set(),   # not used in standard
+    ExperimentRunStatus.results_received: set(),   # not used in standard
+}
+
+# CRO lifecycle — experiments executed by external Contract Research Organizations
+VALID_TRANSITIONS_CRO: dict[ExperimentRunStatus, set[ExperimentRunStatus]] = {
+    ExperimentRunStatus.draft:            {ExperimentRunStatus.ordered, ExperimentRunStatus.failed, ExperimentRunStatus.canceled},
+    ExperimentRunStatus.ordered:          {ExperimentRunStatus.running, ExperimentRunStatus.failed, ExperimentRunStatus.canceled},
+    ExperimentRunStatus.running:          {ExperimentRunStatus.results_received, ExperimentRunStatus.failed, ExperimentRunStatus.canceled},
+    ExperimentRunStatus.results_received: {ExperimentRunStatus.complete, ExperimentRunStatus.failed, ExperimentRunStatus.canceled},
+    ExperimentRunStatus.complete:         {ExperimentRunStatus.published, ExperimentRunStatus.failed, ExperimentRunStatus.canceled},
+    ExperimentRunStatus.published:        set(),
+    ExperimentRunStatus.failed:           set(),
+    ExperimentRunStatus.canceled:         set(),
+}
+
+# Registry — keyed by experiment_templates.lifecycle_type
+LIFECYCLE_TRANSITIONS: dict[str, dict[ExperimentRunStatus, set[ExperimentRunStatus]]] = {
+    "standard": VALID_TRANSITIONS,
+    "cro":      VALID_TRANSITIONS_CRO,
 }
 
 
@@ -84,9 +111,11 @@ class ExperimentRun(Base):
         nullable=False,
         default=ExperimentRunStatus.draft,
     )
+    fit_in_progress = Column(Boolean, nullable=False, server_default='false', default=False)
     started_at = Column(DateTime, nullable=True)
     completed_at = Column(DateTime, nullable=True)
     published_at = Column(DateTime, nullable=True)
+    canceled_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
     created_by = Column(PostgresUUID(as_uuid=True), ForeignKey('users.id'), nullable=True)
     modified_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
