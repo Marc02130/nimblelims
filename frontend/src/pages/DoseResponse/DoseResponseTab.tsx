@@ -15,6 +15,14 @@ import AssessmentIcon from '@mui/icons-material/Assessment';
 import { useNavigate } from 'react-router-dom';
 import { apiService } from '../../services/apiService';
 
+/** Safely convert a FastAPI/Pydantic error to a display string. */
+const apiErrorMsg = (err: any, fallback: string): string => {
+  const detail = err?.response?.data?.detail;
+  if (typeof detail === 'string') return detail;
+  if (Array.isArray(detail) && detail.length > 0) return detail[0]?.msg || fallback;
+  return fallback;
+};
+
 interface DoseResponseSummary {
   run_id: string;
   fit_in_progress: boolean;
@@ -66,7 +74,7 @@ const DoseResponseTab: React.FC<Props> = ({ runId, runStatus }) => {
       return data;
     } catch (err: any) {
       if (err.response?.status !== 404) {
-        setError(err.response?.data?.detail || 'Failed to load summary');
+        setError(apiErrorMsg(err, 'Failed to load summary'));
       }
       return null;
     }
@@ -103,7 +111,7 @@ const DoseResponseTab: React.FC<Props> = ({ runId, runStatus }) => {
       await apiService.triggerDoseResponseFit(runId);
       await loadSummary();
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to trigger fit');
+      setError(apiErrorMsg(err, 'Failed to trigger fit'));
     } finally {
       setFitting(false);
     }

@@ -23,6 +23,13 @@ import VisibilityIcon from '@mui/icons-material/Visibility';
 import { useNavigate } from 'react-router-dom';
 import { apiService } from '../services/apiService';
 
+const apiErrorMsg = (err: any, fallback: string): string => {
+  const detail = err?.response?.data?.detail;
+  if (typeof detail === 'string') return detail;
+  if (Array.isArray(detail) && detail.length > 0) return detail[0]?.msg || fallback;
+  return fallback;
+};
+
 interface RunListItem {
   id: string;
   name: string;
@@ -90,7 +97,7 @@ const RunsManagement: React.FC = () => {
       setRuns(res?.runs ?? []);
       setPagination((p) => ({ ...p, total: res?.total ?? 0, pages: res?.pages ?? 1 }));
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to load runs');
+      setError(apiErrorMsg(err, 'Failed to load runs'));
     } finally {
       setLoading(false);
     }
@@ -112,7 +119,7 @@ const RunsManagement: React.FC = () => {
       setCreateTemplateId('');
       navigate(`/runs/${run.id}`);
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to create run');
+      setError(apiErrorMsg(err, 'Failed to create run'));
     } finally {
       setCreating(false);
     }
