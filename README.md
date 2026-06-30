@@ -300,6 +300,6 @@ Refer to the technical documentation in `.docs/` for detailed implementation spe
 
 **Key files (backend):** `backend/app/routers/experiments.py`, `backend/app/routers/sop_parse.py`, `backend/app/services/sop_parse_service.py`, `backend/app/services/experiment_service.py`, flexible experiment models/migrations.
 
-**Documentation:** `.docs/experiment-planning.md`, `.docs/navigation.md`, `.docs/api_endpoints.md` (Experiments, experiment-templates, sop-parse), `UAT_Scripts/uat-experiment-templates.md`, `UAT_Scripts/uat-testing-log.md`.
+**Documentation:** `.docs/experiments.md` (ELN), `.docs/experiment-runs.md` (LIMS), `.docs/experiment-planning.md`, `.docs/navigation.md`, `.docs/api_endpoints.md`, `UAT_Scripts/uat-experiment-templates.md`.
 
 **Optional env:** `ANTHROPIC_API_KEY` on the backend for SOP extraction (see `backend/app/core/config.py`).

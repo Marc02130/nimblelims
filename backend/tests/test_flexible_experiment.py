@@ -343,8 +343,8 @@ class TestInstrumentImport:
         r = client.get(f"/v1/experiment-runs/{run_id}/data", headers=auth_headers)
         assert r.status_code == 200
         data = r.json()
-        assert len(data) == 1
-        assert data[0]["row_data"]["viability_pct"] == 88.0
+        assert len(data["rows"]) == 1
+        assert data["rows"][0]["row_data"]["viability_pct"] == 88.0
 
 
 # ──────────────────────────────────────────────────────────────────────────────

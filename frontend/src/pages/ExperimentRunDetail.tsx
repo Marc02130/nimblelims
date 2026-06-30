@@ -26,6 +26,13 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { apiService } from '../services/apiService';
 import DoseResponseTab from './DoseResponse/DoseResponseTab';
 
+const apiErrorMsg = (err: any, fallback: string): string => {
+  const detail = err?.response?.data?.detail;
+  if (typeof detail === 'string') return detail;
+  if (Array.isArray(detail) && detail.length > 0) return detail[0]?.msg || fallback;
+  return fallback;
+};
+
 interface RunDetail {
   id: string;
   name: string;
@@ -85,7 +92,7 @@ const ExperimentRunDetail: React.FC = () => {
       const data = await apiService.getExperimentRun(runId);
       setRun(data);
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to load run');
+      setError(apiErrorMsg(err, 'Failed to load run'));
     } finally {
       setLoading(false);
     }
@@ -96,7 +103,7 @@ const ExperimentRunDetail: React.FC = () => {
     setDataLoading(true);
     try {
       const res = await apiService.getExperimentRunData(runId, { page: 1, size: 200 });
-      setDataRows(res?.data ?? []);
+      setDataRows(res?.rows ?? []);
     } catch {
       // non-fatal
     } finally {
@@ -120,7 +127,7 @@ const ExperimentRunDetail: React.FC = () => {
       else if (action === 'cancel') await apiService.cancelExperimentRun(runId);
       await loadRun();
     } catch (err: any) {
-      setError(err.response?.data?.detail || `Failed to ${action} run`);
+      setError(apiErrorMsg(err, `Failed to ${action} run`));
     } finally {
       setTransitioning(false);
     }
