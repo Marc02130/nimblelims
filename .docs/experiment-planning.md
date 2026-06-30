@@ -63,3 +63,7 @@
 **Frontend:** `frontend/src/pages/ExperimentTemplatesManagement.tsx`, `ExperimentsManagement.tsx`, `Sidebar.tsx`, `App.tsx`, `MainLayout.tsx`, `apiService.ts`.
 
 **Backend:** `app/routers/experiments.py`, `app/routers/sop_parse.py`, `app/services/sop_parse_service.py`, `app/services/experiment_service.py`, flexible experiment models/migrations.
+
+**Dedicated detail docs (recommended reading):**
+- `.docs/experiments.md` — ELN side (Experiments)
+- `.docs/experiment-runs.md` — LIMS side (Experiment Runs)
