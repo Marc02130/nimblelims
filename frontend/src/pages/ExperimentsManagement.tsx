@@ -47,6 +47,13 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { apiService } from '../services/apiService';
 import { useUser } from '../contexts/UserContext';
 
+const apiErrorMsg = (err: any, fallback: string): string => {
+  const detail = err?.response?.data?.detail;
+  if (typeof detail === 'string') return detail;
+  if (Array.isArray(detail) && detail.length > 0) return detail[0]?.msg || fallback;
+  return fallback;
+};
+
 interface ExperimentListItem {
   id: string;
   name: string;
@@ -104,7 +111,7 @@ const RunsTab: React.FC<{ experimentId: string }> = ({ experimentId }) => {
     apiService
       .getExperimentRuns({ page: 1, size: 100 })
       .then((res: any) => setRuns(res?.runs ?? []))
-      .catch((e: any) => setError(e.response?.data?.detail || 'Failed to load runs'))
+      .catch((e: any) => setError(apiErrorMsg(e, 'Failed to load runs')))
       .finally(() => setLoading(false));
   }, [experimentId]);
 
@@ -253,7 +260,7 @@ const ExperimentsManagement: React.FC = () => {
         pages: res?.pages ?? 1,
       }));
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to load experiments');
+      setError(apiErrorMsg(err, 'Failed to load experiments'));
       setExperiments([]);
     } finally {
       setLoading(false);
@@ -267,7 +274,7 @@ const ExperimentsManagement: React.FC = () => {
       const data = await apiService.getExperiment(experimentId);
       setSelectedExperiment(data);
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to load experiment');
+      setError(apiErrorMsg(err, 'Failed to load experiment'));
     } finally {
       setLoading(false);
     }
@@ -280,7 +287,7 @@ const ExperimentsManagement: React.FC = () => {
       const data = await apiService.getExperimentLineage(experimentId);
       setLineage(data);
     } catch (err: any) {
-      setLineageError(err.response?.data?.detail || 'Failed to load lineage');
+      setLineageError(apiErrorMsg(err, 'Failed to load lineage'));
       setLineage(null);
     } finally {
       setLineageLoading(false);
@@ -316,7 +323,7 @@ const ExperimentsManagement: React.FC = () => {
       setCreateStatusId('');
       navigate(`/experiments/${created.id}`);
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to create experiment');
+      setError(apiErrorMsg(err, 'Failed to create experiment'));
     } finally {
       setCreateLoading(false);
     }
