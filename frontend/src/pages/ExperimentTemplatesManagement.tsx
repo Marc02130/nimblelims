@@ -36,6 +36,13 @@ import { DataGrid, GridColDef, GridActionsCellItem, GridRowParams } from '@mui/x
 import { useUser } from '../contexts/UserContext';
 import { apiService } from '../services/apiService';
 
+const apiErrorMsg = (err: any, fallback: string): string => {
+  const detail = err?.response?.data?.detail;
+  if (typeof detail === 'string') return detail;
+  if (Array.isArray(detail) && detail.length > 0) return detail[0]?.msg || fallback;
+  return fallback;
+};
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface TransferStep {
@@ -168,7 +175,7 @@ const ExperimentTemplatesManagement: React.FC = () => {
       if (e.response?.status === 403) {
         setError('You do not have permission to view experiment templates.');
       } else {
-        setError(e.response?.data?.detail || 'Failed to load experiment templates');
+        setError(apiErrorMsg(e, 'Failed to load experiment templates'));
       }
       setRows([]);
     } finally {
@@ -250,8 +257,7 @@ const ExperimentTemplatesManagement: React.FC = () => {
       await loadTemplates();
       setFormOpen(false);
     } catch (err: unknown) {
-      const e = err as { response?: { data?: { detail?: string } }; message?: string };
-      setFormError(e.response?.data?.detail || e.message || 'Failed to save template');
+      setFormError(apiErrorMsg(err, (err as any)?.message || 'Failed to save template'));
     } finally {
       setFormSubmitting(false);
     }
@@ -311,8 +317,7 @@ const ExperimentTemplatesManagement: React.FC = () => {
       setDeleteDialogOpen(false);
       setDeleteTarget(null);
     } catch (err: unknown) {
-      const e = err as { response?: { data?: { detail?: string } } };
-      setError(e.response?.data?.detail || 'Failed to delete template');
+      setError(apiErrorMsg(err, 'Failed to delete template'));
       setDeleteDialogOpen(false);
     } finally {
       setDeleteSubmitting(false);
@@ -362,8 +367,7 @@ const ExperimentTemplatesManagement: React.FC = () => {
       await loadTemplates();
       setSignoffOpen(false);
     } catch (err: unknown) {
-      const e = err as { response?: { data?: { detail?: string } }; message?: string };
-      setError(e.response?.data?.detail || e.message || 'Failed to complete sign-off');
+      setError(apiErrorMsg(err, (err as any)?.message || 'Failed to complete sign-off'));
     } finally {
       setSignoffSubmitting(false);
     }
@@ -374,8 +378,7 @@ const ExperimentTemplatesManagement: React.FC = () => {
       await apiService.updateExperimentTemplate(String(row.id), { active: !row.active });
       await loadTemplates();
     } catch (err: unknown) {
-      const e = err as { response?: { data?: { detail?: string } } };
-      setError(e.response?.data?.detail || 'Failed to update template status');
+      setError(apiErrorMsg(err, 'Failed to update template status'));
     }
   };
 
@@ -405,8 +408,7 @@ const ExperimentTemplatesManagement: React.FC = () => {
       jobId = job.id;
       setSopJobId(jobId);
     } catch (err: unknown) {
-      const e = err as { response?: { data?: { detail?: string } }; message?: string };
-      setSopUploadError(e.response?.data?.detail || e.message || 'Upload failed');
+      setSopUploadError(apiErrorMsg(err, (err as any)?.message || 'Upload failed'));
       setSopPhase('idle');
       return;
     }
@@ -445,7 +447,7 @@ const ExperimentTemplatesManagement: React.FC = () => {
               await loadTemplates();
               setSopUploadOpen(false);
             } else {
-              setSopUploadError(e.response?.data?.detail || e.message || 'Apply failed');
+              setSopUploadError(apiErrorMsg(applyErr, (applyErr as any)?.message || 'Apply failed'));
               setSopPhase('idle');
             }
           }

@@ -307,6 +307,26 @@ Scientists want to bulk-export `(compound_id, IC50, hill_slope, r_squared, revie
 
 ---
 
+## Pre-Rework Issues for Experiments + Experiment Runs
+
+See the dedicated prerequisite document before doing structural work on the two experiment systems:
+
+**[.docs/experiment-rework-prerequisites.md](.docs/experiment-rework-prerequisites.md)**
+
+It contains a prioritized checklist plus details on:
+- The one currently failing flexible experiment test (pagination response shape)
+- Frontend error handling fragility (raw `.detail`)
+- Major data model inconsistencies (BaseModel vs Base, name uniqueness, status, active, client_id vs RLS)
+- Workflow integration gap (no Run actions)
+- Missing linking between ELN Experiments and Runs
+- Unwired process/step tracking
+- Concurrency / ownership issues in dose-response paths
+- Template sharing problems, inactive template usage, etc.
+
+Update that document as decisions are made and items are closed.
+
+---
+
 ## Dose Response — End-to-end flow needs test data (2026-04-02)
 
 The full curve-fitting path (Fit Curves → SVG thumbnails → Curve Curator review → batch approve) was verified structurally during QA but not exercised with real data. To validate end-to-end:
