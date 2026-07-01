@@ -169,22 +169,26 @@ Suboptimal when the app needs to query "all templates that use a certain transfe
 
 ## Recommendations
 
-1. **Keep JSONB** for:
+**Key decisions (2026-06-30):**
+- **Custom attributes** as an extensibility mechanism is being retired.
+- We are doing a **hard cutover** (not long dual-write) when migrating data out of custom_attributes JSONB.
+- **JSONB is restricted to Out-Of-Box (OOB) unstructured data only**. There will be no UI allowing users or admins to define new unstructured fields for extensibility.
+
+1. **Keep JSONB** only for OOB cases:
    - Raw instrument output (`row_data`)
    - External opaque payloads (`billing_info`, AI extraction results)
-   - Truly free-form configuration that is loaded wholesale (`parser_config`, `worklist_config` in many cases)
+   - Core OOB configuration (`template_definition`, `parser_config`, `worklist_config`, `runtime_state`)
 
-2. **Refactor away from JSONB** for:
-   - `custom_attributes` — evolve toward a proper attribute definition + value system.
+2. **Refactor away from JSONB** for extensibility:
+   - All `custom_attributes` → move to FieldDefinition + real columns / typed storage.
    - `processing_conditions`
    - `content` (especially links and structured protocol data)
    - `validation_rules`
 
-3. **Hybrid Approach** (recommended long term):
-   - Keep a small JSONB column for truly ad-hoc data.
-   - Use well-defined attribute/entry tables for anything users want to filter, report, or constrain.
-
-4. Consider adding a lightweight schema registry (building on `custom_attributes_config`) that can eventually drive both UI generation and validation, rather than relying on JSONB + ad-hoc Pydantic models.
+3. **Long-term model**:
+   - FieldDefinition for all modeled/scalar/list extensions.
+   - Entries (in Experiments/Processes) built on top of FieldDefinitions for their columns.
+   - JSONB only for the OOB unstructured cases listed above.
 
 ---
 
