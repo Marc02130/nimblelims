@@ -11,7 +11,9 @@ Typical use cases:
 - Linking to downstream tests/results when needed
 - Workflow-orchestrated lab work
 
-It is **not** primarily for high-volume instrument data import or curve fitting/analysis.
+Experiments **can** capture certain instrument-based QC data (e.g. Tapestation, Qubit, and similar quality control uploads).
+
+It is **not** the primary home for large-scale result data analysis or dose-response curve fitting (see Experiment Runs).
 
 ## Core Entities
 
@@ -47,15 +49,54 @@ It is **not** primarily for high-volume instrument data import or curve fitting/
   - Replicates
   - Direct linkage to Tests/Results for promotion of data
 
+## Processes
+
+Processes are composed of one or more linked Experiments (order matters).
+
+A process defines the overall workflow. Samples can be assigned to a process and then queued into the individual experiments that make up that process.
+
+Future UI needs include:
+- Creating and ordering experiments within a process
+- Assigning samples to processes
+- Queuing samples into specific experiments inside a process
+
+## Experiment Entries (Data Capture)
+
+Experiments capture data through **entries**. Entry types include:
+
+- Table data display
+- Action entries (aliquoting, re-racking, QC data review (pass/fail), etc.)
+- Sample-specific data entries
+- Experiment-specific data entries
+
+**Rules for entries:**
+
+- Most entries are **predefined** (e.g. flowcell loading, pooling/aliquoting, index assignment). Predefined entries can be added to experiment templates.
+- Only **sample data entries** and **experiment detail entries** are free-form/custom.
+- Sample data entries and experiment detail entries have their columns defined in the template.
+- Sample data entries must be able to write back to the core Sample table (e.g. updating concentration, volume, etc.).
+- Sample and experiment data entries use experiment-specific tables (not generic EAV for everything).
+
+This gives templates strong control over the structured parts of an experiment while still allowing per-experiment customization where needed.
+
 ## Status and Lifecycle
 
-Currently:
-- Status lives on the `Experiment` (`status_id` → list_entries).
-- The list is configurable/extensible.
+Status for Experiments uses a flexible list (`experiment_status` via `list_entries`). This is configurable and extensible — some labs do not require sign-off for every experiment.
 
-Planned direction:
-- `lifecycle_type` on the template should also drive Experiment behavior (e.g. whether certain review/approval steps are mandatory before a status can be reached).
-- This allows "standard" (lighter) vs more controlled lifecycles with required sign-offs.
+**Benefits of the flexible list approach (preferred for ELN Experiments):**
+- Labs can define their own statuses without code changes.
+- No forced workflow for simple or internal work.
+- Easy to evolve per organization.
+
+A more rigid state machine (with enforced transitions) has benefits in other contexts (see Experiment Runs), such as:
+- Preventing invalid operations (e.g. data import before prerequisites met).
+- Clear audit trail with automatic timestamps on transitions.
+- UI can reliably offer "next actions" and block invalid paths.
+- Useful when external parties (CROs) or regulated processes are involved.
+
+For ELN-style Experiments, the list-based approach gives the right balance of structure and flexibility.
+
+`lifecycle_type` on the template can still influence behavior (e.g. whether certain review/approval steps become mandatory before advancing).
 
 ## Relationship to Other Concepts
 
@@ -73,16 +114,21 @@ Planned direction:
 
 ## Current Limitations
 
-- Status is relatively loose (list-driven) with no built-in state machine or mandatory review enforcement on the ELN side yet.
-- Lineage is currently a linked list via detail rows (not a formal DAG).
-- No direct parent/child relationship to Experiment Runs (as of now).
+- The "entries" system described above is not yet implemented. Current implementation uses loose `ExperimentDetail` + `ExperimentSampleExecution`.
+- Process management UI (creating processes, ordering experiments, assigning/queuing samples) does not exist yet.
+- Lineage between experiments is currently implemented as `experiment_link` detail rows (linked-list style). A more explicit ordered process model would be clearer.
+- No direct relationship model between Experiments and Experiment Runs yet (intentionally kept separate per current direction).
 - Name uniqueness is global (via `BaseModel`).
+- Sample write-back and experiment-specific tables for data entries need to be designed and built.
 
 ## Design Goals (Current Thinking)
 
-- Keep Experiments as the flexible **ELN** tool for process work.
-- Use `lifecycle_type` on templates to control required reviews/approvals on Experiments.
-- Maintain clear separation from the more structured LIMS Experiment Runs.
+- Experiments are the core of the **ELN** for process-oriented work.
+- Use a flexible list-based status for Experiments (configurable per lab). `lifecycle_type` on templates can add required reviews/approvals where needed.
+- Support rich, template-driven **entries** for data capture and actions (predefined entries + custom sample/experiment detail entries with write-back).
+- Processes are explicitly managed collections of ordered, linked Experiments.
+- Maintain clear separation from **Experiment Runs** (LIMS side). QC instrument uploads (Tapestation, Qubit, etc.) can live in Experiments; large structured result sets and analysis stay with Runs.
+- Provide UI support for process creation, sample assignment to processes, and queuing samples into experiments within a process.
 
 ---
 
@@ -91,3 +137,7 @@ Planned direction:
 - `.docs/experiment-planning.md`
 - `.docs/experiment-rework-prerequisites.md`
 - `.docs/workflow-accessioning-to-reporting.md` (workflow actions)
+
+---
+
+*Feedback incorporated from review (2026-06-30). See updated sections above on Purpose (QC data), Processes, Entries, Status/Lifecycle, Limitations, and Design Goals.*
