@@ -27,11 +27,21 @@ Overall direction is sound: move from "everything in JSONB" toward controlled ex
 
 ### 3.1 Data Model and Naming
 
+**User decision (2026-06-30):**
+- We will use **FieldDefinition** terminology.
+- We will **remove the "custom attributes" concept** for extensibility.
+- **JSONB will not be used to extend functionality.** It will only be used to store truly unstructured data.
+
 **Issue:** Proliferation of similar concepts.
 - We already have `custom_attributes_config`, `list_entries`, `ExperimentDetail`, `ExperimentSampleExecution`, and proposed `FieldDefinition` + `ProcessSample`.
 - Risk of confusion between "custom attributes", "field definitions", "entries", and "process samples".
 
-**Recommendation:** Create a clear glossary and decide on canonical naming early (e.g., unify around "AttributeDefinition" or "FieldDefinition" for scalar extensions, keep "Entry" for the richer experiment-specific concept).
+**Recommendation (updated):** 
+- Use **FieldDefinition** as the canonical term.
+- Retire "custom attributes" for extensibility.
+- JSONB only for unstructured/opaque data.
+- Full glossary is in `.docs/design/schema-evolution.md`.
+- We still need a concrete migration/archival strategy for existing `custom_attributes` data and any code that relies on it.
 
 ### 3.2 Scope of "Add Table" Feature
 

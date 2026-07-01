@@ -15,14 +15,25 @@
 
 This design supports the user stories in `.docs/user-stories/schema-modification.md` and addresses gaps identified in the JSONB analysis.
 
+## Glossary (Decided Direction)
+
+- **FieldDefinition**: The canonical term for the metadata definition of an extensible, typed field (scalar or list-backed). Replaces the role previously played by custom attribute definitions. Used for deliberate schema extension.
+- **FieldValue**: The actual value for a FieldDefinition on a specific record. Will live in a properly typed column (or a dedicated value table for complex cases) rather than JSONB.
+- **Entry**: A richer, template-driven component inside an Experiment or Process step. Entries can be tables of data, actions, or structured blocks. Different from simple FieldDefinitions. Columns inside custom Entries are also defined via FieldDefinitions where appropriate.
+- **ProcessSample**: Junction that records which samples are assigned to a Process (separate from per-experiment tracking).
+- **JSONB (unstructured only)**: Strictly for opaque or highly variable data that is not used for modeled functionality. Examples: raw instrument rows (`row_data`), AI extraction results, external opaque payloads. JSONB will **not** be used to extend the data model or carry structured user fields.
+
+**Custom attributes** concept is being retired for new extensibility work.
+
 ## 2. High-Level Architecture
 
 ### 2.1 Core Concepts
 
-- **AttributeDefinition** (or `FieldDefinition`): Metadata for a custom or extended field.
-  - Belongs to an entity type (Sample, Experiment, etc.) or more specifically to a Template/Process.
-  - Properties: name, display_name, data_type (text, integer, list, reference, date, etc.), source_list_id (for list types), required, unique_scope, default_value, validation_rules (JSON or structured), ui_hints.
-  - Can be "core" (added by developers) or "extended" (added via admin UI).
+- **FieldDefinition**: Metadata for an extensible, typed field (the replacement for custom attribute definitions).
+  - Belongs to an entity type (Sample, Experiment, etc.) or scoped to a Template/Process.
+  - Properties: name, display_name, data_type (text, integer, list, reference, date, etc.), source_list_id (for list-backed fields), required, unique_scope, default_value, validation_rules, ui_hints.
+  - Can be "core" (developer-defined) or "extended" (admin-defined via UI).
+  - Will drive both database columns and UI generation.
 
 - **SchemaChange** (audit + migration request): Records proposed and applied changes.
   - Type: ADD_COLUMN, DEPRECATE_COLUMN, DROP_COLUMN, ADD_TABLE, etc.
