@@ -23,49 +23,31 @@ This document outlines the migration strategy for moving from the current extens
 - Leverage existing infrastructure where possible (Lists system for list-backed fields, Alembic for migrations, RLS policies).
 - Prioritize high-value, high-usage entities first.
 
-## 2. High-Level Migration Phases
+## 2. High-Level Migration Phases (Focused MVP)
 
-### Phase 0 — Foundation (Pre-Migration)
-- Implement the `FieldDefinition` model and supporting tables.
-- Build admin UI for defining FieldDefinitions (with support for list-backed fields using `list_entries`).
-- Implement safe migration generation (Alembic fragments or scripts).
-- Add basic form generation and search/filter support for new fields.
-- Define and implement `ProcessSample` model.
-- Establish the Entries model inside Experiments/Processes.
-- Create migration tooling (backfill jobs, validation, dry-run capabilities).
-- Build impact analysis tooling (what will be affected by a given change?).
+**MVP Focus (per CEO recommendation):**
+- Prioritize adding list-backed columns and simple scalars to existing high-value tables (Samples and Experiments first).
+- Deliver clean hard cutover from `custom_attributes` on these entities.
+- Ensure new fields appear automatically in Entries and Processes.
+- Defer "add table" capability.
 
-### Phase 1 — Core Schema Registry + New Fields
-- Enable creation of new fields via FieldDefinition (e.g. adding `specimen_biotype` as a list-backed column to `samples`).
-- Support adding simple columns to existing tables.
-- Begin using FieldDefinitions for new work in Experiments (columns inside custom Entries) and Processes.
-- Deprecate direct writes to `custom_attributes` for new features.
+### Phase 0 — Foundation
+- FieldDefinition model + focused admin UI (list-backed + simple scalars).
+- Safe migration generation and excellent migration UX (dry-run, impact preview, communication).
+- Form/search integration for Entries and Processes.
+- Basic backfill + validation tooling.
 
-### Phase 2 — Per-Entity Hard Cutovers (High-Impact Entities First)
-Target order (subject to refinement):
-1. **Samples** (very high usage, frequently extended, ties into Processes/Entries)
-2. **Projects** and **Batches**
-3. **Experiments** and **ExperimentSampleExecution** (move relevant data out of `processing_conditions` and `custom_attributes`)
-4. **Results**, **Tests**, **Analyses**, etc.
+### Phase 1 — High-ROI Entities
+- Add list-backed (e.g. `specimen_biotype`) and simple scalar fields on Samples and Experiments.
+- Hard cutover from `custom_attributes` on these entities.
+- Full integration into Entries and Processes.
 
-For each entity:
-- Define the set of FieldDefinitions that will replace the old custom attributes.
-- Generate and apply migration(s) to add real columns (or typed value tables).
-- Write one-time data migration scripts to move data from `custom_attributes` JSONB into the new FieldValue storage.
-- Update all read paths to prefer the new structured storage.
-- Hard cutover: remove or restrict the old JSONB path for that entity.
-- Update UI, APIs, reports, and workflows.
+### Phase 2 — Other Core Entities + Cleanup
+- Extend to Projects, Batches, Results, etc.
+- Remove legacy `custom_attributes` paths.
+- Clean documentation and tests.
 
-### Phase 3 — Deprecation and Cleanup
-- Remove or archive remaining `custom_attributes` columns after all major entities are migrated.
-- Clean up dual-read code paths.
-- Remove legacy `custom_attributes_config` usage where replaced.
-- Update all documentation, tests, and example data.
-
-### Phase 4 — Advanced Capabilities
-- Full support for adding new tables via the schema UI (with appropriate guardrails).
-- Deeper integration of FieldDefinitions with template-driven Entries.
-- More sophisticated validation, computed fields, or cross-entity rules (if needed).
+"Add table" and advanced capabilities remain out of scope for the initial release.
 
 ## 3. Data Migration Approach (Hard Cutover Model)
 
