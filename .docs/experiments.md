@@ -51,14 +51,9 @@ It is **not** the primary home for large-scale result data analysis or dose-resp
 
 ## Processes
 
-Processes are composed of one or more linked Experiments (order matters).
+See the dedicated document [`.docs/processes.md`](processes.md) for full details.
 
-A process defines the overall workflow. Samples can be assigned to a process and then queued into the individual experiments that make up that process.
-
-Future UI needs include:
-- Creating and ordering experiments within a process
-- Assigning samples to processes
-- Queuing samples into specific experiments inside a process
+**Summary**: Processes are ordered collections of Experiments. They provide structure for multi-step work where sample flow and sequencing matter. A future UI will support creating processes, assigning samples to them, and queuing samples through the experiments that make up the process.
 
 ## Experiment Entries (Data Capture)
 
@@ -133,6 +128,7 @@ For ELN-style Experiments, the list-based approach gives the right balance of st
 ---
 
 **Related Documents**
+- `.docs/processes.md`
 - `.docs/experiment-runs.md`
 - `.docs/experiment-planning.md`
 - `.docs/experiment-rework-prerequisites.md`
