@@ -74,7 +74,7 @@ For each entity:
 2. **Backfill** existing data from `custom_attributes` JSONB into the new storage.
 3. **Dual-read period** (short): code reads from new storage with fallback to JSONB.
 4. **Cutover**: stop writing to old JSONB for this field, enforce reads from new storage.
-5. **Cleanup**: drop or archive the old data (after validation and backup).
+5. **Cleanup**: drop the old data (after validation and backup).
 
 For a **hard cutover** we compress steps 3–5 into a single deployment window where possible:
 - Run the backfill as part of the deployment or as a prerequisite job.
@@ -133,10 +133,16 @@ For a **hard cutover** we compress steps 3–5 into a single deployment window w
 
 ## 7. Open Questions & Next Steps
 
-- Exact storage model for FieldValue (dedicated `field_values` table vs. adding columns directly to entity tables).
 - Detailed rollback playbook for a hard cutover.
 - How template-scoped FieldDefinitions interact with global ones during migration.
 - Whether we need a "schema version" per Process or Template during the transition.
+
+**Storage model decision (2026-06-30):**
+
+- **Top-level fields** on core entities (e.g. `specimen_biotype` on samples): Add column **directly** to the table (FK for lists, appropriate type otherwise).
+- **Variable columns inside custom Entries** (sample data entries / experiment detail entries): Dedicated `entry_field_values` table (typed columns for value_text / value_number / value_list_entry_id, etc.).
+- JSONB remains only for OOB unstructured data.
+- This will be the basis for the hard cutover migrations.
 
 ---
 
