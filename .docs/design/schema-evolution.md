@@ -159,17 +159,27 @@ For the concrete "add specimenbiotype to samples":
 
 ## 3. Key Flows
 
-### 3.1 Add List-Backed Column (Specimen Biotype)
+### 3.1 Add Field to Existing Table (List-backed or Simple Scalar)
 
-1. Admin selects "Samples" → "Add Field" → Type = List → Source = new or existing "specimen_biotypes" list.
-2. System:
+The "Add list-backed columns + simple scalars" capability covers:
+
+- **List-backed fields** (e.g. `specimen_biotype`): Uses the existing `lists` + `list_entries` system. Stored as a direct FK column (`specimen_biotype_id UUID REFERENCES list_entries(id)`).
+- **Simple scalars**: text, numeric, date, boolean, etc. Stored as native column types (e.g. `TEXT`, `NUMERIC`, `TIMESTAMPTZ`, `BOOLEAN`).
+
+Example flow for adding either type to Samples:
+
+1. Admin selects "Samples" → "Add Field".
+2. Chooses data type:
+   - "List" → selects or creates a source list (e.g. "specimen_biotypes").
+   - "Text", "Number", "Date", "Boolean", etc.
+3. System:
    - Creates `field_definition`.
-   - Generates migration fragment: `add_column('samples', 'specimen_biotype_id', ...)`
-   - Updates any dynamic form/rendering configs.
-   - Records the change in `schema_changes`.
-3. Admin reviews impact (forms, existing data, RLS).
-4. Change is approved/applied → migration is run on next deploy or via admin action.
-5. Field becomes available immediately in UI (after migration) for new and existing records (null for existing).
+   - Generates migration fragment to add the appropriate column directly to the `samples` table.
+   - Updates dynamic form/rendering/search configs.
+4. Admin reviews impact.
+5. Migration applied → field available in UI, Entries, Processes, etc.
+
+This directly supports adding a text column or numeric column to an existing table as a first-class, queryable, typed field.
 
 ### 3.2 Remove / Deprecate Column
 
