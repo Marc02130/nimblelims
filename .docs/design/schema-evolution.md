@@ -19,6 +19,10 @@ This design supports the user stories in `.docs/user-stories/schema-modification
 
 - **FieldDefinition**: The canonical term for the metadata definition of an extensible, typed field (scalar or list-backed). This replaces the old "custom attributes" mechanism for deliberate schema extension. All modeled, user-extensible fields go through FieldDefinition.
 
+  **Important distinction (per design direction):**
+  - A **lookup table (foreign key)** is good when metadata about the record is needed (richer entity with its own attributes, relationships, etc.).
+  - A **list** is used when you just need a value (simple controlled vocabulary from the existing `lists` + `list_entries` system).
+
 - **FieldValue**: The stored value for a FieldDefinition on a concrete record. Lives in a real database column (preferred) or a properly typed mechanism. Not stored in generic JSONB when used for extensibility.
 
 - **Entry**: A richer, composable component that lives inside an Experiment or inside a step of a Process.
@@ -34,6 +38,11 @@ This design supports the user stories in `.docs/user-stories/schema-modification
 - **JSONB (restricted to OOB only)**: Only for Out-Of-Box (OOB) unstructured or highly variable data. There is **no UI** for administrators to define new unstructured fields.
   - Allowed examples: `template_definition`, `row_data` (raw instrument output), `parser_config`, `worklist_config`, `result` (from SopParseJob), `runtime_state`, `billing_info`.
   - JSONB is **explicitly not used** to extend functionality or carry user-modeled data.
+
+For list-backed fields (e.g. `specimen_biotype`):
+- This is a "list" (just a value), not a full lookup table.
+- Implemented as a direct column on the target table: `specimen_biotype_id UUID REFERENCES list_entries(id)`.
+- The FieldDefinition will have `data_type = 'list'` and reference the appropriate List.
 
 **Custom attributes** as an extensibility pattern is being retired. We are planning a **hard cutover** (not a long dual-write period). Existing `custom_attributes` data will be migrated to FieldValue storage as part of the cutover.
 
