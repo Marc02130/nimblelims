@@ -1,9 +1,7 @@
-# User Stories: Schema Modification
+# User Stories: Schema Modification (Focused MVP)
 
 **Date:** 2026-06-30  
-**Context:** Supporting controlled schema evolution as part of moving away from heavy reliance on JSONB for user-defined data. This enables admins to extend the data model safely without developer intervention or uncontrolled JSONB growth.
-
-These stories assume a new or enhanced "Schema Management" capability that allows configuration of custom fields, list-backed columns, and (eventually) new tables, with proper migration, audit, and UI generation.
+**Context:** High-ROI changes for early-stage biotechs: adding list-backed columns and simple scalars to existing tables (Samples/Experiments first), deprecation, and clean integration with Entries and Processes. Adding new tables is deferred.
 
 ## US-1: Add a List-Backed Column to an Existing Table
 
@@ -61,38 +59,11 @@ These stories assume a new or enhanced "Schema Management" capability that allow
 - Supports the goal of cleaning up after promoting fields out of JSONB or retiring unused custom fields.
 - Should integrate with data retention policies.
 
-## US-3: Add a New Table / Entity
+## US-3: Add a New Table / Entity (Deferred)
 
-**Title:** As a Lab Administrator, I want to define a new related table (e.g., "SamplePreparationBatch" or "CompoundLibrary") linked to existing entities so that we can track additional structured data without developer changes.
+**Status:** Explicitly out of MVP scope per focused recommendation.
 
-**As a** Lab Administrator (with elevated privileges)  
-**I want** to add a new table and define its columns and relationships  
-**So that** we can capture new categories of data (e.g., library metadata, preparation batches) in a structured, queryable way.
-
-**Acceptance Criteria:**
-- Admin can define:
-  - Table name (following naming conventions).
-  - Columns: name, type (including list-backed), required, default values, validation rules.
-  - Relationships: foreign keys to existing tables (e.g., many-to-one to Samples or Projects).
-- The system generates or proposes:
-  - Database migration (new table + columns + indexes + FK constraints).
-  - Basic CRUD UI (list, detail, create/edit forms) auto-generated from the definition.
-  - Integration with custom attributes / search if applicable.
-- Permissions model: new table can inherit or define its own role-based access.
-- RLS policies are automatically or manually configurable for the new table.
-- Data import/export templates are generated.
-- Option to mark the table as "experimental" or "core".
-- Full audit of schema change and data operations on the new table.
-- Ability to later promote generated UI to custom code if needed.
-
-**Constraints:**
-- Not all table features may be supported initially (e.g., complex many-to-many, triggers).
-- Must not allow arbitrary raw SQL or unsafe column types.
-- Existing JSONB flexibility should be available as a fallback for highly variable sub-entities.
-
-**Notes:**
-- This is a stepping stone toward more powerful low-code capabilities while maintaining control and safety.
-- Should integrate with the Entries model for experiments/processes where appropriate.
+Early value will come from adding fields to existing high-ROI tables (Samples, Experiments) rather than creating new top-level tables. This story is retained for future phases once the core field-addition + hard-cutover experience is proven.
 
 ## Cross-Cutting Requirements (implied by these stories)
 

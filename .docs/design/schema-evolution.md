@@ -4,14 +4,15 @@
 **Branch:** refactor/jsonb  
 **Status:** Draft for design review
 
-## 1. Goals
+## 1. Goals (Focused MVP)
 
-- Enable controlled, auditable extension of the data model by administrators (add list-backed columns, deprecate columns, add supporting tables).
-- Reduce reliance on unstructured `JSONB` (especially `custom_attributes` and loose `content`/`processing_conditions`) for data that benefits from typing, querying, constraints, and reporting.
+- Enable controlled, auditable addition of high-value fields to existing entities: primarily list-backed columns (e.g. `specimen_biotype` on Samples) and simple scalars (text, number, date, boolean).
+- Perform a clean hard cutover from `custom_attributes` JSONB on key entities (Samples and Experiments first).
+- Make it easy for administrators to deprecate or remove fields.
+- Ensure new fields automatically appear in Entries (sample data entries / experiment detail entries) and Processes.
 - Maintain safety: no runtime schema changes that bypass migrations, RLS, or upgrade paths.
-- Integrate with existing mechanisms (Lists, custom attributes config, Alembic, RLS, audit).
-- Support the evolving Experiment/Process/Entries model (template-driven columns, sample write-back).
-- Provide a migration path from current JSONB-heavy patterns.
+- Integrate with existing mechanisms (Lists system, Alembic, RLS, audit).
+- Reduce long-term technical debt while keeping the system simple for early-stage biotech teams.
 
 This design supports the user stories in `.docs/user-stories/schema-modification.md` and addresses gaps identified in the JSONB analysis.
 
@@ -66,36 +67,25 @@ For list-backed fields (e.g. `specimen_biotype`):
 For list-backed fields (e.g., `specimen_biotype`):
 - Use existing `list_entries` system. The column will be a `list_entry_id` FK (or nullable reference) with a GIN or B-tree index as appropriate.
 
-### 2.2 Storage Strategy for FieldValue (Recommended)
+### 2.2 Storage Strategy for FieldValue (Focused MVP)
 
 **Yes, the "lists" you are referring to are the existing `lists` + `list_entries` system.**  
 This is the right mechanism for list-backed fields (e.g. `specimen_biotype` will be a FK column to `list_entries`, exactly like `sample.matrix`, `sample.qc_type`, `sample.status`, etc.).
 
-**Recommended storage model for FieldValue:**
+**Recommended storage model for MVP:**
 
-- **Top-level extensions on core entities** (e.g. adding `specimen_biotype` directly to the `samples` table, or similar fields on Project, Batch, etc.):  
-  **Add the column directly** to the entity table when the FieldDefinition is activated.  
-  - Use a controlled Alembic migration (generated or reviewed).  
-  - For list types: `xxx_id` FK to `list_entries`.  
-  - This gives best query performance, native constraints, and reporting.
+- **Top-level extensions on core entities** (Samples, Experiments, etc.):
+  - **Add the column directly** to the entity table when the FieldDefinition is activated.
+  - Use a controlled Alembic migration.
+  - List types: `xxx_id UUID REFERENCES list_entries(id)`.
+  - Simple scalars: native types (`TEXT`, `NUMERIC`, `TIMESTAMPTZ`, `BOOLEAN`, etc.).
+  - This gives the best performance and is what scientists expect.
 
-- **Variable columns inside custom Entries** (the "experiment specific tables" and sample data entries inside Experiments/Processes):  
-  Use a **dedicated typed value table** (e.g. `entry_field_values`):  
-  ```sql
-  entry_field_values (
-      id,
-      entry_id (FK to the Entry),
-      field_definition_id (FK to FieldDefinition),
-      value_text,
-      value_number,
-      value_list_entry_id (FK to list_entries),
-      value_date,
-      ... (or a JSONB only for truly complex OOB values)
-  )
-  ```
-  This avoids making the main entity tables infinitely wide and supports per-template / per-entry column definitions.
+- **Columns inside custom Entries** (for now):
+  - Use the same direct-column approach where the parent table allows it.
+  - For highly variable per-template data, we can initially lean on FieldDefinitions + direct columns on the relevant junction or use a lightweight `entry_field_values` table only if table width becomes a problem. Keep it simple first.
 
-- **JSONB restriction**: Only for genuine OOB unstructured data (template_definition, row_data, etc.). No more JSONB for modeled extensibility or user-defined fields.
+- **JSONB restriction**: Strictly for OOB unstructured data (template_definition, row_data, etc.). No JSONB for new modeled user fields.
 
 This hybrid avoids the downsides of pure EAV (bad performance) and pure "add column to everything" (table bloat for highly variable data).
 
@@ -108,18 +98,22 @@ Hard cutover means: when migrating an existing custom_attributes field, we move 
 - Support "soft" application: column is added as nullable, data is backfilled in a background job or admin-triggered batch, then NOT NULL constraint added in a follow-up migration if needed.
 - Dual-write period for promoted fields: write to both JSONB and new column, read from new column with fallback.
 
-### 2.4 UI Components
+### 2.4 UI Components (MVP Scope)
 
 - **Schema Admin** (under Admin or Lab Mgmt):
-  - Browse current fields per entity/table.
-  - "Add Field" wizard: select type (including "List" → choose/create list), properties, scope (global or per-template/process).
-  - Preview of affected forms/reports.
+  - Browse current fields per entity (focus on Samples and Experiments first).
+  - "Add Field" wizard focused on:
+    - List-backed fields (using existing Lists system)
+    - Simple scalars (text, number, date, boolean)
+  - Clear impact preview (which forms, Entries, Processes, and reports will be affected).
   - "Deprecate / Remove" flow with impact analysis.
-  - "Add Table" flow (advanced).
 
-- Generated forms: Use the same pattern as current custom fields but backed by real columns where possible. New fields appear in DataGrids, filters, and accessioning where the entity is used.
+- New fields must automatically appear in:
+  - Standard entity forms and filters
+  - Custom Entries (sample data entries and experiment detail entries)
+  - Processes
 
-- Process/Experiment integration: When defining Entries in a template, admins can reference or promote fields defined at the entity level.
+- No "Add Table" wizard in MVP.
 
 ### 2.5 Data Model Sketch (New/Extended Tables)
 
@@ -190,10 +184,7 @@ This directly supports adding a text column or numeric column to an existing tab
 
 ### 3.3 Add Table
 
-More involved; may be limited to advanced admins.
-- Define table name, columns (via field_definitions), relationships.
-- System proposes full migration + basic model skeleton.
-- UI scaffolding is generated from definitions until custom code is written.
+Deferred beyond MVP (see CEO recommendation). Focus first on adding fields to existing high-value tables.
 
 ## 4. Integration Points
 

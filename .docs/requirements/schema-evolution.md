@@ -6,14 +6,18 @@
 
 ## 1. Introduction
 
-This document captures the functional and non-functional requirements for a controlled schema evolution system. The goal is to reduce reliance on unstructured JSONB for user-defined data while enabling lab administrators to extend the data model (add list-backed columns, custom fields, and eventually new tables) safely, audibly, and with minimal developer involvement.
+This document captures the functional and non-functional requirements for a **focused, controlled schema evolution system**. The goal is to reduce reliance on unstructured `custom_attributes` JSONB for user-defined data by enabling lab administrators to add simple, high-value fields (especially list-backed columns and basic scalars) to existing entities in a safe, auditable way with minimal developer involvement.
 
-The system must support scenarios such as:
-- Adding a list-backed column (e.g., `specimen_biotype`) to the `samples` table.
-- Removing or deprecating columns.
-- Adding new related tables.
+**MVP Scope (per CEO recommendation):**
+- Prioritize adding list-backed columns (e.g. `specimen_biotype`) and simple scalars (text, number, date, boolean) to core existing tables (Samples and Experiments first).
+- Clean integration so new fields appear in Entries and Processes.
+- Solid hard cutover from `custom_attributes` on high-usage entities.
+- Easy deprecation/removal of fields.
+- Excellent migration experience.
 
-It must integrate with the existing architecture (lists, custom attributes config, Alembic migrations, RLS, audit, UI generation).
+Full "add arbitrary table" capability and broad dynamic schema editing are explicitly deferred.
+
+It must integrate with the existing architecture (Lists system, Alembic migrations, RLS, audit, UI generation, Experiments/Processes/Entries model).
 
 ## 2. Functional Requirements
 
@@ -34,17 +38,9 @@ It must integrate with the existing architecture (lists, custom attributes confi
 - Grace period / approval workflow before destructive removal.
 - Audit of deprecation/removal actions.
 
-### FR-3: Add New Tables
-- Privileged admins can define new tables (e.g., supporting entities for samples, experiments, or processes).
-- Define columns using the same attribute system as FR-1.
-- Define relationships (foreign keys to existing tables, cardinality).
-- System generates:
-  - Table + columns + constraints + indexes.
-  - Basic model/ORM scaffolding (or dynamic access).
-  - Auto-generated CRUD UI (list, detail, edit).
-  - Integration points (search, import templates, workflow actions if applicable).
-- Limits on complexity for v1 (e.g., no complex many-to-many, no triggers initially).
-- New tables must respect RLS and existing permission model.
+### FR-3: Add New Tables (Deferred beyond MVP)
+- This capability is explicitly out of scope for the initial focused release.
+- Future consideration only after the core "add field to existing entities + hard cutover" is proven with real customers.
 
 ### FR-4: Integration with Existing Systems
 - New fields/tables must be usable in:
@@ -78,10 +74,10 @@ It must integrate with the existing architecture (lists, custom attributes confi
 ## 3. Non-Functional Requirements
 
 ### NFR-1: Safety and Reliability
-- Schema changes must be reversible or have clear rollback paths where possible.
-- No direct runtime `ALTER TABLE` without going through controlled migrations.
-- Migrations must be reviewable before application.
-- Prevent schema changes that would break critical workflows or RLS policies.
+- Schema changes must be reviewable and produce controlled Alembic migrations (no raw runtime ALTER TABLE from the app).
+- Every schema change must explicitly address RLS policy impact.
+- Hard cutover migrations must include validation, audit, and rollback paths.
+- Prevent schema changes that would break critical workflows, RLS isolation, or data integrity.
 
 ### NFR-2: Performance
 - New columns must be properly indexed (system suggests indexes based on type and usage).
@@ -89,10 +85,11 @@ It must integrate with the existing architecture (lists, custom attributes confi
 - Query plans and index recommendations should be part of the change review.
 
 ### NFR-3: Security and Access Control
-- Only authorized roles can perform schema modifications (e.g., Administrator with `config:edit`).
-- New fields/tables inherit or allow explicit RLS configuration.
-- Data in new fields respects existing project/client isolation rules.
-- Schema definitions themselves are protected.
+- Schema modification requires explicit permission (recommended: elevated or separate from general `config:edit`).
+- Every schema change must surface and require confirmation of RLS policy impact.
+- New columns and any supporting tables must have RLS policies applied (or explicitly inherit from parent entity).
+- All schema changes are fully audited (who, what, when, impact).
+- Data in new fields must respect existing RLS/client/project isolation.
 
 ### NFR-4: Maintainability and Upgrade Safety
 - Schema changes must not prevent future application upgrades or require per-client custom migrations.
