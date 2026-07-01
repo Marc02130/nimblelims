@@ -17,23 +17,35 @@ This design supports the user stories in `.docs/user-stories/schema-modification
 
 ## Glossary (Decided Direction)
 
-- **FieldDefinition**: The canonical term for the metadata definition of an extensible, typed field (scalar or list-backed). Replaces the role previously played by custom attribute definitions. Used for deliberate schema extension.
-- **FieldValue**: The actual value for a FieldDefinition on a specific record. Will live in a properly typed column (or a dedicated value table for complex cases) rather than JSONB.
-- **Entry**: A richer, template-driven component inside an Experiment or Process step. Entries can be tables of data, actions, or structured blocks. Different from simple FieldDefinitions. Columns inside custom Entries are also defined via FieldDefinitions where appropriate.
-- **ProcessSample**: Junction that records which samples are assigned to a Process (separate from per-experiment tracking).
-- **JSONB (unstructured only)**: Strictly for opaque or highly variable data that is not used for modeled functionality. Examples: raw instrument rows (`row_data`), AI extraction results, external opaque payloads. JSONB will **not** be used to extend the data model or carry structured user fields.
+- **FieldDefinition**: The canonical term for the metadata definition of an extensible, typed field (scalar or list-backed). This replaces the old "custom attributes" mechanism for deliberate schema extension. All modeled, user-extensible fields go through FieldDefinition.
 
-**Custom attributes** concept is being retired for new extensibility work.
+- **FieldValue**: The stored value for a FieldDefinition on a concrete record. Lives in a real database column (preferred) or a properly typed mechanism. Not stored in generic JSONB when used for extensibility.
+
+- **Entry**: A richer, composable component that lives inside an Experiment or inside a step of a Process.
+  - **Predefined Entries** (Out-Of-Box): Built-in behaviors such as aliquoting, pooling, index assignment, flowcell loading, QC review (pass/fail).
+  - **Custom Entries**:
+    - Sample data entries: per-sample data tables.
+    - Experiment detail entries: experiment-level data.
+  - The **columns** inside custom Entries are defined using FieldDefinitions (declared in the template).
+  - Relationship: FieldDefinitions are the building blocks (atoms). Entries are higher-level constructs (molecules) that can be built from FieldDefinitions + behavior. A FieldDefinition can also stand alone as a top-level extension on an entity (e.g. adding `specimen_biotype` directly to the Sample table).
+
+- **ProcessSample**: Junction table recording which samples are assigned to a Process (at the process level).
+
+- **JSONB (restricted to OOB only)**: Only for Out-Of-Box (OOB) unstructured or highly variable data. There is **no UI** for administrators to define new unstructured fields.
+  - Allowed examples: `template_definition`, `row_data` (raw instrument output), `parser_config`, `worklist_config`, `result` (from SopParseJob), `runtime_state`, `billing_info`.
+  - JSONB is **explicitly not used** to extend functionality or carry user-modeled data.
+
+**Custom attributes** as an extensibility pattern is being retired. We are planning a **hard cutover** (not a long dual-write period). Existing `custom_attributes` data will be migrated to FieldValue storage as part of the cutover.
 
 ## 2. High-Level Architecture
 
 ### 2.1 Core Concepts
 
-- **FieldDefinition**: Metadata for an extensible, typed field (the replacement for custom attribute definitions).
-  - Belongs to an entity type (Sample, Experiment, etc.) or scoped to a Template/Process.
-  - Properties: name, display_name, data_type (text, integer, list, reference, date, etc.), source_list_id (for list-backed fields), required, unique_scope, default_value, validation_rules, ui_hints.
-  - Can be "core" (developer-defined) or "extended" (admin-defined via UI).
-  - Will drive both database columns and UI generation.
+- **FieldDefinition**: Metadata for an extensible, typed field. This is the replacement for the old custom attributes mechanism.
+  - Can be scoped globally to an entity type or more narrowly to a Template or Process.
+  - Properties include: name, display_name, data_type, source_list_id (for list types), required, validation rules, etc.
+  - Drives real columns + UI generation.
+  - Used for both top-level entity extensions (e.g. adding `specimen_biotype` to Sample) and for defining columns inside custom Entries.
 
 - **SchemaChange** (audit + migration request): Records proposed and applied changes.
   - Type: ADD_COLUMN, DEPRECATE_COLUMN, DROP_COLUMN, ADD_TABLE, etc.

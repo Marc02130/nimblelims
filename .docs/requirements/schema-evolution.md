@@ -128,6 +128,11 @@ It must integrate with the existing architecture (lists, custom attributes confi
 - High adoption of the new fields in reporting and workflows.
 - Clean migration paths when retiring JSONB-heavy patterns.
 
+### Additional Constraints from Current Direction
+
+- **Hard cutover**: When moving from custom_attributes to FieldDefinition-based storage, we will do a hard cutover (with migration), not a long-running dual-write period.
+- **JSONB restriction**: JSONB may only be used for Out-Of-Box (OOB) unstructured data. There will be no UI allowing users or admins to define new unstructured fields for extensibility. JSONB examples that remain allowed: `template_definition`, `row_data`, `parser_config`, certain OOB result blobs.
+
 ---
 
 This requirements document will guide the design and implementation of schema evolution features as part of the JSONB refactor and broader experiment/process improvements.

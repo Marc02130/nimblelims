@@ -27,21 +27,32 @@ Overall direction is sound: move from "everything in JSONB" toward controlled ex
 
 ### 3.1 Data Model and Naming
 
-**User decision (2026-06-30):**
+**User decisions (2026-06-30):**
 - We will use **FieldDefinition** terminology.
-- We will **remove the "custom attributes" concept** for extensibility.
-- **JSONB will not be used to extend functionality.** It will only be used to store truly unstructured data.
+- We will **remove the "custom attributes" concept** entirely for extensibility.
+- **JSONB will not be used to extend functionality.** It is restricted to Out-Of-Box (OOB) unstructured data only. There will be **no UI** for defining new unstructured fields.
+- We are planning a **hard cutover** (not a prolonged dual-storage period) when migrating away from custom_attributes.
 
 **Issue:** Proliferation of similar concepts.
 - We already have `custom_attributes_config`, `list_entries`, `ExperimentDetail`, `ExperimentSampleExecution`, and proposed `FieldDefinition` + `ProcessSample`.
 - Risk of confusion between "custom attributes", "field definitions", "entries", and "process samples".
 
 **Recommendation (updated):** 
-- Use **FieldDefinition** as the canonical term.
-- Retire "custom attributes" for extensibility.
-- JSONB only for unstructured/opaque data.
-- Full glossary is in `.docs/design/schema-evolution.md`.
-- We still need a concrete migration/archival strategy for existing `custom_attributes` data and any code that relies on it.
+- Use **FieldDefinition** as the canonical term for all modeled extensibility.
+- Retire "custom attributes" completely as an extension mechanism.
+- JSONB strictly limited to OOB unstructured data (no UI for defining new unstructured extensibility).
+- Hard cutover (not gradual dual-write) when moving data out of custom_attributes.
+- Full glossary + relationship explanation is in `.docs/design/schema-evolution.md`.
+
+**FieldDefinition vs Entry relationship (clarified):**
+
+- **FieldDefinition** = the atom. It defines a single typed field (e.g. `specimen_biotype` as a list, or `concentration` as a number, or a custom column inside a data table).
+- **Entry** = the molecule. It is a richer construct inside an Experiment or Process step.
+  - A predefined Entry (OOB) is a behavior + possibly some fields (e.g. "Aliquots" action entry, "QC Review" pass/fail entry).
+  - A custom Sample data entry or Experiment detail entry is essentially a table whose columns are defined by FieldDefinitions (the columns are declared in the template).
+- So: Entries can *contain* FieldDefinitions (for their columns), but FieldDefinitions can also stand alone as top-level fields on entities (like adding specimen_biotype directly to Sample).
+
+This separation keeps scalar/list extensions clean while allowing richer, template-defined data structures inside experimental work.
 
 ### 3.2 Scope of "Add Table" Feature
 
