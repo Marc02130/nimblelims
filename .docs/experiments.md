@@ -129,6 +129,8 @@ For ELN-style Experiments, the list-based approach gives the right balance of st
 
 **Related Documents**
 - `.docs/processes.md`
+- `.docs/design-review-process-and-experiment.md`
+- `.docs/gap-analysis-process-and-experiment.md`
 - `.docs/experiment-runs.md`
 - `.docs/experiment-planning.md`
 - `.docs/experiment-rework-prerequisites.md`
