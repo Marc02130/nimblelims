@@ -57,15 +57,40 @@ This design supports the user stories in `.docs/user-stories/schema-modification
 For list-backed fields (e.g., `specimen_biotype`):
 - Use existing `list_entries` system. The column will be a `list_entry_id` FK (or nullable reference) with a GIN or B-tree index as appropriate.
 
-### 2.2 Storage Strategy (Hybrid)
+### 2.2 Storage Strategy for FieldValue (Recommended)
 
-- **Preferred for new/extended fields**: Real columns on the target table (or new junction/support table).
-- **Fallback / transitional**: Small `custom_attributes` JSONB remains for truly ad-hoc data.
-- **Promotion path**: Admin marks a JSONB key as "promotable" → system helps migrate to real column + updates queries/UI.
+**Yes, the "lists" you are referring to are the existing `lists` + `list_entries` system.**  
+This is the right mechanism for list-backed fields (e.g. `specimen_biotype` will be a FK column to `list_entries`, exactly like `sample.matrix`, `sample.qc_type`, `sample.status`, etc.).
 
-For new tables:
-- Generated or manually reviewed model + migration.
-- Basic dynamic access layer (or code generation) for CRUD until a developer provides custom logic.
+**Recommended storage model for FieldValue:**
+
+- **Top-level extensions on core entities** (e.g. adding `specimen_biotype` directly to the `samples` table, or similar fields on Project, Batch, etc.):  
+  **Add the column directly** to the entity table when the FieldDefinition is activated.  
+  - Use a controlled Alembic migration (generated or reviewed).  
+  - For list types: `xxx_id` FK to `list_entries`.  
+  - This gives best query performance, native constraints, and reporting.
+
+- **Variable columns inside custom Entries** (the "experiment specific tables" and sample data entries inside Experiments/Processes):  
+  Use a **dedicated typed value table** (e.g. `entry_field_values`):  
+  ```sql
+  entry_field_values (
+      id,
+      entry_id (FK to the Entry),
+      field_definition_id (FK to FieldDefinition),
+      value_text,
+      value_number,
+      value_list_entry_id (FK to list_entries),
+      value_date,
+      ... (or a JSONB only for truly complex OOB values)
+  )
+  ```
+  This avoids making the main entity tables infinitely wide and supports per-template / per-entry column definitions.
+
+- **JSONB restriction**: Only for genuine OOB unstructured data (template_definition, row_data, etc.). No more JSONB for modeled extensibility or user-defined fields.
+
+This hybrid avoids the downsides of pure EAV (bad performance) and pure "add column to everything" (table bloat for highly variable data).
+
+Hard cutover means: when migrating an existing custom_attributes field, we move the data into the appropriate storage (direct column or entry_field_values) and stop using the old JSONB path.
 
 ### 2.3 Migration Approach
 
