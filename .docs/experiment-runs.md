@@ -132,6 +132,7 @@ You can still enforce strict state-machine rules in the application service laye
 ---
 
 **Related Documents**
+- `.docs/processes.md`
 - `.docs/experiments.md` (ELN side)
 - `.docs/experiment-planning.md`
 - `.docs/experiment-rework-prerequisites.md`
