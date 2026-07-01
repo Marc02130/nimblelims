@@ -60,7 +60,17 @@ The FieldDefinition approach, if scoped correctly, directly supports the "low co
 
 ## Specific Feedback on Scope and Sequencing
 
-**Add list-backed columns (e.g. specimen_biotype on Samples) + simple scalars:** High ROI. Do this. Scientists understand lists. It directly reduces "we hacked it into custom_attributes or a spreadsheet" complaints. Integrate cleanly so the new field appears in Entries and Processes.
+**Add list-backed columns (e.g. specimen_biotype on Samples) + simple scalars:** High ROI. Do this.
+
+"Simple scalars" explicitly includes adding **text columns**, **numeric columns**, **date columns**, and **boolean columns** directly to existing tables (e.g. `samples`, `experiments`, etc.).
+
+Scientists understand lists. Simple scalars are equally common and painful when forced into JSONB/custom_attributes or spreadsheets.
+
+Both types must:
+- Be added as proper typed columns (not JSONB).
+- Appear automatically in relevant Entries (sample data entries / experiment detail entries).
+- Be usable inside Processes.
+- Support search, filtering, and reporting.
 
 **Deprecation / removal of columns:** Valuable. Reduces long-term mess. Include good impact analysis and audit.
 
