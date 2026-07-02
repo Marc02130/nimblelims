@@ -93,17 +93,23 @@ See:
 - `backend/models/field_definition.py` (FieldDefinition + EntryFieldValue)
 - `backend/models/entry.py` (fuller Entry model and relationships)
 
-Key relationships in the sketch:
+Key relationships (updated to match design):
 
-Experiment
-└── Entry (one or more per experiment / process step)
-      ├── linked to many FieldDefinition (via junction) → the columns of this entry
-      └── linked to many EntryFieldValue
-            └── optional link to Sample (for per-sample data + write-back)
+Processes are composed of experiments (templates)
+Experiments are composed of entries
 
-Predefined Entries use `predefined_entry_key` + config and usually don't create many EntryFieldValue rows.
+This does make sense
+ Processes:
+  An Entry can be linked to a process step via process_step_id.
+  ProcessSample tracks which samples are assigned to the overall process; the per-step data lives in the Entry + EntryFieldValue layer.
 
-Custom sample data entries and experiment detail entries are where the dynamic FieldDefinition columns shine.
+Predefined Entries use `predefined_entry_key` + config.
+Custom entries (sample_data / experiment_detail) have columns defined by attached FieldDefinitions (from the template).
+
+This supports:
+- Process-level assignment via ProcessSample.
+- Per-step (per-Experiment) data capture via Entry + EntryFieldValue.
+- Template-driven structure for columns in entries.
 
 Hard cutover means: when migrating an existing custom_attributes field, we move the data into the appropriate storage (direct column or entry_field_values) and stop using the old JSONB path.
 
