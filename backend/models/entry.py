@@ -352,3 +352,7 @@ class ProcessStep(Base):
 # This is how "samples and experiment detail entries will have the columns
 # displayed defined in the template."
 # ---------------------------------------------------------------------------
+
+# Path 1 top-level fields (e.g. specimen_biotype_id on Sample) are available
+# in sample_data Entries (the Entry can include or display the sample's
+# direct columns). They also appear when working with ProcessSample in Processes.
