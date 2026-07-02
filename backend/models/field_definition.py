@@ -22,7 +22,7 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
 from .base import Base, BaseModel
-
+from .list import List
 
 class FieldDefinition(BaseModel):
     """
@@ -97,9 +97,8 @@ class FieldDefinition(BaseModel):
         # You may want a unique constraint on (entity_type, name) + scope later
     )
 
-
 # ---------------------------------------------------------------------------
-# Value storage for dynamic columns inside Entries
+# Value storage for dynamic columns inside Entries (Path 2, but available)
 # (used when the column is defined per-template/per-entry rather than
 #  as a permanent column on the parent entity table)
 # ---------------------------------------------------------------------------
@@ -108,25 +107,15 @@ class EntryFieldValue(Base):
     """
     Stores the actual value for a FieldDefinition that lives inside a custom Entry.
 
-    This table is used **only** for the variable / per-template columns inside
-    custom Entries (sample_data entries or experiment_detail entries).
+    This table is used for the variable columns inside:
+      - Sample data entries
+      - Experiment detail entries
 
-    It allows templates to define arbitrary columns (via FieldDefinitions)
-    without making the main entity tables (samples, experiments) infinitely wide.
+    It allows templates to define arbitrary columns without making the main
+    entity tables infinitely wide.
 
-    For top-level fields (e.g. adding specimen_biotype directly to the samples table),
-    we instead add a real column during migration and set is_materialized_column=True
-    on the FieldDefinition. No row is needed in this table for those.
-
-    For sample_data entries:
-    - There is typically one Entry per "data table" defined for the experiment.
-    - For each sample in that experiment + each column (FieldDefinition) → one row here.
-    - sample_id links it.
-    - After saving, the app can selectively write values back to the core Sample
-      (e.g. concentration, volume) as per the design.
-
-    Typed columns are used so we avoid generic JSONB for modeled data.
-    value_json is only a rare fallback for complex OOB cases inside entries.
+    For top-level fields added directly to Sample / Experiment / etc.,
+    we add real columns instead of (or in addition to) rows in this table.
     """
 
     __tablename__ = 'entry_field_values'
@@ -134,8 +123,6 @@ class EntryFieldValue(Base):
     id = Column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
 
     # The Entry this value belongs to.
-    # For now we keep it generic; later we can have separate tables or
-    # a polymorphic link if needed.
     entry_id = Column(PostgresUUID(as_uuid=True), nullable=False, index=True)
 
     field_definition_id = Column(
@@ -164,79 +151,3 @@ class EntryFieldValue(Base):
     modified_by = Column(PostgresUUID(as_uuid=True), ForeignKey('users.id'))
 
     field_definition = relationship("FieldDefinition")
-
-
-# ---------------------------------------------------------------------------
-# ===========================================================================
-# PATH 1 FOCUS: Direct columns on entity tables for top-level fields
-# (High ROI MVP: list-backed + simple scalars on Samples, Experiments, etc.)
-# ===========================================================================
-
-"""
-Path 1: When adding a top-level field (e.g. via schema admin or template),
-we generate a migration to ADD a real column to the target table.
-
-This is preferred for:
-- Fields that should be queryable with standard SQL
-- List-backed fields (FK to list_entries)
-- Simple scalars that appear on the main entity
-
-Concrete examples:
-
-A. List-backed (specimen_biotype on samples)
-- FieldDefinition:
-    entity_type='sample'
-    name='specimen_biotype'
-    data_type='list'
-    source_list_id = <uuid of 'specimen_biotypes' list>
-    is_materialized_column=True
-    column_name='specimen_biotype_id'
-
-- Generated migration snippet:
-  op.add_column('samples', sa.Column(
-      'specimen_biotype_id', postgresql.UUID(as_uuid=True),
-      sa.ForeignKey('list_entries.id'), nullable=True))
-  op.create_index('ix_samples_specimen_biotype_id', 'samples', ['specimen_biotype_id'])
-
-- In models/sample.py (after):
-  specimen_biotype_id = Column(
-      PostgresUUID(as_uuid=True),
-      ForeignKey('list_entries.id'),
-      nullable=True, index=True
-  )
-  specimen_biotype = relationship(
-      'ListEntry', foreign_keys=[specimen_biotype_id]
-  )
-
-- Usage:
-  sample.specimen_biotype.name   # the value
-  # Appears in Entries if referenced, in Processes via ProcessSample
-
-B. Simple text column (e.g. "lot_number" on samples)
-- data_type='text'
-- Migration: op.add_column('samples', sa.Column('lot_number', sa.Text(), nullable=True))
-- Model: lot_number = Column(Text)
-
-C. Numeric column (e.g. "dilution_factor")
-- data_type='number' → NUMERIC column
-
-Pros of Path 1 (direct columns):
-- Excellent performance, indexes, joins, constraints
-- Standard SQLAlchemy / reporting
-- RLS applies naturally
-- Consistent with existing list fields (matrix, qc_type etc.)
-
-Cons:
-- Migration required per new top-level field (mitigated by generated + reviewed migrations)
-- Tables get wider (ok for focused use on Samples/Experiments first)
-
-When to use Path 1:
-- Top-level on core entities
-- List or simple scalar
-- High ROI for replacing custom_attributes / spreadsheets
-
-Integration:
-- New columns on Sample usable in sample_data Entries
-- Usable in Processes
-- Hard cutover: migrate data from old JSONB to new column
-"""

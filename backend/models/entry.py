@@ -439,7 +439,4 @@ class ProcessStep(Base):
 #               sort_order=...
 #           )
 #
-# This is how “columns defined in the template” works for
-# sample_data and experiment_detail entries.
-# The Entry gets exactly the FieldDefinitions attached in the template.
 # ---------------------------------------------------------------------------

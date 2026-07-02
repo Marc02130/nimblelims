@@ -39,3 +39,8 @@ from .experiment_process import (
     ProcessStepStatus,
     VALID_STEP_TRANSITIONS,
 )
+
+# New for schema evolution refactor (JSONB removal for extensibility)
+from .field_definition import FieldDefinition, EntryFieldValue
+from .entry import Entry, EntryFieldDefinition, Process, ProcessStep as ELNProcessStep, ProcessSample
+
