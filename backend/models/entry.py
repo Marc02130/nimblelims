@@ -325,3 +325,30 @@ class ProcessStep(Base):
     # - Experiment instances are created from the template for this step.
     # - Per-step data lives in Entry + EntryFieldValue (not duplicated on ProcessSample).
 
+
+
+# ---------------------------------------------------------------------------
+# Sketch: How an ExperimentTemplate declares the entries it is composed of
+#
+# "Experiments are composed of entries"
+#
+# class ExperimentTemplate(BaseModel):
+#     ...
+#     # Predefined entries (OOB) that instances of this template will have
+#     # Can be a JSONB list of keys or a proper association table
+#     predefined_entry_keys = Column(JSONB, default=list)
+#
+#     # FieldDefinitions that define custom columns for entries in this template
+#     # These can be grouped (e.g. "my_sample_data_entry_columns")
+#     # For simplicity in MVP, FieldDefinitions can have template_id
+#
+# When an Experiment is instantiated from the template:
+#   - For each key in predefined_entry_keys:
+#       create Entry(..., entry_type='predefined_action', predefined_entry_key=key, ...)
+#   - For custom entries defined in the template:
+#       create Entry(..., entry_type='sample_data' or 'experiment_detail')
+#       link the relevant FieldDefinitions to it via the junction
+#
+# This is how "samples and experiment detail entries will have the columns
+# displayed defined in the template."
+# ---------------------------------------------------------------------------
