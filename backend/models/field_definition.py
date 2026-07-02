@@ -167,36 +167,79 @@ class EntryFieldValue(Base):
 
 
 # ---------------------------------------------------------------------------
-# Storage Examples
-#
-# 1. Top-level field on entity table (direct column)
-#    Example: specimen_biotype (list) added to Samples.
-#
-#    - Migration adds real column to samples table:
-#        specimen_biotype_id = Column(
-#            PostgresUUID(as_uuid=True),
-#            ForeignKey('list_entries.id'),
-#            nullable=True, index=True
-#        )
-#
-#    - FieldDefinition:
-#        entity_type='sample', name='specimen_biotype', data_type='list',
-#        source_list_id=..., is_materialized_column=True,
-#        column_name='specimen_biotype_id'
-#
-#    - In Sample model: direct relationship or property.
-#    - Queryable with normal SQLAlchemy, good indexes, RLS applies naturally.
-#
-# 2. Column inside a custom Entry (uses entry_field_values)
-#    Example: A template defines a "my_sample_data" entry with columns:
-#      concentration (number), temperature (number), notes (text)
-#
-#    - FieldDefinitions created with entity_type='entry' or scoped to template,
-#      is_materialized_column=False.
-#    - When Entry is created for an experiment:
-#        - Junction rows in entry_field_definitions link the Entry to those FieldDefinitions.
-#    - For each sample in the experiment:
-#        - EntryFieldValue rows:
+# ===========================================================================
+# PATH 1 FOCUS: Direct columns on entity tables for top-level fields
+# (High ROI MVP: list-backed + simple scalars on Samples, Experiments, etc.)
+# ===========================================================================
+
+"""
+Path 1: When adding a top-level field (e.g. via schema admin or template),
+we generate a migration to ADD a real column to the target table.
+
+This is preferred for:
+- Fields that should be queryable with standard SQL
+- List-backed fields (FK to list_entries)
+- Simple scalars that appear on the main entity
+
+Concrete examples:
+
+A. List-backed (specimen_biotype on samples)
+- FieldDefinition:
+    entity_type='sample'
+    name='specimen_biotype'
+    data_type='list'
+    source_list_id = <uuid of 'specimen_biotypes' list>
+    is_materialized_column=True
+    column_name='specimen_biotype_id'
+
+- Generated migration snippet:
+  op.add_column('samples', sa.Column(
+      'specimen_biotype_id', postgresql.UUID(as_uuid=True),
+      sa.ForeignKey('list_entries.id'), nullable=True))
+  op.create_index('ix_samples_specimen_biotype_id', 'samples', ['specimen_biotype_id'])
+
+- In models/sample.py (after):
+  specimen_biotype_id = Column(
+      PostgresUUID(as_uuid=True),
+      ForeignKey('list_entries.id'),
+      nullable=True, index=True
+  )
+  specimen_biotype = relationship(
+      'ListEntry', foreign_keys=[specimen_biotype_id]
+  )
+
+- Usage:
+  sample.specimen_biotype.name   # the value
+  # Appears in Entries if referenced, in Processes via ProcessSample
+
+B. Simple text column (e.g. "lot_number" on samples)
+- data_type='text'
+- Migration: op.add_column('samples', sa.Column('lot_number', sa.Text(), nullable=True))
+- Model: lot_number = Column(Text)
+
+C. Numeric column (e.g. "dilution_factor")
+- data_type='number' → NUMERIC column
+
+Pros of Path 1 (direct columns):
+- Excellent performance, indexes, joins, constraints
+- Standard SQLAlchemy / reporting
+- RLS applies naturally
+- Consistent with existing list fields (matrix, qc_type etc.)
+
+Cons:
+- Migration required per new top-level field (mitigated by generated + reviewed migrations)
+- Tables get wider (ok for focused use on Samples/Experiments first)
+
+When to use Path 1:
+- Top-level on core entities
+- List or simple scalar
+- High ROI for replacing custom_attributes / spreadsheets
+
+Integration:
+- New columns on Sample usable in sample_data Entries
+- Usable in Processes
+- Hard cutover: migrate data from old JSONB to new column
+"""
 #            entry_id=..., field_definition_id=conc_fd, sample_id=..., value_number=1.23
 #            entry_id=..., field_definition_id=temp_fd, sample_id=..., value_number=37.0
 #            entry_id=..., field_definition_id=notes_fd, sample_id=..., value_text="..."
