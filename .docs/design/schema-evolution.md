@@ -72,20 +72,82 @@ For list-backed fields (e.g., `specimen_biotype`):
 **Yes, the "lists" you are referring to are the existing `lists` + `list_entries` system.**  
 This is the right mechanism for list-backed fields (e.g. `specimen_biotype` will be a FK column to `list_entries`, exactly like `sample.matrix`, `sample.qc_type`, `sample.status`, etc.).
 
-**Recommended storage model for MVP:**
+**Recommended storage model (detailed with pros/cons and examples):**
 
-- **Top-level extensions on core entities** (Samples, Experiments, etc.):
-  - **Add the column directly** to the entity table when the FieldDefinition is activated.
-  - Use a controlled Alembic migration.
-  - List types: `xxx_id UUID REFERENCES list_entries(id)`.
-  - Simple scalars: native types (`TEXT`, `NUMERIC`, `TIMESTAMPTZ`, `BOOLEAN`, etc.).
-  - This gives the best performance and is what scientists expect.
+**Path 1: Direct columns on entity tables (for top-level fields)**
+- When `is_materialized_column = True` on the FieldDefinition.
+- The system (via migration) adds a real column to the target table (e.g. samples).
+- Example: Adding `specimen_biotype` (list) on Samples.
+  - Migration:
+    ```sql
+    ALTER TABLE samples 
+      ADD COLUMN specimen_biotype_id UUID REFERENCES list_entries(id);
+    CREATE INDEX idx_samples_specimen_biotype ON samples(specimen_biotype_id);
+    ```
+  - In Sample model (after migration):
+    ```python
+    specimen_biotype_id = Column(PostgresUUID(as_uuid=True), 
+                                  ForeignKey('list_entries.id'), nullable=True, index=True)
+    specimen_biotype = relationship("ListEntry", foreign_keys=[specimen_biotype_id])
+    ```
+  - FieldDefinition record:
+    - entity_type='sample', name='specimen_biotype', data_type='list',
+    - source_list_id=..., is_materialized_column=True, column_name='specimen_biotype_id'
 
-- **Columns inside custom Entries** (for now):
-  - Use the same direct-column approach where the parent table allows it.
-  - For highly variable per-template data, we can initially lean on FieldDefinitions + direct columns on the relevant junction or use a lightweight `entry_field_values` table only if table width becomes a problem. Keep it simple first.
+**Pros of direct columns:**
+- Best query performance, joins, indexes, constraints, reporting.
+- Feels natural (same as existing matrix, qc_type, etc.).
+- RLS and existing queries work without changes.
+- Simple for BI/tools.
 
-- **JSONB restriction**: Strictly for OOB unstructured data (template_definition, row_data, etc.). No JSONB for new modeled user fields.
+**Cons:**
+- Requires migration per added field.
+- Main tables can get wide if many top-level custom fields are added over time.
+
+**When to use:** Top-level fields on core entities (Samples, Experiments, Projects, Batches, etc.) that are commonly needed or benefit from DB features. This is the primary path for the high-ROI "add list-backed columns + simple scalars" work.
+
+**Path 2: Dedicated entry_field_values table (for columns inside custom Entries)**
+- When `is_materialized_column = False`.
+- Used for the variable columns inside custom sample_data entries and experiment_detail entries.
+- Table (typed values, minimal JSONB):
+  ```sql
+  entry_field_values (
+    id UUID PRIMARY KEY,
+    entry_id UUID NOT NULL REFERENCES entries(id),
+    field_definition_id UUID NOT NULL REFERENCES field_definitions(id),
+    sample_id UUID REFERENCES samples(id),   -- for sample_data entries
+    value_text TEXT,
+    value_number NUMERIC(20,10),
+    value_list_entry_id UUID REFERENCES list_entries(id),
+    value_date TIMESTAMPTZ,
+    value_boolean BOOLEAN,
+    value_json JSONB   -- only for rare complex OOB cases
+  )
+  ```
+- Example for a custom "my_sample_data" entry in an experiment (columns: concentration, temp, notes):
+  - Template defines the entry + attaches 3 FieldDefinitions.
+  - For each sample + each column → one row:
+    - entry_id=..., field_definition_id=conc_fd, sample_id=..., value_number=12.34
+    - entry_id=..., field_definition_id=temp_fd, sample_id=..., value_number=37
+    - entry_id=..., field_definition_id=notes_fd, sample_id=..., value_text="foo"
+  - App can selectively write back (e.g. concentration → sample.concentration).
+
+**Pros of entry_field_values:**
+- Extremely flexible for per-template / per-entry columns without bloating core tables.
+- Supports the "experiment specific tables" and "columns defined in the template" requirement.
+- Easy to add/remove columns per template without schema changes to main tables.
+- Good for highly variable experimental data.
+
+**Cons:**
+- Queries for multiple columns require joins (or views).
+- Slightly more complex than direct columns.
+- Need careful indexing on (entry_id, field_definition_id, sample_id).
+
+**When to use:** Inside custom Entries (sample_data entries and experiment_detail entries). This is where the per-template flexibility lives. Not for simple top-level fields.
+
+**JSONB restriction (reminder):** Only OOB unstructured (template_definition, row_data, etc.). Never for new modeled/user fields.
+
+**Hybrid rule:** Direct column for top-level/common fields on entities. entry_field_values for dynamic columns inside Entries. This keeps performance good where it matters while enabling template-driven variability.
 
 This hybrid avoids the downsides of pure EAV (bad performance) and pure "add column to everything" (table bloat for highly variable data).
 
