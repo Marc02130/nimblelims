@@ -151,9 +151,9 @@ This is the right mechanism for list-backed fields (e.g. `specimen_biotype` will
 
 This hybrid avoids the downsides of pure EAV (bad performance) and pure "add column to everything" (table bloat for highly variable data).
 
-See:
-- `backend/models/field_definition.py` (FieldDefinition + EntryFieldValue)
-- `backend/models/entry.py` (fuller Entry model and relationships)
+See the sketches in:
+- `backend/models/field_definition.py`
+- `backend/models/entry.py` (includes the template declaration sketch below)
 
 Key relationships (updated to match design):
 
