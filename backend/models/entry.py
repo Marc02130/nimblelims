@@ -46,10 +46,11 @@ class Entry(BaseModel):
         index=True
     )
 
-    # Optional: if this entry is part of a specific step in a Process
+    # Links the Entry to a specific step inside a Process.
+    # Per design: "An Entry can be linked to a process step via process_step_id."
     process_step_id = Column(
         PostgresUUID(as_uuid=True),
-        ForeignKey('process_steps.id'),  # or the new process step if modeled separately
+        ForeignKey('process_steps.id'),
         nullable=True,
         index=True
     )
@@ -79,8 +80,8 @@ class Entry(BaseModel):
     modified_by = Column(PostgresUUID(as_uuid=True), ForeignKey('users.id'))
 
     # Relationships
-    experiment = relationship("Experiment", back_populates="entries")  # add to Experiment model
-    # process_step = relationship(...)
+    experiment = relationship("Experiment", back_populates="entries")
+    process_step = relationship("ProcessStep", back_populates="entries")  # if we add the backref on ProcessStep
 
     # For custom entries: the FieldDefinitions that define the columns of this entry
     field_definitions = relationship(
@@ -272,12 +273,12 @@ class ProcessSample(Base):
     assigned_at = Column(DateTime(timezone=True), server_default=func.now())
 
     # Relationships
-    # process = relationship("Process")
-    # sample = relationship("Sample")
+    process = relationship("Process", back_populates="process_samples")
+    sample = relationship("Sample")  # add back_populates on Sample if desired
 
 
 # ---------------------------------------------------------------------------
-# Minimal supporting Process / ProcessStep (for ELN side composition)
+# Process and ProcessStep (ELN side)
 #
 # Processes are composed of experiments (templates)
 #
@@ -287,7 +288,16 @@ class Process(BaseModel):
 
     name = Column(String(255), nullable=False)
     description = Column(Text)
-    # status, owner, etc.
+    # Add status, owner, created_by etc. as needed (inherits from BaseModel)
+
+    steps = relationship(
+        "ProcessStep",
+        back_populates="process",
+        order_by="ProcessStep.sort_order",
+        cascade="all, delete-orphan"
+    )
+
+    process_samples = relationship("ProcessSample", back_populates="process")
 
 class ProcessStep(Base):
     """
@@ -305,7 +315,13 @@ class ProcessStep(Base):
     )
     sort_order = Column(Integer, nullable=False, default=0)
 
-    # When the process is executed:
-    # - An Experiment instance is (or can be) created from the template.
-    # - The Entry for that experiment can link back via process_step_id.
+    process = relationship("Process", back_populates="steps")
+
+    # Entries that belong to this process step
+    # (An Entry can be linked to a process step via process_step_id)
+    entries = relationship("Entry", back_populates="process_step")
+
+    # When the process is executed for samples:
+    # - Experiment instances are created from the template for this step.
+    # - Per-step data lives in Entry + EntryFieldValue (not duplicated on ProcessSample).
 
