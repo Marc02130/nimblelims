@@ -97,8 +97,9 @@ class Entry(BaseModel):
     )
 
 
-# Junction table to associate FieldDefinitions with a specific Entry
-# (i.e. which columns belong to this custom entry)
+# Junction table to associate FieldDefinitions (columns) with a specific Entry.
+# This is what allows a template to define "these are the columns for this
+# sample data entry in this experiment".
 class EntryFieldDefinition(Base):
     __tablename__ = 'entry_field_definitions'
 
@@ -113,11 +114,14 @@ class EntryFieldDefinition(Base):
         primary_key=True
     )
 
-    # Optional ordering of columns within the entry's table
+    # Column ordering within the entry's table / form
     sort_order = Column(Integer, default=0)
 
+    # Whether this column is shown in the UI for this entry
+    visible = Column(Boolean, default=True)
+
     entry = relationship("Entry", back_populates="field_definitions")
-    field_definition = relationship("FieldDefinition")
+    field_definition = relationship("FieldDefinition", back_populates="entries")
 
 
 # Extend the previous EntryFieldValue with better relationship
@@ -180,37 +184,30 @@ class EntryFieldValue(Base):
     field_definition = relationship("FieldDefinition")
 
 
-# You would also need to add to Experiment model:
+# To wire this up, you would add to the Experiment model:
 # entries = relationship("Entry", back_populates="experiment", cascade="all, delete-orphan")
+#
+# You may also want a many-to-many or direct link from Entry to Sample
+# for entries that are not purely sample_data (or use ExperimentSampleExecution).
 ```
 
-This builds on the previous `EntryFieldValue` sketch.
-
-**Key relationships:**
-
-- `Entry` ←→ many `FieldDefinition` (via `entry_field_definitions` junction) — the columns of this entry.
-- `Entry` ←→ many `EntryFieldValue` — the actual data.
-- `EntryFieldValue` → `FieldDefinition` (the definition of this particular value).
-- For sample data entries: `EntryFieldValue.sample_id` links the value to a specific sample.
-- `Entry` belongs to an `Experiment` (and optionally a Process step).
-
-**For predefined entries:**
-- `predefined_entry_key` identifies the built-in behavior.
-- They may still have some FieldDefinitions for configuration parameters.
-- They usually don't use `EntryFieldValue` for their main output (the action itself may create other records).
-
-**For custom sample data entries:**
-- One `Entry` per "table" defined in the template for that experiment.
-- Multiple `EntryFieldValue` rows per sample (one per column/field).
-- Or alternatively, one row per sample with multiple values — the current sketch uses one value per row for simplicity and flexibility.
-
-This model allows:
-- Template-defined structure (via which FieldDefinitions are attached to the Entry).
-- Sample-specific data with write-back capability (via sample_id + value columns).
-- Clean separation from the old loose JSONB details.
-
-Would you like me to also sketch:
-- The junction model more explicitly?
-- How this interacts with `ExperimentSampleExecution`?
-- Example queries or how write-back to Sample would work?
+# ---------------------------------------------------------------------------
+# Usage Notes & Relationships (for the sketch)
+#
+# Entry
+#   - belongs to Experiment (and optionally a Process step)
+#   - has many FieldDefinitions (its columns) via the junction
+#   - has many EntryFieldValue (the data)
+#
+# For a custom sample_data entry:
+#   - The template defines which FieldDefinitions are the columns of this entry.
+#   - For each sample assigned to the experiment, one EntryFieldValue row per field.
+#   - After validation, selected values can be written back to the Sample record
+#     (e.g. concentration, volume).
+#
+# Predefined entries mostly use `predefined_entry_key` + `config`.
+# They rarely populate many EntryFieldValue rows.
+#
+# This gives template-controlled structure while keeping storage efficient.
+# ---------------------------------------------------------------------------
 - Updates to the `Experiment` model to include `entries`?
