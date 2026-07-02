@@ -46,6 +46,10 @@ class Experiment(BaseModel):
     completed_at = Column(DateTime, nullable=True)
     custom_attributes = Column(JSONB, nullable=True, server_default='{}')  # legacy - phased out via hard cutover to FieldDefinition
 
+    # === Deprecation plan for custom_attributes (hard cutover) ===
+    # See sample.py for full phased plan. Same here: promote modeled fields
+    # (e.g. via Entries) to FieldDefinition-backed columns, hard cutover.
+
     experiment_template = relationship(
         "ExperimentTemplate",
         back_populates="experiments",
@@ -63,10 +67,23 @@ class Experiment(BaseModel):
         cascade="all, delete-orphan",
     )
 
-    # New: Experiments are composed of entries
+    # New: Experiments are composed of entries (per the refactor)
+    # Use string reference to avoid circular import with entry.py
     entries = relationship(
         "Entry",
         back_populates="experiment",
+        cascade="all, delete-orphan",
+        order_by="Entry.sort_order",
+    )
+
+    # New: Experiments are composed of entries (per the refactor)
+    # Use string reference to avoid circular import with entry.py
+    entries = relationship(
+        "Entry",
+        back_populates="experiment",
+        cascade="all, delete-orphan",
+        order_by="Entry.sort_order",
+    )
         cascade="all, delete-orphan",
         order_by="Entry.sort_order",
     )
