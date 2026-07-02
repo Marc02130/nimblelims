@@ -240,14 +240,3 @@ Integration:
 - Usable in Processes
 - Hard cutover: migrate data from old JSONB to new column
 """
-#            entry_id=..., field_definition_id=conc_fd, sample_id=..., value_number=1.23
-#            entry_id=..., field_definition_id=temp_fd, sample_id=..., value_number=37.0
-#            entry_id=..., field_definition_id=notes_fd, sample_id=..., value_text="..."
-#
-#    - Pros of this table: flexible per-template columns without schema bloat.
-#    - Write-back: app can copy value_number from conc_fd to sample.concentration.
-#
-# When to use which:
-# - Direct column: top-level, commonly used, benefits from native DB features (e.g. specimen_biotype on Sample).
-# - entry_field_values: highly variable columns inside template-defined Entries.
-# ---------------------------------------------------------------------------
