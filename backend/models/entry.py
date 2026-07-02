@@ -356,3 +356,90 @@ class ProcessStep(Base):
 # Path 1 top-level fields (e.g. specimen_biotype_id on Sample) are available
 # in sample_data Entries (the Entry can include or display the sample's
 # direct columns). They also appear when working with ProcessSample in Processes.
+
+# ---------------------------------------------------------------------------
+# Sketch: How ExperimentTemplate declares the entries it is composed of
+#
+# "Experiments are composed of entries"
+#
+# In the new model, ExperimentTemplate declares:
+#
+# - Predefined entries (OOB): list of keys for built-in actions/entries
+#   that will be instantiated for every Experiment created from this template.
+#
+# - Custom entries: groups of FieldDefinitions that define the columns
+#   for sample_data and experiment_detail entries.
+#   The "columns displayed defined in the template" come from here.
+#
+# Example associations (add to ExperimentTemplate or as separate models):
+#
+# class ExperimentTemplate(BaseModel):
+#     ...
+#     # Predefined OOB entries (simple for MVP)
+#     # e.g. ["aliquoting", "qc_review_pass_fail", "index_assignment"]
+#     predefined_entry_keys = Column(JSONB, default=list)
+#
+#     # Or a proper many-to-many to a PredefinedEntry registry
+#
+#     # Custom entry definitions (the columns for custom entries)
+#     # These FieldDefinitions are "defined in the template"
+#     custom_entry_definitions = relationship(
+#         "TemplateCustomEntry",
+#         back_populates="template",
+#         cascade="all, delete-orphan"
+#     )
+#
+# class TemplateCustomEntry(Base):
+#     """A named custom entry (sample_data or experiment_detail) in the template."""
+#     __tablename__ = 'template_custom_entries'
+#
+#     template_id = Column(FK('experiment_templates.id'))
+#     entry_name = Column(String(255))      # e.g. "my_sample_data_table", "experiment_notes"
+#     entry_type = Column(String(64))       # 'sample_data' or 'experiment_detail'
+#     sort_order = Column(Integer, default=0)
+#
+#     # The columns for this entry are the linked FieldDefinitions
+#     field_definitions = relationship(
+#         "TemplateCustomEntryField",
+#         back_populates="custom_entry"
+#     )
+#
+# class TemplateCustomEntryField(Base):
+#     """Links a FieldDefinition as a column in a custom entry."""
+#     __tablename__ = 'template_custom_entry_fields'
+#
+#     custom_entry_id = Column(FK('template_custom_entries.id'))
+#     field_definition_id = Column(FK('field_definitions.id'))
+#     sort_order = Column(Integer, default=0)
+#     visible = Column(Boolean, default=True)
+#
+#     custom_entry = relationship("TemplateCustomEntry", back_populates="field_definitions")
+#     field_definition = relationship("FieldDefinition")
+#
+# Instantiation (when creating Experiment from template):
+#   for key in template.predefined_entry_keys:
+#       Entry(
+#           experiment=exp,
+#           entry_type='predefined_action',
+#           predefined_entry_key=key,
+#           ...
+#       )
+#
+#   for custom in template.custom_entry_definitions:
+#       entry = Entry(
+#           experiment=exp,
+#           entry_type=custom.entry_type,   # 'sample_data' or 'experiment_detail'
+#           name=custom.entry_name,
+#           ...
+#       )
+#       for tcef in custom.field_definitions:   # ordered
+#           EntryFieldDefinition(
+#               entry=entry,
+#               field_definition=tcef.field_definition,
+#               sort_order=...
+#           )
+#
+# This is how “columns defined in the template” works for
+# sample_data and experiment_detail entries.
+# The Entry gets exactly the FieldDefinitions attached in the template.
+# ---------------------------------------------------------------------------
