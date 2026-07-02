@@ -138,3 +138,251 @@ For a **hard cutover** we compress steps 3–5 into a single deployment window w
 - `.docs/experiments.md`
 
 This is a starting point. It will be expanded with concrete migration scripts, checklists, and timelines as implementation progresses.
+
+## 8. Concrete Migration Example: Hard Cutover for specimen_biotype
+
+**Scenario (from user story):** Move "specimen_biotype" from legacy `custom_attributes` JSONB on Sample to a proper list-backed FieldDefinition + direct column (`specimen_biotype_id`).
+
+**Assumptions:**
+- We have (or create) a List "specimen_biotypes" with entries (name = the biotype value).
+- Some existing samples have `custom_attributes['specimen_biotype'] = 'B-cell'` (string value matching a list entry name).
+- Hard cutover: one deployment that does the migration + code flip. No long dual-write.
+
+**Step-by-step:**
+
+1. **Define the FieldDefinition (one-time, via admin UI or script)**
+   ```python
+   fd = FieldDefinition(
+       entity_type='sample',
+       name='specimen_biotype',
+       display_name='Specimen Biotype',
+       data_type='list',
+       source_list_id=specimen_biotypes_list.id,
+       is_required=False,
+       is_materialized_column=True,
+       column_name='specimen_biotype_id',
+       # validation_rules, ui_hints etc.
+   )
+   db.add(fd)
+   # This can be done before the migration.
+   ```
+
+2. **Migration (Alembic) - adds the column**
+   ```python
+   def upgrade():
+       op.add_column('samples', sa.Column(
+           'specimen_biotype_id',
+           postgresql.UUID(as_uuid=True),
+           sa.ForeignKey('list_entries.id'),
+           nullable=True
+       ))
+       op.create_index('ix_samples_specimen_biotype_id', 'samples', ['specimen_biotype_id'])
+
+       # Optional: add a comment or temporary column for safety
+   ```
+
+3. **Backfill script (run as part of migration or pre-deploy job)**
+   ```python
+   # Pseudocode for a safe, batched backfill
+   def backfill_specimen_biotype():
+       # Snapshot before
+       # ...
+
+       batch_size = 1000
+       offset = 0
+       while True:
+           samples = db.query(Sample).filter(
+               Sample.custom_attributes['specimen_biotype'].astext != None
+           ).offset(offset).limit(batch_size).all()
+
+           if not samples:
+               break
+
+           for s in samples:
+               old_value = s.custom_attributes.get('specimen_biotype')
+               if old_value:
+                   list_entry = db.query(ListEntry).filter(
+                       ListEntry.list_id == specimen_biotypes_list.id,
+                       ListEntry.name == old_value
+                   ).first()
+                   if list_entry:
+                       s.specimen_biotype_id = list_entry.id
+                       # Optionally remove from JSONB here or after
+                       # del s.custom_attributes['specimen_biotype']  # or mark
+
+           db.commit()
+           offset += batch_size
+           # Progress logging, etc.
+
+       # Validation
+       # - Count of non-null before vs after
+       # - Spot check random samples
+       # - Ensure no invalid list_entry_ids
+   ```
+
+4. **Code changes (in the same release / hard cutover)**
+   - Update Sample model (as sketched): add the real `specimen_biotype_id` column and relationship. Deprecate access via custom_attributes.
+   - Update all read sites:
+     - Old: `s.custom_attributes.get('specimen_biotype')`
+     - New: `s.specimen_biotype.name if s.specimen_biotype else None`
+   - Update write sites / forms: now use the FieldDefinition-driven form field.
+   - In Entries: the new field becomes available for sample_data entries (template can reference the FieldDefinition).
+   - In Processes: visible via ProcessSample + per-experiment data.
+   - Remove or guard old custom_attributes access for this key.
+
+5. **Post-cutover cleanup (follow-up migration)**
+   - Remove the key from any remaining custom_attributes JSONB (or leave historical data).
+   - Optionally drop support for the key in custom_attributes entirely.
+   - Update any reports/queries that assumed the JSONB key.
+
+6. **Validation & Testing**
+   - Before/after row counts and value sampling.
+   - Full test suite for the field in forms, Entries, Processes, search.
+   - RLS tests: ensure the new column respects client/project isolation.
+   - Dry-run the backfill on a staging copy of production data.
+
+**Rollback plan (critical for hard cutover):**
+- Pre-migration snapshot of the samples table (or at least the custom_attributes column).
+- If issues: restore snapshot + revert code to read from custom_attributes.
+- Alternative: have a "re-populate JSONB from new column" script as a quick fallback.
+- Feature flag the new code paths if possible during the cutover window.
+
+**Integration notes for this example:**
+- Once the column exists, it can be pulled into sample_data Entries (via the template's FieldDefinitions).
+- In a Process, samples carrying the biotype via ProcessSample will have the value available in the relevant experiment step's entries.
+
+This pattern generalizes to other simple scalars and list-backed fields.
+```
+
+**Notes on this example:**
+- It demonstrates the hard cutover: backfill + code flip in one go.
+- Data from JSONB moves to the proper typed column.
+- No long dual storage.
+- The FieldDefinition provides the metadata (list source, validation, UI) going forward.
+- Ties directly into Entries (columns defined in template) and Processes.
+
+## 8. Concrete Migration Example: Hard Cutover for specimen_biotype
+
+**Scenario (from user story):** Move "specimen_biotype" from legacy `custom_attributes` JSONB on Sample to a proper list-backed FieldDefinition + direct column (`specimen_biotype_id`).
+
+**Assumptions:**
+- We have (or create) a List "specimen_biotypes" with entries (name = the biotype value).
+- Some existing samples have `custom_attributes['specimen_biotype'] = 'B-cell'` (string value matching a list entry name).
+- Hard cutover: one deployment that does the migration + code flip. No long dual-write.
+
+**Step-by-step:**
+
+1. **Define the FieldDefinition (one-time, via admin UI or script)**
+   ```python
+   fd = FieldDefinition(
+       entity_type='sample',
+       name='specimen_biotype',
+       display_name='Specimen Biotype',
+       data_type='list',
+       source_list_id=specimen_biotypes_list.id,
+       is_required=False,
+       is_materialized_column=True,
+       column_name='specimen_biotype_id',
+       # validation_rules, ui_hints etc.
+   )
+   db.add(fd)
+   # This can be done before the migration.
+   ```
+
+2. **Migration (Alembic) - adds the column**
+   ```python
+   def upgrade():
+       op.add_column('samples', sa.Column(
+           'specimen_biotype_id',
+           postgresql.UUID(as_uuid=True),
+           sa.ForeignKey('list_entries.id'),
+           nullable=True
+       ))
+       op.create_index('ix_samples_specimen_biotype_id', 'samples', ['specimen_biotype_id'])
+
+       # Optional: add a comment or temporary column for safety
+   ```
+
+3. **Backfill script (run as part of migration or pre-deploy job)**
+   ```python
+   # Pseudocode for a safe, batched backfill
+   def backfill_specimen_biotype():
+       # Snapshot before
+       # ...
+
+       batch_size = 1000
+       offset = 0
+       while True:
+           samples = db.query(Sample).filter(
+               Sample.custom_attributes['specimen_biotype'].astext != None
+           ).offset(offset).limit(batch_size).all()
+
+           if not samples:
+               break
+
+           for s in samples:
+               old_value = s.custom_attributes.get('specimen_biotype')
+               if old_value:
+                   list_entry = db.query(ListEntry).filter(
+                       ListEntry.list_id == specimen_biotypes_list.id,
+                       ListEntry.name == old_value
+                   ).first()
+                   if list_entry:
+                       s.specimen_biotype_id = list_entry.id
+                       # Optionally remove from JSONB here or after
+                       # del s.custom_attributes['specimen_biotype']  # or mark
+
+           db.commit()
+           offset += batch_size
+           # Progress logging, etc.
+
+       # Validation
+       # - Count of non-null before vs after
+       # - Spot check random samples
+       # - Ensure no invalid list_entry_ids
+   ```
+
+4. **Code changes (in the same release / hard cutover)**
+   - Update Sample model (as sketched): add the real `specimen_biotype_id` column and relationship. Deprecate access via custom_attributes.
+   - Update all read sites:
+     - Old: `s.custom_attributes.get('specimen_biotype')`
+     - New: `s.specimen_biotype.name if s.specimen_biotype else None`
+   - Update write sites / forms: now use the FieldDefinition-driven form field.
+   - In Entries: the new field becomes available for sample_data entries (template can reference the FieldDefinition).
+   - In Processes: visible via ProcessSample + per-experiment data.
+   - Remove or guard old custom_attributes access for this key.
+
+5. **Post-cutover cleanup (follow-up migration)**
+   - Remove the key from any remaining custom_attributes JSONB (or leave historical data).
+   - Optionally drop support for the key in custom_attributes entirely.
+   - Update any reports/queries that assumed the JSONB key.
+
+6. **Validation & Testing**
+   - Before/after row counts and value sampling.
+   - Full test suite for the field in forms, Entries, Processes, search.
+   - RLS tests: ensure the new column respects client/project isolation.
+   - Dry-run the backfill on a staging copy of production data.
+
+**Rollback plan (critical for hard cutover):**
+- Pre-migration snapshot of the samples table (or at least the custom_attributes column).
+- If issues: restore snapshot + revert code to read from custom_attributes.
+- Alternative: have a "re-populate JSONB from new column" script as a quick fallback.
+- Feature flag the new code paths if possible during the cutover window.
+
+**Integration notes for this example:**
+- Once the column exists, it can be pulled into sample_data Entries (via the template's FieldDefinitions).
+- In a Process, samples carrying the biotype via ProcessSample will have the value available in the relevant experiment step's entries.
+
+This pattern generalizes to other simple scalars and list-backed fields.
+```
+
+**Notes on this example:**
+- It demonstrates the hard cutover: backfill + code flip in one go.
+- Data from JSONB moves to the proper typed column.
+- No long dual storage.
+- The FieldDefinition provides the metadata (list source, validation, UI) going forward.
+- Ties directly into Entries (columns defined in template) and Processes.
+
+This can be turned into a real Alembic migration + script once we have the FieldDefinition model in place.
+
+Let me know if you'd like me to sketch the actual Alembic revision file, the backfill as a standalone script, or move to the next item (e.g. how templates declare entries in more detail, or updating other models).
