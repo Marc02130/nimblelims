@@ -89,7 +89,21 @@ This is the right mechanism for list-backed fields (e.g. `specimen_biotype` will
 
 This hybrid avoids the downsides of pure EAV (bad performance) and pure "add column to everything" (table bloat for highly variable data).
 
-See the initial model sketch in `backend/models/field_definition.py` for the current thinking on `FieldDefinition` and `EntryFieldValue`.
+See:
+- `backend/models/field_definition.py` (FieldDefinition + EntryFieldValue)
+- `backend/models/entry.py` (fuller Entry model and relationships)
+
+Key relationships in the sketch:
+
+Experiment
+└── Entry (one or more per experiment / process step)
+      ├── linked to many FieldDefinition (via junction) → the columns of this entry
+      └── linked to many EntryFieldValue
+            └── optional link to Sample (for per-sample data + write-back)
+
+Predefined Entries use `predefined_entry_key` + config and usually don't create many EntryFieldValue rows.
+
+Custom sample data entries and experiment detail entries are where the dynamic FieldDefinition columns shine.
 
 Hard cutover means: when migrating an existing custom_attributes field, we move the data into the appropriate storage (direct column or entry_field_values) and stop using the old JSONB path.
 

@@ -184,30 +184,9 @@ class EntryFieldValue(Base):
     field_definition = relationship("FieldDefinition")
 
 
-# To wire this up, you would add to the Experiment model:
+# To wire this up, add to the Experiment model:
 # entries = relationship("Entry", back_populates="experiment", cascade="all, delete-orphan")
 #
-# You may also want a many-to-many or direct link from Entry to Sample
-# for entries that are not purely sample_data (or use ExperimentSampleExecution).
-```
-
-# ---------------------------------------------------------------------------
-# Usage Notes & Relationships (for the sketch)
-#
-# Entry
-#   - belongs to Experiment (and optionally a Process step)
-#   - has many FieldDefinitions (its columns) via the junction
-#   - has many EntryFieldValue (the data)
-#
-# For a custom sample_data entry:
-#   - The template defines which FieldDefinitions are the columns of this entry.
-#   - For each sample assigned to the experiment, one EntryFieldValue row per field.
-#   - After validation, selected values can be written back to the Sample record
-#     (e.g. concentration, volume).
-#
-# Predefined entries mostly use `predefined_entry_key` + `config`.
-# They rarely populate many EntryFieldValue rows.
-#
-# This gives template-controlled structure while keeping storage efficient.
-# ---------------------------------------------------------------------------
+# You may also want a link from Entry to Sample (directly or via
+# ExperimentSampleExecution) for non-pure sample_data entries.
 - Updates to the `Experiment` model to include `entries`?
