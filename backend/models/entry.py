@@ -189,4 +189,123 @@ class EntryFieldValue(Base):
 #
 # You may also want a link from Entry to Sample (directly or via
 # ExperimentSampleExecution) for non-pure sample_data entries.
-- Updates to the `Experiment` model to include `entries`?
+
+
+# ---------------------------------------------------------------------------
+# Full Relationship Sketch (user clarification incorporated verbatim)
+#
+# Processes are composed of experiments (templates)
+# Experiments are composed of entries
+#
+# This does make sense
+#  Processes:
+#   An Entry can be linked to a process step via process_step_id.
+#   ProcessSample tracks which samples are assigned to the overall process; the per-step data lives in the Entry + EntryFieldValue layer.
+#
+# Experiments are composed of entries:
+#   - An Experiment has one or more Entry records.
+#   - Entry can be predefined (OOB actions) or custom (sample_data or experiment_detail).
+#   - For custom entries, columns come from FieldDefinitions (defined in the template).
+#   - Values for those columns go into EntryFieldValue.
+#
+# Process <-> Entry / data flow:
+#   - An Entry can be linked to a process step via process_step_id.
+#     (This allows tracing which Entry belongs to which step in the Process.)
+#   - ProcessSample tracks which samples are assigned to the overall process.
+#   - The per-step data lives in the Entry + EntryFieldValue layer.
+#     (Not duplicated at ProcessSample; ProcessSample is the assignment/queueing at process level.)
+#
+# Example flow for a sample in a Process:
+#   1. Sample assigned to Process → ProcessSample row created.
+#   2. For step 1 (Experiment from template):
+#      - Experiment created.
+#      - Entries created for that Experiment (from template).
+#      - For a 'sample_data' Entry: EntryFieldValue rows created for the sample's values in that entry's columns.
+#   3. Data in EntryFieldValue can drive write-back to Sample.
+#   4. Move to next step, new Entries / values for the next Experiment.
+#
+# This keeps:
+# - Process level: which samples, overall ordering of experiment templates.
+# - Experiment level: the entries (data capture components).
+# - Step/Entry level: the actual per-sample or per-experiment data values.
+# ---------------------------------------------------------------------------
+
+
+# ---------------------------------------------------------------------------
+# Minimal Process sketch for composition (to complete the picture)
+#
+# Processes are composed of experiment (templates):
+#
+# class Process(BaseModel):
+#     name = ...
+#     description = ...
+#     # status etc.
+#
+# class ProcessStep(Base):
+#     """One step in a Process: references an ExperimentTemplate."""
+#     process_id = Column(FK('processes.id'))
+#     experiment_template_id = Column(FK('experiment_templates.id'))
+#     sort_order = Column(Integer)
+#     # When the process is executed for samples:
+#     #   - An Experiment instance is created from the template.
+#     #   - Entries are created for that Experiment.
+#     #   - The Entry can reference this ProcessStep via process_step_id.
+#
+# ProcessSample (minimal sketch):
+class ProcessSample(Base):
+    """
+    Tracks samples assigned to a Process.
+
+    Per the design:
+    - Processes are composed of experiment (templates).
+    - ProcessSample records assignment at the Process level.
+    - The detailed per-step (per-Experiment) data lives in Entry + EntryFieldValue.
+    """
+    __tablename__ = 'process_samples'
+
+    id = Column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    process_id = Column(PostgresUUID(as_uuid=True), ForeignKey('processes.id'), nullable=False, index=True)
+    sample_id = Column(PostgresUUID(as_uuid=True), ForeignKey('samples.id'), nullable=False, index=True)
+
+    # Process-level state for this sample
+    status = Column(String(32))  # e.g. assigned, in_progress, completed
+    assigned_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    # Relationships
+    # process = relationship("Process")
+    # sample = relationship("Sample")
+
+
+# ---------------------------------------------------------------------------
+# Minimal supporting Process / ProcessStep (for ELN side composition)
+#
+# Processes are composed of experiments (templates)
+#
+class Process(BaseModel):
+    """A process is an ordered composition of experiment templates."""
+    __tablename__ = 'processes'
+
+    name = Column(String(255), nullable=False)
+    description = Column(Text)
+    # status, owner, etc.
+
+class ProcessStep(Base):
+    """
+    One step in a Process.
+    References an ExperimentTemplate (as per "composed of experiments (templates)").
+    """
+    __tablename__ = 'process_steps'
+
+    process_id = Column(PostgresUUID(as_uuid=True), ForeignKey('processes.id'), nullable=False, index=True)
+    experiment_template_id = Column(
+        PostgresUUID(as_uuid=True),
+        ForeignKey('experiment_templates.id'),
+        nullable=False,
+        index=True
+    )
+    sort_order = Column(Integer, nullable=False, default=0)
+
+    # When the process is executed:
+    # - An Experiment instance is (or can be) created from the template.
+    # - The Entry for that experiment can link back via process_step_id.
+
