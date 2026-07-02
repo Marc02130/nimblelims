@@ -21,7 +21,16 @@ class Sample(BaseModel):
     project_id = Column(PostgresUUID(as_uuid=True), ForeignKey('projects.id'), nullable=False)
     qc_type = Column(PostgresUUID(as_uuid=True), ForeignKey('list_entries.id'), nullable=True)
     client_sample_id = Column(String(255), nullable=True, unique=True)
-    custom_attributes = Column(JSONB, nullable=True, server_default='{}')
+    custom_attributes = Column(JSONB, nullable=True, server_default='{}')  # legacy - will be phased out for modeled fields
+
+    # Path 1 example: direct column for top-level list field (specimen_biotype)
+    # Added via FieldDefinition + migration. Replaces hack in custom_attributes.
+    # specimen_biotype_id = Column(PostgresUUID(as_uuid=True), ForeignKey('list_entries.id'), nullable=True, index=True)
+    # specimen_biotype = relationship("ListEntry", foreign_keys=[specimen_biotype_id])
+
+    # Similar for simple scalars:
+    # lot_number = Column(Text)
+    # dilution_factor = Column(Numeric)
     
     # Relationships
     project = relationship("Project", back_populates="samples")
