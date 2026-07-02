@@ -75,10 +75,21 @@ class FieldDefinition(BaseModel):
     # or only exists inside Entry values (for highly variable per-template columns).
     is_materialized_column = Column(Boolean, nullable=False, server_default='true')
 
+    # For materialized top-level fields, this is the actual column name on the entity table
+    # (e.g. 'specimen_biotype_id'). For non-materialized (inside entries), this is null.
+    column_name = Column(String(255), nullable=True)
+
     active = Column(Boolean, nullable=False, server_default='true', index=True)
 
     # Relationships
     source_list = relationship("List", foreign_keys=[source_list_id])
+
+    # Entries that use this FieldDefinition as one of their columns
+    entries = relationship(
+        "Entry",
+        secondary="entry_field_definitions",
+        back_populates="field_definitions"
+    )
 
     # creator / modifier inherited from BaseModel
 
@@ -97,15 +108,25 @@ class EntryFieldValue(Base):
     """
     Stores the actual value for a FieldDefinition that lives inside a custom Entry.
 
-    This table is used for the variable columns inside:
-      - Sample data entries
-      - Experiment detail entries
+    This table is used **only** for the variable / per-template columns inside
+    custom Entries (sample_data entries or experiment_detail entries).
 
-    It allows templates to define arbitrary columns without making the main
-    entity tables infinitely wide.
+    It allows templates to define arbitrary columns (via FieldDefinitions)
+    without making the main entity tables (samples, experiments) infinitely wide.
 
-    For top-level fields added directly to Sample / Experiment / etc.,
-    we add real columns instead of (or in addition to) rows in this table.
+    For top-level fields (e.g. adding specimen_biotype directly to the samples table),
+    we instead add a real column during migration and set is_materialized_column=True
+    on the FieldDefinition. No row is needed in this table for those.
+
+    For sample_data entries:
+    - There is typically one Entry per "data table" defined for the experiment.
+    - For each sample in that experiment + each column (FieldDefinition) → one row here.
+    - sample_id links it.
+    - After saving, the app can selectively write values back to the core Sample
+      (e.g. concentration, volume) as per the design.
+
+    Typed columns are used so we avoid generic JSONB for modeled data.
+    value_json is only a rare fallback for complex OOB cases inside entries.
     """
 
     __tablename__ = 'entry_field_values'
@@ -146,31 +167,44 @@ class EntryFieldValue(Base):
 
 
 # ---------------------------------------------------------------------------
-# Example: How a top-level list-backed field would appear on Sample
-# (after the corresponding migration has run)
+# Storage Examples
 #
-# In models/sample.py you would eventually see something like:
+# 1. Top-level field on entity table (direct column)
+#    Example: specimen_biotype (list) added to Samples.
 #
-#     specimen_biotype_id = Column(
-#         PostgresUUID(as_uuid=True),
-#         ForeignKey('list_entries.id'),
-#         nullable=True,
-#         index=True
-#     )
+#    - Migration adds real column to samples table:
+#        specimen_biotype_id = Column(
+#            PostgresUUID(as_uuid=True),
+#            ForeignKey('list_entries.id'),
+#            nullable=True, index=True
+#        )
 #
-#     specimen_biotype = relationship(
-#         "ListEntry",
-#         foreign_keys=[specimen_biotype_id]
-#     )
+#    - FieldDefinition:
+#        entity_type='sample', name='specimen_biotype', data_type='list',
+#        source_list_id=..., is_materialized_column=True,
+#        column_name='specimen_biotype_id'
 #
-# The FieldDefinition for this field would have:
-#     entity_type = 'sample'
-#     name = 'specimen_biotype'
-#     data_type = 'list'
-#     source_list_id = <id of the "specimen_biotypes" list>
-#     is_materialized_column = True
+#    - In Sample model: direct relationship or property.
+#    - Queryable with normal SQLAlchemy, good indexes, RLS applies naturally.
 #
-# For a custom column inside an Entry (not on the main table):
-#     is_materialized_column = False
-#     The actual value lives in EntryFieldValue.
+# 2. Column inside a custom Entry (uses entry_field_values)
+#    Example: A template defines a "my_sample_data" entry with columns:
+#      concentration (number), temperature (number), notes (text)
+#
+#    - FieldDefinitions created with entity_type='entry' or scoped to template,
+#      is_materialized_column=False.
+#    - When Entry is created for an experiment:
+#        - Junction rows in entry_field_definitions link the Entry to those FieldDefinitions.
+#    - For each sample in the experiment:
+#        - EntryFieldValue rows:
+#            entry_id=..., field_definition_id=conc_fd, sample_id=..., value_number=1.23
+#            entry_id=..., field_definition_id=temp_fd, sample_id=..., value_number=37.0
+#            entry_id=..., field_definition_id=notes_fd, sample_id=..., value_text="..."
+#
+#    - Pros of this table: flexible per-template columns without schema bloat.
+#    - Write-back: app can copy value_number from conc_fd to sample.concentration.
+#
+# When to use which:
+# - Direct column: top-level, commonly used, benefits from native DB features (e.g. specimen_biotype on Sample).
+# - entry_field_values: highly variable columns inside template-defined Entries.
 # ---------------------------------------------------------------------------
