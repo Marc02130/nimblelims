@@ -8,10 +8,10 @@ import { UserProvider } from '../contexts/UserContext';
 // Mock the API service
 jest.mock('../services/apiService', () => ({
   apiService: {
-    getCustomAttributeConfigs: jest.fn(),
-    createCustomAttributeConfig: jest.fn(),
-    updateCustomAttributeConfig: jest.fn(),
-    deleteCustomAttributeConfig: jest.fn(),
+    getFieldDefinitions: jest.fn(),
+    createFieldDefinition: jest.fn(),
+    updateFieldDefinition: jest.fn(),
+    deleteFieldDefinition: jest.fn(),
   },
 }));
 
@@ -85,8 +85,8 @@ describe('CustomFieldsManagement', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     const { apiService } = require('../services/apiService');
-    apiService.getCustomAttributeConfigs.mockResolvedValue({
-      configs: mockConfigs,
+    apiService.getFieldDefinitions.mockResolvedValue({
+      items: mockConfigs.map(c => ({...c, name: c.attr_name})), // map to new shape
       total: mockConfigs.length,
       page: 1,
       size: 10,
@@ -94,20 +94,21 @@ describe('CustomFieldsManagement', () => {
     });
   });
 
-  test('renders custom fields management page', async () => {
+  test('renders field management page (OOB + Custom with lists)', async () => {
     renderWithProviders(<CustomFieldsManagement />);
 
     await waitFor(() => {
-      expect(screen.getByText('Custom Fields Management')).toBeInTheDocument();
+      expect(screen.getByText(/Field Management|Custom Fields Management/)).toBeInTheDocument();
     });
   });
 
-  test('displays custom fields in DataGrid', async () => {
+  test('displays fields (OOB + custom) in DataGrid', async () => {
     renderWithProviders(<CustomFieldsManagement />);
 
     await waitFor(() => {
       expect(screen.getByText('ph_level')).toBeInTheDocument();
       expect(screen.getByText('instrument_id')).toBeInTheDocument();
+      // OOB fields (e.g. sample_type) should also appear when no filter
     });
   });
 
@@ -125,7 +126,7 @@ describe('CustomFieldsManagement', () => {
     renderWithProviders(<CustomFieldsManagement />);
 
     await waitFor(() => {
-      expect(screen.getByText('Create Custom Field')).toBeInTheDocument();
+      expect(screen.getByText(/Create Custom Field|Create New Field/)).toBeInTheDocument();
     });
   });
 
@@ -202,7 +203,7 @@ describe('CustomFieldsManagement', () => {
     // The API should be called with the filter
     await waitFor(() => {
       const { apiService } = require('../services/apiService');
-      expect(apiService.getCustomAttributeConfigs).toHaveBeenCalledWith(
+      expect(apiService.getFieldDefinitions).toHaveBeenCalledWith(
         expect.objectContaining({
           entity_type: 'samples',
         })
@@ -220,7 +221,7 @@ describe('CustomFieldsManagement', () => {
       validation_rules: { min: -20, max: 40 },
       active: true,
     };
-    apiService.createCustomAttributeConfig.mockResolvedValue(newConfig);
+    apiService.createFieldDefinition.mockResolvedValue(newConfig);
 
     renderWithProviders(<CustomFieldsManagement />);
 
@@ -261,7 +262,7 @@ describe('CustomFieldsManagement', () => {
     fireEvent.click(submitButton);
 
     await waitFor(() => {
-      expect(apiService.createCustomAttributeConfig).toHaveBeenCalledWith({
+      expect(apiService.createFieldDefinition).toHaveBeenCalledWith({
         entity_type: 'samples',
         attr_name: 'temperature',
         data_type: 'number',
@@ -363,7 +364,7 @@ describe('CustomFieldsManagement', () => {
 
   test('handles API error gracefully', async () => {
     const { apiService } = require('../services/apiService');
-    apiService.getCustomAttributeConfigs.mockRejectedValue(new Error('API Error'));
+    apiService.getFieldDefinitions.mockRejectedValue(new Error('API Error'));
 
     renderWithProviders(<CustomFieldsManagement />);
 

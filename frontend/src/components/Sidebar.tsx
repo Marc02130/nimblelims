@@ -241,7 +241,7 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onMobileClose, collapsed 
     { text: 'Runs', path: '/runs', icon: <AssessmentIcon />, tooltip: 'Experiment runs & dose response' },
   ];
 
-  // Admin navigation items from MainNav (includes Name Templates, Custom Attributes, Lists)
+  // Admin navigation items from MainNav (Field Management using lists + FieldDefinitions; legacy Custom Attributes and Name Templates sidebar links removed per requirements)
   const adminItems: AdminNavItem[] = adminNavItemsFromMainNav;
 
   const handleNavigation = (path: string) => {

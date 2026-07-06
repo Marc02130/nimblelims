@@ -76,21 +76,6 @@ class Experiment(BaseModel):
         order_by="Entry.sort_order",
     )
 
-    # New: Experiments are composed of entries (per the refactor)
-    # Use string reference to avoid circular import with entry.py
-    entries = relationship(
-        "Entry",
-        back_populates="experiment",
-        cascade="all, delete-orphan",
-        order_by="Entry.sort_order",
-    )
-        cascade="all, delete-orphan",
-        order_by="Entry.sort_order",
-    )
-        cascade="all, delete-orphan",
-        order_by="Entry.sort_order",
-    )
-
 
 class ExperimentDetail(Base):
     """

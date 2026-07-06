@@ -173,7 +173,7 @@ const AdminHelpSection: React.FC = () => {
               {entry.section === 'EAV Configuration' && (
                 <Box sx={{ mt: 2, p: 2, bgcolor: 'info.light', borderRadius: 1 }}>
                   <Typography variant="body2" color="info.dark">
-                    <strong>Tip:</strong> Custom Attributes: Edit configs (post-MVP EAV). 
+                    <strong>Tip:</strong> Use Field Management (Custom Fields) for extensible fields via FieldDefinitions. 
                     Use the Custom Fields Management page to configure EAV attributes.
                   </Typography>
                 </Box>

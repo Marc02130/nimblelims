@@ -1,4 +1,5 @@
 """Add custom_attributes column to analyses and analytes tables
+# NOTE (cleanup): Legacy for custom attrs. Use lists/FieldDefinitions for new list-backed fields (no embedded options). Migration 0046+ for FieldDef.
 
 Revision ID: 0026
 Revises: 0025

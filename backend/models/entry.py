@@ -18,7 +18,7 @@ Predefined entries have built-in behavior and may still reference FieldDefinitio
 """
 
 import uuid
-from sqlalchemy import Column, String, Integer, ForeignKey, Boolean, DateTime
+from sqlalchemy import Column, String, Integer, ForeignKey, Boolean, DateTime, Text, Numeric
 from sqlalchemy.dialects.postgresql import UUID as PostgresUUID, JSONB
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -48,9 +48,10 @@ class Entry(BaseModel):
 
     # Links the Entry to a specific step inside a Process.
     # Per design: "An Entry can be linked to a process step via process_step_id."
+    # NOTE: uses 'eln_process_steps' to avoid name collision with existing 'process_steps' (LIMS ExperimentProcess steps)
     process_step_id = Column(
         PostgresUUID(as_uuid=True),
-        ForeignKey('process_steps.id'),
+        ForeignKey('eln_process_steps.id'),
         nullable=True,
         index=True
     )
@@ -81,13 +82,21 @@ class Entry(BaseModel):
 
     # Relationships
     experiment = relationship("Experiment", back_populates="entries")
-    process_step = relationship("ProcessStep", back_populates="entries")  # if we add the backref on ProcessStep
+    process_step = relationship("ELNProcessStep", back_populates="entries")
 
     # For custom entries: the FieldDefinitions that define the columns of this entry
     field_definitions = relationship(
         "FieldDefinition",
         secondary="entry_field_definitions",  # junction table
         back_populates="entries"
+    )
+
+    # Link rows (for accessing extra columns like sort_order, visible on the association)
+    field_definition_links = relationship(
+        "EntryFieldDefinition",
+        back_populates="entry",
+        cascade="all, delete-orphan",
+        overlaps="field_definitions,entries"
     )
 
     # Values for the fields (for custom data entries)
@@ -121,8 +130,11 @@ class EntryFieldDefinition(Base):
     # Whether this column is shown in the UI for this entry
     visible = Column(Boolean, default=True)
 
-    entry = relationship("Entry", back_populates="field_definitions")
-    field_definition = relationship("FieldDefinition", back_populates="entries")
+    # Note: We avoid conflicting back_populates here because Entry.field_definitions
+    # is a many-to-many to FieldDefinition (via secondary). Use a separate collection
+    # for the link rows if you need to access sort_order/visible metadata.
+    entry = relationship("Entry", back_populates="field_definition_links", overlaps="entries,field_definitions")
+    field_definition = relationship("FieldDefinition", overlaps="entries,field_definitions")
 
 
 # Extend the previous EntryFieldValue with better relationship
@@ -291,21 +303,24 @@ class Process(BaseModel):
     # Add status, owner, created_by etc. as needed (inherits from BaseModel)
 
     steps = relationship(
-        "ProcessStep",
+        "ELNProcessStep",
         back_populates="process",
-        order_by="ProcessStep.sort_order",
+        order_by="ELNProcessStep.sort_order",
         cascade="all, delete-orphan"
     )
 
     process_samples = relationship("ProcessSample", back_populates="process")
 
-class ProcessStep(Base):
+class ELNProcessStep(Base):
     """
-    One step in a Process.
+    One step in a (ELN) Process.
     References an ExperimentTemplate (as per "composed of experiments (templates)").
     """
-    __tablename__ = 'process_steps'
+    # NOTE: 'eln_process_steps' chosen to avoid collision with legacy 'process_steps' table
+    # (from experiment_process.py attached to experiment_runs / LIMS side).
+    __tablename__ = 'eln_process_steps'
 
+    id = Column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     process_id = Column(PostgresUUID(as_uuid=True), ForeignKey('processes.id'), nullable=False, index=True)
     experiment_template_id = Column(
         PostgresUUID(as_uuid=True),

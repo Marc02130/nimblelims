@@ -85,7 +85,7 @@ Note: This venv is optional for pure Docker dev but aligns with your request.
   ```
   Create the initial project structure for the NimbleLIMS based on the Technical Document (sections 1.3, 2.1, 7.2). Include:
   - Root folder with subfolders: backend (Python/FastAPI), frontend (React), db (Postgres migrations/scripts).
-  - Docker setup with three containers: 
+  - Docker setup with four containers (db, backend, frontend, r-calculator): 
     - DB: PostgreSQL 15+ (official image, persistent volume for data, env vars for credentials).
     - Backend: Python 3.10+ (install deps like fastapi, uvicorn, sqlalchemy, psycopg2, pyjwt, passlib[bcrypt] via requirements.txt; expose port 8000; depend on DB).
     - Frontend: React 18+ (Node.js 18+; build with npm, serve via Nginx or Node; expose port 3000).
@@ -138,7 +138,7 @@ This step implements the Docker configuration from the Technical Document (Secti
     - Migration `0011` creates client_projects table and adds client_project_id to projects, client_sample_id to samples
     - **Note**: The code references `test:configure` permission but it's not in the database; endpoints that use it fall back to `config:edit` permission
 - Verify:
-  - Check running containers: `docker ps` (should show three: db, backend, frontend).
+  - Check running containers: `docker ps` (should show four: lims-db, lims-backend, lims-frontend, lims-r-calculator).
   - Check migration logs: `docker logs lims-backend | grep -i migration`
   - Verify admin user exists: `docker exec lims-db psql -U lims_user -d lims_db -c "SELECT username FROM users WHERE username = 'admin';"`
   - Verify seed data: `docker exec lims-db psql -U lims_user -d lims_db -c "SELECT name FROM analyses WHERE active = true;"`
