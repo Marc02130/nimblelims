@@ -20,9 +20,6 @@ import TestBatteriesManagement from './pages/admin/TestBatteriesManagement';
 import AdminAnalytesManagement from './pages/admin/AnalytesManagement';
 import AnalysisAnalytesConfig from './pages/admin/AnalysisAnalytesConfig';
 import CustomFieldsManagement from './pages/admin/CustomFieldsManagement';
-import CustomAttributesAdmin from './pages/admin/CustomAttributesAdmin';
-import CustomNamesManagement from './pages/admin/CustomNamesManagement';
-import NameTemplatesAdmin from './pages/admin/NameTemplatesAdmin';
 import HelpManagement from './pages/admin/HelpManagement';
 import WorkflowTemplatesManagement from './pages/admin/WorkflowTemplatesManagement';
 import ClientProjects from './pages/ClientProjects';
@@ -359,36 +356,6 @@ function AppRoutes() {
           element={
             hasPermission('config:edit') ? (
               <CustomFieldsManagement />
-            ) : (
-              <Navigate to="/dashboard" replace />
-            )
-          }
-        />
-        <Route
-          path="/admin/custom-attributes"
-          element={
-            hasPermission('config:edit') ? (
-              <CustomAttributesAdmin />
-            ) : (
-              <Navigate to="/dashboard" replace />
-            )
-          }
-        />
-        <Route
-          path="/admin/custom-names"
-          element={
-            hasPermission('config:edit') ? (
-              <CustomNamesManagement />
-            ) : (
-              <Navigate to="/dashboard" replace />
-            )
-          }
-        />
-        <Route
-          path="/admin/name-templates"
-          element={
-            hasPermission('config:edit') ? (
-              <NameTemplatesAdmin />
             ) : (
               <Navigate to="/dashboard" replace />
             )

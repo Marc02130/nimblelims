@@ -4,7 +4,7 @@
 
 ### Architecture Overview
 
-NimbleLIMS is a three-container Docker application (PostgreSQL, FastAPI backend, React frontend) orchestrated by `docker-compose.yml`. See `README.md` for full setup instructions.
+NimbleLIMS is a four-container Docker application (PostgreSQL, FastAPI backend, React frontend, R Calculator microservice) orchestrated by `docker-compose.yml`. See `README.md` for full setup instructions.
 
 ### Running the Application
 
@@ -12,6 +12,7 @@ Start all services: `sudo docker compose up -d --build` from the repo root. Serv
 - **Database** (lims-db): PostgreSQL 15, port 5432. Alembic migrations run automatically on backend startup.
 - **Backend** (lims-backend): FastAPI + Uvicorn, port 8000. API docs at `http://localhost:8000/docs`.
 - **Frontend** (lims-frontend): React 18 built via `react-scripts`, served by Nginx, port 3000.
+- **R Calculator** (lims-r-calculator): Plumber R service for dose-response curve fitting, port 8001 (internal).
 
 Default logins (development/UAT):
 - **Admin**: `admin` / `admin123`
@@ -21,10 +22,11 @@ Default logins (development/UAT):
 
 ### Important Gotchas
 
-- **Missing `frontend/public/` directory**: The `.gitignore` has a `public` entry (line 154, from a Gatsby template) that gitignores the `frontend/public/` directory. If `frontend/public/index.html` is missing, create it with a standard CRA HTML shell (div id="root"). Without it, the frontend Docker build will fail.
-- **Backend tests (`pytest`)**: The `backend/tests/conftest.py` has a pre-existing import bug: line 14 uses `from app.models.user import ...` but models live at `backend/models/`, not `backend/app/models/`. The correct import would be `from models.user import ...`. This blocks all pytest tests from running.
-- **Frontend ESLint**: The `.eslintrc.js` extends `@typescript-eslint/recommended` but the correct config path for eslint legacy config is `plugin:@typescript-eslint/recommended`. The `npm run lint` command fails due to this. The `package.json` eslintConfig (`react-app` preset) works fine with `react-scripts`.
-- **Frontend tests**: Some Jest tests fail due to MUI X DataGrid v8 compatibility issues with the Jest/JSDOM environment (hash module import errors). About 61 of 116 tests pass.
+- **Backend tests (`pytest`)**: Tests use `from models.xxx import ...` + `import models` (with PYTHONPATH or cwd set to backend during pytest). The old `app.models` import bug appears fixed in current conftest.py. Use `pytest` with the testcontainer fixtures (they require Docker).
+- **Frontend ESLint**: The `.eslintrc.js` extends `@typescript-eslint/recommended` but the correct config path for eslint legacy config is `plugin:@typescript-eslint/recommended`. The `npm run lint` command fails due to this. The `package.json` eslintConfig (`react-app` preset) works fine with `react-scripts`. Use `DISABLE_ESLINT_PLUGIN=true npm run build` to bypass for CI/build verification.
+- **Frontend tests**: Some Jest tests fail due to MUI X DataGrid v8 compatibility issues with the Jest/JSDOM environment (hash module import errors). About 61 of 116 tests pass. CustomFieldsManagement.test.tsx needs ongoing updates as Field Management UI evolves (OOB fields, list-backed selects via source lists instead of inline options).
+- **Gitignore for frontend/public**: Was causing issues (legacy Gatsby 'public' entry); has been cleaned up to not ignore CRA public/ (index.html, etc.).
+- **Field Management UI evolution**: Custom fields now prefer list-backed (source_list from central Lists) for reusability (e.g. same list for Sample top-level + Entry fields). Validation rules still supported for scalars. OOB + Custom shown together, denoted. Legacy admin UIs for /admin/custom-attributes and /admin/name-templates have been fully deleted (no sidebar links, no routes, no pages).
 
 ### Development Without Docker
 

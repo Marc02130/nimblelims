@@ -97,57 +97,5 @@ class FieldDefinition(BaseModel):
         # You may want a unique constraint on (entity_type, name) + scope later
     )
 
-# ---------------------------------------------------------------------------
-# Value storage for dynamic columns inside Entries (Path 2, but available)
-# (used when the column is defined per-template/per-entry rather than
-#  as a permanent column on the parent entity table)
-# ---------------------------------------------------------------------------
-
-class EntryFieldValue(Base):
-    """
-    Stores the actual value for a FieldDefinition that lives inside a custom Entry.
-
-    This table is used for the variable columns inside:
-      - Sample data entries
-      - Experiment detail entries
-
-    It allows templates to define arbitrary columns without making the main
-    entity tables infinitely wide.
-
-    For top-level fields added directly to Sample / Experiment / etc.,
-    we add real columns instead of (or in addition to) rows in this table.
-    """
-
-    __tablename__ = 'entry_field_values'
-
-    id = Column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-
-    # The Entry this value belongs to.
-    entry_id = Column(PostgresUUID(as_uuid=True), nullable=False, index=True)
-
-    field_definition_id = Column(
-        PostgresUUID(as_uuid=True),
-        ForeignKey('field_definitions.id'),
-        nullable=False,
-        index=True
-    )
-
-    # Typed value columns (only one should be populated based on data_type)
-    value_text = Column(Text)
-    value_number = Column(Numeric)          # or use separate integer / float if needed
-    value_list_entry_id = Column(
-        PostgresUUID(as_uuid=True),
-        ForeignKey('list_entries.id')
-    )
-    value_date = Column(DateTime(timezone=True))
-    value_boolean = Column(Boolean)
-
-    # Fallback / complex values (should be rare after migration)
-    value_json = Column(JSONB, nullable=True)
-
-    created_at = Column(DateTime, server_default=func.now(), nullable=False)
-    created_by = Column(PostgresUUID(as_uuid=True), ForeignKey('users.id'))
-    modified_at = Column(DateTime, onupdate=func.now())
-    modified_by = Column(PostgresUUID(as_uuid=True), ForeignKey('users.id'))
-
-    field_definition = relationship("FieldDefinition")
+# EntryFieldValue is defined in entry.py (richer version with sample linkage and relationships).
+# Import it from there to avoid duplicate table registration.

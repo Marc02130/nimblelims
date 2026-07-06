@@ -172,16 +172,16 @@ nimblelims/
 - **Units Integration**: Concentration and amount with unit conversions
 
 ### Configuration Management
-- **Name Templates**: Configurable entity naming (sample, project, batch, etc.) with placeholders ({SEQ}, {PROJECT}, {CLIENT}/{CLIABV}, {YYYY}, {YY}, seq_padding_digits). {SEQ} is scoped by “name without SEQ” (e.g. per project for samples), so each project gets its own sequence (01, 02, …). Sequence start API and admin interface at `/admin/name-templates`.
-- **Custom Attributes Config**: Define and manage custom attribute definitions per entity type (admin interface at `/admin/custom-attributes`)
-- **Lists Management**: Full CRUD for lists and list entries via admin interface - create new lists, add/edit/delete entries for statuses, types, matrices, QC types, etc. Empty lists display expand arrows to add entries.
+- **Name Templates**: Configurable entity naming (sample, project, batch, etc.) with placeholders ({SEQ}, {PROJECT}, {CLIENT}/{CLIABV}, {YYYY}, {YY}, seq_padding_digits). {SEQ} is scoped by “name without SEQ” (e.g. per project for samples), so each project gets its own sequence (01, 02, …). Sequence start API (admin interface removed; use API directly).
+- **Field Management** (replaces legacy Custom Attributes): Unified admin UI for OOB (built-in/list-backed) + Custom fields per entity. Prefers list-backed fields (source list from central Lists system) for reusability across Samples and Entries/Processes. Validation rules for scalars. OOB fields denoted and editable for rules. Legacy admin UIs for Custom Attributes and Name Templates have been removed from sidebar (routes deprecated).
+- **Lists Management**: Full CRUD for lists and list entries via admin interface - create new lists, add/edit/delete entries for statuses, types, matrices, QC types, etc. Empty lists display expand arrows to add entries. Used to back list fields in Field Management.
 - **Container Types**: Admin-managed container type definitions (CRUD operations)
 - **Analyses Management**: Create and manage analyses with methods, turnaround times, costs, and custom attributes. Features expandable grid rows to view and manage linked analytes directly from the main list (CRUD). Available in both Admin section and Lab Mgmt accordion.
 - **Analytes Management**: Create and manage analytes with CAS numbers, default units, data types, and custom attributes (CRUD). Available in both Admin section and Lab Mgmt accordion.
 - **Analysis-Analyte Linking**: Link/unlink analytes to analyses via expandable detail panels with inline autocomplete search
 - **Analysis-Analyte Configuration**: Configure validation rules (data types, ranges, significant figures, required flags)
 - **Test Batteries Management**: Group multiple analyses into reusable test batteries with sequence ordering and optional flags (CRUD)
-- **Custom Fields Management**: Define custom attributes for samples, tests, results, projects, client_projects, and batches without schema changes (CRUD)
+- **Field Management** (Custom Fields UI): See above for OOB+Custom with list-backed preference.
 - **Client Projects Management**: Group multiple LIMS projects under client projects for holistic tracking (CRUD)
 - **Users Management**: Create and manage users with role assignments (CRUD)
 - **Roles & Permissions**: Manage roles and assign permissions (CRUD)
@@ -250,7 +250,7 @@ docker exec lims-backend python run_migrations.py
 NimbleLIMS uses a unified sidebar navigation system that provides consistent access to all features:
 
 - **Unified Sidebar**: Persistent left sidebar (240px expanded, 56px collapsed) on all authenticated routes
-- **MainNav**: Admin section and sub-links are defined in `frontend/src/components/MainNav.tsx`; the Sidebar uses these for the Admin accordion (including **Name Templates** `/admin/name-templates`, **Custom Attributes** `/admin/custom-attributes`, **Lists** `/admin/lists`)
+- **MainNav**: Admin section and sub-links are defined in `frontend/src/components/MainNav.tsx`; the Sidebar uses these for the Admin accordion (Field Management / Lists focus; legacy Name Templates and Custom Attributes links removed).
 - **React Router**: All routes are declared in `frontend/src/App.tsx`; admin routes are protected with `hasPermission('config:edit')` (or role-specific permissions)—unauthorized users are redirected to `/dashboard`
 - **Collapsible**: Desktop sidebar can be collapsed to icon-only mode with tooltips on hover
 - **Permission-Based**: Menu items dynamically shown/hidden based on user roles and permissions

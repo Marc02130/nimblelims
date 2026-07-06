@@ -625,7 +625,8 @@ class ApiService {
       params: filters,
     });
     // API returns AnalyteListResponse with {analytes, total, page, size, pages}
-    return response.data;
+    // Extract array for consistency with other list endpoints (samples, batches, etc.)
+    return response.data?.analytes || response.data || [];
   }
 
   async getAnalyte(id: string) {
@@ -844,7 +845,66 @@ class ApiService {
     return response.data;
   }
 
-  // Custom Attributes Configuration endpoints
+  // FieldDefinitions (new modeled fields system)
+  async getFieldDefinitions(filters?: {
+    entity_type?: string;
+    active?: boolean;
+    page?: number;
+    size?: number;
+  }) {
+    const response: AxiosResponse = await this.api.get('/admin/fields', {
+      params: filters,
+    });
+    return response.data;
+  }
+
+  async getFieldDefinition(id: string) {
+    const response: AxiosResponse = await this.api.get(`/admin/fields/${id}`);
+    return response.data;
+  }
+
+  async createFieldDefinition(fieldData: {
+    entity_type: string;
+    name: string;
+    display_name?: string;
+    data_type: 'text' | 'number' | 'date' | 'boolean' | 'list';
+    source_list_id?: string;
+    is_required?: boolean;
+    validation_rules?: Record<string, any>;
+    description?: string;
+    active?: boolean;
+    is_materialized_column?: boolean;
+    column_name?: string;
+  }) {
+    const response: AxiosResponse = await this.api.post('/admin/fields', fieldData);
+    return response.data;
+  }
+
+  async updateFieldDefinition(
+    id: string,
+    fieldData: {
+      entity_type?: string;
+      name?: string;
+      display_name?: string;
+      data_type?: 'text' | 'number' | 'date' | 'boolean' | 'list';
+      source_list_id?: string;
+      is_required?: boolean;
+      validation_rules?: Record<string, any>;
+      description?: string;
+      active?: boolean;
+    }
+  ) {
+    const response: AxiosResponse = await this.api.patch(`/admin/fields/${id}`, fieldData);
+    return response.data;
+  }
+
+  async deleteFieldDefinition(id: string) {
+    const response: AxiosResponse = await this.api.delete(`/admin/fields/${id}`);
+    return response.data;
+  }
+
+  // Custom Attributes config loading (used by forms for runtime custom fields)
+  // Note: Admin management UI deleted (replaced by FieldDefinitions)
   async getCustomAttributeConfigs(filters?: {
     entity_type?: string;
     active?: boolean;
@@ -857,44 +917,8 @@ class ApiService {
     return response.data;
   }
 
-  async getCustomAttributeConfig(id: string) {
-    const response: AxiosResponse = await this.api.get(`/admin/custom-attributes/${id}`);
-    return response.data;
-  }
-
-  async createCustomAttributeConfig(configData: {
-    entity_type: string;
-    attr_name: string;
-    data_type: 'text' | 'number' | 'date' | 'boolean' | 'select';
-    validation_rules: Record<string, any>;
-    description?: string;
-    active?: boolean;
-  }) {
-    const response: AxiosResponse = await this.api.post('/admin/custom-attributes', configData);
-    return response.data;
-  }
-
-  async updateCustomAttributeConfig(
-    id: string,
-    configData: {
-      entity_type?: string;
-      attr_name?: string;
-      data_type?: 'text' | 'number' | 'date' | 'boolean' | 'select';
-      validation_rules?: Record<string, any>;
-      description?: string;
-      active?: boolean;
-    }
-  ) {
-    const response: AxiosResponse = await this.api.patch(`/admin/custom-attributes/${id}`, configData);
-    return response.data;
-  }
-
-  async deleteCustomAttributeConfig(id: string) {
-    const response: AxiosResponse = await this.api.delete(`/admin/custom-attributes/${id}`);
-    return response.data;
-  }
-
-  // Name Templates endpoints
+  // Name Templates (used by forms for name generation)
+  // Note: Admin management UI deleted
   async getNameTemplates(filters?: {
     entity_type?: string;
     active?: boolean;
@@ -907,38 +931,10 @@ class ApiService {
     return response.data;
   }
 
-  async getNameTemplate(id: string) {
-    const response: AxiosResponse = await this.api.get(`/admin/name-templates/${id}`);
-    return response.data;
-  }
-
-  async createNameTemplate(templateData: {
-    entity_type: string;
-    template: string;
-    description?: string;
-    active?: boolean;
-    seq_padding_digits?: number;
-  }) {
-    const response: AxiosResponse = await this.api.post('/admin/name-templates', templateData);
-    return response.data;
-  }
-
-  async updateNameTemplate(
-    id: string,
-    templateData: {
-      entity_type?: string;
-      template?: string;
-      description?: string;
-      active?: boolean;
-      seq_padding_digits?: number;
-    }
-  ) {
-    const response: AxiosResponse = await this.api.patch(`/admin/name-templates/${id}`, templateData);
-    return response.data;
-  }
-
-  async deleteNameTemplate(id: string) {
-    const response: AxiosResponse = await this.api.delete(`/admin/name-templates/${id}`);
+  async getNameTemplatesPreview(entity_type: string, client_id?: string, reference_date?: string) {
+    const response: AxiosResponse = await this.api.get('/admin/name-templates/preview', {
+      params: { entity_type, client_id, reference_date },
+    });
     return response.data;
   }
 

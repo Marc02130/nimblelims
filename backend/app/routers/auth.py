@@ -3,7 +3,7 @@ Authentication router for NimbleLims
 """
 from datetime import timedelta
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from app.database import get_db
 from models.user import User
 from app.schemas.auth import LoginRequest, LoginResponse, VerifyEmailRequest, VerifyEmailResponse
@@ -38,7 +38,12 @@ async def login(
             headers={"WWW-Authenticate": "Bearer"},
         )
     
-    user = db.query(User).filter(User.username == login_data.username).first()
+    user = (
+        db.query(User)
+        .options(joinedload(User.role))
+        .filter(User.username == login_data.username)
+        .first()
+    )
     
     if not user:
         logger.warning(f"User not found: {login_data.username}")
