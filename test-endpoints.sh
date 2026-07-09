@@ -16,7 +16,7 @@ echo ""
 echo "2. Attempting authentication..."
 LOGIN_RESPONSE=$(curl -s -X POST http://localhost:8000/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"username":"admin","password":"admin"}' 2>&1)
+  -d '{"username":"admin","password":"admin123"}' 2>&1)
 
 if echo "$LOGIN_RESPONSE" | grep -q "access_token"; then
   TOKEN=$(echo "$LOGIN_RESPONSE" | jq -r '.access_token // empty')

@@ -9,6 +9,7 @@ from .sample import Sample
 from .container import Container, ContainerType, Contents
 from .analysis import Analysis, Analyte, AnalysisAnalyte
 from .test import Test
+from .test_battery import TestBattery, BatteryAnalysis
 from .result import Result
 from .batch import Batch, BatchContainer
 from .list import List, ListEntry
@@ -39,3 +40,12 @@ from .experiment_process import (
     ProcessStepStatus,
     VALID_STEP_TRANSITIONS,
 )
+
+# New for schema evolution refactor (JSONB removal for extensibility)
+from .field_definition import FieldDefinition
+from .entry import Entry, EntryFieldDefinition, EntryFieldValue, Process, ELNProcessStep, ProcessSample
+
+# Additional models referenced via relationships or used in the app
+from .dose_response import DoseResponseResult, ExperimentDataExclusion
+from .template_well import TemplateWellDefinition
+

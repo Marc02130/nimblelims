@@ -18,6 +18,7 @@ depends_on = None
 
 def upgrade() -> None:
     # Add custom_attributes JSONB column to results table
+    # NOTE: Legacy EAV (options in validation_rules deprecated in favor of lists). New: FieldDef + lists. See 0046.
     op.add_column('results',
         sa.Column('custom_attributes', postgresql.JSONB, nullable=True, server_default='{}')
     )
