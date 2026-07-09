@@ -19,7 +19,7 @@ class ExperimentTemplate(BaseModel):
     __tablename__ = 'experiment_templates'
 
     template_definition = Column(JSONB, nullable=False, server_default='{}')
-    custom_attributes = Column(JSONB, nullable=True, server_default='{}')
+    custom_attributes = Column(JSONB, nullable=True, server_default='{}')  # legacy - phased out via hard cutover to FieldDefinition
     # Controls which state machine applies to ExperimentRuns created from this template.
     # 'standard': draft → running → complete → published | failed | canceled
     # 'cro':      draft → ordered → running → results_received → complete → published | failed | canceled
@@ -44,7 +44,11 @@ class Experiment(BaseModel):
     )
     started_at = Column(DateTime, nullable=True)
     completed_at = Column(DateTime, nullable=True)
-    custom_attributes = Column(JSONB, nullable=True, server_default='{}')
+    custom_attributes = Column(JSONB, nullable=True, server_default='{}')  # legacy - phased out via hard cutover to FieldDefinition
+
+    # === Deprecation plan for custom_attributes (hard cutover) ===
+    # See sample.py for full phased plan. Same here: promote modeled fields
+    # (e.g. via Entries) to FieldDefinition-backed columns, hard cutover.
 
     experiment_template = relationship(
         "ExperimentTemplate",
@@ -61,6 +65,15 @@ class Experiment(BaseModel):
         "ExperimentSampleExecution",
         back_populates="experiment",
         cascade="all, delete-orphan",
+    )
+
+    # New: Experiments are composed of entries (per the refactor)
+    # Use string reference to avoid circular import with entry.py
+    entries = relationship(
+        "Entry",
+        back_populates="experiment",
+        cascade="all, delete-orphan",
+        order_by="Entry.sort_order",
     )
 
 
@@ -80,7 +93,7 @@ class ExperimentDetail(Base):
     detail_type = Column(String(255), nullable=False, index=True)  # e.g. 'protocol', 'conditions'
     content = Column(JSONB, nullable=False, server_default='{}')
     sort_order = Column(Integer, nullable=False, server_default='0')
-    custom_attributes = Column(JSONB, nullable=True, server_default='{}')
+    custom_attributes = Column(JSONB, nullable=True, server_default='{}')  # legacy - phased out via hard cutover to FieldDefinition
     created_at = Column(DateTime, default=func.now(), nullable=False)
     created_by = Column(PostgresUUID(as_uuid=True), ForeignKey('users.id'), nullable=True)
     modified_at = Column(DateTime, default=func.now(), onupdate=func.now(), nullable=False)
@@ -126,7 +139,7 @@ class ExperimentSampleExecution(Base):
         ForeignKey('results.id'),
         nullable=True,
     )
-    custom_attributes = Column(JSONB, nullable=True, server_default='{}')
+    custom_attributes = Column(JSONB, nullable=True, server_default='{}')  # legacy - phased out via hard cutover to FieldDefinition
     created_at = Column(DateTime, default=func.now(), nullable=False)
     created_by = Column(PostgresUUID(as_uuid=True), ForeignKey('users.id'), nullable=True)
     modified_at = Column(DateTime, default=func.now(), onupdate=func.now(), nullable=False)

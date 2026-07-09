@@ -41,6 +41,7 @@ def upgrade() -> None:
     op.create_index('idx_custom_attributes_config_active', 'custom_attributes_config', ['active'])
     
     # Add custom_attributes JSONB column to samples table
+    # NOTE: Legacy EAV. New fields use FieldDefinitions + lists (no options in validation_rules JSON). See 0046.
     op.add_column('samples',
         sa.Column('custom_attributes', postgresql.JSONB, nullable=True, server_default='{}')
     )

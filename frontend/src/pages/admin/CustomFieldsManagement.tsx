@@ -38,16 +38,169 @@ interface CustomAttributeConfig {
   id: string;
   entity_type: string;
   attr_name: string;
-  data_type: 'text' | 'number' | 'date' | 'boolean' | 'select';
+  data_type: 'text' | 'number' | 'date' | 'boolean' | 'list';
   validation_rules: Record<string, any>;
+  source_list_id?: string;
   description?: string;
   active: boolean;
   created_at: string;
   modified_at: string;
 }
 
-const ENTITY_TYPES = ['samples', 'tests', 'results', 'projects', 'client_projects', 'batches'];
-const DATA_TYPES = ['text', 'number', 'date', 'boolean', 'select'];
+// Internal display model that unifies OOB + Custom
+interface FieldRow extends Partial<CustomAttributeConfig> {
+  source: 'oob' | 'custom';
+  id: string; // synthetic for OOB rows
+}
+
+// All entities that can have fields / validation rules defined
+const ENTITY_TYPES = [
+  'samples',
+  'tests',
+  'results',
+  'projects',
+  'client_projects',
+  'batches',
+  'units',
+  'clients',
+  'experiments',
+  'analyses',
+  'containers',
+];
+const DATA_TYPES = ['text', 'number', 'date', 'boolean', 'list'];
+
+// OOB (built-in / out-of-the-box) fields per entity.
+// These are the fields that ship with the system and use list-backed or direct storage today.
+// We surface them here (denoted) so admins see the complete picture for an entity and can manage
+// their validation rules / options.
+const OOB_FIELDS: Record<string, Array<{
+  attr_name: string;
+  data_type: 'text' | 'number' | 'date' | 'boolean' | 'list';
+  description: string;
+  validation_rules?: Record<string, any>;
+}>> = {
+  samples: [
+    {
+      attr_name: 'sample_type',
+      data_type: 'list',
+      description: 'Type of sample material',
+      validation_rules: {},
+    },
+    {
+      attr_name: 'status',
+      data_type: 'list',
+      description: 'Current status of the sample',
+      validation_rules: {},
+    },
+    {
+      attr_name: 'matrix',
+      data_type: 'list',
+      description: 'Sample matrix / material type',
+      validation_rules: {},
+    },
+    {
+      attr_name: 'qc_type',
+      data_type: 'list',
+      description: 'QC classification for the sample',
+      validation_rules: {},
+    },
+    {
+      attr_name: 'specimen_biotype',
+      data_type: 'list',
+      description: 'Biological type / classification of the specimen (list-backed)',
+      validation_rules: {},
+    },
+    // Example OOB scalar fields to demonstrate validation rules for numeric/date
+    {
+      attr_name: 'volume_ml',
+      data_type: 'number',
+      description: 'Sample volume in milliliters',
+      validation_rules: { min: 0, max: 10000 },
+    },
+    {
+      attr_name: 'received_date',
+      data_type: 'date',
+      description: 'Date the sample was received',
+      validation_rules: {},
+    },
+  ],
+  projects: [
+    {
+      attr_name: 'status',
+      data_type: 'list',
+      description: 'Project status',
+      validation_rules: {},
+    },
+    {
+      attr_name: 'access_level',
+      data_type: 'list',
+      description: 'Access / visibility level',
+      validation_rules: {},
+    },
+  ],
+  tests: [
+    {
+      attr_name: 'status',
+      data_type: 'list',
+      description: 'Test / assay status',
+      validation_rules: {},
+    },
+  ],
+  batches: [
+    {
+      attr_name: 'type',
+      data_type: 'list',
+      description: 'Batch type',
+      validation_rules: {},
+    },
+    {
+      attr_name: 'status',
+      data_type: 'list',
+      description: 'Batch status',
+      validation_rules: {},
+    },
+  ],
+  units: [
+    {
+      attr_name: 'type',
+      data_type: 'list',
+      description: 'Unit of measure category',
+      validation_rules: {},
+    },
+  ],
+  clients: [
+    {
+      attr_name: 'type',
+      data_type: 'list',
+      description: 'Client type',
+      validation_rules: {},
+    },
+    {
+      attr_name: 'role',
+      data_type: 'list',
+      description: 'Role / relationship type',
+      validation_rules: {},
+    },
+  ],
+  experiments: [
+    {
+      attr_name: 'status',
+      data_type: 'list',
+      description: 'Experiment status',
+      validation_rules: {},
+    },
+  ],
+  results: [
+    {
+      attr_name: 'qualifiers',
+      data_type: 'list',
+      description: 'Result qualifiers / flags',
+      validation_rules: {},
+    },
+  ],
+  analyses: [],
+  containers: [],
+};
 
 const CustomFieldsManagement: React.FC = () => {
   const theme = useTheme();
@@ -83,8 +236,23 @@ const CustomFieldsManagement: React.FC = () => {
       if (entityTypeFilter) {
         filters.entity_type = entityTypeFilter;
       }
-      const response = await apiService.getCustomAttributeConfigs(filters);
-      setConfigs(response.configs || []);
+      // Use new FieldDefinition endpoint for the new Field Management path
+      const response = await apiService.getFieldDefinitions(filters);
+      // Map FieldDefinition response (items) to legacy shape for minimal UI change
+      const mapped = (response.items || []).map((f: any) => ({
+        id: f.id,
+        entity_type: f.entity_type,
+        attr_name: f.name,
+        data_type: f.data_type,
+        validation_rules: f.validation_rules || {},
+        // do not pollute validation_rules with list info; source separate
+        source_list_id: f.source_list_id,
+        description: f.description || f.display_name,
+        active: f.active,
+        created_at: f.created_at,
+        modified_at: f.modified_at,
+      }));
+      setConfigs(mapped);
       setTotal(response.total || 0);
     } catch (err: any) {
       if (err.response?.status === 403) {
@@ -97,50 +265,123 @@ const CustomFieldsManagement: React.FC = () => {
     }
   };
 
-  const filteredConfigs = useMemo(() => {
-    if (!searchTerm) return configs;
+  // Build unified list of OOB + Custom for display
+  const allFields: FieldRow[] = useMemo(() => {
+    const oobRows: FieldRow[] = [];
+
+    const relevantEntities = entityTypeFilter ? [entityTypeFilter] : ENTITY_TYPES;
+
+    relevantEntities.forEach((et) => {
+      const oobs = OOB_FIELDS[et] || [];
+      oobs.forEach((oob) => {
+        oobRows.push({
+          id: `oob-${et}-${oob.attr_name}`,
+          entity_type: et,
+          attr_name: oob.attr_name,
+          data_type: oob.data_type,
+          validation_rules: oob.validation_rules || {},
+          description: oob.description,
+          active: true,
+          source: 'oob',
+        });
+      });
+    });
+
+    const customRows: FieldRow[] = configs.map((c) => ({
+      ...c,
+      source: 'custom',
+    }));
+
+    // If filtering by entity, only include relevant
+    let combined = [...oobRows, ...customRows];
+
+    if (entityTypeFilter) {
+      combined = combined.filter((f) => f.entity_type === entityTypeFilter);
+    }
+
+    // Sort: OOB first (by name), then customs
+    combined.sort((a, b) => {
+      if (a.source !== b.source) return a.source === 'oob' ? -1 : 1;
+      if (a.entity_type !== b.entity_type) return a.entity_type!.localeCompare(b.entity_type!);
+      return a.attr_name!.localeCompare(b.attr_name!);
+    });
+
+    return combined;
+  }, [configs, entityTypeFilter]);
+
+  const filteredFields = useMemo(() => {
+    if (!searchTerm) return allFields;
     const term = searchTerm.toLowerCase();
-    return configs.filter(
-      (config) =>
-        config.attr_name.toLowerCase().includes(term) ||
-        config.description?.toLowerCase().includes(term) ||
-        config.entity_type.toLowerCase().includes(term)
+    return allFields.filter(
+      (f) =>
+        f.attr_name?.toLowerCase().includes(term) ||
+        f.description?.toLowerCase().includes(term) ||
+        f.entity_type?.toLowerCase().includes(term)
     );
-  }, [configs, searchTerm]);
+  }, [allFields, searchTerm]);
 
   const handleCreate = async (data: {
     entity_type?: string;
     attr_name?: string;
-    data_type?: 'text' | 'number' | 'date' | 'boolean' | 'select';
+    data_type?: 'text' | 'number' | 'date' | 'boolean' | 'list';
     validation_rules?: Record<string, any>;
     description?: string;
     active?: boolean;
+    source_list_id?: string;  // for list types
   }) => {
     // Ensure all required fields are present
     if (!data.entity_type || !data.attr_name || !data.data_type) {
       throw new Error('Missing required fields: entity_type, attr_name, and data_type are required');
     }
-    await apiService.createCustomAttributeConfig({
+    // Switch to new FieldDefinition endpoint - stop calling legacy
+    const payload: any = {
       entity_type: data.entity_type,
-      attr_name: data.attr_name,
+      name: data.attr_name,  // map attr_name -> name
+      display_name: data.description || data.attr_name,
       data_type: data.data_type,
       validation_rules: data.validation_rules || {},
       description: data.description,
       active: data.active ?? true,
-    });
+      is_required: data.validation_rules?.required || false,
+    };
+    if (data.data_type === 'list' && data.source_list_id) {
+      payload.source_list_id = data.source_list_id;
+    }
+    await apiService.createFieldDefinition(payload);
     await loadConfigs();
   };
 
   const handleUpdate = async (data: {
     entity_type?: string;
     attr_name?: string;
-    data_type?: 'text' | 'number' | 'date' | 'boolean' | 'select';
+    data_type?: 'text' | 'number' | 'date' | 'boolean' | 'list';
     validation_rules?: Record<string, any>;
     description?: string;
     active?: boolean;
+    source_list_id?: string;
   }) => {
     if (!selectedConfig) return;
-    await apiService.updateCustomAttributeConfig(selectedConfig.id, data);
+    const isOob = (selectedConfig as any).source === 'oob' || String(selectedConfig.id).startsWith('oob-');
+    if (isOob) {
+      // OOB fields are defined in the system. For now we just refresh the local view.
+      await loadConfigs();
+      setSelectedConfig(null);
+      return;
+    }
+    // Switch to new FieldDefinition endpoint
+    const payload: any = {
+      entity_type: data.entity_type,
+      name: data.attr_name,
+      display_name: data.description,
+      data_type: data.data_type,
+      validation_rules: data.validation_rules,
+      description: data.description,
+      active: data.active,
+    };
+    if (data.data_type === 'list' && data.source_list_id) {
+      payload.source_list_id = data.source_list_id;
+    }
+    await apiService.updateFieldDefinition(selectedConfig.id, payload);
     await loadConfigs();
     setSelectedConfig(null);
   };
@@ -148,7 +389,10 @@ const CustomFieldsManagement: React.FC = () => {
   const handleDelete = async () => {
     if (!deleteTarget) return;
     try {
-      await apiService.deleteCustomAttributeConfig(deleteTarget.id);
+      const isOob = (deleteTarget as any).source === 'oob' || String(deleteTarget.id).startsWith('oob-');
+      if (!isOob) {
+        await apiService.deleteFieldDefinition(deleteTarget.id);
+      }
       await loadConfigs();
       setDeleteDialogOpen(false);
       setDeleteTarget(null);
@@ -165,6 +409,23 @@ const CustomFieldsManagement: React.FC = () => {
 
   const columns: GridColDef[] = [
     {
+      field: 'source',
+      headerName: 'Type',
+      width: 100,
+      flex: isMobile ? 0 : 0.6,
+      renderCell: (params) => {
+        const isOob = params.value === 'oob';
+        return (
+          <Chip
+            label={isOob ? 'OOB' : 'Custom'}
+            size="small"
+            color={isOob ? 'default' : 'success'}
+            variant={isOob ? 'outlined' : 'filled'}
+          />
+        );
+      },
+    },
+    {
       field: 'entity_type',
       headerName: 'Entity Type',
       width: 150,
@@ -180,7 +441,7 @@ const CustomFieldsManagement: React.FC = () => {
     },
     {
       field: 'attr_name',
-      headerName: 'Attribute Name',
+      headerName: 'Field Name',
       width: 200,
       flex: isMobile ? 0 : 1,
     },
@@ -244,28 +505,46 @@ const CustomFieldsManagement: React.FC = () => {
       headerName: 'Actions',
       width: 120,
       getActions: (params: GridRowParams) => {
-        const config = params.row as CustomAttributeConfig;
+        const row = params.row as FieldRow;
         const actions = [];
 
         if (canEdit) {
+          // OOB rows are editable for validation rules etc., but we pass a synthetic object
+          const configForDialog: any = {
+            id: row.id,
+            entity_type: row.entity_type,
+            attr_name: row.attr_name,
+            data_type: row.data_type,
+            validation_rules: row.validation_rules,
+            description: row.description,
+            active: row.active ?? true,
+            source: row.source,
+          };
+
           actions.push(
             <GridActionsCellItem
               icon={<Edit />}
               label="Edit"
               onClick={() => {
-                setSelectedConfig(config);
+                setSelectedConfig(configForDialog);
                 setFormOpen(true);
-              }}
-            />,
-            <GridActionsCellItem
-              icon={<Delete />}
-              label="Delete"
-              onClick={() => {
-                setDeleteTarget(config);
-                setDeleteDialogOpen(true);
               }}
             />
           );
+
+          // Only customs are deletable in this view
+          if (row.source === 'custom') {
+            actions.push(
+              <GridActionsCellItem
+                icon={<Delete />}
+                label="Delete"
+                onClick={() => {
+                  setDeleteTarget(configForDialog);
+                  setDeleteDialogOpen(true);
+                }}
+              />
+            );
+          }
         }
 
         return actions;
@@ -296,7 +575,7 @@ const CustomFieldsManagement: React.FC = () => {
         }}
       >
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Typography variant="h4">Custom Fields Management</Typography>
+          <Typography variant="h4">Field Management</Typography>
           <Tooltip title="Edit help: Use config:edit permission to manage help entries in Help Management">
             <Typography variant="caption" color="text.secondary" sx={{ cursor: 'help' }}>
               (EAV)
@@ -377,20 +656,15 @@ const CustomFieldsManagement: React.FC = () => {
           <CircularProgress />
         </Box>
       ) : (
-        <Box sx={{ height: filteredConfigs.length === 0 ? 'auto' : 600, minHeight: 220, width: '100%', mb: 2 }}>
+        <Box sx={{ height: filteredFields.length === 0 ? 'auto' : 600, minHeight: 220, width: '100%', mb: 2 }}>
           <DataGrid
-            rows={filteredConfigs}
-            autoHeight={filteredConfigs.length === 0}
+            rows={filteredFields}
+            autoHeight={filteredFields.length === 0}
             columns={columns}
             getRowId={(row) => row.id}
             pageSizeOptions={[10, 25, 50]}
-            paginationMode="server"
-            rowCount={total}
-            paginationModel={{ page, pageSize }}
-            onPaginationModelChange={(model) => {
-              setPage(model.page);
-              setPageSize(model.pageSize);
-            }}
+            // Client-side pagination for the unified OOB + Custom view (OOB are in-memory)
+            paginationMode="client"
             disableRowSelectionOnClick
             slots={{
               noRowsOverlay: () => (
@@ -402,7 +676,7 @@ const CustomFieldsManagement: React.FC = () => {
                     height: '100%',
                   }}
                 >
-                  <Typography>No custom fields found</Typography>
+                  <Typography>No fields found for the current filter</Typography>
                 </Box>
               ),
             }}
@@ -416,7 +690,8 @@ const CustomFieldsManagement: React.FC = () => {
         config={selectedConfig}
         entityTypes={ENTITY_TYPES}
         dataTypes={DATA_TYPES}
-        existingConfigs={configs}
+        // Pass the full unified list (OOB + customs) so the dialog can show rich context
+        existingFields={allFields}
         onClose={() => {
           setFormOpen(false);
           setSelectedConfig(null);

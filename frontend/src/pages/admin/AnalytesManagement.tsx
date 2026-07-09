@@ -57,7 +57,9 @@ const AnalytesManagement: React.FC = () => {
       setLoading(true);
       setError(null);
       const analytesData = await apiService.getAnalytes();
-      setAnalytes(analytesData || []);
+      // Handle both array return and paginated {analytes: [...]} wrapper
+      const list = Array.isArray(analytesData) ? analytesData : (analytesData?.analytes || []);
+      setAnalytes(list);
     } catch (err: any) {
       if (err.response?.status === 403) {
         setError('You do not have permission to view analytes management');
@@ -70,9 +72,10 @@ const AnalytesManagement: React.FC = () => {
   };
 
   const filteredAnalytes = useMemo(() => {
-    if (!searchTerm) return analytes;
+    const list = Array.isArray(analytes) ? analytes : [];
+    if (!searchTerm) return list;
     const term = searchTerm.toLowerCase();
-    return analytes.filter(
+    return list.filter(
       (analyte) =>
         analyte.name.toLowerCase().includes(term) ||
         analyte.description?.toLowerCase().includes(term)
@@ -252,7 +255,7 @@ const AnalytesManagement: React.FC = () => {
       <AnalyteFormDialog
         open={formOpen}
         analyte={selectedAnalyte}
-        existingNames={analytes.map((a) => a.name)}
+        existingNames={(analytes || []).map((a) => a.name)}
         onClose={() => {
           setFormOpen(false);
           setSelectedAnalyte(null);

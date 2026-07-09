@@ -22,7 +22,7 @@ Copyright (c) 2025 Marc Breneiser
 - **Analytes Management**: CRUD operations for analytes (admin-only)
 - **Analysis-Analyte Configuration**: Configure validation rules for analytes in analyses (admin-only)
 - **Test Batteries Management**: Group analyses into reusable batteries with sequence and optional flags (admin-only)
-- **Custom Attributes Configuration**: Define custom fields for samples, tests, results, projects, client_projects, and batches (admin-only, Post-MVP)
+- **Field Management / Custom Fields**: Unified management of OOB (built-in) and custom fields. List-backed preferred (via Lists) for options/selects to enable reuse (e.g. one list for Sample + Entry fields). See frontend and .docs/ for details. Legacy custom-attributes endpoints/UI still present.
 - **Users Management**: CRUD operations for users (admin-only)
 - **Roles & Permissions Management**: CRUD operations for roles and permission assignments (admin-only)
 - **Authentication**: JWT-based authentication with RBAC

@@ -150,9 +150,9 @@ jspm_packages/
 .nuxt
 dist
 
-# Gatsby files
+# Gatsby files (legacy - not used)
 .cache/
-public
+# public  # removed: was ignoring frontend/public/ for CRA build (index.html etc.)
 
 # Storybook build outputs
 .out
