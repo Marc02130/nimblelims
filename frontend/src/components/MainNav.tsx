@@ -1,7 +1,7 @@
 /**
  * MainNav – central navigation structure for the app.
  * Used by the sidebar/navigation bar. Admin section includes sub-links
- * to Name Templates, Custom Attributes, and Lists (and other admin routes).
+ * to Lists and other admin routes (Name Templates, Custom Attributes, and Custom Names sidebar links removed; replaced by unified Custom Fields / Field Management using FieldDefinitions + lists).
  * Admin routes are protected by config:edit (or other) permission in App routes.
  */
 
@@ -61,13 +61,12 @@ export const coreNavItems: NavItem[] = [
 ];
 
 /**
- * Admin section nav items. First three are the primary admin sub-links:
- * Name Templates, Custom Attributes, Lists. Then remaining admin routes.
+ * Admin section nav items. Primary admin sub-links for the unified Field Management
+ * (which replaces the old Custom Attributes and Name Templates approaches using FieldDefinitions + lists).
+ * Legacy pages for Custom Attributes, Name Templates, and Custom Names (name templates UI) have been removed from the sidebar (dead code cleanup; name generation still works via API in forms).
  */
 export const adminNavItems: AdminNavItem[] = [
   { text: 'Overview', path: '/admin', icon: <DashboardIcon />, exact: true },
-  { text: 'Name Templates', path: '/admin/name-templates', icon: <TuneIcon /> },
-  { text: 'Custom Attributes', path: '/admin/custom-attributes', icon: <TuneIcon /> },
   { text: 'Lists', path: '/admin/lists', icon: <ViewListIcon /> },
   { text: 'Container Types', path: '/admin/container-types', icon: <InventoryIcon /> },
   { text: 'Units Management', path: '/admin/units', icon: <StraightenIcon /> },
@@ -77,7 +76,6 @@ export const adminNavItems: AdminNavItem[] = [
   { text: 'Analytes Management', path: '/admin/analytes', icon: <Biotech /> },
   { text: 'Test Batteries', path: '/admin/test-batteries', icon: <BatteryChargingFull /> },
   { text: 'Custom Fields', path: '/admin/custom-fields', icon: <TuneIcon /> },
-  { text: 'Custom Names', path: '/admin/custom-names', icon: <TuneIcon /> },
   { text: 'Workflow Templates', path: '/admin/workflow-templates', icon: <TuneIcon /> },
   { text: 'Help Management', path: '/admin/help', icon: <HelpIcon /> },
 ];
