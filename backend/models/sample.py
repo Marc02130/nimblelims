@@ -21,7 +21,49 @@ class Sample(BaseModel):
     project_id = Column(PostgresUUID(as_uuid=True), ForeignKey('projects.id'), nullable=False)
     qc_type = Column(PostgresUUID(as_uuid=True), ForeignKey('list_entries.id'), nullable=True)
     client_sample_id = Column(String(255), nullable=True, unique=True)
-    custom_attributes = Column(JSONB, nullable=True, server_default='{}')
+    custom_attributes = Column(JSONB, nullable=True, server_default='{}')  # legacy - phased out for modeled fields via hard cutover
+
+    # Path 1: direct column for top-level list-backed field (specimen_biotype)
+    # Defined via FieldDefinition (data_type='list', source_list=...), added via migration.
+    # This replaces any previous hack in custom_attributes['specimen_biotype'].
+    specimen_biotype_id = Column(
+        PostgresUUID(as_uuid=True),
+        ForeignKey('list_entries.id'),
+        nullable=True,
+        index=True
+    )
+    specimen_biotype = relationship(
+        "ListEntry", foreign_keys=[specimen_biotype_id]
+    )
+
+    # Example simple scalar (text) - also via FieldDefinition + direct column
+    # lot_number = Column(Text)
+
+    # Example simple scalar (numeric)
+    # dilution_factor = Column(Numeric)
+
+    # === Deprecation plan for custom_attributes (hard cutover) ===
+    # Phase 1: Keep the column for backward compat during transition.
+    # Phase 2: For any field promoted to FieldDefinition (like specimen_biotype_id above),
+    #          add the real column (Path 1), migrate data from JSONB, update all code/Entries/Processes.
+    # Phase 3: Hard cutover - stop reading/writing the key in custom_attributes for modeled fields.
+    #          Provide a one-time backfill script.
+    # Phase 4: After validation, custom_attributes becomes legacy-only (unstructured notes only)
+    #          or can be dropped in a later migration.
+    # Use FieldDefinition to drive new fields; old JSONB access should be flagged deprecated.
+    # See .docs/migration-strategy-schema-evolution.md for detailed backfill/validation/rollback.
+
+    # Deprecation plan for custom_attributes (hard cutover):
+    # - During transition: keep the column but stop writing new modeled fields to it.
+    # - Backfill script moves values to the new typed columns (see migration-strategy doc).
+    # - Post-cutover: custom_attributes becomes read-only for legacy data only.
+    # - Eventually drop or leave as-is for truly unstructured per-sample notes.
+    # Accessor example (temporary compat):
+    # @property
+    # def specimen_biotype_legacy(self):
+    #     if self.specimen_biotype_id:
+    #         return self.specimen_biotype.name
+    #     return self.custom_attributes.get('specimen_biotype')
     
     # Relationships
     project = relationship("Project", back_populates="samples")

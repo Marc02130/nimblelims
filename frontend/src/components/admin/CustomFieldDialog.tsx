@@ -16,19 +16,34 @@ import {
   Chip,
   FormControlLabel,
   Checkbox,
+  IconButton,
 } from '@mui/material';
+import { Add as AddIcon } from '@mui/icons-material';
 import { Formik, Form, Field } from 'formik';
 import * as Yup from 'yup';
 import { apiService } from '../../services/apiService';
+import ListFormDialog from '../../pages/admin/ListFormDialog';
+import { slugToDisplayName } from '../../utils/listUtils';
 
 interface CustomAttributeConfig {
   id: string;
   entity_type: string;
   attr_name: string;
-  data_type: 'text' | 'number' | 'date' | 'boolean' | 'select';
+  data_type: 'text' | 'number' | 'date' | 'boolean' | 'list';
   validation_rules: Record<string, any>;
+  source_list_id?: string;
   description?: string;
   active: boolean;
+}
+
+interface FieldLike {
+  id: string;
+  entity_type?: string;
+  attr_name?: string;
+  data_type?: string;
+  validation_rules?: Record<string, any>;
+  description?: string;
+  source?: 'oob' | 'custom';
 }
 
 interface CustomFieldDialogProps {
@@ -36,22 +51,39 @@ interface CustomFieldDialogProps {
   config?: CustomAttributeConfig | null;
   entityTypes: string[];
   dataTypes: string[];
-  existingConfigs: CustomAttributeConfig[];
+  // Now receives unified OOB + custom so we can show context
+  existingFields?: FieldLike[];
   onClose: () => void;
   onSubmit: (data: {
     entity_type?: string;
     attr_name?: string;
-    data_type?: 'text' | 'number' | 'date' | 'boolean' | 'select';
+    data_type?: 'text' | 'number' | 'date' | 'boolean' | 'list';
     validation_rules?: Record<string, any>;
     description?: string;
     active?: boolean;
+    source_list_id?: string;
   }) => Promise<void>;
 }
+
+// Keep in sync with management page
+const ALL_ENTITY_TYPES = [
+  'samples',
+  'tests',
+  'results',
+  'projects',
+  'client_projects',
+  'batches',
+  'units',
+  'clients',
+  'experiments',
+  'analyses',
+  'containers',
+];
 
 const validationSchema = Yup.object({
   entity_type: Yup.string()
     .required('Entity type is required')
-    .oneOf(['samples', 'tests', 'results', 'projects', 'client_projects', 'batches'], 'Invalid entity type'),
+    .oneOf(ALL_ENTITY_TYPES as any, 'Invalid entity type'),
   attr_name: Yup.string()
     .required('Attribute name is required')
     .min(1, 'Attribute name must be at least 1 character')
@@ -59,7 +91,7 @@ const validationSchema = Yup.object({
     .matches(/^[a-zA-Z0-9_-]+$/, 'Attribute name can only contain letters, numbers, underscores, and hyphens'),
   data_type: Yup.string()
     .required('Data type is required')
-    .oneOf(['text', 'number', 'date', 'boolean', 'select'], 'Invalid data type'),
+    .oneOf(['text', 'number', 'date', 'boolean', 'list'], 'Invalid data type'),
   validation_rules: Yup.string()
     .test(
     'is-valid-json',
@@ -148,20 +180,15 @@ const validationSchema = Yup.object({
       }
     )
     .test(
-      'validate-select-rules',
+      'validate-list-rules',
       function (value) {
         const { data_type } = this.parent;
-        if (!value || value.trim() === '' || data_type !== 'select') return true;
+        if (!value || value.trim() === '' || data_type !== 'list') return true;
         try {
           const parsed = JSON.parse(value);
-          if (!parsed.options || !Array.isArray(parsed.options)) {
+          if (!parsed.source_list) {
             return this.createError({
-              message: 'Select data type requires an "options" array in validation rules',
-            });
-          }
-          if (parsed.options.length === 0) {
-            return this.createError({
-              message: 'Options array cannot be empty',
+              message: 'List data type requires a "source_list" in validation rules (or select a list below)',
             });
           }
           return true;
@@ -169,7 +196,35 @@ const validationSchema = Yup.object({
           return true; // JSON parsing error is handled by is-valid-json test
         }
       }
-  ),
+    )
+    .test(
+      'validate-text-rules',
+      function (value) {
+        const { data_type } = this.parent;
+        if (!value || value.trim() === '' || data_type !== 'text') return true;
+        try {
+          const parsed = JSON.parse(value);
+          if (parsed.min_length !== undefined && typeof parsed.min_length !== 'number') {
+            return this.createError({ message: 'min_length must be a number' });
+          }
+          if (parsed.max_length !== undefined && typeof parsed.max_length !== 'number') {
+            return this.createError({ message: 'max_length must be a number' });
+          }
+          if (
+            parsed.min_length !== undefined &&
+            parsed.max_length !== undefined &&
+            parsed.min_length > parsed.max_length
+          ) {
+            return this.createError({
+              message: 'min_length must be less than or equal to max_length',
+            });
+          }
+          return true;
+        } catch {
+          return true;
+        }
+      }
+    ),
   description: Yup.string().max(500, 'Description must be less than 500 characters'),
   active: Yup.boolean(),
 });
@@ -179,7 +234,7 @@ const CustomFieldDialog: React.FC<CustomFieldDialogProps> = ({
   config,
   entityTypes,
   dataTypes,
-  existingConfigs,
+  existingFields = [],
   onClose,
   onSubmit,
 }) => {
@@ -188,7 +243,31 @@ const CustomFieldDialog: React.FC<CustomFieldDialogProps> = ({
   const [checkingUniqueness, setCheckingUniqueness] = useState(false);
   const [isUnique, setIsUnique] = useState<boolean | null>(null);
 
+  const [availableLists, setAvailableLists] = useState<any[]>([]);
+  const [listDialogOpen, setListDialogOpen] = useState(false);
+  const [listsLoading, setListsLoading] = useState(false);
+
   const isEdit = !!config;
+  const isOob = isEdit && (config as any)?.source === 'oob';
+
+  const loadAvailableLists = async () => {
+    setListsLoading(true);
+    try {
+      const data = await apiService.getLists();
+      setAvailableLists(data || []);
+    } catch (e) {
+      // non-fatal for dialog
+      setAvailableLists([]);
+    } finally {
+      setListsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (open) {
+      loadAvailableLists();
+    }
+  }, [open]);
 
   const initialValues = {
     entity_type: config?.entity_type || '',
@@ -199,15 +278,17 @@ const CustomFieldDialog: React.FC<CustomFieldDialogProps> = ({
       ? JSON.stringify(config.validation_rules, null, 2)
       : '',
     description: config?.description || '',
+    source_list: config?.source_list_id || (config?.validation_rules as any)?.source_list_id || (config?.validation_rules as any)?.source_list || '',
   };
 
   const handleSubmit = async (values: {
     entity_type: string;
     attr_name: string;
-    data_type: 'text' | 'number' | 'date' | 'boolean' | 'select';
+    data_type: 'text' | 'number' | 'date' | 'boolean' | 'list';
     validation_rules: string;
     description?: string;
     active: boolean;
+    source_list?: string;
   }) => {
     setLoading(true);
     setError(null);
@@ -226,11 +307,11 @@ const CustomFieldDialog: React.FC<CustomFieldDialogProps> = ({
       }
 
       // Check for uniqueness (entity_type + attr_name combination)
-      const isDuplicate = existingConfigs.some(
-        (c) =>
-          c.entity_type === values.entity_type &&
-          c.attr_name === values.attr_name &&
-          (!isEdit || c.id !== config.id)
+      const isDuplicate = (existingFields || []).some(
+        (f: any) =>
+          f.entity_type === values.entity_type &&
+          f.attr_name === values.attr_name &&
+          (!isEdit || f.id !== config?.id)
       );
 
       if (isDuplicate) {
@@ -242,10 +323,14 @@ const CustomFieldDialog: React.FC<CustomFieldDialogProps> = ({
       }
 
       // Validate data type specific rules
-      if (values.data_type === 'select' && (!parsedRules.options || !Array.isArray(parsedRules.options))) {
-        setError('Select data type requires an "options" array in validation rules');
-        setLoading(false);
-        return;
+      if (values.data_type === 'list') {
+        const listName = values.source_list || parsedRules.source_list;
+        if (!listName) {
+          setError('List data type requires selecting a source list (or create new with +)');
+          setLoading(false);
+          return;
+        }
+        parsedRules.source_list = listName;
       }
 
       if (values.data_type === 'number') {
@@ -281,6 +366,28 @@ const CustomFieldDialog: React.FC<CustomFieldDialogProps> = ({
         }
       }
 
+      if (values.data_type === 'text') {
+        if (parsedRules.min_length !== undefined && typeof parsedRules.min_length !== 'number') {
+          setError('min_length must be a number');
+          setLoading(false);
+          return;
+        }
+        if (parsedRules.max_length !== undefined && typeof parsedRules.max_length !== 'number') {
+          setError('max_length must be a number');
+          setLoading(false);
+          return;
+        }
+        if (
+          parsedRules.min_length !== undefined &&
+          parsedRules.max_length !== undefined &&
+          parsedRules.min_length > parsedRules.max_length
+        ) {
+          setError('min_length must be less than or equal to max_length');
+          setLoading(false);
+          return;
+        }
+      }
+
       const submitData: any = {
         entity_type: values.entity_type,
         attr_name: values.attr_name,
@@ -288,6 +395,7 @@ const CustomFieldDialog: React.FC<CustomFieldDialogProps> = ({
         validation_rules: parsedRules,
         description: values.description || undefined,
         active: values.active,
+        source_list_id: values.source_list || undefined,  // for list type, passed to new endpoint
       };
 
       if (isEdit) {
@@ -315,9 +423,9 @@ const CustomFieldDialog: React.FC<CustomFieldDialogProps> = ({
 
     setCheckingUniqueness(true);
     try {
-      // Check against existing configs
-      const isDuplicate = existingConfigs.some(
-        (c) => c.entity_type === entityType && c.attr_name === attrName && (!currentId || c.id !== currentId)
+      // Check against unified fields (OOB + custom)
+      const isDuplicate = (existingFields || []).some(
+        (f: any) => f.entity_type === entityType && f.attr_name === attrName && (!currentId || f.id !== currentId)
       );
       setIsUnique(!isDuplicate);
     } catch (err) {
@@ -337,8 +445,8 @@ const CustomFieldDialog: React.FC<CustomFieldDialogProps> = ({
         return 'JSON object with optional: min_date (ISO date string), max_date (ISO date string). Example: {"min_date": "2024-01-01", "max_date": "2024-12-31"}';
       case 'boolean':
         return 'JSON object (no validation rules currently supported for booleans). Example: {}';
-      case 'select':
-        return 'JSON object with required: options (array of strings). Example: {"options": ["option1", "option2"]}';
+      case 'list':
+        return 'Select source list (values come from the list, not here). Additional validation rules optional.';
       default:
         return 'Enter validation rules as JSON object';
     }
@@ -354,8 +462,8 @@ const CustomFieldDialog: React.FC<CustomFieldDialogProps> = ({
         return 'Available validation rules:\n• min_date (ISO date string): Minimum allowed date (YYYY-MM-DD)\n• max_date (ISO date string): Maximum allowed date (YYYY-MM-DD)\n\nNote: min_date must be ≤ max_date\nExample: {"min_date": "2024-01-01", "max_date": "2024-12-31"}';
       case 'boolean':
         return 'No validation rules are currently supported for boolean fields.\nLeave empty or use: {}';
-      case 'select':
-        return 'Required validation rule:\n• options (array of strings): List of selectable options\n\nExample: {"options": ["Option 1", "Option 2", "Option 3"]}';
+      case 'list':
+        return 'List-backed field (USE LISTS):\n• Choose an existing list (reusable across top-level fields and inside Entries)\n• Or click + to create a new list on the fly\n• List values are NOT stored in validation_rules.\n• Use validation_rules JSON for additional constraints if needed (e.g. required).';
       default:
         return 'Enter validation rules as a JSON object based on the selected data type.';
     }
@@ -370,8 +478,13 @@ const CustomFieldDialog: React.FC<CustomFieldDialogProps> = ({
         enableReinitialize
       >
         {({ values, errors, touched, isValid, setFieldValue, setFieldTouched }) => (
+          <>
           <Form>
-            <DialogTitle>{isEdit ? 'Edit Custom Field' : 'Create New Custom Field'}</DialogTitle>
+            <DialogTitle>
+              {isEdit 
+                ? (isOob ? 'Edit Built-in (OOB) Field' : 'Edit Custom Field') 
+                : 'Create New Custom Field'}
+            </DialogTitle>
             <DialogContent>
               {error && (
                 <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
@@ -380,6 +493,7 @@ const CustomFieldDialog: React.FC<CustomFieldDialogProps> = ({
               )}
 
               <Box sx={{ pt: 2 }}>
+                {/* Entity Type is required FIRST. Other fields are disabled until chosen (for create). */}
                 <FormControl fullWidth margin="normal" required>
                   <InputLabel>Entity Type</InputLabel>
                   <Field name="entity_type">
@@ -390,6 +504,11 @@ const CustomFieldDialog: React.FC<CustomFieldDialogProps> = ({
                           label="Entity Type"
                           error={meta.touched && !!meta.error}
                           disabled={isEdit}
+                          onChange={(e: any) => {
+                            field.onChange(e);
+                            // Clear dependent uniqueness when entity changes
+                            setIsUnique(null);
+                          }}
                         >
                           {entityTypes.map((type) => (
                             <MenuItem key={type} value={type}>
@@ -405,7 +524,51 @@ const CustomFieldDialog: React.FC<CustomFieldDialogProps> = ({
                       </>
                     )}
                   </Field>
+                  <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5 }}>
+                    You must select an entity type before defining a new custom field.
+                  </Typography>
                 </FormControl>
+
+                {/* Context: existing fields on the selected entity (OOB + Custom). This helps the user. */}
+                {values.entity_type && (
+                  <Box
+                    sx={{
+                      mt: 1,
+                      mb: 2,
+                      p: 1.5,
+                      bgcolor: 'grey.50',
+                      border: '1px solid',
+                      borderColor: 'divider',
+                      borderRadius: 1,
+                    }}
+                  >
+                    <Typography variant="subtitle2" gutterBottom>
+                      Fields already defined for <strong>{values.entity_type}</strong>
+                    </Typography>
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                      {(() => {
+                        const fieldsForEntity = (existingFields || []).filter(
+                          (f: any) => f.entity_type === values.entity_type
+                        );
+                        if (fieldsForEntity.length === 0) {
+                          return <Typography variant="body2" color="text.secondary">No fields defined yet.</Typography>;
+                        }
+                        return fieldsForEntity.slice(0, 12).map((f: any, idx: number) => (
+                          <Chip
+                            key={idx}
+                            size="small"
+                            label={`${f.attr_name} (${f.data_type || 'list'})`}
+                            color={f.source === 'oob' ? 'default' : 'success'}
+                            variant={f.source === 'oob' ? 'outlined' : 'filled'}
+                          />
+                        ));
+                      })()}
+                    </Box>
+                    <Typography variant="caption" color="text.secondary">
+                      OOB = Built-in / Out-of-the-Box. Custom = user-added. This context helps you avoid duplicates and choose good names.
+                    </Typography>
+                  </Box>
+                )}
 
                 <Field name="attr_name">
                   {({ field, meta }: any) => (
@@ -416,6 +579,7 @@ const CustomFieldDialog: React.FC<CustomFieldDialogProps> = ({
                         fullWidth
                         required
                         margin="normal"
+                        disabled={!values.entity_type && !isEdit || isOob}
                         helperText={
                           meta.touched && meta.error
                             ? meta.error
@@ -423,12 +587,14 @@ const CustomFieldDialog: React.FC<CustomFieldDialogProps> = ({
                             ? 'This attribute name already exists for this entity type'
                             : isUnique === true
                             ? 'Attribute name is available'
-                            : 'Unique identifier for this custom attribute (alphanumeric, underscores, hyphens only)'
+                            : 'Unique identifier for this field (alphanumeric, underscores, hyphens only)'
                         }
                         error={meta.touched && !!meta.error}
                         onChange={(e) => {
                           field.onChange(e);
-                          checkAttributeNameUniqueness(values.entity_type, e.target.value, config?.id);
+                          if (values.entity_type) {
+                            checkAttributeNameUniqueness(values.entity_type, e.target.value, config?.id);
+                          }
                         }}
                         InputProps={{
                           endAdornment:
@@ -450,7 +616,18 @@ const CustomFieldDialog: React.FC<CustomFieldDialogProps> = ({
                   <Field name="data_type">
                     {({ field, meta }: any) => (
                       <>
-                        <Select {...field} label="Data Type" error={meta.touched && !!meta.error}>
+                        <Select
+                          {...field}
+                          label="Data Type"
+                          error={meta.touched && !!meta.error}
+                          disabled={!values.entity_type && !isEdit || isOob}
+                          onChange={(e) => {
+                            field.onChange(e);
+                            if (e.target.value !== 'list') {
+                              setFieldValue('source_list', '');
+                            }
+                          }}
+                        >
                           {dataTypes.map((type) => (
                             <MenuItem key={type} value={type}>
                               {type}
@@ -465,6 +642,57 @@ const CustomFieldDialog: React.FC<CustomFieldDialogProps> = ({
                       </>
                     )}
                   </Field>
+
+                  {/* List selector with inline create button - preferred for list-backed fields */}
+                  {values.data_type === 'list' && (
+                    <FormControl fullWidth margin="normal" required>
+                      <InputLabel>Source List</InputLabel>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                        <Select
+                          value={values.source_list || ''}
+                          onChange={(e) => {
+                            const newListId = e.target.value as string;
+                            setFieldValue('source_list', newListId);
+                          }}
+                          label="Source List"
+                          fullWidth
+                          disabled={!values.entity_type && !isEdit || isOob}
+                        >
+                          {availableLists.map((l: any) => (
+                            <MenuItem key={l.id} value={l.id}>
+                              {slugToDisplayName(l.name)}
+                            </MenuItem>
+                          ))}
+                          {availableLists.length === 0 && !listsLoading && (
+                            <MenuItem disabled value="">No lists yet - use + to create</MenuItem>
+                          )}
+                          {listsLoading && (
+                            <MenuItem disabled value="">Loading lists...</MenuItem>
+                          )}
+                        </Select>
+                        <IconButton
+                          aria-label="Create new list"
+                          onClick={() => setListDialogOpen(true)}
+                          disabled={!values.entity_type && !isEdit || isOob}
+                          color="primary"
+                          size="small"
+                        >
+                          <AddIcon />
+                        </IconButton>
+                      </Box>
+                      <Typography variant="caption" color="text.secondary">
+                        A single list can back fields on Samples and inside Sample data Entries. Choose existing or create new.
+                      </Typography>
+                    </FormControl>
+                  )}
+
+                  {/* Note about list preference */}
+                  {values.data_type === 'list' && (
+                    <Typography variant="caption" color="info.main" sx={{ mt: 0.5, display: 'block' }}>
+                      Using lists: one list maintained in one place, reusable for top-level fields and Entry fields.
+                    </Typography>
+                  )}
+
                 </FormControl>
 
                 <Field name="validation_rules">
@@ -488,6 +716,7 @@ const CustomFieldDialog: React.FC<CustomFieldDialogProps> = ({
                       multiline
                       rows={6}
                       margin="normal"
+                      disabled={!values.entity_type && !isEdit}
                       helperText={
                         meta.touched && meta.error
                           ? meta.error
@@ -526,7 +755,8 @@ const CustomFieldDialog: React.FC<CustomFieldDialogProps> = ({
                       multiline
                       rows={3}
                       margin="normal"
-                      helperText={meta.touched && meta.error ? meta.error : 'Optional description for this custom field'}
+                      disabled={isOob ? false : (!values.entity_type && !isEdit)}
+                      helperText={meta.touched && meta.error ? meta.error : 'Optional description for this field'}
                       error={meta.touched && !!meta.error}
                     />
                   )}
@@ -540,6 +770,7 @@ const CustomFieldDialog: React.FC<CustomFieldDialogProps> = ({
                         {...field}
                           checked={field.value !== undefined ? field.value : true}
                           color="primary"
+                          disabled={isOob}
                         />
                       }
                       label="Active"
@@ -547,6 +778,12 @@ const CustomFieldDialog: React.FC<CustomFieldDialogProps> = ({
                     />
                     )}
                   </Field>
+
+                  {isOob && (
+                    <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                      This is a built-in (OOB) field. You can edit its validation rules and description. For list OOB, the list (values) is managed via Lists; core list choice locked here. Use JSON editor for additional rules on scalars/lists.
+                    </Typography>
+                  )}
               </Box>
             </DialogContent>
             <DialogActions>
@@ -558,7 +795,29 @@ const CustomFieldDialog: React.FC<CustomFieldDialogProps> = ({
               </Button>
             </DialogActions>
           </Form>
-        )}
+
+          {/* Popup for creating new list inline when selecting source list.
+               Rendered as sibling to <Form> inside a fragment because the Formik
+               render prop must return a single root element. */}
+          <ListFormDialog
+            open={listDialogOpen}
+            list={null}
+            existingNames={availableLists.map((l: any) => l.name)}
+            onClose={() => setListDialogOpen(false)}
+            onSubmit={async (data: { name: string; description?: string }) => {
+              try {
+                const newList = await apiService.createList(data);
+                await loadAvailableLists();
+                // Auto select the newly created list by id
+                setFieldValue('source_list', newList.id);
+              } catch (e: any) {
+                // ListFormDialog will show its own error; rethrow if needed
+                throw e;
+              }
+            }}
+          />
+        </>
+      )}
       </Formik>
     </Dialog>
   );

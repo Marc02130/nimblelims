@@ -7,6 +7,7 @@ Create Date: 2026-02-25
 Creates experiment_templates, experiments, experiment_details,
 experiment_sample_executions with proper FKs, indexes (including
 sample_id + experiment_id), constraints, and custom_attributes JSONB.
+# NOTE: Legacy custom_attributes. New modeled fields use FieldDefinitions (0046) with lists (not options in rules).
 """
 from alembic import op
 import sqlalchemy as sa
