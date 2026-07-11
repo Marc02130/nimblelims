@@ -25,15 +25,26 @@ Processes sit above individual Experiments and provide structure for multi-step 
 - A **Process** is the container and sequencer for multiple related Experiments.
 - The same Experiment Template can potentially be used in multiple Processes.
 
-## Current Implementation
+## Current Implementation (Phase 1 — backend)
 
-Currently, "linking" between experiments is handled informally:
+ELN Processes are first-class (distinct from LIMS run sub-processes).
 
-- `ExperimentDetail` records with `detail_type = "experiment_link"` are used to create a linked-list style lineage.
-- There is no first-class `Process` entity.
-- There is no dedicated UI for creating ordered collections of experiments, assigning samples across them, or managing queues within a process.
+| Layer | Detail |
+|-------|--------|
+| Tables | `eln_processes`, `eln_process_steps`, `eln_process_samples` (migration `0047`) |
+| API | `/v1/eln-processes` (CRUD, steps, sample assign/advance) |
+| Permission | `experiment:manage` |
+| Checklist | [`.docs/experiments/checklist.md`](experiments/checklist.md) |
 
-See [`.docs/experiments.md`](experiments.md) for details on the current `experiment_link` mechanism.
+**Naming:** ELN uses `eln_*` prefixes and `/v1/eln-processes`. LIMS run checklists remain at `/v1/experiment-runs/{id}/processes` and `/v1/processes/{id}` (tables `experiment_processes` / `process_steps`).
+
+**Still informal / legacy:**
+
+- `ExperimentDetail` with `detail_type = "experiment_link"` still exists and **coexists** with ELN Processes (no forced migration in Phase 1).
+- No dedicated Process UI yet (Phase 2).
+- Entries / write-back are Phase 2.
+
+See [`.docs/experiments.md`](experiments.md) for `experiment_link` lineage and [checklist](experiments/checklist.md) for remaining work.
 
 ## Target Design
 
