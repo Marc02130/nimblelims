@@ -98,7 +98,7 @@ Legacy `experiment_link` via `ExperimentDetail` **coexists** in Phase 1; no forc
 - [x] Sample data / experiment detail value capture APIs (`/v1/entries`, upsert values)
 - [x] Write-back rules + audit for Sample attributes (allowlist + last-write-wins + `write_back_previous`)
 - [x] Process builder UI + sample queues + overview (`ProcessesManagement` at `/experiments/processes`)
-- [ ] Entry forms driven by FieldDefinitions (UI for value capture in experiment detail — partial; API ready)
+- [x] Entry forms driven by FieldDefinitions (EntryCapturePanel on experiment detail Entries tab)
 - [x] Workflow actions: `create_process`, `add_step_to_process`, `assign_samples_to_process`, `instantiate_process_step`
 
 ---
@@ -151,3 +151,4 @@ Legacy `experiment_link` via `ExperimentDetail` **coexists** in Phase 1; no forc
 | 2026-07-11 | Phase 1 backend landed: models, migration 0047, `/v1/eln-processes` API, tests |
 | 2026-07-11 | Phase 1 polish: docs, apiService, instantiate, status seed, RLS tests |
 | 2026-07-11 | Phase 2 started: entries 0048, APIs, Process UI, workflow actions |
+| 2026-07-11 | Entry capture UI: EntryCapturePanel on experiment detail |
