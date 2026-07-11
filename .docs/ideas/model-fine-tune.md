@@ -82,15 +82,27 @@ RUN pip install transformers datasets trl peft accelerate bitsandbytes
 
 **NimbleLIMS note:** Training must be **offline / separate** from the FastAPI app container. Dataset only from **opt-in approved Applies**, ideally **per tenant** — never a shared multi-tenant fine-tune without legal + isolation review.
 
+## Configuration memory (RAG) — preferred “learning” path
+
+Yes: new SOPs should be guided by **existing** tenant configuration.
+
+1. **Vectorize SOPs** into the DB (chunks + embeddings, tenant-scoped).  
+2. **Store design docs** — applied ConfigurationPlans + links to created FieldDefs / templates / process defs / lims configs.  
+3. **On new upload** — retrieve similar SOPs + design docs + catalog candidates; prompt the model to prefer `link_existing` and consistent patterns.
+
+RAG is the default memory mechanism; fine-tune is optional for JSON/schema skill. Details: [tech review §3.7](../design/docker-model-sop-pipeline.md).
+
 ## Suggested eng phases (from tech review)
 
 | Phase | What | Fine-tune? |
 |-------|------|------------|
-| T0 | `ConfigurationPlan` schema + cloud extraction + Apply | No |
+| T0 | `ConfigurationPlan` + Apply; store applied design doc | No |
 | T1 | Plan review UI + partial accept | No |
+| T1.5 | Inject tenant catalog names/ids into prompt | No |
 | T2 | `LLMProvider` + optional Ollama compose profile | No |
 | T3 | Golden SOP tests + telemetry | No |
-| T4–T5 | Opt-in export + offline fine-tune playbook | Yes |
+| T3.5 | Vector SOPs + design docs; RAG retrieval | No |
+| T4–T5 | Opt-in export + offline fine-tune (**plus** RAG) | Yes |
 
 ## Open product questions
 

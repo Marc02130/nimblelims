@@ -129,6 +129,19 @@ Aligns with **Decision #9**: clients do not edit lab configuration data. Orderin
 3. **Training env** separate from production DB; use export jobs, not live replicas with broad access.
 4. **Model card:** Document base model, data window, known failure modes.
 
+## Configuration memory / RAG risks
+
+If SOPs are vectorized and prior design docs are retrieved into the prompt (see tech review §3.7):
+
+| Risk | Control |
+|------|---------|
+| **Cross-tenant retrieval** | Every vector query filters `client_id` (or equivalent RLS); integration tests for IDOR on search |
+| **Stale / rejected drafts as “truth”** | Index only **applied** design docs by default; drafts unsearchable or low rank |
+| **SOP text retention** | Retention policy; encrypt at rest; delete vectors when document deleted |
+| **Prompt size exfil** | Cap top-k chunks; no dump of unrelated catalog secrets |
+| **Poisoning** | Malicious user uploads SOP crafted to bias future retrieval for the same tenant—accept as same-tenant trust model; admins can unindex documents |
+| **Embedding provider** | If external embed API, same DPA rules as LLM; prefer local embed model for air-gap |
+
 ## Input validation requirements (Apply)
 
 Reject or strip:
