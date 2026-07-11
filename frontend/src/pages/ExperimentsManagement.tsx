@@ -46,6 +46,7 @@ import LinkIcon from '@mui/icons-material/Link';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { apiService } from '../services/apiService';
 import { useUser } from '../contexts/UserContext';
+import EntryCapturePanel from '../components/experiments/EntryCapturePanel';
 
 const apiErrorMsg = (err: any, fallback: string): string => {
   const detail = err?.response?.data?.detail;
@@ -415,6 +416,7 @@ const ExperimentsManagement: React.FC = () => {
           <Tabs value={activeTab} onChange={(_, v) => setActiveTab(v)}>
             <Tab label="Overview" />
             <Tab label="Sample Executions" />
+            <Tab label="Entries" />
             <Tab label="Details / Steps" />
             <Tab label="Lineage" />
             <Tab label="Linked Processes" />
@@ -514,6 +516,18 @@ const ExperimentsManagement: React.FC = () => {
         {activeTab === 2 && (
           <Card variant="outlined" sx={{ mt: 2 }}>
             <CardContent>
+              <EntryCapturePanel
+                experimentId={selectedExperiment.id}
+                sampleExecutions={selectedExperiment.sample_executions || []}
+                canEdit={canManage}
+              />
+            </CardContent>
+          </Card>
+        )}
+
+        {activeTab === 3 && (
+          <Card variant="outlined" sx={{ mt: 2 }}>
+            <CardContent>
               <Typography variant="h6" sx={{ mb: 2 }}>
                 Details / Steps
               </Typography>
@@ -547,7 +561,7 @@ const ExperimentsManagement: React.FC = () => {
           </Card>
         )}
 
-        {activeTab === 3 && (
+        {activeTab === 4 && (
           <Card variant="outlined" sx={{ mt: 2 }}>
             <CardContent>
               <Typography variant="h6" sx={{ mb: 2 }}>
@@ -620,7 +634,7 @@ const ExperimentsManagement: React.FC = () => {
           </Card>
         )}
 
-        {activeTab === 4 && (
+        {activeTab === 5 && (
           <Card variant="outlined" sx={{ mt: 2 }}>
             <CardContent>
               <Typography variant="h6" sx={{ mb: 2 }}>
@@ -633,7 +647,7 @@ const ExperimentsManagement: React.FC = () => {
           </Card>
         )}
 
-        {activeTab === 5 && (
+        {activeTab === 6 && (
           <RunsTab experimentId={selectedExperiment.id} />
         )}
       </Box>
