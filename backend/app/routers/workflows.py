@@ -212,6 +212,121 @@ def _run_action(
         svc = ExperimentService(db, current_user=current_user, auto_commit=False)
         svc.update_experiment(experiment_id, ExperimentUpdate(status_id=status_id))
 
+    # ---------- ELN Process actions (Phase 2) ----------
+    elif action == "create_process":
+        from app.services.eln_process_service import ELNProcessService
+        from app.schemas.eln_process import ELNProcessCreate, ELNProcessStepCreate
+
+        name = params.get("name")
+        if not name:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Step {step_index} action 'create_process' requires 'name' in params",
+            )
+        steps_in = []
+        for s in (params.get("steps") or []):
+            if not isinstance(s, dict):
+                continue
+            tid = s.get("experiment_template_id")
+            if not tid:
+                continue
+            steps_in.append(
+                ELNProcessStepCreate(
+                    experiment_template_id=UUID(str(tid)),
+                    name=s.get("name"),
+                    sort_order=s.get("sort_order"),
+                )
+            )
+        psvc = ELNProcessService(db, current_user=current_user, auto_commit=False)
+        proc = psvc.create_process(
+            ELNProcessCreate(
+                name=str(name).strip()[:255],
+                description=params.get("description"),
+                status_id=_uuid_from_context_or_params(ctx, params, "status_id"),
+                steps=steps_in or None,
+            )
+        )
+        ctx["process_id"] = str(proc.id)
+
+    elif action == "add_step_to_process":
+        from app.services.eln_process_service import ELNProcessService
+        from app.schemas.eln_process import ELNProcessStepCreate
+
+        process_id = _uuid_from_context_or_params(ctx, params, "process_id")
+        if process_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Step {step_index} action 'add_step_to_process' requires process_id",
+            )
+        tid = _uuid_from_context_or_params(ctx, params, "experiment_template_id")
+        if tid is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Step {step_index} action 'add_step_to_process' requires experiment_template_id",
+            )
+        psvc = ELNProcessService(db, current_user=current_user, auto_commit=False)
+        step = psvc.add_step(
+            process_id,
+            ELNProcessStepCreate(
+                experiment_template_id=tid,
+                name=params.get("name"),
+                sort_order=params.get("sort_order"),
+            ),
+        )
+        ctx["process_step_id"] = str(step.id)
+
+    elif action == "assign_samples_to_process":
+        from app.services.eln_process_service import ELNProcessService
+        from app.schemas.eln_process import ELNProcessSampleAssignRequest
+
+        process_id = _uuid_from_context_or_params(ctx, params, "process_id")
+        if process_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Step {step_index} action 'assign_samples_to_process' requires process_id",
+            )
+        raw_ids = params.get("sample_ids") or []
+        if not raw_ids:
+            sid = _uuid_from_context_or_params(ctx, params, "sample_id")
+            if sid:
+                raw_ids = [sid]
+        if not raw_ids:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Step {step_index} action 'assign_samples_to_process' requires sample_ids",
+            )
+        sample_ids = [UUID(str(s)) for s in raw_ids]
+        psvc = ELNProcessService(db, current_user=current_user, auto_commit=False)
+        psvc.assign_samples(
+            process_id,
+            ELNProcessSampleAssignRequest(
+                sample_ids=sample_ids,
+                set_to_first_step=bool(params.get("set_to_first_step", True)),
+            ),
+        )
+
+    elif action == "instantiate_process_step":
+        from app.services.eln_process_service import ELNProcessService
+        from app.schemas.eln_process import ELNProcessStepInstantiateRequest
+
+        process_id = _uuid_from_context_or_params(ctx, params, "process_id")
+        step_id = _uuid_from_context_or_params(ctx, params, "step_id") or _uuid_from_context_or_params(
+            ctx, params, "process_step_id"
+        )
+        if process_id is None or step_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Step {step_index} action 'instantiate_process_step' requires process_id and step_id",
+            )
+        psvc = ELNProcessService(db, current_user=current_user, auto_commit=False)
+        step, exp = psvc.instantiate_step(
+            process_id,
+            step_id,
+            ELNProcessStepInstantiateRequest(name=params.get("name")),
+        )
+        ctx["process_step_id"] = str(step.id)
+        ctx["experiment_id"] = str(exp.id)
+
     else:
         pass  # unknown action no-op
     return ctx

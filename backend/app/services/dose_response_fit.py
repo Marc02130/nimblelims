@@ -2,14 +2,14 @@
 DoseResponseFitService — orchestrates dose-response curve fitting.
 
 Responsibilities:
-  1. Load experiment_data for a run
-  2. Identify control wells via experiment_data.sample_id → samples.qc_type
+  1. Load lims_run_data for a run
+  2. Identify control wells via lims_run_data.sample_id → samples.qc_type
      (NOT via experiment_sample_executions — that table has no well_position)
   3. Validate controls exist and are non-degenerate (pos_mean != neg_mean)
   4. Compute % inhibition per well
   5. Load concentrations from template_well_definitions (not JSONB)
   6. Group by replicate_group, average replicates per concentration level
-  7. Apply experiment_data_exclusions (soft knockout)
+  7. Apply lims_run_data_exclusions (soft knockout)
   8. Enforce 10% knockout rule (warning, not a block)
   9. POST all compounds to r-calculator in one batch (synchronous, 60s timeout)
   10. Write dose_response_results in a single DB transaction
@@ -32,9 +32,9 @@ from app.services.r_calculator_client import RCalculatorClient
 from models.dose_response import (
     CurveCategory,
     DoseResponseResult,
-    ExperimentDataExclusion,
+    LimsRunDataExclusion,
 )
-from models.flexible_experiment import ExperimentData, ExperimentRun
+from models.flexible_experiment import LimsRunData, LimsRun
 from models.sample import Sample
 from models.template_well import TemplateWellDefinition
 from models.user import User
@@ -57,7 +57,7 @@ class DoseResponseFitService:
 
     # ── Public API ────────────────────────────────────────────────────────────
 
-    _FITTABLE_STATUSES = {"running", "results_received", "complete"}  # ExperimentRunStatus is str,Enum
+    _FITTABLE_STATUSES = {"running", "results_received", "complete"}  # LimsRunStatus is str,Enum
 
     def trigger_fit(self, run_id: uuid.UUID) -> Dict:
         """
@@ -91,45 +91,45 @@ class DoseResponseFitService:
 
     # ── Internal ──────────────────────────────────────────────────────────────
 
-    def _get_run_or_404(self, run_id: uuid.UUID) -> ExperimentRun:
+    def _get_run_or_404(self, run_id: uuid.UUID) -> LimsRun:
         run = (
-            self.db.query(ExperimentRun)
-            .filter(ExperimentRun.id == run_id)
+            self.db.query(LimsRun)
+            .filter(LimsRun.id == run_id)
             .with_for_update()
             .first()
         )
         if not run:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Experiment run not found")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="LIMS run not found")
         return run
 
-    def _check_run_status(self, run: ExperimentRun) -> None:
+    def _check_run_status(self, run: LimsRun) -> None:
         if run.status not in self._FITTABLE_STATUSES:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail=f"Cannot fit: run status is '{run.status}'. Must be running, results_received, or complete.",
             )
 
-    def _check_not_in_progress(self, run: ExperimentRun) -> None:
+    def _check_not_in_progress(self, run: LimsRun) -> None:
         if run.fit_in_progress:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="Fit already in progress for this run. Wait for it to complete.",
             )
 
-    def _set_fit_in_progress(self, run: ExperimentRun, value: bool) -> None:
+    def _set_fit_in_progress(self, run: LimsRun, value: bool) -> None:
         run.fit_in_progress = value
         self.db.flush()
         self.db.commit()
 
     def _run_fit(
         self,
-        run: ExperimentRun,
+        run: LimsRun,
         sample_id_filter: Optional[uuid.UUID] = None,
     ) -> Dict:
-        # Load all experiment_data for this run
+        # Load all lims_run_data for this run
         data_rows = (
-            self.db.query(ExperimentData)
-            .filter(ExperimentData.experiment_run_id == run.id)
+            self.db.query(LimsRunData)
+            .filter(LimsRunData.lims_run_id == run.id)
             .all()
         )
         if not data_rows:
@@ -140,10 +140,10 @@ class DoseResponseFitService:
 
         # Load exclusions (excluded point IDs)
         excluded_data_ids = {
-            str(exc.experiment_data_id)
-            for exc in self.db.query(ExperimentDataExclusion)
-            .join(ExperimentData, ExperimentDataExclusion.experiment_data_id == ExperimentData.id)
-            .filter(ExperimentData.experiment_run_id == run.id)
+            str(exc.lims_run_data_id)
+            for exc in self.db.query(LimsRunDataExclusion)
+            .join(LimsRunData, LimsRunDataExclusion.lims_run_data_id == LimsRunData.id)
+            .filter(LimsRunData.lims_run_id == run.id)
             .all()
         }
 
@@ -180,7 +180,7 @@ class DoseResponseFitService:
 
         # ── Step 1: Identify control wells via sample.qc_type ─────────────────
         # sample.qc_type is a UUID FK to list_entries. We match by list entry name.
-        # Control identification uses experiment_data.sample_id → samples.qc_type → list_entries.name
+        # Control identification uses lims_run_data.sample_id → samples.qc_type → list_entries.name
         from models.list import ListEntry
         qc_list_entries = (
             self.db.query(ListEntry)
@@ -191,7 +191,7 @@ class DoseResponseFitService:
 
         pos_control_signals: List[float] = []
         neg_control_signals: List[float] = []
-        test_data_rows: List[ExperimentData] = []
+        test_data_rows: List[LimsRunData] = []
 
         result_col = dr_config.get("result_column")
 
@@ -381,7 +381,7 @@ class DoseResponseFitService:
             old_results = (
                 self.db.query(DoseResponseResult)
                 .filter(
-                    DoseResponseResult.experiment_run_id == run.id,
+                    DoseResponseResult.lims_run_id == run.id,
                     DoseResponseResult.sample_id == sample_id_filter,
                     DoseResponseResult.superseded_by.is_(None),
                 )
@@ -408,7 +408,7 @@ class DoseResponseFitService:
             fit_version = (prior.fit_version + 1) if prior else 1
 
             new_row = DoseResponseResult(
-                experiment_run_id = run.id,
+                lims_run_id = run.id,
                 sample_id         = sid,
                 model             = model,
                 potency           = r_res.get("potency"),
@@ -472,8 +472,8 @@ class DoseResponseFitService:
     # ── Helpers ───────────────────────────────────────────────────────────────
 
     @staticmethod
-    def _extract_signal(row: ExperimentData, result_col: Optional[str]) -> Optional[float]:
-        """Extract the numeric signal from experiment_data.row_data JSONB."""
+    def _extract_signal(row: LimsRunData, result_col: Optional[str]) -> Optional[float]:
+        """Extract the numeric signal from lims_run_data.row_data JSONB."""
         if not row.row_data:
             return None
         if result_col and result_col in row.row_data:

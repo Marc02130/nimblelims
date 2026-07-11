@@ -138,9 +138,9 @@ Without these, the Workflow engine orchestrates the ELN side only. Instrument-dr
 
 **Remaining:** Add `lifecycle_type` selector to the ExperimentTemplate editor UI so users can set CRO vs standard on a template (currently defaults to standard; must be set directly in DB or via API).
 
-### ExperimentProcess / ProcessStep — not surfaced in UI
+### LimsRunChecklist / LimsRunChecklistStep — not surfaced in UI
 
-`experiment_processes` and `process_steps` tables exist (migration 0040) and are the right model for tracking sub-process execution within a Run (e.g., "Sample Prep → queued", "Plate Reading → in_process"). Neither is wired into the Run Detail UI — the tab only shows Overview, Data, and Dose Response. Building the process/step UI would enable real-time checklist tracking within a run.
+`lims_run_checklists` and `lims_run_checklist_steps` tables exist (migration 0040) and are the right model for tracking sub-process execution within a Run (e.g., "Sample Prep → queued", "Plate Reading → in_process"). Neither is wired into the Run Detail UI — the tab only shows Overview, Data, and Dose Response. Building the process/step UI would enable real-time checklist tracking within a run.
 
 ### Experiment linking is a linked list, not a DAG
 
@@ -163,8 +163,8 @@ This section is a retrospective reference. It documents what is fully shipped.
 | `experiment_data` | `id`, `run_id`, `well_position`, `sample_id`, `row_data` JSONB — one row per imported instrument row |
 | `template_well_definitions` | `id`, `template_id`, `well_position`, `qc_type`, `concentration`, `compound_id` |
 | `dose_response_results` | `id`, `run_id`, `compound_id`, curve parameters, fit quality, `approved_at`, `rejected_at` |
-| `experiment_processes` | `id`, `run_id` — sub-process tracking within a run (not yet wired to UI) |
-| `process_steps` | `id`, `process_id`, step name, status — step-level checklist (not yet wired to UI) |
+| `lims_run_checklists` | `id`, `run_id` — sub-process tracking within a run (not yet wired to UI) |
+| `lims_run_checklist_steps` | `id`, `process_id`, step name, status — step-level checklist (not yet wired to UI) |
 
 ### Status state machine
 
@@ -220,7 +220,7 @@ This section is a retrospective reference. It documents what is fully shipped.
 
 ### Known gaps / deferred
 
-- `experiment_processes` and `process_steps` tables exist but are not wired to any UI
+- `lims_run_checklists` and `lims_run_checklist_steps` tables exist but are not wired to any UI
 - No workflow engine actions for ExperimentRun (see Workflow Engine section below)
 - `lifecycle_type` on ExperimentTemplate has no UI selector — must be set via API/admin
 - Dose response end-to-end not validated with real instrument data (see separate TODO)
@@ -311,7 +311,7 @@ Scientists want to bulk-export `(compound_id, IC50, hill_slope, r_squared, revie
 
 See the dedicated prerequisite document before doing structural work on the two experiment systems:
 
-**[.docs/experiment-rework-prerequisites.md](.docs/experiment-rework-prerequisites.md)**
+**[.docs/checklist/experiment-rework-prerequisites.md](.docs/checklist/experiment-rework-prerequisites.md)**
 
 It contains a prioritized checklist plus details on:
 - The one currently failing flexible experiment test (pagination response shape)

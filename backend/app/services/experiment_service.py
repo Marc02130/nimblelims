@@ -163,6 +163,20 @@ class ExperimentService:
             created_by=self._user_id(),
             modified_by=self._user_id(),
         )
+        # Phase 2: auto-instantiate entries from template_definition['entries']
+        if data.experiment_template_id:
+            from app.services.entry_service import EntryService
+            from app.schemas.entry import InstantiateEntriesRequest
+
+            entry_svc = EntryService(
+                self.db,
+                current_user=self.current_user,
+                auto_commit=False,
+            )
+            entry_svc.instantiate_from_template(
+                e.id,
+                InstantiateEntriesRequest(skip_if_exists=True),
+            )
         self._commit_refresh(e)
         return e
 

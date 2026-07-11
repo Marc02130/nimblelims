@@ -35,6 +35,7 @@ import {
   Help as HelpIcon,
   Straighten as StraightenIcon,
   Folder as FolderIcon,
+  AccountTree as AccountTreeIcon,
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useUser } from '../contexts/UserContext';
@@ -236,7 +237,8 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onMobileClose, collapsed 
     templatesOnly?: boolean;
   }
   const experimentItems: ExperimentsNavItem[] = [
-    { text: 'All Experiments', path: '/experiments', icon: <Biotech />, tooltip: 'Experiments & Processes' },
+    { text: 'All Experiments', path: '/experiments', icon: <Biotech />, tooltip: 'Experiments' },
+    { text: 'Processes', path: '/experiments/processes', icon: <AccountTreeIcon />, tooltip: 'ELN multi-step processes' },
     { text: 'Experiment Templates', path: '/experiments/templates', icon: <ViewListIcon />, tooltip: 'Experiment template definitions', templatesOnly: true },
     { text: 'Runs', path: '/runs', icon: <AssessmentIcon />, tooltip: 'Experiment runs & dose response' },
   ];
@@ -573,8 +575,15 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onMobileClose, collapsed 
                     .filter((item) => !item.templatesOnly || hasExperimentTemplatesAccess)
                     .map((item) => {
                       const active = item.path === '/experiments'
-                        ? (location.pathname === '/experiments' || (location.pathname.startsWith('/experiments/') && !location.pathname.startsWith('/experiments/templates')))
-                        : location.pathname.startsWith(item.path);
+                        ? (
+                            location.pathname === '/experiments'
+                            || (
+                              location.pathname.startsWith('/experiments/')
+                              && !location.pathname.startsWith('/experiments/templates')
+                              && !location.pathname.startsWith('/experiments/processes')
+                            )
+                          )
+                        : location.pathname === item.path || location.pathname.startsWith(`${item.path}/`);
                       const tooltipText = item.tooltip || item.text;
                       const listItemButton = (
                         <ListItemButton

@@ -1,6 +1,6 @@
 """
 Pytest tests for the Flexible Experiment Engine:
-  - ExperimentRun lifecycle (draft → running → complete → published)
+  - LimsRun lifecycle (draft → running → complete → published)
   - Status transition guards (invalid transitions → 400)
   - Instrument data import (happy path + error paths)
   - Robot worklist export
@@ -18,8 +18,8 @@ from sqlalchemy.orm import Session
 
 from app.core.security import get_password_hash
 from models.flexible_experiment import (
-    ExperimentRun,
-    ExperimentRunStatus,
+    LimsRun,
+    LimsRunStatus,
     InstrumentParser,
     RobotWorklistConfig,
 )
@@ -122,7 +122,7 @@ def draft_run(client: TestClient, auth_headers, experiment_template):
         "experiment_template_id": experiment_template,
         "description": "test run",
     }
-    r = client.post("/v1/experiment-runs", json=payload, headers=auth_headers)
+    r = client.post("/v1/lims-runs", json=payload, headers=auth_headers)
     assert r.status_code == 201, r.text
     return r.json()
 
@@ -131,7 +131,7 @@ def draft_run(client: TestClient, auth_headers, experiment_template):
 def running_run(client: TestClient, auth_headers, draft_run):
     """Advance a draft run to running status."""
     run_id = draft_run["id"]
-    r = client.patch(f"/v1/experiment-runs/{run_id}/start", headers=auth_headers)
+    r = client.patch(f"/v1/lims-runs/{run_id}/start", headers=auth_headers)
     assert r.status_code == 200, r.text
     return r.json()
 
@@ -169,16 +169,16 @@ def template_with_parser_and_worklist(db_session: Session, template_with_parser)
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# 1. ExperimentRun CRUD
+# 1. LimsRun CRUD
 # ──────────────────────────────────────────────────────────────────────────────
 
-class TestExperimentRunCreate:
+class TestLimsRunCreate:
     def test_create_run_returns_draft(self, client, auth_headers, experiment_template):
         payload = {
             "name": f"Run {uuid4().hex[:8]}",
             "experiment_template_id": experiment_template,
         }
-        r = client.post("/v1/experiment-runs", json=payload, headers=auth_headers)
+        r = client.post("/v1/lims-runs", json=payload, headers=auth_headers)
         assert r.status_code == 201
         data = r.json()
         assert data["status"] == "draft"
@@ -189,34 +189,34 @@ class TestExperimentRunCreate:
             "name": draft_run["name"],
             "experiment_template_id": draft_run["experiment_template_id"],
         }
-        r = client.post("/v1/experiment-runs", json=payload, headers=auth_headers)
+        r = client.post("/v1/lims-runs", json=payload, headers=auth_headers)
         assert r.status_code == 400
         assert "already exists" in r.json()["detail"]
 
     def test_list_runs_returns_created(self, client, auth_headers, draft_run):
-        r = client.get("/v1/experiment-runs", headers=auth_headers)
+        r = client.get("/v1/lims-runs", headers=auth_headers)
         assert r.status_code == 200
         ids = [x["id"] for x in r.json()["runs"]]
         assert draft_run["id"] in ids
 
     def test_list_runs_filter_by_status(self, client, auth_headers, draft_run):
-        r = client.get("/v1/experiment-runs?status=draft", headers=auth_headers)
+        r = client.get("/v1/lims-runs?status=draft", headers=auth_headers)
         assert r.status_code == 200
         for run in r.json()["runs"]:
             assert run["status"] == "draft"
 
     def test_get_run_by_id(self, client, auth_headers, draft_run):
-        r = client.get(f"/v1/experiment-runs/{draft_run['id']}", headers=auth_headers)
+        r = client.get(f"/v1/lims-runs/{draft_run['id']}", headers=auth_headers)
         assert r.status_code == 200
         assert r.json()["id"] == draft_run["id"]
 
     def test_get_run_not_found(self, client, auth_headers):
-        r = client.get(f"/v1/experiment-runs/{uuid4()}", headers=auth_headers)
+        r = client.get(f"/v1/lims-runs/{uuid4()}", headers=auth_headers)
         assert r.status_code == 404
 
     def test_unauthenticated_request_rejected(self, client, experiment_template):
         r = client.post(
-            "/v1/experiment-runs",
+            "/v1/lims-runs",
             json={"name": "X", "experiment_template_id": experiment_template},
         )
         assert r.status_code == 403  # FastAPI HTTPBearer returns 403 for missing credentials
@@ -228,42 +228,42 @@ class TestExperimentRunCreate:
 
 class TestStatusTransitions:
     def test_draft_to_running_sets_started_at(self, client, auth_headers, draft_run):
-        r = client.patch(f"/v1/experiment-runs/{draft_run['id']}/start", headers=auth_headers)
+        r = client.patch(f"/v1/lims-runs/{draft_run['id']}/start", headers=auth_headers)
         assert r.status_code == 200
         data = r.json()
         assert data["status"] == "running"
         assert data["started_at"] is not None
 
     def test_running_to_complete_via_review(self, client, auth_headers, running_run):
-        r = client.patch(f"/v1/experiment-runs/{running_run['id']}/review", headers=auth_headers)
+        r = client.patch(f"/v1/lims-runs/{running_run['id']}/review", headers=auth_headers)
         assert r.status_code == 200
         assert r.json()["status"] == "complete"
 
     def test_complete_to_published(self, client, auth_headers, running_run):
         run_id = running_run["id"]
-        r = client.patch(f"/v1/experiment-runs/{run_id}/review", headers=auth_headers)
+        r = client.patch(f"/v1/lims-runs/{run_id}/review", headers=auth_headers)
         assert r.status_code == 200
-        r = client.patch(f"/v1/experiment-runs/{run_id}/complete", headers=auth_headers)
+        r = client.patch(f"/v1/lims-runs/{run_id}/complete", headers=auth_headers)
         assert r.status_code == 200
         assert r.json()["status"] == "published"
 
     def test_invalid_transition_draft_to_complete(self, client, auth_headers, draft_run):
         """draft → complete is not a valid transition; must go through running."""
-        r = client.patch(f"/v1/experiment-runs/{draft_run['id']}/review", headers=auth_headers)
+        r = client.patch(f"/v1/lims-runs/{draft_run['id']}/review", headers=auth_headers)
         assert r.status_code == 400
         assert "Cannot transition" in r.json()["detail"]
 
     def test_invalid_transition_running_to_published(self, client, auth_headers, running_run):
         """running → published skips the required 'complete' state."""
-        r = client.patch(f"/v1/experiment-runs/{running_run['id']}/complete", headers=auth_headers)
+        r = client.patch(f"/v1/lims-runs/{running_run['id']}/complete", headers=auth_headers)
         assert r.status_code == 400
 
     def test_invalid_transition_complete_to_running(self, client, auth_headers, running_run):
         """complete → running (restart) is not allowed."""
         run_id = running_run["id"]
-        r = client.patch(f"/v1/experiment-runs/{run_id}/review", headers=auth_headers)
+        r = client.patch(f"/v1/lims-runs/{run_id}/review", headers=auth_headers)
         assert r.status_code == 200
-        r = client.patch(f"/v1/experiment-runs/{run_id}/start", headers=auth_headers)
+        r = client.patch(f"/v1/lims-runs/{run_id}/start", headers=auth_headers)
         assert r.status_code == 400
 
 
@@ -281,7 +281,7 @@ class TestInstrumentImport:
             {"well_position": "A2", "row_data": {"viability_pct": 85.1, "well": "A2"}},
         ]
         r = client.post(
-            f"/v1/experiment-runs/{run_id}/import",
+            f"/v1/lims-runs/{run_id}/import",
             json={"rows": rows},
             headers=auth_headers,
         )
@@ -297,7 +297,7 @@ class TestInstrumentImport:
         run_id = draft_run["id"]
         rows = [{"well_position": "A1", "row_data": {"viability_pct": 90.0, "well": "A1"}}]
         r = client.post(
-            f"/v1/experiment-runs/{run_id}/import",
+            f"/v1/lims-runs/{run_id}/import",
             json={"rows": rows},
             headers=auth_headers,
         )
@@ -309,7 +309,7 @@ class TestInstrumentImport:
         run_id = running_run["id"]
         rows = [{"well_position": "A1", "row_data": {"foo": "bar"}}]
         r = client.post(
-            f"/v1/experiment-runs/{run_id}/import",
+            f"/v1/lims-runs/{run_id}/import",
             json={"rows": rows},
             headers=auth_headers,
         )
@@ -322,7 +322,7 @@ class TestInstrumentImport:
         run_id = running_run["id"]
         rows = [{"well_position": "A1", "row_data": {"wrong_field": 1.0}}]
         r = client.post(
-            f"/v1/experiment-runs/{run_id}/import",
+            f"/v1/lims-runs/{run_id}/import",
             json={"rows": rows},
             headers=auth_headers,
         )
@@ -334,13 +334,13 @@ class TestInstrumentImport:
         run_id = running_run["id"]
         rows = [{"well_position": "A1", "row_data": {"viability_pct": 88.0, "well": "A1"}}]
         r = client.post(
-            f"/v1/experiment-runs/{run_id}/import",
+            f"/v1/lims-runs/{run_id}/import",
             json={"rows": rows},
             headers=auth_headers,
         )
         assert r.status_code == 200
 
-        r = client.get(f"/v1/experiment-runs/{run_id}/data", headers=auth_headers)
+        r = client.get(f"/v1/lims-runs/{run_id}/data", headers=auth_headers)
         assert r.status_code == 200
         data = r.json()
         assert len(data["rows"]) == 1
@@ -360,7 +360,7 @@ class TestWorklistExport:
             }},
         ]
         r = client.post(
-            f"/v1/experiment-runs/{run_id}/import",
+            f"/v1/lims-runs/{run_id}/import",
             json={"rows": rows},
             headers=auth_headers,
         )
@@ -370,7 +370,7 @@ class TestWorklistExport:
                                    template_with_parser_and_worklist, db_session):
         run_id = running_run["id"]
         self._import_rows(client, auth_headers, run_id)
-        r = client.get(f"/v1/experiment-runs/{run_id}/worklist", headers=auth_headers)
+        r = client.get(f"/v1/lims-runs/{run_id}/worklist", headers=auth_headers)
         assert r.status_code == 200
         assert r.headers["content-type"].startswith("text/csv")
         lines = r.text.strip().splitlines()
@@ -381,7 +381,7 @@ class TestWorklistExport:
                                              template_with_parser):
         """Template with no worklist config → 400."""
         run_id = running_run["id"]
-        r = client.get(f"/v1/experiment-runs/{run_id}/worklist", headers=auth_headers)
+        r = client.get(f"/v1/lims-runs/{run_id}/worklist", headers=auth_headers)
         assert r.status_code == 400
         assert "no robot worklist config" in r.json()["detail"].lower()
 
@@ -389,7 +389,7 @@ class TestWorklistExport:
                                                       template_with_parser_and_worklist):
         """Running run with no imported data → CSV with headers only, not 500."""
         run_id = running_run["id"]
-        r = client.get(f"/v1/experiment-runs/{run_id}/worklist", headers=auth_headers)
+        r = client.get(f"/v1/lims-runs/{run_id}/worklist", headers=auth_headers)
         assert r.status_code == 200
         assert r.text.strip() == "source_well,dest_well,volume"
 
@@ -408,7 +408,7 @@ class TestWorklistExport:
         db_session.flush()
 
         run_id = running_run["id"]
-        r = client.get(f"/v1/experiment-runs/{run_id}/worklist", headers=auth_headers)
+        r = client.get(f"/v1/lims-runs/{run_id}/worklist", headers=auth_headers)
         assert r.status_code == 400
         assert "mandatory" in r.json()["detail"].lower()
 

@@ -1,0 +1,761 @@
+# Workflow: Accessioning Through Reporting
+
+## Overview
+
+This document describes the complete workflow from sample accessioning through results reporting in NimbleLIMS. The workflow covers the lifecycle of a sample from initial receipt to final reporting, including test assignment, results entry, review, and status management.
+
+**Experiment templates and experiments** (see [Experiment templates and experiments](#experiment-templates-and-experiments) below) run alongside this path: labs define reusable **experiment templates** (manually or via SOP-assisted extraction), create **experiments** from those definitions, and **link samples** to experiments. That does not replace tests or results entry; it adds a process/lineage layer that workflow templates can automate (e.g. `create_experiment_from_template`, `link_sample_to_experiment`). Navigation: **Experiments** → **All Experiments** (`/experiments`) and **Experiment Templates** (`/experiments/templates`); permission **`experiment:manage`**.
+
+## Workflow Stages
+
+### Stage 1: Sample Accessioning
+
+**Purpose**: Receive and register new samples into the system with all required metadata and test assignments.
+
+**Actors**: Lab Technician
+
+**Variation A: Single Sample Accessioning**
+
+**Steps**:
+
+1. **Sample Details Entry**
+   - Enter sample identification: name (unique), description
+   - Set dates: due_date (when results are due), received_date (when sample was received)
+   - Select sample type from configured list (e.g., Blood, Urine, Tissue)
+   - Select matrix from configured list (e.g., Serum, Plasma, Whole Blood)
+   - Enter storage temperature (validated: -273.15 to 1000°C)
+   - Select project (must have project access)
+   - Optionally select client project (for grouping multiple projects)
+   - Optionally select QC type (Sample, Positive Control, Negative Control, Matrix Spike, Duplicate, Blank)
+   - Document any anomalies observed during inspection
+   - **Custom Fields Section**: Enter custom attributes if configured for 'samples' entity type
+     - Fields dynamically rendered based on active custom attribute configurations
+     - Supports text, number, date, boolean, and select data types
+     - Real-time validation against validation rules (min/max, length, options)
+     - Integrated with form validation; errors displayed inline
+
+2. **Container Assignment**
+   - Select container type from admin-preconfigured types (e.g., tube, plate, well)
+   - Enter container name/barcode (unique identifier)
+   - Set position (row, column) for plate-based containers
+   - Optionally enter concentration and amount with units
+   - Container instance is created dynamically during accessioning
+
+3. **Test Assignment**
+   - Option 1: Assign individual analyses
+     - Select one or more analyses from available list
+     - Each analysis creates a separate test instance
+   - Option 2: Assign test battery
+     - Select a pre-configured test battery
+     - System automatically creates tests for all analyses in battery (ordered by sequence)
+     - Optional analyses in battery can be skipped (future enhancement)
+   - Option 3: Combine both (battery + individual analyses)
+     - System prevents duplicate test creation if analysis already exists from battery
+
+4. **Double Entry Validation** (Optional)
+   - Enable double-entry toggle
+   - Re-enter sample name and sample type for verification
+   - Validation occurs in review step before submission
+
+5. **Review and Submit**
+   - Review all entered information
+   - Validate double-entry fields if enabled
+   - Submit creates (via separate API calls):
+     - Container instance (POST `/containers`)
+     - Sample record (POST `/samples` or POST `/samples/accession`, status: "Received")
+     - Content junction (POST `/contents`, links sample to container)
+     - Test instances (via `/samples/accession` with battery_id/assigned_tests, status: "In Process")
+   - **Note**: Frontend uses separate API calls for granular error handling. The `/samples/accession` endpoint can also create tests, but containers are created separately.
+
+**Status Transitions**:
+- Sample: Created with status "Received"
+- Tests: Created with status "In Process"
+
+**Post-Accessioning**:
+- Optional: Create aliquots/derivatives from parent sample
+- Sample becomes available for testing workflow
+
+### Stage 1.5: Sample/Test/Container Editing (Post-Accessioning)
+
+**Purpose**: Edit existing samples, tests, and containers to update metadata, status, and custom attributes after initial accessioning.
+
+**Actors**: Lab Technician, Lab Manager (with appropriate permissions)
+
+**Sample Editing**:
+
+1. **Navigate to Samples Management**
+   - User navigates to `/samples` route
+   - Frontend displays DataGrid with all accessible samples (filtered by RLS)
+   - Columns: name, description, status, project, created_at, etc.
+
+2. **Open Edit Dialog**
+   - User clicks "Edit" button on a sample row
+   - Frontend calls GET /samples/{id} to fetch sample details
+   - SampleForm dialog opens with pre-filled data
+
+3. **Edit Sample Details**
+   - User can modify:
+     - Name (unique validation)
+     - Description
+     - Status (dropdown from list_entries)
+     - Custom attributes (validated against active configs)
+   - Form validates changes in real-time
+   - Custom attribute fields dynamically rendered based on configs
+
+4. **Submit Changes**
+   - User clicks "Save" button
+   - Frontend calls PATCH /samples/{id} with only changed fields (partial update)
+   - Backend validates:
+     - Permission: `sample:update` required
+     - RLS: User must have access to sample's project
+     - Custom attributes: Validated against active configurations
+   - Backend updates audit fields: `modified_at` (current timestamp), `modified_by` (current user)
+   - Returns updated sample
+   - Frontend refreshes DataGrid
+
+**Test Editing**:
+
+1. **Navigate to Tests Management**
+   - User navigates to `/tests` route
+   - Frontend displays DataGrid with all accessible tests (filtered by RLS)
+   - Columns: name, status, sample, analysis, technician, created_at, etc.
+
+2. **Open Edit Dialog**
+   - User clicks "Edit" button on a test row
+   - Frontend calls GET /tests/{id} to fetch test details
+   - TestForm dialog opens with pre-filled data
+
+3. **Edit Test Details**
+   - User can modify:
+     - Status (dropdown from list_entries)
+     - Technician assignment (dropdown from users)
+     - Test date (timestamp)
+     - Custom attributes (validated against active configs)
+   - Form validates changes in real-time
+
+4. **Submit Changes**
+   - User clicks "Save" button
+   - Frontend calls PATCH /tests/{id} with only changed fields
+   - Backend validates:
+     - Permission: `test:update` required
+     - RLS: User must have access to test's sample's project
+     - Custom attributes: Validated against active configurations
+   - Backend updates audit fields: `modified_at`, `modified_by`
+   - Returns updated test
+   - Frontend refreshes DataGrid
+
+**Container Editing**:
+
+1. **Navigate to Container Management**
+   - User navigates to `/containers` route
+   - Frontend displays DataGrid with all accessible containers (filtered by RLS)
+   - Columns: name, type, concentration, created_at, etc.
+
+2. **Open Edit Dialog**
+   - User clicks "Edit" button on a container row
+   - Frontend calls GET /containers/{id} to fetch container details
+   - ContainerForm dialog opens with pre-filled data
+
+3. **Edit Container Details**
+   - User can modify:
+     - Name (unique validation)
+     - Container type (dropdown from container_types)
+     - Concentration and units
+     - Amount and units
+     - Custom attributes (validated against active configs)
+   - Form validates changes in real-time
+
+4. **Submit Changes**
+   - User clicks "Save" button
+   - Frontend calls PATCH /containers/{id} with only changed fields
+   - Backend validates:
+     - Permission: `sample:update` required (containers link to samples)
+     - Container type: Must exist and be active
+     - Custom attributes: Validated against active configurations
+   - Backend updates audit fields: `modified_at`, `modified_by`
+   - Returns updated container
+   - Frontend refreshes DataGrid
+
+**Status Transitions**:
+- Sample status can be updated (e.g., "Received" → "Reviewed" → "In Testing")
+- Test status can be updated (e.g., "In Process" → "Complete")
+- Container metadata can be updated (name, type, concentration)
+
+**Error Handling**:
+- 404: Entity not found (doesn't exist or RLS denies access)
+- 403: Permission denied (no update permission)
+- 422: Validation error (invalid data, custom attributes don't match config)
+- 400: Invalid foreign key (e.g., container type doesn't exist)
+
+**Audit Trail**:
+- All edits update `modified_at` and `modified_by` fields
+- Database indexes on `modified_at` and `modified_by` for efficient querying
+- Full history maintained in database (no data loss on edits)
+
+**Variation B: Bulk Sample Accessioning** (US-24)
+
+**Steps**:
+
+1. **Enable Bulk Mode**
+   - Toggle "Bulk Accessioning Mode" switch in UI
+   - Form switches to bulk mode layout
+
+2. **Common Fields Entry**
+   - Enter fields that apply to all samples:
+     - Due date, received date
+     - Sample type, matrix
+     - Project, client project (optional)
+     - Container type
+     - QC type (optional)
+     - Test battery and/or individual analyses
+   - Configure auto-naming (optional):
+     - Prefix (e.g., "SAMPLE-")
+     - Start number (default: 1)
+
+3. **Unique Fields Entry**
+   - For each sample, enter unique data in table:
+     - Sample name (optional if auto-naming enabled)
+     - Client sample ID (optional)
+     - Container name (required, unique)
+     - Temperature (optional, overrides common)
+     - Description (optional)
+     - Anomalies (optional)
+   - Add/remove rows as needed
+
+4. **Test Assignment**
+   - Assign test battery and/or individual analyses (applies to all samples)
+   - System creates tests for all samples in bulk
+
+5. **Review and Submit**
+   - Review all samples in bulk view
+   - Submit via POST `/samples/bulk-accession` to create all samples, containers, contents, and tests atomically
+   - System validates:
+     - No duplicate sample names
+     - No duplicate container names
+     - No duplicate client_sample_ids
+   - All-or-nothing transaction (rolls back on any error)
+   - **Note**: Bulk accessioning uses a single endpoint that creates everything in one transaction, unlike single sample accessioning which uses separate calls.
+
+**Status Transitions**:
+- All samples: Created with status "Received"
+- All tests: Created with status "In Process"
+
+**Use Cases**:
+- Batch submissions from same client/project
+- Multiple samples with shared metadata
+- Efficient data entry for high-volume workflows
+
+---
+
+### Stage 2: Batch Creation and Organization
+
+**Purpose**: Group containers/samples together for batch processing and results entry. Supports cross-project batching and automatic QC sample generation.
+
+**Actors**: Lab Technician, Lab Manager
+
+**Steps**:
+
+1. **Create Batch**
+   - Enter batch name and description
+   - Select batch type from configured list (optional)
+   - Set initial status: "Created"
+   - Optionally set start_date and end_date
+
+2. **Add Containers to Batch (Cross-Project Support)**
+   - **Single-Project Batching**: Select containers from one project
+   - **Cross-Project Batching** (US-26):
+     - Select containers from multiple accessible projects
+     - System auto-detects cross-project when containers from multiple projects are selected
+     - **Compatibility Validation**: System validates that all samples share at least one common analysis (e.g., shared prep method like "EPA Method 8080 Prep")
+     - If incompatible, system provides error with details:
+       - List of projects involved
+       - List of analyses found
+       - Suggestion to use shared prep method
+     - **RLS Access Check**: System verifies user has access to all projects via `has_project_access` SQL function
+     - **Sub-Batch Support**: Option to specify divergent analyses that require separate sub-batches (future: child_batch_id FK)
+   - For each container, optionally specify:
+     - Position within batch
+     - Notes
+   - Containers can be added individually or in bulk via search/autocomplete
+
+3. **Add QC Samples** (US-27)
+   - **QC Addition**: Add one or more QC samples to be auto-generated with the batch
+   - For each QC addition:
+     - Select QC type from configured list (e.g., Blank, Blank Spike, Matrix Spike, Duplicate, Positive Control, Negative Control)
+     - Optionally add notes
+   - **Auto-Suggestions**: System suggests QC samples based on:
+     - Batch size: Large batches (≥10 containers) suggest Blank, Blank Spike, Matrix Spike
+     - Batch size: Medium batches (5-9 containers) suggest Blank, Matrix Spike
+     - Batch size: Small batches (2-4 containers) suggest Blank
+   - **QC Requirement**: Some batch types may require QC samples (configurable via `REQUIRE_QC_FOR_BATCH_TYPES` environment variable)
+   - **Auto-Generation**: On batch creation, system automatically:
+     - Creates QC sample records inheriting properties from first sample in batch:
+       - project_id
+       - sample_type
+       - matrix
+       - temperature
+       - due_date
+     - Sets qc_type field on sample
+     - Creates container for QC sample (uses first container's type or default)
+     - Links QC sample to container via Contents junction
+     - Links QC container to batch via BatchContainer junction
+   - All QC creation happens atomically within the batch creation transaction
+
+4. **Batch Status Management**
+   - **Created**: Initial state, containers and QC samples added
+   - **In Process**: Batch is actively being processed
+   - **Completed**: All results entered and ready for review
+
+**Status Flow**:
+```
+Created → In Process → Completed
+```
+
+**Use Cases**:
+- Group samples for plate-based analysis
+- Organize samples by analysis run
+- Track batch-level progress
+- Cross-project batching for shared prep steps
+- Automatic QC integration for quality assurance
+
+**Technical Notes**:
+- Cross-project compatibility validation checks for shared analyses across all samples
+- QC samples are created in the same transaction as the batch (atomic operation)
+- QC requirement enforcement is configurable per batch type via `REQUIRE_QC_FOR_BATCH_TYPES` env var
+- All operations respect RLS (Row-Level Security) for project access
+- Compatibility can be pre-validated via POST `/batches/validate-compatibility` endpoint
+
+---
+
+### Stage 3: Results Entry
+
+**Purpose**: Enter test results for samples in a batch. Supports both single-test and bulk entry modes.
+
+**Actors**: Lab Technician
+
+**Variation A: Single-Test Entry (Traditional)**
+
+**Steps**:
+
+1. **Select Batch and Test**
+   - Navigate to Results Management
+   - Select a batch from list (filtered by status if needed)
+   - View batch details: containers, samples, associated tests
+   - QC samples are highlighted with warning indicators (from Sprint 6)
+   - Select test (analysis) to enter results for
+
+2. **Load Analytes**
+   - System loads all analytes configured for the selected test's analysis
+   - Analytes displayed in order specified by `display_order`
+   - Each analyte shows:
+     - Reported name
+     - Data type (numeric, text, list)
+     - Required flag
+     - Validation rules (min/max values, significant figures)
+
+3. **Enter Results**
+   - For each sample in batch:
+     - Enter raw_result (instrument reading or initial value)
+     - Enter reported_result (final value to report)
+     - Select qualifiers (if applicable, from configured list)
+     - System validates:
+       - Required fields are populated
+       - Numeric values are valid numbers
+       - Values are within configured ranges
+       - Significant figures are respected (warning if exceeded)
+
+4. **Save Results**
+   - System validates all results before saving
+   - Creates result records for each sample-analyte combination
+   - Updates test status to "In Analysis" (if not already)
+   - Records entry_date and entered_by (current user)
+
+**Variation B: Batch Results Entry (US-28: Batch Results Entry)**
+
+**Steps**:
+
+1. **Select Batch**
+   - Navigate to Results Management
+   - Select a batch from list
+   - View batch details with QC indicators (warning icons for QC samples)
+   - Batch results entry is the default mode (no toggle needed)
+
+2. **Batch Entry Interface**
+   - System displays tabular interface:
+     - **Rows**: All samples in the batch
+     - **Columns**: Sample name, Position, custom attributes (if configured for 'tests'), and all analytes (one column per analyte)
+   - **Custom Attribute Columns**: Displayed before analyte columns
+     - Shows test custom_attributes values (read-only display)
+     - Formatted by data type (text, number, date, boolean, select)
+     - Values set during test creation/update, displayed here for reference
+   - QC sample rows are highlighted with warning background color
+   - Each analyte column header shows:
+     - Reported name
+     - Required indicator (if applicable)
+     - Min/max values (for numeric analytes)
+     - Data type (numeric/text/list)
+
+3. **Enter Results for Batch**
+   - Edit cells directly in the table:
+     - Raw result field (validated in real-time)
+     - Reported result field
+     - Qualifiers dropdown (if applicable)
+     - Notes field (optional)
+   - **Real-time Validation**:
+     - Inline error messages for invalid values
+     - Range validation (min/max)
+     - Data type validation (numeric vs text)
+     - Required field validation
+   - Validation errors displayed at top of table with row details
+   - Can enter results for multiple tests/analytes in single submission
+
+4. **QC Validation**
+   - System checks QC samples for failures:
+     - Missing results for QC tests
+     - Results outside expected ranges (future: configurable QC acceptance criteria)
+   - **Configurable QC Handling**:
+     - If `FAIL_QC_BLOCKS_BATCH=true`: Submission blocked on QC failures
+     - If `FAIL_QC_BLOCKS_BATCH=false`: Warning shown but submission allowed
+   - QC failures displayed in error alert with details
+
+5. **Submit Results**
+   - Click "Submit Results" button
+   - System validates all results before submission:
+     - Required analytes have values
+     - Numeric values are valid numbers
+     - Values are within configured ranges
+     - All test_ids exist in batch
+   - If validation passes:
+     - Creates/updates result records atomically in transaction
+     - Updates test statuses to "Complete" when all analytes entered for that test
+     - Checks if all tests in batch are complete
+     - **Auto-updates batch status to "Completed"** if all tests complete
+     - Sets batch end_date to current timestamp
+   - If validation fails:
+     - Transaction rolled back
+     - Detailed error messages per test/analyte returned
+     - User can fix errors and resubmit
+   - If QC failures detected:
+     - If `FAIL_QC_BLOCKS_BATCH=true`: Submission blocked, error shown
+     - If `FAIL_QC_BLOCKS_BATCH=false`: Warning shown, submission allowed
+
+**Validation Rules**:
+- Required analytes must have values
+- Numeric analytes must be valid numbers
+- Values must be within configured min/max ranges
+- Significant figures warnings (not blocking)
+- QC validation (configurable blocking)
+
+**Status Transitions**:
+- Test: "In Process" → "Complete" (when all analytes have results)
+- Batch: "Created" or "In Process" → "Completed" (when all tests in batch are complete)
+- Batch end_date set automatically when batch status changes to "Completed"
+
+**Technical Notes**:
+- Batch results entry uses POST `/results/batch` endpoint (US-28)
+- All results created/updated in single transaction
+- Test statuses updated to "Complete" when all analytes entered
+- Batch status update occurs automatically after successful submission (when all tests complete)
+- QC validation checks for missing results and out-of-range values
+- QC blocking configurable via `FAIL_QC_BLOCKS_BATCH` env var
+- Real-time validation provides immediate feedback
+- Validation errors returned with per-test/analyte details
+
+---
+
+### Stage 4: Results Review
+
+**Purpose**: Review and approve test results before reporting.
+
+**Actors**: Lab Manager
+
+**Steps**:
+
+1. **Access Test for Review**
+   - Navigate to test details or batch view
+   - View all results for the test
+   - Review sample information and test metadata
+
+2. **Review Results**
+   - Verify all required analytes have results
+   - Check result values against expected ranges
+   - Review qualifiers and notes
+   - Verify calculations (if applicable, post-MVP)
+
+3. **Approve Test**
+   - Set review_date (current timestamp)
+   - Update test status to "Complete"
+   - System checks if all tests for sample are complete
+   - If all tests complete, updates sample status to "Reviewed"
+
+**Status Transitions**:
+- Test: "In Analysis" → "Complete"
+- Sample: "Testing Complete" → "Reviewed" (when all tests complete)
+
+**Business Rules**:
+- Only Lab Managers (with `result:review` permission) can review
+- Test must have all required results entered before review
+- Sample status updates automatically when all tests are reviewed
+
+---
+
+### Stage 5: Reporting
+
+**Purpose**: Mark sample as reported to client.
+
+**Actors**: Lab Manager, Administrator
+
+**Steps**:
+
+1. **Verify Sample Readiness**
+   - Verify sample status is "Reviewed"
+   - Confirm all tests are "Complete"
+   - Verify all required results are present
+
+2. **Mark as Reported**
+   - Update sample status to "Reported"
+   - Set report_date (current timestamp)
+   - Optionally generate report (post-MVP feature)
+
+**Status Transitions**:
+- Sample: "Reviewed" → "Reported"
+
+**Final State**:
+- Sample lifecycle complete
+- All tests complete and reviewed
+- Results available for client viewing (if client user)
+
+---
+
+## Complete Status Flow
+
+### Sample Status Flow
+```
+Received → Available for Testing → Testing Complete → Reviewed → Reported
+```
+
+**Status Definitions**:
+- **Received**: Sample accessioned, entered into system
+- **Available for Testing**: Sample ready for analysis (set during review/release)
+- **Testing Complete**: All tests finished
+- **Reviewed**: Results reviewed by Lab Manager
+- **Reported**: Results reported to client
+
+### Test Status Flow
+```
+In Process → In Analysis → Complete
+```
+
+**Status Definitions**:
+- **In Process**: Test assigned, ready for analysis
+- **In Analysis**: Results being entered
+- **Complete**: Results reviewed and approved
+
+### Batch Status Flow
+```
+Created → In Process → Completed
+```
+
+**Status Definitions**:
+- **Created**: Batch created, containers added
+- **In Process**: Batch actively being processed
+- **Completed**: All results entered and ready for review
+
+---
+
+## Experiment templates and experiments
+
+**Purpose**: Define reusable experiment/process definitions (**experiment templates**), instantiate **experiments**, link **samples** to those experiments (roles, processing conditions, replicates), and track lineage. This complements the sample→test→result line: a sample can both have tests/results and participate in one or more experiments.
+
+**Actors**: Users with **`experiment:manage`** (default seed: Administrator, Lab Manager, Lab Technician).
+
+**Where in the UI**:
+- **Experiment Templates** — `/experiments/templates` (`ExperimentTemplatesManagement`): grid of templates; **New Template** (tabbed dialog: basic info, protocol steps, transfer steps with optional mandatory review, result columns); **Upload SOP** (SOP file + example instrument CSV → `POST /v1/sop-parse`, poll job, **Apply** → `POST /v1/sop-parse/{job_id}/apply` creates template and related parser/worklist records when extraction succeeds). Backend extraction uses Claude; set **`ANTHROPIC_API_KEY`** on the API server or jobs fail with a configuration error.
+- **Mandatory review / activation** — Transfer steps can require sign-off before the template is treated as ready; the UI blocks **active** until sign-offs are completed (per-step confirmation, no “confirm all”). After sign-off, managers can activate the template.
+- **All Experiments** — `/experiments`, `/experiments/:id`: list (filters, optional **My Experiments** via `?mine=true`), detail tabs (Overview, Sample Executions, Details/Steps, Lineage, Linked Processes). Sample detail shows experiments the sample participated in; experiment detail links back to samples.
+
+**API (summary)** — see `.docs/manuals/api-endpoints.md` for detail:
+- `/v1/experiment-templates` — CRUD (requires `experiment:manage`).
+- `/v1/experiments` — CRUD plus link sample, detail steps, link experiments, lineage, etc.
+- `/v1/sop-parse` — multipart upload, job status, apply (requires `experiment:manage`).
+
+**Relationship to accessioning → reporting**:
+1. Samples are still accessioned and tested as in [Stage 1](#stage-1-sample-accessioning); experiment linkage is additional.
+2. A **workflow template** (Admin → Workflow Templates) can include experiment actions so a single “Apply Template” run creates or updates experiments and links samples using shared context (`experiment_id`, `execution_id` after `link_sample_to_experiment`). See [Workflow Templates (Apply Template)](#workflow-templates-apply-template).
+3. **RLS**: Experiment-engine tables (including `sop_parse_jobs`, `experiment_templates`, `experiments`, …) use client-scoped policies where applicable; admins see all.
+
+**Further reading**: `.docs/design/experiment-planning.md`, `.docs/manuals/navigation.md`.
+
+---
+
+## Workflow Variations
+
+### Variation 1: Aliquot/Derivative Creation
+- After accessioning, create aliquots or derivatives
+- Aliquot: Same sample, new container
+- Derivative: New sample, new container, inherits project/client
+- Both inherit from parent sample
+
+### Variation 2: Test Battery Assignment
+- Assign test battery during accessioning
+- System creates all tests automatically in sequence order
+- Optional analyses can be skipped (future enhancement)
+
+### Variation 3: Individual Test Assignment
+- Assign tests individually after accessioning
+- Use `/tests/assign` endpoint
+- Tests created with "In Process" status
+
+### Variation 4: Pooled Samples
+- Multiple samples in single container
+- Concentration/amount calculations using units multipliers
+- Volume calculated from concentration and amount
+
+### Variation 5: Experiments and experiment templates
+- **Configure templates** at `/experiments/templates` before or during operations: manual authoring, or SOP + instrument CSV upload with AI extraction (when `ANTHROPIC_API_KEY` is set).
+- **Create experiments** from the list page or via workflow actions (`create_experiment`, `create_experiment_from_template` with `experiment_template_id` in params).
+- **Link samples** to experiments from the experiment detail UI or via `link_sample_to_experiment` in a workflow template (after accessioning, context may carry `sample_id`).
+- **Lineage** on experiment detail shows template source and linked experiments; samples list/detail remain the primary place for test/result workflow.
+
+---
+
+## Permissions Required
+
+### Sample Accessioning
+- `sample:create`: Create samples
+- `test:assign`: Assign tests (implicit in accessioning)
+- Project access: User must have access to selected project
+
+### Results Entry
+- `result:enter`: Enter results
+- `batch:read`: View batches
+
+### Results Review
+- `result:review`: Review and approve results
+- `test:update`: Update test status
+
+### Reporting
+- `sample:update`: Update sample status
+- Typically restricted to Lab Manager or Administrator
+
+### Experiments and experiment templates
+- `experiment:manage`: Experiment and experiment-template CRUD, SOP parse upload/apply, sample↔experiment linking via API
+- Distinct from **`config:edit`** (admin configuration) and **`workflow:execute`** (apply workflow template)
+
+---
+
+## Data Relationships
+
+```
+ExperimentTemplate (definition: protocol_steps, transfer_steps, …)
+  └─ Experiment (instance; may reference template)
+       ├─ ExperimentDetail (steps / notes)
+       ├─ ExperimentSampleExecution (junction: sample, role, processing_conditions, …)
+       └─ Links to other experiments (lineage)
+
+Sample
+  ├─ Container (via Contents junction)
+  ├─ Project
+  ├─ Tests
+  │   ├─ Analysis
+  │   ├─ Results
+  │   │   └─ Analyte
+  │   └─ Test Battery (optional)
+  ├─ Status (from lists)
+  └─ ExperimentSampleExecution (optional: sample participates in experiments)
+```
+
+**Key Relationships**:
+- Sample → Container: Many-to-many via Contents
+- Sample → Tests: One-to-many
+- Test → Results: One-to-many
+- Test → Analysis: Many-to-one
+- Result → Analyte: Many-to-one
+- Batch → Containers: Many-to-many via BatchContainers
+- ExperimentTemplate → Experiment: One-to-many (optional FK on experiment)
+- Experiment ↔ Sample: Many-to-many via `experiment_sample_executions`
+- SOP parse job → can create ExperimentTemplate (+ parser/worklist artifacts) after **Apply**
+
+---
+
+## Error Handling
+
+### Accessioning Errors
+- Duplicate sample name: 400 Bad Request
+- Invalid project access: 403 Forbidden
+- Missing required status: 400 Bad Request
+- Invalid container type: 400 Bad Request
+
+### Results Entry Errors
+- Validation failures: 400 Bad Request with error details
+- Missing required analytes: Validation error
+- Out of range values: Validation error
+- Invalid test access: 403 Forbidden
+
+### Review Errors
+- Test not ready: 400 Bad Request
+- Insufficient permissions: 403 Forbidden
+- Missing results: Validation error
+
+---
+
+## Workflow Templates (Apply Template)
+
+**Purpose**: Run predefined workflow templates from key screens with optional context (e.g. batch_id, test_id) to apply repeatable process steps without re-entering each action.
+
+**Actors**: Lab Technician, Lab Manager (with workflow:execute); Administrator (with config:edit for template CRUD).
+
+**Template definition**: Each template has a unique name, description, active flag, and `template_definition` (JSON). The definition contains a `steps` array; each step has an `action` (from a fixed list) and optional `params`.
+
+**Valid actions** (non-experiment): `update_status`, `validate_custom`, `create_qc`, `assign_tests`, `create_batch`, `enter_results`, `send_notification`, `accession_sample`, `link_container`, `review_result`.
+
+**Experiment actions** (orchestrate experiments alongside samples/batches/tests; execution context may carry `experiment_id` after create steps, and `execution_id` after `link_sample_to_experiment`):
+- `create_experiment` — params: `name` (required), optional `description`, `experiment_template_id`, `status_id`, `custom_attributes`
+- `create_experiment_from_template` — params: `experiment_template_id` (required), optional `name`, `description`, `status_id`
+- `link_sample_to_experiment` — params: `sample_id` (required); `experiment_id` from context or params; optional role/processing/replicate/test/result refs
+- `add_experiment_detail_step` — params: `detail_type` (required), optional `content`, `sort_order`
+- `link_experiments` — params: `linked_experiment_id` (required)
+- `update_experiment_status` — params: `status_id` (required)
+
+Requires **experiment templates** (and activated, signed-off templates where applicable) to exist if steps reference `experiment_template_id`. Those templates are maintained under **Experiments → Experiment Templates**, not under Admin Workflow Templates.
+
+**Where to apply**:
+- **Accessioning**: Apply Template dropdown and Apply button in the page header. Context is empty `{}`. On success, lookup data (and optional custom attribute configs) are refreshed; success message shown.
+- **Batch details**: When viewing a batch (view === details), Apply Template dropdown and Apply in the batch card. Context is `{ batch_id: selectedBatch.id }`. On success, batch details are re-fetched and success message shown.
+- **Results entry**: In the Results Entry toolbar (next to Save Results), Apply Template dropdown and Apply. Context is `{ batch_id, test_id }`. On success, optional callback (e.g. loadBatchData) runs to refresh batch/tests/results; success message shown.
+
+**Permissions**: Apply Template UI is shown only when the user has `workflow:execute`. Template list/create/edit/delete (admin) requires `config:edit`.
+
+**Execution behavior**: Steps run in order in a single transaction. If any step fails or an invalid action is used, the transaction rolls back and no workflow instance is created. Successful run creates one workflow_instance record with runtime_state (context, steps_run, completed).
+
+**Admin management**: Administrators with config:edit can open Workflow Templates from the Admin section: list templates, create (name, description, active, JSON definition), edit, soft-deactivate (delete), and run "Execute on Entity" with optional context JSON for testing.
+
+---
+
+## Audit Trail
+
+All workflow steps maintain audit information:
+- `created_at`: Timestamp of creation
+- `created_by`: User who created
+- `modified_at`: Timestamp of last modification
+- `modified_by`: User who last modified
+
+**Audited Actions**:
+- Sample creation and updates
+- Test creation and status changes
+- Result entry and updates
+- Review actions
+- Status transitions
+
+---
+
+## Notes
+
+- All status values come from configurable lists (admin-managed)
+- Container types must be pre-configured by administrators
+- Test batteries must be configured before use
+- Analysis-analyte rules must be configured for validation
+- Units must be configured for concentration/amount conversions
+- Project access is enforced at all workflow stages
+- **Experiment templates** are configured under Experiments (not Admin); use **`experiment:manage`**. SOP-assisted creation needs **`ANTHROPIC_API_KEY`** on the backend. Workflow templates that call `create_experiment_from_template` depend on valid template UUIDs from `/v1/experiment-templates`.
+

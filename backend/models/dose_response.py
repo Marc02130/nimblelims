@@ -2,7 +2,7 @@
 Dose-response curve fitting models.
 
 dose_response_results  — IC50/EC50 fit results with versioning + review workflow
-experiment_data_exclusions — soft knockout audit trail (DELETE row to reverse)
+lims_run_data_exclusions — soft knockout audit trail (DELETE row to reverse)
 """
 import uuid
 import enum
@@ -37,7 +37,7 @@ class ReviewStatus(str, enum.Enum):
 
 class DoseResponseResult(Base):
     """
-    One fit result per compound per experiment run.
+    One fit result per compound per LIMS run.
 
     Versioning:
         Re-fit after knockout creates a new row (fit_version + 1).
@@ -48,7 +48,7 @@ class DoseResponseResult(Base):
     __tablename__ = 'dose_response_results'
 
     id                = Column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    experiment_run_id = Column(PostgresUUID(as_uuid=True), ForeignKey('experiment_runs.id'), nullable=False, index=True)
+    lims_run_id = Column(PostgresUUID(as_uuid=True), ForeignKey('lims_runs.id'), nullable=False, index=True)
     sample_id         = Column(PostgresUUID(as_uuid=True), ForeignKey('samples.id'), nullable=False, index=True)
     model             = Column(String(10), nullable=False)  # '4PL', '3PL_FB', '3PL_FT', '5PL'
 
@@ -100,17 +100,17 @@ class DoseResponseResult(Base):
     client_id = Column(PostgresUUID(as_uuid=True), ForeignKey('clients.id'), nullable=False)
 
 
-class ExperimentDataExclusion(Base):
+class LimsRunDataExclusion(Base):
     """
-    Soft knockout: excludes a single experiment_data point from curve fitting.
+    Soft knockout: excludes a single lims_run_data point from curve fitting.
 
     Reversal: DELETE this row (soft exclusion, hard reversal — no deleted_at).
-    The unique constraint on experiment_data_id prevents double-exclusion.
+    The unique constraint on lims_run_data_id prevents double-exclusion.
     """
-    __tablename__ = 'experiment_data_exclusions'
+    __tablename__ = 'lims_run_data_exclusions'
 
     id                  = Column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    experiment_data_id  = Column(PostgresUUID(as_uuid=True), ForeignKey('experiment_data.id'), nullable=False, index=True)
+    lims_run_data_id  = Column(PostgresUUID(as_uuid=True), ForeignKey('lims_run_data.id'), nullable=False, index=True)
     excluded_by         = Column(PostgresUUID(as_uuid=True), ForeignKey('users.id'), nullable=False)
     excluded_at         = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     reason              = Column(Text(), nullable=True)

@@ -54,7 +54,7 @@ This project uses a four-container Docker setup:
    - Username: `admin`
    - Password: `admin123`
    - **⚠️ IMPORTANT**: Change the default password immediately after first login!
-   - See [.docs/admin_setup.md](.docs/admin_setup.md) for detailed security instructions
+   - See [.docs/manuals/admin-setup.md](.docs/manuals/admin-setup.md) for detailed security instructions
 
 5. **Run migrations (if needed)**
    ```bash
@@ -109,20 +109,17 @@ nimblelims/
 ├── db/                     # Database setup
 │   ├── Dockerfile          # Database container config
 │   └── init.sql            # Database initialization
-├── .docs/                  # Documentation
-│   ├── admin_setup.md      # Admin user setup guide
-│   ├── api_endpoints.md    # Complete API endpoints reference
-│   ├── backend-auth.md     # Authentication implementation
-│   ├── debug_404_errors.md # Troubleshooting guide for API errors
-│   ├── debug_manifest.md  # Manifest debugging guide
-│   ├── inspect_containers.md # Container inspection utilities
-│   ├── lims_mvp_prd.md     # Product requirements document
-│   ├── lims_mvp_tech.md    # Technical specifications
-│   ├── lims_mvp_user.md    # User stories
-│   ├── lims_mvp_dev_setup.md # Development environment setup
-│   ├── accessioning_workflow.md # Sample accessioning process
-│   ├── containers.md       # Container management and usage
-│   └── lists.md            # Configurable lists system
+├── .docs/                  # Documentation (see .docs/README.md)
+│   ├── manuals/            # Setup, API, navigation, domain handbooks
+│   ├── requirements/       # PRD and feature requirements
+│   ├── design/             # Architecture, gap analysis, tech specs
+│   ├── user-stories/       # User stories and acceptance criteria
+│   ├── checklist/          # Implementation checklists
+│   ├── open-questions/     # Decision logs (work gates)
+│   ├── ceo-review/         # CEO / product reviews
+│   ├── design-review/      # UX / design reviews
+│   ├── security-review/    # Security reviews
+│   └── ideas/              # Exploratory notes
 ├── services/               # Auxiliary microservices
 │   └── r-calculator/       # Plumber R API for curve fitting
 │       ├── R/              # Curve fitting, categorization, SVG generation
@@ -158,6 +155,7 @@ nimblelims/
 ### Experiment Management
 - **Experiments**: Full CRUD for experiments; list/detail UI with tabs (Overview, Sample Executions, Details/Steps, Lineage, Linked Processes). Permission: `experiment:manage` (Administrator, Lab Manager, Lab Technician).
 - **Experiment Templates**: Dedicated page at `/experiments/templates` (`ExperimentTemplatesManagement`): DataGrid of templates, tabbed create/edit dialog (basic info, protocol steps, transfer steps with mandatory review, result columns), delete with confirmation, **active** toggle (disabled until mandatory sign-offs are cleared). **Upload SOP**: multipart upload of SOP file + instrument CSV → background Claude extraction (`POST /v1/sop-parse`) → poll job → **Apply** creates template and related records (`POST /v1/sop-parse/{id}/apply`). Fields filled from extraction are highlighted in the form. **Sign-off**: steps marked mandatory review require per-step confirmation in a dialog before `mandatory_review_count` can be cleared and the template activated. Same permission as experiments: `experiment:manage`.
+- **ELN Processes (Phases 1–3)**: Definitions → instances with typed steps (`eln_experiment` \| `lims_run`). APIs: `/v1/eln-process-definitions`, `/v1/eln-processes`, sample journey `GET /v1/samples/{id}/journey`. UI at `/experiments/processes` (Instances + Definitions). Soft advance gates; lazy LimsRun start; run history. Migrations `0047`–`0051`. Distinct from LIMS run checklists under `/v1/processes`. Checklist: [`.docs/checklist/experiment-checklist.md`](.docs/checklist/experiment-checklist.md).
 - **Sidebar**: Dedicated **Experiments** accordion (between Sample Mgmt and Lab Mgmt) with sub-items **All Experiments** and **Experiment Templates** (both require `experiment:manage`).
 - **Sample ↔ experiment linking**: Link samples to experiments (roles, processing conditions, replicate); bidirectional UI: experiment detail links to samples (`/samples?highlight=id`); sample detail shows "Participated in these Experiments" with links to experiments.
 - **Lineage**: Experiment lineage view (template + linked experiment IDs); loading and error states.
@@ -194,7 +192,7 @@ nimblelims/
 - **Data Isolation**: Client-specific data access controls via project_users junction table
 - **Row-Level Security**: PostgreSQL RLS policies for data protection at the database level. `FORCE ROW LEVEL SECURITY` is applied so enforcement holds even for the table owner role (no bypass on direct DB connections).
 - **Samples Access Control**: The `GET /samples` endpoint relies entirely on RLS for access control - no Python-level filtering is applied. Lab Technicians and Lab Managers see samples from projects they have access to via the `project_users` table. Client users see samples from their client's projects. Administrators see all samples.
-- **Experiment Engine Isolation**: The 5 flexible experiment engine tables (`experiment_runs`, `experiment_data`, `instrument_parsers`, `robot_worklist_configs`, `sop_parse_jobs`) use client-scoped RLS: users only see rows created by members of their own client organization. Admins see all. Enforced at the database layer regardless of the API code path.
+- **Experiment Engine Isolation**: The 5 flexible experiment engine tables (`lims_runs`, `lims_run_data`, `instrument_parsers`, `robot_worklist_configs`, `sop_parse_jobs`) use client-scoped RLS: users only see rows created by members of their own client organization. Admins see all. Enforced at the database layer regardless of the API code path.
 
 ## API Documentation
 
@@ -259,36 +257,28 @@ NimbleLIMS uses a unified sidebar navigation system that provides consistent acc
 - **State Persistence**: Sidebar collapsed state saved to localStorage
 - **Top AppBar**: Dynamic page titles, sidebar toggle, back button for nested routes (e.g. experiment detail → list, admin analysis analytes → analyses), user info, and logout
 
-See [`.docs/navigation.md`](.docs/navigation.md) for complete navigation documentation (includes Experiments accordion refactor v2.1, experiment templates route, and permission gating).
+See [`.docs/manuals/navigation.md`](.docs/manuals/navigation.md) for complete navigation documentation (includes Experiments accordion refactor v2.1, experiment templates route, and permission gating).
 
 ## Documentation
 
-Comprehensive documentation is available in the `.docs/` directory:
+All project docs live under [`.docs/`](.docs/) with a fixed layout. **Start here:** [`.docs/README.md`](.docs/README.md).
 
-- **Navigation**: `.docs/navigation.md` - Complete site navigation documentation
-- **Product Requirements**: `.docs/nimblelims_prd.md` - Product requirements document
-- **Technical Specifications**: `.docs/nimblelims_tech.md` - Technical architecture and implementation details
-- **User Stories**: `.docs/nimblelims_user.md` - User stories and acceptance criteria
-- **Workflow Documentation**:
-  - `.docs/accessioning_workflow.md` - Sample accessioning process and workflow (includes test battery assignment)
-  - `.docs/batches.md` - Batch management, QC generation, and sample prioritization
-  - `.docs/containers.md` - Container management, usage, and workflows
-  - `.docs/lists.md` - Configurable lists system and administration
-  - `.docs/technical-accessioning-to-reporting.md` - Technical implementation details for accessioning through reporting
-  - `.docs/ui-accessioning-to-reporting.md` - UI components and interactions for accessioning through reporting
-  - `.docs/workflow-accessioning-to-reporting.md` - Complete workflow from accessioning through reporting (includes Workflow Templates section)
-  - `UAT_Scripts/uat-workflow-templates.md` - UAT test cases for workflow templates (creation, execution, RBAC, rollback)
-  - `UAT_Scripts/uat-experiment-templates.md` - UAT test cases for experiment templates (CRUD, SOP/AI upload, sign-off, activation, RBAC)
-- **Setup Guides**:
-  - `.docs/nimblelims_dev_setup.md` - Development environment setup
-  - `.docs/admin_setup.md` - Admin user configuration
-  - `.docs/useful_command_line.md` - Useful command-line snippets (containers, dumps, RLS)
-- **API Reference**: `.docs/api_endpoints.md` - Complete API endpoints documentation
-- **IDs and Configuration**: `.docs/ids-and-configuration.md` - How sample/project IDs and names work, where configuration is stored (name_templates, custom_attributes_config), and flow from configuration through use
+| Folder | Contents |
+|--------|----------|
+| [`manuals/`](.docs/manuals/) | Setup, API, navigation, domain handbooks (batches, containers, experiments, processes, …) |
+| [`requirements/`](.docs/requirements/) | PRD and feature requirements |
+| [`design/`](.docs/design/) | Architecture, gap analysis, migration strategy, tech specs |
+| [`user-stories/`](.docs/user-stories/) | User stories and acceptance criteria |
+| [`checklist/`](.docs/checklist/) | Implementation checklists |
+| [`open-questions/`](.docs/open-questions/) | Decision logs (gate new work until blockers are Decided) |
+| [`ceo-review/`](.docs/ceo-review/), [`design-review/`](.docs/design-review/), [`security-review/`](.docs/security-review/) | Formal reviews |
+| [`ideas/`](.docs/ideas/) | Exploratory notes (not commitments) |
+
+UAT scripts: `UAT_Scripts/` (e.g. workflow templates, experiment templates).
 
 ## Support
 
-Refer to the technical documentation in `.docs/` for detailed implementation specifications.
+See [`.docs/README.md`](.docs/README.md) and the manuals/design folders for implementation details.
 
 ---
 
@@ -300,6 +290,6 @@ Refer to the technical documentation in `.docs/` for detailed implementation spe
 
 **Key files (backend):** `backend/app/routers/experiments.py`, `backend/app/routers/sop_parse.py`, `backend/app/services/sop_parse_service.py`, `backend/app/services/experiment_service.py`, flexible experiment models/migrations.
 
-**Documentation:** `.docs/processes.md`, `.docs/experiments.md` (ELN), `.docs/experiment-runs.md` (LIMS), `.docs/experiment-planning.md`, `.docs/navigation.md`, `.docs/api_endpoints.md`, `UAT_Scripts/uat-experiment-templates.md`.
+**Documentation:** `.docs/checklist/experiment-checklist.md`, `.docs/manuals/processes.md`, `.docs/manuals/experiments.md` (ELN), `.docs/manuals/lims-runs.md` (LIMS), `.docs/design/experiment-planning.md`, `.docs/manuals/navigation.md`, `.docs/manuals/api-endpoints.md`, `UAT_Scripts/uat-experiment-templates.md`.
 
 **Optional env:** `ANTHROPIC_API_KEY` on the backend for SOP extraction (see `backend/app/core/config.py`).

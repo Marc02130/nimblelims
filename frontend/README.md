@@ -181,6 +181,7 @@ Copyright (c) 2025 Marc Breneiser
 - `GET /client-projects` - List client projects
 - `GET/POST/PATCH/DELETE /v1/experiment-templates` - Experiment templates (requires `experiment:manage`)
 - `GET/POST/PATCH /v1/experiments` - Experiments (requires `experiment:manage`)
+- `GET/POST/PATCH/DELETE /v1/eln-processes` (+ steps, samples, instantiate, advance) - ELN multi-step processes (requires `experiment:manage`; Phase 1 API via `apiService`)
 - `POST /v1/sop-parse`, `GET /v1/sop-parse/{job_id}`, `POST /v1/sop-parse/{job_id}/apply` - SOP extraction jobs (requires `experiment:manage`)
 - `GET /admin/custom-attributes` - List custom attribute configs (admin)
 - `POST /admin/custom-attributes` - Create custom attribute config (admin)
@@ -262,7 +263,7 @@ NimbleLIMS uses a unified sidebar navigation system:
 - **Top AppBar**: Dynamic page titles, back button for nested routes, user info, logout
 - **Responsive**: Permanent drawer on desktop, temporary drawer on mobile
 
-See [`.docs/navigation.md`](../.docs/navigation.md) for complete navigation documentation.
+See [`.docs/manuals/navigation.md`](../.docs/manuals/navigation.md) for complete navigation documentation.
 
 ## User Workflows
 

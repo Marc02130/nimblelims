@@ -46,6 +46,7 @@ const getRouteTitle = (pathname: string): string => {
     '/analytes': 'Analytes',
     '/experiments': 'Experiments',
     '/experiments/templates': 'Experiment Templates',
+    '/experiments/processes': 'ELN Processes',
     '/runs': 'Experiment Runs',
     '/help': 'Help',
     '/admin': 'Admin Dashboard',
@@ -67,8 +68,15 @@ const getRouteTitle = (pathname: string): string => {
     return 'Analysis Analytes Configuration';
   }
 
-  // Experiments section: detail (exclude /experiments/templates)
-  if (pathname.startsWith('/experiments/') && !pathname.startsWith('/experiments/templates')) {
+  // Experiments section: detail (exclude templates and processes)
+  if (pathname.startsWith('/experiments/processes/')) {
+    return 'Process Detail';
+  }
+  if (
+    pathname.startsWith('/experiments/')
+    && !pathname.startsWith('/experiments/templates')
+    && !pathname.startsWith('/experiments/processes')
+  ) {
     return 'Experiment Detail';
   }
   if (pathname.match(/^\/runs\/[^/]+\/dose-response$/)) {
@@ -110,8 +118,16 @@ const shouldShowBackButton = (pathname: string): boolean => {
   if (pathname.match(/\/admin\/analyses\/[^/]+\/analytes/)) {
     return true;
   }
-  // Experiment detail: back to list
-  if (pathname.match(/^\/experiments\/[^/]+$/) && !pathname.startsWith('/experiments/templates')) {
+  // Process detail: back to process list
+  if (pathname.match(/^\/experiments\/processes\/[^/]+$/)) {
+    return true;
+  }
+  // Experiment detail: back to list (exclude templates/processes)
+  if (
+    pathname.match(/^\/experiments\/[^/]+$/)
+    && !pathname.startsWith('/experiments/templates')
+    && !pathname.startsWith('/experiments/processes')
+  ) {
     return true;
   }
   return false;
@@ -122,7 +138,14 @@ const getBackButtonTarget = (pathname: string): string => {
   if (pathname.match(/\/admin\/analyses\/[^/]+\/analytes/)) {
     return '/admin/analyses';
   }
-  if (pathname.match(/^\/experiments\/[^/]+$/) && !pathname.startsWith('/experiments/templates')) {
+  if (pathname.match(/^\/experiments\/processes\/[^/]+$/)) {
+    return '/experiments/processes';
+  }
+  if (
+    pathname.match(/^\/experiments\/[^/]+$/)
+    && !pathname.startsWith('/experiments/templates')
+    && !pathname.startsWith('/experiments/processes')
+  ) {
     return '/experiments';
   }
   return '/dashboard';

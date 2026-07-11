@@ -35,21 +35,21 @@ from app.services.r_calculator_client import RCalculatorClient
 from models.dose_response import (
     CurveCategory,
     DoseResponseResult,
-    ExperimentDataExclusion,
+    LimsRunDataExclusion,
     ReviewStatus,
 )
-from models.flexible_experiment import ExperimentData, ExperimentRun
+from models.flexible_experiment import LimsRunData, LimsRun
 from models.user import User
 
-router = APIRouter(prefix="/experiment-runs", tags=["dose-response"])
+router = APIRouter(prefix="/lims-runs", tags=["dose-response"])
 
 _r_client = RCalculatorClient()
 
 
-def _get_run(run_id: uuid.UUID, db: Session) -> ExperimentRun:
-    run = db.query(ExperimentRun).filter(ExperimentRun.id == run_id).first()
+def _get_run(run_id: uuid.UUID, db: Session) -> LimsRun:
+    run = db.query(LimsRun).filter(LimsRun.id == run_id).first()
     if not run:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Experiment run not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="LIMS run not found")
     return run
 
 
@@ -152,7 +152,7 @@ def list_results(
     q = (
         db.query(DoseResponseResult)
         .filter(
-            DoseResponseResult.experiment_run_id == run_id,
+            DoseResponseResult.lims_run_id == run_id,
             DoseResponseResult.superseded_by.is_(None),
         )
     )
@@ -202,7 +202,7 @@ def get_result(
         db.query(DoseResponseResult)
         .filter(
             DoseResponseResult.id == result_id,
-            DoseResponseResult.experiment_run_id == run_id,
+            DoseResponseResult.lims_run_id == run_id,
         )
         .first()
     )
@@ -232,7 +232,7 @@ def get_result_svg(
         db.query(DoseResponseResult)
         .filter(
             DoseResponseResult.id == result_id,
-            DoseResponseResult.experiment_run_id == run_id,
+            DoseResponseResult.lims_run_id == run_id,
         )
         .first()
     )
@@ -254,19 +254,19 @@ def get_result_svg(
         .all()
     }
 
-    # Load the original data points (non-excluded) from experiment_data
+    # Load the original data points (non-excluded) from lims_run_data
     excluded_ids = {
-        str(exc.experiment_data_id)
-        for exc in db.query(ExperimentDataExclusion)
-        .join(ExperimentData, ExperimentDataExclusion.experiment_data_id == ExperimentData.id)
-        .filter(ExperimentData.experiment_run_id == run_id)
+        str(exc.lims_run_data_id)
+        for exc in db.query(LimsRunDataExclusion)
+        .join(LimsRunData, LimsRunDataExclusion.lims_run_data_id == LimsRunData.id)
+        .filter(LimsRunData.lims_run_id == run_id)
         .all()
     }
     data_rows = (
-        db.query(ExperimentData)
+        db.query(LimsRunData)
         .filter(
-            ExperimentData.experiment_run_id == run_id,
-            ExperimentData.sample_id == result.sample_id,
+            LimsRunData.lims_run_id == run_id,
+            LimsRunData.sample_id == result.sample_id,
         )
         .all()
     )
@@ -277,8 +277,8 @@ def get_result_svg(
     result_col = dr_config.get("result_column")
 
     all_run_rows = (
-        db.query(ExperimentData)
-        .filter(ExperimentData.experiment_run_id == run_id)
+        db.query(LimsRunData)
+        .filter(LimsRunData.lims_run_id == run_id)
         .all()
     )
     all_sample_ids = {r.sample_id for r in all_run_rows if r.sample_id}
@@ -360,7 +360,7 @@ def get_summary(
     all_latest = (
         db.query(DoseResponseResult)
         .filter(
-            DoseResponseResult.experiment_run_id == run_id,
+            DoseResponseResult.lims_run_id == run_id,
             DoseResponseResult.superseded_by.is_(None),
         )
         .all()
@@ -416,7 +416,7 @@ def review_result(
         db.query(DoseResponseResult)
         .filter(
             DoseResponseResult.id == result_id,
-            DoseResponseResult.experiment_run_id == run_id,
+            DoseResponseResult.lims_run_id == run_id,
             DoseResponseResult.superseded_by.is_(None),
         )
         .first()
@@ -453,7 +453,7 @@ def batch_review(
     rows = (
         db.query(DoseResponseResult)
         .filter(
-            DoseResponseResult.experiment_run_id == run_id,
+            DoseResponseResult.lims_run_id == run_id,
             DoseResponseResult.curve_category == body.category,
             DoseResponseResult.review_status == ReviewStatus.pending,
             DoseResponseResult.superseded_by.is_(None),
@@ -485,22 +485,22 @@ def exclude_data_point(
     current_user: User = Depends(require_experiment_manage),
 ):
     """
-    Creates an experiment_data_exclusions row.
+    Creates an lims_run_data_exclusions row.
     Unique constraint prevents double-exclusion.
     Reverse by calling DELETE /data/{data_id}/exclude.
     """
     data_row = (
-        db.query(ExperimentData)
-        .join(ExperimentRun, ExperimentData.experiment_run_id == ExperimentRun.id)
-        .filter(ExperimentData.id == data_id)
+        db.query(LimsRunData)
+        .join(LimsRun, LimsRunData.lims_run_id == LimsRun.id)
+        .filter(LimsRunData.id == data_id)
         .first()
     )
     if not data_row:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Experiment data not found")
 
     existing = (
-        db.query(ExperimentDataExclusion)
-        .filter(ExperimentDataExclusion.experiment_data_id == data_id)
+        db.query(LimsRunDataExclusion)
+        .filter(LimsRunDataExclusion.lims_run_data_id == data_id)
         .first()
     )
     if existing:
@@ -509,8 +509,8 @@ def exclude_data_point(
             detail="Data point is already excluded.",
         )
 
-    exclusion = ExperimentDataExclusion(
-        experiment_data_id=data_id,
+    exclusion = LimsRunDataExclusion(
+        lims_run_data_id=data_id,
         excluded_by=current_user.id,
         reason=body.reason,
         client_id=current_user.client_id,
@@ -532,17 +532,17 @@ def unexclude_data_point(
 ):
     """Deletes the exclusion row. Hard reversal — no soft-delete."""
     data_row = (
-        db.query(ExperimentData)
-        .join(ExperimentRun, ExperimentData.experiment_run_id == ExperimentRun.id)
-        .filter(ExperimentData.id == data_id)
+        db.query(LimsRunData)
+        .join(LimsRun, LimsRunData.lims_run_id == LimsRun.id)
+        .filter(LimsRunData.id == data_id)
         .first()
     )
     if not data_row:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Experiment data not found")
 
     exclusion = (
-        db.query(ExperimentDataExclusion)
-        .filter(ExperimentDataExclusion.experiment_data_id == data_id)
+        db.query(LimsRunDataExclusion)
+        .filter(LimsRunDataExclusion.lims_run_data_id == data_id)
         .first()
     )
     if not exclusion:

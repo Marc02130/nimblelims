@@ -1,8 +1,8 @@
 """
 InstrumentDataService — parses uploaded instrument CSV files using parser_config
-and returns validated ExperimentDataRow objects ready for import.
+and returns validated LimsRunDataRow objects ready for import.
 
-Separates the CSV parsing concern from ExperimentRunService so that the import
+Separates the CSV parsing concern from LimsRunService so that the import
 preview (first 10 rows) and full import share the same parsing logic.
 """
 from __future__ import annotations
@@ -13,7 +13,7 @@ from typing import List, Tuple, Optional
 
 from fastapi import HTTPException, status
 
-from app.schemas.flexible_experiment import ExperimentDataRow, ParserConfig
+from app.schemas.flexible_experiment import LimsRunDataRow, ParserConfig
 
 
 class InstrumentDataService:
@@ -40,13 +40,13 @@ class InstrumentDataService:
         csv_bytes: bytes,
         *,
         max_rows: Optional[int] = None,
-    ) -> Tuple[List[ExperimentDataRow], List[str]]:
+    ) -> Tuple[List[LimsRunDataRow], List[str]]:
         """
-        Parse CSV bytes into ExperimentDataRow objects.
+        Parse CSV bytes into LimsRunDataRow objects.
 
         Returns:
             (rows, warnings)
-            rows: list of ExperimentDataRow ready for import
+            rows: list of LimsRunDataRow ready for import
             warnings: list of non-fatal messages (e.g., skipped rows)
         """
         text = csv_bytes.decode("utf-8-sig", errors="replace")
@@ -81,7 +81,7 @@ class InstrumentDataService:
         well_col = self._config.well_col
         col_map = {col.source_col: col for col in self._config.columns}
 
-        rows: list[ExperimentDataRow] = []
+        rows: list[LimsRunDataRow] = []
         for row_num, raw_row in enumerate(reader, start=self._config.skip_rows + 2):
             if max_rows and len(rows) >= max_rows:
                 break
@@ -106,7 +106,7 @@ class InstrumentDataService:
             well_position = row_dict.get(well_col, "").strip() if well_col else None
 
             rows.append(
-                ExperimentDataRow(
+                LimsRunDataRow(
                     well_position=well_position or None,
                     row_data=row_data,
                 )
