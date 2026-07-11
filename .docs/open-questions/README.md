@@ -5,6 +5,7 @@ Decision logs for workstreams that must not proceed until product/architecture q
 | Doc | Area |
 |-----|------|
 | [experiments.md](experiments.md) | ELN Processes, Entries, LimsRun boundary |
+| [sop-rag-config.md](sop-rag-config.md) | SOP → config via RAG (design docs, vectors, Apply) |
 
 ## Gate rule
 

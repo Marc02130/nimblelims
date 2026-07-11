@@ -3,7 +3,7 @@
 **Date:** 2026-07-11 (revised: RAG-first architecture)  
 **Branch:** `docker-model`  
 **Reviewer:** Engineering / Architecture  
-**Status:** Design only — gate open questions before implementation  
+**Status:** Design only — gate [open-questions/sop-rag-config.md](../open-questions/sop-rag-config.md) before implementation  
 **Idea:** [`.docs/ideas/sop-rag-config.md`](../ideas/sop-rag-config.md)
 
 ## 1. Problem statement

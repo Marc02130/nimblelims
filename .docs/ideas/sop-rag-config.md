@@ -75,12 +75,9 @@ Upload SOP → chunk + embed → store
 
 ## Open questions
 
-1. Default cloud vs local inference SKU?
-2. Process **definitions** only from AI, never instances?
-3. Minimum review checklist before Apply?
-4. Who may mark an SOP lab-owned vs client-confidential?
+**Canonical decision log:** [../open-questions/sop-rag-config.md](../open-questions/sop-rag-config.md)
 
-Gate implementation via [open-questions](../open-questions/) when scheduling work.
+Do not implement R0+ until phase blockers in that doc are Decided (or stamped provisional).
 
 ## Related
 
