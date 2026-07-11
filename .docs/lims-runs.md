@@ -23,7 +23,7 @@ Primary goals:
 | `ExperimentData`              | Imported data rows (one row typically = one instrument reading / well)      | `row_data` (JSONB), optional `well_position`, `sample_id`, `container_id` |
 | `InstrumentParser`            | Column mapping config for importing instrument files                        | Learned or defined per template |
 | `RobotWorklistConfig`         | Configuration for generating robot transfer worklists                       | Currently generic CSV (source/dest/volume) |
-| `ExperimentProcess` / `ProcessStep` | Sub-process tracking within a run (e.g. "Sample Prep", "Bioanalysis")     | Exists but not yet wired in main UI |
+| `LimsRunChecklist` / `LimsRunChecklistStep` | Sub-process tracking within a run (e.g. "Sample Prep", "Bioanalysis")     | Exists but not yet wired in main UI |
 
 ### LimsRun
 

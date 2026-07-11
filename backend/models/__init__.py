@@ -34,11 +34,11 @@ from .flexible_experiment import (
     SopParseJobStatus,
     VALID_TRANSITIONS,
 )
-from .experiment_process import (
-    ExperimentProcess,
-    ProcessStep,
-    ProcessStepStatus,
-    VALID_STEP_TRANSITIONS,
+from .lims_run_checklist import (
+    LimsRunChecklist,
+    LimsRunChecklistStep,
+    LimsRunChecklistStepStatus,
+    VALID_CHECKLIST_STEP_TRANSITIONS,
 )
 
 # New for schema evolution refactor (JSONB removal for extensibility)

@@ -1,5 +1,5 @@
 """
-Pydantic schemas for ExperimentProcess and ProcessStep.
+Pydantic schemas for LimsRunChecklist and LimsRunChecklistStep.
 """
 from __future__ import annotations
 
@@ -9,26 +9,26 @@ from typing import List, Optional
 
 from pydantic import BaseModel
 
-from models.experiment_process import ProcessStepStatus
+from models.lims_run_checklist import LimsRunChecklistStepStatus
 
 
-# ---------- ProcessStep ----------
+# ---------- LimsRunChecklistStep ----------
 
-class ProcessStepCreate(BaseModel):
+class LimsRunChecklistStepCreate(BaseModel):
     name: str
     description: Optional[str] = None
     sort_order: int = 0
 
 
-class ProcessStepRead(BaseModel):
+class LimsRunChecklistStepRead(BaseModel):
     model_config = {"from_attributes": True}
 
     id: uuid.UUID
-    process_id: uuid.UUID
+    checklist_id: uuid.UUID
     name: str
     description: Optional[str]
     sort_order: int
-    status: ProcessStepStatus
+    status: LimsRunChecklistStepStatus
     notes: Optional[str]
     started_at: Optional[datetime]
     completed_at: Optional[datetime]
@@ -39,20 +39,20 @@ class ProcessStepRead(BaseModel):
     modified_by: Optional[uuid.UUID]
 
 
-class ProcessStepUpdateNotes(BaseModel):
+class LimsRunChecklistStepUpdateNotes(BaseModel):
     notes: str
 
 
-# ---------- ExperimentProcess ----------
+# ---------- LimsRunChecklist ----------
 
-class ExperimentProcessCreate(BaseModel):
+class LimsRunChecklistCreate(BaseModel):
     name: str
     description: Optional[str] = None
     sort_order: int = 0
-    steps: List[ProcessStepCreate] = []
+    steps: List[LimsRunChecklistStepCreate] = []
 
 
-class ExperimentProcessRead(BaseModel):
+class LimsRunChecklistRead(BaseModel):
     model_config = {"from_attributes": True}
 
     id: uuid.UUID
@@ -64,4 +64,4 @@ class ExperimentProcessRead(BaseModel):
     created_by: Optional[uuid.UUID]
     modified_at: Optional[datetime]
     modified_by: Optional[uuid.UUID]
-    steps: List[ProcessStepRead] = []
+    steps: List[LimsRunChecklistStepRead] = []
