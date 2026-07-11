@@ -1725,6 +1725,40 @@ Base path: `/api/v1/experiment-templates`. Requires **`experiment:manage`**.
 
 `template_definition` includes fields such as `experiment_name`, `protocol_steps`, `transfer_steps`, `result_columns`, `plate_layout`, `acceptance_criteria`, `mandatory_review_count`, etc. (see Pydantic schemas in `backend/app/schemas/experiment.py`).
 
+## ELN Processes (Phase 1)
+
+Base path: `/api/v1/eln-processes`. Requires **`experiment:manage`**.
+
+First-class ordered multi-experiment workflows on the **ELN** side. Distinct from LIMS run sub-processes at `/api/v1/processes` and `/api/v1/experiment-runs/{id}/processes`.
+
+Tables: `eln_processes`, `eln_process_steps`, `eln_process_samples` (migration `0047`). Optional list-driven status via `eln_process_status` list → `status_id`.
+
+**Process CRUD**
+- `GET /eln-processes` — List (`active`, `mine`, `page`, `size`). Returns step/sample counts.
+- `POST /eln-processes` — Create (optional initial `steps` with `experiment_template_id`).
+- `GET /eln-processes/{process_id}` — Detail with steps + sample assignments.
+- `PATCH /eln-processes/{process_id}` — Update name/description/active/status_id.
+- `DELETE /eln-processes/{process_id}` — Soft-delete (`active=false`).
+
+**Steps (ordered template refs)**
+- `GET /eln-processes/{process_id}/steps`
+- `POST /eln-processes/{process_id}/steps` — Append or insert at `sort_order`.
+- `PATCH /eln-processes/{process_id}/steps/{step_id}`
+- `DELETE /eln-processes/{process_id}/steps/{step_id}` — Compacts sort_order.
+- `POST /eln-processes/{process_id}/steps/reorder` — Body: `{ "step_ids": [uuid, ...] }` (full set).
+- `POST /eln-processes/{process_id}/steps/{step_id}/instantiate` — Create `Experiment` from step template; sets `experiment_id` on the step (400 if already set).
+
+**Samples**
+- `GET /eln-processes/{process_id}/samples` — Optional filters: `current_step_id`, `sample_status`.
+- `POST /eln-processes/{process_id}/samples` — Body: `{ "sample_ids": [...], "set_to_first_step": true }`.
+- `DELETE /eln-processes/{process_id}/samples/{sample_id}`
+- `PATCH /eln-processes/{process_id}/samples/{sample_id}/step` — Set `step_id` / `status`.
+- `POST /eln-processes/{process_id}/samples/{sample_id}/advance` — Move to next step by sort_order; complete on last step.
+
+**Coexistence:** Legacy `ExperimentDetail` `experiment_link` lineage remains supported; no forced migration in Phase 1.
+
+**Checklist:** `.docs/checklist/experiment-checklist.md`.
+
 ## SOP parse (AI-assisted template creation)
 
 Base path: `/api/v1/sop-parse`. Requires **`experiment:manage`**. Used to upload an SOP and example instrument output, run **Claude**-based extraction in a background job, then apply results to create `experiment_templates` and related parser/worklist rows.
@@ -1766,7 +1800,7 @@ Endpoints require specific permissions. The system currently has 17 permissions:
 - `project:manage` - Manage projects
 
 **Experiment permissions:**
-- `experiment:manage` - Experiments and experiment templates CRUD, SOP parse upload/apply (lab roles in seed data: Administrator, Lab Manager, Lab Technician)
+- `experiment:manage` - Experiments, experiment templates, ELN processes (`/v1/eln-processes`), SOP parse upload/apply (lab roles in seed data: Administrator, Lab Manager, Lab Technician)
 
 **System Permissions:**
 - `user:manage` - Manage users

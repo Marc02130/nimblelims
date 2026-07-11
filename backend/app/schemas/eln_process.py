@@ -46,6 +46,16 @@ class ELNProcessStepReorderRequest(BaseModel):
     step_ids: List[UUID] = Field(..., min_length=1)
 
 
+class ELNProcessStepInstantiateRequest(BaseModel):
+    """Optional name for the Experiment created from this step's template."""
+    name: Optional[str] = Field(
+        None,
+        min_length=1,
+        max_length=255,
+        description="Experiment name; default is derived from process + step",
+    )
+
+
 # ---------- Samples ----------
 
 

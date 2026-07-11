@@ -1146,6 +1146,153 @@ class ApiService {
     await this.api.delete(`v1/experiment-templates/${id}`);
   }
 
+  // ELN Processes (Phase 1) — ordered multi-experiment workflows
+  async getElnProcesses(params?: {
+    active?: boolean;
+    mine?: boolean;
+    page?: number;
+    size?: number;
+  }) {
+    const response: AxiosResponse = await this.api.get('v1/eln-processes', { params });
+    return response.data;
+  }
+
+  async getElnProcess(id: string) {
+    const response: AxiosResponse = await this.api.get(`v1/eln-processes/${id}`);
+    return response.data;
+  }
+
+  async createElnProcess(data: {
+    name: string;
+    description?: string;
+    status_id?: string;
+    steps?: Array<{
+      experiment_template_id: string;
+      name?: string;
+      sort_order?: number;
+    }>;
+  }) {
+    const response: AxiosResponse = await this.api.post('v1/eln-processes', data);
+    return response.data;
+  }
+
+  async updateElnProcess(id: string, data: {
+    name?: string;
+    description?: string;
+    active?: boolean;
+    status_id?: string;
+  }) {
+    const response: AxiosResponse = await this.api.patch(`v1/eln-processes/${id}`, data);
+    return response.data;
+  }
+
+  async deleteElnProcess(id: string) {
+    await this.api.delete(`v1/eln-processes/${id}`);
+  }
+
+  async getElnProcessSteps(processId: string) {
+    const response: AxiosResponse = await this.api.get(`v1/eln-processes/${processId}/steps`);
+    return response.data;
+  }
+
+  async addElnProcessStep(processId: string, data: {
+    experiment_template_id: string;
+    name?: string;
+    sort_order?: number;
+  }) {
+    const response: AxiosResponse = await this.api.post(
+      `v1/eln-processes/${processId}/steps`,
+      data,
+    );
+    return response.data;
+  }
+
+  async updateElnProcessStep(
+    processId: string,
+    stepId: string,
+    data: {
+      name?: string;
+      experiment_template_id?: string;
+      experiment_id?: string;
+      sort_order?: number;
+    },
+  ) {
+    const response: AxiosResponse = await this.api.patch(
+      `v1/eln-processes/${processId}/steps/${stepId}`,
+      data,
+    );
+    return response.data;
+  }
+
+  async removeElnProcessStep(processId: string, stepId: string) {
+    await this.api.delete(`v1/eln-processes/${processId}/steps/${stepId}`);
+  }
+
+  async reorderElnProcessSteps(processId: string, stepIds: string[]) {
+    const response: AxiosResponse = await this.api.post(
+      `v1/eln-processes/${processId}/steps/reorder`,
+      { step_ids: stepIds },
+    );
+    return response.data;
+  }
+
+  async instantiateElnProcessStep(
+    processId: string,
+    stepId: string,
+    data?: { name?: string },
+  ) {
+    const response: AxiosResponse = await this.api.post(
+      `v1/eln-processes/${processId}/steps/${stepId}/instantiate`,
+      data ?? {},
+    );
+    return response.data;
+  }
+
+  async getElnProcessSamples(
+    processId: string,
+    params?: { current_step_id?: string; sample_status?: string },
+  ) {
+    const response: AxiosResponse = await this.api.get(
+      `v1/eln-processes/${processId}/samples`,
+      { params },
+    );
+    return response.data;
+  }
+
+  async assignElnProcessSamples(
+    processId: string,
+    data: { sample_ids: string[]; set_to_first_step?: boolean },
+  ) {
+    const response: AxiosResponse = await this.api.post(
+      `v1/eln-processes/${processId}/samples`,
+      data,
+    );
+    return response.data;
+  }
+
+  async removeElnProcessSample(processId: string, sampleId: string) {
+    await this.api.delete(`v1/eln-processes/${processId}/samples/${sampleId}`);
+  }
+
+  async setElnProcessSampleStep(
+    processId: string,
+    sampleId: string,
+    data: { step_id?: string | null; status?: string },
+  ) {
+    const response: AxiosResponse = await this.api.patch(
+      `v1/eln-processes/${processId}/samples/${sampleId}/step`,
+      data,
+    );
+    return response.data;
+  }
+
+  async advanceElnProcessSample(processId: string, sampleId: string) {
+    const response: AxiosResponse = await this.api.post(
+      `v1/eln-processes/${processId}/samples/${sampleId}/advance`,
+    );
+    return response.data;
+  }
+
   // SOP parse jobs (v1 API)
   async createSopParseJob(sopFile: File, instrumentFile: File) {
     const form = new FormData();

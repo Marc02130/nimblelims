@@ -193,13 +193,20 @@ class ELNProcessRepository:
             .first()
         )
 
-    def list_process_samples(self, process_id: UUID) -> List[ELNProcessSample]:
-        return (
-            self.db.query(ELNProcessSample)
-            .filter(ELNProcessSample.process_id == process_id)
-            .order_by(ELNProcessSample.assigned_at)
-            .all()
+    def list_process_samples(
+        self,
+        process_id: UUID,
+        current_step_id: Optional[UUID] = None,
+        sample_status: Optional[str] = None,
+    ) -> List[ELNProcessSample]:
+        query = self.db.query(ELNProcessSample).filter(
+            ELNProcessSample.process_id == process_id,
         )
+        if current_step_id is not None:
+            query = query.filter(ELNProcessSample.current_step_id == current_step_id)
+        if sample_status is not None:
+            query = query.filter(ELNProcessSample.status == sample_status)
+        return query.order_by(ELNProcessSample.assigned_at).all()
 
     def sample_exists(self, sample_id: UUID) -> bool:
         return (
