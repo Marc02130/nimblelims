@@ -93,13 +93,13 @@ Legacy `experiment_link` via `ExperimentDetail` **coexists** in Phase 1; no forc
 
 ## Phase 2 — Entries + process-aware UI
 
-- [ ] Entries tables migration (`entries`, `entry_field_definitions`, `entry_field_values`)
-- [ ] Instantiate entries from ExperimentTemplate
-- [ ] Sample data / experiment detail value capture APIs
-- [ ] Write-back rules + audit for Sample attributes
-- [ ] Process builder UI + sample queues + overview
-- [ ] Entry forms driven by FieldDefinitions
-- [ ] Workflow actions: `create_process`, `add_experiment_to_process`, etc.
+- [x] Entries tables migration (`entries`, `entry_field_definitions`, `entry_field_values`) — `0048`
+- [x] Instantiate entries from ExperimentTemplate (`template_definition.entries`; auto on experiment create + process step instantiate)
+- [x] Sample data / experiment detail value capture APIs (`/v1/entries`, upsert values)
+- [x] Write-back rules + audit for Sample attributes (allowlist + last-write-wins + `write_back_previous`)
+- [x] Process builder UI + sample queues + overview (`ProcessesManagement` at `/experiments/processes`)
+- [ ] Entry forms driven by FieldDefinitions (UI for value capture in experiment detail — partial; API ready)
+- [x] Workflow actions: `create_process`, `add_step_to_process`, `assign_samples_to_process`, `instantiate_process_step`
 
 ---
 
@@ -119,8 +119,8 @@ Legacy `experiment_link` via `ExperimentDetail` **coexists** in Phase 1; no forc
 | 1 | Can a Process reference LIMS Runs? | Open — Phase 1: ELN templates only |
 | 2 | Process status: own list vs derived? | Phase 1: optional `status_id` + seeded `eln_process_status` list |
 | 3 | Can Process override entry config from templates? | Phase 2 |
-| 4 | Write-back conflict rules | Phase 2 |
-| 5 | Workflow integration depth | Phase 2 minimum: new actions only |
+| 4 | Write-back conflict rules | Phase 2: last-write-wins; previous value on EntryFieldValue |
+| 5 | Workflow integration depth | Phase 2: create_process / add_step / assign_samples / instantiate_step |
 | 6 | Process Templates timing | Phase 3 (reviews lean defer) |
 | 7 | Progress visibility for non-admins | Phase 2+ UI |
 
@@ -150,3 +150,4 @@ Legacy `experiment_link` via `ExperimentDetail` **coexists** in Phase 1; no forc
 | 2026-07-11 | Checklist created; Phase 1 started on `refactor/experiments` |
 | 2026-07-11 | Phase 1 backend landed: models, migration 0047, `/v1/eln-processes` API, tests |
 | 2026-07-11 | Phase 1 polish: docs, apiService, instantiate, status seed, RLS tests |
+| 2026-07-11 | Phase 2 started: entries 0048, APIs, Process UI, workflow actions |

@@ -28,6 +28,7 @@ import ProjectsManagement from './pages/ProjectsManagement';
 import AnalysesManagement from './pages/AnalysesManagement';
 import AnalytesManagement from './pages/AnalytesManagement';
 import ExperimentsManagement from './pages/ExperimentsManagement';
+import ProcessesManagement from './pages/ProcessesManagement';
 import ExperimentTemplatesManagement from './pages/ExperimentTemplatesManagement';
 import RunsManagement from './pages/RunsManagement';
 import ExperimentRunDetail from './pages/ExperimentRunDetail';
@@ -192,6 +193,26 @@ function AppRoutes() {
           element={
             hasPermission('experiment:manage') ? (
               <ExperimentTemplatesManagement />
+            ) : (
+              <Navigate to="/dashboard" replace />
+            )
+          }
+        />
+        <Route
+          path="/experiments/processes/:id"
+          element={
+            hasPermission('experiment:manage') ? (
+              <ProcessesManagement />
+            ) : (
+              <Navigate to="/dashboard" replace />
+            )
+          }
+        />
+        <Route
+          path="/experiments/processes"
+          element={
+            hasPermission('experiment:manage') ? (
+              <ProcessesManagement />
             ) : (
               <Navigate to="/dashboard" replace />
             )

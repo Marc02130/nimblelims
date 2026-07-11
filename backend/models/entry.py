@@ -26,127 +26,128 @@ from sqlalchemy.sql import func
 from .base import Base, BaseModel
 
 
-class Entry(BaseModel):
+# Entry types allowed in API / templates
+ENTRY_TYPES = frozenset({
+    'predefined_action',
+    'sample_data',
+    'experiment_detail',
+    'display_table',
+})
+
+# Sample columns that may receive write-back from entry values (Phase 2 allowlist)
+SAMPLE_WRITE_BACK_COLUMNS = frozenset({
+    'specimen_biotype_id',
+    'client_sample_id',
+    'temperature',
+    'date_sampled',
+    'received_date',
+    'due_date',
+    'report_date',
+})
+
+
+class Entry(Base):
     """
     A data capture / action component inside an Experiment.
 
-    Entries are typically defined in an ExperimentTemplate and instantiated
-    for a specific Experiment (or Process step).
-
-    For custom data entries, the actual columns are described by FieldDefinitions
-    associated with this Entry (via EntryFieldDefinition junction or direct association).
+    Does not use BaseModel: entry names are not globally unique (scoped to experiment).
+    Entries are typically declared on ExperimentTemplate.template_definition['entries']
+    and instantiated when an Experiment is created / a process step is instantiated.
     """
 
     __tablename__ = 'entries'
 
+    id = Column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+
     experiment_id = Column(
         PostgresUUID(as_uuid=True),
-        ForeignKey('experiments.id'),
+        ForeignKey('experiments.id', ondelete='CASCADE'),
         nullable=False,
-        index=True
+        index=True,
     )
 
-    # Links the Entry to a specific step inside a Process.
-    # Per design: "An Entry can be linked to a process step via process_step_id."
-    # NOTE: uses 'eln_process_steps' to avoid name collision with existing 'process_steps' (LIMS ExperimentProcess steps)
+    # Optional link to an ELN process step (when experiment lives inside a process)
     process_step_id = Column(
         PostgresUUID(as_uuid=True),
-        ForeignKey('eln_process_steps.id'),
+        ForeignKey('eln_process_steps.id', ondelete='SET NULL'),
         nullable=True,
-        index=True
+        index=True,
     )
 
-    entry_type = Column(String(64), nullable=False, index=True)  # see class docstring
+    entry_type = Column(String(64), nullable=False, index=True)
     name = Column(String(255), nullable=False)
     description = Column(Text)
 
-    # For predefined entries: reference to a built-in entry definition
-    # (could be a code constant or a registry)
     predefined_entry_key = Column(String(128), nullable=True, index=True)
-
-    # Sort order within the Experiment / Process step
-    sort_order = Column(Integer, nullable=False, default=0)
-
-    # Configuration specific to this entry instance (for predefined entries)
-    # e.g. which predefined actions are enabled, parameters, etc.
-    # For custom entries this may be minimal.
+    sort_order = Column(Integer, nullable=False, server_default='0', default=0)
     config = Column(JSONB, nullable=True, server_default='{}')
-
-    # Whether this entry is active in this particular experiment run
-    active = Column(Boolean, nullable=False, server_default='true')
+    active = Column(Boolean, nullable=False, server_default='true', default=True)
 
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
-    created_by = Column(PostgresUUID(as_uuid=True), ForeignKey('users.id'))
-    modified_at = Column(DateTime, onupdate=func.now())
-    modified_by = Column(PostgresUUID(as_uuid=True), ForeignKey('users.id'))
+    created_by = Column(PostgresUUID(as_uuid=True), ForeignKey('users.id'), nullable=True)
+    modified_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
+    modified_by = Column(PostgresUUID(as_uuid=True), ForeignKey('users.id'), nullable=True)
 
-    # Relationships
     experiment = relationship("Experiment", back_populates="entries")
     process_step = relationship("ELNProcessStep", back_populates="entries")
 
-    # For custom entries: the FieldDefinitions that define the columns of this entry
     field_definitions = relationship(
         "FieldDefinition",
-        secondary="entry_field_definitions",  # junction table
-        back_populates="entries"
+        secondary="entry_field_definitions",
+        back_populates="entries",
+        overlaps="field_definition_links,entry,field_definition",
     )
-
-    # Link rows (for accessing extra columns like sort_order, visible on the association)
     field_definition_links = relationship(
         "EntryFieldDefinition",
         back_populates="entry",
         cascade="all, delete-orphan",
-        overlaps="field_definitions,entries"
+        overlaps="field_definitions,entries,field_definition",
     )
-
-    # Values for the fields (for custom data entries)
     values = relationship(
         "EntryFieldValue",
         back_populates="entry",
-        cascade="all, delete-orphan"
+        cascade="all, delete-orphan",
     )
 
 
-# Junction table to associate FieldDefinitions (columns) with a specific Entry.
-# This is what allows a template to define "these are the columns for this
-# sample data entry in this experiment".
 class EntryFieldDefinition(Base):
+    """Junction: which FieldDefinitions are columns on this Entry instance."""
+
     __tablename__ = 'entry_field_definitions'
 
     entry_id = Column(
         PostgresUUID(as_uuid=True),
-        ForeignKey('entries.id'),
-        primary_key=True
+        ForeignKey('entries.id', ondelete='CASCADE'),
+        primary_key=True,
     )
     field_definition_id = Column(
         PostgresUUID(as_uuid=True),
         ForeignKey('field_definitions.id'),
-        primary_key=True
+        primary_key=True,
+    )
+    sort_order = Column(Integer, nullable=False, server_default='0', default=0)
+    visible = Column(Boolean, nullable=False, server_default='true', default=True)
+    # If set, upserting a value for this field may write through to Sample.<column>
+    # Must be in SAMPLE_WRITE_BACK_COLUMNS.
+    write_back_target = Column(String(128), nullable=True)
+
+    entry = relationship(
+        "Entry",
+        back_populates="field_definition_links",
+        overlaps="entries,field_definitions",
+    )
+    field_definition = relationship(
+        "FieldDefinition",
+        overlaps="entries,field_definitions",
     )
 
-    # Column ordering within the entry's table / form
-    sort_order = Column(Integer, default=0)
 
-    # Whether this column is shown in the UI for this entry
-    visible = Column(Boolean, default=True)
-
-    # Note: We avoid conflicting back_populates here because Entry.field_definitions
-    # is a many-to-many to FieldDefinition (via secondary). Use a separate collection
-    # for the link rows if you need to access sort_order/visible metadata.
-    entry = relationship("Entry", back_populates="field_definition_links", overlaps="entries,field_definitions")
-    field_definition = relationship("FieldDefinition", overlaps="entries,field_definitions")
-
-
-# Extend the previous EntryFieldValue with better relationship
 class EntryFieldValue(Base):
     """
-    Value for one FieldDefinition inside one Entry.
+    Typed value for one FieldDefinition inside one Entry.
 
-    For sample data entries:
-        - There will typically be one row per sample per field in the entry.
-        - Link via sample_id or via the ExperimentSampleExecution.
-
-    This replaces putting dynamic column data inside JSONB.
+    sample_data entries: one row per (entry, field, sample).
+    experiment_detail entries: sample_id is NULL (one row per field).
     """
 
     __tablename__ = 'entry_field_values'
@@ -155,43 +156,41 @@ class EntryFieldValue(Base):
 
     entry_id = Column(
         PostgresUUID(as_uuid=True),
-        ForeignKey('entries.id'),
+        ForeignKey('entries.id', ondelete='CASCADE'),
         nullable=False,
-        index=True
+        index=True,
     )
-
     field_definition_id = Column(
         PostgresUUID(as_uuid=True),
         ForeignKey('field_definitions.id'),
         nullable=False,
-        index=True
+        index=True,
     )
-
-    # For sample-specific data entries: which sample this value belongs to
     sample_id = Column(
         PostgresUUID(as_uuid=True),
         ForeignKey('samples.id'),
         nullable=True,
-        index=True
+        index=True,
     )
 
-    # Typed storage (only the relevant one populated)
     value_text = Column(Text)
     value_number = Column(Numeric(precision=20, scale=10))
     value_list_entry_id = Column(
         PostgresUUID(as_uuid=True),
-        ForeignKey('list_entries.id')
+        ForeignKey('list_entries.id'),
     )
     value_date = Column(DateTime(timezone=True))
     value_boolean = Column(Boolean)
-
-    # Only for truly complex OOB cases inside entries (avoid if possible)
     value_json = Column(JSONB)
 
+    # Last write-back audit (Phase 2: last-write-wins; store previous sample value here)
+    write_back_at = Column(DateTime(timezone=True), nullable=True)
+    write_back_previous = Column(JSONB, nullable=True)
+
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
-    created_by = Column(PostgresUUID(as_uuid=True), ForeignKey('users.id'))
-    modified_at = Column(DateTime, onupdate=func.now())
-    modified_by = Column(PostgresUUID(as_uuid=True), ForeignKey('users.id'))
+    created_by = Column(PostgresUUID(as_uuid=True), ForeignKey('users.id'), nullable=True)
+    modified_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
+    modified_by = Column(PostgresUUID(as_uuid=True), ForeignKey('users.id'), nullable=True)
 
     entry = relationship("Entry", back_populates="values")
     field_definition = relationship("FieldDefinition")

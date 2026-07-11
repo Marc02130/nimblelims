@@ -1293,6 +1293,104 @@ class ApiService {
     return response.data;
   }
 
+  // Experiment Entries (Phase 2)
+  async getExperimentEntries(
+    experimentId: string,
+    params?: { active?: boolean; include_values?: boolean },
+  ) {
+    const response: AxiosResponse = await this.api.get(
+      `v1/experiments/${experimentId}/entries`,
+      { params },
+    );
+    return response.data;
+  }
+
+  async createExperimentEntry(
+    experimentId: string,
+    data: {
+      entry_type: string;
+      name: string;
+      description?: string;
+      predefined_entry_key?: string;
+      sort_order?: number;
+      config?: Record<string, unknown>;
+      process_step_id?: string;
+      fields?: Array<{
+        field_definition_id: string;
+        sort_order?: number;
+        visible?: boolean;
+        write_back_target?: string;
+      }>;
+    },
+  ) {
+    const response: AxiosResponse = await this.api.post(
+      `v1/experiments/${experimentId}/entries`,
+      { ...data, experiment_id: experimentId },
+    );
+    return response.data;
+  }
+
+  async instantiateExperimentEntries(
+    experimentId: string,
+    data?: { process_step_id?: string; skip_if_exists?: boolean },
+  ) {
+    const response: AxiosResponse = await this.api.post(
+      `v1/experiments/${experimentId}/entries/instantiate`,
+      data ?? {},
+    );
+    return response.data;
+  }
+
+  async getEntry(entryId: string) {
+    const response: AxiosResponse = await this.api.get(`v1/entries/${entryId}`);
+    return response.data;
+  }
+
+  async updateEntry(
+    entryId: string,
+    data: {
+      name?: string;
+      description?: string;
+      active?: boolean;
+      sort_order?: number;
+      config?: Record<string, unknown>;
+    },
+  ) {
+    const response: AxiosResponse = await this.api.patch(`v1/entries/${entryId}`, data);
+    return response.data;
+  }
+
+  async deleteEntry(entryId: string) {
+    await this.api.delete(`v1/entries/${entryId}`);
+  }
+
+  async getEntryValues(entryId: string, params?: { sample_id?: string }) {
+    const response: AxiosResponse = await this.api.get(`v1/entries/${entryId}/values`, {
+      params,
+    });
+    return response.data;
+  }
+
+  async upsertEntryValues(
+    entryId: string,
+    values: Array<{
+      field_definition_id: string;
+      sample_id?: string;
+      value_text?: string;
+      value_number?: number;
+      value_list_entry_id?: string;
+      value_date?: string;
+      value_boolean?: boolean;
+      value_json?: unknown;
+      apply_write_back?: boolean;
+    }>,
+  ) {
+    const response: AxiosResponse = await this.api.put(`v1/entries/${entryId}/values`, {
+      values,
+    });
+    return response.data;
+  }
+
   // SOP parse jobs (v1 API)
   async createSopParseJob(sopFile: File, instrumentFile: File) {
     const form = new FormData();
