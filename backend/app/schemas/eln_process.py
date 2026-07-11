@@ -1,12 +1,14 @@
 """
-Pydantic schemas for ELN Processes (Phase 1).
+Pydantic schemas for ELN Process instances (Phase 1–3).
 
-Distinct from LIMS experiment_process schemas (run sub-checklists).
+Distinct from lims_run_checklist schemas (checklist inside a LimsRun).
 """
-from pydantic import BaseModel, Field
-from typing import Optional, List
+from pydantic import BaseModel, Field, field_validator
+from typing import Optional, List, Any
 from datetime import datetime
 from uuid import UUID
+
+from models.entry import STEP_KINDS, EXECUTION_MODES
 
 
 # ---------- Steps ----------
@@ -14,22 +16,37 @@ from uuid import UUID
 
 class ELNProcessStepCreate(BaseModel):
     experiment_template_id: UUID
+    step_kind: str = Field(default='eln_experiment')
+    execution_mode: Optional[str] = None
     name: Optional[str] = Field(None, max_length=255)
-    sort_order: Optional[int] = Field(None, ge=0, description="If omitted, appended after last step")
+    sort_order: Optional[int] = Field(None, ge=0)
+
+    @field_validator('step_kind')
+    @classmethod
+    def _kind(cls, v: str) -> str:
+        if v not in STEP_KINDS:
+            raise ValueError(f"step_kind must be one of {sorted(STEP_KINDS)}")
+        return v
 
 
 class ELNProcessStepUpdate(BaseModel):
     name: Optional[str] = Field(None, max_length=255)
     experiment_template_id: Optional[UUID] = None
     experiment_id: Optional[UUID] = None
+    current_lims_run_id: Optional[UUID] = None
     sort_order: Optional[int] = Field(None, ge=0)
+    step_kind: Optional[str] = None
+    execution_mode: Optional[str] = None
 
 
 class ELNProcessStepRead(BaseModel):
     id: UUID
     process_id: UUID
+    step_kind: str = 'eln_experiment'
+    execution_mode: str = 'eln_experiment'
     experiment_template_id: UUID
     experiment_id: Optional[UUID] = None
+    current_lims_run_id: Optional[UUID] = None
     name: Optional[str] = None
     sort_order: int
     created_at: datetime
@@ -42,18 +59,21 @@ class ELNProcessStepRead(BaseModel):
 
 
 class ELNProcessStepReorderRequest(BaseModel):
-    """Ordered list of step IDs; becomes sort_order 0..n-1."""
     step_ids: List[UUID] = Field(..., min_length=1)
 
 
 class ELNProcessStepInstantiateRequest(BaseModel):
-    """Optional name for the Experiment created from this step's template."""
-    name: Optional[str] = Field(
-        None,
-        min_length=1,
-        max_length=255,
-        description="Experiment name; default is derived from process + step",
-    )
+    """Start/materialize a step (Experiment or LimsRun)."""
+    name: Optional[str] = Field(None, min_length=1, max_length=255)
+    # For lims_run retest: create a new run even if one exists
+    force_new: bool = False
+
+
+class ELNProcessStepStartResponse(BaseModel):
+    step: ELNProcessStepRead
+    experiment_id: Optional[UUID] = None
+    lims_run_id: Optional[UUID] = None
+    warning: Optional[str] = None
 
 
 # ---------- Samples ----------
@@ -61,7 +81,6 @@ class ELNProcessStepInstantiateRequest(BaseModel):
 
 class ELNProcessSampleAssignRequest(BaseModel):
     sample_ids: List[UUID] = Field(..., min_length=1)
-    # If true (default), set current_step to first step when process has steps
     set_to_first_step: bool = True
 
 
@@ -82,24 +101,29 @@ class ELNProcessSampleRead(BaseModel):
 
 
 class ELNProcessSampleSetStepRequest(BaseModel):
-    step_id: Optional[UUID] = Field(
-        None,
-        description="Target step; null clears current step",
-    )
-    status: Optional[str] = Field(
-        None,
-        description="Optional status override (assigned|in_progress|completed)",
-    )
+    step_id: Optional[UUID] = None
+    status: Optional[str] = None
 
 
-# ---------- Process ----------
+class ELNProcessSampleAdvanceResponse(BaseModel):
+    sample: ELNProcessSampleRead
+    warning: Optional[str] = None
+    # Soft gate: true if advanced despite incomplete LimsRun step
+    advanced: bool = True
+
+
+# ---------- Process instance ----------
 
 
 class ELNProcessCreate(BaseModel):
+    """
+    Create instance. Prefer process_definition_id (Decision #6).
+    Free-form steps still allowed: auto-creates a snapshot definition.
+    """
     name: str = Field(..., min_length=1, max_length=255)
     description: Optional[str] = None
     status_id: Optional[UUID] = None
-    # Optional initial steps (template refs)
+    process_definition_id: Optional[UUID] = None
     steps: Optional[List[ELNProcessStepCreate]] = None
 
 
@@ -116,6 +140,7 @@ class ELNProcessRead(BaseModel):
     description: Optional[str] = None
     active: bool
     status_id: Optional[UUID] = None
+    process_definition_id: Optional[UUID] = None
     created_at: datetime
     created_by: Optional[UUID] = None
     modified_at: datetime
@@ -133,6 +158,7 @@ class ELNProcessListEntry(BaseModel):
     description: Optional[str] = None
     active: bool
     status_id: Optional[UUID] = None
+    process_definition_id: Optional[UUID] = None
     created_at: datetime
     created_by: Optional[UUID] = None
     step_count: int = 0
@@ -148,3 +174,25 @@ class ELNProcessListResponse(BaseModel):
     page: int
     size: int
     pages: int
+
+
+# ---------- Sample journey (#7) ----------
+
+
+class SampleJourneyStep(BaseModel):
+    process_id: UUID
+    process_name: str
+    process_definition_id: Optional[UUID] = None
+    process_sample_status: str
+    current_step_id: Optional[UUID] = None
+    current_step_name: Optional[str] = None
+    current_step_kind: Optional[str] = None
+    current_step_sort_order: Optional[int] = None
+    experiment_id: Optional[UUID] = None
+    lims_run_id: Optional[UUID] = None
+    lims_run_status: Optional[str] = None
+
+
+class SampleJourneyResponse(BaseModel):
+    sample_id: UUID
+    processes: List[SampleJourneyStep] = Field(default_factory=list)

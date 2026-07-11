@@ -287,16 +287,19 @@ class TestELNProcessInstantiate:
         assert r.status_code == 201, r.text
         body = r.json()
         assert body["step"]["experiment_id"] is not None
-        assert body["experiment"]["id"] == body["step"]["experiment_id"]
-        assert body["experiment"]["experiment_template_id"] == template_a["id"]
+        assert body["experiment_id"] == body["step"]["experiment_id"]
+        assert body["lims_run_id"] is None
 
-        # Second instantiate rejected
+        # Second start returns existing experiment (soft; warning, not 400)
         r = client.post(
             f"/v1/eln-processes/{process_id}/steps/{step_id}/instantiate",
             json={},
             headers=auth_headers,
         )
-        assert r.status_code == 400
+        assert r.status_code == 201, r.text
+        body2 = r.json()
+        assert body2["experiment_id"] == body["experiment_id"]
+        assert body2["warning"] is not None
 
 
 class TestELNProcessSamples:
@@ -339,14 +342,16 @@ class TestELNProcessSamples:
         )
         assert r.status_code == 400
 
-        # Advance to second step
+        # Advance to second step (Phase 3: wrapped response + optional soft warning)
         r = client.post(
             f"/v1/eln-processes/{process_id}/samples/{sample_id}/advance",
             headers=auth_headers,
         )
         assert r.status_code == 200, r.text
-        assert r.json()["current_step_id"] == steps[1]["id"]
-        assert r.json()["status"] == "in_progress"
+        adv = r.json()
+        assert adv["advanced"] is True
+        assert adv["sample"]["current_step_id"] == steps[1]["id"]
+        assert adv["sample"]["status"] == "in_progress"
 
         # Advance past last → completed
         r = client.post(
@@ -354,8 +359,9 @@ class TestELNProcessSamples:
             headers=auth_headers,
         )
         assert r.status_code == 200
-        assert r.json()["status"] == "completed"
-        assert r.json()["current_step_id"] == steps[1]["id"]
+        adv2 = r.json()
+        assert adv2["sample"]["status"] == "completed"
+        assert adv2["sample"]["current_step_id"] == steps[1]["id"]
 
         r = client.delete(
             f"/v1/eln-processes/{process_id}/samples/{sample_id}",

@@ -143,7 +143,7 @@ These live on the Run + dose-response path. A rework that touches fitting or dat
 ## 9. Documentation & Process Items
 
 - Update `TODOS.md` to reference this document once created.
-- Ensure any rework PR updates `.docs/experiment-planning.md`, `README.md` (features section), `api_endpoints.md`, and UAT scripts.
+- Ensure any rework PR updates `.docs/design/experiment-planning.md`, `README.md` (features section), `manuals/api-endpoints.md`, and UAT scripts.
 - Add or expand tests for the chosen unified model (the current 22 dose-response + flexible experiment tests are a good base; one is currently broken).
 - Consider adding RLS isolation tests that cover the new linking if introduced.
 
@@ -192,14 +192,14 @@ These live on the Run + dose-response path. A rework that touches fitting or dat
 
 **Tests:** `tests/test_flexible_experiment.py`, `test_dose_response.py`, `test_experiment_process.py`, `test_rls_experiment_isolation.py`
 
-**Docs:** `TODOS.md`, `.docs/experiment-planning.md`, `README.md`, `.docs/api_endpoints.md`
+**Docs:** `TODOS.md`, `.docs/design/experiment-planning.md`, `README.md`, `.docs/manuals/api-endpoints.md`
 
 ---
 
 ## References
 
 - `TODOS.md` (especially "Architecture: Two Systems, One Gap", dose-response deferred items, concurrency review)
-- `.docs/experiment-planning.md`
+- `.docs/design/experiment-planning.md`
 - Migrations 0036, 0039, 0040–0045 (RLS, CRO, dose-response)
 - `backend/app/schemas/workflow.py` (VALID_WORKFLOW_ACTIONS)
 - Adversarial review notes embedded in `TODOS.md` (2026-04-03)

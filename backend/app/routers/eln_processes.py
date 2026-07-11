@@ -24,18 +24,16 @@ from app.schemas.eln_process import (
     ELNProcessStepRead,
     ELNProcessStepReorderRequest,
     ELNProcessStepInstantiateRequest,
+    ELNProcessStepStartResponse,
     ELNProcessSampleAssignRequest,
     ELNProcessSampleRead,
     ELNProcessSampleSetStepRequest,
+    ELNProcessSampleAdvanceResponse,
+    SampleJourneyResponse,
 )
-from app.schemas.experiment import ExperimentRead
 from models.user import User
-from pydantic import BaseModel
-
-
-class ELNProcessStepInstantiateResponse(BaseModel):
-    step: ELNProcessStepRead
-    experiment: ExperimentRead
+from models.sample import Sample
+from fastapi import HTTPException
 
 router = APIRouter(
     prefix="/eln-processes",
@@ -72,6 +70,7 @@ def list_eln_processes(
                 description=p.description,
                 active=p.active,
                 status_id=p.status_id,
+                process_definition_id=p.process_definition_id,
                 created_at=p.created_at,
                 created_by=p.created_by,
                 step_count=service.repo.count_steps(p.id),
@@ -182,21 +181,22 @@ def reorder_steps(
 
 @router.post(
     "/{process_id}/steps/{step_id}/instantiate",
-    response_model=ELNProcessStepInstantiateResponse,
+    response_model=ELNProcessStepStartResponse,
     status_code=status.HTTP_201_CREATED,
 )
-def instantiate_step(
+@router.post(
+    "/{process_id}/steps/{step_id}/start",
+    response_model=ELNProcessStepStartResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def start_step(
     process_id: UUID,
     step_id: UUID,
     data: ELNProcessStepInstantiateRequest = ELNProcessStepInstantiateRequest(),
     service: ELNProcessService = Depends(get_service),
 ):
-    """Create an Experiment from the step's template and link it on the step."""
-    step, experiment = service.instantiate_step(process_id, step_id, data)
-    return ELNProcessStepInstantiateResponse(
-        step=ELNProcessStepRead.model_validate(step),
-        experiment=ExperimentRead.model_validate(experiment),
-    )
+    """Start step: create Experiment or lazy LimsRun (typed steps, Decision #1)."""
+    return service.instantiate_step(process_id, step_id, data)
 
 
 # ---------- Samples ----------
@@ -268,12 +268,16 @@ def set_sample_step(
 
 @router.post(
     "/{process_id}/samples/{sample_id}/advance",
-    response_model=ELNProcessSampleRead,
+    response_model=ELNProcessSampleAdvanceResponse,
 )
 def advance_sample(
     process_id: UUID,
     sample_id: UUID,
+    force: bool = Query(False, description="Reserved for future hard gate"),
     service: ELNProcessService = Depends(get_service),
 ):
-    ps = service.advance_sample(process_id, sample_id)
-    return ELNProcessSampleRead.model_validate(ps)
+    """Advance sample; soft warning if lims_run step incomplete."""
+    return service.advance_sample(process_id, sample_id, force=force)
+
+
+# Journey is registered on a separate router (sample-scoped, Decision #7)

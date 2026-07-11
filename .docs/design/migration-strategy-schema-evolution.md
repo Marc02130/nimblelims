@@ -220,12 +220,12 @@ See also the full design in .docs/design/schema-evolution.md and requirements.
 ---
 
 **Related Documents**
-- .docs/jsonb-usage-analysis.md (Recommended Refactor Order)
+- .docs/design/jsonb-usage-analysis.md (Recommended Refactor Order)
 - .docs/requirements/schema-evolution.md
 - .docs/design/schema-evolution.md
 - .docs/user-stories/schema-modification.md
-- .docs/processes.md
-- .docs/experiments.md
+- .docs/manuals/processes.md
+- .docs/manuals/experiments.md
 
        # Optional: add a comment or temporary column for safety
    ```

@@ -132,10 +132,10 @@ You can still enforce strict state-machine rules in the application service laye
 ---
 
 **Related Documents**
-- `.docs/processes.md`
-- `.docs/design-review-process-and-experiment.md`
-- `.docs/gap-analysis-process-and-experiment.md`
-- `.docs/experiments.md` (ELN side)
-- `.docs/experiment-planning.md`
-- `.docs/experiment-rework-prerequisites.md`
-- `.docs/batches.md` (for contrast)
+- `.docs/manuals/processes.md`
+- `.docs/design/process-and-experiment-structural.md`
+- `.docs/design/gap-analysis-process-and-experiment.md`
+- `.docs/manuals/experiments.md` (ELN side)
+- `.docs/design/experiment-planning.md`
+- `.docs/checklist/experiment-rework-prerequisites.md`
+- `.docs/manuals/batches.md` (for contrast)

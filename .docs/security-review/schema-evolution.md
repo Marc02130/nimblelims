@@ -140,5 +140,5 @@ This change is supportable from a security standpoint **if** the above issues ar
 - `.docs/design/schema-evolution.md`
 - `.docs/ceo-review/schema-evolution.md`
 - `.docs/requirements/schema-evolution.md`
-- `.docs/jsonb-usage-analysis.md`
+- `.docs/design/jsonb-usage-analysis.md`
 - `.docs/design-review/schema-evolution.md` (prior version)

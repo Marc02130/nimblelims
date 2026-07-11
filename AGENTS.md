@@ -8,7 +8,7 @@
 - Checklists (e.g. [`.docs/checklist/experiment-checklist.md`](.docs/checklist/experiment-checklist.md)) track tasks; **open questions are not owned by the checklist** — they are owned by the open-questions docs.
 - Status labels: **Open** (blocks related work), **Decided (provisional)** (shipped temporary rule), **Decided**, **Deferred**.
 - If coding surfaces a new product/architecture question, add it to the relevant open-questions doc and **pause** if it blocks the current slice.
-- Phases 1–2 of the experiments refactor already shipped with provisional answers; do **not** start Phase 3 until Phase 3 blockers in the experiments open-questions doc are **Decided**.
+- Phases 1–3 of the experiments refactor have shipped (definitions, typed steps, sample journey). Future work still uses the open-questions gate before expanding scope.
 
 ## Cursor Cloud specific instructions
 

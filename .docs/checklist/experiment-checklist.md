@@ -28,10 +28,11 @@
 
 | Concept | ELN (this work) | LIMS (existing) |
 |---------|-----------------|-----------------|
-| Process entity | `eln_processes` table, API `/v1/eln-processes` | `experiment_processes` under runs |
-| Process steps | `eln_process_steps` | `process_steps` |
+| Process definition | `eln_process_definitions` + `_definition_steps` | N/A |
+| Process instance | `eln_processes` table, API `/v1/eln-processes` | LimsRun checklists (`lims_run_checklists`) |
+| Process steps | `eln_process_steps` (typed: `eln_experiment` \| `lims_run`) | checklist steps |
 | Sample assignment | `eln_process_samples` | N/A (per-run) |
-| Permission | `experiment:manage` (Phase 1) | same |
+| Permission | `experiment:manage` (manage); journey via sample access | same manage path |
 
 Legacy `experiment_link` via `ExperimentDetail` **coexists** in Phase 1; no forced migration of existing links.
 
@@ -78,7 +79,7 @@ Legacy `experiment_link` via `ExperimentDetail` **coexists** in Phase 1; no forc
 
 - [x] This checklist
 - [x] Point planning / requirements at Phase 1 API paths
-- [x] Update `.docs/processes.md` with ELN table names + endpoints
+- [x] Update `.docs/manuals/processes.md` with ELN table names + endpoints
 - [x] README / api_endpoints note (follow-up polish)
 - [x] Frontend `apiService` ELN process methods (UI still Phase 2)
 
@@ -105,26 +106,36 @@ Legacy `experiment_link` via `ExperimentDetail` **coexists** in Phase 1; no forc
 
 ## Phase 3 — Process definitions + cross-system visibility
 
-**Gate:** **Open for Phase 3 implementation.** Decisions **#1, #6, #7** locked.
+**Gate:** **Open for Phase 3 implementation.** Decisions **#1, #6, #7** locked.  
+**Status:** **Shipped (v1)** — 2026-07-11.
 
 **#6 Decided:** Processes always defined (definitions → instances).  
 **#1 Decided:** Typed steps (`eln_experiment` \| `lims_run`) in Phase 3 v1 (**1h-A**); defaults 1a–1g (lazy Run, history, soft gates, Run SoT for instrument data).  
 **#7 Decided:** Progress visible to anyone with sample access; no cross-client.
 
-- [ ] First-class process definitions + ordered **typed** steps (`step_kind`, template, `execution_mode`)
-- [ ] Instantiate process instance from definition (snapshot steps; definition FK on instance after cutover)
-- [ ] Definition management UI + “Start process from definition”
-- [ ] Start step: branch create Experiment vs lazy create LimsRun; run history per step
-- [ ] Migration path for Phase 1–2 ad hoc `eln_processes` rows
-- [ ] Sample journey view (sample-scoped visibility per #7) across Processes / Experiments / LimsRuns
-- [ ] Soft advance warnings when Run step not complete/published
-- [ ] Advanced reporting / “samples currently in step X”
+- [x] First-class process definitions + ordered **typed** steps (`step_kind`, template, `execution_mode`) — migration `0051`, models, `/v1/eln-process-definitions`
+- [x] Instantiate process instance from definition (snapshot steps; `process_definition_id` on instance)
+- [x] Free-form create auto-creates a snapshot definition (Decision #6)
+- [x] Definition management UI + “Start process from definition” (`ProcessesManagement` Instances/Definitions tabs)
+- [x] Start step: branch create Experiment vs lazy create LimsRun; run history table `eln_process_step_lims_runs`
+- [x] Migration backfill: ad hoc `eln_processes` → snapshot definitions (`0051`)
+- [x] Sample journey API `GET /v1/samples/{id}/journey` + sample dialog UI (Decision #7)
+- [x] Soft advance warnings when lims_run step incomplete/not published
+- [x] Tests: `test_eln_process_definitions.py` + updated `test_eln_processes.py`
+- [-] Advanced reporting / “samples currently in step X” (filter by step exists; richer reporting deferred)
+
+### Phase 3 exit criteria
+
+- [x] Can create a process definition with mixed `eln_experiment` / `lims_run` steps
+- [x] Can instantiate instance (snapshot) and start each step kind
+- [x] Sample journey visible with sample access (not only experiment:manage)
+- [x] Soft gate on advance returns `warning` without blocking
 
 ---
 
 ## Open questions
 
-**Canonical doc (not this checklist):** [`.docs/open-questions/experiments.md`](../open-questions/experiments.md)
+**Canonical doc (not this checklist):** [`.docs/manuals/experiments.md`](../manuals/experiments.md)
 
 Rule: no new phase / major feature until blocking questions for that work are resolved. See `AGENTS.md` → *Open questions gate*.
 
@@ -136,15 +147,16 @@ Rule: no new phase / major feature until blocking questions for that work are re
 |-----|------|
 | [open-questions/experiments.md](../open-questions/experiments.md) | **Open questions + decisions** |
 | [requirements/experiment-processes-entries.md](../requirements/experiment-processes-entries.md) | Consolidated requirements |
-| [processes.md](../processes.md) | Process concept |
-| [experiments.md](../experiments.md) | ELN Experiments |
-| [lims-runs.md](../lims-runs.md) | LIMS Runs boundary |
-| [gap-analysis-process-and-experiment.md](../gap-analysis-process-and-experiment.md) | Gaps |
-| [experiment-rework-prerequisites.md](../experiment-rework-prerequisites.md) | Pre-rework issues |
+| [manuals/processes.md](../manuals/processes.md) | Process concept |
+| [manuals/experiments.md](../manuals/experiments.md) | ELN Experiments |
+| [manuals/lims-runs.md](../manuals/lims-runs.md) | LIMS Runs boundary |
+| [design/gap-analysis-…](../design/gap-analysis-process-and-experiment.md) | Gaps |
+| [experiment-rework-prerequisites.md](experiment-rework-prerequisites.md) | Pre-rework issues |
 | [ceo-review/process-and-experiment.md](../ceo-review/process-and-experiment.md) | CEO review |
 | [design-review/process-and-experiment.md](../design-review/process-and-experiment.md) | Design review |
 | [security-review/process-and-experiment.md](../security-review/process-and-experiment.md) | Security review |
-| [experiment-planning.md](../experiment-planning.md) | Chunk 1–2 history |
+| [design/experiment-planning.md](../design/experiment-planning.md) | Chunk 1–2 history |
+| [Docs index](../README.md) | Full documentation map |
 
 ---
 
@@ -161,3 +173,4 @@ Rule: no new phase / major feature until blocking questions for that work are re
 | 2026-07-11 | Decision #6: processes always defined (first-class reusable definitions); experiments ad hoc or templated |
 | 2026-07-11 | Decision #7: progress visibility sample-scoped (no cross-client) |
 | 2026-07-11 | Decision #1: typed process steps (C) + 1a–1g + 1h-A hybrid in Phase 3 v1 |
+| 2026-07-11 | **Phase 3 shipped:** migration 0051, definitions API, typed start-step, soft advance, sample journey, Processes UI + journey on sample dialog |

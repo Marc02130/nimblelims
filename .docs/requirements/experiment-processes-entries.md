@@ -3,7 +3,7 @@
 **Date:** 2026-07-09  
 **Branch:** refactor/experiments  
 **Status:** Draft for review  
-**Derived from:** CEO Review, Security (CSO) Review, and Design Review of the Experiment Plans (see `.docs/experiments.md`, `.docs/processes.md`, `.docs/gap-analysis-process-and-experiment.md`, `.docs/design-review-process-and-experiment.md`, `.docs/experiment-planning.md`)
+**Derived from:** CEO Review, Security (CSO) Review, and Design Review of the Experiment Plans (see `.docs/manuals/experiments.md`, `.docs/manuals/processes.md`, `.docs/design/gap-analysis-process-and-experiment.md`, `.docs/design/experiment-planning.md`)
 
 ## 1. Purpose and Context
 
@@ -13,7 +13,7 @@ NimbleLIMS currently supports ELN-style Experiments using loose mechanisms (`Exp
 - Samples are assigned at a process level and progressed through steps.
 - Data capture needs to be template-driven and structured (using FieldDefinitions + lists rather than free-form JSONB).
 
-The goal is to introduce first-class **Processes** and a rich **Entries** system while maintaining clear separation from LIMS Experiment Runs (see `.docs/experiment-runs.md`).
+The goal is to introduce first-class **Processes** and a rich **Entries** system while maintaining clear separation from LIMS Experiment Runs (see `.docs/manuals/lims-runs.md`).
 
 This requirements doc consolidates feedback from CEO, Security, and Design reviews to drive implementation.
 
@@ -206,13 +206,13 @@ This requirements doc consolidates feedback from CEO, Security, and Design revie
 
 ## 12. References
 
-- [`.docs/experiments.md`](experiments.md)
-- [`.docs/processes.md`](processes.md)
-- [`.docs/gap-analysis-process-and-experiment.md`](gap-analysis-process-and-experiment.md)
-- [`.docs/design-review-process-and-experiment.md`](design-review-process-and-experiment.md)
-- [`.docs/experiment-planning.md`](experiment-planning.md)
-- [`.docs/experiment-runs.md`](experiment-runs.md)
-- [`.docs/experiment-rework-prerequisites.md`](experiment-rework-prerequisites.md)
+- [`.docs/manuals/experiments.md`](../manuals/experiments.md)
+- [`.docs/manuals/processes.md`](../manuals/processes.md)
+- [`.docs/design/gap-analysis-process-and-experiment.md`](../design/gap-analysis-process-and-experiment.md)
+- [`.docs/design/experiment-planning.md`](../design/experiment-planning.md)
+- [`.docs/design-review/process-and-experiment.md`](../design-review/process-and-experiment.md)
+- [`.docs/manuals/lims-runs.md`](../manuals/lims-runs.md)
+- [`.docs/checklist/experiment-rework-prerequisites.md`](../checklist/experiment-rework-prerequisites.md)
 - FieldDefinitions work (unified OOB + custom fields via lists)
 
 ---

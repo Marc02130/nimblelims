@@ -15,14 +15,36 @@ from app.schemas.eln_process import (
     ELNProcessStepInstantiateRequest,
     ELNProcessSampleAssignRequest,
     ELNProcessSampleSetStepRequest,
+    ELNProcessSampleAdvanceResponse,
+    ELNProcessSampleRead,
+    ELNProcessStepStartResponse,
+    ELNProcessStepRead,
+    SampleJourneyResponse,
+    SampleJourneyStep,
+)
+from app.schemas.eln_process_definition import (
+    ELNProcessDefinitionCreate,
+    ELNProcessDefinitionUpdate,
+    ELNProcessDefinitionStepCreate,
+    InstantiateProcessFromDefinitionRequest,
 )
 from app.schemas.experiment import ExperimentCreate
+from app.schemas.flexible_experiment import LimsRunCreate
 from app.services.experiment_service import ExperimentService
-from models.entry import ELNProcess, ELNProcessStep, ELNProcessSample
+from models.entry import (
+    ELNProcess,
+    ELNProcessStep,
+    ELNProcessSample,
+    ELNProcessDefinition,
+    STEP_KINDS,
+)
 from models.experiment import Experiment
+from models.flexible_experiment import LimsRun
 from models.user import User
+from models.sample import Sample
 
 VALID_SAMPLE_STATUSES = frozenset({'assigned', 'in_progress', 'completed', 'removed'})
+_RUN_SOFT_GATE_OK = frozenset({'complete', 'published'})
 
 
 class ELNProcessService:
@@ -78,24 +100,215 @@ class ELNProcessService:
             size=size,
         )
 
+    # ---------- Definitions (Phase 3) ----------
+
+    def get_definition(self, definition_id: UUID) -> ELNProcessDefinition:
+        d = self.repo.get_definition(definition_id)
+        if not d:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Process definition not found",
+            )
+        return d
+
+    def list_definitions(
+        self,
+        active: Optional[bool] = True,
+        page: int = 1,
+        size: int = 10,
+    ) -> Tuple[List[ELNProcessDefinition], int]:
+        return self.repo.list_definitions(active=active, page=page, size=size)
+
+    def create_definition(self, data: ELNProcessDefinitionCreate) -> ELNProcessDefinition:
+        if self.repo.get_definition_by_name(data.name):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Process definition with name '{data.name}' already exists",
+            )
+        d = self.repo.create_definition(
+            name=data.name,
+            description=data.description,
+            created_by=self._user_id(),
+            modified_by=self._user_id(),
+        )
+        if data.steps:
+            for i, s in enumerate(data.steps):
+                self._add_definition_step(d.id, s, i if s.sort_order is None else s.sort_order)
+        self._commit_refresh(d)
+        return self.get_definition(d.id)
+
+    def _add_definition_step(
+        self,
+        definition_id: UUID,
+        s: ELNProcessDefinitionStepCreate,
+        sort_order: int,
+    ) -> None:
+        if not self.repo.template_exists(s.experiment_template_id):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Experiment template {s.experiment_template_id} not found",
+            )
+        kind = s.step_kind
+        mode = s.execution_mode or kind
+        if mode != kind:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="execution_mode must match step_kind",
+            )
+        self.repo.create_definition_step(
+            process_definition_id=definition_id,
+            experiment_template_id=s.experiment_template_id,
+            sort_order=sort_order,
+            step_kind=kind,
+            execution_mode=mode,
+            name=s.name,
+            created_by=self._user_id(),
+            modified_by=self._user_id(),
+        )
+
+    def update_definition(
+        self,
+        definition_id: UUID,
+        data: ELNProcessDefinitionUpdate,
+    ) -> ELNProcessDefinition:
+        d = self.get_definition(definition_id)
+        kwargs: Dict[str, Any] = {'modified_by': self._user_id()}
+        if data.name is not None:
+            existing = self.repo.get_definition_by_name(data.name)
+            if existing and existing.id != definition_id:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Another definition named '{data.name}' exists",
+                )
+            kwargs['name'] = data.name
+        if data.description is not None:
+            kwargs['description'] = data.description
+        if data.active is not None:
+            kwargs['active'] = data.active
+        self.repo.update_definition(d, **kwargs)
+        self._commit_refresh(d)
+        return self.get_definition(definition_id)
+
+    def add_definition_step(
+        self,
+        definition_id: UUID,
+        data: ELNProcessDefinitionStepCreate,
+    ):
+        self.get_definition(definition_id)
+        steps = self.repo.list_definition_steps(definition_id)
+        order = data.sort_order if data.sort_order is not None else len(steps)
+        self._add_definition_step(definition_id, data, order)
+        if self.auto_commit:
+            self.db.commit()
+        return self.get_definition(definition_id)
+
+    def instantiate_from_definition(
+        self,
+        definition_id: UUID,
+        data: Optional[InstantiateProcessFromDefinitionRequest] = None,
+    ) -> ELNProcess:
+        """Create process instance by snapshotting definition steps."""
+        data = data or InstantiateProcessFromDefinitionRequest()
+        definition = self.get_definition(definition_id)
+        if not definition.active:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot instantiate an inactive process definition",
+            )
+        def_steps = self.repo.list_definition_steps(definition_id)
+        inst_name = data.name or f"{definition.name} ({uuid4().hex[:6]})"
+        if self.repo.get_by_name(inst_name):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Process with name '{inst_name}' already exists",
+            )
+        p = self.repo.create_process(
+            name=inst_name,
+            description=data.description or definition.description,
+            status_id=data.status_id,
+            process_definition_id=definition_id,
+            created_by=self._user_id(),
+            modified_by=self._user_id(),
+        )
+        for s in def_steps:
+            self.repo.create_step(
+                process_id=p.id,
+                experiment_template_id=s.experiment_template_id,
+                sort_order=s.sort_order,
+                name=s.name,
+                step_kind=s.step_kind,
+                execution_mode=s.execution_mode,
+                created_by=self._user_id(),
+                modified_by=self._user_id(),
+            )
+        if data.sample_ids:
+            self.assign_samples(
+                p.id,
+                ELNProcessSampleAssignRequest(
+                    sample_ids=data.sample_ids,
+                    set_to_first_step=data.set_to_first_step,
+                ),
+            )
+        else:
+            self._commit_refresh(p)
+        return self.get_process(p.id)
+
     def create_process(self, data: ELNProcessCreate) -> ELNProcess:
+        """
+        Create instance. If process_definition_id set, snapshot from definition.
+        Else free-form steps auto-create a snapshot definition (Decision #6).
+        """
+        if data.process_definition_id:
+            return self.instantiate_from_definition(
+                data.process_definition_id,
+                InstantiateProcessFromDefinitionRequest(
+                    name=data.name,
+                    description=data.description,
+                    status_id=data.status_id,
+                ),
+            )
+
         if self.repo.get_by_name(data.name):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Process with name '{data.name}' already exists",
             )
-        p = self.repo.create_process(
-            name=data.name,
+
+        # Auto definition from free-form steps (or empty)
+        def_name = f"{data.name} (definition)"
+        n = 0
+        while self.repo.get_definition_by_name(def_name):
+            n += 1
+            def_name = f"{data.name} (definition {n})"
+        definition = self.repo.create_definition(
+            name=def_name,
             description=data.description,
-            status_id=data.status_id,
             created_by=self._user_id(),
             modified_by=self._user_id(),
         )
         if data.steps:
             for i, step_in in enumerate(data.steps):
-                self._add_step_internal(p.id, step_in, explicit_order=step_in.sort_order if step_in.sort_order is not None else i)
-        self._commit_refresh(p)
-        return self.get_process(p.id)
+                kind = getattr(step_in, 'step_kind', None) or 'eln_experiment'
+                mode = getattr(step_in, 'execution_mode', None) or kind
+                self._add_definition_step(
+                    definition.id,
+                    ELNProcessDefinitionStepCreate(
+                        experiment_template_id=step_in.experiment_template_id,
+                        step_kind=kind,
+                        execution_mode=mode,
+                        name=step_in.name,
+                        sort_order=step_in.sort_order if step_in.sort_order is not None else i,
+                    ),
+                    step_in.sort_order if step_in.sort_order is not None else i,
+                )
+        return self.instantiate_from_definition(
+            definition.id,
+            InstantiateProcessFromDefinitionRequest(
+                name=data.name,
+                description=data.description,
+                status_id=data.status_id,
+            ),
+        )
 
     def update_process(self, process_id: UUID, data: ELNProcessUpdate) -> ELNProcess:
         p = self.get_process(process_id)
@@ -160,11 +373,15 @@ class ELNProcessService:
                     self.repo.update_step(s, sort_order=s.sort_order + 1)
         else:
             sort_order = self.repo.next_sort_order(process_id)
+        kind = data.step_kind or 'eln_experiment'
+        mode = data.execution_mode or kind
         return self.repo.create_step(
             process_id=process_id,
             experiment_template_id=data.experiment_template_id,
             sort_order=sort_order,
             name=data.name,
+            step_kind=kind,
+            execution_mode=mode,
             created_by=self._user_id(),
             modified_by=self._user_id(),
         )
@@ -251,11 +468,12 @@ class ELNProcessService:
         process_id: UUID,
         step_id: UUID,
         data: Optional[ELNProcessStepInstantiateRequest] = None,
-    ) -> Tuple[ELNProcessStep, Experiment]:
+    ) -> ELNProcessStepStartResponse:
         """
-        Create an Experiment from this step's template and link it on the step.
+        Start/materialize a process step (Decision #1 typed steps).
 
-        Idempotent guard: fails if experiment_id is already set.
+        eln_experiment → create Experiment (+ entries)
+        lims_run → lazy create LimsRun (or return current unless force_new)
         """
         process = self.get_process(process_id)
         step = self.repo.get_step_by_id(step_id)
@@ -264,22 +482,61 @@ class ELNProcessService:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Process step not found",
             )
-        if step.experiment_id is not None:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Step already has an instantiated experiment",
-            )
         if not self.repo.template_exists(step.experiment_template_id):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Experiment template not found",
             )
 
+        kind = getattr(step, 'step_kind', None) or 'eln_experiment'
+        force_new = bool(data and data.force_new)
         step_label = step.name or f"Step {step.sort_order}"
-        exp_name = (
+        default_name = (
             (data.name if data and data.name else None)
             or f"{process.name} — {step_label} ({uuid4().hex[:6]})"
         )
+
+        if kind == 'lims_run':
+            if step.current_lims_run_id and not force_new:
+                return ELNProcessStepStartResponse(
+                    step=ELNProcessStepRead.model_validate(step),
+                    lims_run_id=step.current_lims_run_id,
+                    warning="Step already has a LimsRun; pass force_new=true to retest",
+                )
+            from app.services.lims_run_service import LimsRunService
+
+            run_svc = LimsRunService(self.db, current_user=self.current_user)
+            # LimsRunService always commits; temporarily OK for start-step
+            run = run_svc.create_run(
+                LimsRunCreate(
+                    name=default_name,
+                    description=f"From process '{process.name}' step '{step_label}'",
+                    experiment_template_id=step.experiment_template_id,
+                )
+            )
+            self.repo.update_step(
+                step,
+                current_lims_run_id=run.id,
+                modified_by=self._user_id(),
+            )
+            self.repo.add_step_lims_run_history(
+                process_step_id=step.id,
+                lims_run_id=run.id,
+                created_by=self._user_id(),
+            )
+            self._commit_refresh(step)
+            return ELNProcessStepStartResponse(
+                step=ELNProcessStepRead.model_validate(step),
+                lims_run_id=run.id,
+            )
+
+        # eln_experiment
+        if step.experiment_id is not None and not force_new:
+            return ELNProcessStepStartResponse(
+                step=ELNProcessStepRead.model_validate(step),
+                experiment_id=step.experiment_id,
+                warning="Step already has an experiment",
+            )
         exp_service = ExperimentService(
             self.db,
             current_user=self.current_user,
@@ -287,7 +544,7 @@ class ELNProcessService:
         )
         experiment = exp_service.create_experiment(
             ExperimentCreate(
-                name=exp_name,
+                name=default_name,
                 description=f"From ELN process '{process.name}' step '{step_label}'",
                 experiment_template_id=step.experiment_template_id,
             )
@@ -297,7 +554,6 @@ class ELNProcessService:
             experiment_id=experiment.id,
             modified_by=self._user_id(),
         )
-        # Phase 2: instantiate entries declared on the template (no-op if none)
         from app.services.entry_service import EntryService
         from app.schemas.entry import InstantiateEntriesRequest
 
@@ -314,7 +570,10 @@ class ELNProcessService:
             ),
         )
         self._commit_refresh(step, experiment)
-        return step, experiment
+        return ELNProcessStepStartResponse(
+            step=ELNProcessStepRead.model_validate(step),
+            experiment_id=experiment.id,
+        )
 
     # ---------- Samples ----------
 
@@ -417,8 +676,20 @@ class ELNProcessService:
         self._commit_refresh(ps)
         return ps
 
-    def advance_sample(self, process_id: UUID, sample_id: UUID) -> ELNProcessSample:
-        """Move sample to the next step by sort_order; complete if already on last."""
+    def advance_sample(
+        self,
+        process_id: UUID,
+        sample_id: UUID,
+        *,
+        force: bool = False,
+    ) -> ELNProcessSampleAdvanceResponse:
+        """
+        Move sample to the next step by sort_order; complete if already on last.
+
+        Soft gate (Decision #1f): if current step is lims_run and run is not
+        complete/published, return warning; still advances unless you treat
+        warning in UI. Always advances (soft); force reserved for future hard gate.
+        """
         self.get_process(process_id)
         ps = self.repo.get_process_sample(process_id, sample_id)
         if not ps:
@@ -432,8 +703,23 @@ class ELNProcessService:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Process has no steps; cannot advance sample",
             )
+
+        warning: Optional[str] = None
+        if ps.current_step_id:
+            cur = self.repo.get_step_by_id(ps.current_step_id)
+            if cur and (getattr(cur, 'step_kind', None) or 'eln_experiment') == 'lims_run':
+                if cur.current_lims_run_id:
+                    run = self.repo.get_lims_run(cur.current_lims_run_id)
+                    status_val = getattr(run.status, 'value', run.status) if run else None
+                    if run and status_val not in _RUN_SOFT_GATE_OK:
+                        warning = (
+                            f"Current LimsRun status is '{status_val}' "
+                            f"(not complete/published); advancing anyway (soft gate)"
+                        )
+                else:
+                    warning = "Current lims_run step has no LimsRun started yet; advancing anyway (soft gate)"
+
         if ps.current_step_id is None:
-            # Start at first step
             self.repo.update_process_sample(
                 ps,
                 current_step_id=steps[0].id,
@@ -443,7 +729,6 @@ class ELNProcessService:
         else:
             idx = next((i for i, s in enumerate(steps) if s.id == ps.current_step_id), None)
             if idx is None:
-                # Stale step reference — reset to first
                 self.repo.update_process_sample(
                     ps,
                     current_step_id=steps[0].id,
@@ -464,4 +749,50 @@ class ELNProcessService:
                     modified_by=self._user_id(),
                 )
         self._commit_refresh(ps)
-        return ps
+        return ELNProcessSampleAdvanceResponse(
+            sample=ELNProcessSampleRead.model_validate(ps),
+            warning=warning,
+            advanced=True,
+        )
+
+    def sample_journey(self, sample_id: UUID) -> SampleJourneyResponse:
+        """
+        Sample-scoped process progress (Decision #7).
+        Caller must ensure sample access (router checks sample visibility).
+        """
+        if not self.repo.sample_exists(sample_id):
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Sample not found",
+            )
+        assignments = self.repo.list_samples_journey(sample_id)
+        items: List[SampleJourneyStep] = []
+        for a in assignments:
+            proc = a.process
+            if not proc or not proc.active:
+                continue
+            cur = None
+            if a.current_step_id:
+                cur = next((s for s in (proc.steps or []) if s.id == a.current_step_id), None)
+            run_status = None
+            lims_run_id = cur.current_lims_run_id if cur else None
+            if lims_run_id:
+                run = self.repo.get_lims_run(lims_run_id)
+                if run:
+                    run_status = getattr(run.status, 'value', str(run.status))
+            items.append(
+                SampleJourneyStep(
+                    process_id=proc.id,
+                    process_name=proc.name,
+                    process_definition_id=proc.process_definition_id,
+                    process_sample_status=a.status,
+                    current_step_id=a.current_step_id,
+                    current_step_name=cur.name if cur else None,
+                    current_step_kind=getattr(cur, 'step_kind', None) if cur else None,
+                    current_step_sort_order=cur.sort_order if cur else None,
+                    experiment_id=cur.experiment_id if cur else None,
+                    lims_run_id=lims_run_id,
+                    lims_run_status=run_status,
+                )
+            )
+        return SampleJourneyResponse(sample_id=sample_id, processes=items)

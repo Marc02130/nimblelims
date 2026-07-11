@@ -47,11 +47,16 @@ from .entry import (
     Entry,
     EntryFieldDefinition,
     EntryFieldValue,
+    ELNProcessDefinition,
+    ELNProcessDefinitionStep,
     ELNProcess,
     Process,  # alias of ELNProcess
     ELNProcessStep,
+    ELNProcessStepLimsRun,
     ELNProcessSample,
     ProcessSample,  # alias of ELNProcessSample
+    STEP_KINDS,
+    EXECUTION_MODES,
 )
 
 # Additional models referenced via relationships or used in the app

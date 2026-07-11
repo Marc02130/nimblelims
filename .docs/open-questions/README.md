@@ -4,7 +4,7 @@ Decision logs for workstreams that must not proceed until product/architecture q
 
 | Doc | Area |
 |-----|------|
-| [experiments.md](experiments.md) | ELN Processes, Entries, Experiment Runs boundary |
+| [experiments.md](experiments.md) | ELN Processes, Entries, LimsRun boundary |
 
 ## Gate rule
 
@@ -12,3 +12,7 @@ Decision logs for workstreams that must not proceed until product/architecture q
 2. **Do not start** a new phase or major feature until questions that block that scope are **Decided**.
 3. Provisional answers used to ship earlier slices must be labeled **Decided (provisional)** and revisited before expanding scope.
 4. Agents and humans: see root `AGENTS.md` → *Open questions gate*.
+
+## Docs layout
+
+Project documentation is organized under [`.docs/README.md`](../README.md). Checklists track *tasks*; this folder owns *decisions*.

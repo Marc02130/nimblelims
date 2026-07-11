@@ -3,7 +3,7 @@
 **Date:** 2026-07-09  
 **Branch:** refactor/experiments  
 **Reviewer:** CSO / Security  
-**Scope:** Security implications of introducing Processes, ProcessSample, Entries, and related data flows. References: `.docs/experiments.md`, `.docs/processes.md`, `.docs/gap-analysis-process-and-experiment.md`, `.docs/design-review-process-and-experiment.md`, `.docs/requirements/experiment-processes-entries.md`, and existing RLS patterns in the codebase.
+**Scope:** Security implications of introducing Processes, ProcessSample, Entries, and related data flows. References: `.docs/manuals/experiments.md`, `.docs/manuals/processes.md`, `.docs/design/gap-analysis-process-and-experiment.md`, `.docs/requirements/experiment-processes-entries.md`, and existing RLS patterns in the codebase.
 
 ## Executive Summary
 
@@ -137,7 +137,7 @@ Requirements:
 
 - Existing RLS implementations (migrations 0030, 0041, 0042, etc.)
 - `.docs/requirements/experiment-processes-entries.md` (Security section)
-- `.docs/gap-analysis-process-and-experiment.md` (Cross-Cutting section)
+- `.docs/design/gap-analysis-process-and-experiment.md` (Cross-Cutting section)
 - FieldDefinitions security improvements (list-backed fields reduce arbitrary JSONB risk)
 
 ---

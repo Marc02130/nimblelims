@@ -68,22 +68,22 @@
 - Audit trail for sign-off (who/when).
 - User manual generator from template schema (deferred).
 - Phase 2: Entries, write-back, Process UI, workflow actions.
-- Phase 3: Process templates, sample journey across ELN + Runs.
+- Phase 3 (shipped): Process definitions + typed steps (`eln_experiment` \| `lims_run`), instantiate from definition, sample journey `GET /v1/samples/{id}/journey`, soft advance gates.
 
 ---
 
 ## Summary — Files Touched (high level)
 
-**Planning doc:** `.docs/experiment-planning.md` (this file).
+**Planning doc:** `.docs/design/experiment-planning.md` (this file).
 
-**Related:** `.docs/checklist/experiment-checklist.md`, `.docs/navigation.md`, `.docs/api_endpoints.md`, `README.md`, `backend/README.md`, `frontend/README.md`, `.claude/plans/experiment-template-ui.md`, `UAT_Scripts/uat-experiment-templates.md`, `UAT_Scripts/uat-testing-log.md`.
+**Related:** `.docs/checklist/experiment-checklist.md`, `.docs/manuals/navigation.md`, `.docs/manuals/api-endpoints.md`, `README.md`, `backend/README.md`, `frontend/README.md`, `.claude/plans/experiment-template-ui.md`, `UAT_Scripts/uat-experiment-templates.md`, `UAT_Scripts/uat-testing-log.md`.
 
 **Frontend:** `frontend/src/pages/ExperimentTemplatesManagement.tsx`, `ExperimentsManagement.tsx`, `Sidebar.tsx`, `App.tsx`, `MainLayout.tsx`, `apiService.ts` (includes ELN process client methods).
 
 **Backend:** `app/routers/experiments.py`, `app/routers/eln_processes.py`, `app/routers/sop_parse.py`, `app/services/sop_parse_service.py`, `app/services/experiment_service.py`, `app/services/eln_process_service.py`, flexible experiment + ELN process models/migrations (`0047`).
 
 **Dedicated detail docs (recommended reading):**
-- `.docs/processes.md`
-- `.docs/experiments.md` — ELN side (Experiments)
-- `.docs/experiment-runs.md` — LIMS side (Experiment Runs)
+- `.docs/manuals/processes.md`
+- `.docs/manuals/experiments.md` — ELN side (Experiments)
+- `.docs/manuals/lims-runs.md` — LIMS side (Experiment Runs)
 - `.docs/checklist/experiment-checklist.md`

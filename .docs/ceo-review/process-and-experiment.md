@@ -3,7 +3,7 @@
 **Date:** 2026-07-09  
 **Branch:** refactor/experiments  
 **Reviewer:** CEO / Product Strategy  
-**Context:** Review of experiment plans including `.docs/experiments.md`, `.docs/processes.md`, `.docs/gap-analysis-process-and-experiment.md`, `.docs/design-review-process-and-experiment.md`, and the consolidated requirements in `.docs/requirements/experiment-processes-entries.md`.
+**Context:** Review of experiment plans including `.docs/manuals/experiments.md`, `.docs/manuals/processes.md`, `.docs/design/gap-analysis-process-and-experiment.md`, and the consolidated requirements in `.docs/requirements/experiment-processes-entries.md`.
 
 ## Executive Summary
 
@@ -94,4 +94,4 @@ The direction to introduce first-class **Processes** (ordered collections of Exp
 **Bottom line**: This is good product work. The FieldDefs foundation makes it timely. Execute the minimal model + strong visibility + clear mental models first, then expand into reusability and richer orchestration.
 
 ---
-Related: `.docs/requirements/experiment-processes-entries.md`, `.docs/gap-analysis-process-and-experiment.md`
+Related: `.docs/requirements/experiment-processes-entries.md`, `.docs/design/gap-analysis-process-and-experiment.md`

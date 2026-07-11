@@ -13,6 +13,8 @@ import {
   CircularProgress,
   IconButton,
   Tooltip,
+  Chip,
+  Divider,
 } from '@mui/material';
 import { DataGrid, GridColDef, GridActionsCellItem } from '@mui/x-data-grid';
 import EditIcon from '@mui/icons-material/Edit';
@@ -21,6 +23,18 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import SampleForm from '../components/samples/SampleForm';
 import { apiService, addClientFilterIfNeeded } from '../services/apiService';
 import { useUser } from '../contexts/UserContext';
+
+interface JourneyItem {
+  process_id: string;
+  process_name: string;
+  process_sample_status: string;
+  current_step_name?: string;
+  current_step_kind?: string;
+  current_step_sort_order?: number;
+  experiment_id?: string;
+  lims_run_id?: string;
+  lims_run_status?: string;
+}
 
 interface Sample {
   id: string;
@@ -56,6 +70,8 @@ const SamplesManagement: React.FC = () => {
   const [selectedSample, setSelectedSample] = useState<Sample | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [viewMode, setViewMode] = useState(false);
+  const [journey, setJourney] = useState<JourneyItem[]>([]);
+  const [journeyLoading, setJourneyLoading] = useState(false);
   const [lookupData, setLookupData] = useState<{
     sampleTypes: LookupItem[];
     statuses: LookupItem[];
@@ -75,6 +91,29 @@ const SamplesManagement: React.FC = () => {
   useEffect(() => {
     loadData();
   }, [searchParams]);
+
+  useEffect(() => {
+    if (!selectedSample?.id || !showForm) {
+      setJourney([]);
+      return;
+    }
+    let cancelled = false;
+    setJourneyLoading(true);
+    apiService
+      .getSampleJourney(selectedSample.id)
+      .then((res: any) => {
+        if (!cancelled) setJourney(res?.processes ?? []);
+      })
+      .catch(() => {
+        if (!cancelled) setJourney([]);
+      })
+      .finally(() => {
+        if (!cancelled) setJourneyLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedSample?.id, showForm]);
 
   const loadData = async () => {
     try {
@@ -347,6 +386,73 @@ const SamplesManagement: React.FC = () => {
             }}
             readOnly={viewMode}
           />
+          {/* Phase 3: sample-scoped process journey (Decision #7) */}
+          <Divider sx={{ my: 2 }} />
+          <Typography variant="subtitle1" gutterBottom>
+            Process journey
+          </Typography>
+          {journeyLoading ? (
+            <CircularProgress size={20} />
+          ) : journey.length === 0 ? (
+            <Typography variant="body2" color="text.secondary">
+              Not assigned to any ELN process.
+            </Typography>
+          ) : (
+            <Box display="flex" flexDirection="column" gap={1}>
+              {journey.map((j) => (
+                <Box
+                  key={j.process_id}
+                  sx={{
+                    p: 1.5,
+                    border: '1px solid',
+                    borderColor: 'divider',
+                    borderRadius: 1,
+                  }}
+                >
+                  <Box display="flex" alignItems="center" gap={1} flexWrap="wrap" mb={0.5}>
+                    <Button
+                      size="small"
+                      onClick={() => navigate(`/experiments/processes/${j.process_id}`)}
+                    >
+                      {j.process_name}
+                    </Button>
+                    <Chip size="small" label={j.process_sample_status} />
+                    {j.current_step_kind && (
+                      <Chip
+                        size="small"
+                        color={j.current_step_kind === 'lims_run' ? 'secondary' : 'primary'}
+                        label={
+                          j.current_step_kind === 'lims_run' ? 'LIMS Run' : 'ELN Experiment'
+                        }
+                      />
+                    )}
+                  </Box>
+                  <Typography variant="body2" color="text.secondary">
+                    Current step:{' '}
+                    {j.current_step_name
+                      ? `${j.current_step_sort_order ?? ''}: ${j.current_step_name}`
+                      : '—'}
+                    {j.lims_run_status ? ` · Run status: ${j.lims_run_status}` : ''}
+                  </Typography>
+                  <Box display="flex" gap={1} mt={0.5}>
+                    {j.experiment_id && (
+                      <Button
+                        size="small"
+                        onClick={() => navigate(`/experiments/${j.experiment_id}`)}
+                      >
+                        Open experiment
+                      </Button>
+                    )}
+                    {j.lims_run_id && (
+                      <Button size="small" onClick={() => navigate(`/runs/${j.lims_run_id}`)}>
+                        Open run
+                      </Button>
+                    )}
+                  </Box>
+                </Box>
+              ))}
+            </Box>
+          )}
         </DialogContent>
       </Dialog>
     </Box>

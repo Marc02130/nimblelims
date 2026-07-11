@@ -1146,7 +1146,7 @@ class ApiService {
     await this.api.delete(`v1/experiment-templates/${id}`);
   }
 
-  // ELN Processes (Phase 1) — ordered multi-experiment workflows
+  // ELN Processes (Phase 1–3) — definitions + instances + typed steps
   async getElnProcesses(params?: {
     active?: boolean;
     mine?: boolean;
@@ -1166,8 +1166,11 @@ class ApiService {
     name: string;
     description?: string;
     status_id?: string;
+    process_definition_id?: string;
     steps?: Array<{
       experiment_template_id: string;
+      step_kind?: 'eln_experiment' | 'lims_run';
+      execution_mode?: 'eln_experiment' | 'lims_run';
       name?: string;
       sort_order?: number;
     }>;
@@ -1197,6 +1200,8 @@ class ApiService {
 
   async addElnProcessStep(processId: string, data: {
     experiment_template_id: string;
+    step_kind?: 'eln_experiment' | 'lims_run';
+    execution_mode?: 'eln_experiment' | 'lims_run';
     name?: string;
     sort_order?: number;
   }) {
@@ -1214,7 +1219,10 @@ class ApiService {
       name?: string;
       experiment_template_id?: string;
       experiment_id?: string;
+      current_lims_run_id?: string;
       sort_order?: number;
+      step_kind?: string;
+      execution_mode?: string;
     },
   ) {
     const response: AxiosResponse = await this.api.patch(
@@ -1236,16 +1244,26 @@ class ApiService {
     return response.data;
   }
 
-  async instantiateElnProcessStep(
+  /** Start/materialize a step (Experiment or lazy LimsRun). */
+  async startElnProcessStep(
     processId: string,
     stepId: string,
-    data?: { name?: string },
+    data?: { name?: string; force_new?: boolean },
   ) {
     const response: AxiosResponse = await this.api.post(
-      `v1/eln-processes/${processId}/steps/${stepId}/instantiate`,
+      `v1/eln-processes/${processId}/steps/${stepId}/start`,
       data ?? {},
     );
     return response.data;
+  }
+
+  /** @deprecated Prefer startElnProcessStep */
+  async instantiateElnProcessStep(
+    processId: string,
+    stepId: string,
+    data?: { name?: string; force_new?: boolean },
+  ) {
+    return this.startElnProcessStep(processId, stepId, data);
   }
 
   async getElnProcessSamples(
@@ -1290,6 +1308,88 @@ class ApiService {
     const response: AxiosResponse = await this.api.post(
       `v1/eln-processes/${processId}/samples/${sampleId}/advance`,
     );
+    return response.data;
+  }
+
+  // ELN Process Definitions (Phase 3)
+  async getElnProcessDefinitions(params?: {
+    active?: boolean;
+    page?: number;
+    size?: number;
+  }) {
+    const response: AxiosResponse = await this.api.get('v1/eln-process-definitions', {
+      params,
+    });
+    return response.data;
+  }
+
+  async getElnProcessDefinition(id: string) {
+    const response: AxiosResponse = await this.api.get(`v1/eln-process-definitions/${id}`);
+    return response.data;
+  }
+
+  async createElnProcessDefinition(data: {
+    name: string;
+    description?: string;
+    steps?: Array<{
+      experiment_template_id: string;
+      step_kind?: 'eln_experiment' | 'lims_run';
+      execution_mode?: 'eln_experiment' | 'lims_run';
+      name?: string;
+      sort_order?: number;
+    }>;
+  }) {
+    const response: AxiosResponse = await this.api.post('v1/eln-process-definitions', data);
+    return response.data;
+  }
+
+  async updateElnProcessDefinition(
+    id: string,
+    data: { name?: string; description?: string; active?: boolean },
+  ) {
+    const response: AxiosResponse = await this.api.patch(
+      `v1/eln-process-definitions/${id}`,
+      data,
+    );
+    return response.data;
+  }
+
+  async addElnProcessDefinitionStep(
+    definitionId: string,
+    data: {
+      experiment_template_id: string;
+      step_kind?: 'eln_experiment' | 'lims_run';
+      execution_mode?: 'eln_experiment' | 'lims_run';
+      name?: string;
+      sort_order?: number;
+    },
+  ) {
+    const response: AxiosResponse = await this.api.post(
+      `v1/eln-process-definitions/${definitionId}/steps`,
+      data,
+    );
+    return response.data;
+  }
+
+  async instantiateFromElnProcessDefinition(
+    definitionId: string,
+    data?: {
+      name?: string;
+      description?: string;
+      sample_ids?: string[];
+      set_to_first_step?: boolean;
+    },
+  ) {
+    const response: AxiosResponse = await this.api.post(
+      `v1/eln-process-definitions/${definitionId}/instantiate`,
+      data ?? {},
+    );
+    return response.data;
+  }
+
+  /** Sample-scoped process journey (Decision #7) */
+  async getSampleJourney(sampleId: string) {
+    const response: AxiosResponse = await this.api.get(`v1/samples/${sampleId}/journey`);
     return response.data;
   }
 

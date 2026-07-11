@@ -17,7 +17,7 @@ Copyright (c) 2025 Marc Breneiser
 - **Batch Management**: Create and manage batches with container tracking
 - **Container Management**: Container types (admin-managed) and dynamic instance creation
 - **Lists Management**: Configurable lists and entries (admin-editable, full CRUD)
-- **Name Templates**: Configurable entity naming; placeholder resolution: {YY} = str(now.year % 100).zfill(2), {SEQ} = str(seq).zfill(template.seq_padding_digits); sequence start via POST /admin/sequences/{entity_type}/start (see `app/core/name_generation.py`, `.docs/ids-and-configuration.md`)
+- **Name Templates**: Configurable entity naming; placeholder resolution: {YY} = str(now.year % 100).zfill(2), {SEQ} = str(seq).zfill(template.seq_padding_digits); sequence start via POST /admin/sequences/{entity_type}/start (see `app/core/name_generation.py`, `.docs/manuals/ids-and-configuration.md`)
 - **Analyses Management**: CRUD operations for analyses (admin-only)
 - **Analytes Management**: CRUD operations for analytes (admin-only)
 - **Analysis-Analyte Configuration**: Configure validation rules for analytes in analyses (admin-only)
@@ -170,12 +170,11 @@ Copyright (c) 2025 Marc Breneiser
 - `PATCH /v1/experiment-templates/{id}` - Update template (including `active`, `template_definition`)
 - `DELETE /v1/experiment-templates/{id}` - Soft-delete template
 
-#### ELN Processes (requires experiment:manage)
-- `GET/POST /v1/eln-processes` - List / create ordered multi-experiment processes
-- `GET/PATCH/DELETE /v1/eln-processes/{id}` - Detail / update / soft-delete
-- Steps: add, reorder, remove, **instantiate** (create Experiment from step template)
-- Samples: assign, filter by step, advance to next step
-- Distinct from LIMS `/v1/processes` (run sub-checklists). See migration `0047`, checklist `.docs/checklist/experiment-checklist.md`.
+#### ELN Processes (requires experiment:manage) — Phases 1–3
+- Definitions: `GET/POST /v1/eln-process-definitions`, instantiate from definition
+- Instances: `GET/POST /v1/eln-processes`, steps (typed `eln_experiment` \| `lims_run`), samples assign/advance
+- Start step: Experiment or lazy LimsRun; soft advance warnings; journey: `GET /v1/samples/{id}/journey`
+- Distinct from LIMS `/v1/processes` (run checklists). Migrations `0047`–`0051`. Checklist: [`.docs/checklist/experiment-checklist.md`](../.docs/checklist/experiment-checklist.md).
 
 #### SOP parse — AI-assisted template extraction (requires experiment:manage)
 - `POST /v1/sop-parse` - Multipart: `sop_file`, `instrument_file` — returns 202, job id for polling
@@ -403,11 +402,11 @@ The `start.sh` script:
 
 ## Related Documentation
 
-- [API Endpoints Reference](../.docs/api_endpoints.md)
-- [Experiment planning & templates UI](../.docs/experiment-planning.md)
-- [Authentication Implementation](../.docs/backend-auth.md)
-- [Technical Specifications](../.docs/lims_mvp_tech.md)
-- [Accessioning Workflow](../.docs/accessioning_workflow.md)
-- [Container Management](../.docs/containers.md)
-- [Lists System](../.docs/lists.md)
+- [API Endpoints Reference](../.docs/manuals/api-endpoints.md)
+- [Experiment planning & templates UI](../.docs/design/experiment-planning.md)
+- [Authentication Implementation](../.docs/manuals/backend-auth.md)
+- [Technical Specifications](../.docs/design/nimblelims-tech.md)
+- [Accessioning Workflow](../.docs/manuals/accessioning-workflow.md)
+- [Container Management](../.docs/manuals/containers.md)
+- [Lists System](../.docs/manuals/lists.md)
 

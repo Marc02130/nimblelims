@@ -311,7 +311,7 @@ Scientists want to bulk-export `(compound_id, IC50, hill_slope, r_squared, revie
 
 See the dedicated prerequisite document before doing structural work on the two experiment systems:
 
-**[.docs/experiment-rework-prerequisites.md](.docs/experiment-rework-prerequisites.md)**
+**[.docs/checklist/experiment-rework-prerequisites.md](.docs/checklist/experiment-rework-prerequisites.md)**
 
 It contains a prioritized checklist plus details on:
 - The one currently failing flexible experiment test (pagination response shape)
