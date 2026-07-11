@@ -1,10 +1,10 @@
 # Security Review (CSO): SOP → Config via RAG
 
 **Date:** 2026-07-11 (revised: RAG-first)  
-**Branch:** `docker-model`  
+**Branch:** `sop-rag`  
 **Reviewer:** CSO / Security  
 **Idea:** [`.docs/ideas/sop-rag-config.md`](../ideas/sop-rag-config.md)  
-**Tech:** [`.docs/design/docker-model-sop-pipeline.md`](../design/docker-model-sop-pipeline.md)
+**Tech:** [`.docs/design/sop-rag-config.md`](../design/sop-rag-config.md)
 
 ## Executive Summary
 
@@ -136,4 +136,4 @@ RAG/LLM may propose **scientifically wrong** protocol structure. Security cannot
 
 ---
 
-Related: [ceo](../ceo-review/docker-model-sop-pipeline.md), [design-review](../design-review/docker-model-sop-pipeline.md), [tech](../design/docker-model-sop-pipeline.md)
+Related: [ceo](../ceo-review/sop-rag-config.md), [design-review](../design-review/sop-rag-config.md), [tech](../design/sop-rag-config.md)

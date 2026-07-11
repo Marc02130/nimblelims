@@ -1,7 +1,7 @@
 # Idea: SOP → LIMS config via RAG
 
 **Status:** Exploratory + reviewed (RAG-first design)  
-**Branch:** `docker-model`  
+**Branch:** `sop-rag`  
 **Date:** 2026-07-11  
 **Supersedes:** Early “fine-tune Docker model” framing in prior notes
 
@@ -41,10 +41,10 @@ RAG retrieval: **lab catalog** + **client-tagged** confidential SOPs only when a
 
 | Review | Doc |
 |--------|-----|
-| CEO | [../ceo-review/docker-model-sop-pipeline.md](../ceo-review/docker-model-sop-pipeline.md) |
-| Design | [../design-review/docker-model-sop-pipeline.md](../design-review/docker-model-sop-pipeline.md) |
-| Tech | [../design/docker-model-sop-pipeline.md](../design/docker-model-sop-pipeline.md) |
-| Security | [../security-review/docker-model-sop-pipeline.md](../security-review/docker-model-sop-pipeline.md) |
+| CEO | [../ceo-review/sop-rag-config.md](../ceo-review/sop-rag-config.md) |
+| Design | [../design-review/sop-rag-config.md](../design-review/sop-rag-config.md) |
+| Tech | [../design/sop-rag-config.md](../design/sop-rag-config.md) |
+| Security | [../security-review/sop-rag-config.md](../security-review/sop-rag-config.md) |
 
 ## RAG loop (summary)
 

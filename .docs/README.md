@@ -83,10 +83,10 @@ All product and engineering docs live under this directory, organized by purpose
 
 ## Reviews
 
-- **CEO:** [ceo-review/](ceo-review/) — process/experiment, schema evolution, field management, [SOP RAG config](ceo-review/docker-model-sop-pipeline.md)  
-- **Design:** [design-review/](design-review/) — includes [SOP RAG config](design-review/docker-model-sop-pipeline.md)  
-- **Security:** [security-review/](security-review/) — includes [SOP RAG config](security-review/docker-model-sop-pipeline.md)  
-- **Tech (design/):** architecture specs, including [SOP RAG config](design/docker-model-sop-pipeline.md)
+- **CEO:** [ceo-review/](ceo-review/) — process/experiment, schema evolution, field management, [SOP RAG config](ceo-review/sop-rag-config.md)  
+- **Design:** [design-review/](design-review/) — includes [SOP RAG config](design-review/sop-rag-config.md)  
+- **Security:** [security-review/](security-review/) — includes [SOP RAG config](security-review/sop-rag-config.md)  
+- **Tech (design/):** architecture specs, including [SOP RAG config](design/sop-rag-config.md)
 
 ## Ideas
 

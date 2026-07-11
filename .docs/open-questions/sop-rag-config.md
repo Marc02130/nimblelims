@@ -2,8 +2,8 @@
 
 **Status:** Living decision log  
 **Idea:** [`.docs/ideas/sop-rag-config.md`](../ideas/sop-rag-config.md)  
-**Reviews:** [CEO](../ceo-review/docker-model-sop-pipeline.md) · [Design](../design-review/docker-model-sop-pipeline.md) · [Tech](../design/docker-model-sop-pipeline.md) · [Security](../security-review/docker-model-sop-pipeline.md)  
-**Branch (docs):** `docker-model`
+**Reviews:** [CEO](../ceo-review/sop-rag-config.md) · [Design](../design-review/sop-rag-config.md) · [Tech](../design/sop-rag-config.md) · [Security](../security-review/sop-rag-config.md)  
+**Branch (docs):** `sop-rag`
 
 ## Gate rule
 
@@ -138,6 +138,6 @@ RAG v1 assumes one lab per deployment (on-prem or dedicated host). Multi-lab sha
 | Doc | Role |
 |-----|------|
 | [ideas/sop-rag-config.md](../ideas/sop-rag-config.md) | Product idea summary |
-| [design/docker-model-sop-pipeline.md](../design/docker-model-sop-pipeline.md) | Tech / RAG architecture |
+| [design/sop-rag-config.md](../design/sop-rag-config.md) | Tech / RAG architecture |
 | [open-questions/experiments.md](experiments.md) | #7 journey, #9 lab-only edit |
 | [ideas/multi-tenancy.md](../ideas/multi-tenancy.md) | Lab–client vs multi-lab |

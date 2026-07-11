@@ -56,7 +56,7 @@ One deployment is effectively **one laboratory**:
 
 - API isolation summary: [../manuals/api-endpoints.md](../manuals/api-endpoints.md) (Client Data Isolation)
 - Open questions #7 / #9 (sample journey; lab-only data edit): [../open-questions/experiments.md](../open-questions/experiments.md)
-- SOP RAG memory must respect lab-client SOP ownership: [../design/docker-model-sop-pipeline.md](../design/docker-model-sop-pipeline.md) §3.0–3.7
+- SOP RAG memory must respect lab-client SOP ownership: [../design/sop-rag-config.md](../design/sop-rag-config.md) §3.0–3.7
 
 ## Open questions (if ever productized)
 

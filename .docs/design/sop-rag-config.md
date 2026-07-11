@@ -1,7 +1,7 @@
 # Tech Review: SOP → Config via RAG
 
 **Date:** 2026-07-11 (revised: RAG-first architecture)  
-**Branch:** `docker-model`  
+**Branch:** `sop-rag`  
 **Reviewer:** Engineering / Architecture  
 **Status:** Design only — gate [open-questions/sop-rag-config.md](../open-questions/sop-rag-config.md) before implementation  
 **Idea:** [`.docs/ideas/sop-rag-config.md`](../ideas/sop-rag-config.md)
@@ -264,4 +264,4 @@ RAG is the architecture; Docker/Ollama is an optional runtime; fine-tune is opti
 
 ---
 
-Related: [ceo](../ceo-review/docker-model-sop-pipeline.md), [design-review](../design-review/docker-model-sop-pipeline.md), [security](../security-review/docker-model-sop-pipeline.md), [ideas](../ideas/sop-rag-config.md)
+Related: [ceo](../ceo-review/sop-rag-config.md), [design-review](../design-review/sop-rag-config.md), [security](../security-review/sop-rag-config.md), [ideas](../ideas/sop-rag-config.md)

@@ -1,7 +1,7 @@
 # Design Review: SOP → Config via RAG
 
 **Date:** 2026-07-11 (revised: RAG-first)  
-**Branch:** `docker-model`  
+**Branch:** `sop-rag`  
 **Reviewer:** Design / UX  
 **Idea:** [`.docs/ideas/sop-rag-config.md`](../ideas/sop-rag-config.md)
 
@@ -122,4 +122,4 @@ Avoid a standalone “AI” product island.
 
 ---
 
-Related: [ceo](../ceo-review/docker-model-sop-pipeline.md), [tech](../design/docker-model-sop-pipeline.md), [security](../security-review/docker-model-sop-pipeline.md)
+Related: [ceo](../ceo-review/sop-rag-config.md), [tech](../design/sop-rag-config.md), [security](../security-review/sop-rag-config.md)

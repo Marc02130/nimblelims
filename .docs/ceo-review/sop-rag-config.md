@@ -1,7 +1,7 @@
 # CEO Review: SOP → Config via RAG
 
 **Date:** 2026-07-11 (revised: RAG-first)  
-**Branch:** `docker-model`  
+**Branch:** `sop-rag`  
 **Reviewer:** CEO / Product Strategy  
 **Idea:** [`.docs/ideas/sop-rag-config.md`](../ideas/sop-rag-config.md)
 
@@ -95,4 +95,4 @@ Without FieldDefs + process definitions, RAG would dump unstructured JSON. With 
 
 ---
 
-Related: [design](../design/docker-model-sop-pipeline.md), [design-review](../design-review/docker-model-sop-pipeline.md), [security](../security-review/docker-model-sop-pipeline.md)
+Related: [design](../design/sop-rag-config.md), [design-review](../design-review/sop-rag-config.md), [security](../security-review/sop-rag-config.md)
