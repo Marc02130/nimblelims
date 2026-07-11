@@ -11,6 +11,15 @@ Key characteristics:
 
 Processes sit above individual Experiments and provide structure for multi-step experimental work.
 
+### Product rule (Decision #6)
+
+| Entity | How it is defined |
+|--------|-------------------|
+| **Experiment** | **Ad hoc** *or* from an **ExperimentTemplate** |
+| **Process** | **Always defined** — first-class reusable **process definition**; a running process is an **instance** of that definition |
+
+Phase 1–2 shipped ad hoc process create as a provisional MVP. Target model: manage definitions, instantiate instances (snapshot steps at start). See [`.docs/open-questions/experiments.md`](open-questions/experiments.md) Decision #6.
+
 ## Core Concepts
 
 | Concept     | Description                                                                 |

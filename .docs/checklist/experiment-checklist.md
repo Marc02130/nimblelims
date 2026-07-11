@@ -103,13 +103,18 @@ Legacy `experiment_link` via `ExperimentDetail` **coexists** in Phase 1; no forc
 
 ---
 
-## Phase 3 — Templates + cross-system visibility
+## Phase 3 — Process definitions + cross-system visibility
 
-**Gate:** Do not start Phase 3 coding until open questions **#1, #6, #7** (and ideally #8, #10) are **Decided** in [`.docs/open-questions/experiments.md`](../open-questions/experiments.md).
+**Gate:** Do not start Phase 3 coding until open questions **#1, #7** (and ideally #8, #10) are **Decided** in [`.docs/open-questions/experiments.md`](../open-questions/experiments.md).
 
-- [ ] Reusable Process Templates
+**#6 Decided:** Processes are **always defined** (first-class reusable process definitions → instances). Experiments remain ad hoc **or** from ExperimentTemplate. See Decision #6 in the open-questions doc.
+
+- [ ] First-class process definitions (`eln_process_templates` / definitions + ordered steps of experiment templates)
+- [ ] Instantiate process instance from definition (snapshot steps; required definition FK on instance after cutover)
+- [ ] Definition management UI + “Start process from definition” (retire free-form instance-as-primary create)
+- [ ] Migration path for Phase 1–2 ad hoc `eln_processes` rows
 - [ ] Sample journey view across Processes / Experiments / Runs / Batches
-- [ ] Optional link or promotion path between ELN Process steps and LIMS Runs
+- [ ] Optional link or promotion path between ELN Process steps and LIMS Runs (**blocked on #1**)
 - [ ] Advanced reporting / “samples currently in step X”
 
 ---
@@ -150,3 +155,4 @@ Rule: no new phase / major feature until blocking questions for that work are re
 | 2026-07-11 | Phase 2 started: entries 0048, APIs, Process UI, workflow actions |
 | 2026-07-11 | Entry capture UI: EntryCapturePanel on experiment detail |
 | 2026-07-11 | Open questions moved to .docs/open-questions/; Phase 3 gated on Q#1,6,7 |
+| 2026-07-11 | Decision #6: processes always defined (first-class reusable definitions); experiments ad hoc or templated |
