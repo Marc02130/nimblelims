@@ -89,7 +89,10 @@ All product and engineering docs live under this directory, organized by purpose
 
 ## Ideas
 
-Exploratory only: [ideas/model-fine-tune.md](ideas/model-fine-tune.md) (SOP → config via local/fine-tuned models; see reviews above).
+Exploratory only:
+
+- [ideas/model-fine-tune.md](ideas/model-fine-tune.md) — SOP → config via local/fine-tuned models (see reviews above)
+- [ideas/multi-tenancy.md](ideas/multi-tenancy.md) — lab–client isolation vs multi-lab SaaS
 
 ## Agent / contributor rules
 
