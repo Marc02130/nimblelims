@@ -1,5 +1,15 @@
 # NimbleLIMS Development Guide
 
+## Open questions gate
+
+**Do not start a new phase (or a major feature within a phase) until open questions that block that work are resolved.**
+
+- Living decision logs live under [`.docs/open-questions/`](.docs/open-questions/) (e.g. experiments: [`.docs/open-questions/experiments.md`](.docs/open-questions/experiments.md)).
+- Checklists (e.g. [`.docs/checklist/experiment-checklist.md`](.docs/checklist/experiment-checklist.md)) track tasks; **open questions are not owned by the checklist** — they are owned by the open-questions docs.
+- Status labels: **Open** (blocks related work), **Decided (provisional)** (shipped temporary rule), **Decided**, **Deferred**.
+- If coding surfaces a new product/architecture question, add it to the relevant open-questions doc and **pause** if it blocks the current slice.
+- Phases 1–2 of the experiments refactor already shipped with provisional answers; do **not** start Phase 3 until Phase 3 blockers in the experiments open-questions doc are **Decided**.
+
 ## Cursor Cloud specific instructions
 
 ### Architecture Overview

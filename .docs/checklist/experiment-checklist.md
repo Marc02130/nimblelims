@@ -105,6 +105,8 @@ Legacy `experiment_link` via `ExperimentDetail` **coexists** in Phase 1; no forc
 
 ## Phase 3 — Templates + cross-system visibility
 
+**Gate:** Do not start Phase 3 coding until open questions **#1, #6, #7** (and ideally #8, #10) are **Decided** in [`.docs/open-questions/experiments.md`](../open-questions/experiments.md).
+
 - [ ] Reusable Process Templates
 - [ ] Sample journey view across Processes / Experiments / Runs / Batches
 - [ ] Optional link or promotion path between ELN Process steps and LIMS Runs
@@ -112,17 +114,11 @@ Legacy `experiment_link` via `ExperimentDetail` **coexists** in Phase 1; no forc
 
 ---
 
-## Open questions (track until closed)
+## Open questions
 
-| # | Question | Decision |
-|---|----------|----------|
-| 1 | Can a Process reference LIMS Runs? | Open — Phase 1: ELN templates only |
-| 2 | Process status: own list vs derived? | Phase 1: optional `status_id` + seeded `eln_process_status` list |
-| 3 | Can Process override entry config from templates? | Phase 2 |
-| 4 | Write-back conflict rules | Phase 2: last-write-wins; previous value on EntryFieldValue |
-| 5 | Workflow integration depth | Phase 2: create_process / add_step / assign_samples / instantiate_step |
-| 6 | Process Templates timing | Phase 3 (reviews lean defer) |
-| 7 | Progress visibility for non-admins | Phase 2+ UI |
+**Canonical doc (not this checklist):** [`.docs/open-questions/experiments.md`](../open-questions/experiments.md)
+
+Rule: no new phase / major feature until blocking questions for that work are resolved. See `AGENTS.md` → *Open questions gate*.
 
 ---
 
@@ -130,6 +126,7 @@ Legacy `experiment_link` via `ExperimentDetail` **coexists** in Phase 1; no forc
 
 | Doc | Role |
 |-----|------|
+| [open-questions/experiments.md](../open-questions/experiments.md) | **Open questions + decisions** |
 | [requirements/experiment-processes-entries.md](../requirements/experiment-processes-entries.md) | Consolidated requirements |
 | [processes.md](../processes.md) | Process concept |
 | [experiments.md](../experiments.md) | ELN Experiments |
@@ -152,3 +149,4 @@ Legacy `experiment_link` via `ExperimentDetail` **coexists** in Phase 1; no forc
 | 2026-07-11 | Phase 1 polish: docs, apiService, instantiate, status seed, RLS tests |
 | 2026-07-11 | Phase 2 started: entries 0048, APIs, Process UI, workflow actions |
 | 2026-07-11 | Entry capture UI: EntryCapturePanel on experiment detail |
+| 2026-07-11 | Open questions moved to .docs/open-questions/; Phase 3 gated on Q#1,6,7 |
