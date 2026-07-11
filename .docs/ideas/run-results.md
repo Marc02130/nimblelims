@@ -115,11 +115,27 @@ If sample has no test yet:
 - Auto-create tests from sample’s ordered analyses / test battery?  
 - Require explicit test selection in the promote UI?
 
-### 5. Analyte resolution (working assumption)
+### 5. Analyte resolution (working assumption) + aliases
 
-- **Default:** JSONB key matches **analyte name** (normalized) → `analyte_id`.  
-- **Override:** template/run map key → analyte when names differ (`Pb` → Lead).  
-- Non-analyte columns (units, flags, well id) are not promoted unless separately mapped.
+- **Canonical name:** JSONB key matches **`analytes.name`** (normalized) → `analyte_id`.  
+- **Aliases (needed for multi-CRO):** one analyte in the DB can have **many external names** so different CROs/instruments map cleanly without duplicate analytes.
+
+| Example | Resolves to |
+|---------|-------------|
+| `Lead`, `Pb`, `Pb_ug_L` (CRO A / CRO B columns) | analyte **Lead** |
+| `As`, `Arsenic` | analyte **Arsenic** |
+
+**Where aliases live (options to refine):**
+
+| Option | Description |
+|--------|-------------|
+| **A. On analyte** | e.g. `analytes.aliases` text[] / JSONB list of alternate names (global lab catalog) |
+| **B. On promote map** | template/run `result_promotion_config`: `{ "Pb_ug_L": "<analyte_uuid>" }` |
+| **C. Both** | Analyte-level aliases as defaults; template map for one-off CRO quirks |
+
+**First instinct:** **C** — lab maintains aliases on the analyte (reusable across templates); template map only for exceptions.
+
+Non-analyte columns (units, flags, well id) are not promoted unless separately mapped (e.g. into result custom fields).
 
 ### 6. Field mapping surface
 
@@ -208,7 +224,7 @@ If a process step is `lims_run`, promotion might be a step-complete action. Out 
 2. Snapshot vs update-on-repromote?  
 3. Required run status before promote?  
 4. Auto-create missing tests?  
-5. Analyte match: exact name only vs alias map on template?  
+5. Analyte aliases: store on analyte (A), template map only (B), or both (C — preferred)?  
 6. Permissions: same as result entry, or also need run publish?  
 7. Audit / lineage: first-class FKs `lims_run_id` / `lims_run_data_id` vs avoid `custom_attributes` for lineage?  
 8. Env lab vs CRO: same feature both lifecycles?  
