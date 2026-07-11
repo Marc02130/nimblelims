@@ -629,7 +629,7 @@ During sample accessioning:
 2. Sample is linked to container via contents table
 3. Concentration and amount are recorded
 
-**See**: `.docs/accessioning_workflow.md`
+**See**: `.docs/manuals/accessioning-workflow.md`
 
 ### Aliquot/Derivative Creation
 

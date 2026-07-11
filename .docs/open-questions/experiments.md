@@ -216,6 +216,6 @@ Optional (can ship after or alongside):
 ## Related
 
 - Checklist: [`.docs/checklist/experiment-checklist.md`](../checklist/experiment-checklist.md)
-- Processes: [`.docs/processes.md`](../processes.md)
-- Experiments (ELN): [`.docs/experiments.md`](../experiments.md)
-- Runs (LIMS): [`.docs/lims-runs.md`](../lims-runs.md)
+- Processes: [`.docs/manuals/processes.md`](../manuals/processes.md)
+- Experiments (ELN): [`.docs/manuals/experiments.md`](../manuals/experiments.md)
+- Runs (LIMS): [`.docs/manuals/lims-runs.md`](../manuals/lims-runs.md)

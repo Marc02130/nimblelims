@@ -6,14 +6,124 @@ from uuid import UUID
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
 
-from models.entry import ELNProcess, ELNProcessStep, ELNProcessSample
+from models.entry import (
+    ELNProcess,
+    ELNProcessStep,
+    ELNProcessSample,
+    ELNProcessDefinition,
+    ELNProcessDefinitionStep,
+    ELNProcessStepLimsRun,
+)
 from models.experiment import ExperimentTemplate
 from models.sample import Sample
+from models.flexible_experiment import LimsRun
 
 
 class ELNProcessRepository:
     def __init__(self, db: Session) -> None:
         self.db = db
+
+    # ---------- Definitions ----------
+
+    def get_definition(self, definition_id: UUID) -> Optional[ELNProcessDefinition]:
+        return (
+            self.db.query(ELNProcessDefinition)
+            .options(joinedload(ELNProcessDefinition.steps))
+            .filter(ELNProcessDefinition.id == definition_id)
+            .first()
+        )
+
+    def get_definition_by_name(self, name: str) -> Optional[ELNProcessDefinition]:
+        return (
+            self.db.query(ELNProcessDefinition)
+            .filter(ELNProcessDefinition.name == name)
+            .first()
+        )
+
+    def list_definitions(
+        self,
+        active: Optional[bool] = True,
+        page: int = 1,
+        size: int = 10,
+    ) -> Tuple[List[ELNProcessDefinition], int]:
+        q = self.db.query(ELNProcessDefinition)
+        if active is not None:
+            q = q.filter(ELNProcessDefinition.active == active)
+        total = q.count()
+        items = (
+            q.order_by(ELNProcessDefinition.name)
+            .offset((page - 1) * size)
+            .limit(size)
+            .all()
+        )
+        return items, total
+
+    def count_definition_steps(self, definition_id: UUID) -> int:
+        return (
+            self.db.query(func.count(ELNProcessDefinitionStep.id))
+            .filter(ELNProcessDefinitionStep.process_definition_id == definition_id)
+            .scalar()
+            or 0
+        )
+
+    def create_definition(
+        self,
+        name: str,
+        description: Optional[str] = None,
+        active: bool = True,
+        created_by: Optional[UUID] = None,
+        modified_by: Optional[UUID] = None,
+    ) -> ELNProcessDefinition:
+        d = ELNProcessDefinition(
+            name=name,
+            description=description,
+            active=active,
+            created_by=created_by,
+            modified_by=modified_by,
+        )
+        self.db.add(d)
+        self.db.flush()
+        return d
+
+    def update_definition(self, definition: ELNProcessDefinition, **kwargs) -> ELNProcessDefinition:
+        for k, v in kwargs.items():
+            if hasattr(definition, k):
+                setattr(definition, k, v)
+        self.db.flush()
+        return definition
+
+    def create_definition_step(
+        self,
+        process_definition_id: UUID,
+        experiment_template_id: UUID,
+        sort_order: int,
+        step_kind: str = 'eln_experiment',
+        execution_mode: str = 'eln_experiment',
+        name: Optional[str] = None,
+        created_by: Optional[UUID] = None,
+        modified_by: Optional[UUID] = None,
+    ) -> ELNProcessDefinitionStep:
+        s = ELNProcessDefinitionStep(
+            process_definition_id=process_definition_id,
+            experiment_template_id=experiment_template_id,
+            step_kind=step_kind,
+            execution_mode=execution_mode,
+            name=name,
+            sort_order=sort_order,
+            created_by=created_by,
+            modified_by=modified_by,
+        )
+        self.db.add(s)
+        self.db.flush()
+        return s
+
+    def list_definition_steps(self, definition_id: UUID) -> List[ELNProcessDefinitionStep]:
+        return (
+            self.db.query(ELNProcessDefinitionStep)
+            .filter(ELNProcessDefinitionStep.process_definition_id == definition_id)
+            .order_by(ELNProcessDefinitionStep.sort_order)
+            .all()
+        )
 
     # ---------- Process ----------
 
@@ -79,6 +189,7 @@ class ELNProcessRepository:
         description: Optional[str] = None,
         active: bool = True,
         status_id: Optional[UUID] = None,
+        process_definition_id: Optional[UUID] = None,
         created_by: Optional[UUID] = None,
         modified_by: Optional[UUID] = None,
     ) -> ELNProcess:
@@ -87,6 +198,7 @@ class ELNProcessRepository:
             description=description,
             active=active,
             status_id=status_id,
+            process_definition_id=process_definition_id,
             created_by=created_by,
             modified_by=modified_by,
         )
@@ -135,6 +247,9 @@ class ELNProcessRepository:
         sort_order: int,
         name: Optional[str] = None,
         experiment_id: Optional[UUID] = None,
+        step_kind: str = 'eln_experiment',
+        execution_mode: str = 'eln_experiment',
+        current_lims_run_id: Optional[UUID] = None,
         created_by: Optional[UUID] = None,
         modified_by: Optional[UUID] = None,
     ) -> ELNProcessStep:
@@ -142,6 +257,9 @@ class ELNProcessRepository:
             process_id=process_id,
             experiment_template_id=experiment_template_id,
             experiment_id=experiment_id,
+            step_kind=step_kind,
+            execution_mode=execution_mode,
+            current_lims_run_id=current_lims_run_id,
             name=name,
             sort_order=sort_order,
             created_by=created_by,
@@ -150,6 +268,35 @@ class ELNProcessRepository:
         self.db.add(step)
         self.db.flush()
         return step
+
+    def add_step_lims_run_history(
+        self,
+        process_step_id: UUID,
+        lims_run_id: UUID,
+        created_by: Optional[UUID] = None,
+    ) -> ELNProcessStepLimsRun:
+        link = ELNProcessStepLimsRun(
+            process_step_id=process_step_id,
+            lims_run_id=lims_run_id,
+            created_by=created_by,
+        )
+        self.db.add(link)
+        self.db.flush()
+        return link
+
+    def list_samples_journey(self, sample_id: UUID) -> List[ELNProcessSample]:
+        return (
+            self.db.query(ELNProcessSample)
+            .options(
+                joinedload(ELNProcessSample.process).joinedload(ELNProcess.steps),
+            )
+            .filter(ELNProcessSample.sample_id == sample_id)
+            .order_by(ELNProcessSample.assigned_at.desc())
+            .all()
+        )
+
+    def get_lims_run(self, run_id: UUID) -> Optional[LimsRun]:
+        return self.db.query(LimsRun).filter(LimsRun.id == run_id).first()
 
     def update_step(self, step: ELNProcessStep, **kwargs) -> ELNProcessStep:
         for k, v in kwargs.items():

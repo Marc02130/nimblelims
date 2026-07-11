@@ -1725,37 +1725,50 @@ Base path: `/api/v1/experiment-templates`. Requires **`experiment:manage`**.
 
 `template_definition` includes fields such as `experiment_name`, `protocol_steps`, `transfer_steps`, `result_columns`, `plate_layout`, `acceptance_criteria`, `mandatory_review_count`, etc. (see Pydantic schemas in `backend/app/schemas/experiment.py`).
 
-## ELN Processes (Phase 1)
+## ELN Processes (Phase 1–3)
 
 Base path: `/api/v1/eln-processes`. Requires **`experiment:manage`**.
 
-First-class ordered multi-experiment workflows on the **ELN** side. Distinct from LIMS run sub-processes at `/api/v1/processes` and `/api/v1/experiment-runs/{id}/processes`.
+First-class ordered multi-step workflows on the **ELN** side. Distinct from LIMS run checklists at `/api/v1/processes` and `/api/v1/lims-runs/{id}/processes`.
 
-Tables: `eln_processes`, `eln_process_steps`, `eln_process_samples` (migration `0047`). Optional list-driven status via `eln_process_status` list → `status_id`.
+Tables (migrations `0047` + `0051`): `eln_process_definitions`, `eln_process_definition_steps`, `eln_processes`, `eln_process_steps`, `eln_process_samples`, `eln_process_step_lims_runs`. Optional list-driven status via `eln_process_status` list → `status_id`.
 
-**Process CRUD**
-- `GET /eln-processes` — List (`active`, `mine`, `page`, `size`). Returns step/sample counts.
-- `POST /eln-processes` — Create (optional initial `steps` with `experiment_template_id`).
+**Process definitions (Phase 3, Decision #6)** — `/api/v1/eln-process-definitions`, `experiment:manage`
+- `GET /eln-process-definitions` — List (`active`, `page`, `size`).
+- `POST /eln-process-definitions` — Create with ordered typed steps (`step_kind`: `eln_experiment` \| `lims_run`).
+- `GET /eln-process-definitions/{id}` — Detail with steps.
+- `PATCH /eln-process-definitions/{id}` — Update name/description/active.
+- `POST /eln-process-definitions/{id}/steps` — Append definition step.
+- `POST /eln-process-definitions/{id}/instantiate` — Snapshot steps into a process instance (optional `name`, `sample_ids`).
+
+**Process instances**
+- `GET /eln-processes` — List (`active`, `mine`, `page`, `size`). Returns step/sample counts + `process_definition_id`.
+- `POST /eln-processes` — Create: prefer `process_definition_id`; free-form `steps` auto-creates a snapshot definition.
 - `GET /eln-processes/{process_id}` — Detail with steps + sample assignments.
 - `PATCH /eln-processes/{process_id}` — Update name/description/active/status_id.
 - `DELETE /eln-processes/{process_id}` — Soft-delete (`active=false`).
 
-**Steps (ordered template refs)**
+**Steps (typed; Decision #1)**
 - `GET /eln-processes/{process_id}/steps`
-- `POST /eln-processes/{process_id}/steps` — Append or insert at `sort_order`.
+- `POST /eln-processes/{process_id}/steps` — Append/insert; body includes `step_kind` / `execution_mode`.
 - `PATCH /eln-processes/{process_id}/steps/{step_id}`
 - `DELETE /eln-processes/{process_id}/steps/{step_id}` — Compacts sort_order.
 - `POST /eln-processes/{process_id}/steps/reorder` — Body: `{ "step_ids": [uuid, ...] }` (full set).
-- `POST /eln-processes/{process_id}/steps/{step_id}/instantiate` — Create `Experiment` from step template; sets `experiment_id` on the step (400 if already set).
+- `POST /eln-processes/{process_id}/steps/{step_id}/start` (alias `/instantiate`) — Start work item:
+  - `eln_experiment` → create Experiment (+ entries); returns `{ step, experiment_id, warning? }`
+  - `lims_run` → lazy create LimsRun; history in `eln_process_step_lims_runs`; `force_new` for retest
 
 **Samples**
 - `GET /eln-processes/{process_id}/samples` — Optional filters: `current_step_id`, `sample_status`.
 - `POST /eln-processes/{process_id}/samples` — Body: `{ "sample_ids": [...], "set_to_first_step": true }`.
 - `DELETE /eln-processes/{process_id}/samples/{sample_id}`
 - `PATCH /eln-processes/{process_id}/samples/{sample_id}/step` — Set `step_id` / `status`.
-- `POST /eln-processes/{process_id}/samples/{sample_id}/advance` — Move to next step by sort_order; complete on last step.
+- `POST /eln-processes/{process_id}/samples/{sample_id}/advance` — Soft gate: returns `{ sample, warning?, advanced }` (warns if lims_run step incomplete; still advances).
 
-**Coexistence:** Legacy `ExperimentDetail` `experiment_link` lineage remains supported; no forced migration in Phase 1.
+**Sample journey (Phase 3, Decision #7)** — any user who can read the sample
+- `GET /samples/{sample_id}/journey` — Process progress for that sample (process name, current step kind, experiment/run links). Not gated on `experiment:manage`.
+
+**Coexistence:** Legacy `ExperimentDetail` `experiment_link` lineage remains supported.
 
 **Checklist:** `.docs/checklist/experiment-checklist.md`.
 
@@ -1769,7 +1782,7 @@ Base path: `/api/v1/sop-parse`. Requires **`experiment:manage`**. Used to upload
 
 **Configuration:** Set environment variable **`ANTHROPIC_API_KEY`** on the backend. If unset, extraction fails with a clear error on the job record.
 
-**RLS:** `sop_parse_jobs` and related experiment-engine tables use client-scoped RLS (see migrations 0041/0042 and `.docs/experiment-planning.md`).
+**RLS:** `sop_parse_jobs` and related experiment-engine tables use client-scoped RLS (see migrations 0041/0042 and `.docs/design/experiment-planning.md`).
 
 ## Permissions Reference
 
@@ -1809,7 +1822,7 @@ Endpoints require specific permissions. The system currently has 17 permissions:
 
 **Note**: The code references `test:configure` permission in analyses, analytes, and test batteries endpoints, but this permission is not currently in the database. These endpoints use `require_any_permission(["config:edit", "test:configure"])`, which effectively requires `config:edit` permission.
 
-See `.docs/lims_mvp_prd.md` for complete permission list.
+See [nimblelims-prd.md](../requirements/nimblelims-prd.md) for product requirements; permission list is maintained with seed data and this API reference.
 
 ## Help Endpoints
 
@@ -2169,7 +2182,7 @@ Authorization: Bearer <admin_token>
 
 ## Admin - Name Templates
 
-Name templates define how auto-generated entity names (e.g. sample, project, batch) are built. Placeholders: `{SEQ}` (padded by `seq_padding_digits`; **scoped by “name without SEQ”** so e.g. template `{PROJECT}-{SEQ}` gives per-project sequences—first sample in each project is `…-01`), `{YYYY}`, `{YY}`, `{MM}`, `{DD}`, `{YYYYMMDD}`, `{CLIENT}` / `{CLIABV}` (client abbreviation when set, else client name), `{BATCH}` (batch name), `{PROJECT}` (project name). See `backend/app/core/name_generation.py` and `.docs/ids-and-configuration.md`.
+Name templates define how auto-generated entity names (e.g. sample, project, batch) are built. Placeholders: `{SEQ}` (padded by `seq_padding_digits`; **scoped by “name without SEQ”** so e.g. template `{PROJECT}-{SEQ}` gives per-project sequences—first sample in each project is `…-01`), `{YYYY}`, `{YY}`, `{MM}`, `{DD}`, `{YYYYMMDD}`, `{CLIENT}` / `{CLIABV}` (client abbreviation when set, else client name), `{BATCH}` (batch name), `{PROJECT}` (project name). See `backend/app/core/name_generation.py` and `.docs/manuals/ids-and-configuration.md`.
 
 ### GET /admin/name-templates
 List name templates with filtering and pagination.

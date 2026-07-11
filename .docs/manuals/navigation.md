@@ -653,4 +653,4 @@ Both components work together:
 - `backend/app/routers/experiments.py` — list_experiments: `mine` query param, current_user, created_by passed to service.
 - `backend/app/services/experiment_service.py` — list_experiments accepts created_by.
 - `backend/app/repositories/experiment_repository.py` — list_experiments filters by created_by when provided.
-- `.docs/navigation.md` — This file: full documentation of Experiments accordion, Lab Mgmt without Experiments, routes, permissions, role table, back button, and summary.
+- `.docs/manuals/navigation.md` — This file: full documentation of Experiments accordion, Lab Mgmt without Experiments, routes, permissions, role table, back button, and summary.

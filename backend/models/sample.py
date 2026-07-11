@@ -51,7 +51,7 @@ class Sample(BaseModel):
     # Phase 4: After validation, custom_attributes becomes legacy-only (unstructured notes only)
     #          or can be dropped in a later migration.
     # Use FieldDefinition to drive new fields; old JSONB access should be flagged deprecated.
-    # See .docs/migration-strategy-schema-evolution.md for detailed backfill/validation/rollback.
+    # See .docs/design/migration-strategy-schema-evolution.md for detailed backfill/validation/rollback.
 
     # Deprecation plan for custom_attributes (hard cutover):
     # - During transition: keep the column but stop writing new modeled fields to it.

@@ -574,7 +574,7 @@ Created → In Process → Completed
 - **Mandatory review / activation** — Transfer steps can require sign-off before the template is treated as ready; the UI blocks **active** until sign-offs are completed (per-step confirmation, no “confirm all”). After sign-off, managers can activate the template.
 - **All Experiments** — `/experiments`, `/experiments/:id`: list (filters, optional **My Experiments** via `?mine=true`), detail tabs (Overview, Sample Executions, Details/Steps, Lineage, Linked Processes). Sample detail shows experiments the sample participated in; experiment detail links back to samples.
 
-**API (summary)** — see `.docs/api_endpoints.md` for detail:
+**API (summary)** — see `.docs/manuals/api-endpoints.md` for detail:
 - `/v1/experiment-templates` — CRUD (requires `experiment:manage`).
 - `/v1/experiments` — CRUD plus link sample, detail steps, link experiments, lineage, etc.
 - `/v1/sop-parse` — multipart upload, job status, apply (requires `experiment:manage`).
@@ -584,7 +584,7 @@ Created → In Process → Completed
 2. A **workflow template** (Admin → Workflow Templates) can include experiment actions so a single “Apply Template” run creates or updates experiments and links samples using shared context (`experiment_id`, `execution_id` after `link_sample_to_experiment`). See [Workflow Templates (Apply Template)](#workflow-templates-apply-template).
 3. **RLS**: Experiment-engine tables (including `sop_parse_jobs`, `experiment_templates`, `experiments`, …) use client-scoped policies where applicable; admins see all.
 
-**Further reading**: `.docs/experiment-planning.md`, `.docs/navigation.md`.
+**Further reading**: `.docs/design/experiment-planning.md`, `.docs/manuals/navigation.md`.
 
 ---
 

@@ -51,7 +51,7 @@ It is **not** the primary home for large-scale result data analysis or dose-resp
 
 ## Processes
 
-See the dedicated document [`.docs/processes.md`](processes.md) for full details.
+See the dedicated document [`.docs/manuals/processes.md`](processes.md) for full details.
 
 **Summary**: Processes are ordered collections of Experiments. They provide structure for multi-step work where sample flow and sequencing matter. A future UI will support creating processes, assigning samples to them, and queuing samples through the experiments that make up the process.
 
@@ -98,7 +98,7 @@ For ELN-style Experiments, the list-based approach gives the right balance of st
 - **Templates**: Reusable blueprints. One template can be used by many Experiments.
 - **Workflows**: Full support (`create_experiment`, `create_experiment_from_template`, `link_sample_to_experiment`, `add_experiment_detail_step`, `link_experiments`, `update_experiment_status`).
 - **Samples**: Bidirectional linking via executions. Sample detail pages show "Participated in these Experiments".
-- **Experiment Runs (LIMS)**: Separate concept. See `.docs/experiment-runs.md`. Not the same as an ELN Experiment.
+- **Experiment Runs (LIMS)**: Separate concept. See `.docs/manuals/lims-runs.md`. Not the same as an ELN Experiment.
 
 ## UI
 
@@ -128,13 +128,13 @@ For ELN-style Experiments, the list-based approach gives the right balance of st
 ---
 
 **Related Documents**
-- `.docs/processes.md`
-- `.docs/design-review-process-and-experiment.md`
-- `.docs/gap-analysis-process-and-experiment.md`
-- `.docs/experiment-runs.md`
-- `.docs/experiment-planning.md`
-- `.docs/experiment-rework-prerequisites.md`
-- `.docs/workflow-accessioning-to-reporting.md` (workflow actions)
+- `.docs/manuals/processes.md`
+- `.docs/design/process-and-experiment-structural.md`
+- `.docs/design/gap-analysis-process-and-experiment.md`
+- `.docs/manuals/lims-runs.md`
+- `.docs/design/experiment-planning.md`
+- `.docs/checklist/experiment-rework-prerequisites.md`
+- `.docs/manuals/workflow-accessioning-to-reporting.md` (workflow actions)
 
 ---
 

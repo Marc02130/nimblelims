@@ -264,19 +264,66 @@ class EntryFieldValue(Base):
 #     #   - The Entry can reference this ProcessStep via process_step_id.
 #
 # ---------------------------------------------------------------------------
-# ELN Process (Phase 1)
+# ELN Process definitions + instances (Phase 1–3)
 #
-# Distinct from LIMS experiment_processes / process_steps (run sub-checklists).
-# Tables: eln_processes, eln_process_steps, eln_process_samples
-# API: /v1/eln-processes
+# Distinct from lims_run_checklists (checklist inside a LimsRun).
+# Decision #6: processes are always defined → instance from definition.
+# Decision #1: typed steps eln_experiment | lims_run.
 # ---------------------------------------------------------------------------
+
+STEP_KINDS = frozenset({'eln_experiment', 'lims_run'})
+EXECUTION_MODES = frozenset({'eln_experiment', 'lims_run'})
+
+
+class ELNProcessDefinition(BaseModel):
+    """Reusable multi-step protocol (first-class definition)."""
+
+    __tablename__ = 'eln_process_definitions'
+
+    # name, description, active, audit from BaseModel
+    steps = relationship(
+        "ELNProcessDefinitionStep",
+        back_populates="process_definition",
+        order_by="ELNProcessDefinitionStep.sort_order",
+        cascade="all, delete-orphan",
+    )
+    instances = relationship("ELNProcess", back_populates="process_definition")
+
+
+class ELNProcessDefinitionStep(Base):
+    """One ordered step in a process definition (typed)."""
+
+    __tablename__ = 'eln_process_definition_steps'
+
+    id = Column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    process_definition_id = Column(
+        PostgresUUID(as_uuid=True),
+        ForeignKey('eln_process_definitions.id', ondelete='CASCADE'),
+        nullable=False,
+        index=True,
+    )
+    step_kind = Column(String(32), nullable=False, server_default='eln_experiment', default='eln_experiment')
+    execution_mode = Column(String(32), nullable=False, server_default='eln_experiment', default='eln_experiment')
+    experiment_template_id = Column(
+        PostgresUUID(as_uuid=True),
+        ForeignKey('experiment_templates.id'),
+        nullable=False,
+        index=True,
+    )
+    name = Column(String(255), nullable=True)
+    sort_order = Column(Integer, nullable=False, default=0)
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+    created_by = Column(PostgresUUID(as_uuid=True), ForeignKey('users.id'), nullable=True)
+    modified_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
+    modified_by = Column(PostgresUUID(as_uuid=True), ForeignKey('users.id'), nullable=True)
+
+    process_definition = relationship("ELNProcessDefinition", back_populates="steps")
+    experiment_template = relationship("ExperimentTemplate")
+
 
 class ELNProcess(BaseModel):
     """
-    Ordered composition of experiment templates (ELN multi-step workflow).
-
-    Inherits BaseModel: id, name, description, active, audit fields.
-    Name uniqueness is global (same pattern as Experiment / ExperimentTemplate).
+    Process *instance* — one execution of a process definition.
     """
     __tablename__ = 'eln_processes'
 
@@ -286,8 +333,15 @@ class ELNProcess(BaseModel):
         nullable=True,
         index=True,
     )
+    process_definition_id = Column(
+        PostgresUUID(as_uuid=True),
+        ForeignKey('eln_process_definitions.id'),
+        nullable=True,
+        index=True,
+    )
 
     status = relationship("ListEntry", foreign_keys=[status_id])
+    process_definition = relationship("ELNProcessDefinition", back_populates="instances")
     steps = relationship(
         "ELNProcessStep",
         back_populates="process",
@@ -301,14 +355,12 @@ class ELNProcess(BaseModel):
     )
 
 
-# Backward-compatible alias used by earlier sketches / imports
 Process = ELNProcess
 
 
 class ELNProcessStep(Base):
     """
-    One ordered step in an ELN Process.
-    References an ExperimentTemplate; optional experiment_id when instantiated.
+    One ordered step in a process instance (snapshot from definition).
     """
     __tablename__ = 'eln_process_steps'
 
@@ -319,20 +371,27 @@ class ELNProcessStep(Base):
         nullable=False,
         index=True,
     )
+    step_kind = Column(String(32), nullable=False, server_default='eln_experiment', default='eln_experiment')
+    execution_mode = Column(String(32), nullable=False, server_default='eln_experiment', default='eln_experiment')
     experiment_template_id = Column(
         PostgresUUID(as_uuid=True),
         ForeignKey('experiment_templates.id'),
         nullable=False,
         index=True,
     )
-    # Optional: experiment instance created when this step is executed
     experiment_id = Column(
         PostgresUUID(as_uuid=True),
         ForeignKey('experiments.id'),
         nullable=True,
         index=True,
     )
-    name = Column(String(255), nullable=True)  # optional label override
+    current_lims_run_id = Column(
+        PostgresUUID(as_uuid=True),
+        ForeignKey('lims_runs.id', ondelete='SET NULL'),
+        nullable=True,
+        index=True,
+    )
+    name = Column(String(255), nullable=True)
     sort_order = Column(Integer, nullable=False, default=0)
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
     created_by = Column(PostgresUUID(as_uuid=True), ForeignKey('users.id'), nullable=True)
@@ -342,7 +401,38 @@ class ELNProcessStep(Base):
     process = relationship("ELNProcess", back_populates="steps")
     experiment_template = relationship("ExperimentTemplate")
     experiment = relationship("Experiment")
+    current_lims_run = relationship("LimsRun", foreign_keys=[current_lims_run_id])
     entries = relationship("Entry", back_populates="process_step")
+    lims_run_links = relationship(
+        "ELNProcessStepLimsRun",
+        back_populates="process_step",
+        cascade="all, delete-orphan",
+    )
+
+
+class ELNProcessStepLimsRun(Base):
+    """History of LimsRuns attached to a process step instance."""
+
+    __tablename__ = 'eln_process_step_lims_runs'
+
+    id = Column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    process_step_id = Column(
+        PostgresUUID(as_uuid=True),
+        ForeignKey('eln_process_steps.id', ondelete='CASCADE'),
+        nullable=False,
+        index=True,
+    )
+    lims_run_id = Column(
+        PostgresUUID(as_uuid=True),
+        ForeignKey('lims_runs.id', ondelete='CASCADE'),
+        nullable=False,
+        index=True,
+    )
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+    created_by = Column(PostgresUUID(as_uuid=True), ForeignKey('users.id'), nullable=True)
+
+    process_step = relationship("ELNProcessStep", back_populates="lims_run_links")
+    lims_run = relationship("LimsRun")
 
 
 class ELNProcessSample(Base):

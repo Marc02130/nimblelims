@@ -18,7 +18,7 @@ Processes sit above individual Experiments and provide structure for multi-step 
 | **Experiment** | **Ad hoc** *or* from an **ExperimentTemplate** |
 | **Process** | **Always defined** — first-class reusable **process definition**; a running process is an **instance** of that definition |
 
-Phase 1–2 shipped ad hoc process create as a provisional MVP. Target model: manage definitions, instantiate instances (snapshot steps at start). See [`.docs/open-questions/experiments.md`](open-questions/experiments.md) Decision #6.
+Phase 1–2 shipped ad hoc process create as a provisional MVP; Phase 3 made definitions first-class. See [open-questions/experiments.md](../open-questions/experiments.md) Decision #6.
 
 ## Core Concepts
 
@@ -34,26 +34,27 @@ Phase 1–2 shipped ad hoc process create as a provisional MVP. Target model: ma
 - A **Process** is the container and sequencer for multiple related Experiments.
 - The same Experiment Template can potentially be used in multiple Processes.
 
-## Current Implementation (Phase 1 — backend)
+## Current Implementation (Phase 1–3)
 
-ELN Processes are first-class (distinct from LIMS run sub-processes).
+ELN Processes are first-class (distinct from LIMS run checklists). Definitions → instances (Decision #6); typed steps (Decision #1); sample journey (Decision #7).
 
 | Layer | Detail |
 |-------|--------|
-| Tables | `eln_processes`, `eln_process_steps`, `eln_process_samples` (migration `0047`) |
-| API | `/v1/eln-processes` (CRUD, steps, sample assign/advance) |
-| Permission | `experiment:manage` |
-| Checklist | [`.docs/checklist/experiment-checklist.md`](checklist/experiment-checklist.md) |
+| Tables | Definitions: `eln_process_definitions`, `eln_process_definition_steps`. Instances: `eln_processes`, `eln_process_steps`, `eln_process_samples`, `eln_process_step_lims_runs` (migrations `0047` + `0051`) |
+| API | `/v1/eln-process-definitions`, `/v1/eln-processes`, `GET /v1/samples/{id}/journey` |
+| Step kinds | `eln_experiment` (creates Experiment) · `lims_run` (lazy LimsRun + history; soft advance gates) |
+| UI | `/experiments/processes` — Instances + Definitions tabs; start step; sample dialog journey panel |
+| Permission | Manage: `experiment:manage`. Journey: sample visibility (RLS) |
+| Checklist | [`.docs/checklist/experiment-checklist.md`](../checklist/experiment-checklist.md) |
 
-**Naming:** ELN uses `eln_*` prefixes and `/v1/eln-processes`. LIMS run checklists remain at `/v1/lims-runs/{id}/processes` and `/v1/processes/{id}` (tables `experiment_processes` / `process_steps`).
+**Naming:** ELN uses `eln_*` prefixes and `/v1/eln-processes`. LIMS run checklists remain at `/v1/lims-runs/{id}/processes` and `/v1/processes/{id}` (tables `lims_run_checklists` / related).
 
-**Still informal / legacy:**
+**Legacy coexistence:**
 
-- `ExperimentDetail` with `detail_type = "experiment_link"` still exists and **coexists** with ELN Processes (no forced migration in Phase 1).
-- No dedicated Process UI yet (Phase 2).
-- Entries / write-back are Phase 2.
+- `ExperimentDetail` with `detail_type = "experiment_link"` still **coexists** with ELN Processes.
+- Phase 1–2 ad hoc instances were backfilled to snapshot definitions in `0051`.
 
-See [`.docs/experiments.md`](experiments.md) for `experiment_link` lineage and [checklist](checklist/experiment-checklist.md) for remaining work.
+See [experiments.md](experiments.md) for `experiment_link` lineage and [checklist](../checklist/experiment-checklist.md) for remaining work.
 
 ## Target Design
 
@@ -128,10 +129,10 @@ Current lineage via `experiment_link` details may be superseded or augmented by 
 
 **Related Documents**
 
-- [`.docs/design-review-process-and-experiment.md`](design-review-process-and-experiment.md)
-- [`.docs/gap-analysis-process-and-experiment.md`](gap-analysis-process-and-experiment.md)
-- [`.docs/experiments.md`](experiments.md)
-- [`.docs/lims-runs.md`](lims-runs.md)
-- [`.docs/experiment-planning.md`](experiment-planning.md)
-- [`.docs/experiment-rework-prerequisites.md`](experiment-rework-prerequisites.md)
-- [`.docs/workflow-accessioning-to-reporting.md`](workflow-accessioning-to-reporting.md) (for contrast with Workflow Templates)
+- [`.docs/design/process-and-experiment-structural.md`](../design/process-and-experiment-structural.md)
+- [`.docs/design/gap-analysis-process-and-experiment.md`](../design/gap-analysis-process-and-experiment.md)
+- [experiments.md](experiments.md)
+- [`.docs/manuals/lims-runs.md`](lims-runs.md)
+- [`.docs/design/experiment-planning.md`](../design/experiment-planning.md)
+- [`.docs/checklist/experiment-rework-prerequisites.md`](../checklist/experiment-rework-prerequisites.md)
+- [`.docs/manuals/workflow-accessioning-to-reporting.md`](workflow-accessioning-to-reporting.md) (for contrast with Workflow Templates)
