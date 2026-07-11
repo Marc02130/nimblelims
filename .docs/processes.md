@@ -34,7 +34,7 @@ ELN Processes are first-class (distinct from LIMS run sub-processes).
 | Tables | `eln_processes`, `eln_process_steps`, `eln_process_samples` (migration `0047`) |
 | API | `/v1/eln-processes` (CRUD, steps, sample assign/advance) |
 | Permission | `experiment:manage` |
-| Checklist | [`.docs/experiments/checklist.md`](experiments/checklist.md) |
+| Checklist | [`.docs/checklist/experiment-checklist.md`](checklist/experiment-checklist.md) |
 
 **Naming:** ELN uses `eln_*` prefixes and `/v1/eln-processes`. LIMS run checklists remain at `/v1/experiment-runs/{id}/processes` and `/v1/processes/{id}` (tables `experiment_processes` / `process_steps`).
 
@@ -44,7 +44,7 @@ ELN Processes are first-class (distinct from LIMS run sub-processes).
 - No dedicated Process UI yet (Phase 2).
 - Entries / write-back are Phase 2.
 
-See [`.docs/experiments.md`](experiments.md) for `experiment_link` lineage and [checklist](experiments/checklist.md) for remaining work.
+See [`.docs/experiments.md`](experiments.md) for `experiment_link` lineage and [checklist](checklist/experiment-checklist.md) for remaining work.
 
 ## Target Design
 
