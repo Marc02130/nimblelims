@@ -114,7 +114,7 @@ class DoseResponseSummary(BaseModel):
 
 class ExclusionRead(BaseModel):
     id:                 uuid.UUID
-    experiment_data_id: uuid.UUID
+    lims_run_data_id: uuid.UUID
     excluded_by:        uuid.UUID
     excluded_at:        datetime
     reason:             Optional[str] = None

@@ -31,7 +31,7 @@ import ExperimentsManagement from './pages/ExperimentsManagement';
 import ProcessesManagement from './pages/ProcessesManagement';
 import ExperimentTemplatesManagement from './pages/ExperimentTemplatesManagement';
 import RunsManagement from './pages/RunsManagement';
-import ExperimentRunDetail from './pages/ExperimentRunDetail';
+import LimsRunDetail from './pages/LimsRunDetail';
 import CurveCurator from './pages/DoseResponse/CurveCurator';
 import HelpPage from './pages/HelpPage';
 import { useUser } from './contexts/UserContext';
@@ -253,7 +253,7 @@ function AppRoutes() {
           path="/runs/:runId"
           element={
             hasPermission('experiment:manage') ? (
-              <ExperimentRunDetail />
+              <LimsRunDetail />
             ) : (
               <Navigate to="/dashboard" replace />
             )

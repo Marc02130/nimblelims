@@ -27,7 +27,7 @@ class ExperimentProcessRepository:
         created_by: Optional[uuid.UUID] = None,
     ) -> ExperimentProcess:
         process = ExperimentProcess(
-            experiment_run_id=run_id,
+            lims_run_id=run_id,
             name=name,
             description=description,
             sort_order=sort_order,
@@ -46,7 +46,7 @@ class ExperimentProcessRepository:
         return (
             self.db.query(ExperimentProcess)
             .options(selectinload(ExperimentProcess.steps))
-            .filter(ExperimentProcess.experiment_run_id == run_id)
+            .filter(ExperimentProcess.lims_run_id == run_id)
             .order_by(ExperimentProcess.sort_order)
             .all()
         )

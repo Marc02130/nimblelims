@@ -3,7 +3,7 @@ ELN Processes API — /api/v1/eln-processes
 
 Phase 1: process CRUD, ordered steps (template refs), sample assignment + advance.
 
-Distinct from LIMS routes under /v1/processes (experiment run sub-processes).
+Distinct from LIMS routes under /v1/processes (LIMS run sub-processes).
 """
 from typing import Optional, List
 from uuid import UUID

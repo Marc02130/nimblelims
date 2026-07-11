@@ -68,7 +68,7 @@ const statusLabel = (s: string) => {
   return s.charAt(0).toUpperCase() + s.slice(1);
 };
 
-const ExperimentRunDetail: React.FC = () => {
+const LimsRunDetail: React.FC = () => {
   const navigate = useNavigate();
   const { runId } = useParams<{ runId: string }>();
   const [run, setRun] = useState<RunDetail | null>(null);
@@ -89,7 +89,7 @@ const ExperimentRunDetail: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
-      const data = await apiService.getExperimentRun(runId);
+      const data = await apiService.getLimsRun(runId);
       setRun(data);
     } catch (err: any) {
       setError(apiErrorMsg(err, 'Failed to load run'));
@@ -102,7 +102,7 @@ const ExperimentRunDetail: React.FC = () => {
     if (!runId) return;
     setDataLoading(true);
     try {
-      const res = await apiService.getExperimentRunData(runId, { page: 1, size: 200 });
+      const res = await apiService.getLimsRunData(runId, { page: 1, size: 200 });
       setDataRows(res?.rows ?? []);
     } catch {
       // non-fatal
@@ -119,12 +119,12 @@ const ExperimentRunDetail: React.FC = () => {
     if (!runId) return;
     setTransitioning(true);
     try {
-      if (action === 'order') await apiService.orderExperimentRun(runId);
-      else if (action === 'start') await apiService.startExperimentRun(runId);
+      if (action === 'order') await apiService.orderLimsRun(runId);
+      else if (action === 'start') await apiService.startLimsRun(runId);
       else if (action === 'results-received') await apiService.markResultsReceived(runId);
-      else if (action === 'review') await apiService.reviewExperimentRun(runId);
-      else if (action === 'publish') await apiService.publishExperimentRun(runId);
-      else if (action === 'cancel') await apiService.cancelExperimentRun(runId);
+      else if (action === 'review') await apiService.reviewLimsRun(runId);
+      else if (action === 'publish') await apiService.publishLimsRun(runId);
+      else if (action === 'cancel') await apiService.cancelLimsRun(runId);
       await loadRun();
     } catch (err: any) {
       setError(apiErrorMsg(err, `Failed to ${action} run`));
@@ -331,4 +331,4 @@ const ExperimentRunDetail: React.FC = () => {
   );
 };
 
-export default ExperimentRunDetail;
+export default LimsRunDetail;

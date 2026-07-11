@@ -45,7 +45,7 @@ ELN Processes are first-class (distinct from LIMS run sub-processes).
 | Permission | `experiment:manage` |
 | Checklist | [`.docs/checklist/experiment-checklist.md`](checklist/experiment-checklist.md) |
 
-**Naming:** ELN uses `eln_*` prefixes and `/v1/eln-processes`. LIMS run checklists remain at `/v1/experiment-runs/{id}/processes` and `/v1/processes/{id}` (tables `experiment_processes` / `process_steps`).
+**Naming:** ELN uses `eln_*` prefixes and `/v1/eln-processes`. LIMS run checklists remain at `/v1/lims-runs/{id}/processes` and `/v1/processes/{id}` (tables `experiment_processes` / `process_steps`).
 
 **Still informal / legacy:**
 
@@ -97,7 +97,7 @@ Current lineage via `experiment_link` details may be superseded or augmented by 
 ## Relationship to Other Concepts
 
 - **Experiments**: Building blocks. A Process is made of Experiments.
-- **Experiment Runs (LIMS)**: Kept separate. Processes are part of the ELN / experimental workflow layer.
+- **LIMS Runs (LIMS)**: Kept separate. Processes are part of the ELN / experimental workflow layer.
 - **Workflow Templates**: Different concern. Workflow templates are general automation sequences. Processes are specifically about sequencing Experiments and moving samples through them.
 - **Batches**: Operational grouping for testing/results. Processes are experimental workflow constructs.
 - **Samples**: Assigned to processes; can flow through multiple experiments.
@@ -113,12 +113,12 @@ Current lineage via `experiment_link` details may be superseded or augmented by 
 
 - Make Processes first-class so that complex, ordered experimental work can be modeled explicitly.
 - Provide clear UI and backend support for sample assignment and progression through a process.
-- Keep Processes in the ELN domain (distinct from LIMS Experiment Runs).
+- Keep Processes in the ELN domain (distinct from LIMS LIMS Runs).
 - Allow flexibility: some labs may use simple single-experiment workflows; others will need rich multi-step processes.
 
 ## Open Questions
 
-- Should Processes be able to contain both ELN Experiments and references to Experiment Runs?
+- Should Processes be able to contain both ELN Experiments and references to LIMS Runs?
 - How should process-level status aggregate from the individual experiments/steps?
 - Do we need versioning or templating of Processes themselves (reusable process definitions)?
 - How do process steps interact with the new "Entries" model inside individual Experiments?
@@ -131,7 +131,7 @@ Current lineage via `experiment_link` details may be superseded or augmented by 
 - [`.docs/design-review-process-and-experiment.md`](design-review-process-and-experiment.md)
 - [`.docs/gap-analysis-process-and-experiment.md`](gap-analysis-process-and-experiment.md)
 - [`.docs/experiments.md`](experiments.md)
-- [`.docs/experiment-runs.md`](experiment-runs.md)
+- [`.docs/lims-runs.md`](lims-runs.md)
 - [`.docs/experiment-planning.md`](experiment-planning.md)
 - [`.docs/experiment-rework-prerequisites.md`](experiment-rework-prerequisites.md)
 - [`.docs/workflow-accessioning-to-reporting.md`](workflow-accessioning-to-reporting.md) (for contrast with Workflow Templates)

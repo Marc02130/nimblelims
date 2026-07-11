@@ -56,7 +56,7 @@ class ExperimentProcessRead(BaseModel):
     model_config = {"from_attributes": True}
 
     id: uuid.UUID
-    experiment_run_id: uuid.UUID
+    lims_run_id: uuid.UUID
     name: str
     description: Optional[str]
     sort_order: int

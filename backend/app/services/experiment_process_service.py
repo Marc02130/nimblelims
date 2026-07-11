@@ -21,7 +21,7 @@ from app.repositories.experiment_process_repository import (
     ExperimentProcessRepository,
     ProcessStepRepository,
 )
-from app.repositories.flexible_experiment_repository import ExperimentRunRepository
+from app.repositories.flexible_experiment_repository import LimsRunRepository
 from app.schemas.experiment_process import ExperimentProcessCreate
 from models.experiment_process import (
     ExperimentProcess,
@@ -44,7 +44,7 @@ class ExperimentProcessService:
         self.current_user = current_user
         self.process_repo = ExperimentProcessRepository(db)
         self.step_repo = ProcessStepRepository(db)
-        self.run_repo = ExperimentRunRepository(db)
+        self.run_repo = LimsRunRepository(db)
 
     def _user_id(self) -> Optional[uuid.UUID]:
         return self.current_user.id if self.current_user else None
@@ -63,7 +63,7 @@ class ExperimentProcessService:
         if not run:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Experiment run not found",
+                detail="LIMS run not found",
             )
         return run
 

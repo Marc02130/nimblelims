@@ -33,7 +33,7 @@ When resolving: fill **Decision**, **Date**, **Owner**, and one line of **Ration
 
 | # | Question | Status | Blocks | Decision | Date | Owner | Rationale |
 |---|----------|--------|--------|----------|------|-------|-----------|
-| 1 | Can an ELN Process reference LIMS Experiment Runs (link/promote instrument steps)? | **Open** | Phase 3 (Run link / sample journey) | — Phase 1–2: ELN templates only; no Run FK | | | |
+| 1 | Can an ELN Process reference LIMS LIMS Runs (link/promote instrument steps)? | **Open** | Phase 3 (Run link / sample journey) | — Phase 1–2: ELN templates only; no Run FK | | | |
 | 2 | Process status: own list vs strictly derived from steps? | **Decided (provisional)** | — | Optional `status_id` + seeded list `eln_process_status` (Draft, In Progress, On Hold, Completed, Cancelled). Not auto-derived yet. | 2026-07-11 | | Enough for MVP; derivation can be added later without schema break |
 | 3 | Can a Process override or extend entry config from member templates? | **Decided (provisional)** | — | Phase 2: **No override.** Entries come only from ExperimentTemplate `template_definition.entries`. Process does not patch field sets. | 2026-07-11 | | Keeps one source of truth on templates |
 | 4 | Write-back conflict rules when multiple steps/entries update the same Sample attribute | **Decided (provisional)** | — | **Last write wins.** Previous Sample value stored on `EntryFieldValue.write_back_previous`. Allowlist only (`SAMPLE_WRITE_BACK_COLUMNS`). | 2026-07-11 | | Simple, auditable enough for v1; stricter rules need product input |
@@ -132,4 +132,4 @@ Optional but valuable before Phase 3 code:
 - Checklist: [`.docs/checklist/experiment-checklist.md`](../checklist/experiment-checklist.md)
 - Processes: [`.docs/processes.md`](../processes.md)
 - Experiments (ELN): [`.docs/experiments.md`](../experiments.md)
-- Runs (LIMS): [`.docs/experiment-runs.md`](../experiment-runs.md)
+- Runs (LIMS): [`.docs/lims-runs.md`](../lims-runs.md)

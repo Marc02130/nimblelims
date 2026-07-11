@@ -69,7 +69,7 @@ def _set_rls_context(conn, user_id: uuid.UUID | None):
 
 @pytest.fixture(scope="module")
 def rls_seed(migrated_engine):
-    """Seed two client orgs, four users, and experiment_runs belonging to each.
+    """Seed two client orgs, four users, and lims_runs belonging to each.
 
     Uses a superuser connection (bypasses RLS) for setup.
     All data is cleaned up after the module.
@@ -123,13 +123,13 @@ def rls_seed(migrated_engine):
         VALUES (:tid, 'RLS Test Template', NULL, '{}', :ua, :ua)
     """), {"tid": str(tmpl_id), "ua": str(user_a_id)})
 
-    # --- ExperimentRuns: two for Org A, one for Org B ---
+    # --- LimsRuns: two for Org A, one for Org B ---
     run_a1_id = uuid.uuid4()
     run_a2_id = uuid.uuid4()
     run_b1_id = uuid.uuid4()
 
     conn.execute(text("""
-        INSERT INTO experiment_runs (id, name, status, experiment_template_id, created_by)
+        INSERT INTO lims_runs (id, name, status, experiment_template_id, created_by)
         VALUES
             (:r_a1, 'Alpha Run 1', 'draft', :tmpl, :ua),
             (:r_a2, 'Alpha Run 2', 'draft', :tmpl, :ua),
@@ -157,7 +157,7 @@ def rls_seed(migrated_engine):
     # Teardown: clean up seed data (superuser, no RLS restrictions)
     conn = migrated_engine.connect()
     conn.execute(text("BEGIN"))
-    conn.execute(text("DELETE FROM experiment_runs WHERE name IN ('Alpha Run 1', 'Alpha Run 2', 'Beta Run 1')"))
+    conn.execute(text("DELETE FROM lims_runs WHERE name IN ('Alpha Run 1', 'Alpha Run 2', 'Beta Run 1')"))
     conn.execute(text("DELETE FROM experiment_templates WHERE name = 'RLS Test Template'"))
     conn.execute(text("DELETE FROM users WHERE username IN ('user_alpha', 'user_beta', 'admin_rls')"))
     conn.execute(text("DELETE FROM clients WHERE name IN ('Org Alpha', 'Org Beta')"))
@@ -171,18 +171,18 @@ def rls_seed(migrated_engine):
 # ---------------------------------------------------------------------------
 
 class TestExperimentRlsIsolation:
-    """Client-scoped RLS enforcement for experiment_runs (migration 0041)."""
+    """Client-scoped RLS enforcement for lims_runs (migration 0041)."""
 
     def test_user_cannot_read_other_clients_rows(self, migrated_engine, rls_seed):
         """User Alpha (Org A) must not see Beta Run 1 (Org B)."""
         with migrated_engine.connect() as conn:
             _set_rls_context(conn, rls_seed["user_a_id"])
             result = conn.execute(
-                text("SELECT id FROM experiment_runs WHERE id = :rid"),
+                text("SELECT id FROM lims_runs WHERE id = :rid"),
                 {"rid": str(rls_seed["run_b1_id"])},
             ).fetchall()
         assert result == [], (
-            "User Alpha (Org A) must not see experiment_runs created by Org B"
+            "User Alpha (Org A) must not see lims_runs created by Org B"
         )
 
     def test_user_can_read_own_clients_rows(self, migrated_engine, rls_seed):
@@ -190,7 +190,7 @@ class TestExperimentRlsIsolation:
         with migrated_engine.connect() as conn:
             _set_rls_context(conn, rls_seed["user_a_id"])
             rows = conn.execute(
-                text("SELECT id FROM experiment_runs WHERE name LIKE 'Alpha Run%' ORDER BY name"),
+                text("SELECT id FROM lims_runs WHERE name LIKE 'Alpha Run%' ORDER BY name"),
             ).fetchall()
         ids = {str(r[0]) for r in rows}
         assert str(rls_seed["run_a1_id"]) in ids
@@ -202,7 +202,7 @@ class TestExperimentRlsIsolation:
         with migrated_engine.connect() as conn:
             _set_rls_context(conn, rls_seed["admin_id"])
             rows = conn.execute(
-                text("SELECT id FROM experiment_runs WHERE name IN ('Alpha Run 1', 'Alpha Run 2', 'Beta Run 1') ORDER BY name"),
+                text("SELECT id FROM lims_runs WHERE name IN ('Alpha Run 1', 'Alpha Run 2', 'Beta Run 1') ORDER BY name"),
             ).fetchall()
         ids = {str(r[0]) for r in rows}
         assert str(rls_seed["run_a1_id"]) in ids
@@ -214,7 +214,7 @@ class TestExperimentRlsIsolation:
         with migrated_engine.connect() as conn:
             _set_rls_context(conn, rls_seed["user_a_id"])
             result = conn.execute(
-                text("UPDATE experiment_runs SET name = 'PWNED' WHERE id = :rid RETURNING id"),
+                text("UPDATE lims_runs SET name = 'PWNED' WHERE id = :rid RETURNING id"),
                 {"rid": str(rls_seed["run_b1_id"])},
             )
             touched = result.fetchall()
@@ -227,7 +227,7 @@ class TestExperimentRlsIsolation:
         with migrated_engine.connect() as conn:
             _set_rls_context(conn, rls_seed["user_b_id"])
             rows = conn.execute(
-                text("SELECT id FROM experiment_runs WHERE name IN ('Alpha Run 1', 'Alpha Run 2', 'Beta Run 1')"),
+                text("SELECT id FROM lims_runs WHERE name IN ('Alpha Run 1', 'Alpha Run 2', 'Beta Run 1')"),
             ).fetchall()
         ids = {str(r[0]) for r in rows}
         assert str(rls_seed["run_b1_id"]) in ids
@@ -245,7 +245,7 @@ class TestExperimentRlsIsolation:
         with migrated_engine.connect() as conn:
             _set_rls_context(conn, user_id=None)  # no app.current_user_id
             rows = conn.execute(
-                text("SELECT id FROM experiment_runs WHERE name IN ('Alpha Run 1', 'Beta Run 1')"),
+                text("SELECT id FROM lims_runs WHERE name IN ('Alpha Run 1', 'Beta Run 1')"),
             ).fetchall()
         assert rows == [], (
             "No app.current_user_id set → current_user_id() returns NULL → "

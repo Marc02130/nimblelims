@@ -110,7 +110,7 @@ const RunsTab: React.FC<{ experimentId: string }> = ({ experimentId }) => {
     // Experiment runs are not yet filterable by experiment_id in the API,
     // so list all and the user navigates to specific runs
     apiService
-      .getExperimentRuns({ page: 1, size: 100 })
+      .getLimsRuns({ page: 1, size: 100 })
       .then((res: any) => setRuns(res?.runs ?? []))
       .catch((e: any) => setError(apiErrorMsg(e, 'Failed to load runs')))
       .finally(() => setLoading(false));
