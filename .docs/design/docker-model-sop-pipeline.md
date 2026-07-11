@@ -1,389 +1,267 @@
-# Tech Review: Docker Models for SOP → LIMS Configuration
+# Tech Review: SOP → Config via RAG
 
-**Date:** 2026-07-11  
+**Date:** 2026-07-11 (revised: RAG-first architecture)  
 **Branch:** `docker-model`  
 **Reviewer:** Engineering / Architecture  
-**Status:** Design only — not approved for implementation until open questions gated  
-**Inputs:** [ideas/model-fine-tune.md](../ideas/model-fine-tune.md), existing `/v1/sop-parse`, FieldDefinitions, ELN process definitions (0051), LimsRun/parser/worklist stack
+**Status:** Design only — gate open questions before implementation  
+**Idea:** [`.docs/ideas/sop-rag-config.md`](../ideas/sop-rag-config.md)
 
 ## 1. Problem statement
 
-Labs need to turn **unstructured SOPs** (and optional instrument files) into **correct NimbleLIMS configuration**:
+Labs need **SOP → structured NimbleLIMS configuration** that **improves with use**:
 
-| Target object | Purpose |
-|---------------|---------|
-| FieldDefinitions (+ lists) | Columns required to capture protocol data |
-| Experiment Templates (+ entries) | Single-unit protocol structure |
-| Process Definitions (typed steps) | Multi-step SOPs (`eln_experiment` \| `lims_run`) |
-| LimsRun-related config | Parser/worklist/result fragments for instrument steps |
+| Target | Purpose |
+|--------|---------|
+| FieldDefinitions (+ lists) | Capture columns |
+| Experiment Templates (+ entries) | Single protocol units |
+| Process Definitions (typed steps) | Multi-step (`eln_experiment` \| `lims_run`) |
+| LimsRun configs | Parser/worklist scaffolds; **lazy** run instances |
 
-Today: Claude cloud extraction creates **experiment template-oriented** drafts via job + apply. Gap: no first-class plan for fields, process definitions, or typed lims_run steps in one pipeline; no pluggable local model.
+**Architecture choice: RAG-first.**
 
-## 2. Current architecture (baseline)
+1. Vectorize and store SOPs  
+2. Store **design docs** (applied ConfigurationPlans + object links)  
+3. On new SOP, retrieve SOPs + design docs + live catalog, then generate a draft  
 
-```
-Client → POST /v1/sop-parse (multipart SOP + instrument file)
-       → SopParseJob (pending)
-       → background: Claude API (ANTHROPIC_API_KEY)
-       → job.result JSON
-       → POST /v1/sop-parse/{id}/apply → ExperimentTemplate (+ related)
-```
+Fine-tuning is **out of the critical path** (optional R5 for local model JSON quality).
 
-Strengths: async job, connection pool release during LLM call, apply is explicit, permission `experiment:manage`.
+Today: `/v1/sop-parse` → Claude → template-oriented JSON → Apply template. No retrieval memory, no process/field plan.
 
-Limits: single-vendor cloud; output schema not aligned to Process Definitions / FieldDefinitions create APIs; no draft review model beyond template form.
+## 2. Terminology
 
-## 3. Target architecture
+| Term | Meaning |
+|------|---------|
+| **Lab** | Org running NimbleLIMS |
+| **Lab personnel** | System-client / lab roles |
+| **Client** | Customer of the lab (sponsor, env customer)—not vendor SaaS tenant |
+| **Lab-owned SOP** | Shared methods; searchable for lab config jobs |
+| **Client-owned SOP** | Confidential to one lab client; retrieval restricted |
+| **Design doc** | Applied ConfigurationPlan + links to created/linked object IDs |
+| **Catalog** | Live FieldDefs, lists, templates, process definitions |
 
-### 3.1 Separation of concerns
+## 3. Architecture (RAG-centered)
+
+### 3.1 Layers
 
 | Layer | Responsibility |
 |-------|----------------|
-| **Ingestion** | Extract text from PDF/DOCX/images; chunk + **vectorize** SOP text into DB |
-| **Configuration memory** | Store approved **design docs** (ConfigurationPlans + links to live objects); embed for retrieval |
-| **Retrieval (RAG)** | On new SOP: search similar SOPs + design docs + existing FieldDefs/templates/process defs (lab catalog + optional client-scoped SOPs) |
-| **Inference provider** | Pluggable: `anthropic` \| `openai_compat` \| `ollama` (Docker) |
-| **Extraction service** | Prompt = new SOP + retrieved context → schema-validated **ConfigurationPlan** |
-| **Draft store** | Persist plan JSON + status (extend SopParseJob or new `config_from_sop_jobs`) |
-| **Apply service** | Transactional creation via existing domain services only; on success, **index design doc** for future jobs |
-| **Optional training** | Offline LoRA/QLoRA (Unsloth) → GGUF → Ollama — **not in request path**; RAG is the default “memory” |
+| **Ingest** | Extract text; chunk; embed; persist `sop_documents` / `sop_chunks` |
+| **Memory** | Design docs + embeddings; links to live objects |
+| **Catalog index** | Queryable summaries/ids of FieldDefs, templates, process defs (structured + optional embed) |
+| **Retrieve** | Top-k SOPs + design docs + catalog candidates (ownership filters) |
+| **Generate** | LLM(provider) → ConfigurationPlan JSON |
+| **Validate** | Pydantic / schema_version; reject bad enums, names, fake UUIDs |
+| **Draft job** | Extend SopParseJob or `config_from_sop_jobs` |
+| **Apply** | Domain services only; write design doc + re-embed; RBAC/RLS |
+| **Provider** | `anthropic` \| `ollama` \| `openai_compat` — pluggable |
 
-**Hard rule:** Models never receive DB credentials or call SQL. Apply path uses repositories/services with RLS + RBAC.  
-**Hard rule:** Where SOP memory is client-scoped, retrieval respects **lab-customer isolation** (same `client_id` / project RLS as samples)—never leak one **lab client’s** SOPs or design docs to another. See **§3.0 Terminology**.
+**Hard rules**
 
-### 3.0 Terminology: “Client” in NimbleLIMS
+- Model never gets DB credentials or runs SQL.  
+- Apply uses existing services (FieldDefinition, Experiment, ELNProcess definition, lims config helpers).  
+- Retrieval never returns Client B’s client-owned SOP chunks to a Client A–scoped job.  
+- Prefer `link_existing` when retrieved IDs/names match.
 
-**Client** means a **customer of the lab**, not a SaaS tenant of the NimbleLIMS product company.
+### 3.2 End-to-end data flow
 
-| Term | Meaning | Examples |
-|------|---------|----------|
-| **Lab** | Organization running NimbleLIMS (deployment may be on-prem or hosted) | Environmental testing lab; CRO (e.g. Charles River–style); biotech internal lab |
-| **Lab personnel** | Employees of the lab (System client users in RBAC) | Lab tech, lab manager, admin |
-| **Client** | Organization the lab does work *for* | Env lab’s industrial customer; CRO’s sponsor biotech; study owner |
-| **Client users** | Logins belonging to that client org | Sponsor portal user viewing their projects/samples only |
+```
+SOP upload
+    │
+    ├─► extract text
+    ├─► chunk + embed ──► sop_documents / sop_chunks
+    │
+    ▼
+retrieve (lab personnel job)
+    • similar SOP chunks (lab-owned + allowed client-owned)
+    • design docs for those SOPs
+    • catalog candidates (FieldDefs, templates, process defs)
+    │
+    ▼
+prompt = system(schema + rules) + user(new SOP) + context(retrieval)
+    │
+    ▼
+LLM ──► ConfigurationPlan ──► validate ──► job complete
+    │
+    ▼
+human review (partial accept)
+    │
+    ▼
+Apply (transaction)
+    │
+    ├─► lists / FieldDefinitions (link or create)
+    ├─► Experiment Templates
+    ├─► Process Definitions
+    ├─► LimsRun configs (not live runs)
+    │
+    └─► sop_design_docs + sop_design_links + embed design doc
+```
 
-NimbleLIMS already enforces this: projects carry `client_id`; RLS limits client users to their projects; lab (System) users see across clients as policy allows.
-
-**Implication for SOP → config / RAG:**
-
-- **Lab SOPs and shared assay configuration** (many FieldDefs, Experiment Templates, Process Definitions) are often **lab-owned**, not per-client—retrieval for configuration should default to **lab catalog**, not only one client’s rows.
-- **Client-specific SOPs** (sponsor-provided methods, confidential protocols) must stay **scoped to that client** (and lab staff who may work that client’s projects).
-- Isolation goal is **“Client A’s people never see Client B’s data/SOPs”**—same whether the deploy is single-lab on-prem or multi-lab hosted. It is **not** primarily about NimbleLIMS Inc. multi-tenant cloud marketing language.
-
-### 3.2 ConfigurationPlan (proposed schema)
-
-Logical JSON shape (versioned):
+### 3.3 ConfigurationPlan (v1 sketch)
 
 ```json
 {
   "schema_version": "1",
   "summary": "string",
   "confidence": 0.0,
+  "retrieval": {
+    "sop_chunk_ids": [],
+    "design_doc_ids": [],
+    "catalog_refs": []
+  },
   "field_definitions": [
     {
       "action": "create|link_existing",
       "existing_id": null,
-      "name": "rna_integrity_number",
-      "field_type": "number",
-      "entity": "sample|entry|...",
+      "name": "string",
+      "field_type": "string",
+      "entity": "string",
       "source_list_name": null,
-      "rationale": "..."
+      "rationale": "string"
     }
   ],
-  "experiment_templates": [ { "name", "template_definition", "lifecycle_type", "entries": [] } ],
+  "experiment_templates": [],
   "process_definitions": [
     {
-      "name": "NGS Prep",
+      "name": "string",
       "steps": [
         {
-          "name": "Extraction",
-          "step_kind": "eln_experiment",
-          "execution_mode": "eln_experiment",
-          "template_ref": "by_name_or_index"
-        },
-        {
-          "name": "Plate QC",
-          "step_kind": "lims_run",
-          "execution_mode": "lims_run",
-          "template_ref": "..."
+          "name": "string",
+          "step_kind": "eln_experiment|lims_run",
+          "execution_mode": "eln_experiment|lims_run",
+          "template_ref": "name_or_index"
         }
       ]
     }
   ],
-  "lims_run_configs": [
-    {
-      "name": "Optional standalone run scaffold",
-      "parser_config": {},
-      "worklist_config": {},
-      "result_columns": []
-    }
-  ],
-  "warnings": [],
-  "source_spans": []
+  "lims_run_configs": [],
+  "warnings": []
 }
 ```
 
-Validate with Pydantic before job marked `complete`. Reject/partial-fail on schema errors.
+Model may only put UUIDs in `existing_id` / catalog refs that appeared in the retrieval payload.
 
-### 3.3 Provider abstraction
-
-```text
-LLMProvider.complete(system, user, files_meta) -> str
-  AnthropicProvider  # current
-  OpenAICompatibleProvider  # vLLM, etc.
-  OllamaProvider  # http://ollama:11434
-```
-
-Docker Compose (optional profile):
-
-```yaml
-# profile: local-llm
-ollama:
-  image: ollama/ollama
-  volumes: [ollama_data:/root/.ollama]
-  ports: ["11434:11434"]
-  # deploy.resources reservations devices nvidia.com/gpu (optional)
-```
-
-Backend env:
-
-- `LLM_PROVIDER=anthropic|ollama|openai_compat`
-- `OLLAMA_BASE_URL=http://ollama:11434`
-- `OLLAMA_MODEL=llama3.2:3b` (or fine-tuned tag)
-- Keep `ANTHROPIC_API_KEY` for default cloud path
-
-### 3.4 Apply pipeline (transactional)
-
-Order of apply (dependency-aware):
-
-1. Lists (if new list names proposed)  
-2. FieldDefinitions (link_existing first)  
-3. Experiment Templates (entries referencing field defs)  
-4. Process Definitions (steps reference templates by id after create)  
-5. LimsRun-related rows (parser/worklist) **as config only** — do not create active LimsRun instances unless explicitly requested in a later product decision  
-
-Use existing services: `FieldDefinitionService`, `ExperimentService`, `ELNProcessService.create_definition`, lims run template helpers. Single DB transaction where possible; record created IDs on job for UI.
-
-### 3.5 Fine-tuning path (offline, deferred)
-
-From ideas doc — engineering notes only:
-
-| Component | Use |
-|-----------|-----|
-| Unsloth / TRL + PEFT | QLoRA on 1B–9B models |
-| Dataset | JSONL: `{ sop_text, configuration_plan }` from **approved** Applies (opt-in per tenant) |
-| Export | GGUF → `ollama create` |
-| Runtime | Ollama container; no training in API workers |
-
-**Do not** put GPU training in the FastAPI container. Separate job image / CI / offline notebook.
-
-### 3.6 Model selection guidance
-
-| Model class | Fit |
-|-------------|-----|
-| Llama 3.2 3B / Qwen small | Local latency, weak long-SOP fidelity — OK for drafts with heavy review |
-| Cloud Sonnet/Opus-class | Better structure adherence for v1 |
-| Fine-tuned domain adapter | After ≥ dozens labeled plans; improves schema compliance |
-
-Structured output: prefer constrained decoding / JSON schema mode where provider supports it; else repair loop (parse → validate → one repair call).
-
-### 3.7 Configuration memory & RAG (using existing config)
-
-**Yes — the model should use existing configuration.** Prefer **retrieval-augmented generation (RAG)** over fine-tuning for “learn from our SOPs.” Fine-tune remains optional for style/schema compliance; **memory of past work is RAG + DB**.
-
-This matches the product loop:
-
-| # | Store in DB | Role |
-|---|-------------|------|
-| **1** | **SOPs vectorized** | Chunks of source protocol text + embeddings + metadata (filename, version, client, applied_job_id) |
-| **2** | **Design docs** | The model’s (and human-edited) **ConfigurationPlan** after Apply — the “how we implemented this SOP in NimbleLIMS” artifact, with FKs to created FieldDefs / templates / process definitions / lims configs |
-| **3** | **Live config** | Existing FieldDefinitions, lists, Experiment Templates, Process Definitions, LimsRun parser/worklist rows — either embedded summaries or structured lookup by name/type |
-
-#### On new SOP upload
+### 3.4 Persistence (illustrative)
 
 ```
-new SOP → extract + chunk + embed
-       → retrieve top-k similar SOP chunks
-            • lab-owned SOPs (shared methods) always candidates for lab users
-            • client-tagged SOPs only if job is in that client’s context
-       → retrieve linked design docs for those SOPs
-       → retrieve / rank candidate existing objects
-            (FieldDefinitions by name similarity, templates, process defs — lab catalog)
-       → build prompt:
-            system: schema + rules (link_existing preferred)
-            user: new SOP text
-            context: similar SOPs + design docs + candidate IDs/names
-       → LLM → ConfigurationPlan
-            (prefer action=link_existing over create)
-       → validate → human review → Apply
-       → write: SOP vectors (if not already), design doc, embeddings for design doc
+sop_documents
+  id, ownership ('lab'|'client'), client_id NULL,
+  filename, storage_uri, text_hash, created_by, created_at, ...
+
+sop_chunks
+  id, document_id, chunk_index, text, embedding vector(n), ...
+
+sop_design_docs
+  id, document_id, job_id, plan_json, applied_at, applied_by, ...
+
+sop_design_links
+  design_doc_id, object_type, object_id
+  -- field_definition | experiment_template | process_definition | ...
 ```
 
-#### Why this works better than “only fine-tune”
+**Embeddings:** `pgvector` on Postgres preferred (one stack, RLS-friendly).  
+**Alternative:** external vector DB with mandatory ownership filters on every query.
 
-| Approach | Learns | Risks |
-|----------|--------|-------|
-| **RAG over SOPs + design docs** | This **lab’s** methods and *how they mapped to NimbleLIMS*; optional per–lab-client confidential SOPs | Must enforce **client scope** where SOPs are client-owned; bad past Applies can reinforce mistakes (prefer **applied + human-edited** design docs only) |
-| **Fine-tune** | Generic extraction style / JSON shape | Expensive; stale; if trained on client-confidential SOPs, weights become sensitive; doesn’t auto-see new FieldDefs |
-| **Both** | Fine-tune for structure; RAG for lab/client memory | Best long-term; more ops |
+### 3.5 Retrieval policy
 
-#### Suggested tables (illustrative)
+| Include | Exclude |
+|---------|---------|
+| Lab-owned SOPs + design docs | Other clients’ client-owned SOPs |
+| Client-owned SOPs if job `client_id` matches (lab staff working that client) | Abandoned drafts as high-rank memory |
+| Active catalog objects | Soft-deleted unless opted in |
+| Top-k by similarity (+ optional keyword) | Entire catalog dump (token noise) |
 
-```
-sop_documents          id, ownership (lab|client), client_id nullable,
-                       filename, raw_uri, text_hash, created_by, ...
-                       -- client_id set when SOP is sponsor/client-confidential
-sop_chunks             id, document_id, chunk_index, text, embedding vector, ...
-sop_design_docs        id, document_id, job_id, plan_json, applied_at, applied_by, ...
-sop_design_links       design_doc_id, object_type, object_id
-                       -- experiment_template | process_definition | field_definition | ...
-```
+**First SOP / empty memory:** generation still works; `retrieval` empty; UI warns.
 
-Embeddings: `pgvector` on Postgres (fits existing stack) or external vector store.  
-**Query filters:** lab users may search lab-owned + client SOPs they are allowed to access; **client users** do not run SOP→config (Decision #9) and must never retrieve other clients’ SOPs.
+### 3.6 Apply order
 
-#### Design-doc content
+1. Lists (if needed)  
+2. FieldDefinitions (`link_existing` first)  
+3. Experiment Templates (+ entries)  
+4. Process Definitions (resolve template refs to ids)  
+5. LimsRun config rows  
+6. Design doc + links + embed  
 
-A **design doc** is not free-form narrative only. It is:
+Single transaction where practical; record created/linked IDs on job.
 
-1. Final **ConfigurationPlan** JSON (post human edit, as applied)  
-2. Optional short **rationale** (model + human notes)  
-3. **Links** to live object UUIDs after Apply  
-4. Optional “diff from nearest prior design doc” for versioned SOP revisions  
+### 3.7 LLM providers
 
-When a **new version of the same SOP** is uploaded, retrieve prior design doc for that lineage and prompt: “update configuration; prefer patching existing templates/process over duplicates.”
+| Provider | Role |
+|----------|------|
+| Anthropic (current) | Default quality for R0–R3 |
+| Ollama (Docker) | Optional local; internal network only |
+| OpenAI-compatible | vLLM / other |
 
-#### Retrieval policy (product + eng)
+Env: `LLM_PROVIDER`, `OLLAMA_BASE_URL`, `ANTHROPIC_API_KEY`, embed model settings.
 
-| Include in context | Exclude |
-|--------------------|---------|
-| **Lab-owned** SOPs and design docs (shared methods) | — |
-| **Client-owned** SOPs only for the client context of the job | Other lab clients’ confidential SOPs |
-| Applied, human-accepted design docs | Failed / abandoned drafts (or mark low weight) |
-| Active FieldDefinitions / templates / process defs (lab catalog) | Soft-deleted / inactive unless user opts in |
-| Top-k by embedding similarity + optional keyword (assay name) | Dump of entire catalog (token bloat, noise) |
-| Lab personnel running the job | Client-user-driven SOP→config (out of scope; Decision #9) |
+Background jobs: keep **two-session** pattern (no DB hold during LLM/embed HTTP).
 
-#### Prompt contract (guidance to the model)
+### 3.8 Fine-tuning (explicitly secondary)
 
-- Prefer **`link_existing`** when a retrieved FieldDefinition or template matches.  
-- Prefer **extending** a retrieved process definition pattern over inventing new step kinds.  
-- Cite which prior design doc influenced each major choice (for UI “inspired by …”).  
-- Never invent UUIDs; only use IDs present in the retrieval payload.
+| | RAG | Fine-tune |
+|---|-----|-----------|
+| Lab memory | **Yes** | No |
+| Schema/JSON habit | Partial (prompt) | Optional improve |
+| Ops cost | Embed + retrieve | GPU train/deploy |
+| Client isolation | Query filters | Risk if mixed corpora |
 
-#### Phasing relative to T0–T5
+**R5 only:** offline LoRA on approved plans for **structure**; never replace design-doc retrieval. Prefer lab-general methods; avoid mixing client-confidential SOPs into one broadly served model.
 
-| Phase | Memory capability |
-|-------|-------------------|
-| **T0–T1** | No vectors required; Apply stores design doc JSON on job for audit |
-| **T1.5** | Structured catalog injection: list existing FieldDef/template/process **names** for the client into the prompt (no vectors yet) |
-| **T3.5** | `pgvector` SOP chunks + design-doc embeddings; retrieval in job pipeline |
-| **T4–T5** | Optional fine-tune **plus** RAG (RAG remains source of tenant-specific truth) |
+## 4. API evolution
 
-**Recommendation:** Implement **T1.5 catalog injection early** (cheap, high value). Full vector RAG when SOP volume justifies it.
+| Endpoint | Behavior |
+|----------|----------|
+| `POST /v1/sop-parse` | `mode=template_only\|full_plan` (default template_only) |
+| Job pipeline | ingest → retrieve → generate → validate |
+| `GET /v1/sop-parse/{id}` | plan + retrieval metadata for Sources UI |
+| `POST .../apply` | `{ accept: { fields, templates, processes, lims } }` partial |
+| `GET /v1/llm/health` | provider + embed reachability (admin) |
 
-## 4. Data flow diagram
+## 5. Implementation phases
 
-```
-SOP file ──► text extract ──► chunk + embed ──► store sop_documents / sop_chunks
-                     │
-                     ▼
-              retrieve (lab catalog + client-scoped SOPs as allowed)
-              • similar SOP chunks
-              • linked design docs
-              • candidate FieldDefs / templates / process defs
-                     │
-                     ▼
-         prompt(schema_v1 + retrieved context) ──► LLM provider
-                     │
-                     ▼
-             ConfigurationPlan JSON
-                     │
-             Pydantic validate
-                     │
-             job.status = complete
-                     │
-            human review (frontend)
-                     │
-             Apply (RBAC + RLS)
-                     │
-     ┌───────────────┼───────────────┬────────────────┐
-     ▼               ▼               ▼                ▼
-FieldDefinitions  Templates   ProcessDefinitions  Lims configs
-     │               │               │                │
-     └───────────────┴───────────────┴────────────────┘
-                     │
-                     ▼
-         sop_design_docs + links + embed design doc
-         (memory for next SOP)
-```
+| Phase | Deliverable | RAG depth |
+|-------|-------------|-----------|
+| **R0** | ConfigurationPlan + validate + Apply; save design doc JSON on job | Write path only |
+| **R1** | Review UI + partial accept + link_existing | — |
+| **R2** | Inject lab catalog names/ids into prompt | Structured RAG-lite |
+| **R3** | pgvector chunks + design docs; retrieval in pipeline; Sources API | Full RAG |
+| **R4** | Provider abstraction + optional Ollama | — |
+| **R5** | Optional fine-tune playbook | Complements RAG |
 
-## 5. API sketch (evolutionary)
+## 6. Testing
 
-Prefer extending sop-parse rather than greenfield:
+| Layer | Coverage |
+|-------|----------|
+| Unit | Plan schema; retrieval filter (client isolation); apply link vs create |
+| Integration | Apply creates FKs; design doc links; second SOP job returns prior design doc in retrieval |
+| Security | Client A job cannot retrieve Client B SOP chunks |
+| Golden | Fixed SOPs → plan snapshots (allow intentional diffs) |
+| Regression | `template_only` sop-parse remains green |
 
-| Endpoint | Change |
-|----------|--------|
-| `POST /v1/sop-parse` | Accept optional `mode=template_only\|full_plan` (default template_only for back-compat) |
-| `GET /v1/sop-parse/{id}` | `result` may be ConfigurationPlan v1 |
-| `POST /v1/sop-parse/{id}/apply` | Body: `{ accept: { fields: [], templates: [], processes: [], lims: [] } }` partial apply |
-| `GET /v1/llm/health` | Provider reachability (admin) |
+## 7. Performance & ops
 
-## 6. Performance & ops
+- Chunk size / overlap policy; max pages; top-k cap (e.g. 5–15 chunks)  
+- Embed batching on ingest  
+- Job timeouts; queue concurrency per user  
+- Metrics: retrieval hit rate, link_existing rate, token usage, apply success  
 
-- Continue **two-session background pattern** (no long-held DB connections during LLM).
-- Timeouts: 2–10 min for large SOPs; chunk long documents by section headings.
-- Token cost controls: max pages, truncate appendix tables.
-- Observability: job duration, token usage, validation failure rate, apply success rate.
-- GPU: optional; CPU Ollama acceptable for demo, not for 100-page SOPs.
-
-## 7. Testing strategy
-
-| Layer | Tests |
-|-------|-------|
-| Unit | Pydantic plan validation; apply service with mocked plan |
-| Integration | Apply creates definition + templates with FK integrity |
-| Golden files | 5–10 redacted SOPs → expected plan snapshots (diff intentionally) |
-| Provider contract | Mock HTTP for Ollama/Anthropic |
-| Regression | Existing template-only sop-parse tests stay green |
-
-## 8. Migration / compatibility
-
-- `schema_version` on plan; old jobs remain template-shaped.
-- Feature flag: `SOP_FULL_PLAN_ENABLED`.
-- No change to production templates until Apply.
-
-## 9. Implementation phases (eng)
-
-| Phase | Deliverable | Depends on fine-tune? |
-|-------|-------------|----------------------|
-| **T0** | ConfigurationPlan schema + validator + extended apply (cloud model); store applied plan as design doc on job | No |
-| **T1** | UI plan review + partial accept; show “link existing” matches | No |
-| **T1.5** | Inject lab catalog (FieldDef/template/process names+ids) into prompt | No |
-| **T2** | `LLMProvider` + Ollama compose profile | No |
-| **T3** | Telemetry + golden SOP suite | No |
-| **T3.5** | Vectorize SOPs + design docs (`pgvector`); RAG retrieval in job pipeline | No |
-| **T4** | Opt-in dataset export from approved design docs | No |
-| **T5** | Offline fine-tune playbook + private model tag (**complements** RAG, does not replace it) | Yes |
-
-## 10. Tech risks
+## 8. Risks & mitigations
 
 | Risk | Mitigation |
 |------|------------|
-| Unstable JSON from small models | Schema repair; prefer cloud for T0–T1 |
-| Duplicate FieldDefinitions | link_existing + name similarity match |
-| Process step template_ref orphans | Apply creates templates first; resolve refs in-memory |
-| Prompt injection via SOP content | See security review; treat SOP as untrusted |
-| Compose complexity | Optional profile; default cloud |
-| Fine-tune on client-confidential SOPs | Prefer lab-general methods only, or per-client adapters; never train one model on all clients’ confidential SOPs then serve broadly |
+| Bad Applies poison memory | Index applied+accepted only; admin unindex |
+| Duplicate objects | Catalog + link_existing + name collision UI |
+| Small model bad JSON | Schema repair loop; prefer cloud until R4 |
+| Vector/RLS mistakes | Integration tests; FORCE filters in repository layer |
+| Prompt injection via SOP | Treat output untrusted; allowlist types; no code exec |
 
-## 11. Recommendation
+## 9. Recommendation
 
-**Proceed with T0–T3 as engineering plan.**  
-**Park T4–T5** until product commits to local-model SKU and labeled data volume exists.
+**Implement R0→R3 as the core product.**  
+R4 for local inference SKUs.  
+R5 only if metrics demand it.
 
-Fine-tuning is an **optimization of the inference provider**, not a prerequisite for the SOP configuration product.
+RAG is the architecture; Docker/Ollama is an optional runtime; fine-tune is optional polish.
 
 ---
 
-Related: [ceo-review](../ceo-review/docker-model-sop-pipeline.md), [design-review](../design-review/docker-model-sop-pipeline.md), [security-review](../security-review/docker-model-sop-pipeline.md), [ideas/model-fine-tune.md](../ideas/model-fine-tune.md)
+Related: [ceo](../ceo-review/docker-model-sop-pipeline.md), [design-review](../design-review/docker-model-sop-pipeline.md), [security](../security-review/docker-model-sop-pipeline.md), [ideas](../ideas/sop-rag-config.md)

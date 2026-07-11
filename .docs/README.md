@@ -82,17 +82,18 @@ All product and engineering docs live under this directory, organized by purpose
 
 ## Reviews
 
-- **CEO:** [ceo-review/](ceo-review/) — process/experiment, schema evolution, field management, [docker-model SOP pipeline](ceo-review/docker-model-sop-pipeline.md)  
-- **Design:** [design-review/](design-review/) — includes [docker-model SOP pipeline](design-review/docker-model-sop-pipeline.md)  
-- **Security:** [security-review/](security-review/) — includes [docker-model SOP pipeline](security-review/docker-model-sop-pipeline.md)  
-- **Tech (design/):** architecture specs, including [docker-model SOP pipeline](design/docker-model-sop-pipeline.md)
+- **CEO:** [ceo-review/](ceo-review/) — process/experiment, schema evolution, field management, [SOP RAG config](ceo-review/docker-model-sop-pipeline.md)  
+- **Design:** [design-review/](design-review/) — includes [SOP RAG config](design-review/docker-model-sop-pipeline.md)  
+- **Security:** [security-review/](security-review/) — includes [SOP RAG config](security-review/docker-model-sop-pipeline.md)  
+- **Tech (design/):** architecture specs, including [SOP RAG config](design/docker-model-sop-pipeline.md)
 
 ## Ideas
 
 Exploratory only:
 
-- [ideas/model-fine-tune.md](ideas/model-fine-tune.md) — SOP → config via local/fine-tuned models (see reviews above)
+- [ideas/sop-rag-config.md](ideas/sop-rag-config.md) — SOP → LIMS config via **RAG** (design docs + vectors + catalog; see reviews above)
 - [ideas/multi-tenancy.md](ideas/multi-tenancy.md) — lab–client isolation vs multi-lab SaaS
+- [ideas/model-fine-tune.md](ideas/model-fine-tune.md) — stub redirect (superseded by sop-rag-config)
 
 ## Agent / contributor rules
 
