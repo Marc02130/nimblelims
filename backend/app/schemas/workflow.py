@@ -25,6 +25,11 @@ VALID_WORKFLOW_ACTIONS = [
     "add_experiment_detail_step",
     "link_experiments",
     "update_experiment_status",
+    # ELN Process actions (Phase 2)
+    "create_process",
+    "add_step_to_process",
+    "assign_samples_to_process",
+    "instantiate_process_step",
 ]
 
 # Params hints for workflow builder UI: action -> list of param keys (required/optional).
@@ -36,6 +41,10 @@ WORKFLOW_EXPERIMENT_ACTION_PARAMS = {
     "add_experiment_detail_step": ["experiment_id (or from context)", "detail_type (required)", "content", "sort_order"],
     "link_experiments": ["experiment_id (or from context)", "linked_experiment_id (required)"],
     "update_experiment_status": ["experiment_id (or from context)", "status_id (required)"],
+    "create_process": ["name (required)", "description", "status_id", "steps (optional list of {experiment_template_id, name})"],
+    "add_step_to_process": ["process_id (or from context)", "experiment_template_id (required)", "name", "sort_order"],
+    "assign_samples_to_process": ["process_id (or from context)", "sample_ids (required list)", "set_to_first_step"],
+    "instantiate_process_step": ["process_id (or from context)", "step_id (required)", "name (optional experiment name)"],
 }
 
 
