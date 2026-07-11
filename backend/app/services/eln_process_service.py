@@ -2,7 +2,7 @@
 Service layer for ELN Processes (Phase 1).
 """
 from typing import Optional, List, Tuple, Dict, Any
-from uuid import UUID
+from uuid import UUID, uuid4
 from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
 
@@ -12,10 +12,14 @@ from app.schemas.eln_process import (
     ELNProcessUpdate,
     ELNProcessStepCreate,
     ELNProcessStepUpdate,
+    ELNProcessStepInstantiateRequest,
     ELNProcessSampleAssignRequest,
     ELNProcessSampleSetStepRequest,
 )
+from app.schemas.experiment import ExperimentCreate
+from app.services.experiment_service import ExperimentService
 from models.entry import ELNProcess, ELNProcessStep, ELNProcessSample
+from models.experiment import Experiment
 from models.user import User
 
 VALID_SAMPLE_STATUSES = frozenset({'assigned', 'in_progress', 'completed', 'removed'})
@@ -242,11 +246,74 @@ class ELNProcessService:
             self.db.commit()
         return self.repo.list_steps(process_id)
 
+    def instantiate_step(
+        self,
+        process_id: UUID,
+        step_id: UUID,
+        data: Optional[ELNProcessStepInstantiateRequest] = None,
+    ) -> Tuple[ELNProcessStep, Experiment]:
+        """
+        Create an Experiment from this step's template and link it on the step.
+
+        Idempotent guard: fails if experiment_id is already set.
+        """
+        process = self.get_process(process_id)
+        step = self.repo.get_step_by_id(step_id)
+        if not step or step.process_id != process_id:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Process step not found",
+            )
+        if step.experiment_id is not None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Step already has an instantiated experiment",
+            )
+        if not self.repo.template_exists(step.experiment_template_id):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Experiment template not found",
+            )
+
+        step_label = step.name or f"Step {step.sort_order}"
+        exp_name = (
+            (data.name if data and data.name else None)
+            or f"{process.name} — {step_label} ({uuid4().hex[:6]})"
+        )
+        exp_service = ExperimentService(
+            self.db,
+            current_user=self.current_user,
+            auto_commit=False,
+        )
+        experiment = exp_service.create_experiment(
+            ExperimentCreate(
+                name=exp_name,
+                description=f"From ELN process '{process.name}' step '{step_label}'",
+                experiment_template_id=step.experiment_template_id,
+            )
+        )
+        self.repo.update_step(
+            step,
+            experiment_id=experiment.id,
+            modified_by=self._user_id(),
+        )
+        self._commit_refresh(step, experiment)
+        return step, experiment
+
     # ---------- Samples ----------
 
-    def list_samples(self, process_id: UUID) -> List[ELNProcessSample]:
+    def list_samples(
+        self,
+        process_id: UUID,
+        current_step_id: Optional[UUID] = None,
+        sample_status: Optional[str] = None,
+    ) -> List[ELNProcessSample]:
         self.get_process(process_id)
-        return self.repo.list_process_samples(process_id)
+        return self.repo.list_process_samples(
+            process_id,
+            current_step_id=current_step_id,
+            sample_status=sample_status,
+        )
 
     def assign_samples(
         self,

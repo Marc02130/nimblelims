@@ -23,11 +23,19 @@ from app.schemas.eln_process import (
     ELNProcessStepUpdate,
     ELNProcessStepRead,
     ELNProcessStepReorderRequest,
+    ELNProcessStepInstantiateRequest,
     ELNProcessSampleAssignRequest,
     ELNProcessSampleRead,
     ELNProcessSampleSetStepRequest,
 )
+from app.schemas.experiment import ExperimentRead
 from models.user import User
+from pydantic import BaseModel
+
+
+class ELNProcessStepInstantiateResponse(BaseModel):
+    step: ELNProcessStepRead
+    experiment: ExperimentRead
 
 router = APIRouter(
     prefix="/eln-processes",
@@ -172,17 +180,48 @@ def reorder_steps(
     return [ELNProcessStepRead.model_validate(s) for s in steps]
 
 
+@router.post(
+    "/{process_id}/steps/{step_id}/instantiate",
+    response_model=ELNProcessStepInstantiateResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def instantiate_step(
+    process_id: UUID,
+    step_id: UUID,
+    data: ELNProcessStepInstantiateRequest = ELNProcessStepInstantiateRequest(),
+    service: ELNProcessService = Depends(get_service),
+):
+    """Create an Experiment from the step's template and link it on the step."""
+    step, experiment = service.instantiate_step(process_id, step_id, data)
+    return ELNProcessStepInstantiateResponse(
+        step=ELNProcessStepRead.model_validate(step),
+        experiment=ExperimentRead.model_validate(experiment),
+    )
+
+
 # ---------- Samples ----------
 
 
 @router.get("/{process_id}/samples", response_model=List[ELNProcessSampleRead])
 def list_samples(
     process_id: UUID,
+    current_step_id: Optional[UUID] = Query(
+        None,
+        description="Filter samples currently at this process step",
+    ),
+    sample_status: Optional[str] = Query(
+        None,
+        description="Filter by assignment status (assigned|in_progress|completed|removed)",
+    ),
     service: ELNProcessService = Depends(get_service),
 ):
     return [
         ELNProcessSampleRead.model_validate(s)
-        for s in service.list_samples(process_id)
+        for s in service.list_samples(
+            process_id,
+            current_step_id=current_step_id,
+            sample_status=sample_status,
+        )
     ]
 
 

@@ -152,8 +152,55 @@ def upgrade() -> None:
         # Grant to app role if present (mirrors other migrations)
         op.execute(f'GRANT SELECT, INSERT, UPDATE, DELETE ON {table} TO lims_user;')
 
+    # Seed optional list-driven statuses for eln_processes.status_id
+    connection = op.get_bind()
+    # Fixed UUID unlikely to collide with early seed lists (0000…–cccc… ranges)
+    status_list_id = 'e1000000-0000-4000-8000-000000000001'
+    existing = connection.execute(
+        sa.text("SELECT id FROM lists WHERE name = 'eln_process_status' LIMIT 1")
+    ).fetchone()
+    if not existing:
+        connection.execute(
+            sa.text("""
+                INSERT INTO lists (id, name, description, active, created_at, modified_at)
+                VALUES (
+                    :id,
+                    'eln_process_status',
+                    'Status values for ELN Processes (optional status_id on eln_processes)',
+                    true,
+                    NOW(),
+                    NOW()
+                )
+            """),
+            {'id': status_list_id},
+        )
+        for name, desc in (
+            ('Draft', 'Process defined but not started'),
+            ('In Progress', 'Work is underway'),
+            ('On Hold', 'Temporarily paused'),
+            ('Completed', 'All steps finished'),
+            ('Cancelled', 'Process abandoned'),
+        ):
+            connection.execute(
+                sa.text("""
+                    INSERT INTO list_entries (id, name, description, list_id, active, created_at, modified_at)
+                    VALUES (gen_random_uuid(), :name, :description, :list_id, true, NOW(), NOW())
+                    ON CONFLICT (list_id, name) DO NOTHING
+                """),
+                {'name': name, 'description': desc, 'list_id': status_list_id},
+            )
+
 
 def downgrade() -> None:
+    connection = op.get_bind()
+    connection.execute(
+        sa.text("""
+            DELETE FROM list_entries
+            WHERE list_id IN (SELECT id FROM lists WHERE name = 'eln_process_status')
+        """)
+    )
+    connection.execute(sa.text("DELETE FROM lists WHERE name = 'eln_process_status'"))
+
     op.drop_constraint(
         'fk_field_definitions_process_id_eln_processes',
         'field_definitions',

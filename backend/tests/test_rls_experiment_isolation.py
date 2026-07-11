@@ -369,6 +369,8 @@ def rls_seed_0042(migrated_engine, rls_seed):
     yield {
         **rls_seed,
         "tmpl_b_id": tmpl_b_id,
+        "sample_a_id": sample_a_id,
+        "sample_b_id": sample_b_id,
         "exp_a_id": exp_a_id,
         "exp_b_id": exp_b_id,
         "detail_a_id": detail_a_id,
@@ -604,3 +606,147 @@ class TestExperiment0036RlsIsolation:
             exec_ids = {str(r[0]) for r in exec_rows}
             assert str(rls_seed_0042["exec_a_id"]) in exec_ids
             assert str(rls_seed_0042["exec_b_id"]) in exec_ids
+
+
+# ---------------------------------------------------------------------------
+# Migration 0047 — ELN process tables
+# ---------------------------------------------------------------------------
+
+@pytest.fixture(scope="module")
+def rls_seed_0047(migrated_engine, rls_seed_0042):
+    """Seed ELN process rows owned by Org A and Org B for RLS checks."""
+    ua = rls_seed_0042["user_a_id"]
+    ub = rls_seed_0042["user_b_id"]
+    tmpl = rls_seed_0042["tmpl_id"]
+    sample_a_id = rls_seed_0042["sample_a_id"]
+    sample_b_id = rls_seed_0042["sample_b_id"]
+
+    conn = migrated_engine.connect()
+    conn.execute(text("BEGIN"))
+
+    proc_a_id = uuid.uuid4()
+    proc_b_id = uuid.uuid4()
+    conn.execute(text("""
+        INSERT INTO eln_processes (id, name, description, active, created_by, modified_by)
+        VALUES
+            (:pa, 'RLS ELN Process A', NULL, TRUE, :ua, :ua),
+            (:pb, 'RLS ELN Process B', NULL, TRUE, :ub, :ub)
+    """), {
+        "pa": str(proc_a_id), "pb": str(proc_b_id),
+        "ua": str(ua), "ub": str(ub),
+    })
+
+    step_a_id = uuid.uuid4()
+    step_b_id = uuid.uuid4()
+    conn.execute(text("""
+        INSERT INTO eln_process_steps (
+            id, process_id, experiment_template_id, sort_order, created_by, modified_by
+        ) VALUES
+            (:sa, :pa, :tmpl, 0, :ua, :ua),
+            (:sb, :pb, :tmpl, 0, :ub, :ub)
+    """), {
+        "sa": str(step_a_id), "sb": str(step_b_id),
+        "pa": str(proc_a_id), "pb": str(proc_b_id),
+        "tmpl": str(tmpl),
+        "ua": str(ua), "ub": str(ub),
+    })
+
+    ps_a_id = uuid.uuid4()
+    ps_b_id = uuid.uuid4()
+    conn.execute(text("""
+        INSERT INTO eln_process_samples (
+            id, process_id, sample_id, status, created_by, modified_by
+        ) VALUES
+            (:psa, :pa, :smpla, 'assigned', :ua, :ua),
+            (:psb, :pb, :smplb, 'assigned', :ub, :ub)
+    """), {
+        "psa": str(ps_a_id), "psb": str(ps_b_id),
+        "pa": str(proc_a_id), "pb": str(proc_b_id),
+        "smpla": str(sample_a_id), "smplb": str(sample_b_id),
+        "ua": str(ua), "ub": str(ub),
+    })
+
+    conn.execute(text("COMMIT"))
+    conn.close()
+
+    yield {
+        **rls_seed_0042,
+        "eln_proc_a_id": proc_a_id,
+        "eln_proc_b_id": proc_b_id,
+        "eln_step_a_id": step_a_id,
+        "eln_step_b_id": step_b_id,
+        "eln_ps_a_id": ps_a_id,
+        "eln_ps_b_id": ps_b_id,
+    }
+
+    conn = migrated_engine.connect()
+    conn.execute(text("BEGIN"))
+    conn.execute(text(
+        "DELETE FROM eln_process_samples WHERE id IN (:a, :b)"),
+        {"a": str(ps_a_id), "b": str(ps_b_id)},
+    )
+    conn.execute(text(
+        "DELETE FROM eln_process_steps WHERE id IN (:a, :b)"),
+        {"a": str(step_a_id), "b": str(step_b_id)},
+    )
+    conn.execute(text(
+        "DELETE FROM eln_processes WHERE id IN (:a, :b)"),
+        {"a": str(proc_a_id), "b": str(proc_b_id)},
+    )
+    conn.execute(text("COMMIT"))
+    conn.close()
+
+
+class TestElnProcess0047RlsIsolation:
+    """Client-scoped RLS for ELN process tables (migration 0047)."""
+
+    def test_eln_processes_select_isolation(self, migrated_engine, rls_seed_0047):
+        with migrated_engine.connect() as conn:
+            _set_rls_context(conn, rls_seed_0047["user_a_id"])
+            rows = conn.execute(
+                text("SELECT id FROM eln_processes WHERE id = :pid"),
+                {"pid": str(rls_seed_0047["eln_proc_b_id"])},
+            ).fetchall()
+        assert rows == [], "User A must not see Org B eln_processes"
+
+    def test_eln_process_steps_select_isolation(self, migrated_engine, rls_seed_0047):
+        with migrated_engine.connect() as conn:
+            _set_rls_context(conn, rls_seed_0047["user_a_id"])
+            rows = conn.execute(
+                text("SELECT id FROM eln_process_steps WHERE id = :sid"),
+                {"sid": str(rls_seed_0047["eln_step_b_id"])},
+            ).fetchall()
+        assert rows == [], "User A must not see Org B eln_process_steps"
+
+    def test_eln_process_samples_select_isolation(self, migrated_engine, rls_seed_0047):
+        with migrated_engine.connect() as conn:
+            _set_rls_context(conn, rls_seed_0047["user_a_id"])
+            rows = conn.execute(
+                text("SELECT id FROM eln_process_samples WHERE id = :sid"),
+                {"sid": str(rls_seed_0047["eln_ps_b_id"])},
+            ).fetchall()
+        assert rows == [], "User A must not see Org B eln_process_samples"
+
+    def test_eln_process_write_isolation(self, migrated_engine, rls_seed_0047):
+        ua = rls_seed_0047["user_a_id"]
+        with migrated_engine.connect() as conn:
+            _set_rls_context(conn, ua)
+            touched = conn.execute(
+                text("UPDATE eln_processes SET name = 'PWNED' WHERE id = :pid RETURNING id"),
+                {"pid": str(rls_seed_0047["eln_proc_b_id"])},
+            ).fetchall()
+        assert touched == [], "UPDATE on Org B eln_process must be RLS-filtered"
+
+    def test_admin_sees_all_eln_processes(self, migrated_engine, rls_seed_0047):
+        with migrated_engine.connect() as conn:
+            _set_rls_context(conn, rls_seed_0047["admin_id"])
+            rows = conn.execute(
+                text("SELECT id FROM eln_processes WHERE id IN (:a, :b)"),
+                {
+                    "a": str(rls_seed_0047["eln_proc_a_id"]),
+                    "b": str(rls_seed_0047["eln_proc_b_id"]),
+                },
+            ).fetchall()
+        ids = {str(r[0]) for r in rows}
+        assert str(rls_seed_0047["eln_proc_a_id"]) in ids
+        assert str(rls_seed_0047["eln_proc_b_id"]) in ids

@@ -62,6 +62,9 @@ Legacy `experiment_link` via `ExperimentDetail` **coexists** in Phase 1; no forc
 - [x] Steps: add / list / remove / reorder
 - [x] Samples: assign / list / remove
 - [x] Sample progression (basic): set current step / advance to next step
+- [x] Step instantiate: create Experiment from step template
+- [x] Sample list filters (`current_step_id`, `sample_status`)
+- [x] Seed `eln_process_status` list for optional process status_id
 - [x] Permission gate: `experiment:manage`
 
 ### 1.3 Tests
@@ -69,13 +72,15 @@ Legacy `experiment_link` via `ExperimentDetail` **coexists** in Phase 1; no forc
 - [x] API tests: process CRUD, step order, sample assign/remove/advance (`tests/test_eln_processes.py`)
 - [x] Auth: client role denied without `experiment:manage`
 - [x] 404/400 validation (missing template, duplicate sample, bad reorder)
+- [x] RLS isolation tests for eln_* tables (`test_rls_experiment_isolation.py`)
 
 ### 1.4 Docs
 
 - [x] This checklist
 - [x] Point planning / requirements at Phase 1 API paths
 - [x] Update `.docs/processes.md` with ELN table names + endpoints
-- [ ] README / api_endpoints note (follow-up polish)
+- [x] README / api_endpoints note (follow-up polish)
+- [x] Frontend `apiService` ELN process methods (UI still Phase 2)
 
 ### Phase 1 exit criteria
 
@@ -112,7 +117,7 @@ Legacy `experiment_link` via `ExperimentDetail` **coexists** in Phase 1; no forc
 | # | Question | Decision |
 |---|----------|----------|
 | 1 | Can a Process reference LIMS Runs? | Open — Phase 1: ELN templates only |
-| 2 | Process status: own list vs derived? | Phase 1: optional `status_id` list FK; seed later if needed |
+| 2 | Process status: own list vs derived? | Phase 1: optional `status_id` + seeded `eln_process_status` list |
 | 3 | Can Process override entry config from templates? | Phase 2 |
 | 4 | Write-back conflict rules | Phase 2 |
 | 5 | Workflow integration depth | Phase 2 minimum: new actions only |
@@ -144,3 +149,4 @@ Legacy `experiment_link` via `ExperimentDetail` **coexists** in Phase 1; no forc
 |------|------|
 | 2026-07-11 | Checklist created; Phase 1 started on `refactor/experiments` |
 | 2026-07-11 | Phase 1 backend landed: models, migration 0047, `/v1/eln-processes` API, tests |
+| 2026-07-11 | Phase 1 polish: docs, apiService, instantiate, status seed, RLS tests |

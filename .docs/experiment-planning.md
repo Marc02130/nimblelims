@@ -46,11 +46,29 @@
 
 ---
 
+## Chunk 3 — ELN Processes (Phase 1) — Completed (backend)
+
+**Status:** Backend MVP complete on `refactor/experiments`. UI deferred to Phase 2.
+
+**Scope:**
+- Tables `eln_processes`, `eln_process_steps`, `eln_process_samples` (migration `0047`) + client RLS + `eln_process_status` list seed.
+- API `/v1/eln-processes`: process CRUD, ordered steps, sample assign/advance/filter, step **instantiate** (create Experiment from template).
+- Frontend: `apiService` methods only (no Process management page yet).
+- Naming deliberately avoids LIMS `/v1/processes` collision.
+
+**Checklist / requirements:**
+- `.docs/checklist/experiment-checklist.md`
+- `.docs/requirements/experiment-processes-entries.md`
+
+---
+
 ## Future (optional)
 
 - Permission `experiment_template:manage` for template-only access without full experiment workflows.
 - Audit trail for sign-off (who/when).
 - User manual generator from template schema (deferred).
+- Phase 2: Entries, write-back, Process UI, workflow actions.
+- Phase 3: Process templates, sample journey across ELN + Runs.
 
 ---
 
@@ -58,13 +76,14 @@
 
 **Planning doc:** `.docs/experiment-planning.md` (this file).
 
-**Related:** `.docs/navigation.md`, `.docs/api_endpoints.md`, `README.md`, `backend/README.md`, `frontend/README.md`, `.claude/plans/experiment-template-ui.md`, `UAT_Scripts/uat-experiment-templates.md`, `UAT_Scripts/uat-testing-log.md`.
+**Related:** `.docs/checklist/experiment-checklist.md`, `.docs/navigation.md`, `.docs/api_endpoints.md`, `README.md`, `backend/README.md`, `frontend/README.md`, `.claude/plans/experiment-template-ui.md`, `UAT_Scripts/uat-experiment-templates.md`, `UAT_Scripts/uat-testing-log.md`.
 
-**Frontend:** `frontend/src/pages/ExperimentTemplatesManagement.tsx`, `ExperimentsManagement.tsx`, `Sidebar.tsx`, `App.tsx`, `MainLayout.tsx`, `apiService.ts`.
+**Frontend:** `frontend/src/pages/ExperimentTemplatesManagement.tsx`, `ExperimentsManagement.tsx`, `Sidebar.tsx`, `App.tsx`, `MainLayout.tsx`, `apiService.ts` (includes ELN process client methods).
 
-**Backend:** `app/routers/experiments.py`, `app/routers/sop_parse.py`, `app/services/sop_parse_service.py`, `app/services/experiment_service.py`, flexible experiment models/migrations.
+**Backend:** `app/routers/experiments.py`, `app/routers/eln_processes.py`, `app/routers/sop_parse.py`, `app/services/sop_parse_service.py`, `app/services/experiment_service.py`, `app/services/eln_process_service.py`, flexible experiment + ELN process models/migrations (`0047`).
 
 **Dedicated detail docs (recommended reading):**
 - `.docs/processes.md`
 - `.docs/experiments.md` — ELN side (Experiments)
 - `.docs/experiment-runs.md` — LIMS side (Experiment Runs)
+- `.docs/checklist/experiment-checklist.md`

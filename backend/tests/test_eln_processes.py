@@ -258,6 +258,47 @@ class TestELNProcessSteps:
         assert r.status_code == 400
 
 
+class TestELNProcessInstantiate:
+    def test_instantiate_step_creates_experiment(
+        self, client: TestClient, auth_headers, template_a
+    ):
+        r = client.post(
+            "/v1/eln-processes",
+            json={
+                "name": f"Inst {uuid4().hex[:8]}",
+                "steps": [
+                    {
+                        "experiment_template_id": template_a["id"],
+                        "name": "Extraction",
+                    }
+                ],
+            },
+            headers=auth_headers,
+        )
+        assert r.status_code == 201, r.text
+        process_id = r.json()["id"]
+        step_id = r.json()["steps"][0]["id"]
+
+        r = client.post(
+            f"/v1/eln-processes/{process_id}/steps/{step_id}/instantiate",
+            json={"name": f"Exp from step {uuid4().hex[:6]}"},
+            headers=auth_headers,
+        )
+        assert r.status_code == 201, r.text
+        body = r.json()
+        assert body["step"]["experiment_id"] is not None
+        assert body["experiment"]["id"] == body["step"]["experiment_id"]
+        assert body["experiment"]["experiment_template_id"] == template_a["id"]
+
+        # Second instantiate rejected
+        r = client.post(
+            f"/v1/eln-processes/{process_id}/steps/{step_id}/instantiate",
+            json={},
+            headers=auth_headers,
+        )
+        assert r.status_code == 400
+
+
 class TestELNProcessSamples:
     def test_assign_advance_remove(
         self, client: TestClient, auth_headers, template_a, template_b, sample_id
@@ -326,4 +367,44 @@ class TestELNProcessSamples:
             f"/v1/eln-processes/{process_id}/samples",
             headers=auth_headers,
         )
+        assert r.json() == []
+
+    def test_filter_samples_by_step(
+        self, client: TestClient, auth_headers, template_a, template_b, sample_id
+    ):
+        r = client.post(
+            "/v1/eln-processes",
+            json={
+                "name": f"Filter {uuid4().hex[:8]}",
+                "steps": [
+                    {"experiment_template_id": template_a["id"], "name": "S1"},
+                    {"experiment_template_id": template_b["id"], "name": "S2"},
+                ],
+            },
+            headers=auth_headers,
+        )
+        process_id = r.json()["id"]
+        steps = r.json()["steps"]
+
+        r = client.post(
+            f"/v1/eln-processes/{process_id}/samples",
+            json={"sample_ids": [sample_id], "set_to_first_step": True},
+            headers=auth_headers,
+        )
+        assert r.status_code == 201
+
+        r = client.get(
+            f"/v1/eln-processes/{process_id}/samples",
+            params={"current_step_id": steps[0]["id"]},
+            headers=auth_headers,
+        )
+        assert r.status_code == 200
+        assert len(r.json()) == 1
+
+        r = client.get(
+            f"/v1/eln-processes/{process_id}/samples",
+            params={"current_step_id": steps[1]["id"]},
+            headers=auth_headers,
+        )
+        assert r.status_code == 200
         assert r.json() == []

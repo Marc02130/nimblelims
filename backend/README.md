@@ -28,6 +28,7 @@ Copyright (c) 2025 Marc Breneiser
 - **Authentication**: JWT-based authentication with RBAC
 - **Authorization**: Role-based access control with granular permissions
 - **Experiments & templates**: CRUD under `/v1/experiments` and `/v1/experiment-templates` (`experiment:manage`)
+- **ELN Processes**: Ordered multi-step workflows under `/v1/eln-processes` (`experiment:manage`; Phase 1)
 - **SOP parse (AI)**: `/v1/sop-parse` multipart upload, job polling, apply — creates template + parser/worklist data via Claude when `ANTHROPIC_API_KEY` is set
 
 ### API Endpoints
@@ -168,6 +169,13 @@ Copyright (c) 2025 Marc Breneiser
 - `POST /v1/experiment-templates` - Create template
 - `PATCH /v1/experiment-templates/{id}` - Update template (including `active`, `template_definition`)
 - `DELETE /v1/experiment-templates/{id}` - Soft-delete template
+
+#### ELN Processes (requires experiment:manage)
+- `GET/POST /v1/eln-processes` - List / create ordered multi-experiment processes
+- `GET/PATCH/DELETE /v1/eln-processes/{id}` - Detail / update / soft-delete
+- Steps: add, reorder, remove, **instantiate** (create Experiment from step template)
+- Samples: assign, filter by step, advance to next step
+- Distinct from LIMS `/v1/processes` (run sub-checklists). See migration `0047`, checklist `.docs/checklist/experiment-checklist.md`.
 
 #### SOP parse — AI-assisted template extraction (requires experiment:manage)
 - `POST /v1/sop-parse` - Multipart: `sop_file`, `instrument_file` — returns 202, job id for polling
