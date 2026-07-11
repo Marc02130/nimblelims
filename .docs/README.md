@@ -88,7 +88,10 @@ All product and engineering docs live under this directory, organized by purpose
 
 ## Ideas
 
-Exploratory only: [ideas/model-fine-tune.md](ideas/model-fine-tune.md).
+Exploratory only:
+
+- [ideas/run-results.md](ideas/run-results.md) — promote LimsRun JSONB columns → classic Results (parent test)
+- [ideas/model-fine-tune.md](ideas/model-fine-tune.md) — (see `sop-rag` branch for RAG-first SOP config work)
 
 ## Agent / contributor rules
 
