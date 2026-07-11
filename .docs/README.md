@@ -88,10 +88,18 @@ All product and engineering docs live under this directory, organized by purpose
 
 ## Ideas
 
-Exploratory only:
+Exploratory / in review:
 
-- [ideas/run-results.md](ideas/run-results.md) — promote LimsRun JSONB columns → classic Results (parent test)
+- [ideas/run-results.md](ideas/run-results.md) — LimsRun JSONB → Results on **publish** (see reviews below)
 - [ideas/model-fine-tune.md](ideas/model-fine-tune.md) — (see `sop-rag` branch for RAG-first SOP config work)
+
+## Reviews (run-results)
+
+- [ceo-review/run-results.md](ceo-review/run-results.md)
+- [design-review/run-results.md](design-review/run-results.md)
+- [design/run-results.md](design/run-results.md) (tech)
+- [security-review/run-results.md](security-review/run-results.md)
+- [open-questions/run-results.md](open-questions/run-results.md)
 
 ## Agent / contributor rules
 

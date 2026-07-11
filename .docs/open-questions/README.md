@@ -5,6 +5,7 @@ Decision logs for workstreams that must not proceed until product/architecture q
 | Doc | Area |
 |-----|------|
 | [experiments.md](experiments.md) | ELN Processes, Entries, LimsRun boundary |
+| [run-results.md](run-results.md) | LimsRun → structured Results on publish |
 
 ## Gate rule
 
