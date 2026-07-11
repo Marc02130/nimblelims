@@ -1,5 +1,5 @@
 """
-Pytest tests for ExperimentProcess and ProcessStep:
+Pytest tests for LimsRunChecklist and LimsRunChecklistStep:
   - Process CRUD (create with/without steps, list, get, delete)
   - Step CRUD (create, list, get)
   - State machine: queued → in_process → complete | failed
@@ -74,7 +74,7 @@ def process(client: TestClient, auth_headers, draft_run):
     """Create a minimal process on the draft run."""
     run_id = draft_run["id"]
     r = client.post(
-        f"/v1/lims-runs/{run_id}/processes",
+        f"/v1/lims-runs/{run_id}/checklists",
         json={"name": "Prep Process", "description": "test process", "sort_order": 0},
         headers=auth_headers,
     )
@@ -85,9 +85,9 @@ def process(client: TestClient, auth_headers, draft_run):
 @pytest.fixture
 def step(client: TestClient, auth_headers, process):
     """Create a step on the process."""
-    process_id = process["id"]
+    checklist_id = process["id"]
     r = client.post(
-        f"/v1/processes/{process_id}/steps",
+        f"/v1/lims-run-checklists/{checklist_id}/steps",
         json={"name": "Centrifuge", "description": "spin down", "sort_order": 0},
         headers=auth_headers,
     )
@@ -194,14 +194,14 @@ class TestRunNameRegression:
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# ExperimentProcess CRUD
+# LimsRunChecklist CRUD
 # ──────────────────────────────────────────────────────────────────────────────
 
-class TestExperimentProcess:
-    def test_create_process_no_steps(self, client, auth_headers, draft_run):
+class TestLimsRunChecklist:
+    def test_create_checklist_no_steps(self, client, auth_headers, draft_run):
         run_id = draft_run["id"]
         r = client.post(
-            f"/v1/lims-runs/{run_id}/processes",
+            f"/v1/lims-runs/{run_id}/checklists",
             json={"name": "Empty Process", "sort_order": 1},
             headers=auth_headers,
         )
@@ -212,10 +212,10 @@ class TestExperimentProcess:
         assert body["steps"] == []
         assert body["lims_run_id"] == run_id
 
-    def test_create_process_with_inline_steps(self, client, auth_headers, draft_run):
+    def test_create_checklist_with_inline_steps(self, client, auth_headers, draft_run):
         run_id = draft_run["id"]
         r = client.post(
-            f"/v1/lims-runs/{run_id}/processes",
+            f"/v1/lims-runs/{run_id}/checklists",
             json={
                 "name": "Process With Steps",
                 "sort_order": 0,
@@ -236,41 +236,41 @@ class TestExperimentProcess:
         for s in body["steps"]:
             assert s["status"] == "queued"
 
-    def test_list_processes_for_run(self, client, auth_headers, draft_run):
+    def test_list_checklists_for_run(self, client, auth_headers, draft_run):
         run_id = draft_run["id"]
         # Create two processes
         for i in range(2):
             client.post(
-                f"/v1/lims-runs/{run_id}/processes",
+                f"/v1/lims-runs/{run_id}/checklists",
                 json={"name": f"Process {i}", "sort_order": i},
                 headers=auth_headers,
             )
-        r = client.get(f"/v1/lims-runs/{run_id}/processes", headers=auth_headers)
+        r = client.get(f"/v1/lims-runs/{run_id}/checklists", headers=auth_headers)
         assert r.status_code == 200, r.text
         assert len(r.json()) >= 2
 
-    def test_get_process_by_id(self, client, auth_headers, process):
-        process_id = process["id"]
-        r = client.get(f"/v1/processes/{process_id}", headers=auth_headers)
+    def test_get_checklist_by_id(self, client, auth_headers, process):
+        checklist_id = process["id"]
+        r = client.get(f"/v1/lims-run-checklists/{checklist_id}", headers=auth_headers)
         assert r.status_code == 200, r.text
-        assert r.json()["id"] == process_id
+        assert r.json()["id"] == checklist_id
 
-    def test_get_process_unknown_id_returns_404(self, client, auth_headers):
-        r = client.get(f"/v1/processes/{uuid4()}", headers=auth_headers)
+    def test_get_checklist_unknown_id_returns_404(self, client, auth_headers):
+        r = client.get(f"/v1/lims-run-checklists/{uuid4()}", headers=auth_headers)
         assert r.status_code == 404
 
-    def test_delete_process(self, client, auth_headers, process):
-        process_id = process["id"]
-        r = client.delete(f"/v1/processes/{process_id}", headers=auth_headers)
+    def test_delete_checklist(self, client, auth_headers, process):
+        checklist_id = process["id"]
+        r = client.delete(f"/v1/lims-run-checklists/{checklist_id}", headers=auth_headers)
         assert r.status_code == 204
 
         # Confirm gone
-        r2 = client.get(f"/v1/processes/{process_id}", headers=auth_headers)
+        r2 = client.get(f"/v1/lims-run-checklists/{checklist_id}", headers=auth_headers)
         assert r2.status_code == 404
 
-    def test_create_process_unknown_run_returns_404(self, client, auth_headers):
+    def test_create_checklist_unknown_run_returns_404(self, client, auth_headers):
         r = client.post(
-            f"/v1/lims-runs/{uuid4()}/processes",
+            f"/v1/lims-runs/{uuid4()}/checklists",
             json={"name": "Ghost Process", "sort_order": 0},
             headers=auth_headers,
         )
@@ -278,14 +278,14 @@ class TestExperimentProcess:
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# ProcessStep CRUD
+# LimsRunChecklistStep CRUD
 # ──────────────────────────────────────────────────────────────────────────────
 
-class TestProcessStep:
+class TestLimsRunChecklistStep:
     def test_create_step(self, client, auth_headers, process):
-        process_id = process["id"]
+        checklist_id = process["id"]
         r = client.post(
-            f"/v1/processes/{process_id}/steps",
+            f"/v1/lims-run-checklists/{checklist_id}/steps",
             json={"name": "Vortex", "description": "mix well", "sort_order": 0},
             headers=auth_headers,
         )
@@ -298,30 +298,30 @@ class TestProcessStep:
         assert body["failed_at"] is None
 
     def test_list_steps_for_process(self, client, auth_headers, process):
-        process_id = process["id"]
+        checklist_id = process["id"]
         for i in range(3):
             client.post(
-                f"/v1/processes/{process_id}/steps",
+                f"/v1/lims-run-checklists/{checklist_id}/steps",
                 json={"name": f"Step {i}", "sort_order": i},
                 headers=auth_headers,
             )
-        r = client.get(f"/v1/processes/{process_id}/steps", headers=auth_headers)
+        r = client.get(f"/v1/lims-run-checklists/{checklist_id}/steps", headers=auth_headers)
         assert r.status_code == 200, r.text
         assert len(r.json()) >= 3
 
     def test_get_step_by_id(self, client, auth_headers, step):
         step_id = step["id"]
-        r = client.get(f"/v1/process-steps/{step_id}", headers=auth_headers)
+        r = client.get(f"/v1/lims-run-checklist-steps/{step_id}", headers=auth_headers)
         assert r.status_code == 200, r.text
         assert r.json()["id"] == step_id
 
     def test_get_step_unknown_id_returns_404(self, client, auth_headers):
-        r = client.get(f"/v1/process-steps/{uuid4()}", headers=auth_headers)
+        r = client.get(f"/v1/lims-run-checklist-steps/{uuid4()}", headers=auth_headers)
         assert r.status_code == 404
 
     def test_create_step_unknown_process_returns_404(self, client, auth_headers):
         r = client.post(
-            f"/v1/processes/{uuid4()}/steps",
+            f"/v1/lims-run-checklists/{uuid4()}/steps",
             json={"name": "Ghost Step", "sort_order": 0},
             headers=auth_headers,
         )
@@ -329,10 +329,10 @@ class TestProcessStep:
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# ProcessStep state machine
+# LimsRunChecklistStep state machine
 # ──────────────────────────────────────────────────────────────────────────────
 
-class TestProcessStepTransitions:
+class TestLimsRunChecklistStepTransitions:
     """
     State machine:
         queued ──► in_process ──► complete  (terminal)
@@ -343,7 +343,7 @@ class TestProcessStepTransitions:
         step_id = step["id"]
 
         # queued → in_process
-        r = client.post(f"/v1/process-steps/{step_id}/start", headers=auth_headers)
+        r = client.post(f"/v1/lims-run-checklist-steps/{step_id}/start", headers=auth_headers)
         assert r.status_code == 200, r.text
         body = r.json()
         assert body["status"] == "in_process"
@@ -352,7 +352,7 @@ class TestProcessStepTransitions:
         assert body["failed_at"] is None
 
         # in_process → complete
-        r = client.post(f"/v1/process-steps/{step_id}/complete", headers=auth_headers)
+        r = client.post(f"/v1/lims-run-checklist-steps/{step_id}/complete", headers=auth_headers)
         assert r.status_code == 200, r.text
         body = r.json()
         assert body["status"] == "complete"
@@ -363,7 +363,7 @@ class TestProcessStepTransitions:
     def test_queued_to_failed_direct(self, client, auth_headers, step):
         """queued → failed is a valid direct transition."""
         step_id = step["id"]
-        r = client.post(f"/v1/process-steps/{step_id}/fail", headers=auth_headers)
+        r = client.post(f"/v1/lims-run-checklist-steps/{step_id}/fail", headers=auth_headers)
         assert r.status_code == 200, r.text
         body = r.json()
         assert body["status"] == "failed"
@@ -374,8 +374,8 @@ class TestProcessStepTransitions:
     def test_in_process_to_failed(self, client, auth_headers, step):
         """in_process → failed is valid."""
         step_id = step["id"]
-        client.post(f"/v1/process-steps/{step_id}/start", headers=auth_headers)
-        r = client.post(f"/v1/process-steps/{step_id}/fail", headers=auth_headers)
+        client.post(f"/v1/lims-run-checklist-steps/{step_id}/start", headers=auth_headers)
+        r = client.post(f"/v1/lims-run-checklist-steps/{step_id}/fail", headers=auth_headers)
         assert r.status_code == 200, r.text
         body = r.json()
         assert body["status"] == "failed"
@@ -385,53 +385,53 @@ class TestProcessStepTransitions:
     def test_invalid_transition_queued_to_complete_returns_400(self, client, auth_headers, step):
         """Cannot skip in_process — queued → complete is invalid."""
         step_id = step["id"]
-        r = client.post(f"/v1/process-steps/{step_id}/complete", headers=auth_headers)
+        r = client.post(f"/v1/lims-run-checklist-steps/{step_id}/complete", headers=auth_headers)
         assert r.status_code == 400, r.text
         assert "queued" in r.json()["detail"].lower()
 
     def test_complete_is_terminal_no_further_transitions(self, client, auth_headers, step):
         """complete → anything must return 400."""
         step_id = step["id"]
-        client.post(f"/v1/process-steps/{step_id}/start", headers=auth_headers)
-        client.post(f"/v1/process-steps/{step_id}/complete", headers=auth_headers)
+        client.post(f"/v1/lims-run-checklist-steps/{step_id}/start", headers=auth_headers)
+        client.post(f"/v1/lims-run-checklist-steps/{step_id}/complete", headers=auth_headers)
 
-        r = client.post(f"/v1/process-steps/{step_id}/fail", headers=auth_headers)
+        r = client.post(f"/v1/lims-run-checklist-steps/{step_id}/fail", headers=auth_headers)
         assert r.status_code == 400, r.text
         assert "complete" in r.json()["detail"].lower()
 
     def test_failed_is_terminal_no_further_transitions(self, client, auth_headers, step):
         """failed → anything must return 400."""
         step_id = step["id"]
-        client.post(f"/v1/process-steps/{step_id}/fail", headers=auth_headers)
+        client.post(f"/v1/lims-run-checklist-steps/{step_id}/fail", headers=auth_headers)
 
-        r = client.post(f"/v1/process-steps/{step_id}/start", headers=auth_headers)
+        r = client.post(f"/v1/lims-run-checklist-steps/{step_id}/start", headers=auth_headers)
         assert r.status_code == 400, r.text
         assert "failed" in r.json()["detail"].lower()
 
     def test_in_process_cannot_restart(self, client, auth_headers, step):
         """in_process → in_process is invalid (not in transition map)."""
         step_id = step["id"]
-        client.post(f"/v1/process-steps/{step_id}/start", headers=auth_headers)
-        r = client.post(f"/v1/process-steps/{step_id}/start", headers=auth_headers)
+        client.post(f"/v1/lims-run-checklist-steps/{step_id}/start", headers=auth_headers)
+        r = client.post(f"/v1/lims-run-checklist-steps/{step_id}/start", headers=auth_headers)
         assert r.status_code == 400, r.text
 
     def test_started_at_only_set_on_in_process_transition(self, client, auth_headers, process):
         """started_at is None until step reaches in_process."""
-        process_id = process["id"]
+        checklist_id = process["id"]
         r = client.post(
-            f"/v1/processes/{process_id}/steps",
+            f"/v1/lims-run-checklists/{checklist_id}/steps",
             json={"name": "Timestamp Step", "sort_order": 0},
             headers=auth_headers,
         )
         step_id = r.json()["id"]
 
         # Initially null
-        r = client.get(f"/v1/process-steps/{step_id}", headers=auth_headers)
+        r = client.get(f"/v1/lims-run-checklist-steps/{step_id}", headers=auth_headers)
         assert r.json()["started_at"] is None
 
         # After start
-        client.post(f"/v1/process-steps/{step_id}/start", headers=auth_headers)
-        r = client.get(f"/v1/process-steps/{step_id}", headers=auth_headers)
+        client.post(f"/v1/lims-run-checklist-steps/{step_id}/start", headers=auth_headers)
+        r = client.get(f"/v1/lims-run-checklist-steps/{step_id}", headers=auth_headers)
         body = r.json()
         assert body["started_at"] is not None
         assert body["completed_at"] is None
@@ -439,14 +439,14 @@ class TestProcessStepTransitions:
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# ProcessStep notes
+# LimsRunChecklistStep notes
 # ──────────────────────────────────────────────────────────────────────────────
 
-class TestProcessStepNotes:
+class TestLimsRunChecklistStepNotes:
     def test_update_notes_on_queued_step(self, client, auth_headers, step):
         step_id = step["id"]
         r = client.patch(
-            f"/v1/process-steps/{step_id}/notes",
+            f"/v1/lims-run-checklist-steps/{step_id}/notes",
             json={"notes": "Sample was cloudy, noted for review."},
             headers=auth_headers,
         )
@@ -455,9 +455,9 @@ class TestProcessStepNotes:
 
     def test_update_notes_on_in_process_step(self, client, auth_headers, step):
         step_id = step["id"]
-        client.post(f"/v1/process-steps/{step_id}/start", headers=auth_headers)
+        client.post(f"/v1/lims-run-checklist-steps/{step_id}/start", headers=auth_headers)
         r = client.patch(
-            f"/v1/process-steps/{step_id}/notes",
+            f"/v1/lims-run-checklist-steps/{step_id}/notes",
             json={"notes": "Mid-process observation."},
             headers=auth_headers,
         )
@@ -467,10 +467,10 @@ class TestProcessStepNotes:
     def test_update_notes_on_complete_step(self, client, auth_headers, step):
         """Notes must be updatable even after step is complete (terminal)."""
         step_id = step["id"]
-        client.post(f"/v1/process-steps/{step_id}/start", headers=auth_headers)
-        client.post(f"/v1/process-steps/{step_id}/complete", headers=auth_headers)
+        client.post(f"/v1/lims-run-checklist-steps/{step_id}/start", headers=auth_headers)
+        client.post(f"/v1/lims-run-checklist-steps/{step_id}/complete", headers=auth_headers)
         r = client.patch(
-            f"/v1/process-steps/{step_id}/notes",
+            f"/v1/lims-run-checklist-steps/{step_id}/notes",
             json={"notes": "All good, completed cleanly."},
             headers=auth_headers,
         )
@@ -480,9 +480,9 @@ class TestProcessStepNotes:
     def test_update_notes_on_failed_step(self, client, auth_headers, step):
         """Notes must be updatable even after step fails (terminal)."""
         step_id = step["id"]
-        client.post(f"/v1/process-steps/{step_id}/fail", headers=auth_headers)
+        client.post(f"/v1/lims-run-checklist-steps/{step_id}/fail", headers=auth_headers)
         r = client.patch(
-            f"/v1/process-steps/{step_id}/notes",
+            f"/v1/lims-run-checklist-steps/{step_id}/notes",
             json={"notes": "Equipment failure. Restart required."},
             headers=auth_headers,
         )
@@ -491,7 +491,7 @@ class TestProcessStepNotes:
 
     def test_notes_unknown_step_returns_404(self, client, auth_headers):
         r = client.patch(
-            f"/v1/process-steps/{uuid4()}/notes",
+            f"/v1/lims-run-checklist-steps/{uuid4()}/notes",
             json={"notes": "ghost note"},
             headers=auth_headers,
         )
