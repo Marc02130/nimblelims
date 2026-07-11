@@ -1,67 +1,101 @@
-Yes, there are several open-source AIs available as Docker containers that are perfect for small-scale deployment and fine-tuning.
+# Idea: Local / fine-tuned models for SOP-assisted configuration
 
-When it comes to local LLMs, the ecosystem is usually split into two phases: **Inference** (running the model to talk to it) and **Fine-Tuning** (training it on your data).
+**Status:** Exploratory + reviewed (not scheduled for implementation)  
+**Branch:** `docker-model`  
+**Date:** 2026-07-11
 
-Here is the ideal Docker-ready stack and the best small models to use:
+## Product intent
 
----
+Fine-tune or run a small open-weight model (Docker-friendly) so labs can:
 
-## 1. The Small Models to Choose From
+1. **Read SOPs** (and optional instrument example files)
+2. **Propose FieldDefinitions / lists** needed to capture protocol data
+3. **Create Experiment Templates** (+ entries) when appropriate
+4. **Create Process Definitions** (typed steps: `eln_experiment` \| `lims_run`) when the SOP is multi-step
+5. **Propose LimsRun config** (parser/worklist scaffolds) when instrument-shaped — **lazy run create**, not live runs on parse
 
-For fine-tuning on consumer hardware or a single container, you want models under 10 billion parameters. The top open-source choices right now are:
+All proposals are **drafts**. Humans **review and Apply** via existing domain services (RBAC/RLS). Clients do **not** use this path (lab-only config; Decision #9).
 
-* **Llama 3.2 (1B or 3B):** Meta's lightweight models. Exceptionally fast, tiny footprint, and incredibly easy to fine-tune using LoRA/QLoRA methods.
-* **Qwen3 (1.7B or 4B):** Outstanding multilingual capabilities, strong reasoning, and highly optimized for developer tool-calling and structured data outputs.
-* **Gemma 2 (2B or 9B):** Google’s open-weight models that punch well above their weight class for logic and general assistance.
+## Reviews (read these first)
 
----
+| Review | Doc |
+|--------|-----|
+| CEO / product | [../ceo-review/docker-model-sop-pipeline.md](../ceo-review/docker-model-sop-pipeline.md) |
+| Design / UX | [../design-review/docker-model-sop-pipeline.md](../design-review/docker-model-sop-pipeline.md) |
+| Tech / architecture | [../design/docker-model-sop-pipeline.md](../design/docker-model-sop-pipeline.md) |
+| Security (CSO) | [../security-review/docker-model-sop-pipeline.md](../security-review/docker-model-sop-pipeline.md) |
 
-## 2. Docker Containers for Inference & Hosting
+**Consensus:** Build **SOP → structured ConfigurationPlan → review → Apply** first (extend `/v1/sop-parse`). Treat Docker/Ollama + fine-tune as a **pluggable inference backend** (later), not the MVP.
 
-If you want to pull a small model instantly into a container and interact with it or use its API, **Ollama** is the golden standard.
+## Baseline infrastructure notes (inference & fine-tune)
 
-### Running Ollama via Docker (CPU Only)
+There are several open-source AIs available as Docker containers for small-scale deployment and fine-tuning.
+
+The ecosystem is usually split into two phases: **Inference** (running the model) and **Fine-Tuning** (training on your data).
+
+### 1. Small models (under ~10B)
+
+For consumer hardware or a single container:
+
+* **Llama 3.2 (1B or 3B):** Fast, small footprint; LoRA/QLoRA friendly.
+* **Qwen3 (1.7B or 4B):** Strong structured/tool-style outputs; good candidate for JSON plans.
+* **Gemma 2 (2B or 9B):** Strong general quality for size.
+
+### 2. Docker inference — Ollama
+
+**CPU:**
 
 ```bash
 docker run -d -v ollama:/root/.ollama -p 11434:11434 --name ollama ollama/ollama
-
 ```
 
-### Running Ollama via Docker (With NVIDIA GPU Support)
+**NVIDIA GPU:**
 
 ```bash
 docker run -d --gpus=all -v ollama:/root/.ollama -p 11434:11434 --name ollama ollama/ollama
-
 ```
 
-Once the container is running, you can jump inside and download a small model instantly:
+Pull/run a model:
 
 ```bash
 docker exec -it ollama ollama run llama3.2:3b
-
 ```
 
----
+**NimbleLIMS note:** Prefer attaching Ollama on an **internal** compose network (not public `11434`) when integrated. See security review.
 
-## 3. How to Fine-Tune inside Docker
+### 3. Fine-tune inside Docker
 
-Fine-tuning requires a training framework. Running standard Hugging Face scripts natively in a container can be complex due to GPU driver allocations, but the open-source community has highly streamlined workflows for this:
+#### Unsloth + Ollama
 
-### The Unsloth + Ollama Stack
+**Unsloth** is a strong low-memory option for LoRA/QLoRA on Llama/Qwen-class models.
 
-**Unsloth** is currently the fastest, lowest-memory open-source library for fine-tuning models like Llama 3.2 and Qwen3.
+* Community stacks bundle Unsloth + Ollama + OpenWebUI.
+* Or: PyTorch CUDA image + `unsloth`, train on JSONL `(sop_text → configuration_plan)`, export **GGUF**, load into Ollama.
 
-* There are community-maintained Docker stacks (such as the popular **Unsloth + Ollama + OpenWebUI** container templates) that bundle everything together.
-* Alternatively, you can use a base PyTorch Docker container, install `unsloth`, feed it a simple CSV/JSON dataset, and perform a 4-bit QLoRA fine-tune.
-* Once your fine-tune finishes, Unsloth allows you to export the weights natively back into a GGUF file format that your Dockerized Ollama instance can run immediately.
-
-### Custom Fine-Tuning Container (Hugging Face / Axolotl)
-
-If you want a highly customizable raw training environment, you can pull an official NVIDIA CUDA or PyTorch image to build your training environment:
+#### Custom Hugging Face / Axolotl-style container
 
 ```dockerfile
 FROM pytorch/pytorch:2.3.0-cuda12.1-cudnn8-devel
-RUN pip install transformers datasets trl peft accelarate bitsandbytes
-# Add your training script and data here
-
+RUN pip install transformers datasets trl peft accelerate bitsandbytes
+# Add training script and data here
 ```
+
+**NimbleLIMS note:** Training must be **offline / separate** from the FastAPI app container. Dataset only from **opt-in approved Applies**, ideally **per tenant** — never a shared multi-tenant fine-tune without legal + isolation review.
+
+## Suggested eng phases (from tech review)
+
+| Phase | What | Fine-tune? |
+|-------|------|------------|
+| T0 | `ConfigurationPlan` schema + cloud extraction + Apply | No |
+| T1 | Plan review UI + partial accept | No |
+| T2 | `LLMProvider` + optional Ollama compose profile | No |
+| T3 | Golden SOP tests + telemetry | No |
+| T4–T5 | Opt-in export + offline fine-tune playbook | Yes |
+
+## Open product questions
+
+1. Default inference: cloud forever vs paid local-model SKU?
+2. Auto-create process **definitions** only, or ever instances from AI?
+3. Minimum human review checklist before Apply is enabled?
+
+Add blockers to [open-questions](../open-questions/) before implementation.

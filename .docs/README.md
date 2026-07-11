@@ -82,13 +82,14 @@ All product and engineering docs live under this directory, organized by purpose
 
 ## Reviews
 
-- **CEO:** [ceo-review/](ceo-review/) — process/experiment, schema evolution, field management  
-- **Design:** [design-review/](design-review/)  
-- **Security:** [security-review/](security-review/)  
+- **CEO:** [ceo-review/](ceo-review/) — process/experiment, schema evolution, field management, [docker-model SOP pipeline](ceo-review/docker-model-sop-pipeline.md)  
+- **Design:** [design-review/](design-review/) — includes [docker-model SOP pipeline](design-review/docker-model-sop-pipeline.md)  
+- **Security:** [security-review/](security-review/) — includes [docker-model SOP pipeline](security-review/docker-model-sop-pipeline.md)  
+- **Tech (design/):** architecture specs, including [docker-model SOP pipeline](design/docker-model-sop-pipeline.md)
 
 ## Ideas
 
-Exploratory only: [ideas/model-fine-tune.md](ideas/model-fine-tune.md).
+Exploratory only: [ideas/model-fine-tune.md](ideas/model-fine-tune.md) (SOP → config via local/fine-tuned models; see reviews above).
 
 ## Agent / contributor rules
 
