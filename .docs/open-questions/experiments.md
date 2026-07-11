@@ -33,7 +33,7 @@ When resolving: fill **Decision**, **Date**, **Owner**, and one line of **Ration
 
 | # | Question | Status | Blocks | Decision | Date | Owner | Rationale |
 |---|----------|--------|--------|----------|------|-------|-----------|
-| 1 | Can an ELN Process reference LIMS Runs (link/promote instrument steps)? | **Open** | Phase 3 (Run link / hybrid definitions) | Options under discussion — see below / chat. Phase 1–2: ELN templates only; no Run FK. Direction lean: typed process steps. | | | |
+| 1 | Can an ELN Process reference LIMS Runs (link/promote instrument steps)? | **Decided** | Phase 3 hybrid definitions | See **Decision #1** below. **Option C** typed process steps in Phase 3 v1 (**1h-A**); defaults 1a–1g. | 2026-07-11 | Product | Real SOPs mix notebook + instrument steps |
 | 2 | Process status: own list vs strictly derived from steps? | **Decided (provisional)** | — | Optional `status_id` + seeded list `eln_process_status` (Draft, In Progress, On Hold, Completed, Cancelled). Not auto-derived yet. | 2026-07-11 | | Enough for MVP; derivation can be added later without schema break |
 | 3 | Can a Process override or extend entry config from member templates? | **Decided (provisional)** | — | Phase 2: **No override.** Entries come only from ExperimentTemplate `template_definition.entries`. Process does not patch field sets. | 2026-07-11 | | Keeps one source of truth on templates |
 | 4 | Write-back conflict rules when multiple steps/entries update the same Sample attribute | **Decided (provisional)** | — | **Last write wins.** Previous Sample value stored on `EntryFieldValue.write_back_previous`. Allowlist only (`SAMPLE_WRITE_BACK_COLUMNS`). | 2026-07-11 | | Simple, auditable enough for v1; stricter rules need product input |
@@ -87,10 +87,10 @@ What shipped today allows **ad hoc** process create (name + pick templates) with
 3. One-time: for any ad hoc instances, auto-create a definition snapshot (“Legacy: {name}”) or mark `definition_id` nullable only for pre-cutover rows.
 4. Disable free-form instance create in API/UI after cutover (or keep admin-only escape hatch—product can tighten later).
 
-### Out of scope for this decision (still open)
+### Out of scope for this decision (resolved elsewhere / later)
 
-- Whether a definition step may point at a **LIMS Run** template/path (**#1**).
-- Who may browse definitions vs start instances (**#7**, **#9**).
+- Definition steps may be LIMS Runs: **yes** — see **Decision #1**.
+- Who sees progress: **Decision #7**. Who may edit entries: **#9** still open.
 - Versioning UI (publish v1/v2)—default assumption: snapshot instantiate; explicit versioning can follow.
 
 ### Rationale
@@ -99,6 +99,63 @@ What shipped today allows **ad hoc** process create (name + pick templates) with
 - Single experiments still need ad hoc flexibility (troubleshooting, one-offs).
 - Matches CEO “orchestrate how we do work” without forcing every experiment through a template.
 - Aligns mental model: **ExperimentTemplate → Experiment**, **ProcessDefinition → Process instance**.
+
+---
+
+## Decision #1 — Typed process steps (Option C) in Phase 3 v1
+
+**Status:** Decided  
+**Date:** 2026-07-11
+
+### Product rule
+
+ELN **process definitions** may include steps that materialize either:
+
+| `step_kind` | Materializes | Notes |
+|-------------|--------------|--------|
+| `eln_experiment` | ELN **Experiment** (+ entries from template) | Notebook / manual / structured entry work |
+| `lims_run` | **LimsRun** | Instrument / CRO assay; data stays on the run |
+
+**Not chosen:** journey-only (A), soft-link-only (B), hard containment (D), merge Experiment+LimsRun (E).
+
+### Sequencing (**1h-A**)
+
+Phase 3 **first definition release** includes **full hybrid typed steps** (both kinds).  
+Not “ELN-only definitions first, Runs later.” Schema and UI designed for polymorphism from the start.
+
+### Locked defaults (1a–1g)
+
+| ID | Decision |
+|----|----------|
+| **1a** | Only two step kinds: `eln_experiment` \| `lims_run` |
+| **1b** | Step stores `experiment_template_id` + **required `execution_mode`** (do not infer mode from template alone) |
+| **1c** | **Lazy** LimsRun create — placeholder until “Start step” (not eager create of all runs at process start) |
+| **1d** | **Current run + history** per step instance (retest/refit); not single immutable run forever |
+| **1e** | Run samples should be a **subset of process cohort** when linked; plate subset OK; validate where practical |
+| **1f** | **Soft** advance warnings if Run not complete/published (hard gates later if needed) |
+| **1g** | **LimsRun remains source of truth** for instrument data; no auto-promote to Entry/Sample in v1 |
+
+### Distinct from run-internal checklists
+
+| Entity | Role |
+|--------|------|
+| ELN process definition / instance steps | Pipeline across experiments **and** LimsRuns |
+| `lims_run_checklists` / `lims_run_checklist_steps` | Checklist **inside** one LimsRun (unchanged) |
+
+### Implementation notes (Phase 3)
+
+1. Process definition steps: `step_kind`, `experiment_template_id`, `execution_mode`, sort_order, label.
+2. Instance steps: snapshot of definition; for `lims_run`, track `current_lims_run_id` + history junction/table.
+3. “Start step”: branch create Experiment vs create LimsRun (lazy for runs).
+4. Sample journey (#7): surface step kind + status for samples the viewer can access.
+5. Promote/write-back from Run → later phase if needed.
+
+### Rationale
+
+- Real protocols mix notebook and instrument work; definitions must encode both.
+- Lazy create avoids noisy draft/ordered runs for unstarted steps.
+- Soft gates reduce false progress without blocking early adoption.
+- Keeping instrument SoT on LimsRun avoids dual-write drift with Entries.
 
 ---
 
@@ -136,22 +193,23 @@ Not limited to `experiment:manage`. Lab techs, managers, and **clients** see jou
 |-------|-----------------|----------------------------|
 | **1** Process MVP | Done | None remaining |
 | **2** Entries + Process UI | Done (API + Process UI + entry capture) | None remaining for shipped slice; Q4/Q5 provisional OK |
-| **3** Definitions + cross-system visibility | **Not started** | **#1** (and ideally #8, #10). **#6 and #7 Decided** |
+| **3** Definitions + hybrid steps + journey | **Ready to start** | **#1, #6, #7 Decided.** #8 / #9 / #10 optional polish — do not block definition + typed-step v1 |
 
 ---
 
-## Phase 3 — resolve before implementation
+## Phase 3 — status
 
-Answer at least:
+| Decision | Status |
+|----------|--------|
+| **#6** Process definitions first-class | **Decided** |
+| **#1** Typed steps (C) + 1a–1g + **1h-A** hybrid in v1 | **Decided** |
+| **#7** Sample-scoped progress visibility | **Decided** |
 
-1. ~~**#6 Process definitions**~~ — **Decided**.
-2. **#1 Process ↔ LIMS Runs** — see options explanation (typed steps lean); lock Decision #1.
-3. ~~**#7 Visibility**~~ — **Decided** (sample-scoped; no cross-client).
+Optional (can ship after or alongside):
 
-Optional but valuable before Phase 3 code:
-
-4. **#8** Auto sample-exec on step instantiate?
-5. **#10** Lineage coexistence end-state?
+- **#8** Auto sample-exec on step instantiate  
+- **#9** Entry edit permissions beyond `experiment:manage`  
+- **#10** Lineage coexistence end-state
 
 ---
 

@@ -105,17 +105,19 @@ Legacy `experiment_link` via `ExperimentDetail` **coexists** in Phase 1; no forc
 
 ## Phase 3 — Process definitions + cross-system visibility
 
-**Gate:** Do not start Phase 3 coding that depends on Runs-in-process until **#1** is **Decided**. Process **definitions** (#6) and **visibility** (#7) are decided — definition work can start once #1 scope for “ELN-only steps first” vs “hybrid typed steps in v1” is chosen.
+**Gate:** **Open for Phase 3 implementation.** Decisions **#1, #6, #7** locked.
 
 **#6 Decided:** Processes always defined (definitions → instances).  
+**#1 Decided:** Typed steps (`eln_experiment` \| `lims_run`) in Phase 3 v1 (**1h-A**); defaults 1a–1g (lazy Run, history, soft gates, Run SoT for instrument data).  
 **#7 Decided:** Progress visible to anyone with sample access; no cross-client.
 
-- [ ] First-class process definitions (`eln_process_templates` / definitions + ordered steps of experiment templates)
-- [ ] Instantiate process instance from definition (snapshot steps; required definition FK on instance after cutover)
-- [ ] Definition management UI + “Start process from definition” (retire free-form instance-as-primary create)
+- [ ] First-class process definitions + ordered **typed** steps (`step_kind`, template, `execution_mode`)
+- [ ] Instantiate process instance from definition (snapshot steps; definition FK on instance after cutover)
+- [ ] Definition management UI + “Start process from definition”
+- [ ] Start step: branch create Experiment vs lazy create LimsRun; run history per step
 - [ ] Migration path for Phase 1–2 ad hoc `eln_processes` rows
-- [ ] Sample journey view across Processes / Experiments / Runs / Batches
-- [ ] Optional link or promotion path between ELN Process steps and LIMS Runs (**blocked on #1**)
+- [ ] Sample journey view (sample-scoped visibility per #7) across Processes / Experiments / LimsRuns
+- [ ] Soft advance warnings when Run step not complete/published
 - [ ] Advanced reporting / “samples currently in step X”
 
 ---
@@ -158,3 +160,4 @@ Rule: no new phase / major feature until blocking questions for that work are re
 | 2026-07-11 | Open questions moved to .docs/open-questions/; Phase 3 gated on Q#1,6,7 |
 | 2026-07-11 | Decision #6: processes always defined (first-class reusable definitions); experiments ad hoc or templated |
 | 2026-07-11 | Decision #7: progress visibility sample-scoped (no cross-client) |
+| 2026-07-11 | Decision #1: typed process steps (C) + 1a–1g + 1h-A hybrid in Phase 3 v1 |
