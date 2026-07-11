@@ -161,7 +161,7 @@ dist
 # Temporary folders
 tmp/
 temp/
-manuals/
+/manuals/
 
 # Logs
 logs
