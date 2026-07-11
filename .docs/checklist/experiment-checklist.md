@@ -105,9 +105,10 @@ Legacy `experiment_link` via `ExperimentDetail` **coexists** in Phase 1; no forc
 
 ## Phase 3 — Process definitions + cross-system visibility
 
-**Gate:** Do not start Phase 3 coding until open questions **#1, #7** (and ideally #8, #10) are **Decided** in [`.docs/open-questions/experiments.md`](../open-questions/experiments.md).
+**Gate:** Do not start Phase 3 coding that depends on Runs-in-process until **#1** is **Decided**. Process **definitions** (#6) and **visibility** (#7) are decided — definition work can start once #1 scope for “ELN-only steps first” vs “hybrid typed steps in v1” is chosen.
 
-**#6 Decided:** Processes are **always defined** (first-class reusable process definitions → instances). Experiments remain ad hoc **or** from ExperimentTemplate. See Decision #6 in the open-questions doc.
+**#6 Decided:** Processes always defined (definitions → instances).  
+**#7 Decided:** Progress visible to anyone with sample access; no cross-client.
 
 - [ ] First-class process definitions (`eln_process_templates` / definitions + ordered steps of experiment templates)
 - [ ] Instantiate process instance from definition (snapshot steps; required definition FK on instance after cutover)
@@ -156,3 +157,4 @@ Rule: no new phase / major feature until blocking questions for that work are re
 | 2026-07-11 | Entry capture UI: EntryCapturePanel on experiment detail |
 | 2026-07-11 | Open questions moved to .docs/open-questions/; Phase 3 gated on Q#1,6,7 |
 | 2026-07-11 | Decision #6: processes always defined (first-class reusable definitions); experiments ad hoc or templated |
+| 2026-07-11 | Decision #7: progress visibility sample-scoped (no cross-client) |

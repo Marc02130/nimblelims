@@ -33,13 +33,13 @@ When resolving: fill **Decision**, **Date**, **Owner**, and one line of **Ration
 
 | # | Question | Status | Blocks | Decision | Date | Owner | Rationale |
 |---|----------|--------|--------|----------|------|-------|-----------|
-| 1 | Can an ELN Process reference LIMS LIMS Runs (link/promote instrument steps)? | **Open** | Phase 3 (Run link / sample journey) | — Phase 1–2: ELN templates only; no Run FK | | | |
+| 1 | Can an ELN Process reference LIMS Runs (link/promote instrument steps)? | **Open** | Phase 3 (Run link / hybrid definitions) | Options under discussion — see below / chat. Phase 1–2: ELN templates only; no Run FK. Direction lean: typed process steps. | | | |
 | 2 | Process status: own list vs strictly derived from steps? | **Decided (provisional)** | — | Optional `status_id` + seeded list `eln_process_status` (Draft, In Progress, On Hold, Completed, Cancelled). Not auto-derived yet. | 2026-07-11 | | Enough for MVP; derivation can be added later without schema break |
 | 3 | Can a Process override or extend entry config from member templates? | **Decided (provisional)** | — | Phase 2: **No override.** Entries come only from ExperimentTemplate `template_definition.entries`. Process does not patch field sets. | 2026-07-11 | | Keeps one source of truth on templates |
 | 4 | Write-back conflict rules when multiple steps/entries update the same Sample attribute | **Decided (provisional)** | — | **Last write wins.** Previous Sample value stored on `EntryFieldValue.write_back_previous`. Allowlist only (`SAMPLE_WRITE_BACK_COLUMNS`). | 2026-07-11 | | Simple, auditable enough for v1; stricter rules need product input |
 | 5 | Workflow integration depth for Processes | **Decided (provisional)** | — | Phase 2 actions only: `create_process`, `add_step_to_process`, `assign_samples_to_process`, `instantiate_process_step`. No deep orchestration / gates. | 2026-07-11 | | Matches “new actions only” recommendation |
 | 6 | Reusable Process definitions (first-class) — shape and when? | **Decided** | Phase 3 implementation of process definitions | See **Decision #6** below. Processes are **always defined** (first-class reusable definitions). Experiments remain ad hoc **or** template-based. | 2026-07-11 | Product | Product rule: multi-step work is governed by a definition; single experiments stay flexible |
-| 7 | How is process progress / sample step surfaced to non-admin users? | **Open** | Phase 3 (journey UI / reporting) | — Phase 2: manage UI requires `experiment:manage` only | | | |
+| 7 | How is process progress / sample step surfaced to non-admin users? | **Decided** | Phase 3 journey UI | See **Decision #7** below. Progress is visible to anyone with access to the relevant samples; client isolation enforced (no cross-client progress). | 2026-07-11 | Product | Sample-scoped visibility, not manage-permission-only |
 | 8 | Should instantiate-step auto-create ExperimentSampleExecution rows for process samples? | **Open** | Phase 3 polish / sample journey | — Phase 2: assign at process level only; step instantiate creates Experiment + entries, does not auto-link all process samples into the experiment | | | |
 | 9 | Entry capture: who can edit values (experiment:manage only vs lab roles / status gates)? | **Open** | Hardening / multi-role UX | — Currently `experiment:manage` | | | |
 | 10 | Deprecate or coexist long-term with `ExperimentDetail` `experiment_link` lineage? | **Open** | Phase 3 cleanup | — Phase 1–2: **coexist**; no forced migration | | | |
@@ -102,13 +102,41 @@ What shipped today allows **ad hoc** process create (name + pick templates) with
 
 ---
 
+## Decision #7 — Progress visibility is sample-scoped
+
+**Status:** Decided  
+**Date:** 2026-07-11
+
+### Product rule
+
+| Actor | Can see process / sample progress? |
+|-------|-------------------------------------|
+| **Anyone with access to the sample(s)** | **Yes** — progress for those samples (which process, which step, status) |
+| **Other clients’ orgs** | **No** — client isolation (same as samples / RLS) |
+| **Users without sample access** | **No** — not a global “all processes” feed for everyone |
+
+Not limited to `experiment:manage`. Lab techs, managers, and **clients** see journey/progress for **their** samples only.
+
+### Implementation implications (Phase 3 journey)
+
+- Journey/progress APIs filter by sample visibility (project/client RLS), not only `experiment:manage`.
+- Manage actions (create definition, start process, advance samples, edit entries) stay gated by write permissions (today `experiment:manage`; refine with #9 later).
+- Client users: read-only progress on samples they can already see; never another client’s processes.
+
+### Rationale
+
+- “Where is my sample?” is the product value; hiding it behind manage roles breaks the journey.
+- Multi-tenant safety stays non-negotiable: sample access already encodes client boundaries.
+
+---
+
 ## Phase gate summary
 
 | Phase | Scope (summary) | Open blockers before coding |
 |-------|-----------------|----------------------------|
 | **1** Process MVP | Done | None remaining |
 | **2** Entries + Process UI | Done (API + Process UI + entry capture) | None remaining for shipped slice; Q4/Q5 provisional OK |
-| **3** Definitions + cross-system visibility | **Not started** | **#1, #7** (and ideally #8, #10). **#6 is Decided** — implement process definitions as first Phase 3 vertical once remaining blockers allow |
+| **3** Definitions + cross-system visibility | **Not started** | **#1** (and ideally #8, #10). **#6 and #7 Decided** |
 
 ---
 
@@ -116,9 +144,9 @@ What shipped today allows **ad hoc** process create (name + pick templates) with
 
 Answer at least:
 
-1. ~~**#6 Process definitions**~~ — **Decided** (see above).
-2. **#1 Process ↔ Runs** — Link only (FK/junction), promote results, or stay strictly separate with a read-only journey view?
-3. **#7 Visibility** — Who sees process/sample position (all lab roles, project members, clients)?
+1. ~~**#6 Process definitions**~~ — **Decided**.
+2. **#1 Process ↔ LIMS Runs** — see options explanation (typed steps lean); lock Decision #1.
+3. ~~**#7 Visibility**~~ — **Decided** (sample-scoped; no cross-client).
 
 Optional but valuable before Phase 3 code:
 
