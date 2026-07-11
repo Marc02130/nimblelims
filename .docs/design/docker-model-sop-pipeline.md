@@ -41,7 +41,7 @@ Limits: single-vendor cloud; output schema not aligned to Process Definitions / 
 |-------|----------------|
 | **Ingestion** | Extract text from PDF/DOCX/images; chunk + **vectorize** SOP text into DB |
 | **Configuration memory** | Store approved **design docs** (ConfigurationPlans + links to live objects); embed for retrieval |
-| **Retrieval (RAG)** | On new SOP: search similar SOPs + design docs + existing FieldDefs/templates/process defs (tenant-scoped) |
+| **Retrieval (RAG)** | On new SOP: search similar SOPs + design docs + existing FieldDefs/templates/process defs (lab catalog + optional client-scoped SOPs) |
 | **Inference provider** | Pluggable: `anthropic` \| `openai_compat` \| `ollama` (Docker) |
 | **Extraction service** | Prompt = new SOP + retrieved context → schema-validated **ConfigurationPlan** |
 | **Draft store** | Persist plan JSON + status (extend SopParseJob or new `config_from_sop_jobs`) |
@@ -49,7 +49,26 @@ Limits: single-vendor cloud; output schema not aligned to Process Definitions / 
 | **Optional training** | Offline LoRA/QLoRA (Unsloth) → GGUF → Ollama — **not in request path**; RAG is the default “memory” |
 
 **Hard rule:** Models never receive DB credentials or call SQL. Apply path uses repositories/services with RLS + RBAC.  
-**Hard rule:** Retrieval is **tenant/client-scoped** (same isolation as samples/templates)—never cross-customer SOP memory.
+**Hard rule:** Where SOP memory is client-scoped, retrieval respects **lab-customer isolation** (same `client_id` / project RLS as samples)—never leak one **lab client’s** SOPs or design docs to another. See **§3.0 Terminology**.
+
+### 3.0 Terminology: “Client” in NimbleLIMS
+
+**Client** means a **customer of the lab**, not a SaaS tenant of the NimbleLIMS product company.
+
+| Term | Meaning | Examples |
+|------|---------|----------|
+| **Lab** | Organization running NimbleLIMS (deployment may be on-prem or hosted) | Environmental testing lab; CRO (e.g. Charles River–style); biotech internal lab |
+| **Lab personnel** | Employees of the lab (System client users in RBAC) | Lab tech, lab manager, admin |
+| **Client** | Organization the lab does work *for* | Env lab’s industrial customer; CRO’s sponsor biotech; study owner |
+| **Client users** | Logins belonging to that client org | Sponsor portal user viewing their projects/samples only |
+
+NimbleLIMS already enforces this: projects carry `client_id`; RLS limits client users to their projects; lab (System) users see across clients as policy allows.
+
+**Implication for SOP → config / RAG:**
+
+- **Lab SOPs and shared assay configuration** (many FieldDefs, Experiment Templates, Process Definitions) are often **lab-owned**, not per-client—retrieval for configuration should default to **lab catalog**, not only one client’s rows.
+- **Client-specific SOPs** (sponsor-provided methods, confidential protocols) must stay **scoped to that client** (and lab staff who may work that client’s projects).
+- Isolation goal is **“Client A’s people never see Client B’s data/SOPs”**—same whether the deploy is single-lab on-prem or multi-lab hosted. It is **not** primarily about NimbleLIMS Inc. multi-tenant cloud marketing language.
 
 ### 3.2 ConfigurationPlan (proposed schema)
 
@@ -184,10 +203,12 @@ This matches the product loop:
 
 ```
 new SOP → extract + chunk + embed
-       → retrieve top-k similar SOP chunks (same tenant)
+       → retrieve top-k similar SOP chunks
+            • lab-owned SOPs (shared methods) always candidates for lab users
+            • client-tagged SOPs only if job is in that client’s context
        → retrieve linked design docs for those SOPs
        → retrieve / rank candidate existing objects
-            (FieldDefinitions by name similarity, templates, process defs)
+            (FieldDefinitions by name similarity, templates, process defs — lab catalog)
        → build prompt:
             system: schema + rules (link_existing preferred)
             user: new SOP text
@@ -202,21 +223,24 @@ new SOP → extract + chunk + embed
 
 | Approach | Learns | Risks |
 |----------|--------|-------|
-| **RAG over SOPs + design docs** | This tenant’s protocols and *how they mapped to NimbleLIMS* | Must enforce tenant scope; bad past Applies can reinforce mistakes (prefer **applied + human-edited** design docs only) |
-| **Fine-tune** | Generic extraction style / JSON shape | Expensive; stale; cross-tenant leakage if shared; doesn’t auto-see new FieldDefs |
-| **Both** | Fine-tune for structure; RAG for tenant memory | Best long-term; more ops |
+| **RAG over SOPs + design docs** | This **lab’s** methods and *how they mapped to NimbleLIMS*; optional per–lab-client confidential SOPs | Must enforce **client scope** where SOPs are client-owned; bad past Applies can reinforce mistakes (prefer **applied + human-edited** design docs only) |
+| **Fine-tune** | Generic extraction style / JSON shape | Expensive; stale; if trained on client-confidential SOPs, weights become sensitive; doesn’t auto-see new FieldDefs |
+| **Both** | Fine-tune for structure; RAG for lab/client memory | Best long-term; more ops |
 
 #### Suggested tables (illustrative)
 
 ```
-sop_documents          id, client_id, filename, raw_uri, text_hash, created_by, ...
+sop_documents          id, ownership (lab|client), client_id nullable,
+                       filename, raw_uri, text_hash, created_by, ...
+                       -- client_id set when SOP is sponsor/client-confidential
 sop_chunks             id, document_id, chunk_index, text, embedding vector, ...
 sop_design_docs        id, document_id, job_id, plan_json, applied_at, applied_by, ...
 sop_design_links       design_doc_id, object_type, object_id
                        -- experiment_template | process_definition | field_definition | ...
 ```
 
-Embeddings: `pgvector` on Postgres (fits existing stack) or external vector store with **mandatory client_id filter** on every query.
+Embeddings: `pgvector` on Postgres (fits existing stack) or external vector store.  
+**Query filters:** lab users may search lab-owned + client SOPs they are allowed to access; **client users** do not run SOP→config (Decision #9) and must never retrieve other clients’ SOPs.
 
 #### Design-doc content
 
@@ -233,10 +257,12 @@ When a **new version of the same SOP** is uploaded, retrieve prior design doc fo
 
 | Include in context | Exclude |
 |--------------------|---------|
-| Same client (RLS) SOPs and design docs | Other clients’ SOPs |
+| **Lab-owned** SOPs and design docs (shared methods) | — |
+| **Client-owned** SOPs only for the client context of the job | Other lab clients’ confidential SOPs |
 | Applied, human-accepted design docs | Failed / abandoned drafts (or mark low weight) |
-| Active FieldDefinitions / templates / process defs | Soft-deleted / inactive unless user opts in |
+| Active FieldDefinitions / templates / process defs (lab catalog) | Soft-deleted / inactive unless user opts in |
 | Top-k by embedding similarity + optional keyword (assay name) | Dump of entire catalog (token bloat, noise) |
+| Lab personnel running the job | Client-user-driven SOP→config (out of scope; Decision #9) |
 
 #### Prompt contract (guidance to the model)
 
@@ -262,7 +288,7 @@ When a **new version of the same SOP** is uploaded, retrieve prior design doc fo
 SOP file ──► text extract ──► chunk + embed ──► store sop_documents / sop_chunks
                      │
                      ▼
-              retrieve (tenant-scoped)
+              retrieve (lab catalog + client-scoped SOPs as allowed)
               • similar SOP chunks
               • linked design docs
               • candidate FieldDefs / templates / process defs
@@ -333,7 +359,7 @@ Prefer extending sop-parse rather than greenfield:
 |-------|-------------|----------------------|
 | **T0** | ConfigurationPlan schema + validator + extended apply (cloud model); store applied plan as design doc on job | No |
 | **T1** | UI plan review + partial accept; show “link existing” matches | No |
-| **T1.5** | Inject tenant catalog (FieldDef/template/process names+ids) into prompt | No |
+| **T1.5** | Inject lab catalog (FieldDef/template/process names+ids) into prompt | No |
 | **T2** | `LLMProvider` + Ollama compose profile | No |
 | **T3** | Telemetry + golden SOP suite | No |
 | **T3.5** | Vectorize SOPs + design docs (`pgvector`); RAG retrieval in job pipeline | No |
@@ -349,7 +375,7 @@ Prefer extending sop-parse rather than greenfield:
 | Process step template_ref orphans | Apply creates templates first; resolve refs in-memory |
 | Prompt injection via SOP content | See security review; treat SOP as untrusted |
 | Compose complexity | Optional profile; default cloud |
-| Fine-tune data leakage across tenants | Per-tenant training only; never mix |
+| Fine-tune on client-confidential SOPs | Prefer lab-general methods only, or per-client adapters; never train one model on all clients’ confidential SOPs then serve broadly |
 
 ## 11. Recommendation
 

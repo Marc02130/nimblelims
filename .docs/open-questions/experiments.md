@@ -212,17 +212,21 @@ Not limited to `experiment:manage`. Lab techs, managers, and **clients** see jou
 
 ---
 
-## Decision #9 — Lab personnel edit data; clients do not (orders later)
+## Decision #9 — Lab personnel edit data; lab clients do not (orders later)
 
 **Status:** Decided  
 **Date:** 2026-07-11
+
+### Terminology
+
+**Client** = customer of the **lab** (e.g. environmental lab’s industrial customer; CRO’s sponsor). Not “SaaS tenant of the NimbleLIMS vendor.” Lab deployments (on-prem or hosted) still isolate **lab clients** from each other via `client_id` / project RLS—required for multi-client labs and CROs.
 
 ### Product rule
 
 | Actor | Edit experimental data (entries, results, process capture)? | Other |
 |-------|------------------------------------------------------------|--------|
-| **Lab personnel** (admin, lab manager, lab tech — roles with lab write permissions) | **Yes** | Manage processes/experiments per existing RBAC (`experiment:manage` today for process/entry APIs) |
-| **Client users** | **No** — never edit lab/entry/sample experimental data | May later **create orders** if/when client ordering is enabled (ordering ≠ editing lab data) |
+| **Lab personnel** (admin, lab manager, lab tech — System client / lab roles) | **Yes** | Manage processes/experiments per existing RBAC (`experiment:manage` today for process/entry APIs) |
+| **Lab client users** (sponsor / customer org logins) | **No** — never edit lab/entry/sample experimental data | May later **create orders** if/when client ordering is enabled (ordering ≠ editing lab data); may view **their** sample journey (#7) |
 
 ### Implementation implications
 

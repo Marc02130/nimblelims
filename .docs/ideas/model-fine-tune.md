@@ -14,7 +14,9 @@ Fine-tune or run a small open-weight model (Docker-friendly) so labs can:
 4. **Create Process Definitions** (typed steps: `eln_experiment` \| `lims_run`) when the SOP is multi-step
 5. **Propose LimsRun config** (parser/worklist scaffolds) when instrument-shaped — **lazy run create**, not live runs on parse
 
-All proposals are **drafts**. Humans **review and Apply** via existing domain services (RBAC/RLS). Clients do **not** use this path (lab-only config; Decision #9).
+All proposals are **drafts**. Humans **review and Apply** via existing domain services (RBAC/RLS).
+
+**Client** = customer of the **lab** (env sampling client, CRO sponsor, etc.)—not “SaaS tenant of NimbleLIMS.” Lab personnel configure assays; **lab client users** do **not** run SOP→config (Decision #9). They may later create **orders** and already see **their** sample journey (Decision #7). Deployments still keep **lab clients’ data separate** (existing `client_id` / RLS)—critical for CROs and multi-client env labs.
 
 ## Reviews (read these first)
 
@@ -86,11 +88,11 @@ RUN pip install transformers datasets trl peft accelerate bitsandbytes
 
 Yes: new SOPs should be guided by **existing** tenant configuration.
 
-1. **Vectorize SOPs** into the DB (chunks + embeddings, tenant-scoped).  
+1. **Vectorize SOPs** into the DB (chunks + embeddings). Tag **lab-owned** vs **client-owned** (sponsor-confidential) SOPs.  
 2. **Store design docs** — applied ConfigurationPlans + links to created FieldDefs / templates / process defs / lims configs.  
-3. **On new upload** — retrieve similar SOPs + design docs + catalog candidates; prompt the model to prefer `link_existing` and consistent patterns.
+3. **On new upload** — retrieve similar SOPs + design docs + **lab catalog** candidates; never leak Client B’s confidential SOPs into Client A’s job.
 
-RAG is the default memory mechanism; fine-tune is optional for JSON/schema skill. Details: [tech review §3.7](../design/docker-model-sop-pipeline.md).
+RAG is the default memory mechanism; fine-tune is optional for JSON/schema skill. Details: [tech review §3.0–3.7](../design/docker-model-sop-pipeline.md).
 
 ## Suggested eng phases (from tech review)
 
