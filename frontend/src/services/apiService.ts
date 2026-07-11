@@ -1146,6 +1146,351 @@ class ApiService {
     await this.api.delete(`v1/experiment-templates/${id}`);
   }
 
+  // ELN Processes (Phase 1–3) — definitions + instances + typed steps
+  async getElnProcesses(params?: {
+    active?: boolean;
+    mine?: boolean;
+    page?: number;
+    size?: number;
+  }) {
+    const response: AxiosResponse = await this.api.get('v1/eln-processes', { params });
+    return response.data;
+  }
+
+  async getElnProcess(id: string) {
+    const response: AxiosResponse = await this.api.get(`v1/eln-processes/${id}`);
+    return response.data;
+  }
+
+  async createElnProcess(data: {
+    name: string;
+    description?: string;
+    status_id?: string;
+    process_definition_id?: string;
+    steps?: Array<{
+      experiment_template_id: string;
+      step_kind?: 'eln_experiment' | 'lims_run';
+      execution_mode?: 'eln_experiment' | 'lims_run';
+      name?: string;
+      sort_order?: number;
+    }>;
+  }) {
+    const response: AxiosResponse = await this.api.post('v1/eln-processes', data);
+    return response.data;
+  }
+
+  async updateElnProcess(id: string, data: {
+    name?: string;
+    description?: string;
+    active?: boolean;
+    status_id?: string;
+  }) {
+    const response: AxiosResponse = await this.api.patch(`v1/eln-processes/${id}`, data);
+    return response.data;
+  }
+
+  async deleteElnProcess(id: string) {
+    await this.api.delete(`v1/eln-processes/${id}`);
+  }
+
+  async getElnProcessSteps(processId: string) {
+    const response: AxiosResponse = await this.api.get(`v1/eln-processes/${processId}/steps`);
+    return response.data;
+  }
+
+  async addElnProcessStep(processId: string, data: {
+    experiment_template_id: string;
+    step_kind?: 'eln_experiment' | 'lims_run';
+    execution_mode?: 'eln_experiment' | 'lims_run';
+    name?: string;
+    sort_order?: number;
+  }) {
+    const response: AxiosResponse = await this.api.post(
+      `v1/eln-processes/${processId}/steps`,
+      data,
+    );
+    return response.data;
+  }
+
+  async updateElnProcessStep(
+    processId: string,
+    stepId: string,
+    data: {
+      name?: string;
+      experiment_template_id?: string;
+      experiment_id?: string;
+      current_lims_run_id?: string;
+      sort_order?: number;
+      step_kind?: string;
+      execution_mode?: string;
+    },
+  ) {
+    const response: AxiosResponse = await this.api.patch(
+      `v1/eln-processes/${processId}/steps/${stepId}`,
+      data,
+    );
+    return response.data;
+  }
+
+  async removeElnProcessStep(processId: string, stepId: string) {
+    await this.api.delete(`v1/eln-processes/${processId}/steps/${stepId}`);
+  }
+
+  async reorderElnProcessSteps(processId: string, stepIds: string[]) {
+    const response: AxiosResponse = await this.api.post(
+      `v1/eln-processes/${processId}/steps/reorder`,
+      { step_ids: stepIds },
+    );
+    return response.data;
+  }
+
+  /** Start/materialize a step (Experiment or lazy LimsRun). */
+  async startElnProcessStep(
+    processId: string,
+    stepId: string,
+    data?: { name?: string; force_new?: boolean },
+  ) {
+    const response: AxiosResponse = await this.api.post(
+      `v1/eln-processes/${processId}/steps/${stepId}/start`,
+      data ?? {},
+    );
+    return response.data;
+  }
+
+  /** @deprecated Prefer startElnProcessStep */
+  async instantiateElnProcessStep(
+    processId: string,
+    stepId: string,
+    data?: { name?: string; force_new?: boolean },
+  ) {
+    return this.startElnProcessStep(processId, stepId, data);
+  }
+
+  async getElnProcessSamples(
+    processId: string,
+    params?: { current_step_id?: string; sample_status?: string },
+  ) {
+    const response: AxiosResponse = await this.api.get(
+      `v1/eln-processes/${processId}/samples`,
+      { params },
+    );
+    return response.data;
+  }
+
+  async assignElnProcessSamples(
+    processId: string,
+    data: { sample_ids: string[]; set_to_first_step?: boolean },
+  ) {
+    const response: AxiosResponse = await this.api.post(
+      `v1/eln-processes/${processId}/samples`,
+      data,
+    );
+    return response.data;
+  }
+
+  async removeElnProcessSample(processId: string, sampleId: string) {
+    await this.api.delete(`v1/eln-processes/${processId}/samples/${sampleId}`);
+  }
+
+  async setElnProcessSampleStep(
+    processId: string,
+    sampleId: string,
+    data: { step_id?: string | null; status?: string },
+  ) {
+    const response: AxiosResponse = await this.api.patch(
+      `v1/eln-processes/${processId}/samples/${sampleId}/step`,
+      data,
+    );
+    return response.data;
+  }
+
+  async advanceElnProcessSample(processId: string, sampleId: string) {
+    const response: AxiosResponse = await this.api.post(
+      `v1/eln-processes/${processId}/samples/${sampleId}/advance`,
+    );
+    return response.data;
+  }
+
+  // ELN Process Definitions (Phase 3)
+  async getElnProcessDefinitions(params?: {
+    active?: boolean;
+    page?: number;
+    size?: number;
+  }) {
+    const response: AxiosResponse = await this.api.get('v1/eln-process-definitions', {
+      params,
+    });
+    return response.data;
+  }
+
+  async getElnProcessDefinition(id: string) {
+    const response: AxiosResponse = await this.api.get(`v1/eln-process-definitions/${id}`);
+    return response.data;
+  }
+
+  async createElnProcessDefinition(data: {
+    name: string;
+    description?: string;
+    steps?: Array<{
+      experiment_template_id: string;
+      step_kind?: 'eln_experiment' | 'lims_run';
+      execution_mode?: 'eln_experiment' | 'lims_run';
+      name?: string;
+      sort_order?: number;
+    }>;
+  }) {
+    const response: AxiosResponse = await this.api.post('v1/eln-process-definitions', data);
+    return response.data;
+  }
+
+  async updateElnProcessDefinition(
+    id: string,
+    data: { name?: string; description?: string; active?: boolean },
+  ) {
+    const response: AxiosResponse = await this.api.patch(
+      `v1/eln-process-definitions/${id}`,
+      data,
+    );
+    return response.data;
+  }
+
+  async addElnProcessDefinitionStep(
+    definitionId: string,
+    data: {
+      experiment_template_id: string;
+      step_kind?: 'eln_experiment' | 'lims_run';
+      execution_mode?: 'eln_experiment' | 'lims_run';
+      name?: string;
+      sort_order?: number;
+    },
+  ) {
+    const response: AxiosResponse = await this.api.post(
+      `v1/eln-process-definitions/${definitionId}/steps`,
+      data,
+    );
+    return response.data;
+  }
+
+  async instantiateFromElnProcessDefinition(
+    definitionId: string,
+    data?: {
+      name?: string;
+      description?: string;
+      sample_ids?: string[];
+      set_to_first_step?: boolean;
+    },
+  ) {
+    const response: AxiosResponse = await this.api.post(
+      `v1/eln-process-definitions/${definitionId}/instantiate`,
+      data ?? {},
+    );
+    return response.data;
+  }
+
+  /** Sample-scoped process journey (Decision #7) */
+  async getSampleJourney(sampleId: string) {
+    const response: AxiosResponse = await this.api.get(`v1/samples/${sampleId}/journey`);
+    return response.data;
+  }
+
+  // Experiment Entries (Phase 2)
+  async getExperimentEntries(
+    experimentId: string,
+    params?: { active?: boolean; include_values?: boolean },
+  ) {
+    const response: AxiosResponse = await this.api.get(
+      `v1/experiments/${experimentId}/entries`,
+      { params },
+    );
+    return response.data;
+  }
+
+  async createExperimentEntry(
+    experimentId: string,
+    data: {
+      entry_type: string;
+      name: string;
+      description?: string;
+      predefined_entry_key?: string;
+      sort_order?: number;
+      config?: Record<string, unknown>;
+      process_step_id?: string;
+      fields?: Array<{
+        field_definition_id: string;
+        sort_order?: number;
+        visible?: boolean;
+        write_back_target?: string;
+      }>;
+    },
+  ) {
+    const response: AxiosResponse = await this.api.post(
+      `v1/experiments/${experimentId}/entries`,
+      { ...data, experiment_id: experimentId },
+    );
+    return response.data;
+  }
+
+  async instantiateExperimentEntries(
+    experimentId: string,
+    data?: { process_step_id?: string; skip_if_exists?: boolean },
+  ) {
+    const response: AxiosResponse = await this.api.post(
+      `v1/experiments/${experimentId}/entries/instantiate`,
+      data ?? {},
+    );
+    return response.data;
+  }
+
+  async getEntry(entryId: string) {
+    const response: AxiosResponse = await this.api.get(`v1/entries/${entryId}`);
+    return response.data;
+  }
+
+  async updateEntry(
+    entryId: string,
+    data: {
+      name?: string;
+      description?: string;
+      active?: boolean;
+      sort_order?: number;
+      config?: Record<string, unknown>;
+    },
+  ) {
+    const response: AxiosResponse = await this.api.patch(`v1/entries/${entryId}`, data);
+    return response.data;
+  }
+
+  async deleteEntry(entryId: string) {
+    await this.api.delete(`v1/entries/${entryId}`);
+  }
+
+  async getEntryValues(entryId: string, params?: { sample_id?: string }) {
+    const response: AxiosResponse = await this.api.get(`v1/entries/${entryId}/values`, {
+      params,
+    });
+    return response.data;
+  }
+
+  async upsertEntryValues(
+    entryId: string,
+    values: Array<{
+      field_definition_id: string;
+      sample_id?: string;
+      value_text?: string;
+      value_number?: number;
+      value_list_entry_id?: string;
+      value_date?: string;
+      value_boolean?: boolean;
+      value_json?: unknown;
+      apply_write_back?: boolean;
+    }>,
+  ) {
+    const response: AxiosResponse = await this.api.put(`v1/entries/${entryId}/values`, {
+      values,
+    });
+    return response.data;
+  }
+
   // SOP parse jobs (v1 API)
   async createSopParseJob(sopFile: File, instrumentFile: File) {
     const form = new FormData();
@@ -1197,76 +1542,76 @@ class ApiService {
 
   // ── Experiment Runs ────────────────────────────────────────────────────────
 
-  async getExperimentRuns(params?: {
+  async getLimsRuns(params?: {
     template_id?: string;
     status?: string;
     mine?: boolean;
     page?: number;
     size?: number;
   }) {
-    const response: AxiosResponse = await this.api.get('/v1/experiment-runs', { params });
+    const response: AxiosResponse = await this.api.get('/v1/lims-runs', { params });
     return response.data;
   }
 
-  async getExperimentRun(id: string) {
-    const response: AxiosResponse = await this.api.get(`/v1/experiment-runs/${id}`);
+  async getLimsRun(id: string) {
+    const response: AxiosResponse = await this.api.get(`/v1/lims-runs/${id}`);
     return response.data;
   }
 
-  async createExperimentRun(data: { name: string; description?: string; experiment_template_id: string }) {
-    const response: AxiosResponse = await this.api.post('/v1/experiment-runs', data);
+  async createLimsRun(data: { name: string; description?: string; experiment_template_id: string }) {
+    const response: AxiosResponse = await this.api.post('/v1/lims-runs', data);
     return response.data;
   }
 
-  async orderExperimentRun(id: string) {
-    const response: AxiosResponse = await this.api.patch(`/v1/experiment-runs/${id}/order`);
+  async orderLimsRun(id: string) {
+    const response: AxiosResponse = await this.api.patch(`/v1/lims-runs/${id}/order`);
     return response.data;
   }
 
-  async startExperimentRun(id: string) {
-    const response: AxiosResponse = await this.api.patch(`/v1/experiment-runs/${id}/start`);
+  async startLimsRun(id: string) {
+    const response: AxiosResponse = await this.api.patch(`/v1/lims-runs/${id}/start`);
     return response.data;
   }
 
   async markResultsReceived(id: string) {
-    const response: AxiosResponse = await this.api.patch(`/v1/experiment-runs/${id}/results-received`);
+    const response: AxiosResponse = await this.api.patch(`/v1/lims-runs/${id}/results-received`);
     return response.data;
   }
 
-  async reviewExperimentRun(id: string, notes?: string) {
-    const response: AxiosResponse = await this.api.patch(`/v1/experiment-runs/${id}/review`, { notes });
+  async reviewLimsRun(id: string, notes?: string) {
+    const response: AxiosResponse = await this.api.patch(`/v1/lims-runs/${id}/review`, { notes });
     return response.data;
   }
 
-  async publishExperimentRun(id: string) {
-    const response: AxiosResponse = await this.api.patch(`/v1/experiment-runs/${id}/complete`);
+  async publishLimsRun(id: string) {
+    const response: AxiosResponse = await this.api.patch(`/v1/lims-runs/${id}/complete`);
     return response.data;
   }
 
-  async cancelExperimentRun(id: string) {
-    const response: AxiosResponse = await this.api.patch(`/v1/experiment-runs/${id}/cancel`);
+  async cancelLimsRun(id: string) {
+    const response: AxiosResponse = await this.api.patch(`/v1/lims-runs/${id}/cancel`);
     return response.data;
   }
 
-  async getExperimentRunData(id: string, params?: { page?: number; size?: number }) {
-    const response: AxiosResponse = await this.api.get(`/v1/experiment-runs/${id}/data`, { params });
+  async getLimsRunData(id: string, params?: { page?: number; size?: number }) {
+    const response: AxiosResponse = await this.api.get(`/v1/lims-runs/${id}/data`, { params });
     return response.data;
   }
 
   // ── Dose Response ──────────────────────────────────────────────────────────
 
   async triggerDoseResponseFit(runId: string) {
-    const response: AxiosResponse = await this.api.post(`/v1/experiment-runs/${runId}/dose-response/fit`);
+    const response: AxiosResponse = await this.api.post(`/v1/lims-runs/${runId}/dose-response/fit`);
     return response.data;
   }
 
   async triggerDoseResponseRefit(runId: string, sampleId: string) {
-    const response: AxiosResponse = await this.api.post(`/v1/experiment-runs/${runId}/dose-response/refit/${sampleId}`);
+    const response: AxiosResponse = await this.api.post(`/v1/lims-runs/${runId}/dose-response/refit/${sampleId}`);
     return response.data;
   }
 
   async getDoseResponseSummary(runId: string) {
-    const response: AxiosResponse = await this.api.get(`/v1/experiment-runs/${runId}/dose-response/summary`);
+    const response: AxiosResponse = await this.api.get(`/v1/lims-runs/${runId}/dose-response/summary`);
     return response.data;
   }
 
@@ -1275,7 +1620,7 @@ class ApiService {
     params: { category?: string; review_status?: string; page?: number; size?: number }
   ) {
     const response: AxiosResponse = await this.api.get(
-      `/v1/experiment-runs/${runId}/dose-response/results`,
+      `/v1/lims-runs/${runId}/dose-response/results`,
       { params }
     );
     return response.data;
@@ -1283,14 +1628,14 @@ class ApiService {
 
   async getDoseResponseResult(runId: string, resultId: string) {
     const response: AxiosResponse = await this.api.get(
-      `/v1/experiment-runs/${runId}/dose-response/results/${resultId}`
+      `/v1/lims-runs/${runId}/dose-response/results/${resultId}`
     );
     return response.data;
   }
 
   async reviewDoseResponseResult(runId: string, resultId: string, reviewStatus: string, notes?: string) {
     const response: AxiosResponse = await this.api.post(
-      `/v1/experiment-runs/${runId}/dose-response/results/${resultId}/review`,
+      `/v1/lims-runs/${runId}/dose-response/results/${resultId}/review`,
       { status: reviewStatus, notes }
     );
     return response.data;
@@ -1298,7 +1643,7 @@ class ApiService {
 
   async batchReviewDoseResponse(runId: string, category: string, reviewStatus: string) {
     const response: AxiosResponse = await this.api.post(
-      `/v1/experiment-runs/${runId}/dose-response/results/batch-review`,
+      `/v1/lims-runs/${runId}/dose-response/results/batch-review`,
       { category, status: reviewStatus }
     );
     return response.data;
@@ -1306,7 +1651,7 @@ class ApiService {
 
   async excludeDataPoint(dataId: string, reason?: string) {
     const response: AxiosResponse = await this.api.post(
-      `/v1/experiment-runs/data/${dataId}/exclude`,
+      `/v1/lims-runs/data/${dataId}/exclude`,
       { reason }
     );
     return response.data;
@@ -1314,7 +1659,7 @@ class ApiService {
 
   async unexcludeDataPoint(dataId: string) {
     const response: AxiosResponse = await this.api.delete(
-      `/v1/experiment-runs/data/${dataId}/exclude`
+      `/v1/lims-runs/data/${dataId}/exclude`
     );
     return response.data;
   }

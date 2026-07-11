@@ -126,6 +126,6 @@ This direction makes sense — with disciplined scoping.
 - `.docs/security-review/schema-evolution.md`
 - `.docs/requirements/schema-evolution.md`
 - `.docs/user-stories/schema-modification.md`
-- `.docs/jsonb-usage-analysis.md`
-- `.docs/processes.md`
-- `.docs/experiments.md`
+- `.docs/design/jsonb-usage-analysis.md`
+- `.docs/manuals/processes.md`
+- `.docs/manuals/experiments.md`

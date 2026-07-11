@@ -1,9 +1,9 @@
 """
 Flexible experiment engine models (Phase 1).
 
-experiment_runs      — lifecycle-managed instances of experiment_templates
+lims_runs      — lifecycle-managed instances of experiment_templates
                        status: draft → running → complete → published | failed
-experiment_data      — JSONB result rows from instrument imports, per run
+lims_run_data      — JSONB result rows from instrument imports, per run
 instrument_parsers   — AI-learned column-mapping config for instrument output files
 robot_worklist_configs — source/dest/volume config for liquid handling robot worklists
 sop_parse_jobs       — tracks async Claude API SOP extraction jobs
@@ -21,8 +21,8 @@ from sqlalchemy.sql import func
 from .base import Base
 
 
-class ExperimentRunStatus(str, enum.Enum):
-    """Lifecycle states for an experiment run.
+class LimsRunStatus(str, enum.Enum):
+    """Lifecycle states for an LIMS run.
 
     Standard lifecycle (lifecycle_type='standard'):
         draft ──► running ──► complete ──► published
@@ -43,31 +43,31 @@ class ExperimentRunStatus(str, enum.Enum):
 
 
 # Standard in-house lifecycle
-VALID_TRANSITIONS: dict[ExperimentRunStatus, set[ExperimentRunStatus]] = {
-    ExperimentRunStatus.draft:            {ExperimentRunStatus.running, ExperimentRunStatus.failed, ExperimentRunStatus.canceled},
-    ExperimentRunStatus.running:          {ExperimentRunStatus.complete, ExperimentRunStatus.failed, ExperimentRunStatus.canceled},
-    ExperimentRunStatus.complete:         {ExperimentRunStatus.published, ExperimentRunStatus.failed, ExperimentRunStatus.canceled},
-    ExperimentRunStatus.published:        set(),
-    ExperimentRunStatus.failed:           set(),
-    ExperimentRunStatus.canceled:         set(),
-    ExperimentRunStatus.ordered:          set(),   # not used in standard
-    ExperimentRunStatus.results_received: set(),   # not used in standard
+VALID_TRANSITIONS: dict[LimsRunStatus, set[LimsRunStatus]] = {
+    LimsRunStatus.draft:            {LimsRunStatus.running, LimsRunStatus.failed, LimsRunStatus.canceled},
+    LimsRunStatus.running:          {LimsRunStatus.complete, LimsRunStatus.failed, LimsRunStatus.canceled},
+    LimsRunStatus.complete:         {LimsRunStatus.published, LimsRunStatus.failed, LimsRunStatus.canceled},
+    LimsRunStatus.published:        set(),
+    LimsRunStatus.failed:           set(),
+    LimsRunStatus.canceled:         set(),
+    LimsRunStatus.ordered:          set(),   # not used in standard
+    LimsRunStatus.results_received: set(),   # not used in standard
 }
 
 # CRO lifecycle — experiments executed by external Contract Research Organizations
-VALID_TRANSITIONS_CRO: dict[ExperimentRunStatus, set[ExperimentRunStatus]] = {
-    ExperimentRunStatus.draft:            {ExperimentRunStatus.ordered, ExperimentRunStatus.failed, ExperimentRunStatus.canceled},
-    ExperimentRunStatus.ordered:          {ExperimentRunStatus.running, ExperimentRunStatus.failed, ExperimentRunStatus.canceled},
-    ExperimentRunStatus.running:          {ExperimentRunStatus.results_received, ExperimentRunStatus.failed, ExperimentRunStatus.canceled},
-    ExperimentRunStatus.results_received: {ExperimentRunStatus.complete, ExperimentRunStatus.failed, ExperimentRunStatus.canceled},
-    ExperimentRunStatus.complete:         {ExperimentRunStatus.published, ExperimentRunStatus.failed, ExperimentRunStatus.canceled},
-    ExperimentRunStatus.published:        set(),
-    ExperimentRunStatus.failed:           set(),
-    ExperimentRunStatus.canceled:         set(),
+VALID_TRANSITIONS_CRO: dict[LimsRunStatus, set[LimsRunStatus]] = {
+    LimsRunStatus.draft:            {LimsRunStatus.ordered, LimsRunStatus.failed, LimsRunStatus.canceled},
+    LimsRunStatus.ordered:          {LimsRunStatus.running, LimsRunStatus.failed, LimsRunStatus.canceled},
+    LimsRunStatus.running:          {LimsRunStatus.results_received, LimsRunStatus.failed, LimsRunStatus.canceled},
+    LimsRunStatus.results_received: {LimsRunStatus.complete, LimsRunStatus.failed, LimsRunStatus.canceled},
+    LimsRunStatus.complete:         {LimsRunStatus.published, LimsRunStatus.failed, LimsRunStatus.canceled},
+    LimsRunStatus.published:        set(),
+    LimsRunStatus.failed:           set(),
+    LimsRunStatus.canceled:         set(),
 }
 
 # Registry — keyed by experiment_templates.lifecycle_type
-LIFECYCLE_TRANSITIONS: dict[str, dict[ExperimentRunStatus, set[ExperimentRunStatus]]] = {
+LIFECYCLE_TRANSITIONS: dict[str, dict[LimsRunStatus, set[LimsRunStatus]]] = {
     "standard": VALID_TRANSITIONS,
     "cro":      VALID_TRANSITIONS_CRO,
 }
@@ -80,7 +80,7 @@ class SopParseJobStatus(str, enum.Enum):
     failed = "failed"
 
 
-class ExperimentRun(Base):
+class LimsRun(Base):
     """
     A single run of an experiment_template.
 
@@ -93,12 +93,11 @@ class ExperimentRun(Base):
     Worklist generation: disabled unless template has robot_worklist_config
     Data import: only allowed when status == 'running'
     """
-    __tablename__ = 'experiment_runs'
+    __tablename__ = 'lims_runs'
 
     id = Column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    # name is unique per client (enforced at the service layer via get_by_name_for_client),
-    # NOT globally unique — two client orgs may use identical run names.
-    name = Column(String(255), nullable=False, index=True)
+    # Global unique name (DB constraint uq_lims_runs_name) — same policy as experiments/templates.
+    name = Column(String(255), nullable=False, unique=True, index=True)
     description = Column(Text, nullable=True)
     experiment_template_id = Column(
         PostgresUUID(as_uuid=True),
@@ -107,9 +106,9 @@ class ExperimentRun(Base):
         index=True,
     )
     status = Column(
-        SAEnum(ExperimentRunStatus, name='experiment_run_status', create_type=False),
+        SAEnum(LimsRunStatus, name='lims_run_status', create_type=False),
         nullable=False,
-        default=ExperimentRunStatus.draft,
+        default=LimsRunStatus.draft,
     )
     fit_in_progress = Column(Boolean, nullable=False, server_default='false', default=False)
     started_at = Column(DateTime, nullable=True)
@@ -123,29 +122,29 @@ class ExperimentRun(Base):
 
     experiment_template = relationship("ExperimentTemplate")
     data_rows = relationship(
-        "ExperimentData",
-        back_populates="experiment_run",
+        "LimsRunData",
+        back_populates="lims_run",
         cascade="all, delete-orphan",
     )
     creator = relationship("User", foreign_keys=[created_by])
     modifier = relationship("User", foreign_keys=[modified_by])
 
 
-class ExperimentData(Base):
+class LimsRunData(Base):
     """
-    One row of instrument data imported into an experiment run.
+    One row of instrument data imported into an LIMS run.
 
     container_id → the plate/rack Container the well belongs to.
     well_position → e.g. "A1", "B12".
     sample_id → resolved via Contents at import time; null if well not in Contents.
     row_data (JSONB) → the raw instrument columns after parser_config mapping.
     """
-    __tablename__ = 'experiment_data'
+    __tablename__ = 'lims_run_data'
 
     id = Column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    experiment_run_id = Column(
+    lims_run_id = Column(
         PostgresUUID(as_uuid=True),
-        ForeignKey('experiment_runs.id', ondelete='CASCADE'),
+        ForeignKey('lims_runs.id', ondelete='CASCADE'),
         nullable=False,
         index=True,
     )
@@ -168,7 +167,7 @@ class ExperimentData(Base):
     modified_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
     modified_by = Column(PostgresUUID(as_uuid=True), ForeignKey('users.id'), nullable=True)
 
-    experiment_run = relationship("ExperimentRun", back_populates="data_rows")
+    lims_run = relationship("LimsRun", back_populates="data_rows")
     container = relationship("Container")
     sample = relationship("Sample")
     creator = relationship("User", foreign_keys=[created_by])

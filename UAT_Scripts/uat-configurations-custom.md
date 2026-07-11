@@ -10,7 +10,7 @@ This document contains User Acceptance Testing (UAT) scripts for configurations 
 - **Navigation**: Admin sub-links (Name Templates, Custom Attributes, Lists) from MainNav at `/admin/name-templates`, `/admin/custom-attributes`, `/admin/lists`
 - **Technical Document**: `technical-accessioning-to-reporting.md` (custom_attributes_config table)
 - **API Document**: `api_endpoints.md` (CRUD `/admin/custom-attributes`, `/lists`, name templates and sequences)
-- **Name generation**: Placeholders include `{YY}` (two-digit year), `{SEQ}` (padded by `seq_padding_digits`). API: POST `/admin/sequences/{entity_type}/start` with `{ "start_value": int }` to set sequence start (requires `config:edit`). See `.docs/ids-and-configuration.md`.
+- **Name generation**: Placeholders include `{YY}` (two-digit year), `{SEQ}` (padded by `seq_padding_digits`). API: POST `/admin/sequences/{entity_type}/start` with `{ "start_value": int }` to set sequence start (requires `config:edit`). See `.docs/manuals/ids-and-configuration.md`.
 
 ## Test Environment Setup
 
@@ -133,7 +133,7 @@ Verify name template admin page and preview use placeholder {YY} (two-digit year
 
 | Category | Expected Outcome |
 |----------|------------------|
-| **Placeholder resolution** | Backend `name_generation.py`: `{YY}` = `str(now.year % 100).zfill(2)`; for `{SEQ}`, `seq_padding_digits` from template, then `formatted_seq = str(seq).zfill(template.seq_padding_digits)`. See `.docs/ids-and-configuration.md`. |
+| **Placeholder resolution** | Backend `name_generation.py`: `{YY}` = `str(now.year % 100).zfill(2)`; for `{SEQ}`, `seq_padding_digits` from template, then `formatted_seq = str(seq).zfill(template.seq_padding_digits)`. See `.docs/manuals/ids-and-configuration.md`. |
 | **Preview API** | GET `/admin/name-templates/preview?entity_type=sample` returns `{ "preview": "SAMPLE-25-001" }` (or similar) when template uses {YY} and seq_padding_digits=3. |
 
 ### Pass/Fail Criteria
@@ -183,7 +183,7 @@ Verify that when the sample name template includes `{PROJECT}-{SEQ}` (or similar
 
 | Category | Expected Outcome |
 |----------|------------------|
-| **Per-project sequence** | Backend uses “name without {SEQ}” (e.g. project name) as sequence_key in `get_next_sequence(db, 'sample', sequence_key=…)`. Each project has its own sequence (e.g. `name_template_seq_sample_UTC2600001`, `name_template_seq_sample_UTC2600002`). See `.docs/ids-and-configuration.md`. |
+| **Per-project sequence** | Backend uses “name without {SEQ}” (e.g. project name) as sequence_key in `get_next_sequence(db, 'sample', sequence_key=…)`. Each project has its own sequence (e.g. `name_template_seq_sample_UTC2600001`, `name_template_seq_sample_UTC2600002`). See `.docs/manuals/ids-and-configuration.md`. |
 | **Sample IDs** | First sample in project A: `A-01`; first sample in project B: `B-01`; second in A: `A-02`; second in B: `B-02`. |
 
 ### Pass/Fail Criteria
