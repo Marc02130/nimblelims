@@ -18,7 +18,7 @@ Predefined entries have built-in behavior and may still reference FieldDefinitio
 """
 
 import uuid
-from sqlalchemy import Column, String, Integer, ForeignKey, Boolean, DateTime, Text, Numeric
+from sqlalchemy import Column, String, Integer, ForeignKey, Boolean, DateTime, Text, Numeric, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID as PostgresUUID, JSONB
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -264,81 +264,134 @@ class EntryFieldValue(Base):
 #     #   - Entries are created for that Experiment.
 #     #   - The Entry can reference this ProcessStep via process_step_id.
 #
-# ProcessSample (minimal sketch):
-class ProcessSample(Base):
-    """
-    Tracks samples assigned to a Process.
-
-    Per the design:
-    - Processes are composed of experiment (templates).
-    - ProcessSample records assignment at the Process level.
-    - The detailed per-step (per-Experiment) data lives in Entry + EntryFieldValue.
-    """
-    __tablename__ = 'process_samples'
-
-    id = Column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    process_id = Column(PostgresUUID(as_uuid=True), ForeignKey('processes.id'), nullable=False, index=True)
-    sample_id = Column(PostgresUUID(as_uuid=True), ForeignKey('samples.id'), nullable=False, index=True)
-
-    # Process-level state for this sample
-    status = Column(String(32))  # e.g. assigned, in_progress, completed
-    assigned_at = Column(DateTime(timezone=True), server_default=func.now())
-
-    # Relationships
-    process = relationship("Process", back_populates="process_samples")
-    sample = relationship("Sample")  # add back_populates on Sample if desired
-
-
 # ---------------------------------------------------------------------------
-# Process and ProcessStep (ELN side)
+# ELN Process (Phase 1)
 #
-# Processes are composed of experiments (templates)
-#
-class Process(BaseModel):
-    """A process is an ordered composition of experiment templates."""
-    __tablename__ = 'processes'
+# Distinct from LIMS experiment_processes / process_steps (run sub-checklists).
+# Tables: eln_processes, eln_process_steps, eln_process_samples
+# API: /v1/eln-processes
+# ---------------------------------------------------------------------------
 
-    name = Column(String(255), nullable=False)
-    description = Column(Text)
-    # Add status, owner, created_by etc. as needed (inherits from BaseModel)
+class ELNProcess(BaseModel):
+    """
+    Ordered composition of experiment templates (ELN multi-step workflow).
 
+    Inherits BaseModel: id, name, description, active, audit fields.
+    Name uniqueness is global (same pattern as Experiment / ExperimentTemplate).
+    """
+    __tablename__ = 'eln_processes'
+
+    status_id = Column(
+        PostgresUUID(as_uuid=True),
+        ForeignKey('list_entries.id'),
+        nullable=True,
+        index=True,
+    )
+
+    status = relationship("ListEntry", foreign_keys=[status_id])
     steps = relationship(
         "ELNProcessStep",
         back_populates="process",
         order_by="ELNProcessStep.sort_order",
-        cascade="all, delete-orphan"
+        cascade="all, delete-orphan",
+    )
+    process_samples = relationship(
+        "ELNProcessSample",
+        back_populates="process",
+        cascade="all, delete-orphan",
     )
 
-    process_samples = relationship("ProcessSample", back_populates="process")
+
+# Backward-compatible alias used by earlier sketches / imports
+Process = ELNProcess
+
 
 class ELNProcessStep(Base):
     """
-    One step in a (ELN) Process.
-    References an ExperimentTemplate (as per "composed of experiments (templates)").
+    One ordered step in an ELN Process.
+    References an ExperimentTemplate; optional experiment_id when instantiated.
     """
-    # NOTE: 'eln_process_steps' chosen to avoid collision with legacy 'process_steps' table
-    # (from experiment_process.py attached to experiment_runs / LIMS side).
     __tablename__ = 'eln_process_steps'
 
     id = Column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    process_id = Column(PostgresUUID(as_uuid=True), ForeignKey('processes.id'), nullable=False, index=True)
+    process_id = Column(
+        PostgresUUID(as_uuid=True),
+        ForeignKey('eln_processes.id', ondelete='CASCADE'),
+        nullable=False,
+        index=True,
+    )
     experiment_template_id = Column(
         PostgresUUID(as_uuid=True),
         ForeignKey('experiment_templates.id'),
         nullable=False,
-        index=True
+        index=True,
     )
+    # Optional: experiment instance created when this step is executed
+    experiment_id = Column(
+        PostgresUUID(as_uuid=True),
+        ForeignKey('experiments.id'),
+        nullable=True,
+        index=True,
+    )
+    name = Column(String(255), nullable=True)  # optional label override
     sort_order = Column(Integer, nullable=False, default=0)
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+    created_by = Column(PostgresUUID(as_uuid=True), ForeignKey('users.id'), nullable=True)
+    modified_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
+    modified_by = Column(PostgresUUID(as_uuid=True), ForeignKey('users.id'), nullable=True)
 
-    process = relationship("Process", back_populates="steps")
-
-    # Entries that belong to this process step
-    # (An Entry can be linked to a process step via process_step_id)
+    process = relationship("ELNProcess", back_populates="steps")
+    experiment_template = relationship("ExperimentTemplate")
+    experiment = relationship("Experiment")
     entries = relationship("Entry", back_populates="process_step")
 
-    # When the process is executed for samples:
-    # - Experiment instances are created from the template for this step.
-    # - Per-step data lives in Entry + EntryFieldValue (not duplicated on ProcessSample).
+
+class ELNProcessSample(Base):
+    """
+    Sample assignment at the ELN Process level.
+
+    Authoritative for "this sample belongs to this process".
+    Per-step execution detail remains ExperimentSampleExecution / Entry (Phase 2).
+    """
+    __tablename__ = 'eln_process_samples'
+    __table_args__ = (
+        UniqueConstraint('process_id', 'sample_id', name='uq_eln_process_samples_process_sample'),
+    )
+
+    id = Column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    process_id = Column(
+        PostgresUUID(as_uuid=True),
+        ForeignKey('eln_processes.id', ondelete='CASCADE'),
+        nullable=False,
+        index=True,
+    )
+    sample_id = Column(
+        PostgresUUID(as_uuid=True),
+        ForeignKey('samples.id'),
+        nullable=False,
+        index=True,
+    )
+    # assigned | in_progress | completed | removed
+    status = Column(String(32), nullable=False, server_default='assigned', default='assigned')
+    current_step_id = Column(
+        PostgresUUID(as_uuid=True),
+        ForeignKey('eln_process_steps.id', ondelete='SET NULL'),
+        nullable=True,
+        index=True,
+    )
+    assigned_at = Column(DateTime(timezone=True), server_default=func.now())
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+    created_by = Column(PostgresUUID(as_uuid=True), ForeignKey('users.id'), nullable=True)
+    modified_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
+    modified_by = Column(PostgresUUID(as_uuid=True), ForeignKey('users.id'), nullable=True)
+
+    process = relationship("ELNProcess", back_populates="process_samples")
+    sample = relationship("Sample")
+    current_step = relationship("ELNProcessStep", foreign_keys=[current_step_id])
+
+
+# Backward-compatible alias
+ProcessSample = ELNProcessSample
 
 
 

@@ -43,7 +43,16 @@ from .experiment_process import (
 
 # New for schema evolution refactor (JSONB removal for extensibility)
 from .field_definition import FieldDefinition
-from .entry import Entry, EntryFieldDefinition, EntryFieldValue, Process, ELNProcessStep, ProcessSample
+from .entry import (
+    Entry,
+    EntryFieldDefinition,
+    EntryFieldValue,
+    ELNProcess,
+    Process,  # alias of ELNProcess
+    ELNProcessStep,
+    ELNProcessSample,
+    ProcessSample,  # alias of ELNProcessSample
+)
 
 # Additional models referenced via relationships or used in the app
 from .dose_response import DoseResponseResult, ExperimentDataExclusion

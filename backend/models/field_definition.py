@@ -68,7 +68,7 @@ class FieldDefinition(BaseModel):
 
     # Scope (MVP: mostly global; can be narrowed later)
     template_id = Column(PostgresUUID(as_uuid=True), ForeignKey('experiment_templates.id'), nullable=True)
-    process_id = Column(PostgresUUID(as_uuid=True), ForeignKey('processes.id'), nullable=True)
+    process_id = Column(PostgresUUID(as_uuid=True), ForeignKey('eln_processes.id'), nullable=True)
 
     # Whether this field is materialized as a real column on the parent entity table
     # (true for top-level extensions like specimen_biotype on samples)
