@@ -41,8 +41,8 @@ When resolving: fill **Decision**, **Date**, **Owner**, and one line of **Ration
 | 6 | Reusable Process definitions (first-class) — shape and when? | **Decided** | Phase 3 implementation of process definitions | See **Decision #6** below. Processes are **always defined** (first-class reusable definitions). Experiments remain ad hoc **or** template-based. | 2026-07-11 | Product | Product rule: multi-step work is governed by a definition; single experiments stay flexible |
 | 7 | How is process progress / sample step surfaced to non-admin users? | **Decided** | Phase 3 journey UI | See **Decision #7** below. Progress is visible to anyone with access to the relevant samples; client isolation enforced (no cross-client progress). | 2026-07-11 | Product | Sample-scoped visibility, not manage-permission-only |
 | 8 | Should instantiate-step auto-create ExperimentSampleExecution rows for process samples? | **Open** | Phase 3 polish / sample journey | — Phase 2: assign at process level only; step instantiate creates Experiment + entries, does not auto-link all process samples into the experiment | | | |
-| 9 | Entry capture: who can edit values (experiment:manage only vs lab roles / status gates)? | **Open** | Hardening / multi-role UX | — Currently `experiment:manage` | | | |
-| 10 | Deprecate or coexist long-term with `ExperimentDetail` `experiment_link` lineage? | **Open** | Phase 3 cleanup | — Phase 1–2: **coexist**; no forced migration | | | |
+| 9 | Entry capture: who can edit values (experiment:manage only vs lab roles / status gates)? | **Decided** | Hardening / multi-role UX | See **Decision #9** below. **Lab personnel only** edit experimental / entry data. Clients do **not** edit lab data; if client ordering ships later, clients may **create orders** only. | 2026-07-11 | Product | Lab SoT for data integrity; ordering is a separate client capability |
+| 10 | Deprecate or coexist long-term with `ExperimentDetail` `experiment_link` lineage? | **Open** | Lineage cleanup (not Phase 3) | — Phase 1–3: **coexist** with ELN Processes. See explanation under **#10 notes** below. | | | |
 
 ---
 
@@ -205,11 +205,74 @@ Not limited to `experiment:manage`. Lab techs, managers, and **clients** see jou
 | **#1** Typed steps (C) + 1a–1g + **1h-A** hybrid in v1 | **Decided** |
 | **#7** Sample-scoped progress visibility | **Decided** |
 
-Optional (can ship after or alongside):
+**Phase 3 status:** shipped (definitions, typed steps, journey). Remaining open polish:
 
 - **#8** Auto sample-exec on step instantiate  
-- **#9** Entry edit permissions beyond `experiment:manage`  
-- **#10** Lineage coexistence end-state
+- **#10** Lineage coexistence end-state (`experiment_link` vs Processes)
+
+---
+
+## Decision #9 — Lab personnel edit data; clients do not (orders later)
+
+**Status:** Decided  
+**Date:** 2026-07-11
+
+### Product rule
+
+| Actor | Edit experimental data (entries, results, process capture)? | Other |
+|-------|------------------------------------------------------------|--------|
+| **Lab personnel** (admin, lab manager, lab tech — roles with lab write permissions) | **Yes** | Manage processes/experiments per existing RBAC (`experiment:manage` today for process/entry APIs) |
+| **Client users** | **No** — never edit lab/entry/sample experimental data | May later **create orders** if/when client ordering is enabled (ordering ≠ editing lab data) |
+
+### Implementation implications
+
+- Entry value upsert, write-back, process step start/advance, and similar **data mutation** stay lab-side.
+- Do not grant clients `experiment:manage` (or equivalent) for entry capture as a shortcut.
+- Future **client ordering** is a separate feature surface (create order / request work), not opening entry grids to clients.
+- Refine which lab roles get `experiment:manage` vs narrower “entry:write” later if needed — still **lab only**.
+
+### Rationale
+
+- Lab remains source of truth for measured/captured data.
+- Clients need visibility of progress (#7) and may need to place work requests later, without contaminating lab SoT.
+
+---
+
+## #10 notes — What is `experiment_link`?
+
+**Not a separate table.** It is a **usage of** `ExperimentDetail`:
+
+| Piece | Role |
+|-------|------|
+| Table | `experiment_details` (`ExperimentDetail` model) |
+| `detail_type` | `"experiment_link"` |
+| `content` (JSONB) | e.g. `{ "linked_experiment_id": "<uuid>" }` |
+| API | `POST .../link` / workflow action `link_experiments` |
+| Lineage | `get_experiment_lineage` walks details with this type and collects linked experiment IDs |
+
+### How it works (pre-Process model)
+
+Before first-class **ELN Processes**, multi-experiment chaining was a **linked list of detail rows**:
+
+```
+Experiment A  --(detail experiment_link)-->  Experiment B  --(detail)-->  Experiment C
+```
+
+- No process entity, no ordered process steps, no process-level sample assignment.
+- No hard gates (“B cannot start until A completes”).
+- Scientist / workflow wires the chain manually.
+
+### How Processes relate
+
+| Old (`experiment_link`) | New (ELN Process) |
+|-------------------------|-------------------|
+| Ad hoc link between two experiments | Ordered steps on a process definition/instance |
+| Stored as free-form detail JSONB | First-class `eln_process_steps` (+ typed LimsRun steps) |
+| Lineage UI on experiment detail | Process UI + sample journey |
+
+**Current policy (Phases 1–3):** **coexist** — Process is the preferred multi-step model; `experiment_link` still works for simple A→B links and is not force-migrated.
+
+**#10 remains Open** until product chooses: keep forever as lightweight A→B, or deprecate after Processes cover lineage fully.
 
 ---
 
