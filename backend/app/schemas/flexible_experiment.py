@@ -2,8 +2,8 @@
 Pydantic schemas for the flexible experiment engine.
 
 TemplateDefinition  — strict validation of the JSONB stored in experiment_templates
-ExperimentRun*      — CRUD schemas for experiment_runs
-ExperimentData*     — schemas for instrument data rows
+LimsRun*      — CRUD schemas for lims_runs
+LimsRunData*     — schemas for instrument data rows
 InstrumentParser*   — schemas for parser configs
 RobotWorklistConfig* — schemas for worklist configs
 SopParseJob*        — schemas for SOP parse jobs
@@ -16,7 +16,7 @@ from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field, field_validator
 
-from models.flexible_experiment import ExperimentRunStatus, SopParseJobStatus
+from models.flexible_experiment import LimsRunStatus, SopParseJobStatus
 
 
 # ---------------------------------------------------------------------------
@@ -72,21 +72,21 @@ class TemplateDefinition(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# ExperimentRun schemas
+# LimsRun schemas
 # ---------------------------------------------------------------------------
 
-class ExperimentRunCreate(BaseModel):
+class LimsRunCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=255)
     description: Optional[str] = None
     experiment_template_id: uuid.UUID
 
 
-class ExperimentRunRead(BaseModel):
+class LimsRunRead(BaseModel):
     id: uuid.UUID
     name: str
     description: Optional[str]
     experiment_template_id: uuid.UUID
-    status: ExperimentRunStatus
+    status: LimsRunStatus
     started_at: Optional[datetime]
     completed_at: Optional[datetime]
     published_at: Optional[datetime]
@@ -98,8 +98,8 @@ class ExperimentRunRead(BaseModel):
     model_config = {"from_attributes": True}
 
 
-class ExperimentRunListResponse(BaseModel):
-    runs: List[ExperimentRunRead]
+class LimsRunListResponse(BaseModel):
+    runs: List[LimsRunRead]
     total: int
     page: int
     size: int
@@ -107,10 +107,10 @@ class ExperimentRunListResponse(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# ExperimentData schemas
+# LimsRunData schemas
 # ---------------------------------------------------------------------------
 
-class ExperimentDataRow(BaseModel):
+class LimsRunDataRow(BaseModel):
     """A single imported instrument data row."""
     container_id: Optional[uuid.UUID] = None
     well_position: Optional[str] = Field(None, max_length=10)
@@ -118,9 +118,9 @@ class ExperimentDataRow(BaseModel):
     row_data: Dict[str, Any]
 
 
-class ExperimentDataRead(BaseModel):
+class LimsRunDataRead(BaseModel):
     id: uuid.UUID
-    experiment_run_id: uuid.UUID
+    lims_run_id: uuid.UUID
     container_id: Optional[uuid.UUID]
     well_position: Optional[str]
     sample_id: Optional[uuid.UUID]
@@ -130,8 +130,8 @@ class ExperimentDataRead(BaseModel):
     model_config = {"from_attributes": True}
 
 
-class ExperimentDataListResponse(BaseModel):
-    rows: List[ExperimentDataRead]
+class LimsRunDataListResponse(BaseModel):
+    rows: List[LimsRunDataRead]
     total: int
     page: int
     size: int
@@ -139,14 +139,14 @@ class ExperimentDataListResponse(BaseModel):
 
 
 class ImportDataRequest(BaseModel):
-    """Body for POST /experiment-runs/{id}/import."""
-    rows: List[ExperimentDataRow] = Field(..., min_length=1)
+    """Body for POST /lims-runs/{id}/import."""
+    rows: List[LimsRunDataRow] = Field(..., min_length=1)
 
 
 class ImportDataResponse(BaseModel):
     imported: int
     skipped: int
-    rows: List[ExperimentDataRead]
+    rows: List[LimsRunDataRead]
 
 
 # ---------------------------------------------------------------------------

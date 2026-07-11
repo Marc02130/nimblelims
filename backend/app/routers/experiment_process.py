@@ -1,11 +1,11 @@
 """
-Experiment Process API — /api/v1/experiment-runs/{run_id}/processes
+Experiment Process API — /api/v1/lims-runs/{run_id}/processes
                          /api/v1/processes/{process_id}
                          /api/v1/process-steps/{step_id}
 
 Routes:
-    POST   /experiment-runs/{run_id}/processes          — create process (with optional steps)
-    GET    /experiment-runs/{run_id}/processes          — list processes for a run
+    POST   /lims-runs/{run_id}/processes          — create process (with optional steps)
+    GET    /lims-runs/{run_id}/processes          — list processes for a run
     GET    /processes/{process_id}                      — get process detail
     DELETE /processes/{process_id}                      — delete process
 
@@ -49,7 +49,7 @@ def _service(
 # ---------- Processes ----------
 
 @router.post(
-    "/experiment-runs/{run_id}/processes",
+    "/lims-runs/{run_id}/processes",
     response_model=ExperimentProcessRead,
     status_code=status.HTTP_201_CREATED,
 )
@@ -58,20 +58,20 @@ def create_process(
     data: ExperimentProcessCreate,
     service: ExperimentProcessService = Depends(_service),
 ):
-    """Create a named process (with optional initial steps) within an experiment run."""
+    """Create a named process (with optional initial steps) within an LIMS run."""
     process = service.create_process(run_id, data)
     return ExperimentProcessRead.model_validate(process)
 
 
 @router.get(
-    "/experiment-runs/{run_id}/processes",
+    "/lims-runs/{run_id}/processes",
     response_model=List[ExperimentProcessRead],
 )
 def list_processes(
     run_id: UUID,
     service: ExperimentProcessService = Depends(_service),
 ):
-    """List all processes for an experiment run, ordered by sort_order."""
+    """List all processes for an LIMS run, ordered by sort_order."""
     processes, _ = service.list_processes(run_id)
     return [ExperimentProcessRead.model_validate(p) for p in processes]
 

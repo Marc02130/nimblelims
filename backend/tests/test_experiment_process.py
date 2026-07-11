@@ -64,7 +64,7 @@ def draft_run(client: TestClient, auth_headers, experiment_template):
         "experiment_template_id": experiment_template,
         "description": "process test run",
     }
-    r = client.post("/v1/experiment-runs", json=payload, headers=auth_headers)
+    r = client.post("/v1/lims-runs", json=payload, headers=auth_headers)
     assert r.status_code == 201, r.text
     return r.json()
 
@@ -74,7 +74,7 @@ def process(client: TestClient, auth_headers, draft_run):
     """Create a minimal process on the draft run."""
     run_id = draft_run["id"]
     r = client.post(
-        f"/v1/experiment-runs/{run_id}/processes",
+        f"/v1/lims-runs/{run_id}/processes",
         json={"name": "Prep Process", "description": "test process", "sort_order": 0},
         headers=auth_headers,
     )
@@ -100,14 +100,13 @@ def step(client: TestClient, auth_headers, process):
 # ──────────────────────────────────────────────────────────────────────────────
 
 class TestRunNameRegression:
-    """Cross-client name uniqueness — two clients can use the same run name."""
+    """Global unique LIMS run names (aligned with experiments/templates)."""
 
-    def test_create_run_cross_client_same_name_allowed(
+    def test_create_run_cross_client_same_name_rejected(
         self, client: TestClient, auth_headers, experiment_template, db_session
     ):
         """
-        Run names are unique per-client, not globally. Two separate clients
-        must be able to create runs with identical names without a 409.
+        Run names are globally unique. A second client cannot reuse an existing run name.
         """
         from app.core.security import get_password_hash
         from models.user import User, Role
@@ -171,7 +170,7 @@ class TestRunNameRegression:
 
         # Client 1 creates run with shared_name
         r1 = client.post(
-            "/v1/experiment-runs",
+            "/v1/lims-runs",
             json={
                 "name": shared_name,
                 "experiment_template_id": experiment_template,
@@ -180,17 +179,17 @@ class TestRunNameRegression:
         )
         assert r1.status_code == 201, r1.text
 
-        # Client 2 creates run with the same shared_name — must succeed
+        # Client 2 reuses shared_name — must fail (global unique)
         r2_run = client.post(
-            "/v1/experiment-runs",
+            "/v1/lims-runs",
             json={
                 "name": shared_name,
                 "experiment_template_id": template2_id,
             },
             headers=headers2,
         )
-        assert r2_run.status_code == 201, (
-            f"Expected 201 for cross-client duplicate name, got {r2_run.status_code}: {r2_run.text}"
+        assert r2_run.status_code == 400, (
+            f"Expected 400 for global duplicate name, got {r2_run.status_code}: {r2_run.text}"
         )
 
 
@@ -202,7 +201,7 @@ class TestExperimentProcess:
     def test_create_process_no_steps(self, client, auth_headers, draft_run):
         run_id = draft_run["id"]
         r = client.post(
-            f"/v1/experiment-runs/{run_id}/processes",
+            f"/v1/lims-runs/{run_id}/processes",
             json={"name": "Empty Process", "sort_order": 1},
             headers=auth_headers,
         )
@@ -211,12 +210,12 @@ class TestExperimentProcess:
         assert body["name"] == "Empty Process"
         assert body["sort_order"] == 1
         assert body["steps"] == []
-        assert body["experiment_run_id"] == run_id
+        assert body["lims_run_id"] == run_id
 
     def test_create_process_with_inline_steps(self, client, auth_headers, draft_run):
         run_id = draft_run["id"]
         r = client.post(
-            f"/v1/experiment-runs/{run_id}/processes",
+            f"/v1/lims-runs/{run_id}/processes",
             json={
                 "name": "Process With Steps",
                 "sort_order": 0,
@@ -242,11 +241,11 @@ class TestExperimentProcess:
         # Create two processes
         for i in range(2):
             client.post(
-                f"/v1/experiment-runs/{run_id}/processes",
+                f"/v1/lims-runs/{run_id}/processes",
                 json={"name": f"Process {i}", "sort_order": i},
                 headers=auth_headers,
             )
-        r = client.get(f"/v1/experiment-runs/{run_id}/processes", headers=auth_headers)
+        r = client.get(f"/v1/lims-runs/{run_id}/processes", headers=auth_headers)
         assert r.status_code == 200, r.text
         assert len(r.json()) >= 2
 
@@ -271,7 +270,7 @@ class TestExperimentProcess:
 
     def test_create_process_unknown_run_returns_404(self, client, auth_headers):
         r = client.post(
-            f"/v1/experiment-runs/{uuid4()}/processes",
+            f"/v1/lims-runs/{uuid4()}/processes",
             json={"name": "Ghost Process", "sort_order": 0},
             headers=auth_headers,
         )

@@ -18,9 +18,9 @@ from sqlalchemy.orm import Session
 
 from app.services.dose_response_fit import DoseResponseFitService
 from models.client import Client
-from models.dose_response import CurveCategory, DoseResponseResult, ExperimentDataExclusion, ReviewStatus
+from models.dose_response import CurveCategory, DoseResponseResult, LimsRunDataExclusion, ReviewStatus
 from models.experiment import ExperimentTemplate
-from models.flexible_experiment import ExperimentData, ExperimentRun, ExperimentRunStatus
+from models.flexible_experiment import LimsRunData, LimsRun, LimsRunStatus
 from models.list import List, ListEntry
 from models.project import Project
 from models.sample import Sample
@@ -107,8 +107,8 @@ def _make_run(
     user_id: uuid.UUID,
     status: str = "running",
     fit_in_progress: bool = False,
-) -> ExperimentRun:
-    run = ExperimentRun(
+) -> LimsRun:
+    run = LimsRun(
         name=f"run_{uuid.uuid4().hex[:6]}",
         experiment_template_id=template_id,
         status=status,
@@ -147,9 +147,9 @@ def _make_data_row(
     well_position: str,
     signal: float,
     user_id: uuid.UUID,
-) -> ExperimentData:
-    row = ExperimentData(
-        experiment_run_id=run_id,
+) -> LimsRunData:
+    row = LimsRunData(
+        lims_run_id=run_id,
         sample_id=sample_id,
         well_position=well_position,
         row_data={"result": signal},
@@ -463,7 +463,7 @@ def test_refit_creates_new_version(db_session, test_admin_user, test_org, dr_set
     svc.trigger_fit(run.id)
     results_v1 = (
         db_session.query(DoseResponseResult)
-        .filter(DoseResponseResult.experiment_run_id == run.id)
+        .filter(DoseResponseResult.lims_run_id == run.id)
         .all()
     )
     assert len(results_v1) == 1
@@ -474,7 +474,7 @@ def test_refit_creates_new_version(db_session, test_admin_user, test_org, dr_set
     svc.trigger_refit(run.id, test_sample.id)
     all_results = (
         db_session.query(DoseResponseResult)
-        .filter(DoseResponseResult.experiment_run_id == run.id)
+        .filter(DoseResponseResult.lims_run_id == run.id)
         .order_by(DoseResponseResult.fit_version)
         .all()
     )
@@ -523,7 +523,7 @@ def test_review_result_sets_status(client, db_session, test_admin_user, test_org
 
     # Insert a result row directly
     result = DoseResponseResult(
-        experiment_run_id=run.id,
+        lims_run_id=run.id,
         sample_id=test_sample.id,
         model="4PL",
         curve_category=CurveCategory.SIGMOID,
@@ -535,7 +535,7 @@ def test_review_result_sets_status(client, db_session, test_admin_user, test_org
     db_session.commit()
 
     resp = client.post(
-        f"/v1/experiment-runs/{run.id}/dose-response/results/{result.id}/review",
+        f"/v1/lims-runs/{run.id}/dose-response/results/{result.id}/review",
         json={"status": "approved", "notes": "looks good"},
         headers={"Authorization": f"Bearer {admin_token}"},
     )
@@ -554,7 +554,7 @@ def test_review_result_sets_status(client, db_session, test_admin_user, test_org
 def test_review_result_wrong_run_returns_404(client, db_session, test_admin_user, test_org, admin_token, dr_setup):
     test_sample = dr_setup["test_sample"]
     result = DoseResponseResult(
-        experiment_run_id=dr_setup["run"].id,
+        lims_run_id=dr_setup["run"].id,
         sample_id=test_sample.id,
         model="4PL",
         curve_category=CurveCategory.SIGMOID,
@@ -567,7 +567,7 @@ def test_review_result_wrong_run_returns_404(client, db_session, test_admin_user
 
     wrong_run_id = uuid.uuid4()
     resp = client.post(
-        f"/v1/experiment-runs/{wrong_run_id}/dose-response/results/{result.id}/review",
+        f"/v1/lims-runs/{wrong_run_id}/dose-response/results/{result.id}/review",
         json={"status": "approved"},
         headers={"Authorization": f"Bearer {admin_token}"},
     )
@@ -584,7 +584,7 @@ def test_batch_review_only_updates_pending(client, db_session, test_admin_user, 
 
     def _result(status: ReviewStatus) -> DoseResponseResult:
         r = DoseResponseResult(
-            experiment_run_id=run.id,
+            lims_run_id=run.id,
             sample_id=test_sample.id,
             model="4PL",
             curve_category=CurveCategory.SIGMOID,
@@ -602,7 +602,7 @@ def test_batch_review_only_updates_pending(client, db_session, test_admin_user, 
     db_session.commit()
 
     resp = client.post(
-        f"/v1/experiment-runs/{run.id}/dose-response/results/batch-review",
+        f"/v1/lims-runs/{run.id}/dose-response/results/batch-review",
         json={"category": "SIGMOID", "status": "approved"},
         headers={"Authorization": f"Bearer {admin_token}"},
     )
@@ -624,12 +624,12 @@ def test_batch_review_respects_category_filter(client, db_session, test_admin_us
 
     test_sample = dr_setup["test_sample"]
     sigmoid_pending = DoseResponseResult(
-        experiment_run_id=run.id, sample_id=test_sample.id, model="4PL",
+        lims_run_id=run.id, sample_id=test_sample.id, model="4PL",
         curve_category=CurveCategory.SIGMOID, quality_flag="ok",
         review_status=ReviewStatus.pending, fit_version=1, client_id=test_org.id,
     )
     inactive_pending = DoseResponseResult(
-        experiment_run_id=run.id, sample_id=test_sample.id, model="4PL",
+        lims_run_id=run.id, sample_id=test_sample.id, model="4PL",
         curve_category=CurveCategory.INACTIVE, quality_flag="ok",
         review_status=ReviewStatus.pending, fit_version=1, client_id=test_org.id,
     )
@@ -637,7 +637,7 @@ def test_batch_review_respects_category_filter(client, db_session, test_admin_us
     db_session.commit()
 
     resp = client.post(
-        f"/v1/experiment-runs/{run.id}/dose-response/results/batch-review",
+        f"/v1/lims-runs/{run.id}/dose-response/results/batch-review",
         json={"category": "SIGMOID", "status": "approved"},
         headers={"Authorization": f"Bearer {admin_token}"},
     )
@@ -657,15 +657,15 @@ def test_exclude_data_point_creates_exclusion(client, db_session, test_admin_use
     data_row = dr_setup["test_data"]
 
     resp = client.post(
-        f"/v1/experiment-runs/data/{data_row.id}/exclude",
+        f"/v1/lims-runs/data/{data_row.id}/exclude",
         json={"reason": "outlier"},
         headers={"Authorization": f"Bearer {admin_token}"},
     )
     assert resp.status_code == 200
     body = resp.json()
-    assert body["experiment_data_id"] == str(data_row.id)
+    assert body["lims_run_data_id"] == str(data_row.id)
 
-    exc = db_session.query(ExperimentDataExclusion).filter_by(experiment_data_id=data_row.id).first()
+    exc = db_session.query(LimsRunDataExclusion).filter_by(lims_run_data_id=data_row.id).first()
     assert exc is not None
     assert exc.reason == "outlier"
     assert exc.client_id == test_org.id
@@ -679,12 +679,12 @@ def test_exclude_data_point_double_exclusion_returns_409(client, db_session, tes
     data_row = dr_setup["test_data"]
 
     client.post(
-        f"/v1/experiment-runs/data/{data_row.id}/exclude",
+        f"/v1/lims-runs/data/{data_row.id}/exclude",
         json={"reason": "first"},
         headers={"Authorization": f"Bearer {admin_token}"},
     )
     resp = client.post(
-        f"/v1/experiment-runs/data/{data_row.id}/exclude",
+        f"/v1/lims-runs/data/{data_row.id}/exclude",
         json={"reason": "second"},
         headers={"Authorization": f"Bearer {admin_token}"},
     )
@@ -700,17 +700,17 @@ def test_unexclude_data_point_removes_exclusion(client, db_session, test_admin_u
     data_row = dr_setup["test_data"]
 
     client.post(
-        f"/v1/experiment-runs/data/{data_row.id}/exclude",
+        f"/v1/lims-runs/data/{data_row.id}/exclude",
         json={"reason": "test"},
         headers={"Authorization": f"Bearer {admin_token}"},
     )
     resp = client.delete(
-        f"/v1/experiment-runs/data/{data_row.id}/exclude",
+        f"/v1/lims-runs/data/{data_row.id}/exclude",
         headers={"Authorization": f"Bearer {admin_token}"},
     )
     assert resp.status_code == 200
 
-    exc = db_session.query(ExperimentDataExclusion).filter_by(experiment_data_id=data_row.id).first()
+    exc = db_session.query(LimsRunDataExclusion).filter_by(lims_run_data_id=data_row.id).first()
     assert exc is None
 
 
@@ -724,19 +724,19 @@ def test_get_summary_aggregates_correctly(client, db_session, test_admin_user, t
     test_sample = dr_setup["test_sample"]
     for _ in range(2):
         db_session.add(DoseResponseResult(
-            experiment_run_id=run.id, sample_id=test_sample.id, model="4PL",
+            lims_run_id=run.id, sample_id=test_sample.id, model="4PL",
             curve_category=CurveCategory.SIGMOID, potency=Decimal("0.045"), r_squared=Decimal("0.97"),
             quality_flag="ok", review_status=ReviewStatus.approved, fit_version=1, client_id=test_org.id,
         ))
     db_session.add(DoseResponseResult(
-        experiment_run_id=run.id, sample_id=test_sample.id, model="4PL",
+        lims_run_id=run.id, sample_id=test_sample.id, model="4PL",
         curve_category=CurveCategory.INACTIVE, quality_flag="ok",
         review_status=ReviewStatus.pending, fit_version=1, client_id=test_org.id,
     ))
     db_session.commit()
 
     resp = client.get(
-        f"/v1/experiment-runs/{run.id}/dose-response/summary",
+        f"/v1/lims-runs/{run.id}/dose-response/summary",
         headers={"Authorization": f"Bearer {admin_token}"},
     )
     assert resp.status_code == 200
@@ -757,14 +757,14 @@ def test_get_summary_excludes_superseded_results(client, db_session, test_admin_
 
     test_sample = dr_setup["test_sample"]
     active = DoseResponseResult(
-        experiment_run_id=run.id, sample_id=test_sample.id, model="4PL",
+        lims_run_id=run.id, sample_id=test_sample.id, model="4PL",
         curve_category=CurveCategory.SIGMOID, quality_flag="ok", fit_version=2, client_id=test_org.id,
     )
     db_session.add(active)
     db_session.flush()
 
     superseded = DoseResponseResult(
-        experiment_run_id=run.id, sample_id=active.sample_id, model="4PL",
+        lims_run_id=run.id, sample_id=active.sample_id, model="4PL",
         curve_category=CurveCategory.SIGMOID, quality_flag="ok",
         fit_version=1, superseded_by=active.id, client_id=test_org.id,
     )
@@ -772,7 +772,7 @@ def test_get_summary_excludes_superseded_results(client, db_session, test_admin_
     db_session.commit()
 
     resp = client.get(
-        f"/v1/experiment-runs/{run.id}/dose-response/summary",
+        f"/v1/lims-runs/{run.id}/dose-response/summary",
         headers={"Authorization": f"Bearer {admin_token}"},
     )
     assert resp.status_code == 200

@@ -1,8 +1,8 @@
-# Experiment Runs (LIMS)
+# LIMS Runs
 
 ## Purpose
 
-**Experiment Runs** are the structured LIMS component for capturing the execution of defined experimental protocols, particularly where data is imported from instruments or external parties (CROs), and where a formal review/publish lifecycle + optional analysis is required.
+**LIMS Runs** are the structured LIMS component for capturing the execution of defined experimental protocols, particularly where data is imported from instruments or external parties (CROs), and where a formal review/publish lifecycle + optional analysis is required.
 
 Primary goals:
 - Support repeatable, data-driven work (CRO or in-house).
@@ -10,26 +10,26 @@ Primary goals:
 - Enable structured data import with validation.
 - Serve as a foundation for analysis (currently dose-response is the most mature example; the intent is to support other analyses).
 
-**Important distinction**: An Experiment Run is **not** the same as a Batch.
+**Important distinction**: An LIMS Run is **not** the same as a Batch.
 - Batches are operational groupings for processing samples through tests and results entry.
-- Experiment Runs represent execution of a protocol/template with focus on data capture, structure, lifecycle, and derived analysis.
+- LIMS Runs represent execution of a protocol/template with focus on data capture, structure, lifecycle, and derived analysis.
 
 ## Core Entities
 
 | Entity                        | Description                                                                 | Notes |
 |-------------------------------|-----------------------------------------------------------------------------|-------|
 | `ExperimentTemplate`          | Reusable protocol definition (shared with ELN Experiments)                  | Contains `lifecycle_type`, `template_definition`, parser/worklist config |
-| `ExperimentRun`               | An instance of a template execution                                         | Strict status, data import, review lifecycle |
+| `LimsRun`               | An instance of a template execution                                         | Strict status, data import, review lifecycle |
 | `ExperimentData`              | Imported data rows (one row typically = one instrument reading / well)      | `row_data` (JSONB), optional `well_position`, `sample_id`, `container_id` |
 | `InstrumentParser`            | Column mapping config for importing instrument files                        | Learned or defined per template |
 | `RobotWorklistConfig`         | Configuration for generating robot transfer worklists                       | Currently generic CSV (source/dest/volume) |
 | `ExperimentProcess` / `ProcessStep` | Sub-process tracking within a run (e.g. "Sample Prep", "Bioanalysis")     | Exists but not yet wired in main UI |
 
-### ExperimentRun
+### LimsRun
 
-- Table: `experiment_runs`
+- Table: `lims_runs`
 - Does **not** extend `BaseModel` (name is unique per client, not globally; no `active` soft-delete flag).
-- Status is a strict enum (`ExperimentRunStatus`) with two lifecycles controlled by the template's `lifecycle_type`.
+- Status is a strict enum (`LimsRunStatus`) with two lifecycles controlled by the template's `lifecycle_type`.
 - Key timestamps: `started_at`, `completed_at`, `published_at`, `canceled_at`.
 - Special field: `fit_in_progress` (mutex for curve fitting).
 
@@ -99,7 +99,7 @@ draft → ordered → running → results_received → complete → published
 
 **ELN Experiments already use lookup tables** (`list_entries` for `experiment_status`). This is more flexible.
 
-**Recommendation for Experiment Runs**:
+**Recommendation for LIMS Runs**:
 Lookup tables (or an extension of the lists system) are generally a better long-term design for status when you want:
 - Easier addition of states without DB migrations.
 - Potential for per-template or per-client customization.
@@ -112,22 +112,22 @@ You can still enforce strict state-machine rules in the application service laye
 ## Proposed Mental Model (Direction)
 
 - **Experiment (ELN)**: Flexible notebook for processes, conditions, sample roles, and lineage.
-- **Experiment Run (LIMS)**: Structured execution of a protocol. Focus on data import/capture, lifecycle (including CRO handoff), review/publish, and analysis.
+- **LIMS Run (LIMS)**: Structured execution of a protocol. Focus on data import/capture, lifecycle (including CRO handoff), review/publish, and analysis.
 - `lifecycle_type` on the template should influence both sides (reviews/approvals on Experiments + state machine on Runs).
 - Runs should become more general-purpose for lab data work (in-house and CRO), not just dose-response.
 
 ## UI / API Surface
 
 - Routes: `/runs`, `/runs/:id`, `/runs/:id/dose-response`
-- Main pages: RunsManagement, ExperimentRunDetail (Overview / Data / Dose Response tabs)
-- API under `/v1/experiment-runs`
+- Main pages: RunsManagement, LimsRunDetail (Overview / Data / Dose Response tabs)
+- API under `/v1/lims-runs`
 
 ## Next Steps / Open Questions
 
 - Clarify distinction from Batches in all documentation and UI.
 - Decide on status implementation (enum vs lookup table) before adding many more phases.
 - Define what "more flexible" data structures are needed for general ADME / non-dose-response work.
-- Consider whether `ExperimentRun` should eventually be able to live inside (or be referenced by) an ELN Experiment.
+- Consider whether `LimsRun` should eventually be able to live inside (or be referenced by) an ELN Experiment.
 
 ---
 

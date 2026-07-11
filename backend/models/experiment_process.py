@@ -1,7 +1,7 @@
 """
 ExperimentProcess and ProcessStep models.
 
-experiment_processes   — named sub-process within an experiment_run (e.g. "Sample Prep",
+experiment_processes   — named sub-process within an lims_run (e.g. "Sample Prep",
                          "Plate Reading", "Data Review")
 process_steps          — ordered steps within a process
                          status: queued → in_process → complete | failed (terminal)
@@ -42,7 +42,7 @@ VALID_STEP_TRANSITIONS: dict[ProcessStepStatus, set[ProcessStepStatus]] = {
 
 class ExperimentProcess(Base):
     """
-    A named sub-process within an experiment_run.
+    A named sub-process within an lims_run.
 
     Examples: "Sample Preparation", "Plate Reading", "Data Review".
     Each process owns an ordered list of ProcessStep records.
@@ -53,9 +53,9 @@ class ExperimentProcess(Base):
     __tablename__ = 'experiment_processes'
 
     id = Column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    experiment_run_id = Column(
+    lims_run_id = Column(
         PostgresUUID(as_uuid=True),
-        ForeignKey('experiment_runs.id', ondelete='CASCADE'),
+        ForeignKey('lims_runs.id', ondelete='CASCADE'),
         nullable=False,
         index=True,
     )
@@ -68,7 +68,7 @@ class ExperimentProcess(Base):
     modified_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
     modified_by = Column(PostgresUUID(as_uuid=True), ForeignKey('users.id'), nullable=True)
 
-    experiment_run = relationship("ExperimentRun")
+    lims_run = relationship("LimsRun")
     steps = relationship(
         "ProcessStep",
         back_populates="process",

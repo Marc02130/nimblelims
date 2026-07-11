@@ -1,5 +1,5 @@
 """
-ExperimentRunService — business logic for experiment_runs lifecycle.
+LimsRunService — business logic for lims_runs lifecycle.
 
 Standard lifecycle (lifecycle_type='standard'):
     draft → running       (PATCH /start)
@@ -29,30 +29,30 @@ from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.repositories.flexible_experiment_repository import (
-    ExperimentDataRepository,
-    ExperimentRunRepository,
+    LimsRunDataRepository,
+    LimsRunRepository,
     RobotWorklistConfigRepository,
     InstrumentParserRepository,
 )
 from app.schemas.flexible_experiment import (
-    ExperimentRunCreate,
-    ExperimentDataRow,
+    LimsRunCreate,
+    LimsRunDataRow,
     ImportDataResponse,
-    ExperimentDataRead,
+    LimsRunDataRead,
 )
 from models.flexible_experiment import (
-    ExperimentRun,
-    ExperimentRunStatus,
-    ExperimentData,
+    LimsRun,
+    LimsRunStatus,
+    LimsRunData,
     VALID_TRANSITIONS,
     LIFECYCLE_TRANSITIONS,
 )
 from models.user import User
 
 
-class ExperimentRunService:
+class LimsRunService:
     """
-    Business logic for experiment_runs.
+    Business logic for lims_runs.
 
     Data import: only allowed when run.status == 'running'.
     Status transitions: validated against VALID_TRANSITIONS.
@@ -65,8 +65,8 @@ class ExperimentRunService:
     def __init__(self, db: Session, current_user: Optional[User] = None) -> None:
         self.db = db
         self.current_user = current_user
-        self.run_repo = ExperimentRunRepository(db)
-        self.data_repo = ExperimentDataRepository(db)
+        self.run_repo = LimsRunRepository(db)
+        self.data_repo = LimsRunDataRepository(db)
         self.worklist_repo = RobotWorklistConfigRepository(db)
         self.parser_repo = InstrumentParserRepository(db)
 
@@ -82,12 +82,12 @@ class ExperimentRunService:
 
     # ---------- CRUD ----------
 
-    def create_run(self, data: ExperimentRunCreate) -> ExperimentRun:
-        client_id = self.current_user.client_id if self.current_user else None
-        if client_id and self.run_repo.get_by_name_for_client(data.name, client_id):
+    def create_run(self, data: LimsRunCreate) -> LimsRun:
+        # Global unique name (aligned with other first-class entities)
+        if self.run_repo.get_by_name(data.name):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Experiment run '{data.name}' already exists",
+                detail=f"LIMS run '{data.name}' already exists",
             )
         run = self.run_repo.create(
             name=data.name,
@@ -98,20 +98,20 @@ class ExperimentRunService:
         self._commit_refresh(run)
         return run
 
-    def get_run(self, run_id: uuid.UUID) -> ExperimentRun:
+    def get_run(self, run_id: uuid.UUID) -> LimsRun:
         run = self.run_repo.get_by_id(run_id)
         if not run:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Experiment run not found")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="LIMS run not found")
         return run
 
     def list_runs(
         self,
         template_id: Optional[uuid.UUID] = None,
-        status: Optional[ExperimentRunStatus] = None,
+        status: Optional[LimsRunStatus] = None,
         mine: bool = False,
         page: int = 1,
         size: int = 10,
-    ) -> Tuple[List[ExperimentRun], int]:
+    ) -> Tuple[List[LimsRun], int]:
         created_by = self._user_id() if mine else None
         return self.run_repo.list(
             template_id=template_id,
@@ -123,13 +123,13 @@ class ExperimentRunService:
 
     # ---------- Status transitions ----------
 
-    def _lifecycle_transitions(self, run: ExperimentRun) -> dict:
+    def _lifecycle_transitions(self, run: LimsRun) -> dict:
         """Return the correct transitions dict based on the template's lifecycle_type."""
         lifecycle = getattr(run.experiment_template, "lifecycle_type", "standard") or "standard"
         return LIFECYCLE_TRANSITIONS.get(lifecycle, VALID_TRANSITIONS)
 
-    def _transition(self, run: ExperimentRun, new_status: ExperimentRunStatus) -> ExperimentRun:
-        current = ExperimentRunStatus(run.status)
+    def _transition(self, run: LimsRun, new_status: LimsRunStatus) -> LimsRun:
+        current = LimsRunStatus(run.status)
         transitions = self._lifecycle_transitions(run)
         if new_status not in transitions.get(current, set()):
             raise HTTPException(
@@ -140,42 +140,42 @@ class ExperimentRunService:
         self._commit_refresh(run)
         return run
 
-    def order_run(self, run_id: uuid.UUID) -> ExperimentRun:
+    def order_run(self, run_id: uuid.UUID) -> LimsRun:
         """draft → ordered (CRO lifecycle only)"""
         run = self.get_run(run_id)
-        return self._transition(run, ExperimentRunStatus.ordered)
+        return self._transition(run, LimsRunStatus.ordered)
 
-    def start_run(self, run_id: uuid.UUID) -> ExperimentRun:
+    def start_run(self, run_id: uuid.UUID) -> LimsRun:
         """draft → running (standard) or ordered → running (CRO)"""
         run = self.get_run(run_id)
-        return self._transition(run, ExperimentRunStatus.running)
+        return self._transition(run, LimsRunStatus.running)
 
-    def mark_results_received(self, run_id: uuid.UUID) -> ExperimentRun:
+    def mark_results_received(self, run_id: uuid.UUID) -> LimsRun:
         """running → results_received (CRO lifecycle only)"""
         run = self.get_run(run_id)
-        return self._transition(run, ExperimentRunStatus.results_received)
+        return self._transition(run, LimsRunStatus.results_received)
 
-    def move_to_review(self, run_id: uuid.UUID) -> ExperimentRun:
+    def move_to_review(self, run_id: uuid.UUID) -> LimsRun:
         """running → complete (standard) or results_received → complete (CRO)"""
         run = self.get_run(run_id)
-        return self._transition(run, ExperimentRunStatus.complete)
+        return self._transition(run, LimsRunStatus.complete)
 
-    def publish_run(self, run_id: uuid.UUID) -> ExperimentRun:
+    def publish_run(self, run_id: uuid.UUID) -> LimsRun:
         """complete → published. Caller must have verified experiment:publish permission."""
         run = self.get_run(run_id)
-        return self._transition(run, ExperimentRunStatus.published)
+        return self._transition(run, LimsRunStatus.published)
 
-    def cancel_run(self, run_id: uuid.UUID) -> ExperimentRun:
+    def cancel_run(self, run_id: uuid.UUID) -> LimsRun:
         """Any non-terminal state → canceled."""
         run = self.get_run(run_id)
-        return self._transition(run, ExperimentRunStatus.canceled)
+        return self._transition(run, LimsRunStatus.canceled)
 
     # ---------- Data import ----------
 
     def import_data(
         self,
         run_id: uuid.UUID,
-        rows: List[ExperimentDataRow],
+        rows: List[LimsRunDataRow],
     ) -> ImportDataResponse:
         """
         Import instrument data into a running experiment.
@@ -183,7 +183,7 @@ class ExperimentRunService:
         Columns must match the template's parser_config; raises 422 if they don't.
         """
         run = self.get_run(run_id)
-        _import_allowed = {ExperimentRunStatus.running, ExperimentRunStatus.results_received}
+        _import_allowed = {LimsRunStatus.running, LimsRunStatus.results_received}
         if run.status not in _import_allowed:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -228,7 +228,7 @@ class ExperimentRunService:
         return ImportDataResponse(
             imported=len(created_rows),
             skipped=0,
-            rows=[ExperimentDataRead.model_validate(r) for r in created_rows],
+            rows=[LimsRunDataRead.model_validate(r) for r in created_rows],
         )
 
     def get_data_rows(
@@ -236,7 +236,7 @@ class ExperimentRunService:
         run_id: uuid.UUID,
         page: int = 1,
         size: int = 100,
-    ) -> Tuple[List[ExperimentData], int]:
+    ) -> Tuple[List[LimsRunData], int]:
         self.get_run(run_id)  # 404 guard
         return self.data_repo.list_for_run(run_id, page=page, size=size)
 

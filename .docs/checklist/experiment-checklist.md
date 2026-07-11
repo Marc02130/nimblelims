@@ -17,7 +17,7 @@
 
 - [x] ELN Experiments + templates API (CRUD, sample links, lineage, workflow actions)
 - [x] Experiment Templates UI + SOP/AI parse + sign-off
-- [x] Experiment Runs + dose-response + CRO lifecycle
+- [x] LIMS Runs + dose-response + CRO lifecycle
 - [x] FieldDefinitions + lists hard cutover (merged from `refactor/jsonb`)
 - [x] Design docs, gap analysis, CEO / design / security reviews
 - [x] Model sketches: `Entry`, `Process` / `ELNProcessStep`, `ProcessSample`, `FieldDefinition`
@@ -135,7 +135,7 @@ Rule: no new phase / major feature until blocking questions for that work are re
 | [requirements/experiment-processes-entries.md](../requirements/experiment-processes-entries.md) | Consolidated requirements |
 | [processes.md](../processes.md) | Process concept |
 | [experiments.md](../experiments.md) | ELN Experiments |
-| [experiment-runs.md](../experiment-runs.md) | LIMS Runs boundary |
+| [lims-runs.md](../lims-runs.md) | LIMS Runs boundary |
 | [gap-analysis-process-and-experiment.md](../gap-analysis-process-and-experiment.md) | Gaps |
 | [experiment-rework-prerequisites.md](../experiment-rework-prerequisites.md) | Pre-rework issues |
 | [ceo-review/process-and-experiment.md](../ceo-review/process-and-experiment.md) | CEO review |

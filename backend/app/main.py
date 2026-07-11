@@ -3,7 +3,7 @@ FastAPI application for NimbleLims
 """
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routers import auth, samples, tests, containers, batches, results, aliquots, lists, projects, analyses, analytes, units, users, roles, permissions, clients, test_batteries, client_projects, custom_attributes, help, admin, sequences, workflows, experiments, experiment_runs, sop_parse, experiment_process, dose_response, field_definitions, eln_processes, entries
+from app.routers import auth, samples, tests, containers, batches, results, aliquots, lists, projects, analyses, analytes, units, users, roles, permissions, clients, test_batteries, client_projects, custom_attributes, help, admin, sequences, workflows, experiments, lims_runs, sop_parse, experiment_process, dose_response, field_definitions, eln_processes, entries
 import os
 import logging
 
@@ -93,7 +93,7 @@ app.include_router(sequences.router, tags=["admin"])
 # Nginx proxies /api/* to backend with /api stripped, so use /v1 to match /api/v1/experiments -> /v1/experiments
 app.include_router(experiments.experiment_templates_router, prefix="/v1")
 app.include_router(experiments.experiments_router, prefix="/v1")
-app.include_router(experiment_runs.router, prefix="/v1")
+app.include_router(lims_runs.router, prefix="/v1")
 app.include_router(sop_parse.router, prefix="/v1")
 app.include_router(experiment_process.router, prefix="/v1")
 app.include_router(eln_processes.router, prefix="/v1")

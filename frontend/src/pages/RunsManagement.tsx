@@ -93,7 +93,7 @@ const RunsManagement: React.FC = () => {
         size: pagination.size,
       };
       if (statusFilter) params.status = statusFilter;
-      const res = await apiService.getExperimentRuns(params);
+      const res = await apiService.getLimsRuns(params);
       setRuns(res?.runs ?? []);
       setPagination((p) => ({ ...p, total: res?.total ?? 0, pages: res?.pages ?? 1 }));
     } catch (err: any) {
@@ -108,7 +108,7 @@ const RunsManagement: React.FC = () => {
     setCreating(true);
     setError(null);
     try {
-      const run = await apiService.createExperimentRun({
+      const run = await apiService.createLimsRun({
         name: createName.trim(),
         description: createDesc.trim() || undefined,
         experiment_template_id: createTemplateId,

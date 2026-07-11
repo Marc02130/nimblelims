@@ -25,9 +25,9 @@ from .experiment import (
     ExperimentSampleExecution,
 )
 from .flexible_experiment import (
-    ExperimentRun,
-    ExperimentRunStatus,
-    ExperimentData,
+    LimsRun,
+    LimsRunStatus,
+    LimsRunData,
     InstrumentParser,
     RobotWorklistConfig,
     SopParseJob,
@@ -55,6 +55,6 @@ from .entry import (
 )
 
 # Additional models referenced via relationships or used in the app
-from .dose_response import DoseResponseResult, ExperimentDataExclusion
+from .dose_response import DoseResponseResult, LimsRunDataExclusion
 from .template_well import TemplateWellDefinition
 

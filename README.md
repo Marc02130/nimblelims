@@ -195,7 +195,7 @@ nimblelims/
 - **Data Isolation**: Client-specific data access controls via project_users junction table
 - **Row-Level Security**: PostgreSQL RLS policies for data protection at the database level. `FORCE ROW LEVEL SECURITY` is applied so enforcement holds even for the table owner role (no bypass on direct DB connections).
 - **Samples Access Control**: The `GET /samples` endpoint relies entirely on RLS for access control - no Python-level filtering is applied. Lab Technicians and Lab Managers see samples from projects they have access to via the `project_users` table. Client users see samples from their client's projects. Administrators see all samples.
-- **Experiment Engine Isolation**: The 5 flexible experiment engine tables (`experiment_runs`, `experiment_data`, `instrument_parsers`, `robot_worklist_configs`, `sop_parse_jobs`) use client-scoped RLS: users only see rows created by members of their own client organization. Admins see all. Enforced at the database layer regardless of the API code path.
+- **Experiment Engine Isolation**: The 5 flexible experiment engine tables (`lims_runs`, `lims_run_data`, `instrument_parsers`, `robot_worklist_configs`, `sop_parse_jobs`) use client-scoped RLS: users only see rows created by members of their own client organization. Admins see all. Enforced at the database layer regardless of the API code path.
 
 ## API Documentation
 
@@ -301,6 +301,6 @@ Refer to the technical documentation in `.docs/` for detailed implementation spe
 
 **Key files (backend):** `backend/app/routers/experiments.py`, `backend/app/routers/sop_parse.py`, `backend/app/services/sop_parse_service.py`, `backend/app/services/experiment_service.py`, flexible experiment models/migrations.
 
-**Documentation:** `.docs/checklist/experiment-checklist.md`, `.docs/processes.md`, `.docs/experiments.md` (ELN), `.docs/experiment-runs.md` (LIMS), `.docs/experiment-planning.md`, `.docs/navigation.md`, `.docs/api_endpoints.md`, `UAT_Scripts/uat-experiment-templates.md`.
+**Documentation:** `.docs/checklist/experiment-checklist.md`, `.docs/processes.md`, `.docs/experiments.md` (ELN), `.docs/lims-runs.md` (LIMS), `.docs/experiment-planning.md`, `.docs/navigation.md`, `.docs/api_endpoints.md`, `UAT_Scripts/uat-experiment-templates.md`.
 
 **Optional env:** `ANTHROPIC_API_KEY` on the backend for SOP extraction (see `backend/app/core/config.py`).
