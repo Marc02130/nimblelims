@@ -38,18 +38,28 @@ Users already import rich tables into a run. They should not re-type the same nu
 - `ExperimentSampleExecution.result_id` can point at a Result (ELN path).
 - LimsRun data rows do **not** currently own a first-class “promoted to result_id” link.
 
-## Sketch of the idea (v0)
+## Sketch of the idea (v0) — refined mapping
+
+**Primary mapping rule (product sketch):**
+
+| Source | Target |
+|--------|--------|
+| JSONB **column name** (key in `row_data`) | **`analytes`** (match by analyte name/code → `analyte_id`) |
+| JSONB **value** on that key | **`results.raw_result`** |
+| `lims_run_data.sample_id` | Resolve **test** for that sample (+ analysis that includes the analyte) |
 
 ```
-LimsRun (has imported lims_run_data rows)
-    │
-    │  user selects column mapping (when assay/setup allows)
-    │  e.g. row_data["concentration"] → Result.raw_result
-    │       row_data["analyte_code"]  → resolve Analyte
-    │       sample_id on row         → find/create Tests?
-    ▼
-results (parent test_id + analyte_id)
+lims_run_data row:
+  sample_id = S1
+  row_data  = { "Lead": "12.3", "Arsenic": "0.4", "units": "ug/L" }
+
+mapping:
+  column "Lead"    → analyte Lead    → result(raw_result="12.3") on test for S1
+  column "Arsenic" → analyte Arsenic → result(raw_result="0.4") on test for S1
+  column "units"   → not an analyte  → skip (or map elsewhere later)
 ```
+
+One import row with N analyte columns → **N result rows** (same sample/test family as assay setup allows).
 
 ### Preconditions (“if the assay is set up”)
 
@@ -105,25 +115,56 @@ If sample has no test yet:
 - Auto-create tests from sample’s ordered analyses / test battery?  
 - Require explicit test selection in the promote UI?
 
-### 5. Analyte resolution
+### 5. Analyte resolution (working assumption)
 
-How does a JSONB column become `analyte_id`?
-
-- Column name matches analyte name/code  
-- Explicit map: key `IC50` → analyte UUID  
-- One column → one analyte always (simple assays)
+- **Default:** JSONB key matches **analyte name** (normalized) → `analyte_id`.  
+- **Override:** template/run map key → analyte when names differ (`Pb` → Lead).  
+- Non-analyte columns (units, flags, well id) are not promoted unless separately mapped.
 
 ### 6. Field mapping surface
 
-Results today are mostly **scalar strings** (`raw_result`, `reported_result`, `calculated_result`) + qualifier list entry — not arbitrary columns.
+Promotion v1 targets **`raw_result`** only (value from JSONB).  
+`reported_result` may copy from raw later or stay manual review.
 
-So “select columns” likely means:
+### 6b. Calculated results — can LimsRuns do calculations?
 
-- Map **one** JSONB key → `raw_result` (and/or reported)  
-- Optionally map another → qualifier / custom_attributes  
-- Or map **multiple keys → multiple analytes** (multiple result rows)
+**Today: no general calculation engine on LimsRuns.**
 
-Not “copy whole JSONB object into results” without a shape.
+| Capability | Exists? |
+|------------|---------|
+| Import/map columns into `row_data` JSONB | Yes (parser) |
+| Arbitrary formulas on run columns → another column | **No** |
+| Dose-response fit (R calculator) → `dose_response_results` | Yes — **analysis-specific**, not classic `results.calculated_result` |
+| `results.calculated_result` column | Exists; schema/docs call it **post-MVP / stub** — no product calc pipeline |
+
+So for promote:
+
+- **v1:** map instrument values → **`raw_result`** only.  
+- **`calculated_result`:** leave null unless we define a separate calc step (options below).  
+- Do **not** assume promote will fill calculated from the run.
+
+**Options if we need calculated later (product pick):**
+
+| Option | Description |
+|--------|-------------|
+| A | Manual entry of calculated after promote |
+| B | Simple promote-time formula (e.g. raw × dilution) stored on template map |
+| C | Dedicated calc service (like R dose-response) writing `calculated_result` or DR tables |
+| D | Pre-compute in instrument file / parser so JSONB already holds the “calculated” value → still map to raw or reported |
+
+### 6c. Why does `results` still have `custom_attributes`?
+
+**Historical extensibility**, same pattern as samples/projects before FieldDefinitions:
+
+- Many entities got a JSONB bag + `validate_custom_attributes(..., "results")` in the API.  
+- Lets labs stash extra keys without a migration.  
+- **Not** a first-class multi-column results model; parallel to the JSONB debt FieldDefinitions were meant to replace for *modeled* data.
+
+For run→results promote:
+
+- **Prefer not** dumping leftover JSONB keys into `custom_attributes` by default (opaque, hard to report).  
+- Either map only analyte columns → raw_result, or later use FieldDefinitions on results if we need structured extra fields.  
+- Keeping the column in the schema does not mean promote must use it.
 
 ### 7. Relationship to dose-response
 
@@ -167,10 +208,12 @@ If a process step is `lims_run`, promotion might be a step-complete action. Out 
 2. Snapshot vs update-on-repromote?  
 3. Required run status before promote?  
 4. Auto-create missing tests?  
-5. Multi-analyte from one row — required in v1?  
+5. Analyte match: exact name only vs alias map on template?  
 6. Permissions: same as result entry, or also need run publish?  
-7. Audit / lineage: store `lims_run_id` + `lims_run_data_id` on result (new columns or custom_attributes)?  
+7. Audit / lineage: first-class FKs `lims_run_id` / `lims_run_data_id` vs avoid `custom_attributes` for lineage?  
 8. Env lab vs CRO: same feature both lifecycles?  
+9. **Calculated:** v1 raw-only, or promote-time simple formula (B)?  
+10. **custom_attributes on results:** leave unused by promote; deprecate later with FieldDefs?  
 
 ## Suggested next step
 
