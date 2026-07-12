@@ -58,6 +58,131 @@ Use (every run):
   → publish promote uses name/alias as today
 ```
 
+## How parsers and LimsRuns work together
+
+Two different concerns, one pipeline:
+
+| Concern | Owns | When |
+|---------|------|------|
+| **Parser** | *How* the file becomes JSONB rows (`lims_run_data`) | Import (running / results_received) |
+| **Analysis + promote** | *How* JSONB becomes Tests/Results | Publish (only if `analysis_id` set) |
+
+Today the run already has **`analysis_id`** (promote opt-in) and resolves a parser only via **`experiment_template_id`** (`InstrumentParser` on template). Target: parser selection is driven by **analysis + data source (instrument|CRO)**, while template still owns protocol/lifecycle/worklist.
+
+### End-to-end flow (lab, standard lifecycle)
+
+```
+1. Setup (once, not per run)
+   Admin creates Parser(analysis=Metals, instrument=LCMS-1)
+   optional AI draft from sample .txt → save parser_config
+
+2. Create LimsRun
+   template = metals plate protocol (lifecycle, worklist, …)
+   analysis_id = Metals          ← reportable path
+   instrument_id = LCMS-1        ← optional on run; helps auto-pick parser
+   parser_id = <resolved or explicit>
+
+3. Start run
+   if no analysis_id → existing warn/ack (non-reportable)
+   if analysis set but no parser for analysis×source → warn or block import later
+
+4. Import (running)
+   file → InstrumentDataService(parser_config) → lims_run_data rows
+   NO AI
+   validation: columns match parser field_names (as today, but parser from run not only template)
+
+5. Review / complete
+
+6. Publish
+   if analysis_id set → ResultPromotionService
+     field_name / aliases → analytes on that analysis
+     ensure Test(sample, analysis), write Result(raw, replicate, lims_run_id)
+   if no analysis → publish only (instrument SoT stays JSONB)
+```
+
+### CRO lifecycle (same idea)
+
+```
+draft → ordered → running → results_received → complete → published
+                              ↑
+                         import here (and/or running)
+
+Run: analysis_id + cro_source_id (e.g. Eurofins)
+Parser: (analysis, cro_source) — same deterministic import
+Promote: unchanged (analysis-gated)
+```
+
+CRO lifecycle type still comes from the **template**; CRO **source** is who returned the file and which parser applies.
+
+### What lives on the LimsRun
+
+| Field | Role |
+|-------|------|
+| `experiment_template_id` | Protocol, lifecycle_type, worklist, UI template — **not** primary parser key going forward |
+| `analysis_id` | Promote opt-in + which analyte catalog to promote into (shipped) |
+| `instrument_id` *or* `cro_source_id` | Data **source** for this run (light catalog) |
+| `parser_id` (optional explicit) | Override if multiple parsers exist for that analysis×source |
+
+**Resolution order for import (proposed):**
+
+1. Explicit `run.parser_id` if set  
+2. Else unique active parser for `(run.analysis_id, run.instrument_id|cro_source_id)`  
+3. Else unique parser for `run.analysis_id` if only one source-agnostic fallback (optional product rule)  
+4. Else legacy: parser for `experiment_template_id` (compat)  
+5. Else **400** “configure a parser for this analysis + instrument/CRO”
+
+**Rules of thumb:**
+
+- Prefer setting **analysis + instrument/CRO before first import** so parser auto-resolves.  
+- Changing analysis after import: allow if data empty; if data exists, warn (promote targets different analytes).  
+- Non-reportable runs (`analysis_id` null): still need a parser to import — either require source + a “generic” parser, or keep template-linked parser only for that path.
+
+### Two mapping layers (do not conflate)
+
+```
+File column "Pb (ug/L)"
+    │  parser maps source_col → field_name
+    ▼
+row_data["Pb_ug_L"] = "12.3"          ← lims_run_data (import)
+    │  promote matches field_name / alias → analyte
+    ▼
+Result(analyte=Lead, raw_result="12.3")  ← published structure
+```
+
+| Layer | Config | Best practice |
+|-------|--------|----------------|
+| **Parser** | `source_col` → `field_name` | Prefer `field_name` = analyte name or **stable alias** you will maintain |
+| **Promote** | `field_name` → analyte (name/alias) | Uses analysis’s analytes + `analyte_aliases` |
+
+Ideal setup: parser emits field names that already resolve on promote (zero unresolved columns). AI setup can suggest both parser map **and** alias adds (alias apply remains human-confirmed).
+
+### UI sketch (run detail)
+
+1. **Overview:** Analysis (shipped) + Instrument **or** CRO source + resolved Parser (read-only chip / change link).  
+2. **Data tab / Import:** Upload file → apply **run’s** parser → preview rows → commit.  
+3. **Publish:** existing promotion preview (creates/updates/conflicts).  
+
+Parser **create/edit** lives under Admin (or Analysis detail), not reinvented on every run — run only **selects**.
+
+### Compatibility with template parsers
+
+| Phase | Behavior |
+|-------|----------|
+| Transition | Import resolution: run parser first, else template parser |
+| SOP parse | May still seed a template parser; optionally also offer “save as analysis×instrument parser” |
+| End state | Template no longer required for import validation; template remains for protocol/lifecycle |
+
+### Branch fit (with LimsRun)
+
+| Phase | Includes LimsRun touch? |
+|-------|-------------------------|
+| P0 catalog (instrument/CRO) | Minimal (entities only) |
+| P1 parser + import use | **Yes** — resolve parser on import; optional FKs on run |
+| P2 AI draft | Setup UI only; runs unchanged |
+| P3 auto-select polish | `instrument_id`/`cro_source_id` on run, UI |
+
+---
+
 ### Parser config (reuse existing shape)
 
 Keep evolving `parser_config` (already in codebase):
