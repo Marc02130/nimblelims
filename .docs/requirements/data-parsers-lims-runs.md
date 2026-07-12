@@ -1,8 +1,10 @@
 # Requirements: Data parsers, instruments/CRO sources, and LimsRun import
 
 **Date:** 2026-07-12  
-**Status:** Draft for review (CEO · Security · Architecture · UI)  
+**Status:** **In review** (CEO · Security · Architecture · UI) — tech sketch attached  
 **Idea / direction:** [`.docs/ideas/ai-data-import.md`](../ideas/ai-data-import.md)  
+**Tech sketch:** [`.docs/tech-sketch/data-parsers-lims-runs.md`](../tech-sketch/data-parsers-lims-runs.md)  
+**Open questions:** [`.docs/open-questions/data-parsers-lims-runs.md`](../open-questions/data-parsers-lims-runs.md)  
 **Depends on (shipped):** [run-results](../ideas/run-results.md) promote-on-publish (`analysis_id`, analyte aliases, `ResultPromotionService`)  
 **Related:** [manuals/lims-runs.md](../manuals/lims-runs.md), SOP parse (template-centric AI, separate)
 
@@ -263,15 +265,17 @@ File column  --parser-->  row_data[field_name]  --promote-->  Result(analyte)
 
 ---
 
-## 10. Review packet
+## 10. Review packet (resubmitted with tech sketch)
 
-| Review | Location | Status |
-|--------|----------|--------|
-| Requirements (this doc) | [requirements/data-parsers-lims-runs.md](data-parsers-lims-runs.md) | **Ready for review** |
+| Doc | Location | Status |
+|-----|----------|--------|
+| Requirements | this file | **In review** |
+| **Tech sketch** | [tech-sketch/data-parsers-lims-runs.md](../tech-sketch/data-parsers-lims-runs.md) | **Ready for review** |
 | CEO / product | [ceo-review/data-parsers-lims-runs.md](../ceo-review/data-parsers-lims-runs.md) | Awaiting review |
 | Security | [security-review/data-parsers-lims-runs.md](../security-review/data-parsers-lims-runs.md) | Awaiting review |
 | Architecture | [architecture-review/data-parsers-lims-runs.md](../architecture-review/data-parsers-lims-runs.md) | Awaiting review |
 | UI / UX | [ui-review/data-parsers-lims-runs.md](../ui-review/data-parsers-lims-runs.md) | Awaiting review |
-| Idea (exploration) | [ideas/ai-data-import.md](../ideas/ai-data-import.md) | Direction sketch |
+| Open questions | [open-questions/data-parsers-lims-runs.md](../open-questions/data-parsers-lims-runs.md) | Living |
+| Idea | [ideas/ai-data-import.md](../ideas/ai-data-import.md) | Direction sketch |
 
-**Gate:** Do not start P1 implementation until CEO + Architecture blockers in open questions are **Decided** (or provisional defaults accepted). Security must accept trust boundaries before AI setup (P2) ships.
+**Gate:** Do not start P1 until CEO + Architecture blockers are **Decided** (or provisional defaults accepted) and developer has processed review verdicts. Security must accept trust boundaries before AI setup (P2) ships.

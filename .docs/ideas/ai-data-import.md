@@ -1,8 +1,10 @@
 # Idea: Parser setup (analysis + instrument/CRO) with optional AI assist
 
-**Status:** **Requirements in review** (CEO · Security · Architecture · UI)  
+**Status:** **In review** — requirements + tech sketch submitted  
 **Date:** 2026-07-12  
 **Requirements:** [../requirements/data-parsers-lims-runs.md](../requirements/data-parsers-lims-runs.md)  
+**Tech sketch:** [../tech-sketch/data-parsers-lims-runs.md](../tech-sketch/data-parsers-lims-runs.md)  
+**Open questions:** [../open-questions/data-parsers-lims-runs.md](../open-questions/data-parsers-lims-runs.md)  
 **Related:** [run-results.md](run-results.md), [ai-analyte-resolution.md](ai-analyte-resolution.md), [ai-data-analysis.md](ai-data-analysis.md), [manuals/lims-runs.md](../manuals/lims-runs.md)
 
 ## One-liner
