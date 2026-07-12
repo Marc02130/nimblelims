@@ -18,6 +18,11 @@ class ResultBase(BaseModel):
     entry_date: datetime = Field(default_factory=datetime.utcnow, description="Date result was entered")
     entered_by: UUID = Field(..., description="ID of user who entered result")
     custom_attributes: Dict[str, Any] = Field(default_factory=dict, description="Custom attributes as JSON")
+    replicate: int = Field(1, ge=1, description="Replicate number (default 1)")
+    lims_run_id: Optional[UUID] = Field(
+        None,
+        description="Source LimsRun when created via promote-on-publish",
+    )
 
     @validator('entry_date')
     def validate_entry_date(cls, v):
@@ -40,6 +45,7 @@ class ResultUpdate(BaseModel):
     entry_date: Optional[datetime] = None
     entered_by: Optional[UUID] = None
     custom_attributes: Optional[Dict[str, Any]] = Field(None, description="Custom attributes as JSON")
+    replicate: Optional[int] = Field(None, ge=1)
 
     @validator('entry_date')
     def validate_entry_date(cls, v):
@@ -53,9 +59,10 @@ class ResultResponse(ResultBase):
     id: UUID
     active: bool
     created_at: datetime
-    created_by: UUID
+    created_by: Optional[UUID] = None
     modified_at: datetime
-    modified_by: UUID
+    modified_by: Optional[UUID] = None
+    description: Optional[str] = None
 
     class Config:
         from_attributes = True

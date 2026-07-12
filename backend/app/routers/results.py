@@ -175,7 +175,7 @@ async def create_result(
                 detail=str(e)
             )
     
-    # Create result
+    # Create result (no global name — Decision #17)
     result = Result(
         test_id=result_data.test_id,
         analyte_id=result_data.analyte_id,
@@ -186,6 +186,8 @@ async def create_result(
         entry_date=result_data.entry_date,
         entered_by=result_data.entered_by,
         custom_attributes=validated_custom_attributes,
+        replicate=getattr(result_data, 'replicate', None) or 1,
+        lims_run_id=getattr(result_data, 'lims_run_id', None),
         created_by=current_user.id,
         modified_by=current_user.id
     )
@@ -392,6 +394,7 @@ async def enter_batch_results_us28(
                 existing_result = db.query(Result).filter(
                     Result.test_id == test_result_entry.test_id,
                     Result.analyte_id == analyte_id,
+                    Result.replicate == 1,
                     Result.active == True
                 ).first()
                 
@@ -411,11 +414,12 @@ async def enter_batch_results_us28(
                         raw_result=analyte_result.raw_result,
                         reported_result=analyte_result.reported_result,
                         qualifiers=analyte_result.qualifiers,
-            entry_date=datetime.utcnow(),
-            entered_by=current_user.id,
-            created_by=current_user.id,
-            modified_by=current_user.id
-        )
+                        entry_date=datetime.utcnow(),
+                        entered_by=current_user.id,
+                        created_by=current_user.id,
+                        modified_by=current_user.id,
+                        replicate=1,
+                    )
                     db.add(new_result)
                     created_results.append(new_result)
     

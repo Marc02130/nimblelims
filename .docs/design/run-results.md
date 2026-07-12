@@ -225,7 +225,7 @@ Permissions: **publish alone** is enough to create/update tests/results on this 
 
 | Risk | Mitigation |
 |------|------------|
-| Global unique `results.name` | Robust name generator |
+| ~~Global unique `results.name`~~ | **Dropped** (Decision #17 / P2) |
 | Large runs (10k rows × analytes) | Batch inserts; **admin-configurable batch size, default 200**; timeout; prefer sync transactional publish |
 | Alias collisions | Unique constraint + admin validation |
 
