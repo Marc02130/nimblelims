@@ -222,9 +222,55 @@ class LimsRunService:
         return self._transition(run, LimsRunStatus.complete)
 
     def publish_run(self, run_id: uuid.UUID) -> LimsRun:
-        """complete → published. Caller must have verified experiment:publish permission."""
+        """
+        complete → published. Caller must have verified experiment:publish permission.
+
+        When analysis_id is set, promotes lims_run_data → tests/results in the same
+        transaction (P3). Conflicts with other runs abort publish.
+        """
         run = self.get_run(run_id)
-        return self._transition(run, LimsRunStatus.published)
+        current = LimsRunStatus(run.status)
+        transitions = self._lifecycle_transitions(run)
+        if LimsRunStatus.published not in transitions.get(current, set()):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Cannot transition from '{current.value}' to 'published'",
+            )
+
+        from app.services.result_promotion_service import ResultPromotionService
+
+        promo = ResultPromotionService(self.db, current_user=self.current_user)
+        # Plan first (may create tests via ensure); apply if analysis set
+        if run.analysis_id:
+            plan = promo.plan_promotion(run)
+            if plan.conflict_count:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail={
+                        "code": "promotion_conflict",
+                        "message": (
+                            "Cannot publish: some results already exist from another "
+                            "run or manual entry. Resolve conflicts before publishing."
+                        ),
+                        "conflict_count": plan.conflict_count,
+                        "errors": plan.errors[:20],
+                        "preview": plan.to_dict(),
+                    },
+                )
+            promo.apply_plan(run, plan)
+
+        self.run_repo.update_status(run, LimsRunStatus.published, self._user_id())
+        self._commit_refresh(run)
+        return run
+
+    def promotion_preview(self, run_id: uuid.UUID) -> dict:
+        """Dry-run of promote-on-publish (no DB writes)."""
+        run = self.get_run(run_id)
+        from app.services.result_promotion_service import ResultPromotionService
+
+        promo = ResultPromotionService(self.db, current_user=self.current_user)
+        plan = promo.plan_promotion(run, dry_run=True)
+        return plan.to_dict()
 
     def cancel_run(self, run_id: uuid.UUID) -> LimsRun:
         """Any non-terminal state → canceled."""

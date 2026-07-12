@@ -169,10 +169,27 @@ def publish_run(
     db: Session = Depends(get_db),
     publisher: User = Depends(require_permission("experiment:publish")),
 ):
-    """Transition: complete → published (requires experiment:publish permission)."""
+    """
+    Transition: complete → published (requires experiment:publish).
+
+    When analysis_id is set, promotes instrument data to tests/results in the same
+    transaction. Conflicts with other runs return 409.
+    """
     service = LimsRunService(db, current_user=publisher)
     run = service.publish_run(run_id)
     return _run_read(run)
+
+
+@router.get("/{run_id}/promotion/preview")
+def promotion_preview(
+    run_id: UUID,
+    service: LimsRunService = Depends(_run_service),
+):
+    """
+    Preview what would happen on publish for structured promote
+    (creates/updates/conflicts/unresolved columns). Does not write.
+    """
+    return service.promotion_preview(run_id)
 
 
 @router.patch("/{run_id}/cancel", response_model=LimsRunRead)
