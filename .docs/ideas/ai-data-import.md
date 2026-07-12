@@ -12,12 +12,13 @@
 
 | Principle | Decision |
 |-----------|----------|
-| **SoT for import** | Saved **parser config** — not the LLM |
+| **SoT for import** | Saved **parser config in DB (JSONB instructions)** — not the LLM, not custom code |
 | **AI role** | **Setup assistant** only: propose delimiter, header row, skip rows, column map from a sample file |
 | **Human role** | Review/edit/save parser; re-run import without AI |
 | **Repetition** | Same analysis + same instrument (or same CRO) → **reuse** the parser |
 | **Scope key (lab)** | **Analysis + instrument** |
 | **Scope key (CRO)** | **Analysis + CRO** (CRO is the “source system” when work is external) |
+| **On each LimsRun** | Track **`instrument_id` or `cro_source_id`**, and **`parser_id`** (default from analysis+source, user may override; store for troubleshooting) |
 | **Example file for setup** | **Text table required**: `.txt` / CSV-like with **tab, comma, semicolon**, etc. (not binary-only instruments in v1) |
 
 This is **not** “AI imports results every time.” It is “AI helps you configure the thing that will import results forever.”
@@ -114,28 +115,96 @@ Promote: unchanged (analysis-gated)
 
 CRO lifecycle type still comes from the **template**; CRO **source** is who returned the file and which parser applies.
 
-### What lives on the LimsRun
+### What lives on the LimsRun (**decided**)
 
-| Field | Role |
-|-------|------|
-| `experiment_template_id` | Protocol, lifecycle_type, worklist, UI template — **not** primary parser key going forward |
-| `analysis_id` | Promote opt-in + which analyte catalog to promote into (shipped) |
-| `instrument_id` *or* `cro_source_id` | Data **source** for this run (light catalog) |
-| `parser_id` (optional explicit) | Override if multiple parsers exist for that analysis×source |
+Track source + which parser was used (for troubleshooting and re-import fidelity):
 
-**Resolution order for import (proposed):**
+| Column | Required? | Role |
+|--------|-----------|------|
+| `experiment_template_id` | Yes (today) | Protocol, lifecycle_type, worklist |
+| `analysis_id` | Optional | Promote opt-in + analyte catalog (shipped) |
+| `instrument_id` | Optional | Lab data source (FK → light instruments catalog) |
+| `cro_source_id` | Optional | External CRO source (FK → light CRO catalog) |
+| `parser_id` | Set before/at first import | **Which parser instructions were used** (FK → parsers table) |
 
-1. Explicit `run.parser_id` if set  
-2. Else unique active parser for `(run.analysis_id, run.instrument_id|cro_source_id)`  
-3. Else unique parser for `run.analysis_id` if only one source-agnostic fallback (optional product rule)  
-4. Else legacy: parser for `experiment_template_id` (compat)  
-5. Else **400** “configure a parser for this analysis + instrument/CRO”
+**Constraints (product):**
 
-**Rules of thumb:**
+- Lab vs CRO: typically **one of** `instrument_id` / `cro_source_id` (not both).  
+- **Default parser:** when user sets `analysis_id` + instrument|CRO, system **resolves** default parser for that triple and **writes `parser_id` on the run**.  
+- **Override:** user may pick another active parser (same analysis preferred; product may allow cross-source only with warning). **Store the chosen `parser_id`** — do not re-resolve silently later.  
+- **Troubleshooting:** stored `parser_id` answers “what instructions did we use for this run’s import?” even if catalog defaults change later.  
+- Optional later: snapshot `parser_config` JSONB on first import if we need bit-for-bit historical fidelity after parser edits (v1 can start with FK only + audit of parser updates).
 
-- Prefer setting **analysis + instrument/CRO before first import** so parser auto-resolves.  
-- Changing analysis after import: allow if data empty; if data exists, warn (promote targets different analytes).  
-- Non-reportable runs (`analysis_id` null): still need a parser to import — either require source + a “generic” parser, or keep template-linked parser only for that path.
+**Default vs override UX:**
+
+```
+User sets analysis + instrument (or CRO)
+  → backend finds default parser for (analysis, source)
+  → sets lims_runs.parser_id = that id
+  → UI shows “Parser: Metals / LCMS-1 (default)” with Change…
+
+User overrides parser
+  → lims_runs.parser_id = chosen id
+  → UI shows “(override)” + still keeps instrument/CRO for lineage
+```
+
+Import always uses **`run.parser_id`’s `parser_config`**, not a live re-lookup (unless parser_id null → resolve once and persist, or 400).
+
+**Resolution when setting default (proposed):**
+
+1. Active parser matching `(analysis_id, instrument_id)` or `(analysis_id, cro_source_id)` with `is_default` if multiple  
+2. Else single active parser for that pair  
+3. Else legacy template parser (compat) → still **copy id onto `run.parser_id`** when used  
+4. Else leave null until user selects; **import requires non-null parser_id**
+
+### How the parser is stored (**not code**)
+
+A parser is a **DB row of instructions**, not deployed code or a plugin.
+
+```
+instrument_parsers (evolve name if needed: data_parsers)
+├── id, name, description, active
+├── analysis_id          FK  — scope
+├── instrument_id        FK nullable  — lab path
+├── cro_source_id        FK nullable  — CRO path
+├── is_default           bool  — default among siblings for same analysis×source
+├── parser_config        JSONB  ← THE INSTRUCTIONS
+├── created_by / modified_at / …
+```
+
+**`parser_config` is declarative config** read by the shared `InstrumentDataService` (generic engine already in the app):
+
+| Instruction area | Examples in JSONB |
+|------------------|-------------------|
+| File shape | `delimiter`, `encoding`, `skip_rows`, `header_row` |
+| Identity columns | `well_col`, `sample_col` |
+| Column map | `columns[]`: `source_col` → `field_name`, `data_type`, `unit` |
+| Future | date formats, null tokens, multi-line headers — still data, not code |
+
+```
+┌─────────────────────┐     read config      ┌──────────────────────────┐
+│  parsers table      │ ──────────────────►  │ InstrumentDataService    │
+│  parser_config JSONB│                      │ (generic Python engine)  │
+└─────────────────────┘                      └────────────┬─────────────┘
+                                                          │ apply to file
+                                                          ▼
+                                                 lims_run_data rows
+```
+
+- **No** per-instrument Python modules in v1.  
+- **No** user-uploaded scripts.  
+- AI (optional setup) only **fills JSONB**; after save, import never calls the LLM.  
+- Same pattern as today: `InstrumentParser.parser_config` already is JSONB — we re-key/scope the row and point the run at it.
+
+**Why store `parser_id` on the run if config is in the parser table?**
+
+| Store | Purpose |
+|-------|---------|
+| Catalog parser row | Reusable definition for many runs |
+| `lims_runs.parser_id` | **Lineage**: this run used *this* definition (override or default) |
+| Optional import-time snapshot | Freeze config if catalog parser is later edited (P3+) |
+
+Editing a catalog parser affects **future** imports / runs that re-select default; past runs keep pointing at the same row (and optionally a snapshot if we add it).
 
 ### Two mapping layers (do not conflate)
 
