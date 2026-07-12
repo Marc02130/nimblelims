@@ -24,18 +24,18 @@ Do not implement a phase until questions that block it are **Decided** (or provi
 |---|----------|--------|--------|----------|------|-------|-----------|
 | 1 | When are structured results written from run data? | **Decided** | Whole feature | **On run publish** (`→ published`) | 2026-07-11 | Product | Official moment; matches publish permission |
 | 2 | What value field is filled in v1? | **Decided** | Mapping | **`raw_result`** from JSONB value; calculated deferred | 2026-07-11 | Product | No general run calc engine |
-| 3 | How do JSONB columns resolve to analytes? | **Decided (provisional)** | Mapping | Name match + **aliases** + optional template map | 2026-07-11 | Product | Multi-CRO column names |
+| 3 | How do JSONB columns resolve to analytes? | **Decided** | Mapping | Name match + **aliases on analyte** (+ optional template map if needed later) | 2026-07-11 | Product | Multi-CRO column names |
 | 4 | Cardinality: multi-analyte columns? | **Decided** | Promote service | **One column → one result row** per sample/test; multi-analyte = multi-row | 2026-07-11 | Product | Matches results model |
 | 5 | Instrument vs results SoT? | **Decided** | Integrity | Run JSONB remains instrument SoT; results = published projection | 2026-07-11 | Product | Align Decision #1g |
-| 6 | Always promote on publish, or opt-in? | **Decided** | Publish hook | See **Decision #6**. Promote when run has **`analysis_id` set** and status → **published**. No analysis → publish without promoting to tests/results. | 2026-07-11 | Product | Analysis association is the opt-in; clear assay setup |
-| 7 | Missing tests on sample: block publish vs auto-create? | **Open** | Promote readiness | With analysis FK: lean find-or-create test for (sample, analysis) — confirm | | | |
-| 8 | Re-promote / existing results: update, skip, or fail? | **Open** | Idempotency | | | | |
-| 9 | Alias storage: on analyte, template only, or both? | **Open** | P0 aliases | Lean **both** (analyte defaults + template override) | | | |
-| 10 | Permissions: publish alone vs publish + result:enter? | **Open** | AuthZ | Security wants explicit model | | | |
-| 11 | Lineage: first-class FKs on results? | **Open** | Schema | Lean yes (`source_lims_run_id`, `source_lims_run_data_id`) | | | |
+| 6 | Always promote on publish, or opt-in? | **Decided** | Publish hook | See **Decision #6**. Promote when run has **`analysis_id` set** and status → **published**. | 2026-07-11 | Product | Analysis association is the opt-in |
+| 7 | Missing tests on sample: block vs auto-create? | **Decided** | Promote readiness | See **Decision #7**. Analysis/analyte = catalog objects; test/result = instances. If analysis is on the run, tests are **ensured** (find-or-create)—there is no “missing test” failure mode for a defined analysis. | 2026-07-11 | Product | Objects vs instances |
+| 8 | Existing results conflict policy? | **Decided** | Idempotency | See **Decision #8**. Same run re-publish/edit → **update**. Different run promoting same sample/analyte/replicate → **fail + notify**. | 2026-07-11 | Product | Lineage distinguishes runs |
+| 9 | Alias storage? | **Decided** | P0 aliases | **On analyte** only | 2026-07-11 | Product | Lab catalog, reusable across runs |
+| 10 | Permissions: publish alone vs + result:enter? | **Decided** | AuthZ | **Publish alone is enough** to write tests/results on promote | 2026-07-11 | Product | Publish is the official gate |
+| 11 | Lineage on results? | **Decided** | Schema / #8 | **`lims_run_id` FK on results** (required for conflict rules). Optional data-row FK later. | 2026-07-11 | Product | Distinguishes same-run update vs other-run fail |
 | 12 | Unmapped JSONB keys → custom_attributes? | **Decided** | Scope | **No** by default | 2026-07-11 | Product | Prefer Field Management for meta |
 | 13 | Dose-response integration? | **Deferred** | — | Separate tables; not classic promote v1 | 2026-07-11 | | |
-| 14 | Replicates: multiple rows same sample+analyte? | **Open** | on_conflict | | | | |
+| 14 | Replicates: multiple data rows same sample+analyte? | **Decided** | Schema | **`results.replicate` INT** (nullable or default 1). Multiple data rows map to multiple result rows distinguished by replicate. | 2026-07-11 | Product | Structured replicates for query/report |
 
 ---
 
@@ -43,10 +43,12 @@ Do not implement a phase until questions that block it are **Decided** (or provi
 
 | Phase | Scope | Open blockers |
 |-------|--------|---------------|
-| **P0** | Analyte aliases | **#9** |
-| **P1** | Template promotion config + preview; analysis selection UX | — |
-| **P2** | Promote on publish when `analysis_id` set (transactional) | **#7**, **#8**, **#10**, **#11**, **#14** |
-| **P3** | UI lineage / polish | — |
+| **P0** | Analyte aliases (on analyte) | None (Decided) |
+| **P1** | `analysis_id` on run + UI; start-run warning | None |
+| **P2** | Promote on publish: ensure tests, write results + `lims_run_id` + `replicate` | None for core policy |
+| **P3** | Preview UX, conflict notifications, lineage UI | — |
+
+**Implementation unblocked** on product policy (v1). Remaining work is engineering detail (normalize alias matching, name generation, batch size).
 
 ---
 
@@ -110,8 +112,8 @@ There is no separate “promote_on_publish” boolean. **Associating the run wit
 
 1. **Schema:** `lims_runs.analysis_id` nullable FK to `analyses.id`.  
 2. **UI:** Analysis selection list on create/edit run (required for structured reporting path).  
-3. **Test target:** For each distinct `sample_id` in `lims_run_data`, results hang off a **test** for that sample under the chosen analysis (find existing or create — see open **#7**).  
-4. **Analyte scope:** Prefer analytes on that analysis (via `analysis_analytes`) when resolving columns; aliases still apply.  
+3. **Test target:** For each distinct `sample_id` in `lims_run_data`, **ensure** a **test** instance for that sample + analysis (see **#7**).  
+4. **Analyte scope:** Prefer analytes on that analysis (via `analysis_analytes`) when resolving columns; aliases on analyte.  
 5. **Template default:** Optional default `analysis_id` from template for convenience; run can override.
 
 ### Rationale
@@ -136,6 +138,80 @@ There is no separate “promote_on_publish” boolean. **Associating the run wit
 **If `analysis_id` is set:** no warning; start proceeds; promote still only on **publish**.
 
 **Rationale:** Catch missing assay setup before instrument work and import, when fix cost is low—not only at publish when the lab expects structured results.
+
+---
+
+## Decision #7 — Tests are instances of Analysis (no “missing test”)
+
+**Status:** Decided · **Date:** 2026-07-11
+
+### Model
+
+| Layer | Role |
+|-------|------|
+| **Analysis** / **Analyte** | Catalog **objects** (definitions) |
+| **Test** / **Result** | **Instances** of analysis / analyte for a sample (and run lineage) |
+
+### Rule
+
+If the run has an **`analysis_id`**, promote **always ensures** a test for each sample involved:
+
+- Find existing test for `(sample_id, analysis_id)`, or  
+- **Create** that test instance  
+
+There is **no** failure mode “analysis defined but test missing”—that would contradict objects vs instances.  
+(Still fail if `sample_id` missing on data rows, or analyte cannot be resolved.)
+
+**Yes — that makes sense for #7.**
+
+---
+
+## Decision #8 — Conflict policy (update vs fail)
+
+**Status:** Decided · **Date:** 2026-07-11
+
+| Situation | Behavior |
+|-----------|----------|
+| **Same LimsRun** re-published / data edited then published again | **Update** existing results that belong to this run (via lineage) |
+| **Different LimsRun** would write the same sample + analyte (+ replicate) | **Fail promote** and **notify** user (do not overwrite the other run’s results) |
+
+Requires **`results.lims_run_id`** (Decision #11) to tell “ours” from “another run’s.”
+
+---
+
+## Decision #9 — Aliases on analyte
+
+**Status:** Decided · **Date:** 2026-07-11
+
+Store CRO/instrument alternate names **on the analyte** (e.g. list/array or alias table keyed by `analyte_id`). Not template-only.
+
+---
+
+## Decision #10 — Publish permission is enough
+
+**Status:** Decided · **Date:** 2026-07-11
+
+Users who can **publish** the run may create/update tests and results as part of promote. No separate `result:enter` required for this path.
+
+---
+
+## Decision #11 — Lineage: `lims_run_id` on results
+
+**Status:** Decided · **Date:** 2026-07-11
+
+Add **`results.lims_run_id`** FK → `lims_runs` (nullable for manually entered results; set on promote).  
+Needed for Decision **#8** (update vs fail across runs). Optional later: `lims_run_data_id` for row-level trace.
+
+---
+
+## Decision #14 — Replicate column on results
+
+**Status:** Decided · **Date:** 2026-07-11
+
+Add **`results.replicate`** as **integer** (default `1` or null meaning 1).  
+
+Multiple `lims_run_data` rows for the same sample+analyte become multiple result rows distinguished by **replicate**.  
+Conflict key for #8 includes replicate: `(sample’s test, analyte_id, replicate)` + ownership by `lims_run_id`.
 
 ---
 

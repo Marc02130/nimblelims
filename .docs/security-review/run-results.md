@@ -58,8 +58,8 @@ Huge promote on publish blocks API.
 **Mitigation:** Limits, batching, timeout; optional async with care (don’t leave published without results—prefer sync transaction or status “publishing”).
 
 ### Elevation of privilege
-Publish without `result:enter` creates results anyway.  
-**Mitigation:** Require **both** publish and result-write permissions, or define publish as implying result write for this path only (document explicitly).
+Publish creates results without separate `result:enter`.  
+**Mitigation:** **Decided:** publish alone is enough for this path—document as intentional; do not grant publish lightly.
 
 ## Authorization matrix
 
@@ -68,7 +68,7 @@ Publish without `result:enter` creates results anyway.
 | Configure promotion map / aliases | Yes (config) | No / limited | No | **No** |
 | Import run data | Yes | Yes | Yes | **No** |
 | Start run without analysis (ack non-reportable) | Yes | Yes | Yes | **No** |
-| Publish + promote (analysis set) | Yes | Yes if publish perm | **No** | **No** |
+| Publish + promote (analysis set) | Yes | Yes if **publish** perm (implies result write) | **No** | **No** |
 | View structured results | Yes | Yes | Yes | **Own client only** |
 
 Aligns Decision **#9** (lab edits data) and **#7** (client sees own samples/results).
