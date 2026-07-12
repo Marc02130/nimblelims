@@ -57,7 +57,7 @@ async def get_analyses(
     search: Optional[str] = Query(None, description="Search by name or method (ilike)"),
     active: Optional[bool] = Query(None, description="Filter by active status"),
     page: int = Query(1, ge=1, description="Page number"),
-    size: int = Query(10, ge=1, le=100, description="Page size"),
+    size: int = Query(10, ge=1, le=500, description="Page size (max 500)"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
