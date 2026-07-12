@@ -6,20 +6,22 @@ All product and engineering docs live under this directory, organized by purpose
 
 | Directory | Purpose |
 |-----------|---------|
+| [`development-process/`](development-process/) | **How we build** — ideation → ship |
 | [`manuals/`](manuals/) | Day-to-day reference: setup, API, navigation, domain handbooks |
 | [`requirements/`](requirements/) | PRD and feature requirements |
-| [`design/`](design/) | Architecture, tech specs, gap analysis, migration strategy |
+| [`tech-sketch/`](tech-sketch/) | Lightweight *how* before architecture/UI review |
+| [`design/`](design/) | Longer-form architecture / tech specs |
 | [`user-stories/`](user-stories/) | User stories and acceptance criteria |
 | [`checklist/`](checklist/) | Implementation checklists (task tracking) |
-| [`open-questions/`](open-questions/) | **Decision logs** — gate new phases/features until blockers are Decided |
+| [`open-questions/`](open-questions/) | **Decision logs** — gate phases until blockers are Decided |
 | [`ceo-review/`](ceo-review/) | CEO / product strategy reviews |
-| [`ui-review/`](ui-review/) | UI / UX reviews (was `ui-review/`) |
-| [`architecture-review/`](architecture-review/) | Architecture reviews of feature packets |
+| [`ui-review/`](ui-review/) | UI / UX reviews |
+| [`architecture-review/`](architecture-review/) | Architecture design reviews |
 | [`security-review/`](security-review/) | Security reviews |
 | [`ideas/`](ideas/) | Exploratory notes — not commitments |
 | `private/` | Local-only materials (gitignored) |
 
-**Index rule:** do not leave new docs at `.docs/` root. Put them in the folder above that matches their role.
+**Index rule:** do not leave new docs at `.docs/` root. Put them in the folder that matches their role.
 
 ## Start here
 
