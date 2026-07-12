@@ -80,6 +80,8 @@ All product and engineering docs live under this directory, organized by purpose
 | [checklist/experiment-checklist.md](checklist/experiment-checklist.md) | Experiments / processes / entries phases |
 | [checklist/experiment-rework-prerequisites.md](checklist/experiment-rework-prerequisites.md) | Pre-rework issues (historical checklist) |
 | [open-questions/experiments.md](open-questions/experiments.md) | Experiments decision log |
+| [open-questions/run-results.md](open-questions/run-results.md) | Run→results decisions (shipped) |
+| [open-questions/data-parsers-lims-runs.md](open-questions/data-parsers-lims-runs.md) | Parsers + run lineage (in review) |
 | [open-questions/README.md](open-questions/README.md) | Gate rule |
 
 ## Reviews

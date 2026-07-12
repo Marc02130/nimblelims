@@ -57,7 +57,9 @@ lims_run_data  →  publish promote (existing)
 
 ## Open architecture questions
 
-_See requirements §9; add technical decisions here._
+**Log:** [open-questions/data-parsers-lims-runs.md](../open-questions/data-parsers-lims-runs.md)
+
+**Priority for this review:** **Q1** — canonical `ParserConfig` / JSON Schema shared by engine, API, UI, and AI; validate before save; dry-run sample file; `schema_version` evolution.
 
 ## Verdict (fill in)
 
