@@ -1625,6 +1625,14 @@ class ApiService {
     return response.data;
   }
 
+  /** Dry-run of promote-on-publish (creates/updates/conflicts). */
+  async getLimsRunPromotionPreview(id: string) {
+    const response: AxiosResponse = await this.api.get(
+      `/v1/lims-runs/${id}/promotion/preview`,
+    );
+    return response.data;
+  }
+
   async cancelLimsRun(id: string) {
     const response: AxiosResponse = await this.api.patch(`/v1/lims-runs/${id}/cancel`);
     return response.data;
