@@ -1,14 +1,29 @@
 # NimbleLIMS Development Guide
 
+## Product development process
+
+Full pipeline (proportional), folders, phased implementation, and review handling:
+
+→ **[`.docs/development-process/README.md`](.docs/development-process/README.md)**
+
+Summary:
+
+| Size | Process |
+|------|---------|
+| **Tiny** | Skip formal docs → implement |
+| **Small** | Idea optional → implement |
+| **Everything else** | Ideation → requirements → tech sketch → CEO/security/UI/architecture reviews → developer resolves review outcomes → open questions for phase → implement phase → test → monitor → update requirements → docs/merge |
+
 ## Open questions gate
 
 **Do not start a new phase (or a major feature within a phase) until open questions that block that work are resolved.**
 
-- Living decision logs live under [`.docs/open-questions/`](.docs/open-questions/) (e.g. experiments: [`.docs/open-questions/experiments.md`](.docs/open-questions/experiments.md)).
+- Living decision logs live under [`.docs/open-questions/`](.docs/open-questions/) (e.g. experiments: [`.docs/open-questions/experiments.md`](.docs/open-questions/experiments.md), parsers: [`.docs/open-questions/data-parsers-lims-runs.md`](.docs/open-questions/data-parsers-lims-runs.md)).
 - Checklists (e.g. [`.docs/checklist/experiment-checklist.md`](.docs/checklist/experiment-checklist.md)) track tasks; **open questions are not owned by the checklist** — they are owned by the open-questions docs.
 - Status labels: **Open** (blocks related work), **Decided (provisional)** (shipped temporary rule), **Decided**, **Deferred**.
 - If coding surfaces a new product/architecture question, add it to the relevant open-questions doc and **pause** if it blocks the current slice.
 - Phases 1–3 of the experiments refactor have shipped (definitions, typed steps, sample journey). Future work still uses the open-questions gate before expanding scope.
+- After a slice ships: test → monitor signals → feed **requirements** (and open questions if needed), then docs sync.
 
 ## Cursor Cloud specific instructions
 

@@ -25,6 +25,7 @@ All product and engineering docs live under this directory, organized by purpose
 
 | Need | Doc |
 |------|-----|
+| **How we develop features** | [development-process/README.md](development-process/README.md) |
 | Run the app | [manuals/dev-setup.md](manuals/dev-setup.md), root [README.md](../README.md) |
 | Admin password / first login | [manuals/admin-setup.md](manuals/admin-setup.md) |
 | API reference | [manuals/api-endpoints.md](manuals/api-endpoints.md) |
@@ -59,7 +60,11 @@ All product and engineering docs live under this directory, organized by purpose
 | [schema-evolution.md](requirements/schema-evolution.md) | FieldDefinitions / schema evolution requirements |
 | [data-parsers-lims-runs.md](requirements/data-parsers-lims-runs.md) | Parsers (analysis×instrument/CRO), run lineage, optional AI setup — **in review** |
 
-## Design
+## Tech sketches
+
+Lightweight *how* (see [tech-sketch/README.md](tech-sketch/README.md)). Feature sketches land here after requirements, before architecture review.
+
+## Design (long-form)
 
 | Doc | Topic |
 |-----|--------|

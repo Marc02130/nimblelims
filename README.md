@@ -117,6 +117,8 @@ nimblelims/
 │   ├── checklist/          # Implementation checklists
 │   ├── open-questions/     # Decision logs (work gates)
 │   ├── ceo-review/         # CEO / product reviews
+│   ├── development-process/ # Feature pipeline (ideation → ship)
+│   ├── tech-sketch/        # Lightweight technical how-to sketches
 │   ├── ui-review/          # UI / UX reviews
 │   ├── architecture-review/ # Architecture reviews
 │   ├── security-review/    # Security reviews
@@ -280,6 +282,8 @@ All project docs live under [`.docs/`](.docs/) with a fixed layout. **Start here
 | [`user-stories/`](.docs/user-stories/) | User stories and acceptance criteria |
 | [`checklist/`](.docs/checklist/) | Implementation checklists |
 | [`open-questions/`](.docs/open-questions/) | Decision logs (gate new work until blockers are Decided) |
+| [`development-process/`](.docs/development-process/) | Feature development process |
+| [`tech-sketch/`](.docs/tech-sketch/) | Tech sketches (post-requirements) |
 | [`ceo-review/`](.docs/ceo-review/), [`ui-review/`](.docs/ui-review/), [`architecture-review/`](.docs/architecture-review/), [`security-review/`](.docs/security-review/) | Formal reviews |
 | [`ideas/`](.docs/ideas/) | Exploratory notes (not commitments) |
 
