@@ -31,8 +31,9 @@ Get run data into a **structured format** for easy querying, reporting, and use�
 
 | Topic | Decision |
 |-------|----------|
-| **When** | Write results on **publish** |
-| **What** | **`raw_result`** (calculated deferred) |
+| **When** | Write results on **publish**, only if run has **`analysis_id`** |
+| **Opt-in** | **`lims_runs.analysis_id`** + UI analysis list — not a separate promote flag |
+| **What** | **`raw_result`** (calculated deferred) on tests for that analysis |
 | **Map** | JSONB column → analyte (name + **aliases** + optional template map) → value |
 | **Shape** | Multi-analyte columns → **many result rows** |
 | **SoT** | Run keeps instrument data; results = published projection |
@@ -62,7 +63,7 @@ LimsRun with analysis_id NULL → publish only, no results written
 **Standard:** `draft → running → complete → published` (+ failed/canceled)  
 **CRO:** `draft → ordered → running → results_received → complete → published`  
 
-Import allowed in `running` / `results_received`. **Structured results written at `published`.**
+Import allowed in `running` / `results_received`. **Structured results written at `published` only when `analysis_id` is set.**
 
 ## Still open (see open-questions)
 
@@ -77,9 +78,10 @@ Import allowed in `running` / `results_received`. **Structured results written a
 | Phase | Focus |
 |-------|--------|
 | P0 | Analyte aliases |
-| P1 | Template promotion config + preview |
-| P2 | Transactional promote on publish |
-| P3 | Lineage UI |
+| P1 | `analysis_id` on lims_runs + UI selection |
+| P2 | Column map / alias resolve + preview |
+| P3 | Transactional promote on publish when analysis set |
+| P4 | Lineage UI |
 
 ## Non-goals (v1)
 
