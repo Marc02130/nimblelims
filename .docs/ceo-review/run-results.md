@@ -30,8 +30,9 @@ Promoting run data into **structured `results` rows when the run is published** 
 
 | Rule | Decision |
 |------|----------|
-| **When data is written to results** | **On run publish** (`complete → published`) |
-| **What is written** | Primarily **`raw_result`** from mapped JSONB values |
+| **When data is written to results** | **On run publish**, only if run has **`analysis_id`** |
+| **Opt-in** | Associate LimsRun with an **Analysis** (new FK + UI list)—not a separate promote flag |
+| **What is written** | Primarily **`raw_result`** from mapped JSONB values onto **tests** for that analysis |
 | **Column → analyte** | JSONB key resolves via analyte **name** and **aliases** (multi-CRO) |
 | **Cardinality** | One mapped analyte column per sample → one result row (multi-analyte = multi-row) |
 | **Instrument SoT** | `lims_run_data` remains instrument truth; results are the **published structured projection** |
@@ -75,15 +76,14 @@ Promoting run data into **structured `results` rows when the run is published** 
 ## Open strategic questions
 
 1. On re-publish / re-promote: update existing results or fail if already promoted?  
-2. Missing tests: block publish vs auto-create tests?  
-3. Does publish **always** promote, or opt-in per template (“promote_on_publish”)?  
+2. Missing tests: block publish vs **auto-create** test for (sample, analysis)? (lean create)
 
 ## Recommendations
 
-1. **Default: promote as part of publish** for templates with a promotion map configured.  
+1. **Promote on publish when `analysis_id` is set**—analysis association is the opt-in.  
 2. **Invest in analyte aliases** as a first-class lab catalog feature—high leverage for multi-CRO.  
 3. **Keep Field Management on results** for extra meta; do not dump unmapped JSONB into custom_attributes.  
-4. **Measure:** % published runs that produce ≥1 result; time from import to structured results; support tickets on wrong analyte map.
+4. **Measure:** % of analysis-linked published runs that produce ≥1 result; alias/map error rates.
 
 **CEO score: 8.5/10** — clear customer value, fits existing lifecycle, bounded scope if publish-gated.
 

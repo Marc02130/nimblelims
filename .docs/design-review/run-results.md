@@ -27,31 +27,32 @@ Publish is already a high-intent action. Bundling structure creation there reduc
 
 ## Principles
 
-1. **Publish writes structure** — results created/updated when run becomes `published`.  
-2. **Preview before commit** — show “N results will be created/updated” on the publish confirmation.  
-3. **Mapping is setup, not improvisation** — defaults from template; advanced override only if needed.  
-4. **Failures are visible** — unmapped columns listed; missing tests block with actionable links.  
-5. **Raw is the v1 target** — don’t invent calculated UX yet.  
-6. **Aliases are user-facing** — manage on Analyte; show “matched via alias Pb → Lead”.
+1. **Analysis = opt-in** — selecting an **Analysis** on the run means “this publish will write tests/results.”  
+2. **Publish writes structure** — when `analysis_id` set and run becomes `published`.  
+3. **Preview before commit** — show “N results will be created/updated” on the publish confirmation.  
+4. **Mapping is setup, not improvisation** — analyte aliases + optional column map; analysis defines assay.  
+5. **Failures are visible** — unmapped columns listed; missing sample_id / map errors clear.  
+6. **Raw is the v1 target** — don’t invent calculated UX yet.  
+7. **Aliases are user-facing** — manage on Analyte; show “matched via alias Pb → Lead”.
 
 ## Primary flows
 
 ### A. Assay setup (once)
 
 1. Analytes catalog + **aliases** (CRO/instrument names).  
-2. Experiment template: **Result promotion map**  
-   - Which JSONB keys participate (or “auto by analyte/alias”)  
-   - Optional explicit key → analyte  
-3. Custom fields on results if extra meta is required (already in Field Management).
+2. Analysis defines which analytes belong to the assay.  
+3. Optional template default analysis + column map.  
+4. Custom fields on results if extra meta is required (Field Management).
 
 ### B. Run execution
 
-1. Draft → … → import data (`running` / `results_received`).  
-2. Complete run.  
-3. **Publish**  
-   - Modal: summary of promotion plan  
-   - Errors: block publish until fixed (or allow “publish without promote” only if product allows—default **no** if map configured)  
-4. Results appear on sample/test; run remains source of instrument data.
+1. Create/edit run: **select Analysis** (list) when results should be structured. Leave empty for non-reportable runs.  
+2. Draft → … → import data (`running` / `results_received`).  
+3. Complete run.  
+4. **Publish**  
+   - If analysis set: modal previews promotion into that analysis’s tests/results  
+   - If analysis empty: normal publish, no results  
+5. Results appear on sample/test; run remains instrument SoT.
 
 ### C. After publish
 

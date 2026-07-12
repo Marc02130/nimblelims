@@ -27,8 +27,8 @@ Do not implement a phase until questions that block it are **Decided** (or provi
 | 3 | How do JSONB columns resolve to analytes? | **Decided (provisional)** | Mapping | Name match + **aliases** + optional template map | 2026-07-11 | Product | Multi-CRO column names |
 | 4 | Cardinality: multi-analyte columns? | **Decided** | Promote service | **One column → one result row** per sample/test; multi-analyte = multi-row | 2026-07-11 | Product | Matches results model |
 | 5 | Instrument vs results SoT? | **Decided** | Integrity | Run JSONB remains instrument SoT; results = published projection | 2026-07-11 | Product | Align Decision #1g |
-| 6 | Always promote on publish, or opt-in per template? | **Open** | Publish hook | — | | | |
-| 7 | Missing tests on sample: block publish vs auto-create? | **Open** | Promote readiness | Tech lean **block** | | | |
+| 6 | Always promote on publish, or opt-in? | **Decided** | Publish hook | See **Decision #6**. Promote when run has **`analysis_id` set** and status → **published**. No analysis → publish without promoting to tests/results. | 2026-07-11 | Product | Analysis association is the opt-in; clear assay setup |
+| 7 | Missing tests on sample: block publish vs auto-create? | **Open** | Promote readiness | With analysis FK: lean find-or-create test for (sample, analysis) — confirm | | | |
 | 8 | Re-promote / existing results: update, skip, or fail? | **Open** | Idempotency | | | | |
 | 9 | Alias storage: on analyte, template only, or both? | **Open** | P0 aliases | Lean **both** (analyte defaults + template override) | | | |
 | 10 | Permissions: publish alone vs publish + result:enter? | **Open** | AuthZ | Security wants explicit model | | | |
@@ -44,8 +44,8 @@ Do not implement a phase until questions that block it are **Decided** (or provi
 | Phase | Scope | Open blockers |
 |-------|--------|---------------|
 | **P0** | Analyte aliases | **#9** |
-| **P1** | Template promotion config + preview | **#6** |
-| **P2** | Promote on publish (transactional) | **#7**, **#8**, **#10**, **#11**, **#14** |
+| **P1** | Template promotion config + preview; analysis selection UX | — |
+| **P2** | Promote on publish when `analysis_id` set (transactional) | **#7**, **#8**, **#10**, **#11**, **#14** |
 | **P3** | UI lineage / polish | — |
 
 ---
@@ -90,6 +90,35 @@ No write-back from results to JSONB in v1.
 **Status:** Decided · **Date:** 2026-07-11
 
 Do not auto-copy unmapped keys into `results.custom_attributes`. Use result Field Management / custom fields for defined meta.
+
+---
+
+## Decision #6 — Opt-in via Analysis association
+
+**Status:** Decided · **Date:** 2026-07-11
+
+### Product rule
+
+| Condition | On publish |
+|-----------|------------|
+| LimsRun has **`analysis_id`** (FK → `analyses`) selected in UI | **Promote** run data → **tests** + **results** for each sample on the data rows |
+| LimsRun has **no** `analysis_id` | Publish only — **no** structured results written |
+
+There is no separate “promote_on_publish” boolean. **Associating the run with an analysis is the opt-in.**
+
+### Implications
+
+1. **Schema:** `lims_runs.analysis_id` nullable FK to `analyses.id`.  
+2. **UI:** Analysis selection list on create/edit run (required for structured reporting path).  
+3. **Test target:** For each distinct `sample_id` in `lims_run_data`, results hang off a **test** for that sample under the chosen analysis (find existing or create — see open **#7**).  
+4. **Analyte scope:** Prefer analytes on that analysis (via `analysis_analytes`) when resolving columns; aliases still apply.  
+5. **Template default:** Optional default `analysis_id` from template for convenience; run can override.
+
+### Rationale
+
+- Analysis is already the LIMS assay unit linking samples → tests → analytes.  
+- Makes “this run is for this assay” explicit for multi-CRO and multi-analyte panels.  
+- Runs used only for plate QC / dose-response / non-reportable work stay free of forced results by leaving analysis unset.
 
 ---
 

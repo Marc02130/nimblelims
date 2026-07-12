@@ -8,7 +8,9 @@
 
 ## Executive Summary
 
-Promotion on **publish** is the right control point: high privilege (`experiment:publish`), intentional, auditable. Risks center on **authorization**, **integrity** (wrong analyte/sample), **client isolation**, and **overwrite** of existing results.
+Promotion on **publish** is the right control point: high privilege (`experiment:publish`), intentional, auditable. **Opt-in** is explicit: only when **`lims_runs.analysis_id`** is set—reduces accidental result creation.
+
+Risks: **authorization**, **integrity** (wrong analyte/sample), **client isolation**, **overwrite**.
 
 **Acceptable if:** lab-only; RLS preserved on created results; transactional publish+promote; no client-user path; lineage audited.
 
