@@ -42,6 +42,8 @@ Get run data into a **structured format** for easy querying, reporting, and use�
 | **Batch size** | Admin Lims Runs setting; **default 200** |
 | **Conflicts** | Same run → **update**; other run same sample/analyte/replicate → **fail + notify** |
 | **Lineage** | **`results.lims_run_id`** FK |
+| **No result `name`** | Drop BaseModel name/uniqueness on results — not a named entity |
+| **Preview** | Dry-run of **what would happen on publish** (creates/updates/conflicts) |
 | **Permissions** | **Publish alone** enough for promote writes |
 | **SoT** | Run keeps instrument data; results = published projection |
 | **No** | Dump unmapped keys into `custom_attributes` |

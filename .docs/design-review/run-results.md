@@ -57,9 +57,9 @@ Publish is already a high-intent action. Bundling structure creation there reduc
 3. Import data (`running` / `results_received`).  
 4. Complete run.  
 5. **Publish**  
-   - If analysis set: modal previews promotion into that analysis’s tests/results  
+   - If analysis set: modal **preview = what would happen on publish** (creates / updates / conflicts / unresolved columns)  
    - If analysis empty: publish without results (user already warned at start)  
-6. Results appear on sample/test; run remains instrument SoT.
+6. Results appear on sample/test (identified by analyte/sample/replicate—**not** a result “name”); run remains instrument SoT.
 
 ### C. After publish
 
