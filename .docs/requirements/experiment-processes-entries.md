@@ -210,7 +210,7 @@ This requirements doc consolidates feedback from CEO, Security, and Design revie
 - [`.docs/manuals/processes.md`](../manuals/processes.md)
 - [`.docs/design/gap-analysis-process-and-experiment.md`](../design/gap-analysis-process-and-experiment.md)
 - [`.docs/design/experiment-planning.md`](../design/experiment-planning.md)
-- [`.docs/design-review/process-and-experiment.md`](../design-review/process-and-experiment.md)
+- [`.docs/ui-review/process-and-experiment.md`](../ui-review/process-and-experiment.md)
 - [`.docs/manuals/lims-runs.md`](../manuals/lims-runs.md)
 - [`.docs/checklist/experiment-rework-prerequisites.md`](../checklist/experiment-rework-prerequisites.md)
 - FieldDefinitions work (unified OOB + custom fields via lists)

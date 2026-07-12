@@ -117,7 +117,8 @@ nimblelims/
 │   ├── checklist/          # Implementation checklists
 │   ├── open-questions/     # Decision logs (work gates)
 │   ├── ceo-review/         # CEO / product reviews
-│   ├── design-review/      # UX / design reviews
+│   ├── ui-review/          # UI / UX reviews
+│   ├── architecture-review/ # Architecture reviews
 │   ├── security-review/    # Security reviews
 │   └── ideas/              # Exploratory notes
 ├── services/               # Auxiliary microservices
@@ -279,7 +280,7 @@ All project docs live under [`.docs/`](.docs/) with a fixed layout. **Start here
 | [`user-stories/`](.docs/user-stories/) | User stories and acceptance criteria |
 | [`checklist/`](.docs/checklist/) | Implementation checklists |
 | [`open-questions/`](.docs/open-questions/) | Decision logs (gate new work until blockers are Decided) |
-| [`ceo-review/`](.docs/ceo-review/), [`design-review/`](.docs/design-review/), [`security-review/`](.docs/security-review/) | Formal reviews |
+| [`ceo-review/`](.docs/ceo-review/), [`ui-review/`](.docs/ui-review/), [`architecture-review/`](.docs/architecture-review/), [`security-review/`](.docs/security-review/) | Formal reviews |
 | [`ideas/`](.docs/ideas/) | Exploratory notes (not commitments) |
 
 UAT scripts: `UAT_Scripts/` (e.g. workflow templates, experiment templates).
