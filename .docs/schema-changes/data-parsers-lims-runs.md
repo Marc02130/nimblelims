@@ -13,7 +13,7 @@
 
 ## 1. Summary
 
-Add light **instrument** and **CRO source** catalogs; evolve **instrument_parsers** to scope by analysis × instrument|CRO (template link becomes optional/legacy); add **lims_runs** FKs for instrument, CRO source, and parser used. No change to `results` / promote schema (already shipped).
+Add light **instrument** and **CRO source** catalogs; re-scope **instrument_parsers** to **analysis × instrument|CRO only**; **remove `experiment_template_id`** from parsers (no template-linked parsers); add **lims_runs** FKs for instrument, CRO source, and parser used. No change to `results` / promote schema (already shipped).
 
 ## 2. Delta (authoritative list)
 
@@ -28,8 +28,8 @@ Add light **instrument** and **CRO source** catalogs; evolve **instrument_parser
 
 | Table | Change | Notes |
 |-------|--------|-------|
-| **`instrument_parsers`** | `experiment_template_id` → **nullable** | Was NOT NULL; legacy rows keep template id |
-| **`instrument_parsers`** | ADD `analysis_id` UUID NULL → `analyses(id)` | Required for new analysis-scoped parsers |
+| **`instrument_parsers`** | **DROP `experiment_template_id`** (column + FK + related indexes) | **Decided:** parsers are not template-scoped. Pre-migration data handling: §4 |
+| **`instrument_parsers`** | ADD `analysis_id` UUID **NOT NULL** → `analyses(id)` | Required for every parser |
 | **`instrument_parsers`** | ADD `instrument_id` UUID NULL → `instruments(id)` | Lab path |
 | **`instrument_parsers`** | ADD `cro_source_id` UUID NULL → `cro_sources(id)` | CRO path |
 | **`instrument_parsers`** | ADD `is_default` BOOLEAN NOT NULL DEFAULT false | Default among siblings |
@@ -39,16 +39,19 @@ Add light **instrument** and **CRO source** catalogs; evolve **instrument_parser
 | **`lims_runs`** | ADD `cro_source_id` UUID NULL → `cro_sources` ON DELETE SET NULL | XOR with instrument |
 | **`lims_runs`** | ADD `parser_id` UUID NULL → `instrument_parsers` ON DELETE SET NULL | Stored default/override |
 
-`lims_runs.analysis_id` — **already exists** (run-results); no change.
+`lims_runs.analysis_id` — **already exists** (run-results); no change.  
+`lims_runs.experiment_template_id` — **unchanged** (protocol/lifecycle still on the run).
 
 ### 2.3 Constraints & indexes
 
 | Name | Definition | Why |
 |------|------------|-----|
-| **`instrument_parsers` scope CHECK** | New rows: exactly one of `instrument_id` / `cro_source_id` when `analysis_id` set; legacy: both null and `experiment_template_id` set | Enforce analysis×source vs legacy template |
+| **`instrument_parsers` source CHECK** | Exactly one of `instrument_id` / `cro_source_id` is non-null | Lab XOR CRO scope |
+| **`instrument_parsers` analysis** | `analysis_id` NOT NULL | Every parser belongs to an analysis |
 | **`lims_runs` source CHECK** | NOT (instrument_id AND cro_source_id both non-null) | One source type per run |
 | **`uq_parser_default_instrument`** | UNIQUE (`analysis_id`, `instrument_id`) WHERE `is_default AND active AND instrument_id IS NOT NULL` | One default per analysis×instrument |
 | **`uq_parser_default_cro`** | UNIQUE (`analysis_id`, `cro_source_id`) WHERE `is_default AND active AND cro_source_id IS NOT NULL` | One default per analysis×CRO |
+| Drop indexes/FKs | Any index/FK solely on `instrument_parsers.experiment_template_id` | With column drop |
 | Indexes on FKs | `analysis_id`, `instrument_id`, `cro_source_id`, `parser_id` as needed | Lookup performance |
 
 Exact CHECK SQL may be refined at implement time; intent is fixed.
@@ -80,15 +83,20 @@ Architecture + security must approve RLS approach before merge; document final p
 ## 4. Data migration / backfill
 
 - [x] **No backfill required** for new catalogs (empty at start)  
-- [x] **Legacy parsers:** leave `experiment_template_id` populated; `analysis_id` / instrument / cro null until optional later migration  
-- [ ] Optional later: map known template parsers → analysis×source (out of P0/P1 critical path)  
-- [ ] No dual-write period required for P0/P1  
+- [ ] **Existing `instrument_parsers` rows** (template-scoped): before DROP `experiment_template_id`:
+  1. **Preferred:** migrate each row to analysis×instrument|CRO if mapping is known, **or**  
+  2. **Acceptable for early envs:** **delete** template-only parser rows (dev/UAT with disposable data) after confirming no critical production dependence, **or**  
+  3. One-time script: export configs for re-entry via new admin UI  
+- [x] **No dual-write** to template-scoped parsers after cutover  
+- [x] **Import** no longer resolves parser via `experiment_template_id`  
+
+**SOP parse impact (app, not only DB):** stop creating parsers with template FK; either create analysis×source parsers when context exists, or create template protocol only and leave parser setup to the new flow (product choice at implement).
 
 ## 5. Rollback
 
 - Forward migrations preferred.  
-- Rollback: DROP new columns/tables in reverse order if deploy fails before data dependence; after production use of new FKs, forward-fix only.  
-- Soft-delete via `active=false` preferred over DROP of catalog rows.
+- Re-adding `experiment_template_id` after drop is painful if data was deleted—prefer staging validation.  
+- Soft-delete via `active=false` preferred over DROP of catalog/parser rows in production.
 
 ## 6. Explicitly out of scope (this cycle)
 
@@ -99,7 +107,8 @@ Do **not** change as part of data-parsers P0/P1:
 | `results`, `tests`, promote columns | Shipped in run-results |
 | `analyte_aliases` | Shipped |
 | Field Management / dynamic schema product (`design/schema-evolution.md`) | Separate workstream |
-| `experiment_templates` structure | Unchanged (still used for protocol/lifecycle) |
+| `experiment_templates` structure | Unchanged (still used for protocol/lifecycle on the **run**) |
+| Parser ↔ template link | **Removed** — not “nullable legacy” |
 | Executable parser storage | Forbidden |
 
 ## 7. Open schema blockers

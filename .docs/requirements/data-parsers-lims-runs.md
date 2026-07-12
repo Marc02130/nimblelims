@@ -96,7 +96,7 @@ Promote-on-publish already maps JSONB columns → analytes/results when `analysi
 | FR-3.4 | Parser shall be scoped to **exactly one** of: (analysis + instrument) or (analysis + CRO source). |
 | FR-3.5 | Multiple named parsers per analysis×source allowed; at most one **`is_default`** per scope pair. |
 | FR-3.6 | Admin UI (or analysis-adjacent UI) for manual create/edit/list of parsers without AI. |
-| FR-3.7 | Compatibility: existing template-linked parsers remain usable during transition (see FR-7). |
+| FR-3.7 | Parsers are **not** linked to experiment templates; **`experiment_template_id` is removed** from the parser table (see schema-changes). |
 
 ### FR-4: LimsRun tracks source and parser
 
@@ -144,9 +144,9 @@ User testing is part of the **parser framework**, not a separate product.
 
 | ID | Requirement |
 |----|-------------|
-| FR-7.1 | During transition, if run has no analysis×source parser, import may fall back to template-scoped parser and should **set `parser_id`** when that parser is used. |
-| FR-7.2 | SOP parse may continue to create template-linked parsers; product may later offer “save as analysis×source parser.” |
-| FR-7.3 | Migration path documented for moving template parsers to analysis×source scope where possible. |
+| FR-7.1 | **No template-scoped parsers** after cutover; import does **not** fall back to `experiment_template_id`. |
+| FR-7.2 | Migration **drops** `instrument_parsers.experiment_template_id`; existing rows migrated to analysis×source or removed (see schema-changes). |
+| FR-7.3 | SOP parse must **stop** creating template-linked parsers; parser setup uses the analysis×instrument/CRO flow (or SOP only fills protocol template). |
 
 ### FR-8: Permissions and audit
 
@@ -172,7 +172,7 @@ User testing is part of the **parser framework**, not a separate product.
 |----|-------------|
 | NFR-1 | Import performance suitable for multi-MB text files; no LLM latency on import. |
 | NFR-2 | Parser JSON schema validated on save (reject invalid configs). |
-| NFR-3 | Backward compatible import for existing template-parser runs during migration window. |
+| NFR-3 | Clean cutover: after migration, only analysis×source parsers; document handling of any pre-existing template-parser rows. |
 | NFR-4 | Secrets: LLM keys only on backend env; never sent to client beyond job status. |
 | NFR-5 | Clear separation in UX and API: setup vs import vs promote. |
 
@@ -191,7 +191,7 @@ parsers / instrument_parsers (evolved)
   cro_source_id NULL
   -- exactly one of instrument_id / cro_source_id set
   parser_config JSONB NOT NULL
-  experiment_template_id NULL  -- legacy optional
+  -- experiment_template_id REMOVED
 
 lims_runs (additions)
   instrument_id NULL
@@ -260,7 +260,7 @@ File column  --parser-->  row_data[field_name]  --promote-->  Result(analyte)
 | 3 | Permission for parser CRUD? | `config:edit` |
 | 4 | Allow override to a parser from a different analysis? | No without strong warning / block |
 | 5 | Snapshot parser_config on first import? | Defer to P3; FK sufficient for MVP |
-| 6 | Non-reportable run without analysis: require template parser only? | Yes for MVP |
+| 6 | Non-reportable run without analysis: how is parser selected? | Open — **no template parser fallback**; see open-questions |
 | 7 | Multi-tenant: are instruments global to lab only? | Lab-only, not client-owned |
 
 ---
