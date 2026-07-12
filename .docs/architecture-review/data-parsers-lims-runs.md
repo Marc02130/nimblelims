@@ -1,65 +1,47 @@
 # Architecture Review: Data parsers + LimsRun source/parser lineage
 
 **Date:** 2026-07-12  
-**Status:** **Awaiting review**  
+**Status:** **Resubmitted for review** — **tech sketch attached**  
 **Requirements:** [`.docs/requirements/data-parsers-lims-runs.md`](../requirements/data-parsers-lims-runs.md)  
-**Idea:** [`.docs/ideas/ai-data-import.md`](../ideas/ai-data-import.md)  
-**As-is code:** `InstrumentParser`, `InstrumentDataService`, `LimsRunService.import_data`, SOP parse
+**Tech sketch:** [`.docs/tech-sketch/data-parsers-lims-runs.md`](../tech-sketch/data-parsers-lims-runs.md)  
+**Open questions:** [`.docs/open-questions/data-parsers-lims-runs.md`](../open-questions/data-parsers-lims-runs.md)
 
 ## Ask of architecture
 
-1. Confirm **parsers as JSONB instructions** + single generic engine (no plugin code).  
-2. Confirm **schema evolution** of `instrument_parsers` (add analysis_id, instrument_id, cro_source_id; relax template FK).  
-3. Confirm **lims_runs** FKs: `instrument_id`, `cro_source_id`, `parser_id` and resolution rules.  
-4. Migration strategy from template-scoped parsers.  
-5. API surface sketch and phase boundaries (P0/P1/P2).  
-6. Interaction with promote-on-publish (field_name stability).
+1. Approve **schema evolution** of `instrument_parsers` + new catalogs + lims_runs FKs.  
+2. Approve **ParserConfig v1** fields and `extra=forbid` + engine parity (delimiter/encoding).  
+3. Approve **ParserEngine** dual use: production import + setup test suite.  
+4. Approve **default/override** resolution and “store parser_id, don’t silent re-resolve.”  
+5. Approve **phase cut** P0/P1/P2 and migration/compat with template parsers.  
+6. Lock or refine **Q1** (schema-first AI/config contract) and **#10** test harness details.
 
-## Current state
+## Sketch summary
 
-| Component | Today |
-|-----------|--------|
-| `instrument_parsers` | `experiment_template_id` required; `parser_config` JSONB |
-| Import | Resolves parser **only** via template |
-| Run | Has `analysis_id`; no instrument/CRO/parser_id |
-| Engine | `InstrumentDataService(parser_config)` |
-| AI | SOP parse → template + parser + worklist |
+| Area | Proposal |
+|------|----------|
+| Catalogs | `instruments`, `cro_sources` |
+| Parser row | analysis + instrument XOR cro; `parser_config` JSONB; is_default |
+| Run | instrument_id XOR cro_source_id; parser_id stored |
+| Engine | Extend `InstrumentDataService`; single contract |
+| Setup | Multi-file examples/tests; activate gate; P2 AI draft + edge fixtures |
+| Legacy | Template parser fallback; nullable template FK |
 
-## Target architecture (for review)
+Full detail: **tech sketch** (data model, API sketch, flows, migration).
 
-```
-instruments / cro_sources  (light catalogs)
-        │
-        ▼
-parsers (analysis_id + instrument_id | cro_source_id, parser_config JSONB)
-        │
-        │  FK parser_id (stored)
-        ▼
-lims_runs (analysis_id, instrument_id|cro_source_id, parser_id)
-        │
-        │  import uses parser_config
-        ▼
-lims_run_data  →  publish promote (existing)
-```
+## Priority open questions for this review
 
-**Import resolution:** use stored `run.parser_id`; if null, resolve default and **persist**, or 400.
+| # | Topic |
+|---|--------|
+| **Q1** | Canonical ParserConfig + AI must emit same schema |
+| **#10** | Multi-file testing; AI edges judged by engine |
+| Q9 | Keep table name `instrument_parsers` |
+| Q5 | Snapshot config on import (lean defer) |
 
-**Engine:** one code path reads JSONB; no dynamic code load.
+## Risks to confirm
 
-## Risks / tradeoffs
-
-| Topic | Options | Lean |
-|-------|---------|------|
-| Snapshot config on import | FK only vs JSONB copy | FK for MVP |
-| Template FK | Keep nullable legacy | Yes |
-| Table rename | keep `instrument_parsers` vs `data_parsers` | Keep name or alias |
-| Unique constraint | (analysis, instrument) unique default | is_default + unique partial index |
-
-## Open architecture questions
-
-**Log:** [open-questions/data-parsers-lims-runs.md](../open-questions/data-parsers-lims-runs.md)
-
-**Priority for this review:** **Q1** — canonical `ParserConfig` / JSON Schema shared by engine, API, UI, and AI; validate before save; dry-run sample file; `schema_version` evolution.
+- CHECK constraints for XOR instrument/cro  
+- Partial unique indexes for is_default  
+- Whether setup files are ephemeral in P1  
 
 ## Verdict (fill in)
 
@@ -67,6 +49,7 @@ lims_run_data  →  publish promote (existing)
 |-------|--------|
 | **Verdict** | _Pending_ |
 | **Schema approach approved** | _Pending_ |
+| **ParserConfig v1 approved** | _Pending_ |
 | **Phase cut approved** | _Pending_ |
 | **Reviewer** | |
 | **Date completed** | |
