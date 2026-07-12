@@ -44,14 +44,16 @@ Do not implement a phase until questions that block it are **Decided** (or provi
 
 ## Phase gate
 
-| Phase | Scope | Open blockers |
-|-------|--------|---------------|
-| **P0** | Analyte aliases (on analyte) | None (Decided) |
-| **P1** | `analysis_id` on run + UI; start-run warning | None |
-| **P2** | Promote on publish: ensure tests, write results + `lims_run_id` + `replicate` | None for core policy |
-| **P3** | Preview UX, conflict notifications, lineage UI | — |
+| Phase | Scope | Status |
+|-------|--------|--------|
+| **P0** | Analyte aliases (on analyte) | **Shipped** |
+| **P1** | `analysis_id` on run + UI; start-run warning | **Shipped** |
+| **P2** | Schema: `lims_run_id`, `replicate`; drop `results.name` | **Shipped** |
+| **P3** | Promote service + publish hook | **Shipped** |
+| **P4** | Preview UX, conflict notifications | **Shipped** |
+| **P5** | Optional JSONB → result custom fields | Deferred |
 
-**Implementation unblocked** on product policy (v1). Remaining work is engineering detail (normalize alias matching, name generation, batch size).
+**v1 product policy + implementation complete.** Follow-ons: [ai-analyte-resolution](../ideas/ai-analyte-resolution.md), [ai-data-import](../ideas/ai-data-import.md), [ai-data-analysis](../ideas/ai-data-analysis.md).
 
 ---
 

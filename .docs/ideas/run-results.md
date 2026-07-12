@@ -1,8 +1,8 @@
 # Idea: Promote LimsRun JSONB data → Results
 
-**Status:** Reviewed (CEO / design / tech / security) — open questions remain for implementation  
+**Status:** **Shipped (v1)** — P0–P4 on `run-results` (merged toward main)  
 **Branch:** `run-results`  
-**Date:** 2026-07-11
+**Date:** 2026-07-11 · **Implemented:** 2026-07-12
 
 ## One-liner
 
@@ -80,13 +80,24 @@ See [open-questions/run-results.md](../open-questions/run-results.md). Remaining
 
 ## Implementation phases (tech)
 
-| Phase | Focus |
-|-------|--------|
-| P0 | Analyte aliases on analyte |
-| P1 | `analysis_id` on lims_runs + UI + start warning |
-| P2 | `results.lims_run_id`, `results.replicate` |
-| P3 | Ensure test instance; promote on publish; update vs fail |
-| P4 | Preview / notify UX |
+| Phase | Focus | Status |
+|-------|--------|--------|
+| P0 | Analyte aliases on analyte (+ admin UI) | **Done** |
+| P1 | `analysis_id` on lims_runs + UI + start warning | **Done** |
+| P2 | `results.lims_run_id`, `results.replicate`; drop `results.name` | **Done** |
+| P3 | Ensure test; promote on publish; update vs fail; batch flush | **Done** |
+| P4 | Publish confirmation = promotion preview + conflict UX | **Done** |
+| P5 | Optional map JSONB → result custom fields | Deferred |
+
+### Shipped surface (v1)
+
+| Layer | What |
+|-------|------|
+| Schema | `analyte_aliases`; `lims_runs.analysis_id`; `results.lims_run_id`, `results.replicate`; no `results.name` |
+| API | Start ack without analysis; `GET /v1/lims-runs/{id}/promotion/preview`; promote on `PATCH …/complete` (publish) |
+| Service | `ResultPromotionService` — name/alias match, ensure Test, create/update/conflict |
+| UI | Analysis on run; start warning; publish modal with create/update/conflict/unresolved |
+| Config | `LIMS_PROMOTE_BATCH_SIZE` env (default **200**) |
 
 ## Non-goals (v1)
 

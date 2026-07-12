@@ -2249,3 +2249,25 @@ Set the next value for the global sequence `name_template_seq_{entity_type}`.
 
 **Example:** `POST /admin/sequences/sample/start` with `{ "start_value": 100 }` — next generated sample name using `{SEQ}` will use 100 (then 101, 102, …).
 
+---
+
+## LIMS Runs — promote-on-publish
+
+Full run lifecycle is under `/v1/lims-runs`. See [lims-runs.md](lims-runs.md) for product rules.
+
+### GET /v1/lims-runs/{id}/promotion/preview
+Dry-run of what publish would write to Tests/Results when `analysis_id` is set. **No DB writes.**
+
+**Response (shape):** `will_promote`, `create_count`, `update_count`, `conflict_count`, `skip_count`, `unresolved_columns[]`, `errors[]`, `items[]` (capped).
+
+### PATCH /v1/lims-runs/{id}/complete
+Transition `complete → published` (requires `experiment:publish`).
+
+When run has **`analysis_id`**, promotes instrument JSONB → Tests/Results in the same transaction. **409** with `code: promotion_conflict` if another run/manual result owns the same test/analyte/replicate.
+
+### PATCH /v1/lims-runs/{id}/start
+Start run. If no `analysis_id`, requires `acknowledge_no_analysis: true` or returns **400** `analysis_required_ack`.
+
+### Analyte aliases
+- List/create/delete under `/analytes/{id}/aliases` (admin analyte form also manages aliases).
+
