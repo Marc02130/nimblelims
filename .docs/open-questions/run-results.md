@@ -30,7 +30,9 @@ Do not implement a phase until questions that block it are **Decided** (or provi
 | 6 | Always promote on publish, or opt-in? | **Decided** | Publish hook | See **Decision #6**. Promote when run has **`analysis_id` set** and status → **published**. | 2026-07-11 | Product | Analysis association is the opt-in |
 | 7 | Missing tests on sample: block vs auto-create? | **Decided** | Promote readiness | See **Decision #7**. Analysis/analyte = catalog objects; test/result = instances. If analysis is on the run, tests are **ensured** (find-or-create)—there is no “missing test” failure mode for a defined analysis. | 2026-07-11 | Product | Objects vs instances |
 | 8 | Existing results conflict policy? | **Decided** | Idempotency | See **Decision #8**. Same run re-publish/edit → **update**. Different run promoting same sample/analyte/replicate → **fail + notify**. | 2026-07-11 | Product | Lineage distinguishes runs |
-| 9 | Alias storage? | **Decided** | P0 aliases | **On analyte** only | 2026-07-11 | Product | Lab catalog, reusable across runs |
+| 9 | Alias storage / matching? | **Decided** | P0 aliases | **Maintained list on analyte** (no pattern matching). AI assist for misses = **later idea** ([ai-analyte-resolution](../ideas/ai-analyte-resolution.md)) | 2026-07-11 | Product | EtOH / C2H5OH / ethanol have no pattern |
+| 15 | Replicate number when JSONB has none? | **Decided** | Promote | Use **row order** (1..n) among rows for that sample+analyte | 2026-07-11 | Product | Deterministic without instrument replicate column |
+| 16 | Promote batch size? | **Decided** | Ops | **Configurable** (admin Lims Runs settings); **default 200** | 2026-07-11 | Product | Large imports |
 | 10 | Permissions: publish alone vs + result:enter? | **Decided** | AuthZ | **Publish alone is enough** to write tests/results on promote | 2026-07-11 | Product | Publish is the official gate |
 | 11 | Lineage on results? | **Decided** | Schema / #8 | **`lims_run_id` FK on results** (required for conflict rules). Optional data-row FK later. | 2026-07-11 | Product | Distinguishes same-run update vs other-run fail |
 | 12 | Unmapped JSONB keys → custom_attributes? | **Decided** | Scope | **No** by default | 2026-07-11 | Product | Prefer Field Management for meta |
@@ -179,11 +181,34 @@ Requires **`results.lims_run_id`** (Decision #11) to tell “ours” from “ano
 
 ---
 
-## Decision #9 — Aliases on analyte
+## Decision #9 — Aliases: maintained list on analyte
 
 **Status:** Decided · **Date:** 2026-07-11
 
-Store CRO/instrument alternate names **on the analyte** (e.g. list/array or alias table keyed by `analyte_id`). Not template-only.
+Store CRO/instrument alternate names as a **maintained list on the analyte** (array or `analyte_aliases` table).  
+
+Matching is **list membership** (after light normalize: trim, casefold)—**not** chemical heuristics or regex patterns. Names like `ethanol` / `EtOH` / `C2H5OH` have no discoverable pattern; labs already maintain synonym lists for this reason.
+
+**v1:** unresolved column → surface in preview/errors (skip or block per policy).  
+**Later:** AI-assisted resolution / suggest alias — [ideas/ai-analyte-resolution.md](../ideas/ai-analyte-resolution.md).
+
+---
+
+## Decision #15 — Replicate from order if absent
+
+**Status:** Decided · **Date:** 2026-07-11
+
+If the JSONB / import does not supply a replicate number, assign **`replicate` by stable order** of `lims_run_data` rows for that sample (and analyte mapping), starting at **1**.
+
+If instrument provides a replicate field later, prefer that when present.
+
+---
+
+## Decision #16 — Configurable promote batch size
+
+**Status:** Decided · **Date:** 2026-07-11
+
+Promote processes result writes in batches. Size is **admin-configurable** on a **Lims Runs** admin/settings page. **Default: 200**.
 
 ---
 

@@ -101,10 +101,17 @@ Storage options:
 ### 3.3 Analyte aliases (schema sketch)
 
 ```
-analytes.aliases  TEXT[]  -- or separate analyte_aliases(analyte_id, alias) UNIQUE(alias)
+analyte_aliases (
+  id, analyte_id FK,
+  alias TEXT,  -- e.g. 'EtOH', 'C2H5OH'
+  UNIQUE (lower(alias))  -- or unique per lab later
+)
 ```
 
-Unique alias globally (or per lab/client scope later) to avoid ambiguous resolution.
+Or `analytes.aliases TEXT[]` with app-level uniqueness checks.
+
+**Matching:** normalize (trim + casefold) then **exact membership** in the maintained list—not fuzzy/chemical AI in v1.  
+AI-assisted resolution when list misses: [ideas/ai-analyte-resolution.md](../ideas/ai-analyte-resolution.md).
 
 ### 3.4 Result row shape (v1)
 
@@ -141,7 +148,9 @@ Analytes promoted should generally be members of that analysis (`analysis_analyt
 
 - One `(data_row, analyte)` → one result with a **`replicate`** int.  
 - Multi-analyte columns on one JSONB object → many results.  
-- Multiple data rows for same sample+analyte → multiple results with distinct replicate (1, 2, 3… or from import if present).
+- Multiple data rows for same sample+analyte → multiple results with distinct **`replicate`**.  
+  - If import/JSONB has replicate → use it.  
+  - Else **`replicate = 1..n` by row order** among those rows (Decided #15).
 
 ### 3.7 Idempotency / conflicts (Decided #8)
 
@@ -157,8 +166,33 @@ Conflict identity: roughly `(test_id, analyte_id, replicate)` + ownership check 
 | Hook | Behavior |
 |------|----------|
 | Existing status transition to `published` | Call `ResultPromotionService.promote_run(run_id)` |
-| `POST /v1/lims-runs/{id}/promotion/preview` | Dry-run without write (for UI modal) |
+| `POST /v1/lims-runs/{id}/promotion/preview` | Dry-run without write (for UI modal) — see §3.11 |
 | Template CRUD | Include `promotion` config |
+| Admin Lims Runs settings | `promote_batch_size` (default **200**) |
+
+### 3.11 Preview and errors (UX/API)
+
+**Preview** = dry-run of promote **without writing** DB (called from publish modal and optionally before start if analysis set):
+
+| Preview shows | Purpose |
+|---------------|---------|
+| Rows that **will** create results (sample, analyte, raw, replicate, match via name/alias) | Confidence before publish |
+| Columns **skipped** (not an analyte) | e.g. `units` |
+| Columns **unresolved** (no name/alias) | User must fix aliases or map before publish (or accept skip policy) |
+| Analysis analytes with **no** matching column | “Expected Lead; not in file” |
+| **Conflicts** (other run owns same test/analyte/replicate) | Fail path — notify, do not overwrite |
+| Counts | e.g. “128 results to create, 12 to update, 3 unresolved” |
+
+**Errors** = hard failures that **block publish** (when analysis is set), e.g.:
+
+- Unresolved required columns (if policy is fail-closed)  
+- Conflict with another run’s results (#8)  
+- Missing `sample_id` on data rows  
+- Analysis set but zero promotable data  
+
+**Warnings** = non-blocking (e.g. optional unmapped columns listed; start without analysis with explicit ack).
+
+Implementation note: `results.name` is globally unique (BaseModel)—generate deterministic unique names (e.g. include sample/analyte/replicate/run short id). This is **not** a product “result label” issue; it is a schema constraint on insert.
 
 Permissions: **publish alone** is enough to create/update tests/results on this path (Decided #10).
 
@@ -189,7 +223,7 @@ Permissions: **publish alone** is enough to create/update tests/results on this 
 | Risk | Mitigation |
 |------|------------|
 | Global unique `results.name` | Robust name generator |
-| Large runs (10k rows × analytes) | Batch inserts; timeout; async promote only if publish can wait |
+| Large runs (10k rows × analytes) | Batch inserts; **admin-configurable batch size, default 200**; timeout; prefer sync transactional publish |
 | Alias collisions | Unique constraint + admin validation |
 
 ## 6. Recommendation
