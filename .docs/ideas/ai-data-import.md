@@ -20,7 +20,9 @@
 | **Scope key (lab)** | **Analysis + instrument** |
 | **Scope key (CRO)** | **Analysis + CRO** (CRO is the “source system” when work is external) |
 | **On each LimsRun** | Track **`instrument_id` or `cro_source_id`**, and **`parser_id`** (default from analysis+source, user may override; store for troubleshooting) |
-| **Example file for setup** | **Text table required**: `.txt` / CSV-like with **tab, comma, semicolon**, etc. (not binary-only instruments in v1) |
+| **Setup files** | **1+ example** files (derive config) and **1+ test** files (engine dry-run); text tables (tab/comma/etc.) |
+| **User testing** | Framework runs same import engine on test files before activate; AI may suggest **edge tests** (e.g. negatives) — human accepts; engine judges |
+| **Open questions** | [open-questions/data-parsers-lims-runs.md](../open-questions/data-parsers-lims-runs.md) |
 
 This is **not** “AI imports results every time.” It is “AI helps you configure the thing that will import results forever.”
 
