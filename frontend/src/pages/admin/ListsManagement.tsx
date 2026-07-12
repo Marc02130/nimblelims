@@ -388,10 +388,10 @@ const ListsManagement: React.FC = () => {
         </Box>
       ) : (
         <>
-          <Box sx={{ height: filteredLists.length === 0 ? 'auto' : 600, minHeight: 220, width: '100%', mb: 2 }}>
+          <Box sx={{ width: '100%' }}>
             <DataGrid
               rows={filteredLists}
-              autoHeight={filteredLists.length === 0}
+              autoHeight
               columns={columns}
               getRowId={(row) => row.id}
               pageSizeOptions={[10, 25, 50]}
@@ -442,10 +442,10 @@ const ListsManagement: React.FC = () => {
                     No entries in this list
                   </Typography>
                 ) : (
-                  <Box sx={{ height: list.entries.length === 0 ? 'auto' : 400, minHeight: 180, width: '100%' }}>
+                  <Box sx={{ width: '100%' }}>
                     <DataGrid
                       rows={list.entries}
-                      autoHeight={list.entries.length === 0}
+                      autoHeight
                       columns={getEntryColumns(list)}
                       getRowId={(row) => row.id}
                       pageSizeOptions={[10, 25, 50]}

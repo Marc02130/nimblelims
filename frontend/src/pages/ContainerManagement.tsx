@@ -212,8 +212,8 @@ const ContainerManagement: React.FC = () => {
                 paginationModel: { page: 0, pageSize: 25 },
               },
             }}
-            sx={{ height: containers.length === 0 ? 'auto' : 600, minHeight: 220 }}
-            autoHeight={containers.length === 0}
+            sx={{ width: '100%' }}
+            autoHeight
             disableRowSelectionOnClick
           />
         </CardContent>

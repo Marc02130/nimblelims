@@ -656,10 +656,10 @@ const CustomFieldsManagement: React.FC = () => {
           <CircularProgress />
         </Box>
       ) : (
-        <Box sx={{ height: filteredFields.length === 0 ? 'auto' : 600, minHeight: 220, width: '100%', mb: 2 }}>
+        <Box sx={{ width: '100%' }}>
           <DataGrid
             rows={filteredFields}
-            autoHeight={filteredFields.length === 0}
+            autoHeight
             columns={columns}
             getRowId={(row) => row.id}
             pageSizeOptions={[10, 25, 50]}

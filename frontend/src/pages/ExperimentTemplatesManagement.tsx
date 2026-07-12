@@ -691,7 +691,7 @@ const ExperimentTemplatesManagement: React.FC = () => {
           <CircularProgress />
         </Box>
       ) : (
-        <Box sx={{ height: rows.length === 0 ? 'auto' : 600, minHeight: 220, width: '100%', mb: 2 }}>
+        <Box sx={{ width: '100%' }}>
           <DataGrid
             rows={rows}
             columns={columns}
@@ -699,7 +699,7 @@ const ExperimentTemplatesManagement: React.FC = () => {
             pageSizeOptions={[10, 25, 50]}
             initialState={{ pagination: { paginationModel: { pageSize: 25 } } }}
             disableRowSelectionOnClick
-            autoHeight={rows.length === 0}
+            autoHeight
             slots={{
               noRowsOverlay: () => (
                 <Box

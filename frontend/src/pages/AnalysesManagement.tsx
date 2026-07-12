@@ -793,15 +793,13 @@ const AnalysesManagement: React.FC = () => {
               paginationModel={paginationModel}
               onPaginationModelChange={setPaginationModel}
               pageSizeOptions={[10, 25, 50, 100]}
-              sx={{ 
-                height: totalRows === 0 ? 'auto' : 600,
-                minHeight: 220,
+              autoHeight
+              sx={{
                 border: 'none',
                 '& .MuiDataGrid-row': {
                   cursor: 'pointer',
                 },
               }}
-              autoHeight={totalRows === 0}
               disableRowSelectionOnClick
               slots={{
                 toolbar: GridToolbar,
