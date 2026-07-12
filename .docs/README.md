@@ -6,7 +6,7 @@ All product and engineering docs live under this directory, organized by purpose
 
 | Directory | Purpose |
 |-----------|---------|
-| [`development-process/`](development-process/) | **How we build** — ideation → ship |
+| [`development-process/`](development-process/) | **How we build** — ideation → production (includes dogfood/UAT) |
 | [`manuals/`](manuals/) | Day-to-day reference: setup, API, navigation, domain handbooks |
 | [`requirements/`](requirements/) | PRD and feature requirements |
 | [`tech-sketch/`](tech-sketch/) | Lightweight *how* before architecture/UI review |

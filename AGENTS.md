@@ -12,7 +12,7 @@ Summary:
 |------|---------|
 | **Tiny** | Skip formal docs → implement |
 | **Small** | Idea optional → implement |
-| **Everything else** | Ideation → requirements → tech sketch → CEO/security/UI/architecture reviews → developer resolves review outcomes → open questions for phase → implement phase → test → monitor → update requirements → docs/merge |
+| **Everything else** | Ideation → requirements → tech sketch → reviews → open questions → implement → **docs sync** → **dogfood** → **UAT** → **merge to main (production)** → monitor → requirements update |
 
 ## Open questions gate
 
@@ -23,7 +23,7 @@ Summary:
 - Status labels: **Open** (blocks related work), **Decided (provisional)** (shipped temporary rule), **Decided**, **Deferred**.
 - If coding surfaces a new product/architecture question, add it to the relevant open-questions doc and **pause** if it blocks the current slice.
 - Phases 1–3 of the experiments refactor have shipped (definitions, typed steps, sample journey). Future work still uses the open-questions gate before expanding scope.
-- After a slice ships: test → monitor signals → feed **requirements** (and open questions if needed), then docs sync.
+- After implement (full pipeline): **docs sync** → **dogfood** → **UAT pass** → **merge to `main`** (production) → monitor → requirements update. See [`.docs/development-process/`](.docs/development-process/).
 
 ## Cursor Cloud specific instructions
 
