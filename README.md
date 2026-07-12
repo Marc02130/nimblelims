@@ -152,6 +152,14 @@ nimblelims/
 - **IC50 Summary**: Dashboard summary of fit results by category and review status; re-fit and reset-in-progress controls.
 - **Audit Trail**: Every curve fit is versioned (`fit_version`); superseded results preserved. Data exclusions are soft (reason-tracked), control-well exclusions apply to normalization means.
 
+### LIMS Runs → Structured Results (promote-on-publish)
+- **Opt-in via Analysis**: Associate an **Analysis** on a LimsRun; import remains flexible JSONB (`lims_run_data`).
+- **Start warning**: Starting without analysis requires acknowledgement that publish will not write Tests/Results.
+- **Promote on publish**: When `analysis_id` is set and status → `published`, map columns to analytes (name + **aliases**), ensure Tests per sample, write **Results** (`raw_result`, `replicate`, `lims_run_id`).
+- **Conflicts**: Same run updates; other run/manual ownership fails publish with **409**.
+- **Preview**: Publish confirmation dry-runs create/update/conflict/unresolved columns (`GET /v1/lims-runs/{id}/promotion/preview`).
+- **Docs**: [`.docs/ideas/run-results.md`](.docs/ideas/run-results.md), [`.docs/manuals/lims-runs.md`](.docs/manuals/lims-runs.md).
+
 ### Experiment Management
 - **Experiments**: Full CRUD for experiments; list/detail UI with tabs (Overview, Sample Executions, Details/Steps, Lineage, Linked Processes). Permission: `experiment:manage` (Administrator, Lab Manager, Lab Technician).
 - **Experiment Templates**: Dedicated page at `/experiments/templates` (`ExperimentTemplatesManagement`): DataGrid of templates, tabbed create/edit dialog (basic info, protocol steps, transfer steps with mandatory review, result columns), delete with confirmation, **active** toggle (disabled until mandatory sign-offs are cleared). **Upload SOP**: multipart upload of SOP file + instrument CSV → background Claude extraction (`POST /v1/sop-parse`) → poll job → **Apply** creates template and related records (`POST /v1/sop-parse/{id}/apply`). Fields filled from extraction are highlighted in the form. **Sign-off**: steps marked mandatory review require per-step confirmation in a dialog before `mandatory_review_count` can be cleared and the template activated. Same permission as experiments: `experiment:manage`.
@@ -174,8 +182,8 @@ nimblelims/
 - **Field Management** (replaces legacy Custom Attributes): Unified admin UI for OOB (built-in/list-backed) + Custom fields per entity. Prefers list-backed fields (source list from central Lists system) for reusability across Samples and Entries/Processes. Validation rules for scalars. OOB fields denoted and editable for rules. Legacy admin UIs for Custom Attributes and Name Templates have been removed from sidebar (routes deprecated).
 - **Lists Management**: Full CRUD for lists and list entries via admin interface - create new lists, add/edit/delete entries for statuses, types, matrices, QC types, etc. Empty lists display expand arrows to add entries. Used to back list fields in Field Management.
 - **Container Types**: Admin-managed container type definitions (CRUD operations)
-- **Analyses Management**: Create and manage analyses with methods, turnaround times, costs, and custom attributes. Features expandable grid rows to view and manage linked analytes directly from the main list (CRUD). Available in both Admin section and Lab Mgmt accordion.
-- **Analytes Management**: Create and manage analytes with CAS numbers, default units, data types, and custom attributes (CRUD). Available in both Admin section and Lab Mgmt accordion.
+- **Analyses Management**: Create and manage analyses with methods, turnaround times, costs, and custom attributes. Features expandable grid rows to view and manage linked analytes directly from the main list (CRUD). Available in both Admin section and Lab Mgmt accordion. Used as the opt-in assay for LIMS run promote-on-publish.
+- **Analytes Management**: Create and manage analytes with CAS numbers, default units, data types, **aliases** (instrument/CRO column names), and custom attributes (CRUD). Available in both Admin section and Lab Mgmt accordion.
 - **Analysis-Analyte Linking**: Link/unlink analytes to analyses via expandable detail panels with inline autocomplete search
 - **Analysis-Analyte Configuration**: Configure validation rules (data types, ranges, significant figures, required flags)
 - **Test Batteries Management**: Group multiple analyses into reusable test batteries with sequence ordering and optional flags (CRUD)

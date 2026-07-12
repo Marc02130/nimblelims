@@ -88,11 +88,13 @@ All product and engineering docs live under this directory, organized by purpose
 
 ## Ideas
 
-Exploratory / in review:
-
-- [ideas/run-results.md](ideas/run-results.md) — LimsRun JSONB → Results on **publish** (see reviews below)
-- [ideas/ai-analyte-resolution.md](ideas/ai-analyte-resolution.md) — AI help when analyte alias list misses (follow-on)
-- [ideas/model-fine-tune.md](ideas/model-fine-tune.md) — (see `sop-rag` branch for RAG-first SOP config work)
+| Doc | Topic | Status |
+|-----|--------|--------|
+| [ideas/run-results.md](ideas/run-results.md) | LimsRun JSONB → Results on **publish** | **Shipped v1** (P0–P4); see reviews + [manuals/lims-runs.md](manuals/lims-runs.md) |
+| [ideas/ai-analyte-resolution.md](ideas/ai-analyte-resolution.md) | AI help when analyte alias list misses | Exploratory follow-on |
+| [ideas/ai-data-import.md](ideas/ai-data-import.md) | AI-assisted instrument/CRO import mapping | **Placeholder** |
+| [ideas/ai-data-analysis.md](ideas/ai-data-analysis.md) | AI-assisted query / anomaly / summary of run+result data | **Placeholder** |
+| [ideas/model-fine-tune.md](ideas/model-fine-tune.md) | Model fine-tune notes | See `sop-rag` for related SOP/RAG work |
 
 ## Reviews (run-results)
 
