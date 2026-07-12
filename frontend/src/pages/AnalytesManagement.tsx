@@ -429,8 +429,8 @@ const AnalytesManagement: React.FC = () => {
             paginationModel={paginationModel}
             onPaginationModelChange={setPaginationModel}
             pageSizeOptions={[10, 25, 50, 100]}
-            sx={{ height: totalRows === 0 ? 'auto' : 600, minHeight: 220 }}
-            autoHeight={totalRows === 0}
+            sx={{ width: '100%' }}
+            autoHeight
             disableRowSelectionOnClick
             slots={{
               toolbar: GridToolbar,

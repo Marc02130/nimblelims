@@ -297,10 +297,10 @@ const ClientsManagement: React.FC = () => {
           <CircularProgress />
         </Box>
       ) : (
-        <Box sx={{ height: filteredClients.length === 0 ? 'auto' : 600, minHeight: 220, width: '100%' }}>
+        <Box sx={{ width: '100%' }}>
           <DataGrid
             rows={filteredClients}
-            autoHeight={filteredClients.length === 0}
+            autoHeight
             columns={columns}
             getRowId={(row) => row.id}
             pageSizeOptions={[10, 25, 50]}
