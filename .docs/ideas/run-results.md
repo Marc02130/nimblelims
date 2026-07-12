@@ -42,15 +42,19 @@ Get run data into a **structured format** for easy querying, reporting, and use�
 ## Mapping sketch
 
 ```
+LimsRun.analysis_id = Analysis "Metals Panel"
 lims_run_data:
   sample_id = S1
   row_data  = { "Pb_ug_L": "12.3", "Arsenic": "0.4", "units": "ug/L" }
 
 aliases: Pb_ug_L → analyte Lead
 publish →
-  result(test on S1, analyte Lead,    raw_result="12.3")
-  result(test on S1, analyte Arsenic, raw_result="0.4")
+  ensure Test(S1, Metals Panel)
+  result(that test, analyte Lead,    raw_result="12.3")
+  result(that test, analyte Arsenic, raw_result="0.4")
   units skipped (not an analyte)
+
+LimsRun with analysis_id NULL → publish only, no results written
 ```
 
 ## Run lifecycle (context)
@@ -62,8 +66,7 @@ Import allowed in `running` / `results_received`. **Structured results written a
 
 ## Still open (see open-questions)
 
-- Always promote vs opt-in per template  
-- Missing tests: block vs auto-create  
+- Missing tests: block vs auto-create (lean find-or-create for sample+analysis)  
 - Re-promote / conflict policy  
 - Alias storage shape  
 - Publish vs result:enter permissions  

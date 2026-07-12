@@ -15,7 +15,9 @@
 
 **Goal:** On **run publish**, project mapped JSONB values into structured `results` for easy querying/reporting.
 
-**Locked:** Write path runs when status transitions to **`published`**.
+**Locked:**
+- Write path when status transitions to **`published`**.
+- **Opt-in:** only if `lims_runs.analysis_id` is set (FK → `analyses`). No analysis → publish without promote.
 
 ## 2. Current building blocks
 
@@ -32,11 +34,15 @@
 ```
 transition_status(run, published)
     │
+    ├─ if run.analysis_id is NULL:
+    │     set status = published; return   # no promote
+    │
     ├─ validate promotion readiness
-    │     • template has promotion config OR auto-mode
+    │     • analysis_id set (opt-in)
     │     • each data row sample_id present (or skip policy)
-    │     • tests exist for samples (or create policy — open)
-    │     • columns resolve to analytes (name | alias | explicit map)
+    │     • test for (sample, analysis): exist or create (open #7)
+    │     • columns resolve to analytes (name | alias | map)
+    │     • prefer analytes on analysis_analytes for that analysis
     │
     ├─ if invalid → abort status change (transaction)
     │
@@ -44,14 +50,23 @@ transition_status(run, published)
     │
     └─ promote:
           for each lims_run_data row:
+            test = find_or_create(sample_id, run.analysis_id)
             for each mapped JSONB key with value:
               resolve analyte_id
-              resolve test_id for (sample, analysis?)
               upsert Result(test_id, analyte_id, raw_result=value, …)
               set lineage (lims_run_id, lims_run_data_id)
 ```
 
 **Atomicity:** Prefer single DB transaction: status + all result writes. Partial promote after published is worse.
+
+### 3.1b Schema: analysis on run
+
+```
+lims_runs.analysis_id  UUID NULL REFERENCES analyses(id)
+```
+
+- UI: required for “reportable assay” runs; optional for pure instrument/DR-only runs.  
+- Optional template default `default_analysis_id` copied onto new runs.
 
 ### 3.2 Mapping model
 
@@ -107,15 +122,17 @@ Unique alias globally (or per lab/client scope later) to avoid ambiguous resolut
 Do **not** dump unmapped JSONB into `custom_attributes` by default.  
 Extra meta → **result custom fields** (Field Management already supports `results`).
 
-### 3.5 Test resolution (open but critical)
+### 3.5 Test resolution
+
+With **`run.analysis_id`** fixed:
 
 | Strategy | Behavior |
 |----------|----------|
-| **Strict** | Sample must already have a test whose analysis includes the analyte; else fail publish |
-| **Create** | Auto-create test from default analysis on template |
-| **Map** | Promotion config names analysis_id / test selection rules |
+| **Find** | Existing test for `(sample_id, analysis_id)` |
+| **Create** | If missing, create test for that sample + analysis (open **#7** — lean create for smoother publish) |
+| **Fail** | If missing, block publish |
 
-**Recommend v1: Strict** + clear errors—safer for env/CRO reporting.
+Analytes promoted should generally be members of that analysis (`analysis_analytes`); extras via explicit map only if product allows.
 
 ### 3.6 Cardinality
 
@@ -151,10 +168,11 @@ Permissions: publish permission + result create (lab only).
 | Phase | Deliverable |
 |-------|-------------|
 | **P0** | Analyte aliases model + admin API/UI |
-| **P1** | Template promotion config + preview API |
-| **P2** | Promote service + hook on publish (transactional) |
-| **P3** | Lineage FKs + result UI badge |
-| **P4** | Custom field mapping from selected JSONB keys (optional) |
+| **P1** | `lims_runs.analysis_id` FK + UI selection list (+ optional template default) |
+| **P2** | Template column map / auto-alias resolve + preview API |
+| **P3** | Promote service + hook on publish when `analysis_id` set (transactional) |
+| **P4** | Lineage FKs + result UI badge |
+| **P5** | Optional map JSONB → result custom fields |
 
 ## 4. Testing
 
