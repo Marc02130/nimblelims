@@ -29,7 +29,7 @@ import {
 import { DataGrid, GridColDef, GridActionsCellItem, GridRowParams } from '@mui/x-data-grid';
 import { useNavigate } from 'react-router-dom';
 import { useUser } from '../../contexts/UserContext';
-import { apiService } from '../../services/apiService';
+import { apiService, ApiService } from '../../services/apiService';
 import AnalysisFormDialog from './AnalysisFormDialog';
 
 interface Analyte {
@@ -75,20 +75,28 @@ const AnalysesManagement: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
-      const analysesData = await apiService.getAnalyses();
-      
-      // Load analytes for each analysis
+      // API returns { analyses, total, ... } (not a bare array)
+      const response = await apiService.getAnalyses({ page: 1, size: 500 });
+      const list = ApiService.unwrapAnalysesList(response);
+
+      // Prefer embedded analytes from list payload; fall back to per-analysis fetch
       const analysesWithAnalytes = await Promise.all(
-        (analysesData || []).map(async (analysis: Analysis) => {
-          try {
-            const analytes = await apiService.getAnalysisAnalytes(analysis.id);
+        list.map(async (analysis: Analysis) => {
+          if (analysis.analytes && analysis.analytes.length > 0) {
             return {
               ...analysis,
-              analytes: analytes || [],
-              analytes_count: analytes?.length || 0,
+              analytes_count: analysis.analytes.length,
+            };
+          }
+          try {
+            const analytes = await apiService.getAnalysisAnalytes(analysis.id);
+            const arr = Array.isArray(analytes) ? analytes : analytes?.analytes || [];
+            return {
+              ...analysis,
+              analytes: arr,
+              analytes_count: arr.length,
             };
           } catch {
-            // If endpoint doesn't exist, use analytes from analysis if available
             return {
               ...analysis,
               analytes: analysis.analytes || [],
@@ -97,13 +105,13 @@ const AnalysesManagement: React.FC = () => {
           }
         })
       );
-      
+
       setAnalyses(analysesWithAnalytes);
     } catch (err: any) {
       if (err.response?.status === 403) {
         setError('You do not have permission to view analyses management');
       } else {
-        setError(err.response?.data?.detail || 'Failed to load analyses');
+        setError(err.response?.data?.detail || err?.message || 'Failed to load analyses');
       }
     } finally {
       setLoading(false);

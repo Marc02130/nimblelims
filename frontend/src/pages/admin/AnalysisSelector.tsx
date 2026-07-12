@@ -19,7 +19,7 @@ import {
   Delete,
   Add,
 } from '@mui/icons-material';
-import { apiService } from '../../services/apiService';
+import { apiService, ApiService } from '../../services/apiService';
 
 interface Analysis {
   id: string;
@@ -64,8 +64,8 @@ const AnalysisSelector: React.FC<AnalysisSelectorProps> = ({
   const loadAnalyses = async () => {
     try {
       setLoading(true);
-      const analyses = await apiService.getAnalyses();
-      setAllAnalyses(analyses || []);
+      const response = await apiService.getAnalyses({ page: 1, size: 500 });
+      setAllAnalyses(ApiService.unwrapAnalysesList(response));
     } catch (err: any) {
       console.error('Failed to load analyses:', err);
     } finally {

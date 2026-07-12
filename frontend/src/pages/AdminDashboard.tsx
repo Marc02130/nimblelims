@@ -88,7 +88,7 @@ const AdminDashboard: React.FC = () => {
         apiService.getLists(),
         apiService.getContainerTypes(),
         apiService.getUsers().catch(() => []), // Users endpoint may not exist yet
-        apiService.getAnalyses().catch(() => []), // Analyses endpoint
+        apiService.getAnalyses({ page: 1, size: 1 }).catch(() => ({ analyses: [], total: 0 })),
         apiService.getAnalytes().catch(() => []), // Analytes endpoint
         apiService.getRoles().catch(() => []), // Roles endpoint
         apiService.getTestBatteries().catch(() => ({ batteries: [], total: 0 })), // Test batteries endpoint
@@ -98,8 +98,8 @@ const AdminDashboard: React.FC = () => {
         listsCount: lists?.length || 0,
         containerTypesCount: containerTypes?.length || 0,
         usersCount: users?.length || 0,
-        analysesCount: analyses?.length || 0,
-        analytesCount: analytes?.length || 0,
+        analysesCount: analyses?.total ?? analyses?.analyses?.length ?? (Array.isArray(analyses) ? analyses.length : 0),
+        analytesCount: analytes?.total ?? analytes?.analytes?.length ?? (Array.isArray(analytes) ? analytes.length : 0),
         rolesCount: roles?.length || 0,
         batteriesCount: batteries?.total || batteries?.batteries?.length || 0,
       });

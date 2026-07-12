@@ -26,7 +26,7 @@ import {
 } from '@mui/icons-material';
 import { DataGrid, GridColDef, GridActionsCellItem, GridRowParams } from '@mui/x-data-grid';
 import { useUser } from '../../contexts/UserContext';
-import { apiService } from '../../services/apiService';
+import { apiService, ApiService } from '../../services/apiService';
 import AnalyteRuleForm from './AnalyteRuleForm';
 
 interface AnalyteRule {
@@ -77,8 +77,8 @@ const AnalysisAnalytesConfig: React.FC = () => {
       setLoading(true);
       setError(null);
       
-      const [analysesData, rulesData, dataTypesData] = await Promise.all([
-        apiService.getAnalyses(),
+      const [analysesResponse, rulesData, dataTypesData] = await Promise.all([
+        apiService.getAnalyses({ page: 1, size: 500 }),
         apiService.getAnalysisAnalyteRules(analysisId).catch(() => []),
         apiService.getListEntries('data_types').catch(() => {
           // Fallback to common data types if list doesn't exist
@@ -90,6 +90,7 @@ const AnalysisAnalytesConfig: React.FC = () => {
         }),
       ]);
 
+      const analysesData = ApiService.unwrapAnalysesList(analysesResponse);
       const foundAnalysis = analysesData.find((a: Analysis) => a.id === analysisId);
       if (!foundAnalysis) {
         setError('Analysis not found');
