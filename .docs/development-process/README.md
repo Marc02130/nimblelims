@@ -75,7 +75,8 @@ Tiny/small must **not** skip security or product decisions on sensitive changes 
 |-------|---------|----------------------|
 | **Ideation** | Problem, one-liner, non-goals, rough success metric | [`.docs/ideas/`](../ideas/) |
 | **Requirements** | FR/NFR, phases, acceptance criteria, review packet links | [`.docs/requirements/`](../requirements/) |
-| **Tech sketch** | Lightweight *how*: data model, APIs, engine contracts | [`.docs/tech-sketch/`](../tech-sketch/) |
+| **Tech sketch** | Lightweight *how*: APIs, engine, flows (may draft model) | [`.docs/tech-sketch/`](../tech-sketch/) |
+| **Schema changes** | **Authoritative DB delta for this cycle** (architecture verifies here) | [`.docs/schema-changes/`](../schema-changes/) |
 | **CEO review** | Scope, MVP cut, priority | [`.docs/ceo-review/`](../ceo-review/) |
 | **Security review** | Trust boundaries, STRIDE, authZ, AI/data | [`.docs/security-review/`](../security-review/) |
 | **UI design review** | Personas, flows, empty states | [`.docs/ui-review/`](../ui-review/) |
@@ -92,13 +93,16 @@ Tiny/small must **not** skip security or product decisions on sensitive changes 
 
 **Do not** leave feature docs at `.docs/` root. Do not invent parallel process trees.
 
-### Tech sketch vs design vs architecture review
+### Tech sketch vs schema-changes vs architecture review
 
 | Artifact | Role |
 |----------|------|
-| **Tech sketch** | Early *how*—enough for architecture/UI review |
-| **Architecture review** | Verdict on the sketch/requirements |
-| **design/** | Optional longer design once the approach is stable |
+| **Tech sketch** | Early *how*—APIs, engine, flows; may include draft model |
+| **schema-changes/** | **Only** DB/RLS/backfill delta for this cycle — **architecture’s schema checklist** |
+| **Architecture review** | Verdict on sketch + **schema-changes** + requirements |
+| **design/schema-evolution.md** | Platform product for *dynamic* field management — **not** per-cycle migration lists |
+
+**Rule:** If the cycle includes Alembic work, create `schema-changes/<stem>.md` before architecture review. Do not expect reviewers to reconstruct the delta from seven narrative docs.
 
 ---
 
@@ -257,6 +261,7 @@ After merge: **monitor** production, then **update requirements** with learnings
 | `ideas/<stem>.md` | Ideation |
 | `requirements/<stem>.md` | Requirements |
 | `tech-sketch/<stem>.md` | Tech sketch |
+| `schema-changes/<stem>.md` | **DB delta** (if migrations in scope) |
 | `ceo-review/<stem>.md` | CEO verdict |
 | `security-review/<stem>.md` | Security verdict |
 | `ui-review/<stem>.md` | UI verdict |
@@ -283,8 +288,9 @@ After merge: **monitor** production, then **update requirements** with learnings
 2. Correct folder; same feature stem.  
 3. No phase implement while blocking open questions are **Open**.  
 4. Read reviews; resolve / defer / hold.  
-5. After implement: **docs → dogfood → UAT → merge to main** for production.  
-6. After production: monitor → requirements update.  
+5. DB impact → keep **`schema-changes/<stem>.md`** accurate; architecture reviews that file for schema.  
+6. After implement: **docs → dogfood → UAT → merge to main** for production.  
+7. After production: monitor → requirements update.  
 
 ---
 

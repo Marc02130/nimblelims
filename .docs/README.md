@@ -10,6 +10,7 @@ All product and engineering docs live under this directory, organized by purpose
 | [`manuals/`](manuals/) | Day-to-day reference: setup, API, navigation, domain handbooks |
 | [`requirements/`](requirements/) | PRD and feature requirements |
 | [`tech-sketch/`](tech-sketch/) | Lightweight *how* before architecture/UI review |
+| [`schema-changes/`](schema-changes/) | **Per-cycle DB delta** (architecture schema checklist) |
 | [`design/`](design/) | Longer-form architecture / tech specs |
 | [`user-stories/`](user-stories/) | User stories and acceptance criteria |
 | [`checklist/`](checklist/) | Implementation checklists (task tracking) |
@@ -65,6 +66,15 @@ All product and engineering docs live under this directory, organized by purpose
 ## Tech sketches
 
 Lightweight *how* (see [tech-sketch/README.md](tech-sketch/README.md)). Feature sketches land here after requirements, before architecture review.
+
+## Schema changes (per cycle)
+
+**Single place** for “what migrations does this feature need?” — [schema-changes/README.md](schema-changes/README.md).  
+Do not confuse with the platform Field Management design ([design/schema-evolution.md](design/schema-evolution.md)).
+
+| Cycle | Doc |
+|-------|-----|
+| data-parsers-lims-runs | [schema-changes/data-parsers-lims-runs.md](schema-changes/data-parsers-lims-runs.md) |
 
 ## Design (long-form)
 
