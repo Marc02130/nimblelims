@@ -112,7 +112,8 @@ Tiny/small must **not** skip security or product decisions on sensitive changes 
 |-------|-----------|
 | **Ideation** | Problem, non-goals, rough success metric written |
 | **Requirements** | FR/NFR, phases, acceptance criteria, review links; ready for review |
-| **Tech sketch** | Model/APIs/contracts sketched; risks listed; linked from requirements |
+| **Tech sketch** | APIs/engine/flows sketched; risks listed; linked from requirements |
+| **Schema changes** (if DB impact) | `schema-changes/<stem>.md`: full delta, RLS, backfill, out-of-scope, rollback |
 | **Each review** | Verdict: **Accept** / **Accept with conditions** / **Reject** |
 | **Developer review of reviews** | Disagreements **resolved**, **deferred**, or idea **on hold**—§5 |
 | **Open questions (phase N)** | No **Open** items that **block phase N** |
