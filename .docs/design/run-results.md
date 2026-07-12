@@ -115,40 +115,42 @@ Unique alias globally (or per lab/client scope later) to avoid ambiguous resolut
 | `raw_result` | Stringify JSONB value |
 | `reported_result` | null or copy raw (product) |
 | `calculated_result` | null in v1 |
+| `replicate` | **INT** (default 1) — distinguishes multi-row same analyte |
+| `lims_run_id` | **FK** → promoting run (null if manually entered) |
 | `entered_by` | Publishing user |
 | `entry_date` | now |
 | `name` | Generated unique (existing BaseModel constraint) |
-| Lineage | New nullable FKs preferred: `source_lims_run_id`, `source_lims_run_data_id` |
 
 Do **not** dump unmapped JSONB into `custom_attributes` by default.  
 Extra meta → **result custom fields** (Field Management already supports `results`).
 
-### 3.5 Test resolution
+### 3.5 Test resolution (Decided #7)
 
-With **`run.analysis_id`** fixed:
+**Analysis / analyte = objects; test / result = instances.**
 
-| Strategy | Behavior |
-|----------|----------|
-| **Find** | Existing test for `(sample_id, analysis_id)` |
-| **Create** | If missing, create test for that sample + analysis (open **#7** — lean create for smoother publish) |
-| **Fail** | If missing, block publish |
+With **`run.analysis_id`** set:
 
-Analytes promoted should generally be members of that analysis (`analysis_analytes`); extras via explicit map only if product allows.
+1. **Find** test for `(sample_id, analysis_id)`, or  
+2. **Create** test instance for that sample + analysis  
 
-### 3.6 Cardinality
+No “missing test” error when analysis is defined. Fail only if sample_id missing or analyte unresolved.
 
-- One `(data_row, analyte)` → one result.  
+Analytes promoted should generally be members of that analysis (`analysis_analytes`); resolve columns via name + **analyte aliases**.
+
+### 3.6 Cardinality + replicate
+
+- One `(data_row, analyte)` → one result with a **`replicate`** int.  
 - Multi-analyte columns on one JSONB object → many results.  
-- Multiple data rows for same sample+analyte (replicates): **on_conflict** policy (last wins / fail / average later).
+- Multiple data rows for same sample+analyte → multiple results with distinct replicate (1, 2, 3… or from import if present).
 
-### 3.7 Idempotency / re-publish
+### 3.7 Idempotency / conflicts (Decided #8)
 
-Published runs are terminal today (no transition out of `published`). Re-promote only if:
+| Case | Behavior |
+|------|----------|
+| Result already exists with **same `lims_run_id`** (this run re-published / data fixed) | **Update** `raw_result` (and related fields) |
+| Result exists for same test+analyte+replicate but **other / null `lims_run_id`** (second run or manual) | **Fail promote** and **notify** — do not overwrite |
 
-- New API “re-promote published run”, or  
-- Future unpublish  
-
-v1 can assume **once** on first publish. If results already exist for source lineage, apply `on_conflict`.
+Conflict identity: roughly `(test_id, analyte_id, replicate)` + ownership check via `lims_run_id`.
 
 ### 3.8 API sketch
 
@@ -158,7 +160,7 @@ v1 can assume **once** on first publish. If results already exist for source lin
 | `POST /v1/lims-runs/{id}/promotion/preview` | Dry-run without write (for UI modal) |
 | Template CRUD | Include `promotion` config |
 
-Permissions: publish permission + result create (lab only).
+Permissions: **publish alone** is enough to create/update tests/results on this path (Decided #10).
 
 ### 3.9 Relation to dose-response
 
@@ -168,11 +170,11 @@ Permissions: publish permission + result create (lab only).
 
 | Phase | Deliverable |
 |-------|-------------|
-| **P0** | Analyte aliases model + admin API/UI |
-| **P1** | `lims_runs.analysis_id` FK + UI selection list (+ optional template default) |
-| **P2** | Template column map / auto-alias resolve + preview API |
-| **P3** | Promote service + hook on publish when `analysis_id` set (transactional) |
-| **P4** | Lineage FKs + result UI badge |
+| **P0** | Analyte aliases on analyte + admin UI |
+| **P1** | `lims_runs.analysis_id` + UI + start-run warning |
+| **P2** | `results.lims_run_id`, `results.replicate` migrations |
+| **P3** | Promote service: ensure test, resolve analyte, update-vs-fail, publish hook |
+| **P4** | Preview + conflict notification UX |
 | **P5** | Optional map JSONB → result custom fields |
 
 ## 4. Testing

@@ -74,17 +74,20 @@ Promoting run data into **structured `results` rows when the run is published** 
 | Wrong analyte via bad alias | Medium | Alias admin UX; conflict detection if two analytes claim same alias |
 | Scope creep into full ETL platform | Medium | v1 = raw_result + aliases + publish hook only |
 
-## Open strategic questions
+## Product policy (closed)
 
-1. On re-publish / re-promote: update existing results or fail if already promoted?  
-2. Missing tests: block publish vs **auto-create** test for (sample, analysis)? (lean create)
+- **Tests:** instances of analysis — ensure on promote when analysis set.  
+- **Conflicts:** same run → update; other run → fail + notify (`lims_run_id` on result).  
+- **Aliases:** on analyte.  
+- **Auth:** publish alone.  
+- **Replicates:** `results.replicate` int.
 
 ## Recommendations
 
 1. **Promote on publish when `analysis_id` is set**—analysis association is the opt-in.  
 2. **Invest in analyte aliases** as a first-class lab catalog feature—high leverage for multi-CRO.  
 3. **Keep Field Management on results** for extra meta; do not dump unmapped JSONB into custom_attributes.  
-4. **Measure:** % of analysis-linked published runs that produce ≥1 result; alias/map error rates.
+4. **Measure:** % of analysis-linked published runs that produce ≥1 result; cross-run conflict rate.
 
 **CEO score: 8.5/10** — clear customer value, fits existing lifecycle, bounded scope if publish-gated.
 

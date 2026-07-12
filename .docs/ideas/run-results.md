@@ -34,12 +34,16 @@ Get run data into a **structured format** for easy querying, reporting, and use�
 | **When** | Write results on **publish**, only if run has **`analysis_id`** |
 | **Opt-in** | **`lims_runs.analysis_id`** + UI analysis list — not a separate promote flag |
 | **Start guard** | If no analysis at **run start**, **warn** (no Tests/Results on publish) and offer associate / create analysis / continue without |
-| **What** | **`raw_result`** (calculated deferred) on tests for that analysis |
-| **Map** | JSONB column → analyte (name + **aliases** + optional template map) → value |
-| **Shape** | Multi-analyte columns → **many result rows** |
+| **Objects vs instances** | Analysis/Analyte = catalog; Test/Result = instances. Analysis on run ⇒ **ensure** tests for samples |
+| **What** | **`raw_result`** (+ **`replicate` int**); calculated deferred |
+| **Map** | JSONB column → analyte (name + **aliases on analyte**) → value |
+| **Shape** | Multi-analyte columns → **many result rows**; multi-row same analyte → **replicate** |
+| **Conflicts** | Same run → **update**; other run same sample/analyte/replicate → **fail + notify** |
+| **Lineage** | **`results.lims_run_id`** FK |
+| **Permissions** | **Publish alone** enough for promote writes |
 | **SoT** | Run keeps instrument data; results = published projection |
 | **No** | Dump unmapped keys into `custom_attributes` |
-| **Extensibility** | Result/test **custom fields** (Field Management already supports `tests` / `results`) for defined meta |
+| **Extensibility** | Result/test **custom fields** already in Field Management |
 
 ## Mapping sketch
 
@@ -66,23 +70,19 @@ LimsRun with analysis_id NULL → publish only, no results written
 
 Import allowed in `running` / `results_received`. **Structured results written at `published` only when `analysis_id` is set.**
 
-## Still open (see open-questions)
+## Product policy closed
 
-- Missing tests: block vs auto-create (lean find-or-create for sample+analysis)  
-- Re-promote / conflict policy  
-- Alias storage shape  
-- Publish vs result:enter permissions  
-- Lineage FK columns  
+See [open-questions/run-results.md](../open-questions/run-results.md). Remaining work is implementation detail.
 
 ## Implementation phases (tech)
 
 | Phase | Focus |
 |-------|--------|
-| P0 | Analyte aliases |
-| P1 | `analysis_id` on lims_runs + UI selection |
-| P2 | Column map / alias resolve + preview |
-| P3 | Transactional promote on publish when analysis set |
-| P4 | Lineage UI |
+| P0 | Analyte aliases on analyte |
+| P1 | `analysis_id` on lims_runs + UI + start warning |
+| P2 | `results.lims_run_id`, `results.replicate` |
+| P3 | Ensure test instance; promote on publish; update vs fail |
+| P4 | Preview / notify UX |
 
 ## Non-goals (v1)
 
