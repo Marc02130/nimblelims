@@ -111,7 +111,7 @@ const AnalysesManagement: React.FC = () => {
       if (err.response?.status === 403) {
         setError('You do not have permission to view analyses management');
       } else {
-        setError(err.response?.data?.detail || err?.message || 'Failed to load analyses');
+        setError(ApiService.formatError(err, 'Failed to load analyses'));
       }
     } finally {
       setLoading(false);
