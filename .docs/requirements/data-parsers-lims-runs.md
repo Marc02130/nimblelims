@@ -120,16 +120,23 @@ Promote-on-publish already maps JSONB columns → analytes/results when `analysi
 | FR-5.4 | Validation failures (missing expected fields, bad delimiter, etc.) shall be user-visible and actionable. |
 | FR-5.5 | Integration with promote-on-publish unchanged: when `analysis_id` set, publish maps `field_name`/aliases → results. |
 
-### FR-6: Optional AI parser setup (not required for MVP core)
+### FR-6: Parser setup — multi-file examples, tests, and optional AI
+
+User testing is part of the **parser framework**, not a separate product.
 
 | ID | Requirement |
 |----|-------------|
-| FR-6.1 | User may upload an **example** text result file (txt/csv/tsv) and select analysis + instrument\|CRO to **draft** a parser. |
-| FR-6.2 | AI may propose `parser_config` only; **human must review and save** before the parser is active for import. |
-| FR-6.3 | AI shall not invent result values; only structure/mapping suggestions. |
-| FR-6.4 | Optional: AI may suggest new analyte aliases (human confirm before write)—see [ai-analyte-resolution](../ideas/ai-analyte-resolution.md). |
-| FR-6.5 | Requires configured LLM credentials (e.g. existing Anthropic pattern from SOP parse); degrade with clear error if missing. |
-| FR-6.6 | Async job + poll + apply pattern recommended (consistent with `/v1/sop-parse`). |
+| FR-6.1 | When creating/editing a parser, user may upload **one or more example files** (text tables) used to derive/refine `parser_config`. |
+| FR-6.2 | User may upload **one or more test files** used to validate a candidate config (may differ from examples). |
+| FR-6.3 | Framework shall run the **same import engine** against each test file with the candidate config (after schema validation—see open Q1). |
+| FR-6.4 | UI shall show per-file results: pass/fail, row counts, warnings, hard errors. |
+| FR-6.5 | **Activate / ready-for-import** (provisional): at least one test file completes with **zero hard errors** before parser is marked production-ready. |
+| FR-6.6 | Optional AI may draft `parser_config` from example file(s); **human must review and save**. |
+| FR-6.7 | Optional AI may **suggest edge test cases** based on observed data (e.g. negative values, empties, type stress, structural noise); suggestions become fixtures only after user accepts. |
+| FR-6.8 | Edge tests and all test files are judged by the **code engine**, not by the LLM alone. |
+| FR-6.9 | AI shall not invent official result values or run on production LimsRun import. |
+| FR-6.10 | Optional: AI may suggest analyte aliases (human confirm)—see [ai-analyte-resolution](../ideas/ai-analyte-resolution.md). |
+| FR-6.11 | LLM path requires server credentials; degrade with clear error if missing. Async job pattern recommended (cf. SOP parse). |
 
 ### FR-7: Compatibility and migration
 
@@ -211,12 +218,12 @@ File column  --parser-->  row_data[field_name]  --promote-->  Result(analyte)
 | Phase | Scope | AI | LimsRun |
 |-------|--------|-----|---------|
 | **P0** | Instrument + CRO source catalogs + UI | No | Optional FKs only if cheap |
-| **P1** | Parser scoped analysis×source; manual editor; **run instrument/CRO/parser_id**; import uses run parser | No | **Yes** |
-| **P2** | AI draft parser from example text file | Yes | Setup only |
+| **P1** | Parser scoped analysis×source; manual editor; **example + test multi-file dry-run**; **run instrument/CRO/parser_id**; import uses run parser | No | **Yes** |
+| **P2** | AI draft config from examples + **AI edge-test suggestions** | Yes | Setup only |
 | **P3** | Snapshots, richer formats, SOP bridge, alias co-suggest | Optional | Polish |
 
-**Recommended first implementation branch:** P0+P1.  
-**Second branch:** P2.
+**Recommended first implementation branch:** P0+P1 (includes test harness without AI).  
+**Second branch:** P2 (AI draft + edge suggestions).
 
 ---
 
@@ -224,14 +231,19 @@ File column  --parser-->  row_data[field_name]  --promote-->  Result(analyte)
 
 1. Lab can create an instrument and a CRO source.  
 2. Lab can create a parser for (analysis + instrument) and (analysis + CRO) with JSONB config via UI (no AI required).  
-3. On a LimsRun, user can set analysis + instrument or CRO; **default parser_id is applied and stored**.  
-4. User can override parser_id; override is stored and used on import.  
-5. Import applies stored parser_config deterministically; fails clearly if parser missing/invalid.  
-6. Publish + promote still works when analysis_id set (existing behavior).  
-7. Historical run shows which instrument/CRO and parser_id were used.
+3. Lab can attach **≥1 example file** and **≥1 test file** while creating/editing a parser.  
+4. Framework runs engine on all test files and shows pass/fail/warnings per file.  
+5. Parser cannot be activated for production import until activation gate is met (provisional: ≥1 test with zero hard errors).  
+6. On a LimsRun, user can set analysis + instrument or CRO; **default parser_id is applied and stored**.  
+7. User can override parser_id; override is stored and used on import.  
+8. Import applies stored parser_config deterministically; fails clearly if parser missing/invalid.  
+9. Publish + promote still works when analysis_id set (existing behavior).  
+10. Historical run shows which instrument/CRO and parser_id were used.
 
 **P2 acceptance (when scheduled):**  
-8. From sample text file + analysis + source, AI produces draft parser_config; user must save; import still never calls AI.
+11. From example file(s) + analysis + source, AI produces draft parser_config; user must save.  
+12. AI suggests edge test fixtures from data (e.g. negatives); user accepts; engine re-runs tests.  
+13. Production LimsRun import still never calls AI.
 
 ---
 

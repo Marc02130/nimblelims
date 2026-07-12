@@ -23,7 +23,14 @@
 1. Instruments list — create “LCMS-1”  
 2. CRO sources list — create “Eurofins metals”  
 3. Parsers — create for Analysis=Metals + Instrument=LCMS-1; edit column map  
-4. (Later) “Draft from sample file” → review → save  
+4. **Upload example file(s)** (1+) and **test file(s)** (1+); run tests → pass/fail panel  
+5. (P2) “Draft config from examples” + “Suggest edge tests” → accept → re-run tests → save / activate  
+
+### A2. Parser test panel (required UX)
+
+- Lists each test file: status, rows parsed, warnings, errors  
+- “Add edge test” (manual) / “Suggest edges” (AI, P2)  
+- Clear **Activate** disabled until gate met (show why)  
 
 ### B. Run (lab tech) — every time
 

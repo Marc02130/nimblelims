@@ -23,6 +23,7 @@ Do not implement a phase until questions that **block** that phase are **Decided
 | # | Question | Status | Blocks | Decision | Date | Owner | Rationale |
 |---|----------|--------|--------|----------|------|-------|-----------|
 | **1** | How do we ensure AI-generated `parser_config` JSONB is **standardized** and works with the **code framework** that runs parsers? | **Open** (proposed approach below) | P2 AI setup; schema freeze for P1 | See **Decision #1 (proposed)** | 2026-07-12 | Architecture | Single schema + validate before save; AI must emit that schema only |
+| **10** | How is **user testing** built into parser creation (example files + test files + edge cases)? | **Decided (provisional)** | P1 framework dry-run; P2 AI edge suggestions | See **Decision #10** | 2026-07-12 | Product | Setup quality gate before parser is trusted for production imports |
 | 2 | Instrument = named instance vs type? | **Open** | P0 catalog | _Suggested:_ named source/instance (or named export stream) | | Product | CRO exports are streams more than asset types |
 | 3 | Permission for parser / instrument / CRO CRUD? | **Open** | P0–P1 | _Suggested:_ `config:edit` | | Product | Align with other lab config |
 | 4 | Allow override to a parser for a **different** analysis than the run? | **Open** | P1 UI/API | _Suggested:_ block (or warn+block) | | Product | Promote uses run.analysis_id |
@@ -163,13 +164,91 @@ Optional: **dry-run** against the sample file after validate—engine runs `pars
 
 ---
 
+## Decision #10 — Parser creation includes multi-file **user testing** in the framework
+
+**Status:** **Decided (provisional)** · **Date:** 2026-07-12 · **Owner:** Product  
+**Blocks:** P1 (engine dry-run harness); P2 (AI edge-test suggestions)
+
+### Intent
+
+Creating/editing a parser is not only “upload one sample and hope.” The framework must support **guided validation** so the lab trusts the config before it is used on real LimsRuns.
+
+### Decided rules
+
+| Rule | Detail |
+|------|--------|
+| **Example files** | User may attach **1 or more** example files used to **derive / refine** `parser_config` (headers, delimiter, skip_rows, column map). |
+| **Test files** | User may attach **1 or more** test files used to **validate** a candidate config (must not be required to be the same set as examples). |
+| **Engine runs tests** | Framework runs the **same import engine** against each test file with the candidate `parser_config` (schema-validated first—Decision #1). |
+| **Pass / fail visible** | Per-file and aggregate results: success, row counts, warnings, hard errors (missing columns, coerce failures, empty parse). |
+| **Activate gate (provisional)** | Parser may be marked **ready for production import** only after at least **one** test file passes with zero hard errors (warnings allowed but listed). Soften later if product wants draft parsers for experimental use. |
+| **AI edge tests (P2)** | From uploaded data (examples and/or tests), AI may **suggest additional synthetic or derived edge test cases**—e.g. negative values, empty cells, extra columns, missing expected columns, scientific notation, BOM/encoding quirks—expressed as **test file payloads or fixtures**, not as free-form code. |
+| **Human owns edges** | User accepts/rejects AI edge suggestions; only accepted fixtures run through the engine. |
+| **No AI on production import** | Unchanged: LimsRun import never calls the LLM. |
+
+### Roles of file sets
+
+```
+Example file(s)  ──►  propose / refine parser_config  (human and/or AI draft)
+                            │
+                            ▼
+                     validate schema (ParserConfig)
+                            │
+Test file(s)     ──►  engine.parse(file, config)  ──►  pass/fail report
+  + optional AI-suggested edge fixtures
+                            │
+                     user reviews ──► save / activate parser
+```
+
+| Set | Purpose | Min count |
+|-----|---------|-----------|
+| **Examples** | Teach the shape of the real export | ≥ 1 |
+| **Tests** | Prove the config works on held-out or edge data | ≥ 1 for activate (provisional) |
+
+Users may reuse an example as a test, but the product should **encourage** at least one independent test file when available.
+
+### AI-suggested edge tests (detail)
+
+Given column stats from examples/tests (types, min/max, null rate, sample of values), AI may propose fixtures such as:
+
+| Edge class | Example suggestion |
+|------------|-------------------|
+| Sign / range | Negative numeric where all training positives |
+| Empty / null | Blank cell in required-looking column |
+| Extra noise | Extra trailing column; junk preamble row |
+| Type stress | `"N/A"`, `"<LOD"`, scientific notation |
+| Structure | Missing header; wrong delimiter variant |
+
+**Output shape (proposed):** list of `{ name, description, file_content or mutations, expect: pass|warn|fail }` — still run only through the **code engine**, never “AI judges pass/fail” as sole gate.
+
+### Still open under #10
+
+| Sub-Q | Suggested default |
+|-------|-------------------|
+| 10a | Retain uploaded files in DB vs ephemeral session only? | Ephemeral + optional attach to parser for re-run |
+| 10b | Max files / max size? | e.g. 10 files, 10 MB each |
+| 10c | Must all tests pass to activate, or majority? | All hard-error-free |
+| 10d | Synthetic edge fixtures stored as blobs or generated on the fly? | Store accepted fixtures with parser |
+
+### Decision record
+
+| Field | Value |
+|-------|--------|
+| **Status** | **Decided (provisional)** |
+| **Example files** | 1+ |
+| **Test files** | 1+; engine-run; activate after ≥1 clean pass (provisional) |
+| **AI edge suggestions** | Yes on setup (P2); human accept; engine executes |
+| **Date** | 2026-07-12 |
+
+---
+
 ## Phase gate
 
 | Phase | Scope | Open blockers |
 |-------|--------|---------------|
 | **P0** | Instrument + CRO catalogs | Q2, Q3, Q7 |
-| **P1** | Parser scoped analysis×source; run FKs; import by `parser_id` | Q1 schema freeze (core fields), Q4, Q6, Q8, Q9 |
-| **P2** | AI draft from sample file | **Q1 fully locked** + Security P2 conditions |
+| **P1** | Parser scoped analysis×source; run FKs; import by `parser_id`; **example+test file dry-run harness** | Q1 schema freeze (core fields), Q4, Q6, Q8, Q9; **#10a–c** for product polish |
+| **P2** | AI draft config + **AI edge-test suggestions** | **Q1 fully locked** + Security P2 + #10d |
 | **P3** | Snapshot, formats, SOP bridge | Q5 |
 
 ---
