@@ -39,6 +39,7 @@ import * as Yup from 'yup';
 import { useUser } from '../contexts/UserContext';
 import { apiService } from '../services/apiService';
 import CustomAttributeField from '../components/common/CustomAttributeField';
+import { FillHeightPage, FillHeightTable } from '../components/common/FillHeightPage';
 
 interface Unit {
   id: string;
@@ -377,75 +378,73 @@ const AnalytesManagement: React.FC = () => {
   }
 
   return (
-    <Box sx={{ p: 3, position: 'relative' }}>
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-        <Typography variant="h4">Analytes</Typography>
-      </Box>
+    <FillHeightPage
+      sx={{ position: 'relative' }}
+      header={
+        <>
+          <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
+            <Typography variant="h4">Analytes</Typography>
+          </Box>
 
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
-          {error}
-        </Alert>
-      )}
+          {error && (
+            <Alert severity="error" sx={{ mb: 1 }} onClose={() => setError(null)}>
+              {error}
+            </Alert>
+          )}
 
-      {!canManage && (
-        <Alert severity="info" sx={{ mb: 2 }}>
-          You have read-only access. Contact your administrator for management permissions.
-        </Alert>
-      )}
+          {!canManage && (
+            <Alert severity="info" sx={{ mb: 1 }}>
+              You have read-only access. Contact your administrator for management permissions.
+            </Alert>
+          )}
 
-      {/* Search */}
-      <Box sx={{ mb: 2 }}>
-        <TextField
-          fullWidth
-          placeholder="Search by name or CAS number..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <Search />
-              </InputAdornment>
-            ),
-            endAdornment: searchTerm && (
-              <InputAdornment position="end">
-                <IconButton size="small" onClick={() => setSearchTerm('')}>
-                  <Clear />
-                </IconButton>
-              </InputAdornment>
-            ),
-          }}
-        />
-      </Box>
-
-      <Card>
-        <CardContent>
-          <DataGrid
-            rows={analytes}
-            columns={columns}
-            rowCount={totalRows}
-            loading={loading}
-            paginationMode="server"
-            paginationModel={paginationModel}
-            onPaginationModelChange={setPaginationModel}
-            pageSizeOptions={[10, 25, 50, 100]}
-            sx={{ width: '100%' }}
-            autoHeight
-            disableRowSelectionOnClick
-            slots={{
-              toolbar: GridToolbar,
-            }}
-            slotProps={{
-              toolbar: {
-                showQuickFilter: false,
-                printOptions: { disableToolbarButton: true },
-              },
+          <TextField
+            fullWidth
+            size="small"
+            placeholder="Search by name or CAS number..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <Search />
+                </InputAdornment>
+              ),
+              endAdornment: searchTerm && (
+                <InputAdornment position="end">
+                  <IconButton size="small" onClick={() => setSearchTerm('')}>
+                    <Clear />
+                  </IconButton>
+                </InputAdornment>
+              ),
             }}
           />
-        </CardContent>
-      </Card>
+        </>
+      }
+    >
+      <FillHeightTable>
+        <DataGrid
+          rows={analytes}
+          columns={columns}
+          rowCount={totalRows}
+          loading={loading}
+          paginationMode="server"
+          paginationModel={paginationModel}
+          onPaginationModelChange={setPaginationModel}
+          pageSizeOptions={[10, 25, 50, 100]}
+          disableRowSelectionOnClick
+          slots={{
+            toolbar: GridToolbar,
+          }}
+          slotProps={{
+            toolbar: {
+              showQuickFilter: false,
+              printOptions: { disableToolbarButton: true },
+            },
+          }}
+        />
+      </FillHeightTable>
 
-      {/* FAB for Create */}
       {canManage && (
         <Fab
           color="primary"
@@ -625,7 +624,7 @@ const AnalytesManagement: React.FC = () => {
           {snackbar.message}
         </Alert>
       </Snackbar>
-    </Box>
+    </FillHeightPage>
   );
 };
 

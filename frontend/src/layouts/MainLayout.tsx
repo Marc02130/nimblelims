@@ -298,7 +298,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
         {/* Spacer for fixed AppBar (Toolbar default height 64px) */}
         <Toolbar sx={{ flexShrink: 0 }} />
 
-        {/* Main content: padding wrapper; scroll area has explicit height so it never over-reserves */}
+        {/* Main content: fixed viewport height so table pages can fill and scroll inside the grid */}
         <Box
           sx={{
             flex: '1 1 0',
@@ -309,7 +309,11 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
             flexDirection: 'column',
           }}
         >
-          {/* Single scroll container: height = viewport minus app bar and padding; scrollbar only when content overflows */}
+          {/*
+            Height-locked content host. Table pages use height:100% + overflow:hidden
+            so only the DataGrid scrolls (headers/actions stay put). Non-table pages
+            that grow past the viewport still scroll here via overflow:auto.
+          */}
           <Box
             className="main-content-scroll"
             sx={{
@@ -317,9 +321,11 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
               maxHeight: `calc(100vh - ${MAIN_CONTENT_OFFSET}px)`,
               minHeight: 0,
               minWidth: 0,
+              width: '100%',
+              display: 'flex',
+              flexDirection: 'column',
               overflowX: 'auto',
               overflowY: 'auto',
-              width: '100%',
             }}
           >
             {children}

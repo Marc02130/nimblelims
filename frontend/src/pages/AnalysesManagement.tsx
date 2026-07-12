@@ -42,6 +42,7 @@ import * as Yup from 'yup';
 import { useUser } from '../contexts/UserContext';
 import { apiService } from '../services/apiService';
 import CustomAttributeField from '../components/common/CustomAttributeField';
+import { FillHeightPage, FillHeightTable } from '../components/common/FillHeightPage';
 
 interface Analyte {
   id: string;
@@ -739,92 +740,93 @@ const AnalysesManagement: React.FC = () => {
   }
 
   return (
-    <Box sx={{ p: 3, position: 'relative' }}>
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-        <Typography variant="h4">Analyses</Typography>
-      </Box>
+    <FillHeightPage
+      sx={{ position: 'relative' }}
+      header={
+        <>
+          <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
+            <Typography variant="h4">Analyses</Typography>
+          </Box>
 
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
-          {error}
-        </Alert>
-      )}
+          {error && (
+            <Alert severity="error" sx={{ mb: 1 }} onClose={() => setError(null)}>
+              {error}
+            </Alert>
+          )}
 
-      {!canManage && (
-        <Alert severity="info" sx={{ mb: 2 }}>
-          You have read-only access. Contact your administrator for management permissions.
-        </Alert>
-      )}
+          {!canManage && (
+            <Alert severity="info" sx={{ mb: 1 }}>
+              You have read-only access. Contact your administrator for management permissions.
+            </Alert>
+          )}
 
-      {/* Search */}
-      <Box sx={{ mb: 2 }}>
-        <TextField
-          fullWidth
-          placeholder="Search by name or method..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <Search />
-              </InputAdornment>
-            ),
-            endAdornment: searchTerm && (
-              <InputAdornment position="end">
-                <IconButton size="small" onClick={() => setSearchTerm('')}>
-                  <Clear />
-                </IconButton>
-              </InputAdornment>
-            ),
+          <TextField
+            fullWidth
+            size="small"
+            placeholder="Search by name or method..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <Search />
+                </InputAdornment>
+              ),
+              endAdornment: searchTerm && (
+                <InputAdornment position="end">
+                  <IconButton size="small" onClick={() => setSearchTerm('')}>
+                    <Clear />
+                  </IconButton>
+                </InputAdornment>
+              ),
+            }}
+          />
+
+          {/* Expanded detail panels sit in the chrome so the grid keeps column headers fixed */}
+          {Object.keys(expandedRows).some((id) => expandedRows[id]) && (
+            <Box sx={{ mt: 1.5, maxHeight: 180, overflowY: 'auto' }}>
+              {analyses.map(
+                (analysis) =>
+                  expandedRows[analysis.id] && (
+                    <Box key={`detail-${analysis.id}`} sx={{ mb: 1 }}>
+                      {renderDetailPanel(analysis.id)}
+                    </Box>
+                  ),
+              )}
+            </Box>
+          )}
+        </>
+      }
+    >
+      <FillHeightTable>
+        <DataGrid
+          rows={analyses}
+          columns={columns}
+          rowCount={totalRows}
+          loading={loading}
+          paginationMode="server"
+          paginationModel={paginationModel}
+          onPaginationModelChange={setPaginationModel}
+          pageSizeOptions={[10, 25, 50, 100]}
+          sx={{
+            border: 'none',
+            '& .MuiDataGrid-row': {
+              cursor: 'pointer',
+            },
+          }}
+          disableRowSelectionOnClick
+          slots={{
+            toolbar: GridToolbar,
+          }}
+          slotProps={{
+            toolbar: {
+              showQuickFilter: false,
+              printOptions: { disableToolbarButton: true },
+            },
           }}
         />
-      </Box>
+      </FillHeightTable>
 
-      <Card>
-        <CardContent sx={{ p: 0, '&:last-child': { pb: 0 } }}>
-          {/* Custom rendering to support expandable rows */}
-          <Box>
-            <DataGrid
-              rows={analyses}
-              columns={columns}
-              rowCount={totalRows}
-              loading={loading}
-              paginationMode="server"
-              paginationModel={paginationModel}
-              onPaginationModelChange={setPaginationModel}
-              pageSizeOptions={[10, 25, 50, 100]}
-              autoHeight
-              sx={{
-                border: 'none',
-                '& .MuiDataGrid-row': {
-                  cursor: 'pointer',
-                },
-              }}
-              disableRowSelectionOnClick
-              slots={{
-                toolbar: GridToolbar,
-              }}
-              slotProps={{
-                toolbar: {
-                  showQuickFilter: false,
-                  printOptions: { disableToolbarButton: true },
-                },
-              }}
-            />
-          </Box>
-          
-          {/* Expanded Detail Panels - rendered below the grid for each expanded row */}
-          {analyses.map((analysis) => (
-            expandedRows[analysis.id] && (
-              <Box key={`detail-${analysis.id}`}>
-                {renderDetailPanel(analysis.id)}
-              </Box>
-            )
-          ))}
-        </CardContent>
-      </Card>
-
-      {/* FAB for Create */}
       {canManage && (
         <Fab
           color="primary"
@@ -1009,7 +1011,7 @@ const AnalysesManagement: React.FC = () => {
           {snackbar.message}
         </Alert>
       </Snackbar>
-    </Box>
+    </FillHeightPage>
   );
 };
 

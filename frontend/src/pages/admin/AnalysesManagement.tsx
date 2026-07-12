@@ -30,6 +30,7 @@ import { DataGrid, GridColDef, GridActionsCellItem, GridRowParams } from '@mui/x
 import { useNavigate } from 'react-router-dom';
 import { useUser } from '../../contexts/UserContext';
 import { apiService, ApiService } from '../../services/apiService';
+import { FillHeightPage, FillHeightTable } from '../../components/common/FillHeightPage';
 import AnalysisFormDialog from './AnalysisFormDialog';
 
 interface Analyte {
@@ -326,127 +327,128 @@ const AnalysesManagement: React.FC = () => {
   }
 
   return (
-    <Box>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h4">Analyses Management</Typography>
-        {canEdit && (
-          <Button
-            variant="contained"
-            startIcon={<Add />}
-            onClick={() => {
-              setSelectedAnalysis(null);
-              setFormOpen(true);
+    <FillHeightPage
+      header={
+        <>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+            <Typography variant="h4">Analyses Management</Typography>
+            {canEdit && (
+              <Button
+                variant="contained"
+                startIcon={<Add />}
+                onClick={() => {
+                  setSelectedAnalysis(null);
+                  setFormOpen(true);
+                }}
+              >
+                Create Analysis
+              </Button>
+            )}
+          </Box>
+
+          {error && (
+            <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
+              {error}
+            </Alert>
+          )}
+
+          <TextField
+            fullWidth
+            size="small"
+            placeholder="Search analyses, methods, or analytes..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <Search />
+                </InputAdornment>
+              ),
+              endAdornment: searchTerm && (
+                <InputAdornment position="end">
+                  <IconButton size="small" onClick={() => setSearchTerm('')}>
+                    <Clear />
+                  </IconButton>
+                </InputAdornment>
+              ),
             }}
-          >
-            Create Analysis
-          </Button>
-        )}
-      </Box>
+          />
 
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
-          {error}
-        </Alert>
-      )}
-
-      <Box sx={{ mb: 2 }}>
-        <TextField
-          fullWidth
-          placeholder="Search analyses, methods, or analytes..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <Search />
-              </InputAdornment>
-            ),
-            endAdornment: searchTerm && (
-              <InputAdornment position="end">
-                <IconButton size="small" onClick={() => setSearchTerm('')}>
-                  <Clear />
-                </IconButton>
-              </InputAdornment>
-            ),
-          }}
-        />
-      </Box>
-
+          {/* Expanded analyte chips (above grid so column headers stay pinned in the grid) */}
+          {expandedRows.size > 0 && (
+            <Box sx={{ mt: 2, maxHeight: 140, overflowY: 'auto' }}>
+              {Array.from(expandedRows).map((analysisId) => {
+                const analysis = analyses.find((a) => a.id === analysisId);
+                if (!analysis) return null;
+                return (
+                  <Box
+                    key={`analytes-${analysisId}`}
+                    sx={{
+                      mb: 1,
+                      p: 1.5,
+                      bgcolor: 'background.paper',
+                      borderRadius: 1,
+                      border: 1,
+                      borderColor: 'divider',
+                    }}
+                  >
+                    <Typography variant="subtitle2" gutterBottom>
+                      Analytes for {analysis.name}
+                    </Typography>
+                    {analysis.analytes && analysis.analytes.length > 0 ? (
+                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                        {analysis.analytes.map((analyte) => (
+                          <Chip
+                            key={analyte.id}
+                            label={analyte.name}
+                            size="small"
+                            color="primary"
+                            variant="outlined"
+                            title={analyte.description}
+                          />
+                        ))}
+                      </Box>
+                    ) : (
+                      <Typography variant="body2" color="text.secondary">
+                        No analytes assigned to this analysis
+                      </Typography>
+                    )}
+                  </Box>
+                );
+              })}
+            </Box>
+          )}
+        </>
+      }
+    >
       {loading ? (
-        <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
+        <Box display="flex" justifyContent="center" alignItems="center" flex={1}>
           <CircularProgress />
         </Box>
       ) : (
-        <>
-          <Box sx={{ width: '100%' }}>
-            <DataGrid
-              rows={filteredAnalyses}
-              autoHeight
-              columns={columns}
-              getRowId={(row) => row.id}
-              pageSizeOptions={[10, 25, 50]}
-              initialState={{
-                pagination: {
-                  paginationModel: { page: 0, pageSize: 10 },
-                },
-              }}
-              disableRowSelectionOnClick
-              slots={{
-                noRowsOverlay: () => (
-                  <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
-                    <Typography>No analyses found</Typography>
-                  </Box>
-                ),
-              }}
-            />
-          </Box>
-
-          {/* Expanded rows for analytes */}
-          {Array.from(expandedRows).map((analysisId) => {
-            const analysis = analyses.find((a) => a.id === analysisId);
-            if (!analysis) return null;
-
-            return (
-              <Box
-                key={`analytes-${analysisId}`}
-                sx={{
-                  mt: 2,
-                  mb: 3,
-                  p: 2,
-                  bgcolor: 'background.paper',
-                  borderRadius: 1,
-                  border: 1,
-                  borderColor: 'divider',
-                }}
-              >
-                <Typography variant="h6" gutterBottom>
-                  Analytes for {analysis.name}
-                </Typography>
-                {analysis.analytes && analysis.analytes.length > 0 ? (
-                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                    {analysis.analytes.map((analyte) => (
-                      <Chip
-                        key={analyte.id}
-                        label={analyte.name}
-                        size="small"
-                        color="primary"
-                        variant="outlined"
-                        title={analyte.description}
-                      />
-                    ))}
-                  </Box>
-                ) : (
-                  <Typography color="text.secondary">
-                    No analytes assigned to this analysis
-                  </Typography>
-                )}
-              </Box>
-            );
-          })}
-        </>
+        <FillHeightTable>
+          <DataGrid
+            rows={filteredAnalyses}
+            columns={columns}
+            getRowId={(row) => row.id}
+            pageSizeOptions={[10, 25, 50, 100]}
+            initialState={{
+              pagination: {
+                paginationModel: { page: 0, pageSize: 25 },
+              },
+            }}
+            disableRowSelectionOnClick
+            slots={{
+              noRowsOverlay: () => (
+                <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+                  <Typography>No analyses found</Typography>
+                </Box>
+              ),
+            }}
+          />
+        </FillHeightTable>
       )}
 
-      {/* Analysis Form Dialog */}
       <AnalysisFormDialog
         open={formOpen}
         analysis={selectedAnalysis}
@@ -458,7 +460,6 @@ const AnalysesManagement: React.FC = () => {
         onSubmit={selectedAnalysis ? handleUpdate : handleCreate}
       />
 
-      {/* Delete Confirmation Dialog */}
       <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)}>
         <DialogTitle>Confirm Delete</DialogTitle>
         <DialogContent>
@@ -476,7 +477,7 @@ const AnalysesManagement: React.FC = () => {
           </Button>
         </DialogActions>
       </Dialog>
-    </Box>
+    </FillHeightPage>
   );
 };
 
