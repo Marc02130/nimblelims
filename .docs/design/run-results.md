@@ -65,8 +65,9 @@ transition_status(run, published)
 lims_runs.analysis_id  UUID NULL REFERENCES analyses(id)
 ```
 
-- UI: required for “reportable assay” runs; optional for pure instrument/DR-only runs.  
-- Optional template default `default_analysis_id` copied onto new runs.
+- UI: select for “reportable assay” runs; optional for pure instrument/DR-only runs.  
+- Optional template default `default_analysis_id` copied onto new runs.  
+- **Start-run guard:** if `analysis_id` is null, API/UI **warns** that publish will not write tests/results; user must associate analysis, create analysis+analytes, or **explicitly confirm** continue-without-analysis (e.g. `acknowledge_no_analysis: true` on start transition).
 
 ### 3.2 Mapping model
 

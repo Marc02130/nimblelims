@@ -46,13 +46,20 @@ Publish is already a high-intent action. Bundling structure creation there reduc
 
 ### B. Run execution
 
-1. Create/edit run: **select Analysis** (list) when results should be structured. Leave empty for non-reportable runs.  
-2. Draft → … → import data (`running` / `results_received`).  
-3. Complete run.  
-4. **Publish**  
+1. Create/edit run: **select Analysis** (list) when results should be structured. Leave empty only for intentional non-reportable runs.  
+2. **Start run** (`draft` → `running`, or CRO start path):  
+   - If **no analysis:** **warn before start** — imported data will **not** write to Tests/Results on publish.  
+   - Offer:  
+     - Associate an **existing analysis**  
+     - **Create analysis** (and analytes) then associate  
+     - **Continue without analysis** (explicit non-reportable path)  
+   - If analysis set: start with no warning.  
+3. Import data (`running` / `results_received`).  
+4. Complete run.  
+5. **Publish**  
    - If analysis set: modal previews promotion into that analysis’s tests/results  
-   - If analysis empty: normal publish, no results  
-5. Results appear on sample/test; run remains instrument SoT.
+   - If analysis empty: publish without results (user already warned at start)  
+6. Results appear on sample/test; run remains instrument SoT.
 
 ### C. After publish
 
@@ -77,6 +84,8 @@ Publish is already a high-intent action. Bundling structure creation there reduc
 | Column unmatched | List skipped columns; optional force map |
 | Alias conflict | Two analytes claim same alias—admin error |
 | Zero rows to promote | Warn; allow publish-only if intentional |
+| Start without analysis | Pre-start dialog: associate / create analysis / continue without |
+| Publish without analysis | No promote; optional soft reminder (primary warn was at start) |
 
 ## Anti-patterns
 
