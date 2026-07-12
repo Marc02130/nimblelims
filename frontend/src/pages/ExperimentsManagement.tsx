@@ -47,6 +47,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { apiService } from '../services/apiService';
 import { useUser } from '../contexts/UserContext';
 import EntryCapturePanel from '../components/experiments/EntryCapturePanel';
+import { FillHeightPage, FillHeightTable } from '../components/common/FillHeightPage';
 
 const apiErrorMsg = (err: any, fallback: string): string => {
   const detail = err?.response?.data?.detail;
@@ -655,29 +656,29 @@ const ExperimentsManagement: React.FC = () => {
   }
 
   return (
-    <Box sx={{ p: 3 }}>
-      <Box display="flex" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={2} mb={3}>
-        <Typography variant="h4">Experiments</Typography>
-        {canManage && (
-          <Button
-            variant="contained"
-            onClick={() => setShowCreateDialog(true)}
-            aria-label="New experiment"
-          >
-            New Experiment
-          </Button>
-        )}
-      </Box>
+    <FillHeightPage
+      header={
+        <>
+          <Box display="flex" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={2} mb={2}>
+            <Typography variant="h4">Experiments</Typography>
+            {canManage && (
+              <Button
+                variant="contained"
+                onClick={() => setShowCreateDialog(true)}
+                aria-label="New experiment"
+              >
+                New Experiment
+              </Button>
+            )}
+          </Box>
 
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
-          {error}
-        </Alert>
-      )}
+          {error && (
+            <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
+              {error}
+            </Alert>
+          )}
 
-      <Card sx={{ mb: 2 }}>
-        <CardContent>
-          <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mb: 2 }}>
+          <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
             <TextField
               size="small"
               label="Search by name"
@@ -731,33 +732,35 @@ const ExperimentsManagement: React.FC = () => {
               aria-label={mineFilter ? 'Filter: my experiments (click to clear)' : 'Show only my experiments'}
             />
           </Box>
-          {loading ? (
-            <Box display="flex" justifyContent="center" py={4}>
-              <CircularProgress />
-            </Box>
-          ) : (
-            <DataGrid
-              rows={filteredExperiments}
-              columns={columns}
-              pageSizeOptions={[10, 25, 50, 100]}
-              initialState={{
-                pagination: { paginationModel: { pageSize: pagination.size } },
-              }}
-              paginationMode="server"
-              rowCount={pagination.total}
-              paginationModel={{
-                page: pagination.page - 1,
-                pageSize: pagination.size,
-              }}
-              onPaginationModelChange={(model) =>
-                setPagination((p) => ({ ...p, page: model.page + 1, size: model.pageSize }))
-              }
-              autoHeight
-              disableRowSelectionOnClick
-            />
-          )}
-        </CardContent>
-      </Card>
+        </>
+      }
+    >
+      {loading ? (
+        <Box display="flex" justifyContent="center" alignItems="center" flex={1}>
+          <CircularProgress />
+        </Box>
+      ) : (
+        <FillHeightTable>
+          <DataGrid
+            rows={filteredExperiments}
+            columns={columns}
+            pageSizeOptions={[10, 25, 50, 100]}
+            initialState={{
+              pagination: { paginationModel: { pageSize: pagination.size } },
+            }}
+            paginationMode="server"
+            rowCount={pagination.total}
+            paginationModel={{
+              page: pagination.page - 1,
+              pageSize: pagination.size,
+            }}
+            onPaginationModelChange={(model) =>
+              setPagination((p) => ({ ...p, page: model.page + 1, size: model.pageSize }))
+            }
+            disableRowSelectionOnClick
+          />
+        </FillHeightTable>
+      )}
 
       <Dialog open={showCreateDialog} onClose={() => !createLoading && setShowCreateDialog(false)} maxWidth="sm" fullWidth>
         <DialogTitle>New Experiment</DialogTitle>
@@ -820,7 +823,7 @@ const ExperimentsManagement: React.FC = () => {
           </Button>
         </DialogActions>
       </Dialog>
-    </Box>
+    </FillHeightPage>
   );
 };
 

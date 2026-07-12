@@ -22,6 +22,7 @@ import Tooltip from '@mui/material/Tooltip';
 import { DataGrid, GridColDef, GridActionsCellItem, GridRowParams } from '@mui/x-data-grid';
 import { useUser } from '../../contexts/UserContext';
 import { apiService } from '../../services/apiService';
+import { FillHeightPage, FillHeightTable } from '../../components/common/FillHeightPage';
 
 export interface WorkflowTemplateRow {
   id: string;
@@ -305,39 +306,42 @@ const WorkflowTemplatesManagement: React.FC = () => {
   }
 
   return (
-    <Box sx={{ p: 2 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2, mb: 2 }}>
-        <Typography variant="h5">Workflow Templates</Typography>
-        {canEdit && (
-          <Button variant="contained" startIcon={<Add />} onClick={handleOpenCreate}>
-            Add Template
-          </Button>
-        )}
-      </Box>
+    <FillHeightPage
+      header={
+        <>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2, mb: 2 }}>
+            <Typography variant="h5">Workflow Templates</Typography>
+            {canEdit && (
+              <Button variant="contained" startIcon={<Add />} onClick={handleOpenCreate}>
+                Add Template
+              </Button>
+            )}
+          </Box>
 
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
-          {error}
-        </Alert>
-      )}
-
+          {error && (
+            <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
+              {error}
+            </Alert>
+          )}
+        </>
+      }
+    >
       {loading ? (
-        <Box display="flex" justifyContent="center" alignItems="center" minHeight={400}>
+        <Box display="flex" justifyContent="center" alignItems="center" flex={1}>
           <CircularProgress />
         </Box>
       ) : (
-        <Box sx={{ width: '100%' }}>
+        <FillHeightTable>
           <DataGrid
             rows={rows}
             columns={columns}
             getRowId={(row) => row.id}
             pageSizeOptions={[10, 25, 50]}
-            initialState={{ pagination: { paginationModel: { pageSize: 25 } } }}
+            initialState={{ pagination: { paginationModel: { page: 0, pageSize: 25 } } }}
             disableRowSelectionOnClick
-            autoHeight
             slots={{
               noRowsOverlay: () => (
-                <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', minHeight: 160 }}>
+                <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
                   <Typography>No workflow templates. Create one to get started.</Typography>
                 </Box>
               ),
@@ -346,7 +350,7 @@ const WorkflowTemplatesManagement: React.FC = () => {
               '& .MuiDataGrid-cell': { fontSize: theme.typography.body2.fontSize },
             }}
           />
-        </Box>
+        </FillHeightTable>
       )}
 
       {/* Create/Edit Dialog with JSON editor (monospace TextField; can be replaced by Monaco/CodeMirror) */}
@@ -477,7 +481,7 @@ const WorkflowTemplatesManagement: React.FC = () => {
           </Tooltip>
         </DialogActions>
       </Dialog>
-    </Box>
+    </FillHeightPage>
   );
 };
 

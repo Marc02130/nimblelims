@@ -29,6 +29,7 @@ import {
 import { DataGrid, GridColDef, GridActionsCellItem, GridRowParams } from '@mui/x-data-grid';
 import { useUser } from '../../contexts/UserContext';
 import { apiService } from '../../services/apiService';
+import { FillHeightPage, FillHeightTable } from '../../components/common/FillHeightPage';
 import UserFormDialog from './UserFormDialog';
 
 interface User {
@@ -265,77 +266,81 @@ const UsersManagement: React.FC = () => {
   }
 
   return (
-    <Box>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h4">Users Management</Typography>
-        {canEdit && (
-          <Button
-            variant="contained"
-            startIcon={<Add />}
-            onClick={() => {
-              setSelectedUser(null);
-              setFormOpen(true);
-            }}
-          >
-            Create User
-          </Button>
-        )}
-      </Box>
+    <FillHeightPage
+      header={
+        <>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+            <Typography variant="h4">Users Management</Typography>
+            {canEdit && (
+              <Button
+                variant="contained"
+                startIcon={<Add />}
+                onClick={() => {
+                  setSelectedUser(null);
+                  setFormOpen(true);
+                }}
+              >
+                Create User
+              </Button>
+            )}
+          </Box>
 
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
-          {error}
-        </Alert>
-      )}
+          {error && (
+            <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
+              {error}
+            </Alert>
+          )}
 
-      <Box sx={{ mb: 2, display: 'flex', gap: 2, alignItems: 'center' }}>
-        <TextField
-          sx={{ flex: 1 }}
-          placeholder="Search users..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <Search />
-              </InputAdornment>
-            ),
-            endAdornment: searchTerm && (
-              <InputAdornment position="end">
-                <IconButton size="small" onClick={() => setSearchTerm('')}>
-                  <Clear />
-                </IconButton>
-              </InputAdornment>
-            ),
-          }}
-        />
-        <FormControlLabel
-          control={
-            <Switch
-              checked={showInactive}
-              onChange={(e) => setShowInactive(e.target.checked)}
-              color="primary"
+          <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+            <TextField
+              sx={{ flex: 1 }}
+              size="small"
+              placeholder="Search users..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <Search />
+                  </InputAdornment>
+                ),
+                endAdornment: searchTerm && (
+                  <InputAdornment position="end">
+                    <IconButton size="small" onClick={() => setSearchTerm('')}>
+                      <Clear />
+                    </IconButton>
+                  </InputAdornment>
+                ),
+              }}
             />
-          }
-          label="Show inactive"
-        />
-      </Box>
-
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={showInactive}
+                  onChange={(e) => setShowInactive(e.target.checked)}
+                  color="primary"
+                />
+              }
+              label="Show inactive"
+            />
+          </Box>
+        </>
+      }
+    >
       {loading ? (
-        <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
+        <Box display="flex" justifyContent="center" alignItems="center" flex={1}>
           <CircularProgress />
         </Box>
       ) : (
-        <Box sx={{ width: '100%' }}>
+        <FillHeightTable>
           <DataGrid
             rows={filteredUsers}
-            autoHeight
             columns={columns}
             getRowId={(row) => row.id}
             pageSizeOptions={[10, 25, 50]}
             initialState={{
               pagination: {
-                paginationModel: { page: 0, pageSize: 10 },
+                paginationModel: { page: 0, pageSize: 25 },
               },
             }}
             disableRowSelectionOnClick
@@ -347,10 +352,9 @@ const UsersManagement: React.FC = () => {
               ),
             }}
           />
-        </Box>
+        </FillHeightTable>
       )}
 
-      {/* User Form Dialog */}
       <UserFormDialog
         open={formOpen}
         user={selectedUser}
@@ -366,7 +370,6 @@ const UsersManagement: React.FC = () => {
         onSubmit={selectedUser ? handleUpdate : handleCreate}
       />
 
-      {/* Delete Confirmation Dialog */}
       <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)}>
         <DialogTitle>Confirm Delete</DialogTitle>
         <DialogContent>
@@ -384,7 +387,7 @@ const UsersManagement: React.FC = () => {
           </Button>
         </DialogActions>
       </Dialog>
-    </Box>
+    </FillHeightPage>
   );
 };
 

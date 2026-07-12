@@ -24,6 +24,7 @@ import {
 import { DataGrid, GridColDef, GridActionsCellItem, GridRowParams } from '@mui/x-data-grid';
 import { useUser } from '../../contexts/UserContext';
 import { apiService } from '../../services/apiService';
+import { FillHeightPage, FillHeightTable } from '../../components/common/FillHeightPage';
 import ListFormDialog from './ListFormDialog';
 import EntryFormDialog from './EntryFormDialog';
 import { slugToDisplayName } from '../../utils/listUtils';
@@ -374,61 +375,66 @@ const ListsAdmin: React.FC = () => {
 
   if (selectedList) {
     return (
-      <Box>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-          <Button
-            startIcon={<ArrowBack />}
-            onClick={() => {
-              setSelectedList(null);
-              setSelectedEntry(null);
-            }}
-            size="small"
-          >
-            Back to lists
-          </Button>
-        </Box>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-          <Typography variant="h5">
-            Entries: {slugToDisplayName(selectedList.name)}
-          </Typography>
-          {canEdit && (
-            <Button
-              variant="contained"
-              startIcon={<Add />}
-              onClick={() => {
-                setSelectedEntry(null);
-                setEntryFormOpen(true);
-              }}
-            >
-              Add Entry
-            </Button>
-          )}
-        </Box>
+      <FillHeightPage
+        header={
+          <>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+              <Button
+                startIcon={<ArrowBack />}
+                onClick={() => {
+                  setSelectedList(null);
+                  setSelectedEntry(null);
+                }}
+                size="small"
+              >
+                Back to lists
+              </Button>
+            </Box>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+              <Typography variant="h5">
+                Entries: {slugToDisplayName(selectedList.name)}
+              </Typography>
+              {canEdit && (
+                <Button
+                  variant="contained"
+                  startIcon={<Add />}
+                  onClick={() => {
+                    setSelectedEntry(null);
+                    setEntryFormOpen(true);
+                  }}
+                >
+                  Add Entry
+                </Button>
+              )}
+            </Box>
 
-        {error && (
-          <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
-            {error}
-          </Alert>
-        )}
-
+            {error && (
+              <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
+                {error}
+              </Alert>
+            )}
+          </>
+        }
+      >
         {selectedList.entries.length === 0 ? (
-          <Typography color="text.secondary" sx={{ py: 4, textAlign: 'center' }}>
-            No entries in this list. {canEdit && 'Click "Add Entry" to create one.'}
-          </Typography>
+          <Box display="flex" justifyContent="center" alignItems="center" flex={1}>
+            <Typography color="text.secondary" sx={{ textAlign: 'center' }}>
+              No entries in this list. {canEdit && 'Click "Add Entry" to create one.'}
+            </Typography>
+          </Box>
         ) : (
-          <Box sx={{ width: '100%' }}>
+          <FillHeightTable>
             <DataGrid
               rows={selectedList.entries}
-              autoHeight
               columns={entryColumns}
               getRowId={(row) => row.id}
               pageSizeOptions={[10, 25, 50]}
               initialState={{
-                pagination: { paginationModel: { page: 0, pageSize: 10 } },
+                pagination: { paginationModel: { page: 0, pageSize: 25 } },
               }}
               disableRowSelectionOnClick
             />
-          </Box>
+          </FillHeightTable>
         )}
 
         <EntryFormDialog
@@ -463,48 +469,51 @@ const ListsAdmin: React.FC = () => {
             {snackbar.message}
           </AlertComponent>
         </Snackbar>
-      </Box>
+      </FillHeightPage>
     );
   }
 
   return (
-    <Box>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h4">Lists</Typography>
-        {canEdit && (
-          <Button
-            variant="contained"
-            startIcon={<Add />}
-            onClick={() => {
-              setListFormList(null);
-              setListFormOpen(true);
-            }}
-          >
-            Create List
-          </Button>
-        )}
-      </Box>
+    <FillHeightPage
+      header={
+        <>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+            <Typography variant="h4">Lists</Typography>
+            {canEdit && (
+              <Button
+                variant="contained"
+                startIcon={<Add />}
+                onClick={() => {
+                  setListFormList(null);
+                  setListFormOpen(true);
+                }}
+              >
+                Create List
+              </Button>
+            )}
+          </Box>
 
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
-          {error}
-        </Alert>
-      )}
-
+          {error && (
+            <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
+              {error}
+            </Alert>
+          )}
+        </>
+      }
+    >
       {loading ? (
-        <Box display="flex" justifyContent="center" alignItems="center" minHeight={400}>
+        <Box display="flex" justifyContent="center" alignItems="center" flex={1}>
           <CircularProgress />
         </Box>
       ) : (
-        <Box sx={{ width: '100%' }}>
+        <FillHeightTable>
           <DataGrid
             rows={lists}
-            autoHeight
             columns={listColumns}
             getRowId={(row) => row.id}
             pageSizeOptions={[10, 25, 50]}
             initialState={{
-              pagination: { paginationModel: { page: 0, pageSize: 10 } },
+              pagination: { paginationModel: { page: 0, pageSize: 25 } },
             }}
             disableRowSelectionOnClick
             onRowClick={(params) => openEntriesForList(params.row as List)}
@@ -526,7 +535,7 @@ const ListsAdmin: React.FC = () => {
               ),
             }}
           />
-        </Box>
+        </FillHeightTable>
       )}
 
       <ListFormDialog
@@ -563,7 +572,7 @@ const ListsAdmin: React.FC = () => {
           {snackbar.message}
         </AlertComponent>
       </Snackbar>
-    </Box>
+    </FillHeightPage>
   );
 };
 

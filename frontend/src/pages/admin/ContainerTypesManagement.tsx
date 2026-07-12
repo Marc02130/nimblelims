@@ -24,6 +24,7 @@ import {
 import { DataGrid, GridColDef, GridActionsCellItem, GridRowParams } from '@mui/x-data-grid';
 import { useUser } from '../../contexts/UserContext';
 import { apiService } from '../../services/apiService';
+import { FillHeightPage, FillHeightTable } from '../../components/common/FillHeightPage';
 import ContainerTypeForm from './ContainerTypeForm';
 
 interface ContainerType {
@@ -214,67 +215,69 @@ const ContainerTypesManagement: React.FC = () => {
   }
 
   return (
-    <Box>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h4">Container Types Management</Typography>
-        {canEdit && (
-          <Button
-            variant="contained"
-            startIcon={<Add />}
-            onClick={() => {
-              setSelectedContainerType(null);
-              setFormOpen(true);
+    <FillHeightPage
+      header={
+        <>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+            <Typography variant="h4">Container Types Management</Typography>
+            {canEdit && (
+              <Button
+                variant="contained"
+                startIcon={<Add />}
+                onClick={() => {
+                  setSelectedContainerType(null);
+                  setFormOpen(true);
+                }}
+              >
+                Create Container Type
+              </Button>
+            )}
+          </Box>
+
+          {error && (
+            <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
+              {error}
+            </Alert>
+          )}
+
+          <TextField
+            fullWidth
+            size="small"
+            placeholder="Search container types..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <Search />
+                </InputAdornment>
+              ),
+              endAdornment: searchTerm && (
+                <InputAdornment position="end">
+                  <IconButton size="small" onClick={() => setSearchTerm('')}>
+                    <Clear />
+                  </IconButton>
+                </InputAdornment>
+              ),
             }}
-          >
-            Create Container Type
-          </Button>
-        )}
-      </Box>
-
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
-          {error}
-        </Alert>
-      )}
-
-      <Box sx={{ mb: 2 }}>
-        <TextField
-          fullWidth
-          placeholder="Search container types..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <Search />
-              </InputAdornment>
-            ),
-            endAdornment: searchTerm && (
-              <InputAdornment position="end">
-                <IconButton size="small" onClick={() => setSearchTerm('')}>
-                  <Clear />
-                </IconButton>
-              </InputAdornment>
-            ),
-          }}
-        />
-      </Box>
-
+          />
+        </>
+      }
+    >
       {loading ? (
-        <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
+        <Box display="flex" justifyContent="center" alignItems="center" flex={1}>
           <CircularProgress />
         </Box>
       ) : (
-        <Box sx={{ width: '100%' }}>
+        <FillHeightTable>
           <DataGrid
             rows={filteredContainerTypes}
-            autoHeight
             columns={columns}
             getRowId={(row) => row.id}
             pageSizeOptions={[10, 25, 50]}
             initialState={{
               pagination: {
-                paginationModel: { page: 0, pageSize: 10 },
+                paginationModel: { page: 0, pageSize: 25 },
               },
             }}
             disableRowSelectionOnClick
@@ -286,10 +289,9 @@ const ContainerTypesManagement: React.FC = () => {
               ),
             }}
           />
-        </Box>
+        </FillHeightTable>
       )}
 
-      {/* Container Type Form Dialog */}
       <ContainerTypeForm
         open={formOpen}
         containerType={selectedContainerType}
@@ -301,7 +303,6 @@ const ContainerTypesManagement: React.FC = () => {
         onSubmit={selectedContainerType ? handleUpdate : handleCreate}
       />
 
-      {/* Delete Confirmation Dialog */}
       <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)}>
         <DialogTitle>Confirm Delete</DialogTitle>
         <DialogContent>
@@ -319,7 +320,7 @@ const ContainerTypesManagement: React.FC = () => {
           </Button>
         </DialogActions>
       </Dialog>
-    </Box>
+    </FillHeightPage>
   );
 };
 

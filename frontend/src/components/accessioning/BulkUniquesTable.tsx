@@ -216,23 +216,25 @@ const BulkUniquesTable: React.FC<BulkUniquesTableProps> = ({
         </Paper>
       </Box>
 
-      <DataGrid
-        rows={uniques}
-        columns={columns}
-        getRowId={(row) => row.id}
-        processRowUpdate={handleProcessRowUpdate}
-        onProcessRowUpdateError={(error) => {
-          console.error('Row update error:', error);
-        }}
-        autoHeight
-        disableRowSelectionOnClick
-        sx={{
-          '& .MuiDataGrid-cell': {
-            display: 'flex',
-            alignItems: 'center',
-          },
-        }}
-      />
+      <Box sx={{ height: 360, width: '100%' }}>
+        <DataGrid
+          rows={uniques}
+          columns={columns}
+          getRowId={(row) => row.id}
+          processRowUpdate={handleProcessRowUpdate}
+          onProcessRowUpdateError={(error) => {
+            console.error('Row update error:', error);
+          }}
+          disableRowSelectionOnClick
+          sx={{
+            height: '100%',
+            '& .MuiDataGrid-cell': {
+              display: 'flex',
+              alignItems: 'center',
+            },
+          }}
+        />
+      </Box>
     </Box>
   );
 };

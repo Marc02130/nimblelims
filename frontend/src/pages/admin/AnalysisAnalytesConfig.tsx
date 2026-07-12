@@ -27,6 +27,7 @@ import {
 import { DataGrid, GridColDef, GridActionsCellItem, GridRowParams } from '@mui/x-data-grid';
 import { useUser } from '../../contexts/UserContext';
 import { apiService, ApiService } from '../../services/apiService';
+import { FillHeightPage, FillHeightTable } from '../../components/common/FillHeightPage';
 import AnalyteRuleForm from './AnalyteRuleForm';
 
 interface AnalyteRule {
@@ -265,15 +266,7 @@ const AnalysisAnalytesConfig: React.FC = () => {
     );
   }
 
-  if (loading) {
-    return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
-        <CircularProgress />
-      </Box>
-    );
-  }
-
-  if (!analysis) {
+  if (!loading && !analysis) {
     return (
       <Box>
         <Alert severity="error">Analysis not found</Alert>
@@ -282,87 +275,94 @@ const AnalysisAnalytesConfig: React.FC = () => {
   }
 
   return (
-    <Box>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Box>
-          <Button
-            startIcon={<ArrowBack />}
-            onClick={() => navigate('/admin/analyses')}
-            sx={{ mb: 1 }}
-          >
-            Back to Analyses
-          </Button>
-          <Typography variant="h4">
-            Configure Analytes: {analysis.name}
-          </Typography>
-        </Box>
-        {canEdit && (
-          <Button
-            variant="contained"
-            startIcon={<Add />}
-            onClick={() => {
-              setSelectedRule(null);
-              setFormOpen(true);
-            }}
-          >
-            Add Analyte Rule
-          </Button>
-        )}
-      </Box>
+    <FillHeightPage
+      header={
+        <>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+            <Box>
+              <Button
+                startIcon={<ArrowBack />}
+                onClick={() => navigate('/admin/analyses')}
+                sx={{ mb: 1 }}
+              >
+                Back to Analyses
+              </Button>
+              <Typography variant="h4">
+                Configure Analytes: {analysis?.name || '…'}
+              </Typography>
+            </Box>
+            {canEdit && (
+              <Button
+                variant="contained"
+                startIcon={<Add />}
+                onClick={() => {
+                  setSelectedRule(null);
+                  setFormOpen(true);
+                }}
+              >
+                Add Analyte Rule
+              </Button>
+            )}
+          </Box>
 
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
-          {error}
-        </Alert>
+          {error && (
+            <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
+              {error}
+            </Alert>
+          )}
+
+          <TextField
+            fullWidth
+            size="small"
+            placeholder="Search analytes, data types, or reported names..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <Search />
+                </InputAdornment>
+              ),
+              endAdornment: searchTerm && (
+                <InputAdornment position="end">
+                  <IconButton size="small" onClick={() => setSearchTerm('')}>
+                    <Clear />
+                  </IconButton>
+                </InputAdornment>
+              ),
+            }}
+          />
+        </>
+      }
+    >
+      {loading ? (
+        <Box display="flex" justifyContent="center" alignItems="center" flex={1}>
+          <CircularProgress />
+        </Box>
+      ) : (
+        <FillHeightTable>
+          <DataGrid
+            rows={filteredRules}
+            columns={columns}
+            getRowId={(row) => row.analyte_id}
+            pageSizeOptions={[10, 25, 50]}
+            initialState={{
+              pagination: {
+                paginationModel: { page: 0, pageSize: 25 },
+              },
+            }}
+            disableRowSelectionOnClick
+            slots={{
+              noRowsOverlay: () => (
+                <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+                  <Typography>No analyte rules configured</Typography>
+                </Box>
+              ),
+            }}
+          />
+        </FillHeightTable>
       )}
 
-      <Box sx={{ mb: 2 }}>
-        <TextField
-          fullWidth
-          placeholder="Search analytes, data types, or reported names..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <Search />
-              </InputAdornment>
-            ),
-            endAdornment: searchTerm && (
-              <InputAdornment position="end">
-                <IconButton size="small" onClick={() => setSearchTerm('')}>
-                  <Clear />
-                </IconButton>
-              </InputAdornment>
-            ),
-          }}
-        />
-      </Box>
-
-      <Box sx={{ width: '100%' }}>
-        <DataGrid
-          rows={filteredRules}
-          autoHeight
-          columns={columns}
-          getRowId={(row) => row.analyte_id}
-          pageSizeOptions={[10, 25, 50]}
-          initialState={{
-            pagination: {
-              paginationModel: { page: 0, pageSize: 10 },
-            },
-          }}
-          disableRowSelectionOnClick
-          slots={{
-            noRowsOverlay: () => (
-              <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
-                <Typography>No analyte rules configured</Typography>
-              </Box>
-            ),
-          }}
-        />
-      </Box>
-
-      {/* Analyte Rule Form Dialog */}
       <AnalyteRuleForm
         open={formOpen}
         analysisId={analysisId || ''}
@@ -376,7 +376,6 @@ const AnalysisAnalytesConfig: React.FC = () => {
         onSubmit={selectedRule ? handleUpdate : handleCreate}
       />
 
-      {/* Delete Confirmation Dialog */}
       <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)}>
         <DialogTitle>Confirm Delete</DialogTitle>
         <DialogContent>
@@ -394,7 +393,7 @@ const AnalysisAnalytesConfig: React.FC = () => {
           </Button>
         </DialogActions>
       </Dialog>
-    </Box>
+    </FillHeightPage>
   );
 };
 

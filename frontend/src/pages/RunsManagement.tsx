@@ -3,8 +3,6 @@ import {
   Box,
   Typography,
   Button,
-  Card,
-  CardContent,
   Alert,
   CircularProgress,
   Chip,
@@ -22,6 +20,7 @@ import { DataGrid, GridColDef, GridActionsCellItem } from '@mui/x-data-grid';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import { useNavigate } from 'react-router-dom';
 import { apiService } from '../services/apiService';
+import { FillHeightPage, FillHeightTable } from '../components/common/FillHeightPage';
 
 const apiErrorMsg = (err: any, fallback: string): string => {
   const detail = err?.response?.data?.detail;
@@ -179,23 +178,23 @@ const RunsManagement: React.FC = () => {
   ];
 
   return (
-    <Box sx={{ p: 3 }}>
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-        <Typography variant="h4">Experiment Runs</Typography>
-        <Button variant="contained" onClick={() => setShowCreate(true)}>
-          New Run
-        </Button>
-      </Box>
+    <FillHeightPage
+      header={
+        <>
+          <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+            <Typography variant="h4">Experiment Runs</Typography>
+            <Button variant="contained" onClick={() => setShowCreate(true)}>
+              New Run
+            </Button>
+          </Box>
 
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
-          {error}
-        </Alert>
-      )}
+          {error && (
+            <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
+              {error}
+            </Alert>
+          )}
 
-      <Card sx={{ mb: 2 }}>
-        <CardContent>
-          <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mb: 2 }}>
+          <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
             <TextField
               size="small"
               label="Search by name"
@@ -215,29 +214,31 @@ const RunsManagement: React.FC = () => {
               </Select>
             </FormControl>
           </Box>
-          {loading ? (
-            <Box display="flex" justifyContent="center" py={4}>
-              <CircularProgress />
-            </Box>
-          ) : (
-            <DataGrid
-              rows={filtered}
-              columns={columns}
-              pageSizeOptions={[10, 25, 50]}
-              paginationMode="server"
-              rowCount={pagination.total}
-              paginationModel={{ page: pagination.page - 1, pageSize: pagination.size }}
-              onPaginationModelChange={(m) =>
-                setPagination((p) => ({ ...p, page: m.page + 1, size: m.pageSize }))
-              }
-              autoHeight
-              disableRowSelectionOnClick
-              onRowClick={(params) => navigate(`/runs/${params.id}`)}
-              sx={{ cursor: 'pointer' }}
-            />
-          )}
-        </CardContent>
-      </Card>
+        </>
+      }
+    >
+      {loading ? (
+        <Box display="flex" justifyContent="center" alignItems="center" flex={1}>
+          <CircularProgress />
+        </Box>
+      ) : (
+        <FillHeightTable>
+          <DataGrid
+            rows={filtered}
+            columns={columns}
+            pageSizeOptions={[10, 25, 50, 100]}
+            paginationMode="server"
+            rowCount={pagination.total}
+            paginationModel={{ page: pagination.page - 1, pageSize: pagination.size }}
+            onPaginationModelChange={(m) =>
+              setPagination((p) => ({ ...p, page: m.page + 1, size: m.pageSize }))
+            }
+            disableRowSelectionOnClick
+            onRowClick={(params) => navigate(`/runs/${params.id}`)}
+            sx={{ cursor: 'pointer' }}
+          />
+        </FillHeightTable>
+      )}
 
       <Dialog open={showCreate} onClose={() => !creating && setShowCreate(false)} maxWidth="sm" fullWidth>
         <DialogTitle>New Experiment Run</DialogTitle>
@@ -305,7 +306,7 @@ const RunsManagement: React.FC = () => {
           </Button>
         </DialogActions>
       </Dialog>
-    </Box>
+    </FillHeightPage>
   );
 };
 

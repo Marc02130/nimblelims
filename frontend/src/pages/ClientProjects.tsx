@@ -31,6 +31,7 @@ import { DataGrid, GridColDef, GridActionsCellItem, GridRowParams } from '@mui/x
 import { useUser } from '../contexts/UserContext';
 import { apiService, addClientFilterIfNeeded } from '../services/apiService';
 import ClientProjectForm from '../components/client-projects/ClientProjectForm';
+import { FillHeightPage, FillHeightTable } from '../components/common/FillHeightPage';
 
 interface Client {
   id: string;
@@ -61,7 +62,7 @@ const ClientProjects: React.FC = () => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<ClientProject | null>(null);
   const [viewMode, setViewMode] = useState(false);
-  const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 10 });
+  const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 25 });
   const [total, setTotal] = useState(0);
 
   const canManage = hasPermission('project:manage');
@@ -280,94 +281,99 @@ const ClientProjects: React.FC = () => {
   }
 
   return (
-    <Box>
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-        <Typography variant="h4">Client Projects</Typography>
-        {canManage && (
-          <Button
-            variant="contained"
-            startIcon={<Add />}
-            onClick={() => {
-              setSelectedClientProject(null);
-              setFormOpen(true);
-            }}
-          >
-            Create Client Project
-          </Button>
-        )}
-      </Box>
+    <FillHeightPage
+      header={
+        <>
+          <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+            <Typography variant="h4">Client Projects</Typography>
+            {canManage && (
+              <Button
+                variant="contained"
+                startIcon={<Add />}
+                onClick={() => {
+                  setSelectedClientProject(null);
+                  setFormOpen(true);
+                }}
+              >
+                Create Client Project
+              </Button>
+            )}
+          </Box>
 
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
-          {error}
-        </Alert>
-      )}
+          {error && (
+            <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
+              {error}
+            </Alert>
+          )}
 
-      <Box mb={2} display="flex" gap={2}>
-        <TextField
-          fullWidth
-          size="small"
-          placeholder="Search by name, description, or client..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <Search />
-              </InputAdornment>
-            ),
-            endAdornment: searchTerm && (
-              <InputAdornment position="end">
-                <IconButton size="small" onClick={() => setSearchTerm('')}>
-                  <Clear />
-                </IconButton>
-              </InputAdornment>
-            ),
-          }}
-        />
-        <FormControl size="small" sx={{ minWidth: 200 }}>
-          <InputLabel>Filter by Client</InputLabel>
-          <Select
-            value={clientFilter}
-            onChange={(e) => {
-              setClientFilter(e.target.value);
-              setPaginationModel({ page: 0, pageSize: paginationModel.pageSize });
-            }}
-            label="Filter by Client"
-          >
-            <MenuItem value="">All Clients</MenuItem>
-            {clients.map((client) => (
-              <MenuItem key={client.id} value={client.id}>
-                {client.name}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-      </Box>
-
+          <Box display="flex" gap={2}>
+            <TextField
+              fullWidth
+              size="small"
+              placeholder="Search by name, description, or client..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <Search />
+                  </InputAdornment>
+                ),
+                endAdornment: searchTerm && (
+                  <InputAdornment position="end">
+                    <IconButton size="small" onClick={() => setSearchTerm('')}>
+                      <Clear />
+                    </IconButton>
+                  </InputAdornment>
+                ),
+              }}
+            />
+            <FormControl size="small" sx={{ minWidth: 200 }}>
+              <InputLabel>Filter by Client</InputLabel>
+              <Select
+                value={clientFilter}
+                onChange={(e) => {
+                  setClientFilter(e.target.value);
+                  setPaginationModel({ page: 0, pageSize: paginationModel.pageSize });
+                }}
+                label="Filter by Client"
+              >
+                <MenuItem value="">All Clients</MenuItem>
+                {clients.map((client) => (
+                  <MenuItem key={client.id} value={client.id}>
+                    {client.name}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Box>
+        </>
+      }
+    >
       {loading ? (
-        <Box display="flex" justifyContent="center" p={3}>
+        <Box display="flex" justifyContent="center" alignItems="center" flex={1}>
           <CircularProgress />
         </Box>
       ) : (
-        <DataGrid
-          rows={filteredClientProjects}
-          columns={columns}
-          getRowId={(row) => row.id}
-          autoHeight
-          disableRowSelectionOnClick
-          paginationModel={paginationModel}
-          onPaginationModelChange={setPaginationModel}
-          pageSizeOptions={[10, 25, 50, 100]}
-          rowCount={total}
-          paginationMode="server"
-          sx={{
-            '& .MuiDataGrid-cell': {
-              display: 'flex',
-              alignItems: 'center',
-            },
-          }}
-        />
+        <FillHeightTable>
+          <DataGrid
+            rows={filteredClientProjects}
+            columns={columns}
+            getRowId={(row) => row.id}
+            disableRowSelectionOnClick
+            paginationModel={paginationModel}
+            onPaginationModelChange={setPaginationModel}
+            pageSizeOptions={[10, 25, 50, 100]}
+            rowCount={total}
+            paginationMode="server"
+            sx={{
+              '& .MuiDataGrid-cell': {
+                display: 'flex',
+                alignItems: 'center',
+              },
+            }}
+          />
+        </FillHeightTable>
       )}
 
       <ClientProjectForm
@@ -397,7 +403,7 @@ const ClientProjects: React.FC = () => {
           </Button>
         </DialogActions>
       </Dialog>
-    </Box>
+    </FillHeightPage>
   );
 };
 

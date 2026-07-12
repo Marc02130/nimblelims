@@ -30,6 +30,7 @@ import {
 import { DataGrid, GridColDef, GridActionsCellItem, GridRowParams } from '@mui/x-data-grid';
 import { useUser } from '../../contexts/UserContext';
 import { apiService } from '../../services/apiService';
+import { FillHeightPage, FillHeightTable } from '../../components/common/FillHeightPage';
 import HelpEntryDialog from '../../components/admin/HelpEntryDialog';
 
 interface HelpEntry {
@@ -62,7 +63,7 @@ const HelpManagement: React.FC = () => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<HelpEntry | null>(null);
   const [page, setPage] = useState(0);
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(25);
   const [total, setTotal] = useState(0);
 
   const canEdit = hasPermission('config:edit');
@@ -276,100 +277,103 @@ const HelpManagement: React.FC = () => {
   }
 
   return (
-    <Box>
-      <Box
-        sx={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          mb: 3,
-          flexDirection: isMobile ? 'column' : 'row',
-          gap: 2,
-        }}
-      >
-        <Typography variant="h4">Help Management</Typography>
-        {canEdit && (
-          <Button
-            variant="contained"
-            startIcon={<Add />}
-            onClick={() => {
-              setSelectedEntry(null);
-              setFormOpen(true);
+    <FillHeightPage
+      header={
+        <>
+          <Box
+            sx={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              mb: 2,
+              flexDirection: isMobile ? 'column' : 'row',
+              gap: 2,
             }}
           >
-            Create Help Entry
-          </Button>
-        )}
-      </Box>
+            <Typography variant="h4">Help Management</Typography>
+            {canEdit && (
+              <Button
+                variant="contained"
+                startIcon={<Add />}
+                onClick={() => {
+                  setSelectedEntry(null);
+                  setFormOpen(true);
+                }}
+              >
+                Create Help Entry
+              </Button>
+            )}
+          </Box>
 
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
-          {error}
-        </Alert>
-      )}
+          {error && (
+            <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
+              {error}
+            </Alert>
+          )}
 
-      <Box
-        sx={{
-          mb: 2,
-          display: 'flex',
-          gap: 2,
-          flexDirection: isMobile ? 'column' : 'row',
-        }}
-      >
-        <TextField
-          fullWidth={isMobile}
-          sx={{ flex: isMobile ? 1 : 2 }}
-          placeholder="Search by section or content..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <Search />
-              </InputAdornment>
-            ),
-            endAdornment: searchTerm && (
-              <InputAdornment position="end">
-                <IconButton size="small" onClick={() => setSearchTerm('')}>
-                  <Clear />
-                </IconButton>
-              </InputAdornment>
-            ),
-          }}
-        />
-        <FormControl sx={{ minWidth: isMobile ? '100%' : 200 }}>
-          <InputLabel>Filter by Role</InputLabel>
-          <Select
-            value={roleFilter}
-            label="Filter by Role"
-            onChange={(e) => {
-              setRoleFilter(e.target.value);
-              setPage(0);
+          <Box
+            sx={{
+              display: 'flex',
+              gap: 2,
+              flexDirection: isMobile ? 'column' : 'row',
             }}
           >
-            <MenuItem value="">All Roles</MenuItem>
-            {roles.map((role) => {
-              const roleSlug = role.name.toLowerCase().replace(' ', '-');
-              return (
-                <MenuItem key={role.id} value={roleSlug}>
-                  {role.name}
-                </MenuItem>
-              );
-            })}
-            <MenuItem value="null">Public (No Role)</MenuItem>
-          </Select>
-        </FormControl>
-      </Box>
-
+            <TextField
+              fullWidth={isMobile}
+              size="small"
+              sx={{ flex: isMobile ? 1 : 2 }}
+              placeholder="Search by section or content..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <Search />
+                  </InputAdornment>
+                ),
+                endAdornment: searchTerm && (
+                  <InputAdornment position="end">
+                    <IconButton size="small" onClick={() => setSearchTerm('')}>
+                      <Clear />
+                    </IconButton>
+                  </InputAdornment>
+                ),
+              }}
+            />
+            <FormControl size="small" sx={{ minWidth: isMobile ? '100%' : 200 }}>
+              <InputLabel>Filter by Role</InputLabel>
+              <Select
+                value={roleFilter}
+                label="Filter by Role"
+                onChange={(e) => {
+                  setRoleFilter(e.target.value);
+                  setPage(0);
+                }}
+              >
+                <MenuItem value="">All Roles</MenuItem>
+                {roles.map((role) => {
+                  const roleSlug = role.name.toLowerCase().replace(' ', '-');
+                  return (
+                    <MenuItem key={role.id} value={roleSlug}>
+                      {role.name}
+                    </MenuItem>
+                  );
+                })}
+                <MenuItem value="null">Public (No Role)</MenuItem>
+              </Select>
+            </FormControl>
+          </Box>
+        </>
+      }
+    >
       {loading ? (
-        <Box display="flex" justifyContent="center" alignItems="center" minHeight={400}>
+        <Box display="flex" justifyContent="center" alignItems="center" flex={1}>
           <CircularProgress />
         </Box>
       ) : (
-        <Box sx={{ width: '100%' }}>
+        <FillHeightTable>
           <DataGrid
             rows={filteredEntries}
-            autoHeight
             columns={columns}
             getRowId={(row) => row.id}
             pageSizeOptions={[10, 25, 50]}
@@ -387,7 +391,7 @@ const HelpManagement: React.FC = () => {
               },
             }}
           />
-        </Box>
+        </FillHeightTable>
       )}
 
       <HelpEntryDialog
@@ -419,7 +423,7 @@ const HelpManagement: React.FC = () => {
           </Button>
         </DialogActions>
       </Dialog>
-    </Box>
+    </FillHeightPage>
   );
 };
 

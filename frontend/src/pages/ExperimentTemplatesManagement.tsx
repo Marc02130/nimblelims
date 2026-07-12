@@ -35,6 +35,7 @@ import LinearProgress from '@mui/material/LinearProgress';
 import { DataGrid, GridColDef, GridActionsCellItem, GridRowParams } from '@mui/x-data-grid';
 import { useUser } from '../contexts/UserContext';
 import { apiService } from '../services/apiService';
+import { FillHeightPage, FillHeightTable } from '../components/common/FillHeightPage';
 
 const apiErrorMsg = (err: any, fallback: string): string => {
   const detail = err?.response?.data?.detail;
@@ -654,44 +655,45 @@ const ExperimentTemplatesManagement: React.FC = () => {
     pendingReviewSteps.length > 0 && pendingReviewSteps.every((s) => signoffConfirmed.has(s.step));
 
   return (
-    <Box sx={{ p: 2 }}>
-      {/* Header */}
-      <Box
-        sx={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          flexWrap: 'wrap',
-          gap: 2,
-          mb: 2,
-        }}
-      >
-        <Typography variant="h5">Experiment Templates</Typography>
-        {canManage && (
-          <Box sx={{ display: 'flex', gap: 1 }}>
-            <Button variant="contained" startIcon={<Upload />} onClick={openSopUpload}>
-              Upload SOP
-            </Button>
-            <Button variant="outlined" startIcon={<Add />} onClick={openCreate}>
-              New Template
-            </Button>
+    <FillHeightPage
+      header={
+        <>
+          <Box
+            sx={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: 2,
+            }}
+          >
+            <Typography variant="h5">Experiment Templates</Typography>
+            {canManage && (
+              <Box sx={{ display: 'flex', gap: 1 }}>
+                <Button variant="contained" startIcon={<Upload />} onClick={openSopUpload}>
+                  Upload SOP
+                </Button>
+                <Button variant="outlined" startIcon={<Add />} onClick={openCreate}>
+                  New Template
+                </Button>
+              </Box>
+            )}
           </Box>
-        )}
-      </Box>
 
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
-          {error}
-        </Alert>
-      )}
-
-      {/* List */}
+          {error && (
+            <Alert severity="error" sx={{ mt: 2 }} onClose={() => setError(null)}>
+              {error}
+            </Alert>
+          )}
+        </>
+      }
+    >
       {loading ? (
-        <Box display="flex" justifyContent="center" alignItems="center" minHeight={400}>
+        <Box display="flex" justifyContent="center" alignItems="center" flex={1}>
           <CircularProgress />
         </Box>
       ) : (
-        <Box sx={{ width: '100%' }}>
+        <FillHeightTable>
           <DataGrid
             rows={rows}
             columns={columns}
@@ -699,7 +701,6 @@ const ExperimentTemplatesManagement: React.FC = () => {
             pageSizeOptions={[10, 25, 50]}
             initialState={{ pagination: { paginationModel: { pageSize: 25 } } }}
             disableRowSelectionOnClick
-            autoHeight
             slots={{
               noRowsOverlay: () => (
                 <Box
@@ -708,7 +709,6 @@ const ExperimentTemplatesManagement: React.FC = () => {
                     justifyContent: 'center',
                     alignItems: 'center',
                     height: '100%',
-                    minHeight: 160,
                   }}
                 >
                   <Typography>No experiment templates yet. Create one to get started.</Typography>
@@ -717,7 +717,7 @@ const ExperimentTemplatesManagement: React.FC = () => {
             }}
             sx={{ '& .MuiDataGrid-cell': { fontSize: theme.typography.body2.fontSize } }}
           />
-        </Box>
+        </FillHeightTable>
       )}
 
       {/* ── Create/Edit Dialog ───────────────────────────────────────────── */}
@@ -1254,7 +1254,7 @@ const ExperimentTemplatesManagement: React.FC = () => {
           </Button>
         </DialogActions>
       </Dialog>
-    </Box>
+    </FillHeightPage>
   );
 };
 

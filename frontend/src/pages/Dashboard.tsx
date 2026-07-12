@@ -16,6 +16,7 @@ import {
 import { DataGrid, GridColDef } from '@mui/x-data-grid';
 import { useUser } from '../contexts/UserContext';
 import { apiService } from '../services/apiService';
+import { FillHeightPage, FillHeightTable } from '../components/common/FillHeightPage';
 
 interface Sample {
   id: string;
@@ -193,99 +194,92 @@ const Dashboard: React.FC = () => {
     },
   ];
 
-  if (loading && samples.length === 0) {
-    return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
-        <CircularProgress />
-      </Box>
-    );
-  }
-
   return (
-    <Box>
-      <Typography variant="h4" gutterBottom>
-        Dashboard
-      </Typography>
-      
-      <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-        Welcome, {user?.username}. Manage your samples and track their progress.
-      </Typography>
+    <FillHeightPage
+      header={
+        <>
+          <Typography variant="h4" gutterBottom>
+            Dashboard
+          </Typography>
 
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }}>
-          {error}
-        </Alert>
-      )}
+          <Typography variant="body1" color="text.secondary" sx={{ mb: 2 }}>
+            Welcome, {user?.username}. Manage your samples and track their progress.
+          </Typography>
 
-      {/* Summary Cards */}
-      <Grid container spacing={3} sx={{ mb: 3 }}>
-        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-          <Card>
-            <CardContent>
-              <Typography color="text.secondary" gutterBottom>
-                Total Samples
-              </Typography>
-              <Typography variant="h4">
-                {samples.length}
-              </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-        
-        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-          <Card>
-            <CardContent>
-              <Typography color="text.secondary" gutterBottom>
-                In Progress
-              </Typography>
-              <Typography variant="h4">
-                {samples.filter(s => 
-                  getLookupName(s.status, lookupData.statuses) === 'Available for Testing' ||
-                  getLookupName(s.status, lookupData.statuses) === 'Testing Complete'
-                ).length}
-              </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-        
-        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-          <Card>
-            <CardContent>
-              <Typography color="text.secondary" gutterBottom>
-                Completed
-              </Typography>
-              <Typography variant="h4">
-                {samples.filter(s => 
-                  getLookupName(s.status, lookupData.statuses) === 'Reported'
-                ).length}
-              </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-        
-        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-          <Card>
-            <CardContent>
-              <Typography color="text.secondary" gutterBottom>
-                Total Tests
-              </Typography>
-              <Typography variant="h4">
-                {samples.reduce((total, sample) => total + (sample.tests?.length || 0), 0)}
-              </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-      </Grid>
+          {error && (
+            <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
+              {error}
+            </Alert>
+          )}
 
-      {/* Filters */}
-      <Card sx={{ mb: 3 }}>
-        <CardContent>
+          {/* Summary Cards */}
+          <Grid container spacing={2} sx={{ mb: 2 }}>
+            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+              <Card>
+                <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
+                  <Typography color="text.secondary" gutterBottom variant="body2">
+                    Total Samples
+                  </Typography>
+                  <Typography variant="h5">
+                    {samples.length}
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+
+            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+              <Card>
+                <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
+                  <Typography color="text.secondary" gutterBottom variant="body2">
+                    In Progress
+                  </Typography>
+                  <Typography variant="h5">
+                    {samples.filter(s =>
+                      getLookupName(s.status, lookupData.statuses) === 'Available for Testing' ||
+                      getLookupName(s.status, lookupData.statuses) === 'Testing Complete'
+                    ).length}
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+
+            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+              <Card>
+                <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
+                  <Typography color="text.secondary" gutterBottom variant="body2">
+                    Completed
+                  </Typography>
+                  <Typography variant="h5">
+                    {samples.filter(s =>
+                      getLookupName(s.status, lookupData.statuses) === 'Reported'
+                    ).length}
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+
+            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+              <Card>
+                <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
+                  <Typography color="text.secondary" gutterBottom variant="body2">
+                    Total Tests
+                  </Typography>
+                  <Typography variant="h5">
+                    {samples.reduce((total, sample) => total + (sample.tests?.length || 0), 0)}
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+          </Grid>
+
+          {/* Filters */}
           <Grid container spacing={2} alignItems="center">
             <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-              <FormControl fullWidth>
+              <FormControl fullWidth size="small">
                 <InputLabel>Status</InputLabel>
                 <Select
                   value={filters.status}
+                  label="Status"
                   onChange={(e) => setFilters({ ...filters, status: e.target.value })}
                 >
                   <MenuItem value="">All Statuses</MenuItem>
@@ -297,12 +291,13 @@ const Dashboard: React.FC = () => {
                 </Select>
               </FormControl>
             </Grid>
-            
+
             <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-              <FormControl fullWidth>
+              <FormControl fullWidth size="small">
                 <InputLabel>Project</InputLabel>
                 <Select
                   value={filters.project_id}
+                  label="Project"
                   onChange={(e) => setFilters({ ...filters, project_id: e.target.value })}
                 >
                   <MenuItem value="">All Projects</MenuItem>
@@ -315,28 +310,30 @@ const Dashboard: React.FC = () => {
               </FormControl>
             </Grid>
           </Grid>
-        </CardContent>
-      </Card>
-
-      {/* Samples Table */}
-      <Card>
-        <CardContent>
+        </>
+      }
+    >
+      {loading && samples.length === 0 ? (
+        <Box display="flex" justifyContent="center" alignItems="center" flex={1}>
+          <CircularProgress />
+        </Box>
+      ) : (
+        <FillHeightTable>
           <DataGrid
             rows={samples}
             columns={columns}
             loading={loading}
-            pageSizeOptions={[10, 25, 50]}
+            pageSizeOptions={[10, 25, 50, 100]}
             initialState={{
               pagination: {
-                paginationModel: { page: 0, pageSize: 10 },
+                paginationModel: { page: 0, pageSize: 25 },
               },
             }}
-            sx={{ width: '100%' }}
-            autoHeight
+            disableRowSelectionOnClick
           />
-        </CardContent>
-      </Card>
-    </Box>
+        </FillHeightTable>
+      )}
+    </FillHeightPage>
   );
 };
 

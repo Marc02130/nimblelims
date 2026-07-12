@@ -552,10 +552,9 @@ const BatchResultsEntryTable: React.FC<BatchResultsEntryTableProps> = ({
 
       <Card>
         <CardContent>
-          <Box sx={{ width: '100%' }}>
+          <Box sx={{ width: '100%', minHeight: 400, height: '40vh' }}>
             <DataGrid
               rows={rows}
-              autoHeight
               columns={columns}
               pageSizeOptions={[10, 25, 50, 100]}
               initialState={{
@@ -568,6 +567,7 @@ const BatchResultsEntryTable: React.FC<BatchResultsEntryTableProps> = ({
                 return isQCSample(test.sample) ? 'qc-row' : '';
               }}
               sx={{
+                height: '100%',
                 '& .qc-row': {
                   backgroundColor: 'warning.light',
                   '&:hover': {

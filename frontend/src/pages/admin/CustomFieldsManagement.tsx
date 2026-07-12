@@ -32,6 +32,7 @@ import Tooltip from '@mui/material/Tooltip';
 import { DataGrid, GridColDef, GridActionsCellItem, GridRowParams } from '@mui/x-data-grid';
 import { useUser } from '../../contexts/UserContext';
 import { apiService } from '../../services/apiService';
+import { FillHeightPage, FillHeightTable } from '../../components/common/FillHeightPage';
 import CustomFieldDialog from '../../components/admin/CustomFieldDialog';
 
 interface CustomAttributeConfig {
@@ -563,108 +564,116 @@ const CustomFieldsManagement: React.FC = () => {
   }
 
   return (
-    <Box>
-      <Box
-        sx={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          mb: 3,
-          flexDirection: isMobile ? 'column' : 'row',
-          gap: 2,
-        }}
-      >
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Typography variant="h4">Field Management</Typography>
-          <Tooltip title="Edit help: Use config:edit permission to manage help entries in Help Management">
-            <Typography variant="caption" color="text.secondary" sx={{ cursor: 'help' }}>
-              (EAV)
-            </Typography>
-          </Tooltip>
-        </Box>
-        {canEdit && (
-          <Button
-            variant="contained"
-            startIcon={<Add />}
-            onClick={() => {
-              setSelectedConfig(null);
-              setFormOpen(true);
+    <FillHeightPage
+      header={
+        <>
+          <Box
+            sx={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              mb: 2,
+              flexDirection: isMobile ? 'column' : 'row',
+              gap: 2,
             }}
           >
-            Create Custom Field
-          </Button>
-        )}
-      </Box>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Typography variant="h4">Field Management</Typography>
+              <Tooltip title="Edit help: Use config:edit permission to manage help entries in Help Management">
+                <Typography variant="caption" color="text.secondary" sx={{ cursor: 'help' }}>
+                  (EAV)
+                </Typography>
+              </Tooltip>
+            </Box>
+            {canEdit && (
+              <Button
+                variant="contained"
+                startIcon={<Add />}
+                onClick={() => {
+                  setSelectedConfig(null);
+                  setFormOpen(true);
+                }}
+              >
+                Create Custom Field
+              </Button>
+            )}
+          </Box>
 
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
-          {error}
-        </Alert>
-      )}
+          {error && (
+            <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
+              {error}
+            </Alert>
+          )}
 
-      <Box
-        sx={{
-          mb: 2,
-          display: 'flex',
-          gap: 2,
-          flexDirection: isMobile ? 'column' : 'row',
-        }}
-      >
-        <TextField
-          fullWidth={isMobile}
-          sx={{ flex: isMobile ? 1 : 2 }}
-          placeholder="Search by attribute name or description..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <Search />
-              </InputAdornment>
-            ),
-            endAdornment: searchTerm && (
-              <InputAdornment position="end">
-                <IconButton size="small" onClick={() => setSearchTerm('')}>
-                  <Clear />
-                </IconButton>
-              </InputAdornment>
-            ),
-          }}
-        />
-        <FormControl sx={{ minWidth: isMobile ? '100%' : 200 }}>
-          <InputLabel>Entity Type</InputLabel>
-          <Select
-            value={entityTypeFilter}
-            label="Entity Type"
-            onChange={(e) => {
-              setEntityTypeFilter(e.target.value);
-              setPage(0);
+          <Box
+            sx={{
+              display: 'flex',
+              gap: 2,
+              flexDirection: isMobile ? 'column' : 'row',
             }}
           >
-            <MenuItem value="">All</MenuItem>
-            {ENTITY_TYPES.map((type) => (
-              <MenuItem key={type} value={type}>
-                {type}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-      </Box>
-
+            <TextField
+              fullWidth={isMobile}
+              size="small"
+              sx={{ flex: isMobile ? 1 : 2 }}
+              placeholder="Search by attribute name or description..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <Search />
+                  </InputAdornment>
+                ),
+                endAdornment: searchTerm && (
+                  <InputAdornment position="end">
+                    <IconButton size="small" onClick={() => setSearchTerm('')}>
+                      <Clear />
+                    </IconButton>
+                  </InputAdornment>
+                ),
+              }}
+            />
+            <FormControl size="small" sx={{ minWidth: isMobile ? '100%' : 200 }}>
+              <InputLabel>Entity Type</InputLabel>
+              <Select
+                value={entityTypeFilter}
+                label="Entity Type"
+                onChange={(e) => {
+                  setEntityTypeFilter(e.target.value);
+                  setPage(0);
+                }}
+              >
+                <MenuItem value="">All</MenuItem>
+                {ENTITY_TYPES.map((type) => (
+                  <MenuItem key={type} value={type}>
+                    {type}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Box>
+        </>
+      }
+    >
       {loading ? (
-        <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
+        <Box display="flex" justifyContent="center" alignItems="center" flex={1}>
           <CircularProgress />
         </Box>
       ) : (
-        <Box sx={{ width: '100%' }}>
+        <FillHeightTable>
           <DataGrid
             rows={filteredFields}
-            autoHeight
             columns={columns}
             getRowId={(row) => row.id}
             pageSizeOptions={[10, 25, 50]}
             // Client-side pagination for the unified OOB + Custom view (OOB are in-memory)
             paginationMode="client"
+            initialState={{
+              pagination: {
+                paginationModel: { page: 0, pageSize: 25 },
+              },
+            }}
             disableRowSelectionOnClick
             slots={{
               noRowsOverlay: () => (
@@ -681,10 +690,9 @@ const CustomFieldsManagement: React.FC = () => {
               ),
             }}
           />
-        </Box>
+        </FillHeightTable>
       )}
 
-      {/* Custom Field Form Dialog */}
       <CustomFieldDialog
         open={formOpen}
         config={selectedConfig}
@@ -699,7 +707,6 @@ const CustomFieldsManagement: React.FC = () => {
         onSubmit={selectedConfig ? handleUpdate : handleCreate}
       />
 
-      {/* Delete Confirmation Dialog */}
       <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)}>
         <DialogTitle>Confirm Delete</DialogTitle>
         <DialogContent>
@@ -719,7 +726,7 @@ const CustomFieldsManagement: React.FC = () => {
           </Button>
         </DialogActions>
       </Dialog>
-    </Box>
+    </FillHeightPage>
   );
 };
 
