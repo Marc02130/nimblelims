@@ -23,8 +23,12 @@ Do not implement a phase until questions that **block** that phase are **Decided
 | # | Question | Status | Blocks | Decision | Date | Owner | Rationale |
 |---|----------|--------|--------|----------|------|-------|-----------|
 | **1** | How do we ensure AI-generated `parser_config` JSONB is **standardized** and works with the **code framework** that runs parsers? | **Open** (proposed approach below) | P2 AI setup; schema freeze for P1 | See **Decision #1 (proposed)** | 2026-07-12 | Architecture | Single schema + validate before save; AI must emit that schema only |
-| **10** | How is **user testing** built into parser creation (example files + test files + edge cases)? | **Decided (provisional)** | P1 framework dry-run; P2 AI edge suggestions | See **Decision #10** | 2026-07-12 | Product | Setup quality gate before parser is trusted for production imports |
-| 2 | Instrument = named instance vs type? | **Open** | P0 catalog | _Suggested:_ named source/instance (or named export stream) | | Product | CRO exports are streams more than asset types |
+| **10** | How is **user testing** built into parser creation (example files + test files + edge cases)? | **Decided** (CEO confirmed) | P1 framework dry-run; P2 AI edge suggestions | See **Decision #10** | 2026-07-12 | Product / CEO | Results correctness is core LIMS value; multi-file + edges required |
+| **11** | Parser scope: analysis-only vs analysis×instrument/CRO? | **Decided** | Whole feature | **Analysis + instrument** or **analysis + CRO** only—not analysis alone | 2026-07-12 | CEO | Formats/names vary by instrument (model/vendor) and CRO; analysis-only is unmaintainable |
+| **12** | AI on every import vs setup-only? | **Decided** | Whole feature / P2 | **Setup only.** Instrument/CRO consistency → one parser, many cheap imports | 2026-07-12 | CEO | Minimize AI cost; deterministic day-to-day import |
+| **13** | MVP phase cut and priority? | **Decided** | Roadmap | **P0+P1 MVP (high priority)**; P2 after P0+P1; result import is expected (manual entry not OK as primary path) | 2026-07-12 | CEO | Modern LIMS table stakes |
+| **14** | Resolve open questions before implementation? | **Decided** | Process | **Yes** — blocking questions resolved before implementation starts | 2026-07-12 | CEO | Aligns with development-process gate |
+| 2 | Instrument catalog grain: instance vs model/vendor? | **Open** (CEO input) | P0 catalog | Formats vary by **model/vendor**; catalog should support naming that reflects that (e.g. name + vendor/model fields). Exact grain TBD. | 2026-07-12 | Product | CEO: model/vendor drive format variance |
 | 3 | Permission for parser / instrument / CRO CRUD? | **Open** | P0–P1 | _Suggested:_ `config:edit` | | Product | Align with other lab config |
 | 4 | Allow override to a parser for a **different** analysis than the run? | **Open** | P1 UI/API | _Suggested:_ block (or warn+block) | | Product | Promote uses run.analysis_id |
 | 5 | Snapshot `parser_config` on first import? | **Open** / lean defer | P3 | _Suggested:_ FK only for MVP | | Architecture | Lineage via parser_id enough if edits audited |
@@ -166,12 +170,14 @@ Optional: **dry-run** against the sample file after validate—engine runs `pars
 
 ## Decision #10 — Parser creation includes multi-file **user testing** in the framework
 
-**Status:** **Decided (provisional)** · **Date:** 2026-07-12 · **Owner:** Product  
+**Status:** **Decided** (CEO confirmed 2026-07-12) · **Owner:** Product / CEO  
 **Blocks:** P1 (engine dry-run harness); P2 (AI edge-test suggestions)
 
 ### Intent
 
 Creating/editing a parser is not only “upload one sample and hope.” The framework must support **guided validation** so the lab trusts the config before it is used on real LimsRuns.
+
+**CEO:** Results are why NimbleLIMS exists; multiple tests and edge cases are required for **correct** import—not optional polish.
 
 ### Decided rules
 
@@ -234,11 +240,46 @@ Given column stats from examples/tests (types, min/max, null rate, sample of val
 
 | Field | Value |
 |-------|--------|
-| **Status** | **Decided (provisional)** |
+| **Status** | **Decided** (CEO confirmed) |
 | **Example files** | 1+ |
-| **Test files** | 1+; engine-run; activate after ≥1 clean pass (provisional) |
+| **Test files** | 1+; engine-run; activate after ≥1 clean pass (provisional detail #10a–c) |
 | **AI edge suggestions** | Yes on setup (P2); human accept; engine executes |
 | **Date** | 2026-07-12 |
+
+---
+
+## Decision #11 — Scope parsers by analysis × instrument or analysis × CRO
+
+**Status:** **Decided** · **Date:** 2026-07-12 · **Owner:** CEO  
+
+| Rule | Detail |
+|------|--------|
+| Lab | Parser keyed by **analysis + instrument** |
+| CRO | Parser keyed by **analysis + CRO source** |
+| Forbidden | Parser keyed by **analysis alone** (must handle all instruments/CROs → unmaintainable) |
+| Run tracking | Store instrument XOR CRO + `parser_id` so import lineage matches scope key |
+
+**Rationale:** File format and column names vary by instrument model/vendor and by CRO data systems.
+
+---
+
+## Decision #12 — AI setup-only (economics)
+
+**Status:** **Decided** · **Date:** 2026-07-12 · **Owner:** CEO  
+
+Instruments and CROs emit **consistent** files. Create parser once (optionally with AI assist in P2); **never** use AI to parse every result file. Minimizes cost and keeps import deterministic.
+
+---
+
+## Decision #13 — MVP and priority
+
+**Status:** **Decided** · **Date:** 2026-07-12 · **Owner:** CEO  
+
+| Item | Decision |
+|------|----------|
+| MVP | **P0 + P1** |
+| P2 | After P0+P1 complete |
+| Priority | **High** — result import is expected; primary reliance on manual entry is not acceptable for modern LIMS |
 
 ---
 
@@ -246,10 +287,12 @@ Given column stats from examples/tests (types, min/max, null rate, sample of val
 
 | Phase | Scope | Open blockers |
 |-------|--------|---------------|
-| **P0** | Instrument + CRO catalogs | Q2, Q3, Q7 |
-| **P1** | Parser scoped analysis×source; run FKs; import by `parser_id`; **example+test file dry-run harness** | Q1 schema freeze (core fields), Q4, Q6, Q8, Q9; **#10a–c** for product polish |
-| **P2** | AI draft config + **AI edge-test suggestions** | **Q1 fully locked** + Security P2 + #10d |
+| **P0** | Instrument + CRO catalogs | Q2 (catalog grain), Q3, Q7 |
+| **P1** | Parser scoped analysis×source; run FKs; import by `parser_id`; **example+test file dry-run harness** | Q1 schema freeze (core fields), Q4, Q6, Q8, Q9; **#10a–c** for activate/retention polish |
+| **P2** | AI draft config + **AI edge-test suggestions** | **Q1 fully locked** + Security P2 + #10d; **P0+P1 done** |
 | **P3** | Snapshot, formats, SOP bridge | Q5 |
+
+**CEO:** Resolve open questions **before implementation starts**. Architecture, security, and UI reviews still outstanding.
 
 ---
 

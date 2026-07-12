@@ -120,12 +120,12 @@ Long-form tech designs stay in [design/](design/). UI review was previously `ui-
 - [security-review/run-results.md](security-review/run-results.md)
 - [open-questions/run-results.md](open-questions/run-results.md)
 
-## Reviews (data parsers / LimsRun import) — **in flight (tech sketch ready)**
+## Reviews (data parsers / LimsRun import) — **CEO Accept; other reviews open**
 
 - **Requirements:** [requirements/data-parsers-lims-runs.md](requirements/data-parsers-lims-runs.md)
 - **Tech sketch:** [tech-sketch/data-parsers-lims-runs.md](tech-sketch/data-parsers-lims-runs.md)
 - **Open questions:** [open-questions/data-parsers-lims-runs.md](open-questions/data-parsers-lims-runs.md)
-- [ceo-review/data-parsers-lims-runs.md](ceo-review/data-parsers-lims-runs.md)
+- [ceo-review/data-parsers-lims-runs.md](ceo-review/data-parsers-lims-runs.md) — **Accept** (high priority, P0+P1 MVP)
 - [security-review/data-parsers-lims-runs.md](security-review/data-parsers-lims-runs.md)
 - [architecture-review/data-parsers-lims-runs.md](architecture-review/data-parsers-lims-runs.md)
 - [ui-review/data-parsers-lims-runs.md](ui-review/data-parsers-lims-runs.md)

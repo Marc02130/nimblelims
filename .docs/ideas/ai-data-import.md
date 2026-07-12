@@ -1,6 +1,6 @@
 # Idea: Parser setup (analysis + instrument/CRO) with optional AI assist
 
-**Status:** **In review** — requirements + tech sketch submitted  
+**Status:** **In review** — **CEO Accept** (high priority, P0+P1 MVP); Security · Architecture · UI outstanding  
 **Date:** 2026-07-12  
 **Requirements:** [../requirements/data-parsers-lims-runs.md](../requirements/data-parsers-lims-runs.md)  
 **Tech sketch:** [../tech-sketch/data-parsers-lims-runs.md](../tech-sketch/data-parsers-lims-runs.md)  
