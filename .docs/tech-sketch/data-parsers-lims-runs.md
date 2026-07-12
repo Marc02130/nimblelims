@@ -77,6 +77,10 @@ ParserSetupService
 
 ## 4. Data model
 
+> **Authoritative schema delta for architecture / migrations:**  
+> [`.docs/schema-changes/data-parsers-lims-runs.md`](../schema-changes/data-parsers-lims-runs.md)  
+> Sections below are a summary; if they disagree with that file, **schema-changes wins**—update both.
+
 ### 4.1 New tables
 
 ```sql
