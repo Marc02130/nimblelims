@@ -33,6 +33,7 @@ Get run data into a **structured format** for easy querying, reporting, and use�
 |-------|----------|
 | **When** | Write results on **publish**, only if run has **`analysis_id`** |
 | **Opt-in** | **`lims_runs.analysis_id`** + UI analysis list — not a separate promote flag |
+| **Start guard** | If no analysis at **run start**, **warn** (no Tests/Results on publish) and offer associate / create analysis / continue without |
 | **What** | **`raw_result`** (calculated deferred) on tests for that analysis |
 | **Map** | JSONB column → analyte (name + **aliases** + optional template map) → value |
 | **Shape** | Multi-analyte columns → **many result rows** |

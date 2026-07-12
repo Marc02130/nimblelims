@@ -120,6 +120,23 @@ There is no separate “promote_on_publish” boolean. **Associating the run wit
 - Makes “this run is for this assay” explicit for multi-CRO and multi-analyte panels.  
 - Runs used only for plate QC / dose-response / non-reportable work stay free of forced results by leaving analysis unset.
 
+### UX: warn before run start if no analysis (Decided)
+
+**When:** User attempts to **start the run** (status → `running`, or CRO equivalent start path)—not only at publish.
+
+**If `analysis_id` is null:**
+
+1. **Warn** (blocking or strong confirm):  
+   > Data imported on this run will **not** be written to Tests/Results when published, because no Analysis is associated.
+2. Offer actions (do not dead-end):
+   - **Associate existing analysis** — picker on the run  
+   - **Create analysis** (and analytes as needed) — shortcut into assay setup, then return to run  
+   - **Continue without analysis** — acknowledge non-reportable path (import/publish only; no promote)
+
+**If `analysis_id` is set:** no warning; start proceeds; promote still only on **publish**.
+
+**Rationale:** Catch missing assay setup before instrument work and import, when fix cost is low—not only at publish when the lab expects structured results.
+
 ---
 
 ## Related
