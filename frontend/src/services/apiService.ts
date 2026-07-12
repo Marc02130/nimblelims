@@ -644,6 +644,22 @@ class ApiService {
     return response.data;
   }
 
+  async getAnalyteAliases(analyteId: string) {
+    const response: AxiosResponse = await this.api.get(`/analytes/${analyteId}/aliases`);
+    return response.data;
+  }
+
+  async addAnalyteAlias(analyteId: string, alias: string) {
+    const response: AxiosResponse = await this.api.post(`/analytes/${analyteId}/aliases`, {
+      alias,
+    });
+    return response.data;
+  }
+
+  async deleteAnalyteAlias(analyteId: string, aliasId: string) {
+    await this.api.delete(`/analytes/${analyteId}/aliases/${aliasId}`);
+  }
+
   async deleteAnalyte(id: string) {
     const response: AxiosResponse = await this.api.delete(`/analytes/${id}`);
     return response.data;
@@ -1558,8 +1574,26 @@ class ApiService {
     return response.data;
   }
 
-  async createLimsRun(data: { name: string; description?: string; experiment_template_id: string }) {
+  async createLimsRun(data: {
+    name: string;
+    description?: string;
+    experiment_template_id: string;
+    analysis_id?: string | null;
+  }) {
     const response: AxiosResponse = await this.api.post('/v1/lims-runs', data);
+    return response.data;
+  }
+
+  async updateLimsRun(
+    id: string,
+    data: {
+      name?: string;
+      description?: string;
+      analysis_id?: string | null;
+      clear_analysis?: boolean;
+    },
+  ) {
+    const response: AxiosResponse = await this.api.patch(`/v1/lims-runs/${id}`, data);
     return response.data;
   }
 
@@ -1568,8 +1602,11 @@ class ApiService {
     return response.data;
   }
 
-  async startLimsRun(id: string) {
-    const response: AxiosResponse = await this.api.patch(`/v1/lims-runs/${id}/start`);
+  async startLimsRun(id: string, body?: { acknowledge_no_analysis?: boolean }) {
+    const response: AxiosResponse = await this.api.patch(
+      `/v1/lims-runs/${id}/start`,
+      body ?? {},
+    );
     return response.data;
   }
 

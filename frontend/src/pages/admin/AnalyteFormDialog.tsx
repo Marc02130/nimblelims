@@ -8,9 +8,12 @@ import {
   TextField,
   Box,
   Alert,
+  Typography,
+  Chip,
 } from '@mui/material';
 import { Formik, Form, Field } from 'formik';
 import * as Yup from 'yup';
+import { apiService } from '../../services/apiService';
 
 interface AnalyteFormDialogProps {
   open: boolean;
@@ -18,12 +21,14 @@ interface AnalyteFormDialogProps {
     id: string;
     name: string;
     description?: string;
+    aliases?: string[];
   } | null;
   existingNames: string[];
   onClose: () => void;
   onSubmit: (data: {
     name: string;
     description?: string;
+    aliases?: string[];
   }) => Promise<void>;
 }
 
@@ -33,6 +38,7 @@ const validationSchema = Yup.object({
     .min(2, 'Analyte name must be at least 2 characters')
     .max(255, 'Analyte name must be less than 255 characters'),
   description: Yup.string().max(500, 'Description must be less than 500 characters'),
+  aliasesText: Yup.string(),
 });
 
 const AnalyteFormDialog: React.FC<AnalyteFormDialogProps> = ({
@@ -44,29 +50,56 @@ const AnalyteFormDialog: React.FC<AnalyteFormDialogProps> = ({
 }) => {
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const [loadedAliases, setLoadedAliases] = React.useState<string[]>([]);
 
   const isEdit = !!analyte;
+
+  React.useEffect(() => {
+    if (!open) return;
+    setError(null);
+    if (analyte?.id) {
+      apiService
+        .getAnalyteAliases(analyte.id)
+        .then((rows: any) => {
+          const list = Array.isArray(rows) ? rows.map((r: any) => r.alias) : [];
+          setLoadedAliases(list);
+        })
+        .catch(() => setLoadedAliases(analyte.aliases || []));
+    } else {
+      setLoadedAliases([]);
+    }
+  }, [open, analyte?.id]);
 
   const initialValues = {
     name: analyte?.name || '',
     description: analyte?.description || '',
+    aliasesText: loadedAliases.join('\n'),
   };
 
-  const handleSubmit = async (values: { name: string; description?: string }) => {
+  const handleSubmit = async (values: {
+    name: string;
+    description?: string;
+    aliasesText?: string;
+  }) => {
     setLoading(true);
     setError(null);
 
     try {
-      // Check for uniqueness (excluding current analyte if editing)
-      if (existingNames.includes(values.name) && (!isEdit || values.name !== analyte.name)) {
+      if (existingNames.includes(values.name) && (!isEdit || values.name !== analyte!.name)) {
         setError('An analyte with this name already exists');
         setLoading(false);
         return;
       }
 
+      const aliases = (values.aliasesText || '')
+        .split(/[\n,]+/)
+        .map((s) => s.trim())
+        .filter(Boolean);
+
       await onSubmit({
         name: values.name,
         description: values.description || undefined,
+        aliases,
       });
       onClose();
     } catch (err: any) {
@@ -84,13 +117,13 @@ const AnalyteFormDialog: React.FC<AnalyteFormDialogProps> = ({
         onSubmit={handleSubmit}
         enableReinitialize
       >
-        {({ values, errors, touched, isValid }) => (
+        {({ values, isValid }) => (
           <Form>
             <DialogTitle>{isEdit ? 'Edit Analyte' : 'Create New Analyte'}</DialogTitle>
             <DialogContent>
               {error && (
                 <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
-                  {error}
+                  {typeof error === 'string' ? error : JSON.stringify(error)}
                 </Alert>
               )}
 
@@ -103,7 +136,11 @@ const AnalyteFormDialog: React.FC<AnalyteFormDialogProps> = ({
                       fullWidth
                       required
                       margin="normal"
-                      helperText={meta.touched && meta.error ? meta.error : 'Unique identifier for this analyte'}
+                      helperText={
+                        meta.touched && meta.error
+                          ? meta.error
+                          : 'Canonical name in the catalog (e.g. Ethanol)'
+                      }
                       error={meta.touched && !!meta.error}
                     />
                   )}
@@ -116,13 +153,38 @@ const AnalyteFormDialog: React.FC<AnalyteFormDialogProps> = ({
                       label="Description"
                       fullWidth
                       multiline
-                      rows={3}
+                      rows={2}
                       margin="normal"
-                      helperText={meta.touched && meta.error ? meta.error : 'Optional description for this analyte'}
+                      helperText={meta.touched && meta.error ? meta.error : 'Optional'}
                       error={meta.touched && !!meta.error}
                     />
                   )}
                 </Field>
+
+                <Field name="aliasesText">
+                  {({ field }: any) => (
+                    <TextField
+                      {...field}
+                      label="Aliases (CRO / instrument names)"
+                      fullWidth
+                      multiline
+                      minRows={3}
+                      margin="normal"
+                      placeholder={'EtOH\nC2H5OH\nEthyl alcohol'}
+                      helperText="One per line or comma-separated. Used to match import column headers (exact match, case-insensitive)."
+                    />
+                  )}
+                </Field>
+                {loadedAliases.length > 0 && (
+                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 1 }}>
+                    <Typography variant="caption" color="text.secondary" sx={{ width: '100%' }}>
+                      Current aliases:
+                    </Typography>
+                    {loadedAliases.map((a) => (
+                      <Chip key={a} size="small" label={a} />
+                    ))}
+                  </Box>
+                )}
               </Box>
             </DialogContent>
             <DialogActions>
@@ -141,4 +203,3 @@ const AnalyteFormDialog: React.FC<AnalyteFormDialogProps> = ({
 };
 
 export default AnalyteFormDialog;
-

@@ -24,7 +24,13 @@ class LimsRunRepository:
         self.db = db
 
     def get_by_id(self, run_id: uuid.UUID) -> Optional[LimsRun]:
-        return self.db.query(LimsRun).filter(LimsRun.id == run_id).first()
+        from sqlalchemy.orm import joinedload
+        return (
+            self.db.query(LimsRun)
+            .options(joinedload(LimsRun.experiment_template))
+            .filter(LimsRun.id == run_id)
+            .first()
+        )
 
     def get_by_name(self, name: str) -> Optional[LimsRun]:
         return self.db.query(LimsRun).filter(LimsRun.name == name).first()
@@ -54,16 +60,25 @@ class LimsRunRepository:
         experiment_template_id: uuid.UUID,
         description: Optional[str],
         created_by: Optional[uuid.UUID],
+        analysis_id: Optional[uuid.UUID] = None,
     ) -> LimsRun:
         run = LimsRun(
             name=name,
             description=description,
             experiment_template_id=experiment_template_id,
+            analysis_id=analysis_id,
             status=LimsRunStatus.draft,
             created_by=created_by,
             modified_by=created_by,
         )
         self.db.add(run)
+        return run
+
+    def update_fields(self, run: LimsRun, **kwargs) -> LimsRun:
+        for k, v in kwargs.items():
+            if hasattr(run, k):
+                setattr(run, k, v)
+        self.db.flush()
         return run
 
     def get_by_name_for_client(self, name: str, client_id: uuid.UUID) -> Optional[LimsRun]:

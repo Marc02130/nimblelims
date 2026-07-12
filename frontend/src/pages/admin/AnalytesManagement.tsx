@@ -82,20 +82,55 @@ const AnalytesManagement: React.FC = () => {
     );
   }, [analytes, searchTerm]);
 
+  const syncAliases = async (analyteId: string, desired: string[]) => {
+    const existing: { id: string; alias: string }[] =
+      (await apiService.getAnalyteAliases(analyteId)) || [];
+    const existingMap = new Map(
+      existing.map((e) => [e.alias.toLowerCase(), e]),
+    );
+    const desiredNorm = desired.map((a) => a.trim()).filter(Boolean);
+    const desiredLower = new Set(desiredNorm.map((a) => a.toLowerCase()));
+
+    for (const row of existing) {
+      if (!desiredLower.has(row.alias.toLowerCase())) {
+        await apiService.deleteAnalyteAlias(analyteId, row.id);
+      }
+    }
+    for (const alias of desiredNorm) {
+      if (!existingMap.has(alias.toLowerCase())) {
+        await apiService.addAnalyteAlias(analyteId, alias);
+      }
+    }
+  };
+
   const handleCreate = async (data: {
     name: string;
     description?: string;
+    aliases?: string[];
   }) => {
-    await apiService.createAnalyte(data);
+    const created = await apiService.createAnalyte({
+      name: data.name,
+      description: data.description,
+    });
+    if (data.aliases?.length && created?.id) {
+      await syncAliases(created.id, data.aliases);
+    }
     await loadAnalytes();
   };
 
   const handleUpdate = async (data: {
     name: string;
     description?: string;
+    aliases?: string[];
   }) => {
     if (!selectedAnalyte) return;
-    await apiService.updateAnalyte(selectedAnalyte.id, data);
+    await apiService.updateAnalyte(selectedAnalyte.id, {
+      name: data.name,
+      description: data.description,
+    });
+    if (data.aliases) {
+      await syncAliases(selectedAnalyte.id, data.aliases);
+    }
     await loadAnalytes();
     setSelectedAnalyte(null);
   };

@@ -79,6 +79,27 @@ class LimsRunCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=255)
     description: Optional[str] = None
     experiment_template_id: uuid.UUID
+    analysis_id: Optional[uuid.UUID] = Field(
+        None,
+        description="Analysis for promote-on-publish (tests/results). Null = non-reportable run.",
+    )
+
+
+class LimsRunUpdate(BaseModel):
+    """Partial update for draft (and limited fields later)."""
+    name: Optional[str] = Field(None, min_length=1, max_length=255)
+    description: Optional[str] = None
+    analysis_id: Optional[uuid.UUID] = None
+    # Explicit clear: pass clear_analysis=true to set analysis_id null
+    clear_analysis: bool = False
+
+
+class LimsRunStartRequest(BaseModel):
+    """Optional body for start transition when no analysis is set."""
+    acknowledge_no_analysis: bool = Field(
+        False,
+        description="Required true to start without analysis_id (non-reportable path).",
+    )
 
 
 class LimsRunRead(BaseModel):
@@ -86,6 +107,7 @@ class LimsRunRead(BaseModel):
     name: str
     description: Optional[str]
     experiment_template_id: uuid.UUID
+    analysis_id: Optional[uuid.UUID] = None
     status: LimsRunStatus
     started_at: Optional[datetime]
     completed_at: Optional[datetime]
@@ -94,6 +116,8 @@ class LimsRunRead(BaseModel):
     created_at: datetime
     created_by: Optional[uuid.UUID]
     modified_at: datetime
+    # Convenience for UI lifecycle buttons
+    lifecycle_type: Optional[str] = None
 
     model_config = {"from_attributes": True}
 

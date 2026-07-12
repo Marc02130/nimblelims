@@ -36,6 +36,7 @@ from app.repositories.flexible_experiment_repository import (
 )
 from app.schemas.flexible_experiment import (
     LimsRunCreate,
+    LimsRunUpdate,
     LimsRunDataRow,
     ImportDataResponse,
     LimsRunDataRead,
@@ -89,12 +90,49 @@ class LimsRunService:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"LIMS run '{data.name}' already exists",
             )
+        if data.analysis_id is not None:
+            self._require_analysis(data.analysis_id)
         run = self.run_repo.create(
             name=data.name,
             experiment_template_id=data.experiment_template_id,
             description=data.description,
             created_by=self._user_id(),
+            analysis_id=data.analysis_id,
         )
+        self._commit_refresh(run)
+        return run
+
+    def _require_analysis(self, analysis_id: uuid.UUID) -> None:
+        from models.analysis import Analysis
+        exists = self.db.query(Analysis.id).filter(
+            Analysis.id == analysis_id,
+            Analysis.active == True,  # noqa: E712
+        ).first()
+        if not exists:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Analysis {analysis_id} not found or inactive",
+            )
+
+    def update_run(self, run_id: uuid.UUID, data: LimsRunUpdate) -> LimsRun:
+        run = self.get_run(run_id)
+        kwargs: dict = {"modified_by": self._user_id()}
+        if data.name is not None:
+            other = self.run_repo.get_by_name(data.name)
+            if other and other.id != run_id:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"LIMS run '{data.name}' already exists",
+                )
+            kwargs["name"] = data.name
+        if data.description is not None:
+            kwargs["description"] = data.description
+        if data.clear_analysis:
+            kwargs["analysis_id"] = None
+        elif data.analysis_id is not None:
+            self._require_analysis(data.analysis_id)
+            kwargs["analysis_id"] = data.analysis_id
+        self.run_repo.update_fields(run, **kwargs)
         self._commit_refresh(run)
         return run
 
@@ -145,9 +183,32 @@ class LimsRunService:
         run = self.get_run(run_id)
         return self._transition(run, LimsRunStatus.ordered)
 
-    def start_run(self, run_id: uuid.UUID) -> LimsRun:
-        """draft → running (standard) or ordered → running (CRO)"""
+    def start_run(
+        self,
+        run_id: uuid.UUID,
+        *,
+        acknowledge_no_analysis: bool = False,
+    ) -> LimsRun:
+        """
+        draft → running (standard) or ordered → running (CRO).
+
+        If analysis_id is null and acknowledge_no_analysis is false, raise 400 with
+        a structured detail so the UI can warn and offer associate/create analysis.
+        """
         run = self.get_run(run_id)
+        if run.analysis_id is None and not acknowledge_no_analysis:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={
+                    "code": "analysis_required_ack",
+                    "message": (
+                        "No Analysis is associated with this run. Imported data will not be "
+                        "written to Tests/Results when published. Associate an analysis, "
+                        "create one, or acknowledge to continue without structured results."
+                    ),
+                    "analysis_id": None,
+                },
+            )
         return self._transition(run, LimsRunStatus.running)
 
     def mark_results_received(self, run_id: uuid.UUID) -> LimsRun:

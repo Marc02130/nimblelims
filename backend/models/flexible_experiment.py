@@ -105,6 +105,13 @@ class LimsRun(Base):
         nullable=False,
         index=True,
     )
+    # Opt-in for promote-on-publish: when set, publish writes tests/results for this analysis
+    analysis_id = Column(
+        PostgresUUID(as_uuid=True),
+        ForeignKey('analyses.id', ondelete='SET NULL'),
+        nullable=True,
+        index=True,
+    )
     status = Column(
         SAEnum(LimsRunStatus, name='lims_run_status', create_type=False),
         nullable=False,
@@ -121,6 +128,7 @@ class LimsRun(Base):
     modified_by = Column(PostgresUUID(as_uuid=True), ForeignKey('users.id'), nullable=True)
 
     experiment_template = relationship("ExperimentTemplate")
+    analysis = relationship("Analysis", foreign_keys=[analysis_id])
     data_rows = relationship(
         "LimsRunData",
         back_populates="lims_run",

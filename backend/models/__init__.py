@@ -7,7 +7,7 @@ from .client import Client, Location, Person, PeopleLocation, ContactMethod, Cli
 from .project import Project, ProjectUser
 from .sample import Sample
 from .container import Container, ContainerType, Contents
-from .analysis import Analysis, Analyte, AnalysisAnalyte
+from .analysis import Analysis, Analyte, AnalysisAnalyte, AnalyteAlias
 from .test import Test
 from .test_battery import TestBattery, BatteryAnalysis
 from .result import Result

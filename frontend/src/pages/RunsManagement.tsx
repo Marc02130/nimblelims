@@ -71,12 +71,21 @@ const RunsManagement: React.FC = () => {
   const [createName, setCreateName] = useState('');
   const [createDesc, setCreateDesc] = useState('');
   const [createTemplateId, setCreateTemplateId] = useState('');
+  const [createAnalysisId, setCreateAnalysisId] = useState('');
+  const [analyses, setAnalyses] = useState<{ id: string; name: string }[]>([]);
   const [creating, setCreating] = useState(false);
 
   useEffect(() => {
     apiService
       .getExperimentTemplates({ page: 1, size: 500 })
       .then((res: any) => setTemplates(res?.templates ?? []))
+      .catch(() => {});
+    apiService
+      .getAnalyses({ page: 1, size: 500, active: true })
+      .then((res: any) => {
+        const list = res?.analyses ?? (Array.isArray(res) ? res : []);
+        setAnalyses(list.map((a: any) => ({ id: a.id, name: a.name })));
+      })
       .catch(() => {});
   }, []);
 
@@ -112,11 +121,13 @@ const RunsManagement: React.FC = () => {
         name: createName.trim(),
         description: createDesc.trim() || undefined,
         experiment_template_id: createTemplateId,
+        analysis_id: createAnalysisId || undefined,
       });
       setShowCreate(false);
       setCreateName('');
       setCreateDesc('');
       setCreateTemplateId('');
+      setCreateAnalysisId('');
       navigate(`/runs/${run.id}`);
     } catch (err: any) {
       setError(apiErrorMsg(err, 'Failed to create run'));
@@ -259,6 +270,23 @@ const RunsManagement: React.FC = () => {
               {templates.map((t) => (
                 <MenuItem key={t.id} value={t.id}>
                   {t.name}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          <FormControl fullWidth size="small" sx={{ mt: 2 }}>
+            <InputLabel>Analysis (optional)</InputLabel>
+            <Select
+              value={createAnalysisId}
+              label="Analysis (optional)"
+              onChange={(e) => setCreateAnalysisId(e.target.value)}
+            >
+              <MenuItem value="">
+                <em>None — non-reportable (no Tests/Results on publish)</em>
+              </MenuItem>
+              {analyses.map((a) => (
+                <MenuItem key={a.id} value={a.id}>
+                  {a.name}
                 </MenuItem>
               ))}
             </Select>
