@@ -6,6 +6,7 @@ Decision logs for workstreams that must not proceed until product/architecture q
 |-----|------|
 | [experiments.md](experiments.md) | ELN Processes, Entries, LimsRun boundary |
 | [run-results.md](run-results.md) | LimsRun → structured Results on publish |
+| [data-parsers-lims-runs.md](data-parsers-lims-runs.md) | Parsers (analysis×instrument/CRO), run lineage, AI setup schema |
 
 ## Gate rule
 

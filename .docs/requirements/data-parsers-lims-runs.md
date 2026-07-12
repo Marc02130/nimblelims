@@ -237,14 +237,17 @@ File column  --parser-->  row_data[field_name]  --promote-->  Result(analyte)
 
 ## 9. Open questions (for reviewers)
 
+**Living log:** [`.docs/open-questions/data-parsers-lims-runs.md`](../open-questions/data-parsers-lims-runs.md)
+
 | # | Question | Suggested default |
 |---|----------|-------------------|
-| Q1 | Instrument = named instance vs type? | Named source/instance (or named export stream) |
-| Q2 | Permission for parser CRUD? | `config:edit` |
-| Q3 | Allow override to a parser from a different analysis? | No without strong warning / block |
-| Q4 | Snapshot parser_config on first import? | Defer to P3; FK sufficient for MVP |
-| Q5 | Non-reportable run without analysis: require template parser only? | Yes for MVP |
-| Q6 | Multi-tenant: are instruments global to lab only? | Lab-only, not client-owned |
+| **1** | How is AI/manual `parser_config` kept compatible with the import engine? | **Schema-first:** one Pydantic/JSON Schema; validate all writers; AI emits that schema only; dry-run on sample file |
+| 2 | Instrument = named instance vs type? | Named source/instance (or named export stream) |
+| 3 | Permission for parser CRUD? | `config:edit` |
+| 4 | Allow override to a parser from a different analysis? | No without strong warning / block |
+| 5 | Snapshot parser_config on first import? | Defer to P3; FK sufficient for MVP |
+| 6 | Non-reportable run without analysis: require template parser only? | Yes for MVP |
+| 7 | Multi-tenant: are instruments global to lab only? | Lab-only, not client-owned |
 
 ---
 
