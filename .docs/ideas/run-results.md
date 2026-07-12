@@ -22,7 +22,7 @@ Get run data into a **structured format** for easy querying, reporting, and useâ
 | Doc | Link |
 |-----|------|
 | CEO | [../ceo-review/run-results.md](../ceo-review/run-results.md) |
-| Design | [../design-review/run-results.md](../design-review/run-results.md) |
+| UI | [../ui-review/run-results.md](../ui-review/run-results.md) |
 | Tech | [../design/run-results.md](../design/run-results.md) |
 | Security | [../security-review/run-results.md](../security-review/run-results.md) |
 | Open questions | [../open-questions/run-results.md](../open-questions/run-results.md) |

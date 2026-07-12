@@ -93,4 +93,4 @@ Promoting run data into **structured `results` rows when the run is published** 
 
 ---
 
-Related: [design-review](../design-review/run-results.md) · [tech](../design/run-results.md) · [security](../security-review/run-results.md)
+Related: [ui-review](../ui-review/run-results.md) · [tech](../design/run-results.md) · [security](../security-review/run-results.md)

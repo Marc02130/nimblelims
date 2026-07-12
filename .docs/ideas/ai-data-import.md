@@ -1,7 +1,8 @@
 # Idea: Parser setup (analysis + instrument/CRO) with optional AI assist
 
-**Status:** Product direction locked for scope sketch · not implemented  
-**Date:** 2026-07-12 · updated same day  
+**Status:** **Requirements in review** (CEO · Security · Architecture · UI)  
+**Date:** 2026-07-12  
+**Requirements:** [../requirements/data-parsers-lims-runs.md](../requirements/data-parsers-lims-runs.md)  
 **Related:** [run-results.md](run-results.md), [ai-analyte-resolution.md](ai-analyte-resolution.md), [ai-data-analysis.md](ai-data-analysis.md), [manuals/lims-runs.md](../manuals/lims-runs.md)
 
 ## One-liner

@@ -2,7 +2,7 @@
 
 **Status:** Living decision log  
 **Idea:** [`.docs/ideas/run-results.md`](../ideas/run-results.md)  
-**Reviews:** [CEO](../ceo-review/run-results.md) · [Design](../design-review/run-results.md) · [Tech](../design/run-results.md) · [Security](../security-review/run-results.md)  
+**Reviews:** [CEO](../ceo-review/run-results.md) · [UI](../ui-review/run-results.md) · [Tech](../design/run-results.md) · [Security](../security-review/run-results.md)  
 **Branch:** `run-results`
 
 ## Gate rule

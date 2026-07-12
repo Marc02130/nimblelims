@@ -235,4 +235,4 @@ Implement **publish-gated, transactional promotion** with **analyte aliases** an
 
 ---
 
-Related: [ceo](../ceo-review/run-results.md) · [design-review](../design-review/run-results.md) · [security](../security-review/run-results.md)
+Related: [ceo](../ceo-review/run-results.md) · [ui-review](../ui-review/run-results.md) · [security](../security-review/run-results.md)

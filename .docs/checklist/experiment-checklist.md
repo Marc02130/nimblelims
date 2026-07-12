@@ -153,7 +153,7 @@ Rule: no new phase / major feature until blocking questions for that work are re
 | [design/gap-analysis-…](../design/gap-analysis-process-and-experiment.md) | Gaps |
 | [experiment-rework-prerequisites.md](experiment-rework-prerequisites.md) | Pre-rework issues |
 | [ceo-review/process-and-experiment.md](../ceo-review/process-and-experiment.md) | CEO review |
-| [design-review/process-and-experiment.md](../design-review/process-and-experiment.md) | Design review |
+| [ui-review/process-and-experiment.md](../ui-review/process-and-experiment.md) | UI review |
 | [security-review/process-and-experiment.md](../security-review/process-and-experiment.md) | Security review |
 | [design/experiment-planning.md](../design/experiment-planning.md) | Chunk 1–2 history |
 | [Docs index](../README.md) | Full documentation map |

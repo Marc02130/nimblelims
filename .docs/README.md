@@ -13,7 +13,8 @@ All product and engineering docs live under this directory, organized by purpose
 | [`checklist/`](checklist/) | Implementation checklists (task tracking) |
 | [`open-questions/`](open-questions/) | **Decision logs** — gate new phases/features until blockers are Decided |
 | [`ceo-review/`](ceo-review/) | CEO / product strategy reviews |
-| [`design-review/`](design-review/) | UX / design reviews |
+| [`ui-review/`](ui-review/) | UI / UX reviews (was `ui-review/`) |
+| [`architecture-review/`](architecture-review/) | Architecture reviews of feature packets |
 | [`security-review/`](security-review/) | Security reviews |
 | [`ideas/`](ideas/) | Exploratory notes — not commitments |
 | `private/` | Local-only materials (gitignored) |
@@ -56,6 +57,7 @@ All product and engineering docs live under this directory, organized by purpose
 | [nimblelims-prd.md](requirements/nimblelims-prd.md) | Product requirements (MVP+) |
 | [experiment-processes-entries.md](requirements/experiment-processes-entries.md) | Processes, entries, experiments requirements |
 | [schema-evolution.md](requirements/schema-evolution.md) | FieldDefinitions / schema evolution requirements |
+| [data-parsers-lims-runs.md](requirements/data-parsers-lims-runs.md) | Parsers (analysis×instrument/CRO), run lineage, optional AI setup — **in review** |
 
 ## Design
 
@@ -82,9 +84,14 @@ All product and engineering docs live under this directory, organized by purpose
 
 ## Reviews
 
-- **CEO:** [ceo-review/](ceo-review/) — process/experiment, schema evolution, field management  
-- **Design:** [design-review/](design-review/)  
-- **Security:** [security-review/](security-review/)  
+| Track | Folder |
+|-------|--------|
+| **CEO / product** | [ceo-review/](ceo-review/) |
+| **UI / UX** | [ui-review/](ui-review/) |
+| **Architecture** | [architecture-review/](architecture-review/) |
+| **Security** | [security-review/](security-review/) |
+
+Long-form tech designs stay in [design/](design/). UI review was previously `ui-review/`.
 
 ## Ideas
 
@@ -92,17 +99,25 @@ All product and engineering docs live under this directory, organized by purpose
 |-----|--------|--------|
 | [ideas/run-results.md](ideas/run-results.md) | LimsRun JSONB → Results on **publish** | **Shipped v1** (P0–P4); see reviews + [manuals/lims-runs.md](manuals/lims-runs.md) |
 | [ideas/ai-analyte-resolution.md](ideas/ai-analyte-resolution.md) | AI help when analyte alias list misses | Exploratory follow-on |
-| [ideas/ai-data-import.md](ideas/ai-data-import.md) | Deterministic parsers (analysis+instrument/CRO); AI only for setup from sample file | **Direction sketch** |
+| [ideas/ai-data-import.md](ideas/ai-data-import.md) | Deterministic parsers (analysis+instrument/CRO); AI only for setup | **Requirements in review** |
 | [ideas/ai-data-analysis.md](ideas/ai-data-analysis.md) | AI-assisted query / anomaly / summary of run+result data | **Placeholder** |
 | [ideas/model-fine-tune.md](ideas/model-fine-tune.md) | Model fine-tune notes | See `sop-rag` for related SOP/RAG work |
 
-## Reviews (run-results)
+## Reviews (run-results) — complete
 
 - [ceo-review/run-results.md](ceo-review/run-results.md)
-- [design-review/run-results.md](design-review/run-results.md)
-- [design/run-results.md](design/run-results.md) (tech)
+- [ui-review/run-results.md](ui-review/run-results.md)
+- [design/run-results.md](design/run-results.md) (tech design)
 - [security-review/run-results.md](security-review/run-results.md)
 - [open-questions/run-results.md](open-questions/run-results.md)
+
+## Reviews (data parsers / LimsRun import) — **in flight**
+
+- **Requirements:** [requirements/data-parsers-lims-runs.md](requirements/data-parsers-lims-runs.md)
+- [ceo-review/data-parsers-lims-runs.md](ceo-review/data-parsers-lims-runs.md)
+- [security-review/data-parsers-lims-runs.md](security-review/data-parsers-lims-runs.md)
+- [architecture-review/data-parsers-lims-runs.md](architecture-review/data-parsers-lims-runs.md)
+- [ui-review/data-parsers-lims-runs.md](ui-review/data-parsers-lims-runs.md)
 
 ## Agent / contributor rules
 
