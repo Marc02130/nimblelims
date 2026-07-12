@@ -1,3 +1,4 @@
+import uuid
 from sqlalchemy import Column, String, DateTime, ForeignKey, Boolean, Numeric, Integer
 from sqlalchemy.dialects.postgresql import UUID as PostgresUUID, JSONB
 from sqlalchemy.orm import relationship
@@ -37,9 +38,36 @@ class Analyte(BaseModel):
     analyses = relationship("Analysis", secondary="analysis_analytes", back_populates="analytes")
     results = relationship("Result", back_populates="analyte")
     analysis_analytes = relationship("AnalysisAnalyte", back_populates="analyte")
+    aliases = relationship(
+        "AnalyteAlias",
+        back_populates="analyte",
+        cascade="all, delete-orphan",
+        order_by="AnalyteAlias.alias",
+    )
     default_unit = relationship("Unit", foreign_keys=[units_default])
     creator = relationship("User", foreign_keys="Analyte.created_by", back_populates="created_analytes")
     modifier = relationship("User", foreign_keys="Analyte.modified_by", back_populates="modified_analytes")
+
+
+class AnalyteAlias(Base):
+    """
+    Maintained synonym for instrument/CRO column names (e.g. EtOH, C2H5OH → Ethanol).
+    Matching is exact after lower/trim — not pattern-based.
+    """
+    __tablename__ = 'analyte_aliases'
+
+    id = Column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    analyte_id = Column(
+        PostgresUUID(as_uuid=True),
+        ForeignKey('analytes.id', ondelete='CASCADE'),
+        nullable=False,
+        index=True,
+    )
+    alias = Column(String(255), nullable=False)
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+    created_by = Column(PostgresUUID(as_uuid=True), ForeignKey('users.id'), nullable=True)
+
+    analyte = relationship("Analyte", back_populates="aliases")
 
 
 class AnalysisAnalyte(Base):

@@ -6,22 +6,33 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
 from app.database import get_db
-from models.analysis import Analyte, AnalysisAnalyte
+from models.analysis import Analyte, AnalysisAnalyte, AnalyteAlias
 from models.user import User
 from app.schemas.analyte import (
     AnalyteResponse,
     AnalyteListResponse,
     AnalyteCreate,
     AnalyteUpdate,
+    AnalyteAliasCreate,
+    AnalyteAliasRead,
 )
 from app.core.security import get_current_user, get_user_permissions
 from app.core.rbac import require_any_permission
 from uuid import UUID
+from sqlalchemy.orm import joinedload
+from sqlalchemy import func
 import logging
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+def _alias_strings(analyte: Analyte) -> list:
+    try:
+        return [a.alias for a in (analyte.aliases or [])]
+    except Exception:
+        return []
 
 
 def _build_analyte_response(analyte: Analyte) -> AnalyteResponse:
@@ -39,6 +50,7 @@ def _build_analyte_response(analyte: Analyte) -> AnalyteResponse:
         units_default=analyte.units_default if hasattr(analyte, 'units_default') else None,
         data_type=analyte.data_type if hasattr(analyte, 'data_type') else None,
         custom_attributes=analyte.custom_attributes if hasattr(analyte, 'custom_attributes') and analyte.custom_attributes else {},
+        aliases=_alias_strings(analyte),
     )
 
 
@@ -91,7 +103,13 @@ async def get_analytes(
         
         # Apply pagination
         offset = (page - 1) * size
-        analytes = query.order_by(Analyte.name).offset(offset).limit(size).all()
+        analytes = (
+            query.options(joinedload(Analyte.aliases))
+            .order_by(Analyte.name)
+            .offset(offset)
+            .limit(size)
+            .all()
+        )
         
         # Calculate pages
         pages = (total + size - 1) // size if total > 0 else 0
@@ -125,7 +143,12 @@ async def get_analyte(
     Returns 404 if analyte not found.
     """
     try:
-        analyte = db.query(Analyte).filter(Analyte.id == analyte_id).first()
+        analyte = (
+            db.query(Analyte)
+            .options(joinedload(Analyte.aliases))
+            .filter(Analyte.id == analyte_id)
+            .first()
+        )
         
         if not analyte:
             raise HTTPException(
@@ -142,6 +165,93 @@ async def get_analyte(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to retrieve analyte: {str(e)}"
         )
+
+
+@router.get("/{analyte_id}/aliases", response_model=List[AnalyteAliasRead])
+async def list_analyte_aliases(
+    analyte_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """List maintained instrument/CRO synonyms for an analyte."""
+    analyte = db.query(Analyte).filter(Analyte.id == analyte_id).first()
+    if not analyte:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Analyte not found")
+    rows = (
+        db.query(AnalyteAlias)
+        .filter(AnalyteAlias.analyte_id == analyte_id)
+        .order_by(AnalyteAlias.alias)
+        .all()
+    )
+    return [AnalyteAliasRead.model_validate(r) for r in rows]
+
+
+@router.post(
+    "/{analyte_id}/aliases",
+    response_model=AnalyteAliasRead,
+    status_code=status.HTTP_201_CREATED,
+)
+async def add_analyte_alias(
+    analyte_id: UUID,
+    body: AnalyteAliasCreate,
+    current_user: User = Depends(
+        require_any_permission(["config:edit", "test:configure", "analysis:manage"])
+    ),
+    db: Session = Depends(get_db),
+):
+    """Add a synonym (e.g. EtOH, C2H5OH) for instrument/CRO column matching."""
+    analyte = db.query(Analyte).filter(Analyte.id == analyte_id).first()
+    if not analyte:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Analyte not found")
+    alias_clean = body.alias.strip()
+    if not alias_clean:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Alias cannot be empty")
+    # Case-insensitive uniqueness
+    existing = (
+        db.query(AnalyteAlias)
+        .filter(func.lower(AnalyteAlias.alias) == alias_clean.lower())
+        .first()
+    )
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Alias '{alias_clean}' is already used"
+            + (
+                f" by another analyte"
+                if existing.analyte_id != analyte_id
+                else ""
+            ),
+        )
+    row = AnalyteAlias(
+        analyte_id=analyte_id,
+        alias=alias_clean,
+        created_by=current_user.id,
+    )
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return AnalyteAliasRead.model_validate(row)
+
+
+@router.delete("/{analyte_id}/aliases/{alias_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_analyte_alias(
+    analyte_id: UUID,
+    alias_id: UUID,
+    current_user: User = Depends(
+        require_any_permission(["config:edit", "test:configure", "analysis:manage"])
+    ),
+    db: Session = Depends(get_db),
+):
+    row = (
+        db.query(AnalyteAlias)
+        .filter(AnalyteAlias.id == alias_id, AnalyteAlias.analyte_id == analyte_id)
+        .first()
+    )
+    if not row:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Alias not found")
+    db.delete(row)
+    db.commit()
+    return None
 
 
 @router.post("", response_model=AnalyteResponse, status_code=status.HTTP_201_CREATED)

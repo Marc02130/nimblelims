@@ -28,6 +28,8 @@ from app.core.rbac import require_experiment_manage
 from app.services.lims_run_service import LimsRunService
 from app.schemas.flexible_experiment import (
     LimsRunCreate,
+    LimsRunUpdate,
+    LimsRunStartRequest,
     LimsRunRead,
     LimsRunListResponse,
     ImportDataRequest,
@@ -35,7 +37,7 @@ from app.schemas.flexible_experiment import (
     LimsRunDataRead,
     LimsRunDataListResponse,
 )
-from models.flexible_experiment import LimsRunStatus
+from models.flexible_experiment import LimsRunStatus, LimsRun
 from models.user import User
 
 router = APIRouter(prefix="/lims-runs", tags=["lims-runs"])
@@ -46,6 +48,15 @@ def _run_service(
     current_user: User = Depends(require_experiment_manage),
 ) -> LimsRunService:
     return LimsRunService(db, current_user=current_user)
+
+
+def _run_read(run: LimsRun) -> LimsRunRead:
+    data = LimsRunRead.model_validate(run)
+    # Attach lifecycle_type from template for UI buttons
+    lt = None
+    if run.experiment_template is not None:
+        lt = getattr(run.experiment_template, "lifecycle_type", None) or "standard"
+    return data.model_copy(update={"lifecycle_type": lt})
 
 
 @router.get("", response_model=LimsRunListResponse)
@@ -66,7 +77,7 @@ def list_runs(
     )
     pages = (total + size - 1) // size if size else 0
     return LimsRunListResponse(
-        runs=[LimsRunRead.model_validate(r) for r in items],
+        runs=[_run_read(r) for r in items],
         total=total,
         page=page,
         size=size,
@@ -80,7 +91,7 @@ def create_run(
     service: LimsRunService = Depends(_run_service),
 ):
     run = service.create_run(data)
-    return LimsRunRead.model_validate(run)
+    return _run_read(run)
 
 
 @router.get("/{run_id}", response_model=LimsRunRead)
@@ -89,7 +100,18 @@ def get_run(
     service: LimsRunService = Depends(_run_service),
 ):
     run = service.get_run(run_id)
-    return LimsRunRead.model_validate(run)
+    return _run_read(run)
+
+
+@router.patch("/{run_id}", response_model=LimsRunRead)
+def update_run(
+    run_id: UUID,
+    data: LimsRunUpdate,
+    service: LimsRunService = Depends(_run_service),
+):
+    """Update run fields (e.g. analysis_id for promote-on-publish opt-in)."""
+    run = service.update_run(run_id, data)
+    return _run_read(run)
 
 
 @router.patch("/{run_id}/order", response_model=LimsRunRead)
@@ -99,17 +121,26 @@ def order_run(
 ):
     """Transition: draft → ordered. CRO lifecycle only — sends experiment to external lab."""
     run = service.order_run(run_id)
-    return LimsRunRead.model_validate(run)
+    return _run_read(run)
 
 
 @router.patch("/{run_id}/start", response_model=LimsRunRead)
 def start_run(
     run_id: UUID,
+    body: LimsRunStartRequest = LimsRunStartRequest(),
     service: LimsRunService = Depends(_run_service),
 ):
-    """Transition: draft → running (standard) or ordered → running (CRO)."""
-    run = service.start_run(run_id)
-    return LimsRunRead.model_validate(run)
+    """
+    Transition: draft → running (standard) or ordered → running (CRO).
+
+    If the run has no analysis_id, pass acknowledge_no_analysis=true after the UI
+    warns that Tests/Results will not be written on publish.
+    """
+    run = service.start_run(
+        run_id,
+        acknowledge_no_analysis=body.acknowledge_no_analysis,
+    )
+    return _run_read(run)
 
 
 @router.patch("/{run_id}/results-received", response_model=LimsRunRead)
@@ -119,7 +150,7 @@ def mark_results_received(
 ):
     """Transition: running → results_received. CRO lifecycle only — instrument data returned by CRO."""
     run = service.mark_results_received(run_id)
-    return LimsRunRead.model_validate(run)
+    return _run_read(run)
 
 
 @router.patch("/{run_id}/review", response_model=LimsRunRead)
@@ -129,7 +160,7 @@ def submit_for_review(
 ):
     """Transition: running → complete (standard) or results_received → complete (CRO)."""
     run = service.move_to_review(run_id)
-    return LimsRunRead.model_validate(run)
+    return _run_read(run)
 
 
 @router.patch("/{run_id}/complete", response_model=LimsRunRead)
@@ -141,7 +172,7 @@ def publish_run(
     """Transition: complete → published (requires experiment:publish permission)."""
     service = LimsRunService(db, current_user=publisher)
     run = service.publish_run(run_id)
-    return LimsRunRead.model_validate(run)
+    return _run_read(run)
 
 
 @router.patch("/{run_id}/cancel", response_model=LimsRunRead)
@@ -151,7 +182,7 @@ def cancel_run(
 ):
     """Transition: any non-terminal state → canceled."""
     run = service.cancel_run(run_id)
-    return LimsRunRead.model_validate(run)
+    return _run_read(run)
 
 
 @router.post("/{run_id}/import", response_model=ImportDataResponse)

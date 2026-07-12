@@ -47,6 +47,22 @@ class AnalyteUpdate(BaseModel):
     custom_attributes: Optional[Dict[str, Any]] = None
 
 
+class AnalyteAliasCreate(BaseModel):
+    """Add a maintained instrument/CRO synonym for an analyte."""
+    alias: str = Field(..., min_length=1, max_length=255)
+
+
+class AnalyteAliasRead(BaseModel):
+    id: UUID
+    analyte_id: UUID
+    alias: str
+    created_at: datetime
+    created_by: Optional[UUID] = None
+
+    class Config:
+        from_attributes = True
+
+
 class AnalyteResponse(BaseModel):
     """Schema for analyte response"""
     id: UUID
@@ -61,6 +77,7 @@ class AnalyteResponse(BaseModel):
     units_default: Optional[UUID] = None
     data_type: Optional[str] = None
     custom_attributes: Dict[str, Any] = Field(default_factory=dict, description="Custom attributes as JSON")
+    aliases: List[str] = Field(default_factory=list, description="Maintained CRO/instrument synonyms")
 
     class Config:
         from_attributes = True
