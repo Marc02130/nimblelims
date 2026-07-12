@@ -138,7 +138,7 @@ export interface BatchCompatibilityResult {
   warnings?: BatchCompatibilityWarning[];
 }
 
-class ApiService {
+export class ApiService {
   private api: AxiosInstance;
 
   constructor() {
@@ -364,6 +364,17 @@ class ApiService {
     });
     // API returns AnalysisListResponse with {analyses, total, page, size, pages}
     return response.data;
+  }
+
+  /**
+   * Normalize getAnalyses() payload to a plain list.
+   * Backend returns { analyses, total, page, size, pages }; some callers still expect an array.
+   */
+  static unwrapAnalysesList(response: any): any[] {
+    if (!response) return [];
+    if (Array.isArray(response)) return response;
+    if (Array.isArray(response.analyses)) return response.analyses;
+    return [];
   }
 
   async getAnalysis(id: string) {
