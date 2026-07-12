@@ -1,7 +1,7 @@
 # Requirements: Data parsers, instruments/CRO sources, and LimsRun import
 
 **Date:** 2026-07-12  
-**Status:** **In review** (CEO · Security · Architecture · UI) — tech sketch attached  
+**Status:** **In review** — **CEO Accept** (2026-07-12); Security · Architecture · UI outstanding; tech sketch attached  
 **Idea / direction:** [`.docs/ideas/ai-data-import.md`](../ideas/ai-data-import.md)  
 **Tech sketch:** [`.docs/tech-sketch/data-parsers-lims-runs.md`](../tech-sketch/data-parsers-lims-runs.md)  
 **Open questions:** [`.docs/open-questions/data-parsers-lims-runs.md`](../open-questions/data-parsers-lims-runs.md)  
