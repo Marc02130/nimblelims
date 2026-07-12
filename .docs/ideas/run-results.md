@@ -36,8 +36,10 @@ Get run data into a **structured format** for easy querying, reporting, and use�
 | **Start guard** | If no analysis at **run start**, **warn** (no Tests/Results on publish) and offer associate / create analysis / continue without |
 | **Objects vs instances** | Analysis/Analyte = catalog; Test/Result = instances. Analysis on run ⇒ **ensure** tests for samples |
 | **What** | **`raw_result`** (+ **`replicate` int**); calculated deferred |
-| **Map** | JSONB column → analyte (name + **aliases on analyte**) → value |
-| **Shape** | Multi-analyte columns → **many result rows**; multi-row same analyte → **replicate** |
+| **Map** | JSONB column → analyte (name + **maintained alias list on analyte**) → value; no pattern match |
+| **AI later** | If no match / missing analysis analyte — see [ai-analyte-resolution.md](ai-analyte-resolution.md) |
+| **Shape** | Multi-analyte → **many result rows**; multi-row same analyte → **`replicate`** (from JSONB or **row order**) |
+| **Batch size** | Admin Lims Runs setting; **default 200** |
 | **Conflicts** | Same run → **update**; other run same sample/analyte/replicate → **fail + notify** |
 | **Lineage** | **`results.lims_run_id`** FK |
 | **Permissions** | **Publish alone** enough for promote writes |

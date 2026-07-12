@@ -91,6 +91,7 @@ All product and engineering docs live under this directory, organized by purpose
 Exploratory / in review:
 
 - [ideas/run-results.md](ideas/run-results.md) — LimsRun JSONB → Results on **publish** (see reviews below)
+- [ideas/ai-analyte-resolution.md](ideas/ai-analyte-resolution.md) — AI help when analyte alias list misses (follow-on)
 - [ideas/model-fine-tune.md](ideas/model-fine-tune.md) — (see `sop-rag` branch for RAG-first SOP config work)
 
 ## Reviews (run-results)
