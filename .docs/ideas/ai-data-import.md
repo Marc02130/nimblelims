@@ -73,7 +73,7 @@ Two different concerns, one pipeline:
 | **Parser** | *How* the file becomes JSONB rows (`lims_run_data`) | Import (running / results_received) |
 | **Analysis + promote** | *How* JSONB becomes Tests/Results | Publish (only if `analysis_id` set) |
 
-Today the run already has **`analysis_id`** (promote opt-in) and resolves a parser only via **`experiment_template_id`** (`InstrumentParser` on template). Target: parser selection is driven by **analysis + data source (instrument|CRO)**, while template still owns protocol/lifecycle/worklist.
+Today the run has **`analysis_id`** (promote opt-in) and import still resolves a parser via **template** in code. Target: **`experiment_template_id` is removed from parsers**; selection is **analysis + instrument|CRO** only; template remains on the run for protocol/lifecycle/worklist.
 
 ### End-to-end flow (lab, standard lifecycle)
 
@@ -126,7 +126,7 @@ Track source + which parser was used (for troubleshooting and re-import fidelity
 
 | Column | Required? | Role |
 |--------|-----------|------|
-| `experiment_template_id` | Yes (today) | Protocol, lifecycle_type, worklist |
+| `experiment_template_id` | Yes (run only) | Protocol, lifecycle_type, worklist — **not** on parser |
 | `analysis_id` | Optional | Promote opt-in + analyte catalog (shipped) |
 | `instrument_id` | Optional | Lab data source (FK → light instruments catalog) |
 | `cro_source_id` | Optional | External CRO source (FK → light CRO catalog) |
@@ -159,8 +159,7 @@ Import always uses **`run.parser_id`’s `parser_config`**, not a live re-lookup
 
 1. Active parser matching `(analysis_id, instrument_id)` or `(analysis_id, cro_source_id)` with `is_default` if multiple  
 2. Else single active parser for that pair  
-3. Else legacy template parser (compat) → still **copy id onto `run.parser_id`** when used  
-4. Else leave null until user selects; **import requires non-null parser_id**
+3. Else leave null until user selects; **import requires non-null parser_id** (no template fallback)
 
 ### How the parser is stored (**not code**)
 
@@ -240,11 +239,12 @@ Parser **create/edit** lives under Admin (or Analysis detail), not reinvented on
 
 ### Compatibility with template parsers
 
-| Phase | Behavior |
-|-------|----------|
-| Transition | Import resolution: run parser first, else template parser |
-| SOP parse | May still seed a template parser; optionally also offer “save as analysis×instrument parser” |
-| End state | Template no longer required for import validation; template remains for protocol/lifecycle |
+| Decision | Behavior |
+|----------|----------|
+| **DB** | **DROP** `instrument_parsers.experiment_template_id` |
+| **Import** | No fallback to template |
+| **SOP parse** | Must stop creating template-scoped parsers; use analysis×source setup (or protocol-only) |
+| **Template on run** | Still required for lifecycle/protocol |
 
 ### Branch fit (with LimsRun)
 
@@ -329,8 +329,7 @@ instrument_parsers  (evolve from today)
   analysis_id FK,           -- NEW: primary scope
   instrument_id FK null,    -- lab path
   cro_source_id FK null,    -- CRO path (one of instrument/cro set)
-  experiment_template_id null?,  -- optional link for backward compat
-  parser_config JSONB,
+  parser_config JSONB,  -- no experiment_template_id
   …
   UNIQUE-ish: (analysis_id, instrument_id) or (analysis_id, cro_source_id)
 ```
@@ -373,7 +372,7 @@ Keep both: SOP path for **protocol setup**; this path for **data-format setup** 
 2. **One parser per analysis×source or many?** Allow multiple named parsers (versions / plate vs list formats); default flag optional.  
 3. **Who may edit parsers?** `config:edit` vs `experiment:manage` vs lab tech.  
 4. **Delimiter:** user-selected vs AI-detected vs both (recommend both).  
-5. **Relationship to experiment template parsers:** migrate, dual-write, or leave template parsers as legacy.  
+5. ~~Relationship to experiment template parsers~~ — **Decided: drop template FK; migrate or delete old rows.**
 6. **Sample identity column:** map to sample_id at import vs leave for later linking.  
 
 ## Success metrics

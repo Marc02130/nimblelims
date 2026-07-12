@@ -11,8 +11,8 @@
 
 | Today | Gap |
 |-------|-----|
-| `instrument_parsers.experiment_template_id` required | Parsers not keyed by analysis × instrument/CRO |
-| Import resolves parser only via template | Run does not store source or parser used |
+| `instrument_parsers.experiment_template_id` required | **Remove** template link; parsers keyed by analysis × instrument/CRO only |
+| Import resolves parser only via template | Run stores source + `parser_id`; no template fallback |
 | `ParserConfig` is minimal; engine hardcodes UTF-8 / csv defaults | Need explicit delimiter/encoding in schema for real files |
 | SOP AI creates template-centric parser | Need setup path: examples + tests + optional AI draft of same schema |
 | No harness | Need multi-file dry-run before activate |
@@ -110,17 +110,16 @@ cro_sources (
 
 ```sql
 ALTER instrument_parsers:
-  experiment_template_id  NULLABLE  -- was NOT NULL; legacy rows keep value
-  analysis_id             UUID NULL REFERENCES analyses(id)
-  instrument_id           UUID NULL REFERENCES instruments(id)
-  cro_source_id           UUID NULL REFERENCES cro_sources(id)
-  is_default              BOOLEAN NOT NULL DEFAULT false
-  active                  BOOLEAN NOT NULL DEFAULT true
+  DROP experiment_template_id   -- decided: no template-scoped parsers
+  analysis_id      UUID NOT NULL REFERENCES analyses(id)
+  instrument_id    UUID NULL REFERENCES instruments(id)
+  cro_source_id    UUID NULL REFERENCES cro_sources(id)
+  is_default       BOOLEAN NOT NULL DEFAULT false
+  active           BOOLEAN NOT NULL DEFAULT true
   -- parser_config JSONB already exists
   -- name, description already exist
 
-CHECK: (instrument_id IS NOT NULL) <> (cro_source_id IS NOT NULL)
-       OR (both null AND experiment_template_id IS NOT NULL)  -- legacy only
+CHECK: exactly one of (instrument_id, cro_source_id) is non-null
 
 -- Partial unique: at most one default per analysis×source
 UNIQUE INDEX uq_parser_default_instrument
@@ -132,8 +131,7 @@ UNIQUE INDEX uq_parser_default_cro
   WHERE is_default AND active AND cro_source_id IS NOT NULL;
 ```
 
-**New (analysis-scoped) rows:** `analysis_id` set + exactly one of instrument/cro.  
-**Legacy rows:** `experiment_template_id` set; analysis/instrument/cro null until migrated.
+**Every parser row:** `analysis_id` + exactly one of instrument/cro. See [schema-changes](../schema-changes/data-parsers-lims-runs.md) for drop/migration of existing template-linked rows.
 
 ### 4.3 LimsRun columns
 
@@ -240,9 +238,8 @@ import:
 ### 6.2 Import resolution order
 
 1. `run.parser_id` if set  
-2. Else default for `(analysis_id, instrument|cro)` → persist  
-3. Else legacy template parser for `experiment_template_id` → persist id if found  
-4. Else 400  
+2. Else default for `(analysis_id, instrument|cro)` → persist on run  
+3. Else 400 — configure analysis + source + parser (no template fallback)  
 
 ### 6.3 Parser setup wizard (P1 without AI)
 
@@ -302,11 +299,10 @@ Permissions (provisional): catalog/parser CRUD = `config:edit`; run fields = exi
 ## 9. Migration plan
 
 1. Add `instruments`, `cro_sources`.  
-2. Add nullable columns on `instrument_parsers` + CHECKs/indexes; make `experiment_template_id` nullable.  
-3. Backfill: leave legacy template parsers as-is.  
-4. Add lims_runs FKs.  
-5. Change import resolution (new path first, legacy fallback).  
-6. Optional data migration: copy template parser → analysis×source when mapping known.  
+2. On `instrument_parsers`: add analysis/instrument/cro/is_default/active; migrate or delete existing template-scoped rows; **DROP `experiment_template_id`**.  
+3. Add lims_runs FKs (`instrument_id`, `cro_source_id`, `parser_id`).  
+4. Import resolves only via `run.parser_id` / analysis×source default.  
+5. Update SOP parse to stop writing template-scoped parsers.  
 
 ## 10. Phase mapping
 
@@ -325,7 +321,7 @@ Permissions (provisional): catalog/parser CRUD = `config:edit`; run fields = exi
 | AI invalid JSON | Schema in prompt; validate; one repair; dry-run |
 | Wrong promote mapping | Encourage field_name = analyte; setup report unresolved vs analysis analytes |
 | Large files | Size limits; max_rows on preview; async AI only |
-| Legacy template parsers | Explicit fallback + persist parser_id |
+| Existing template-scoped parser rows | Migrate or delete before DROP column |
 
 ## 12. Open technical items → open-questions doc
 

@@ -13,7 +13,7 @@
 2. Approve **ParserConfig v1** (app JSONB contract) + engine parity — tech sketch §5 / open Q1.  
 3. Approve **ParserEngine** dual use: production import + setup test suite.  
 4. Approve **default/override** resolution and “store parser_id, don’t silent re-resolve.”  
-5. Approve **phase cut** P0/P1/P2 and migration/compat with template parsers.  
+5. Approve **phase cut** P0/P1/P2 and **DROP `experiment_template_id`** from parsers (migrate/delete existing rows; no template fallback).  
 6. Lock or refine **Q1** and remaining schema blockers listed in schema-changes §7.
 
 ## Sketch summary

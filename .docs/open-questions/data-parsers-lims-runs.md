@@ -32,7 +32,8 @@ Do not implement a phase until questions that **block** that phase are **Decided
 | 3 | Permission for parser / instrument / CRO CRUD? | **Open** | P0–P1 | _Suggested:_ `config:edit` | | Product | Align with other lab config |
 | 4 | Allow override to a parser for a **different** analysis than the run? | **Open** | P1 UI/API | _Suggested:_ block (or warn+block) | | Product | Promote uses run.analysis_id |
 | 5 | Snapshot `parser_config` on first import? | **Open** / lean defer | P3 | _Suggested:_ FK only for MVP | | Architecture | Lineage via parser_id enough if edits audited |
-| 6 | Non-reportable run (no analysis): how is parser required? | **Open** | P1 import | _Suggested:_ template parser fallback only | | Product | Matches today |
+| 6 | Non-reportable run (no analysis): how is parser required? | **Open** | P1 import | _No template fallback_ (column removed). Options: require analysis for import; or allow source+parser with analysis optional for non-reportable | 2026-07-12 | Product | Template-scoped parsers removed by decision |
+| **15** | Keep `experiment_template_id` on parsers? | **Decided** | Schema | **Remove** the column entirely | 2026-07-12 | Product / Architecture | Parsers are analysis×instrument/CRO only |
 | 7 | Instruments/CRO catalogs multi-tenant scope? | **Open** | P0 | _Suggested:_ lab-global, not client-owned | | Product / Security | Config not client portal |
 | 8 | Multiple parsers per analysis×source: default selection rule? | **Open** | P1 | _Suggested:_ `is_default` + require unique default | | Product | |
 | 9 | Table naming: keep `instrument_parsers` vs rename? | **Open** | P1 migration | _Suggested:_ keep table, evolve columns | | Architecture | Less migration noise |
