@@ -38,6 +38,7 @@ Do not implement a phase until questions that block it are **Decided** (or provi
 | 12 | Unmapped JSONB keys → custom_attributes? | **Decided** | Scope | **No** by default | 2026-07-11 | Product | Prefer Field Management for meta |
 | 13 | Dose-response integration? | **Deferred** | — | Separate tables; not classic promote v1 | 2026-07-11 | | |
 | 14 | Replicates: multiple data rows same sample+analyte? | **Decided** | Schema | **`results.replicate` INT** (nullable or default 1). Multiple data rows map to multiple result rows distinguished by replicate. | 2026-07-11 | Product | Structured replicates for query/report |
+| 17 | Does `results` need BaseModel `name` (global unique)? | **Decided** | Schema | **Remove `name` (and name uniqueness) from results** — does not make product sense. Identity = id + test/analyte/replicate/lims_run_id. | 2026-07-11 | Product | Results are values, not named entities |
 
 ---
 
@@ -237,6 +238,27 @@ Add **`results.replicate`** as **integer** (default `1` or null meaning 1).
 
 Multiple `lims_run_data` rows for the same sample+analyte become multiple result rows distinguished by **replicate**.  
 Conflict key for #8 includes replicate: `(sample’s test, analyte_id, replicate)` + ownership by `lims_run_id`.
+
+If import has no replicate field: assign **1..n by row order** (#15).
+
+---
+
+## Decision #17 — Drop `name` on results
+
+**Status:** Decided · **Date:** 2026-07-11
+
+**Remove** the BaseModel-style **`name`** column (and global unique constraint) from **`results`**.
+
+Results are not named lab objects (unlike samples, batches, runs). Natural identity is:
+
+- `id`
+- `test_id` + `analyte_id` + `replicate` (+ `lims_run_id` when from promote)
+
+### Eng implications
+
+- Stop inheriting name-required BaseModel for Result, or drop/null `name` via migration and adjust model.
+- API schemas already omit `name` on create in places—align ORM/DB with that.
+- UI should show analyte + sample + value, never a synthetic result name.
 
 ---
 

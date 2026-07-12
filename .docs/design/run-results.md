@@ -126,7 +126,7 @@ AI-assisted resolution when list misses: [ideas/ai-analyte-resolution.md](../ide
 | `lims_run_id` | **FK** → promoting run (null if manually entered) |
 | `entered_by` | Publishing user |
 | `entry_date` | now |
-| `name` | Generated unique (existing BaseModel constraint) |
+| ~~`name`~~ | **Removed** (Decision #17) — not a named entity |
 
 Do **not** dump unmapped JSONB into `custom_attributes` by default.  
 Extra meta → **result custom fields** (Field Management already supports `results`).
@@ -172,27 +172,30 @@ Conflict identity: roughly `(test_id, analyte_id, replicate)` + ownership check 
 
 ### 3.11 Preview and errors (UX/API)
 
-**Preview** = dry-run of promote **without writing** DB (called from publish modal and optionally before start if analysis set):
+**Preview = “what would happen on publish”** for structured promote (dry-run, **no DB writes**).
 
-| Preview shows | Purpose |
+Shown on the **Publish** confirmation when `analysis_id` is set (and available as API for tooling):
+
+| Preview shows | Meaning |
 |---------------|---------|
-| Rows that **will** create results (sample, analyte, raw, replicate, match via name/alias) | Confidence before publish |
-| Columns **skipped** (not an analyte) | e.g. `units` |
-| Columns **unresolved** (no name/alias) | User must fix aliases or map before publish (or accept skip policy) |
-| Analysis analytes with **no** matching column | “Expected Lead; not in file” |
-| **Conflicts** (other run owns same test/analyte/replicate) | Fail path — notify, do not overwrite |
-| Counts | e.g. “128 results to create, 12 to update, 3 unresolved” |
+| Results **to create** | New rows: sample, analyte, raw value, replicate, matched how (name/alias) |
+| Results **to update** | Same run already owns this test/analyte/replicate — will update raw |
+| **Conflicts** | Another run (or manual result) owns that slot — publish would **fail** until resolved |
+| Columns **skipped** | Not analytes (e.g. `units`) |
+| Columns **unresolved** | No name/alias match — fix list or AI later |
+| Analysis analytes **missing from file** | Expected on assay, no column in import |
+| **Counts** | e.g. create 128 / update 12 / conflict 0 / unresolved 3 |
 
-**Errors** = hard failures that **block publish** (when analysis is set), e.g.:
+**Errors** = hard failures that **block publish** when analysis is set (preview shows them before user confirms):
 
-- Unresolved required columns (if policy is fail-closed)  
-- Conflict with another run’s results (#8)  
+- Conflicts with another run’s results  
 - Missing `sample_id` on data rows  
-- Analysis set but zero promotable data  
+- Fail-closed unresolved columns (if configured)  
+- Zero promotable data with analysis set (optional policy)
 
-**Warnings** = non-blocking (e.g. optional unmapped columns listed; start without analysis with explicit ack).
+**Warnings** = non-blocking (start without analysis ack; optional skipped columns).
 
-Implementation note: `results.name` is globally unique (BaseModel)—generate deterministic unique names (e.g. include sample/analyte/replicate/run short id). This is **not** a product “result label” issue; it is a schema constraint on insert.
+**Schema:** Drop **`results.name`** (Decision #17)—no synthetic name generation.
 
 Permissions: **publish alone** is enough to create/update tests/results on this path (Decided #10).
 
@@ -206,7 +209,7 @@ Permissions: **publish alone** is enough to create/update tests/results on this 
 |-------|-------------|
 | **P0** | Analyte aliases on analyte + admin UI |
 | **P1** | `lims_runs.analysis_id` + UI + start-run warning |
-| **P2** | `results.lims_run_id`, `results.replicate` migrations |
+| **P2** | `results.lims_run_id`, `results.replicate`; **drop `results.name`** (and unique) |
 | **P3** | Promote service: ensure test, resolve analyte, update-vs-fail, publish hook |
 | **P4** | Preview + conflict notification UX |
 | **P5** | Optional map JSONB → result custom fields |
