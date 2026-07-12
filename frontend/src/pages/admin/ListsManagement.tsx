@@ -28,6 +28,7 @@ import {
 import { DataGrid, GridColDef, GridActionsCellItem, GridRowParams } from '@mui/x-data-grid';
 import { useUser } from '../../contexts/UserContext';
 import { apiService } from '../../services/apiService';
+import { FillHeightPage, FillHeightTable } from '../../components/common/FillHeightPage';
 import ListFormDialog from './ListFormDialog';
 import EntryFormDialog from './EntryFormDialog';
 import { slugToDisplayName } from '../../utils/listUtils';
@@ -336,135 +337,152 @@ const ListsManagement: React.FC = () => {
   }
 
   return (
-    <Box>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h4">Lists Management</Typography>
-        {canEdit && (
-          <Button
-            variant="contained"
-            startIcon={<Add />}
-            onClick={() => {
-              setSelectedList(null);
-              setListFormOpen(true);
+    <FillHeightPage
+      header={
+        <>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+            <Typography variant="h4">Lists Management</Typography>
+            {canEdit && (
+              <Button
+                variant="contained"
+                startIcon={<Add />}
+                onClick={() => {
+                  setSelectedList(null);
+                  setListFormOpen(true);
+                }}
+              >
+                Create List
+              </Button>
+            )}
+          </Box>
+
+          {error && (
+            <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
+              {error}
+            </Alert>
+          )}
+
+          <TextField
+            fullWidth
+            size="small"
+            placeholder="Search lists and entries..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <Search />
+                </InputAdornment>
+              ),
+              endAdornment: searchTerm && (
+                <InputAdornment position="end">
+                  <IconButton size="small" onClick={() => setSearchTerm('')}>
+                    <Clear />
+                  </IconButton>
+                </InputAdornment>
+              ),
             }}
-          >
-            Create List
-          </Button>
-        )}
-      </Box>
+          />
 
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
-          {error}
-        </Alert>
-      )}
+          {/* Expanded entry sub-tables (capped height so main grid keeps fill-height) */}
+          {expandedRows.size > 0 && (
+            <Box sx={{ mt: 2, maxHeight: 220, overflowY: 'auto' }}>
+              {Array.from(expandedRows).map((listId) => {
+                const list = lists.find((l) => l.id === listId);
+                if (!list) return null;
 
-      <Box sx={{ mb: 2 }}>
-        <TextField
-          fullWidth
-          placeholder="Search lists and entries..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <Search />
-              </InputAdornment>
-            ),
-            endAdornment: searchTerm && (
-              <InputAdornment position="end">
-                <IconButton size="small" onClick={() => setSearchTerm('')}>
-                  <Clear />
-                </IconButton>
-              </InputAdornment>
-            ),
-          }}
-        />
-      </Box>
-
+                return (
+                  <Box
+                    key={`entries-${listId}`}
+                    sx={{
+                      mb: 1,
+                      p: 1.5,
+                      bgcolor: 'background.paper',
+                      borderRadius: 1,
+                      border: 1,
+                      borderColor: 'divider',
+                    }}
+                  >
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                      <Typography variant="subtitle2">
+                        Entries for {slugToDisplayName(list.name)}
+                      </Typography>
+                      {canEdit && (
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          startIcon={<Add />}
+                          onClick={() => {
+                            setSelectedList(list);
+                            setSelectedEntry(null);
+                            setEntryFormOpen(true);
+                          }}
+                        >
+                          Add Entry
+                        </Button>
+                      )}
+                    </Box>
+                    {list.entries.length === 0 ? (
+                      <Typography color="text.secondary" sx={{ textAlign: 'center', py: 2 }}>
+                        No entries in this list
+                      </Typography>
+                    ) : (
+                      <Box sx={{ width: '100%', maxHeight: 200, minHeight: 120, overflow: 'auto' }}>
+                        <DataGrid
+                          rows={list.entries}
+                          columns={getEntryColumns(list)}
+                          getRowId={(row) => row.id}
+                          pageSizeOptions={[10, 25, 50]}
+                          initialState={{
+                            pagination: {
+                              paginationModel: { page: 0, pageSize: 10 },
+                            },
+                          }}
+                          disableRowSelectionOnClick
+                          sx={{
+                            border: 0,
+                            minHeight: 120,
+                            maxHeight: 200,
+                          }}
+                        />
+                      </Box>
+                    )}
+                  </Box>
+                );
+              })}
+            </Box>
+          )}
+        </>
+      }
+    >
       {loading ? (
-        <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
+        <Box display="flex" justifyContent="center" alignItems="center" flex={1}>
           <CircularProgress />
         </Box>
       ) : (
-        <>
-          <Box sx={{ width: '100%' }}>
-            <DataGrid
-              rows={filteredLists}
-              autoHeight
-              columns={columns}
-              getRowId={(row) => row.id}
-              pageSizeOptions={[10, 25, 50]}
-              initialState={{
-                pagination: {
-                  paginationModel: { page: 0, pageSize: 10 },
-                },
-              }}
-              disableRowSelectionOnClick
-              slots={{
-                noRowsOverlay: () => (
-                  <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
-                    <Typography>No lists found</Typography>
-                  </Box>
-                ),
-              }}
-            />
-          </Box>
-
-          {/* Expanded rows for entries */}
-          {Array.from(expandedRows).map((listId) => {
-            const list = lists.find((l) => l.id === listId);
-            if (!list) return null;
-
-            return (
-              <Box key={`entries-${listId}`} sx={{ mt: 2, mb: 3, p: 2, bgcolor: 'background.paper', borderRadius: 1, border: 1, borderColor: 'divider' }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                  <Typography variant="h6">
-                    Entries for {slugToDisplayName(list.name)}
-                  </Typography>
-                  {canEdit && (
-                    <Button
-                      size="small"
-                      variant="outlined"
-                      startIcon={<Add />}
-                      onClick={() => {
-                        setSelectedList(list);
-                        setSelectedEntry(null);
-                        setEntryFormOpen(true);
-                      }}
-                    >
-                      Add Entry
-                    </Button>
-                  )}
+        <FillHeightTable>
+          <DataGrid
+            rows={filteredLists}
+            columns={columns}
+            getRowId={(row) => row.id}
+            pageSizeOptions={[10, 25, 50]}
+            initialState={{
+              pagination: {
+                paginationModel: { page: 0, pageSize: 25 },
+              },
+            }}
+            disableRowSelectionOnClick
+            slots={{
+              noRowsOverlay: () => (
+                <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+                  <Typography>No lists found</Typography>
                 </Box>
-                {list.entries.length === 0 ? (
-                  <Typography color="text.secondary" sx={{ textAlign: 'center', py: 4 }}>
-                    No entries in this list
-                  </Typography>
-                ) : (
-                  <Box sx={{ width: '100%' }}>
-                    <DataGrid
-                      rows={list.entries}
-                      autoHeight
-                      columns={getEntryColumns(list)}
-                      getRowId={(row) => row.id}
-                      pageSizeOptions={[10, 25, 50]}
-                      initialState={{
-                        pagination: {
-                          paginationModel: { page: 0, pageSize: 10 },
-                        },
-                      }}
-                      disableRowSelectionOnClick
-                    />
-                  </Box>
-                )}
-              </Box>
-            );
-          })}
-        </>
+              ),
+            }}
+          />
+        </FillHeightTable>
       )}
 
-      {/* List Form Dialog */}
       <ListFormDialog
         open={listFormOpen}
         list={selectedList}
@@ -476,7 +494,6 @@ const ListsManagement: React.FC = () => {
         onSubmit={selectedList ? handleUpdateList : handleCreateList}
       />
 
-      {/* Entry Form Dialog */}
       <EntryFormDialog
         open={entryFormOpen}
         listName={selectedList ? slugToDisplayName(selectedList.name) : ''}
@@ -490,7 +507,6 @@ const ListsManagement: React.FC = () => {
         onSubmit={selectedEntry ? handleUpdateEntry : handleCreateEntry}
       />
 
-      {/* Delete Confirmation Dialog */}
       <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)}>
         <DialogTitle>Confirm Delete</DialogTitle>
         <DialogContent>
@@ -511,7 +527,7 @@ const ListsManagement: React.FC = () => {
           </Button>
         </DialogActions>
       </Dialog>
-    </Box>
+    </FillHeightPage>
   );
 };
 

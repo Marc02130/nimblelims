@@ -40,6 +40,7 @@ import AddIcon from '@mui/icons-material/Add';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import { useNavigate, useParams } from 'react-router-dom';
 import { apiService } from '../services/apiService';
+import { FillHeightPage, FillHeightTable } from '../components/common/FillHeightPage';
 
 const apiErrorMsg = (err: any, fallback: string): string => {
   const detail = err?.response?.data?.detail;
@@ -886,91 +887,91 @@ const ProcessesManagement: React.FC = () => {
 
   // ── List view ────────────────────────────────────────────────────────────
   return (
-    <Box p={2}>
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-        <Typography variant="h5">ELN Processes</Typography>
-        <Box display="flex" gap={1}>
-          {listTab === 1 ? (
-            <Button variant="contained" startIcon={<AddIcon />} onClick={() => setShowCreateDef(true)}>
-              New definition
-            </Button>
-          ) : (
-            <>
-              <Button
-                variant="outlined"
-                startIcon={<PlayArrowIcon />}
-                onClick={() => {
-                  setStartDefId(definitions[0]?.id || '');
-                  setShowStartFromDef(true);
-                }}
-                disabled={!definitions.length}
-              >
-                Start from definition
-              </Button>
-              <Button
-                variant="contained"
-                startIcon={<AddIcon />}
-                onClick={() => {
-                  if (!createSteps.length) {
-                    setCreateSteps([
-                      { experiment_template_id: '', step_kind: 'eln_experiment', name: '' },
-                    ]);
-                  }
-                  setShowCreate(true);
-                }}
-              >
-                New process
-              </Button>
-            </>
+    <FillHeightPage
+      header={
+        <>
+          <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+            <Typography variant="h5">ELN Processes</Typography>
+            <Box display="flex" gap={1}>
+              {listTab === 1 ? (
+                <Button variant="contained" startIcon={<AddIcon />} onClick={() => setShowCreateDef(true)}>
+                  New definition
+                </Button>
+              ) : (
+                <>
+                  <Button
+                    variant="outlined"
+                    startIcon={<PlayArrowIcon />}
+                    onClick={() => {
+                      setStartDefId(definitions[0]?.id || '');
+                      setShowStartFromDef(true);
+                    }}
+                    disabled={!definitions.length}
+                  >
+                    Start from definition
+                  </Button>
+                  <Button
+                    variant="contained"
+                    startIcon={<AddIcon />}
+                    onClick={() => {
+                      if (!createSteps.length) {
+                        setCreateSteps([
+                          { experiment_template_id: '', step_kind: 'eln_experiment', name: '' },
+                        ]);
+                      }
+                      setShowCreate(true);
+                    }}
+                  >
+                    New process
+                  </Button>
+                </>
+              )}
+            </Box>
+          </Box>
+          {error && (
+            <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
+              {error}
+            </Alert>
           )}
-        </Box>
-      </Box>
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
-          {error}
-        </Alert>
-      )}
-      {info && (
-        <Alert severity="info" sx={{ mb: 2 }} onClose={() => setInfo(null)}>
-          {info}
-        </Alert>
-      )}
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-        Definitions are reusable multi-step SOPs. Instances snapshot a definition and track
-        samples. Steps are typed as ELN Experiment or LIMS Run.
-      </Typography>
-
-      <Tabs value={listTab} onChange={(_, v) => setListTab(v)} sx={{ mb: 2 }}>
-        <Tab label={`Instances (${processes.length})`} />
-        <Tab label={`Definitions (${definitions.length})`} />
-      </Tabs>
-
-      <Card>
-        <CardContent>
-          {listTab === 0 ? (
-            <DataGrid
-              autoHeight
-              rows={processes}
-              columns={processColumns}
-              loading={loading}
-              pageSizeOptions={[25, 50]}
-              initialState={{ pagination: { paginationModel: { pageSize: 25 } } }}
-              disableRowSelectionOnClick
-              onRowDoubleClick={(p) => navigate(`/experiments/processes/${p.id}`)}
-            />
-          ) : (
-            <DataGrid
-              autoHeight
-              rows={definitions}
-              columns={definitionColumns}
-              loading={loading}
-              pageSizeOptions={[25, 50]}
-              initialState={{ pagination: { paginationModel: { pageSize: 25 } } }}
-              disableRowSelectionOnClick
-            />
+          {info && (
+            <Alert severity="info" sx={{ mb: 2 }} onClose={() => setInfo(null)}>
+              {info}
+            </Alert>
           )}
-        </CardContent>
-      </Card>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+            Definitions are reusable multi-step SOPs. Instances snapshot a definition and track
+            samples. Steps are typed as ELN Experiment or LIMS Run.
+          </Typography>
+
+          <Tabs value={listTab} onChange={(_, v) => setListTab(v)}>
+            <Tab label={`Instances (${processes.length})`} />
+            <Tab label={`Definitions (${definitions.length})`} />
+          </Tabs>
+        </>
+      }
+    >
+      <FillHeightTable>
+        {listTab === 0 ? (
+          <DataGrid
+            rows={processes}
+            columns={processColumns}
+            loading={loading}
+            pageSizeOptions={[25, 50]}
+            initialState={{ pagination: { paginationModel: { pageSize: 25 } } }}
+            disableRowSelectionOnClick
+            onRowDoubleClick={(p) => navigate(`/experiments/processes/${p.id}`)}
+          />
+        ) : (
+          <DataGrid
+            rows={definitions}
+            columns={definitionColumns}
+            loading={loading}
+            pageSizeOptions={[25, 50]}
+            initialState={{ pagination: { paginationModel: { pageSize: 25 } } }}
+            disableRowSelectionOnClick
+          />
+        )}
+      </FillHeightTable>
 
       {/* Create free-form instance or from definition */}
       <Dialog open={showCreate} onClose={() => setShowCreate(false)} fullWidth maxWidth="md">
@@ -1110,7 +1111,7 @@ const ProcessesManagement: React.FC = () => {
           </Button>
         </DialogActions>
       </Dialog>
-    </Box>
+    </FillHeightPage>
   );
 };
 

@@ -35,6 +35,7 @@ import {
 import { DataGrid, GridColDef, GridActionsCellItem, GridRowParams, GridRenderCellParams } from '@mui/x-data-grid';
 import { useUser } from '../../contexts/UserContext';
 import { apiService } from '../../services/apiService';
+import { FillHeightPage, FillHeightTable } from '../../components/common/FillHeightPage';
 import BatteryFormDialog from './BatteryFormDialog';
 
 interface BatteryAnalysis {
@@ -348,68 +349,119 @@ const TestBatteriesManagement: React.FC = () => {
   }
 
   return (
-    <Box>
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-        <Typography variant="h4">Test Batteries Management</Typography>
-        {canEdit && (
-          <Button
-            variant="contained"
-            startIcon={<Add />}
-            onClick={() => {
-              setSelectedBattery(null);
-              setFormOpen(true);
+    <FillHeightPage
+      header={
+        <>
+          <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+            <Typography variant="h4">Test Batteries Management</Typography>
+            {canEdit && (
+              <Button
+                variant="contained"
+                startIcon={<Add />}
+                onClick={() => {
+                  setSelectedBattery(null);
+                  setFormOpen(true);
+                }}
+              >
+                Create Battery
+              </Button>
+            )}
+          </Box>
+
+          {error && (
+            <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
+              {error}
+            </Alert>
+          )}
+
+          <TextField
+            fullWidth
+            size="small"
+            placeholder="Search batteries by name or description..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <Search />
+                </InputAdornment>
+              ),
+              endAdornment: searchTerm && (
+                <InputAdornment position="end">
+                  <IconButton size="small" onClick={() => setSearchTerm('')}>
+                    <Clear />
+                  </IconButton>
+                </InputAdornment>
+              ),
             }}
-          >
-            Create Battery
-          </Button>
-        )}
-      </Box>
+          />
 
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
-          {error}
-        </Alert>
-      )}
-
-      <Box mb={2}>
-        <TextField
-          fullWidth
-          size="small"
-          placeholder="Search batteries by name or description..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <Search />
-              </InputAdornment>
-            ),
-            endAdornment: searchTerm && (
-              <InputAdornment position="end">
-                <IconButton size="small" onClick={() => setSearchTerm('')}>
-                  <Clear />
-                </IconButton>
-              </InputAdornment>
-            ),
-          }}
-        />
-      </Box>
-
+          {expandedRows.size > 0 && (
+            <Box sx={{ mt: 2, maxHeight: 200, overflowY: 'auto' }}>
+              {filteredBatteries
+                .filter((battery) => expandedRows.has(battery.id))
+                .map((battery) => (
+                  <Paper key={battery.id} variant="outlined" sx={{ mb: 1, p: 1.5 }}>
+                    <Typography variant="subtitle2" gutterBottom>
+                      Analyses in {battery.name}
+                    </Typography>
+                    {battery.analyses && battery.analyses.length > 0 ? (
+                      <TableContainer>
+                        <Table size="small">
+                          <TableHead>
+                            <TableRow>
+                              <TableCell>Sequence</TableCell>
+                              <TableCell>Analysis Name</TableCell>
+                              <TableCell>Method</TableCell>
+                              <TableCell>Optional</TableCell>
+                            </TableRow>
+                          </TableHead>
+                          <TableBody>
+                            {battery.analyses
+                              .sort((a, b) => a.sequence - b.sequence)
+                              .map((analysis) => (
+                                <TableRow key={analysis.analysis_id}>
+                                  <TableCell>{analysis.sequence}</TableCell>
+                                  <TableCell>{analysis.analysis_name}</TableCell>
+                                  <TableCell>{analysis.analysis_method || '-'}</TableCell>
+                                  <TableCell>
+                                    <Chip
+                                      label={analysis.optional ? 'Yes' : 'No'}
+                                      size="small"
+                                      color={analysis.optional ? 'warning' : 'default'}
+                                    />
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                          </TableBody>
+                        </Table>
+                      </TableContainer>
+                    ) : (
+                      <Typography variant="body2" color="textSecondary">
+                        No analyses assigned to this battery.
+                      </Typography>
+                    )}
+                  </Paper>
+                ))}
+            </Box>
+          )}
+        </>
+      }
+    >
       {loading ? (
-        <Box display="flex" justifyContent="center" p={3}>
+        <Box display="flex" justifyContent="center" alignItems="center" flex={1}>
           <CircularProgress />
         </Box>
       ) : (
-        <Box>
+        <FillHeightTable>
           <DataGrid
             rows={filteredBatteries}
             columns={columns}
             getRowId={(row) => row.id}
-            autoHeight
             disableRowSelectionOnClick
             initialState={{
               pagination: {
-                paginationModel: { page: 0, pageSize: 10 },
+                paginationModel: { page: 0, pageSize: 25 },
               },
             }}
             pageSizeOptions={[10, 25, 50]}
@@ -420,54 +472,7 @@ const TestBatteriesManagement: React.FC = () => {
               },
             }}
           />
-
-          {/* Expanded rows showing analyses */}
-          {filteredBatteries
-            .filter((battery) => expandedRows.has(battery.id))
-            .map((battery) => (
-              <Paper key={battery.id} variant="outlined" sx={{ mt: 2, p: 2 }}>
-                <Typography variant="h6" gutterBottom>
-                  Analyses in {battery.name}
-                </Typography>
-                {battery.analyses && battery.analyses.length > 0 ? (
-                  <TableContainer>
-                    <Table size="small">
-                      <TableHead>
-                        <TableRow>
-                          <TableCell>Sequence</TableCell>
-                          <TableCell>Analysis Name</TableCell>
-                          <TableCell>Method</TableCell>
-                          <TableCell>Optional</TableCell>
-                        </TableRow>
-                      </TableHead>
-                      <TableBody>
-                        {battery.analyses
-                          .sort((a, b) => a.sequence - b.sequence)
-                          .map((analysis) => (
-                            <TableRow key={analysis.analysis_id}>
-                              <TableCell>{analysis.sequence}</TableCell>
-                              <TableCell>{analysis.analysis_name}</TableCell>
-                              <TableCell>{analysis.analysis_method || '-'}</TableCell>
-                              <TableCell>
-                                <Chip
-                                  label={analysis.optional ? 'Yes' : 'No'}
-                                  size="small"
-                                  color={analysis.optional ? 'warning' : 'default'}
-                                />
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                      </TableBody>
-                    </Table>
-                  </TableContainer>
-                ) : (
-                  <Typography variant="body2" color="textSecondary">
-                    No analyses assigned to this battery.
-                  </Typography>
-                )}
-              </Paper>
-            ))}
-        </Box>
+        </FillHeightTable>
       )}
 
       <BatteryFormDialog
@@ -505,7 +510,7 @@ const TestBatteriesManagement: React.FC = () => {
           </Button>
         </DialogActions>
       </Dialog>
-    </Box>
+    </FillHeightPage>
   );
 };
 

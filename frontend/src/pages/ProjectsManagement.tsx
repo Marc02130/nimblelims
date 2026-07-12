@@ -20,6 +20,7 @@ import { useNavigate } from 'react-router-dom';
 import { useUser } from '../contexts/UserContext';
 import { apiService, addClientFilterIfNeeded } from '../services/apiService';
 import ProjectForm from '../components/projects/ProjectForm';
+import { FillHeightPage, FillHeightTable } from '../components/common/FillHeightPage';
 
 interface Client {
   id: string;
@@ -61,7 +62,7 @@ const ProjectsManagement: React.FC = () => {
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Project | null>(null);
-  const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 10 });
+  const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 25 });
   const [total, setTotal] = useState(0);
 
   const canManage = hasPermission('project:manage');
@@ -309,68 +310,70 @@ const ProjectsManagement: React.FC = () => {
     },
   ], [canManage, clients, projects, statuses]);
 
-  if (loading && projects.length === 0) {
-    return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
-        <CircularProgress />
-      </Box>
-    );
-  }
-
   return (
-    <Box>
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-        <Box>
-          <Typography variant="h4" component="h1" gutterBottom>
-            Projects
-          </Typography>
-          <Tooltip title="Internal Projects: Core lab tracking units">
-            <Typography variant="body2" color="text.secondary">
-              Manage internal projects for sample tracking and workflow management
-            </Typography>
-          </Tooltip>
+    <FillHeightPage
+      header={
+        <>
+          <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+            <Box>
+              <Typography variant="h4" component="h1" gutterBottom>
+                Projects
+              </Typography>
+              <Tooltip title="Internal Projects: Core lab tracking units">
+                <Typography variant="body2" color="text.secondary">
+                  Manage internal projects for sample tracking and workflow management
+                </Typography>
+              </Tooltip>
+            </Box>
+            {canManage && (
+              <Button
+                variant="contained"
+                startIcon={<Add />}
+                onClick={() => {
+                  setSelectedProject(null);
+                  setFormOpen(true);
+                }}
+              >
+                Create Project
+              </Button>
+            )}
+          </Box>
+
+          {error && (
+            <Alert severity="error" onClose={() => setError(null)} sx={{ mb: 2 }}>
+              {error}
+            </Alert>
+          )}
+        </>
+      }
+    >
+      {loading && projects.length === 0 ? (
+        <Box display="flex" justifyContent="center" alignItems="center" flex={1}>
+          <CircularProgress />
         </Box>
-        {canManage && (
-          <Button
-            variant="contained"
-            startIcon={<Add />}
-            onClick={() => {
-              setSelectedProject(null);
-              setFormOpen(true);
+      ) : (
+        <FillHeightTable>
+          <DataGrid
+            rows={projects}
+            columns={columns}
+            loading={loading}
+            paginationMode="server"
+            paginationModel={paginationModel}
+            onPaginationModelChange={setPaginationModel}
+            pageSizeOptions={[10, 25, 50, 100]}
+            rowCount={total}
+            disableRowSelectionOnClick
+            slots={{
+              toolbar: GridToolbar,
             }}
-          >
-            Create Project
-          </Button>
-        )}
-      </Box>
-
-      {error && (
-        <Alert severity="error" onClose={() => setError(null)} sx={{ mb: 2 }}>
-          {error}
-        </Alert>
+            sx={{
+              '& .MuiDataGrid-cell': {
+                fontSize: '0.875rem',
+              },
+            }}
+          />
+        </FillHeightTable>
       )}
-
-      <Box sx={{ width: '100%', overflowX: 'auto' }}>
-        <DataGrid
-          rows={projects}
-          columns={columns}
-          loading={loading}
-          paginationMode="server"
-          paginationModel={paginationModel}
-          onPaginationModelChange={setPaginationModel}
-          pageSizeOptions={[10, 25, 50, 100]}
-          rowCount={total}
-          disableRowSelectionOnClick
-          slots={{
-            toolbar: GridToolbar,
-          }}
-          sx={{
-            '& .MuiDataGrid-cell': {
-              fontSize: '0.875rem',
-            },
-          }}
-        />
-      </Box>
 
       {/* Create/Edit Form Dialog */}
       <ProjectForm
@@ -429,7 +432,7 @@ const ProjectsManagement: React.FC = () => {
           </Box>
         </Box>
       )}
-    </Box>
+    </FillHeightPage>
   );
 };
 

@@ -654,7 +654,7 @@ const AnalysesManagement: React.FC = () => {
           {!data.loading && !data.error && (
             <>
               {data.analytes.length > 0 ? (
-                <Box sx={{ overflowX: 'auto' }}>
+                <Box sx={{ height: 240, width: '100%' }}>
                   <DataGrid
                     rows={data.analytes}
                     columns={[
@@ -692,7 +692,6 @@ const AnalysesManagement: React.FC = () => {
                         },
                       },
                     ]}
-                    autoHeight
                     hideFooter={data.analytes.length <= 5}
                     pageSizeOptions={[5, 10]}
                     initialState={{
@@ -701,7 +700,8 @@ const AnalysesManagement: React.FC = () => {
                     disableRowSelectionOnClick
                     density="compact"
                     sx={{
-                      '& .MuiDataGrid-root': { border: 'none' },
+                      height: '100%',
+                      border: 'none',
                       bgcolor: 'background.paper',
                     }}
                   />

@@ -3,15 +3,11 @@ import {
   Box,
   Typography,
   Button,
-  Card,
-  CardContent,
   Dialog,
   DialogTitle,
   DialogContent,
-  DialogActions,
   Alert,
   CircularProgress,
-  IconButton,
   Tooltip,
   Chip,
   Divider,
@@ -23,6 +19,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import SampleForm from '../components/samples/SampleForm';
 import { apiService, addClientFilterIfNeeded } from '../services/apiService';
 import { useUser } from '../contexts/UserContext';
+import { FillHeightPage, FillHeightTable } from '../components/common/FillHeightPage';
 
 interface JourneyItem {
   process_id: string;
@@ -61,7 +58,7 @@ interface LookupItem {
 }
 
 const SamplesManagement: React.FC = () => {
-  const { hasPermission, user, isSystemClient, isAdmin } = useUser();
+  const { hasPermission, user } = useUser();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [samples, setSamples] = useState<Sample[]>([]);
@@ -307,43 +304,41 @@ const SamplesManagement: React.FC = () => {
     },
   ];
 
-  if (loading) {
-    return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
-        <CircularProgress />
-      </Box>
-    );
-  }
-
   return (
-    <Box sx={{ p: 3 }}>
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-        <Typography variant="h4">
-          Samples Management
-        </Typography>
-        <Button
-          variant="contained"
-          onClick={() => navigate('/accessioning')}
-          aria-label="Navigate to accessioning form"
-        >
-          Create Sample
-        </Button>
-      </Box>
+    <FillHeightPage
+      header={
+        <>
+          <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+            <Typography variant="h4">Samples Management</Typography>
+            <Button
+              variant="contained"
+              onClick={() => navigate('/accessioning')}
+              aria-label="Navigate to accessioning form"
+            >
+              Create Sample
+            </Button>
+          </Box>
 
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
-          {error}
-        </Alert>
-      )}
+          {error && (
+            <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
+              {error}
+            </Alert>
+          )}
 
-      {!canUpdate && (
-        <Alert severity="info" sx={{ mb: 2 }}>
-          You have read-only access. Contact your administrator for update permissions.
-        </Alert>
-      )}
-
-      <Card>
-        <CardContent>
+          {!canUpdate && (
+            <Alert severity="info" sx={{ mb: 2 }}>
+              You have read-only access. Contact your administrator for update permissions.
+            </Alert>
+          )}
+        </>
+      }
+    >
+      {loading ? (
+        <Box display="flex" justifyContent="center" alignItems="center" flex={1}>
+          <CircularProgress />
+        </Box>
+      ) : (
+        <FillHeightTable>
           <DataGrid
             rows={samples}
             columns={columns}
@@ -353,11 +348,10 @@ const SamplesManagement: React.FC = () => {
                 paginationModel: { page: 0, pageSize: 25 },
               },
             }}
-            autoHeight
             disableRowSelectionOnClick
           />
-        </CardContent>
-      </Card>
+        </FillHeightTable>
+      )}
 
       {/* Sample Form Dialog */}
       <Dialog
@@ -455,7 +449,7 @@ const SamplesManagement: React.FC = () => {
           )}
         </DialogContent>
       </Dialog>
-    </Box>
+    </FillHeightPage>
   );
 };
 

@@ -3,22 +3,19 @@ import {
   Box,
   Typography,
   Button,
-  Grid,
-  Card,
-  CardContent,
   Dialog,
   DialogTitle,
   DialogContent,
-  DialogActions,
   Alert,
   CircularProgress,
+  Tooltip,
 } from '@mui/material';
 import { DataGrid, GridColDef, GridActionsCellItem } from '@mui/x-data-grid';
 import EditIcon from '@mui/icons-material/Edit';
-import { Tooltip } from '@mui/material';
 import ContainerForm from '../components/containers/ContainerForm';
 import ContainerDetails from '../components/containers/ContainerDetails';
 import { apiService } from '../services/apiService';
+import { FillHeightPage, FillHeightTable } from '../components/common/FillHeightPage';
 
 interface Container {
   id: string;
@@ -172,36 +169,31 @@ const ContainerManagement: React.FC = () => {
     },
   ];
 
-  if (loading) {
-    return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
-        <CircularProgress />
-      </Box>
-    );
-  }
-
   return (
-    <Box>
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-        <Typography variant="h4">
-          Container Management
-        </Typography>
-        <Button
-          variant="contained"
-          onClick={() => setShowForm(true)}
-        >
-          Create Container
-        </Button>
-      </Box>
+    <FillHeightPage
+      header={
+        <>
+          <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+            <Typography variant="h4">Container Management</Typography>
+            <Button variant="contained" onClick={() => setShowForm(true)}>
+              Create Container
+            </Button>
+          </Box>
 
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }}>
-          {error}
-        </Alert>
-      )}
-
-      <Card>
-        <CardContent>
+          {error && (
+            <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
+              {error}
+            </Alert>
+          )}
+        </>
+      }
+    >
+      {loading ? (
+        <Box display="flex" justifyContent="center" alignItems="center" flex={1}>
+          <CircularProgress />
+        </Box>
+      ) : (
+        <FillHeightTable>
           <DataGrid
             rows={containers}
             columns={columns}
@@ -212,12 +204,10 @@ const ContainerManagement: React.FC = () => {
                 paginationModel: { page: 0, pageSize: 25 },
               },
             }}
-            sx={{ width: '100%' }}
-            autoHeight
             disableRowSelectionOnClick
           />
-        </CardContent>
-      </Card>
+        </FillHeightTable>
+      )}
 
       {/* Container Form Dialog */}
       <Dialog
@@ -233,7 +223,7 @@ const ContainerManagement: React.FC = () => {
           <ContainerForm
             container={selectedContainer}
             lookupData={lookupData}
-            onSubmit={selectedContainer ? 
+            onSubmit={selectedContainer ?
               (data) => handleUpdateContainer(selectedContainer.id, data) :
               handleCreateContainer
             }
@@ -267,7 +257,7 @@ const ContainerManagement: React.FC = () => {
           )}
         </DialogContent>
       </Dialog>
-    </Box>
+    </FillHeightPage>
   );
 };
 

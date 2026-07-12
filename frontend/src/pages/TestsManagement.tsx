@@ -2,9 +2,6 @@ import React, { useState, useEffect } from 'react';
 import {
   Box,
   Typography,
-  Button,
-  Card,
-  CardContent,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -14,10 +11,10 @@ import {
 } from '@mui/material';
 import { DataGrid, GridColDef, GridActionsCellItem } from '@mui/x-data-grid';
 import EditIcon from '@mui/icons-material/Edit';
-import { useNavigate } from 'react-router-dom';
 import TestForm from '../components/tests/TestForm';
 import { apiService, addClientFilterIfNeeded } from '../services/apiService';
 import { useUser } from '../contexts/UserContext';
+import { FillHeightPage, FillHeightTable } from '../components/common/FillHeightPage';
 
 interface Test {
   id: string;
@@ -38,8 +35,7 @@ interface Test {
 }
 
 const TestsManagement: React.FC = () => {
-  const { hasPermission, user, isSystemClient, isAdmin } = useUser();
-  const navigate = useNavigate();
+  const { hasPermission, user } = useUser();
   const [tests, setTests] = useState<Test[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -199,36 +195,34 @@ const TestsManagement: React.FC = () => {
     },
   ];
 
-  if (loading) {
-    return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
-        <CircularProgress />
-      </Box>
-    );
-  }
-
   return (
-    <Box sx={{ p: 3 }}>
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-        <Typography variant="h4">
-          Tests Management
-        </Typography>
-      </Box>
+    <FillHeightPage
+      header={
+        <>
+          <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+            <Typography variant="h4">Tests Management</Typography>
+          </Box>
 
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
-          {error}
-        </Alert>
-      )}
+          {error && (
+            <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
+              {error}
+            </Alert>
+          )}
 
-      {!canUpdate && (
-        <Alert severity="info" sx={{ mb: 2 }}>
-          You have read-only access. Contact your administrator for update permissions.
-        </Alert>
-      )}
-
-      <Card>
-        <CardContent>
+          {!canUpdate && (
+            <Alert severity="info" sx={{ mb: 2 }}>
+              You have read-only access. Contact your administrator for update permissions.
+            </Alert>
+          )}
+        </>
+      }
+    >
+      {loading ? (
+        <Box display="flex" justifyContent="center" alignItems="center" flex={1}>
+          <CircularProgress />
+        </Box>
+      ) : (
+        <FillHeightTable>
           <DataGrid
             rows={tests}
             columns={columns}
@@ -238,12 +232,10 @@ const TestsManagement: React.FC = () => {
                 paginationModel: { page: 0, pageSize: 25 },
               },
             }}
-            sx={{ width: '100%' }}
-            autoHeight
             disableRowSelectionOnClick
           />
-        </CardContent>
-      </Card>
+        </FillHeightTable>
+      )}
 
       {/* Test Form Dialog */}
       <Dialog
@@ -271,7 +263,7 @@ const TestsManagement: React.FC = () => {
           />
         </DialogContent>
       </Dialog>
-    </Box>
+    </FillHeightPage>
   );
 };
 
