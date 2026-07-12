@@ -96,6 +96,36 @@ export interface BatchCompatibilityWarning {
   samples: ExpiredSampleWarning[] | ExpiringSoonSampleWarning[];
 }
 
+/** Dry-run promote-on-publish plan (GET /v1/lims-runs/{id}/promotion/preview). */
+export interface PromotionPreviewItem {
+  action: 'create' | 'update' | 'conflict' | 'skip' | string;
+  sample_id?: string | null;
+  test_id?: string | null;
+  analyte_id?: string | null;
+  analyte_name?: string | null;
+  raw_result?: string | null;
+  replicate?: number;
+  column_key?: string | null;
+  match_via?: string | null;
+  message?: string | null;
+  lims_run_data_id?: string | null;
+}
+
+export interface PromotionPreview {
+  run_id: string;
+  analysis_id?: string | null;
+  will_promote: boolean;
+  create_count: number;
+  update_count: number;
+  conflict_count: number;
+  skip_count: number;
+  unresolved_columns: string[];
+  missing_sample_rows: number;
+  errors: string[];
+  items: PromotionPreviewItem[];
+  items_truncated?: boolean;
+}
+
 export interface BatchCompatibilityResult {
   compatible: boolean;
   error?: string;
@@ -1626,8 +1656,8 @@ class ApiService {
   }
 
   /** Dry-run of promote-on-publish (creates/updates/conflicts). */
-  async getLimsRunPromotionPreview(id: string) {
-    const response: AxiosResponse = await this.api.get(
+  async getLimsRunPromotionPreview(id: string): Promise<PromotionPreview> {
+    const response: AxiosResponse<PromotionPreview> = await this.api.get(
       `/v1/lims-runs/${id}/promotion/preview`,
     );
     return response.data;

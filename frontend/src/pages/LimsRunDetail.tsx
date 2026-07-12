@@ -32,13 +32,25 @@ import {
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { useNavigate, useParams } from 'react-router-dom';
-import { apiService } from '../services/apiService';
+import { apiService, PromotionPreview } from '../services/apiService';
+import PublishPromotionDialog from '../components/runs/PublishPromotionDialog';
 import DoseResponseTab from './DoseResponse/DoseResponseTab';
 
 const apiErrorMsg = (err: any, fallback: string): string => {
   const detail = err?.response?.data?.detail;
   if (typeof detail === 'string') return detail;
-  if (detail && typeof detail === 'object' && detail.message) return detail.message;
+  if (detail && typeof detail === 'object') {
+    if (detail.message) {
+      const extra =
+        Array.isArray(detail.errors) && detail.errors.length
+          ? ` ${detail.errors.slice(0, 3).join('; ')}`
+          : '';
+      return `${detail.message}${extra}`;
+    }
+    if (detail.code === 'promotion_conflict') {
+      return 'Publish blocked: result conflicts with another run or manual entry.';
+    }
+  }
   if (Array.isArray(detail) && detail.length > 0) return detail[0]?.msg || fallback;
   return fallback;
 };
@@ -102,6 +114,12 @@ const LimsRunDetail: React.FC = () => {
   const [analyses, setAnalyses] = useState<{ id: string; name: string }[]>([]);
   const [savingAnalysis, setSavingAnalysis] = useState(false);
   const [noAnalysisDialog, setNoAnalysisDialog] = useState(false);
+  const [publishDialogOpen, setPublishDialogOpen] = useState(false);
+  const [publishPreview, setPublishPreview] = useState<PromotionPreview | null>(null);
+  const [publishPreviewLoading, setPublishPreviewLoading] = useState(false);
+  const [publishPreviewError, setPublishPreviewError] = useState<string | null>(null);
+  const [publishing, setPublishing] = useState(false);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
   useEffect(() => {
     if (!runId) return;
@@ -194,6 +212,62 @@ const LimsRunDetail: React.FC = () => {
     }
   };
 
+  const openPublishDialog = async () => {
+    if (!runId || !run) return;
+    setSuccessMsg(null);
+    setError(null);
+    setPublishDialogOpen(true);
+    setPublishPreview(null);
+    setPublishPreviewError(null);
+
+    if (!run.analysis_id) {
+      setPublishPreviewLoading(false);
+      return;
+    }
+
+    setPublishPreviewLoading(true);
+    try {
+      const preview = await apiService.getLimsRunPromotionPreview(runId);
+      setPublishPreview(preview);
+    } catch (err: any) {
+      setPublishPreviewError(apiErrorMsg(err, 'Failed to load promotion preview'));
+    } finally {
+      setPublishPreviewLoading(false);
+    }
+  };
+
+  const confirmPublish = async () => {
+    if (!runId) return;
+    setPublishing(true);
+    setError(null);
+    try {
+      await apiService.publishLimsRun(runId);
+      setPublishDialogOpen(false);
+      setPublishPreview(null);
+      const created = publishPreview?.create_count ?? 0;
+      const updated = publishPreview?.update_count ?? 0;
+      if (run?.analysis_id) {
+        setSuccessMsg(
+          `Published. Results: ${created} created, ${updated} updated.`,
+        );
+      } else {
+        setSuccessMsg('Published (no analysis — no Tests/Results written).');
+      }
+      await loadRun();
+    } catch (err: any) {
+      const status = err?.response?.status;
+      const detail = err?.response?.data?.detail;
+      // Surface 409 conflicts in-dialog when possible
+      if (status === 409 && detail?.preview) {
+        setPublishPreview(detail.preview as PromotionPreview);
+        setPublishPreviewError(null);
+      }
+      setError(apiErrorMsg(err, 'Failed to publish run'));
+    } finally {
+      setPublishing(false);
+    }
+  };
+
   const handleTransition = async (
     action: 'order' | 'start' | 'results-received' | 'review' | 'publish' | 'cancel',
   ) => {
@@ -202,12 +276,15 @@ const LimsRunDetail: React.FC = () => {
       await doStart(false);
       return;
     }
+    if (action === 'publish') {
+      await openPublishDialog();
+      return;
+    }
     setTransitioning(true);
     try {
       if (action === 'order') await apiService.orderLimsRun(runId);
       else if (action === 'results-received') await apiService.markResultsReceived(runId);
       else if (action === 'review') await apiService.reviewLimsRun(runId);
-      else if (action === 'publish') await apiService.publishLimsRun(runId);
       else if (action === 'cancel') await apiService.cancelLimsRun(runId);
       await loadRun();
     } catch (err: any) {
@@ -250,6 +327,11 @@ const LimsRunDetail: React.FC = () => {
       {error && (
         <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
           {error}
+        </Alert>
+      )}
+      {successMsg && (
+        <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccessMsg(null)}>
+          {successMsg}
         </Alert>
       )}
 
@@ -496,6 +578,24 @@ const LimsRunDetail: React.FC = () => {
       {activeTab === 2 && runId && (
         <DoseResponseTab runId={runId} runStatus={run.status} />
       )}
+
+      <PublishPromotionDialog
+        open={publishDialogOpen}
+        onClose={() => {
+          if (!publishing) {
+            setPublishDialogOpen(false);
+            setPublishPreview(null);
+            setPublishPreviewError(null);
+          }
+        }}
+        onConfirm={confirmPublish}
+        hasAnalysis={Boolean(run.analysis_id)}
+        analysisName={analysisName}
+        preview={publishPreview}
+        loading={publishPreviewLoading}
+        loadError={publishPreviewError}
+        publishing={publishing}
+      />
 
       <Dialog open={noAnalysisDialog} onClose={() => setNoAnalysisDialog(false)} maxWidth="sm" fullWidth>
         <DialogTitle>No analysis associated</DialogTitle>
