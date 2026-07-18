@@ -40,7 +40,8 @@
 
 - CHECK constraints for XOR instrument/cro  
 - Partial unique indexes for is_default  
-- Whether setup files are ephemeral in P1  
+- Setup files: **persisted in P1** (`parser_setup_files`) — not ephemeral (product 2026-07-18)  
+- Pre-release: simple migrate/delete of old template parsers; **no** dual-write production cutover plan until real users
 
 ## Verdict (fill in)
 

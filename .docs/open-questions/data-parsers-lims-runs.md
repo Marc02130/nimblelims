@@ -232,10 +232,10 @@ Given column stats from examples/tests (types, min/max, null rate, sample of val
 
 | Sub-Q | Suggested default |
 |-------|-------------------|
-| 10a | Retain uploaded files in DB vs ephemeral session only? | Ephemeral + optional attach to parser for re-run |
-| 10b | Max files / max size? | e.g. 10 files, 10 MB each |
+| 10a | Retain uploaded files? | **Decided: persist** (`parser_setup_files` in P1)—not ephemeral-only |
+| 10b | Max files / max size? | e.g. 10 files, 10 MB each (implement defaults OK) |
 | 10c | Must all tests pass to activate, or majority? | All hard-error-free |
-| 10d | Synthetic edge fixtures stored as blobs or generated on the fly? | Store accepted fixtures with parser |
+| 10d | Synthetic edge fixtures stored? | Store accepted fixtures with parser (same table, role=`edge_fixture`) |
 
 ### Decision record
 
@@ -289,9 +289,11 @@ Instruments and CROs emit **consistent** files. Create parser once (optionally w
 | Phase | Scope | Open blockers |
 |-------|--------|---------------|
 | **P0** | Instrument + CRO catalogs | Q2 (catalog grain), Q3, Q7 |
-| **P1** | Parser scoped analysis×source; run FKs; import by `parser_id`; **example+test file dry-run harness** | Q1 schema freeze (core fields), Q4, Q6, Q8, Q9; **#10a–c** for activate/retention polish |
-| **P2** | AI draft config + **AI edge-test suggestions** | **Q1 fully locked** + Security P2 + #10d; **P0+P1 done** |
-| **P3** | Snapshot, formats, SOP bridge | Q5 |
+| **P1** | Parsers analysis×source; run FKs; **persisted** setup files; test harness; import by `parser_id` | Q1 freeze (core fields), Q4, Q6, Q8, Q9; #10b–c polish |
+| **P2** | AI draft + edge suggestions | **Q1 locked** + Security P2; **P0+P1 done** |
+| **P3+** | Snapshot / richer formats / multi-tenant cutover patterns | Only when there are real production users (Q5 etc.) |
+
+**Pre-release:** phase the **work** (P0→P1→P2). Do **not** invest in production dual-write / switchover plans until multi-tenant production use exists.
 
 **CEO:** Resolve open questions **before implementation starts**. Architecture, security, and UI reviews still outstanding.
 
