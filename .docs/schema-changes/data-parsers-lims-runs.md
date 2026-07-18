@@ -2,7 +2,7 @@
 
 **Feature / cycle:** Data parsers, instruments/CRO sources, LimsRun lineage  
 **Phases covered:** **P0 + P1** (P2 AI = no schema required unless setup-file persistence chosen)  
-**Status:** Ready for architecture review  
+**Status:** Schema **verified** by architecture (2026-07-18); full architecture review still in progress  
 **Alembic revisions:** _(none yet)_  
 **Requirements:** [../requirements/data-parsers-lims-runs.md](../requirements/data-parsers-lims-runs.md)  
 **Tech sketch:** [../tech-sketch/data-parsers-lims-runs.md](../tech-sketch/data-parsers-lims-runs.md)  
