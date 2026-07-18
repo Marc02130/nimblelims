@@ -74,12 +74,13 @@ Exact CHECK SQL may be refined at implement time; intent is fixed.
 
 | Object | Policy change | Notes |
 |--------|---------------|-------|
-| `instruments` | **TBD implement** | Lab-config tables: typically all lab users with config:edit can manage; readable by lab roles that import. **Not** client-user writable. Confirm with security. |
-| `cro_sources` | **TBD implement** | Same as instruments |
-| `instrument_parsers` | **Review existing** + extend for new rows | Ensure client roles cannot mutate parsers |
-| `lims_runs` new FKs | No new table | Existing lims_runs RLS continues; FKs do not expand client write surface |
+| `instruments` | Lab-global config | **Not multi-tenant.** Readable/writable by lab config roles; **not** client-user writable. No `org_id` / tenant column this cycle. |
+| `cro_sources` | Lab-global config | Same as instruments |
+| `instrument_parsers` | Lab-global config | Same; client roles cannot mutate |
+| `parser_setup_files` | Lab-global / owned via parser | Same posture as parsers |
+| `lims_runs` new FKs | No new table | Existing lims_runs RLS continues |
 
-Architecture + security must approve RLS approach before merge; document final policies here when implemented.
+**Multi-tenant / org segregation:** out of scope — [ideas/multi-tenant.md](../ideas/multi-tenant.md). Do not add tenant keys “for later” in this feature.
 
 ## 4. Data migration / backfill
 
@@ -115,7 +116,7 @@ Do **not** change as part of data-parsers P0/P1:
 | ID | Topic | Blocks |
 |----|--------|--------|
 | Q2 | Instrument grain (name + vendor/model sufficient?) | P0 column set |
-| Q7 | Lab-global vs client-scoped catalogs | RLS design |
+| Q7 | Multi-tenant catalogs | **Decided: lab-global; multi-tenant OOS** — ideas/multi-tenant.md |
 | Q9 | Keep table name `instrument_parsers` | Naming only |
 | #10a | Persist setup files? | **Decided: yes** — `parser_setup_files` in P1 |
 | Q5 | parser_config snapshot on run | Defer until multi-user production need |

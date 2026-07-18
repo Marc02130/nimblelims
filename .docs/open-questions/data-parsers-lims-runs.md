@@ -34,7 +34,7 @@ Do not implement a phase until questions that **block** that phase are **Decided
 | 5 | Snapshot `parser_config` on first import? | **Open** / lean defer | P3 | _Suggested:_ FK only for MVP | | Architecture | Lineage via parser_id enough if edits audited |
 | 6 | Non-reportable run (no analysis): how is parser required? | **Open** | P1 import | _No template fallback_ (column removed). Options: require analysis for import; or allow source+parser with analysis optional for non-reportable | 2026-07-12 | Product | Template-scoped parsers removed by decision |
 | **15** | Keep `experiment_template_id` on parsers? | **Decided** | Schema | **Remove** the column entirely | 2026-07-12 | Product / Architecture | Parsers are analysis×instrument/CRO only |
-| 7 | Instruments/CRO catalogs multi-tenant scope? | **Open** | P0 | _Suggested:_ lab-global, not client-owned | | Product / Security | Config not client portal |
+| 7 | Instruments/CRO catalogs multi-tenant scope? | **Decided** | P0 | **Lab-global only.** No org segregation. Multi-tenant **out of scope** until real multi-org users — see [ideas/multi-tenant.md](../ideas/multi-tenant.md) | 2026-07-18 | Product | Pre-release; single lab deployment |
 | 8 | Multiple parsers per analysis×source: default selection rule? | **Open** | P1 | _Suggested:_ `is_default` + require unique default | | Product | |
 | 9 | Table naming: keep `instrument_parsers` vs rename? | **Open** | P1 migration | _Suggested:_ keep table, evolve columns | | Architecture | Less migration noise |
 
@@ -289,7 +289,7 @@ Instruments and CROs emit **consistent** files. Create parser once (optionally w
 
 | Phase | Scope | Open blockers |
 |-------|--------|---------------|
-| **P0** | Instrument + CRO catalogs | Q2 (catalog grain), Q3, Q7 |
+| **P0** | Instrument + CRO catalogs | Q2 (catalog grain), Q3 |
 | **P1** | Parsers analysis×source; run FKs; **persisted** setup files; test harness; import by `parser_id` | Q1 freeze (core fields), Q4, Q6, Q8, Q9; #10b–c polish |
 | **P2** | AI draft + edge suggestions | **Q1 locked** + Security P2; **P0+P1 done** |
 | **P3+** | Snapshot / richer formats / multi-tenant cutover patterns | Only when there are real production users (Q5 etc.) |

@@ -25,6 +25,7 @@
 | **Setup files** | **1+ example** files (derive config) and **1+ test** files (engine dry-run); text tables (tab/comma/etc.) |
 | **User testing** | Framework runs same import engine on test files before activate; AI may suggest **edge tests** (e.g. negatives) — human accepts; engine judges |
 | **Open questions** | [open-questions/data-parsers-lims-runs.md](../open-questions/data-parsers-lims-runs.md) |
+| **Multi-tenant** | **Out of scope** — lab-global catalogs; future: [multi-tenant.md](multi-tenant.md) |
 
 This is **not** “AI imports results every time.” It is “AI helps you configure the thing that will import results forever.”
 
