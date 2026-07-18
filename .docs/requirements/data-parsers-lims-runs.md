@@ -128,8 +128,8 @@ User testing is part of the **parser framework**, not a separate product.
 
 | ID | Requirement |
 |----|-------------|
-| FR-6.1 | When creating/editing a parser, user may upload **one or more example files** (text tables) used to derive/refine `parser_config`. |
-| FR-6.2 | User may upload **one or more test files** used to validate a candidate config (may differ from examples). |
+| FR-6.1 | When creating/editing a parser, user may upload **one or more example files** (text tables) used to derive/refine `parser_config`. Files are **persisted** (not session-only). |
+| FR-6.2 | User may upload **one or more test files** used to validate a candidate config (may differ from examples). Files are **persisted**. |
 | FR-6.3 | Framework shall run the **same import engine** against each test file with the candidate config (after schema validation—see open Q1). |
 | FR-6.4 | UI shall show per-file results: pass/fail, row counts, warnings, hard errors. |
 | FR-6.5 | **Activate / ready-for-import** (provisional): at least one test file completes with **zero hard errors** before parser is marked production-ready. |

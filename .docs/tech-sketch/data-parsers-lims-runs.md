@@ -146,21 +146,21 @@ CHECK: NOT (instrument_id IS NOT NULL AND cro_source_id IS NOT NULL)
 
 `analysis_id` already present.
 
-### 4.4 Setup artifacts (P1 ephemeral or light persistence)
+### 4.4 Setup artifacts (P1 — **persisted**, not ephemeral)
 
-**Provisional:** session/API-held uploads during wizard; optional later table:
+Examples, tests, and accepted edge fixtures are stored for re-run and audit (pre-release: simple storage is fine).
 
 ```sql
 parser_setup_files (
-  id, parser_id NULL,  -- null until parser saved
+  id, parser_id NULL,  -- set when parser saved / linked
   role  TEXT CHECK (role IN ('example', 'test', 'edge_fixture')),
   filename, content_type, size_bytes,
-  storage_ref or bytea,  -- prefer object storage / limited bytea
+  storage_ref or bytea,
   created_by, created_at
 );
 ```
 
-P1 can use **in-request multipart** for dry-run without permanent storage (open Q10a).
+No dual ephemeral/P1 vs permanent path. See schema-changes for the authoritative table.
 
 ## 5. ParserConfig contract (schema-first)
 
@@ -296,13 +296,14 @@ Permissions (provisional): catalog/parser CRUD = `config:edit`; run fields = exi
 | LimsRun Overview | Analysis + Instrument XOR CRO + Parser chip (default/override) |
 | LimsRun Import | File → engine with stored parser_id; errors plain language |
 
-## 9. Migration plan
+## 9. Migration plan (pre-release — keep simple)
 
-1. Add `instruments`, `cro_sources`.  
-2. On `instrument_parsers`: add analysis/instrument/cro/is_default/active; migrate or delete existing template-scoped rows; **DROP `experiment_template_id`**.  
-3. Add lims_runs FKs (`instrument_id`, `cro_source_id`, `parser_id`).  
-4. Import resolves only via `run.parser_id` / analysis×source default.  
-5. Update SOP parse to stop writing template-scoped parsers.  
+**Do not** plan gradual production cutover, dual-write, or long dual-path import until there are real multi-tenant production users. Chunk by **phase**, not by blue/green switchover.
+
+1. **P0:** `instruments`, `cro_sources`.  
+2. **P1:** `parser_setup_files`; re-scope parsers (delete old template-scoped rows OK); **DROP `experiment_template_id`**; lims_runs FKs; new import resolution.  
+3. SOP parse: stop writing template-scoped parsers.  
+4. **P2:** AI only (no schema required beyond existing setup files).
 
 ## 10. Phase mapping
 

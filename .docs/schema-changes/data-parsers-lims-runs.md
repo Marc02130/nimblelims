@@ -1,8 +1,8 @@
 # Schema changes: data-parsers-lims-runs
 
 **Feature / cycle:** Data parsers, instruments/CRO sources, LimsRun lineage  
-**Phases covered:** **P0 + P1** (P2 AI = no schema required unless setup-file persistence chosen)  
-**Status:** Schema **verified** by architecture (2026-07-18); full architecture review still in progress  
+**Phases covered:** **P0 + P1** (P2 AI = no extra schema beyond setup files already in P1)  
+**Status:** Schema **verified** by architecture (2026-07-18); updated 2026-07-18 — no ephemeral setup path; pre-release (no production switchover plan)  
 **Alembic revisions:** _(none yet)_  
 **Requirements:** [../requirements/data-parsers-lims-runs.md](../requirements/data-parsers-lims-runs.md)  
 **Tech sketch:** [../tech-sketch/data-parsers-lims-runs.md](../tech-sketch/data-parsers-lims-runs.md)  
@@ -23,6 +23,7 @@ Add light **instrument** and **CRO source** catalogs; re-scope **instrument_pars
 |-------|---------|-------------|
 | **`instruments`** | Lab data-source catalog (not full asset CMMS) | `id`, `name`, `vendor` NULL, `model` NULL, `description` NULL, `active`, audit cols |
 | **`cro_sources`** | External/CRO export-source catalog | `id`, `name`, `description` NULL, `client_id` NULL → `clients`, `active`, audit cols |
+| **`parser_setup_files`** | Persisted example / test / edge fixtures for parser setup | `id`, `parser_id` FK (nullable until saved), `role` (`example`\|`test`\|`edge_fixture`), `filename`, `content_type`, `size_bytes`, storage (bytea or object ref), `created_by`, `created_at` |
 
 ### 2.2 Altered tables
 
@@ -62,12 +63,12 @@ Exact CHECK SQL may be refined at implement time; intent is fixed.
 |------|--------|
 | — | **None** this cycle |
 
-### 2.5 Optional / not MVP (P2–P3 — do not implement in P0/P1 unless decided)
+### 2.5 Optional / not MVP (later — not P0/P1)
 
 | Object | Notes |
 |--------|-------|
-| **`parser_setup_files`** | Only if product chooses persistent examples/tests (open #10a). Default P1: ephemeral upload for dry-run. |
-| Snapshot column on `lims_runs` (e.g. `parser_config_snapshot` JSONB) | Open Q5 — lean defer |
+| Snapshot column on `lims_runs` (e.g. `parser_config_snapshot` JSONB) | Open Q5 — lean defer until real multi-tenant production need |
+| Dual-write / gradual production cutover of template parsers | **Out of scope** — pre-release; simple migrate-or-delete |
 
 ## 3. RLS
 
@@ -82,21 +83,19 @@ Architecture + security must approve RLS approach before merge; document final p
 
 ## 4. Data migration / backfill
 
-- [x] **No backfill required** for new catalogs (empty at start)  
-- [ ] **Existing `instrument_parsers` rows** (template-scoped): before DROP `experiment_template_id`:
-  1. **Preferred:** migrate each row to analysis×instrument|CRO if mapping is known, **or**  
-  2. **Acceptable for early envs:** **delete** template-only parser rows (dev/UAT with disposable data) after confirming no critical production dependence, **or**  
-  3. One-time script: export configs for re-entry via new admin UI  
-- [x] **No dual-write** to template-scoped parsers after cutover  
-- [x] **Import** no longer resolves parser via `experiment_template_id`  
+**Context:** NimbleLIMS is **pre-release**. Do **not** design a multi-step production switchover, dual-write window, or long dual-path import. Chunk work by **phase (P0/P1/P2)**; keep migrations simple.
 
-**SOP parse impact (app, not only DB):** stop creating parsers with template FK; either create analysis×source parsers when context exists, or create template protocol only and leave parser setup to the new flow (product choice at implement).
+- [x] New catalogs and `parser_setup_files` start empty (or only what setup creates)  
+- [ ] **Existing template-scoped `instrument_parsers` rows:** **delete** (or one-shot re-create under analysis×source if we care about a specific env) then **DROP `experiment_template_id`**  
+- [x] **No dual-write**, no “legacy fallback” import path after cutover  
+- [x] **Import** only via `run.parser_id` / analysis×source default  
+
+**SOP parse (app):** stop creating template-linked parsers; protocol template only or future analysis×source path.
 
 ## 5. Rollback
 
-- Forward migrations preferred.  
-- Re-adding `experiment_template_id` after drop is painful if data was deleted—prefer staging validation.  
-- Soft-delete via `active=false` preferred over DROP of catalog/parser rows in production.
+- Forward migrations preferred; pre-release envs can rebuild DB if needed.  
+- Soft-delete via `active=false` for catalogs/parsers once data is real.
 
 ## 6. Explicitly out of scope (this cycle)
 
@@ -118,8 +117,8 @@ Do **not** change as part of data-parsers P0/P1:
 | Q2 | Instrument grain (name + vendor/model sufficient?) | P0 column set |
 | Q7 | Lab-global vs client-scoped catalogs | RLS design |
 | Q9 | Keep table name `instrument_parsers` | Naming only |
-| #10a | Persist setup files table? | Optional table |
-| Q5 | parser_config snapshot on run | P3 |
+| #10a | Persist setup files? | **Decided: yes** — `parser_setup_files` in P1 |
+| Q5 | parser_config snapshot on run | Defer until multi-user production need |
 
 Product: CEO locked analysis×instrument/CRO scope (Decision #11). Architecture to approve this delta list.
 
