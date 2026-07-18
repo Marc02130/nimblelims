@@ -228,14 +228,14 @@ Given column stats from examples/tests (types, min/max, null rate, sample of val
 
 **Output shape (proposed):** list of `{ name, description, file_content or mutations, expect: pass|warn|fail }` — still run only through the **code engine**, never “AI judges pass/fail” as sole gate.
 
-### Still open under #10
+### Sub-decisions under #10
 
-| Sub-Q | Suggested default |
-|-------|-------------------|
-| 10a | Retain uploaded files? | **Decided: persist** (`parser_setup_files` in P1)—not ephemeral-only |
-| 10b | Max files / max size? | e.g. 10 files, 10 MB each (implement defaults OK) |
-| 10c | Must all tests pass to activate, or majority? | All hard-error-free |
-| 10d | Synthetic edge fixtures stored? | Store accepted fixtures with parser (same table, role=`edge_fixture`) |
+| Sub-Q | Status | Decision |
+|-------|--------|----------|
+| 10a | **Decided** | **Persist** examples/tests/edges (`parser_setup_files` in P1)—not ephemeral-only |
+| 10b | Open / implement default | Caps e.g. 10 files, 10 MB each |
+| 10c | Open / lean | All hard-error-free to activate |
+| 10d | **Decided** | Accepted edge fixtures stored with parser |
 
 ### Decision record
 
@@ -243,9 +243,10 @@ Given column stats from examples/tests (types, min/max, null rate, sample of val
 |-------|--------|
 | **Status** | **Decided** (CEO confirmed) |
 | **Example files** | 1+ |
-| **Test files** | 1+; engine-run; activate after ≥1 clean pass (provisional detail #10a–c) |
+| **Test files** | 1+; engine-run; activate after ≥1 clean pass |
+| **File storage** | **Persisted** (not ephemeral) |
 | **AI edge suggestions** | Yes on setup (P2); human accept; engine executes |
-| **Date** | 2026-07-12 |
+| **Date** | 2026-07-12 · storage clarified 2026-07-18 |
 
 ---
 
