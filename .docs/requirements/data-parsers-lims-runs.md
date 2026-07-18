@@ -155,7 +155,7 @@ User testing is part of the **parser framework**, not a separate product.
 | FR-8.1 | Catalog and parser CRUD restricted to lab configuration roles (not lab client users). |
 | FR-8.2 | Run field changes (analysis, source, parser) require run edit permissions consistent with existing LimsRun RBAC. |
 | FR-8.3 | Import and parser CRUD actions are auditable (who, when, entity ids). |
-| FR-8.4 | Client RLS: instruments/CRO sources/parsers are lab-global config unless multi-tenant product later scopes them (default: lab-only, not client-configurable). |
+| FR-8.4 | Instruments / CRO sources / parsers are **lab-global** config (not client-configurable). **Multi-tenant / org segregation is out of scope** — see [ideas/multi-tenant.md](../ideas/multi-tenant.md). |
 
 ### FR-9: Non-reportable runs
 
@@ -261,7 +261,7 @@ File column  --parser-->  row_data[field_name]  --promote-->  Result(analyte)
 | 4 | Allow override to a parser from a different analysis? | No without strong warning / block |
 | 5 | Snapshot parser_config on first import? | Defer to P3; FK sufficient for MVP |
 | 6 | Non-reportable run without analysis: how is parser selected? | Open — **no template parser fallback**; see open-questions |
-| 7 | Multi-tenant: are instruments global to lab only? | Lab-only, not client-owned |
+| 7 | Multi-tenant / org segregation? | **Out of scope** — lab-global config; [ideas/multi-tenant.md](../ideas/multi-tenant.md) |
 
 ---
 
