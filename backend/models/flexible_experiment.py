@@ -4,7 +4,7 @@ Flexible experiment engine models (Phase 1).
 lims_runs      — lifecycle-managed instances of experiment_templates
                        status: draft → running → complete → published | failed
 lims_run_data      — JSONB result rows from instrument imports, per run
-instrument_parsers   — AI-learned column-mapping config for instrument output files
+data_parsers         — versioned file parse instructions (instrument XOR CRO)
 robot_worklist_configs — source/dest/volume config for liquid handling robot worklists
 sop_parse_jobs       — tracks async Claude API SOP extraction jobs
 
@@ -13,7 +13,7 @@ is left intact.
 """
 import uuid
 import enum
-from sqlalchemy import Column, String, Text, DateTime, ForeignKey, Enum as SAEnum, Boolean
+from sqlalchemy import Column, String, Text, DateTime, ForeignKey, Enum as SAEnum, Boolean, Integer, LargeBinary
 from sqlalchemy.dialects.postgresql import UUID as PostgresUUID, JSONB
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -170,6 +170,12 @@ class LimsRunData(Base):
         index=True,
     )
     row_data = Column(JSONB, nullable=False, server_default='{}')
+    import_id = Column(
+        PostgresUUID(as_uuid=True),
+        ForeignKey('lims_run_imports.id', ondelete='SET NULL'),
+        nullable=True,
+        index=True,
+    )
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
     created_by = Column(PostgresUUID(as_uuid=True), ForeignKey('users.id'), nullable=True)
     modified_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
@@ -178,44 +184,143 @@ class LimsRunData(Base):
     lims_run = relationship("LimsRun", back_populates="data_rows")
     container = relationship("Container")
     sample = relationship("Sample")
+    lims_run_import = relationship("LimsRunImport", foreign_keys=[import_id])
     creator = relationship("User", foreign_keys=[created_by])
     modifier = relationship("User", foreign_keys=[modified_by])
 
 
-class InstrumentParser(Base):
+class DataParser(Base):
     """
-    AI-learned column-mapping config for an instrument output format.
+    Versioned declarative parse instructions for instrument or CRO files.
 
-    parser_config schema (JSONB):
-    {
-      "columns": [
-        {"source_col": "Well", "field_name": "well_position", "data_type": "string"},
-        {"source_col": "RFU", "field_name": "rfu_value", "data_type": "float", "unit": "RFU"}
-      ],
-      "well_col": "Well",   // which column identifies the well position
-      "skip_rows": 2        // header rows to skip before data starts
-    }
+    Each row is one immutable version. Logical parser = version_group_id.
+    Exactly one of instrument_id / cro_source_id. At most one active per group.
     """
-    __tablename__ = 'instrument_parsers'
+    __tablename__ = 'data_parsers'
 
     id = Column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    experiment_template_id = Column(
-        PostgresUUID(as_uuid=True),
-        ForeignKey('experiment_templates.id', ondelete='CASCADE'),
-        nullable=False,
-        index=True,
-    )
     name = Column(String(255), nullable=False)
     description = Column(Text, nullable=True)
     parser_config = Column(JSONB, nullable=False, server_default='{}')
+    instrument_id = Column(
+        PostgresUUID(as_uuid=True),
+        ForeignKey('instruments.id'),
+        nullable=True,
+        index=True,
+    )
+    cro_source_id = Column(
+        PostgresUUID(as_uuid=True),
+        ForeignKey('cro_sources.id'),
+        nullable=True,
+        index=True,
+    )
+    version_group_id = Column(PostgresUUID(as_uuid=True), nullable=False, index=True)
+    version = Column(Integer, nullable=False, default=1)
+    active = Column(Boolean, nullable=False, default=False)
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
     created_by = Column(PostgresUUID(as_uuid=True), ForeignKey('users.id'), nullable=True)
     modified_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
     modified_by = Column(PostgresUUID(as_uuid=True), ForeignKey('users.id'), nullable=True)
 
-    experiment_template = relationship("ExperimentTemplate")
+    instrument = relationship("Instrument", foreign_keys=[instrument_id])
+    cro_source = relationship("CroSource", foreign_keys=[cro_source_id])
+    analyses_links = relationship(
+        "ParserAnalysis",
+        back_populates="parser",
+        cascade="all, delete-orphan",
+    )
+    setup_files = relationship(
+        "ParserSetupFile",
+        back_populates="parser",
+        cascade="all, delete-orphan",
+    )
     creator = relationship("User", foreign_keys=[created_by])
     modifier = relationship("User", foreign_keys=[modified_by])
+
+
+# Backward-compatible alias
+InstrumentParser = DataParser
+
+
+class ParserAnalysis(Base):
+    """M2M: which analyses a data parser version may serve."""
+    __tablename__ = 'parser_analyses'
+
+    parser_id = Column(
+        PostgresUUID(as_uuid=True),
+        ForeignKey('data_parsers.id', ondelete='CASCADE'),
+        primary_key=True,
+    )
+    analysis_id = Column(
+        PostgresUUID(as_uuid=True),
+        ForeignKey('analyses.id', ondelete='CASCADE'),
+        primary_key=True,
+    )
+    is_default = Column(Boolean, nullable=False, default=False)
+
+    parser = relationship("DataParser", back_populates="analyses_links")
+    analysis = relationship("Analysis")
+
+
+class ParserSetupFile(Base):
+    """Persisted example / test / edge fixtures for parser setup."""
+    __tablename__ = 'parser_setup_files'
+
+    id = Column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    parser_id = Column(
+        PostgresUUID(as_uuid=True),
+        ForeignKey('data_parsers.id', ondelete='CASCADE'),
+        nullable=True,
+        index=True,
+    )
+    role = Column(String(32), nullable=False)  # example | test | edge_fixture
+    filename = Column(String(512), nullable=False)
+    content_type = Column(String(128), nullable=True)
+    size_bytes = Column(Integer, nullable=False)
+    content = Column(LargeBinary, nullable=False)
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+    created_by = Column(PostgresUUID(as_uuid=True), ForeignKey('users.id'), nullable=True)
+
+    parser = relationship("DataParser", back_populates="setup_files")
+    creator = relationship("User", foreign_keys=[created_by])
+
+
+class LimsRunImport(Base):
+    """One import file/batch on a run — stores version parser_id used."""
+    __tablename__ = 'lims_run_imports'
+
+    id = Column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    lims_run_id = Column(
+        PostgresUUID(as_uuid=True),
+        ForeignKey('lims_runs.id', ondelete='CASCADE'),
+        nullable=False,
+        index=True,
+    )
+    instrument_id = Column(
+        PostgresUUID(as_uuid=True),
+        ForeignKey('instruments.id'),
+        nullable=True,
+    )
+    cro_source_id = Column(
+        PostgresUUID(as_uuid=True),
+        ForeignKey('cro_sources.id'),
+        nullable=True,
+    )
+    parser_id = Column(
+        PostgresUUID(as_uuid=True),
+        ForeignKey('data_parsers.id'),
+        nullable=False,
+        index=True,
+    )
+    filename = Column(String(512), nullable=True)
+    imported_at = Column(DateTime, server_default=func.now(), nullable=False)
+    imported_by = Column(PostgresUUID(as_uuid=True), ForeignKey('users.id'), nullable=True)
+
+    lims_run = relationship("LimsRun")
+    instrument = relationship("Instrument")
+    cro_source = relationship("CroSource")
+    parser = relationship("DataParser")
+    importer = relationship("User", foreign_keys=[imported_by])
 
 
 class RobotWorklistConfig(Base):

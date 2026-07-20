@@ -619,6 +619,69 @@ export class ApiService {
     return response.data;
   }
 
+  // Data parsers (P1)
+  async getDataParsers(params?: {
+    active_only?: boolean;
+    instrument_id?: string;
+    cro_source_id?: string;
+    analysis_id?: string;
+    version_group_id?: string;
+  }) {
+    const response: AxiosResponse = await this.api.get('/v1/data-parsers', { params });
+    return response.data;
+  }
+
+  async createDataParser(data: any) {
+    const response: AxiosResponse = await this.api.post('/v1/data-parsers', data);
+    return response.data;
+  }
+
+  async activateDataParser(id: string) {
+    const response: AxiosResponse = await this.api.post(`/v1/data-parsers/${id}/activate`);
+    return response.data;
+  }
+
+  async createDataParserVersion(versionGroupId: string, data: any) {
+    const response: AxiosResponse = await this.api.post(
+      `/v1/data-parsers/groups/${versionGroupId}/versions`,
+      data
+    );
+    return response.data;
+  }
+
+  async testDataParserConfig(parserConfig: any, files: File[]) {
+    const form = new FormData();
+    form.append('parser_config', JSON.stringify(parserConfig));
+    files.forEach((f) => form.append('files', f));
+    const response: AxiosResponse = await this.api.post('/v1/data-parsers/test', form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  }
+
+  async importLimsRunFile(
+    runId: string,
+    file: File,
+    meta: { instrument_id?: string; cro_source_id?: string; parser_id?: string }
+  ) {
+    const form = new FormData();
+    form.append('file', file);
+    if (meta.instrument_id) form.append('instrument_id', meta.instrument_id);
+    if (meta.cro_source_id) form.append('cro_source_id', meta.cro_source_id);
+    if (meta.parser_id) form.append('parser_id', meta.parser_id);
+    const response: AxiosResponse = await this.api.post(
+      `/v1/lims-runs/${runId}/import-file`,
+      form,
+      { headers: { 'Content-Type': 'multipart/form-data' } }
+    );
+    return response.data;
+  }
+
+  async getLimsRunImports(runId: string) {
+    const response: AxiosResponse = await this.api.get(`/v1/lims-runs/${runId}/imports`);
+    return response.data;
+  }
+
   // Container types endpoints
   async getContainerTypes() {
     const response: AxiosResponse = await this.api.get('/containers/types');
