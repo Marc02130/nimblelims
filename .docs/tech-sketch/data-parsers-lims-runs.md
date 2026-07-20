@@ -11,7 +11,7 @@
 
 | Today | Gap |
 |-------|-----|
-| `instrument_parsers.experiment_template_id` required | **Remove** template link; parsers keyed by analysis × instrument/CRO only |
+| `instrument_parsers` (+ template FK) | **Rename → `data_parsers`**; drop template link; instrument XOR CRO + M2M analyses |
 | Import resolves parser only via template | Run stores source + `parser_id`; no template fallback |
 | `ParserConfig` is minimal; engine hardcodes UTF-8 / csv defaults | Need explicit delimiter/encoding in schema for real files |
 | SOP AI creates template-centric parser | Need setup path: examples + tests + optional AI draft of same schema |
@@ -67,7 +67,7 @@
          └──────────┬───────────┘
                     ▼
 ┌───────────────────────────────────┐     ┌──────────────────┐
-│ instrument_parsers (version row)  │────►│ parser_analyses  │
+│ data_parsers (version row)        │────►│ parser_analyses  │
 │  version_group + version + active │ M2M │ analysis_id      │
 │  instrument|cro; parser_config    │     │ is_default       │
 └───────────────┬───────────────────┘     └────────┬─────────┘
@@ -136,12 +136,14 @@ cro_sources (
 );
 ```
 
-### 4.2 Evolve `instrument_parsers` (keep table name for migration ease)
+### 4.2 Rename + evolve → `data_parsers` (Decision #9)
 
 Each **row** is an **immutable version**. Logical parser = `version_group_id`. No import-time JSON snapshot (Decision #5).
 
 ```sql
-ALTER instrument_parsers:
+RENAME instrument_parsers TO data_parsers;
+
+ALTER data_parsers:
   DROP experiment_template_id
   instrument_id      UUID NULL REFERENCES instruments(id)
   cro_source_id      UUID NULL REFERENCES cro_sources(id)
@@ -156,7 +158,7 @@ UNIQUE (version_group_id, version)
 UNIQUE (version_group_id) WHERE active   -- partial: at most one active version
 
 parser_analyses (
-  parser_id UUID NOT NULL REFERENCES instrument_parsers,  -- version row
+  parser_id UUID NOT NULL REFERENCES data_parsers,  -- version row
   analysis_id UUID NOT NULL REFERENCES analyses,
   is_default BOOLEAN NOT NULL DEFAULT false,
   PRIMARY KEY (parser_id, analysis_id)
@@ -183,7 +185,7 @@ See [schema-changes](../schema-changes/data-parsers-lims-runs.md).
 lims_runs:
   instrument_id  UUID NULL REFERENCES instruments(id) ON DELETE SET NULL
   cro_source_id  UUID NULL REFERENCES cro_sources(id) ON DELETE SET NULL
-  parser_id      UUID NULL REFERENCES instrument_parsers(id) ON DELETE SET NULL
+  parser_id      UUID NULL REFERENCES data_parsers(id) ON DELETE SET NULL
 
 CHECK: NOT (instrument_id IS NOT NULL AND cro_source_id IS NOT NULL)
 ```
@@ -334,7 +336,7 @@ If ICP import wrote 20 metals into JSONB but run analysis is RCRA-8, promote cre
 |--------|------|-------|
 | CRUD | `/v1/instruments` | config permission |
 | CRUD | `/v1/cro-sources` | config permission |
-| CRUD | `/v1/data-parsers` or `/v1/instrument-parsers` | list active by default; include version history |
+| CRUD | `/v1/data-parsers` | list active by default; include version history |
 | POST | `/v1/data-parsers` | create v1 |
 | POST | `/v1/data-parsers/{version_group_id}/versions` | save new version (body: config + analyses + `activate?: bool`) |
 | POST | `/v1/data-parsers/{id}/activate` | activate this version; deactivate others in group |
@@ -346,9 +348,7 @@ If ICP import wrote 20 metals into JSONB but run analysis is RCRA-8, promote cre
 | POST | `/v1/lims-runs/{id}/import` | multipart: file + instrument_id\|cro_source_id + optional parser_id override → creates import event |
 | GET | `/v1/lims-runs/{id}/imports` | import history (source + parser per batch) |
 
-Exact path naming: prefer evolving existing parser routes if any; otherwise `/v1/data-parsers`.
-
-Permissions (provisional): catalog/parser CRUD = `config:edit`; run fields = existing run edit; import = existing run import; AI = same as parser CRUD + server key.
+Permissions: catalog/parser CRUD = `config:edit`; run fields = existing run edit; import = existing run import; AI = same as parser CRUD + server key.
 
 ## 8. UI surfaces (for UI review)
 
@@ -356,7 +356,7 @@ Permissions (provisional): catalog/parser CRUD = `config:edit`; run fields = exi
 |---------|----------|
 | Admin Instruments | Fill-height DataGrid CRUD |
 | Admin CRO sources | Same |
-| Admin / Analysis Parsers | List **active** by default; version history; editor; example/test; save → **activate prompt** |
+| Admin **Data parsers** | List **active** by default; version history; editor; example/test; save → **activate prompt** |
 | LimsRun Overview | Analysis + Instrument XOR CRO + Parser chip (name + version) |
 | LimsRun Import | File → engine with stored version `parser_id`; history shows version used |
 
@@ -374,7 +374,7 @@ Permissions (provisional): catalog/parser CRUD = `config:edit`; run fields = exi
 | Phase | Deliver |
 |-------|---------|
 | **P0** | `instruments`, `cro_sources` models/API/UI |
-| **P1** | Parser scope + **version_group/version/active**; ParserConfig v1 + engine; setup test harness; import by version `parser_id`; activate prompt |
+| **P1** | **`data_parsers` rename**; version_group/version/active; ParserConfig v1 + engine; setup tests; import by version `parser_id`; activate prompt |
 | **P2** | AI draft + edge suggestions (async jobs); still validate+engine |
 | **P3** | XLSX; richer formats; SOP bridge polish |
 

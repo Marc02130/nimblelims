@@ -33,7 +33,7 @@
 |---|--------|
 | **Q1** | Canonical ParserConfig + AI must emit same schema |
 | **#10** | Multi-file testing; AI edges judged by engine |
-| Q9 | Keep table name `instrument_parsers` |
+| Q9 | **Decided:** rename → **`data_parsers`** |
 | Q5 | **Decided:** version_group + version + active; no import JSON snapshot |
 
 ## Risks to confirm

@@ -12,7 +12,7 @@
 
 ### 1.1 Problem
 
-LimsRun import today depends on an **`InstrumentParser` tied to an experiment template**. Real labs and CROs need:
+LimsRun import today depends on an **`InstrumentParser`** (table `instrument_parsers`) **tied to an experiment template**. Real labs and CROs need **`data_parsers`** (generic name) keyed by instrument or CRO:
 
 - A **reusable, deterministic** way to turn instrument/CRO result files into `lims_run_data`  
 - Scoping by **analysis + instrument** (in-house) or **analysis + CRO** (external)  
@@ -165,7 +165,7 @@ User testing is part of the **parser framework**, not a separate product.
 | ID | Requirement |
 |----|-------------|
 | FR-7.1 | **No template-scoped parsers** after cutover; import does **not** fall back to `experiment_template_id`. |
-| FR-7.2 | Migration **drops** `instrument_parsers.experiment_template_id`; existing rows migrated to analysis×source or removed (see schema-changes). |
+| FR-7.2 | Migration **renames** `instrument_parsers` → **`data_parsers`**, **drops** `experiment_template_id`; existing rows migrated or removed (see schema-changes). |
 | FR-7.3 | SOP parse must **stop** creating template-linked parsers; parser setup uses the analysis×instrument/CRO flow (or SOP only fills protocol template). |
 
 ### FR-8: Permissions and audit
@@ -206,7 +206,7 @@ User testing is part of the **parser framework**, not a separate product.
 instruments (id, name, vendor?, model?, description?, active, …)
 cro_sources (id, name, description?, client_id?, active, …)
 
-instrument_parsers (evolved — each row is one version)
+data_parsers (renamed from instrument_parsers — each row is one version)
   id, version_group_id, version, active   -- at most one active per group
   name, description
   instrument_id NULL | cro_source_id NULL  -- exactly one

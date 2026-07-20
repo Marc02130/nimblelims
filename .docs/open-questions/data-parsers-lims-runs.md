@@ -38,7 +38,7 @@ Do not implement a phase until questions that **block** that phase are **Decided
 | **16** | Run analysis + multi instrument/parser rules? | **Decided** | P1 import/schema | See **Decision #16** | 2026-07-19 | Product | Run tied to analysis; multiple instruments/parsers allowed; each must match analysis + that instrument/CRO |
 | 7 | Instruments/CRO catalogs multi-tenant scope? | **Decided** | P0 | **Lab-global only.** No org segregation. Multi-tenant **out of scope** until real multi-org users — see [ideas/multi-tenant.md](../ideas/multi-tenant.md) | 2026-07-18 | Product | Pre-release; single lab deployment |
 | 8 | Multiple parsers per analysis×source: default selection rule? | **Decided (provisional)** | P1 | `parser_analyses.is_default` for that analysis; at most one default per (analysis, instrument\|cro) among linked parsers | 2026-07-19 | Product | |
-| 9 | Table naming: keep `instrument_parsers` vs rename? | **Open** | P1 migration | _Suggested:_ keep table, evolve columns | | Architecture | Less migration noise |
+| 9 | Table naming: keep `instrument_parsers` vs rename? | **Decided** | P1 migration | **Rename → `data_parsers`** (generic; instrument + CRO). API/UI: “Data parsers” | 2026-07-19 | Product | See **Decision #9** |
 
 ---
 
@@ -344,7 +344,7 @@ Optional UI convenience: “last instrument / last parser” denormalized on the
 | Phase | Scope | Open blockers |
 |-------|--------|---------------|
 | **P0** | Instrument types + instances + CRO catalogs | Q2 done; permissions **config:edit** |
-| **P1** | Parsers analysis×source; run FKs; **persisted** setup files; test harness; import by `parser_id` | Q1 freeze (core fields), Q8, Q9; #10b–c polish (Q4, Q6 decided) |
+| **P1** | Parsers analysis×source; **`data_parsers` rename**; run FKs; setup files; test harness; import by `parser_id` | Q1 freeze (core fields); #10b–c polish |
 | **P2** | AI draft + edge suggestions | **Q1 locked** + Security P2; **P0+P1 done** |
 | **P3+** | Richer formats / multi-tenant cutover patterns | Only when there are real production users |
 
@@ -409,6 +409,41 @@ Treat each **saved definition** of a parser as an **immutable version row**. Imp
 
 ---
 
+## Decision #9 — Rename `instrument_parsers` → `data_parsers`
+
+**Status:** **Decided** · **Date:** 2026-07-19 · **Owner:** Product  
+**Blocks:** P1 migration naming
+
+### Decided
+
+| Layer | Name |
+|-------|------|
+| **Table** | **`data_parsers`** (rename from `instrument_parsers`) |
+| **Model / code** | `DataParser` (replace `InstrumentParser`) |
+| **API** | `/v1/data-parsers` |
+| **UI** | “Data parsers” |
+
+### Why
+
+- Parsers cover **instrument XOR CRO**, not instruments only.  
+- Aligns with feature name “data parsers.”  
+- Rename cost is low in the same P1 migration that drops `experiment_template_id` and adds versioning.
+
+### Migration note
+
+`RENAME TABLE instrument_parsers TO data_parsers` (or Alembic equivalent); update FKs, RLS policies, indexes, and app code. Pre-release: no dual-name period required.
+
+### Decision record
+
+| Field | Value |
+|-------|--------|
+| **Status** | **Decided** |
+| **Date** | 2026-07-19 |
+| **Owner** | Product |
+| **Summary** | Generic **`data_parsers`** table/API/UI; retire `instrument_parsers` name |
+
+---
+
 ## Decision #6 — No non-reportable runs; method-dev deferred to lab projects
 
 **Status:** **Decided** · **Date:** 2026-07-19 · **Owner:** Product  
@@ -449,4 +484,5 @@ Treat each **saved definition** of a parser as an **immutable version row**. Imp
 - Permissions: **`config:edit`** for instrument/CRO/parser CRUD.  
 - **Parser versions + active** (Decision #5); import stores version `parser_id` only.  
 - **No non-reportable runs** (Decision #6); method-dev → [orders-and-projects](../ideas/orders-and-projects.md).  
+- Table/API name **`data_parsers`** (Decision #9).  
 
