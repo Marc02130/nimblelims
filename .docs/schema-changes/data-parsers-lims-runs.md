@@ -3,7 +3,7 @@
 **Feature / cycle:** Data parsers, instruments/CRO sources, LimsRun lineage  
 **Phases covered:** **P0 + P1** (P2 AI = no extra schema beyond setup files already in P1)  
 **Status:** Schema **accepted** by architecture (2026-07-19 Accept with conditions); **`data_parsers`**, versioning + active; pre-release  
-**Alembic revisions:** _(none yet)_  
+**Alembic revisions:** `0054` (P0 catalogs: instrument_types, instruments, cro_sources)  
 **Requirements:** [../requirements/data-parsers-lims-runs.md](../requirements/data-parsers-lims-runs.md)  
 **Tech sketch:** [../tech-sketch/data-parsers-lims-runs.md](../tech-sketch/data-parsers-lims-runs.md)  
 **Architecture review:** [../architecture-review/data-parsers-lims-runs.md](../architecture-review/data-parsers-lims-runs.md)  
@@ -197,11 +197,11 @@ Product: analysis×instrument/CRO (M2M), `data_parsers`, versioning, analysis re
 
 ## 8. Implementation checklist
 
-- [ ] Migration(s) match this doc  
-- [ ] SQLAlchemy models match migration  
-- [ ] RLS policies documented and tested  
+- [x] **P0** Migration `0054` — instrument_types, instruments, cro_sources  
+- [x] **P0** SQLAlchemy models + API + admin UI (config:edit)  
+- [x] **P0** RLS lab-global (`is_admin() OR active`)  
+- [ ] Migration(s) for **P1** (`data_parsers` rename, versioning, parser_analyses, lims_run_imports, setup files)  
 - [ ] ParserConfig v1 validated in app (not a DB constraint)  
-- [ ] This file updated with Alembic revision id(s)  
 - [ ] Import resolution uses **active** version only; stores **version** `parser_id` on import  
 - [ ] Parser “update” creates new version; activate prompt deactivates prior active in group  
 - [ ] Table/model/API renamed **`data_parsers`** / `DataParser` / `/v1/data-parsers`  

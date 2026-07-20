@@ -3,7 +3,7 @@ FastAPI application for NimbleLims
 """
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routers import auth, samples, tests, containers, batches, results, aliquots, lists, projects, analyses, analytes, units, users, roles, permissions, clients, test_batteries, client_projects, custom_attributes, help, admin, sequences, workflows, experiments, lims_runs, sop_parse, lims_run_checklists, dose_response, field_definitions, eln_processes, eln_process_definitions, entries, sample_journey
+from app.routers import auth, samples, tests, containers, batches, results, aliquots, lists, projects, analyses, analytes, units, users, roles, permissions, clients, test_batteries, client_projects, custom_attributes, help, admin, sequences, workflows, experiments, lims_runs, sop_parse, lims_run_checklists, dose_response, field_definitions, eln_processes, eln_process_definitions, entries, sample_journey, instrument_catalog
 import os
 import logging
 
@@ -77,6 +77,9 @@ app.include_router(projects.router, prefix="/projects", tags=["projects"])
 app.include_router(analyses.router, prefix="/analyses", tags=["analyses"])
 app.include_router(analytes.router, prefix="/analytes", tags=["analytes"])
 app.include_router(units.router, prefix="/units", tags=["units"])
+app.include_router(instrument_catalog.instrument_types_router, prefix="/v1")
+app.include_router(instrument_catalog.instruments_router, prefix="/v1")
+app.include_router(instrument_catalog.cro_sources_router, prefix="/v1")
 app.include_router(users.router, prefix="/users", tags=["users"])
 app.include_router(roles.router, prefix="/roles", tags=["roles"])
 app.include_router(permissions.router, prefix="/permissions", tags=["permissions"])
