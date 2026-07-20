@@ -30,9 +30,9 @@ Do not implement a phase until questions that **block** that phase are **Decided
 | **13** | MVP phase cut and priority? | **Decided** | Roadmap | **P0+P1 MVP (high priority)**; P2 after P0+P1; result import is expected (manual entry not OK as primary path) | 2026-07-12 | CEO | Modern LIMS table stakes |
 | **14** | Resolve open questions before implementation? | **Decided** | Process | **Yes** — blocking questions resolved before implementation starts | 2026-07-12 | CEO | Aligns with development-process gate |
 | 2 | Instrument catalog grain: instance vs model/vendor? | **Decided** | P0 catalog | **Type** (vendor, model) + **instance** (type FK, serial, name). No location until [lab-locations](../ideas/lab-locations.md). Parsers/runs key **instance**. | 2026-07-19 | Product | Format ~ type; lineage ~ instance |
-| 3 | Permission for parser / instrument / CRO CRUD? | **Open** | P0–P1 | _Suggested:_ `config:edit` | | Product | Align with other lab config |
+| 3 | Permission for parser / instrument / CRO CRUD? | **Decided** | P0–P1 | **`config:edit`** | 2026-07-19 | Product | Acceptable; aligns with other lab config |
 | 4 | Allow override to a parser for a **different** analysis than the run? | **Decided** | P1 UI/API | **Block** — parser must be linked to `run.analysis_id` via `parser_analyses` | 2026-07-19 | Product | Import validity |
-| 5 | Snapshot `parser_config` on first import? | **Open** / lean defer | P3 | _Suggested:_ FK only for MVP | | Architecture | Lineage via parser_id enough if edits audited |
+| 5 | Snapshot `parser_config` on first import? | **Open** — see explanation below | P3 / optional | _Lean:_ **defer**; store `parser_id` only for MVP | | Architecture / Product | Explained under **Q5 explained** |
 | 6 | Non-reportable run (no analysis): how is parser required? | **Open** | P1 import | _No template fallback_ (column removed). Options: require analysis for import; or allow source+parser with analysis optional for non-reportable | 2026-07-12 | Product | Template-scoped parsers removed by decision |
 | **15** | Keep `experiment_template_id` on parsers? | **Decided** | Schema | **Remove** the column entirely | 2026-07-12 | Product / Architecture | Parsers are analysis×instrument/CRO only |
 | **16** | Run analysis + multi instrument/parser rules? | **Decided** | P1 import/schema | See **Decision #16** | 2026-07-19 | Product | Run tied to analysis; multiple instruments/parsers allowed; each must match analysis + that instrument/CRO |
@@ -343,7 +343,7 @@ Optional UI convenience: “last instrument / last parser” denormalized on the
 
 | Phase | Scope | Open blockers |
 |-------|--------|---------------|
-| **P0** | Instrument types + instances + CRO catalogs | Q3 |
+| **P0** | Instrument types + instances + CRO catalogs | Q2 done; permissions **config:edit** |
 | **P1** | Parsers analysis×source; run FKs; **persisted** setup files; test harness; import by `parser_id` | Q1 freeze (core fields), Q4, Q6, Q8, Q9; #10b–c polish |
 | **P2** | AI draft + edge suggestions | **Q1 locked** + Security P2; **P0+P1 done** |
 | **P3+** | Snapshot / richer formats / multi-tenant cutover patterns | Only when there are real production users (Q5 etc.) |
@@ -354,8 +354,46 @@ Optional UI convenience: “last instrument / last parser” denormalized on the
 
 ---
 
+## Q5 explained — snapshot `parser_config` on import?
+
+### What we already store
+
+On each import we store **`parser_id`**: a pointer to the parser **row** in the catalog.
+
+That row has a live **`parser_config` JSONB** that admins can **edit later**.
+
+### The problem snapshot solves
+
+| Without snapshot | With snapshot |
+|------------------|---------------|
+| Import records “used parser #42” | Import records “used parser #42” **and** a copy of config as it was then |
+| Six months later someone edits parser #42’s column map | Historical import still has the old instructions |
+| “Why did this file parse that way?” uses **today’s** config | “Why did this file parse that way?” uses **then’s** config |
+
+So a **snapshot** = freeze the JSON instructions on the import event (e.g. `lims_run_imports.parser_config_snapshot`), not only the FK.
+
+### Why we might **not** need it yet
+
+- **Pre-release / few users:** if someone breaks a parser, they can fix it; rare forensic need.  
+- **`parser_id` + audit log** of parser edits may be enough: “config changed on date X by user Y.”  
+- Snapshots **duplicate** large JSON on every import and add migration/API surface.  
+- You already keep **example/test files** on the parser for setup re-runs—not the same as freeze-per-import.
+
+### Recommendation
+
+| Phase | Approach |
+|-------|----------|
+| **P0/P1 MVP** | Store **`parser_id` only** on `lims_run_imports`. Do **not** snapshot. |
+| **Later (if needed)** | Add optional `parser_config_snapshot` when real users need “bit-for-bit what ran that day” for CAPA/audit. |
+
+**Not the same as** promote lineage (`results.lims_run_id`)—that’s which run produced results, not which JSON instructions parsed the file.
+
+---
+
 ## Related product locks (from idea/requirements — not re-opened here)
 
 - Parser SoT = DB JSONB instructions; AI setup-only.  
-- Run stores `instrument_id` XOR `cro_source_id` + `parser_id` (default + override).  
+- Run tied to analysis; multi-instrument imports; M2M parser↔analyses.  
 - Promote remains separate (analysis_id on publish).  
+- Permissions: **`config:edit`** for instrument/CRO/parser CRUD.  
+
