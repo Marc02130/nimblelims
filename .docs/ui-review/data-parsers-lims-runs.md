@@ -13,6 +13,7 @@
 | **Analysis** | What assay / panel | Reportable results on publish |
 | **Instrument / CRO** | Where the file came from | Lineage + which parser family |
 | **Parser** | How we read this file format | Import only |
+| **Version / Active** | Saved definition of a parser; only the active version is used for new imports | Edit creates new version; prompt to activate |
 | **Examples vs tests** | Teach the format vs prove the format | Parser setup |
 | **Template** | Protocol / lifecycle / worklist | Run setup (unchanged) |
 
@@ -28,28 +29,31 @@
 4. Parsers — create for Instrument **instance** ICP-1; multi-select **analyses** (e.g. RCRA-8 + RCRA-13); map all metal columns  
 
 5. **Upload example file(s)** (1+) and **test file(s)** (1+); **Run tests** → pass/fail panel  
-6. (P2) “Draft config from examples” + “Suggest edge tests” → accept → re-run tests → **Activate** / save  
+6. **Save** creates a **new version** (never overwrites an existing version’s config)  
+7. Dialog: **“Make this version active?”** — Yes → deactivate previous active; No → leave as draft version  
+8. (P2) “Draft config from examples” + “Suggest edge tests” → accept → re-run tests → save / activate  
 
 ### A2. Parser test panel (required UX)
 
 - Lists each test file: status, rows parsed, warnings, errors  
 - “Add edge test” (manual) / “Suggest edges” (AI, P2)  
-- **Activate** disabled until gate met (show why)  
+- Version list / history on the logical parser; badge **Active** on current production version  
+- **Activate** after save (prompt); ideally disabled until test gate met (show why)
 
 ### B. Run (lab tech) — every time
 
 1. Create/open LimsRun (template as today)  
 2. Overview: set **Analysis** (run is tied to this assay)  
 3. **Import:** pick **Instrument** *or* **CRO** (only those with a parser for this analysis)  
-4. **Parser** defaults for (analysis, that source); **Change** only among parsers for that pair  
+4. **Parser** defaults to **active** version for (analysis, that source); **Change** only among **active** parsers for that pair  
 5. File → preview → commit; may repeat with **another** instrument/parser on the same run  
-6. Import history: which instrument/CRO + parser per batch  
+6. Import history: instrument/CRO + parser **name + version** per batch  
 7. Publish → existing promotion preview (analysis-scoped)
 
 ### C. Troubleshooting
 
-- Run detail shows instrument/CRO + parser name  
-- Link to parser definition if user can view config  
+- Run detail shows instrument/CRO + parser name **and version**  
+- Link opens **that version’s** definition (immutable history), not necessarily the current active
 
 ## UI principles
 
@@ -68,9 +72,9 @@
 | Admin: Instrument types | CRUD (vendor/model) |
 | Admin: Instruments (instances) | CRUD (type, serial, name) |
 | Admin: CRO sources | CRUD grid |
-| Admin: Parsers | List + editor + multi-file test panel |
-| LimsRun Overview | Analysis, Instrument/CRO, Parser (default/override) |
-| LimsRun Import | Upload bound to `run.parser_id` |
+| Admin: Parsers | List active; version history; editor; multi-file tests; **activate prompt** on save |
+| LimsRun Overview | Analysis, Instrument/CRO, Parser (name + version) |
+| LimsRun Import | Upload bound to stored **version** `parser_id` on import event |
 
 ## Wireframe notes (optional)
 

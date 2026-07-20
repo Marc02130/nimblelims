@@ -108,10 +108,15 @@ Optional `cro_sources.client_id` is a **label** (related client), not a tenant s
 | FR-3.3 | Minimum instruction support: delimiter (tab/comma/semicolon/etc.), encoding, skip_rows / header_row, column mappings (`source_col`, `field_name`, `data_type`, optional `unit`), optional well_col / sample_col. |
 | FR-3.4 | Parser shall be scoped to **exactly one** source: **instrument instance** XOR **CRO source** (file shape). |
 | FR-3.5 | Parser shall link to **one or more analyses** via **`parser_analyses`** (M2M). Example: one metals ICP parser → RCRA-8 and RCRA-13. |
-| FR-3.6 | Multiple parsers per (analysis, source) allowed; at most one **default** per (analysis, source) via `parser_analyses.is_default`. |
+| FR-3.6 | Multiple parsers per (analysis, source) allowed; at most one **default** per (analysis, source) via `parser_analyses.is_default` among **active** versions. |
 | FR-3.7 | Admin UI for parsers + multi-select analyses; no AI required for P1. |
 | FR-3.8 | Parsers are **not** linked to experiment templates; **`experiment_template_id` removed**. |
 | FR-3.9 | Parser config may map **all** instrument columns; **run.analysis_id** + promote determine which analytes become Results. |
+| FR-3.10 | Parsers shall be **versioned**: each row is one version (`version_group_id`, `version`, `active`). |
+| FR-3.11 | **Any update** to a parser definition creates a **new version row** — do **not** mutate `parser_config` (or definition) in place on an existing version. |
+| FR-3.12 | On save of a new version, UI shall **prompt to make active**. If yes: activate new version and **deactivate** the previous active version in the same group. If no: new version stays inactive; prior active remains for imports. |
+| FR-3.13 | Default resolution, capability, and pickers use **active** versions only. Historical imports keep their stored version `parser_id`. |
+| FR-3.14 | **No** `parser_config` JSON snapshot on import or run — lineage is the version FK only. |
 
 ### FR-4: LimsRun tied to analysis; multi-instrument imports; valid parsers only
 
@@ -122,9 +127,9 @@ Optional `cro_sources.client_id` is a **label** (related client), not a tenant s
 | FR-4.3 | Each import shall record **instrument XOR cro_source** and **`parser_id`** (e.g. `lims_run_imports` + optional `lims_run_data.import_id`). |
 | FR-4.4 | Parser on an import **must** be linked to `run.analysis_id` via **`parser_analyses`** and match the import’s instrument/CRO. |
 | FR-4.5 | UI shall only offer parsers for the selected instrument\|CRO that include **run.analysis** in their M2M links—not an arbitrary parser. |
-| FR-4.6 | Instrument/CRO is eligible for a run’s analysis only if an active parser for that source is linked to that analysis. |
-| FR-4.7 | Import shall use the **stored import `parser_id`** config (no silent re-resolve for that batch later). |
-| FR-4.8 | UI shall show analysis on the run; import history shows instrument/CRO + parser used per batch. |
+| FR-4.6 | Instrument/CRO is eligible for a run’s analysis only if an **active version** of a parser for that source is linked to that analysis. |
+| FR-4.7 | Import shall use the **stored import `parser_id`** (specific **version** row) — load that version’s config; no silent re-resolve; no config blob on the import. |
+| FR-4.8 | UI shall show analysis on the run; import history shows instrument/CRO + parser **name + version** used per batch. |
 | FR-4.9 | Optional: denormalize “last import” source/parser on the run for display only. |
 
 ### FR-5: Deterministic import on LimsRun
@@ -147,7 +152,7 @@ User testing is part of the **parser framework**, not a separate product.
 | FR-6.2 | User may upload **one or more test files** used to validate a candidate config (may differ from examples). Files are **persisted**. |
 | FR-6.3 | Framework shall run the **same import engine** against each test file with the candidate config (after schema validation—see open Q1). |
 | FR-6.4 | UI shall show per-file results: pass/fail, row counts, warnings, hard errors. |
-| FR-6.5 | **Activate / ready-for-import** (provisional): at least one test file completes with **zero hard errors** before parser is marked production-ready. |
+| FR-6.5 | **Activate version** (Decision #5 + testing): activating a version should require setup tests pass (provisional: ≥1 test file zero hard errors). Activate deactivates the prior active version in the group. |
 | FR-6.6 | Optional AI may draft `parser_config` from example file(s); **human must review and save**. |
 | FR-6.7 | Optional AI may **suggest edge test cases** based on observed data (e.g. negative values, empties, type stress, structural noise); suggestions become fixtures only after user accepts. |
 | FR-6.8 | Edge tests and all test files are judged by the **code engine**, not by the LLM alone. |
@@ -169,7 +174,7 @@ User testing is part of the **parser framework**, not a separate product.
 |----|-------------|
 | FR-8.1 | Catalog and parser CRUD require **`config:edit`** (not lab client users). |
 | FR-8.2 | Run field changes (analysis, source, parser) require run edit permissions consistent with existing LimsRun RBAC. |
-| FR-8.3 | Import and parser CRUD actions are auditable (who, when, entity ids). |
+| FR-8.3 | Import and parser CRUD actions are auditable (who, when, entity ids, including **new version** and **activate** events). |
 | FR-8.4 | Instruments / CRO sources / parsers are **lab-global** config (not client-configurable). **Multi-tenant / org segregation is out of scope** — see [ideas/multi-tenant.md](../ideas/multi-tenant.md). |
 
 ### FR-9: Non-reportable runs
@@ -199,18 +204,21 @@ User testing is part of the **parser framework**, not a separate product.
 instruments (id, name, vendor?, model?, description?, active, …)
 cro_sources (id, name, description?, client_id?, active, …)
 
-instrument_parsers (evolved)
-  id, name, description, active
+instrument_parsers (evolved — each row is one version)
+  id, version_group_id, version, active   -- at most one active per group
+  name, description
   instrument_id NULL | cro_source_id NULL  -- exactly one
-  parser_config JSONB NOT NULL
+  parser_config JSONB NOT NULL            -- immutable after insert
   -- NO analysis_id on row; NO experiment_template_id
+  -- updates create new version; activate prompt deactivates prior
 
-parser_analyses (M2M)
+parser_analyses (M2M per version)
   parser_id, analysis_id, is_default
   -- e.g. ICP metals parser → RCRA-8 and RCRA-13
 
 lims_run_imports
-  lims_run_id, instrument_id|cro_source_id, parser_id, …
+  lims_run_id, instrument_id|cro_source_id, parser_id (version row), …
+  -- no parser_config snapshot
 
 lims_runs
   analysis_id  -- which panel this run stores/promotes
@@ -236,9 +244,9 @@ File column  --parser-->  row_data[field_name]  --promote-->  Result(analyte)
 | Phase | Scope | AI | LimsRun |
 |-------|--------|-----|---------|
 | **P0** | Instrument + CRO source catalogs + UI | No | Optional FKs only if cheap |
-| **P1** | Parser scoped analysis×source; manual editor; **example + test multi-file dry-run**; **run instrument/CRO/parser_id**; import uses run parser | No | **Yes** |
+| **P1** | Parser scoped analysis×source; **versioning + active**; manual editor; example/test dry-run; import stores **version** `parser_id` | No | **Yes** |
 | **P2** | AI draft config from examples + **AI edge-test suggestions** | Yes | Setup only |
-| **P3** | Snapshots, richer formats, SOP bridge, alias co-suggest | Optional | Polish |
+| **P3** | Richer formats, SOP bridge, alias co-suggest | Optional | Polish |
 
 **Recommended first implementation branch:** P0+P1 (includes test harness without AI).  
 **Second branch:** P2 (AI draft + edge suggestions).
@@ -248,20 +256,21 @@ File column  --parser-->  row_data[field_name]  --promote-->  Result(analyte)
 ## 8. Acceptance criteria (MVP = P0+P1)
 
 1. Lab can create an instrument and a CRO source.  
-2. Lab can create a parser for (analysis + instrument) and (analysis + CRO) with JSONB config via UI (no AI required).  
+2. Lab can create a parser for (analysis + instrument) and (analysis + CRO) with JSONB config via UI (no AI required) as **version 1**.  
 3. Lab can attach **≥1 example file** and **≥1 test file** while creating/editing a parser.  
 4. Framework runs engine on all test files and shows pass/fail/warnings per file.  
-5. Parser cannot be activated for production import until activation gate is met (provisional: ≥1 test with zero hard errors).  
-6. On a LimsRun, user can set analysis + instrument or CRO; **default parser_id is applied and stored**.  
-7. User can override parser_id; override is stored and used on import.  
-8. Import applies stored parser_config deterministically; fails clearly if parser missing/invalid.  
-9. Publish + promote still works when analysis_id set (existing behavior).  
-10. Historical run shows which instrument/CRO and parser_id were used.
+5. **Save of an edit creates a new version**; UI prompts **make active**; activating deactivates the prior active version.  
+6. Only **active** versions appear as defaults/capability for new imports (provisional test gate before activate).  
+7. On a LimsRun, user picks instrument/CRO; **default active parser_id** is applied and stored **per import**.  
+8. User can override among active parsers for the pair; override is stored and used on import.  
+9. Import loads config from the **stored version row** (no JSON snapshot); fails clearly if missing/invalid.  
+10. Publish + promote still works when analysis_id set (existing behavior).  
+11. Historical import shows instrument/CRO + parser **name + version**; reopening that version shows the config used then.
 
 **P2 acceptance (when scheduled):**  
-11. From example file(s) + analysis + source, AI produces draft parser_config; user must save.  
-12. AI suggests edge test fixtures from data (e.g. negatives); user accepts; engine re-runs tests.  
-13. Production LimsRun import still never calls AI.
+12. From example file(s) + analysis + source, AI produces draft parser_config; user must save as a version.  
+13. AI suggests edge test fixtures from data (e.g. negatives); user accepts; engine re-runs tests.  
+14. Production LimsRun import still never calls AI.
 
 ---
 
@@ -275,7 +284,7 @@ File column  --parser-->  row_data[field_name]  --promote-->  Result(analyte)
 | 2 | Instrument type vs instance? | **Decided:** type (vendor/model) + instance (serial); see schema-changes |
 | 3 | Permission for parser CRUD? | `config:edit` |
 | 4 | Allow override to a parser from a different analysis? | No without strong warning / block |
-| 5 | Snapshot parser_config on first import? | Defer to P3; FK sufficient for MVP |
+| 5 | Snapshot vs versioning? | **Version + active**; no import JSON snapshot; updates create new versions |
 | 6 | Non-reportable run without analysis: how is parser selected? | Open — **no template parser fallback**; see open-questions |
 | 7 | Multi-tenant / org segregation? | **Out of scope** — lab-global config; [ideas/multi-tenant.md](../ideas/multi-tenant.md) |
 

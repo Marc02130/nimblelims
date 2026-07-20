@@ -2,7 +2,7 @@
 
 **Feature / cycle:** Data parsers, instruments/CRO sources, LimsRun lineage  
 **Phases covered:** **P0 + P1** (P2 AI = no extra schema beyond setup files already in P1)  
-**Status:** Schema **verified** by architecture (2026-07-18); updated 2026-07-18 — no ephemeral setup path; pre-release (no production switchover plan)  
+**Status:** Schema **verified** by architecture (2026-07-18); updated 2026-07-19 — parser **versioning + active** (no import JSON snapshot); no ephemeral setup path; pre-release  
 **Alembic revisions:** _(none yet)_  
 **Requirements:** [../requirements/data-parsers-lims-runs.md](../requirements/data-parsers-lims-runs.md)  
 **Tech sketch:** [../tech-sketch/data-parsers-lims-runs.md](../tech-sketch/data-parsers-lims-runs.md)  
@@ -13,7 +13,7 @@
 
 ## 1. Summary
 
-Add **instrument types** + **instances**; **CRO sources**; re-scope **instrument_parsers** to **instrument instance XOR CRO** (file shape); **many-to-many `parser_analyses`** so one ICP metals parser can serve RCRA-8 and RCRA-13; **DROP `experiment_template_id`**; **`lims_run_imports`** for multi-instrument lineage. Run still has one **`analysis_id`** (what we store/promote). No lab location this cycle.
+Add **instrument types** + **instances**; **CRO sources**; re-scope **instrument_parsers** to **instrument instance XOR CRO** (file shape) with **version_group_id + version + active** (immutable versions; no in-place config edit; no import-time JSON snapshot); **many-to-many `parser_analyses`** so one ICP metals parser can serve RCRA-8 and RCRA-13; **DROP `experiment_template_id`**; **`lims_run_imports`** for multi-instrument lineage. Run still has one **`analysis_id`** (what we store/promote). No lab location this cycle.
 
 ## 2. Delta (authoritative list)
 
@@ -43,17 +43,27 @@ Add **instrument types** + **instances**; **CRO sources**; re-scope **instrument
 | **`instrument_parsers`** | **DROP `experiment_template_id`** | Not template-scoped |
 | **`instrument_parsers`** | ADD `instrument_id` UUID NULL → **`instruments`** | Lab path (instance) — **no `analysis_id` on parser row** |
 | **`instrument_parsers`** | ADD `cro_source_id` UUID NULL → `cro_sources` | CRO path |
-| **`instrument_parsers`** | ADD `active` BOOLEAN NOT NULL DEFAULT true | Soft deactivate |
-| **`instrument_parsers`** | `parser_config` JSONB | ParserConfig v1 (app validation); may include **all** ICP metals columns |
+| **`instrument_parsers`** | ADD **`version_group_id`** UUID NOT NULL | Logical parser identity shared by all versions |
+| **`instrument_parsers`** | ADD **`version`** INT NOT NULL | Monotonic per group (1, 2, 3…); first version = 1 |
+| **`instrument_parsers`** | ADD/keep **`active`** BOOLEAN NOT NULL DEFAULT false | **This version** is current production for the group; at most one `active=true` per `version_group_id` |
+| **`instrument_parsers`** | `parser_config` JSONB | ParserConfig v1 for **this version only**; **immutable after insert** (updates → new version row) |
 | **`lims_runs`** | *(optional)* last_* denorm for UI | Lineage via **`lims_run_imports`** |
 | **`lims_run_data`** | ADD `import_id` UUID NULL → `lims_run_imports` | Row-level lineage |
+
+**Versioning rules (app + constraints):**
+
+1. **Create** → insert version row (`version=1`, usually activate).  
+2. **Update** → **insert** new row same `version_group_id`, `version = max+1`, new `parser_config` / links — **never UPDATE `parser_config` in place**.  
+3. **Activate** (prompt on save) → set new row `active=true`; set all other rows in group `active=false`.  
+4. **Import** stores `parser_id` = **specific version** PK. Resolve defaults / pickers from **`active=true` only**.  
+5. **No** `parser_config_snapshot` on imports or runs.
 
 ### 2.1b Import events + parser↔analysis M2M
 
 | Table | Purpose | Key columns |
 |-------|---------|-------------|
 | **`parser_analyses`** | **Many-to-many:** parser ↔ analyses | `parser_id`, `analysis_id`, **`is_default`** (default for this analysis when using this parser’s instrument/CRO) |
-| **`lims_run_imports`** | One import file/batch on a run | `id`, `lims_run_id`, `instrument_id`\|`cro_source_id`, `parser_id`, `imported_at`, `imported_by`, filename optional |
+| **`lims_run_imports`** | One import file/batch on a run | `id`, `lims_run_id`, `instrument_id`\|`cro_source_id`, **`parser_id`** (specific **version** row), `imported_at`, `imported_by`, filename optional — **no config snapshot column** |
 
 `lims_runs.analysis_id` — **required** for structured path (what the run **stores/promotes**—e.g. RCRA-8 only).  
 `lims_runs.experiment_template_id` — **unchanged**.
@@ -72,12 +82,14 @@ Add **instrument types** + **instances**; **CRO sources**; re-scope **instrument
 | Name | Definition | Why |
 |------|------------|-----|
 | **`instrument_parsers` source CHECK** | Exactly one of `instrument_id` / `cro_source_id` non-null | Lab XOR CRO |
-| **`parser_analyses` PK** | (`parser_id`, `analysis_id`) | M2M |
+| **`instrument_parsers` version unique** | UNIQUE (`version_group_id`, `version`) | One row per version number in a group |
+| **At most one active per group** | Partial unique: UNIQUE (`version_group_id`) WHERE `active` | Only one production version |
+| **`parser_analyses` PK** | (`parser_id`, `analysis_id`) | M2M **per version row** |
 | **`parser_analyses` FK** | → parsers, analyses | Integrity |
-| **Default uniqueness** | App-enforced (or partial unique via expression if feasible): at most one `is_default` parser per (analysis_id, instrument_id) or (analysis_id, cro_source_id) | Join parsers ↔ parser_analyses |
+| **Default uniqueness** | App-enforced among **active** versions: at most one `is_default` per (analysis_id, instrument_id\|cro_source_id) | Join parsers ↔ parser_analyses WHERE active |
 | **`lims_run_imports` source CHECK** | Exactly one of instrument / cro | Same as parsers |
 | Drop | `experiment_template_id` indexes/FKs | Column drop |
-| Indexes | type, instance, parser_analyses, import FKs | Lookup |
+| Indexes | type, instance, version_group_id, parser_analyses, import FKs | Lookup |
 | Optional unique | `instruments (instrument_type_id, serial_number)` WHERE serial not null | Serials |
 
 **App integrity on import:**
@@ -93,7 +105,7 @@ Required:
 
 **Promote:** only maps columns that resolve to analytes **on analysis A** (extra metals in row_data stay in JSONB / unresolved for that analysis—not forced into Results).
 
-**Capability:** instrument usable for analysis A ⇔ active parser for that instrument with row in `parser_analyses` for A.
+**Capability:** instrument usable for analysis A ⇔ an **`active`** version of a parser for that instrument with row in `parser_analyses` for A.
 
 ### 2.4 Enums / types
 
@@ -105,7 +117,7 @@ Required:
 
 | Object | Notes |
 |--------|-------|
-| Snapshot column on `lims_runs` (e.g. `parser_config_snapshot` JSONB) | Open Q5 — lean defer |
+| Import-time `parser_config_snapshot` JSONB | **Rejected** (Decision #5) — use versioned parser rows instead |
 | Dual-write / gradual production cutover of template parsers | **Out of scope** — pre-release; simple migrate-or-delete |
 | **`instruments.room_id` / location** | Lab buildings/rooms + rename `locations`→`addresses` — [ideas/lab-locations.md](../ideas/lab-locations.md) |
 | Parser keyed only by **instrument_type** | Out of scope this cycle; parsers/runs use **instance** (type available via join) |
@@ -180,7 +192,7 @@ Do **not** change as part of data-parsers P0/P1:
 | Q7 | Multi-tenant catalogs | **Decided: lab-global; multi-tenant OOS** — ideas/multi-tenant.md |
 | Q9 | Keep table name `instrument_parsers` | Naming only |
 | #10a | Persist setup files? | **Decided: yes** — `parser_setup_files` in P1 |
-| Q5 | parser_config snapshot on run | Defer until multi-user production need |
+| Q5 | snapshot vs versioning | **Decided:** version_group + version + active; no import JSON snapshot |
 
 Product: CEO locked analysis×instrument/CRO scope (Decision #11). Architecture to approve this delta list.
 
@@ -191,7 +203,8 @@ Product: CEO locked analysis×instrument/CRO scope (Decision #11). Architecture 
 - [ ] RLS policies documented and tested  
 - [ ] ParserConfig v1 validated in app (not a DB constraint)  
 - [ ] This file updated with Alembic revision id(s)  
-- [ ] Import resolution uses `lims_runs.parser_id`  
+- [ ] Import resolution uses **active** version only; stores **version** `parser_id` on import  
+- [ ] Parser “update” creates new version; activate prompt deactivates prior active in group  
 
 ## 9. App-level contract (not DB, but schema-adjacent)
 

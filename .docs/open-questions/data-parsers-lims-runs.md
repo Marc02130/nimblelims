@@ -32,7 +32,7 @@ Do not implement a phase until questions that **block** that phase are **Decided
 | 2 | Instrument catalog grain: instance vs model/vendor? | **Decided** | P0 catalog | **Type** (vendor, model) + **instance** (type FK, serial, name). No location until [lab-locations](../ideas/lab-locations.md). Parsers/runs key **instance**. | 2026-07-19 | Product | Format ~ type; lineage ~ instance |
 | 3 | Permission for parser / instrument / CRO CRUD? | **Decided** | P0–P1 | **`config:edit`** | 2026-07-19 | Product | Acceptable; aligns with other lab config |
 | 4 | Allow override to a parser for a **different** analysis than the run? | **Decided** | P1 UI/API | **Block** — parser must be linked to `run.analysis_id` via `parser_analyses` | 2026-07-19 | Product | Import validity |
-| 5 | Snapshot `parser_config` on first import? | **Open** — see explanation below | P3 / optional | _Lean:_ **defer**; store `parser_id` only for MVP | | Architecture / Product | Explained under **Q5 explained** |
+| 5 | Snapshot `parser_config` on import vs versioning? | **Decided** | P1 schema + admin UX | **No JSON snapshot.** Versioned parser rows + `active`; import stores version `parser_id` | 2026-07-19 | Product | See **Decision #5** |
 | 6 | Non-reportable run (no analysis): how is parser required? | **Open** | P1 import | _No template fallback_ (column removed). Options: require analysis for import; or allow source+parser with analysis optional for non-reportable | 2026-07-12 | Product | Template-scoped parsers removed by decision |
 | **15** | Keep `experiment_template_id` on parsers? | **Decided** | Schema | **Remove** the column entirely | 2026-07-12 | Product / Architecture | Parsers are analysis×instrument/CRO only |
 | **16** | Run analysis + multi instrument/parser rules? | **Decided** | P1 import/schema | See **Decision #16** | 2026-07-19 | Product | Run tied to analysis; multiple instruments/parsers allowed; each must match analysis + that instrument/CRO |
@@ -346,7 +346,7 @@ Optional UI convenience: “last instrument / last parser” denormalized on the
 | **P0** | Instrument types + instances + CRO catalogs | Q2 done; permissions **config:edit** |
 | **P1** | Parsers analysis×source; run FKs; **persisted** setup files; test harness; import by `parser_id` | Q1 freeze (core fields), Q4, Q6, Q8, Q9; #10b–c polish |
 | **P2** | AI draft + edge suggestions | **Q1 locked** + Security P2; **P0+P1 done** |
-| **P3+** | Snapshot / richer formats / multi-tenant cutover patterns | Only when there are real production users (Q5 etc.) |
+| **P3+** | Richer formats / multi-tenant cutover patterns | Only when there are real production users |
 
 **Pre-release:** phase the **work** (P0→P1→P2). Do **not** invest in production dual-write / switchover plans until multi-tenant production use exists.
 
@@ -354,39 +354,58 @@ Optional UI convenience: “last instrument / last parser” denormalized on the
 
 ---
 
-## Q5 explained — snapshot `parser_config` on import?
+## Decision #5 — Parser versioning + active (no JSON snapshot on import)
 
-### What we already store
+**Status:** **Decided** · **Date:** 2026-07-19 · **Owner:** Product  
+**Blocks:** P1 schema + parser admin UX + import lineage
 
-On each import we store **`parser_id`**: a pointer to the parser **row** in the catalog.
+### Rejected approach
 
-That row has a live **`parser_config` JSONB** that admins can **edit later**.
+Do **not** store a copy of `parser_config` JSON on `lims_run_imports` (or the run). No per-import config blob.
 
-### The problem snapshot solves
+### Decided approach
 
-| Without snapshot | With snapshot |
-|------------------|---------------|
-| Import records “used parser #42” | Import records “used parser #42” **and** a copy of config as it was then |
-| Six months later someone edits parser #42’s column map | Historical import still has the old instructions |
-| “Why did this file parse that way?” uses **today’s** config | “Why did this file parse that way?” uses **then’s** config |
+Treat each **saved definition** of a parser as an **immutable version row**. Imports point at a **specific version** via `parser_id`. Lineage = that FK, not a duplicated JSON snapshot.
 
-So a **snapshot** = freeze the JSON instructions on the import event (e.g. `lims_run_imports.parser_config_snapshot`), not only the FK.
+| Column / concept | Role |
+|------------------|------|
+| **`id`** | This version’s PK — what `lims_run_imports.parser_id` stores |
+| **`version_group_id`** | Stable identity of the logical parser across versions |
+| **`version`** | Monotonic int per group (1, 2, 3…) |
+| **`active`** | Whether this version is the **current production** definition for the group |
+| **`parser_config`** | Instructions for **this version only** (not mutated after save) |
 
-### Why we might **not** need it yet
+### Rules
 
-- **Pre-release / few users:** if someone breaks a parser, they can fix it; rare forensic need.  
-- **`parser_id` + audit log** of parser edits may be enough: “config changed on date X by user Y.”  
-- Snapshots **duplicate** large JSON on every import and add migration/API surface.  
-- You already keep **example/test files** on the parser for setup re-runs—not the same as freeze-per-import.
+1. **Create** first version: `version = 1`, `version_group_id` set (typically = first row’s `id` or a dedicated UUID), user may activate (usually yes for v1).
+2. **Any update** to a parser’s definition (config, analysis links, name/source scope as product defines) **does not PATCH in place** — it **inserts a new version row** (`version = max+1` for that group) with the new definition.
+3. After save of a new version, UI **prompts: make this version active?**
+   - **Yes** → set new row `active = true`; set **all other** rows in the same `version_group_id` to `active = false`.
+   - **No** → new version stays inactive (draft/candidate); previous active version remains the one used for default import resolution.
+4. **Default selection / capability / pickers** use only **`active = true`** versions (plus other validity: analysis M2M, instrument/CRO match).
+5. **Historical imports** keep their stored `parser_id` (specific version). Re-opening that import’s lineage loads **that version’s** `parser_config` — even if a newer version is now active.
+6. Inactive versions remain **readable** (audit, re-inspect, optional “activate this older version” which deactivates the current active).
+7. Soft-retire a whole logical parser: deactivate the active version without activating another (group has no active version → not offered for new imports).
 
-### Recommendation
+### Why this instead of snapshot JSON
 
-| Phase | Approach |
-|-------|----------|
-| **P0/P1 MVP** | Store **`parser_id` only** on `lims_run_imports`. Do **not** snapshot. |
-| **Later (if needed)** | Add optional `parser_config_snapshot` when real users need “bit-for-bit what ran that day” for CAPA/audit. |
+| Concern | Versioned rows | Import JSON snapshot |
+|---------|----------------|----------------------|
+| “What instructions ran?” | FK → immutable version row | Blob on every import |
+| Edit safety | Old versions untouched | Mutating live row breaks history unless snapshotted |
+| Storage | One config per version, shared by many imports | Config duplicated per import |
+| Admin UX | Version history + activate prompt | Opaque edit history |
 
-**Not the same as** promote lineage (`results.lims_run_id`)—that’s which run produced results, not which JSON instructions parsed the file.
+**Not the same as** promote lineage (`results.lims_run_id`) — that is which run produced results.
+
+### Decision record
+
+| Field | Value |
+|-------|--------|
+| **Status** | **Decided** |
+| **Date** | 2026-07-19 |
+| **Owner** | Product |
+| **Summary** | No import-time `parser_config` snapshot; version + active on parser table; updates create new versions; activate prompt deactivates prior active in the group |
 
 ---
 
@@ -396,4 +415,5 @@ So a **snapshot** = freeze the JSON instructions on the import event (e.g. `lims
 - Run tied to analysis; multi-instrument imports; M2M parser↔analyses.  
 - Promote remains separate (analysis_id on publish).  
 - Permissions: **`config:edit`** for instrument/CRO/parser CRUD.  
+- **Parser versions + active** (Decision #5); import stores version `parser_id` only.  
 
