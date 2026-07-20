@@ -14,7 +14,7 @@
 | 1 | **Verify schema** using **only** [schema-changes/data-parsers-lims-runs.md](../schema-changes/data-parsers-lims-runs.md) | **Done — verified** (2026-07-18) |
 | 2 | Approve **ParserConfig v1** + engine parity — tech sketch §5 / open Q1 | _Pending_ |
 | 3 | Approve **ParserEngine** dual use: production import + setup test suite | _Pending_ |
-| 4 | Approve **default/override** + store `parser_id` (no silent re-resolve) | _Pending_ |
+| 4 | Approve **default/override** + store `parser_id` **per import** (multi-instrument run; no random parser; no silent re-resolve) | _Pending_ — see Decision #16 / schema `lims_run_imports` |
 | 5 | Approve **phase cut** P0/P1/P2 + **DROP `experiment_template_id`** | _Pending_ (DROP already decided in open Q15 / schema-changes; confirm) |
 | 6 | Lock **Q1** + schema blockers in schema-changes §7 | _Pending_ |
 

@@ -34,6 +34,7 @@ Do not implement a phase until questions that **block** that phase are **Decided
 | 5 | Snapshot `parser_config` on first import? | **Open** / lean defer | P3 | _Suggested:_ FK only for MVP | | Architecture | Lineage via parser_id enough if edits audited |
 | 6 | Non-reportable run (no analysis): how is parser required? | **Open** | P1 import | _No template fallback_ (column removed). Options: require analysis for import; or allow source+parser with analysis optional for non-reportable | 2026-07-12 | Product | Template-scoped parsers removed by decision |
 | **15** | Keep `experiment_template_id` on parsers? | **Decided** | Schema | **Remove** the column entirely | 2026-07-12 | Product / Architecture | Parsers are analysis×instrument/CRO only |
+| **16** | Run analysis + multi instrument/parser rules? | **Decided** | P1 import/schema | See **Decision #16** | 2026-07-19 | Product | Run tied to analysis; multiple instruments/parsers allowed; each must match analysis + that instrument/CRO |
 | 7 | Instruments/CRO catalogs multi-tenant scope? | **Decided** | P0 | **Lab-global only.** No org segregation. Multi-tenant **out of scope** until real multi-org users — see [ideas/multi-tenant.md](../ideas/multi-tenant.md) | 2026-07-18 | Product | Pre-release; single lab deployment |
 | 8 | Multiple parsers per analysis×source: default selection rule? | **Open** | P1 | _Suggested:_ `is_default` + require unique default | | Product | |
 | 9 | Table naming: keep `instrument_parsers` vs rename? | **Open** | P1 migration | _Suggested:_ keep table, evolve columns | | Architecture | Less migration noise |
@@ -282,6 +283,58 @@ Instruments and CROs emit **consistent** files. Create parser once (optionally w
 | MVP | **P0 + P1** |
 | P2 | After P0+P1 complete |
 | Priority | **High** — result import is expected; primary reliance on manual entry is not acceptable for modern LIMS |
+
+---
+
+## Decision #16 — Run ↔ analysis; multi instrument/parser; no random parsers
+
+**Status:** **Decided** · **Date:** 2026-07-19 · **Owner:** Product  
+
+### Rules
+
+| Rule | Detail |
+|------|--------|
+| **Run tied to analysis** | Reportable / structured import path: run has **`analysis_id`** (the assay whose results are expected). Promote already uses this. |
+| **Multiple instruments** | A single run **may use more than one instrument** (and/or CRO sources) over its life—e.g. different files from different boxes. |
+| **Multiple parsers** | Therefore a run may use **more than one parser**—one per import context, not one forever on the run. |
+| **Not a random parser** | Every parser used must be valid for **that run’s analysis** and for **the instrument (or CRO) that produced the file**. |
+
+### Validity (enforced in app; preferably DB-checkable where easy)
+
+```
+run.analysis_id  = A
+import uses instrument I (or CRO C) and parser P
+
+Required:
+  P.analysis_id = A
+  if lab:  P.instrument_id = I
+  if CRO:  P.cro_source_id = C
+```
+
+- There is **no** free choice of “any parser in the system.”  
+- An instrument is eligible for a run’s analysis only if a **parser exists** for `(analysis, instrument)` (capability = catalog of parsers, not a separate matrix unless we add one later).  
+- Same for CRO: capability = parser for `(analysis, cro_source)`.
+
+### Schema implication (see schema-changes)
+
+Single `lims_runs.parser_id` + single `instrument_id` is **not enough** for multi-file multi-instrument lineage.
+
+**Preferred model:**
+
+| Store | Role |
+|-------|------|
+| `lims_runs.analysis_id` | Assay for the run (required for import of structured results path) |
+| **`lims_run_imports`** (or equivalent) | Each import event: instrument XOR cro, `parser_id`, timestamps, user |
+| `lims_run_data.import_id` | Optional FK so rows know which import/parser produced them |
+
+Optional UI convenience: “last instrument / last parser” denormalized on the run—not the sole source of truth.
+
+### Import UX sketch
+
+1. Run has analysis set (Metals).  
+2. User starts import → picks **instrument** (or CRO) → system offers only parsers for **(Metals, that instrument)** (default + override within that pair only).  
+3. Second import may pick a **different** instrument/parser; still must match Metals.  
+4. Promote on publish still uses run `analysis_id` + all `lims_run_data` field_names.
 
 ---
 

@@ -38,10 +38,12 @@
 ### B. Run (lab tech) — every time
 
 1. Create/open LimsRun (template as today)  
-2. Overview: set **Analysis**, set **Instrument** *or* **CRO**  
-3. **Parser** fills to default; chip “Default” / **Change** (override stored)  
-4. Import file → preview → commit (no AI)  
-5. Publish → existing promotion preview  
+2. Overview: set **Analysis** (run is tied to this assay)  
+3. **Import:** pick **Instrument** *or* **CRO** (only those with a parser for this analysis)  
+4. **Parser** defaults for (analysis, that source); **Change** only among parsers for that pair  
+5. File → preview → commit; may repeat with **another** instrument/parser on the same run  
+6. Import history: which instrument/CRO + parser per batch  
+7. Publish → existing promotion preview (analysis-scoped)
 
 ### C. Troubleshooting
 

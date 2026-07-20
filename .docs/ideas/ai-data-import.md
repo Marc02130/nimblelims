@@ -122,46 +122,33 @@ Promote: unchanged (analysis-gated)
 
 CRO lifecycle type still comes from the **template**; CRO **source** is who returned the file and which parser applies.
 
-### What lives on the LimsRun (**decided**)
+### What lives on the LimsRun (**decided** — refined 2026-07-19)
 
-Track source + which parser was used (for troubleshooting and re-import fidelity):
+| Field / entity | Role |
+|----------------|------|
+| `experiment_template_id` | Protocol, lifecycle, worklist |
+| **`analysis_id`** | **Run is tied to this analysis** (expected results / promote catalog) |
+| **`lims_run_imports`** | **Each import** records instrument XOR CRO + **`parser_id`** (run may have many) |
+| `lims_run_data.import_id` | Optional link from rows to that import |
 
-| Column | Required? | Role |
-|--------|-----------|------|
-| `experiment_template_id` | Yes (run only) | Protocol, lifecycle_type, worklist — **not** on parser |
-| `analysis_id` | Optional | Promote opt-in + analyte catalog (shipped) |
-| `instrument_id` | Optional | Lab data source (FK → light instruments catalog) |
-| `cro_source_id` | Optional | External CRO source (FK → light CRO catalog) |
-| `parser_id` | Set before/at first import | **Which parser instructions were used** (FK → parsers table) |
+**Not:** a single random `parser_id` on the run for all time. Multiple instruments ⇒ multiple parsers over the run’s life.
 
-**Constraints (product):**
+**Constraints (product — Decision #16):**
 
-- Lab vs CRO: typically **one of** `instrument_id` / `cro_source_id` (not both).  
-- **Default parser:** when user sets `analysis_id` + instrument|CRO, system **resolves** default parser for that triple and **writes `parser_id` on the run**.  
-- **Override:** user may pick another active parser (same analysis preferred; product may allow cross-source only with warning). **Store the chosen `parser_id`** — do not re-resolve silently later.  
-- **Troubleshooting:** stored `parser_id` answers “what instructions did we use for this run’s import?” even if catalog defaults change later.  
-- Optional later: snapshot `parser_config` JSONB on first import if we need bit-for-bit historical fidelity after parser edits (v1 can start with FK only + audit of parser updates).
+- Parser used on an import **must** have `parser.analysis_id = run.analysis_id`.  
+- Parser **must** match the instrument or CRO chosen for that import (`parser.instrument_id` / `cro_source_id`).  
+- UI lists only parsers for **(run.analysis, selected instrument|CRO)**—default + override **within that pair only**.  
+- Instrument/CRO is eligible for the run’s analysis iff a parser exists for that pair (capability via catalog).  
+- Store parser on the **import event** for troubleshooting (do not silent re-resolve later for that batch).
 
-**Default vs override UX:**
+**Import UX:**
 
 ```
-User sets analysis + instrument (or CRO)
-  → backend finds default parser for (analysis, source)
-  → sets lims_runs.parser_id = that id
-  → UI shows “Parser: Metals / LCMS-1 (default)” with Change…
-
-User overrides parser
-  → lims_runs.parser_id = chosen id
-  → UI shows “(override)” + still keeps instrument/CRO for lineage
+Run analysis = Metals
+Import 1: instrument LCMS-1 → default parser (Metals, LCMS-1) → lims_run_imports + data
+Import 2: instrument GC-2  → default parser (Metals, GC-2)   → another import event
+Publish: promote all data under analysis Metals
 ```
-
-Import always uses **`run.parser_id`’s `parser_config`**, not a live re-lookup (unless parser_id null → resolve once and persist, or 400).
-
-**Resolution when setting default (proposed):**
-
-1. Active parser matching `(analysis_id, instrument_id)` or `(analysis_id, cro_source_id)` with `is_default` if multiple  
-2. Else single active parser for that pair  
-3. Else leave null until user selects; **import requires non-null parser_id** (no template fallback)
 
 ### How the parser is stored (**not code**)
 
