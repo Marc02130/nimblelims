@@ -111,19 +111,19 @@ Optional `cro_sources.client_id` is a **label** (related client), not a tenant s
 | FR-3.6 | Admin UI (or analysis-adjacent UI) for manual create/edit/list of parsers without AI. |
 | FR-3.7 | Parsers are **not** linked to experiment templates; **`experiment_template_id` is removed** from the parser table (see schema-changes). |
 
-### FR-4: LimsRun tracks source and parser
+### FR-4: LimsRun tied to analysis; multi-instrument imports; valid parsers only
 
 | ID | Requirement |
 |----|-------------|
-| FR-4.1 | `lims_runs` shall store optional **`instrument_id`** XOR optional **`cro_source_id`** (product: one source type per run). |
-| FR-4.2 | `lims_runs` shall store **`parser_id`** (FK to parser) once resolved or selected. |
-| FR-4.3 | When user sets `analysis_id` + instrument **or** cro_source, system shall **default** `parser_id` to the default (or sole) active parser for that pair. |
-| FR-4.4 | User may **override** `parser_id` to another active parser; system shall **persist** the override (not re-resolve on every import). |
-| FR-4.5 | Import shall use **`run.parser_id`’s `parser_config`**, not a silent re-lookup that ignores stored id. |
-| FR-4.6 | If `parser_id` is null at import, system shall either resolve-and-persist once (if unambiguous) or return **4xx** with a clear “select/configure parser” message. |
-| FR-4.7 | UI shall show analysis, instrument/CRO, and parser (default vs override) on run overview. |
-| FR-4.8 | Stored `parser_id` supports troubleshooting: “which instructions did this run use?” even if catalog defaults change later. |
-| FR-4.9 | Optional later (not MVP): snapshot of `parser_config` at first import for bit-for-bit historical freeze. |
+| FR-4.1 | Structured import path: run shall have **`analysis_id`** (assay whose results are expected). |
+| FR-4.2 | A run **may** perform **multiple imports** using **different instruments and/or CRO sources** (and thus different parsers). |
+| FR-4.3 | Each import shall record **instrument XOR cro_source** and **`parser_id`** (e.g. `lims_run_imports` + optional `lims_run_data.import_id`). |
+| FR-4.4 | Parser on an import **must** satisfy: `parser.analysis_id = run.analysis_id` and parser source matches the instrument/CRO of that import. |
+| FR-4.5 | UI shall only offer parsers for **(run.analysis, selected instrument\|CRO)**; default + override **within that pair only**—not an arbitrary system parser. |
+| FR-4.6 | Instrument/CRO is eligible for a run’s analysis only if an active parser exists for that pair (capability via parser catalog). |
+| FR-4.7 | Import shall use the **stored import `parser_id`** config (no silent re-resolve for that batch later). |
+| FR-4.8 | UI shall show analysis on the run; import history shows instrument/CRO + parser used per batch. |
+| FR-4.9 | Optional: denormalize “last import” source/parser on the run for display only. |
 
 ### FR-5: Deterministic import on LimsRun
 

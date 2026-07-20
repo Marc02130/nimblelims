@@ -46,12 +46,19 @@ Add **instrument types** (vendor/model) and **instrument instances** (serial, ty
 | **`instrument_parsers`** | ADD `is_default` BOOLEAN NOT NULL DEFAULT false | Default among siblings |
 | **`instrument_parsers`** | ADD `active` BOOLEAN NOT NULL DEFAULT true | Soft deactivate |
 | **`instrument_parsers`** | `parser_config` JSONB | **No structural change** — content must match ParserConfig v1 (app validation) |
-| **`lims_runs`** | ADD `instrument_id` UUID NULL → **`instruments`** (instance) ON DELETE SET NULL | Which unit produced the file; XOR with cro |
-| **`lims_runs`** | ADD `cro_source_id` UUID NULL → `cro_sources` ON DELETE SET NULL | XOR with instrument |
-| **`lims_runs`** | ADD `parser_id` UUID NULL → `instrument_parsers` ON DELETE SET NULL | Stored default/override |
+| **`lims_runs`** | *(optional)* last_instrument_id / last_parser_id for UI only | **Not** sole lineage—see **`lims_run_imports`** |
+| **`lims_run_data`** | ADD `import_id` UUID NULL → `lims_run_imports` | Row-level lineage to import event |
 
-`lims_runs.analysis_id` — **already exists** (run-results); no change.  
-`lims_runs.experiment_template_id` — **unchanged** (protocol/lifecycle still on the run).
+### 2.1b Import events (multi instrument/parser per run)
+
+| Table | Purpose | Key columns |
+|-------|---------|-------------|
+| **`lims_run_imports`** | One import file/batch on a run | `id`, `lims_run_id` NOT NULL, `instrument_id` NULL, `cro_source_id` NULL, `parser_id` NOT NULL, `imported_at`, `imported_by`, filename/meta optional |
+
+`lims_runs.analysis_id` — **already exists**; **required** for structured import path (run tied to analysis).  
+`lims_runs.experiment_template_id` — **unchanged** (protocol/lifecycle).
+
+**Product (Decision #16):** A run may import from **multiple instruments/CROs** (hence multiple parsers). Each import must use a parser for **(run.analysis_id, that instrument|CRO)**—not a random parser.
 
 ### 2.3 Constraints & indexes
 
@@ -59,16 +66,26 @@ Add **instrument types** (vendor/model) and **instrument instances** (serial, ty
 |------|------------|-----|
 | **`instrument_parsers` source CHECK** | Exactly one of `instrument_id` / `cro_source_id` is non-null | Lab XOR CRO scope |
 | **`instrument_parsers` analysis** | `analysis_id` NOT NULL | Every parser belongs to an analysis |
-| **`lims_runs` source CHECK** | NOT (instrument_id AND cro_source_id both non-null) | One source type per run |
+| **`lims_run_imports` source CHECK** | Exactly one of instrument_id / cro_source_id non-null | Same as parsers |
 | **`uq_parser_default_instrument`** | UNIQUE (`analysis_id`, `instrument_id`) WHERE `is_default AND active AND instrument_id IS NOT NULL` | One default per analysis×instrument |
 | **`uq_parser_default_cro`** | UNIQUE (`analysis_id`, `cro_source_id`) WHERE `is_default AND active AND cro_source_id IS NOT NULL` | One default per analysis×CRO |
 | Drop indexes/FKs | Any index/FK solely on `instrument_parsers.experiment_template_id` | With column drop |
-| Indexes on FKs | `instrument_types`, `instruments.instrument_type_id`, parser/run FKs | Lookup performance |
-| Optional unique | `instruments (instrument_type_id, serial_number)` WHERE serial not null | Avoid duplicate serials per type (implementer choice) |
+| Indexes on FKs | type, instance, parser, import FKs | Lookup performance |
+| Optional unique | `instruments (instrument_type_id, serial_number)` WHERE serial not null | Avoid duplicate serials per type |
 
 Exact CHECK SQL may be refined at implement time; intent is fixed.
 
-**Note:** File **format** is driven by **type** (vendor/model). Parsers and runs still key the **instance** (which unit/source stream). Same type can share similar parsers per instance, or users create one parser per instance.
+**App (and ideally DB) integrity on import:**
+
+```
+import.parser.analysis_id = run.analysis_id
+import.parser.instrument_id = import.instrument_id   -- if lab
+import.parser.cro_source_id = import.cro_source_id   -- if CRO
+```
+
+**Capability:** instrument/CRO “can perform” this analysis ⇔ an active parser exists for `(analysis, instrument|cro)`. No separate capability table required for MVP.
+
+**Note:** File **format** ~ **instrument type** (vendor/model). Parsers and imports key the **instance** (or CRO).
 
 ### 2.4 Enums / types
 
@@ -94,7 +111,8 @@ Exact CHECK SQL may be refined at implement time; intent is fixed.
 | `cro_sources` | Lab-global config | Same as instruments |
 | `instrument_parsers` | Lab-global config | Same; client roles cannot mutate |
 | `parser_setup_files` | Lab-global / owned via parser | Same posture as parsers |
-| `lims_runs` new FKs | No new table | Existing lims_runs RLS continues |
+| `lims_run_imports` | Via parent run RLS | Same access as lims_run / run data |
+| `lims_run_data.import_id` | Existing run data RLS | |
 
 **Multi-tenant / org segregation:** out of scope — [ideas/multi-tenant.md](../ideas/multi-tenant.md). Do not add tenant keys “for later” in this feature.
 
