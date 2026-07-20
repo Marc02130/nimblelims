@@ -511,6 +511,114 @@ export class ApiService {
     return response.data;
   }
 
+  // Instrument types / instruments / CRO sources (data-parsers P0)
+  async getInstrumentTypes(params?: { search?: string; active?: boolean }) {
+    const response: AxiosResponse = await this.api.get('/v1/instrument-types', { params });
+    return response.data;
+  }
+
+  async createInstrumentType(data: {
+    name: string;
+    description?: string;
+    vendor?: string;
+    model?: string;
+    active?: boolean;
+  }) {
+    const response: AxiosResponse = await this.api.post('/v1/instrument-types', data);
+    return response.data;
+  }
+
+  async updateInstrumentType(
+    id: string,
+    data: Partial<{
+      name: string;
+      description?: string;
+      vendor?: string;
+      model?: string;
+      active?: boolean;
+    }>
+  ) {
+    const response: AxiosResponse = await this.api.patch(`/v1/instrument-types/${id}`, data);
+    return response.data;
+  }
+
+  async deleteInstrumentType(id: string) {
+    const response: AxiosResponse = await this.api.delete(`/v1/instrument-types/${id}`);
+    return response.data;
+  }
+
+  async getInstruments(params?: {
+    search?: string;
+    instrument_type_id?: string;
+    active?: boolean;
+  }) {
+    const response: AxiosResponse = await this.api.get('/v1/instruments', { params });
+    return response.data;
+  }
+
+  async createInstrument(data: {
+    name: string;
+    description?: string;
+    instrument_type_id: string;
+    serial_number?: string;
+    active?: boolean;
+  }) {
+    const response: AxiosResponse = await this.api.post('/v1/instruments', data);
+    return response.data;
+  }
+
+  async updateInstrument(
+    id: string,
+    data: Partial<{
+      name: string;
+      description?: string;
+      instrument_type_id: string;
+      serial_number?: string;
+      active?: boolean;
+    }>
+  ) {
+    const response: AxiosResponse = await this.api.patch(`/v1/instruments/${id}`, data);
+    return response.data;
+  }
+
+  async deleteInstrument(id: string) {
+    const response: AxiosResponse = await this.api.delete(`/v1/instruments/${id}`);
+    return response.data;
+  }
+
+  async getCroSources(params?: { search?: string; active?: boolean }) {
+    const response: AxiosResponse = await this.api.get('/v1/cro-sources', { params });
+    return response.data;
+  }
+
+  async createCroSource(data: {
+    name: string;
+    description?: string;
+    client_id?: string | null;
+    active?: boolean;
+  }) {
+    const response: AxiosResponse = await this.api.post('/v1/cro-sources', data);
+    return response.data;
+  }
+
+  async updateCroSource(
+    id: string,
+    data: Partial<{
+      name: string;
+      description?: string;
+      client_id?: string | null;
+      active?: boolean;
+    }>
+  ) {
+    const response: AxiosResponse = await this.api.patch(`/v1/cro-sources/${id}`, data);
+    return response.data;
+  }
+
+  async deleteCroSource(id: string) {
+    const response: AxiosResponse = await this.api.delete(`/v1/cro-sources/${id}`);
+    return response.data;
+  }
+
   // Container types endpoints
   async getContainerTypes() {
     const response: AxiosResponse = await this.api.get('/containers/types');

@@ -35,6 +35,7 @@ import {
   Help as HelpIcon,
   Straighten as StraightenIcon,
   Folder as FolderIcon,
+  PrecisionManufacturing as PrecisionManufacturingIcon,
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useUser } from '../contexts/UserContext';
@@ -70,6 +71,11 @@ export const adminNavItems: AdminNavItem[] = [
   { text: 'Lists', path: '/admin/lists', icon: <ViewListIcon /> },
   { text: 'Container Types', path: '/admin/container-types', icon: <InventoryIcon /> },
   { text: 'Units Management', path: '/admin/units', icon: <StraightenIcon /> },
+  {
+    text: 'Instruments & CRO',
+    path: '/admin/instruments',
+    icon: <PrecisionManufacturingIcon />,
+  },
   { text: 'Users Management', path: '/admin/users', icon: <People /> },
   { text: 'Roles & Permissions', path: '/admin/roles', icon: <Security /> },
   { text: 'Analyses Management', path: '/admin/analyses', icon: <ScienceIcon /> },
