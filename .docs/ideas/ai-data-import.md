@@ -26,6 +26,7 @@
 | **User testing** | Framework runs same import engine on test files before activate; AI may suggest **edge tests** (e.g. negatives) — human accepts; engine judges |
 | **Open questions** | [open-questions/data-parsers-lims-runs.md](../open-questions/data-parsers-lims-runs.md) |
 | **Multi-tenant** | **Out of scope** — lab-global catalogs; future: [multi-tenant.md](multi-tenant.md) |
+| **Lab locations** | Buildings/rooms + rename client `locations`→`addresses` — [lab-locations.md](lab-locations.md); not in P0/P1 |
 
 This is **not** “AI imports results every time.” It is “AI helps you configure the thing that will import results forever.”
 

@@ -1,49 +1,109 @@
-# Idea: Lab locations (facility / storage places)
+# Idea: Lab locations (buildings & rooms) + rename client locations → address
 
 **Status:** Placeholder — **not in data-parsers P0/P1**  
 **Date:** 2026-07-19  
-**Related:** [data-parsers / instruments](../schema-changes/data-parsers-lims-runs.md), containers, equipment
+**Related:** [data-parsers / instruments](../schema-changes/data-parsers-lims-runs.md), containers, equipment, clients/people
 
 ## One-liner
 
-First-class **lab facility locations** (building, room, bench, cold room, etc.) so instruments, containers, and other assets can record **where they are**.
+1. Rename today’s client **mailing/site** table from `locations` → **`addresses`** (semantics match reality).  
+2. Introduce a real **lab location** model: **buildings** (optional link to an address) and **rooms** (inside buildings)—for instruments, storage, and other assets.
 
-## Why not use existing `locations`?
+## Why change existing `locations`?
 
-| Table | Meaning today |
-|-------|----------------|
-| **`locations`** | **Client** addresses (mail/site for people/contacts)—`client_id`, street, city, country |
-| **Lab locations (this idea)** | **Internal lab** places—not a client mailing address |
+| Today | Reality |
+|-------|---------|
+| Table name: **`locations`** | Rows are **client postal/site addresses** (`client_id`, street, city, country) used with people/contacts |
+| Implied meaning | “Where something is in the lab” — **misleading** |
 
-Reusing client `locations` for “LCMS in Room 12” would conflate CRM geography with lab ops.
+**Proposal:** rename table (and model/API) to **`addresses`** so “location” is free for lab ops.
+
+| After rename | Meaning |
+|--------------|---------|
+| **`addresses`** | Physical postal/site address (client-related or shared); street, city, etc. |
+| **`lab_locations`** (or `locations` after rename) | Lab facility graph: building / room |
+
+Migration is rename + API path updates (`/locations` → `/addresses` or keep alias)—product timing TBD.
 
 ## Problem
 
-Instrument **instances** need optional location (and serial). Containers and other assets often need the same. Without a lab location model, we either skip location (current choice for instruments) or stuff free-text.
+- Instrument **instances** need optional **where** (building/room), plus serial.  
+- Containers and other assets often need the same.  
+- Free-text “Room 12” does not scale.  
+- Client address table must not be overloaded for lab floor plans.
 
-## Sketch (not committed)
+## Target model (sketch)
+
+```
+addresses                          -- renamed from locations
+  id, name?, client_id?,
+  address_line1, address_line2, city, state, postal_code, country,
+  lat/long?, type?, active, …
+
+lab_buildings                      -- or lab_locations with type=building
+  id, name,                        -- "Building A"
+  address_id NULL → addresses,     -- campus / street address of the building
+  description, active, …
+
+lab_rooms                          -- or lab_locations with type=room + parent
+  id, name,                        -- "Room 12" / "Cold room 2"
+  building_id NOT NULL → lab_buildings,
+  description, active, …
+
+instruments.room_id NULL → lab_rooms   -- optional; not in parsers P0/P1
+-- future: containers.room_id, etc.
+```
+
+### Hierarchy
+
+| Level | Has address? | Example |
+|-------|----------------|---------|
+| **Address** | *Is* the street address | 100 Lab Ave, City |
+| **Building** | Optional FK → address | Building A (at that address) |
+| **Room** | No (inherits building’s address) | Room 12, Mass Spec suite |
+
+Optional later: floor, bench, shelf as children of room—or list-backed “place type.”
+
+### Alternative: single `lab_locations` table
 
 ```
 lab_locations (
-  id, name,  -- e.g. "Building A / Room 12 / Bench 3"
-  parent_id NULL,  -- optional hierarchy
-  description, active, …
+  id, name, kind: building | room,
+  parent_id NULL,           -- room → building
+  address_id NULL,          -- only for buildings
+  …
 )
-
-instruments.location_id → lab_locations  -- optional
-containers.location_id → …  -- possible future
 ```
 
-Open questions when reviewed:
+Same product rules; one table vs two. Choose in a future tech sketch.
 
-- Hierarchy depth (site → building → room)?  
-- List-backed “location type” vs free hierarchy?  
-- Shared with sample storage vs instruments only?  
+## Explicit non-goals (this idea until scheduled)
 
-## Current decision (instruments)
+- Implementing lab locations in the **data-parsers** cycle  
+- Putting `location_id` on instruments in P0/P1  
+- Using client `locations`/`addresses` as “Room 12”  
 
-**No location column on instruments** until this idea is a real requirements cycle. Instance fields for P0: type FK, serial, name, active.
+## Current instruments decision (unchanged)
 
-## Success metric (future)
+**No location/room column on instruments** until this idea is requirements + schema-changes. Instance fields for parsers P0: **type FK, serial, name**.
 
-Assets reportable by room/bench; no free-text location sprawl.
+## Open questions (when this idea is reviewed)
+
+1. Rename `locations` → `addresses` in one migration vs dual name period?  
+2. Two tables (buildings/rooms) vs single hierarchical `lab_locations`?  
+3. Can a building exist without an address (on-campus only name)?  
+4. Share rooms with container storage and instruments?  
+5. Permissions: same as lab config vs facilities admin?  
+
+## Success metrics (future)
+
+- Client addresses clearly named; no confusion with lab places  
+- Instruments/assets reportable by building/room  
+- No free-text location sprawl for lab assets  
+
+## Links when work starts
+
+- Requirements / tech sketch / **schema-changes** (rename + new tables)  
+- Update client/people APIs and UI labels  
+- Instruments: optional `room_id`  
+- Security: lab-global config (multi-tenant still OOS unless multi-tenant idea ships)  

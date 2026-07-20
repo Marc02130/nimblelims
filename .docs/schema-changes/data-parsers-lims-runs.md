@@ -33,7 +33,7 @@ Add **instrument types** (vendor/model) and **instrument instances** (serial, ty
 | **Type** | vendor, model | Agilent 6495C |
 | **Instance** | type FK, serial, lab name | “LCMS-1”, serial `US123456` |
 
-**Location:** Do **not** FK `instruments` → `locations`. Existing `locations` is **client mailing/site** (`client_id` + address). Lab facility places → future [ideas/lab-locations.md](../ideas/lab-locations.md).
+**Location:** Do **not** FK instruments → client **`locations`**. That table should become **`addresses`** (rename idea). Lab **buildings/rooms** → [ideas/lab-locations.md](../ideas/lab-locations.md). No instrument location this cycle.
 
 ### 2.2 Altered tables
 
@@ -82,7 +82,7 @@ Exact CHECK SQL may be refined at implement time; intent is fixed.
 |--------|-------|
 | Snapshot column on `lims_runs` (e.g. `parser_config_snapshot` JSONB) | Open Q5 — lean defer |
 | Dual-write / gradual production cutover of template parsers | **Out of scope** — pre-release; simple migrate-or-delete |
-| **`instruments.location_id`** | No lab location model; client `locations` wrong fit — [ideas/lab-locations.md](../ideas/lab-locations.md) |
+| **`instruments.room_id` / location** | Lab buildings/rooms + rename `locations`→`addresses` — [ideas/lab-locations.md](../ideas/lab-locations.md) |
 | Parser keyed only by **instrument_type** | Out of scope this cycle; parsers/runs use **instance** (type available via join) |
 
 ## 3. RLS
