@@ -122,7 +122,7 @@ Long-form tech designs stay in [design/](design/). UI review was previously `ui-
 | [ideas/ai-data-analysis.md](ideas/ai-data-analysis.md) | AI-assisted query / anomaly / summary of run+result data | **Placeholder** |
 | [ideas/multi-tenant.md](ideas/multi-tenant.md) | Org segregation / true multi-tenant isolation | **Placeholder — OOS until real multi-org users** |
 | [ideas/lab-locations.md](ideas/lab-locations.md) | Lab buildings/rooms; rename client `locations` → `addresses` | **Placeholder** |
-| [ideas/orders-and-projects.md](ideas/orders-and-projects.md) | Rename today’s `projects` → **orders** (sampling event); new **projects** for work over time | **Placeholder** |
+| [ideas/orders-and-projects.md](ideas/orders-and-projects.md) | Rename today’s `projects` → **orders**; keep **client_projects** (CRO reporting); new **lab projects** (method-dev etc.) | **Placeholder** |
 | [ideas/model-fine-tune.md](ideas/model-fine-tune.md) | Model fine-tune notes | See `sop-rag` for related SOP/RAG work |
 
 ## Reviews (run-results) — complete
