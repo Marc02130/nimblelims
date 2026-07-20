@@ -13,7 +13,7 @@
 
 ## 1. Summary
 
-Add **instrument types** (vendor/model) and **instrument instances** (serial, type FK); **CRO sources**; re-scope **instrument_parsers** to **analysis × instrument instance|CRO only**; **DROP `experiment_template_id`** from parsers; add **lims_runs** FKs for instrument instance, CRO, parser. No lab location FK yet (existing `locations` = client addresses only). No change to `results` / promote schema.
+Add **instrument types** + **instances**; **CRO sources**; re-scope **instrument_parsers** to **instrument instance XOR CRO** (file shape); **many-to-many `parser_analyses`** so one ICP metals parser can serve RCRA-8 and RCRA-13; **DROP `experiment_template_id`**; **`lims_run_imports`** for multi-instrument lineage. Run still has one **`analysis_id`** (what we store/promote). No lab location this cycle.
 
 ## 2. Delta (authoritative list)
 
@@ -25,6 +25,7 @@ Add **instrument types** (vendor/model) and **instrument instances** (serial, ty
 | **`instruments`** | **Instance** of a type (which physical unit / named stream) | `id`, **`instrument_type_id` NOT NULL** → `instrument_types`, `name` (lab nickname), **`serial_number` NULL**, `description` NULL, `active`, audit cols — **no location_id** this cycle |
 | **`cro_sources`** | External/CRO export-source catalog | `id`, `name`, `description` NULL, `client_id` NULL → `clients`, `active`, audit cols |
 | **`parser_setup_files`** | Persisted example / test / edge fixtures for parser setup | `id`, `parser_id` FK (nullable until saved), `role` (`example`\|`test`\|`edge_fixture`), `filename`, `content_type`, `size_bytes`, storage (bytea or object ref), `created_by`, `created_at` |
+| **`parser_analyses`** | **M2M:** which analyses a parser may serve | `parser_id` NOT NULL, `analysis_id` NOT NULL, `is_default` BOOLEAN NOT NULL DEFAULT false, PK (`parser_id`, `analysis_id`) |
 
 **Instrument vs type**
 
@@ -39,53 +40,60 @@ Add **instrument types** (vendor/model) and **instrument instances** (serial, ty
 
 | Table | Change | Notes |
 |-------|--------|-------|
-| **`instrument_parsers`** | **DROP `experiment_template_id`** (column + FK + related indexes) | **Decided:** parsers are not template-scoped. Pre-migration data handling: §4 |
-| **`instrument_parsers`** | ADD `analysis_id` UUID **NOT NULL** → `analyses(id)` | Required for every parser |
-| **`instrument_parsers`** | ADD `instrument_id` UUID NULL → **`instruments`** (instance) | Lab path — analysis × **instance** |
-| **`instrument_parsers`** | ADD `cro_source_id` UUID NULL → `cro_sources(id)` | CRO path |
-| **`instrument_parsers`** | ADD `is_default` BOOLEAN NOT NULL DEFAULT false | Default among siblings |
+| **`instrument_parsers`** | **DROP `experiment_template_id`** | Not template-scoped |
+| **`instrument_parsers`** | ADD `instrument_id` UUID NULL → **`instruments`** | Lab path (instance) — **no `analysis_id` on parser row** |
+| **`instrument_parsers`** | ADD `cro_source_id` UUID NULL → `cro_sources` | CRO path |
 | **`instrument_parsers`** | ADD `active` BOOLEAN NOT NULL DEFAULT true | Soft deactivate |
-| **`instrument_parsers`** | `parser_config` JSONB | **No structural change** — content must match ParserConfig v1 (app validation) |
-| **`lims_runs`** | *(optional)* last_instrument_id / last_parser_id for UI only | **Not** sole lineage—see **`lims_run_imports`** |
-| **`lims_run_data`** | ADD `import_id` UUID NULL → `lims_run_imports` | Row-level lineage to import event |
+| **`instrument_parsers`** | `parser_config` JSONB | ParserConfig v1 (app validation); may include **all** ICP metals columns |
+| **`lims_runs`** | *(optional)* last_* denorm for UI | Lineage via **`lims_run_imports`** |
+| **`lims_run_data`** | ADD `import_id` UUID NULL → `lims_run_imports` | Row-level lineage |
 
-### 2.1b Import events (multi instrument/parser per run)
+### 2.1b Import events + parser↔analysis M2M
 
 | Table | Purpose | Key columns |
 |-------|---------|-------------|
-| **`lims_run_imports`** | One import file/batch on a run | `id`, `lims_run_id` NOT NULL, `instrument_id` NULL, `cro_source_id` NULL, `parser_id` NOT NULL, `imported_at`, `imported_by`, filename/meta optional |
+| **`parser_analyses`** | **Many-to-many:** parser ↔ analyses | `parser_id`, `analysis_id`, **`is_default`** (default for this analysis when using this parser’s instrument/CRO) |
+| **`lims_run_imports`** | One import file/batch on a run | `id`, `lims_run_id`, `instrument_id`\|`cro_source_id`, `parser_id`, `imported_at`, `imported_by`, filename optional |
 
-`lims_runs.analysis_id` — **already exists**; **required** for structured import path (run tied to analysis).  
-`lims_runs.experiment_template_id` — **unchanged** (protocol/lifecycle).
+`lims_runs.analysis_id` — **required** for structured path (what the run **stores/promotes**—e.g. RCRA-8 only).  
+`lims_runs.experiment_template_id` — **unchanged**.
 
-**Product (Decision #16):** A run may import from **multiple instruments/CROs** (hence multiple parsers). Each import must use a parser for **(run.analysis_id, that instrument|CRO)**—not a random parser.
+**Product:**
+
+| Concept | Example |
+|---------|---------|
+| **Parser / instrument** | Metals ICP file maps **all** metal columns the instrument reports |
+| **Run analysis** | RCRA-8 or RCRA-13 — promote only **relevant** analytes for that analysis |
+| **M2M** | Same ICP parser linked to **both** RCRA-8 and RCRA-13 |
+| **Import** | Run analysis = RCRA-8; instrument = ICP-1; parser must be linked to RCRA-8 **and** match ICP-1 |
 
 ### 2.3 Constraints & indexes
 
 | Name | Definition | Why |
 |------|------------|-----|
-| **`instrument_parsers` source CHECK** | Exactly one of `instrument_id` / `cro_source_id` is non-null | Lab XOR CRO scope |
-| **`instrument_parsers` analysis** | `analysis_id` NOT NULL | Every parser belongs to an analysis |
-| **`lims_run_imports` source CHECK** | Exactly one of instrument_id / cro_source_id non-null | Same as parsers |
-| **`uq_parser_default_instrument`** | UNIQUE (`analysis_id`, `instrument_id`) WHERE `is_default AND active AND instrument_id IS NOT NULL` | One default per analysis×instrument |
-| **`uq_parser_default_cro`** | UNIQUE (`analysis_id`, `cro_source_id`) WHERE `is_default AND active AND cro_source_id IS NOT NULL` | One default per analysis×CRO |
-| Drop indexes/FKs | Any index/FK solely on `instrument_parsers.experiment_template_id` | With column drop |
-| Indexes on FKs | type, instance, parser, import FKs | Lookup performance |
-| Optional unique | `instruments (instrument_type_id, serial_number)` WHERE serial not null | Avoid duplicate serials per type |
+| **`instrument_parsers` source CHECK** | Exactly one of `instrument_id` / `cro_source_id` non-null | Lab XOR CRO |
+| **`parser_analyses` PK** | (`parser_id`, `analysis_id`) | M2M |
+| **`parser_analyses` FK** | → parsers, analyses | Integrity |
+| **Default uniqueness** | App-enforced (or partial unique via expression if feasible): at most one `is_default` parser per (analysis_id, instrument_id) or (analysis_id, cro_source_id) | Join parsers ↔ parser_analyses |
+| **`lims_run_imports` source CHECK** | Exactly one of instrument / cro | Same as parsers |
+| Drop | `experiment_template_id` indexes/FKs | Column drop |
+| Indexes | type, instance, parser_analyses, import FKs | Lookup |
+| Optional unique | `instruments (instrument_type_id, serial_number)` WHERE serial not null | Serials |
 
-Exact CHECK SQL may be refined at implement time; intent is fixed.
-
-**App (and ideally DB) integrity on import:**
+**App integrity on import:**
 
 ```
-import.parser.analysis_id = run.analysis_id
-import.parser.instrument_id = import.instrument_id   -- if lab
-import.parser.cro_source_id = import.cro_source_id   -- if CRO
+run.analysis_id = A
+import uses instrument I (or CRO C) and parser P
+
+Required:
+  EXISTS parser_analyses(P, A)
+  P.instrument_id = I   (or cro_source_id = C)
 ```
 
-**Capability:** instrument/CRO “can perform” this analysis ⇔ an active parser exists for `(analysis, instrument|cro)`. No separate capability table required for MVP.
+**Promote:** only maps columns that resolve to analytes **on analysis A** (extra metals in row_data stay in JSONB / unresolved for that analysis—not forced into Results).
 
-**Note:** File **format** ~ **instrument type** (vendor/model). Parsers and imports key the **instance** (or CRO).
+**Capability:** instrument usable for analysis A ⇔ active parser for that instrument with row in `parser_analyses` for A.
 
 ### 2.4 Enums / types
 
@@ -110,6 +118,7 @@ import.parser.cro_source_id = import.cro_source_id   -- if CRO
 | `instruments` | Lab-global config | Same; instances of types |
 | `cro_sources` | Lab-global config | Same as instruments |
 | `instrument_parsers` | Lab-global config | Same; client roles cannot mutate |
+| `parser_analyses` | Lab-global | Same |
 | `parser_setup_files` | Lab-global / owned via parser | Same posture as parsers |
 | `lims_run_imports` | Via parent run RLS | Same access as lims_run / run data |
 | `lims_run_data.import_id` | Existing run data RLS | |

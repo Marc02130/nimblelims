@@ -23,9 +23,10 @@
 
 - Single **ParserConfig** contract for DB, engine, UI, AI  
 - Generic **parse engine** only (no user code)  
-- Catalogs: **instrument_types** (vendor/model) + **instruments** (instance: type FK, serial), cro_sources  
-- Parsers scoped analysis + (**instrument instance** XOR cro_source)  
-- LimsRun: `instrument_id` (instance) | `cro_source_id`, `parser_id` (default + override, stored)  
+- Catalogs: **instrument_types** + **instruments** (instances), cro_sources  
+- Parsers: **instrument XOR cro** + **M2M `parser_analyses`** (one ICP parser → many analyses)  
+- Run: **`analysis_id`** (what we promote); imports: source + parser per batch  
+
 - Setup: 1+ examples, 1+ tests; engine judges; optional AI edges (P2)  
 - Production import: deterministic, no LLM  
 
@@ -65,23 +66,23 @@
          │                      │
          └──────────┬───────────┘
                     ▼
-┌───────────────────────────────────┐
-│ instrument_parsers                │
-│  analysis_id + instrument|cro     │
-│  parser_config JSONB              │
-│  is_default, active               │
-└───────────────┬───────────────────┘
-                │ parser_id (stored)
-                ▼
-┌───────────────────────────────────┐     ┌─────────────────────────┐
-│ lims_runs                         │────►│ ParserEngine            │
-│  analysis_id (exists)             │     │ parse(bytes, config)    │
-│  instrument_id | cro_source_id    │     │                         │
-│  parser_id                        │     │                         │
-└───────────────────────────────────┘     └───────────┬─────────────┘
-                                                      ▼
-                                              lims_run_data → promote
+┌───────────────────────────────────┐     ┌──────────────────┐
+│ instrument_parsers                │────►│ parser_analyses  │
+│  instrument|cro  (file shape)     │ M2M │ analysis_id      │
+│  parser_config (all columns OK)   │     │ is_default       │
+└───────────────┬───────────────────┘     └────────┬─────────┘
+                │                                  │
+                │         lims_run_imports         │
+                │         (source + parser)        │
+                ▼                                  ▼
+┌───────────────────────────────────┐     run.analysis_id
+│ lims_runs.analysis_id             │     (RCRA-8 vs RCRA-13)
+│  → promote only that analysis’s   │
+│    analytes                       │
+└───────────────────────────────────┘
 ```
+
+Example: ICP parser maps all metals; run analysis RCRA-8 promotes only the eight; same parser usable on a RCRA-13 run.
 
 **No location on instruments** this cycle. Client table `locations` is address CRM—not lab rooms. Future: [ideas/lab-locations.md](../ideas/lab-locations.md).
 
@@ -139,28 +140,25 @@ cro_sources (
 
 ```sql
 ALTER instrument_parsers:
-  DROP experiment_template_id   -- decided: no template-scoped parsers
-  analysis_id      UUID NOT NULL REFERENCES analyses(id)
+  DROP experiment_template_id
   instrument_id    UUID NULL REFERENCES instruments(id)
   cro_source_id    UUID NULL REFERENCES cro_sources(id)
-  is_default       BOOLEAN NOT NULL DEFAULT false
   active           BOOLEAN NOT NULL DEFAULT true
-  -- parser_config JSONB already exists
-  -- name, description already exist
+  -- NO analysis_id on parser row
+  -- parser_config JSONB (may list all instrument columns)
 
 CHECK: exactly one of (instrument_id, cro_source_id) is non-null
 
--- Partial unique: at most one default per analysis×source
-UNIQUE INDEX uq_parser_default_instrument
-  ON instrument_parsers (analysis_id, instrument_id)
-  WHERE is_default AND active AND instrument_id IS NOT NULL;
-
-UNIQUE INDEX uq_parser_default_cro
-  ON instrument_parsers (analysis_id, cro_source_id)
-  WHERE is_default AND active AND cro_source_id IS NOT NULL;
+parser_analyses (
+  parser_id UUID NOT NULL REFERENCES instrument_parsers,
+  analysis_id UUID NOT NULL REFERENCES analyses,
+  is_default BOOLEAN NOT NULL DEFAULT false,
+  PRIMARY KEY (parser_id, analysis_id)
+);
+-- default uniqueness for (analysis, instrument) enforced in app (or clever unique index)
 ```
 
-**Every parser row:** `analysis_id` + exactly one of instrument/cro. See [schema-changes](../schema-changes/data-parsers-lims-runs.md) for drop/migration of existing template-linked rows.
+See [schema-changes](../schema-changes/data-parsers-lims-runs.md).
 
 ### 4.3 LimsRun columns
 
@@ -260,7 +258,7 @@ each import:
   2. user selects instrument XOR cro_source
   3. resolve parser: default for (run.analysis_id, source) or user override
      ONLY among parsers where:
-       P.analysis_id = run.analysis_id
+       EXISTS parser_analyses(P, run.analysis_id)
        P.instrument_id = I  (or cro_source_id = C)
   4. create lims_run_imports(run, source, parser_id, …)
   5. engine.parse → lims_run_data(import_id=…)
@@ -299,11 +297,13 @@ each import:
 
 **Production import never calls AI.**
 
-### 6.5 Promote (unchanged)
+### 6.5 Promote (unchanged rules; filters by run analysis)
 
-`field_name` in row_data → analyte name/alias on `run.analysis_id` at publish.
+`field_name` in row_data → analyte name/alias **on `run.analysis_id` only**.
 
-**Design note:** setup UI should encourage `field_name` aligned with analyte names/aliases.
+If ICP import wrote 20 metals into JSONB but run analysis is RCRA-8, promote creates Results only for the eight (and listed) analytes; other columns remain instrument data / unresolved for that analysis.
+
+**Design note:** parser field_names should match catalog analyte names/aliases so promote works across linked analyses.
 
 ## 7. API sketch (v1)
 

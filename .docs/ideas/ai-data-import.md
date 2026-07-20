@@ -19,8 +19,9 @@
 | **AI role** | **Setup assistant** only: propose delimiter, header row, skip rows, column map from a sample file |
 | **Human role** | Review/edit/save parser; re-run import without AI |
 | **Repetition** | Same analysis + same instrument (or same CRO) → **reuse** the parser |
-| **Scope key (lab)** | **Analysis + instrument** |
-| **Scope key (CRO)** | **Analysis + CRO** (CRO is the “source system” when work is external) |
+| **Parser source** | **Instrument instance** XOR **CRO** (file shape) |
+| **Parser ↔ analyses** | **Many-to-many** — e.g. ICP metals parser → RCRA-8 and RCRA-13 |
+| **Run analysis** | What we **promote/store** (subset of what instrument may report) |
 | **On each LimsRun** | Track **`instrument_id` or `cro_source_id`**, and **`parser_id`** (default from analysis+source, user may override; store for troubleshooting) |
 | **Setup files** | **1+ example** files (derive config) and **1+ test** files (engine dry-run); text tables (tab/comma/etc.) |
 | **User testing** | Framework runs same import engine on test files before activate; AI may suggest **edge tests** (e.g. negatives) — human accepts; engine judges |
@@ -50,8 +51,12 @@ This is **not** “AI imports results every time.” It is “AI helps you confi
 ## Target model (proposed)
 
 ```
-Analysis ──┬── Instrument (lab)  ──► Parser (deterministic config)
-           └── CRO (external)    ──► Parser (deterministic config)
+Instrument / CRO ──► Parser (file shape, all columns)
+                         │
+                         ├── analysis RCRA-8   (M2M)
+                         └── analysis RCRA-13  (M2M)
+
+Run.analysis_id picks which panel to promote; import still uses instrument+parser
 
 Setup (once):
   1. Choose Analysis + Instrument | CRO

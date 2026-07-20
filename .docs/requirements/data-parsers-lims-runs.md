@@ -106,10 +106,12 @@ Optional `cro_sources.client_id` is a **label** (related client), not a tenant s
 | FR-3.1 | A parser shall be stored as a database entity with **`parser_config` JSONB**—no per-source code modules or user scripts in v1. |
 | FR-3.2 | `parser_config` shall be interpretable by a **generic** server-side engine (extend existing `InstrumentDataService` / `ParserConfig` schema). |
 | FR-3.3 | Minimum instruction support: delimiter (tab/comma/semicolon/etc.), encoding, skip_rows / header_row, column mappings (`source_col`, `field_name`, `data_type`, optional `unit`), optional well_col / sample_col. |
-| FR-3.4 | Parser shall be scoped to **exactly one** of: (analysis + instrument) or (analysis + CRO source). |
-| FR-3.5 | Multiple named parsers per analysis×source allowed; at most one **`is_default`** per scope pair. |
-| FR-3.6 | Admin UI (or analysis-adjacent UI) for manual create/edit/list of parsers without AI. |
-| FR-3.7 | Parsers are **not** linked to experiment templates; **`experiment_template_id` is removed** from the parser table (see schema-changes). |
+| FR-3.4 | Parser shall be scoped to **exactly one** source: **instrument instance** XOR **CRO source** (file shape). |
+| FR-3.5 | Parser shall link to **one or more analyses** via **`parser_analyses`** (M2M). Example: one metals ICP parser → RCRA-8 and RCRA-13. |
+| FR-3.6 | Multiple parsers per (analysis, source) allowed; at most one **default** per (analysis, source) via `parser_analyses.is_default`. |
+| FR-3.7 | Admin UI for parsers + multi-select analyses; no AI required for P1. |
+| FR-3.8 | Parsers are **not** linked to experiment templates; **`experiment_template_id` removed**. |
+| FR-3.9 | Parser config may map **all** instrument columns; **run.analysis_id** + promote determine which analytes become Results. |
 
 ### FR-4: LimsRun tied to analysis; multi-instrument imports; valid parsers only
 
@@ -118,9 +120,9 @@ Optional `cro_sources.client_id` is a **label** (related client), not a tenant s
 | FR-4.1 | Structured import path: run shall have **`analysis_id`** (assay whose results are expected). |
 | FR-4.2 | A run **may** perform **multiple imports** using **different instruments and/or CRO sources** (and thus different parsers). |
 | FR-4.3 | Each import shall record **instrument XOR cro_source** and **`parser_id`** (e.g. `lims_run_imports` + optional `lims_run_data.import_id`). |
-| FR-4.4 | Parser on an import **must** satisfy: `parser.analysis_id = run.analysis_id` and parser source matches the instrument/CRO of that import. |
-| FR-4.5 | UI shall only offer parsers for **(run.analysis, selected instrument\|CRO)**; default + override **within that pair only**—not an arbitrary system parser. |
-| FR-4.6 | Instrument/CRO is eligible for a run’s analysis only if an active parser exists for that pair (capability via parser catalog). |
+| FR-4.4 | Parser on an import **must** be linked to `run.analysis_id` via **`parser_analyses`** and match the import’s instrument/CRO. |
+| FR-4.5 | UI shall only offer parsers for the selected instrument\|CRO that include **run.analysis** in their M2M links—not an arbitrary parser. |
+| FR-4.6 | Instrument/CRO is eligible for a run’s analysis only if an active parser for that source is linked to that analysis. |
 | FR-4.7 | Import shall use the **stored import `parser_id`** config (no silent re-resolve for that batch later). |
 | FR-4.8 | UI shall show analysis on the run; import history shows instrument/CRO + parser used per batch. |
 | FR-4.9 | Optional: denormalize “last import” source/parser on the run for display only. |
@@ -197,20 +199,21 @@ User testing is part of the **parser framework**, not a separate product.
 instruments (id, name, vendor?, model?, description?, active, …)
 cro_sources (id, name, description?, client_id?, active, …)
 
-parsers / instrument_parsers (evolved)
-  id, name, description, active, is_default
-  analysis_id NOT NULL
-  instrument_id NULL
-  cro_source_id NULL
-  -- exactly one of instrument_id / cro_source_id set
+instrument_parsers (evolved)
+  id, name, description, active
+  instrument_id NULL | cro_source_id NULL  -- exactly one
   parser_config JSONB NOT NULL
-  -- experiment_template_id REMOVED
+  -- NO analysis_id on row; NO experiment_template_id
 
-lims_runs (additions)
-  instrument_id NULL
-  cro_source_id NULL
-  parser_id NULL
-  -- analysis_id already exists
+parser_analyses (M2M)
+  parser_id, analysis_id, is_default
+  -- e.g. ICP metals parser → RCRA-8 and RCRA-13
+
+lims_run_imports
+  lims_run_id, instrument_id|cro_source_id, parser_id, …
+
+lims_runs
+  analysis_id  -- which panel this run stores/promotes
 ```
 
 ---

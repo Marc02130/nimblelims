@@ -24,19 +24,20 @@ Do not implement a phase until questions that **block** that phase are **Decided
 |---|----------|--------|--------|----------|------|-------|-----------|
 | **1** | How do we ensure AI-generated `parser_config` JSONB is **standardized** and works with the **code framework** that runs parsers? | **Open** (proposed approach below) | P2 AI setup; schema freeze for P1 | See **Decision #1 (proposed)** | 2026-07-12 | Architecture | Single schema + validate before save; AI must emit that schema only |
 | **10** | How is **user testing** built into parser creation (example files + test files + edge cases)? | **Decided** (CEO confirmed) | P1 framework dry-run; P2 AI edge suggestions | See **Decision #10** | 2026-07-12 | Product / CEO | Results correctness is core LIMS value; multi-file + edges required |
-| **11** | Parser scope: analysis-only vs analysis×instrument/CRO? | **Decided** | Whole feature | **Analysis + instrument** or **analysis + CRO** only—not analysis alone | 2026-07-12 | CEO | Formats/names vary by instrument (model/vendor) and CRO; analysis-only is unmaintainable |
+| **11** | Parser scope: analysis-only vs analysis×instrument/CRO? | **Decided** (refined #17) | Whole feature | Parser keyed by **instrument XOR CRO**; **M2M to analyses** (not analysis-only, not single analysis FK on parser) | 2026-07-12 / 19 | CEO + Product | Format ~ instrument; one ICP file can serve RCRA-8 and RCRA-13 |
+| **17** | Parser↔analysis cardinality? | **Decided** | Schema P1 | **Many-to-many `parser_analyses`** | 2026-07-19 | Product | Metals ICP imports all metals; run analysis selects which analytes to promote/store as results |
 | **12** | AI on every import vs setup-only? | **Decided** | Whole feature / P2 | **Setup only.** Instrument/CRO consistency → one parser, many cheap imports | 2026-07-12 | CEO | Minimize AI cost; deterministic day-to-day import |
 | **13** | MVP phase cut and priority? | **Decided** | Roadmap | **P0+P1 MVP (high priority)**; P2 after P0+P1; result import is expected (manual entry not OK as primary path) | 2026-07-12 | CEO | Modern LIMS table stakes |
 | **14** | Resolve open questions before implementation? | **Decided** | Process | **Yes** — blocking questions resolved before implementation starts | 2026-07-12 | CEO | Aligns with development-process gate |
 | 2 | Instrument catalog grain: instance vs model/vendor? | **Decided** | P0 catalog | **Type** (vendor, model) + **instance** (type FK, serial, name). No location until [lab-locations](../ideas/lab-locations.md). Parsers/runs key **instance**. | 2026-07-19 | Product | Format ~ type; lineage ~ instance |
 | 3 | Permission for parser / instrument / CRO CRUD? | **Open** | P0–P1 | _Suggested:_ `config:edit` | | Product | Align with other lab config |
-| 4 | Allow override to a parser for a **different** analysis than the run? | **Open** | P1 UI/API | _Suggested:_ block (or warn+block) | | Product | Promote uses run.analysis_id |
+| 4 | Allow override to a parser for a **different** analysis than the run? | **Decided** | P1 UI/API | **Block** — parser must be linked to `run.analysis_id` via `parser_analyses` | 2026-07-19 | Product | Import validity |
 | 5 | Snapshot `parser_config` on first import? | **Open** / lean defer | P3 | _Suggested:_ FK only for MVP | | Architecture | Lineage via parser_id enough if edits audited |
 | 6 | Non-reportable run (no analysis): how is parser required? | **Open** | P1 import | _No template fallback_ (column removed). Options: require analysis for import; or allow source+parser with analysis optional for non-reportable | 2026-07-12 | Product | Template-scoped parsers removed by decision |
 | **15** | Keep `experiment_template_id` on parsers? | **Decided** | Schema | **Remove** the column entirely | 2026-07-12 | Product / Architecture | Parsers are analysis×instrument/CRO only |
 | **16** | Run analysis + multi instrument/parser rules? | **Decided** | P1 import/schema | See **Decision #16** | 2026-07-19 | Product | Run tied to analysis; multiple instruments/parsers allowed; each must match analysis + that instrument/CRO |
 | 7 | Instruments/CRO catalogs multi-tenant scope? | **Decided** | P0 | **Lab-global only.** No org segregation. Multi-tenant **out of scope** until real multi-org users — see [ideas/multi-tenant.md](../ideas/multi-tenant.md) | 2026-07-18 | Product | Pre-release; single lab deployment |
-| 8 | Multiple parsers per analysis×source: default selection rule? | **Open** | P1 | _Suggested:_ `is_default` + require unique default | | Product | |
+| 8 | Multiple parsers per analysis×source: default selection rule? | **Decided (provisional)** | P1 | `parser_analyses.is_default` for that analysis; at most one default per (analysis, instrument\|cro) among linked parsers | 2026-07-19 | Product | |
 | 9 | Table naming: keep `instrument_parsers` vs rename? | **Open** | P1 migration | _Suggested:_ keep table, evolve columns | | Architecture | Less migration noise |
 
 ---
@@ -251,18 +252,19 @@ Given column stats from examples/tests (types, min/max, null rate, sample of val
 
 ---
 
-## Decision #11 — Scope parsers by analysis × instrument or analysis × CRO
+## Decision #11 / #17 — Parser = instrument|CRO file shape; many analyses via M2M
 
-**Status:** **Decided** · **Date:** 2026-07-12 · **Owner:** CEO  
+**Status:** **Decided** · **Updated:** 2026-07-19 · **Owner:** CEO + Product  
 
 | Rule | Detail |
 |------|--------|
-| Lab | Parser keyed by **analysis + instrument** |
-| CRO | Parser keyed by **analysis + CRO source** |
-| Forbidden | Parser keyed by **analysis alone** (must handle all instruments/CROs → unmaintainable) |
-| Run tracking | Store instrument XOR CRO + `parser_id` so import lineage matches scope key |
+| **Parser source** | Keyed by **instrument instance** XOR **CRO source** (file format/shape) |
+| **Parser ↔ analyses** | **Many-to-many** table `parser_analyses` |
+| **Forbidden** | Analysis-only parser (no instrument/CRO); single forced analysis FK that prevents sharing |
+| **Example** | Metals ICP parser linked to **RCRA-8** and **RCRA-13**. Instrument may report all metals; **run.analysis_id** chooses which panel is stored/promoted |
+| **Run** | One analysis (what we care about for Results); many imports/instruments possible |
 
-**Rationale:** File format and column names vary by instrument model/vendor and by CRO data systems.
+**Rationale:** Format varies by instrument/CRO. One instrument output can feed multiple analysis definitions without duplicating parsers.
 
 ---
 
@@ -306,14 +308,13 @@ run.analysis_id  = A
 import uses instrument I (or CRO C) and parser P
 
 Required:
-  P.analysis_id = A
+  EXISTS parser_analyses(parser_id=P, analysis_id=A)
   if lab:  P.instrument_id = I
   if CRO:  P.cro_source_id = C
 ```
 
 - There is **no** free choice of “any parser in the system.”  
-- An instrument is eligible for a run’s analysis only if a **parser exists** for `(analysis, instrument)` (capability = catalog of parsers, not a separate matrix unless we add one later).  
-- Same for CRO: capability = parser for `(analysis, cro_source)`.
+- Capability = active parser for that instrument/CRO **linked** to analysis A via `parser_analyses`.
 
 ### Schema implication (see schema-changes)
 
