@@ -22,11 +22,12 @@
 
 ### A. Setup (admin / lab manager) — once
 
-1. Instruments list — create “LCMS-1”  
-2. CRO sources list — create “Eurofins metals”  
-3. Parsers — create for Analysis=Metals + Instrument=LCMS-1; edit column map  
-4. **Upload example file(s)** (1+) and **test file(s)** (1+); **Run tests** → pass/fail panel  
-5. (P2) “Draft config from examples” + “Suggest edge tests” → accept → re-run tests → **Activate** / save  
+1. Instrument **types** — e.g. vendor Agilent, model 6495C  
+2. Instrument **instances** — e.g. name LCMS-1, type above, serial optional (no location yet)  
+3. CRO sources list — create “Eurofins metals”  
+4. Parsers — create for Analysis=Metals + Instrument **instance** LCMS-1; edit column map  
+5. **Upload example file(s)** (1+) and **test file(s)** (1+); **Run tests** → pass/fail panel  
+6. (P2) “Draft config from examples” + “Suggest edge tests” → accept → re-run tests → **Activate** / save  
 
 ### A2. Parser test panel (required UX)
 
@@ -61,7 +62,8 @@
 
 | Surface | Content |
 |---------|---------|
-| Admin: Instruments | CRUD grid |
+| Admin: Instrument types | CRUD (vendor/model) |
+| Admin: Instruments (instances) | CRUD (type, serial, name) |
 | Admin: CRO sources | CRUD grid |
 | Admin: Parsers | List + editor + multi-file test panel |
 | LimsRun Overview | Analysis, Instrument/CRO, Parser (default/override) |
