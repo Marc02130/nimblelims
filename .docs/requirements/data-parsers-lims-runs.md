@@ -88,7 +88,7 @@ Optional `cro_sources.client_id` is a **label** (related client), not a tenant s
 | FR-1.4 | **No location** on instruments this cycle. Existing `locations` is client address data—not lab rooms. Future: [ideas/lab-locations.md](../ideas/lab-locations.md). |
 | FR-1.5 | Soft-deactivate preferred over hard delete when parsers/runs reference the instrument. |
 | FR-1.6 | Parsers and lims_runs reference the **instance** (not the type). Type is available via join for display/AI context (vendor/model). |
-| FR-1.7 | Permission: lab config admin (`config:edit` or dedicated—**open** Q3). |
+| FR-1.7 | Permission: **`config:edit`** for instrument types/instances (and related config). |
 
 ### FR-2: CRO source catalog (light)
 
@@ -97,7 +97,7 @@ Optional `cro_sources.client_id` is a **label** (related client), not a tenant s
 | FR-2.1 | System shall support CRUD for **CRO sources** (name, optional description, optional link to client/org, active). |
 | FR-2.2 | CRO source is the external analogue of instrument for parser scoping and run lineage. |
 | FR-2.3 | Soft-deactivate when referenced by parsers. |
-| FR-2.4 | Same permission class as instruments unless product splits later. |
+| FR-2.4 | Same permission: **`config:edit`**. |
 
 ### FR-3: Parser as DB instructions (not code)
 
@@ -167,7 +167,7 @@ User testing is part of the **parser framework**, not a separate product.
 
 | ID | Requirement |
 |----|-------------|
-| FR-8.1 | Catalog and parser CRUD restricted to lab configuration roles (not lab client users). |
+| FR-8.1 | Catalog and parser CRUD require **`config:edit`** (not lab client users). |
 | FR-8.2 | Run field changes (analysis, source, parser) require run edit permissions consistent with existing LimsRun RBAC. |
 | FR-8.3 | Import and parser CRUD actions are auditable (who, when, entity ids). |
 | FR-8.4 | Instruments / CRO sources / parsers are **lab-global** config (not client-configurable). **Multi-tenant / org segregation is out of scope** — see [ideas/multi-tenant.md](../ideas/multi-tenant.md). |
