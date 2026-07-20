@@ -1,7 +1,7 @@
 # Requirements: Data parsers, instruments/CRO sources, and LimsRun import
 
 **Date:** 2026-07-12  
-**Status:** **In review** — **CEO Accept** (2026-07-12); Security · Architecture · UI outstanding; tech sketch attached  
+**Status:** **Accepted for implementation** (2026-07-19) — CEO re-confirm; Architecture · Security · UI **Accept with conditions**  
 **Idea / direction:** [`.docs/ideas/ai-data-import.md`](../ideas/ai-data-import.md)  
 **Tech sketch:** [`.docs/tech-sketch/data-parsers-lims-runs.md`](../tech-sketch/data-parsers-lims-runs.md)  
 **Open questions:** [`.docs/open-questions/data-parsers-lims-runs.md`](../open-questions/data-parsers-lims-runs.md)  
@@ -293,17 +293,18 @@ File column  --parser-->  row_data[field_name]  --promote-->  Result(analyte)
 
 ---
 
-## 10. Review packet (resubmitted with tech sketch)
+## 10. Review packet
 
 | Doc | Location | Status |
 |-----|----------|--------|
-| Requirements | this file | **In review** |
-| **Tech sketch** | [tech-sketch/data-parsers-lims-runs.md](../tech-sketch/data-parsers-lims-runs.md) | **Ready for review** |
-| CEO / product | [ceo-review/data-parsers-lims-runs.md](../ceo-review/data-parsers-lims-runs.md) | Awaiting review |
-| Security | [security-review/data-parsers-lims-runs.md](../security-review/data-parsers-lims-runs.md) | Awaiting review |
-| Architecture | [architecture-review/data-parsers-lims-runs.md](../architecture-review/data-parsers-lims-runs.md) | Awaiting review |
-| UI / UX | [ui-review/data-parsers-lims-runs.md](../ui-review/data-parsers-lims-runs.md) | Awaiting review |
-| Open questions | [open-questions/data-parsers-lims-runs.md](../open-questions/data-parsers-lims-runs.md) | Living |
+| Requirements | this file | **Accepted for implementation** |
+| **Tech sketch** | [tech-sketch/data-parsers-lims-runs.md](../tech-sketch/data-parsers-lims-runs.md) | Ready |
+| CEO / product | [ceo-review/data-parsers-lims-runs.md](../ceo-review/data-parsers-lims-runs.md) | **Accept** (re-confirm 2026-07-19) |
+| Security | [security-review/data-parsers-lims-runs.md](../security-review/data-parsers-lims-runs.md) | **Accept with conditions** (P1 S1–S5; P2 S6–S8) |
+| Architecture | [architecture-review/data-parsers-lims-runs.md](../architecture-review/data-parsers-lims-runs.md) | **Accept with conditions** (A1–A7) |
+| UI / UX | [ui-review/data-parsers-lims-runs.md](../ui-review/data-parsers-lims-runs.md) | **Accept with conditions** (U1–U4 must; U5–U7 nice) |
+| Open questions | [open-questions/data-parsers-lims-runs.md](../open-questions/data-parsers-lims-runs.md) | Product closed (Q8 provisional) |
+| Schema changes | [schema-changes/data-parsers-lims-runs.md](../schema-changes/data-parsers-lims-runs.md) | Architecture re-verified |
 | Idea | [ideas/ai-data-import.md](../ideas/ai-data-import.md) | Direction sketch |
 
-**Gate:** Do not start P1 until CEO + Architecture blockers are **Decided** (or provisional defaults accepted) and developer has processed review verdicts. Security must accept trust boundaries before AI setup (P2) ships.
+**Gate:** Product + reviews complete for P0/P1. Implement conditions in review docs. P2 still requires Security S6–S8.

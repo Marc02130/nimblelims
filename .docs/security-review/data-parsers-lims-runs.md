@@ -2,82 +2,66 @@
 
 **Date:** 2026-07-12  
 **Resubmitted:** 2026-07-19  
-**Status:** **Resubmitted for security review**  
+**Verdict date:** 2026-07-19  
+**Status:** **Accepted with conditions** (P1 clear; P2 conditional)  
 **Requirements:** [`.docs/requirements/data-parsers-lims-runs.md`](../requirements/data-parsers-lims-runs.md)  
 **Tech sketch:** [`.docs/tech-sketch/data-parsers-lims-runs.md`](../tech-sketch/data-parsers-lims-runs.md)  
 **Schema changes:** [`.docs/schema-changes/data-parsers-lims-runs.md`](../schema-changes/data-parsers-lims-runs.md)  
 **Open questions:** [`.docs/open-questions/data-parsers-lims-runs.md`](../open-questions/data-parsers-lims-runs.md)
 
-## Ask of security (this pass)
-
-Accept or condition **P1** and note **P2** AI requirements. Product locks below are fixed for this cycle.
-
-## Trust boundaries
+## Trust boundaries (accepted)
 
 ```
-[Lab admin]  CRUD instrument types/instances, CRO sources, data_parsers (config:edit)
-[Lab user]   set run analysis (required); import with instrument|CRO + parser version
-[Backend]    ParserEngine applies parser_config only (no eval/exec)
-[Setup]      dry-run engine on test files (same code path); caps 10 files / 10 MB
-[Optional P2] AI setup: examples → draft JSON; stats → edge fixtures only
-[Publish]    existing promote path (analysis always present)
+[Lab admin]  CRUD catalogs + data_parsers (config:edit)
+[Lab user]   run analysis required; import file + instrument|CRO + parser version
+[Backend]    ParserEngine only — no eval/exec of user content
+[Setup]      same engine; server-enforced 10 files / 10 MB
+[P2]         AI drafts JSON only; human save; never on import
+[Publish]    existing promote (analysis always set)
 ```
 
-## Product locks with security impact
+## STRIDE results
 
-| Lock | Security note |
-|------|----------------|
-| **No executable parsers** | JSONB instructions + engine only |
-| **Schema-first ParserConfig (Q1)** | `extra=forbid`; validate all writers including AI |
-| **AI setup-only (P2)** | Import path never calls LLM |
-| **config:edit** | Clients cannot mutate catalogs/parsers |
-| **Versioned parsers** | Import stores version `parser_id` (lineage/audit); no config snapshot blob |
-| **Setup caps 10 / 10 MB** | DoS bound on uploads |
-| **All-clean activate** | Reduces bad production parsers (integrity) |
-| **Lab-global catalogs** | No multi-tenant segregation this cycle |
-| **analysis_id required** | Clearer promote/authz story |
+| Threat | Mitigation | Status |
+|--------|------------|--------|
+| Spoofing | JWT + existing auth | **OK** for P1 |
+| Tampering (maps) | `config:edit` only; schema validate; audit | **OK** |
+| RCE | Forbid executable parsers; JSON + engine only | **OK — must-test** |
+| AI key injection | `extra=forbid`; validate AI output | **OK for P2 design** |
+| Repudiation | version `parser_id` on import; activate audit | **OK** |
+| Info disclosure (LLM) | P2 only; lab roles; minimize PII | **P2 condition** |
+| Cross-client config | Lab-global catalogs; not client-owned | **OK** (multi-tenant later) |
+| DoS | **10 files / 10 MB** server-side; no AI on import | **OK — must-enforce** |
+| Elevation | Clients blocked from config CRUD | **OK** |
 
-## STRIDE checklist (reviewer)
-
-| Threat | Concern | Proposed mitigation | Status |
-|--------|---------|---------------------|--------|
-| Spoofing | Stolen token edits parsers | Existing auth/JWT; `config:edit` | _Review_ |
-| Tampering | Malicious column maps | Lab-only config; schema validate; audit | _Review_ |
-| Tampering | User scripts / RCE | **Forbid** executable parsers | _Review_ |
-| Tampering | AI injects unknown keys | `extra=forbid`; allow-listed types | _Review_ |
-| Repudiation | Who imported with which parser | Store version `parser_id` on import; audit | _Review_ |
-| Info disclosure | Sample files to LLM (P2) | Backend key; minimize PII; lab-only | _Review_ |
-| Info disclosure | Cross-client config | Lab-global; not client-owned | _Review_ |
-| DoS | Huge uploads / AI jobs | **10 files / 10 MB**; async AI; no AI on import | _Review_ |
-| Elevation | Client configures parsers | Block client roles from config CRUD | _Review_ |
-
-## Must-accept conditions (draft)
-
-1. **No user-supplied code execution** for parsers.  
-2. Import path **never** calls LLM.  
-3. AI setup (P2) is lab-only, confirm-before-save, secrets server-side.  
-4. Edge tests from AI are fixtures run by **engine**, not AI-judged.  
-5. RLS: run data / results under existing isolation; catalogs lab-config only.  
-6. File size/count limits enforced server-side (**10 / 10 MB**).  
-7. Activate only after engine tests pass (**all** hard-error-free).  
-
-## P1 vs P2
-
-| Phase | Security focus |
-|-------|----------------|
-| **P1** | Config authZ; no RCE; upload limits; audit; schema validation |
-| **P2** | LLM data handling; prompt injection; no trust of model for pass/fail |
-
-## Verdict (fill in)
+## Verdict
 
 | Field | Value |
 |-------|--------|
-| **Verdict** | _Pending_ (Accept / Accept with conditions / Reject) |
-| **Blockers for P1** | |
-| **Blockers for P2 (AI)** | |
-| **Reviewer** | |
-| **Date completed** | |
+| **Verdict** | **Accept with conditions** |
+| **Blockers for P1** | **None** if S1–S5 implemented |
+| **Blockers for P2 (AI)** | S6–S8 before P2 ships |
+| **Reviewer** | Security (CSO posture) |
+| **Date completed** | 2026-07-19 |
+
+### P1 conditions (implement with feature)
+
+| # | Condition |
+|---|-----------|
+| S1 | **No** user code/snippets in `parser_config` — Pydantic allow-list only; reject unknown keys. |
+| S2 | Import and setup parse paths **never** call LLM (assert in tests / code review). |
+| S3 | Upload limits **enforced server-side**: max 10 files, max 10 MB each; reject oversized before storage. |
+| S4 | **`config:edit`** required for catalog/parser mutate; client roles cannot CRUD. |
+| S5 | Audit: create/activate parser version; import with `parser_id` + actor + timestamp. |
+
+### P2 conditions (before AI setup ships)
+
+| # | Condition |
+|---|-----------|
+| S6 | LLM credentials only on server; never exposed to client. |
+| S7 | Treat model output as untrusted: validate ParserConfig; engine judges tests — never AI pass/fail alone. |
+| S8 | Document/minimize PII in example files sent to LLM; lab-only access to setup + draft jobs. |
 
 ## Notes
 
-_Resubmitted 2026-07-19: Q1 accepted, 10b/10c locked, data_parsers rename, versioning, analysis required, M2M._
+Design posture is sound for a deterministic import LIMS feature. P1 is security-clear with standard authZ/validation/limits. P2 is a separate gate.

@@ -351,7 +351,7 @@ Optional UI convenience: “last instrument / last parser” denormalized on the
 
 **Pre-release:** phase the **work** (P0→P1→P2). Do **not** invest in production dual-write / switchover plans until multi-tenant production use exists.
 
-**2026-07-19:** Product open questions closed (Q1, #10b, #10c). **Resubmitted** for CEO / UI / Architecture (design) / Security review of the full delta.
+**2026-07-19:** Product open questions closed. Reviews: CEO **Accept**; Architecture / Security / UI **Accept with conditions** — **ready for P0/P1 implementation**.
 
 ---
 

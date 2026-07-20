@@ -2,7 +2,7 @@
 
 **Feature / cycle:** Data parsers, instruments/CRO sources, LimsRun lineage  
 **Phases covered:** **P0 + P1** (P2 AI = no extra schema beyond setup files already in P1)  
-**Status:** Schema **verified** by architecture (2026-07-18); updated 2026-07-19 — **`data_parsers` rename**, versioning + active; no ephemeral setup; pre-release  
+**Status:** Schema **accepted** by architecture (2026-07-19 Accept with conditions); **`data_parsers`**, versioning + active; pre-release  
 **Alembic revisions:** _(none yet)_  
 **Requirements:** [../requirements/data-parsers-lims-runs.md](../requirements/data-parsers-lims-runs.md)  
 **Tech sketch:** [../tech-sketch/data-parsers-lims-runs.md](../tech-sketch/data-parsers-lims-runs.md)  
@@ -191,7 +191,7 @@ Do **not** change as part of data-parsers P0/P1:
 |----|--------|--------|
 | — | **None for product** (2026-07-19) | Architecture re-accept of full delta |
 
-Closed: Q1–Q9, #10a–d, #11–17 as applicable. See open-questions. **Resubmitted** for Architecture / Security / UI / CEO re-confirm.
+Closed: Q1–Q9, #10a–d, #11–17 as applicable. Reviews **Accepted** 2026-07-19 (Architecture conditions A1–A7).
 
 Product: analysis×instrument/CRO (M2M), `data_parsers`, versioning, analysis required.
 
