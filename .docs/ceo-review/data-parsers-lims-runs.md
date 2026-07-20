@@ -55,7 +55,7 @@ This also supports run fields: **instrument XOR CRO** + stored **`parser_id`** (
 
 **Confirmed process:** remaining open product/architecture questions will be **resolved before implementation starts** (per phase gate).
 
-*Note:* CEO did not individually settle Q3 permissions, Q6 non-reportable fallback, Q4 cross-analysis override, etc. Those remain in open-questions for architecture/security/product lock **before code**.
+*Note:* Product later locked Q3 (`config:edit`), Q4 (block cross-analysis override), Q5 (versioning, no snapshot), Q6 (**no non-reportable runs**; method-dev deferred to lab projects). Remaining open questions still gate implementation where listed.
 
 ### 6. Roadmap priority
 

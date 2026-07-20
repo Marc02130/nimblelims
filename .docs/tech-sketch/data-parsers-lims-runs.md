@@ -268,7 +268,7 @@ Setup path: `run_test_suite` only—no DB import.
 ### 6.1 Run analysis + multi-instrument import (Decision #16)
 
 ```
-run.analysis_id required for structured import (assay expected)
+run.analysis_id REQUIRED for import (Decision #6 — no non-reportable path)
 
 each import:
   1. require run.analysis_id
@@ -342,7 +342,7 @@ If ICP import wrote 20 metals into JSONB but run analysis is RCRA-8, promote cre
 | POST | `/v1/data-parsers/test` | multipart: config + test files → reports |
 | POST | `/v1/data-parsers/draft` | P2 AI; examples multipart |
 | POST | `/v1/data-parsers/suggest-edges` | P2 AI; returns fixtures not pass/fail |
-| PATCH | `/v1/lims-runs/{id}` | analysis_id (required for structured path) |
+| PATCH | `/v1/lims-runs/{id}` | analysis_id required before import (Decision #6) |
 | POST | `/v1/lims-runs/{id}/import` | multipart: file + instrument_id\|cro_source_id + optional parser_id override → creates import event |
 | GET | `/v1/lims-runs/{id}/imports` | import history (source + parser per batch) |
 

@@ -2,7 +2,7 @@
 
 **Status:** Placeholder — **not in data-parsers P0/P1**  
 **Date:** 2026-07-19 · **Updated:** 2026-07-19 (client_projects kept; internal projects separate)  
-**Related:** Accessioning / samples / RLS; [client_projects](../user-stories/nimblelims-user.md) (US-25); method-dev / non-reportable runs (data-parsers open Q6); [multi-tenant](multi-tenant.md); Lab QC system project
+**Related:** Accessioning / samples / RLS; [client_projects](../user-stories/nimblelims-user.md) (US-25); data-parsers **Decision #6** (no non-reportable runs; method-dev deferred here); [multi-tenant](multi-tenant.md); Lab QC system project
 
 ## One-liner
 
@@ -138,19 +138,21 @@ Kinds can start as a **list** entry, not a hard enum.
 - **Lab `projects`:** internal; method-dev/scratch use lab roles. Optional later: project-level grants for child orders.  
 - Do not require a lab project for client/CRO report identity—that is **`client_project_id`**.
 
-## Method-dev / non-reportable (tie-in)
+## Method-dev (tie-in) — data-parsers Decision #6
 
-Do **not** use “run with no analysis” as the method-dev model.
+**Locked in data-parsers:** **no non-reportable runs**; structured import always requires `analysis_id`. Method-dev is **deferred to this idea** (lab projects), not a null-analysis path.
+
+When this idea is implemented, prefer:
 
 | Need | Prefer |
 |------|--------|
 | Assay under development | **Draft analysis** + versioned parsers (data-parsers Decision #5) |
 | Related work over weeks | **Lab project** kind = method_dev (not a client_project) |
 | Samples / spikes for the program | **Orders** optionally under that lab project |
-| Client/CRO report line | **`client_project_id` on the order** when the work is billable/client work—method-dev orders often omit it |
-| Non-reportable | **No promote** (draft analysis / lab project policy)—not missing `analysis_id` |
+| Client/CRO report line | **`client_project_id` on the order** when billable/client work—method-dev orders often omit it |
+| Not yet reportable | Policy on promote / draft analysis / lab project kind—**still has an analysis** |
 
-Data-parsers P0/P1 can stay on **lab-global parsers + analysis-scoped import** without waiting for this rename. This idea unblocks **language and long-horizon lab grouping** later; client_projects stay for reporting.
+Until then: production path only—analysis required for import.
 
 ## Migration (when scheduled)
 
