@@ -72,7 +72,7 @@
 | Admin: Instrument types | CRUD (vendor/model) |
 | Admin: Instruments (instances) | CRUD (type, serial, name) |
 | Admin: CRO sources | CRUD grid |
-| Admin: Parsers | List active; version history; editor; multi-file tests; **activate prompt** on save |
+| Admin: **Data parsers** | List active; version history; editor; multi-file tests; **activate prompt** on save |
 | LimsRun Overview | Analysis, Instrument/CRO, Parser (name + version) |
 | LimsRun Import | Upload bound to stored **version** `parser_id` on import event |
 
