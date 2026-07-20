@@ -14,7 +14,22 @@ True multi-tenant isolation: segregate configuration and data **by organization*
 - Current work (including data parsers) assumes a **single lab deployment**: no segregating instruments, CRO sources, parsers, or similar catalogs by org.  
 - Investing in full tenant isolation, dual-write, and cutover patterns before that need is premature.
 
-**Until this idea is prioritized:** do not design schema or UX around per-org config namespaces for new features unless already required by existing client/project RLS.
+**Until this idea is prioritized:** do not implement per-org config namespaces or dual multi-tenant code paths.
+
+### Readiness for new features (current policy)
+
+When building **new** lab config (e.g. instruments, CRO sources, data parsers):
+
+| Do | Do not |
+|----|--------|
+| Ship **lab-global** tables for a single-lab deployment | Pretend multi-tenant is live |
+| Prefer patterns that stay **additive** later (UUID PKs, soft `active`, clean FKs) | Scatter org logic through import/promote engines |
+| Note in that feature’s **schema-changes** / tech sketch a short **multi-tenant readiness** section | Add nullable `tenant_id` everywhere “for later” |
+| Keep lab-client users out of lab config CRUD | Use optional `client_id` labels as a security tenant |
+
+**Rule of thumb:** multi-tenant should become “add tenant key + uniques + RLS,” not “rewrite the feature.”
+
+Example applied to parsers: [schema-changes/data-parsers-lims-runs.md](../schema-changes/data-parsers-lims-runs.md) §6b · [tech-sketch/data-parsers-lims-runs.md](../tech-sketch/data-parsers-lims-runs.md) §2b.
 
 ## Problem (when we need it)
 

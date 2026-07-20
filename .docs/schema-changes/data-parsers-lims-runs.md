@@ -110,6 +110,24 @@ Do **not** change as part of data-parsers P0/P1:
 | `experiment_templates` structure | Unchanged (still used for protocol/lifecycle on the **run**) |
 | Parser ↔ template link | **Removed** — not “nullable legacy” |
 | Executable parser storage | Forbidden |
+| **Multi-tenant / org segregation** | **Out of scope** — [ideas/multi-tenant.md](../ideas/multi-tenant.md) |
+
+## 6b. Multi-tenant readiness (not implementation)
+
+**Now:** single-lab, **lab-global** catalogs (`instruments`, `cro_sources`, parsers, setup files). No `tenant_id` / `org_id` columns this cycle.
+
+**Goal of readiness:** later multi-tenant should be an **additive** change (column + unique/RLS), not a rewrite of import/promote.
+
+| Do (cheap readiness) | Do not (over-design) |
+|----------------------|----------------------|
+| UUID PKs; soft `active` | Nullable `tenant_id` with all nulls “for later” |
+| Clean FKs: instrument/cro → parser → run | Dual code paths `if multi_tenant` |
+| Unique `name` simple for one lab; note future `(tenant_id, name)` | Partial unique indexes on null tenant |
+| App: resolve parser by analysis×source, not “global magic” | Per-org admin UX now |
+| Optional `cro_sources.client_id` as **label** only (not security tenancy) | Using client_id as tenant wall without a multi-tenant design |
+| Client roles cannot mutate lab config | Fake multi-tenant RLS policies |
+
+**When multi-tenant ships:** likely add tenant/org scope to these tables, change uniques to per-tenant, RLS by tenant. Document that work under a future multi-tenant requirements/schema-changes cycle—not as dual-write in P0/P1.
 
 ## 7. Open schema blockers
 

@@ -58,6 +58,12 @@ How to reverse, or “forward-only” with reason.
 
 List tables/columns **not** changing so reviewers do not hunt elsewhere.
 
+## 6b. Multi-tenant readiness (optional)
+
+- Lab-global vs tenant-scoped **this cycle**  
+- Cheap readiness (FKs, soft active) vs forbidden over-design (null tenant_id, dual paths)  
+- Link: [ideas/multi-tenant.md](../ideas/multi-tenant.md)
+
 ## 7. Open schema blockers
 
 Link to open-questions items that block migration.

@@ -32,6 +32,22 @@
 **Non-goals**
 
 - Equipment CMMS, executable parsers, XLSX v1, changing promote rules  
+- **Multi-tenant / org segregation** (lab-global config only; see readiness below)
+
+### 2b. Multi-tenant readiness (not implementation)
+
+**Context:** Real multi-org users are not the current target. Full multi-tenant design lives in [ideas/multi-tenant.md](../ideas/multi-tenant.md). Instruments/CRO/parsers are **prepared** so tenancy can be added later without redesigning the import pipeline.
+
+| Principle | Application here |
+|-----------|------------------|
+| **Ship lab-global** | One deployment = one lab’s catalogs; no org switcher |
+| **Additive later** | Future `tenant_id` (or equivalent) + per-tenant unique + RLS—not a second parser engine |
+| **Clean ownership chain** | `instrument`/`cro_source` → `parser` → `lims_run.parser_id` stays the resolution story |
+| **No fake tenancy** | Do not add null tenant columns or dual code paths in P0–P2 |
+| **client_id on CRO** | Optional labeling only; not the multi-tenant security boundary |
+| **Security now** | Lab roles manage config; lab **client** users do not edit instruments/parsers |
+
+**Engine/import:** remains deterministic and keyed by run’s stored source + `parser_id`. Tenant filtering, when it exists, should sit **above** resolution (which catalogs are visible), not inside `ParserConfig` JSON.
 
 ## 3. Component diagram
 
