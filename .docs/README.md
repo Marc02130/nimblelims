@@ -121,7 +121,7 @@ Long-form tech designs stay in [design/](design/). UI review was previously `ui-
 | [ideas/ai-data-import.md](ideas/ai-data-import.md) | Deterministic parsers (analysis+instrument/CRO); AI only for setup | **Requirements in review** |
 | [ideas/ai-data-analysis.md](ideas/ai-data-analysis.md) | AI-assisted query / anomaly / summary of run+result data | **Placeholder** |
 | [ideas/multi-tenant.md](ideas/multi-tenant.md) | Org segregation / true multi-tenant isolation | **Placeholder — OOS until real multi-org users** |
-| [ideas/lab-locations.md](ideas/lab-locations.md) | Lab facility locations for instruments/assets | **Placeholder** (not client `locations`) |
+| [ideas/lab-locations.md](ideas/lab-locations.md) | Lab buildings/rooms; rename client `locations` → `addresses` | **Placeholder** |
 | [ideas/model-fine-tune.md](ideas/model-fine-tune.md) | Model fine-tune notes | See `sop-rag` for related SOP/RAG work |
 
 ## Reviews (run-results) — complete
