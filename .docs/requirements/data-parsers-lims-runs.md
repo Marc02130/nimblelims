@@ -78,14 +78,17 @@ Optional `cro_sources.client_id` is a **label** (related client), not a tenant s
 
 ## 3. Functional requirements
 
-### FR-1: Instrument catalog (light)
+### FR-1: Instrument types and instances (light)
 
 | ID | Requirement |
 |----|-------------|
-| FR-1.1 | System shall support CRUD for **instruments** (name, optional vendor/model/description, active flag). |
-| FR-1.2 | Instruments are **lab configuration**, not full asset management. Serial/calibration optional later. |
-| FR-1.3 | Soft-deactivate (active=false) preferred over hard delete when parsers reference the instrument. |
-| FR-1.4 | Permission: configurable lab admin (`config:edit` or dedicated permission—**open**). |
+| FR-1.1 | System shall support CRUD for **instrument types** with **vendor** and **model** (plus name/description/active). |
+| FR-1.2 | System shall support CRUD for **instrument instances** with **FK to instrument type**, **name** (lab nickname), optional **serial number**, description, active. |
+| FR-1.3 | Instruments are **lab configuration**, not full CMMS (no calibration/IQ-OQ this cycle). |
+| FR-1.4 | **No location** on instruments this cycle. Existing `locations` is client address data—not lab rooms. Future: [ideas/lab-locations.md](../ideas/lab-locations.md). |
+| FR-1.5 | Soft-deactivate preferred over hard delete when parsers/runs reference the instrument. |
+| FR-1.6 | Parsers and lims_runs reference the **instance** (not the type). Type is available via join for display/AI context (vendor/model). |
+| FR-1.7 | Permission: lab config admin (`config:edit` or dedicated—**open** Q3). |
 
 ### FR-2: CRO source catalog (light)
 
@@ -266,7 +269,7 @@ File column  --parser-->  row_data[field_name]  --promote-->  Result(analyte)
 | # | Question | Suggested default |
 |---|----------|-------------------|
 | **1** | How is AI/manual `parser_config` kept compatible with the import engine? | **Schema-first:** one Pydantic/JSON Schema; validate all writers; AI emits that schema only; dry-run on sample file |
-| 2 | Instrument = named instance vs type? | Named source/instance (or named export stream) |
+| 2 | Instrument type vs instance? | **Decided:** type (vendor/model) + instance (serial); see schema-changes |
 | 3 | Permission for parser CRUD? | `config:edit` |
 | 4 | Allow override to a parser from a different analysis? | No without strong warning / block |
 | 5 | Snapshot parser_config on first import? | Defer to P3; FK sufficient for MVP |

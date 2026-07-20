@@ -23,9 +23,9 @@
 
 - Single **ParserConfig** contract for DB, engine, UI, AI  
 - Generic **parse engine** only (no user code)  
-- Catalogs: instruments, cro_sources  
-- Parsers scoped analysis + (instrument XOR cro_source)  
-- LimsRun: `instrument_id` | `cro_source_id`, `parser_id` (default + override, stored)  
+- Catalogs: **instrument_types** (vendor/model) + **instruments** (instance: type FK, serial), cro_sources  
+- Parsers scoped analysis + (**instrument instance** XOR cro_source)  
+- LimsRun: `instrument_id` (instance) | `cro_source_id`, `parser_id` (default + override, stored)  
 - Setup: 1+ examples, 1+ tests; engine judges; optional AI edges (P2)  
 - Production import: deterministic, no LLM  
 
@@ -52,15 +52,21 @@
 ## 3. Component diagram
 
 ```
-┌─────────────┐  ┌──────────────┐
-│ instruments │  │ cro_sources  │
-└──────┬──────┘  └──────┬───────┘
-       │                │
-       └────────┬───────┘
-                ▼
+┌──────────────────┐
+│ instrument_types │  vendor, model
+└────────┬─────────┘
+         │
+         ▼
+┌──────────────────┐     ┌──────────────┐
+│ instruments      │     │ cro_sources  │
+│ (instance)       │     │              │
+│ type_id, serial  │     │              │
+└────────┬─────────┘     └──────┬───────┘
+         │                      │
+         └──────────┬───────────┘
+                    ▼
 ┌───────────────────────────────────┐
-│ data_parsers (evolve instrument_  │
-│   parsers)                        │
+│ instrument_parsers                │
 │  analysis_id + instrument|cro     │
 │  parser_config JSONB              │
 │  is_default, active               │
@@ -69,17 +75,15 @@
                 ▼
 ┌───────────────────────────────────┐     ┌─────────────────────────┐
 │ lims_runs                         │────►│ ParserEngine            │
-│  analysis_id (exists)             │     │ (extend InstrumentData  │
-│  instrument_id | cro_source_id    │     │  Service)               │
-│  parser_id                        │     │  parse(bytes, config)   │
+│  analysis_id (exists)             │     │ parse(bytes, config)    │
+│  instrument_id | cro_source_id    │     │                         │
+│  parser_id                        │     │                         │
 └───────────────────────────────────┘     └───────────┬─────────────┘
-                                                      │
                                                       ▼
-                                              lims_run_data
-                                                      │
-                                              publish promote
-                                              (existing)
+                                              lims_run_data → promote
 ```
+
+**No location on instruments** this cycle. Client table `locations` is address CRM—not lab rooms. Future: [ideas/lab-locations.md](../ideas/lab-locations.md).
 
 **Setup path (not production import):**
 
@@ -100,10 +104,9 @@ ParserSetupService
 ### 4.1 New tables
 
 ```sql
--- Light instrument catalog (lab)
-instruments (
+instrument_types (
   id UUID PK,
-  name TEXT NOT NULL UNIQUE,  -- or unique(active) policy TBD
+  name TEXT NOT NULL,           -- display label
   vendor TEXT NULL,
   model TEXT NULL,
   description TEXT NULL,
@@ -111,12 +114,22 @@ instruments (
   created_at, created_by, modified_at, modified_by
 );
 
--- Light CRO / external export source
+instruments (  -- instances
+  id UUID PK,
+  instrument_type_id UUID NOT NULL REFERENCES instrument_types(id),
+  name TEXT NOT NULL,           -- lab nickname e.g. LCMS-1
+  serial_number TEXT NULL,
+  description TEXT NULL,
+  active BOOLEAN NOT NULL DEFAULT true,
+  -- no location_id (see ideas/lab-locations.md)
+  created_at, created_by, modified_at, modified_by
+);
+
 cro_sources (
   id UUID PK,
   name TEXT NOT NULL UNIQUE,
   description TEXT NULL,
-  client_id UUID NULL REFERENCES clients(id),  -- optional org link
+  client_id UUID NULL REFERENCES clients(id),  -- optional label only
   active BOOLEAN NOT NULL DEFAULT true,
   created_at, created_by, modified_at, modified_by
 );
@@ -316,7 +329,7 @@ Permissions (provisional): catalog/parser CRUD = `config:edit`; run fields = exi
 
 **Do not** plan gradual production cutover, dual-write, or long dual-path import until there are real multi-tenant production users. Chunk by **phase**, not by blue/green switchover.
 
-1. **P0:** `instruments`, `cro_sources`.  
+1. **P0:** `instrument_types`, `instruments` (instances), `cro_sources`.  
 2. **P1:** `parser_setup_files`; re-scope parsers (delete old template-scoped rows OK); **DROP `experiment_template_id`**; lims_runs FKs; new import resolution.  
 3. SOP parse: stop writing template-scoped parsers.  
 4. **P2:** AI only (no schema required beyond existing setup files).

@@ -13,7 +13,7 @@
 
 ## 1. Summary
 
-Add light **instrument** and **CRO source** catalogs; re-scope **instrument_parsers** to **analysis × instrument|CRO only**; **remove `experiment_template_id`** from parsers (no template-linked parsers); add **lims_runs** FKs for instrument, CRO source, and parser used. No change to `results` / promote schema (already shipped).
+Add **instrument types** (vendor/model) and **instrument instances** (serial, type FK); **CRO sources**; re-scope **instrument_parsers** to **analysis × instrument instance|CRO only**; **DROP `experiment_template_id`** from parsers; add **lims_runs** FKs for instrument instance, CRO, parser. No lab location FK yet (existing `locations` = client addresses only). No change to `results` / promote schema.
 
 ## 2. Delta (authoritative list)
 
@@ -21,9 +21,19 @@ Add light **instrument** and **CRO source** catalogs; re-scope **instrument_pars
 
 | Table | Purpose | Key columns |
 |-------|---------|-------------|
-| **`instruments`** | Lab data-source catalog (not full asset CMMS) | `id`, `name`, `vendor` NULL, `model` NULL, `description` NULL, `active`, audit cols |
+| **`instrument_types`** | Vendor/model class (what the box *is*) | `id`, `name` (e.g. display label), `vendor` NULL, `model` NULL, `description` NULL, `active`, audit cols |
+| **`instruments`** | **Instance** of a type (which physical unit / named stream) | `id`, **`instrument_type_id` NOT NULL** → `instrument_types`, `name` (lab nickname), **`serial_number` NULL**, `description` NULL, `active`, audit cols — **no location_id** this cycle |
 | **`cro_sources`** | External/CRO export-source catalog | `id`, `name`, `description` NULL, `client_id` NULL → `clients`, `active`, audit cols |
 | **`parser_setup_files`** | Persisted example / test / edge fixtures for parser setup | `id`, `parser_id` FK (nullable until saved), `role` (`example`\|`test`\|`edge_fixture`), `filename`, `content_type`, `size_bytes`, storage (bytea or object ref), `created_by`, `created_at` |
+
+**Instrument vs type**
+
+| Entity | Holds | Example |
+|--------|--------|---------|
+| **Type** | vendor, model | Agilent 6495C |
+| **Instance** | type FK, serial, lab name | “LCMS-1”, serial `US123456` |
+
+**Location:** Do **not** FK `instruments` → `locations`. Existing `locations` is **client mailing/site** (`client_id` + address). Lab facility places → future [ideas/lab-locations.md](../ideas/lab-locations.md).
 
 ### 2.2 Altered tables
 
@@ -31,12 +41,12 @@ Add light **instrument** and **CRO source** catalogs; re-scope **instrument_pars
 |-------|--------|-------|
 | **`instrument_parsers`** | **DROP `experiment_template_id`** (column + FK + related indexes) | **Decided:** parsers are not template-scoped. Pre-migration data handling: §4 |
 | **`instrument_parsers`** | ADD `analysis_id` UUID **NOT NULL** → `analyses(id)` | Required for every parser |
-| **`instrument_parsers`** | ADD `instrument_id` UUID NULL → `instruments(id)` | Lab path |
+| **`instrument_parsers`** | ADD `instrument_id` UUID NULL → **`instruments`** (instance) | Lab path — analysis × **instance** |
 | **`instrument_parsers`** | ADD `cro_source_id` UUID NULL → `cro_sources(id)` | CRO path |
 | **`instrument_parsers`** | ADD `is_default` BOOLEAN NOT NULL DEFAULT false | Default among siblings |
 | **`instrument_parsers`** | ADD `active` BOOLEAN NOT NULL DEFAULT true | Soft deactivate |
 | **`instrument_parsers`** | `parser_config` JSONB | **No structural change** — content must match ParserConfig v1 (app validation) |
-| **`lims_runs`** | ADD `instrument_id` UUID NULL → `instruments` ON DELETE SET NULL | XOR with cro |
+| **`lims_runs`** | ADD `instrument_id` UUID NULL → **`instruments`** (instance) ON DELETE SET NULL | Which unit produced the file; XOR with cro |
 | **`lims_runs`** | ADD `cro_source_id` UUID NULL → `cro_sources` ON DELETE SET NULL | XOR with instrument |
 | **`lims_runs`** | ADD `parser_id` UUID NULL → `instrument_parsers` ON DELETE SET NULL | Stored default/override |
 
@@ -53,9 +63,12 @@ Add light **instrument** and **CRO source** catalogs; re-scope **instrument_pars
 | **`uq_parser_default_instrument`** | UNIQUE (`analysis_id`, `instrument_id`) WHERE `is_default AND active AND instrument_id IS NOT NULL` | One default per analysis×instrument |
 | **`uq_parser_default_cro`** | UNIQUE (`analysis_id`, `cro_source_id`) WHERE `is_default AND active AND cro_source_id IS NOT NULL` | One default per analysis×CRO |
 | Drop indexes/FKs | Any index/FK solely on `instrument_parsers.experiment_template_id` | With column drop |
-| Indexes on FKs | `analysis_id`, `instrument_id`, `cro_source_id`, `parser_id` as needed | Lookup performance |
+| Indexes on FKs | `instrument_types`, `instruments.instrument_type_id`, parser/run FKs | Lookup performance |
+| Optional unique | `instruments (instrument_type_id, serial_number)` WHERE serial not null | Avoid duplicate serials per type (implementer choice) |
 
 Exact CHECK SQL may be refined at implement time; intent is fixed.
+
+**Note:** File **format** is driven by **type** (vendor/model). Parsers and runs still key the **instance** (which unit/source stream). Same type can share similar parsers per instance, or users create one parser per instance.
 
 ### 2.4 Enums / types
 
@@ -67,14 +80,17 @@ Exact CHECK SQL may be refined at implement time; intent is fixed.
 
 | Object | Notes |
 |--------|-------|
-| Snapshot column on `lims_runs` (e.g. `parser_config_snapshot` JSONB) | Open Q5 — lean defer until real multi-tenant production need |
+| Snapshot column on `lims_runs` (e.g. `parser_config_snapshot` JSONB) | Open Q5 — lean defer |
 | Dual-write / gradual production cutover of template parsers | **Out of scope** — pre-release; simple migrate-or-delete |
+| **`instruments.location_id`** | No lab location model; client `locations` wrong fit — [ideas/lab-locations.md](../ideas/lab-locations.md) |
+| Parser keyed only by **instrument_type** | Out of scope this cycle; parsers/runs use **instance** (type available via join) |
 
 ## 3. RLS
 
 | Object | Policy change | Notes |
 |--------|---------------|-------|
-| `instruments` | Lab-global config | **Not multi-tenant.** Readable/writable by lab config roles; **not** client-user writable. No `org_id` / tenant column this cycle. |
+| `instrument_types` | Lab-global config | Lab config roles; not client-writable |
+| `instruments` | Lab-global config | Same; instances of types |
 | `cro_sources` | Lab-global config | Same as instruments |
 | `instrument_parsers` | Lab-global config | Same; client roles cannot mutate |
 | `parser_setup_files` | Lab-global / owned via parser | Same posture as parsers |
@@ -133,7 +149,7 @@ Do **not** change as part of data-parsers P0/P1:
 
 | ID | Topic | Blocks |
 |----|--------|--------|
-| Q2 | Instrument grain (name + vendor/model sufficient?) | P0 column set |
+| Q2 | Instrument type vs instance | **Decided:** type (vendor/model) + instance (serial); no location FK |
 | Q7 | Multi-tenant catalogs | **Decided: lab-global; multi-tenant OOS** — ideas/multi-tenant.md |
 | Q9 | Keep table name `instrument_parsers` | Naming only |
 | #10a | Persist setup files? | **Decided: yes** — `parser_setup_files` in P1 |
