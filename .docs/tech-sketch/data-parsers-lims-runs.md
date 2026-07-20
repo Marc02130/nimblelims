@@ -67,13 +67,13 @@
          └──────────┬───────────┘
                     ▼
 ┌───────────────────────────────────┐     ┌──────────────────┐
-│ instrument_parsers                │────►│ parser_analyses  │
-│  instrument|cro  (file shape)     │ M2M │ analysis_id      │
-│  parser_config (all columns OK)   │     │ is_default       │
+│ instrument_parsers (version row)  │────►│ parser_analyses  │
+│  version_group + version + active │ M2M │ analysis_id      │
+│  instrument|cro; parser_config    │     │ is_default       │
 └───────────────┬───────────────────┘     └────────┬─────────┘
                 │                                  │
-                │         lims_run_imports         │
-                │         (source + parser)        │
+                │  lims_run_imports.parser_id      │
+                │  (version PK, no config blob)    │
                 ▼                                  ▼
 ┌───────────────────────────────────┐     run.analysis_id
 │ lims_runs.analysis_id             │     (RCRA-8 vs RCRA-13)
@@ -138,24 +138,41 @@ cro_sources (
 
 ### 4.2 Evolve `instrument_parsers` (keep table name for migration ease)
 
+Each **row** is an **immutable version**. Logical parser = `version_group_id`. No import-time JSON snapshot (Decision #5).
+
 ```sql
 ALTER instrument_parsers:
   DROP experiment_template_id
-  instrument_id    UUID NULL REFERENCES instruments(id)
-  cro_source_id    UUID NULL REFERENCES cro_sources(id)
-  active           BOOLEAN NOT NULL DEFAULT true
+  instrument_id      UUID NULL REFERENCES instruments(id)
+  cro_source_id      UUID NULL REFERENCES cro_sources(id)
+  version_group_id   UUID NOT NULL   -- shared by all versions of this parser
+  version            INT  NOT NULL   -- 1, 2, 3… per group
+  active             BOOLEAN NOT NULL DEFAULT false
   -- NO analysis_id on parser row
-  -- parser_config JSONB (may list all instrument columns)
+  -- parser_config JSONB immutable after insert (updates → new version row)
 
 CHECK: exactly one of (instrument_id, cro_source_id) is non-null
+UNIQUE (version_group_id, version)
+UNIQUE (version_group_id) WHERE active   -- partial: at most one active version
 
 parser_analyses (
-  parser_id UUID NOT NULL REFERENCES instrument_parsers,
+  parser_id UUID NOT NULL REFERENCES instrument_parsers,  -- version row
   analysis_id UUID NOT NULL REFERENCES analyses,
   is_default BOOLEAN NOT NULL DEFAULT false,
   PRIMARY KEY (parser_id, analysis_id)
 );
--- default uniqueness for (analysis, instrument) enforced in app (or clever unique index)
+-- default uniqueness for (analysis, instrument) among active versions enforced in app
+```
+
+**Version lifecycle**
+
+```
+Create v1 ──► (optional activate) ──► active for imports
+     │
+  "Edit" ──► insert v2 (inactive) ──► prompt "Make active?"
+                                      ├─ Yes → v2 active, v1 inactive
+                                      └─ No  → v1 still active; v2 draft
+Import stores parser_id = specific version id forever
 ```
 
 See [schema-changes](../schema-changes/data-parsers-lims-runs.md).
@@ -258,33 +275,39 @@ each import:
   2. user selects instrument XOR cro_source
   3. resolve parser: default for (run.analysis_id, source) or user override
      ONLY among parsers where:
+       P.active = true
        EXISTS parser_analyses(P, run.analysis_id)
        P.instrument_id = I  (or cro_source_id = C)
-  4. create lims_run_imports(run, source, parser_id, …)
-  5. engine.parse → lims_run_data(import_id=…)
-  6. never re-resolve parser for that import_id later
+  4. create lims_run_imports(run, source, parser_id=P.id, …)  -- version PK
+  5. engine.parse(P.parser_config) → lims_run_data(import_id=…)
+  6. never re-resolve; no parser_config snapshot on import
 ```
 
-**Reject:** parser for another analysis; parser for another instrument; arbitrary system parser.  
-**Capability:** instrument shown/usable iff active parser exists for `(run.analysis_id, instrument)`.
+**Reject:** parser for another analysis; parser for another instrument; inactive version for default pick.  
+**Capability:** instrument shown/usable iff an **active** version exists for `(run.analysis_id, instrument)`.
 
 ### 6.2 Import resolution order (per import event)
 
 1. Require `run.analysis_id`  
 2. Require instrument XOR cro on this import  
-3. `parser_id` override only if it matches analysis + source; else default for pair  
-4. Else 400 — no valid parser for this analysis × source  
-5. Persist on **`lims_run_imports`** (not a single forever `run.parser_id`)  
+3. `parser_id` override only if it is an **active** version matching analysis + source; else default active for pair  
+4. Else 400 — no valid active parser for this analysis × source  
+5. Persist **version** `parser_id` on **`lims_run_imports`** only (no config blob)
 
 ### 6.3 Parser setup wizard (P1 without AI)
 
-1. Choose analysis + instrument|CRO + name  
+1. Choose instrument|CRO + name (+ multi-select analyses)  
 2. Edit config form (or paste JSON validated)  
 3. Upload example file(s) ≥1 (optional for pure manual map; recommended)  
 4. Upload test file(s) ≥1  
 5. Run tests → report  
-6. Activate if ≥1 test with zero hard errors (Decision #10 provisional)  
-7. Save parser row  
+6. **Save** → inserts version row (`version=1` or `max+1`; config immutable thereafter)  
+7. **Prompt: make this version active?**  
+   - Yes → `active=true` on new; deactivate other versions in `version_group_id`  
+   - No → leave inactive; prior active (if any) stays  
+8. Activate ideally only if tests pass (Decision #10 provisional)
+
+**Edit path:** never PATCH `parser_config` on existing version → always new version.
 
 ### 6.4 AI setup (P2)
 
@@ -311,7 +334,10 @@ If ICP import wrote 20 metals into JSONB but run analysis is RCRA-8, promote cre
 |--------|------|-------|
 | CRUD | `/v1/instruments` | config permission |
 | CRUD | `/v1/cro-sources` | config permission |
-| CRUD | `/v1/data-parsers` or `/v1/instrument-parsers` | filter by analysis, instrument, cro |
+| CRUD | `/v1/data-parsers` or `/v1/instrument-parsers` | list active by default; include version history |
+| POST | `/v1/data-parsers` | create v1 |
+| POST | `/v1/data-parsers/{version_group_id}/versions` | save new version (body: config + analyses + `activate?: bool`) |
+| POST | `/v1/data-parsers/{id}/activate` | activate this version; deactivate others in group |
 | POST | `/v1/data-parsers/validate-config` | body: parser_config |
 | POST | `/v1/data-parsers/test` | multipart: config + test files → reports |
 | POST | `/v1/data-parsers/draft` | P2 AI; examples multipart |
@@ -330,16 +356,16 @@ Permissions (provisional): catalog/parser CRUD = `config:edit`; run fields = exi
 |---------|----------|
 | Admin Instruments | Fill-height DataGrid CRUD |
 | Admin CRO sources | Same |
-| Admin / Analysis Parsers | List by analysis; editor; example/test upload; test results panel; Activate |
-| LimsRun Overview | Analysis + Instrument XOR CRO + Parser chip (default/override) |
-| LimsRun Import | File → engine with stored parser_id; errors plain language |
+| Admin / Analysis Parsers | List **active** by default; version history; editor; example/test; save → **activate prompt** |
+| LimsRun Overview | Analysis + Instrument XOR CRO + Parser chip (name + version) |
+| LimsRun Import | File → engine with stored version `parser_id`; history shows version used |
 
 ## 9. Migration plan (pre-release — keep simple)
 
 **Do not** plan gradual production cutover, dual-write, or long dual-path import until there are real multi-tenant production users. Chunk by **phase**, not by blue/green switchover.
 
 1. **P0:** `instrument_types`, `instruments` (instances), `cro_sources`.  
-2. **P1:** `parser_setup_files`; re-scope parsers (delete old template-scoped rows OK); **DROP `experiment_template_id`**; lims_runs FKs; new import resolution.  
+2. **P1:** `parser_setup_files`; re-scope parsers + **version_group/version/active**; delete old template-scoped rows OK; **DROP `experiment_template_id`**; import events store version `parser_id`.  
 3. SOP parse: stop writing template-scoped parsers.  
 4. **P2:** AI only (no schema required beyond existing setup files).
 
@@ -348,9 +374,9 @@ Permissions (provisional): catalog/parser CRUD = `config:edit`; run fields = exi
 | Phase | Deliver |
 |-------|---------|
 | **P0** | `instruments`, `cro_sources` models/API/UI |
-| **P1** | Parser scope columns; ParserConfig v1 + engine delimiter/encoding; setup test harness (multi-file); lims_runs FKs; import by parser_id; default/override |
+| **P1** | Parser scope + **version_group/version/active**; ParserConfig v1 + engine; setup test harness; import by version `parser_id`; activate prompt |
 | **P2** | AI draft + edge suggestions (async jobs); still validate+engine |
-| **P3** | Config snapshot on import; XLSX; permanent setup file storage; SOP bridge |
+| **P3** | XLSX; richer formats; SOP bridge polish |
 
 ## 11. Risks
 
