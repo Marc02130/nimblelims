@@ -250,25 +250,33 @@ Setup path: `run_test_suite` only—no DB import.
 
 ## 6. Runtime flows
 
-### 6.1 Default / override parser on run
+### 6.1 Run analysis + multi-instrument import (Decision #16)
 
 ```
-set analysis_id + instrument_id (or cro_source_id)
-  → resolve default parser (is_default or sole active for pair)
-  → SET lims_runs.parser_id
-user override: user PATCH parser_id → store; do not re-resolve on import
+run.analysis_id required for structured import (assay expected)
 
-import:
-  require parser_id (or resolve-once-and-persist if null and unambiguous)
-  config = load(parser_id).parser_config
-  engine.parse(file) → lims_run_data
+each import:
+  1. require run.analysis_id
+  2. user selects instrument XOR cro_source
+  3. resolve parser: default for (run.analysis_id, source) or user override
+     ONLY among parsers where:
+       P.analysis_id = run.analysis_id
+       P.instrument_id = I  (or cro_source_id = C)
+  4. create lims_run_imports(run, source, parser_id, …)
+  5. engine.parse → lims_run_data(import_id=…)
+  6. never re-resolve parser for that import_id later
 ```
 
-### 6.2 Import resolution order
+**Reject:** parser for another analysis; parser for another instrument; arbitrary system parser.  
+**Capability:** instrument shown/usable iff active parser exists for `(run.analysis_id, instrument)`.
 
-1. `run.parser_id` if set  
-2. Else default for `(analysis_id, instrument|cro)` → persist on run  
-3. Else 400 — configure analysis + source + parser (no template fallback)  
+### 6.2 Import resolution order (per import event)
+
+1. Require `run.analysis_id`  
+2. Require instrument XOR cro on this import  
+3. `parser_id` override only if it matches analysis + source; else default for pair  
+4. Else 400 — no valid parser for this analysis × source  
+5. Persist on **`lims_run_imports`** (not a single forever `run.parser_id`)  
 
 ### 6.3 Parser setup wizard (P1 without AI)
 
@@ -308,8 +316,9 @@ import:
 | POST | `/v1/data-parsers/test` | multipart: config + test files → reports |
 | POST | `/v1/data-parsers/draft` | P2 AI; examples multipart |
 | POST | `/v1/data-parsers/suggest-edges` | P2 AI; returns fixtures not pass/fail |
-| PATCH | `/v1/lims-runs/{id}` | analysis_id, instrument_id, cro_source_id, parser_id |
-| POST | `/v1/lims-runs/{id}/import` | use run.parser_id config (file upload path may already exist partially) |
+| PATCH | `/v1/lims-runs/{id}` | analysis_id (required for structured path) |
+| POST | `/v1/lims-runs/{id}/import` | multipart: file + instrument_id\|cro_source_id + optional parser_id override → creates import event |
+| GET | `/v1/lims-runs/{id}/imports` | import history (source + parser per batch) |
 
 Exact path naming: prefer evolving existing parser routes if any; otherwise `/v1/data-parsers`.
 
