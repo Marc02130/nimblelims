@@ -76,6 +76,11 @@ export const adminNavItems: AdminNavItem[] = [
     path: '/admin/instruments',
     icon: <PrecisionManufacturingIcon />,
   },
+  {
+    text: 'Data parsers',
+    path: '/admin/data-parsers',
+    icon: <TuneIcon />,
+  },
   { text: 'Users Management', path: '/admin/users', icon: <People /> },
   { text: 'Roles & Permissions', path: '/admin/roles', icon: <Security /> },
   { text: 'Analyses Management', path: '/admin/analyses', icon: <ScienceIcon /> },

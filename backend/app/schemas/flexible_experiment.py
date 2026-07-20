@@ -79,9 +79,9 @@ class LimsRunCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=255)
     description: Optional[str] = None
     experiment_template_id: uuid.UUID
-    analysis_id: Optional[uuid.UUID] = Field(
-        None,
-        description="Analysis for promote-on-publish (tests/results). Null = non-reportable run.",
+    analysis_id: uuid.UUID = Field(
+        ...,
+        description="Required analysis for the run (import + promote).",
     )
 
 
@@ -90,16 +90,11 @@ class LimsRunUpdate(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=255)
     description: Optional[str] = None
     analysis_id: Optional[uuid.UUID] = None
-    # Explicit clear: pass clear_analysis=true to set analysis_id null
-    clear_analysis: bool = False
 
 
 class LimsRunStartRequest(BaseModel):
-    """Optional body for start transition when no analysis is set."""
-    acknowledge_no_analysis: bool = Field(
-        False,
-        description="Required true to start without analysis_id (non-reportable path).",
-    )
+    """Optional body for start transition (analysis must already be set)."""
+    pass
 
 
 class LimsRunRead(BaseModel):
@@ -178,6 +173,8 @@ class ImportDataResponse(BaseModel):
 # ---------------------------------------------------------------------------
 
 class ParserColumn(BaseModel):
+    model_config = {"extra": "forbid"}
+
     source_col: str
     field_name: str
     data_type: Literal["string", "float", "integer", "boolean"] = "string"
@@ -185,12 +182,21 @@ class ParserColumn(BaseModel):
 
 
 class ParserConfig(BaseModel):
-    columns: List[ParserColumn]
+    """Canonical parse instructions — Decision #1 schema-first."""
+    model_config = {"extra": "forbid"}
+
+    schema_version: Literal["1"] = "1"
+    delimiter: Literal[",", "\t", ";", "|"] = ","
+    encoding: str = "utf-8"
+    skip_rows: int = Field(default=0, ge=0)
+    header_row: int = Field(default=0, ge=0)
+    columns: List[ParserColumn] = Field(..., min_length=1)
     well_col: Optional[str] = Field(None, description="Column that identifies well position")
-    skip_rows: int = Field(default=0, ge=0, description="Header rows to skip")
+    sample_col: Optional[str] = None
 
 
 class InstrumentParserCreate(BaseModel):
+    """Legacy template parser create — deprecated; use /v1/data-parsers."""
     name: str = Field(..., min_length=1, max_length=255)
     description: Optional[str] = None
     parser_config: ParserConfig
@@ -198,13 +204,25 @@ class InstrumentParserCreate(BaseModel):
 
 class InstrumentParserRead(BaseModel):
     id: uuid.UUID
-    experiment_template_id: uuid.UUID
     name: str
     description: Optional[str]
     parser_config: Dict[str, Any]
+    version: Optional[int] = None
+    active: Optional[bool] = None
+    instrument_id: Optional[uuid.UUID] = None
+    cro_source_id: Optional[uuid.UUID] = None
+    version_group_id: Optional[uuid.UUID] = None
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class FileImportRequest(BaseModel):
+    """Metadata for multipart file import on a run."""
+    instrument_id: Optional[uuid.UUID] = None
+    cro_source_id: Optional[uuid.UUID] = None
+    parser_id: Optional[uuid.UUID] = None
+
 
 
 # ---------------------------------------------------------------------------

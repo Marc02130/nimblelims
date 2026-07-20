@@ -29,7 +29,11 @@ from .flexible_experiment import (
     LimsRun,
     LimsRunStatus,
     LimsRunData,
-    InstrumentParser,
+    DataParser,
+    InstrumentParser,  # alias of DataParser
+    ParserAnalysis,
+    ParserSetupFile,
+    LimsRunImport,
     RobotWorklistConfig,
     SopParseJob,
     SopParseJobStatus,

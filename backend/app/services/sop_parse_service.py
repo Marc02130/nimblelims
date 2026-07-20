@@ -196,16 +196,10 @@ class SOPParseService:
         self.db.add(template)
         self.db.flush()  # get template.id
 
-        # Create InstrumentParser
-        parser_repo = InstrumentParserRepository(self.db)
-        parser = parser_repo.create(
-            template_id=template.id,
-            name=f"{experiment_name} — parser",
-            description=f"Auto-generated from SOP parse job {job_id}",
-            parser_config=parser_cfg,
-            created_by=user_id,
-        )
-        self.db.flush()
+        # P1: template-scoped parsers removed. SOP may still extract parser_config
+        # for review, but Data parsers are configured separately (analysis × instrument|CRO).
+        parser = None
+        _ = parser_cfg  # retained in job.result for future data-parser draft
 
         # Create RobotWorklistConfig (only if worklist steps present)
         worklist_config_id: Optional[uuid.UUID] = None
@@ -227,12 +221,11 @@ class SOPParseService:
         self.db.flush()
         self.db.commit()
         self.db.refresh(template)
-        self.db.refresh(parser)
 
         return {
             "job_id": job.id,
             "experiment_template_id": template.id,
-            "instrument_parser_id": parser.id,
+            "instrument_parser_id": None,  # P1: use /v1/data-parsers instead
             "robot_worklist_config_id": worklist_config_id,
         }
 
