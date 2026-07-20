@@ -33,7 +33,7 @@ Do not implement a phase until questions that **block** that phase are **Decided
 | 3 | Permission for parser / instrument / CRO CRUD? | **Decided** | P0–P1 | **`config:edit`** | 2026-07-19 | Product | Acceptable; aligns with other lab config |
 | 4 | Allow override to a parser for a **different** analysis than the run? | **Decided** | P1 UI/API | **Block** — parser must be linked to `run.analysis_id` via `parser_analyses` | 2026-07-19 | Product | Import validity |
 | 5 | Snapshot `parser_config` on import vs versioning? | **Decided** | P1 schema + admin UX | **No JSON snapshot.** Versioned parser rows + `active`; import stores version `parser_id` | 2026-07-19 | Product | See **Decision #5** |
-| 6 | Non-reportable run (no analysis) / method-dev path? | **Decided** | P1 import (no special path) | **No non-reportable runs.** Import requires `analysis_id`. Method-dev / lab projects **deferred** until [orders-and-projects](../ideas/orders-and-projects.md) | 2026-07-19 | Product | See **Decision #6** |
+| 6 | Non-reportable run (no analysis) / method-dev path? | **Decided** | All run paths | **No non-reportable runs.** `analysis_id` **required** on every run (create/start/import/publish). Method-dev deferred to [orders-and-projects](../ideas/orders-and-projects.md) | 2026-07-19 | Product | See **Decision #6**; aligns [run-results #6](run-results.md) |
 | **15** | Keep `experiment_template_id` on parsers? | **Decided** | Schema | **Remove** the column entirely | 2026-07-12 | Product / Architecture | Parsers are analysis×instrument/CRO only |
 | **16** | Run analysis + multi instrument/parser rules? | **Decided** | P1 import/schema | See **Decision #16** | 2026-07-19 | Product | Run tied to analysis; multiple instruments/parsers allowed; each must match analysis + that instrument/CRO |
 | 7 | Instruments/CRO catalogs multi-tenant scope? | **Decided** | P0 | **Lab-global only.** No org segregation. Multi-tenant **out of scope** until real multi-org users — see [ideas/multi-tenant.md](../ideas/multi-tenant.md) | 2026-07-18 | Product | Pre-release; single lab deployment |
@@ -416,19 +416,19 @@ Treat each **saved definition** of a parser as an **immutable version row**. Imp
 
 ### Decided
 
-1. **No non-reportable runs** for the data-parsers / structured import product path.  
-2. **Import requires `run.analysis_id`.** No parser selection, no file import, no “source-only parser” without an analysis.  
-3. **Do not** build a null-analysis import path, template fallback, or “continue without analysis” for structured instrument/CRO import in this cycle.  
-4. **Method development / scratch / work-over-time** is **deferred** until **lab projects** are implemented ([ideas/orders-and-projects.md](../ideas/orders-and-projects.md)). Not solved by null `analysis_id`.  
-5. **Promote** remains analysis-scoped on publish as today (run with analysis → promote when published).
+1. **No non-reportable runs** anywhere in the LimsRun product path.  
+2. **`run.analysis_id` is required** from create — not optional for start, import, or publish.  
+3. **Do not** keep “continue without analysis”, `acknowledge_no_analysis`, or publish-without-promote.  
+4. **Method development / scratch / work-over-time** is **deferred** until **lab projects** ([ideas/orders-and-projects.md](../ideas/orders-and-projects.md)). Still uses a real analysis later—not null.  
+5. **Promote on publish** always uses the run’s analysis.
 
 ### Rejected
 
 | Approach | Why rejected |
 |----------|----------------|
-| Import with no analysis | Fights parser M2M (analysis×instrument/CRO); ambiguous lineage |
-| “Non-reportable” as first-class run mode | Deferred method-dev needs a real analysis + lab project later, not a hole |
-| Defer only the *question* while shipping a half-path | Product: decide **no** path now |
+| Run or import with no analysis | Fights parser M2M; ambiguous assay identity |
+| “Non-reportable” as first-class run mode | Method-dev needs analysis + lab project later, not a hole |
+| Start-run ack to skip analysis | Superseded 2026-07-19 |
 
 ### Decision record
 
@@ -437,7 +437,7 @@ Treat each **saved definition** of a parser as an **immutable version row**. Imp
 | **Status** | **Decided** |
 | **Date** | 2026-07-19 |
 | **Owner** | Product |
-| **Summary** | No non-reportable runs; structured import requires analysis; method-dev deferred to lab projects idea |
+| **Summary** | Every run has analysis_id; no non-reportable path; method-dev deferred to lab projects |
 
 ---
 

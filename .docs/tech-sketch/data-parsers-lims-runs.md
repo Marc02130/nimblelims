@@ -268,7 +268,7 @@ Setup path: `run_test_suite` only—no DB import.
 ### 6.1 Run analysis + multi-instrument import (Decision #16)
 
 ```
-run.analysis_id REQUIRED for import (Decision #6 — no non-reportable path)
+run.analysis_id REQUIRED always (Decision #6 — no non-reportable path; create/start/import/publish)
 
 each import:
   1. require run.analysis_id

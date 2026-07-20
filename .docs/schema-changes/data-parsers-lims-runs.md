@@ -65,7 +65,7 @@ Add **instrument types** + **instances**; **CRO sources**; re-scope **instrument
 | **`parser_analyses`** | **Many-to-many:** parser ↔ analyses | `parser_id`, `analysis_id`, **`is_default`** (default for this analysis when using this parser’s instrument/CRO) |
 | **`lims_run_imports`** | One import file/batch on a run | `id`, `lims_run_id`, `instrument_id`\|`cro_source_id`, **`parser_id`** (specific **version** row), `imported_at`, `imported_by`, filename optional — **no config snapshot column** |
 
-`lims_runs.analysis_id` — **required for import** (Decision #6 — no non-reportable path). What the run **stores/promotes** (e.g. RCRA-8 only).  
+`lims_runs.analysis_id` — **required on the run** (Decision #6 — no non-reportable path; target **NOT NULL**). What the run **stores/promotes** (e.g. RCRA-8 only).  
 `lims_runs.experiment_template_id` — **unchanged**.
 
 **Product:**

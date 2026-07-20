@@ -96,7 +96,7 @@ Today the run has **`analysis_id`** (promote opt-in) and import still resolves a
    parser_id = <resolved or explicit>
 
 3. Start run
-   if no analysis_id → existing warn/ack (non-reportable)
+   require analysis_id (no non-reportable path)
    if analysis set but no parser for analysis×source → warn or block import later
 
 4. Import (running)
@@ -110,7 +110,7 @@ Today the run has **`analysis_id`** (promote opt-in) and import still resolves a
    if analysis_id set → ResultPromotionService
      field_name / aliases → analytes on that analysis
      ensure Test(sample, analysis), write Result(raw, replicate, lims_run_id)
-   if no analysis → publish only (instrument SoT stays JSONB)
+   analysis always set → promote on publish (instrument SoT stays JSONB)
 ```
 
 ### CRO lifecycle (same idea)
