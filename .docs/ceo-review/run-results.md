@@ -30,9 +30,9 @@ Promoting run data into **structured `results` rows when the run is published** 
 
 | Rule | Decision |
 |------|----------|
-| **When data is written to results** | **On run publish**, only if run has **`analysis_id`** |
-| **Opt-in** | Associate LimsRun with an **Analysis** (new FK + UI list)—not a separate promote flag |
-| **Start guard** | Before **run start**, if no analysis: **warn** that data will not go to Tests/Results on publish; allow associate, create analysis/analytes, or continue without |
+| **When data is written to results** | **On run publish** (run always has **`analysis_id`**) |
+| **Analysis required** | Every LimsRun **must** have an Analysis from create — not optional, not a separate promote flag |
+| **No non-reportable path** | No “continue without analysis”; method-dev deferred to lab projects (2026-07-19) |
 | **What is written** | Primarily **`raw_result`** from mapped JSONB values onto **tests** for that analysis |
 | **Column → analyte** | JSONB key resolves via analyte **name** and **aliases** (multi-CRO) |
 | **Cardinality** | One mapped analyte column per sample → one result row (multi-analyte = multi-row) |

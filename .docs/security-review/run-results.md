@@ -67,8 +67,8 @@ Publish creates results without separate `result:enter`.
 |--------|-----------|--------------------|------------------------------|------------|
 | Configure promotion map / aliases | Yes (config) | No / limited | No | **No** |
 | Import run data | Yes | Yes | Yes | **No** |
-| Start run without analysis (ack non-reportable) | Yes | Yes | Yes | **No** |
-| Publish + promote (analysis set) | Yes | Yes if **publish** perm (implies result write) | **No** | **No** |
+| Start / import / publish without analysis | **No** (blocked for all) | **No** | **No** | **No** |
+| Publish + promote | Yes | Yes if **publish** perm (implies result write) | **No** | **No** |
 | View structured results | Yes | Yes | Yes | **Own client only** |
 
 Aligns Decision **#9** (lab edits data) and **#7** (client sees own samples/results).

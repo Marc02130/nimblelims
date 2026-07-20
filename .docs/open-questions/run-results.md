@@ -100,49 +100,42 @@ Do not auto-copy unmapped keys into `results.custom_attributes`. Use result Fiel
 
 ---
 
-## Decision #6 — Opt-in via Analysis association
+## Decision #6 — Runs are always tied to an Analysis
 
-**Status:** Decided · **Date:** 2026-07-11
+**Status:** Decided · **Date:** 2026-07-11 · **Superseded UX:** 2026-07-19  
+**Also:** [data-parsers Decision #6](data-parsers-lims-runs.md) (no non-reportable path)
 
-### Product rule
+### Product rule (current)
 
-| Condition | On publish |
-|-----------|------------|
-| LimsRun has **`analysis_id`** (FK → `analyses`) selected in UI | **Promote** run data → **tests** + **results** for each sample on the data rows |
-| LimsRun has **no** `analysis_id` | Publish only — **no** structured results written |
+| Rule | Behavior |
+|------|----------|
+| **Every LimsRun has an `analysis_id`** | Required from create/edit — **not** optional |
+| **No non-reportable runs** | Cannot create, start, import, or publish a run without analysis |
+| **On publish** | Always promote run data → **tests** + **results** for samples on data rows (subject to map/conflicts) |
 
-There is no separate “promote_on_publish” boolean. **Associating the run with an analysis is the opt-in.**
+There is no separate “promote_on_publish” boolean and **no** “continue without analysis” path.
 
 ### Implications
 
-1. **Schema:** `lims_runs.analysis_id` nullable FK to `analyses.id`.  
-2. **UI:** Analysis selection list on create/edit run (required for structured reporting path).  
-3. **Test target:** For each distinct `sample_id` in `lims_run_data`, **ensure** a **test** instance for that sample + analysis (see **#7**).  
-4. **Analyte scope:** Prefer analytes on that analysis (via `analysis_analytes`) when resolving columns; aliases on analyte.  
-5. **Template default:** Optional default `analysis_id` from template for convenience; run can override.
+1. **Schema (target):** `lims_runs.analysis_id` **NOT NULL** FK → `analyses.id` (migrate nullable column when implementation aligns).  
+2. **UI:** Analysis selection **required** on create/edit run; no “None (non-reportable)” option.  
+3. **Start / import / publish:** Reject if `analysis_id` missing — no ack flag.  
+4. **Test target:** For each distinct `sample_id` in `lims_run_data`, **ensure** a **test** instance for that sample + analysis (see **#7**).  
+5. **Analyte scope:** Prefer analytes on that analysis (via `analysis_analytes`); aliases on analyte.  
+6. **Template default:** Optional default `analysis_id` from template for convenience; run can override to another analysis.  
+7. **Method-dev / scratch:** Deferred to [lab projects](../ideas/orders-and-projects.md) — still use a real analysis (e.g. draft), not null.
+
+### Superseded (do not reintroduce)
+
+- Start-run warn + **Continue without analysis** / `acknowledge_no_analysis`  
+- Publish without promote when analysis null  
+- “Non-reportable” as a first-class run mode  
 
 ### Rationale
 
-- Analysis is already the LIMS assay unit linking samples → tests → analytes.  
-- Makes “this run is for this assay” explicit for multi-CRO and multi-analyte panels.  
-- Runs used only for plate QC / dose-response / non-reportable work stay free of forced results by leaving analysis unset.
-
-### UX: warn before run start if no analysis (Decided)
-
-**When:** User attempts to **start the run** (status → `running`, or CRO equivalent start path)—not only at publish.
-
-**If `analysis_id` is null:**
-
-1. **Warn** (blocking or strong confirm):  
-   > Data imported on this run will **not** be written to Tests/Results when published, because no Analysis is associated.
-2. Offer actions (do not dead-end):
-   - **Associate existing analysis** — picker on the run  
-   - **Create analysis** (and analytes as needed) — shortcut into assay setup, then return to run  
-   - **Continue without analysis** — acknowledge non-reportable path (import/publish only; no promote)
-
-**If `analysis_id` is set:** no warning; start proceeds; promote still only on **publish**.
-
-**Rationale:** Catch missing assay setup before instrument work and import, when fix cost is low—not only at publish when the lab expects structured results.
+- Analysis is the LIMS assay unit linking samples → tests → analytes.  
+- “This run is for this assay” is always explicit (multi-CRO / multi-analyte panels).  
+- Parsers are analysis × instrument/CRO; null analysis has no valid import model.
 
 ---
 

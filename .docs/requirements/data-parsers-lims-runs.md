@@ -122,7 +122,7 @@ Optional `cro_sources.client_id` is a **label** (related client), not a tenant s
 
 | ID | Requirement |
 |----|-------------|
-| FR-4.1 | **Import requires `analysis_id`.** No non-reportable / null-analysis import path (Decision #6). |
+| FR-4.1 | **Every run has `analysis_id`** (required from create). No non-reportable / null-analysis path (Decision #6). |
 | FR-4.2 | A run **may** perform **multiple imports** using **different instruments and/or CRO sources** (and thus different parsers). |
 | FR-4.3 | Each import shall record **instrument XOR cro_source** and **`parser_id`** (e.g. `lims_run_imports` + optional `lims_run_data.import_id`). |
 | FR-4.4 | Parser on an import **must** be linked to `run.analysis_id` via **`parser_analyses`** and match the import’s instrument/CRO. |
@@ -177,13 +177,14 @@ User testing is part of the **parser framework**, not a separate product.
 | FR-8.3 | Import and parser CRUD actions are auditable (who, when, entity ids, including **new version** and **activate** events). |
 | FR-8.4 | Instruments / CRO sources / parsers are **lab-global** config (not client-configurable). **Multi-tenant / org segregation is out of scope** — see [ideas/multi-tenant.md](../ideas/multi-tenant.md). |
 
-### FR-9: Analysis required (no non-reportable import path)
+### FR-9: Analysis required on every run (no non-reportable path)
 
 | ID | Requirement |
 |----|-------------|
-| FR-9.1 | **No non-reportable runs** for structured instrument/CRO import (Decision #6). |
-| FR-9.2 | Import API/UI shall **reject** when `run.analysis_id` is null (clear error: set analysis first). |
-| FR-9.3 | Method-dev / scratch / work-over-time without production reporting is **out of scope** until [lab projects](../ideas/orders-and-projects.md) are implemented—not solved by null analysis. |
+| FR-9.1 | **No non-reportable runs** (Decision #6). `analysis_id` required on create/edit. |
+| FR-9.2 | Start, import, and publish shall **reject** if `analysis_id` is null (no ack / continue-without). |
+| FR-9.3 | Method-dev / scratch is **out of scope** until [lab projects](../ideas/orders-and-projects.md)—not solved by null analysis. |
+| FR-9.4 | Target schema: `lims_runs.analysis_id` **NOT NULL** when implementation aligns with this lock. |
 
 ---
 

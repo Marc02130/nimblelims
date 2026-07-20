@@ -2,7 +2,7 @@
 
 ## Purpose
 
-**LIMS Runs** are the structured LIMS component for capturing the execution of defined experimental protocols, particularly where data is imported from instruments or external parties (CROs), and where a formal review/publish lifecycle + optional analysis is required.
+**LIMS Runs** are the structured LIMS component for capturing the execution of defined experimental protocols, particularly where data is imported from instruments or external parties (CROs), and where a formal review/publish lifecycle is required. **Every run is tied to an Analysis** from the start.
 
 Primary goals:
 - Support repeatable, data-driven work (CRO or in-house).
@@ -31,7 +31,7 @@ Primary goals:
 - Status is a strict enum (`LimsRunStatus`) with two lifecycles controlled by the template's `lifecycle_type`.
 - Key timestamps: `started_at`, `completed_at`, `published_at`, `canceled_at`.
 - Special field: `fit_in_progress` (mutex for curve fitting).
-- **`analysis_id`** (optional FK → `analyses`): **opt-in** for promote-on-publish. When set, publishing writes Tests/Results from imported data. When null, publish is data-only (non-reportable path).
+- **`analysis_id`** (required FK → `analyses`): assay this run is for. Set on create/edit; required to start, import, and publish. On publish, instrument data is promoted to Tests/Results for that analysis.
 
 ### Lifecycle and Status (Current)
 
@@ -61,8 +61,8 @@ Shipped v1 — see [ideas/run-results.md](../ideas/run-results.md).
 
 | Rule | Behavior |
 |------|----------|
-| **When** | Status → `published` **and** run has **`analysis_id`** |
-| **If no analysis** | Publish still succeeds; **no** Tests/Results written (user warned at **start** unless they ack) |
+| **When** | Status → `published` (run always has **`analysis_id`**) |
+| **No analysis** | **Not allowed** — set analysis on create/edit; no non-reportable / continue-without path |
 | **Mapping** | JSONB column → analyte via **name** or **analyte alias** (casefold); known non-analyte keys (`units`, etc.) skipped |
 | **Tests** | Find-or-create Test per `(sample_id, analysis_id)` |
 | **Results** | Write `raw_result`, `replicate` (from JSONB or row order), `lims_run_id` lineage |
@@ -87,7 +87,7 @@ Instrument JSONB remains SoT for raw import; Results are the published structure
 - **Samples**: Linked via imported data rows. Less rich than `ExperimentSampleExecution` (no built-in role/replicate/conditions on the junction itself).
 - **Batches**: Different concept. See warning above. Do not model a Run as "the batch of samples tested".
 - **ELN Experiments**: Separate. Runs are the structured LIMS execution path. Future linking may be added.
-- **Analyses / Analytes**: Catalog for reportable assays. Aliases on analytes support multi-CRO column names. Associating an analysis to a run is the promote opt-in.
+- **Analyses / Analytes**: Catalog assays. Aliases on analytes support multi-CRO column names. Every run **must** have an analysis; publish promotes into that analysis’s Tests/Results.
 - **Dose Response**: Specialized analysis on top of Runs (curve fitting, exclusions, review)—orthogonal to classic promote-to-results.
 
 ## In-House vs CRO
@@ -140,7 +140,7 @@ You can still enforce strict state-machine rules in the application service laye
 
 - Routes: `/runs`, `/runs/:id`, `/runs/:id/dose-response`
 - Main pages: RunsManagement, LimsRunDetail (Overview / Data / Dose Response tabs)
-  - Overview: select **Analysis**, start warning if none, **Publish** opens promotion preview when analysis is set
+  - Overview: **Analysis** required; **Publish** opens promotion preview
 - API under `/v1/lims-runs` (including `GET …/promotion/preview`, publish = `PATCH …/complete`)
 
 ## Next Steps / Open Questions

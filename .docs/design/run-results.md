@@ -62,12 +62,12 @@ transition_status(run, published)
 ### 3.1b Schema: analysis on run
 
 ```
-lims_runs.analysis_id  UUID NULL REFERENCES analyses(id)
+lims_runs.analysis_id  UUID NOT NULL REFERENCES analyses(id)   -- target; was nullable in first ship
 ```
 
-- UI: select for “reportable assay” runs; optional for pure instrument/DR-only runs.  
+- UI: **required** analysis on every run (no non-reportable / “none” option).  
 - Optional template default `default_analysis_id` copied onto new runs.  
-- **Start-run guard:** if `analysis_id` is null, API/UI **warns** that publish will not write tests/results; user must associate analysis, create analysis+analytes, or **explicitly confirm** continue-without-analysis (e.g. `acknowledge_no_analysis: true` on start transition).
+- **Missing analysis:** block create / start / import / publish — no `acknowledge_no_analysis` path (product lock 2026-07-19).
 
 ### 3.2 Mapping model
 
@@ -193,7 +193,7 @@ Shown on the **Publish** confirmation when `analysis_id` is set (and available a
 - Fail-closed unresolved columns (if configured)  
 - Zero promotable data with analysis set (optional policy)
 
-**Warnings** = non-blocking (start without analysis ack; optional skipped columns).
+**Warnings** = non-blocking (e.g. optional skipped columns). Missing analysis is an **error**, not a warning.
 
 **Schema:** Drop **`results.name`** (Decision #17)—no synthetic name generation.
 

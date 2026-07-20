@@ -156,9 +156,9 @@ nimblelims/
 - **Audit Trail**: Every curve fit is versioned (`fit_version`); superseded results preserved. Data exclusions are soft (reason-tracked), control-well exclusions apply to normalization means.
 
 ### LIMS Runs → Structured Results (promote-on-publish)
-- **Opt-in via Analysis**: Associate an **Analysis** on a LimsRun; import remains flexible JSONB (`lims_run_data`).
-- **Start warning**: Starting without analysis requires acknowledgement that publish will not write Tests/Results.
-- **Promote on publish**: When `analysis_id` is set and status → `published`, map columns to analytes (name + **aliases**), ensure Tests per sample, write **Results** (`raw_result`, `replicate`, `lims_run_id`).
+- **Analysis required**: Every LimsRun has an **Analysis** from create (no non-reportable / null-analysis path).
+- **Import remains flexible JSONB** (`lims_run_data`); parsers/import are analysis-scoped.
+- **Promote on publish**: Status → `published` maps columns to analytes (name + **aliases**), ensures Tests per sample, writes **Results** (`raw_result`, `replicate`, `lims_run_id`).
 - **Conflicts**: Same run updates; other run/manual ownership fails publish with **409**.
 - **Preview**: Publish confirmation dry-runs create/update/conflict/unresolved columns (`GET /v1/lims-runs/{id}/promotion/preview`).
 - **Docs**: [`.docs/ideas/run-results.md`](.docs/ideas/run-results.md), [`.docs/manuals/lims-runs.md`](.docs/manuals/lims-runs.md).
