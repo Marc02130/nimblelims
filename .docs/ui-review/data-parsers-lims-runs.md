@@ -1,90 +1,98 @@
 # UI / UX Review: Data parsers + LimsRun source/parser lineage
 
 **Date:** 2026-07-12  
-**Status:** **Resubmitted for review** (tech sketch ready)  
+**Resubmitted:** 2026-07-19  
+**Status:** **Resubmitted for UI review**  
 **Requirements:** [`.docs/requirements/data-parsers-lims-runs.md`](../requirements/data-parsers-lims-runs.md)  
 **Tech sketch:** [`.docs/tech-sketch/data-parsers-lims-runs.md`](../tech-sketch/data-parsers-lims-runs.md)  
-**Open questions:** [`.docs/open-questions/data-parsers-lims-runs.md`](../open-questions/data-parsers-lims-runs.md)
+**Open questions:** [`.docs/open-questions/data-parsers-lims-runs.md`](../open-questions/data-parsers-lims-runs.md)  
+**Schema:** [`.docs/schema-changes/data-parsers-lims-runs.md`](../schema-changes/data-parsers-lims-runs.md)
+
+## Ask of UI review
+
+Confirm flows and copy are acceptable for **P0+P1** build. Focus areas below reflect **product locks since first draft**.
 
 ## Mental model users must learn
 
 | Concept | User language | When |
 |---------|---------------|------|
-| **Analysis** | What assay / panel | Reportable results on publish |
-| **Instrument / CRO** | Where the file came from | Lineage + which parser family |
-| **Parser** | How we read this file format | Import only |
-| **Version / Active** | Saved definition of a parser; only the active version is used for new imports | Edit creates new version; prompt to activate |
-| **Examples vs tests** | Teach the format vs prove the format | Parser setup |
-| **Template** | Protocol / lifecycle / worklist | Run setup (unchanged) |
+| **Analysis** | What assay / panel | **Required on every run** from create |
+| **Instrument type / instance** | What kind of box / which unit | Catalog setup; import picks **instance** |
+| **CRO source** | External lab export source | Import alternative to instrument |
+| **Data parser** | How we read this file format | Setup + import (not “instrument parser” only) |
+| **Version / Active** | Saved definition; only active used for new imports | Edit → new version; activate prompt |
+| **Examples vs tests** | Teach format vs prove format | Parser setup (max 10 files, 10 MB each) |
+| **Template** | Protocol / lifecycle / worklist | Run setup (unchanged; **not** parser scope) |
 
-**Risk:** “Parser” vs “template” vs “analysis” confusion—UI must keep labels distinct.
+**Risks:** parser vs template vs analysis; “version” vs “active”; CRO vs instrument pickers.
 
 ## Primary flows
 
 ### A. Setup (admin / lab manager) — once
 
-1. Instrument **types** — e.g. vendor Agilent, model 6495C  
-2. Instrument **instances** — e.g. name LCMS-1, type above, serial optional (no location yet)  
-3. CRO sources list — create “Eurofins metals”  
-4. Parsers — create for Instrument **instance** ICP-1; multi-select **analyses** (e.g. RCRA-8 + RCRA-13); map all metal columns  
-
-5. **Upload example file(s)** (1+) and **test file(s)** (1+); **Run tests** → pass/fail panel  
-6. **Save** creates a **new version** (never overwrites an existing version’s config)  
-7. Dialog: **“Make this version active?”** — Yes → deactivate previous active; No → leave as draft version  
-8. (P2) “Draft config from examples” + “Suggest edge tests” → accept → re-run tests → save / activate  
-
-### A2. Parser test panel (required UX)
-
-- Lists each test file: status, rows parsed, warnings, errors  
-- “Add edge test” (manual) / “Suggest edges” (AI, P2)  
-- Version list / history on the logical parser; badge **Active** on current production version  
-- **Activate** after save (prompt); ideally disabled until test gate met (show why)
+1. **Instrument types** — vendor, model  
+2. **Instrument instances** — name, type, serial optional  
+3. **CRO sources**  
+4. **Data parsers** — instrument **or** CRO; multi-select **analyses** (e.g. RCRA-8 + RCRA-13); map columns (may include all metals)  
+5. Upload **example** (1+) and **test** (1+) files — **max 10 files, 10 MB each**  
+6. **Run tests** → per-file pass/fail (hard errors vs warnings)  
+7. **Save** → **new version** (never overwrite prior version config)  
+8. Dialog: **“Make this version active?”**  
+   - Enabled only if **all** tests/edges are **hard-error-free**  
+   - Yes → this version active; previous active deactivated  
+   - No → draft version; old active remains for imports  
+9. (P2) AI draft config + suggest edges → human accept → re-test → save/activate  
 
 ### B. Run (lab tech) — every time
 
-1. Create/open LimsRun (template as today)  
-2. Overview: set **Analysis** (run is tied to this assay)  
-3. **Import:** pick **Instrument** *or* **CRO** (only those with a parser for this analysis)  
-4. **Parser** defaults to **active** version for (analysis, that source); **Change** only among **active** parsers for that pair  
-5. File → preview → commit; may repeat with **another** instrument/parser on the same run  
-6. Import history: instrument/CRO + parser **name + version** per batch  
-7. Publish → existing promotion preview (analysis-scoped)
+1. Create run with **Analysis required** (no “none / non-reportable”)  
+2. **Import:** pick **Instrument** *or* **CRO** (only if an **active** parser links that source to the run’s analysis)  
+3. **Parser** defaults to active default for (analysis, source); override only among valid active parsers  
+4. File → preview → commit; may **repeat** with another instrument/parser on the same run  
+5. Import history: source + parser **name + version**  
+6. Publish → promotion preview (always has analysis)
 
 ### C. Troubleshooting
 
-- Run detail shows instrument/CRO + parser name **and version**  
-- Link opens **that version’s** definition (immutable history), not necessarily the current active
+- History links open **that version’s** definition (immutable), not only current active  
 
 ## UI principles
 
-1. **Default then override** — don’t force parser pick when one default exists.  
-2. **Stored choice visible** — never silently re-pick parser after override.  
-3. **Import errors plain language** — missing columns, bad delimiter.  
-4. **Examples vs tests** labeled clearly; encourage independent test file.  
-5. **AI is setup-only**, never on Import button.  
-6. **Fill-height tables** for admin lists (project standard).  
-7. Empty states: “No parser for this analysis + instrument — create one.”  
+1. **Default then override** among valid parsers only.  
+2. **Stored version visible** — never silent re-resolve.  
+3. **Plain-language** import/setup errors.  
+4. **Examples vs tests** labeled; caps shown on upload.  
+5. **AI setup-only** (P2) — never on Import.  
+6. **Fill-height** admin grids.  
+7. Empty: “No active data parser for this analysis + instrument — create one.”  
+8. Labels: **Data parsers** (not “instrument parsers”).  
 
-## Surfaces (from tech sketch)
+## Surfaces
 
 | Surface | Content |
 |---------|---------|
-| Admin: Instrument types | CRUD (vendor/model) |
-| Admin: Instruments (instances) | CRUD (type, serial, name) |
-| Admin: CRO sources | CRUD grid |
-| Admin: **Data parsers** | List active; version history; editor; multi-file tests; **activate prompt** on save |
-| LimsRun Overview | Analysis, Instrument/CRO, Parser (name + version) |
-| LimsRun Import | Upload bound to stored **version** `parser_id` on import event |
+| Admin: Instrument types | CRUD |
+| Admin: Instruments (instances) | CRUD |
+| Admin: CRO sources | CRUD |
+| Admin: **Data parsers** | Active list; version history; editor; tests; activate prompt |
+| LimsRun Overview | Analysis **required**; last import chips optional |
+| LimsRun Import | Multi-import; version lineage |
 
-## Wireframe notes (optional)
+## Review checklist (UI)
 
-_Add mock links or sketches during review._
+- [ ] Analysis-required run create/edit (no non-reportable empty option)  
+- [ ] Version + activate dialog clarity  
+- [ ] Activate disabled until all tests clean; show which file failed  
+- [ ] 10 file / 10 MB messaging  
+- [ ] Multi-select analyses on parser  
+- [ ] Import: instrument XOR CRO; filtered parsers  
+- [ ] Import history name + version  
 
 ## Verdict (fill in)
 
 | Field | Value |
 |-------|--------|
-| **Verdict** | _Pending_ |
+| **Verdict** | _Pending_ (Accept / Accept with conditions / Reject) |
 | **Must-fix before build** | |
 | **Nice-to-have** | |
 | **Reviewer** | |
@@ -92,4 +100,4 @@ _Add mock links or sketches during review._
 
 ## Notes
 
-_Add UX findings during review._
+_Resubmitted 2026-07-19 with product locks: data_parsers naming, versioning, analysis required, M2M analyses, 10/10MB, all-clean activate._
