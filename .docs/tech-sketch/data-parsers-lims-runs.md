@@ -1,7 +1,7 @@
 # Tech sketch: Data parsers, instruments/CRO, LimsRun import
 
 **Date:** 2026-07-12  
-**Status:** Ready for architecture / UI / security / CEO review  
+**Status:** **Accepted for implementation** (reviews 2026-07-19)  
 **Requirements:** [`.docs/requirements/data-parsers-lims-runs.md`](../requirements/data-parsers-lims-runs.md)  
 **Open questions:** [`.docs/open-questions/data-parsers-lims-runs.md`](../open-questions/data-parsers-lims-runs.md)  
 **Idea:** [`.docs/ideas/ai-data-import.md`](../ideas/ai-data-import.md)  
@@ -397,7 +397,7 @@ Product questions **closed** (2026-07-19). Remaining: review re-accept + impleme
 | Q1 ParserConfig schema-first | **Decided** |
 | #10a–d persist / 10 files · 10 MB / all clean activate / edges stored | **Decided** |
 | Q3 `config:edit` · Q9 `data_parsers` · Q5 versioning · Q6 analysis required | **Decided** |
-| CEO / UI / Architecture / Security re-review of full delta | **Resubmitted 2026-07-19** |
+| CEO / UI / Architecture / Security re-review | **Accepted 2026-07-19** (conditions in review docs) |
 
 ## 13. Success metrics (technical)
 

@@ -1,79 +1,59 @@
 # Architecture Review: Data parsers + LimsRun source/parser lineage
 
-**Date:** 2026-07-12 · **Updated / resubmitted:** 2026-07-19  
-**Status:** **Resubmitted for architecture (design) review**  
+**Date:** 2026-07-12 · **Updated:** 2026-07-19  
+**Verdict date:** 2026-07-19  
+**Status:** **Accepted with conditions**  
 **Requirements:** [`.docs/requirements/data-parsers-lims-runs.md`](../requirements/data-parsers-lims-runs.md)  
 **Tech sketch:** [`.docs/tech-sketch/data-parsers-lims-runs.md`](../tech-sketch/data-parsers-lims-runs.md)  
 **Schema changes (authoritative DB delta):** [`.docs/schema-changes/data-parsers-lims-runs.md`](../schema-changes/data-parsers-lims-runs.md)  
 **Open questions:** [`.docs/open-questions/data-parsers-lims-runs.md`](../open-questions/data-parsers-lims-runs.md)
 
-## Ask of architecture (this pass)
-
-Re-verify and **accept or condition** the full design. Product open questions are **closed**. Prior ask #1 (schema) was verified 2026-07-18 — **re-check** after rename + versioning + `lims_run_imports`.
+## Ask results
 
 | # | Ask | Status |
 |---|-----|--------|
-| 1 | **Verify schema** using **only** [schema-changes](../schema-changes/data-parsers-lims-runs.md) | Was verified 2026-07-18 — **re-verify** full delta |
-| 2 | Approve **ParserConfig v1** + engine parity — tech sketch §5 / **Decision #1 accepted** | _Pending re-accept_ |
-| 3 | Approve **ParserEngine** dual use: production import + setup test suite | _Pending_ |
-| 4 | Approve **default/override** + store **version** `parser_id` per import (`lims_run_imports`; active-only; no snapshot) | _Pending_ |
-| 5 | Approve **phase cut** P0/P1/P2 + **DROP template FK** + **RENAME → data_parsers** | _Pending_ |
-| 6 | Confirm **no open product blockers** for P0/P1 | Product: **closed** 2026-07-19 |
+| 1 | Verify schema (schema-changes only) | **Accept** — re-verified 2026-07-19 (rename, versioning, imports, M2M) |
+| 2 | ParserConfig v1 + engine parity | **Accept** — Decision #1; engine **must** implement every model field in same phase as schema use |
+| 3 | ParserEngine dual use (import + setup suite) | **Accept** — single code path required |
+| 4 | Default/override + version `parser_id` per import | **Accept** — `lims_run_imports`; active-only resolve; no snapshot |
+| 5 | Phase cut + DROP template FK + RENAME `data_parsers` | **Accept** |
+| 6 | Product blockers | **None** (Q8 provisional OK) |
 
-## Authoritative sources
+## Schema re-verify notes
 
-| Area | Doc |
-|------|-----|
-| **DB delta** | [schema-changes/…](../schema-changes/data-parsers-lims-runs.md) |
-| Engine / APIs / flows | [tech-sketch/…](../tech-sketch/data-parsers-lims-runs.md) |
-| Product | [ceo-review](../ceo-review/data-parsers-lims-runs.md) · [open-questions](../open-questions/data-parsers-lims-runs.md) |
+**Sound:**
 
-## Locked product decisions (architecture must implement)
+- XOR instrument/CRO on parsers and imports  
+- Version unique + partial unique one active per `version_group_id`  
+- M2M `parser_analyses` per version row  
+- Import lineage via `lims_run_imports` + optional `lims_run_data.import_id`  
+- No snapshot column (version FK is lineage)  
+- `analysis_id` required on run aligns with import validity  
 
-| ID | Decision |
-|----|----------|
-| #1 | **ParserConfig schema-first** (Pydantic + JSON Schema; validate all writers; AI same schema) |
-| #5 | Version rows + `active`; no import JSON snapshot |
-| #6 | **analysis_id required** on every run |
-| #9 | Table **`data_parsers`** (rename from `instrument_parsers`) |
-| #10 / 10b / 10c | Persist setup files; **10 files, 10 MB each**; activate only if **all** hard-error-free |
-| #11 / #17 | Instrument\|CRO + **M2M** `parser_analyses` |
-| #15 | DROP `experiment_template_id` |
-| #16 | Multi-instrument imports via **`lims_run_imports`** |
-| Q2 | Instrument **type + instance** |
-| Q3 | Permission **`config:edit`** |
-| Q7 | Lab-global catalogs; multi-tenant OOS |
-| Q8 | `is_default` provisional |
+**Implementation conditions (non-blocking for Accept):**
 
-## Schema highlights to re-verify
+| # | Condition |
+|---|-----------|
+| A1 | **Engine parity:** every `ParserConfig` field used by validators is honored by `ParserEngine` in P1 (no orphan keys). |
+| A2 | **Immutability:** API forbids PATCH of `parser_config` / source FKs on existing version rows; “edit” = insert version. |
+| A3 | **Setup files:** decide in impl — attach to **version row** (recommended: copy or re-link on new version) so historical version keeps fixtures; document choice in schema-changes checklist. |
+| A4 | **`analysis_id` NOT NULL:** migration backfills or deletes null-analysis runs before NOT NULL (pre-release: delete OK). |
+| A5 | **`is_default` (Q8):** app-enforced among active versions is fine; add partial unique later if races appear. |
+| A6 | **RLS:** after RENAME, recreate policies on `data_parsers`; catalogs lab-config only (not client-writable). |
+| A7 | **SOP parse:** stop writing template-linked parsers in the same release as DROP. |
 
-- RENAME `instrument_parsers` → **`data_parsers`**  
-- `version_group_id`, `version`, `active` + partial unique one active per group  
-- XOR `instrument_id` / `cro_source_id`  
-- `parser_analyses`, `parser_setup_files`, `lims_run_imports`  
-- `lims_runs.analysis_id` target **NOT NULL**  
-- No `parser_config_snapshot`  
-
-## Risks to confirm
-
-- Immutability of version rows in app  
-- Default uniqueness among **active** versions  
-- Setup files attached per version vs group  
-- RLS after rename  
-- Pre-release delete of template-scoped rows  
-
-## Verdict (fill in)
+## Verdict
 
 | Field | Value |
 |-------|--------|
-| **Verdict** | _Pending_ (Accept / Accept with conditions / Reject) |
-| **Schema approach approved** | _Re-verify_ |
-| **ParserConfig v1 approved** | Product accepted Decision #1 — _arch confirm_ |
-| **Phase cut approved** | _Pending_ |
+| **Verdict** | **Accept with conditions** (A1–A7 above) |
+| **Schema approach approved** | **Yes** |
+| **ParserConfig v1 approved** | **Yes** |
+| **Phase cut approved** | **Yes** — P0 catalogs → P1 parsers/import → P2 AI |
 | **Reviewer** | Architecture |
-| **Date completed** | |
+| **Date completed** | 2026-07-19 |
 
 ## Notes
 
-- **2026-07-18:** Schema verified (pre-versioning/rename).  
-- **2026-07-19:** Product closed Q1, #10b, #10c; full delta resubmitted for architecture re-accept.
+- 2026-07-18: Initial schema verify (pre-versioning).  
+- 2026-07-19: Full delta Accept with implement conditions; ready for P0/P1 build when Security/UI/CEO also accepted.
