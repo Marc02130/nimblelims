@@ -22,7 +22,7 @@ Do not implement a phase until questions that **block** that phase are **Decided
 
 | # | Question | Status | Blocks | Decision | Date | Owner | Rationale |
 |---|----------|--------|--------|----------|------|-------|-----------|
-| **1** | How do we ensure AI-generated `parser_config` JSONB is **standardized** and works with the **code framework** that runs parsers? | **Open** (proposed approach below) | P2 AI setup; schema freeze for P1 | See **Decision #1 (proposed)** | 2026-07-12 | Architecture | Single schema + validate before save; AI must emit that schema only |
+| **1** | How do we ensure AI-generated `parser_config` JSONB is **standardized** and works with the **code framework** that runs parsers? | **Decided** | P1 schema freeze; P2 AI | See **Decision #1** — schema-first proposal **accepted** | 2026-07-19 | Product + Architecture | Single schema + validate before save; AI emits that schema only |
 | **10** | How is **user testing** built into parser creation (example files + test files + edge cases)? | **Decided** (CEO confirmed) | P1 framework dry-run; P2 AI edge suggestions | See **Decision #10** | 2026-07-12 | Product / CEO | Results correctness is core LIMS value; multi-file + edges required |
 | **11** | Parser scope: analysis-only vs analysis×instrument/CRO? | **Decided** (refined #17) | Whole feature | Parser keyed by **instrument XOR CRO**; **M2M to analyses** (not analysis-only, not single analysis FK on parser) | 2026-07-12 / 19 | CEO + Product | Format ~ instrument; one ICP file can serve RCRA-8 and RCRA-13 |
 | **17** | Parser↔analysis cardinality? | **Decided** | Schema P1 | **Many-to-many `parser_analyses`** | 2026-07-19 | Product | Metals ICP imports all metals; run analysis selects which analytes to promote/store as results |
@@ -42,11 +42,10 @@ Do not implement a phase until questions that **block** that phase are **Decided
 
 ---
 
-## Decision #1 (proposed) — Standardize `parser_config` for framework + AI
+## Decision #1 — Standardize `parser_config` for framework + AI
 
-**Status:** Open · **Proposed default for review** · **Blocks:** P2 (AI); strongly informs P1 schema freeze  
-**Date proposed:** 2026-07-12  
-**Owner:** Architecture (+ Security for AI path)
+**Status:** **Decided** · **Date:** 2026-07-19 · **Owner:** Product (+ Architecture implementation)  
+**Blocks:** None remaining for product — implement per approach below
 
 ### Problem
 
@@ -158,16 +157,16 @@ Optional: **dry-run** against the sample file after validate—engine runs `pars
 | Separate AI schema + mapper | Two contracts drift |
 | Code-gen parsers per file | Ops nightmare; security |
 
-### Decision record (fill when locked)
+### Decision record
 
 | Field | Value |
 |-------|--------|
-| **Status** | Open / Decided provisional / Decided |
-| **Chosen approach** | |
-| **schema_version at ship** | |
-| **Dry-run required before AI save?** | |
-| **Date** | |
-| **Owner** | |
+| **Status** | **Decided** |
+| **Chosen approach** | Schema-first proposal as written above (Pydantic + JSON Schema; validate all writers; AI constrained to same schema; no free-form / no code) |
+| **schema_version at ship** | `"1"` (extend with engine in P1 as needed) |
+| **Dry-run before AI save** | Recommended; engine dry-run on sample after validate (P2) |
+| **Date** | Proposed 2026-07-12 · **Accepted 2026-07-19** |
+| **Owner** | Product (accept) · Architecture (implement) |
 
 ---
 
@@ -235,20 +234,22 @@ Given column stats from examples/tests (types, min/max, null rate, sample of val
 | Sub-Q | Status | Decision |
 |-------|--------|----------|
 | 10a | **Decided** | **Persist** examples/tests/edges (`parser_setup_files` in P1)—not ephemeral-only |
-| 10b | Open / implement default | Caps e.g. 10 files, 10 MB each |
-| 10c | Open / lean | All hard-error-free to activate |
+| 10b | **Decided** | Caps: **10 files**, **10 MB each** (per role pool or total setup set—implement as max 10 files and max 10 MB per file) |
+| 10c | **Decided** | **All** test (and edge) files must be **hard-error-free** to activate a version |
 | 10d | **Decided** | Accepted edge fixtures stored with parser |
 
 ### Decision record
 
 | Field | Value |
 |-------|--------|
-| **Status** | **Decided** (CEO confirmed) |
+| **Status** | **Decided** (CEO confirmed + product polish 2026-07-19) |
 | **Example files** | 1+ |
-| **Test files** | 1+; engine-run; activate after ≥1 clean pass |
+| **Test files** | 1+; engine-run |
+| **Activate gate** | **All** tests/edges hard-error-free (**10c**) |
+| **File caps** | **10 files**, **10 MB each** (**10b**) |
 | **File storage** | **Persisted** (not ephemeral) |
 | **AI edge suggestions** | Yes on setup (P2); human accept; engine executes |
-| **Date** | 2026-07-12 · storage clarified 2026-07-18 |
+| **Date** | 2026-07-12 · storage 2026-07-18 · 10b/10c 2026-07-19 |
 
 ---
 
@@ -343,14 +344,14 @@ Optional UI convenience: “last instrument / last parser” denormalized on the
 
 | Phase | Scope | Open blockers |
 |-------|--------|---------------|
-| **P0** | Instrument types + instances + CRO catalogs | Q2 done; permissions **config:edit** |
-| **P1** | Parsers analysis×source; **`data_parsers` rename**; run FKs; setup files; test harness; import by `parser_id` | Q1 freeze (core fields); #10b–c polish |
-| **P2** | AI draft + edge suggestions | **Q1 locked** + Security P2; **P0+P1 done** |
+| **P0** | Instrument types + instances + CRO catalogs | **None** (product) — review packets resubmitted |
+| **P1** | `data_parsers` + versioning; setup files (10/10MB); all-clean activate; import by version `parser_id` | **None** (product) — Architecture/Security/UI re-accept |
+| **P2** | AI draft + edge suggestions | Security P2 accept; **P0+P1 done** |
 | **P3+** | Richer formats / multi-tenant cutover patterns | Only when there are real production users |
 
 **Pre-release:** phase the **work** (P0→P1→P2). Do **not** invest in production dual-write / switchover plans until multi-tenant production use exists.
 
-**CEO:** Resolve open questions **before implementation starts**. Architecture, security, and UI reviews still outstanding.
+**2026-07-19:** Product open questions closed (Q1, #10b, #10c). **Resubmitted** for CEO / UI / Architecture (design) / Security review of the full delta.
 
 ---
 

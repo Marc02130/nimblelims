@@ -189,13 +189,11 @@ Do **not** change as part of data-parsers P0/P1:
 
 | ID | Topic | Blocks |
 |----|--------|--------|
-| Q2 | Instrument type vs instance | **Decided:** type (vendor/model) + instance (serial); no location FK |
-| Q7 | Multi-tenant catalogs | **Decided: lab-global; multi-tenant OOS** — ideas/multi-tenant.md |
-| Q9 | Table name | **Decided:** rename → **`data_parsers`** |
-| #10a | Persist setup files? | **Decided: yes** — `parser_setup_files` in P1 |
-| Q5 | snapshot vs versioning | **Decided:** version_group + version + active; no import JSON snapshot |
+| — | **None for product** (2026-07-19) | Architecture re-accept of full delta |
 
-Product: CEO locked analysis×instrument/CRO scope (Decision #11). Architecture to approve this delta list.
+Closed: Q1–Q9, #10a–d, #11–17 as applicable. See open-questions. **Resubmitted** for Architecture / Security / UI / CEO re-confirm.
+
+Product: analysis×instrument/CRO (M2M), `data_parsers`, versioning, analysis required.
 
 ## 8. Implementation checklist
 

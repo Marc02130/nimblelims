@@ -152,7 +152,8 @@ User testing is part of the **parser framework**, not a separate product.
 | FR-6.2 | User may upload **one or more test files** used to validate a candidate config (may differ from examples). Files are **persisted**. |
 | FR-6.3 | Framework shall run the **same import engine** against each test file with the candidate config (after schema validation—see open Q1). |
 | FR-6.4 | UI shall show per-file results: pass/fail, row counts, warnings, hard errors. |
-| FR-6.5 | **Activate version** (Decision #5 + testing): activating a version should require setup tests pass (provisional: ≥1 test file zero hard errors). Activate deactivates the prior active version in the group. |
+| FR-6.5 | **Activate version** (Decision #5 + #10c): **all** test and edge files must complete with **zero hard errors**. Activate deactivates the prior active version in the group. |
+| FR-6.12 | Setup file caps (**#10b**): max **10 files**, max **10 MB per file** (examples + tests + edges combined unless product later splits pools). |
 | FR-6.6 | Optional AI may draft `parser_config` from example file(s); **human must review and save**. |
 | FR-6.7 | Optional AI may **suggest edge test cases** based on observed data (e.g. negative values, empties, type stress, structural noise); suggestions become fixtures only after user accepts. |
 | FR-6.8 | Edge tests and all test files are judged by the **code engine**, not by the LLM alone. |
@@ -282,7 +283,7 @@ File column  --parser-->  row_data[field_name]  --promote-->  Result(analyte)
 
 | # | Question | Suggested default |
 |---|----------|-------------------|
-| **1** | How is AI/manual `parser_config` kept compatible with the import engine? | **Schema-first:** one Pydantic/JSON Schema; validate all writers; AI emits that schema only; dry-run on sample file |
+| **1** | How is AI/manual `parser_config` kept compatible with the import engine? | **Decided:** schema-first proposal accepted (Pydantic + JSON Schema; validate all writers; AI same schema) |
 | 2 | Instrument type vs instance? | **Decided:** type (vendor/model) + instance (serial); see schema-changes |
 | 3 | Permission for parser CRUD? | `config:edit` |
 | 4 | Allow override to a parser from a different analysis? | No without strong warning / block |

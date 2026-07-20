@@ -304,10 +304,10 @@ each import:
 4. Upload test file(s) ≥1  
 5. Run tests → report  
 6. **Save** → inserts version row (`version=1` or `max+1`; config immutable thereafter)  
-7. **Prompt: make this version active?**  
+7. **Prompt: make this version active?** (only if **all** tests/edges hard-error-free — #10c)  
    - Yes → `active=true` on new; deactivate other versions in `version_group_id`  
    - No → leave inactive; prior active (if any) stays  
-8. Activate ideally only if tests pass (Decision #10 provisional)
+8. File caps: max **10 files**, **10 MB each** (#10b)
 
 **Edit path:** never PATCH `parser_config` on existing version → always new version.
 
@@ -388,15 +388,20 @@ Permissions: catalog/parser CRUD = `config:edit`; run fields = existing run edit
 | Large files | Size limits; max_rows on preview; async AI only |
 | Existing template-scoped parser rows | Migrate or delete before DROP column |
 
-## 12. Open technical items → open-questions doc
+## 12. Open technical items
 
-- Q1 lock (schema + AI contract)  
-- Q10a–d (file retention, limits, activate rule)  
-- Permission string (Q3)  
-- Path naming for APIs  
+Product questions **closed** (2026-07-19). Remaining: review re-accept + implement.
+
+| Item | Status |
+|------|--------|
+| Q1 ParserConfig schema-first | **Decided** |
+| #10a–d persist / 10 files · 10 MB / all clean activate / edges stored | **Decided** |
+| Q3 `config:edit` · Q9 `data_parsers` · Q5 versioning · Q6 analysis required | **Decided** |
+| CEO / UI / Architecture / Security re-review of full delta | **Resubmitted 2026-07-19** |
 
 ## 13. Success metrics (technical)
 
 - Import path has zero LLM dependencies in call graph  
 - 100% of saved configs pass `ParserConfig` validation in CI fixtures  
-- Setup test suite catches missing-column configs before activate  
+- Setup test suite: **all** files hard-error-free before activate  
+
