@@ -122,7 +122,7 @@ Optional `cro_sources.client_id` is a **label** (related client), not a tenant s
 
 | ID | Requirement |
 |----|-------------|
-| FR-4.1 | Structured import path: run shall have **`analysis_id`** (assay whose results are expected). |
+| FR-4.1 | **Import requires `analysis_id`.** No non-reportable / null-analysis import path (Decision #6). |
 | FR-4.2 | A run **may** perform **multiple imports** using **different instruments and/or CRO sources** (and thus different parsers). |
 | FR-4.3 | Each import shall record **instrument XOR cro_source** and **`parser_id`** (e.g. `lims_run_imports` + optional `lims_run_data.import_id`). |
 | FR-4.4 | Parser on an import **must** be linked to `run.analysis_id` via **`parser_analyses`** and match the import’s instrument/CRO. |
@@ -140,7 +140,7 @@ Optional `cro_sources.client_id` is a **label** (related client), not a tenant s
 | FR-5.2 | Upload path: text table file → apply `parser_config` → preview optional → write `lims_run_data`. |
 | FR-5.3 | No LLM call on import path. |
 | FR-5.4 | Validation failures (missing expected fields, bad delimiter, etc.) shall be user-visible and actionable. |
-| FR-5.5 | Integration with promote-on-publish unchanged: when `analysis_id` set, publish maps `field_name`/aliases → results. |
+| FR-5.5 | Integration with promote-on-publish: publish maps `field_name`/aliases → results for the run’s **required** `analysis_id`. |
 
 ### FR-6: Parser setup — multi-file examples, tests, and optional AI
 
@@ -177,12 +177,13 @@ User testing is part of the **parser framework**, not a separate product.
 | FR-8.3 | Import and parser CRUD actions are auditable (who, when, entity ids, including **new version** and **activate** events). |
 | FR-8.4 | Instruments / CRO sources / parsers are **lab-global** config (not client-configurable). **Multi-tenant / org segregation is out of scope** — see [ideas/multi-tenant.md](../ideas/multi-tenant.md). |
 
-### FR-9: Non-reportable runs
+### FR-9: Analysis required (no non-reportable import path)
 
 | ID | Requirement |
 |----|-------------|
-| FR-9.1 | Runs without `analysis_id` may still import if a `parser_id` is available (template fallback or source-only parser if product allows). |
-| FR-9.2 | Existing start-run warning for no analysis remains; promote still skipped without analysis. |
+| FR-9.1 | **No non-reportable runs** for structured instrument/CRO import (Decision #6). |
+| FR-9.2 | Import API/UI shall **reject** when `run.analysis_id` is null (clear error: set analysis first). |
+| FR-9.3 | Method-dev / scratch / work-over-time without production reporting is **out of scope** until [lab projects](../ideas/orders-and-projects.md) are implemented—not solved by null analysis. |
 
 ---
 
@@ -285,7 +286,7 @@ File column  --parser-->  row_data[field_name]  --promote-->  Result(analyte)
 | 3 | Permission for parser CRUD? | `config:edit` |
 | 4 | Allow override to a parser from a different analysis? | No without strong warning / block |
 | 5 | Snapshot vs versioning? | **Version + active**; no import JSON snapshot; updates create new versions |
-| 6 | Non-reportable run without analysis: how is parser selected? | Open — **no template parser fallback**; see open-questions |
+| 6 | Non-reportable / null analysis import? | **Decided:** no non-reportable runs; require analysis; method-dev deferred to lab projects |
 | 7 | Multi-tenant / org segregation? | **Out of scope** — lab-global config; [ideas/multi-tenant.md](../ideas/multi-tenant.md) |
 
 ---

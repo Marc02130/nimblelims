@@ -33,7 +33,7 @@ Do not implement a phase until questions that **block** that phase are **Decided
 | 3 | Permission for parser / instrument / CRO CRUD? | **Decided** | P0–P1 | **`config:edit`** | 2026-07-19 | Product | Acceptable; aligns with other lab config |
 | 4 | Allow override to a parser for a **different** analysis than the run? | **Decided** | P1 UI/API | **Block** — parser must be linked to `run.analysis_id` via `parser_analyses` | 2026-07-19 | Product | Import validity |
 | 5 | Snapshot `parser_config` on import vs versioning? | **Decided** | P1 schema + admin UX | **No JSON snapshot.** Versioned parser rows + `active`; import stores version `parser_id` | 2026-07-19 | Product | See **Decision #5** |
-| 6 | Non-reportable run (no analysis): how is parser required? | **Open** (lean below) | P1 import | _Lean:_ **require analysis** for structured import; non-reportable = no promote (draft/dev analysis). Method-dev work-over-time → future [orders/projects idea](../ideas/orders-and-projects.md)—not null analysis | 2026-07-12 / 19 | Product | Today’s `projects` = order-like sampling batch |
+| 6 | Non-reportable run (no analysis) / method-dev path? | **Decided** | P1 import (no special path) | **No non-reportable runs.** Import requires `analysis_id`. Method-dev / lab projects **deferred** until [orders-and-projects](../ideas/orders-and-projects.md) | 2026-07-19 | Product | See **Decision #6** |
 | **15** | Keep `experiment_template_id` on parsers? | **Decided** | Schema | **Remove** the column entirely | 2026-07-12 | Product / Architecture | Parsers are analysis×instrument/CRO only |
 | **16** | Run analysis + multi instrument/parser rules? | **Decided** | P1 import/schema | See **Decision #16** | 2026-07-19 | Product | Run tied to analysis; multiple instruments/parsers allowed; each must match analysis + that instrument/CRO |
 | 7 | Instruments/CRO catalogs multi-tenant scope? | **Decided** | P0 | **Lab-global only.** No org segregation. Multi-tenant **out of scope** until real multi-org users — see [ideas/multi-tenant.md](../ideas/multi-tenant.md) | 2026-07-18 | Product | Pre-release; single lab deployment |
@@ -344,7 +344,7 @@ Optional UI convenience: “last instrument / last parser” denormalized on the
 | Phase | Scope | Open blockers |
 |-------|--------|---------------|
 | **P0** | Instrument types + instances + CRO catalogs | Q2 done; permissions **config:edit** |
-| **P1** | Parsers analysis×source; run FKs; **persisted** setup files; test harness; import by `parser_id` | Q1 freeze (core fields), Q4, Q6, Q8, Q9; #10b–c polish |
+| **P1** | Parsers analysis×source; run FKs; **persisted** setup files; test harness; import by `parser_id` | Q1 freeze (core fields), Q8, Q9; #10b–c polish (Q4, Q6 decided) |
 | **P2** | AI draft + edge suggestions | **Q1 locked** + Security P2; **P0+P1 done** |
 | **P3+** | Richer formats / multi-tenant cutover patterns | Only when there are real production users |
 
@@ -409,6 +409,38 @@ Treat each **saved definition** of a parser as an **immutable version row**. Imp
 
 ---
 
+## Decision #6 — No non-reportable runs; method-dev deferred to lab projects
+
+**Status:** **Decided** · **Date:** 2026-07-19 · **Owner:** Product  
+**Blocks:** Nothing for P1 special-case import (path removed). Method-dev UX blocked on [orders-and-projects](../ideas/orders-and-projects.md)
+
+### Decided
+
+1. **No non-reportable runs** for the data-parsers / structured import product path.  
+2. **Import requires `run.analysis_id`.** No parser selection, no file import, no “source-only parser” without an analysis.  
+3. **Do not** build a null-analysis import path, template fallback, or “continue without analysis” for structured instrument/CRO import in this cycle.  
+4. **Method development / scratch / work-over-time** is **deferred** until **lab projects** are implemented ([ideas/orders-and-projects.md](../ideas/orders-and-projects.md)). Not solved by null `analysis_id`.  
+5. **Promote** remains analysis-scoped on publish as today (run with analysis → promote when published).
+
+### Rejected
+
+| Approach | Why rejected |
+|----------|----------------|
+| Import with no analysis | Fights parser M2M (analysis×instrument/CRO); ambiguous lineage |
+| “Non-reportable” as first-class run mode | Deferred method-dev needs a real analysis + lab project later, not a hole |
+| Defer only the *question* while shipping a half-path | Product: decide **no** path now |
+
+### Decision record
+
+| Field | Value |
+|-------|--------|
+| **Status** | **Decided** |
+| **Date** | 2026-07-19 |
+| **Owner** | Product |
+| **Summary** | No non-reportable runs; structured import requires analysis; method-dev deferred to lab projects idea |
+
+---
+
 ## Related product locks (from idea/requirements — not re-opened here)
 
 - Parser SoT = DB JSONB instructions; AI setup-only.  
@@ -416,4 +448,5 @@ Treat each **saved definition** of a parser as an **immutable version row**. Imp
 - Promote remains separate (analysis_id on publish).  
 - Permissions: **`config:edit`** for instrument/CRO/parser CRUD.  
 - **Parser versions + active** (Decision #5); import stores version `parser_id` only.  
+- **No non-reportable runs** (Decision #6); method-dev → [orders-and-projects](../ideas/orders-and-projects.md).  
 
