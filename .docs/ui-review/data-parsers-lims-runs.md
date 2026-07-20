@@ -25,7 +25,8 @@
 1. Instrument **types** — e.g. vendor Agilent, model 6495C  
 2. Instrument **instances** — e.g. name LCMS-1, type above, serial optional (no location yet)  
 3. CRO sources list — create “Eurofins metals”  
-4. Parsers — create for Analysis=Metals + Instrument **instance** LCMS-1; edit column map  
+4. Parsers — create for Instrument **instance** ICP-1; multi-select **analyses** (e.g. RCRA-8 + RCRA-13); map all metal columns  
+
 5. **Upload example file(s)** (1+) and **test file(s)** (1+); **Run tests** → pass/fail panel  
 6. (P2) “Draft config from examples” + “Suggest edge tests” → accept → re-run tests → **Activate** / save  
 
