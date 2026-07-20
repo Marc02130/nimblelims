@@ -39,7 +39,17 @@ Promote-on-publish already maps JSONB columns → analytes/results when `analysi
 - AI inventing numeric results or auto-promoting without publish  
 - Binary proprietary formats as MVP (XLSX may be a later phase)  
 - Replacing SOP→template AI (that path remains template-centric)  
-- Changing promote-on-publish product rules (already shipped)
+- Changing promote-on-publish product rules (already shipped)  
+- **Multi-tenant / org segregation** of instruments, CRO sources, or parsers ([ideas/multi-tenant.md](../ideas/multi-tenant.md))
+
+### 1.3b Multi-tenant readiness (consideration only)
+
+NimbleLIMS is not implementing multi-tenant isolation in this cycle. Catalogs are **lab-global**.
+
+**Do:** design instruments/CRO/parsers so a future tenant scope can be added without rewriting import/promote (UUID PKs, clear FKs, soft active, config not owned by lab-client users).  
+**Do not:** add tenant columns, dual RLS paths, or org-scoped UX “for later” without a multi-tenant requirements cycle.
+
+Optional `cro_sources.client_id` is a **label** (related client), not a tenant security wall.
 
 ### 1.4 Personas
 

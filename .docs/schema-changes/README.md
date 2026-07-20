@@ -36,7 +36,8 @@ Optional: Alembic revision ids filled in at implement time (`0054_…`).
 4. **Backfill / dual-write** — if any  
 5. **Rollback** — how to reverse or why forward-only  
 6. **Out of scope** — schema explicitly **not** changing this cycle  
-7. **Links** — requirements + tech sketch (context only; do not duplicate product prose)
+7. **Multi-tenant readiness** (optional short §) — lab-global now? what stays additive later? See [ideas/multi-tenant.md](../ideas/multi-tenant.md)  
+8. **Links** — requirements + tech sketch (context only; do not duplicate product prose)
 
 ## What does **not** go here
 
