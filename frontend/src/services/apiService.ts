@@ -631,6 +631,11 @@ export class ApiService {
     return response.data;
   }
 
+  async getDataParser(id: string) {
+    const response: AxiosResponse = await this.api.get(`/v1/data-parsers/${id}`);
+    return response.data;
+  }
+
   async createDataParser(data: any) {
     const response: AxiosResponse = await this.api.post('/v1/data-parsers', data);
     return response.data;
