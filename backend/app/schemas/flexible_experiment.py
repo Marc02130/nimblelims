@@ -191,8 +191,17 @@ class ParserConfig(BaseModel):
     skip_rows: int = Field(default=0, ge=0)
     header_row: int = Field(default=0, ge=0)
     columns: List[ParserColumn] = Field(..., min_length=1)
-    well_col: Optional[str] = Field(None, description="Column that identifies well position")
-    sample_col: Optional[str] = None
+    well_col: Optional[str] = Field(
+        None,
+        description=(
+            "Optional. Source column that holds a LIMS well id (max 10 chars). "
+            "Omit (null) when the file has no wells — not required for every instrument."
+        ),
+    )
+    sample_col: Optional[str] = Field(
+        None,
+        description="Optional. Source column that holds a sample label (metadata hint only).",
+    )
 
 
 class InstrumentParserCreate(BaseModel):
