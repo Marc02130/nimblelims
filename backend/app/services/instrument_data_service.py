@@ -165,17 +165,34 @@ class InstrumentDataService:
                     row_data[col_def.field_name] = raw_val
 
             well_position = row_dict.get(well_col, "").strip() if well_col else None
-            # sample_col stored in row_data only if mapped; optional separate handling later
-            if sample_col and sample_col in row_dict and "sample_id" not in row_data:
-                # leave as field if not mapped; do not invent UUID
-                pass
-
-            rows.append(
-                LimsRunDataRow(
-                    well_position=well_position or None,
-                    row_data=row_data,
+            if well_position == "":
+                well_position = None
+            # LimsRunDataRow / DB well_position is max 10 chars (e.g. "A01")
+            if well_position and len(well_position) > 10:
+                warnings.append(
+                    f"Row {row_num}: well_position '{well_position[:40]}…' "
+                    f"exceeds 10 characters — stored in row_data only, not well_position"
                 )
-            )
+                # Keep full value in mapped field if present; clear typed well slot
+                if "well_position" not in row_data:
+                    row_data["well_position"] = well_position
+                well_position = None
+
+            # sample_col is metadata for which source col is the sample label;
+            # value already lands in row_data if mapped in columns[]
+            _ = sample_col
+
+            try:
+                rows.append(
+                    LimsRunDataRow(
+                        well_position=well_position,
+                        row_data=row_data,
+                    )
+                )
+            except ValidationError as e:
+                # Never 500 during test/import — report as hard error for this row
+                hard_errors.append(f"Row {row_num}: invalid row ({e.error_count()} field error(s))")
+                # continue parsing remaining rows
 
         if not rows and not hard_errors:
             hard_errors.append("No data rows found after header")
@@ -219,6 +236,16 @@ class ParserEngine:
                 detail = e.detail if isinstance(e.detail, str) else str(e.detail)
                 reports.append(
                     FileReport(filename=name, ok=False, hard_errors=[detail], row_count=0)
+                )
+            except Exception as e:
+                # Never let a single file 500 the whole suite
+                reports.append(
+                    FileReport(
+                        filename=name,
+                        ok=False,
+                        hard_errors=[f"Parse failed: {type(e).__name__}: {e}"],
+                        row_count=0,
+                    )
                 )
         return reports
 
