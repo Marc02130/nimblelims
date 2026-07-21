@@ -48,11 +48,6 @@ def list_data_parsers(
     )
 
 
-@router.get("/{parser_id}", response_model=DataParserRead)
-def get_data_parser(parser_id: UUID, svc: DataParserService = Depends(_svc)):
-    return svc._to_read(svc.get(parser_id))
-
-
 @router.post("", response_model=DataParserRead, status_code=status.HTTP_201_CREATED)
 def create_data_parser(
     body: DataParserCreate,
@@ -76,15 +71,7 @@ def create_parser_version(
     return DataParserService(db, current_user=user).create_version(version_group_id, body)
 
 
-@router.post("/{parser_id}/activate", response_model=DataParserRead)
-def activate_parser(
-    parser_id: UUID,
-    user: User = Depends(require_config_edit),
-    db: Session = Depends(get_db),
-):
-    return DataParserService(db, current_user=user).activate(parser_id)
-
-
+# Static POST paths BEFORE /{parser_id} routes
 @router.post("/validate-config")
 def validate_config(
     body: ParserConfig,
@@ -96,16 +83,31 @@ def validate_config(
 @router.post("/test", response_model=TestSuiteResponse)
 async def test_parser_config(
     parser_config: str = Form(..., description="JSON ParserConfig"),
-    files: List[UploadFile] = File(...),
+    files: List[UploadFile] = File(default_factory=list),
     user: User = Depends(require_config_edit),
     db: Session = Depends(get_db),
 ):
+    """Multipart: parser_config (JSON string) + files (one or more, field name files)."""
     import json
 
+    if not files:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="At least one test file is required (form field name: files)",
+        )
     try:
-        cfg = ParserConfig.model_validate(json.loads(parser_config))
+        raw = json.loads(parser_config)
+        cfg = ParserConfig.model_validate(raw)
+    except json.JSONDecodeError as e:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"parser_config is not valid JSON: {e}",
+        )
     except Exception as e:
-        raise HTTPException(422, f"Invalid parser_config: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Invalid parser_config: {e}",
+        )
     if len(files) > MAX_SETUP_FILES:
         raise HTTPException(400, f"Max {MAX_SETUP_FILES} files")
     payloads: list[tuple[str, bytes]] = []
@@ -115,6 +117,20 @@ async def test_parser_config(
             raise HTTPException(400, f"{f.filename} exceeds size limit")
         payloads.append((f.filename or "file", content))
     return DataParserService(db, current_user=user).test_config(cfg, payloads)
+
+
+@router.get("/{parser_id}", response_model=DataParserRead)
+def get_data_parser(parser_id: UUID, svc: DataParserService = Depends(_svc)):
+    return svc._to_read(svc.get(parser_id))
+
+
+@router.post("/{parser_id}/activate", response_model=DataParserRead)
+def activate_parser(
+    parser_id: UUID,
+    user: User = Depends(require_config_edit),
+    db: Session = Depends(get_db),
+):
+    return DataParserService(db, current_user=user).activate(parser_id)
 
 
 @router.post(

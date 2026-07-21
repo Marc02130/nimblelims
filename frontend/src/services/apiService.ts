@@ -149,12 +149,22 @@ export class ApiService {
       },
     });
 
-    // Request interceptor to add auth token
+    // Request interceptor: auth token + multipart FormData handling
     this.api.interceptors.request.use(
       (config) => {
         const token = localStorage.getItem('token');
         if (token) {
           config.headers.Authorization = `Bearer ${token}`;
+        }
+        // Default Content-Type is application/json. For FormData the browser must set
+        // multipart/form-data WITH boundary — otherwise FastAPI returns 422 on File/Form.
+        if (typeof FormData !== 'undefined' && config.data instanceof FormData) {
+          if (config.headers && typeof (config.headers as any).set === 'function') {
+            (config.headers as any).delete('Content-Type');
+          } else if (config.headers) {
+            delete (config.headers as any)['Content-Type'];
+            delete (config.headers as any)['content-type'];
+          }
         }
         return config;
       },
@@ -659,7 +669,6 @@ export class ApiService {
     form.append('parser_config', JSON.stringify(parserConfig));
     // Same field name repeated — FastAPI List[UploadFile] = File(...)
     files.forEach((f) => form.append('files', f));
-    // Do NOT set Content-Type manually; browser/axios must add multipart boundary
     const response: AxiosResponse = await this.api.post('/v1/data-parsers/test', form);
     return response.data;
   }
@@ -674,7 +683,6 @@ export class ApiService {
     if (meta.instrument_id) form.append('instrument_id', meta.instrument_id);
     if (meta.cro_source_id) form.append('cro_source_id', meta.cro_source_id);
     if (meta.parser_id) form.append('parser_id', meta.parser_id);
-    // Do NOT set Content-Type manually (multipart boundary)
     const response: AxiosResponse = await this.api.post(
       `/v1/lims-runs/${runId}/import-file`,
       form

@@ -242,11 +242,19 @@ const DataParsersManagement: React.FC = () => {
         setError('Some tests have hard errors — activate will require all clean');
       }
     } catch (e: any) {
-      setError(
-        typeof e.response?.data?.detail === 'string'
-          ? e.response.data.detail
-          : e.message || 'Test failed'
-      );
+      const d = e.response?.data?.detail;
+      let msg = e.message || 'Test failed';
+      if (typeof d === 'string') msg = d;
+      else if (Array.isArray(d)) {
+        // FastAPI validation errors
+        msg = d
+          .map((x: any) => {
+            const loc = (x.loc || []).join('.');
+            return loc ? `${loc}: ${x.msg}` : x.msg || JSON.stringify(x);
+          })
+          .join('; ');
+      } else if (d) msg = JSON.stringify(d);
+      setError(msg);
     } finally {
       setTesting(false);
     }
