@@ -652,10 +652,10 @@ export class ApiService {
   async testDataParserConfig(parserConfig: any, files: File[]) {
     const form = new FormData();
     form.append('parser_config', JSON.stringify(parserConfig));
+    // Same field name repeated — FastAPI List[UploadFile] = File(...)
     files.forEach((f) => form.append('files', f));
-    const response: AxiosResponse = await this.api.post('/v1/data-parsers/test', form, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
+    // Do NOT set Content-Type manually; browser/axios must add multipart boundary
+    const response: AxiosResponse = await this.api.post('/v1/data-parsers/test', form);
     return response.data;
   }
 
@@ -669,10 +669,10 @@ export class ApiService {
     if (meta.instrument_id) form.append('instrument_id', meta.instrument_id);
     if (meta.cro_source_id) form.append('cro_source_id', meta.cro_source_id);
     if (meta.parser_id) form.append('parser_id', meta.parser_id);
+    // Do NOT set Content-Type manually (multipart boundary)
     const response: AxiosResponse = await this.api.post(
       `/v1/lims-runs/${runId}/import-file`,
-      form,
-      { headers: { 'Content-Type': 'multipart/form-data' } }
+      form
     );
     return response.data;
   }

@@ -104,19 +104,40 @@ const DataParsersManagement: React.FC = () => {
     load();
   }, [load]);
 
+  const [testing, setTesting] = useState(false);
+
   const runTests = async () => {
     if (!testFiles?.length) {
       setError('Select test file(s)');
       return;
     }
+    setTesting(true);
+    setError(null);
+    setSuccess(null);
+    setTestResult(null);
     try {
       const cfg = JSON.parse(form.parser_config_json);
-      const res = await apiService.testDataParserConfig(cfg, Array.from(testFiles));
+      const fileList = Array.from(testFiles);
+      const res = await apiService.testDataParserConfig(cfg, fileList);
       setTestResult(res);
-      if (res.all_clean) setSuccess('All test files clean');
-      else setError('Some tests have hard errors — activate will require all clean');
+      const n = res.files?.length ?? 0;
+      if (n !== fileList.length) {
+        setError(
+          `Expected results for ${fileList.length} files but got ${n}. Re-select files and try again.`
+        );
+      } else if (res.all_clean) {
+        setSuccess(`All ${n} test file(s) clean`);
+      } else {
+        setError('Some tests have hard errors — activate will require all clean');
+      }
     } catch (e: any) {
-      setError(e.response?.data?.detail || e.message || 'Test failed');
+      setError(
+        typeof e.response?.data?.detail === 'string'
+          ? e.response.data.detail
+          : e.message || 'Test failed'
+      );
+    } finally {
+      setTesting(false);
     }
   };
 
@@ -326,23 +347,72 @@ const DataParsersManagement: React.FC = () => {
             inputProps={{ style: { fontFamily: 'monospace', fontSize: 12 } }}
           />
           <Box>
-            <Typography variant="subtitle2">Test files (required for activate confidence)</Typography>
-            <input type="file" multiple onChange={(e) => setTestFiles(e.target.files)} />
-            <Button startIcon={<PlayArrow />} onClick={runTests} sx={{ ml: 1 }}>
-              Run tests
-            </Button>
+            <Typography variant="subtitle2" gutterBottom>
+              Test files (required for activate confidence) — select multiple (max 10)
+            </Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+              <input
+                type="file"
+                multiple
+                accept=".csv,text/csv,text/plain"
+                onChange={(e) => {
+                  setTestFiles(e.target.files);
+                  setTestResult(null);
+                }}
+              />
+              <Typography variant="caption" color="text.secondary">
+                {testFiles?.length ? `${testFiles.length} file(s) selected` : 'No files selected'}
+              </Typography>
+              <Button
+                startIcon={<PlayArrow />}
+                onClick={runTests}
+                disabled={testing || !testFiles?.length}
+                variant="outlined"
+                size="small"
+              >
+                {testing ? 'Running…' : 'Run tests'}
+              </Button>
+            </Box>
             {testResult && (
-              <Box sx={{ mt: 1 }}>
+              <Box
+                sx={{
+                  mt: 1.5,
+                  p: 1.5,
+                  border: 1,
+                  borderColor: 'divider',
+                  borderRadius: 1,
+                  maxHeight: 220,
+                  overflow: 'auto',
+                  bgcolor: 'action.hover',
+                }}
+              >
                 <Chip
-                  label={testResult.all_clean ? 'All clean' : 'Has hard errors'}
+                  label={
+                    testResult.all_clean
+                      ? `All clean (${testResult.files?.length ?? 0} files)`
+                      : `Has hard errors (${testResult.files?.length ?? 0} files)`
+                  }
                   color={testResult.all_clean ? 'success' : 'error'}
                   size="small"
+                  sx={{ mb: 1 }}
                 />
-                {testResult.files?.map((f: any) => (
-                  <Typography key={f.filename} variant="caption" display="block">
-                    {f.filename}: {f.ok ? 'ok' : f.hard_errors?.join('; ')} ({f.row_count} rows)
+                {(testResult.files || []).map((f: any, idx: number) => (
+                  <Typography
+                    key={`${f.filename}-${idx}`}
+                    variant="body2"
+                    sx={{ fontFamily: 'monospace', fontSize: 12, mb: 0.5 }}
+                    color={f.ok ? 'success.main' : 'error.main'}
+                  >
+                    {f.ok ? '✓' : '✗'} {f.filename}:{' '}
+                    {f.ok ? `ok (${f.row_count} rows)` : (f.hard_errors || []).join('; ')}
+                    {f.warnings?.length ? ` · ${f.warnings.length} warning(s)` : ''}
                   </Typography>
                 ))}
+                {!testResult.files?.length && (
+                  <Typography variant="body2" color="error">
+                    No per-file results returned from server.
+                  </Typography>
+                )}
               </Box>
             )}
           </Box>
