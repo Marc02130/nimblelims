@@ -115,7 +115,9 @@ const PublishPromotionDialog: React.FC<PublishPromotionDialogProps> = ({
     !loading &&
     !loadError &&
     !publishing &&
-    (!hasAnalysis || (preview != null && !hasConflicts));
+    hasAnalysis &&
+    preview != null &&
+    !hasConflicts;
 
   const creates = (preview?.items || []).filter((i) => i.action === 'create');
   const updates = (preview?.items || []).filter((i) => i.action === 'update');
@@ -126,16 +128,10 @@ const PublishPromotionDialog: React.FC<PublishPromotionDialogProps> = ({
       <DialogTitle>Publish run</DialogTitle>
       <DialogContent dividers>
         {!hasAnalysis && (
-          <>
-            <Alert severity="warning" sx={{ mb: 2 }}>
-              No analysis is associated with this run. Publishing will <strong>not</strong> write
-              Tests or Results from imported instrument data.
-            </Alert>
-            <DialogContentText>
-              Continue only if this is intentional (e.g. non-reportable plate QC). You can cancel
-              and leave the run in complete status.
-            </DialogContentText>
-          </>
+          <Alert severity="error" sx={{ mb: 2 }}>
+            Analysis is required. Associate an analysis on the run before publishing. There is no
+            non-reportable publish path.
+          </Alert>
         )}
 
         {hasAnalysis && (

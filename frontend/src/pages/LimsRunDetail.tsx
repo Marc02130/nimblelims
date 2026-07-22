@@ -55,13 +55,13 @@ const apiErrorMsg = (err: any, fallback: string): string => {
   return fallback;
 };
 
-const isAnalysisAckError = (err: any): boolean => {
+const isAnalysisRequiredError = (err: any): boolean => {
   const detail = err?.response?.data?.detail;
   return (
     err?.response?.status === 400 &&
     detail &&
     typeof detail === 'object' &&
-    detail.code === 'analysis_required_ack'
+    (detail.code === 'analysis_required' || detail.code === 'analysis_required_ack')
   );
 };
 
@@ -174,15 +174,11 @@ const LimsRunDetail: React.FC = () => {
   }, [activeTab, runId]);
 
   const handleAnalysisChange = async (analysisId: string) => {
-    if (!runId) return;
+    if (!runId || !analysisId) return;
     setSavingAnalysis(true);
     setError(null);
     try {
-      const data =
-        analysisId === ''
-          ? { clear_analysis: true }
-          : { analysis_id: analysisId };
-      const updated = await apiService.updateLimsRun(runId, data);
+      const updated = await apiService.updateLimsRun(runId, { analysis_id: analysisId });
       setRun(updated);
     } catch (err: any) {
       setError(apiErrorMsg(err, 'Failed to update analysis'));
@@ -191,18 +187,20 @@ const LimsRunDetail: React.FC = () => {
     }
   };
 
-  const doStart = async (acknowledgeNoAnalysis: boolean) => {
+  const doStart = async () => {
     if (!runId) return;
+    if (!run?.analysis_id) {
+      setNoAnalysisDialog(true);
+      return;
+    }
     setTransitioning(true);
     setError(null);
     try {
-      await apiService.startLimsRun(runId, {
-        acknowledge_no_analysis: acknowledgeNoAnalysis,
-      });
+      await apiService.startLimsRun(runId);
       setNoAnalysisDialog(false);
       await loadRun();
     } catch (err: any) {
-      if (isAnalysisAckError(err)) {
+      if (isAnalysisRequiredError(err)) {
         setNoAnalysisDialog(true);
       } else {
         setError(apiErrorMsg(err, 'Failed to start run'));
@@ -246,13 +244,9 @@ const LimsRunDetail: React.FC = () => {
       setPublishPreview(null);
       const created = publishPreview?.create_count ?? 0;
       const updated = publishPreview?.update_count ?? 0;
-      if (run?.analysis_id) {
-        setSuccessMsg(
-          `Published. Results: ${created} created, ${updated} updated.`,
-        );
-      } else {
-        setSuccessMsg('Published (no analysis — no Tests/Results written).');
-      }
+      setSuccessMsg(
+        `Published. Results: ${created} created, ${updated} updated.`,
+      );
       await loadRun();
     } catch (err: any) {
       const status = err?.response?.status;
@@ -273,7 +267,7 @@ const LimsRunDetail: React.FC = () => {
   ) => {
     if (!runId) return;
     if (action === 'start') {
-      await doStart(false);
+      await doStart();
       return;
     }
     if (action === 'publish') {
@@ -341,7 +335,7 @@ const LimsRunDetail: React.FC = () => {
         {run.analysis_id ? (
           <Chip size="small" color="primary" variant="outlined" label={`Analysis: ${analysisName}`} />
         ) : (
-          <Chip size="small" variant="outlined" label="No analysis (non-reportable)" />
+          <Chip size="small" color="warning" variant="outlined" label="Analysis required" />
         )}
       </Box>
       {run.description && (
@@ -453,22 +447,31 @@ const LimsRunDetail: React.FC = () => {
         <Card variant="outlined" sx={{ mt: 2 }}>
           <CardContent>
             <Typography variant="subtitle1" gutterBottom>
-              Analysis (reportable results)
+              Analysis (required)
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-              When an analysis is set and the run is published, imported data is written to Tests and
-              Results for each sample. Leave empty only for non-reportable runs (e.g. pure plate QC).
+              Every run must have an analysis. On publish, imported data is written to Tests and
+              Results for that assay. Data parsers must be linked to this analysis.
             </Typography>
-            <FormControl fullWidth size="small" sx={{ maxWidth: 400, mb: 2 }} disabled={!canEditAnalysis || savingAnalysis}>
+            <FormControl
+              fullWidth
+              size="small"
+              required
+              sx={{ maxWidth: 400, mb: 2 }}
+              disabled={!canEditAnalysis || savingAnalysis}
+            >
               <InputLabel>Analysis</InputLabel>
               <Select
                 label="Analysis"
                 value={run.analysis_id || ''}
+                displayEmpty
                 onChange={(e) => handleAnalysisChange(e.target.value as string)}
               >
-                <MenuItem value="">
-                  <em>None (non-reportable)</em>
-                </MenuItem>
+                {!run.analysis_id && (
+                  <MenuItem value="" disabled>
+                    <em>Select analysis…</em>
+                  </MenuItem>
+                )}
                 {analyses.map((a) => (
                   <MenuItem key={a.id} value={a.id}>
                     {a.name}
@@ -598,28 +601,28 @@ const LimsRunDetail: React.FC = () => {
       />
 
       <Dialog open={noAnalysisDialog} onClose={() => setNoAnalysisDialog(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>No analysis associated</DialogTitle>
+        <DialogTitle>Analysis required</DialogTitle>
         <DialogContent>
           <DialogContentText>
-            Data imported on this run will <strong>not</strong> be written to Tests and Results when
-            published, because no Analysis is associated.
+            Every LimsRun must have an <strong>Analysis</strong> before start, import, or publish.
+            There is no non-reportable path.
           </DialogContentText>
-          <DialogContentText sx={{ mt: 2 }}>
-            Associate an existing analysis, create one (and analytes) under Admin, or continue
-            without analysis for a non-reportable run.
-          </DialogContentText>
-          <FormControl fullWidth size="small" sx={{ mt: 2 }}>
+          <FormControl fullWidth size="small" sx={{ mt: 2 }} required>
             <InputLabel>Associate analysis</InputLabel>
             <Select
               label="Associate analysis"
               value={run.analysis_id || ''}
+              displayEmpty
               onChange={async (e) => {
-                await handleAnalysisChange(e.target.value as string);
+                const v = e.target.value as string;
+                if (v) await handleAnalysisChange(v);
               }}
             >
-              <MenuItem value="">
-                <em>None</em>
-              </MenuItem>
+              {!run.analysis_id && (
+                <MenuItem value="" disabled>
+                  <em>Select analysis…</em>
+                </MenuItem>
+              )}
               {analyses.map((a) => (
                 <MenuItem key={a.id} value={a.id}>
                   {a.name}
@@ -631,21 +634,13 @@ const LimsRunDetail: React.FC = () => {
         <DialogActions sx={{ flexWrap: 'wrap', gap: 1 }}>
           <Button onClick={() => setNoAnalysisDialog(false)}>Cancel</Button>
           <Button onClick={() => navigate('/admin/analyses')}>Create / manage analyses</Button>
-          <Button onClick={() => navigate('/admin/analytes')}>Manage analytes</Button>
-          {run.analysis_id ? (
-            <Button variant="contained" disabled={transitioning} onClick={() => doStart(false)}>
-              Start with analysis
-            </Button>
-          ) : (
-            <Button
-              variant="contained"
-              color="warning"
-              disabled={transitioning}
-              onClick={() => doStart(true)}
-            >
-              Continue without analysis
-            </Button>
-          )}
+          <Button
+            variant="contained"
+            disabled={transitioning || !run.analysis_id}
+            onClick={() => doStart()}
+          >
+            Start run
+          </Button>
         </DialogActions>
       </Dialog>
     </Box>
