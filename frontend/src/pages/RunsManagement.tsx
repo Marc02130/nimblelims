@@ -112,7 +112,7 @@ const RunsManagement: React.FC = () => {
   };
 
   const handleCreate = async () => {
-    if (!createName.trim() || !createTemplateId) return;
+    if (!createName.trim() || !createTemplateId || !createAnalysisId) return;
     setCreating(true);
     setError(null);
     try {
@@ -120,7 +120,7 @@ const RunsManagement: React.FC = () => {
         name: createName.trim(),
         description: createDesc.trim() || undefined,
         experiment_template_id: createTemplateId,
-        analysis_id: createAnalysisId || undefined,
+        analysis_id: createAnalysisId,
       });
       setShowCreate(false);
       setCreateName('');
@@ -275,16 +275,13 @@ const RunsManagement: React.FC = () => {
               ))}
             </Select>
           </FormControl>
-          <FormControl fullWidth size="small" sx={{ mt: 2 }}>
-            <InputLabel>Analysis (optional)</InputLabel>
+          <FormControl fullWidth size="small" sx={{ mt: 2 }} required>
+            <InputLabel>Analysis</InputLabel>
             <Select
               value={createAnalysisId}
-              label="Analysis (optional)"
+              label="Analysis"
               onChange={(e) => setCreateAnalysisId(e.target.value)}
             >
-              <MenuItem value="">
-                <em>None — non-reportable (no Tests/Results on publish)</em>
-              </MenuItem>
               {analyses.map((a) => (
                 <MenuItem key={a.id} value={a.id}>
                   {a.name}
@@ -292,6 +289,10 @@ const RunsManagement: React.FC = () => {
               ))}
             </Select>
           </FormControl>
+          <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 1 }}>
+            Template defines protocol and lifecycle. Analysis is required (assay for import and
+            promote-on-publish).
+          </Typography>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setShowCreate(false)} disabled={creating}>
@@ -300,7 +301,9 @@ const RunsManagement: React.FC = () => {
           <Button
             variant="contained"
             onClick={handleCreate}
-            disabled={!createName.trim() || !createTemplateId || creating}
+            disabled={
+              !createName.trim() || !createTemplateId || !createAnalysisId || creating
+            }
           >
             {creating ? 'Creating…' : 'Create'}
           </Button>
