@@ -1,8 +1,9 @@
 # Experiments Refactor — Checklist
 
-**Branch:** `refactor/experiments`  
-**Last updated:** 2026-07-11  
-**Primary requirements:** [`.docs/requirements/experiment-processes-entries.md`](../requirements/experiment-processes-entries.md)
+**Branch:** `refactor/experiments` / `run-results`  
+**Last updated:** 2026-07-28  
+**Primary requirements:** [`.docs/requirements/experiment-processes-entries.md`](../requirements/experiment-processes-entries.md)  
+**Template entries tech sketch (in review):** [`.docs/tech-sketch/experiment-template-entries.md`](../tech-sketch/experiment-template-entries.md)
 
 ## Status legend
 
@@ -133,9 +134,42 @@ Legacy `experiment_link` via `ExperimentDetail` **coexists** in Phase 1; no forc
 
 ---
 
+## Phase 4 — Template / experiment entries (ELN building blocks)
+
+**Gate:** **CLOSED (2026-07-29).** Lab Ops **Hold**. Do **not** implement until Lab Ops Accept and Q17–Q22 resolved enough for P0.  
+**Packet:** [tech-sketch/experiment-template-entries.md](../tech-sketch/experiment-template-entries.md)  
+**Lab ops:** [lab-ops-review/experiment-template-entries.md](../lab-ops-review/experiment-template-entries.md)
+
+### Reviews
+
+| Review | Status | Note |
+|--------|--------|------|
+| **Lab Ops (SVP)** | **Hold / Revise** | Entry catalog, aliquot derivatives, plates, materials, submit/lock |
+| CEO | Accept (tech only) | Not sufficient implement gate alone |
+| UI | Accept (tech only) | — |
+| Architecture | Accept (tech only) | Substrate OK; product incomplete |
+| Security | Accept (tech only) | Revisit after catalog locks |
+
+### Before re-open (Lab Ops §6)
+
+- [ ] Lab workflow brief: 2–3 target SOPs (steps + entry kinds)
+- [ ] Entry catalog v1 in requirements (P0/P1/P2 kinds + behaviors)
+- [ ] Q8 / Q22 process sample population decision
+- [ ] Q18 aliquot creates children vs plan-only
+- [ ] Q20 entry complete/unlock rules
+- [ ] Lab Ops re-review → Accept or Accept with conditions
+- [ ] Then P0 eng tasks (sample_table engine + first OOTB kinds)
+
+### P0 eng (blocked — do not start)
+
+- [ ] *(blocked)* Types / columns / row_source / grid API / Tables & forms UI
+- [ ] *(blocked)* First OOTB kinds from catalog (not only generic tables)
+
+---
+
 ## Open questions
 
-**Canonical doc (not this checklist):** [`.docs/manuals/experiments.md`](../manuals/experiments.md)
+**Canonical decision log:** [`.docs/open-questions/experiments.md`](../open-questions/experiments.md)
 
 Rule: no new phase / major feature until blocking questions for that work are resolved. See `AGENTS.md` → *Open questions gate*.
 
@@ -147,14 +181,20 @@ Rule: no new phase / major feature until blocking questions for that work are re
 |-----|------|
 | [open-questions/experiments.md](../open-questions/experiments.md) | **Open questions + decisions** |
 | [requirements/experiment-processes-entries.md](../requirements/experiment-processes-entries.md) | Consolidated requirements |
+| [tech-sketch/experiment-template-entries.md](../tech-sketch/experiment-template-entries.md) | Template entries how (**Lab Ops Hold**) |
+| [lab-ops-review/experiment-template-entries.md](../lab-ops-review/experiment-template-entries.md) | **SVP Lab Ops** review |
+| [lab-ops-review/README.md](../lab-ops-review/README.md) | Lab ops review role |
+| [schema-changes/experiment-template-entries.md](../schema-changes/experiment-template-entries.md) | Schema delta (P0: mostly none) |
 | [manuals/processes.md](../manuals/processes.md) | Process concept |
 | [manuals/experiments.md](../manuals/experiments.md) | ELN Experiments |
 | [manuals/lims-runs.md](../manuals/lims-runs.md) | LIMS Runs boundary |
 | [design/gap-analysis-…](../design/gap-analysis-process-and-experiment.md) | Gaps |
 | [experiment-rework-prerequisites.md](experiment-rework-prerequisites.md) | Pre-rework issues |
-| [ceo-review/process-and-experiment.md](../ceo-review/process-and-experiment.md) | CEO review |
-| [ui-review/process-and-experiment.md](../ui-review/process-and-experiment.md) | UI review |
-| [security-review/process-and-experiment.md](../security-review/process-and-experiment.md) | Security review |
+| [ceo-review/process-and-experiment.md](../ceo-review/process-and-experiment.md) | CEO review (Phase 1–3) |
+| [ceo-review/experiment-template-entries.md](../ceo-review/experiment-template-entries.md) | CEO review (template entries) |
+| [ui-review/experiment-template-entries.md](../ui-review/experiment-template-entries.md) | UI review (template entries) |
+| [architecture-review/experiment-template-entries.md](../architecture-review/experiment-template-entries.md) | Architecture review |
+| [security-review/experiment-template-entries.md](../security-review/experiment-template-entries.md) | Security review |
 | [design/experiment-planning.md](../design/experiment-planning.md) | Chunk 1–2 history |
 | [Docs index](../README.md) | Full documentation map |
 
@@ -174,3 +214,6 @@ Rule: no new phase / major feature until blocking questions for that work are re
 | 2026-07-11 | Decision #7: progress visibility sample-scoped (no cross-client) |
 | 2026-07-11 | Decision #1: typed process steps (C) + 1a–1g + 1h-A hybrid in Phase 3 v1 |
 | 2026-07-11 | **Phase 3 shipped:** migration 0051, definitions API, typed start-step, soft advance, sample journey, Processes UI + journey on sample dialog |
+| 2026-07-28 | **Phase 4 packet ready for review:** template Entries authoring + sample roster tech sketch, schema-changes, CEO/UI/arch/security review stubs, Q11–Q14 |
+| 2026-07-29 | Phase 4 tech reviews Accept; then **Lab Ops Hold** — implement gate closed; Q17–Q22; process + lab-ops-review role added |
+| 2026-07-29 | SVP Lab Ops review written; Sapio Experiments Guide used as competitive floor; slow-down on ELN entry rush |
