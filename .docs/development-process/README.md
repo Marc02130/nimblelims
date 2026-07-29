@@ -19,7 +19,8 @@ Requirements
     ↓
 Tech sketch                          ← how (lightweight)
     ↓
-Reviews (parallel when possible)
+Reviews (parallel when possible; see lab-ops gate below)
+    ├── Lab operations (SVP Lab Ops)   ← required for ELN/LIMS lab workflows
     ├── CEO / product
     ├── Security
     ├── UI design
@@ -77,6 +78,7 @@ Tiny/small must **not** skip security or product decisions on sensitive changes 
 | **Requirements** | FR/NFR, phases, acceptance criteria, review packet links | [`.docs/requirements/`](../requirements/) |
 | **Tech sketch** | Lightweight *how*: APIs, engine, flows (may draft model) | [`.docs/tech-sketch/`](../tech-sketch/) |
 | **Schema changes** | **Authoritative DB delta for this cycle** (architecture verifies here) | [`.docs/schema-changes/`](../schema-changes/) |
+| **Lab operations review** | **Target-customer lab workflows** (SVP Lab Ops persona); required for ELN/experiments/processes/runs | [`.docs/lab-ops-review/`](../lab-ops-review/) |
 | **CEO review** | Scope, MVP cut, priority | [`.docs/ceo-review/`](../ceo-review/) |
 | **Security review** | Trust boundaries, STRIDE, authZ, AI/data | [`.docs/security-review/`](../security-review/) |
 | **UI design review** | Personas, flows, empty states | [`.docs/ui-review/`](../ui-review/) |
@@ -92,6 +94,18 @@ Tiny/small must **not** skip security or product decisions on sensitive changes 
 **Naming:** same feature stem across docs when possible, e.g. `data-parsers-lims-runs.md`, `uat-data-parsers-lims-runs.md`.
 
 **Do not** leave feature docs at `.docs/` root. Do not invent parallel process trees.
+
+### Lab operations gate (slow down when it matters)
+
+For work that changes **how labs run experiments, processes, samples, plates, or instrument runs**:
+
+1. **Do not treat eng/product Accept alone as implement clearance.**  
+2. **Lab ops review is required** ([lab-ops-review/README.md](../lab-ops-review/README.md)). Persona: SVP Lab Ops (biology PhD, chemistry/sequencing, decades biotech/pharma).  
+3. Lab ops may **Revise / Hold** and send work **back** to requirements or tech sketch—even if architecture already accepted a schema shape.  
+4. Prefer a **first lab ops pass early** (after sketch exists) so we do not polish the wrong abstraction.  
+5. Competitive/reference manuals (e.g. Sapio Experiments Guide under `manuals/`) inform catalog depth; we do not copy blindly.
+
+**Anti-pattern:** Rapid rename cycles + “Accept with conditions” from four tech reviews while the lab entry catalog is still undefined. That is rushing.
 
 ### Tech sketch vs schema-changes vs architecture review
 

@@ -19,6 +19,7 @@ All product and engineering docs live under this directory, organized by purpose
 | [`ui-review/`](ui-review/) | UI / UX reviews |
 | [`architecture-review/`](architecture-review/) | Architecture design reviews |
 | [`security-review/`](security-review/) | Security reviews |
+| [`lab-ops-review/`](lab-ops-review/) | **SVP Lab Ops** — target-customer lab workflows (required for ELN/experiments) |
 | [`ideas/`](ideas/) | Exploratory notes — not commitments |
 | `private/` | Local-only materials (gitignored) |
 
@@ -67,6 +68,11 @@ All product and engineering docs live under this directory, organized by purpose
 
 Lightweight *how* (see [tech-sketch/README.md](tech-sketch/README.md)). Feature sketches land here after requirements, before architecture review.
 
+| Cycle | Doc | Status |
+|-------|-----|--------|
+| data-parsers-lims-runs | [tech-sketch/data-parsers-lims-runs.md](tech-sketch/data-parsers-lims-runs.md) | Accepted |
+| experiment-template-entries | [tech-sketch/experiment-template-entries.md](tech-sketch/experiment-template-entries.md) | **Hold** — Lab Ops revise (2026-07-29) |
+
 ## Schema changes (per cycle)
 
 **Single place** for “what migrations does this feature need?” — [schema-changes/README.md](schema-changes/README.md).  
@@ -75,6 +81,7 @@ Do not confuse with the platform Field Management design ([design/schema-evoluti
 | Cycle | Doc |
 |-------|-----|
 | data-parsers-lims-runs | [schema-changes/data-parsers-lims-runs.md](schema-changes/data-parsers-lims-runs.md) |
+| experiment-template-entries | [schema-changes/experiment-template-entries.md](schema-changes/experiment-template-entries.md) |
 
 ## Design (long-form)
 
