@@ -47,6 +47,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { apiService } from '../services/apiService';
 import { useUser } from '../contexts/UserContext';
 import EntryCapturePanel from '../components/experiments/EntryCapturePanel';
+import StartCohortPanel from '../components/experiments/StartCohortPanel';
 import { FillHeightPage, FillHeightTable } from '../components/common/FillHeightPage';
 
 const apiErrorMsg = (err: any, fallback: string): string => {
@@ -463,6 +464,17 @@ const ExperimentsManagement: React.FC = () => {
         {activeTab === 1 && (
           <Card variant="outlined" sx={{ mt: 2 }}>
             <CardContent>
+              <StartCohortPanel
+                experimentId={selectedExperiment.id}
+                startedAt={selectedExperiment.started_at}
+                existingSampleIds={(selectedExperiment.sample_executions || []).map(
+                  (ex) => ex.sample_id,
+                )}
+                canEdit={canManage}
+                onStarted={() => {
+                  void loadExperimentDetail(selectedExperiment.id);
+                }}
+              />
               <Typography variant="h6" sx={{ mb: 2 }}>
                 Sample Executions
               </Typography>

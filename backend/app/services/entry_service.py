@@ -38,6 +38,7 @@ from models.entry import (
     ENTRY_TYPES,
     SAMPLE_WRITE_BACK_COLUMNS,
     SAMPLE_SYSTEM_FIELDS,
+    PREDEFINED_ENTRY_DEFAULTS,
     normalize_entry_type,
     is_sample_scoped_entry,
     is_experiment_scoped_entry,
@@ -215,14 +216,20 @@ class EntryService:
         for i, raw in enumerate(decls):
             if not isinstance(raw, dict):
                 continue
-            entry_type = raw.get('entry_type') or 'experiment_data'
+            predef_key = raw.get('predefined_entry_key')
+            defaults = PREDEFINED_ENTRY_DEFAULTS.get(predef_key) if predef_key else None
+            entry_type = raw.get('entry_type') or (defaults or {}).get('entry_type') or 'experiment_data'
             if entry_type not in ENTRY_TYPES:
                 continue
             entry_type = normalize_entry_type(entry_type)
-            name = raw.get('name') or f'Entry {i + 1}'
+            name = raw.get('name') or (defaults or {}).get('name') or f'Entry {i + 1}'
             fields = raw.get('fields') or []
-            config = dict(raw.get('config') or {})
+            config = dict((defaults or {}).get('config') or {})
+            config.update(raw.get('config') or {})
             config.setdefault('status', 'draft')
+            description = raw.get('description')
+            if description is None and defaults:
+                description = defaults.get('description')
             # Prefer columns[] sample_field keys into config for grid RO fields
             columns = raw.get('columns') or []
             sample_field_keys = [
@@ -235,8 +242,8 @@ class EntryService:
                 experiment_id=experiment_id,
                 entry_type=entry_type,
                 name=name,
-                description=raw.get('description'),
-                predefined_entry_key=raw.get('predefined_entry_key'),
+                description=description,
+                predefined_entry_key=predef_key,
                 sort_order=int(raw.get('sort_order', i)),
                 config=config,
                 process_step_id=data.process_step_id,

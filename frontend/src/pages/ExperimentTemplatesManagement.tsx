@@ -205,6 +205,67 @@ const blankEntry = (sortOrder = 0): TemplateEntryDeclaration => ({
   fields: [],
 });
 
+const PREDEFINED_PRESETS: {
+  key: string;
+  label: string;
+  entry: Omit<TemplateEntryDeclaration, 'sort_order'>;
+}[] = [
+  {
+    key: 'experiment_header',
+    label: 'Header',
+    entry: {
+      entry_type: 'experiment_data',
+      name: 'Experiment header',
+      description: 'Start context for the experiment',
+      predefined_entry_key: 'experiment_header',
+      fields: [],
+    },
+  },
+  {
+    key: 'samples',
+    label: 'Samples',
+    entry: {
+      entry_type: 'experiment_sample_data',
+      name: 'Samples',
+      description: 'Cohort selected at experiment start (queue / scan)',
+      predefined_entry_key: 'samples',
+      config: {
+        sample_columns: [
+          'client_sample_id',
+          'specimen_biotype_id',
+          'received_date',
+          'sample_type',
+          'status',
+        ],
+      },
+      fields: [],
+    },
+  },
+  {
+    key: 'aliquot_pool_plan',
+    label: 'Aliquot/pool plan',
+    entry: {
+      entry_type: 'experiment_data',
+      name: 'Aliquot / pool plan',
+      description: 'Plan amounts; execute creates dest samples (methods in v1)',
+      predefined_entry_key: 'aliquot_pool_plan',
+      fields: [],
+    },
+  },
+  {
+    key: 'aliquots_pools',
+    label: 'Aliquots/pools results',
+    entry: {
+      entry_type: 'experiment_sample_data',
+      name: 'Aliquots / pools',
+      description: 'Post-execute view of resulting samples',
+      predefined_entry_key: 'aliquots_pools',
+      config: { sample_columns: ['client_sample_id'] },
+      fields: [],
+    },
+  },
+];
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 const ExperimentTemplatesManagement: React.FC = () => {
@@ -1427,15 +1488,35 @@ const ExperimentTemplatesManagement: React.FC = () => {
               })}
             </Box>
 
-            <Button
-              startIcon={<Add />}
-              onClick={addEntry}
-              variant="outlined"
-              size="small"
-              sx={{ mt: 2 }}
-            >
-              Add table / form
-            </Button>
+            <Box sx={{ mt: 2, display: 'flex', flexWrap: 'wrap', gap: 1, alignItems: 'center' }}>
+              <Button startIcon={<Add />} onClick={addEntry} variant="outlined" size="small">
+                Add table / form
+              </Button>
+              <Typography variant="body2" color="text.secondary" sx={{ mx: 0.5 }}>
+                Presets:
+              </Typography>
+              {PREDEFINED_PRESETS.map((p) => {
+                const already = (formDef.entries ?? []).some(
+                  (e) => e.predefined_entry_key === p.key,
+                );
+                return (
+                  <Button
+                    key={p.key}
+                    size="small"
+                    variant="text"
+                    disabled={already}
+                    onClick={() =>
+                      setEntries([
+                        ...(formDef.entries ?? []),
+                        { ...p.entry, sort_order: (formDef.entries ?? []).length },
+                      ])
+                    }
+                  >
+                    + {p.label}
+                  </Button>
+                );
+              })}
+            </Box>
           </TabPanel>
 
           {formError && (

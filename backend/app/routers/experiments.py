@@ -32,6 +32,10 @@ from app.schemas.experiment import (
     ExperimentLineageRead,
     GetSampleExperimentsResponse,
     SampleExperimentEntry,
+    ResolveScanRequest,
+    ResolveScanResponse,
+    StartExperimentRequest,
+    StartExperimentResponse,
 )
 from models.user import User
 
@@ -152,6 +156,18 @@ def list_experiments(
     )
 
 
+@experiments_router.post(
+    "/resolve-scan",
+    response_model=ResolveScanResponse,
+)
+def resolve_scan(
+    data: ResolveScanRequest,
+    service: ExperimentService = Depends(get_experiment_service),
+):
+    """Resolve plate/tube barcode (container name) or client_sample_id to samples for queue start."""
+    return service.resolve_scan(data)
+
+
 @experiments_router.get("/{experiment_id}", response_model=ExperimentRead)
 def get_experiment(
     experiment_id: UUID,
@@ -205,9 +221,23 @@ def link_sample_to_experiment(
     data: LinkSampleToExperimentRequest,
     service: ExperimentService = Depends(get_experiment_service),
 ):
-    """Link a sample (or aliquot) to an experiment with role, processing_conditions, replicate_number."""
+    """Link a sample (or aliquot) to an experiment with role, processing_conditions, replicate_number.
+    Rejected after experiment start (cohort locked)."""
     ex = service.link_sample_to_experiment(experiment_id, data)
     return ExperimentSampleExecutionRead.model_validate(ex)
+
+
+@experiments_router.post(
+    "/{experiment_id}/start",
+    response_model=StartExperimentResponse,
+)
+def start_experiment(
+    experiment_id: UUID,
+    data: StartExperimentRequest,
+    service: ExperimentService = Depends(get_experiment_service),
+):
+    """Select cohort (1..N samples) and start experiment. Cohort is fixed after start."""
+    return service.start_experiment(experiment_id, data)
 
 
 # ---------- Add experiment detail step ----------
