@@ -156,10 +156,12 @@ Legacy `experiment_link` via `ExperimentDetail` **coexists** in Phase 1; no forc
 
 ### P0 eng (open)
 
-- [ ] Types + grid/export/save/submit APIs
-- [ ] Write-back map (submit only, config-eligible targets)
+- [x] Types + grid/export/save/submit APIs (`experiment_sample_data` / `experiment_data` + aliases)
+- [x] Write-back map (submit only, SAMPLE_WRITE_BACK_COLUMNS allowlist)
+- [x] Template UI: Tables & forms tab (entries, columns, sample RO fields, write-back map)
+- [x] Capture UI: Save (draft) + Submit (write-back) on EntryCapturePanel
 - [ ] Queue + scan plate/tube + start experiment/run
-- [ ] Template UI: entries, columns, deps, **all** aliquot methods
+- [ ] Template UI: deps + **all** aliquot methods
 - [ ] Aliquot/pool plan + execute (transaction) + results
 - [ ] Header + Samples predefined
 - [ ] Tests + UAT spine demo

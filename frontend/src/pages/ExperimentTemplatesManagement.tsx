@@ -56,6 +56,89 @@ interface TransferStep {
   mandatory_review: boolean;
 }
 
+/** Declared on template_definition.entries — instantiated on experiment create. */
+interface TemplateEntryField {
+  field_definition_id: string;
+  sort_order?: number;
+  visible?: boolean;
+  write_back_target?: string | null;
+}
+
+interface TemplateEntryDeclaration {
+  entry_type:
+    | 'experiment_sample_data'
+    | 'experiment_data'
+    | 'predefined_action'
+    | 'display_table'
+    | 'sample_data'
+    | 'experiment_detail';
+  name: string;
+  description?: string;
+  predefined_entry_key?: string;
+  sort_order?: number;
+  config?: {
+    sample_columns?: string[];
+    status?: string;
+    [key: string]: unknown;
+  };
+  fields?: TemplateEntryField[];
+}
+
+interface FieldDefOption {
+  id: string;
+  name: string;
+  display_name?: string | null;
+  data_type: string;
+  entity_type?: string;
+}
+
+const ENTRY_TYPE_OPTIONS: {
+  value: TemplateEntryDeclaration['entry_type'];
+  label: string;
+  helper: string;
+}[] = [
+  {
+    value: 'experiment_sample_data',
+    label: 'Sample data',
+    helper: 'One row per sample in the experiment cohort',
+  },
+  {
+    value: 'experiment_data',
+    label: 'Experiment data',
+    helper: 'Purpose table/form — rows not auto from full cohort',
+  },
+  {
+    value: 'predefined_action',
+    label: 'Predefined action',
+    helper: 'OOB behavior (aliquot/pool, etc.)',
+  },
+  {
+    value: 'display_table',
+    label: 'Display table',
+    helper: 'Read-only structured display',
+  },
+];
+
+const SAMPLE_COLUMN_OPTIONS = [
+  { key: 'client_sample_id', label: 'Client Sample ID' },
+  { key: 'received_date', label: 'Received date' },
+  { key: 'date_sampled', label: 'Date sampled' },
+  { key: 'specimen_biotype_id', label: 'Biotype' },
+  { key: 'sample_type', label: 'Sample type' },
+  { key: 'status', label: 'Status' },
+  { key: 'matrix', label: 'Matrix' },
+  { key: 'temperature', label: 'Temperature' },
+];
+
+/** Config-eligible Sample columns for write-back on Submit only. */
+const WRITE_BACK_TARGETS = [
+  { value: '', label: 'None' },
+  { value: 'specimen_biotype_id', label: 'Sample.specimen_biotype_id' },
+  { value: 'temperature', label: 'Sample.temperature' },
+  { value: 'due_date', label: 'Sample.due_date' },
+  { value: 'report_date', label: 'Sample.report_date' },
+];
+
 interface TemplateDefinition {
   experiment_name: string;
   description?: string;
@@ -65,6 +148,8 @@ interface TemplateDefinition {
   result_columns: Record<string, unknown>[];
   acceptance_criteria?: string;
   mandatory_review_count: number;
+  /** Tables & forms — ELN entry places (P0) */
+  entries?: TemplateEntryDeclaration[];
 }
 
 interface ExperimentTemplateRow {
@@ -108,6 +193,16 @@ const blankDefinition = (): TemplateDefinition => ({
   result_columns: [],
   acceptance_criteria: '',
   mandatory_review_count: 0,
+  entries: [],
+});
+
+const blankEntry = (sortOrder = 0): TemplateEntryDeclaration => ({
+  entry_type: 'experiment_sample_data',
+  name: '',
+  description: '',
+  sort_order: sortOrder,
+  config: { sample_columns: ['client_sample_id'] },
+  fields: [],
 });
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -127,7 +222,7 @@ const ExperimentTemplatesManagement: React.FC = () => {
   const [formOpen, setFormOpen] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<ExperimentTemplateRow | null>(null);
   const [activeTab, setActiveTab] = useState(0);
-  const [tabErrors, setTabErrors] = useState<boolean[]>([false, false, false, false]);
+  const [tabErrors, setTabErrors] = useState<boolean[]>([false, false, false, false, false]);
   const [formSubmitting, setFormSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -139,6 +234,7 @@ const ExperimentTemplatesManagement: React.FC = () => {
 
   // Form fields — template_definition
   const [formDef, setFormDef] = useState<TemplateDefinition>(blankDefinition());
+  const [fieldDefOptions, setFieldDefOptions] = useState<FieldDefOption[]>([]);
 
   // Delete dialog state
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -188,6 +284,16 @@ const ExperimentTemplatesManagement: React.FC = () => {
     loadTemplates();
   }, []);
 
+  const loadFieldDefinitions = async () => {
+    try {
+      const data = await apiService.getFieldDefinitions({ active: true, page: 1, size: 200 });
+      const items: FieldDefOption[] = data?.items ?? data?.field_definitions ?? (Array.isArray(data) ? data : []);
+      setFieldDefOptions(items);
+    } catch {
+      setFieldDefOptions([]);
+    }
+  };
+
   // ── Form helpers ─────────────────────────────────────────────────────────
 
   const openCreate = () => {
@@ -198,9 +304,10 @@ const ExperimentTemplatesManagement: React.FC = () => {
     setFormLifecycleType('standard');
     setFormDef(blankDefinition());
     setActiveTab(0);
-    setTabErrors([false, false, false, false]);
+    setTabErrors([false, false, false, false, false]);
     setFormError(null);
     setFormOpen(true);
+    void loadFieldDefinitions();
   };
 
   const openEdit = (row: ExperimentTemplateRow) => {
@@ -212,19 +319,96 @@ const ExperimentTemplatesManagement: React.FC = () => {
     setFormDef({
       ...blankDefinition(),
       ...row.template_definition,
+      entries: row.template_definition?.entries ?? [],
     });
     setActiveTab(0);
-    setTabErrors([false, false, false, false]);
+    setTabErrors([false, false, false, false, false]);
     setFormError(null);
     setFormOpen(true);
+    void loadFieldDefinitions();
   };
 
   const validateForm = (): { valid: boolean; tabErrors: boolean[] } => {
-    const errors = [false, false, false, false];
+    const errors = [false, false, false, false, false];
     if (!formName.trim() || !formDef.experiment_name.trim()) {
       errors[0] = true;
     }
+    const entries = formDef.entries ?? [];
+    for (const e of entries) {
+      if (!e.name?.trim() || !e.entry_type) {
+        errors[4] = true;
+        break;
+      }
+    }
     return { valid: !errors.some(Boolean), tabErrors: errors };
+  };
+
+  // ── Entry (Tables & forms) helpers ───────────────────────────────────────
+
+  const entriesList = formDef.entries ?? [];
+
+  const setEntries = (entries: TemplateEntryDeclaration[]) => {
+    setFormDef((d) => ({
+      ...d,
+      entries: entries.map((e, i) => ({ ...e, sort_order: e.sort_order ?? i })),
+    }));
+  };
+
+  const addEntry = () => {
+    setEntries([...entriesList, blankEntry(entriesList.length)]);
+  };
+
+  const updateEntry = (index: number, patch: Partial<TemplateEntryDeclaration>) => {
+    const updated = entriesList.map((e, i) => (i === index ? { ...e, ...patch } : e));
+    setEntries(updated);
+  };
+
+  const removeEntry = (index: number) => {
+    setEntries(entriesList.filter((_, i) => i !== index));
+  };
+
+  const addEntryField = (entryIndex: number, fieldDefinitionId: string) => {
+    if (!fieldDefinitionId) return;
+    const entry = entriesList[entryIndex];
+    const fields = [...(entry.fields || [])];
+    if (fields.some((f) => f.field_definition_id === fieldDefinitionId)) return;
+    fields.push({
+      field_definition_id: fieldDefinitionId,
+      sort_order: fields.length,
+      visible: true,
+      write_back_target: null,
+    });
+    updateEntry(entryIndex, { fields });
+  };
+
+  const updateEntryField = (
+    entryIndex: number,
+    fieldIndex: number,
+    patch: Partial<TemplateEntryField>,
+  ) => {
+    const entry = entriesList[entryIndex];
+    const fields = (entry.fields || []).map((f, i) => (i === fieldIndex ? { ...f, ...patch } : f));
+    updateEntry(entryIndex, { fields });
+  };
+
+  const removeEntryField = (entryIndex: number, fieldIndex: number) => {
+    const entry = entriesList[entryIndex];
+    const fields = (entry.fields || []).filter((_, i) => i !== fieldIndex);
+    updateEntry(entryIndex, { fields });
+  };
+
+  const toggleSampleColumn = (entryIndex: number, key: string) => {
+    const entry = entriesList[entryIndex];
+    const current = entry.config?.sample_columns || [];
+    const next = current.includes(key) ? current.filter((k) => k !== key) : [...current, key];
+    updateEntry(entryIndex, {
+      config: { ...(entry.config || {}), sample_columns: next },
+    });
+  };
+
+  const fieldLabel = (id: string) => {
+    const fd = fieldDefOptions.find((f) => f.id === id);
+    return fd?.display_name || fd?.name || id.slice(0, 8);
   };
 
   const handleSave = async () => {
@@ -739,12 +923,17 @@ const ExperimentTemplatesManagement: React.FC = () => {
               {tabErrors[1] && <div>Tab 2 (Protocol Steps): Check for empty steps.</div>}
               {tabErrors[2] && <div>Tab 3 (Transfer Steps): Check step entries.</div>}
               {tabErrors[3] && <div>Tab 4 (Result Columns): Check column entries.</div>}
+              {tabErrors[4] && (
+                <div>Tab 5 (Tables &amp; forms): Each entry needs a name and type.</div>
+              )}
             </Alert>
           )}
 
           <Tabs
             value={activeTab}
             onChange={(_, v) => setActiveTab(v)}
+            variant="scrollable"
+            scrollButtons="auto"
             sx={{ borderBottom: 1, borderColor: 'divider' }}
           >
             <Tab
@@ -756,6 +945,12 @@ const ExperimentTemplatesManagement: React.FC = () => {
             <Tab label="Protocol Steps" />
             <Tab label="Transfer Steps" />
             <Tab label="Result Columns" />
+            <Tab
+              label="Tables & forms"
+              sx={{ color: tabErrors[4] ? 'error.main' : undefined }}
+              icon={tabErrors[4] ? <span style={{ color: 'red', fontSize: 10 }}>●</span> : undefined}
+              iconPosition="end"
+            />
           </Tabs>
 
           {/* Tab 1: Basic Info */}
@@ -1019,6 +1214,228 @@ const ExperimentTemplatesManagement: React.FC = () => {
                 Add Column
               </Button>
             </Box>
+          </TabPanel>
+
+          {/* Tab 5: Tables & forms (ELN entries) */}
+          <TabPanel value={activeTab} index={4}>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              Pre-configured capture places for experiments created from this template. Instantiated
+              automatically on experiment create. <strong>Sample data</strong> = one row per cohort
+              sample; <strong>Experiment data</strong> = purpose table/form (plans, headers). Write-back
+              targets apply on <strong>Submit</strong> only (not Save).
+            </Typography>
+
+            {(formDef.entries ?? []).length === 0 && (
+              <Alert severity="info" sx={{ mb: 2 }}>
+                No tables or forms yet. Add at least one entry if this template should capture structured
+                data (or leave empty for transfer/protocol-only templates).
+              </Alert>
+            )}
+
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              {(formDef.entries ?? []).map((entry, ei) => {
+                const isSample =
+                  entry.entry_type === 'experiment_sample_data' || entry.entry_type === 'sample_data';
+                const usedFieldIds = new Set((entry.fields || []).map((f) => f.field_definition_id));
+                const availableFields = fieldDefOptions.filter((f) => !usedFieldIds.has(f.id));
+
+                return (
+                  <Box
+                    key={ei}
+                    sx={{
+                      border: 1,
+                      borderColor: 'divider',
+                      borderRadius: 1,
+                      p: 2,
+                    }}
+                  >
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        gap: 1,
+                        flexWrap: 'wrap',
+                        alignItems: 'flex-start',
+                        mb: 1,
+                      }}
+                    >
+                      <TextField
+                        size="small"
+                        required
+                        label="Entry name"
+                        value={entry.name}
+                        onChange={(e) => updateEntry(ei, { name: e.target.value })}
+                        error={tabErrors[4] && !entry.name.trim()}
+                        sx={{ minWidth: 180, flex: 1 }}
+                      />
+                      <FormControl size="small" sx={{ minWidth: 200 }}>
+                        <InputLabel>Type</InputLabel>
+                        <Select
+                          label="Type"
+                          value={entry.entry_type}
+                          onChange={(e) =>
+                            updateEntry(ei, {
+                              entry_type: e.target.value as TemplateEntryDeclaration['entry_type'],
+                            })
+                          }
+                        >
+                          {ENTRY_TYPE_OPTIONS.map((opt) => (
+                            <MenuItem key={opt.value} value={opt.value}>
+                              {opt.label}
+                            </MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
+                      {entry.entry_type === 'predefined_action' && (
+                        <TextField
+                          size="small"
+                          label="Predefined key"
+                          placeholder="e.g. aliquot_pool"
+                          value={entry.predefined_entry_key ?? ''}
+                          onChange={(e) =>
+                            updateEntry(ei, { predefined_entry_key: e.target.value || undefined })
+                          }
+                          sx={{ minWidth: 160 }}
+                        />
+                      )}
+                      <IconButton size="small" color="error" onClick={() => removeEntry(ei)}>
+                        <Delete fontSize="small" />
+                      </IconButton>
+                    </Box>
+
+                    <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1 }}>
+                      {ENTRY_TYPE_OPTIONS.find((o) => o.value === entry.entry_type)?.helper ||
+                        entry.entry_type}
+                    </Typography>
+
+                    <TextField
+                      size="small"
+                      fullWidth
+                      label="Description"
+                      value={entry.description ?? ''}
+                      onChange={(e) => updateEntry(ei, { description: e.target.value })}
+                      sx={{ mb: 1.5 }}
+                    />
+
+                    {isSample && (
+                      <Box sx={{ mb: 1.5 }}>
+                        <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
+                          Read-only sample columns
+                        </Typography>
+                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                          {SAMPLE_COLUMN_OPTIONS.map((opt) => {
+                            const selected = (entry.config?.sample_columns || []).includes(opt.key);
+                            return (
+                              <Chip
+                                key={opt.key}
+                                size="small"
+                                label={opt.label}
+                                color={selected ? 'primary' : 'default'}
+                                variant={selected ? 'filled' : 'outlined'}
+                                onClick={() => toggleSampleColumn(ei, opt.key)}
+                              />
+                            );
+                          })}
+                        </Box>
+                      </Box>
+                    )}
+
+                    <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
+                      Custom columns (Field Definitions)
+                    </Typography>
+                    {(entry.fields || []).length === 0 ? (
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                        No custom columns — add Field Definitions used as capture columns.
+                      </Typography>
+                    ) : (
+                      <Table size="small" sx={{ mb: 1 }}>
+                        <TableHead>
+                          <TableRow>
+                            <TableCell>Field</TableCell>
+                            <TableCell width={200}>Write-back (on Submit)</TableCell>
+                            <TableCell width={48} />
+                          </TableRow>
+                        </TableHead>
+                        <TableBody>
+                          {(entry.fields || []).map((f, fi) => (
+                            <TableRow key={f.field_definition_id}>
+                              <TableCell>
+                                <Typography variant="body2">{fieldLabel(f.field_definition_id)}</Typography>
+                                <Typography variant="caption" color="text.secondary">
+                                  {f.field_definition_id.slice(0, 8)}…
+                                </Typography>
+                              </TableCell>
+                              <TableCell>
+                                <FormControl size="small" fullWidth disabled={!isSample}>
+                                  <Select
+                                    displayEmpty
+                                    value={f.write_back_target ?? ''}
+                                    onChange={(e) =>
+                                      updateEntryField(ei, fi, {
+                                        write_back_target: e.target.value || null,
+                                      })
+                                    }
+                                  >
+                                    {WRITE_BACK_TARGETS.map((t) => (
+                                      <MenuItem key={t.value || 'none'} value={t.value}>
+                                        {t.label}
+                                      </MenuItem>
+                                    ))}
+                                  </Select>
+                                </FormControl>
+                              </TableCell>
+                              <TableCell>
+                                <IconButton
+                                  size="small"
+                                  color="error"
+                                  onClick={() => removeEntryField(ei, fi)}
+                                >
+                                  <Delete fontSize="small" />
+                                </IconButton>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    )}
+
+                    <FormControl size="small" sx={{ minWidth: 280 }}>
+                      <InputLabel>Add field</InputLabel>
+                      <Select
+                        label="Add field"
+                        value=""
+                        onChange={(e) => addEntryField(ei, String(e.target.value))}
+                        disabled={availableFields.length === 0}
+                      >
+                        {availableFields.length === 0 ? (
+                          <MenuItem value="" disabled>
+                            {fieldDefOptions.length === 0
+                              ? 'No field definitions loaded'
+                              : 'All available fields added'}
+                          </MenuItem>
+                        ) : (
+                          availableFields.map((fd) => (
+                            <MenuItem key={fd.id} value={fd.id}>
+                              {fd.display_name || fd.name} ({fd.data_type}
+                              {fd.entity_type ? ` · ${fd.entity_type}` : ''})
+                            </MenuItem>
+                          ))
+                        )}
+                      </Select>
+                    </FormControl>
+                  </Box>
+                );
+              })}
+            </Box>
+
+            <Button
+              startIcon={<Add />}
+              onClick={addEntry}
+              variant="outlined"
+              size="small"
+              sx={{ mt: 2 }}
+            >
+              Add table / form
+            </Button>
           </TabPanel>
 
           {formError && (
