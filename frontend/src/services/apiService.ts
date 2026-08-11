@@ -1942,11 +1942,21 @@ export class ApiService {
     return response.data;
   }
 
-  async startLimsRun(id: string, body?: { acknowledge_no_analysis?: boolean }) {
+  async startLimsRun(
+    id: string,
+    body?: { sample_ids?: string[]; acknowledge_no_analysis?: boolean },
+  ) {
     const response: AxiosResponse = await this.api.patch(
       `/v1/lims-runs/${id}/start`,
       body ?? {},
     );
+    return response.data;
+  }
+
+  async setLimsRunCohort(id: string, sampleIds: string[]) {
+    const response: AxiosResponse = await this.api.put(`/v1/lims-runs/${id}/cohort`, {
+      sample_ids: sampleIds,
+    });
     return response.data;
   }
 

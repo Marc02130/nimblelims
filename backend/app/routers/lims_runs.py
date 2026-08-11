@@ -132,14 +132,30 @@ def start_run(
 ):
     """
     Transition: draft → running (standard) or ordered → running (CRO).
-
-    If the run has no analysis_id, pass acknowledge_no_analysis=true after the UI
-    warns that Tests/Results will not be written on publish.
+    Requires analysis_id and a sample cohort (body.sample_ids or previously set).
+    Cohort is locked at start — no mid-flight sample changes.
     """
     run = service.start_run(
         run_id,
-        acknowledge_no_analysis=body.acknowledge_no_analysis,
+        sample_ids=body.sample_ids,
     )
+    return _run_read(run)
+
+
+@router.put("/{run_id}/cohort", response_model=LimsRunRead)
+def set_run_cohort(
+    run_id: UUID,
+    body: LimsRunStartRequest,
+    service: LimsRunService = Depends(_run_service),
+):
+    """Set draft cohort without starting (sample_ids required)."""
+    if not body.sample_ids:
+        from fastapi import HTTPException, status as http_status
+        raise HTTPException(
+            status_code=http_status.HTTP_400_BAD_REQUEST,
+            detail="sample_ids required",
+        )
+    run = service.set_cohort(run_id, body.sample_ids, lock=False)
     return _run_read(run)
 
 

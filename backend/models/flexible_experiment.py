@@ -118,6 +118,8 @@ class LimsRun(Base):
         default=LimsRunStatus.draft,
     )
     fit_in_progress = Column(Boolean, nullable=False, server_default='false', default=False)
+    # Queue start cohort: { "sample_ids": [...], "locked_at": "..." }
+    cohort = Column(JSONB, nullable=True, server_default='{}')
     started_at = Column(DateTime, nullable=True)
     completed_at = Column(DateTime, nullable=True)
     published_at = Column(DateTime, nullable=True)

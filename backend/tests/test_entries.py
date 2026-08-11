@@ -243,3 +243,58 @@ class TestEntries:
         assert r.status_code == 200
         assert r.json()["meta"]["status"] == "submitted"
         assert r.json()["row_count"] >= 1
+
+    def test_submit_dependency_gate(
+        self, client: TestClient, auth_headers, experiment, db_session, test_admin_user
+    ):
+        from models.field_definition import FieldDefinition
+
+        fd = FieldDefinition(
+            name=f"dep_{uuid4().hex[:6]}",
+            entity_type="experiment",
+            data_type="text",
+            display_name="Note",
+            is_materialized_column=False,
+            created_by=test_admin_user.id,
+            modified_by=test_admin_user.id,
+        )
+        db_session.add(fd)
+        db_session.commit()
+
+        r = client.post(
+            f"/v1/experiments/{experiment['id']}/entries",
+            json={
+                "experiment_id": experiment["id"],
+                "entry_type": "experiment_data",
+                "name": "First",
+                "fields": [{"field_definition_id": str(fd.id)}],
+            },
+            headers=auth_headers,
+        )
+        assert r.status_code == 201, r.text
+        first = r.json()
+
+        r = client.post(
+            f"/v1/experiments/{experiment['id']}/entries",
+            json={
+                "experiment_id": experiment["id"],
+                "entry_type": "experiment_data",
+                "name": "Second",
+                "config": {"depends_on": ["First"]},
+                "fields": [{"field_definition_id": str(fd.id)}],
+            },
+            headers=auth_headers,
+        )
+        assert r.status_code == 201, r.text
+        second = r.json()
+
+        r = client.post(f"/v1/entries/{second['id']}/submit", headers=auth_headers)
+        assert r.status_code == 400, r.text
+        detail = r.json()["detail"]
+        assert detail["code"] == "dependencies_not_met"
+
+        r = client.post(f"/v1/entries/{first['id']}/submit", headers=auth_headers)
+        assert r.status_code == 200, r.text
+
+        r = client.post(f"/v1/entries/{second['id']}/submit", headers=auth_headers)
+        assert r.status_code == 200, r.text

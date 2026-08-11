@@ -192,9 +192,13 @@ class LimsRunService:
         self,
         run_id: uuid.UUID,
         *,
+        sample_ids: Optional[List[uuid.UUID]] = None,
         acknowledge_no_analysis: bool = False,  # ignored; analysis always required
     ) -> LimsRun:
-        """draft → running (standard) or ordered → running (CRO). Requires analysis_id."""
+        """
+        draft → running (standard) or ordered → running (CRO).
+        Requires analysis_id. Locks sample cohort at start (queue / scan).
+        """
         run = self.get_run(run_id)
         if run.analysis_id is None:
             raise HTTPException(
@@ -204,7 +208,117 @@ class LimsRunService:
                     "message": "analysis_id is required before starting a run.",
                 },
             )
+
+        existing_cohort = dict(run.cohort or {})
+        existing_ids = existing_cohort.get("sample_ids") or []
+        locked = bool(existing_cohort.get("locked_at"))
+
+        if sample_ids is not None:
+            # Deduplicate preserving order
+            seen = set()
+            ids: List[str] = []
+            for sid in sample_ids:
+                s = str(sid)
+                if s not in seen:
+                    seen.add(s)
+                    ids.append(s)
+            if not ids:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="At least one sample_id is required for the run cohort",
+                )
+            if locked and set(ids) != set(str(x) for x in existing_ids):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=(
+                        "LIMS run cohort is locked. "
+                        "Cancel and create a new run to change samples."
+                    ),
+                )
+            from models.sample import Sample
+            from datetime import datetime, timezone
+
+            for sid in sample_ids:
+                if not self.db.query(Sample.id).filter(Sample.id == sid).first():
+                    raise HTTPException(
+                        status_code=status.HTTP_404_NOT_FOUND,
+                        detail=f"Sample {sid} not found",
+                    )
+            run.cohort = {
+                "sample_ids": ids,
+                "locked_at": datetime.now(timezone.utc).isoformat(),
+            }
+            run.modified_by = self._user_id()
+            self.db.flush()
+        elif not existing_ids:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={
+                    "code": "cohort_required",
+                    "message": (
+                        "Select samples for the run cohort before start "
+                        "(scan plate/tube or choose from queue)."
+                    ),
+                },
+            )
+        elif not locked:
+            from datetime import datetime, timezone
+            run.cohort = {
+                "sample_ids": list(existing_ids),
+                "locked_at": datetime.now(timezone.utc).isoformat(),
+            }
+            run.modified_by = self._user_id()
+            self.db.flush()
+
         return self._transition(run, LimsRunStatus.running)
+
+    def set_cohort(
+        self,
+        run_id: uuid.UUID,
+        sample_ids: List[uuid.UUID],
+        *,
+        lock: bool = False,
+    ) -> LimsRun:
+        """Set cohort while draft/ordered; lock optional until start."""
+        run = self.get_run(run_id)
+        if run.status not in (LimsRunStatus.draft, LimsRunStatus.ordered):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cohort can only be set before the run is started",
+            )
+        existing = dict(run.cohort or {})
+        if existing.get("locked_at"):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cohort is locked",
+            )
+        from models.sample import Sample
+        from datetime import datetime, timezone
+
+        seen = set()
+        ids: List[str] = []
+        for sid in sample_ids:
+            s = str(sid)
+            if s not in seen:
+                seen.add(s)
+                ids.append(s)
+            if not self.db.query(Sample.id).filter(Sample.id == sid).first():
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Sample {sid} not found",
+                )
+        if not ids:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="At least one sample_id is required",
+            )
+        cohort: dict = {"sample_ids": ids}
+        if lock:
+            cohort["locked_at"] = datetime.now(timezone.utc).isoformat()
+        run.cohort = cohort
+        run.modified_by = self._user_id()
+        self._commit_refresh(run)
+        return run
 
     def mark_results_received(self, run_id: uuid.UUID) -> LimsRun:
         """running → results_received (CRO lifecycle only)"""
