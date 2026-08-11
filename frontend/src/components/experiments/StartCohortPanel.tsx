@@ -40,19 +40,28 @@ export interface ScanSample {
 }
 
 export interface StartCohortPanelProps {
-  experimentId: string;
+  /** Experiment id when using default experiment start API */
+  experimentId?: string;
+  /** Custom start (e.g. LIMS run) — receives selected sample ids */
+  onStartCohort?: (sampleIds: string[]) => Promise<void>;
   startedAt?: string | null;
   existingSampleIds?: string[];
   canEdit?: boolean;
   onStarted?: () => void;
+  title?: string;
+  /** When true, cohort is locked (e.g. run already running with locked_at) */
+  locked?: boolean;
 }
 
 const StartCohortPanel: React.FC<StartCohortPanelProps> = ({
   experimentId,
+  onStartCohort,
   startedAt,
   existingSampleIds = [],
   canEdit = true,
   onStarted,
+  title = 'Start cohort',
+  locked: lockedProp,
 }) => {
   const [barcode, setBarcode] = useState('');
   const [scanning, setScanning] = useState(false);
@@ -65,7 +74,10 @@ const StartCohortPanel: React.FC<StartCohortPanelProps> = ({
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [manualId, setManualId] = useState('');
 
-  const locked = Boolean(startedAt) && existingSampleIds.length > 0;
+  const locked =
+    lockedProp !== undefined
+      ? lockedProp
+      : Boolean(startedAt) && existingSampleIds.length > 0;
 
   const mergeCandidates = (samples: ScanSample[]) => {
     setCandidates((prev) => {
@@ -142,17 +154,25 @@ const StartCohortPanel: React.FC<StartCohortPanelProps> = ({
     setError(null);
     setSuccess(null);
     try {
-      const res = await apiService.startExperiment(experimentId, {
-        sample_ids: ids,
-        set_started_at: true,
-      });
-      setSuccess(
-        `Started with ${res.linked_count + res.already_linked_count} sample(s)` +
-          (res.linked_count ? ` (${res.linked_count} newly linked)` : ''),
-      );
+      if (onStartCohort) {
+        await onStartCohort(ids);
+        setSuccess(`Started with ${ids.length} sample(s)`);
+      } else if (experimentId) {
+        const res = await apiService.startExperiment(experimentId, {
+          sample_ids: ids,
+          set_started_at: true,
+        });
+        setSuccess(
+          `Started with ${res.linked_count + res.already_linked_count} sample(s)` +
+            (res.linked_count ? ` (${res.linked_count} newly linked)` : ''),
+        );
+      } else {
+        setError('No experiment or start handler configured');
+        return;
+      }
       onStarted?.();
     } catch (err) {
-      setError(apiErrorMsg(err, 'Failed to start experiment'));
+      setError(apiErrorMsg(err, 'Failed to start'));
     } finally {
       setStarting(false);
     }
@@ -180,7 +200,7 @@ const StartCohortPanel: React.FC<StartCohortPanelProps> = ({
   return (
     <Box sx={{ mb: 3 }}>
       <Typography variant="h6" sx={{ mb: 1 }}>
-        Start cohort
+        {title}
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
         Scan a <strong>plate</strong> (all samples on it) or <strong>tube</strong> (including

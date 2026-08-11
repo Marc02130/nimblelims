@@ -76,9 +76,12 @@ interface TemplateEntryDeclaration {
   description?: string;
   predefined_entry_key?: string;
   sort_order?: number;
+  /** Names or predefined keys that must be submitted before this entry */
+  depends_on?: string[];
   config?: {
     sample_columns?: string[];
     status?: string;
+    depends_on?: string[];
     [key: string]: unknown;
   };
   fields?: TemplateEntryField[];
@@ -1376,6 +1379,39 @@ const ExperimentTemplatesManagement: React.FC = () => {
                       onChange={(e) => updateEntry(ei, { description: e.target.value })}
                       sx={{ mb: 1.5 }}
                     />
+
+                    <FormControl size="small" fullWidth sx={{ mb: 1.5 }}>
+                      <InputLabel>Depends on (submit first)</InputLabel>
+                      <Select
+                        multiple
+                        label="Depends on (submit first)"
+                        value={entry.depends_on || entry.config?.depends_on || []}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          const deps = typeof v === 'string' ? v.split(',') : (v as string[]);
+                          updateEntry(ei, { depends_on: deps });
+                        }}
+                        renderValue={(selected) => (selected as string[]).join(', ') || 'None'}
+                      >
+                        {(formDef.entries ?? [])
+                          .filter((_, j) => j !== ei)
+                          .map((other) => {
+                            const key = other.predefined_entry_key || other.name;
+                            if (!key) return null;
+                            return (
+                              <MenuItem key={key} value={key}>
+                                {other.name || key}
+                                {other.predefined_entry_key
+                                  ? ` (${other.predefined_entry_key})`
+                                  : ''}
+                              </MenuItem>
+                            );
+                          })}
+                      </Select>
+                    </FormControl>
+                    <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1.5 }}>
+                      Submit is blocked until each dependency is submitted (template SOP control).
+                    </Typography>
 
                     {isSample && (
                       <Box sx={{ mb: 1.5 }}>

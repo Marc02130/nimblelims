@@ -227,6 +227,12 @@ class EntryService:
             config = dict((defaults or {}).get('config') or {})
             config.update(raw.get('config') or {})
             config.setdefault('status', 'draft')
+            # Template-level depends_on → instance config (names or predefined keys)
+            deps = raw.get('depends_on')
+            if deps is None:
+                deps = (raw.get('config') or {}).get('depends_on')
+            if deps:
+                config['depends_on'] = list(deps) if isinstance(deps, list) else [deps]
             description = raw.get('description')
             if description is None and defaults:
                 description = defaults.get('description')
@@ -380,6 +386,8 @@ class EntryService:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Cannot submit read-only entry type",
             )
+        # Template entry dependencies: depends_on names / predefined keys must be submitted first
+        self._assert_dependencies_met(entry)
         write_backs = 0
         values = self.repo.list_values(entry_id)
         for val in values:
@@ -410,6 +418,40 @@ class EntryService:
         self.repo.update_entry(entry, config=cfg, modified_by=self._user_id())
         self._commit_refresh(entry)
         return self.get_entry(entry_id), write_backs
+
+    def _assert_dependencies_met(self, entry: Entry) -> None:
+        """
+        Gate submit when config.depends_on lists other entry names or predefined keys.
+        Example: depends_on: ["Experiment header"] or ["experiment_header"].
+        """
+        deps = (entry.config or {}).get('depends_on') or []
+        if not deps:
+            return
+        siblings = self.repo.list_for_experiment(entry.experiment_id, active=True, load_values=False)
+        by_name = {e.name: e for e in siblings}
+        by_key = {e.predefined_entry_key: e for e in siblings if e.predefined_entry_key}
+        missing: List[str] = []
+        for dep in deps:
+            if not isinstance(dep, str) or not dep.strip():
+                continue
+            target = by_key.get(dep) or by_name.get(dep)
+            if not target:
+                missing.append(f"{dep} (not found)")
+                continue
+            if target.id == entry.id:
+                continue
+            status_cfg = (target.config or {}).get('status') or 'draft'
+            if status_cfg != 'submitted':
+                missing.append(target.name or dep)
+        if missing:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={
+                    "code": "dependencies_not_met",
+                    "message": "Submit required predecessor entries first",
+                    "missing": missing,
+                },
+            )
 
     def get_grid(self, entry_id: UUID) -> EntryGridResponse:
         entry = self.get_entry(entry_id)

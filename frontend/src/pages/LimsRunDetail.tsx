@@ -35,6 +35,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { apiService, PromotionPreview } from '../services/apiService';
 import PublishPromotionDialog from '../components/runs/PublishPromotionDialog';
 import DoseResponseTab from './DoseResponse/DoseResponseTab';
+import StartCohortPanel from '../components/experiments/StartCohortPanel';
 
 const apiErrorMsg = (err: any, fallback: string): string => {
   const detail = err?.response?.data?.detail;
@@ -73,6 +74,7 @@ interface RunDetail {
   analysis_id?: string | null;
   status: string;
   lifecycle_type?: string;
+  cohort?: { sample_ids?: string[]; locked_at?: string | null } | null;
   started_at?: string;
   completed_at?: string;
   published_at?: string;
@@ -187,16 +189,26 @@ const LimsRunDetail: React.FC = () => {
     }
   };
 
-  const doStart = async () => {
+  const doStart = async (sampleIds?: string[]) => {
     if (!runId) return;
     if (!run?.analysis_id) {
       setNoAnalysisDialog(true);
       return;
     }
+    const ids =
+      sampleIds && sampleIds.length > 0
+        ? sampleIds
+        : (run.cohort?.sample_ids || []).map(String);
+    if (ids.length === 0) {
+      setError(
+        'Select a sample cohort first (scan plate/tube below), then Start.',
+      );
+      return;
+    }
     setTransitioning(true);
     setError(null);
     try {
-      await apiService.startLimsRun(runId);
+      await apiService.startLimsRun(runId, { sample_ids: ids });
       setNoAnalysisDialog(false);
       await loadRun();
     } catch (err: any) {
@@ -494,6 +506,32 @@ const LimsRunDetail: React.FC = () => {
             <Button size="small" sx={{ mb: 2 }} onClick={() => navigate('/admin/analytes')}>
               Manage analytes / aliases
             </Button>
+
+            {(run.status === 'draft' || run.status === 'ordered') && (
+              <Box sx={{ mb: 3 }}>
+                <StartCohortPanel
+                  title="Run cohort (queue / scan)"
+                  startedAt={run.started_at}
+                  locked={Boolean(run.cohort?.locked_at)}
+                  existingSampleIds={(run.cohort?.sample_ids || []).map(String)}
+                  canEdit={Boolean(run.analysis_id)}
+                  onStartCohort={async (ids) => {
+                    if (!run.analysis_id) {
+                      setNoAnalysisDialog(true);
+                      throw new Error('Analysis required');
+                    }
+                    await apiService.startLimsRun(runId!, { sample_ids: ids });
+                  }}
+                  onStarted={() => void loadRun()}
+                />
+              </Box>
+            )}
+            {run.cohort?.sample_ids && run.cohort.sample_ids.length > 0 && (
+              <Alert severity="info" sx={{ mb: 2 }}>
+                Cohort: {run.cohort.sample_ids.length} sample(s)
+                {run.cohort.locked_at ? ' (locked)' : ''}
+              </Alert>
+            )}
 
             <List dense>
               <ListItem>

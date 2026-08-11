@@ -38,6 +38,7 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import PlaylistAddIcon from '@mui/icons-material/PlaylistAdd';
 import SyncAltIcon from '@mui/icons-material/SyncAlt';
 import { apiService } from '../../services/apiService';
+import AliquotPlanEditor from './AliquotPlanEditor';
 
 const apiErrorMsg = (err: any, fallback: string): string => {
   const detail = err?.response?.data?.detail;
@@ -672,52 +673,12 @@ const EntryCapturePanel: React.FC<EntryCapturePanelProps> = ({
                     )}
                   </Alert>
                 )}
-                {entry.predefined_entry_key === 'aliquot_pool_plan' && canEdit && (
-                  <Box mb={2} display="flex" gap={1}>
-                    <Button
-                      size="small"
-                      variant="outlined"
-                      disabled={isSaving}
-                      onClick={async () => {
-                        try {
-                          const res: any = await apiService.executeAliquotPlan(entry.id, {
-                            dry_run: true,
-                          });
-                          setSuccess(
-                            `Dry-run: ${res.success_count} ok, ${res.error_count} error(s)`,
-                          );
-                        } catch (err) {
-                          setError(apiErrorMsg(err, 'Dry-run failed'));
-                        }
-                      }}
-                    >
-                      Dry-run execute
-                    </Button>
-                    <Button
-                      size="small"
-                      variant="contained"
-                      color="warning"
-                      disabled={isSaving}
-                      onClick={async () => {
-                        setSaving((s) => ({ ...s, [entry.id]: true }));
-                        try {
-                          const res: any = await apiService.executeAliquotPlan(entry.id, {
-                            dry_run: false,
-                          });
-                          setSuccess(
-                            `Executed: ${res.success_count} ok, ${res.error_count} error(s)`,
-                          );
-                          await load();
-                        } catch (err) {
-                          setError(apiErrorMsg(err, 'Execute failed'));
-                        } finally {
-                          setSaving((s) => ({ ...s, [entry.id]: false }));
-                        }
-                      }}
-                    >
-                      Execute plan
-                    </Button>
-                  </Box>
+                {entry.predefined_entry_key === 'aliquot_pool_plan' && (
+                  <AliquotPlanEditor
+                    entryId={entry.id}
+                    canEdit={canEdit}
+                    sampleIds={sampleIds}
+                  />
                 )}
 
                 {isSampleScoped(entry.entry_type) ? (

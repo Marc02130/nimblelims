@@ -93,8 +93,16 @@ class LimsRunUpdate(BaseModel):
 
 
 class LimsRunStartRequest(BaseModel):
-    """Optional body for start transition (analysis must already be set)."""
-    pass
+    """Start transition: optional cohort selection (locks after start)."""
+    sample_ids: Optional[List[uuid.UUID]] = Field(
+        None,
+        description="Cohort samples selected at start (scan plate/tube or queue). Required if no cohort yet.",
+    )
+
+
+class LimsRunCohort(BaseModel):
+    sample_ids: List[uuid.UUID] = Field(default_factory=list)
+    locked_at: Optional[str] = None
 
 
 class LimsRunRead(BaseModel):
@@ -104,6 +112,7 @@ class LimsRunRead(BaseModel):
     experiment_template_id: uuid.UUID
     analysis_id: Optional[uuid.UUID] = None
     status: LimsRunStatus
+    cohort: Optional[Dict[str, Any]] = None
     started_at: Optional[datetime]
     completed_at: Optional[datetime]
     published_at: Optional[datetime]

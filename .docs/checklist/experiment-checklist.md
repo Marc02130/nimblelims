@@ -164,10 +164,10 @@ Legacy `experiment_link` via `ExperimentDetail` **coexists** in Phase 1; no forc
 - [x] Header + Samples predefined (keys + template presets + instantiate defaults)
 - [x] Aliquot/pool methods (full matrix) + plan save + execute API (amount=mass/count; volume convert)
 - [x] Capture UI: dry-run / execute buttons on aliquot_pool_plan entry
-- [ ] Queue/start for LIMS run (scan plate/tube)
-- [ ] Template UI: entry dependencies
-- [ ] Aliquot plan editor UI (method-driven columns) + pool multi-content polish
-- [ ] Tests + UAT spine demo
+- [x] Queue/start for LIMS run (cohort + scan UI; locked at start; migration 0056)
+- [x] Template UI: entry dependencies (`depends_on`) + submit gate
+- [x] Aliquot plan editor UI (method-driven columns + pool group)
+- [ ] UAT spine demo end-to-end
 
 ---
 
