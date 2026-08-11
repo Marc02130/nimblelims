@@ -1822,6 +1822,31 @@ export class ApiService {
     return response.data;
   }
 
+  async getAliquotMethods() {
+    const response: AxiosResponse = await this.api.get('v1/entries/aliquot-methods');
+    return response.data;
+  }
+
+  async getAliquotPlan(entryId: string) {
+    const response: AxiosResponse = await this.api.get(`v1/entries/${entryId}/aliquot-plan`);
+    return response.data;
+  }
+
+  async saveAliquotPlan(entryId: string, lines: Array<Record<string, unknown>>) {
+    const response: AxiosResponse = await this.api.put(`v1/entries/${entryId}/aliquot-plan`, {
+      lines,
+    });
+    return response.data;
+  }
+
+  async executeAliquotPlan(
+    entryId: string,
+    data?: { dry_run?: boolean; lines?: Array<Record<string, unknown>> },
+  ) {
+    const response: AxiosResponse = await this.api.post(`v1/entries/${entryId}/execute`, data || {});
+    return response.data;
+  }
+
   // SOP parse jobs (v1 API)
   async createSopParseJob(sopFile: File, instrumentFile: File) {
     const form = new FormData();
