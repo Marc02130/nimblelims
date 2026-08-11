@@ -136,40 +136,33 @@ Legacy `experiment_link` via `ExperimentDetail` **coexists** in Phase 1; no forc
 
 ## Phase 4 — Template / experiment entries (ELN building blocks)
 
-**Gate:** Lab Ops **Accept with conditions** (2026-08-10). Continue **CEO → UI → Arch → Security**; implement after chain + L1–L8.  
+**Gate:** **CLEARED for implementation** (2026-08-10) — all reviews Accept with conditions (Lab Ops L1–L9 includes **all** aliquot methods).  
 **Packet:** [tech-sketch/experiment-template-entries.md](../tech-sketch/experiment-template-entries.md) §0  
-**Lab ops:** [lab-ops-review/experiment-template-entries.md](../lab-ops-review/experiment-template-entries.md)
 
 ### Reviews
 
 | Review | Status | Note |
 |--------|--------|------|
-| **Lab Ops (SVP)** | **Accept w/ L1–L9** (2026-08-10) | L9: all aliquot/pool methods in v1 (not one-first) |
-| CEO | Pending re-review | Scope freeze on v1 spine |
-| UI | Pending re-review | Queue, template builder, save/submit |
-| Architecture | Pending re-review | Grid/export/submit, aliquot execute |
-| Security | Pending re-review | Write-back config, RLS |
+| **Lab Ops (SVP)** | **Accept w/ L1–L9** | L9: all aliquot/pool methods in v1 |
+| CEO | **Accept w/ C1–C4** | Scope freeze |
+| UI | **Accept w/ U1–U7** | Queue, save/submit, methods |
+| Architecture | **Accept w/ A1–A9** | Grid/export/submit/execute |
+| Security | **Accept w/ S1–S7** | Write-back + RLS + execute |
 
-### Substrate locked (Decision #23 / tech sketch §0) — 2026-07-29
+### Substrate locked
 
-- [x] Kinds: `experiment_sample_data` (rows = samples **in** experiment) + `experiment_data` (manual/code rows)
-- [x] Storage: entries + entry_field_definitions + entry_field_values (typed cells)
-- [x] Contracts: `GET …/grid` (wide UI) + `GET …/export` (long report) + `PUT …/values`
+- [x] Kinds, EAV storage, grid + export + values
+- [x] Queue start, write-back, containers/amount, aliquot execute, lifecycle
 
-### Before re-open full Phase 4 (Lab Ops)
+### P0 eng (open)
 
-- [ ] Lab workflow brief: 2–3 target SOPs (steps + entry kinds)
-- [ ] Entry catalog v1 in requirements (predefined on top of two kinds)
-- [ ] Q8 / Q22 process sample population decision
-- [ ] Q18 aliquot creates children vs plan-only
-- [ ] Q20 entry complete/unlock rules
-- [ ] Lab Ops re-review → Accept or Accept with conditions
-
-### P0 eng (blocked on Lab Ops catalog; substrate may be stubbed after catalog lock)
-
-- [ ] *(blocked)* Normalize types + grid + export APIs per §0
-- [ ] *(blocked)* Template Tables & forms authoring
-- [ ] *(blocked)* First OOTB predefined entries from catalog
+- [ ] Types + grid/export/save/submit APIs
+- [ ] Write-back map (submit only, config-eligible targets)
+- [ ] Queue + scan plate/tube + start experiment/run
+- [ ] Template UI: entries, columns, deps, **all** aliquot methods
+- [ ] Aliquot/pool plan + execute (transaction) + results
+- [ ] Header + Samples predefined
+- [ ] Tests + UAT spine demo
 
 ---
 
