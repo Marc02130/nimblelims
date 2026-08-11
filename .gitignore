@@ -182,3 +182,6 @@ alembic/versions/*.py
 
 # Grok local artifacts
 .grok/
+
+# Data
+TestData/

@@ -1,7 +1,8 @@
 # Schema changes: Experiment template entries
 
 **Date:** 2026-07-28  
-**Status:** **Accepted** with architecture review (2026-07-29) — no migration for P0  
+**Status:** **Foundation locked** (tech sketch §0, 2026-07-29) — **no migration for substrate**  
+Kinds are logical (`entry_type`); storage remains `entries` / `entry_field_definitions` / `entry_field_values`.  
 **Phase covered:** P0 (template Entries authoring + sample roster)  
 **Tech sketch:** [`.docs/tech-sketch/experiment-template-entries.md`](../tech-sketch/experiment-template-entries.md)  
 **Requirements:** [`.docs/requirements/experiment-processes-entries.md`](../requirements/experiment-processes-entries.md)
