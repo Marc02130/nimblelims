@@ -247,3 +247,41 @@ class GetSampleExperimentsResponse(BaseModel):
     sample_id: UUID
     experiments: List[SampleExperimentEntry]
     total: int
+
+
+# ---------- Start cohort (queue / scan) ----------
+
+
+class ResolveScanRequest(BaseModel):
+    """Resolve a plate/tube barcode (container name) or client_sample_id to samples."""
+    barcode: str = Field(..., min_length=1, max_length=255, description="Container name/barcode or client sample ID")
+
+
+class ResolveScanSample(BaseModel):
+    sample_id: UUID
+    client_sample_id: Optional[str] = None
+    sample_name: Optional[str] = None
+    container_id: Optional[UUID] = None
+    container_name: Optional[str] = None
+
+
+class ResolveScanResponse(BaseModel):
+    barcode: str
+    match_type: str  # container | sample | none
+    container_id: Optional[UUID] = None
+    container_name: Optional[str] = None
+    samples: List[ResolveScanSample] = Field(default_factory=list)
+    total: int = 0
+
+
+class StartExperimentRequest(BaseModel):
+    """Select cohort and start experiment — cohort fixed after start (no mid-flight adds)."""
+    sample_ids: List[UUID] = Field(..., min_length=1, description="Samples to include in the experiment cohort")
+    set_started_at: bool = Field(True, description="Set experiment.started_at if not already set")
+
+
+class StartExperimentResponse(BaseModel):
+    experiment: ExperimentRead
+    linked_count: int
+    already_linked_count: int = 0
+    cohort_locked: bool = True

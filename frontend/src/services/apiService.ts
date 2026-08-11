@@ -1375,6 +1375,36 @@ export class ApiService {
     return response.data;
   }
 
+  /** Resolve plate/tube barcode or client_sample_id to samples for queue start. */
+  async resolveExperimentScan(barcode: string) {
+    const response: AxiosResponse = await this.api.post('v1/experiments/resolve-scan', { barcode });
+    return response.data as {
+      barcode: string;
+      match_type: 'container' | 'sample' | 'none';
+      container_id?: string;
+      container_name?: string;
+      samples: Array<{
+        sample_id: string;
+        client_sample_id?: string;
+        sample_name?: string;
+        container_id?: string;
+        container_name?: string;
+      }>;
+      total: number;
+    };
+  }
+
+  /** Link cohort samples and start experiment (locks cohort). */
+  async startExperiment(experimentId: string, data: { sample_ids: string[]; set_started_at?: boolean }) {
+    const response: AxiosResponse = await this.api.post(`v1/experiments/${experimentId}/start`, data);
+    return response.data as {
+      experiment: unknown;
+      linked_count: number;
+      already_linked_count: number;
+      cohort_locked: boolean;
+    };
+  }
+
   async addExperimentDetailStep(experimentId: string, data: {
     detail_type: string;
     content?: Record<string, unknown>;

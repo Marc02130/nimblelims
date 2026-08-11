@@ -89,6 +89,47 @@ SAMPLE_WRITE_BACK_COLUMNS = frozenset({
     'report_date',
 })
 
+# v1 predefined entry keys (functionality wrappers; columns via field defs / config)
+PREDEFINED_ENTRY_KEYS = frozenset({
+    'experiment_header',  # experiment_data — start context
+    'samples',            # experiment_sample_data — cohort display
+    'aliquot_pool_plan',  # experiment_data — plan lines + execute
+    'aliquots_pools',     # experiment_sample_data — post-execute view
+})
+
+PREDEFINED_ENTRY_DEFAULTS = {
+    'experiment_header': {
+        'entry_type': 'experiment_data',
+        'name': 'Experiment header',
+        'description': 'Start context for the experiment',
+    },
+    'samples': {
+        'entry_type': 'experiment_sample_data',
+        'name': 'Samples',
+        'description': 'Cohort selected at experiment start (queue / scan)',
+        'config': {
+            'sample_columns': [
+                'client_sample_id',
+                'specimen_biotype_id',
+                'received_date',
+                'sample_type',
+                'status',
+            ],
+        },
+    },
+    'aliquot_pool_plan': {
+        'entry_type': 'experiment_data',
+        'name': 'Aliquot / pool plan',
+        'description': 'Plan amounts to remove/add; execute creates dest samples',
+    },
+    'aliquots_pools': {
+        'entry_type': 'experiment_sample_data',
+        'name': 'Aliquots / pools',
+        'description': 'Post-execute view of resulting samples',
+        'config': {'sample_columns': ['client_sample_id']},
+    },
+}
+
 
 class Entry(Base):
     """

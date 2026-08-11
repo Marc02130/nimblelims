@@ -160,10 +160,11 @@ Legacy `experiment_link` via `ExperimentDetail` **coexists** in Phase 1; no forc
 - [x] Write-back map (submit only, SAMPLE_WRITE_BACK_COLUMNS allowlist)
 - [x] Template UI: Tables & forms tab (entries, columns, sample RO fields, write-back map)
 - [x] Capture UI: Save (draft) + Submit (write-back) on EntryCapturePanel
-- [ ] Queue + scan plate/tube + start experiment/run
+- [x] Queue + scan plate/tube + start experiment (resolve-scan, start, cohort lock UI)
+- [x] Header + Samples predefined (keys + template presets + instantiate defaults)
+- [ ] Queue/start for LIMS run (scan plate/tube)
 - [ ] Template UI: deps + **all** aliquot methods
 - [ ] Aliquot/pool plan + execute (transaction) + results
-- [ ] Header + Samples predefined
 - [ ] Tests + UAT spine demo
 
 ---

@@ -5,6 +5,7 @@ Uses ExperimentRepository for DB access; handles validation, 404/400, commit/rol
 """
 from typing import Optional, List, Tuple, Dict, Any
 from uuid import UUID
+from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
 
@@ -17,8 +18,16 @@ from app.schemas.experiment import (
     AddExperimentDetailStepRequest,
     LinkSampleToExperimentRequest,
     LinkExperimentsRequest,
+    ResolveScanRequest,
+    ResolveScanResponse,
+    ResolveScanSample,
+    StartExperimentRequest,
+    StartExperimentResponse,
+    ExperimentRead,
 )
 from models.experiment import ExperimentTemplate, Experiment, ExperimentDetail, ExperimentSampleExecution
+from models.container import Container, Contents
+from models.sample import Sample
 from models.user import User
 
 
@@ -234,12 +243,24 @@ class ExperimentService:
 
     # ---------- Link sample to experiment ----------
 
+    def _cohort_locked(self, experiment: Experiment) -> bool:
+        """After start, cohort is fixed — no mid-flight sample adds."""
+        return experiment.started_at is not None
+
     def link_sample_to_experiment(
         self,
         experiment_id: UUID,
         data: LinkSampleToExperimentRequest,
     ) -> ExperimentSampleExecution:
-        self.get_experiment(experiment_id, load_details=False, load_sample_executions=False)
+        experiment = self.get_experiment(experiment_id, load_details=False, load_sample_executions=False)
+        if self._cohort_locked(experiment):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    "Experiment cohort is locked (already started). "
+                    "Cancel/restart or create a new experiment to change samples."
+                ),
+            )
         sample = self.repo.get_sample_by_id(data.sample_id)
         if not sample:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sample not found")
@@ -267,6 +288,175 @@ class ExperimentService:
         )
         self._commit_refresh(ex)
         return ex
+
+    def resolve_scan(self, data: ResolveScanRequest) -> ResolveScanResponse:
+        """Resolve plate/tube barcode (container name) or client_sample_id to sample list."""
+        barcode = (data.barcode or "").strip()
+        if not barcode:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="barcode is required")
+
+        # Prefer exact container name match (plate → all contents; tube → contents, may be pool)
+        container = (
+            self.db.query(Container)
+            .filter(Container.name == barcode, Container.active == True)  # noqa: E712
+            .first()
+        )
+        if container:
+            contents = (
+                self.db.query(Contents)
+                .filter(Contents.container_id == container.id)
+                .all()
+            )
+            samples_out: List[ResolveScanSample] = []
+            seen = set()
+            for c in contents:
+                if not c.sample_id or c.sample_id in seen:
+                    continue
+                seen.add(c.sample_id)
+                sample = self.repo.get_sample_by_id(c.sample_id)
+                samples_out.append(ResolveScanSample(
+                    sample_id=c.sample_id,
+                    client_sample_id=getattr(sample, 'client_sample_id', None) if sample else None,
+                    sample_name=getattr(sample, 'name', None) if sample else None,
+                    container_id=container.id,
+                    container_name=container.name,
+                ))
+            return ResolveScanResponse(
+                barcode=barcode,
+                match_type='container',
+                container_id=container.id,
+                container_name=container.name,
+                samples=samples_out,
+                total=len(samples_out),
+            )
+
+        # Fallback: client_sample_id or sample name
+        sample = (
+            self.db.query(Sample)
+            .filter(Sample.client_sample_id == barcode, Sample.active == True)  # noqa: E712
+            .first()
+        )
+        if not sample:
+            sample = (
+                self.db.query(Sample)
+                .filter(Sample.name == barcode, Sample.active == True)  # noqa: E712
+                .first()
+            )
+        if sample:
+            return ResolveScanResponse(
+                barcode=barcode,
+                match_type='sample',
+                samples=[ResolveScanSample(
+                    sample_id=sample.id,
+                    client_sample_id=sample.client_sample_id,
+                    sample_name=sample.name,
+                )],
+                total=1,
+            )
+
+        return ResolveScanResponse(
+            barcode=barcode,
+            match_type='none',
+            samples=[],
+            total=0,
+        )
+
+    def start_experiment(
+        self,
+        experiment_id: UUID,
+        data: StartExperimentRequest,
+    ) -> StartExperimentResponse:
+        """
+        Link selected samples as the experiment cohort and optionally set started_at.
+        After start, cohort is fixed (no mid-flight adds via link_sample).
+        """
+        experiment = self.get_experiment(
+            experiment_id, load_details=False, load_sample_executions=True,
+        )
+        if experiment.completed_at is not None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot start a completed experiment",
+            )
+
+        # Deduplicate while preserving order
+        seen = set()
+        sample_ids: List[UUID] = []
+        for sid in data.sample_ids:
+            if sid not in seen:
+                seen.add(sid)
+                sample_ids.append(sid)
+
+        if not sample_ids:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="At least one sample_id is required",
+            )
+
+        # If already started with a different cohort, reject mid-flight changes
+        existing_execs = experiment.sample_executions or []
+        existing_ids = {ex.sample_id for ex in existing_execs if ex.sample_id}
+        if self._cohort_locked(experiment) and existing_ids:
+            new_set = set(sample_ids)
+            if not new_set.issubset(existing_ids) or new_set != existing_ids:
+                # Allow re-start only if same set; adding/removing is mid-flight change
+                if new_set != existing_ids:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=(
+                            "Experiment cohort is locked (already started). "
+                            "Cancel/restart or create a new experiment to change samples."
+                        ),
+                    )
+
+        linked = 0
+        already = 0
+        for sid in sample_ids:
+            sample = self.repo.get_sample_by_id(sid)
+            if not sample:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Sample {sid} not found",
+                )
+            existing = self.repo.find_execution(
+                experiment_id=experiment_id,
+                sample_id=sid,
+                replicate_number=1,
+            )
+            if existing:
+                already += 1
+                continue
+            if self._cohort_locked(experiment) and existing_ids:
+                # Started with empty cohort edge case: allow first fill only if no samples yet
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Experiment cohort is locked; cannot add samples",
+                )
+            self.repo.add_sample_execution(
+                experiment_id=experiment_id,
+                sample_id=sid,
+                processing_conditions={},
+                replicate_number=1,
+                created_by=self._user_id(),
+                modified_by=self._user_id(),
+            )
+            linked += 1
+
+        if data.set_started_at and experiment.started_at is None:
+            self.repo.update_experiment(
+                experiment,
+                started_at=datetime.now(timezone.utc).replace(tzinfo=None),
+                modified_by=self._user_id(),
+            )
+
+        self._commit_refresh(experiment)
+        full = self.get_experiment(experiment_id, load_details=True, load_sample_executions=True)
+        return StartExperimentResponse(
+            experiment=ExperimentRead.model_validate(full),
+            linked_count=linked,
+            already_linked_count=already,
+            cohort_locked=full.started_at is not None,
+        )
 
     # ---------- Link experiments (store as detail type experiment_link) ----------
 
