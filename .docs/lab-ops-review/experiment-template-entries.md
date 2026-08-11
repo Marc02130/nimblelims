@@ -68,6 +68,7 @@ That matches how target labs actually work and correctly keeps accessioning, mat
 | **L6** | Template entry dependencies + default “all submitted to complete experiment” | SOP control without blocking free edit mid-work |
 | **L7** | Keep template sign-off path working while entries ship | Don’t break activation |
 | **L8** | Do not slip materials, index sets, or accessioning rewrite into this phase | Scope |
+| **L9** | **All** aliquot/pool methods in v1 (by mass, by volume, target mass, target volume, target concentration, and other method modes product defines) — not “one method first” | Labs choose method per process |
 
 ---
 
@@ -75,7 +76,7 @@ That matches how target labs actually work and correctly keeps accessioning, mat
 
 | Risk | Mitigation |
 |------|------------|
-| Aliquot method matrix (by mass/vol/target…) complexity | Ship one method first; expand columns by method flag |
+| Aliquot method matrix complexity | **Not deferred:** v1 must support **all** methods labs use (by mass, by volume, target mass, target volume, target concentration, etc.). Columns/UI driven by method flag; full matrix in scope — **L9** |
 | Pool (multi-content tube) edge cases | Explicit tests: reduce each source content; dest sample identity rules |
 | Ad hoc columns without write-back | Clear UI so techs don’t expect Sample update |
 | “Cancel and restart” for more samples | Document in UI empty/help; measure demand before mid-flight add |
@@ -107,7 +108,7 @@ That matches how target labs actually work and correctly keeps accessioning, mat
 
 | Field | Value |
 |-------|--------|
-| **Verdict** | **Accept with conditions** (L1–L8) |
+| **Verdict** | **Accept with conditions** (L1–L9) |
 | **Date** | 2026-08-10 |
 | **Implement foundation + v1 predefined?** | **Yes**, after eng/CEO/UI/security pass conditions (Lab Ops does not block further review) |
 | **Prior Hold** | Lifted for this scope |

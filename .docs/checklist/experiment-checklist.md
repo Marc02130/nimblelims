@@ -144,7 +144,7 @@ Legacy `experiment_link` via `ExperimentDetail` **coexists** in Phase 1; no forc
 
 | Review | Status | Note |
 |--------|--------|------|
-| **Lab Ops (SVP)** | **Accept w/ L1–L8** (2026-08-10) | Foundation + v1 spine; OOS materials/index/accessioning |
+| **Lab Ops (SVP)** | **Accept w/ L1–L9** (2026-08-10) | L9: all aliquot/pool methods in v1 (not one-first) |
 | CEO | Pending re-review | Scope freeze on v1 spine |
 | UI | Pending re-review | Queue, template builder, save/submit |
 | Architecture | Pending re-review | Grid/export/submit, aliquot execute |

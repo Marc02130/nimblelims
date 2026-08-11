@@ -1,7 +1,7 @@
 # Tech sketch: Experiment template entries (table / form places)
 
 **Date:** 2026-07-28 · **Updated:** 2026-08-10  
-**Status:** **Ready for review** — Lab Ops **first**, then eng/CEO/UI/security  
+**Status:** **Accepted with conditions** (2026-08-10) — Lab Ops L1–L9 (all aliquot methods); CEO/UI/Arch/Security Accept; **implement gate open**  
 **Requirements:** [`.docs/requirements/experiment-processes-entries.md`](../requirements/experiment-processes-entries.md) §4.3 Entries  
 **Open questions:** [`.docs/open-questions/experiments.md`](../open-questions/experiments.md) (Decision #23 + session locks below)  
 **Schema changes:** [`.docs/schema-changes/experiment-template-entries.md`](../schema-changes/experiment-template-entries.md)  
@@ -245,7 +245,7 @@ Admin defines FieldDefinitions. Template picks columns + write-back. Instance ma
 | **Amount** | **Mass or count only — never volume.** Store amount + units; optional concentration + units |
 | Volume | **Not stored.** Display if amount(mass)+conc allow calc. Inbound volume+conc → compute mass, store amount+conc |
 | Pool in tube | 1 tube container, **x** content rows (x samples) |
-| Aliquot/pool **plan** | `experiment_data`: amounts to remove from source / add to dest; method-dependent columns (by mass, by volume UI→mass, target mass/vol/conc, …) |
+| Aliquot/pool **plan** | `experiment_data`: amounts to remove from source / add to dest; **all methods in v1** (by mass, by volume→store mass, target mass, target volume, target concentration, …) — columns/UI switch by method |
 | Aliquot/pool **execute** | Reduce source contents amount; create dest containers; **create new dest samples**; seed dest contents with amount (+ source conc when applicable) |
 | Aliquot/pool **results** | `experiment_sample_data` for resulting aliquots/pools |
 
