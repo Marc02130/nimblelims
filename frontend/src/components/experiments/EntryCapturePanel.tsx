@@ -1,7 +1,8 @@
 /**
- * Entry capture UI for an Experiment (Phase 2).
- * Renders structured Entries (experiment_detail, sample_data, etc.)
- * driven by FieldDefinitions with typed value upsert + write-back indicators.
+ * Entry capture UI for an Experiment (P0 foundation).
+ * Kinds: experiment_sample_data | experiment_data | predefined_action | display_table
+ * (legacy sample_data / experiment_detail still accepted).
+ * Save = entry values only; Submit = mark complete + Sample write-back.
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
@@ -32,6 +33,7 @@ import {
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import SaveIcon from '@mui/icons-material/Save';
+import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import PlaylistAddIcon from '@mui/icons-material/PlaylistAdd';
 import SyncAltIcon from '@mui/icons-material/SyncAlt';
@@ -74,9 +76,27 @@ interface Entry {
   predefined_entry_key?: string | null;
   sort_order: number;
   active: boolean;
+  config?: { status?: string; submitted_at?: string; sample_columns?: string[] } | null;
   field_definition_links: FieldLink[];
   values: EntryValue[];
 }
+
+/** Canonical + legacy aliases for sample-oriented rows (one per experiment sample). */
+const isSampleScoped = (entryType: string) =>
+  entryType === 'experiment_sample_data' || entryType === 'sample_data';
+
+/** Experiment-level / purpose table (rows not auto from full cohort). */
+const isExperimentScoped = (entryType: string) =>
+  entryType === 'experiment_data' || entryType === 'experiment_detail';
+
+const isWritableEntry = (entryType: string) =>
+  isSampleScoped(entryType) || isExperimentScoped(entryType) || entryType === 'predefined_action';
+
+const typeLabel = (entryType: string): string => {
+  if (entryType === 'sample_data') return 'experiment_sample_data';
+  if (entryType === 'experiment_detail') return 'experiment_data';
+  return entryType;
+};
 
 interface FieldDef {
   id: string;
@@ -109,8 +129,10 @@ const draftKey = (fieldId: string, sampleId?: string | null) =>
   `${fieldId}::${sampleId || ''}`;
 
 const TYPE_COLORS: Record<string, 'default' | 'primary' | 'secondary' | 'info' | 'warning' | 'success'> = {
-  experiment_detail: 'info',
+  experiment_sample_data: 'primary',
+  experiment_data: 'info',
   sample_data: 'primary',
+  experiment_detail: 'info',
   predefined_action: 'warning',
   display_table: 'default',
 };
@@ -162,7 +184,7 @@ const EntryCapturePanel: React.FC<EntryCapturePanelProps> = ({
       for (const link of links) {
         const fd = fmap[link.field_definition_id];
         const dt = fd?.data_type || 'text';
-        if (entry.entry_type === 'sample_data') {
+        if (isSampleScoped(entry.entry_type)) {
           for (const sid of sampleIds) {
             const existing = (entry.values || []).find(
               (v) => v.field_definition_id === link.field_definition_id && v.sample_id === sid,
@@ -265,9 +287,10 @@ const EntryCapturePanel: React.FC<EntryCapturePanelProps> = ({
     raw: any,
     sampleId?: string | null,
   ) => {
+    // Save path: entry values only — write-back runs on submit
     const base: any = {
       field_definition_id: fieldId,
-      apply_write_back: true,
+      apply_write_back: false,
     };
     if (sampleId) base.sample_id = sampleId;
 
@@ -309,9 +332,11 @@ const EntryCapturePanel: React.FC<EntryCapturePanelProps> = ({
       const links = (entry.field_definition_links || []).filter((l) => l.visible !== false);
       const values: any[] = [];
 
-      if (entry.entry_type === 'sample_data') {
+      if (isSampleScoped(entry.entry_type)) {
         if (sampleIds.length === 0) {
-          setError('Link samples to this experiment first (Sample Executions) before capturing sample data.');
+          setError(
+            'Select samples for this experiment (queue at start / sample executions) before capturing sample data.',
+          );
           return;
         }
         for (const link of links) {
@@ -322,7 +347,7 @@ const EntryCapturePanel: React.FC<EntryCapturePanelProps> = ({
             values.push(toUpsertPayload(link.field_definition_id, dt, drafts[key], sid));
           }
         }
-      } else if (entry.entry_type === 'experiment_detail' || entry.entry_type === 'predefined_action') {
+      } else if (isExperimentScoped(entry.entry_type) || entry.entry_type === 'predefined_action') {
         for (const link of links) {
           const fd = fieldMap[link.field_definition_id];
           const dt = fd?.data_type || 'text';
@@ -341,10 +366,68 @@ const EntryCapturePanel: React.FC<EntryCapturePanelProps> = ({
 
       await apiService.upsertEntryValues(entry.id, values);
       setDirty((d) => ({ ...d, [entry.id]: false }));
-      setSuccess(`Saved “${entry.name}”`);
+      setSuccess(`Saved “${entry.name}” (draft — use Submit to write back to samples)`);
       await load();
     } catch (err) {
       setError(apiErrorMsg(err, `Failed to save ${entry.name}`));
+    } finally {
+      setSaving((s) => ({ ...s, [entry.id]: false }));
+    }
+  };
+
+  const submitEntry = async (entry: Entry) => {
+    setSaving((s) => ({ ...s, [entry.id]: true }));
+    setError(null);
+    setSuccess(null);
+    try {
+      // Persist unsaved drafts first (still no write-back until submit)
+      if (dirty[entry.id] && isWritableEntry(entry.entry_type)) {
+        const links = (entry.field_definition_links || []).filter((l) => l.visible !== false);
+        const values: any[] = [];
+        if (isSampleScoped(entry.entry_type)) {
+          for (const link of links) {
+            const fd = fieldMap[link.field_definition_id];
+            const dt = fd?.data_type || 'text';
+            for (const sid of sampleIds) {
+              values.push(
+                toUpsertPayload(
+                  link.field_definition_id,
+                  dt,
+                  drafts[draftKey(link.field_definition_id, sid)],
+                  sid,
+                ),
+              );
+            }
+          }
+        } else {
+          for (const link of links) {
+            const fd = fieldMap[link.field_definition_id];
+            const dt = fd?.data_type || 'text';
+            values.push(
+              toUpsertPayload(
+                link.field_definition_id,
+                dt,
+                drafts[draftKey(link.field_definition_id)],
+              ),
+            );
+          }
+        }
+        if (values.length > 0) {
+          await apiService.upsertEntryValues(entry.id, values);
+        }
+      }
+
+      const res: any = await apiService.submitEntry(entry.id);
+      const n = res?.write_backs_applied ?? 0;
+      setDirty((d) => ({ ...d, [entry.id]: false }));
+      setSuccess(
+        n > 0
+          ? `Submitted “${entry.name}” (${n} sample write-back${n === 1 ? '' : 's'})`
+          : `Submitted “${entry.name}”`,
+      );
+      await load();
+    } catch (err) {
+      setError(apiErrorMsg(err, `Failed to submit ${entry.name}`));
     } finally {
       setSaving((s) => ({ ...s, [entry.id]: false }));
     }
@@ -395,7 +478,7 @@ const EntryCapturePanel: React.FC<EntryCapturePanelProps> = ({
         title={
           existing?.write_back_at
             ? `Last write-back to Sample.${writeBack} at ${new Date(existing.write_back_at).toLocaleString()}`
-            : `Writes back to Sample.${writeBack} on save`
+            : `Writes back to Sample.${writeBack} on Submit (not Save)`
         }
       >
         <SyncAltIcon fontSize="small" color="action" sx={{ ml: 0.5 }} />
@@ -514,8 +597,10 @@ const EntryCapturePanel: React.FC<EntryCapturePanelProps> = ({
       </Box>
 
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-        Structured data capture for this experiment. Sample data entries use samples linked under
-        Sample Executions. Fields with ⇄ write back to the Sample record on save (last write wins).
+        Structured data capture for this experiment. Sample-oriented entries use the experiment
+        cohort (queue at start / sample executions). <strong>Save</strong> stores draft values only;{' '}
+        <strong>Submit</strong> completes the entry and applies Sample write-backs (⇄, last write
+        wins). You can edit again after submit until the experiment is done.
       </Typography>
 
       {entries.length === 0 ? (
@@ -531,6 +616,8 @@ const EntryCapturePanel: React.FC<EntryCapturePanelProps> = ({
             .sort((a, b) => a.sort_order - b.sort_order);
           const isDirty = Boolean(dirty[entry.id]);
           const isSaving = Boolean(saving[entry.id]);
+          const entryStatus = entry.config?.status || 'draft';
+          const isSubmitted = entryStatus === 'submitted';
 
           return (
             <Accordion key={entry.id} defaultExpanded={entries.length <= 3}>
@@ -539,12 +626,18 @@ const EntryCapturePanel: React.FC<EntryCapturePanelProps> = ({
                   <Typography fontWeight={600}>{entry.name}</Typography>
                   <Chip
                     size="small"
-                    label={entry.entry_type}
+                    label={typeLabel(entry.entry_type)}
                     color={TYPE_COLORS[entry.entry_type] || 'default'}
                   />
                   {entry.predefined_entry_key && (
                     <Chip size="small" variant="outlined" label={entry.predefined_entry_key} />
                   )}
+                  <Chip
+                    size="small"
+                    variant="outlined"
+                    color={isSubmitted ? 'success' : 'default'}
+                    label={isSubmitted ? 'Submitted' : 'Draft'}
+                  />
                   {isDirty && <Chip size="small" color="warning" label="Unsaved" />}
                 </Box>
               </AccordionSummary>
@@ -569,11 +662,11 @@ const EntryCapturePanel: React.FC<EntryCapturePanelProps> = ({
                   </Alert>
                 )}
 
-                {entry.entry_type === 'sample_data' ? (
+                {isSampleScoped(entry.entry_type) ? (
                   sampleIds.length === 0 ? (
                     <Alert severity="warning">
-                      No samples linked to this experiment. Add sample executions first, then capture
-                      per-sample data here.
+                      No samples on this experiment yet. Select the cohort at start (queue / scan),
+                      then capture per-sample data here.
                     </Alert>
                   ) : links.length === 0 ? (
                     <Typography color="text.secondary">No fields configured on this entry.</Typography>
@@ -589,8 +682,12 @@ const EntryCapturePanel: React.FC<EntryCapturePanelProps> = ({
                                 <TableCell key={link.field_definition_id}>
                                   {fd?.display_name || fd?.name || 'Field'}
                                   {link.write_back_target && (
-                                    <Tooltip title={`Write-back: Sample.${link.write_back_target}`}>
-                                      <SyncAltIcon sx={{ fontSize: 14, ml: 0.5, verticalAlign: 'middle' }} />
+                                    <Tooltip
+                                      title={`Write-back on Submit: Sample.${link.write_back_target}`}
+                                    >
+                                      <SyncAltIcon
+                                        sx={{ fontSize: 14, ml: 0.5, verticalAlign: 'middle' }}
+                                      />
                                     </Tooltip>
                                   )}
                                 </TableCell>
@@ -607,7 +704,10 @@ const EntryCapturePanel: React.FC<EntryCapturePanelProps> = ({
                                 </Typography>
                               </TableCell>
                               {links.map((link) => (
-                                <TableCell key={`${sid}-${link.field_definition_id}`} sx={{ minWidth: 140 }}>
+                                <TableCell
+                                  key={`${sid}-${link.field_definition_id}`}
+                                  sx={{ minWidth: 140 }}
+                                >
                                   {renderFieldInput(entry, link, sid)}
                                 </TableCell>
                               ))}
@@ -625,16 +725,34 @@ const EntryCapturePanel: React.FC<EntryCapturePanelProps> = ({
                   </Box>
                 )}
 
-                {canEdit && entry.entry_type !== 'display_table' && links.length > 0 && (
-                  <Box mt={2}>
+                {canEdit && isWritableEntry(entry.entry_type) && links.length > 0 && (
+                  <Box mt={2} display="flex" gap={1} flexWrap="wrap">
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      startIcon={
+                        isSaving ? <CircularProgress size={16} color="inherit" /> : <SaveIcon />
+                      }
+                      disabled={isSaving || (!isDirty && !isSampleScoped(entry.entry_type))}
+                      onClick={() => saveEntry(entry)}
+                    >
+                      {isSaving ? 'Saving…' : 'Save'}
+                    </Button>
                     <Button
                       variant="contained"
                       size="small"
-                      startIcon={isSaving ? <CircularProgress size={16} color="inherit" /> : <SaveIcon />}
-                      disabled={isSaving || (!isDirty && entry.entry_type !== 'sample_data')}
-                      onClick={() => saveEntry(entry)}
+                      color="success"
+                      startIcon={
+                        isSaving ? (
+                          <CircularProgress size={16} color="inherit" />
+                        ) : (
+                          <CheckCircleOutlineIcon />
+                        )
+                      }
+                      disabled={isSaving}
+                      onClick={() => submitEntry(entry)}
                     >
-                      {isSaving ? 'Saving…' : 'Save entry'}
+                      {isSubmitted ? 'Re-submit' : 'Submit'}
                     </Button>
                   </Box>
                 )}

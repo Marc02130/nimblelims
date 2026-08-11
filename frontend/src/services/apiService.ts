@@ -1774,6 +1774,24 @@ export class ApiService {
     return response.data;
   }
 
+  async getEntryGrid(entryId: string) {
+    const response: AxiosResponse = await this.api.get(`v1/entries/${entryId}/grid`);
+    return response.data;
+  }
+
+  async exportEntry(entryId: string, format: 'json' | 'csv' = 'json') {
+    const response: AxiosResponse = await this.api.get(`v1/entries/${entryId}/export`, {
+      params: { format },
+      responseType: format === 'csv' ? 'blob' : 'json',
+    });
+    return response.data;
+  }
+
+  async submitEntry(entryId: string) {
+    const response: AxiosResponse = await this.api.post(`v1/entries/${entryId}/submit`);
+    return response.data;
+  }
+
   // SOP parse jobs (v1 API)
   async createSopParseJob(sopFile: File, instrumentFile: File) {
     const form = new FormData();

@@ -1,14 +1,19 @@
 """
-Experiment Entries API — Phase 2
+Experiment Entries API (P0 foundation)
 
   /v1/experiments/{experiment_id}/entries
   /v1/entries/{entry_id}
-  /v1/entries/{entry_id}/values
+  /v1/entries/{entry_id}/values   — save (no Sample write-back)
+  /v1/entries/{entry_id}/submit   — complete + write-back
+  /v1/entries/{entry_id}/grid     — wide UI
+  /v1/entries/{entry_id}/export   — long report
 """
 from typing import Optional, List
 from uuid import UUID
 from fastapi import APIRouter, Depends, Query, status
-from sqlalchemy.orm import Session
+from fastapi.responses import StreamingResponse
+import csv
+import io
 
 from app.database import get_db
 from app.core.rbac import require_experiment_manage
@@ -18,12 +23,15 @@ from app.schemas.entry import (
     EntryUpdate,
     EntryRead,
     EntryListResponse,
-    EntryFieldValueUpsert,
     EntryFieldValueBulkUpsert,
     EntryFieldValueRead,
     InstantiateEntriesRequest,
+    EntryGridResponse,
+    EntryExportResponse,
+    EntrySubmitResponse,
 )
 from models.user import User
+from sqlalchemy.orm import Session
 
 router = APIRouter(tags=["entries"])
 
@@ -66,7 +74,6 @@ def create_entry(
     data: EntryCreate,
     service: EntryService = Depends(get_service),
 ):
-    # Ensure path and body agree
     payload = data.model_copy(update={'experiment_id': experiment_id})
     entry = service.create_entry(payload)
     return EntryRead.model_validate(entry)
@@ -128,9 +135,76 @@ def upsert_values(
     data: EntryFieldValueBulkUpsert,
     service: EntryService = Depends(get_service),
 ):
-    """Upsert field values; applies allowlisted sample write-back when configured."""
-    values = service.upsert_values(entry_id, data.values)
+    """Save field values only — does not write back to Sample (use submit)."""
+    values = service.upsert_values(entry_id, data.values, apply_write_back=False)
     return [EntryFieldValueRead.model_validate(v) for v in values]
+
+
+@router.post(
+    "/entries/{entry_id}/submit",
+    response_model=EntrySubmitResponse,
+)
+def submit_entry(
+    entry_id: UUID,
+    service: EntryService = Depends(get_service),
+):
+    """Mark entry submitted and apply Sample write-back for mapped columns."""
+    entry, n = service.submit_entry(entry_id)
+    return EntrySubmitResponse(
+        entry=EntryRead.model_validate(entry),
+        write_backs_applied=n,
+    )
+
+
+@router.get(
+    "/entries/{entry_id}/grid",
+    response_model=EntryGridResponse,
+)
+def get_entry_grid(
+    entry_id: UUID,
+    service: EntryService = Depends(get_service),
+):
+    """Wide grid for UI capture (columns + rows[].cells)."""
+    return service.get_grid(entry_id)
+
+
+@router.get(
+    "/entries/{entry_id}/export",
+    response_model=EntryExportResponse,
+)
+def export_entry(
+    entry_id: UUID,
+    format: str = Query("json", pattern="^(json|csv)$"),
+    service: EntryService = Depends(get_service),
+):
+    """Long-form export for reports (one record per cell)."""
+    result = service.export_entry(entry_id)
+    if format == "csv":
+        buf = io.StringIO()
+        fieldnames = [
+            "experiment_id", "experiment_name", "entry_id", "entry_name", "entry_type",
+            "sample_id", "client_sample_id", "field_definition_id", "field_name",
+            "field_display_name", "column_kind", "data_type", "value_text", "value_number",
+            "value_list_entry_id", "value_list_entry_name", "value_date", "value_boolean",
+            "display_value", "modified_at", "modified_by",
+        ]
+        writer = csv.DictWriter(buf, fieldnames=fieldnames, extrasaction="ignore")
+        writer.writeheader()
+        for row in result.rows:
+            d = row.model_dump()
+            for k, v in list(d.items()):
+                if v is not None and not isinstance(v, (str, int, float, bool)):
+                    d[k] = str(v)
+            writer.writerow({k: d.get(k) for k in fieldnames})
+        buf.seek(0)
+        return StreamingResponse(
+            iter([buf.getvalue()]),
+            media_type="text/csv",
+            headers={
+                "Content-Disposition": f'attachment; filename="entry_{entry_id}_export.csv"'
+            },
+        )
+    return result
 
 
 @router.get(
