@@ -130,6 +130,9 @@ Long-form tech designs stay in [design/](design/). UI review was previously `ui-
 | [ideas/multi-tenant.md](ideas/multi-tenant.md) | Org segregation / true multi-tenant isolation | **Placeholder — OOS until real multi-org users** |
 | [ideas/lab-locations.md](ideas/lab-locations.md) | Lab buildings/rooms; rename client `locations` → `addresses` | **Placeholder** |
 | [ideas/orders-and-projects.md](ideas/orders-and-projects.md) | Rename today’s `projects` → **orders**; keep **client_projects** (CRO reporting); new **lab projects** (method-dev etc.) | **Placeholder** |
+| [ideas/accessioning-and-workflows-revisit.md](ideas/accessioning-and-workflows-revisit.md) | Revisit accessioning workflows: sample manifest upload + receive verification (continuous vs discontinuous) | **Placeholder — OOS experiment entries** |
+| [ideas/materials-and-lot-tracking.md](ideas/materials-and-lot-tracking.md) | Materials/reagents + lot inventory and use on experiments | **Placeholder — not in NimbleLIMS today** |
+| [ideas/index-sets-and-sequencing-setup.md](ideas/index-sets-and-sequencing-setup.md) | Index set catalog, index assignment entry, sequencer sample sheets / flow cell loading | **Placeholder** |
 | [ideas/ui-tabbed-admin-catalogs.md](ideas/ui-tabbed-admin-catalogs.md) | Tabbed shells + menu names: Assay catalog, Customers, Work, Instruments, Access control; CRO separate | **Placeholder** |
 | [ideas/model-fine-tune.md](ideas/model-fine-tune.md) | Model fine-tune notes | See `sop-rag` for related SOP/RAG work |
 

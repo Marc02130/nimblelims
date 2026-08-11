@@ -1,14 +1,306 @@
 # Tech sketch: Experiment template entries (table / form places)
 
-**Date:** 2026-07-28 · **Reviewed:** 2026-07-29  
-**Status:** **Revise — Hold implementation** (Lab Ops 2026-07-29). Tech reviews were premature for implement gate.  
-**Requirements:** [`.docs/requirements/experiment-processes-entries.md`](../requirements/experiment-processes-entries.md) §4.3 Entries — **needs entry catalog + workflow brief before code**  
-**Open questions:** [`.docs/open-questions/experiments.md`](../open-questions/experiments.md) (Q11–Q16 partial; **Q17–Q22 open** block implement)  
+**Date:** 2026-07-28 · **Updated:** 2026-08-10  
+**Status:** **Ready for review** — Lab Ops **first**, then eng/CEO/UI/security  
+**Requirements:** [`.docs/requirements/experiment-processes-entries.md`](../requirements/experiment-processes-entries.md) §4.3 Entries  
+**Open questions:** [`.docs/open-questions/experiments.md`](../open-questions/experiments.md) (Decision #23 + session locks below)  
 **Schema changes:** [`.docs/schema-changes/experiment-template-entries.md`](../schema-changes/experiment-template-entries.md)  
-**Reviews:** [Lab Ops](../lab-ops-review/experiment-template-entries.md) (**Hold**) · [CEO](../ceo-review/experiment-template-entries.md) · [UI](../ui-review/experiment-template-entries.md) · [Architecture](../architecture-review/experiment-template-entries.md) · [Security](../security-review/experiment-template-entries.md)  
+**Reviews:** [Lab Ops](../lab-ops-review/experiment-template-entries.md) · [CEO](../ceo-review/experiment-template-entries.md) · [UI](../ui-review/experiment-template-entries.md) · [Architecture](../architecture-review/experiment-template-entries.md) · [Security](../security-review/experiment-template-entries.md)  
+**Ideas (OOS):** [accessioning](../ideas/accessioning-and-workflows-revisit.md) · [materials/lots](../ideas/materials-and-lot-tracking.md) · [index sets / sample sheets](../ideas/index-sets-and-sequencing-setup.md)  
 **Reference:** [`manuals/Sapio Experiments Guide.pdf`](../../manuals/Sapio%20Experiments%20Guide.pdf)  
-**Related manuals:** [experiments.md](../manuals/experiments.md), [processes.md](../manuals/processes.md)  
-**Process:** [development-process/README.md](../development-process/README.md) — **lab ops gate required**
+**Related manuals:** [experiments.md](../manuals/experiments.md), [processes.md](../manuals/processes.md), [lims-runs.md](../manuals/lims-runs.md)  
+**Process:** Lab Ops first, then other reviews ([lab-ops-review/README.md](../lab-ops-review/README.md))
+
+---
+
+## 0. LOCKED FOUNDATION (product decisions through 2026-08-10)
+
+> **Do not reopen without product decision.**  
+> This section is the authoritative lock from Q&A sets A–H.  
+> Sketch scope = **two base kinds + columns/population + v1 predefined wrappers + template UI** — not full Sapio catalog.
+
+### 0.1 Two entry kinds (product names)
+
+| Kind | Meaning | Rows |
+|------|---------|------|
+| **`experiment_sample_data`** | Sample-oriented capture/display for one purpose on the experiment | **One row per sample in the experiment** (cohort selected at start). Many such entries per experiment, each with its own columns. |
+| **`experiment_data`** | Purpose-specific experiment table/form (plans, headers, operation lines) | Rows are **not automatic** — only when **code or user** creates them. A row **may** reference a `sample_id` (subset for a purpose) but does **not** auto-expand to all experiment samples. |
+
+Legacy API strings `sample_data` / `experiment_detail` **alias →** these names on read/write normalization.
+
+**Multiplicity:** One experiment can have **many** entries of each kind.
+
+**LIMS Runs:** Own **instrument** file → results → promote. **No** ELN instrument entry. **Analysis required** on every LIMS Run.
+
+### 0.1b Start cohort (queue) — not per entry
+
+| Rule | Detail |
+|------|--------|
+| When | **Start of experiment** or **start of LIMS run** only — not on individual entries |
+| UI | **Queue** (sample status / process context) → scientist selects **1..N** (all, subset, or one) |
+| Scan | **Plate** → all samples on that plate; **tube** → that tube (pool = multiple contents) |
+| After start | Cohort is **fixed**; process as **one set**. No mid-flight add (cancel/restart or new experiment/run) |
+| Process auto-link | **No** — process may filter queue; selection is always explicit |
+| Inside experiment | All selected samples are processed together on `experiment_sample_data` entries |
+
+### 0.2 Storage (not “one JSON blob”)
+
+| Layer | Table / mechanism |
+|-------|-------------------|
+| Entry shell | `entries` (`entry_type`, name, `config` JSONB for layout/population hints only) |
+| Columns | `entry_field_definitions` → `field_definitions` |
+| Cells | `entry_field_values` **typed columns**: `value_text`, `value_number`, `value_list_entry_id`, `value_date`, `value_boolean`; optional `value_json` only for complex fields |
+| Sample key | `entry_field_values.sample_id` set for `experiment_sample_data`; null for pure experiment-level `experiment_data` cells; optional sample_id on subset rows for purpose-specific `experiment_data` |
+
+**No new physical tables** named `experiment_sample_data` / `experiment_data` in v1 — those are **entry types** (logical). Hybrid path: SQL views later for reporting if needed.
+
+### 0.3 Grid read contract (UI — wide rows)
+
+**Endpoint (canonical):**
+
+```http
+GET /v1/entries/{entry_id}/grid
+```
+
+**Auth:** same as entry read (today `experiment:manage`; refine with Decision #9 later).  
+**RLS:** samples only if visible; no cross-client leakage.
+
+**Response schema (locked shape):**
+
+```json
+{
+  "entry_id": "uuid",
+  "experiment_id": "uuid",
+  "entry_type": "experiment_sample_data",
+  "name": "Prep measurements",
+  "columns": [
+    {
+      "key": "client_sample_id",
+      "kind": "sample_field",
+      "field_definition_id": null,
+      "label": "Client Sample ID",
+      "data_type": "text",
+      "editable": false,
+      "sort_order": 0
+    },
+    {
+      "key": "<field_definition_uuid>",
+      "kind": "field_definition",
+      "field_definition_id": "<uuid>",
+      "label": "Concentration",
+      "data_type": "number",
+      "editable": true,
+      "sort_order": 1,
+      "write_back_target": null
+    }
+  ],
+  "rows": [
+    {
+      "row_id": "optional-stable-id",
+      "sample_id": "uuid",
+      "cells": {
+        "client_sample_id": {
+          "value": "S-001",
+          "display": "S-001",
+          "value_type": "text"
+        },
+        "<field_definition_uuid>": {
+          "value": 12.5,
+          "display": "12.5",
+          "value_type": "number",
+          "value_id": "uuid-of-entry_field_value-if-exists"
+        }
+      }
+    }
+  ],
+  "row_count": 1,
+  "meta": {
+    "row_policy": "experiment_samples",
+    "empty_reason": null
+  }
+}
+```
+
+| Rule | Detail |
+|------|--------|
+| **experiment_sample_data rows** | Exactly the samples **in** the experiment (selected at start). Order: link/`created_at`, then `sample_id`. **No** mid-experiment sample adds in v1. |
+| **experiment_data rows** | Only rows created by user/code; **not** auto-filled from full sample list. `sample_id` optional per row. |
+| **cells** | Keyed by column `key` (sample_field key or field_definition_id string). Missing → omit or null. |
+| **display** | Server resolves list FKs to list entry **names**. |
+| **empty_reason** | e.g. `no_samples_on_experiment` when kind is experiment_sample_data and none selected. |
+
+**Write path (cell model):**
+
+```http
+PUT /v1/entries/{entry_id}/values   # Save — entry values only; no Sample write-back
+POST /v1/entries/{entry_id}/submit  # Submit — mark complete; apply write-back maps; may unlock next entry
+```
+
+Body for values: list of `{ field_definition_id, sample_id?, value_* }`. Reject writes to non-editable `sample_field` columns.
+
+### 0.4 Export / report list contract (stable, long-form)
+
+For reporting, BI, and stable integrations — **long (normalized) rows**, not wide pivot. Survives column set changes without breaking column positions.
+
+**Endpoint (canonical):**
+
+```http
+GET /v1/entries/{entry_id}/export
+GET /v1/experiments/{experiment_id}/entries/export   # optional: all entries on experiment
+```
+
+Query params (v1):
+
+| Param | Default | Notes |
+|-------|---------|--------|
+| `format` | `json` | `json` \| `csv` |
+| `include_inactive_fields` | `false` | If true, include columns no longer on entry |
+| `sample_id` | — | Optional filter |
+
+**JSON item shape (one object per cell — locked):**
+
+```json
+{
+  "experiment_id": "uuid",
+  "experiment_name": "string",
+  "entry_id": "uuid",
+  "entry_name": "string",
+  "entry_type": "experiment_sample_data",
+  "sample_id": "uuid | null",
+  "client_sample_id": "string | null",
+  "field_definition_id": "uuid | null",
+  "field_name": "string",
+  "field_display_name": "string",
+  "column_kind": "field_definition | sample_field",
+  "data_type": "text | number | list | date | boolean | json",
+  "value_text": null,
+  "value_number": 12.5,
+  "value_list_entry_id": null,
+  "value_list_entry_name": null,
+  "value_date": null,
+  "value_boolean": null,
+  "value_json": null,
+  "display_value": "12.5",
+  "modified_at": "iso-8601",
+  "modified_by": "uuid | null"
+}
+```
+
+**CSV:** same fields as header row; one line per cell. UTF-8. Stable column order as table above.
+
+**experiment_sample_data:** export includes one row per (sample × column that has a value or all columns with nulls — **v1: emit all configured columns per sample**, nulls empty, so grids rehydrate). Prefer **all configured columns × all experiment samples** for complete export even if never saved (empty cells).
+
+**experiment_data:** one row per stored cell (or per configured field if experiment-scoped form with no sample).
+
+### 0.5 Access story (single picture)
+
+```text
+                    ┌─────────────────────────────┐
+                    │ entry_field_values (typed)  │
+                    │ + sample_id / field def     │
+                    └─────────────┬───────────────┘
+                                  │
+              ┌───────────────────┼───────────────────┐
+              ▼                                       ▼
+   GET …/grid (wide)                      GET …/export (long)
+   UI tables / capture                    Reports, BI, ETL, scripts
+   columns[] + rows[].cells               one record per cell
+```
+
+| Consumer | Use |
+|----------|-----|
+| React EntryCapturePanel | `/grid` + `PUT …/values` |
+| Sample journey / detail embeds | `/grid` for one entry |
+| Internal reports / future dashboards | `/export?format=json` or `csv` |
+| Ad-hoc SQL | Join `entry_field_values` ↔ `entries` ↔ `field_definitions` ↔ `samples` (same as export) |
+
+### 0.6 Columns
+
+| Column kind | On | Editable | Storage |
+|-------------|-----|----------|---------|
+| **sample_field** (RO) | `experiment_sample_data` (required capability) | **No** | Projection from Sample/related (accessioning SoT). Examples: client_sample_id, client, subject/patient, biotype, received_date |
+| **field_definition** | Both kinds | Yes (unless marked RO) | `entry_field_values` typed cells |
+| **Ad hoc on instance** | Both kinds | Yes | Existing FieldDefinitions only; **never** write-back |
+| **Template-authored** | Both kinds | Yes | May set write-back map (below) |
+
+Admin defines FieldDefinitions. Template picks columns + write-back. Instance may add existing fields without write-back.
+
+### 0.7 Write-back to Sample
+
+| Rule | Detail |
+|------|--------|
+| Default | **Off** |
+| What | Only **experiment-derived** FieldDefinition columns — never accessioning identity fields |
+| Map | On **entry column**: `write_back_enabled` + **target Sample field** (dropdown, **type-matched**, from **config-eligible** sample fields so new sample fields can be included without code change) |
+| Timing | **On entry submit only**; **Save** = entry values only (long-running steps) |
+| Conflict | **Last write wins** + audit previous (`write_back_previous`); expected across processing steps |
+| Not via write-back | Container amount/conc/location; volume |
+
+### 0.8 Containers, amount, aliquot/pool
+
+| Rule | Detail |
+|------|--------|
+| Container | id + type (tube/rack/plate/box); type has **# elements** |
+| Contents | samples, cells, compounds (samples), … ; multi-content per well allowed (e.g. cells + compound) |
+| **Amount** | **Mass or count only — never volume.** Store amount + units; optional concentration + units |
+| Volume | **Not stored.** Display if amount(mass)+conc allow calc. Inbound volume+conc → compute mass, store amount+conc |
+| Pool in tube | 1 tube container, **x** content rows (x samples) |
+| Aliquot/pool **plan** | `experiment_data`: amounts to remove from source / add to dest; method-dependent columns (by mass, by volume UI→mass, target mass/vol/conc, …) |
+| Aliquot/pool **execute** | Reduce source contents amount; create dest containers; **create new dest samples**; seed dest contents with amount (+ source conc when applicable) |
+| Aliquot/pool **results** | `experiment_sample_data` for resulting aliquots/pools |
+
+### 0.9 v1 predefined entries (+ LIMS)
+
+| Predefined | Kind | Behavior |
+|------------|------|----------|
+| **Experiment header** | `experiment_data` | Start context |
+| **Samples** | `experiment_sample_data` | Display cohort from queue selection |
+| **Aliquot/pool plan** | `experiment_data` | Plan lines + **execute** behavior |
+| **Aliquots/pools** | `experiment_sample_data` | Post-execute sample view |
+| Plating / LH plan, flow-cell notes | `experiment_data` (generic) for now | Upload/automation file as plan data |
+| Instrument primary data | **LIMS Run** | Analysis required; no ELN instrument entry |
+
+**Predefined = functionality** (e.g. execute aliquot), not only a default column pack. Columns depend on method.
+
+**Out of v1 / ideas:** materials/lots, index sets + assignment entry, sequencer-specific sample sheets, accessioning manifest/verify revisit.
+
+### 0.10 Lifecycle (entry + experiment)
+
+| Rule | Detail |
+|------|--------|
+| Edit | **Free edit** until experiment done |
+| Save | Entry values only |
+| Submit entry | Optional unless template dependency requires it; applies write-back; marks step complete |
+| **Entry dependencies** | **Template design**: entry B may require entry A submitted before B can start |
+| Experiment complete | **Default: all entries submitted** required |
+| Template activation sign-off | **Keep** current transfer-step / mandatory review sign-off for now |
+
+### 0.11 Template UI (in scope for this sketch)
+
+Author on Experiment Template:
+
+- Ordered entries (base kinds + predefined wrappers)
+- Columns (sample_field + FieldDefinitions)
+- Write-back map (template only)
+- Entry dependencies (submit gates)
+- Method for aliquot/pool when predefined
+
+Instance: queue start, grid, save/submit, execute aliquot where applicable.
+
+### 0.12 Review order
+
+1. **Lab Ops**  
+2. Architecture / eng, CEO, UI, Security  
+
+### 0.13 Open / later (non-blocking for foundation review)
+
+- Exact config UI for write-back-eligible sample fields  
+- Formal `element_count` on container type if not already modeled  
+- Polymorphic contents beyond sample (cells, compounds) schema evolution  
+- `experiment_data` multi-row `row_id` if needed beyond cells  
+- Accessioning workflow revisit (idea)  
+
+---
 
 ## 1. Problem (technical)
 

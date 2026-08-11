@@ -1,198 +1,105 @@
 # Lab Ops Review (SVP): Experiment template entries
 
-**Date:** 2026-07-29  
-**Status:** **Revise — Hold implementation**  
-**Reviewer persona:** SVP Lab Operations (PhD biology; chemistry & sequencing; ~30y biotech/pharma ops)  
-**Packet:** [tech-sketch/experiment-template-entries.md](../tech-sketch/experiment-template-entries.md)  
-**Requirements:** [experiment-processes-entries.md](../requirements/experiment-processes-entries.md)  
-**External reference:** [`manuals/Sapio Experiments Guide.pdf`](../../manuals/Sapio%20Experiments%20Guide.pdf)  
-**Open questions:** [experiments.md](../open-questions/experiments.md) (new Q17–Q22)
+**Date:** 2026-08-10  
+**Status:** **Accept with conditions**  
+**Reviewer persona:** SVP Lab Ops (PhD biology; chemistry & sequencing; ~30y biotech/pharma)  
+**Packet:** [tech-sketch/experiment-template-entries.md](../tech-sketch/experiment-template-entries.md) §0 (locked foundation through 2026-08-10)  
+**Prior hold:** 2026-07-29 (premature catalog) — **superseded** by product Q&A locks  
 
 ---
 
 ## 1. Executive summary
 
-**We are moving too fast from abstraction to API types.**
+The packet is no longer “two empty grids.” Product locked a **credible lab spine**:
 
-The engineering direction (ordered entry blocks on a template, custom columns, population from experiment samples) is *directionally* right for an ELN. The current sketch **is not yet a lab design**. It names two generic tables (`sample_table` / `experiment_table`) and treats aliquoting as “columns on a grid.” That under-serves how real biotech/pharma and sequencing labs actually run work.
+- Queue → select (scan plate/tube) → fixed cohort  
+- Header + Samples entries  
+- Aliquot/pool **plan + execute** (containers, new dest samples, amount=mass/count never volume)  
+- LIMS Run for instruments (analysis required)  
+- Free edit + optional submit + template entry dependencies + default all-submitted to complete experiment  
+- Write-back only for experiment-derived sample attributes, submit-only, config-driven targets  
 
-Sapio (and every mature ELN/LIMS the persona has used) models an experiment as a **sequence of specialized entries**—Samples, Plates, Aliquot/Pool, Material Tracking, Instrument Tracking, Notes, Forms, domain tools—with **submit/lock**, **template composition**, and **process stringing**. Our plan collapses that catalog into two grids plus optional population. That is not enough for target customers evaluating “can we run NGS library prep / sample prep / QC here?”
+That matches how target labs actually work and correctly keeps accessioning, materials, and NGS index/sample-sheet as **later** ideas.
 
-**Verdict: Revise. Hold Phase 4 implementation** until lab workflows and an entry **catalog** are written into requirements and the sketch is re-reviewed by this role.
-
-Prior CEO/UI/Architecture/Security “Accept” on this packet is **insufficient alone** to open the implement gate for ELN entry work.
-
----
-
-## 2. What I reviewed
-
-- Tech sketch (building blocks, row_source, columns, grid API)  
-- Decisions #15–#16 (plan/results tables, naming)  
-- Sapio Experiments Guide: entry menu, OOTB/Silver/Gold entries, Samples, Plates, Aliquot/Pool, Material Tracking, submit/unlock, templates, process manager mention  
-- Existing NimbleLIMS: processes (ELN + lims_run), LimsRun + analysis, Field Management, EntryCapturePanel  
+**Verdict: Accept with conditions** for foundation + v1 predefined spine. **Do not expand scope** into materials/index sets/accessioning rewrite in this phase.
 
 ---
 
-## 3. Lab workflow reality (persona lens)
+## 2. Lab fit assessment
 
-### 3.1 What a customer lab expects from an “experiment”
+| Dimension | Score (0–10) | Notes |
+|-----------|--------------|--------|
+| Cohort intake | 9 | Queue + discretionary select + scan plate/tube; no silent process auto-link |
+| Fixed set after start | 9 | Matches “process as one”; cancel/restart is honest |
+| Identity vs process data | 9 | RO accessioning fields; write-back only for experiment-derived sample attrs |
+| Container / aliquot | 8 | Execute model correct; implement carefully (pools, partial transfers) |
+| Instrument boundary | 10 | LIMS Run only; analysis required |
+| Lifecycle / gates | 8 | Free edit + optional submit + template deps + default all-submitted — good |
+| Scope discipline | 9 | Explicit OOS + ideas for accessioning, materials, index sets |
+| Template authoring | 8 | In sketch; needs clear admin UX for deps and write-back map |
 
-| Expectation | Sapio-like systems | Our sketch today |
-|-------------|--------------------|------------------|
-| Ordered procedure inside one experiment | Many entry types in series | Two generic table types |
-| Bring samples/plates into the experiment | First-class Samples / Plates entries | sample_executions + generic sample_table |
-| Aliquot / pool creates **new sample identities** | Aliquot/Pool / HT plate pooling | Custom columns only—no derivative model |
-| Reagent/lot consumption | Material Tracking | **Missing** |
-| Instrument used | Instrument Tracking / result viewer | LimsRun path separate; ELN weak |
-| Protocol/notes fixed on template | Experiment Notes pre-filled | Protocol tab orphaned |
-| Step complete before next | Submit/lock; unlock with reason | Not specified |
-| Multi-step SOP across experiments | Process Manager | ELN process exists; entry auto-populate (Q8) open |
-| Sequencing setup | Index, Illumina run, sample sheet | LimsRun/analysis only; no ELN entry kinds |
-
-### 3.2 Sequencing / chemistry pressure
-
-For NGS-heavy customers (persona sequencing background):
-
-- **Index assignment**, **pooling**, **plate maps**, **sample sheet generation** are not “another column set on sample_table.” They are **workflow actions with rules** (unique indexes, plate density, pooling mass balance).  
-- Dose-response / instrument import correctly lives in **LimsRun**; ELN still must hand off **which samples/plates** cleanly. Sketch does not define plate entry or process→experiment population as non-optional.
-
-### 3.3 GxP / regulated habits (even if full Part 11 is later)
-
-Labs will ask early:
-
-- Can we **lock** a completed table?  
-- Who unlocks and **why** (audit)?  
-- Are critical fields **required** before complete?  
-- Is **lot number** of enzyme/kit captured?
-
-Sketch is silent. That fails a lab ops interview.
+**Overall lab readiness: 8.5/10** for v1 spine — **implementable** after conditions.
 
 ---
 
-## 4. Findings (severity = lab adoption risk)
+## 3. What improved since Hold (2026-07-29)
 
-### L1 — CRITICAL: Two generic tables ≠ experiment entry catalog
-
-**Problem:** `sample_table` / `experiment_table` are storage/UI shapes, not lab entry kinds. Customers buy **behaviors** (aliquot creates children, material deducts lot, samples entry owns intake).
-
-**Required before code:** Requirements list **v1 entry catalog** with at least:
-
-| Priority | Entry kind (lab language) | Notes |
-|----------|---------------------------|--------|
-| P0 | **Samples** (bring samples into experiment) | Distinct from “results grid” |
-| P0 | **Custom sample table** (measurements / plan columns) | Your column picker |
-| P0 | **Custom experiment form/table** | Conditions, notes fields |
-| P0 | **Experiment notes / protocol text** | Template-prefilled |
-| P1 | **Plates** (or plate map) | Sequencing/prep reality |
-| P1 | **Aliquot / pool** (creates derivatives) | Not only plan columns |
-| P1 | **Material / reagent tracking** | Lot, qty used |
-| P2 | Instrument tracking; domain tools | Align with LimsRun |
-
-Map each kind to storage (generic table + `predefined_entry_key` / behavior plugin is fine eng-wise—but **product catalog first**).
-
-### L2 — CRITICAL: Aliquot plan without derivative samples is incomplete
-
-**Problem:** Plan rows with dest/volume do not answer: “Where is the daughter tube? What is its ID? What parent volume remains?”
-
-**Required:** Either  
-
-- **A)** Aliquot entry that **creates/links child samples** (preferred for biotech), or  
-- **B)** Explicit non-goal: “plan-only documentation; no inventory effect” with customer messaging  
-
-Persona rejects silent B for target pharma/biotech without stating it.
-
-### L3 — HIGH: Population model is right but too thin
-
-**Good:** `row_source = experiment_samples` matches “populate from samples brought into the experiment” (Sapio Samples + process queue).
-
-**Gaps:**
-
-- How samples **get** onto the experiment (UI: pick existing / from process / plate)?  
-- Q8 still open (process samples → executions)—**blocking for process-driven labs**  
-- No `row_source` for **plates**, **materials**, or **child samples from aliquot**
-
-### L4 — HIGH: No complete/submit semantics on entries
-
-Sapio: green checkmark submit; unlock needs credentials + reason; some entries require prior entry complete.
-
-**Required in design (even if soft gates in v1):**  
-
-- Entry status: draft | complete  
-- Optional “required before experiment complete”  
-- Audit on unlock  
-
-### L5 — HIGH: Materials/lots absent
-
-Chemistry background: **no lot = no trustworthy experiment** for many customers.
-
-**Minimum P1:** material tracking entry or required custom columns linked to inventory (if inventory exists) / free-text lot with validation later.
-
-### L6 — MEDIUM: Template story vs Protocol/Transfer tabs
-
-Demoting Transfer Steps is correct if **behaviors** replace it. Until aliquot + plates exist, do not claim transfer is “just experiment detail columns.”
-
-Protocol free-text must have a home in the entry catalog (notes), not a orphaned tab forever.
-
-### L7 — MEDIUM: Competitive floor (Sapio guide)
-
-From the guide, customers will compare:
-
-- Breadth of **Add entry** menu  
-- **Template** with pre-selected entries and pre-populated fields  
-- **Process** chaining templates  
-- Specialized NGS tools over time  
-
-Our sketch optimizes the **custom table engine**—necessary infrastructure—but markets as the whole ELN. Separate:
-
-1. **Platform capability:** configurable sample/experiment tables + population  
-2. **Lab product:** catalog of OOTB entries and SOPs  
-
-Ship messaging and roadmap must show (2), not only (1).
-
-### L8 — LOW (process): Reviews accepted too early
-
-CEO/UI/arch/security accepted while lab model still moving (detail → roster → sample_table renames). **Slow down:** lab ops sign-off before implement gate on this stem.
+| Prior concern | Status |
+|---------------|--------|
+| Only two generic tables, no lab spine | **Addressed** — header, samples, aliquot plan/results + LIMS |
+| Aliquot without child samples | **Addressed** — execute creates dest samples + updates source amounts |
+| No queue / intake | **Addressed** — start of experiment/run only |
+| Process auto-link ambiguity | **Addressed** — explicit select; process filters queue only |
+| Write-back vs accessioning | **Addressed** — RO identity; config map; submit only |
+| Volume on sample like Sapio | **Addressed** — amount never volume; containers own metrics |
+| Full Sapio catalog pressure | **Addressed** — deferred with ideas |
 
 ---
 
-## 5. What is worth keeping (do not throw away)
+## 4. Conditions (must land with implement)
+
+| ID | Condition | Why |
+|----|-----------|-----|
+| **L1** | Queue + start UX for **experiment and LIMS run** before calling cohort “done” | Without this, sample_data grids are empty and unusable |
+| **L2** | Scan plate → all samples on plate; scan tube → tube contents | Bench speed; barcode workflow |
+| **L3** | Aliquot/pool **execute** is a real action (not plan documentation only) | Inventory + child samples |
+| **L4** | Amount = mass/count only; volume display-only / inbound convert | Data integrity |
+| **L5** | Write-back never on client_sample_id / client / subject; never container metrics | Accessioning + container SoT |
+| **L6** | Template entry dependencies + default “all submitted to complete experiment” | SOP control without blocking free edit mid-work |
+| **L7** | Keep template sign-off path working while entries ship | Don’t break activation |
+| **L8** | Do not slip materials, index sets, or accessioning rewrite into this phase | Scope |
+
+---
+
+## 5. Risks / watch items (non-blocking)
+
+| Risk | Mitigation |
+|------|------------|
+| Aliquot method matrix (by mass/vol/target…) complexity | Ship one method first; expand columns by method flag |
+| Pool (multi-content tube) edge cases | Explicit tests: reduce each source content; dest sample identity rules |
+| Ad hoc columns without write-back | Clear UI so techs don’t expect Sample update |
+| “Cancel and restart” for more samples | Document in UI empty/help; measure demand before mid-flight add |
+
+---
+
+## 6. Ideas acknowledged (correctly OOS)
 
 | Idea | Lab ops view |
 |------|----------------|
-| Ordered entries on template → instance | **Yes** — matches Sapio composition |
-| Custom columns via FieldDefinitions | **Yes** — forms/tables with predefined fields |
-| Population from experiment samples | **Yes** — core |
-| Separate LimsRun for instrument curves/import | **Yes** — keep boundary; improve handoff |
-| ELN process definitions | **Yes** — string experiments; finish sample auto-link |
-
-Infrastructure sketch is a **substrate**. Catalog + behaviors sit on top.
+| [Accessioning revisit](../ideas/accessioning-and-workflows-revisit.md) | **Critical next workflow** after entries spine |
+| [Materials/lots](../ideas/materials-and-lot-tracking.md) | Needed for many SOPs; not blocking this foundation |
+| [Index sets / sample sheets](../ideas/index-sets-and-sequencing-setup.md) | NGS must-have later; experiment_data OK interim |
 
 ---
 
-## 6. Required work before re-open implement gate
+## 7. Asks for other reviews
 
-| # | Deliverable | Owner |
-|---|-------------|--------|
-| 1 | **Lab workflow brief** (2–3 target SOPs): e.g. NGS library prep step, sample aliquot/prep, simple QC notebook—step by step what entries appear | Product + Lab ops |
-| 2 | **Entry catalog v1** table in requirements (kinds, behaviors, P0/P1/P2) | Product + Lab ops |
-| 3 | Resolve **Q8** (process samples → experiment) for process-driven path | Product + Eng |
-| 4 | Decision: aliquot **creates samples** vs plan-only | Lab ops + Product |
-| 5 | Entry **complete/unlock** rules (even soft) in sketch | Eng + Lab ops |
-| 6 | Re-run **Lab ops** review → then arch/security delta if catalog changes storage | All |
-| 7 | Only then Phase 4 P0 code | Eng |
-
----
-
-## 7. Open questions raised (log as Q17–Q22)
-
-| # | Question |
-|---|----------|
-| Q17 | v1 entry catalog: which OOTB kinds beyond two generic tables? |
-| Q18 | Does aliquot/pool create child samples and volume adjustments? |
-| Q19 | How do plates enter an experiment (first-class entry vs container only)? |
-| Q20 | Entry complete/submit and unlock-with-reason in v1? |
-| Q21 | Material/lot tracking minimum for v1 vs explicit defer? |
-| Q22 | Must process→experiment sample population (Q8) ship with Entries P0? |
+| Review | Focus |
+|--------|--------|
+| **Architecture** | Grid/export/submit APIs; execute aliquot transaction; container amount updates; no volume column |
+| **UI** | Queue+scan; template entry builder; RO sample fields; write-back map; save vs submit |
+| **Security** | Write-back allowlist/config; submit auth; RLS on grid/export |
+| **CEO** | Scope freeze on v1 spine; prioritization of accessioning next |
 
 ---
 
@@ -200,11 +107,11 @@ Infrastructure sketch is a **substrate**. Catalog + behaviors sit on top.
 
 | Field | Value |
 |-------|--------|
-| **Verdict** | **Revise — Hold implementation** |
-| **Date** | 2026-07-29 |
-| **Implement Phase 4 code?** | **No** until §6 items 1–5 done and this review re-run to Accept / Accept with conditions |
-| **Prior Accepts (CEO/UI/Arch/Sec)** | Stand as **technical feedback only**; not sufficient gate for ELN entry build |
+| **Verdict** | **Accept with conditions** (L1–L8) |
+| **Date** | 2026-08-10 |
+| **Implement foundation + v1 predefined?** | **Yes**, after eng/CEO/UI/security pass conditions (Lab Ops does not block further review) |
+| **Prior Hold** | Lifted for this scope |
 
 ### Bottom line (persona)
 
-I will not sign off a system that tells a sequencing lab “configure two grids” and calls that an experiment. Give me a **catalog of lab entries**, **real SOPs**, and **sample/plate/derivative integrity**—then the table engine is the right foundation to implement.
+This is a **lab-credible** first cut: intake, fixed cohort, real aliquot execute, instrument on LIMS Run, and controlled write-back. Build the spine; park materials, indexes, and accessioning in ideas. Do not reopen “two grids only” debates — the locks in §0 are enough to proceed through the rest of the review chain.

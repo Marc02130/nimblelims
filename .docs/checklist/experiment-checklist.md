@@ -136,34 +136,40 @@ Legacy `experiment_link` via `ExperimentDetail` **coexists** in Phase 1; no forc
 
 ## Phase 4 — Template / experiment entries (ELN building blocks)
 
-**Gate:** **CLOSED (2026-07-29).** Lab Ops **Hold**. Do **not** implement until Lab Ops Accept and Q17–Q22 resolved enough for P0.  
-**Packet:** [tech-sketch/experiment-template-entries.md](../tech-sketch/experiment-template-entries.md)  
+**Gate:** Lab Ops **Accept with conditions** (2026-08-10). Continue **CEO → UI → Arch → Security**; implement after chain + L1–L8.  
+**Packet:** [tech-sketch/experiment-template-entries.md](../tech-sketch/experiment-template-entries.md) §0  
 **Lab ops:** [lab-ops-review/experiment-template-entries.md](../lab-ops-review/experiment-template-entries.md)
 
 ### Reviews
 
 | Review | Status | Note |
 |--------|--------|------|
-| **Lab Ops (SVP)** | **Hold / Revise** | Entry catalog, aliquot derivatives, plates, materials, submit/lock |
-| CEO | Accept (tech only) | Not sufficient implement gate alone |
-| UI | Accept (tech only) | — |
-| Architecture | Accept (tech only) | Substrate OK; product incomplete |
-| Security | Accept (tech only) | Revisit after catalog locks |
+| **Lab Ops (SVP)** | **Accept w/ L1–L8** (2026-08-10) | Foundation + v1 spine; OOS materials/index/accessioning |
+| CEO | Pending re-review | Scope freeze on v1 spine |
+| UI | Pending re-review | Queue, template builder, save/submit |
+| Architecture | Pending re-review | Grid/export/submit, aliquot execute |
+| Security | Pending re-review | Write-back config, RLS |
 
-### Before re-open (Lab Ops §6)
+### Substrate locked (Decision #23 / tech sketch §0) — 2026-07-29
+
+- [x] Kinds: `experiment_sample_data` (rows = samples **in** experiment) + `experiment_data` (manual/code rows)
+- [x] Storage: entries + entry_field_definitions + entry_field_values (typed cells)
+- [x] Contracts: `GET …/grid` (wide UI) + `GET …/export` (long report) + `PUT …/values`
+
+### Before re-open full Phase 4 (Lab Ops)
 
 - [ ] Lab workflow brief: 2–3 target SOPs (steps + entry kinds)
-- [ ] Entry catalog v1 in requirements (P0/P1/P2 kinds + behaviors)
+- [ ] Entry catalog v1 in requirements (predefined on top of two kinds)
 - [ ] Q8 / Q22 process sample population decision
 - [ ] Q18 aliquot creates children vs plan-only
 - [ ] Q20 entry complete/unlock rules
 - [ ] Lab Ops re-review → Accept or Accept with conditions
-- [ ] Then P0 eng tasks (sample_table engine + first OOTB kinds)
 
-### P0 eng (blocked — do not start)
+### P0 eng (blocked on Lab Ops catalog; substrate may be stubbed after catalog lock)
 
-- [ ] *(blocked)* Types / columns / row_source / grid API / Tables & forms UI
-- [ ] *(blocked)* First OOTB kinds from catalog (not only generic tables)
+- [ ] *(blocked)* Normalize types + grid + export APIs per §0
+- [ ] *(blocked)* Template Tables & forms authoring
+- [ ] *(blocked)* First OOTB predefined entries from catalog
 
 ---
 
@@ -217,3 +223,4 @@ Rule: no new phase / major feature until blocking questions for that work are re
 | 2026-07-28 | **Phase 4 packet ready for review:** template Entries authoring + sample roster tech sketch, schema-changes, CEO/UI/arch/security review stubs, Q11–Q14 |
 | 2026-07-29 | Phase 4 tech reviews Accept; then **Lab Ops Hold** — implement gate closed; Q17–Q22; process + lab-ops-review role added |
 | 2026-07-29 | SVP Lab Ops review written; Sapio Experiments Guide used as competitive floor; slow-down on ELN entry rush |
+| 2026-07-29 | **Decision #23:** lock experiment_sample_data / experiment_data kinds, EAV storage, grid+export contracts (tech sketch §0) |

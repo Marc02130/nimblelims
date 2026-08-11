@@ -55,8 +55,9 @@ When resolving: fill **Decision**, **Date**, **Owner**, and one line of **Ration
 | 20 | Entry **complete/submit** + unlock reason in v1? | **Open** | GxP habits | — | | Lab Ops + Security | Sapio submit/lock |
 | 21 | **Material/lot** tracking in v1 vs defer? | **Open** | Chemistry ops | — | | Lab Ops | Quality-sensitive labs |
 | 22 | Process→experiment sample fill (Q8) with Entries P0? | **Open** | Process labs | — | | Lab Ops + Eng | Multi-step SOPs |
+| 23 | Entry kinds + storage + grid/export access? | **Decided** | Substrate (all entry work) | See **Decision #23**. Kinds `experiment_sample_data` / `experiment_data`; storage `entries`+`entry_field_*`; grid wide + export long. | 2026-07-29 | Product + Eng | Locked in tech sketch §0 |
 
-**Template entries packet:** [tech-sketch](../tech-sketch/experiment-template-entries.md) · [**Lab Ops Hold**](../lab-ops-review/experiment-template-entries.md) · implement **blocked**
+**Template entries packet:** [tech-sketch §0 locked](../tech-sketch/experiment-template-entries.md) · [Lab Ops Hold on catalog](../lab-ops-review/experiment-template-entries.md) · substrate locked; full P0 still needs Q17+
 
 ---
 
@@ -341,6 +342,37 @@ Map legacy API `sample_data` → `sample_table`, `experiment_detail` → `experi
 ### Storage
 
 Reuse `entries` / `entry_field_definitions` / `entry_field_values`. No new value tables required for P0.
+
+---
+
+## Decision #23 — Entry kinds, storage, grid + export contracts
+
+**Status:** Decided  
+**Date:** 2026-07-29  
+**Authoritative detail:** [tech-sketch/experiment-template-entries.md §0](../tech-sketch/experiment-template-entries.md)
+
+### Product kinds
+
+| Kind | Rows |
+|------|------|
+| **`experiment_sample_data`** | One row per **sample in the experiment** (per entry). Many entries per experiment. |
+| **`experiment_data`** | Purpose-specific; rows **not automatic** (manual/code). Optional `sample_id` for subsets. |
+
+### Storage
+
+Logical kinds only (v1). Physical: `entries` + `entry_field_definitions` + `entry_field_values` with **typed value columns** (not a single JSON blob for the grid). `value_json` optional for complex fields. `entries.config` JSON for settings only.
+
+### Access (locked APIs)
+
+| Contract | Endpoint | Shape |
+|----------|----------|--------|
+| **UI grid** | `GET /v1/entries/{id}/grid` | Wide: `columns[]` + `rows[].cells` |
+| **Write** | `PUT /v1/entries/{id}/values` | Cell upserts (typed fields) |
+| **Report/export** | `GET /v1/entries/{id}/export` (+ optional experiment-level) | Long: one record per cell; `json` \| `csv` |
+
+### Still gated
+
+Predefined catalog, aliquot derivatives, plates, submit/lock, materials, process sample auto-link — Lab Ops Q17–Q22.
 
 ---
 
