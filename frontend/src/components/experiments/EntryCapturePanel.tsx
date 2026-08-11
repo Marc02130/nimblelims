@@ -654,12 +654,70 @@ const EntryCapturePanel: React.FC<EntryCapturePanelProps> = ({
                   </Typography>
                 )}
 
-                {entry.entry_type === 'predefined_action' && (
+                {(entry.entry_type === 'predefined_action' ||
+                  entry.predefined_entry_key === 'aliquot_pool_plan') && (
                   <Alert severity="info" sx={{ mb: 2 }}>
-                    Predefined action <strong>{entry.predefined_entry_key || entry.name}</strong>.
-                    Configurable parameters (if any) can be saved below. Full action execution is a
-                    later phase.
+                    {entry.predefined_entry_key === 'aliquot_pool_plan' ? (
+                      <>
+                        Aliquot/pool plan — methods: by mass, by volume (→ mass), by count, target
+                        mass/volume/concentration/count. Save plan lines via API (
+                        <code>PUT …/aliquot-plan</code>), then{' '}
+                        <strong>Execute</strong> reduces source contents and creates dest samples.
+                      </>
+                    ) : (
+                      <>
+                        Predefined action <strong>{entry.predefined_entry_key || entry.name}</strong>.
+                        Configurable parameters (if any) can be saved below.
+                      </>
+                    )}
                   </Alert>
+                )}
+                {entry.predefined_entry_key === 'aliquot_pool_plan' && canEdit && (
+                  <Box mb={2} display="flex" gap={1}>
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      disabled={isSaving}
+                      onClick={async () => {
+                        try {
+                          const res: any = await apiService.executeAliquotPlan(entry.id, {
+                            dry_run: true,
+                          });
+                          setSuccess(
+                            `Dry-run: ${res.success_count} ok, ${res.error_count} error(s)`,
+                          );
+                        } catch (err) {
+                          setError(apiErrorMsg(err, 'Dry-run failed'));
+                        }
+                      }}
+                    >
+                      Dry-run execute
+                    </Button>
+                    <Button
+                      size="small"
+                      variant="contained"
+                      color="warning"
+                      disabled={isSaving}
+                      onClick={async () => {
+                        setSaving((s) => ({ ...s, [entry.id]: true }));
+                        try {
+                          const res: any = await apiService.executeAliquotPlan(entry.id, {
+                            dry_run: false,
+                          });
+                          setSuccess(
+                            `Executed: ${res.success_count} ok, ${res.error_count} error(s)`,
+                          );
+                          await load();
+                        } catch (err) {
+                          setError(apiErrorMsg(err, 'Execute failed'));
+                        } finally {
+                          setSaving((s) => ({ ...s, [entry.id]: false }));
+                        }
+                      }}
+                    >
+                      Execute plan
+                    </Button>
+                  </Box>
                 )}
 
                 {isSampleScoped(entry.entry_type) ? (

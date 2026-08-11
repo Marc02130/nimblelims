@@ -162,9 +162,11 @@ Legacy `experiment_link` via `ExperimentDetail` **coexists** in Phase 1; no forc
 - [x] Capture UI: Save (draft) + Submit (write-back) on EntryCapturePanel
 - [x] Queue + scan plate/tube + start experiment (resolve-scan, start, cohort lock UI)
 - [x] Header + Samples predefined (keys + template presets + instantiate defaults)
+- [x] Aliquot/pool methods (full matrix) + plan save + execute API (amount=mass/count; volume convert)
+- [x] Capture UI: dry-run / execute buttons on aliquot_pool_plan entry
 - [ ] Queue/start for LIMS run (scan plate/tube)
-- [ ] Template UI: deps + **all** aliquot methods
-- [ ] Aliquot/pool plan + execute (transaction) + results
+- [ ] Template UI: entry dependencies
+- [ ] Aliquot plan editor UI (method-driven columns) + pool multi-content polish
 - [ ] Tests + UAT spine demo
 
 ---

@@ -18,6 +18,7 @@ import io
 from app.database import get_db
 from app.core.rbac import require_experiment_manage
 from app.services.entry_service import EntryService
+from app.services.aliquot_plan_service import AliquotPlanService
 from app.schemas.entry import (
     EntryCreate,
     EntryUpdate,
@@ -30,6 +31,13 @@ from app.schemas.entry import (
     EntryExportResponse,
     EntrySubmitResponse,
 )
+from app.schemas.aliquot_plan import (
+    AliquotPlanSaveRequest,
+    AliquotPlanSaveResponse,
+    AliquotExecuteRequest,
+    AliquotExecuteResponse,
+    AliquotMethodListResponse,
+)
 from models.user import User
 from sqlalchemy.orm import Session
 
@@ -41,6 +49,13 @@ def get_service(
     current_user: User = Depends(require_experiment_manage),
 ) -> EntryService:
     return EntryService(db, current_user=current_user)
+
+
+def get_aliquot_service(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_experiment_manage),
+) -> AliquotPlanService:
+    return AliquotPlanService(db, current_user=current_user)
 
 
 @router.get(
@@ -98,6 +113,17 @@ def instantiate_entries(
         entries=[EntryRead.model_validate(e) for e in items],
         total=len(items),
     )
+
+
+@router.get(
+    "/entries/aliquot-methods",
+    response_model=AliquotMethodListResponse,
+)
+def list_aliquot_methods(
+    service: AliquotPlanService = Depends(get_aliquot_service),
+):
+    """Return full v1 aliquot/pool method matrix (Lab Ops L9)."""
+    return AliquotMethodListResponse(methods=service.list_methods())
 
 
 @router.get("/entries/{entry_id}", response_model=EntryRead)
@@ -219,3 +245,46 @@ def list_values(
     service.get_entry(entry_id)
     rows = service.repo.list_values(entry_id, sample_id=sample_id)
     return [EntryFieldValueRead.model_validate(v) for v in rows]
+
+
+# ---------- Aliquot / pool plan + execute (all methods) ----------
+
+
+@router.get(
+    "/entries/{entry_id}/aliquot-plan",
+    response_model=AliquotPlanSaveResponse,
+)
+def get_aliquot_plan(
+    entry_id: UUID,
+    service: AliquotPlanService = Depends(get_aliquot_service),
+):
+    return service.get_plan(entry_id)
+
+
+@router.put(
+    "/entries/{entry_id}/aliquot-plan",
+    response_model=AliquotPlanSaveResponse,
+)
+def save_aliquot_plan(
+    entry_id: UUID,
+    data: AliquotPlanSaveRequest,
+    service: AliquotPlanService = Depends(get_aliquot_service),
+):
+    """Save plan lines on entry.config.plan_lines (method inputs validated)."""
+    return service.save_plan(entry_id, data)
+
+
+@router.post(
+    "/entries/{entry_id}/execute",
+    response_model=AliquotExecuteResponse,
+)
+def execute_aliquot_plan(
+    entry_id: UUID,
+    data: Optional[AliquotExecuteRequest] = None,
+    service: AliquotPlanService = Depends(get_aliquot_service),
+):
+    """
+    Execute aliquot/pool plan: reduce source contents amount; create dest samples
+    and contents. Supports dry_run. Amount = mass/count only (volume converted).
+    """
+    return service.execute(entry_id, data or AliquotExecuteRequest())
