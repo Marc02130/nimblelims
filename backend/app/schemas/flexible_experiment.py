@@ -79,9 +79,9 @@ class LimsRunCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=255)
     description: Optional[str] = None
     experiment_template_id: uuid.UUID
-    analysis_id: Optional[uuid.UUID] = Field(
-        None,
-        description="Analysis for promote-on-publish (tests/results). Null = non-reportable run.",
+    analysis_id: uuid.UUID = Field(
+        ...,
+        description="Required analysis for the run (import + promote).",
     )
 
 
@@ -90,16 +90,19 @@ class LimsRunUpdate(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=255)
     description: Optional[str] = None
     analysis_id: Optional[uuid.UUID] = None
-    # Explicit clear: pass clear_analysis=true to set analysis_id null
-    clear_analysis: bool = False
 
 
 class LimsRunStartRequest(BaseModel):
-    """Optional body for start transition when no analysis is set."""
-    acknowledge_no_analysis: bool = Field(
-        False,
-        description="Required true to start without analysis_id (non-reportable path).",
+    """Start transition: optional cohort selection (locks after start)."""
+    sample_ids: Optional[List[uuid.UUID]] = Field(
+        None,
+        description="Cohort samples selected at start (scan plate/tube or queue). Required if no cohort yet.",
     )
+
+
+class LimsRunCohort(BaseModel):
+    sample_ids: List[uuid.UUID] = Field(default_factory=list)
+    locked_at: Optional[str] = None
 
 
 class LimsRunRead(BaseModel):
@@ -109,6 +112,7 @@ class LimsRunRead(BaseModel):
     experiment_template_id: uuid.UUID
     analysis_id: Optional[uuid.UUID] = None
     status: LimsRunStatus
+    cohort: Optional[Dict[str, Any]] = None
     started_at: Optional[datetime]
     completed_at: Optional[datetime]
     published_at: Optional[datetime]
@@ -178,6 +182,8 @@ class ImportDataResponse(BaseModel):
 # ---------------------------------------------------------------------------
 
 class ParserColumn(BaseModel):
+    model_config = {"extra": "forbid"}
+
     source_col: str
     field_name: str
     data_type: Literal["string", "float", "integer", "boolean"] = "string"
@@ -185,12 +191,30 @@ class ParserColumn(BaseModel):
 
 
 class ParserConfig(BaseModel):
-    columns: List[ParserColumn]
-    well_col: Optional[str] = Field(None, description="Column that identifies well position")
-    skip_rows: int = Field(default=0, ge=0, description="Header rows to skip")
+    """Canonical parse instructions — Decision #1 schema-first."""
+    model_config = {"extra": "forbid"}
+
+    schema_version: Literal["1"] = "1"
+    delimiter: Literal[",", "\t", ";", "|"] = ","
+    encoding: str = "utf-8"
+    skip_rows: int = Field(default=0, ge=0)
+    header_row: int = Field(default=0, ge=0)
+    columns: List[ParserColumn] = Field(..., min_length=1)
+    well_col: Optional[str] = Field(
+        None,
+        description=(
+            "Optional. Source column that holds a LIMS well id (max 10 chars). "
+            "Omit (null) when the file has no wells — not required for every instrument."
+        ),
+    )
+    sample_col: Optional[str] = Field(
+        None,
+        description="Optional. Source column that holds a sample label (metadata hint only).",
+    )
 
 
 class InstrumentParserCreate(BaseModel):
+    """Legacy template parser create — deprecated; use /v1/data-parsers."""
     name: str = Field(..., min_length=1, max_length=255)
     description: Optional[str] = None
     parser_config: ParserConfig
@@ -198,13 +222,25 @@ class InstrumentParserCreate(BaseModel):
 
 class InstrumentParserRead(BaseModel):
     id: uuid.UUID
-    experiment_template_id: uuid.UUID
     name: str
     description: Optional[str]
     parser_config: Dict[str, Any]
+    version: Optional[int] = None
+    active: Optional[bool] = None
+    instrument_id: Optional[uuid.UUID] = None
+    cro_source_id: Optional[uuid.UUID] = None
+    version_group_id: Optional[uuid.UUID] = None
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class FileImportRequest(BaseModel):
+    """Metadata for multipart file import on a run."""
+    instrument_id: Optional[uuid.UUID] = None
+    cro_source_id: Optional[uuid.UUID] = None
+    parser_id: Optional[uuid.UUID] = None
+
 
 
 # ---------------------------------------------------------------------------

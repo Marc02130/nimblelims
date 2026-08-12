@@ -43,6 +43,21 @@ When resolving: fill **Decision**, **Date**, **Owner**, and one line of **Ration
 | 8 | Should instantiate-step auto-create ExperimentSampleExecution rows for process samples? | **Open** | Phase 3 polish / sample journey | — Phase 2: assign at process level only; step instantiate creates Experiment + entries, does not auto-link all process samples into the experiment | | | |
 | 9 | Entry capture: who can edit values (experiment:manage only vs lab roles / status gates)? | **Decided** | Hardening / multi-role UX | See **Decision #9** below. **Lab personnel only** edit experimental / entry data. Clients do **not** edit lab data; if client ordering ships later, clients may **create orders** only. | 2026-07-11 | Product | Lab SoT for data integrity; ordering is a separate client capability |
 | 10 | Deprecate or coexist long-term with `ExperimentDetail` `experiment_link` lineage? | **Open** | Lineage cleanup (not Phase 3) | — Phase 1–3: **coexist** with ELN Processes. See explanation under **#10 notes** below. | | | |
+| 11 | Keep Protocol/Transfer tabs alongside Entries, or merge? | **Decided** (refined) | Template Entries P0 UI | **Entries are the product surface.** Transfer/aliquot **plan** = **`experiment_detail`** (columns: source, dest, volume/mass/conc, …). **Results** = following **`sample_data`**. Legacy Transfer Steps tab is transitional (sign-off/SOP only); robot worklist stays on `robot_worklist_configs`. Demote/hide Transfer tab as Entries ship. Protocol free-text optional. See **Decision #15**. | 2026-07-29 | Product | Transfer is experiment detail, not a parallel step list |
+| 12 | Sample starting-table type: `sample_roster` vs `display_table`? | **Superseded** | — | Use **`sample_table`** substrate + sample_field columns; full catalog is Q17. | 2026-07-29 | Product | Building-block refine |
+| 13 | Sample system field allowlist for display columns? | **Decided** | Substrate | Server allowlist of Sample OOB + Path-1; fail closed. | 2026-07-29 | Architecture + Security | Projection safety |
+| 14 | Force sample picker at experiment create? | **Decided** | Start UX | **No** forced picker; empty until samples linked. Q8/Q22 for process path. | 2026-07-29 | Product | Progressive flow |
+| 15 | Transfer/aliquot modeling | **Decided** (provisional) | — | Plan/results via tables as *direction*; **Lab Ops requires Q18** (derivatives) before treat as complete. | 2026-07-29 | Product → Lab Ops | Hold implement until Q18 |
+| 16 | Names sample_table / experiment_table? | **Decided** (substrate only) | — | Engine shapes, **not** full entry catalog (Q17). | 2026-07-29 | Product + Lab Ops | Lab Ops: tables ≠ product |
+| 17 | v1 **entry catalog** beyond two generic tables? | **Open** | **Hold Phase 4** | Samples intake, Plates, Aliquot/Pool, Materials, Notes, … | | Lab Ops | Sapio-like customer floor |
+| 18 | Aliquot creates **child samples** / volume effects? | **Open** | **Hold Phase 4** | — | | Lab Ops + Product | Lineage integrity |
+| 19 | How **plates** enter experiments? | **Open** | Sequencing/prep | — | | Lab Ops | Plate maps / NGS |
+| 20 | Entry **complete/submit** + unlock reason in v1? | **Open** | GxP habits | — | | Lab Ops + Security | Sapio submit/lock |
+| 21 | **Material/lot** tracking in v1 vs defer? | **Open** | Chemistry ops | — | | Lab Ops | Quality-sensitive labs |
+| 22 | Process→experiment sample fill (Q8) with Entries P0? | **Open** | Process labs | — | | Lab Ops + Eng | Multi-step SOPs |
+| 23 | Entry kinds + storage + grid/export access? | **Decided** | Substrate (all entry work) | See **Decision #23**. Kinds `experiment_sample_data` / `experiment_data`; storage `entries`+`entry_field_*`; grid wide + export long. | 2026-07-29 | Product + Eng | Locked in tech sketch §0 |
+
+**Template entries packet:** [tech-sketch §0 locked](../tech-sketch/experiment-template-entries.md) · [Lab Ops Hold on catalog](../lab-ops-review/experiment-template-entries.md) · substrate locked; full P0 still needs Q17+
 
 ---
 
@@ -276,9 +291,95 @@ Experiment A  --(detail experiment_link)-->  Experiment B  --(detail)-->  Experi
 
 ---
 
+## Decision #15 — Transfer/aliquot via sample tables + population
+
+**Status:** Decided (refined)  
+**Date:** 2026-07-29
+
+### Product rule
+
+Aliquoting / transfer is **not** a separate “Transfer Steps” system.
+
+| Block | Type | `row_source` | Columns (examples) |
+|-------|------|--------------|--------------------|
+| **Plan** | **Sample table** | `experiment_samples` | Sample fields + dest, volume, mass, conc (custom) |
+| **Results** | **Sample table** | `experiment_samples` | Measured outcomes (custom) |
+| **Conditions** | **Experiment table** | `none` | Operator, kit lot, … (custom) |
+
+When samples are brought into the experiment, **plan rows populate** from that set.
+
+### Legacy
+
+Transfer Steps tab / `transfer_steps` JSON: transitional (sign-off, SOP). Robot worklist: `robot_worklist_configs`.
+
+### Dev
+
+No prod users; keep paths working while renaming types and shipping Tables & forms.
+
+---
+
+## Decision #16 — Sample table & Experiment table (not “detail”)
+
+**Status:** Decided  
+**Date:** 2026-07-29
+
+### Product rule
+
+ELN building blocks:
+
+| UI name | API | Rows | Columns |
+|---------|-----|------|---------|
+| **Sample table** | `sample_table` | From population rule (usually experiment samples) | Per-entry: Sample system fields + custom FieldDefinitions |
+| **Experiment table** | `experiment_table` | Experiment-scoped (form) | Per-entry: custom FieldDefinitions |
+
+Authors **select columns for each entry** and **how the entry is populated** (`config.row_source`).
+
+### Naming
+
+Avoid product terms **sample_detail** / **experiment_detail**.  
+Map legacy API `sample_data` → `sample_table`, `experiment_detail` → `experiment_table`.
+
+### Storage
+
+Reuse `entries` / `entry_field_definitions` / `entry_field_values`. No new value tables required for P0.
+
+---
+
+## Decision #23 — Entry kinds, storage, grid + export contracts
+
+**Status:** Decided  
+**Date:** 2026-07-29  
+**Authoritative detail:** [tech-sketch/experiment-template-entries.md §0](../tech-sketch/experiment-template-entries.md)
+
+### Product kinds
+
+| Kind | Rows |
+|------|------|
+| **`experiment_sample_data`** | One row per **sample in the experiment** (per entry). Many entries per experiment. |
+| **`experiment_data`** | Purpose-specific; rows **not automatic** (manual/code). Optional `sample_id` for subsets. |
+
+### Storage
+
+Logical kinds only (v1). Physical: `entries` + `entry_field_definitions` + `entry_field_values` with **typed value columns** (not a single JSON blob for the grid). `value_json` optional for complex fields. `entries.config` JSON for settings only.
+
+### Access (locked APIs)
+
+| Contract | Endpoint | Shape |
+|----------|----------|--------|
+| **UI grid** | `GET /v1/entries/{id}/grid` | Wide: `columns[]` + `rows[].cells` |
+| **Write** | `PUT /v1/entries/{id}/values` | Cell upserts (typed fields) |
+| **Report/export** | `GET /v1/entries/{id}/export` (+ optional experiment-level) | Long: one record per cell; `json` \| `csv` |
+
+### Still gated
+
+Predefined catalog, aliquot derivatives, plates, submit/lock, materials, process sample auto-link — Lab Ops Q17–Q22.
+
+---
+
 ## Related
 
 - Checklist: [`.docs/checklist/experiment-checklist.md`](../checklist/experiment-checklist.md)
 - Processes: [`.docs/manuals/processes.md`](../manuals/processes.md)
+- Template entries: [`.docs/tech-sketch/experiment-template-entries.md`](../tech-sketch/experiment-template-entries.md)
 - Experiments (ELN): [`.docs/manuals/experiments.md`](../manuals/experiments.md)
 - Runs (LIMS): [`.docs/manuals/lims-runs.md`](../manuals/lims-runs.md)

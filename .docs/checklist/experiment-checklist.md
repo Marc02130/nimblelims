@@ -1,8 +1,9 @@
 # Experiments Refactor — Checklist
 
-**Branch:** `refactor/experiments`  
-**Last updated:** 2026-07-11  
-**Primary requirements:** [`.docs/requirements/experiment-processes-entries.md`](../requirements/experiment-processes-entries.md)
+**Branch:** `refactor/experiments` / `run-results`  
+**Last updated:** 2026-07-28  
+**Primary requirements:** [`.docs/requirements/experiment-processes-entries.md`](../requirements/experiment-processes-entries.md)  
+**Template entries tech sketch (in review):** [`.docs/tech-sketch/experiment-template-entries.md`](../tech-sketch/experiment-template-entries.md)
 
 ## Status legend
 
@@ -133,9 +134,46 @@ Legacy `experiment_link` via `ExperimentDetail` **coexists** in Phase 1; no forc
 
 ---
 
+## Phase 4 — Template / experiment entries (ELN building blocks)
+
+**Gate:** **CLEARED for implementation** (2026-08-10) — all reviews Accept with conditions (Lab Ops L1–L9 includes **all** aliquot methods).  
+**Packet:** [tech-sketch/experiment-template-entries.md](../tech-sketch/experiment-template-entries.md) §0  
+
+### Reviews
+
+| Review | Status | Note |
+|--------|--------|------|
+| **Lab Ops (SVP)** | **Accept w/ L1–L9** | L9: all aliquot/pool methods in v1 |
+| CEO | **Accept w/ C1–C4** | Scope freeze |
+| UI | **Accept w/ U1–U7** | Queue, save/submit, methods |
+| Architecture | **Accept w/ A1–A9** | Grid/export/submit/execute |
+| Security | **Accept w/ S1–S7** | Write-back + RLS + execute |
+
+### Substrate locked
+
+- [x] Kinds, EAV storage, grid + export + values
+- [x] Queue start, write-back, containers/amount, aliquot execute, lifecycle
+
+### P0 eng (open)
+
+- [x] Types + grid/export/save/submit APIs (`experiment_sample_data` / `experiment_data` + aliases)
+- [x] Write-back map (submit only, SAMPLE_WRITE_BACK_COLUMNS allowlist)
+- [x] Template UI: Tables & forms tab (entries, columns, sample RO fields, write-back map)
+- [x] Capture UI: Save (draft) + Submit (write-back) on EntryCapturePanel
+- [x] Queue + scan plate/tube + start experiment (resolve-scan, start, cohort lock UI)
+- [x] Header + Samples predefined (keys + template presets + instantiate defaults)
+- [x] Aliquot/pool methods (full matrix) + plan save + execute API (amount=mass/count; volume convert)
+- [x] Capture UI: dry-run / execute buttons on aliquot_pool_plan entry
+- [x] Queue/start for LIMS run (cohort + scan UI; locked at start; migration 0056)
+- [x] Template UI: entry dependencies (`depends_on`) + submit gate
+- [x] Aliquot plan editor UI (method-driven columns + pool group)
+- [ ] UAT spine demo end-to-end
+
+---
+
 ## Open questions
 
-**Canonical doc (not this checklist):** [`.docs/manuals/experiments.md`](../manuals/experiments.md)
+**Canonical decision log:** [`.docs/open-questions/experiments.md`](../open-questions/experiments.md)
 
 Rule: no new phase / major feature until blocking questions for that work are resolved. See `AGENTS.md` → *Open questions gate*.
 
@@ -147,14 +185,20 @@ Rule: no new phase / major feature until blocking questions for that work are re
 |-----|------|
 | [open-questions/experiments.md](../open-questions/experiments.md) | **Open questions + decisions** |
 | [requirements/experiment-processes-entries.md](../requirements/experiment-processes-entries.md) | Consolidated requirements |
+| [tech-sketch/experiment-template-entries.md](../tech-sketch/experiment-template-entries.md) | Template entries how (**Lab Ops Hold**) |
+| [lab-ops-review/experiment-template-entries.md](../lab-ops-review/experiment-template-entries.md) | **SVP Lab Ops** review |
+| [lab-ops-review/README.md](../lab-ops-review/README.md) | Lab ops review role |
+| [schema-changes/experiment-template-entries.md](../schema-changes/experiment-template-entries.md) | Schema delta (P0: mostly none) |
 | [manuals/processes.md](../manuals/processes.md) | Process concept |
 | [manuals/experiments.md](../manuals/experiments.md) | ELN Experiments |
 | [manuals/lims-runs.md](../manuals/lims-runs.md) | LIMS Runs boundary |
 | [design/gap-analysis-…](../design/gap-analysis-process-and-experiment.md) | Gaps |
 | [experiment-rework-prerequisites.md](experiment-rework-prerequisites.md) | Pre-rework issues |
-| [ceo-review/process-and-experiment.md](../ceo-review/process-and-experiment.md) | CEO review |
-| [design-review/process-and-experiment.md](../design-review/process-and-experiment.md) | Design review |
-| [security-review/process-and-experiment.md](../security-review/process-and-experiment.md) | Security review |
+| [ceo-review/process-and-experiment.md](../ceo-review/process-and-experiment.md) | CEO review (Phase 1–3) |
+| [ceo-review/experiment-template-entries.md](../ceo-review/experiment-template-entries.md) | CEO review (template entries) |
+| [ui-review/experiment-template-entries.md](../ui-review/experiment-template-entries.md) | UI review (template entries) |
+| [architecture-review/experiment-template-entries.md](../architecture-review/experiment-template-entries.md) | Architecture review |
+| [security-review/experiment-template-entries.md](../security-review/experiment-template-entries.md) | Security review |
 | [design/experiment-planning.md](../design/experiment-planning.md) | Chunk 1–2 history |
 | [Docs index](../README.md) | Full documentation map |
 
@@ -174,3 +218,7 @@ Rule: no new phase / major feature until blocking questions for that work are re
 | 2026-07-11 | Decision #7: progress visibility sample-scoped (no cross-client) |
 | 2026-07-11 | Decision #1: typed process steps (C) + 1a–1g + 1h-A hybrid in Phase 3 v1 |
 | 2026-07-11 | **Phase 3 shipped:** migration 0051, definitions API, typed start-step, soft advance, sample journey, Processes UI + journey on sample dialog |
+| 2026-07-28 | **Phase 4 packet ready for review:** template Entries authoring + sample roster tech sketch, schema-changes, CEO/UI/arch/security review stubs, Q11–Q14 |
+| 2026-07-29 | Phase 4 tech reviews Accept; then **Lab Ops Hold** — implement gate closed; Q17–Q22; process + lab-ops-review role added |
+| 2026-07-29 | SVP Lab Ops review written; Sapio Experiments Guide used as competitive floor; slow-down on ELN entry rush |
+| 2026-07-29 | **Decision #23:** lock experiment_sample_data / experiment_data kinds, EAV storage, grid+export contracts (tech sketch §0) |

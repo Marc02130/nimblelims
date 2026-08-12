@@ -6,15 +6,14 @@ This is part of the new structured approach replacing loose ExperimentDetail + J
 An Entry represents a "component" or "block" inside an Experiment (or a step in a Process).
 
 Types of Entries (entry_type):
-- 'predefined_action'     : OOB actions like aliquoting, pooling, index assignment, flowcell loading, QC review (pass/fail)
-- 'sample_data'           : Per-sample data table (columns defined in template via FieldDefinitions)
-- 'experiment_detail'     : Experiment-level data / notes (columns defined in template)
-- 'display_table'         : For displaying structured table data
+- 'experiment_sample_data' : One row per sample in the experiment (process data + RO sample fields)
+- 'experiment_data'        : Purpose-specific table/form (plan lines, header); rows not auto from cohort
+- 'predefined_action'      : OOB behaviors (aliquot/pool execute, etc.)
+- 'display_table'          : Read-only structured display (legacy)
+- Legacy aliases (normalized on write): 'sample_data' → experiment_sample_data,
+  'experiment_detail' → experiment_data
 
-Custom data entries (sample_data, experiment_detail) use FieldDefinitions to define their columns.
-Values are stored in EntryFieldValue (typed columns, not generic JSONB for modeled data).
-
-Predefined entries have built-in behavior and may still reference FieldDefinitions for any configurable parameters.
+Custom columns use FieldDefinitions; values in EntryFieldValue (typed columns).
 """
 
 import uuid
@@ -26,24 +25,110 @@ from sqlalchemy.sql import func
 from .base import Base, BaseModel
 
 
-# Entry types allowed in API / templates
+# Canonical + legacy aliases (legacy accepted, normalized to canonical on create/instantiate)
 ENTRY_TYPES = frozenset({
+    'experiment_sample_data',
+    'experiment_data',
     'predefined_action',
+    'display_table',
+    # legacy
     'sample_data',
     'experiment_detail',
+})
+
+ENTRY_TYPE_ALIASES = {
+    'sample_data': 'experiment_sample_data',
+    'experiment_detail': 'experiment_data',
+}
+
+SAMPLE_SCOPED_ENTRY_TYPES = frozenset({
+    'experiment_sample_data',
+    'sample_data',
+})
+
+EXPERIMENT_SCOPED_ENTRY_TYPES = frozenset({
+    'experiment_data',
+    'experiment_detail',
+})
+
+READ_ONLY_ENTRY_TYPES = frozenset({
     'display_table',
 })
 
-# Sample columns that may receive write-back from entry values (Phase 2 allowlist)
+
+def normalize_entry_type(entry_type: str) -> str:
+    return ENTRY_TYPE_ALIASES.get(entry_type, entry_type)
+
+
+def is_sample_scoped_entry(entry_type: str) -> bool:
+    return normalize_entry_type(entry_type) == 'experiment_sample_data'
+
+
+def is_experiment_scoped_entry(entry_type: str) -> bool:
+    return normalize_entry_type(entry_type) == 'experiment_data'
+
+
+# Display-only Sample system fields (accessioning SoT — never write-back)
+SAMPLE_SYSTEM_FIELDS = {
+    'client_sample_id': {'label': 'Client Sample ID', 'data_type': 'text'},
+    'received_date': {'label': 'Received date', 'data_type': 'date'},
+    'date_sampled': {'label': 'Date sampled', 'data_type': 'date'},
+    'specimen_biotype_id': {'label': 'Biotype', 'data_type': 'list'},
+    'sample_type': {'label': 'Sample type', 'data_type': 'list'},
+    'status': {'label': 'Status', 'data_type': 'list'},
+    'matrix': {'label': 'Matrix', 'data_type': 'list'},
+    'temperature': {'label': 'Temperature', 'data_type': 'number'},
+}
+
+# Experiment-mutable Sample columns eligible for write-back on entry submit
+# (identity/accessioning fields excluded; config may expand later via FieldDefinition flags)
 SAMPLE_WRITE_BACK_COLUMNS = frozenset({
     'specimen_biotype_id',
-    'client_sample_id',
     'temperature',
-    'date_sampled',
-    'received_date',
     'due_date',
     'report_date',
 })
+
+# v1 predefined entry keys (functionality wrappers; columns via field defs / config)
+PREDEFINED_ENTRY_KEYS = frozenset({
+    'experiment_header',  # experiment_data — start context
+    'samples',            # experiment_sample_data — cohort display
+    'aliquot_pool_plan',  # experiment_data — plan lines + execute
+    'aliquots_pools',     # experiment_sample_data — post-execute view
+})
+
+PREDEFINED_ENTRY_DEFAULTS = {
+    'experiment_header': {
+        'entry_type': 'experiment_data',
+        'name': 'Experiment header',
+        'description': 'Start context for the experiment',
+    },
+    'samples': {
+        'entry_type': 'experiment_sample_data',
+        'name': 'Samples',
+        'description': 'Cohort selected at experiment start (queue / scan)',
+        'config': {
+            'sample_columns': [
+                'client_sample_id',
+                'specimen_biotype_id',
+                'received_date',
+                'sample_type',
+                'status',
+            ],
+        },
+    },
+    'aliquot_pool_plan': {
+        'entry_type': 'experiment_data',
+        'name': 'Aliquot / pool plan',
+        'description': 'Plan amounts to remove/add; execute creates dest samples',
+    },
+    'aliquots_pools': {
+        'entry_type': 'experiment_sample_data',
+        'name': 'Aliquots / pools',
+        'description': 'Post-execute view of resulting samples',
+        'config': {'sample_columns': ['client_sample_id']},
+    },
+}
 
 
 class Entry(Base):
@@ -146,8 +231,8 @@ class EntryFieldValue(Base):
     """
     Typed value for one FieldDefinition inside one Entry.
 
-    sample_data entries: one row per (entry, field, sample).
-    experiment_detail entries: sample_id is NULL (one row per field).
+    experiment_sample_data: one row per (entry, field, sample).
+    experiment_data: sample_id optional (null for pure experiment-level cells).
     """
 
     __tablename__ = 'entry_field_values'

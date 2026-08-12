@@ -18,7 +18,7 @@ Routes:
 from typing import Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query, Response
+from fastapi import APIRouter, Depends, File, Form, Query, Response, UploadFile
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
@@ -132,14 +132,30 @@ def start_run(
 ):
     """
     Transition: draft → running (standard) or ordered → running (CRO).
-
-    If the run has no analysis_id, pass acknowledge_no_analysis=true after the UI
-    warns that Tests/Results will not be written on publish.
+    Requires analysis_id and a sample cohort (body.sample_ids or previously set).
+    Cohort is locked at start — no mid-flight sample changes.
     """
     run = service.start_run(
         run_id,
-        acknowledge_no_analysis=body.acknowledge_no_analysis,
+        sample_ids=body.sample_ids,
     )
+    return _run_read(run)
+
+
+@router.put("/{run_id}/cohort", response_model=LimsRunRead)
+def set_run_cohort(
+    run_id: UUID,
+    body: LimsRunStartRequest,
+    service: LimsRunService = Depends(_run_service),
+):
+    """Set draft cohort without starting (sample_ids required)."""
+    if not body.sample_ids:
+        from fastapi import HTTPException, status as http_status
+        raise HTTPException(
+            status_code=http_status.HTTP_400_BAD_REQUEST,
+            detail="sample_ids required",
+        )
+    run = service.set_cohort(run_id, body.sample_ids, lock=False)
     return _run_read(run)
 
 
@@ -208,8 +224,41 @@ def import_data(
     data: ImportDataRequest,
     service: LimsRunService = Depends(_run_service),
 ):
-    """Import instrument data rows into a running experiment."""
+    """Import pre-parsed rows (prefer multipart /import-file for CSV + parser)."""
     return service.import_data(run_id, data.rows)
+
+
+@router.post("/{run_id}/import-file")
+async def import_file(
+    run_id: UUID,
+    file: UploadFile = File(...),
+    instrument_id: Optional[UUID] = Form(None),
+    cro_source_id: Optional[UUID] = Form(None),
+    parser_id: Optional[UUID] = Form(None),
+    service: LimsRunService = Depends(_run_service),
+):
+    """
+    Multipart import: file + instrument_id XOR cro_source_id + optional parser_id.
+    Uses active data parser for run.analysis_id + source.
+    """
+    content = await file.read()
+    return service.import_file(
+        run_id,
+        content,
+        instrument_id=instrument_id,
+        cro_source_id=cro_source_id,
+        parser_id=parser_id,
+        filename=file.filename,
+    )
+
+
+@router.get("/{run_id}/imports")
+def list_imports(
+    run_id: UUID,
+    service: LimsRunService = Depends(_run_service),
+):
+    """Import history for a run (source + parser version per batch)."""
+    return service.list_imports(run_id)
 
 
 @router.get("/{run_id}/data", response_model=LimsRunDataListResponse)

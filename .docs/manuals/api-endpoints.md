@@ -2263,10 +2263,10 @@ Dry-run of what publish would write to Tests/Results when `analysis_id` is set. 
 ### PATCH /v1/lims-runs/{id}/complete
 Transition `complete → published` (requires `experiment:publish`).
 
-When run has **`analysis_id`**, promotes instrument JSONB → Tests/Results in the same transaction. **409** with `code: promotion_conflict` if another run/manual result owns the same test/analyte/replicate.
+Promotes instrument JSONB → Tests/Results in the same transaction (**run always has `analysis_id`**). **409** with `code: promotion_conflict` if another run/manual result owns the same test/analyte/replicate.
 
 ### PATCH /v1/lims-runs/{id}/start
-Start run. If no `analysis_id`, requires `acknowledge_no_analysis: true` or returns **400** `analysis_required_ack`.
+Start run. **Requires `analysis_id`** on the run — **400** if missing. No non-reportable / `acknowledge_no_analysis` path (product lock 2026-07-19; remove legacy ack if still in code).
 
 ### Analyte aliases
 - List/create/delete under `/analytes/{id}/aliases` (admin analyte form also manages aliases).

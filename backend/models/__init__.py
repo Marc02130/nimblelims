@@ -14,6 +14,7 @@ from .result import Result
 from .batch import Batch, BatchContainer
 from .list import List, ListEntry
 from .unit import Unit
+from .instrument import InstrumentType, Instrument, CroSource
 from .custom_attributes_config import CustomAttributeConfig
 from .help_entry import HelpEntry
 from .name_template import NameTemplate
@@ -28,7 +29,11 @@ from .flexible_experiment import (
     LimsRun,
     LimsRunStatus,
     LimsRunData,
-    InstrumentParser,
+    DataParser,
+    InstrumentParser,  # alias of DataParser
+    ParserAnalysis,
+    ParserSetupFile,
+    LimsRunImport,
     RobotWorklistConfig,
     SopParseJob,
     SopParseJobStatus,

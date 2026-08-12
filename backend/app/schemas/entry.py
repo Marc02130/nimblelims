@@ -1,4 +1,4 @@
-"""Pydantic schemas for Experiment Entries (Phase 2)."""
+"""Pydantic schemas for Experiment Entries (P0 foundation)."""
 from pydantic import BaseModel, Field
 from typing import Optional, List, Any, Dict
 from datetime import datetime
@@ -21,7 +21,7 @@ class EntryFieldDefinitionLinkCreate(BaseModel):
     visible: bool = True
     write_back_target: Optional[str] = Field(
         None,
-        description="Allowlisted Sample column for write-back (e.g. specimen_biotype_id)",
+        description="Sample column for write-back on entry submit (config-eligible allowlist)",
     )
 
 
@@ -29,7 +29,10 @@ class EntryCreate(BaseModel):
     experiment_id: UUID
     entry_type: str = Field(
         ...,
-        description="predefined_action | sample_data | experiment_detail | display_table",
+        description=(
+            "experiment_sample_data | experiment_data | predefined_action | display_table "
+            "(legacy: sample_data, experiment_detail)"
+        ),
     )
     name: str = Field(..., min_length=1, max_length=255)
     description: Optional[str] = None
@@ -107,8 +110,8 @@ class EntryFieldValueUpsert(BaseModel):
     value_date: Optional[datetime] = None
     value_boolean: Optional[bool] = None
     value_json: Optional[Any] = None
-    # When true (default), apply write-back if the field link has write_back_target
-    apply_write_back: bool = True
+    # Save path defaults False; submit applies write-back server-side
+    apply_write_back: bool = False
 
 
 class EntryFieldValueBulkUpsert(BaseModel):
@@ -118,7 +121,6 @@ class EntryFieldValueBulkUpsert(BaseModel):
 class InstantiateEntriesRequest(BaseModel):
     """Instantiate entries declared on the experiment's template (or provided defs)."""
     process_step_id: Optional[UUID] = None
-    # If true, skip if experiment already has entries
     skip_if_exists: bool = True
 
 
@@ -131,3 +133,85 @@ class TemplateEntryDeclaration(BaseModel):
     sort_order: int = 0
     config: Optional[Dict[str, Any]] = None
     fields: Optional[List[EntryFieldDefinitionLinkCreate]] = None
+
+
+# --- Grid (wide UI) ---
+
+class EntryGridColumn(BaseModel):
+    key: str
+    kind: str  # sample_field | field_definition
+    field_definition_id: Optional[UUID] = None
+    label: str
+    data_type: str
+    editable: bool = True
+    sort_order: int = 0
+    write_back_target: Optional[str] = None
+
+
+class EntryGridCell(BaseModel):
+    value: Any = None
+    display: Optional[str] = None
+    value_type: Optional[str] = None
+    value_id: Optional[UUID] = None
+
+
+class EntryGridRow(BaseModel):
+    row_id: Optional[str] = None
+    sample_id: Optional[UUID] = None
+    cells: Dict[str, EntryGridCell] = Field(default_factory=dict)
+
+
+class EntryGridMeta(BaseModel):
+    row_policy: str  # experiment_samples | manual
+    status: str = "draft"  # draft | submitted
+    empty_reason: Optional[str] = None
+
+
+class EntryGridResponse(BaseModel):
+    entry_id: UUID
+    experiment_id: UUID
+    entry_type: str
+    name: str
+    columns: List[EntryGridColumn]
+    rows: List[EntryGridRow]
+    row_count: int
+    meta: EntryGridMeta
+
+
+# --- Export (long / report) ---
+
+class EntryExportRow(BaseModel):
+    experiment_id: UUID
+    experiment_name: Optional[str] = None
+    entry_id: UUID
+    entry_name: str
+    entry_type: str
+    sample_id: Optional[UUID] = None
+    client_sample_id: Optional[str] = None
+    field_definition_id: Optional[UUID] = None
+    field_name: str
+    field_display_name: str
+    column_kind: str
+    data_type: str
+    value_text: Optional[str] = None
+    value_number: Optional[float] = None
+    value_list_entry_id: Optional[UUID] = None
+    value_list_entry_name: Optional[str] = None
+    value_date: Optional[datetime] = None
+    value_boolean: Optional[bool] = None
+    value_json: Optional[Any] = None
+    display_value: Optional[str] = None
+    modified_at: Optional[datetime] = None
+    modified_by: Optional[UUID] = None
+
+
+class EntryExportResponse(BaseModel):
+    entry_id: UUID
+    rows: List[EntryExportRow]
+    total: int
+
+
+class EntrySubmitResponse(BaseModel):
+    entry: EntryRead
+    write_backs_applied: int = 0
+    warning: Optional[str] = None
