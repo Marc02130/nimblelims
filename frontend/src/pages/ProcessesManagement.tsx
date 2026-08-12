@@ -131,6 +131,15 @@ const kindLabel = (k?: string) =>
 const kindColor = (k?: string): 'primary' | 'secondary' | 'default' =>
   k === 'lims_run' ? 'secondary' : 'primary';
 
+/** Both step kinds bind experiment_template_id; label clarifies what gets materialized. */
+const templateFieldLabel = (k?: StepKind) =>
+  k === 'lims_run' ? 'Run template' : 'Experiment template';
+
+const templateFieldHelper = (k?: StepKind) =>
+  k === 'lims_run'
+    ? 'From Experiment Templates (plate layout, lifecycle, worklist). Starting this step creates a LIMS run.'
+    : 'From Experiment Templates. Starting this step creates an ELN experiment.';
+
 const ProcessesManagement: React.FC = () => {
   const navigate = useNavigate();
   const { id: routeId } = useParams<{ id?: string }>();
@@ -492,27 +501,13 @@ const ProcessesManagement: React.FC = () => {
       <Typography variant="subtitle2" gutterBottom>
         Steps
       </Typography>
+      <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1 }}>
+        Kind first, then pick an Experiment Template. LIMS Run and ELN Experiment both use that
+        catalog — the kind only changes what is created when the step is started.
+      </Typography>
       {steps.map((s, idx) => (
-        <Box key={idx} display="flex" gap={1} alignItems="center" mb={1} flexWrap="wrap">
-          <FormControl size="small" sx={{ minWidth: 180, flex: 1 }}>
-            <InputLabel>Template</InputLabel>
-            <Select
-              label="Template"
-              value={s.experiment_template_id}
-              onChange={(e) => {
-                const next = [...steps];
-                next[idx] = { ...next[idx], experiment_template_id: e.target.value };
-                setSteps(next);
-              }}
-            >
-              {templates.map((t) => (
-                <MenuItem key={t.id} value={t.id}>
-                  {t.name}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-          <FormControl size="small" sx={{ minWidth: 140 }}>
+        <Box key={idx} display="flex" gap={1} alignItems="flex-start" mb={1.5} flexWrap="wrap">
+          <FormControl size="small" sx={{ minWidth: 150 }}>
             <InputLabel>Kind</InputLabel>
             <Select
               label="Kind"
@@ -526,6 +521,33 @@ const ProcessesManagement: React.FC = () => {
               <MenuItem value="eln_experiment">ELN Experiment</MenuItem>
               <MenuItem value="lims_run">LIMS Run</MenuItem>
             </Select>
+          </FormControl>
+          <FormControl size="small" sx={{ minWidth: 200, flex: 1 }}>
+            <InputLabel>{templateFieldLabel(s.step_kind)}</InputLabel>
+            <Select
+              label={templateFieldLabel(s.step_kind)}
+              value={s.experiment_template_id}
+              onChange={(e) => {
+                const next = [...steps];
+                next[idx] = { ...next[idx], experiment_template_id: e.target.value };
+                setSteps(next);
+              }}
+            >
+              {templates.length === 0 ? (
+                <MenuItem value="" disabled>
+                  No active experiment templates
+                </MenuItem>
+              ) : (
+                templates.map((t) => (
+                  <MenuItem key={t.id} value={t.id}>
+                    {t.name}
+                  </MenuItem>
+                ))
+              )}
+            </Select>
+            <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, ml: 0.5 }}>
+              {templateFieldHelper(s.step_kind)}
+            </Typography>
           </FormControl>
           <TextField
             size="small"
@@ -543,6 +565,7 @@ const ProcessesManagement: React.FC = () => {
             aria-label="remove draft step"
             onClick={() => setSteps(steps.filter((_, i) => i !== idx))}
             disabled={steps.length <= 1}
+            sx={{ mt: 0.5 }}
           >
             <DeleteIcon fontSize="small" />
           </IconButton>
@@ -812,20 +835,6 @@ const ProcessesManagement: React.FC = () => {
           <DialogTitle>Add step</DialogTitle>
           <DialogContent>
             <FormControl fullWidth margin="normal">
-              <InputLabel>Experiment template</InputLabel>
-              <Select
-                label="Experiment template"
-                value={stepTemplateId}
-                onChange={(e) => setStepTemplateId(e.target.value)}
-              >
-                {templates.map((t) => (
-                  <MenuItem key={t.id} value={t.id}>
-                    {t.name}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-            <FormControl fullWidth margin="normal">
               <InputLabel>Step kind</InputLabel>
               <Select
                 label="Step kind"
@@ -835,6 +844,29 @@ const ProcessesManagement: React.FC = () => {
                 <MenuItem value="eln_experiment">ELN Experiment</MenuItem>
                 <MenuItem value="lims_run">LIMS Run (instrument / plate)</MenuItem>
               </Select>
+            </FormControl>
+            <FormControl fullWidth margin="normal">
+              <InputLabel>{templateFieldLabel(stepKind)}</InputLabel>
+              <Select
+                label={templateFieldLabel(stepKind)}
+                value={stepTemplateId}
+                onChange={(e) => setStepTemplateId(e.target.value)}
+              >
+                {templates.length === 0 ? (
+                  <MenuItem value="" disabled>
+                    No active experiment templates
+                  </MenuItem>
+                ) : (
+                  templates.map((t) => (
+                    <MenuItem key={t.id} value={t.id}>
+                      {t.name}
+                    </MenuItem>
+                  ))
+                )}
+              </Select>
+              <Typography variant="caption" color="text.secondary" sx={{ mt: 0.75, display: 'block' }}>
+                {templateFieldHelper(stepKind)}
+              </Typography>
             </FormControl>
             <TextField
               fullWidth

@@ -104,7 +104,7 @@ Gaps are categorized by area and prioritized (P1 = blocking for basic Process fu
 
 **Related Documents**
 - `.docs/manuals/processes.md`
-- `.docs/design-review/process-and-experiment.md`
+- `.docs/ui-review/process-and-experiment.md`
 - `.docs/manuals/experiments.md`
 - `.docs/manuals/lims-runs.md`
 - `.docs/checklist/experiment-rework-prerequisites.md`

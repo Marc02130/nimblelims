@@ -117,7 +117,10 @@ nimblelims/
 │   ├── checklist/          # Implementation checklists
 │   ├── open-questions/     # Decision logs (work gates)
 │   ├── ceo-review/         # CEO / product reviews
-│   ├── design-review/      # UX / design reviews
+│   ├── development-process/ # Feature pipeline (ideation → ship)
+│   ├── tech-sketch/        # Lightweight technical how-to sketches
+│   ├── ui-review/          # UI / UX reviews
+│   ├── architecture-review/ # Architecture reviews
 │   ├── security-review/    # Security reviews
 │   └── ideas/              # Exploratory notes
 ├── services/               # Auxiliary microservices
@@ -153,9 +156,9 @@ nimblelims/
 - **Audit Trail**: Every curve fit is versioned (`fit_version`); superseded results preserved. Data exclusions are soft (reason-tracked), control-well exclusions apply to normalization means.
 
 ### LIMS Runs → Structured Results (promote-on-publish)
-- **Opt-in via Analysis**: Associate an **Analysis** on a LimsRun; import remains flexible JSONB (`lims_run_data`).
-- **Start warning**: Starting without analysis requires acknowledgement that publish will not write Tests/Results.
-- **Promote on publish**: When `analysis_id` is set and status → `published`, map columns to analytes (name + **aliases**), ensure Tests per sample, write **Results** (`raw_result`, `replicate`, `lims_run_id`).
+- **Analysis required**: Every LimsRun has an **Analysis** from create (no non-reportable / null-analysis path).
+- **Import remains flexible JSONB** (`lims_run_data`); parsers/import are analysis-scoped.
+- **Promote on publish**: Status → `published` maps columns to analytes (name + **aliases**), ensures Tests per sample, writes **Results** (`raw_result`, `replicate`, `lims_run_id`).
 - **Conflicts**: Same run updates; other run/manual ownership fails publish with **409**.
 - **Preview**: Publish confirmation dry-runs create/update/conflict/unresolved columns (`GET /v1/lims-runs/{id}/promotion/preview`).
 - **Docs**: [`.docs/ideas/run-results.md`](.docs/ideas/run-results.md), [`.docs/manuals/lims-runs.md`](.docs/manuals/lims-runs.md).
@@ -279,7 +282,9 @@ All project docs live under [`.docs/`](.docs/) with a fixed layout. **Start here
 | [`user-stories/`](.docs/user-stories/) | User stories and acceptance criteria |
 | [`checklist/`](.docs/checklist/) | Implementation checklists |
 | [`open-questions/`](.docs/open-questions/) | Decision logs (gate new work until blockers are Decided) |
-| [`ceo-review/`](.docs/ceo-review/), [`design-review/`](.docs/design-review/), [`security-review/`](.docs/security-review/) | Formal reviews |
+| [`development-process/`](.docs/development-process/) | Feature development process |
+| [`tech-sketch/`](.docs/tech-sketch/) | Tech sketches (post-requirements) |
+| [`ceo-review/`](.docs/ceo-review/), [`ui-review/`](.docs/ui-review/), [`architecture-review/`](.docs/architecture-review/), [`security-review/`](.docs/security-review/) | Formal reviews |
 | [`ideas/`](.docs/ideas/) | Exploratory notes (not commitments) |
 
 UAT scripts: `UAT_Scripts/` (e.g. workflow templates, experiment templates).

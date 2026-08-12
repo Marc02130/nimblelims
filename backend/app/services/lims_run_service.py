@@ -32,7 +32,6 @@ from app.repositories.flexible_experiment_repository import (
     LimsRunDataRepository,
     LimsRunRepository,
     RobotWorklistConfigRepository,
-    InstrumentParserRepository,
 )
 from app.schemas.flexible_experiment import (
     LimsRunCreate,
@@ -41,10 +40,14 @@ from app.schemas.flexible_experiment import (
     ImportDataResponse,
     LimsRunDataRead,
 )
+from app.schemas.data_parser import ImportFileResponse, LimsRunImportRead
+from app.services.data_parser_service import DataParserService
+from app.services.instrument_data_service import InstrumentDataService
 from models.flexible_experiment import (
     LimsRun,
     LimsRunStatus,
     LimsRunData,
+    LimsRunImport,
     VALID_TRANSITIONS,
     LIFECYCLE_TRANSITIONS,
 )
@@ -69,7 +72,7 @@ class LimsRunService:
         self.run_repo = LimsRunRepository(db)
         self.data_repo = LimsRunDataRepository(db)
         self.worklist_repo = RobotWorklistConfigRepository(db)
-        self.parser_repo = InstrumentParserRepository(db)
+        self.data_parser_svc = DataParserService(db, current_user=current_user)
 
     def _user_id(self) -> Optional[uuid.UUID]:
         return self.current_user.id if self.current_user else None
@@ -90,8 +93,12 @@ class LimsRunService:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"LIMS run '{data.name}' already exists",
             )
-        if data.analysis_id is not None:
-            self._require_analysis(data.analysis_id)
+        if not data.analysis_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="analysis_id is required on every LIMS run",
+            )
+        self._require_analysis(data.analysis_id)
         run = self.run_repo.create(
             name=data.name,
             experiment_template_id=data.experiment_template_id,
@@ -127,9 +134,7 @@ class LimsRunService:
             kwargs["name"] = data.name
         if data.description is not None:
             kwargs["description"] = data.description
-        if data.clear_analysis:
-            kwargs["analysis_id"] = None
-        elif data.analysis_id is not None:
+        if data.analysis_id is not None:
             self._require_analysis(data.analysis_id)
             kwargs["analysis_id"] = data.analysis_id
         self.run_repo.update_fields(run, **kwargs)
@@ -187,29 +192,133 @@ class LimsRunService:
         self,
         run_id: uuid.UUID,
         *,
-        acknowledge_no_analysis: bool = False,
+        sample_ids: Optional[List[uuid.UUID]] = None,
+        acknowledge_no_analysis: bool = False,  # ignored; analysis always required
     ) -> LimsRun:
         """
         draft → running (standard) or ordered → running (CRO).
-
-        If analysis_id is null and acknowledge_no_analysis is false, raise 400 with
-        a structured detail so the UI can warn and offer associate/create analysis.
+        Requires analysis_id. Locks sample cohort at start (queue / scan).
         """
         run = self.get_run(run_id)
-        if run.analysis_id is None and not acknowledge_no_analysis:
+        if run.analysis_id is None:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail={
-                    "code": "analysis_required_ack",
-                    "message": (
-                        "No Analysis is associated with this run. Imported data will not be "
-                        "written to Tests/Results when published. Associate an analysis, "
-                        "create one, or acknowledge to continue without structured results."
-                    ),
-                    "analysis_id": None,
+                    "code": "analysis_required",
+                    "message": "analysis_id is required before starting a run.",
                 },
             )
+
+        existing_cohort = dict(run.cohort or {})
+        existing_ids = existing_cohort.get("sample_ids") or []
+        locked = bool(existing_cohort.get("locked_at"))
+
+        if sample_ids is not None:
+            # Deduplicate preserving order
+            seen = set()
+            ids: List[str] = []
+            for sid in sample_ids:
+                s = str(sid)
+                if s not in seen:
+                    seen.add(s)
+                    ids.append(s)
+            if not ids:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="At least one sample_id is required for the run cohort",
+                )
+            if locked and set(ids) != set(str(x) for x in existing_ids):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=(
+                        "LIMS run cohort is locked. "
+                        "Cancel and create a new run to change samples."
+                    ),
+                )
+            from models.sample import Sample
+            from datetime import datetime, timezone
+
+            for sid in sample_ids:
+                if not self.db.query(Sample.id).filter(Sample.id == sid).first():
+                    raise HTTPException(
+                        status_code=status.HTTP_404_NOT_FOUND,
+                        detail=f"Sample {sid} not found",
+                    )
+            run.cohort = {
+                "sample_ids": ids,
+                "locked_at": datetime.now(timezone.utc).isoformat(),
+            }
+            run.modified_by = self._user_id()
+            self.db.flush()
+        elif not existing_ids:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={
+                    "code": "cohort_required",
+                    "message": (
+                        "Select samples for the run cohort before start "
+                        "(scan plate/tube or choose from queue)."
+                    ),
+                },
+            )
+        elif not locked:
+            from datetime import datetime, timezone
+            run.cohort = {
+                "sample_ids": list(existing_ids),
+                "locked_at": datetime.now(timezone.utc).isoformat(),
+            }
+            run.modified_by = self._user_id()
+            self.db.flush()
+
         return self._transition(run, LimsRunStatus.running)
+
+    def set_cohort(
+        self,
+        run_id: uuid.UUID,
+        sample_ids: List[uuid.UUID],
+        *,
+        lock: bool = False,
+    ) -> LimsRun:
+        """Set cohort while draft/ordered; lock optional until start."""
+        run = self.get_run(run_id)
+        if run.status not in (LimsRunStatus.draft, LimsRunStatus.ordered):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cohort can only be set before the run is started",
+            )
+        existing = dict(run.cohort or {})
+        if existing.get("locked_at"):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cohort is locked",
+            )
+        from models.sample import Sample
+        from datetime import datetime, timezone
+
+        seen = set()
+        ids: List[str] = []
+        for sid in sample_ids:
+            s = str(sid)
+            if s not in seen:
+                seen.add(s)
+                ids.append(s)
+            if not self.db.query(Sample.id).filter(Sample.id == sid).first():
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Sample {sid} not found",
+                )
+        if not ids:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="At least one sample_id is required",
+            )
+        cohort: dict = {"sample_ids": ids}
+        if lock:
+            cohort["locked_at"] = datetime.now(timezone.utc).isoformat()
+        run.cohort = cohort
+        run.modified_by = self._user_id()
+        self._commit_refresh(run)
+        return run
 
     def mark_results_received(self, run_id: uuid.UUID) -> LimsRun:
         """running → results_received (CRO lifecycle only)"""
@@ -241,23 +350,27 @@ class LimsRunService:
 
         promo = ResultPromotionService(self.db, current_user=self.current_user)
         # Plan first (may create tests via ensure); apply if analysis set
-        if run.analysis_id:
-            plan = promo.plan_promotion(run)
-            if plan.conflict_count:
-                raise HTTPException(
-                    status_code=status.HTTP_409_CONFLICT,
-                    detail={
-                        "code": "promotion_conflict",
-                        "message": (
-                            "Cannot publish: some results already exist from another "
-                            "run or manual entry. Resolve conflicts before publishing."
-                        ),
-                        "conflict_count": plan.conflict_count,
-                        "errors": plan.errors[:20],
-                        "preview": plan.to_dict(),
-                    },
-                )
-            promo.apply_plan(run, plan)
+        if not run.analysis_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="analysis_id is required to publish",
+            )
+        plan = promo.plan_promotion(run)
+        if plan.conflict_count:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "code": "promotion_conflict",
+                    "message": (
+                        "Cannot publish: some results already exist from another "
+                        "run or manual entry. Resolve conflicts before publishing."
+                    ),
+                    "conflict_count": plan.conflict_count,
+                    "errors": plan.errors[:20],
+                    "preview": plan.to_dict(),
+                },
+            )
+        promo.apply_plan(run, plan)
 
         self.run_repo.update_status(run, LimsRunStatus.published, self._user_id())
         self._commit_refresh(run)
@@ -283,38 +396,48 @@ class LimsRunService:
         self,
         run_id: uuid.UUID,
         rows: List[LimsRunDataRow],
+        *,
+        instrument_id: Optional[uuid.UUID] = None,
+        cro_source_id: Optional[uuid.UUID] = None,
+        parser_id: Optional[uuid.UUID] = None,
+        filename: Optional[str] = None,
     ) -> ImportDataResponse:
         """
-        Import instrument data into a running experiment.
-        Only allowed when status == 'running'.
-        Columns must match the template's parser_config; raises 422 if they don't.
+        Import pre-parsed rows. Prefer import_file() for CSV with parser resolution.
+        Still requires analysis + instrument|CRO + active parser when source provided.
         """
         run = self.get_run(run_id)
-        _import_allowed = {LimsRunStatus.running, LimsRunStatus.results_received}
-        if run.status not in _import_allowed:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Data import requires status 'running' or 'results_received'; current status is '{run.status.value}'",
-            )
+        self._assert_import_allowed(run)
+        if not run.analysis_id:
+            raise HTTPException(400, "Run requires analysis_id before import")
 
-        # Validate parser_config exists on template
-        parser = self.parser_repo.get_for_template(run.experiment_template_id)
-        if not parser:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Template has no instrument parser configured. Cannot import data.",
+        import_id = None
+        if instrument_id or cro_source_id or parser_id:
+            parser = self.data_parser_svc.resolve_for_import(
+                analysis_id=run.analysis_id,
+                instrument_id=instrument_id,
+                cro_source_id=cro_source_id,
+                parser_id=parser_id,
             )
-
-        # Validate row_data columns match expected field names
-        expected_fields = {col["field_name"] for col in parser.parser_config.get("columns", [])}
-        if expected_fields:
-            for i, row in enumerate(rows):
-                missing = expected_fields - set(row.row_data.keys())
-                if missing:
-                    raise HTTPException(
-                        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                        detail=f"Row {i}: missing expected columns: {sorted(missing)}",
-                    )
+            imp = self._create_import_event(
+                run_id=run_id,
+                instrument_id=instrument_id or parser.instrument_id,
+                cro_source_id=cro_source_id or parser.cro_source_id,
+                parser_id=parser.id,
+                filename=filename,
+            )
+            import_id = imp.id
+            expected_fields = {
+                col.get("field_name") for col in (parser.parser_config or {}).get("columns", [])
+            }
+            if expected_fields:
+                for i, row in enumerate(rows):
+                    missing = expected_fields - set(row.row_data.keys())
+                    if missing:
+                        raise HTTPException(
+                            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                            detail=f"Row {i}: missing expected columns: {sorted(missing)}",
+                        )
 
         row_dicts = [
             {
@@ -322,13 +445,11 @@ class LimsRunService:
                 "well_position": row.well_position,
                 "sample_id": row.sample_id,
                 "row_data": row.row_data,
+                "import_id": import_id,
             }
             for row in rows
         ]
         created_rows = self.data_repo.bulk_create(run_id, row_dicts, self._user_id())
-        # Flush + commit without per-row refresh (avoids N+1 round-trips).
-        # created_rows are already in-memory; created_at will be populated by DB default
-        # on flush. The response schema tolerates None for server-set timestamps.
         self.db.flush()
         self.db.commit()
 
@@ -337,6 +458,123 @@ class LimsRunService:
             skipped=0,
             rows=[LimsRunDataRead.model_validate(r) for r in created_rows],
         )
+
+    def import_file(
+        self,
+        run_id: uuid.UUID,
+        file_bytes: bytes,
+        *,
+        instrument_id: Optional[uuid.UUID] = None,
+        cro_source_id: Optional[uuid.UUID] = None,
+        parser_id: Optional[uuid.UUID] = None,
+        filename: Optional[str] = None,
+    ) -> ImportFileResponse:
+        """Parse file with resolved data parser and import rows."""
+        run = self.get_run(run_id)
+        self._assert_import_allowed(run)
+        if not run.analysis_id:
+            raise HTTPException(400, "Run requires analysis_id before import")
+
+        parser = self.data_parser_svc.resolve_for_import(
+            analysis_id=run.analysis_id,
+            instrument_id=instrument_id,
+            cro_source_id=cro_source_id,
+            parser_id=parser_id,
+        )
+        rows, warnings, _hard = InstrumentDataService(parser.parser_config).parse(
+            file_bytes, raise_on_hard=True
+        )
+        if not rows:
+            raise HTTPException(422, "No rows imported")
+
+        imp = self._create_import_event(
+            run_id=run_id,
+            instrument_id=instrument_id or parser.instrument_id,
+            cro_source_id=cro_source_id or parser.cro_source_id,
+            parser_id=parser.id,
+            filename=filename,
+        )
+        row_dicts = [
+            {
+                "container_id": row.container_id,
+                "well_position": row.well_position,
+                "sample_id": row.sample_id,
+                "row_data": row.row_data,
+                "import_id": imp.id,
+            }
+            for row in rows
+        ]
+        created = self.data_repo.bulk_create(run_id, row_dicts, self._user_id())
+        self.db.flush()
+        self.db.commit()
+        return ImportFileResponse(
+            imported=len(created),
+            skipped=0,
+            warnings=warnings,
+            import_id=imp.id,
+            parser_id=parser.id,
+        )
+
+    def list_imports(self, run_id: uuid.UUID) -> List[LimsRunImportRead]:
+        self.get_run(run_id)
+        rows = (
+            self.db.query(LimsRunImport)
+            .filter(LimsRunImport.lims_run_id == run_id)
+            .order_by(LimsRunImport.imported_at.desc())
+            .all()
+        )
+        out: List[LimsRunImportRead] = []
+        for r in rows:
+            out.append(
+                LimsRunImportRead(
+                    id=r.id,
+                    lims_run_id=r.lims_run_id,
+                    instrument_id=r.instrument_id,
+                    cro_source_id=r.cro_source_id,
+                    parser_id=r.parser_id,
+                    filename=r.filename,
+                    imported_at=r.imported_at,
+                    imported_by=r.imported_by,
+                    parser_name=r.parser.name if r.parser else None,
+                    parser_version=r.parser.version if r.parser else None,
+                    instrument_name=r.instrument.name if r.instrument else None,
+                    cro_source_name=r.cro_source.name if r.cro_source else None,
+                )
+            )
+        return out
+
+    def _assert_import_allowed(self, run: LimsRun) -> None:
+        _import_allowed = {LimsRunStatus.running, LimsRunStatus.results_received}
+        if run.status not in _import_allowed:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    f"Data import requires status 'running' or 'results_received'; "
+                    f"current status is '{run.status.value}'"
+                ),
+            )
+
+    def _create_import_event(
+        self,
+        *,
+        run_id: uuid.UUID,
+        instrument_id: Optional[uuid.UUID],
+        cro_source_id: Optional[uuid.UUID],
+        parser_id: uuid.UUID,
+        filename: Optional[str],
+    ) -> LimsRunImport:
+        imp = LimsRunImport(
+            id=uuid.uuid4(),
+            lims_run_id=run_id,
+            instrument_id=instrument_id,
+            cro_source_id=cro_source_id,
+            parser_id=parser_id,
+            filename=filename,
+            imported_by=self._user_id(),
+        )
+        self.db.add(imp)
+        self.db.flush()
+        return imp
 
     def get_data_rows(
         self,

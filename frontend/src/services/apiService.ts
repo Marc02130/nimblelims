@@ -149,12 +149,22 @@ export class ApiService {
       },
     });
 
-    // Request interceptor to add auth token
+    // Request interceptor: auth token + multipart FormData handling
     this.api.interceptors.request.use(
       (config) => {
         const token = localStorage.getItem('token');
         if (token) {
           config.headers.Authorization = `Bearer ${token}`;
+        }
+        // Default Content-Type is application/json. For FormData the browser must set
+        // multipart/form-data WITH boundary — otherwise FastAPI returns 422 on File/Form.
+        if (typeof FormData !== 'undefined' && config.data instanceof FormData) {
+          if (config.headers && typeof (config.headers as any).set === 'function') {
+            (config.headers as any).delete('Content-Type');
+          } else if (config.headers) {
+            delete (config.headers as any)['Content-Type'];
+            delete (config.headers as any)['content-type'];
+          }
         }
         return config;
       },
@@ -508,6 +518,180 @@ export class ApiService {
 
   async deleteUnit(id: string) {
     const response: AxiosResponse = await this.api.delete(`/units/${id}`);
+    return response.data;
+  }
+
+  // Instrument types / instruments / CRO sources (data-parsers P0)
+  async getInstrumentTypes(params?: { search?: string; active?: boolean }) {
+    const response: AxiosResponse = await this.api.get('/v1/instrument-types', { params });
+    return response.data;
+  }
+
+  async createInstrumentType(data: {
+    name: string;
+    description?: string;
+    vendor?: string;
+    model?: string;
+    active?: boolean;
+  }) {
+    const response: AxiosResponse = await this.api.post('/v1/instrument-types', data);
+    return response.data;
+  }
+
+  async updateInstrumentType(
+    id: string,
+    data: Partial<{
+      name: string;
+      description?: string;
+      vendor?: string;
+      model?: string;
+      active?: boolean;
+    }>
+  ) {
+    const response: AxiosResponse = await this.api.patch(`/v1/instrument-types/${id}`, data);
+    return response.data;
+  }
+
+  async deleteInstrumentType(id: string) {
+    const response: AxiosResponse = await this.api.delete(`/v1/instrument-types/${id}`);
+    return response.data;
+  }
+
+  async getInstruments(params?: {
+    search?: string;
+    instrument_type_id?: string;
+    active?: boolean;
+  }) {
+    const response: AxiosResponse = await this.api.get('/v1/instruments', { params });
+    return response.data;
+  }
+
+  async createInstrument(data: {
+    name: string;
+    description?: string;
+    instrument_type_id: string;
+    serial_number?: string;
+    active?: boolean;
+  }) {
+    const response: AxiosResponse = await this.api.post('/v1/instruments', data);
+    return response.data;
+  }
+
+  async updateInstrument(
+    id: string,
+    data: Partial<{
+      name: string;
+      description?: string;
+      instrument_type_id: string;
+      serial_number?: string;
+      active?: boolean;
+    }>
+  ) {
+    const response: AxiosResponse = await this.api.patch(`/v1/instruments/${id}`, data);
+    return response.data;
+  }
+
+  async deleteInstrument(id: string) {
+    const response: AxiosResponse = await this.api.delete(`/v1/instruments/${id}`);
+    return response.data;
+  }
+
+  async getCroSources(params?: { search?: string; active?: boolean }) {
+    const response: AxiosResponse = await this.api.get('/v1/cro-sources', { params });
+    return response.data;
+  }
+
+  async createCroSource(data: {
+    name: string;
+    description?: string;
+    client_id?: string | null;
+    active?: boolean;
+  }) {
+    const response: AxiosResponse = await this.api.post('/v1/cro-sources', data);
+    return response.data;
+  }
+
+  async updateCroSource(
+    id: string,
+    data: Partial<{
+      name: string;
+      description?: string;
+      client_id?: string | null;
+      active?: boolean;
+    }>
+  ) {
+    const response: AxiosResponse = await this.api.patch(`/v1/cro-sources/${id}`, data);
+    return response.data;
+  }
+
+  async deleteCroSource(id: string) {
+    const response: AxiosResponse = await this.api.delete(`/v1/cro-sources/${id}`);
+    return response.data;
+  }
+
+  // Data parsers (P1)
+  async getDataParsers(params?: {
+    active_only?: boolean;
+    instrument_id?: string;
+    cro_source_id?: string;
+    analysis_id?: string;
+    version_group_id?: string;
+  }) {
+    const response: AxiosResponse = await this.api.get('/v1/data-parsers', { params });
+    return response.data;
+  }
+
+  async getDataParser(id: string) {
+    const response: AxiosResponse = await this.api.get(`/v1/data-parsers/${id}`);
+    return response.data;
+  }
+
+  async createDataParser(data: any) {
+    const response: AxiosResponse = await this.api.post('/v1/data-parsers', data);
+    return response.data;
+  }
+
+  async activateDataParser(id: string) {
+    const response: AxiosResponse = await this.api.post(`/v1/data-parsers/${id}/activate`);
+    return response.data;
+  }
+
+  async createDataParserVersion(versionGroupId: string, data: any) {
+    const response: AxiosResponse = await this.api.post(
+      `/v1/data-parsers/groups/${versionGroupId}/versions`,
+      data
+    );
+    return response.data;
+  }
+
+  async testDataParserConfig(parserConfig: any, files: File[]) {
+    const form = new FormData();
+    form.append('parser_config', JSON.stringify(parserConfig));
+    // Same field name repeated — FastAPI List[UploadFile] = File(...)
+    files.forEach((f) => form.append('files', f));
+    const response: AxiosResponse = await this.api.post('/v1/data-parsers/test', form);
+    return response.data;
+  }
+
+  async importLimsRunFile(
+    runId: string,
+    file: File,
+    meta: { instrument_id?: string; cro_source_id?: string; parser_id?: string }
+  ) {
+    const form = new FormData();
+    form.append('file', file);
+    if (meta.instrument_id) form.append('instrument_id', meta.instrument_id);
+    if (meta.cro_source_id) form.append('cro_source_id', meta.cro_source_id);
+    if (meta.parser_id) form.append('parser_id', meta.parser_id);
+    const response: AxiosResponse = await this.api.post(
+      `/v1/lims-runs/${runId}/import-file`,
+      form
+    );
+    return response.data;
+  }
+
+  async getLimsRunImports(runId: string) {
+    const response: AxiosResponse = await this.api.get(`/v1/lims-runs/${runId}/imports`);
     return response.data;
   }
 
@@ -1191,6 +1375,36 @@ export class ApiService {
     return response.data;
   }
 
+  /** Resolve plate/tube barcode or client_sample_id to samples for queue start. */
+  async resolveExperimentScan(barcode: string) {
+    const response: AxiosResponse = await this.api.post('v1/experiments/resolve-scan', { barcode });
+    return response.data as {
+      barcode: string;
+      match_type: 'container' | 'sample' | 'none';
+      container_id?: string;
+      container_name?: string;
+      samples: Array<{
+        sample_id: string;
+        client_sample_id?: string;
+        sample_name?: string;
+        container_id?: string;
+        container_name?: string;
+      }>;
+      total: number;
+    };
+  }
+
+  /** Link cohort samples and start experiment (locks cohort). */
+  async startExperiment(experimentId: string, data: { sample_ids: string[]; set_started_at?: boolean }) {
+    const response: AxiosResponse = await this.api.post(`v1/experiments/${experimentId}/start`, data);
+    return response.data as {
+      experiment: unknown;
+      linked_count: number;
+      already_linked_count: number;
+      cohort_locked: boolean;
+    };
+  }
+
   async addExperimentDetailStep(experimentId: string, data: {
     detail_type: string;
     content?: Record<string, unknown>;
@@ -1590,6 +1804,49 @@ export class ApiService {
     return response.data;
   }
 
+  async getEntryGrid(entryId: string) {
+    const response: AxiosResponse = await this.api.get(`v1/entries/${entryId}/grid`);
+    return response.data;
+  }
+
+  async exportEntry(entryId: string, format: 'json' | 'csv' = 'json') {
+    const response: AxiosResponse = await this.api.get(`v1/entries/${entryId}/export`, {
+      params: { format },
+      responseType: format === 'csv' ? 'blob' : 'json',
+    });
+    return response.data;
+  }
+
+  async submitEntry(entryId: string) {
+    const response: AxiosResponse = await this.api.post(`v1/entries/${entryId}/submit`);
+    return response.data;
+  }
+
+  async getAliquotMethods() {
+    const response: AxiosResponse = await this.api.get('v1/entries/aliquot-methods');
+    return response.data;
+  }
+
+  async getAliquotPlan(entryId: string) {
+    const response: AxiosResponse = await this.api.get(`v1/entries/${entryId}/aliquot-plan`);
+    return response.data;
+  }
+
+  async saveAliquotPlan(entryId: string, lines: Array<Record<string, unknown>>) {
+    const response: AxiosResponse = await this.api.put(`v1/entries/${entryId}/aliquot-plan`, {
+      lines,
+    });
+    return response.data;
+  }
+
+  async executeAliquotPlan(
+    entryId: string,
+    data?: { dry_run?: boolean; lines?: Array<Record<string, unknown>> },
+  ) {
+    const response: AxiosResponse = await this.api.post(`v1/entries/${entryId}/execute`, data || {});
+    return response.data;
+  }
+
   // SOP parse jobs (v1 API)
   async createSopParseJob(sopFile: File, instrumentFile: File) {
     const form = new FormData();
@@ -1685,11 +1942,21 @@ export class ApiService {
     return response.data;
   }
 
-  async startLimsRun(id: string, body?: { acknowledge_no_analysis?: boolean }) {
+  async startLimsRun(
+    id: string,
+    body?: { sample_ids?: string[]; acknowledge_no_analysis?: boolean },
+  ) {
     const response: AxiosResponse = await this.api.patch(
       `/v1/lims-runs/${id}/start`,
       body ?? {},
     );
+    return response.data;
+  }
+
+  async setLimsRunCohort(id: string, sampleIds: string[]) {
+    const response: AxiosResponse = await this.api.put(`/v1/lims-runs/${id}/cohort`, {
+      sample_ids: sampleIds,
+    });
     return response.data;
   }
 

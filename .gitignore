@@ -180,5 +180,10 @@ alembic/versions/*.py
 !alembic/versions/.gitkeep
 .gstack/
 
-# Grok local artifacts
-.grok/
+# Grok: ignore local settings; commit shared skills
+.grok/*
+!.grok/skills/
+!.grok/skills/**
+
+# Data
+TestData/

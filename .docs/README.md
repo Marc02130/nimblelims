@@ -6,24 +6,32 @@ All product and engineering docs live under this directory, organized by purpose
 
 | Directory | Purpose |
 |-----------|---------|
+| [`development-process/`](development-process/) | **How we build** — ideation → production (includes dogfood/UAT) |
 | [`manuals/`](manuals/) | Day-to-day reference: setup, API, navigation, domain handbooks |
 | [`requirements/`](requirements/) | PRD and feature requirements |
-| [`design/`](design/) | Architecture, tech specs, gap analysis, migration strategy |
+| [`tech-sketch/`](tech-sketch/) | Lightweight *how* before architecture/UI review |
+| [`schema-changes/`](schema-changes/) | **Per-cycle DB delta** (architecture schema checklist) |
+| [`design/`](design/) | Longer-form architecture / tech specs |
 | [`user-stories/`](user-stories/) | User stories and acceptance criteria |
 | [`checklist/`](checklist/) | Implementation checklists (task tracking) |
-| [`open-questions/`](open-questions/) | **Decision logs** — gate new phases/features until blockers are Decided |
+| [`open-questions/`](open-questions/) | **Decision logs** — gate phases until blockers are Decided |
 | [`ceo-review/`](ceo-review/) | CEO / product strategy reviews |
-| [`design-review/`](design-review/) | UX / design reviews |
+| [`ui-review/`](ui-review/) | UI / UX reviews |
+| [`architecture-review/`](architecture-review/) | Architecture design reviews |
 | [`security-review/`](security-review/) | Security reviews |
+| [`lab-ops-review/`](lab-ops-review/) | **SVP Lab Ops** — target-customer lab workflows (required for ELN/experiments) |
 | [`ideas/`](ideas/) | Exploratory notes — not commitments |
 | `private/` | Local-only materials (gitignored) |
 
-**Index rule:** do not leave new docs at `.docs/` root. Put them in the folder above that matches their role.
+**Formal review skills (Grok):** [`.grok/skills/nimble-reviews/README.md`](../.grok/skills/nimble-reviews/README.md) — Lab Ops, CEO, UI, Arch, CSO packet + orchestrator (`/nimble-*-review`, `/nimble-review-packet`). Shared rules: [PACKET.md](../.grok/skills/nimble-reviews/PACKET.md).
+
+**Index rule:** do not leave new docs at `.docs/` root. Put them in the folder that matches their role.
 
 ## Start here
 
 | Need | Doc |
 |------|-----|
+| **How we develop features** | [development-process/README.md](development-process/README.md) |
 | Run the app | [manuals/dev-setup.md](manuals/dev-setup.md), root [README.md](../README.md) |
 | Admin password / first login | [manuals/admin-setup.md](manuals/admin-setup.md) |
 | API reference | [manuals/api-endpoints.md](manuals/api-endpoints.md) |
@@ -56,8 +64,28 @@ All product and engineering docs live under this directory, organized by purpose
 | [nimblelims-prd.md](requirements/nimblelims-prd.md) | Product requirements (MVP+) |
 | [experiment-processes-entries.md](requirements/experiment-processes-entries.md) | Processes, entries, experiments requirements |
 | [schema-evolution.md](requirements/schema-evolution.md) | FieldDefinitions / schema evolution requirements |
+| [data-parsers-lims-runs.md](requirements/data-parsers-lims-runs.md) | Parsers (analysis×instrument/CRO), run lineage, optional AI setup — **in review** |
 
-## Design
+## Tech sketches
+
+Lightweight *how* (see [tech-sketch/README.md](tech-sketch/README.md)). Feature sketches land here after requirements, before architecture review.
+
+| Cycle | Doc | Status |
+|-------|-----|--------|
+| data-parsers-lims-runs | [tech-sketch/data-parsers-lims-runs.md](tech-sketch/data-parsers-lims-runs.md) | Accepted |
+| experiment-template-entries | [tech-sketch/experiment-template-entries.md](tech-sketch/experiment-template-entries.md) | **Hold** — Lab Ops revise (2026-07-29) |
+
+## Schema changes (per cycle)
+
+**Single place** for “what migrations does this feature need?” — [schema-changes/README.md](schema-changes/README.md).  
+Do not confuse with the platform Field Management design ([design/schema-evolution.md](design/schema-evolution.md)).
+
+| Cycle | Doc |
+|-------|-----|
+| data-parsers-lims-runs | [schema-changes/data-parsers-lims-runs.md](schema-changes/data-parsers-lims-runs.md) |
+| experiment-template-entries | [schema-changes/experiment-template-entries.md](schema-changes/experiment-template-entries.md) |
+
+## Design (long-form)
 
 | Doc | Topic |
 |-----|--------|
@@ -78,13 +106,20 @@ All product and engineering docs live under this directory, organized by purpose
 | [checklist/experiment-checklist.md](checklist/experiment-checklist.md) | Experiments / processes / entries phases |
 | [checklist/experiment-rework-prerequisites.md](checklist/experiment-rework-prerequisites.md) | Pre-rework issues (historical checklist) |
 | [open-questions/experiments.md](open-questions/experiments.md) | Experiments decision log |
+| [open-questions/run-results.md](open-questions/run-results.md) | Run→results decisions (shipped) |
+| [open-questions/data-parsers-lims-runs.md](open-questions/data-parsers-lims-runs.md) | Parsers + run lineage (in review) |
 | [open-questions/README.md](open-questions/README.md) | Gate rule |
 
 ## Reviews
 
-- **CEO:** [ceo-review/](ceo-review/) — process/experiment, schema evolution, field management  
-- **Design:** [design-review/](design-review/)  
-- **Security:** [security-review/](security-review/)  
+| Track | Folder |
+|-------|--------|
+| **CEO / product** | [ceo-review/](ceo-review/) |
+| **UI / UX** | [ui-review/](ui-review/) |
+| **Architecture** | [architecture-review/](architecture-review/) |
+| **Security** | [security-review/](security-review/) |
+
+Long-form tech designs stay in [design/](design/). UI review was previously `ui-review/`.
 
 ## Ideas
 
@@ -92,17 +127,34 @@ All product and engineering docs live under this directory, organized by purpose
 |-----|--------|--------|
 | [ideas/run-results.md](ideas/run-results.md) | LimsRun JSONB → Results on **publish** | **Shipped v1** (P0–P4); see reviews + [manuals/lims-runs.md](manuals/lims-runs.md) |
 | [ideas/ai-analyte-resolution.md](ideas/ai-analyte-resolution.md) | AI help when analyte alias list misses | Exploratory follow-on |
-| [ideas/ai-data-import.md](ideas/ai-data-import.md) | AI-assisted instrument/CRO import mapping | **Placeholder** |
+| [ideas/ai-data-import.md](ideas/ai-data-import.md) | Deterministic parsers (analysis+instrument/CRO); AI only for setup | **Requirements in review** |
 | [ideas/ai-data-analysis.md](ideas/ai-data-analysis.md) | AI-assisted query / anomaly / summary of run+result data | **Placeholder** |
+| [ideas/multi-tenant.md](ideas/multi-tenant.md) | Org segregation / true multi-tenant isolation | **Placeholder — OOS until real multi-org users** |
+| [ideas/lab-locations.md](ideas/lab-locations.md) | Lab buildings/rooms; rename client `locations` → `addresses` | **Placeholder** |
+| [ideas/orders-and-projects.md](ideas/orders-and-projects.md) | Rename today’s `projects` → **orders**; keep **client_projects** (CRO reporting); new **lab projects** (method-dev etc.) | **Placeholder** |
+| [ideas/accessioning-and-workflows-revisit.md](ideas/accessioning-and-workflows-revisit.md) | Revisit accessioning workflows: sample manifest upload + receive verification (continuous vs discontinuous) | **Placeholder — OOS experiment entries** |
+| [ideas/materials-and-lot-tracking.md](ideas/materials-and-lot-tracking.md) | Materials/reagents + lot inventory and use on experiments | **Placeholder — not in NimbleLIMS today** |
+| [ideas/index-sets-and-sequencing-setup.md](ideas/index-sets-and-sequencing-setup.md) | Index set catalog, index assignment entry, sequencer sample sheets / flow cell loading | **Placeholder** |
+| [ideas/ui-tabbed-admin-catalogs.md](ideas/ui-tabbed-admin-catalogs.md) | Tabbed shells + menu names: Assay catalog, Customers, Work, Instruments, Access control; CRO separate | **Placeholder** |
 | [ideas/model-fine-tune.md](ideas/model-fine-tune.md) | Model fine-tune notes | See `sop-rag` for related SOP/RAG work |
 
-## Reviews (run-results)
+## Reviews (run-results) — complete
 
 - [ceo-review/run-results.md](ceo-review/run-results.md)
-- [design-review/run-results.md](design-review/run-results.md)
-- [design/run-results.md](design/run-results.md) (tech)
+- [ui-review/run-results.md](ui-review/run-results.md)
+- [design/run-results.md](design/run-results.md) (tech design)
 - [security-review/run-results.md](security-review/run-results.md)
 - [open-questions/run-results.md](open-questions/run-results.md)
+
+## Reviews (data parsers / LimsRun import) — **CEO Accept; other reviews open**
+
+- **Requirements:** [requirements/data-parsers-lims-runs.md](requirements/data-parsers-lims-runs.md)
+- **Tech sketch:** [tech-sketch/data-parsers-lims-runs.md](tech-sketch/data-parsers-lims-runs.md)
+- **Open questions:** [open-questions/data-parsers-lims-runs.md](open-questions/data-parsers-lims-runs.md)
+- [ceo-review/data-parsers-lims-runs.md](ceo-review/data-parsers-lims-runs.md) — **Accept** (high priority, P0+P1 MVP)
+- [security-review/data-parsers-lims-runs.md](security-review/data-parsers-lims-runs.md)
+- [architecture-review/data-parsers-lims-runs.md](architecture-review/data-parsers-lims-runs.md)
+- [ui-review/data-parsers-lims-runs.md](ui-review/data-parsers-lims-runs.md)
 
 ## Agent / contributor rules
 

@@ -13,6 +13,8 @@ import AdminOverview from './pages/admin/AdminOverview';
 import ListsAdmin from './pages/admin/ListsAdmin';
 import ContainerTypesManagement from './pages/admin/ContainerTypesManagement';
 import UnitsManagement from './pages/admin/UnitsManagement';
+import InstrumentCatalogManagement from './pages/admin/InstrumentCatalogManagement';
+import DataParsersManagement from './pages/admin/DataParsersManagement';
 import UsersManagement from './pages/admin/UsersManagement';
 import RolesManagement from './pages/admin/RolesManagement';
 import AdminAnalysesManagement from './pages/admin/AnalysesManagement';
@@ -307,6 +309,26 @@ function AppRoutes() {
           element={
             hasPermission('config:edit') ? (
               <UnitsManagement />
+            ) : (
+              <Navigate to="/dashboard" replace />
+            )
+          }
+        />
+        <Route
+          path="/admin/instruments"
+          element={
+            hasPermission('config:edit') ? (
+              <InstrumentCatalogManagement />
+            ) : (
+              <Navigate to="/dashboard" replace />
+            )
+          }
+        />
+        <Route
+          path="/admin/data-parsers"
+          element={
+            hasPermission('config:edit') ? (
+              <DataParsersManagement />
             ) : (
               <Navigate to="/dashboard" replace />
             )

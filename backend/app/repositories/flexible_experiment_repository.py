@@ -156,6 +156,7 @@ class LimsRunDataRepository:
                 well_position=row.get("well_position"),
                 sample_id=row.get("sample_id"),
                 row_data=row["row_data"],
+                import_id=row.get("import_id"),
                 created_by=created_by,
                 modified_by=created_by,
             )
@@ -166,44 +167,21 @@ class LimsRunDataRepository:
 
 
 class InstrumentParserRepository:
+    """Deprecated template-scoped parsers — no-op / empty after P1."""
+
     def __init__(self, db: Session) -> None:
         self.db = db
 
-    def get_for_template(self, template_id: uuid.UUID) -> Optional[InstrumentParser]:
-        return (
-            self.db.query(InstrumentParser)
-            .filter(InstrumentParser.experiment_template_id == template_id)
-            .first()
+    def get_for_template(self, template_id: uuid.UUID):
+        return None
+
+    def create(self, *args, **kwargs):
+        raise RuntimeError(
+            "Template-scoped parsers removed. Use /v1/data-parsers (analysis × instrument|CRO)."
         )
 
-    def create(
-        self,
-        template_id: uuid.UUID,
-        name: str,
-        description: Optional[str],
-        parser_config: dict,
-        created_by: Optional[uuid.UUID],
-    ) -> InstrumentParser:
-        parser = InstrumentParser(
-            experiment_template_id=template_id,
-            name=name,
-            description=description,
-            parser_config=parser_config,
-            created_by=created_by,
-            modified_by=created_by,
-        )
-        self.db.add(parser)
-        return parser
-
-    def update(
-        self,
-        parser: InstrumentParser,
-        parser_config: dict,
-        modified_by: Optional[uuid.UUID],
-    ) -> InstrumentParser:
-        parser.parser_config = parser_config
-        parser.modified_by = modified_by
-        return parser
+    def update(self, *args, **kwargs):
+        raise RuntimeError("Template-scoped parsers removed. Use /v1/data-parsers.")
 
 
 class RobotWorklistConfigRepository:

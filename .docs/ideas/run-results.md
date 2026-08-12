@@ -22,7 +22,7 @@ Get run data into a **structured format** for easy querying, reporting, and use�
 | Doc | Link |
 |-----|------|
 | CEO | [../ceo-review/run-results.md](../ceo-review/run-results.md) |
-| Design | [../design-review/run-results.md](../design-review/run-results.md) |
+| UI | [../ui-review/run-results.md](../ui-review/run-results.md) |
 | Tech | [../design/run-results.md](../design/run-results.md) |
 | Security | [../security-review/run-results.md](../security-review/run-results.md) |
 | Open questions | [../open-questions/run-results.md](../open-questions/run-results.md) |
@@ -31,9 +31,9 @@ Get run data into a **structured format** for easy querying, reporting, and use�
 
 | Topic | Decision |
 |-------|----------|
-| **When** | Write results on **publish**, only if run has **`analysis_id`** |
-| **Opt-in** | **`lims_runs.analysis_id`** + UI analysis list — not a separate promote flag |
-| **Start guard** | If no analysis at **run start**, **warn** (no Tests/Results on publish) and offer associate / create analysis / continue without |
+| **When** | Write results on **publish** |
+| **Analysis required** | **`lims_runs.analysis_id`** required from create — not optional; no non-reportable runs (2026-07-19) |
+| **Start / import** | Reject if analysis missing — no ack / continue-without path |
 | **Objects vs instances** | Analysis/Analyte = catalog; Test/Result = instances. Analysis on run ⇒ **ensure** tests for samples |
 | **What** | **`raw_result`** (+ **`replicate` int**); calculated deferred |
 | **Map** | JSONB column → analyte (name + **maintained alias list on analyte**) → value; no pattern match |
@@ -64,7 +64,7 @@ publish →
   result(that test, analyte Arsenic, raw_result="0.4")
   units skipped (not an analyte)
 
-LimsRun with analysis_id NULL → publish only, no results written
+// analysis_id always set on the run — no null / non-reportable path
 ```
 
 ## Run lifecycle (context)
@@ -72,7 +72,7 @@ LimsRun with analysis_id NULL → publish only, no results written
 **Standard:** `draft → running → complete → published` (+ failed/canceled)  
 **CRO:** `draft → ordered → running → results_received → complete → published`  
 
-Import allowed in `running` / `results_received`. **Structured results written at `published` only when `analysis_id` is set.**
+Import allowed in `running` / `results_received`. **Structured results written at `published`** (analysis always present).
 
 ## Product policy closed
 
@@ -83,7 +83,7 @@ See [open-questions/run-results.md](../open-questions/run-results.md). Remaining
 | Phase | Focus | Status |
 |-------|--------|--------|
 | P0 | Analyte aliases on analyte (+ admin UI) | **Done** |
-| P1 | `analysis_id` on lims_runs + UI + start warning | **Done** |
+| P1 | `analysis_id` on lims_runs + UI (later: required, no non-reportable) | **Done** (requiredness product lock 2026-07-19) |
 | P2 | `results.lims_run_id`, `results.replicate`; drop `results.name` | **Done** |
 | P3 | Ensure test; promote on publish; update vs fail; batch flush | **Done** |
 | P4 | Publish confirmation = promotion preview + conflict UX | **Done** |
@@ -94,9 +94,9 @@ See [open-questions/run-results.md](../open-questions/run-results.md). Remaining
 | Layer | What |
 |-------|------|
 | Schema | `analyte_aliases`; `lims_runs.analysis_id`; `results.lims_run_id`, `results.replicate`; no `results.name` |
-| API | Start ack without analysis; `GET /v1/lims-runs/{id}/promotion/preview`; promote on `PATCH …/complete` (publish) |
+| API | `GET /v1/lims-runs/{id}/promotion/preview`; promote on `PATCH …/complete` (publish). **Target:** no `acknowledge_no_analysis` — analysis always required |
 | Service | `ResultPromotionService` — name/alias match, ensure Test, create/update/conflict |
-| UI | Analysis on run; start warning; publish modal with create/update/conflict/unresolved |
+| UI | Analysis **required** on run; publish modal with create/update/conflict/unresolved. **Target:** remove non-reportable / continue-without UX |
 | Config | `LIMS_PROMOTE_BATCH_SIZE` env (default **200**) |
 
 ## Non-goals (v1)
