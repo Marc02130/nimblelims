@@ -20,11 +20,12 @@ Requirements
 Tech sketch                          ← how (lightweight)
     ↓
 Reviews (parallel when possible; see lab-ops gate below)
-    ├── Lab operations (SVP Lab Ops)   ← required for ELN/LIMS lab workflows
-    ├── CEO / product
-    ├── Security
-    ├── UI design
-    └── Architecture design
+    ├── Lab operations (SVP Lab Ops)   ← required for ELN/LIMS lab workflows  → /nimble-lab-ops-review
+    ├── CEO / product                  → /nimble-ceo-review
+    ├── Security                       → /nimble-cso-review
+    ├── UI design                      → /nimble-ui-review
+    └── Architecture design            → /nimble-arch-review
+    (orchestrate: /nimble-review-packet)
     ↓
 Developer reviews review docs
     ├── Agree → proceed
@@ -78,11 +79,12 @@ Tiny/small must **not** skip security or product decisions on sensitive changes 
 | **Requirements** | FR/NFR, phases, acceptance criteria, review packet links | [`.docs/requirements/`](../requirements/) |
 | **Tech sketch** | Lightweight *how*: APIs, engine, flows (may draft model) | [`.docs/tech-sketch/`](../tech-sketch/) |
 | **Schema changes** | **Authoritative DB delta for this cycle** (architecture verifies here) | [`.docs/schema-changes/`](../schema-changes/) |
-| **Lab operations review** | **Target-customer lab workflows** (SVP Lab Ops persona); required for ELN/experiments/processes/runs | [`.docs/lab-ops-review/`](../lab-ops-review/) |
-| **CEO review** | Scope, MVP cut, priority | [`.docs/ceo-review/`](../ceo-review/) |
-| **Security review** | Trust boundaries, STRIDE, authZ, AI/data | [`.docs/security-review/`](../security-review/) |
-| **UI design review** | Personas, flows, empty states | [`.docs/ui-review/`](../ui-review/) |
-| **Architecture design review** | Schema, APIs, migration | [`.docs/architecture-review/`](../architecture-review/) |
+| **Lab operations review** | **Target-customer lab workflows** (SVP Lab Ops persona); required for ELN/experiments/processes/runs | [`.docs/lab-ops-review/`](../lab-ops-review/) · skill `/nimble-lab-ops-review` |
+| **CEO review** | Scope, MVP cut, priority | [`.docs/ceo-review/`](../ceo-review/) · skill `/nimble-ceo-review` |
+| **Security review** | Trust boundaries, STRIDE, authZ, AI/data | [`.docs/security-review/`](../security-review/) · skill `/nimble-cso-review` |
+| **UI design review** | Personas, flows, empty states | [`.docs/ui-review/`](../ui-review/) · skill `/nimble-ui-review` |
+| **Architecture design review** | Schema, APIs, migration | [`.docs/architecture-review/`](../architecture-review/) · skill `/nimble-arch-review` |
+| **Review skills (how agents run reviews)** | Formal Grok skills + packet rules | [`.grok/skills/nimble-reviews/`](../../.grok/skills/nimble-reviews/) |
 | **Open questions** | Decision log; phase gate | [`.docs/open-questions/`](../open-questions/) |
 | **Implementation tracking** | Phase checklists / tasks | [`.docs/checklist/`](../checklist/) |
 | **Long-form design** (optional) | Deeper tech design | [`.docs/design/`](../design/) |

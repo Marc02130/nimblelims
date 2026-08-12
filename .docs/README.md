@@ -23,6 +23,8 @@ All product and engineering docs live under this directory, organized by purpose
 | [`ideas/`](ideas/) | Exploratory notes — not commitments |
 | `private/` | Local-only materials (gitignored) |
 
+**Formal review skills (Grok):** [`.grok/skills/nimble-reviews/README.md`](../.grok/skills/nimble-reviews/README.md) — Lab Ops, CEO, UI, Arch, CSO packet + orchestrator (`/nimble-*-review`, `/nimble-review-packet`). Shared rules: [PACKET.md](../.grok/skills/nimble-reviews/PACKET.md).
+
 **Index rule:** do not leave new docs at `.docs/` root. Put them in the folder that matches their role.
 
 ## Start here
