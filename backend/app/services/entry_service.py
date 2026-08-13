@@ -301,6 +301,21 @@ class EntryService:
             self.db.commit()
         return [self.get_entry(e.id) for e in created]
 
+    def delete_row(self, entry_id: UUID, row_key: str) -> int:
+        """Remove all cells for one experiment_data table row."""
+        entry = self.get_entry(entry_id)
+        if not is_experiment_scoped_entry(entry.entry_type):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Row delete is only for experiment_data entries",
+            )
+        if not row_key or not str(row_key).strip():
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="row_key required")
+        n = self.repo.delete_values_for_row(entry_id, str(row_key).strip())
+        if self.auto_commit:
+            self.db.commit()
+        return n
+
     def upsert_values(
         self,
         entry_id: UUID,
@@ -335,7 +350,15 @@ class EntryService:
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="sample_id is required for experiment_sample_data entry values",
                 )
-            # experiment_data may optionally carry sample_id for purpose subsets
+            # experiment_data multi-row tables use row_key; sample_id optional for purpose subset
+            if is_experiment_scoped_entry(entry.entry_type) and not item.row_key and not item.sample_id:
+                # Allow legacy single-cell (both null) or require row_key for multi-row
+                pass
+            if is_experiment_scoped_entry(entry.entry_type) and item.row_key and item.sample_id:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="experiment_data row_key values cannot also set sample_id",
+                )
 
             value_kwargs = {
                 'value_text': item.value_text,
@@ -350,6 +373,7 @@ class EntryService:
                 entry_id,
                 item.field_definition_id,
                 item.sample_id,
+                row_key=item.row_key,
             )
             if existing:
                 val = self.repo.update_value(existing, **value_kwargs)
@@ -358,6 +382,7 @@ class EntryService:
                     entry_id=entry_id,
                     field_definition_id=item.field_definition_id,
                     sample_id=item.sample_id,
+                    row_key=item.row_key,
                     created_by=self._user_id(),
                     **{k: v for k, v in value_kwargs.items() if k != 'modified_by'},
                     modified_by=self._user_id(),
@@ -486,32 +511,47 @@ class EntryService:
                     cells=cells,
                 ))
         else:
-            # experiment_data: one synthetic row of field values (sample_id null)
-            # or one row per distinct sample_id if purpose subset used
+            # experiment_data: multi-row table keyed by row_key (preferred)
+            # or legacy: one row per sample_id / single null row
             values = self.repo.list_values(entry_id)
-            sample_ids_present = sorted(
-                {v.sample_id for v in values if v.sample_id is not None},
-                key=lambda x: str(x),
-            )
-            by_key: Dict[Tuple[Optional[UUID], UUID], EntryFieldValue] = {
-                (v.sample_id, v.field_definition_id): v for v in values
+            row_keys = sorted({v.row_key for v in values if v.row_key})
+            by_row_field: Dict[Tuple[Optional[str], UUID], EntryFieldValue] = {
+                (v.row_key, v.field_definition_id): v for v in values if v.row_key
             }
-            if sample_ids_present:
-                for sid in sample_ids_present:
+            if row_keys:
+                for rk in row_keys:
                     cells = {}
                     for col in columns:
                         if col.field_definition_id:
-                            v = by_key.get((sid, col.field_definition_id))
+                            v = by_row_field.get((rk, col.field_definition_id))
                             cells[col.key] = self._value_to_cell(v, col.data_type)
-                    rows.append(EntryGridRow(row_id=str(sid), sample_id=sid, cells=cells))
+                    rows.append(EntryGridRow(row_id=rk, sample_id=None, cells=cells))
             else:
-                cells = {}
-                for col in columns:
-                    if col.field_definition_id:
-                        v = by_key.get((None, col.field_definition_id))
-                        cells[col.key] = self._value_to_cell(v, col.data_type)
-                if columns:
-                    rows.append(EntryGridRow(row_id='experiment', sample_id=None, cells=cells))
+                sample_ids_present = sorted(
+                    {v.sample_id for v in values if v.sample_id is not None},
+                    key=lambda x: str(x),
+                )
+                by_key: Dict[Tuple[Optional[UUID], UUID], EntryFieldValue] = {
+                    (v.sample_id, v.field_definition_id): v
+                    for v in values
+                    if not v.row_key
+                }
+                if sample_ids_present:
+                    for sid in sample_ids_present:
+                        cells = {}
+                        for col in columns:
+                            if col.field_definition_id:
+                                v = by_key.get((sid, col.field_definition_id))
+                                cells[col.key] = self._value_to_cell(v, col.data_type)
+                        rows.append(EntryGridRow(row_id=str(sid), sample_id=sid, cells=cells))
+                else:
+                    cells = {}
+                    for col in columns:
+                        if col.field_definition_id:
+                            v = by_key.get((None, col.field_definition_id))
+                            cells[col.key] = self._value_to_cell(v, col.data_type)
+                    if columns:
+                        rows.append(EntryGridRow(row_id='experiment', sample_id=None, cells=cells))
 
         status_cfg = (entry.config or {}).get('status') or 'draft'
         return EntryGridResponse(

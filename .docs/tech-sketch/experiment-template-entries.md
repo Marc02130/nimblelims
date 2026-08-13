@@ -23,36 +23,42 @@
 
 | Kind | Meaning | Rows |
 |------|---------|------|
-| **`experiment_sample_data`** | Sample-oriented capture/display for one purpose on the experiment | **One row per sample in the experiment** (cohort selected at start). Many such entries per experiment, each with its own columns. |
-| **`experiment_data`** | Purpose-specific experiment table/form (plans, headers, operation lines) | Rows are **not automatic** — only when **code or user** creates them. A row **may** reference a `sample_id` (subset for a purpose) but does **not** auto-expand to all experiment samples. |
+| **`experiment_sample_data`** | Sample-oriented capture/display for one purpose on the experiment | **Table**: one row per sample in the experiment cohort. Many such entries per experiment, each with its own columns. |
+| **`experiment_data`** | Purpose-specific experiment **tables** (plans, **Experiment Header**, operation lines) | **Table only — no form layout.** Multi-row free rows (`row_key`); user adds rows. Optional `sample_id` for purpose subsets is secondary to free multi-row. |
 
 Legacy API strings `sample_data` / `experiment_detail` **alias →** these names on read/write normalization.
 
-**Multiplicity:** One experiment can have **many** entries of each kind.
+**Multiplicity:** One experiment can have **many** entries of each kind.  
+**Experiment Header** = `experiment_data` + `predefined_entry_key = experiment_header` (not a separate kind).
 
 **LIMS Runs:** Own **instrument** file → results → promote. **No** ELN instrument entry. **Analysis required** on every LIMS Run.
 
 ### 0.1b Start cohort (queue) — not per entry
 
+**Full rules:** [open-questions Decision #24](../open-questions/experiments.md) (2026-08-12).
+
 | Rule | Detail |
 |------|--------|
 | When | **Start of experiment** or **start of LIMS run** only — not on individual entries |
-| UI | **Queue** (sample status / process context) → scientist selects **1..N** (all, subset, or one) |
-| Scan | **Plate** → all samples on that plate; **tube** → that tube (pool = multiple contents) |
-| After start | Cohort is **fixed**; process as **one set**. No mid-flight add (cancel/restart or new experiment/run) |
-| Process auto-link | **No** — process may filter queue; selection is always explicit |
-| Inside experiment | All selected samples are processed together on `experiment_sample_data` entries |
+| Eligibility | **`Sample.status` = Available for Testing**; if under process → sample on **`eln_process_samples`** (not removed). Server-enforced. |
+| UI (product target) | **Start dialog only** (process accordion click): dual list Available ↔ Selected; then dialog **gone**. **Not** a permanent panel on experiment detail. Scan optional. |
+| UI (current) | `StartCohortPanel` stuck on experiment detail — **wrong long-term** (implies mid-flight adds) |
+| On start | Process samples selected → `in_progress` + `current_step_id` = this step |
+| After start | Cohort **fixed**; experiment detail has **no** add-samples control |
+| Process auto-link | **No** — explicit select only |
+| Inside experiment | Selected samples on `experiment_sample_data` entries |
 
 ### 0.2 Storage (not “one JSON blob”)
 
 | Layer | Table / mechanism |
 |-------|-------------------|
 | Entry shell | `entries` (`entry_type`, name, `config` JSONB for layout/population hints only) |
-| Columns | `entry_field_definitions` → `field_definitions` |
-| Cells | `entry_field_values` **typed columns**: `value_text`, `value_number`, `value_list_entry_id`, `value_date`, `value_boolean`; optional `value_json` only for complex fields |
-| Sample key | `entry_field_values.sample_id` set for `experiment_sample_data`; null for pure experiment-level `experiment_data` cells; optional sample_id on subset rows for purpose-specific `experiment_data` |
+| Columns | `entry_field_definitions` → `field_definitions` with `entity_type` ∈ {`experiment_sample_data`, `experiment_data`}, **not** Custom Fields on Sample/Test |
+| Cells | `entry_field_values` **typed columns** + **`row_key`** for multi-row experiment_data (migration `0057`) |
+| Sample key | `sample_id` for experiment_sample_data; `row_key` for free experiment_data rows |
 
-**No new physical tables** named `experiment_sample_data` / `experiment_data` in v1 — those are **entry types** (logical). Hybrid path: SQL views later for reporting if needed.
+**No new physical tables** named `experiment_sample_data` / `experiment_data` — those are **entry types** (logical).  
+**Custom Fields** admin = DB entities only. Entry columns: template **Create field** / Add existing (`is_materialized_column = false`).
 
 ### 0.3 Grid read contract (UI — wide rows)
 
@@ -238,15 +244,21 @@ Admin defines FieldDefinitions. Template picks columns + write-back. Instance ma
 
 ### 0.8 Containers, amount, aliquot/pool
 
+**Canonical locks:** [`.docs/open-questions/containers.md`](../open-questions/containers.md) (2026-08-11).
+
 | Rule | Detail |
 |------|--------|
-| Container | id + type (tube/rack/plate/box); type has **# elements** |
-| Contents | samples, cells, compounds (samples), … ; multi-content per well allowed (e.g. cells + compound) |
-| **Amount** | **Mass or count only — never volume.** Store amount + units; optional concentration + units |
-| Volume | **Not stored.** Display if amount(mass)+conc allow calc. Inbound volume+conc → compute mass, store amount+conc |
-| Pool in tube | 1 tube container, **x** content rows (x samples) |
+| Nesting | Multi-element parent (plate/rack/box) → single-element children (well/tube) → `Contents` only on children |
+| Container type | **`rows` × `columns`** (integers ≥ 1). **Not** free-text `dimensions`. `element_count = rows * columns`. 1×1 = tube/well; e.g. 8×12 = plate |
+| Contents eligibility | **Only single-element types** (`rows=1` and `columns=1`) may have `Contents`. Multi-element = structure only |
+| Contents | samples (cells/compounds-as-samples later); multi-content on one **1×1** vessel (pool tube / multi-sample well) allowed |
+| **Amount** | **Solute mass or count only — never volume.** **Liquid/diluent is not mass** (Option A) |
+| Vessel amount + conc | On 1×1 container: total solute mass of interest + concentration; multi-element has no liquid inventory |
+| Volume | **Not stored.** \( V = m_{\text{solute}} / C \) when units allow. Inbound volume+conc → mass; store amount+conc |
+| Diluent | Changes concentration (derived volume); does **not** increase stored solute amount |
+| Pool in tube | 1 tube (1×1), **x** content rows (x samples) |
 | Aliquot/pool **plan** | `experiment_data`: amounts to remove from source / add to dest; **all methods in v1** (by mass, by volume→store mass, target mass, target volume, target concentration, …) — columns/UI switch by method |
-| Aliquot/pool **execute** | Reduce source contents amount; create dest containers; **create new dest samples**; seed dest contents with amount (+ source conc when applicable) |
+| Aliquot/pool **execute** | Reduce source contents amount; create dest 1×1 containers; **create new dest samples**; seed dest contents with amount (+ source conc when applicable); keep vessel amount/conc consistent |
 | Aliquot/pool **results** | `experiment_sample_data` for resulting aliquots/pools |
 
 ### 0.9 v1 predefined entries (+ LIMS)
@@ -295,7 +307,7 @@ Instance: queue start, grid, save/submit, execute aliquot where applicable.
 ### 0.13 Open / later (non-blocking for foundation review)
 
 - Exact config UI for write-back-eligible sample fields  
-- Formal `element_count` on container type if not already modeled  
+- ~~Formal `element_count` on container type~~ → **Decided:** `rows` × `columns` on type (`element_count = rows * columns`); see open-questions/containers.md (implement pending)  
 - Polymorphic contents beyond sample (cells, compounds) schema evolution  
 - `experiment_data` multi-row `row_id` if needed beyond cells  
 - Accessioning workflow revisit (idea)  
@@ -417,12 +429,12 @@ Transfer/aliquot is **not** a separate Transfer Steps system. It is a **sample t
 
 | Surface | Status |
 |---------|--------|
-| Transfer Steps tab | Transitional (sign-off / SOP extract only) |
-| Protocol Steps | Optional free-text until folded into entry descriptions |
-| `robot_worklist_configs` | Keep for robot CSV export |
-| Old types `sample_data` / `experiment_detail` | Map → `sample_table` / `experiment_table` |
+| Transfer Steps / Protocol Steps / Result Columns **tabs** | **Removed from UI** (2026-08-11, dev) — entries-only authoring |
+| Transfer-based mandatory sign-off | **Removed from UI**; saves force `mandatory_review_count: 0` and empty legacy arrays |
+| `robot_worklist_configs` | Keep for robot CSV export (separate from template authoring tabs) |
+| Old types `sample_data` / `experiment_detail` | Map → `experiment_sample_data` / `experiment_data` |
 
-**Dev:** No production users. Prefer correct names and population rules. Keep working: template CRUD, sign-off, SOP apply, experiment create, entry capture, process start, worklist export while renaming.
+**Dev:** No production users. Template authoring = Basic Info + Tables & forms. SOP extract may still write legacy JSON keys; UI ignores them and re-save clears them.
 
 See **Decision #15 / #16** in open-questions.
 

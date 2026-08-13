@@ -41,6 +41,7 @@ import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import { useNavigate, useParams } from 'react-router-dom';
 import { apiService } from '../services/apiService';
 import { FillHeightPage, FillHeightTable } from '../components/common/FillHeightPage';
+import StartExperimentDialog from '../components/experiments/StartExperimentDialog';
 
 const apiErrorMsg = (err: any, fallback: string): string => {
   const detail = err?.response?.data?.detail;
@@ -351,8 +352,16 @@ const ProcessesManagement: React.FC = () => {
     }
   };
 
+  const [startDialogStep, setStartDialogStep] = useState<ProcessStep | null>(null);
+
   const handleStartStep = async (step: ProcessStep, forceNew = false) => {
     if (!routeId) return;
+    const kind = step.step_kind || 'eln_experiment';
+    // Decision #24: eln_experiment opens dual-list start dialog (not immediate empty start)
+    if (kind === 'eln_experiment' && !forceNew) {
+      setStartDialogStep(step);
+      return;
+    }
     try {
       const res: any = await apiService.startElnProcessStep(routeId, step.id, {
         force_new: forceNew,
@@ -360,12 +369,25 @@ const ProcessesManagement: React.FC = () => {
       if (res.warning) setInfo(res.warning);
       else setInfo(step.step_kind === 'lims_run' ? 'LimsRun started' : 'Experiment created');
       await loadDetail(routeId);
-      if (res.experiment_id) {
-        // stay on process; user can open experiment
-      }
     } catch (err) {
       setError(apiErrorMsg(err, 'Failed to start step'));
     }
+  };
+
+  const handleStartDialogDone = async (result: {
+    experimentId?: string;
+    linkedCount?: number;
+    processSamplesUpdated?: number;
+  }) => {
+    setStartDialogStep(null);
+    if (routeId) await loadDetail(routeId);
+    const n = result.linkedCount ?? 0;
+    const p = result.processSamplesUpdated ?? 0;
+    setInfo(
+      `Experiment started with ${n} sample(s)` +
+        (p ? `; ${p} process sample(s) set to in_progress` : '') +
+        (result.experimentId ? `. Open from Steps when ready.` : ''),
+    );
   };
 
   const handleRemoveStep = async (stepId: string) => {
@@ -714,8 +736,20 @@ const ProcessesManagement: React.FC = () => {
                           </TableCell>
                           <TableCell align="right">
                             {!hasWork && (
-                              <Button size="small" onClick={() => handleStartStep(s)}>
+                              <Button
+                                size="small"
+                                startIcon={<PlayArrowIcon />}
+                                onClick={() => handleStartStep(s)}
+                              >
                                 Start
+                              </Button>
+                            )}
+                            {kind === 'eln_experiment' && hasWork && (
+                              <Button
+                                size="small"
+                                onClick={() => setStartDialogStep(s)}
+                              >
+                                Start cohort
                               </Button>
                             )}
                             {kind === 'lims_run' && hasWork && (
@@ -913,6 +947,21 @@ const ProcessesManagement: React.FC = () => {
             </Button>
           </DialogActions>
         </Dialog>
+
+        <StartExperimentDialog
+          open={Boolean(startDialogStep && routeId)}
+          onClose={() => setStartDialogStep(null)}
+          processId={routeId}
+          stepId={startDialogStep?.id}
+          stepLabel={
+            startDialogStep
+              ? startDialogStep.name ||
+                templateName(startDialogStep.experiment_template_id) ||
+                `Step ${startDialogStep.sort_order}`
+              : undefined
+          }
+          onStarted={handleStartDialogDone}
+        />
       </Box>
     );
   }

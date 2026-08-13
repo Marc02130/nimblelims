@@ -1,61 +1,50 @@
 # Schema changes: Experiment template entries
 
-**Date:** 2026-07-28  
-**Status:** **Foundation locked** (tech sketch §0, 2026-07-29) — **no migration for substrate**  
+**Date:** 2026-07-28 · **Updated:** 2026-08-12  
+**Status:** Foundation locked + multi-row experiment_data shipped  
 Kinds are logical (`entry_type`); storage remains `entries` / `entry_field_definitions` / `entry_field_values`.  
-**Phase covered:** P0 (template Entries authoring + sample roster)  
-**Tech sketch:** [`.docs/tech-sketch/experiment-template-entries.md`](../tech-sketch/experiment-template-entries.md)  
-**Requirements:** [`.docs/requirements/experiment-processes-entries.md`](../requirements/experiment-processes-entries.md)
+**Tech sketch:** [`.docs/tech-sketch/experiment-template-entries.md`](../tech-sketch/experiment-template-entries.md)
 
 ## 1. Scope
 
-Make template-declared **entry blocks** (including a sample roster display) first-class in app contracts and UI. Prefer **no new tables** in P0 if existing `entries` / `entry_field_*` / `template_definition` JSONB suffice.
+Template-declared entry blocks; multi-row experiment_data tables; entry field catalogs separate from Custom Fields (DB entities).
 
 ## 2. Delta table
 
-| Change | Detail | P0? |
-|--------|--------|-----|
-| **App allowlist** | Add `sample_roster` to `ENTRY_TYPES` | Yes |
-| **JSONB contract** | Document + validate `template_definition.entries[]` (including `config.sample_columns`) | Yes |
-| **New tables** | None expected | — |
-| **New columns on `entries`** | None expected (`config` JSONB already holds roster columns) | — |
-| **Optional later** | Normalized `template_entry_definitions` tables if JSONB validation/UX becomes painful | Not P0 |
+| Change | Detail | Status |
+|--------|--------|--------|
+| JSONB `template_definition.entries[]` | Declaration of entries + sample_columns + field ids | Shipped |
+| `entry_field_values.row_key` | Multi-row free tables for experiment_data | **Shipped** migration `0057` |
+| Partial unique indexes | row_key / sample_id / legacy null variants | `0057` |
+| FieldDefinitions `entity_type` | `experiment_sample_data`, `experiment_data` for entry columns | App convention (no new table) |
+| New tables | None | — |
 
-### 2.1 Existing schema used (no migration)
+### 2.1 Schema used
 
 ```
-entries (
-  …,
-  entry_type,          -- includes sample_roster
-  config JSONB,        -- sample_roster: { sample_columns: string[] }
-  …
-)
-entry_field_definitions (…, write_back_target, …)  -- sample_data / experiment_detail
-entry_field_values (…)                             -- writable types only
-experiment_templates.template_definition JSONB     -- entries[] declaration
+entries (entry_type, config JSONB, predefined_entry_key, …)
+entry_field_definitions (field_definition_id, write_back_target, …)
+entry_field_values (sample_id, row_key, value_*, …)   -- 0057 adds row_key
+field_definitions (entity_type = experiment_sample_data | experiment_data for entry cols)
+experiment_templates.template_definition JSONB        -- entries[] declaration
 ```
 
 ## 3. RLS
 
-No new tables → **no new RLS policies** in P0.
-
-Roster endpoint must only return samples already visible under existing sample RLS (via experiment membership / executions). Architecture to verify query path does not widen visibility.
+No new tenant tables in `0057`. Existing entry/sample RLS paths apply.
 
 ## 4. Backfill / dual-write
 
-None. Existing templates without `entries` remain valid. No rewrite of protocol_steps / transfer_steps.
+None required for `row_key`. Legacy single cells (null `row_key` + null `sample_id`) still readable; capture UI migrates them into one free row on load.
 
 ## 5. Rollback
 
-App-only: revert type allowlist + UI. No DB rollback needed if no migration ships.
-
-If a migration is later added for check constraints on `entry_type`, use expandable CHECK or app-only validation (prefer app-only to avoid migration churn when adding types).
+`0057` downgrade drops `row_key` and restores prior unique indexes.
 
 ## 6. Out of scope (schema)
 
 - Process sample ↔ execution auto-link tables  
-- Write-back allowlist expansion  
-- Dropping protocol/transfer from `template_definition`  
+- Materialized columns for entry field types  
 - Multi-tenant columns  
 
 ## 7. Multi-tenant readiness

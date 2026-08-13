@@ -57,6 +57,7 @@ class EntryFieldValueRead(BaseModel):
     entry_id: UUID
     field_definition_id: UUID
     sample_id: Optional[UUID] = None
+    row_key: Optional[str] = None
     value_text: Optional[str] = None
     value_number: Optional[float] = None
     value_list_entry_id: Optional[UUID] = None
@@ -104,6 +105,11 @@ class EntryListResponse(BaseModel):
 class EntryFieldValueUpsert(BaseModel):
     field_definition_id: UUID
     sample_id: Optional[UUID] = None
+    row_key: Optional[str] = Field(
+        None,
+        max_length=64,
+        description="Stable row id for multi-row experiment_data tables",
+    )
     value_text: Optional[str] = None
     value_number: Optional[float] = None
     value_list_entry_id: Optional[UUID] = None

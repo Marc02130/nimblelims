@@ -67,6 +67,11 @@ class ELNProcessStepInstantiateRequest(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=255)
     # For lims_run retest: create a new run even if one exists
     force_new: bool = False
+    # Decision #24: when set for eln_experiment, start cohort and update process samples
+    sample_ids: Optional[List[UUID]] = Field(
+        None,
+        description="Cohort for eln_experiment start (Available for Testing + on process)",
+    )
 
 
 class ELNProcessStepStartResponse(BaseModel):
@@ -74,6 +79,8 @@ class ELNProcessStepStartResponse(BaseModel):
     experiment_id: Optional[UUID] = None
     lims_run_id: Optional[UUID] = None
     warning: Optional[str] = None
+    linked_count: int = 0
+    process_samples_updated: int = 0
 
 
 # ---------- Samples ----------
@@ -95,6 +102,12 @@ class ELNProcessSampleRead(BaseModel):
     created_by: Optional[UUID] = None
     modified_at: datetime
     modified_by: Optional[UUID] = None
+    # Optional enrichment for start dialog
+    client_sample_id: Optional[str] = None
+    sample_name: Optional[str] = None
+    sample_status_name: Optional[str] = None
+    eligible: Optional[bool] = None
+    ineligible_reason: Optional[str] = None
 
     class Config:
         from_attributes = True

@@ -113,9 +113,11 @@ class TestStartCohort:
         db_session.add(lst)
         db_session.flush()
         sample_type = ListEntry(list_id=lst.id, name=f"type_{uuid4().hex[:4]}")
-        status = ListEntry(list_id=lst.id, name=f"status_{uuid4().hex[:4]}")
+        # Decision #24 requires Available for Testing
+        status = ListEntry(list_id=lst.id, name="Available for Testing")
         matrix = ListEntry(list_id=lst.id, name=f"matrix_{uuid4().hex[:4]}")
-        db_session.add_all([sample_type, status, matrix])
+        other_status = ListEntry(list_id=lst.id, name="Received")
+        db_session.add_all([sample_type, status, matrix, other_status])
         db_session.flush()
         project = Project(
             name=f"CProj {uuid4().hex[:8]}",
@@ -216,6 +218,7 @@ class TestStartCohort:
         assert r.json()["match_type"] == "sample"
         assert r.json()["total"] == 1
         assert r.json()["samples"][0]["sample_id"] == str(s.id)
+        assert r.json()["samples"][0]["eligible"] is True
 
         # Resolve plate → all contents
         r = client.post(
@@ -226,3 +229,42 @@ class TestStartCohort:
         assert r.status_code == 200, r.text
         assert r.json()["match_type"] == "container"
         assert r.json()["total"] == 2
+
+        # Not Available for Testing → reject start
+        tr = client.post(
+            "/v1/experiment-templates",
+            json={
+                "name": f"Tpl Gate {uuid4().hex[:8]}",
+                "template_definition": VALID_TEMPLATE_DEF,
+            },
+            headers=auth_headers,
+        )
+        assert tr.status_code == 201, tr.text
+        er = client.post(
+            "/v1/experiments",
+            json={
+                "name": f"Exp Gate {uuid4().hex[:8]}",
+                "experiment_template_id": tr.json()["id"],
+            },
+            headers=auth_headers,
+        )
+        assert er.status_code == 201, er.text
+        bad = Sample(
+            name=f"bad_{uuid4().hex[:8]}",
+            sample_type=sample_type.id,
+            status=other_status.id,
+            matrix=matrix.id,
+            project_id=project.id,
+            client_sample_id=f"CS-BAD-{uuid4().hex[:6]}",
+            created_by=test_admin_user.id,
+            modified_by=test_admin_user.id,
+        )
+        db_session.add(bad)
+        db_session.commit()
+        r = client.post(
+            f"/v1/experiments/{er.json()['id']}/start",
+            json={"sample_ids": [str(bad.id)], "set_started_at": True},
+            headers=auth_headers,
+        )
+        assert r.status_code == 400, r.text
+        assert "Available for Testing" in r.json()["detail"]
