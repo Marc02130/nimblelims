@@ -222,7 +222,7 @@ def list_samples(
     ),
     sample_status: Optional[str] = Query(
         None,
-        description="Filter by assignment status (assigned|in_progress|completed|removed)",
+        description="Filter by process-sample status (queued|in_progress|completed|removed; assigned=legacy queued)",
     ),
     service: ELNProcessService = Depends(get_service),
 ):

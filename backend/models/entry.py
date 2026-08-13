@@ -548,8 +548,9 @@ class ELNProcessSample(Base):
         nullable=False,
         index=True,
     )
-    # assigned | in_progress | completed | removed
-    status = Column(String(32), nullable=False, server_default='assigned', default='assigned')
+    # queued (ready/waiting) | in_progress (experiment started) | completed | removed
+    # legacy: "assigned" treated as queued
+    status = Column(String(32), nullable=False, server_default='queued', default='queued')
     current_step_id = Column(
         PostgresUUID(as_uuid=True),
         ForeignKey('eln_process_steps.id', ondelete='SET NULL'),

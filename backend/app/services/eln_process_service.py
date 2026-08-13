@@ -43,7 +43,14 @@ from models.flexible_experiment import LimsRun
 from models.user import User
 from models.sample import Sample
 
-VALID_SAMPLE_STATUSES = frozenset({'assigned', 'in_progress', 'completed', 'removed'})
+# Process-sample lifecycle (not Sample.status):
+#   queued      — assigned to process / waiting for experiment start
+#   in_progress — experiment for current step has started
+#   completed   — finished last step (or process done for this sample)
+#   removed     — unassigned
+#   assigned    — legacy alias of queued (still accepted)
+VALID_SAMPLE_STATUSES = frozenset({'queued', 'assigned', 'in_progress', 'completed', 'removed'})
+QUEUED_STATUSES = frozenset({'queued', 'assigned'})
 _RUN_SOFT_GATE_OK = frozenset({'complete', 'published'})
 
 
@@ -648,6 +655,12 @@ class ELNProcessService:
         process_id: UUID,
         data: ELNProcessSampleAssignRequest,
     ) -> List[ELNProcessSample]:
+        """
+        Assign samples to the process queue.
+
+        Process-sample status = **queued** (not in_progress).
+        Does **not** change Sample.status (Available for Testing remains a separate gate).
+        """
         self.get_process(process_id)
         steps = self.repo.list_steps(process_id)
         first_step_id = steps[0].id if steps and data.set_to_first_step else None
@@ -664,11 +677,11 @@ class ELNProcessService:
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail=f"Sample {sample_id} is already assigned to this process",
                 )
-            status_val = 'in_progress' if first_step_id else 'assigned'
+            # queued = ready/waiting for experiment start; in_progress only after Start
             ps = self.repo.create_process_sample(
                 process_id=process_id,
                 sample_id=sample_id,
-                status=status_val,
+                status='queued',
                 current_step_id=first_step_id,
                 created_by=self._user_id(),
                 modified_by=self._user_id(),
@@ -710,8 +723,8 @@ class ELNProcessService:
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Step does not belong to this process",
                 )
-            kwargs['current_step_id'] = data.step_id
-            kwargs['status'] = data.status or 'in_progress'
+            # Moving to a step without starting experiment → still queued
+            kwargs['status'] = data.status or 'queued'
         else:
             # Explicit clear when step_id is null in body — only if field was provided
             # For set endpoint with step_id: null, clear current step
@@ -737,11 +750,11 @@ class ELNProcessService:
         force: bool = False,
     ) -> ELNProcessSampleAdvanceResponse:
         """
-        Move sample to the next step by sort_order; complete if already on last.
+        Finish current step and move sample to the next step (or complete process).
 
-        Soft gate (Decision #1f): if current step is lims_run and run is not
-        complete/published, return warning; still advances unless you treat
-        warning in UI. Always advances (soft); force reserved for future hard gate.
+        - After a step: status → **queued** on the next step (waiting for that experiment start)
+        - On last step: status → **completed**
+        Soft gate (Decision #1f) for lims_run completeness.
         """
         self.get_process(process_id)
         ps = self.repo.get_process_sample(process_id, sample_id)
@@ -773,10 +786,11 @@ class ELNProcessService:
                     warning = "Current lims_run step has no LimsRun started yet; advancing anyway (soft gate)"
 
         if ps.current_step_id is None:
+            # Place on first step as queued (not in_progress until experiment starts)
             self.repo.update_process_sample(
                 ps,
                 current_step_id=steps[0].id,
-                status='in_progress',
+                status='queued',
                 modified_by=self._user_id(),
             )
         else:
@@ -785,7 +799,7 @@ class ELNProcessService:
                 self.repo.update_process_sample(
                     ps,
                     current_step_id=steps[0].id,
-                    status='in_progress',
+                    status='queued',
                     modified_by=self._user_id(),
                 )
             elif idx >= len(steps) - 1:
@@ -795,10 +809,11 @@ class ELNProcessService:
                     modified_by=self._user_id(),
                 )
             else:
+                # Next step: queued until that experiment is started
                 self.repo.update_process_sample(
                     ps,
                     current_step_id=steps[idx + 1].id,
-                    status='in_progress',
+                    status='queued',
                     modified_by=self._user_id(),
                 )
         self._commit_refresh(ps)
