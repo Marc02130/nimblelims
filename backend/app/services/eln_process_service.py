@@ -28,7 +28,7 @@ from app.schemas.eln_process_definition import (
     ELNProcessDefinitionStepCreate,
     InstantiateProcessFromDefinitionRequest,
 )
-from app.schemas.experiment import ExperimentCreate
+from app.schemas.experiment import ExperimentCreate, StartExperimentRequest
 from app.schemas.flexible_experiment import LimsRunCreate
 from app.services.experiment_service import ExperimentService
 from models.entry import (
@@ -531,48 +531,81 @@ class ELNProcessService:
             )
 
         # eln_experiment
-        if step.experiment_id is not None and not force_new:
-            return ELNProcessStepStartResponse(
-                step=ELNProcessStepRead.model_validate(step),
-                experiment_id=step.experiment_id,
-                warning="Step already has an experiment",
-            )
         exp_service = ExperimentService(
             self.db,
             current_user=self.current_user,
             auto_commit=False,
         )
-        experiment = exp_service.create_experiment(
-            ExperimentCreate(
-                name=default_name,
-                description=f"From ELN process '{process.name}' step '{step_label}'",
-                experiment_template_id=step.experiment_template_id,
-            )
-        )
-        self.repo.update_step(
-            step,
-            experiment_id=experiment.id,
-            modified_by=self._user_id(),
-        )
-        from app.services.entry_service import EntryService
-        from app.schemas.entry import InstantiateEntriesRequest
+        sample_ids = list(data.sample_ids) if data and data.sample_ids else []
+        warning = None
 
-        entry_svc = EntryService(
-            self.db,
-            current_user=self.current_user,
-            auto_commit=False,
-        )
-        entry_svc.instantiate_from_template(
-            experiment.id,
-            InstantiateEntriesRequest(
-                process_step_id=step.id,
-                skip_if_exists=True,
-            ),
-        )
-        self._commit_refresh(step, experiment)
+        if step.experiment_id is not None and not force_new:
+            experiment_id = step.experiment_id
+            experiment = exp_service.get_experiment(
+                experiment_id, load_details=False, load_sample_executions=True,
+            )
+            warning = "Step already has an experiment"
+            if not sample_ids:
+                self._commit_refresh(step)
+                return ELNProcessStepStartResponse(
+                    step=ELNProcessStepRead.model_validate(step),
+                    experiment_id=experiment_id,
+                    warning=warning,
+                )
+        else:
+            experiment = exp_service.create_experiment(
+                ExperimentCreate(
+                    name=default_name,
+                    description=f"From ELN process '{process.name}' step '{step_label}'",
+                    experiment_template_id=step.experiment_template_id,
+                )
+            )
+            self.repo.update_step(
+                step,
+                experiment_id=experiment.id,
+                modified_by=self._user_id(),
+            )
+            from app.services.entry_service import EntryService
+            from app.schemas.entry import InstantiateEntriesRequest
+
+            entry_svc = EntryService(
+                self.db,
+                current_user=self.current_user,
+                auto_commit=False,
+            )
+            entry_svc.instantiate_from_template(
+                experiment.id,
+                InstantiateEntriesRequest(
+                    process_step_id=step.id,
+                    skip_if_exists=True,
+                ),
+            )
+            self.db.flush()
+            experiment_id = experiment.id
+
+        linked_count = 0
+        process_samples_updated = 0
+        if sample_ids:
+            # Decision #24: start cohort + process sample status
+            start_res = exp_service.start_experiment(
+                experiment_id,
+                StartExperimentRequest(
+                    sample_ids=sample_ids,
+                    set_started_at=True,
+                ),
+            )
+            linked_count = start_res.linked_count + start_res.already_linked_count
+            process_samples_updated = start_res.process_samples_updated
+            warning = None  # successful start with cohort
+            step = self.repo.get_step_by_id(step_id)
+
+        self._commit_refresh(step)
         return ELNProcessStepStartResponse(
             step=ELNProcessStepRead.model_validate(step),
-            experiment_id=experiment.id,
+            experiment_id=experiment_id,
+            linked_count=linked_count,
+            process_samples_updated=process_samples_updated,
+            warning=warning,
         )
 
     # ---------- Samples ----------
@@ -589,6 +622,26 @@ class ELNProcessService:
             current_step_id=current_step_id,
             sample_status=sample_status,
         )
+
+    def list_eligible_for_step(
+        self,
+        process_id: UUID,
+        step_id: UUID,
+    ) -> List[Dict[str, Any]]:
+        """Decision #24: process samples eligible to start this step."""
+        self.get_process(process_id)
+        step = self.repo.get_step_by_id(step_id)
+        if not step or step.process_id != process_id:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Process step not found",
+            )
+        exp_svc = ExperimentService(
+            self.db,
+            current_user=self.current_user,
+            auto_commit=False,
+        )
+        return exp_svc.list_cohort_eligible_for_process(process_id, step_id=step_id)
 
     def assign_samples(
         self,

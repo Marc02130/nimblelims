@@ -1,11 +1,10 @@
 FROM rocker/r-ver:4.4
 
-# System libraries for R source builds. Without these, install.packages() prints
-# errors but Rscript still exits 0 — plumber/drc end up missing at runtime.
-# - plumber: httpuv (zlib), sodium (libsodium), webutils (R curl → libcurl)
-# - drc → car → lme4 → nloptr (cmake; optional system nlopt via pkg-config)
+# System libraries for R package native code.
+# - plumber: httpuv (zlib), sodium (libsodium), webutils (libcurl)
+# - drc → car → lme4 → nloptr (cmake; system nlopt)
 # - svglite: systemfonts / textshaping (font + harfbuzz stack)
-# curl: docker-compose healthcheck uses curl against localhost:8000
+# curl: docker-compose healthcheck
 RUN apt-get update && apt-get install -y --no-install-recommends \
     cmake \
     curl \
@@ -24,9 +23,22 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     zlib1g-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Single-line RUN: multi-line strings without trailing \ are parsed as new Dockerfile instructions.
-RUN Rscript -e "install.packages(c('plumber','drc','ggplot2','svglite','jsonlite','MASS','R.utils','testthat'), repos='https://cloud.r-project.org')" \
-    && Rscript -e "stopifnot('plumber' %in% rownames(installed.packages()), 'drc' %in% rownames(installed.packages()))"
+# Install R packages using rocker's default Posit Package Manager binary repo
+# (Ubuntu noble). Do NOT force repos='https://cloud.r-project.org' — that
+# installs from source and regularly breaks the drc dependency chain
+# (Deriv → doBy → pbkrtest → car → drc).
+#
+# Depends + Imports + LinkingTo (R default for TRUE, but without Suggests).
+# LinkingTo is required for header packages like cpp11 (systemfonts → svglite).
+# Suggests are omitted so we do not pull optional geospatial stacks (sf/gdal).
+# Runtime packages only (testthat is for host/dev tests, not the service image).
+RUN Rscript -e " \
+    options(Ncpus = max(1L, parallel::detectCores())); \
+    pkgs <- c('plumber', 'drc', 'ggplot2', 'svglite', 'jsonlite', 'MASS', 'R.utils'); \
+    install.packages(pkgs, dependencies = c('Depends', 'Imports', 'LinkingTo')); \
+    missing <- setdiff(pkgs, rownames(installed.packages())); \
+    if (length(missing)) stop('Failed to install: ', paste(missing, collapse = ', ')); \
+    "
 
 COPY . /app
 WORKDIR /app

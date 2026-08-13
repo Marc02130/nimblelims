@@ -12,7 +12,7 @@ Add first-class **materials** (reagents, kits, enzymes, media, etc.) with **lot/
 
 | Exists | Does not exist as inventory |
 |--------|-----------------------------|
-| `containers` / `contents` (samples in vessels) | Reagent/material catalog |
+| `containers` / `contents` (samples in vessels; solute mass only — diluent is **not** mass; see [open-questions/containers.md](../open-questions/containers.md)) | Reagent/material catalog |
 | `container_types.material` (vessel composition string) | Lot numbers, expiry, remaining qty for consumables |
 | Commented sketch `lot_number` on Sample | Material consume/deduct on step execute |
 

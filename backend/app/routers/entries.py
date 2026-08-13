@@ -166,6 +166,20 @@ def upsert_values(
     return [EntryFieldValueRead.model_validate(v) for v in values]
 
 
+@router.delete(
+    "/entries/{entry_id}/rows/{row_key}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def delete_entry_row(
+    entry_id: UUID,
+    row_key: str,
+    service: EntryService = Depends(get_service),
+):
+    """Delete one multi-row experiment_data table row (all cells with that row_key)."""
+    service.delete_row(entry_id, row_key)
+    return None
+
+
 @router.post(
     "/entries/{entry_id}/submit",
     response_model=EntrySubmitResponse,

@@ -157,6 +157,7 @@ class EntryRepository:
         entry_id: UUID,
         field_definition_id: UUID,
         sample_id: Optional[UUID],
+        row_key: Optional[str] = None,
     ) -> Optional[EntryFieldValue]:
         q = self.db.query(EntryFieldValue).filter(
             EntryFieldValue.entry_id == entry_id,
@@ -166,6 +167,10 @@ class EntryRepository:
             q = q.filter(EntryFieldValue.sample_id.is_(None))
         else:
             q = q.filter(EntryFieldValue.sample_id == sample_id)
+        if row_key is None:
+            q = q.filter(EntryFieldValue.row_key.is_(None))
+        else:
+            q = q.filter(EntryFieldValue.row_key == row_key)
         return q.first()
 
     def create_value(
@@ -173,6 +178,7 @@ class EntryRepository:
         entry_id: UUID,
         field_definition_id: UUID,
         sample_id: Optional[UUID] = None,
+        row_key: Optional[str] = None,
         value_text: Optional[str] = None,
         value_number=None,
         value_list_entry_id: Optional[UUID] = None,
@@ -186,6 +192,7 @@ class EntryRepository:
             entry_id=entry_id,
             field_definition_id=field_definition_id,
             sample_id=sample_id,
+            row_key=row_key,
             value_text=value_text,
             value_number=value_number,
             value_list_entry_id=value_list_entry_id,
@@ -198,6 +205,16 @@ class EntryRepository:
         self.db.add(v)
         self.db.flush()
         return v
+
+    def delete_values_for_row(self, entry_id: UUID, row_key: str) -> int:
+        q = self.db.query(EntryFieldValue).filter(
+            EntryFieldValue.entry_id == entry_id,
+            EntryFieldValue.row_key == row_key,
+        )
+        count = q.count()
+        q.delete(synchronize_session=False)
+        self.db.flush()
+        return count
 
     def update_value(self, value: EntryFieldValue, **kwargs) -> EntryFieldValue:
         for k, v in kwargs.items():

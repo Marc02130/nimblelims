@@ -14,17 +14,26 @@ Container types define the physical characteristics of containers. They are conf
 
 - **name**: Unique identifier for the container type (e.g., "96-well plate", "15mL tube")
 - **description**: Optional description
-- **capacity**: Numeric value representing capacity in base units
-- **material**: Material composition (e.g., "polypropylene", "glass")
-- **dimensions**: String describing dimensions (e.g., "8x12" for plates, "15x100mm" for tubes)
+- **capacity**: Numeric value representing capacity in base units (optional)
+- **material**: Vessel composition (e.g., "polypropylene", "glass") — **not** reagent material
+- **rows** / **columns**: Integer grid shape of the type (`element_count = rows × columns`). **Decided product model** (2026-08-11); **code may still expose legacy free-text `dimensions` until the schema slice lands**
 - **preservative**: Optional preservative information
+
+### Single-element vs multi-element
+
+| Kind | rows × columns | Role | Contents? |
+|------|----------------|------|-----------|
+| Tube, well, vial | **1 × 1** | Liquid-bearing unit of account | **Yes** |
+| Plate, rack, box | e.g. 8×12, 1×10 | Structural parent only | **No** — children hold contents |
+
+**Locked rules:** [`.docs/open-questions/containers.md`](../open-questions/containers.md)
 
 ### Common Container Types
 
-- **Tubes**: Individual sample containers (e.g., 15mL, 50mL tubes)
-- **Plates**: Multi-well plates (e.g., 96-well, 384-well)
-- **Wells**: Individual wells within plates
-- **Racks**: Storage racks holding multiple containers
+- **Tubes**: Single-element sample vessels (1×1)
+- **Plates**: Multi-element parents (e.g. 8×12); children are wells
+- **Wells**: Single-element children of plates (1×1); hold contents
+- **Racks / boxes**: Multi-element parents; children are tubes or other 1×1 vessels
 
 **Implementation**: `backend/models/container.py::ContainerType`
 
@@ -42,33 +51,32 @@ All containers inherit standard base model fields:
 
 ### Container-Specific Fields
 
-- **row**: Integer (default: 1) - Row position for plate-based containers
-- **column**: Integer (default: 1) - Column position for plate-based containers
-- **concentration**: Numeric(15,6) - Concentration value for container contents
-- **concentration_units**: FK to units.id - Unit for concentration measurement
-- **amount**: Numeric(15,6) - Amount value for container contents
-- **amount_units**: FK to units.id - Unit for amount measurement
-- **type_id**: FK to container_types.id (required) - Container type
-- **parent_container_id**: FK to containers.id (nullable) - Parent container for hierarchy
+- **row** / **column**: Integer (default: 1) — position of this instance within a multi-element parent (1-based; range from parent type’s rows/columns)
+- **concentration** / **concentration_units**: On **single-element** vessels only — mixture/analyte conc for \( V = m/C \)
+- **amount** / **amount_units**: On **single-element** vessels only — total **solute mass** (or count basis) of interest; never volume
+- **type_id**: FK to container_types.id (required)
+- **parent_container_id**: FK to containers.id (nullable) — parent for hierarchy
 
 **Implementation**: `backend/models/container.py::Container`
 
 ## Hierarchical Relationships
 
-Containers support self-referential parent-child relationships to model physical containment:
+Containers support self-referential parent-child relationships to model physical containment.
+
+**Locked inventory model:** multi-element parent → single-element children → contents only on single-element vessels. See [open-questions/containers.md](../open-questions/containers.md).
 
 ### Examples
 
 1. **Plate → Wells**:
-   - Parent: 96-well plate container
-   - Children: 96 individual well containers (row/column positions)
+   - Parent: 96-well plate (type 8×12) — **no contents**
+   - Children: 96 well containers (type 1×1), each with `row`/`column` position
+   - Samples link via **Contents** on each well
 
 2. **Rack → Tubes**:
-   - Parent: Storage rack container
-   - Children: Individual tube containers
+   - Parent: Storage rack (multi-element) — **no contents**
+   - Children: Tube containers (1×1) with contents
 
-3. **Freezer → Racks → Tubes**:
-   - Multi-level hierarchy for complex storage
+3. **Box → Tubes** (same pattern as rack)
 
 ### Relationships
 
@@ -79,64 +87,66 @@ Containers support self-referential parent-child relationships to model physical
 **Use Cases**:
 - Tracking physical location of samples
 - Plate-based workflows (wells in plates)
-- Storage organization (racks, freezers)
+- Storage organization (racks, boxes)
 - Batch processing (grouping containers)
 
 ## Contents (Sample-Container Junction)
 
-The `contents` table is a junction table linking samples to containers, enabling:
+The `contents` table is a junction table linking samples to **single-element** containers only:
 
-1. **Single Sample per Container**: Standard case (one-to-one)
-2. **Pooled Samples**: Multiple samples in one container (many-to-one)
-3. **Sample-Specific Measurements**: Concentration and amount per sample-container pair
+1. **Single Sample per vessel**: Standard case (one-to-one)
+2. **Pooled Samples**: Multiple samples in one **1×1** container (many-to-one)
+3. **Sample-specific solute mass**: Amount (mass or count) per sample–container pair
+
+**Not allowed:** Contents on multi-element containers (plates, racks, boxes).
 
 ### Contents Fields
 
-- **container_id**: FK to containers.id (primary key)
+- **container_id**: FK to containers.id (primary key) — must be single-element type
 - **sample_id**: FK to samples.id (primary key)
-- **concentration**: Numeric(15,6) - Sample-specific concentration
-- **concentration_units**: FK to units.id - Concentration unit
-- **amount**: Numeric(15,6) - Sample-specific amount
-- **amount_units**: FK to units.id - Amount unit
+- **concentration**: Numeric(15,6) — optional per content; vessel-level conc preferred for mixture volume
+- **concentration_units**: FK to units.id
+- **amount**: Numeric(15,6) — **solute mass or count** (never volume; diluent is not mass)
+- **amount_units**: FK to units.id
 - **Unique Constraint**: (container_id, sample_id)
 
 **Implementation**: `backend/models/container.py::Contents`
 
 ### Pooling Samples
 
-Pooling allows multiple samples to be stored in a single container:
+Pooling = multiple content rows on one **tube/well (1×1)**:
 
-- Each sample-container relationship has its own concentration/amount values
-- Useful for:
-  - Quality control pools
-  - Composite samples
-  - Batch processing workflows
-  - Volume-limited scenarios
+- Each sample has its own solute amount
+- Parent plate/rack never holds contents
+- Useful for QC pools, composites, multi-sample wells
 
 **User Story**: US-6: Pooled Samples Creation
 
-## Units and Measurements
+## Amount, concentration, and volume (locked)
 
-Containers and contents use the units system for measurements:
+**Option A (solute mass)** — full rules in [open-questions/containers.md](../open-questions/containers.md):
+
+| Store | Where |
+|-------|--------|
+| Solute mass (or count) per sample | `Contents.amount` |
+| Total solute mass of interest | Single-element `Container.amount` |
+| Mixture / analyte concentration | Single-element `Container.concentration` |
+| Volume | **Never stored** — \( V = m_{\text{solute}} / C \) when units allow |
+
+- **Liquid / diluent is not mass.** Dilution updates concentration (and derived volume), not solute amount.
+- Inbound volume + concentration → compute mass; store amount + conc.
 
 ### Unit Types
 
 - **concentration**: Units like g/L, µg/µL, mg/mL
 - **mass**: Units like g, mg, µg
-- **volume**: Units like L, mL, µL
+- **volume**: Units like L, mL, µL (display / inbound only — not amount storage)
 - **molar**: Units like mol/L, mmol/L
 
 ### Unit Structure
 
 - **multiplier**: Relative to base unit (e.g., 0.001 for mg relative to g)
 - **type**: FK to list_entries (concentration, mass, volume, molar)
-- Base units implied by type (g/L for concentration, g for mass, L for volume)
-
-### Conversions
-
-Backend handles unit conversions using multipliers:
-- Volume calculations: `volume = amount / concentration` (normalized to base units)
-- Pooling calculations: Average/sum rules based on unit types
 
 **Implementation**: `backend/models/unit.py::Unit`
 

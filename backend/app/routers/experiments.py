@@ -164,8 +164,17 @@ def resolve_scan(
     data: ResolveScanRequest,
     service: ExperimentService = Depends(get_experiment_service),
 ):
-    """Resolve plate/tube barcode (container name) or client_sample_id to samples for queue start."""
+    """Resolve plate/tube barcode (container name) or client_sample_id; annotate Decision #24 eligibility."""
     return service.resolve_scan(data)
+
+
+@experiments_router.get("/cohort-eligible-samples")
+def list_cohort_eligible_ad_hoc(
+    service: ExperimentService = Depends(get_experiment_service),
+):
+    """Ad hoc start dialog: samples with status Available for Testing (no process)."""
+    rows = service.list_cohort_eligible_ad_hoc()
+    return {"samples": rows, "total": len(rows)}
 
 
 @experiments_router.get("/{experiment_id}", response_model=ExperimentRead)

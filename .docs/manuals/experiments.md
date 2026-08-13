@@ -13,129 +13,154 @@ Typical use cases:
 
 Experiments **can** capture certain instrument-based QC data (e.g. Tapestation, Qubit, and similar quality control uploads).
 
-It is **not** the primary home for large-scale result data analysis or dose-response curve fitting (see Experiment Runs).
+It is **not** the primary home for large-scale result data analysis or dose-response curve fitting (see LIMS Runs).
 
 ## Core Entities
 
 | Entity                        | Description                                                                 | Key Characteristics |
 |-------------------------------|-----------------------------------------------------------------------------|---------------------|
-| `ExperimentTemplate`          | Reusable definition of an experiment (protocol structure)                   | `template_definition` (JSONB), `lifecycle_type`, `active` |
-| `Experiment`                  | An instance/run of a template or ad-hoc experiment                          | Links to template, flexible status, started/completed dates |
-| `ExperimentDetail`            | Free-form steps, protocol entries, notes, or links between experiments      | `detail_type`, `content` (JSONB), `sort_order` |
-| `ExperimentSampleExecution`   | Association between an experiment and samples (or aliquots)                 | `role_in_experiment`, `processing_conditions` (JSONB), `replicate_number`, optional `test_id`/`result_id` |
+| `ExperimentTemplate`          | Reusable definition of an experiment (ordered **entries**)                  | `template_definition` (JSONB: `entries[]`, plate layout, …), `lifecycle_type`, `active` |
+| `Experiment`                  | An instance of a template (or ad-hoc)                                       | Links to template, flexible status, started/completed dates, fixed sample cohort after start |
+| `Entry`                       | Capture / action block on an experiment                                     | Instantiated from template; kinds below |
+| `ExperimentSampleExecution`   | Sample ↔ experiment association (cohort)                                    | Role, conditions, replicates |
 
 ### ExperimentTemplate
 
 - Stored in `experiment_templates`.
-- `template_definition` (JSONB) holds protocol steps, transfer steps, result expectations, etc.
-- `lifecycle_type` (currently `'standard'` or `'cro'`) — intended to influence review/approval requirements on the Experiment side as well as Runs.
-- Can be created manually or via SOP upload + AI extraction.
+- **Authoring UI** (`/experiments/templates`): **Basic Info** + **Tables & forms** only (Protocol/Transfer/Result Columns tabs removed).
+- `template_definition.entries[]` declares ordered entry blocks (type, name, `predefined_entry_key`, sample RO columns, field definition IDs, dependencies).
+- On save, legacy `protocol_steps` / `transfer_steps` / `result_columns` are cleared and `mandatory_review_count` is set to 0.
+- New templates seed **Experiment header** + **Samples** presets.
+- SOP upload may pre-fill basic fields; author **Tables & forms** for the reusable body.
+- `lifecycle_type`: `'standard'` \| `'cro'`.
 
 ### Experiment
 
 - Uses `BaseModel` (has `active` soft-delete, global name uniqueness).
-- Status is **flexible** via FK to `list_entries` (the `experiment_status` list).
-  - Seeded values: Draft, In Progress, Completed, On Hold, Cancelled.
-  - Workflows can update status via `update_experiment_status` action.
+- Status is **flexible** via FK to `list_entries` (`experiment_status` list).
 - Can exist without a template (ad-hoc).
 - Has `started_at` / `completed_at`.
-
-### Details and Sample Executions
-
-- **Details** (`ExperimentDetail`): Key-value or structured content. Used for protocol steps, conditions, and `experiment_link` lineage.
-- **Sample Executions**: Rich junction table. Supports:
-  - Role in experiment
-  - Processing conditions (JSONB)
-  - Replicates
-  - Direct linkage to Tests/Results for promotion of data
-
-## Processes
-
-See the dedicated document [`.docs/manuals/processes.md`](processes.md) for full details.
-
-**Summary**: Processes are ordered collections of Experiments. They provide structure for multi-step work where sample flow and sequencing matter. A future UI will support creating processes, assigning samples to them, and queuing samples through the experiments that make up the process.
+- **Cohort is fixed after start** — samples selected at start only (no mid-flight add).
 
 ## Experiment Entries (Data Capture)
 
-Experiments capture data through **entries**. Entry types include:
+### Entry kinds
 
-- Table data display
-- Action entries (aliquoting, re-racking, QC data review (pass/fail), etc.)
-- Sample-specific data entries
-- Experiment-specific data entries
+| Kind | Product meaning | Layout | Rows |
+|------|-----------------|--------|------|
+| **`experiment_sample_data`** | Per-sample process data | **Table** | One row per sample in the experiment cohort |
+| **`experiment_data`** | Experiment-level / purpose tables (incl. **Experiment Header**) | **Table only** (no form layout) | Multi-row free rows (`row_key`); user adds rows |
+| **`predefined_action`** | Built-in behavior | Special UI | e.g. **Aliquot / pool** plan + execute |
+| Legacy | `sample_data` → sample data; `experiment_detail` → experiment data | — | Normalized on write |
 
-**Rules for entries:**
+**Experiment Header** = experiment data with `predefined_entry_key = experiment_header` (same kind as other experiment data tables; not a separate “Overview” product type).
 
-- Most entries are **predefined** (e.g. flowcell loading, pooling/aliquoting, index assignment). Predefined entries can be added to experiment templates.
-- Only **sample data entries** and **experiment detail entries** are free-form/custom.
-- Sample data entries and experiment detail entries have their columns defined in the template.
-- Sample data entries must be able to write back to the core Sample table (e.g. updating concentration, volume, etc.).
-- Sample and experiment data entries use experiment-specific tables (not generic EAV for everything).
+### Columns
 
-This gives templates strong control over the structured parts of an experiment while still allowing per-experiment customization where needed.
+| Column source | Used on | Storage |
+|---------------|---------|---------|
+| **Sample RO columns** (`config.sample_columns`) | experiment_sample_data | Read from `samples` (template chips); capture UI may still lag on full RO projection |
+| **Entry field definitions** | experiment_sample_data, experiment_data | `field_definitions` with `entity_type` = `experiment_sample_data` \| `experiment_data`, `is_materialized_column = false`; linked via `entry_field_definitions`; values in `entry_field_values` (typed cells) |
+| **Aliquot plan** | aliquot_pool_plan | Plan lines in entry `config` + execute service — not FieldDefinition columns |
+
+**Custom Fields** (`/admin/custom-fields`) = extend **DB entities** (Sample, Test, …).  
+**Not** for defining entry table columns. Entry columns are created from the **template** dialog: **Create field** (scoped entity type) or **Add existing field**.
+
+### Values
+
+- Typed columns on `entry_field_values`: text, number, list, date, boolean (`value_json` only for complex cases).
+- Sample-scoped: `sample_id` set; `row_key` null.
+- Experiment-data multi-row: **`row_key`** set (migration `0057`); `DELETE /v1/entries/{id}/rows/{row_key}` removes a row.
+- **Save** = upsert values only. **Submit** = mark complete + Sample write-back for mapped columns (allowlist).
+
+### Runtime UI
+
+- `EntryCapturePanel` on experiment detail (Entries).
+- **Instantiate from template** if entries not yet created (also auto on create when template has `entries`).
+- Sample data: table by cohort. Experiment data: multi-row table + Add/Delete row. Aliquot: `AliquotPlanEditor`.
+
+## Starting an experiment (cohort)
+
+**Canonical product rules:** [open-questions/experiments.md Decision #24](../open-questions/experiments.md)
+
+### Eligibility (required — not yet fully enforced in code)
+
+When adding samples to an experiment:
+
+1. **`Sample.status` = Available for Testing** (list `sample_status`).  
+2. **If the experiment is under a process:** sample must be on that process (`eln_process_samples`, not `removed`).  
+3. Selection is **explicit** (never auto-start entire process).  
+4. After start, cohort is **locked**.
+
+Scan/resolve of a sample that fails these gates must **not** enter the selected cohort (clear error).
+
+### Product target start UX (Sapio-aligned dual list)
+
+**Canonical:** [Decision #24](../open-questions/experiments.md). Early labs often **lack barcode scanners**.
+
+1. **Process accordion** — click step/experiment to **Start** (not a permanent panel on experiment detail).  
+2. **Ephemeral dialog — dual list (primary):**
+
+   | Available (eligible) | `<<` `<` `>` `>>` | Selected |
+   |----------------------|-------------------|----------|
+   | Process samples + **Available for Testing** | Move | Cohort (starts empty) |
+
+3. **Optional scan/paste** — only moves **eligible** samples into Selected.  
+4. **Start** — dialog **closes** (disappears); experiment has fixed cohort; **no** “add samples” UI left on experiment detail (avoids expecting mid-flight adds).  
+5. **Process sample update** — for each selected sample on the process: `eln_process_samples.status → in_progress`, `current_step_id → this step`. Global `Sample.status` unchanged.
+
+**Do not** keep dual-list / `StartCohortPanel` always visible on experiment detail after start (or as a standing tab control that implies samples can be added anytime).
+
+### Current NimbleLIMS implementation
+
+| Piece | Status |
+|-------|--------|
+| Create experiment from template | Yes |
+| Dual-list `StartExperimentDialog` from process **Start** | **Yes** (Decision #24) |
+| Server gates: Available for Testing + process membership | **Yes** on start / link / resolve-scan annotate |
+| Process sample → `in_progress` + `current_step_id` on start | **Yes** |
+| Permanent add-samples panel on experiment detail | **Removed** — ad hoc start is one-shot dialog only |
+
+## Processes
+
+See [processes.md](processes.md). Processes group ordered steps (`eln_experiment` \| `lims_run`). Sample journey: `GET /v1/samples/{id}/journey`.
 
 ## Status and Lifecycle
 
-Status for Experiments uses a flexible list (`experiment_status` via `list_entries`). This is configurable and extensible — some labs do not require sign-off for every experiment.
-
-**Benefits of the flexible list approach (preferred for ELN Experiments):**
-- Labs can define their own statuses without code changes.
-- No forced workflow for simple or internal work.
-- Easy to evolve per organization.
-
-A more rigid state machine (with enforced transitions) has benefits in other contexts (see Experiment Runs), such as:
-- Preventing invalid operations (e.g. data import before prerequisites met).
-- Clear audit trail with automatic timestamps on transitions.
-- UI can reliably offer "next actions" and block invalid paths.
-- Useful when external parties (CROs) or regulated processes are involved.
-
-For ELN-style Experiments, the list-based approach gives the right balance of structure and flexibility.
-
-`lifecycle_type` on the template can still influence behavior (e.g. whether certain review/approval steps become mandatory before advancing).
+Status for Experiments uses a flexible list (`experiment_status`). `lifecycle_type` on the template can influence review behavior.
 
 ## Relationship to Other Concepts
 
-- **Templates**: Reusable blueprints. One template can be used by many Experiments.
-- **Workflows**: Full support (`create_experiment`, `create_experiment_from_template`, `link_sample_to_experiment`, `add_experiment_detail_step`, `link_experiments`, `update_experiment_status`).
-- **Samples**: Bidirectional linking via executions. Sample detail pages show "Participated in these Experiments".
-- **Experiment Runs (LIMS)**: Separate concept. See `.docs/manuals/lims-runs.md`. Not the same as an ELN Experiment.
+- **Templates**: Reusable blueprints; many Experiments per template.
+- **Workflows**: `create_experiment`, `create_experiment_from_template`, `link_sample_to_experiment`, etc.
+- **Samples**: Cohort via `ExperimentSampleExecution`.
+- **LIMS Runs**: Separate instrument import/promote path — [lims-runs.md](lims-runs.md).
 
-## UI
+## UI map
 
-- Sidebar: "All Experiments" and "Experiment Templates" (under Experiments accordion).
-- List + detail with tabs: Overview, Sample Executions, Details/Steps, Lineage, Linked Processes.
-- "My Experiments" filter via `?mine=true`.
-- Templates management at `/experiments/templates` (includes SOP upload, mandatory review sign-off, activation guard).
+| Route | Purpose |
+|-------|---------|
+| `/experiments` | Experiment list + detail (Overview, Sample Executions, Entries/`EntryCapturePanel`, Lineage, …) |
+| `/experiments/templates` | Template CRUD: Basic Info + Tables & forms; Create field for entry columns |
+| `/experiments/processes` | Process definitions + instances |
 
-## Current Limitations
+Permission: `experiment:manage` for manage surfaces.
 
-- The "entries" system described above is not yet implemented. Current implementation uses loose `ExperimentDetail` + `ExperimentSampleExecution`.
-- Process management UI (creating processes, ordering experiments, assigning/queuing samples) does not exist yet.
-- Lineage between experiments is currently implemented as `experiment_link` detail rows (linked-list style). A more explicit ordered process model would be clearer.
-- No direct relationship model between Experiments and Experiment Runs yet (intentionally kept separate per current direction).
-- Name uniqueness is global (via `BaseModel`).
-- Sample write-back and experiment-specific tables for data entries need to be designed and built.
+## APIs (entries — high level)
 
-## Design Goals (Current Thinking)
+| Endpoint | Role |
+|----------|------|
+| `GET/POST /v1/experiments/{id}/entries` | List / create entries |
+| `POST /v1/experiments/{id}/entries/instantiate` | From template |
+| `PUT /v1/entries/{id}/values` | Save cells (`sample_id` and/or `row_key`) |
+| `DELETE /v1/entries/{id}/rows/{row_key}` | Delete experiment_data table row |
+| `POST /v1/entries/{id}/submit` | Submit + write-back |
+| `GET /v1/entries/{id}/grid` | Wide grid (sample RO + field cols) |
+| Aliquot plan / execute | Under `/v1/entries/...` |
 
-- Experiments are the core of the **ELN** for process-oriented work.
-- Use a flexible list-based status for Experiments (configurable per lab). `lifecycle_type` on templates can add required reviews/approvals where needed.
-- Support rich, template-driven **entries** for data capture and actions (predefined entries + custom sample/experiment detail entries with write-back).
-- Processes are explicitly managed collections of ordered, linked Experiments.
-- Maintain clear separation from **Experiment Runs** (LIMS side). QC instrument uploads (Tapestation, Qubit, etc.) can live in Experiments; large structured result sets and analysis stay with Runs.
-- Provide UI support for process creation, sample assignment to processes, and queuing samples into experiments within a process.
+## Design Goals
 
----
-
-**Related Documents**
-- `.docs/manuals/processes.md`
-- `.docs/design/process-and-experiment-structural.md`
-- `.docs/design/gap-analysis-process-and-experiment.md`
-- `.docs/manuals/lims-runs.md`
-- `.docs/design/experiment-planning.md`
-- `.docs/checklist/experiment-rework-prerequisites.md`
-- `.docs/manuals/workflow-accessioning-to-reporting.md` (workflow actions)
-
----
-
-*Feedback incorporated from review (2026-06-30). See updated sections above on Purpose (QC data), Processes, Entries, Status/Lifecycle, Limitations, and Design Goals.*
+- Template-driven **entries** as the ELN body (tables + predefined actions).
+- Sapio-aligned **start**: process → choose experiment → select from queue → instance + cohort.
+- Clear separation from **LIMS Runs**.
+- Containers/amount: solute mass only; see [open-questions/containers.md](../open-questions/containers.md).
