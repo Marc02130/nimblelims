@@ -364,7 +364,7 @@ class ELNProcessRepository:
         self,
         process_id: UUID,
         sample_id: UUID,
-        status: str = 'assigned',
+        status: str = 'queued',
         current_step_id: Optional[UUID] = None,
         created_by: Optional[UUID] = None,
         modified_by: Optional[UUID] = None,

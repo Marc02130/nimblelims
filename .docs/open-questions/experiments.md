@@ -442,19 +442,26 @@ Process accordion
 
 **Ad hoc experiment (no process):** Same dual-list dialog at **first Start** (e.g. from “Start experiment” action), not a permanent tab panel. Eligible set without process = Available for Testing (scope: project / lab — implement detail). Still **not** a sticky panel on detail after start.
 
-### On Start — process sample status update (locked)
+### Process-sample lifecycle (locked 2026-08-13)
 
-When Start succeeds for an experiment that belongs to a **process step**:
+`eln_process_samples.status` is **not** the same as `Sample.status`.
 
-| Update | Rule |
-|--------|------|
-| **Cohort** | Selected samples → `ExperimentSampleExecution` + experiment `started_at`; cohort locked |
-| **Process sample status** | For each selected sample’s `eln_process_samples` row: set **`status = in_progress`** (or keep `in_progress` if already) |
-| **current_step_id** | Set to **this process step** for selected samples |
-| **Not selected** | Unchanged (remain `assigned` / prior status on process) |
-| **Sample.status** (global) | **Unchanged** by start — remains Available for Testing until lab workflow advances it elsewhere |
+| Event | Process-sample status | Notes |
+|-------|----------------------|--------|
+| **Assign to process** | **`queued`** | Waiting for experiment start (legacy alias: `assigned`) |
+| **Start experiment** (this step) | **`in_progress`** | Cohort linked; `current_step_id` = this step |
+| **Advance to next step** | **`queued`** on next step | Waiting for next experiment start |
+| **Finish last step / process done** | **`completed`** | |
+| **Remove from process** | **`removed`** or row deleted | |
 
-Later (not this decision): complete step → process sample `completed` or advance to next step.
+| Update on Start | Rule |
+|-----------------|------|
+| **Cohort** | Selected → `ExperimentSampleExecution` + `started_at`; locked |
+| **Process sample** | Selected → `in_progress`, `current_step_id` = this step |
+| **Not selected** | Stay `queued` |
+| **Sample.status** (global) | **Unchanged** by assign or start — Available for Testing is a separate gate |
+
+**Assign does not** set process-sample to `in_progress` and does **not** auto-change Sample.status.
 
 ### Is dual-list the best approach?
 
