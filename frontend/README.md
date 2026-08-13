@@ -69,7 +69,7 @@ Copyright (c) 2025 Marc Breneiser
 
 ### Experiments & experiment templates
 - **Experiments** (`/experiments`, `/experiments/:id`): List with filters and “My Experiments” (`?mine=true`); detail tabs (Overview, Sample Executions, Details/Steps, Lineage, Linked Processes); bidirectional links with samples. Requires `experiment:manage`.
-- **Experiment Templates** (`/experiments/templates`): `ExperimentTemplatesManagement` — DataGrid; **New Template** (tabbed dialog: basic info, protocol steps, transfer steps with mandatory review toggles, result columns); **Upload SOP** (SOP file + instrument CSV, poll job, apply); sign-off dialog for mandatory transfer steps; active toggle when sign-offs complete; delete. Same permission: `experiment:manage`.
+- **Experiment Templates** (`/experiments/templates`): Basic Info + Tables & forms; **Create field** for entry table columns; presets (header, samples, aliquot); SOP upload; active toggle. Capture: `EntryCapturePanel`. **Start cohort (Decision #24):** `StartExperimentDialog` dual-list from process **Start** (not a permanent experiment-detail panel).
 
 ## Technical Implementation
 
@@ -104,7 +104,7 @@ Copyright (c) 2025 Marc Breneiser
 ### Pages
 - `Dashboard` - Main overview with sample listing and filtering
 - `ExperimentsManagement` - Experiments list, detail, create (`/experiments`, `/experiments/:id`)
-- `ExperimentTemplatesManagement` - Experiment templates CRUD, SOP upload, sign-off (`/experiments/templates`)
+- `ExperimentTemplatesManagement` - Experiment templates CRUD (entries), SOP upload (`/experiments/templates`)
 - `AccessioningForm` - Multi-step sample accessioning wizard
 - `ContainerManagement` - Container instance creation and management
 - `BatchManagement` - Batch creation and management

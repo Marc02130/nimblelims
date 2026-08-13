@@ -23,7 +23,7 @@ The UAT scripts should be run in the following order based on their dependencies
 | 15 | `uat-workflow-templates` | uat-security-rbac | Workflow template CRUD, execute (accessioning/batch/results), RBAC, rollback |
 | 16 | `uat-experiments-navigation` | uat-security-rbac | Sidebar Experiments accordion visibility; Experiment Templates visible to all roles with `experiment:manage` |
 | 17 | `uat-experiment-management` | uat-security-rbac, uat-sample-accessioning (optional for link) | Experiment CRUD, list/detail, linking sample↔experiment, workflow integration, lineage, My Experiments filter |
-| 18 | `uat-experiment-templates` | uat-security-rbac | Experiment Templates page: CRUD, sign-off/activation, SOP upload (optional API key), RBAC |
+| 18 | `uat-experiment-templates` | uat-security-rbac | Experiment Templates page: entries CRUD, activation, SOP upload (optional API key), RBAC |
 
 ## Dependency Diagram
 
@@ -46,7 +46,7 @@ uat-security-rbac (Foundation)
     └── uat-bulk-enhancements (requires sample-accessioning + batch-management)
 ├── uat-experiments-navigation (Experiments accordion, templates visibility)
 ├── uat-experiment-management (Experiment CRUD, linking, workflow, lineage; optional: uat-sample-accessioning)
-└── uat-experiment-templates (Template CRUD, SOP/AI, sign-off; see uat-experiment-templates.md)
+└── uat-experiment-templates (Template entries CRUD, SOP/AI; see uat-experiment-templates.md)
 ```
 
 ## Recommended Next Script
@@ -85,7 +85,7 @@ After completing `uat-configurations-custom`, the recommended next scripts are:
 | | uat-workflow-templates | ⬜ Pending | | Template CRUD, execute, RBAC, rollback (see UAT_Scripts/uat-workflow-templates.md) |
 | | uat-experiments-navigation | ⬜ Pending | | Sidebar Experiments section & templates visibility (`experiment:manage`) — see script below |
 | | uat-experiment-management | ⬜ Pending | | Experiment CRUD, linking, workflow integration, lineage (see below) |
-| | uat-experiment-templates | ⬜ Pending | | Template CRUD, SOP/AI, sign-off — see `uat-experiment-templates.md` |
+| | uat-experiment-templates | ⬜ Pending | | Template entries CRUD, SOP/AI — see `uat-experiment-templates.md` |
 
 ---
 
@@ -110,7 +110,7 @@ After completing `uat-configurations-custom`, the recommended next scripts are:
 
 **Pass criteria:** Admin, Lab Manager, and Lab Technician see both sub-items and can open `/experiments/templates`; Client does not see Experiments section and cannot open experiment routes by URL.
 
-**Detailed template/SOP/sign-off cases:** See `UAT_Scripts/uat-experiment-templates.md`.
+**Detailed template/SOP/entries cases:** See `UAT_Scripts/uat-experiment-templates.md`.
 
 ---
 

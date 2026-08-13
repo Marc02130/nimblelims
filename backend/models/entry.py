@@ -231,8 +231,9 @@ class EntryFieldValue(Base):
     """
     Typed value for one FieldDefinition inside one Entry.
 
-    experiment_sample_data: one row per (entry, field, sample).
-    experiment_data: sample_id optional (null for pure experiment-level cells).
+    experiment_sample_data: one cell per (entry, field, sample); row_key null.
+    experiment_data: multi-row table; each logical row has a stable row_key;
+      sample_id optional (purpose subset). Legacy single cell: both null.
     """
 
     __tablename__ = 'entry_field_values'
@@ -257,6 +258,8 @@ class EntryFieldValue(Base):
         nullable=True,
         index=True,
     )
+    # Free multi-row identity for experiment_data tables (not sample-scoped).
+    row_key = Column(String(64), nullable=True, index=True)
 
     value_text = Column(Text)
     value_number = Column(Numeric(precision=20, scale=10))

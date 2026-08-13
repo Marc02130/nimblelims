@@ -47,7 +47,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { apiService } from '../services/apiService';
 import { useUser } from '../contexts/UserContext';
 import EntryCapturePanel from '../components/experiments/EntryCapturePanel';
-import StartCohortPanel from '../components/experiments/StartCohortPanel';
+import StartExperimentDialog from '../components/experiments/StartExperimentDialog';
 import { FillHeightPage, FillHeightTable } from '../components/common/FillHeightPage';
 
 const apiErrorMsg = (err: any, fallback: string): string => {
@@ -202,6 +202,7 @@ const ExperimentsManagement: React.FC = () => {
   const [createTemplateId, setCreateTemplateId] = useState('');
   const [createStatusId, setCreateStatusId] = useState('');
   const [createLoading, setCreateLoading] = useState(false);
+  const [showStartDialog, setShowStartDialog] = useState(false);
 
   const canManage = hasPermission('experiment:manage');
 
@@ -464,17 +465,29 @@ const ExperimentsManagement: React.FC = () => {
         {activeTab === 1 && (
           <Card variant="outlined" sx={{ mt: 2 }}>
             <CardContent>
-              <StartCohortPanel
-                experimentId={selectedExperiment.id}
-                startedAt={selectedExperiment.started_at}
-                existingSampleIds={(selectedExperiment.sample_executions || []).map(
-                  (ex) => ex.sample_id,
-                )}
-                canEdit={canManage}
-                onStarted={() => {
-                  void loadExperimentDetail(selectedExperiment.id);
-                }}
-              />
+              {!selectedExperiment.started_at && canManage && (
+                <Alert severity="info" sx={{ mb: 2 }}>
+                  Cohort is selected only at <strong>Start</strong> (dual-list dialog). Prefer starting
+                  from a <strong>process step</strong> when samples are process-assigned. Ad hoc start
+                  is available below if this experiment is not under a process.
+                  <Box mt={1}>
+                    <Button
+                      size="small"
+                      variant="contained"
+                      onClick={() => setShowStartDialog(true)}
+                    >
+                      Start experiment (select samples)
+                    </Button>
+                  </Box>
+                </Alert>
+              )}
+              {selectedExperiment.started_at && (
+                <Alert severity="success" sx={{ mb: 2 }}>
+                  Cohort locked since{' '}
+                  {new Date(selectedExperiment.started_at).toLocaleString()}. Samples cannot be
+                  added mid-flight.
+                </Alert>
+              )}
               <Typography variant="h6" sx={{ mb: 2 }}>
                 Sample Executions
               </Typography>
@@ -663,6 +676,16 @@ const ExperimentsManagement: React.FC = () => {
         {activeTab === 6 && (
           <RunsTab experimentId={selectedExperiment.id} />
         )}
+
+        <StartExperimentDialog
+          open={showStartDialog}
+          onClose={() => setShowStartDialog(false)}
+          experimentId={selectedExperiment.id}
+          onStarted={() => {
+            setShowStartDialog(false);
+            void loadExperimentDetail(selectedExperiment.id);
+          }}
+        />
       </Box>
     );
   }

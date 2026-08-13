@@ -255,6 +255,10 @@ class GetSampleExperimentsResponse(BaseModel):
 class ResolveScanRequest(BaseModel):
     """Resolve a plate/tube barcode (container name) or client_sample_id to samples."""
     barcode: str = Field(..., min_length=1, max_length=255, description="Container name/barcode or client sample ID")
+    process_id: Optional[UUID] = Field(
+        None,
+        description="When set, annotate eligibility for this process (Decision #24)",
+    )
 
 
 class ResolveScanSample(BaseModel):
@@ -263,6 +267,8 @@ class ResolveScanSample(BaseModel):
     sample_name: Optional[str] = None
     container_id: Optional[UUID] = None
     container_name: Optional[str] = None
+    eligible: bool = True
+    ineligible_reason: Optional[str] = None
 
 
 class ResolveScanResponse(BaseModel):
@@ -272,6 +278,7 @@ class ResolveScanResponse(BaseModel):
     container_name: Optional[str] = None
     samples: List[ResolveScanSample] = Field(default_factory=list)
     total: int = 0
+    eligible_total: int = 0
 
 
 class StartExperimentRequest(BaseModel):
@@ -285,3 +292,18 @@ class StartExperimentResponse(BaseModel):
     linked_count: int
     already_linked_count: int = 0
     cohort_locked: bool = True
+    process_samples_updated: int = 0
+
+
+class CohortEligibleSample(BaseModel):
+    """Sample eligible for experiment start (Decision #24)."""
+    sample_id: UUID
+    client_sample_id: Optional[str] = None
+    sample_name: Optional[str] = None
+    process_sample_status: Optional[str] = None
+    current_step_id: Optional[UUID] = None
+
+
+class CohortEligibleListResponse(BaseModel):
+    samples: List[CohortEligibleSample] = Field(default_factory=list)
+    total: int = 0

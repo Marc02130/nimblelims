@@ -1,8 +1,11 @@
 /**
- * Entry capture UI for an Experiment (P0 foundation).
+ * Entry capture UI for an Experiment.
  * Kinds: experiment_sample_data | experiment_data | predefined_action | display_table
  * (legacy sample_data / experiment_detail still accepted).
- * Save = entry values only; Submit = mark complete + Sample write-back.
+ *
+ * experiment_sample_data → table: one row per cohort sample
+ * experiment_data → table: multi-row free rows (row_key), not a form
+ * Save = entry values only; Submit = mark complete + Sample write-back
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
@@ -15,8 +18,7 @@ import {
   Chip,
   CircularProgress,
   FormControl,
-  FormControlLabel,
-  InputLabel,
+  IconButton,
   MenuItem,
   Select,
   Switch,
@@ -37,6 +39,8 @@ import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import PlaylistAddIcon from '@mui/icons-material/PlaylistAdd';
 import SyncAltIcon from '@mui/icons-material/SyncAlt';
+import AddIcon from '@mui/icons-material/Add';
+import DeleteIcon from '@mui/icons-material/Delete';
 import { apiService } from '../../services/apiService';
 import AliquotPlanEditor from './AliquotPlanEditor';
 
@@ -46,6 +50,11 @@ const apiErrorMsg = (err: any, fallback: string): string => {
   if (Array.isArray(detail) && detail.length > 0) return detail[0]?.msg || fallback;
   return fallback;
 };
+
+const newRowKey = () =>
+  typeof crypto !== 'undefined' && crypto.randomUUID
+    ? crypto.randomUUID()
+    : `row-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 
 interface FieldLink {
   field_definition_id: string;
@@ -58,6 +67,7 @@ interface EntryValue {
   id: string;
   field_definition_id: string;
   sample_id?: string | null;
+  row_key?: string | null;
   value_text?: string | null;
   value_number?: number | null;
   value_list_entry_id?: string | null;
@@ -82,11 +92,9 @@ interface Entry {
   values: EntryValue[];
 }
 
-/** Canonical + legacy aliases for sample-oriented rows (one per experiment sample). */
 const isSampleScoped = (entryType: string) =>
   entryType === 'experiment_sample_data' || entryType === 'sample_data';
 
-/** Experiment-level / purpose table (rows not auto from full cohort). */
 const isExperimentScoped = (entryType: string) =>
   entryType === 'experiment_data' || entryType === 'experiment_detail';
 
@@ -124,10 +132,12 @@ export interface EntryCapturePanelProps {
   canEdit?: boolean;
 }
 
-type DraftKey = string; // `${fieldId}::${sampleId || ''}`
-
-const draftKey = (fieldId: string, sampleId?: string | null) =>
-  `${fieldId}::${sampleId || ''}`;
+/** draft key: fieldId::s::sampleId | fieldId::r::rowKey */
+const draftKey = (fieldId: string, opts: { sampleId?: string | null; rowKey?: string | null }) => {
+  if (opts.rowKey) return `${fieldId}::r::${opts.rowKey}`;
+  if (opts.sampleId) return `${fieldId}::s::${opts.sampleId}`;
+  return `${fieldId}::legacy`;
+};
 
 const TYPE_COLORS: Record<string, 'default' | 'primary' | 'secondary' | 'info' | 'warning' | 'success'> = {
   experiment_sample_data: 'primary',
@@ -145,14 +155,16 @@ const EntryCapturePanel: React.FC<EntryCapturePanelProps> = ({
 }) => {
   const [entries, setEntries] = useState<Entry[]>([]);
   const [fieldMap, setFieldMap] = useState<Record<string, FieldDef>>({});
-  const [listOptions, setListOptions] = useState<Record<string, ListOption[]>>({}); // by field_definition_id
+  const [listOptions, setListOptions] = useState<Record<string, ListOption[]>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [drafts, setDrafts] = useState<Record<DraftKey, any>>({});
-  const [dirty, setDirty] = useState<Record<string, boolean>>({}); // entry_id
+  const [drafts, setDrafts] = useState<Record<string, any>>({});
+  const [dirty, setDirty] = useState<Record<string, boolean>>({});
   const [saving, setSaving] = useState<Record<string, boolean>>({});
   const [instantiating, setInstantiating] = useState(false);
+  /** Multi-row experiment_data: ordered row_keys per entry */
+  const [rowKeysByEntry, setRowKeysByEntry] = useState<Record<string, string[]>>({});
 
   const sampleIds = useMemo(
     () => Array.from(new Set(sampleExecutions.map((s) => s.sample_id).filter(Boolean))),
@@ -177,30 +189,79 @@ const EntryCapturePanel: React.FC<EntryCapturePanelProps> = ({
   };
 
   const buildDraftsFromEntries = (list: Entry[], fmap: Record<string, FieldDef>) => {
-    const next: Record<DraftKey, any> = {};
+    const next: Record<string, any> = {};
+    const rowsMap: Record<string, string[]> = {};
+
     for (const entry of list) {
       const links = (entry.field_definition_links || [])
         .filter((l) => l.visible !== false)
         .sort((a, b) => a.sort_order - b.sort_order);
-      for (const link of links) {
-        const fd = fmap[link.field_definition_id];
-        const dt = fd?.data_type || 'text';
-        if (isSampleScoped(entry.entry_type)) {
+
+      if (isSampleScoped(entry.entry_type)) {
+        for (const link of links) {
+          const fd = fmap[link.field_definition_id];
+          const dt = fd?.data_type || 'text';
           for (const sid of sampleIds) {
             const existing = (entry.values || []).find(
               (v) => v.field_definition_id === link.field_definition_id && v.sample_id === sid,
             );
-            next[draftKey(link.field_definition_id, sid)] = valueFromRow(existing, dt);
+            next[draftKey(link.field_definition_id, { sampleId: sid })] = valueFromRow(existing, dt);
+          }
+        }
+      } else if (isExperimentScoped(entry.entry_type)) {
+        const keys = Array.from(
+          new Set(
+            (entry.values || [])
+              .map((v) => v.row_key)
+              .filter((k): k is string => Boolean(k)),
+          ),
+        );
+        // Migrate legacy single-cell (no row_key) into one row
+        const hasLegacy = (entry.values || []).some((v) => !v.row_key && !v.sample_id);
+        if (keys.length === 0) {
+          const rk = newRowKey();
+          rowsMap[entry.id] = [rk];
+          for (const link of links) {
+            const fd = fmap[link.field_definition_id];
+            const dt = fd?.data_type || 'text';
+            const existing = hasLegacy
+              ? (entry.values || []).find(
+                  (v) =>
+                    v.field_definition_id === link.field_definition_id &&
+                    !v.sample_id &&
+                    !v.row_key,
+                )
+              : undefined;
+            next[draftKey(link.field_definition_id, { rowKey: rk })] = valueFromRow(existing, dt);
           }
         } else {
+          rowsMap[entry.id] = keys;
+          for (const rk of keys) {
+            for (const link of links) {
+              const fd = fmap[link.field_definition_id];
+              const dt = fd?.data_type || 'text';
+              const existing = (entry.values || []).find(
+                (v) => v.field_definition_id === link.field_definition_id && v.row_key === rk,
+              );
+              next[draftKey(link.field_definition_id, { rowKey: rk })] = valueFromRow(existing, dt);
+            }
+          }
+        }
+      } else {
+        // predefined_action params (rare): single legacy row
+        for (const link of links) {
+          const fd = fmap[link.field_definition_id];
+          const dt = fd?.data_type || 'text';
           const existing = (entry.values || []).find(
-            (v) => v.field_definition_id === link.field_definition_id && !v.sample_id,
+            (v) => v.field_definition_id === link.field_definition_id && !v.sample_id && !v.row_key,
           );
-          next[draftKey(link.field_definition_id)] = valueFromRow(existing, dt);
+          next[draftKey(link.field_definition_id, {})] = valueFromRow(existing, dt);
         }
       }
     }
+
     setDrafts(next);
+    setRowKeysByEntry(rowsMap);
     setDirty({});
   };
 
@@ -213,7 +274,7 @@ const EntryCapturePanel: React.FC<EntryCapturePanelProps> = ({
           active: true,
           include_values: true,
         }),
-        apiService.getFieldDefinitions({ active: true, page: 1, size: 200 }),
+        apiService.getFieldDefinitions({ active: true, page: 1, size: 500 }),
         apiService.getLists().catch(() => []),
       ]);
 
@@ -222,7 +283,6 @@ const EntryCapturePanel: React.FC<EntryCapturePanelProps> = ({
       const fmap: Record<string, FieldDef> = {};
       for (const f of fieldItems) fmap[f.id] = f;
 
-      // Fetch any missing field defs by id
       const neededIds = new Set<string>();
       for (const e of entryList) {
         for (const l of e.field_definition_links || []) {
@@ -235,13 +295,12 @@ const EntryCapturePanel: React.FC<EntryCapturePanelProps> = ({
             const one = await apiService.getFieldDefinition(fid);
             fmap[fid] = one;
           } catch {
-            // ignore missing
+            // ignore
           }
         }
       }
       setFieldMap(fmap);
 
-      // Resolve list options for list/lookup fields (getLists includes nested entries)
       const lists: Array<{ id: string; name: string; entries?: ListOption[] }> = Array.isArray(
         listsRes,
       )
@@ -276,27 +335,66 @@ const EntryCapturePanel: React.FC<EntryCapturePanelProps> = ({
     load();
   }, [load]);
 
-  const setDraft = (entryId: string, fieldId: string, sampleId: string | null | undefined, val: any) => {
-    const key = draftKey(fieldId, sampleId);
+  const setDraft = (
+    entryId: string,
+    fieldId: string,
+    opts: { sampleId?: string | null; rowKey?: string | null },
+    val: any,
+  ) => {
+    const key = draftKey(fieldId, opts);
     setDrafts((d) => ({ ...d, [key]: val }));
     setDirty((x) => ({ ...x, [entryId]: true }));
+  };
+
+  const addDataRow = (entryId: string) => {
+    const rk = newRowKey();
+    setRowKeysByEntry((m) => ({
+      ...m,
+      [entryId]: [...(m[entryId] || []), rk],
+    }));
+    setDirty((x) => ({ ...x, [entryId]: true }));
+  };
+
+  const removeDataRow = async (entry: Entry, rowKey: string) => {
+    const keys = rowKeysByEntry[entry.id] || [];
+    if (keys.length <= 1) {
+      setError('Keep at least one row on the table.');
+      return;
+    }
+    try {
+      // Best-effort server delete (no-op if row never saved)
+      await apiService.deleteEntryRow(entry.id, rowKey).catch(() => undefined);
+    } catch {
+      // ignore
+    }
+    setRowKeysByEntry((m) => ({
+      ...m,
+      [entry.id]: (m[entry.id] || []).filter((k) => k !== rowKey),
+    }));
+    setDrafts((d) => {
+      const next = { ...d };
+      for (const k of Object.keys(next)) {
+        if (k.includes(`::r::${rowKey}`)) delete next[k];
+      }
+      return next;
+    });
+    setDirty((x) => ({ ...x, [entry.id]: true }));
   };
 
   const toUpsertPayload = (
     fieldId: string,
     dataType: string,
     raw: any,
-    sampleId?: string | null,
+    opts: { sampleId?: string | null; rowKey?: string | null },
   ) => {
-    // Save path: entry values only — write-back runs on submit
     const base: any = {
       field_definition_id: fieldId,
       apply_write_back: false,
     };
-    if (sampleId) base.sample_id = sampleId;
+    if (opts.sampleId) base.sample_id = opts.sampleId;
+    if (opts.rowKey) base.row_key = opts.rowKey;
 
     if (raw === '' || raw === undefined || raw === null) {
-      // clear typed columns
       base.value_text = null;
       base.value_number = null;
       base.value_list_entry_id = null;
@@ -317,7 +415,7 @@ const EntryCapturePanel: React.FC<EntryCapturePanelProps> = ({
         base.value_list_entry_id = raw;
         break;
       case 'date':
-        base.value_date = raw; // YYYY-MM-DD
+        base.value_date = raw;
         break;
       default:
         base.value_text = String(raw);
@@ -325,46 +423,60 @@ const EntryCapturePanel: React.FC<EntryCapturePanelProps> = ({
     return base;
   };
 
+  const collectValues = (entry: Entry): any[] => {
+    const links = (entry.field_definition_links || []).filter((l) => l.visible !== false);
+    const values: any[] = [];
+
+    if (isSampleScoped(entry.entry_type)) {
+      for (const link of links) {
+        const fd = fieldMap[link.field_definition_id];
+        const dt = fd?.data_type || 'text';
+        for (const sid of sampleIds) {
+          const key = draftKey(link.field_definition_id, { sampleId: sid });
+          values.push(
+            toUpsertPayload(link.field_definition_id, dt, drafts[key], { sampleId: sid }),
+          );
+        }
+      }
+    } else if (isExperimentScoped(entry.entry_type)) {
+      const rowKeys = rowKeysByEntry[entry.id] || [];
+      for (const rk of rowKeys) {
+        for (const link of links) {
+          const fd = fieldMap[link.field_definition_id];
+          const dt = fd?.data_type || 'text';
+          const key = draftKey(link.field_definition_id, { rowKey: rk });
+          values.push(
+            toUpsertPayload(link.field_definition_id, dt, drafts[key], { rowKey: rk }),
+          );
+        }
+      }
+    } else if (entry.entry_type === 'predefined_action') {
+      for (const link of links) {
+        const fd = fieldMap[link.field_definition_id];
+        const dt = fd?.data_type || 'text';
+        const key = draftKey(link.field_definition_id, {});
+        values.push(toUpsertPayload(link.field_definition_id, dt, drafts[key], {}));
+      }
+    }
+    return values;
+  };
+
   const saveEntry = async (entry: Entry) => {
     setSaving((s) => ({ ...s, [entry.id]: true }));
     setError(null);
     setSuccess(null);
     try {
-      const links = (entry.field_definition_links || []).filter((l) => l.visible !== false);
-      const values: any[] = [];
-
-      if (isSampleScoped(entry.entry_type)) {
-        if (sampleIds.length === 0) {
-          setError(
-            'Select samples for this experiment (queue at start / sample executions) before capturing sample data.',
-          );
-          return;
-        }
-        for (const link of links) {
-          const fd = fieldMap[link.field_definition_id];
-          const dt = fd?.data_type || 'text';
-          for (const sid of sampleIds) {
-            const key = draftKey(link.field_definition_id, sid);
-            values.push(toUpsertPayload(link.field_definition_id, dt, drafts[key], sid));
-          }
-        }
-      } else if (isExperimentScoped(entry.entry_type) || entry.entry_type === 'predefined_action') {
-        for (const link of links) {
-          const fd = fieldMap[link.field_definition_id];
-          const dt = fd?.data_type || 'text';
-          const key = draftKey(link.field_definition_id);
-          values.push(toUpsertPayload(link.field_definition_id, dt, drafts[key]));
-        }
-      } else {
-        // display_table is read-only
+      if (isSampleScoped(entry.entry_type) && sampleIds.length === 0) {
+        setError(
+          'Select samples for this experiment (queue at start / sample executions) before capturing sample data.',
+        );
         return;
       }
-
+      const values = collectValues(entry);
       if (values.length === 0) {
         setError('No fields to save on this entry.');
         return;
       }
-
       await apiService.upsertEntryValues(entry.id, values);
       setDirty((d) => ({ ...d, [entry.id]: false }));
       setSuccess(`Saved “${entry.name}” (draft — use Submit to write back to samples)`);
@@ -381,43 +493,12 @@ const EntryCapturePanel: React.FC<EntryCapturePanelProps> = ({
     setError(null);
     setSuccess(null);
     try {
-      // Persist unsaved drafts first (still no write-back until submit)
       if (dirty[entry.id] && isWritableEntry(entry.entry_type)) {
-        const links = (entry.field_definition_links || []).filter((l) => l.visible !== false);
-        const values: any[] = [];
-        if (isSampleScoped(entry.entry_type)) {
-          for (const link of links) {
-            const fd = fieldMap[link.field_definition_id];
-            const dt = fd?.data_type || 'text';
-            for (const sid of sampleIds) {
-              values.push(
-                toUpsertPayload(
-                  link.field_definition_id,
-                  dt,
-                  drafts[draftKey(link.field_definition_id, sid)],
-                  sid,
-                ),
-              );
-            }
-          }
-        } else {
-          for (const link of links) {
-            const fd = fieldMap[link.field_definition_id];
-            const dt = fd?.data_type || 'text';
-            values.push(
-              toUpsertPayload(
-                link.field_definition_id,
-                dt,
-                drafts[draftKey(link.field_definition_id)],
-              ),
-            );
-          }
-        }
+        const values = collectValues(entry);
         if (values.length > 0) {
           await apiService.upsertEntryValues(entry.id, values);
         }
       }
-
       const res: any = await apiService.submitEntry(entry.id);
       const n = res?.write_backs_applied ?? 0;
       setDirty((d) => ({ ...d, [entry.id]: false }));
@@ -455,72 +536,41 @@ const EntryCapturePanel: React.FC<EntryCapturePanelProps> = ({
     }
   };
 
-  const renderFieldInput = (
+  const renderCellInput = (
     entry: Entry,
     link: FieldLink,
-    sampleId?: string | null,
+    opts: { sampleId?: string | null; rowKey?: string | null },
   ) => {
     const fd = fieldMap[link.field_definition_id];
-    const label = fd?.display_name || fd?.name || link.field_definition_id.slice(0, 8);
     const dt = fd?.data_type || 'text';
-    const key = draftKey(link.field_definition_id, sampleId);
+    const key = draftKey(link.field_definition_id, opts);
     const val = drafts[key];
     const readOnly = !canEdit || entry.entry_type === 'display_table';
-    const writeBack = link.write_back_target;
-
-    const existing = (entry.values || []).find(
-      (v) =>
-        v.field_definition_id === link.field_definition_id &&
-        (sampleId ? v.sample_id === sampleId : !v.sample_id),
-    );
-
-    const adornment = writeBack ? (
-      <Tooltip
-        title={
-          existing?.write_back_at
-            ? `Last write-back to Sample.${writeBack} at ${new Date(existing.write_back_at).toLocaleString()}`
-            : `Writes back to Sample.${writeBack} on Submit (not Save)`
-        }
-      >
-        <SyncAltIcon fontSize="small" color="action" sx={{ ml: 0.5 }} />
-      </Tooltip>
-    ) : null;
 
     if (dt === 'boolean') {
       return (
-        <Box key={key} display="flex" alignItems="center" gap={0.5}>
-          <FormControlLabel
-            control={
-              <Switch
-                checked={Boolean(val)}
-                disabled={readOnly}
-                onChange={(e) => setDraft(entry.id, link.field_definition_id, sampleId, e.target.checked)}
-              />
-            }
-            label={label}
-          />
-          {adornment}
-        </Box>
+        <Switch
+          size="small"
+          checked={Boolean(val)}
+          disabled={readOnly}
+          onChange={(e) => setDraft(entry.id, link.field_definition_id, opts, e.target.checked)}
+        />
       );
     }
 
     if (dt === 'list' || dt === 'lookup') {
-      const opts = listOptions[link.field_definition_id] || [];
+      const listOpts = listOptions[link.field_definition_id] || [];
       return (
-        <FormControl key={key} fullWidth size="small" margin="dense" disabled={readOnly}>
-          <InputLabel>
-            {label}
-            {writeBack ? ' ⇄' : ''}
-          </InputLabel>
+        <FormControl fullWidth size="small" disabled={readOnly}>
           <Select
-            label={`${label}${writeBack ? ' ⇄' : ''}`}
+            displayEmpty
             value={val || ''}
-            onChange={(e) => setDraft(entry.id, link.field_definition_id, sampleId, e.target.value)}
+            onChange={(e) => setDraft(entry.id, link.field_definition_id, opts, e.target.value)}
           >
             <MenuItem value="">
               <em>—</em>
             </MenuItem>
-            {opts.map((o) => (
+            {listOpts.map((o) => (
               <MenuItem key={o.id} value={o.id}>
                 {o.name}
               </MenuItem>
@@ -532,26 +582,13 @@ const EntryCapturePanel: React.FC<EntryCapturePanelProps> = ({
 
     return (
       <TextField
-        key={key}
         fullWidth
         size="small"
-        margin="dense"
-        label={label}
         type={dt === 'number' ? 'number' : dt === 'date' ? 'date' : 'text'}
         InputLabelProps={dt === 'date' ? { shrink: true } : undefined}
         value={val ?? ''}
         disabled={readOnly}
-        onChange={(e) =>
-          setDraft(
-            entry.id,
-            link.field_definition_id,
-            sampleId,
-            dt === 'number' ? e.target.value : e.target.value,
-          )
-        }
-        InputProps={{
-          endAdornment: adornment,
-        }}
+        onChange={(e) => setDraft(entry.id, link.field_definition_id, opts, e.target.value)}
       />
     );
   };
@@ -598,17 +635,16 @@ const EntryCapturePanel: React.FC<EntryCapturePanelProps> = ({
       </Box>
 
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-        Structured data capture for this experiment. Sample-oriented entries use the experiment
-        cohort (queue at start / sample executions). <strong>Save</strong> stores draft values only;{' '}
-        <strong>Submit</strong> completes the entry and applies Sample write-backs (⇄, last write
-        wins). You can edit again after submit until the experiment is done.
+        <strong>Experiment sample data</strong> — one row per cohort sample.{' '}
+        <strong>Experiment data</strong> — multi-row table (add rows as needed).{' '}
+        <strong>Save</strong> stores draft values; <strong>Submit</strong> completes the entry and
+        applies Sample write-backs (⇄).
       </Typography>
 
       {entries.length === 0 ? (
         <Alert severity="info">
           No entries yet. If the experiment template defines{' '}
           <code>template_definition.entries</code>, use <strong>Instantiate from template</strong>.
-          You can also add entries via the API.
         </Alert>
       ) : (
         entries.map((entry) => {
@@ -619,6 +655,7 @@ const EntryCapturePanel: React.FC<EntryCapturePanelProps> = ({
           const isSaving = Boolean(saving[entry.id]);
           const entryStatus = entry.config?.status || 'draft';
           const isSubmitted = entryStatus === 'submitted';
+          const dataRows = rowKeysByEntry[entry.id] || [];
 
           return (
             <Accordion key={entry.id} defaultExpanded={entries.length <= 3}>
@@ -649,26 +686,18 @@ const EntryCapturePanel: React.FC<EntryCapturePanelProps> = ({
                   </Typography>
                 )}
 
-                {entry.entry_type === 'display_table' && (
-                  <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                    Read-only display entry.
-                  </Typography>
-                )}
-
                 {(entry.entry_type === 'predefined_action' ||
                   entry.predefined_entry_key === 'aliquot_pool_plan') && (
                   <Alert severity="info" sx={{ mb: 2 }}>
                     {entry.predefined_entry_key === 'aliquot_pool_plan' ? (
                       <>
                         Aliquot/pool plan — methods: by mass, by volume (→ mass), by count, target
-                        mass/volume/concentration/count. Save plan lines via API (
-                        <code>PUT …/aliquot-plan</code>), then{' '}
-                        <strong>Execute</strong> reduces source contents and creates dest samples.
+                        mass/volume/concentration/count. <strong>Execute</strong> reduces source
+                        contents and creates dest samples.
                       </>
                     ) : (
                       <>
                         Predefined action <strong>{entry.predefined_entry_key || entry.name}</strong>.
-                        Configurable parameters (if any) can be saved below.
                       </>
                     )}
                   </Alert>
@@ -688,7 +717,9 @@ const EntryCapturePanel: React.FC<EntryCapturePanelProps> = ({
                       then capture per-sample data here.
                     </Alert>
                   ) : links.length === 0 ? (
-                    <Typography color="text.secondary">No fields configured on this entry.</Typography>
+                    <Typography color="text.secondary">
+                      No columns configured on this entry. Add field definitions on the template.
+                    </Typography>
                   ) : (
                     <TableContainer component={Paper} variant="outlined">
                       <Table size="small">
@@ -727,7 +758,7 @@ const EntryCapturePanel: React.FC<EntryCapturePanelProps> = ({
                                   key={`${sid}-${link.field_definition_id}`}
                                   sx={{ minWidth: 140 }}
                                 >
-                                  {renderFieldInput(entry, link, sid)}
+                                  {renderCellInput(entry, link, { sampleId: sid })}
                                 </TableCell>
                               ))}
                             </TableRow>
@@ -736,45 +767,143 @@ const EntryCapturePanel: React.FC<EntryCapturePanelProps> = ({
                       </Table>
                     </TableContainer>
                   )
+                ) : isExperimentScoped(entry.entry_type) ? (
+                  links.length === 0 ? (
+                    <Typography color="text.secondary">
+                      No columns configured. Add field definitions on the template (entity type
+                      experiment_data).
+                    </Typography>
+                  ) : (
+                    <Box>
+                      <TableContainer component={Paper} variant="outlined">
+                        <Table size="small">
+                          <TableHead>
+                            <TableRow>
+                              <TableCell width={40}>#</TableCell>
+                              {links.map((link) => {
+                                const fd = fieldMap[link.field_definition_id];
+                                return (
+                                  <TableCell key={link.field_definition_id}>
+                                    {fd?.display_name || fd?.name || 'Field'}
+                                  </TableCell>
+                                );
+                              })}
+                              {canEdit && <TableCell width={48} />}
+                            </TableRow>
+                          </TableHead>
+                          <TableBody>
+                            {dataRows.map((rk, idx) => (
+                              <TableRow key={rk}>
+                                <TableCell>
+                                  <Typography variant="caption" color="text.secondary">
+                                    {idx + 1}
+                                  </Typography>
+                                </TableCell>
+                                {links.map((link) => (
+                                  <TableCell
+                                    key={`${rk}-${link.field_definition_id}`}
+                                    sx={{ minWidth: 140 }}
+                                  >
+                                    {renderCellInput(entry, link, { rowKey: rk })}
+                                  </TableCell>
+                                ))}
+                                {canEdit && (
+                                  <TableCell>
+                                    <IconButton
+                                      size="small"
+                                      color="error"
+                                      disabled={dataRows.length <= 1}
+                                      onClick={() => removeDataRow(entry, rk)}
+                                      aria-label="Delete row"
+                                    >
+                                      <DeleteIcon fontSize="small" />
+                                    </IconButton>
+                                  </TableCell>
+                                )}
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </TableContainer>
+                      {canEdit && (
+                        <Button
+                          size="small"
+                          startIcon={<AddIcon />}
+                          onClick={() => addDataRow(entry.id)}
+                          sx={{ mt: 1 }}
+                        >
+                          Add row
+                        </Button>
+                      )}
+                    </Box>
+                  )
                 ) : links.length === 0 ? (
-                  <Typography color="text.secondary">No fields configured on this entry.</Typography>
+                  entry.predefined_entry_key === 'aliquot_pool_plan' ? null : (
+                    <Typography color="text.secondary">No fields configured on this entry.</Typography>
+                  )
                 ) : (
-                  <Box display="flex" flexDirection="column" gap={0.5} maxWidth={480}>
-                    {links.map((link) => renderFieldInput(entry, link))}
-                  </Box>
+                  // predefined_action non-aliquot: still table-shaped single-row optional
+                  <TableContainer component={Paper} variant="outlined">
+                    <Table size="small">
+                      <TableHead>
+                        <TableRow>
+                          {links.map((link) => {
+                            const fd = fieldMap[link.field_definition_id];
+                            return (
+                              <TableCell key={link.field_definition_id}>
+                                {fd?.display_name || fd?.name || 'Field'}
+                              </TableCell>
+                            );
+                          })}
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        <TableRow>
+                          {links.map((link) => (
+                            <TableCell key={link.field_definition_id} sx={{ minWidth: 140 }}>
+                              {renderCellInput(entry, link, {})}
+                            </TableCell>
+                          ))}
+                        </TableRow>
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
                 )}
 
-                {canEdit && isWritableEntry(entry.entry_type) && links.length > 0 && (
-                  <Box mt={2} display="flex" gap={1} flexWrap="wrap">
-                    <Button
-                      variant="outlined"
-                      size="small"
-                      startIcon={
-                        isSaving ? <CircularProgress size={16} color="inherit" /> : <SaveIcon />
-                      }
-                      disabled={isSaving || (!isDirty && !isSampleScoped(entry.entry_type))}
-                      onClick={() => saveEntry(entry)}
-                    >
-                      {isSaving ? 'Saving…' : 'Save'}
-                    </Button>
-                    <Button
-                      variant="contained"
-                      size="small"
-                      color="success"
-                      startIcon={
-                        isSaving ? (
-                          <CircularProgress size={16} color="inherit" />
-                        ) : (
-                          <CheckCircleOutlineIcon />
-                        )
-                      }
-                      disabled={isSaving}
-                      onClick={() => submitEntry(entry)}
-                    >
-                      {isSubmitted ? 'Re-submit' : 'Submit'}
-                    </Button>
-                  </Box>
-                )}
+                {canEdit &&
+                  isWritableEntry(entry.entry_type) &&
+                  links.length > 0 &&
+                  entry.predefined_entry_key !== 'aliquot_pool_plan' && (
+                    <Box mt={2} display="flex" gap={1} flexWrap="wrap">
+                      <Button
+                        variant="outlined"
+                        size="small"
+                        startIcon={
+                          isSaving ? <CircularProgress size={16} color="inherit" /> : <SaveIcon />
+                        }
+                        disabled={isSaving}
+                        onClick={() => saveEntry(entry)}
+                      >
+                        {isSaving ? 'Saving…' : 'Save'}
+                      </Button>
+                      <Button
+                        variant="contained"
+                        size="small"
+                        color="success"
+                        startIcon={
+                          isSaving ? (
+                            <CircularProgress size={16} color="inherit" />
+                          ) : (
+                            <CheckCircleOutlineIcon />
+                          )
+                        }
+                        disabled={isSaving}
+                        onClick={() => submitEntry(entry)}
+                      >
+                        {isSubmitted ? 'Re-submit' : 'Submit'}
+                      </Button>
+                    </Box>
+                  )}
               </AccordionDetails>
             </Accordion>
           );
