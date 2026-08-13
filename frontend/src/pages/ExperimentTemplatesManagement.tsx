@@ -28,9 +28,8 @@ import {
   TableCell,
   useTheme,
   useMediaQuery,
-  Tooltip,
 } from '@mui/material';
-import { Add, Edit, Delete, RateReview, Upload } from '@mui/icons-material';
+import { Add, Edit, Delete, Upload } from '@mui/icons-material';
 import LinearProgress from '@mui/material/LinearProgress';
 import { DataGrid, GridColDef, GridActionsCellItem, GridRowParams } from '@mui/x-data-grid';
 import { useUser } from '../contexts/UserContext';
@@ -45,16 +44,6 @@ const apiErrorMsg = (err: any, fallback: string): string => {
 };
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-
-interface TransferStep {
-  step: number;
-  source_plate?: string;
-  source_well?: string;
-  dest_plate?: string;
-  dest_well?: string;
-  volume_ul?: number;
-  mandatory_review: boolean;
-}
 
 /** Declared on template_definition.entries — instantiated on experiment create. */
 interface TemplateEntryField {
@@ -102,25 +91,38 @@ const ENTRY_TYPE_OPTIONS: {
 }[] = [
   {
     value: 'experiment_sample_data',
-    label: 'Sample data',
-    helper: 'One row per sample in the experiment cohort',
+    label: 'Experiment sample data',
+    helper: 'Table: one row per sample in the experiment cohort',
   },
   {
     value: 'experiment_data',
     label: 'Experiment data',
-    helper: 'Purpose table/form — rows not auto from full cohort',
+    helper: 'Table: multi-row free records (not a form)',
   },
   {
     value: 'predefined_action',
-    label: 'Predefined action',
-    helper: 'OOB behavior (aliquot/pool, etc.)',
-  },
-  {
-    value: 'display_table',
-    label: 'Display table',
-    helper: 'Read-only structured display',
+    label: 'Aliquot / pool (predefined)',
+    helper: 'Plan + execute aliquot/pool (not FieldDefinition columns)',
   },
 ];
+
+/** FieldDefinitions used as entry columns (not Custom Fields for Sample/Test tables). */
+const ENTRY_FIELD_ENTITY_TYPES = {
+  experiment_sample_data: 'experiment_sample_data',
+  experiment_data: 'experiment_data',
+  sample_data: 'experiment_sample_data',
+  experiment_detail: 'experiment_data',
+} as const;
+
+const fieldEntityTypeForEntry = (entryType: string): string | null => {
+  if (entryType === 'experiment_sample_data' || entryType === 'sample_data') {
+    return ENTRY_FIELD_ENTITY_TYPES.experiment_sample_data;
+  }
+  if (entryType === 'experiment_data' || entryType === 'experiment_detail') {
+    return ENTRY_FIELD_ENTITY_TYPES.experiment_data;
+  }
+  return null;
+};
 
 const SAMPLE_COLUMN_OPTIONS = [
   { key: 'client_sample_id', label: 'Client Sample ID' },
@@ -145,13 +147,9 @@ const WRITE_BACK_TARGETS = [
 interface TemplateDefinition {
   experiment_name: string;
   description?: string;
-  protocol_steps: string[];
   plate_layout?: '96-well' | '384-well' | null;
-  transfer_steps: TransferStep[];
-  result_columns: Record<string, unknown>[];
   acceptance_criteria?: string;
-  mandatory_review_count: number;
-  /** Tables & forms — ELN entry places (P0) */
+  /** Ordered capture places — the reusable template body (instantiated on experiment create). */
   entries?: TemplateEntryDeclaration[];
 }
 
@@ -186,18 +184,6 @@ function TabPanel({ children, value, index }: TabPanelProps) {
 }
 
 // ─── Blank form state ─────────────────────────────────────────────────────────
-
-const blankDefinition = (): TemplateDefinition => ({
-  experiment_name: '',
-  description: '',
-  protocol_steps: [],
-  plate_layout: null,
-  transfer_steps: [],
-  result_columns: [],
-  acceptance_criteria: '',
-  mandatory_review_count: 0,
-  entries: [],
-});
 
 const blankEntry = (sortOrder = 0): TemplateEntryDeclaration => ({
   entry_type: 'experiment_sample_data',
@@ -269,6 +255,20 @@ const PREDEFINED_PRESETS: {
   },
 ];
 
+/** New templates start with Header + Samples so create always yields a reusable entry spine. */
+const defaultEntries = (): TemplateEntryDeclaration[] => [
+  { ...PREDEFINED_PRESETS[0].entry, sort_order: 0 },
+  { ...PREDEFINED_PRESETS[1].entry, sort_order: 1 },
+];
+
+const blankDefinition = (): TemplateDefinition => ({
+  experiment_name: '',
+  description: '',
+  plate_layout: null,
+  acceptance_criteria: '',
+  entries: defaultEntries(),
+});
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 const ExperimentTemplatesManagement: React.FC = () => {
@@ -286,7 +286,8 @@ const ExperimentTemplatesManagement: React.FC = () => {
   const [formOpen, setFormOpen] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<ExperimentTemplateRow | null>(null);
   const [activeTab, setActiveTab] = useState(0);
-  const [tabErrors, setTabErrors] = useState<boolean[]>([false, false, false, false, false]);
+  /** Index 0 = Basic Info, 1 = Tables & forms */
+  const [tabErrors, setTabErrors] = useState<boolean[]>([false, false]);
   const [formSubmitting, setFormSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -300,17 +301,23 @@ const ExperimentTemplatesManagement: React.FC = () => {
   const [formDef, setFormDef] = useState<TemplateDefinition>(blankDefinition());
   const [fieldDefOptions, setFieldDefOptions] = useState<FieldDefOption[]>([]);
 
+  // Create FieldDefinition (entry columns — not Custom Fields for Sample/Test)
+  const [createFieldOpen, setCreateFieldOpen] = useState(false);
+  const [createFieldEntryIndex, setCreateFieldEntryIndex] = useState<number | null>(null);
+  const [createFieldName, setCreateFieldName] = useState('');
+  const [createFieldDisplay, setCreateFieldDisplay] = useState('');
+  const [createFieldDataType, setCreateFieldDataType] = useState<
+    'text' | 'number' | 'date' | 'boolean' | 'list'
+  >('text');
+  const [createFieldListId, setCreateFieldListId] = useState('');
+  const [createFieldLists, setCreateFieldLists] = useState<{ id: string; name: string }[]>([]);
+  const [createFieldSubmitting, setCreateFieldSubmitting] = useState(false);
+  const [createFieldError, setCreateFieldError] = useState<string | null>(null);
+
   // Delete dialog state
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<ExperimentTemplateRow | null>(null);
   const [deleteSubmitting, setDeleteSubmitting] = useState(false);
-
-  // Sign-off dialog state
-  const [signoffOpen, setSignoffOpen] = useState(false);
-  const [signoffTemplate, setSignoffTemplate] = useState<ExperimentTemplateRow | null>(null);
-  const [signoffConfirmed, setSignoffConfirmed] = useState<Set<number>>(new Set());
-  const [signoffSubmitting, setSignoffSubmitting] = useState(false);
-  const [signoffCloseWarning, setSignoffCloseWarning] = useState(false);
 
   // SOP upload dialog state
   const [sopUploadOpen, setSopUploadOpen] = useState(false);
@@ -350,9 +357,26 @@ const ExperimentTemplatesManagement: React.FC = () => {
 
   const loadFieldDefinitions = async () => {
     try {
-      const data = await apiService.getFieldDefinitions({ active: true, page: 1, size: 200 });
-      const items: FieldDefOption[] = data?.items ?? data?.field_definitions ?? (Array.isArray(data) ? data : []);
-      setFieldDefOptions(items);
+      // Entry column catalogs for both kinds (+ keep sample entity for future RO display if needed)
+      const [esd, ed] = await Promise.all([
+        apiService.getFieldDefinitions({
+          entity_type: 'experiment_sample_data',
+          active: true,
+          page: 1,
+          size: 200,
+        }),
+        apiService.getFieldDefinitions({
+          entity_type: 'experiment_data',
+          active: true,
+          page: 1,
+          size: 200,
+        }),
+      ]);
+      const a: FieldDefOption[] = esd?.items ?? esd?.field_definitions ?? (Array.isArray(esd) ? esd : []);
+      const b: FieldDefOption[] = ed?.items ?? ed?.field_definitions ?? (Array.isArray(ed) ? ed : []);
+      const byId = new Map<string, FieldDefOption>();
+      for (const f of [...a, ...b]) byId.set(f.id, f);
+      setFieldDefOptions(Array.from(byId.values()));
     } catch {
       setFieldDefOptions([]);
     }
@@ -368,7 +392,7 @@ const ExperimentTemplatesManagement: React.FC = () => {
     setFormLifecycleType('standard');
     setFormDef(blankDefinition());
     setActiveTab(0);
-    setTabErrors([false, false, false, false, false]);
+    setTabErrors([false, false]);
     setFormError(null);
     setFormOpen(true);
     void loadFieldDefinitions();
@@ -380,27 +404,35 @@ const ExperimentTemplatesManagement: React.FC = () => {
     setFormDescription(row.description ?? '');
     setFormActive(row.active);
     setFormLifecycleType(row.lifecycle_type ?? 'standard');
+    const existingEntries = row.template_definition?.entries;
     setFormDef({
-      ...blankDefinition(),
-      ...row.template_definition,
-      entries: row.template_definition?.entries ?? [],
+      experiment_name: row.template_definition?.experiment_name ?? '',
+      description: row.template_definition?.description,
+      plate_layout: (row.template_definition?.plate_layout as TemplateDefinition['plate_layout']) ?? null,
+      acceptance_criteria: row.template_definition?.acceptance_criteria ?? '',
+      // Prefer declared entries; empty legacy templates get the default spine for re-save
+      entries:
+        existingEntries && existingEntries.length > 0 ? existingEntries : defaultEntries(),
     });
-    setActiveTab(0);
-    setTabErrors([false, false, false, false, false]);
+    setActiveTab(existingEntries && existingEntries.length > 0 ? 1 : 0);
+    setTabErrors([false, false]);
     setFormError(null);
     setFormOpen(true);
     void loadFieldDefinitions();
   };
 
   const validateForm = (): { valid: boolean; tabErrors: boolean[] } => {
-    const errors = [false, false, false, false, false];
+    const errors = [false, false];
     if (!formName.trim() || !formDef.experiment_name.trim()) {
       errors[0] = true;
     }
     const entries = formDef.entries ?? [];
+    if (entries.length === 0) {
+      errors[1] = true;
+    }
     for (const e of entries) {
       if (!e.name?.trim() || !e.entry_type) {
-        errors[4] = true;
+        errors[1] = true;
         break;
       }
     }
@@ -445,6 +477,65 @@ const ExperimentTemplatesManagement: React.FC = () => {
     updateEntry(entryIndex, { fields });
   };
 
+  const openCreateField = async (entryIndex: number) => {
+    setCreateFieldEntryIndex(entryIndex);
+    setCreateFieldName('');
+    setCreateFieldDisplay('');
+    setCreateFieldDataType('text');
+    setCreateFieldListId('');
+    setCreateFieldError(null);
+    setCreateFieldOpen(true);
+    try {
+      const lists = await apiService.getLists();
+      const arr = Array.isArray(lists) ? lists : lists?.lists ?? [];
+      setCreateFieldLists(arr.map((l: any) => ({ id: l.id, name: l.name })));
+    } catch {
+      setCreateFieldLists([]);
+    }
+  };
+
+  const handleCreateField = async () => {
+    if (createFieldEntryIndex == null) return;
+    const entry = entriesList[createFieldEntryIndex];
+    const entityType = fieldEntityTypeForEntry(entry?.entry_type || '');
+    if (!entityType) {
+      setCreateFieldError('This entry type does not use field definition columns.');
+      return;
+    }
+    const name = createFieldName.trim().toLowerCase().replace(/\s+/g, '_');
+    if (!name) {
+      setCreateFieldError('Internal name is required (e.g. elution_volume).');
+      return;
+    }
+    if (createFieldDataType === 'list' && !createFieldListId) {
+      setCreateFieldError('List-backed fields require a source list.');
+      return;
+    }
+    setCreateFieldSubmitting(true);
+    setCreateFieldError(null);
+    try {
+      const created = await apiService.createFieldDefinition({
+        entity_type: entityType,
+        name,
+        display_name: createFieldDisplay.trim() || name,
+        data_type: createFieldDataType,
+        source_list_id: createFieldDataType === 'list' ? createFieldListId : undefined,
+        is_required: false,
+        active: true,
+        is_materialized_column: false,
+      });
+      await loadFieldDefinitions();
+      if (created?.id) {
+        addEntryField(createFieldEntryIndex, created.id);
+      }
+      setCreateFieldOpen(false);
+    } catch (err: unknown) {
+      setCreateFieldError(apiErrorMsg(err, 'Failed to create field definition'));
+    } finally {
+      setCreateFieldSubmitting(false);
+    }
+  };
+
   const updateEntryField = (
     entryIndex: number,
     fieldIndex: number,
@@ -486,14 +577,27 @@ const ExperimentTemplatesManagement: React.FC = () => {
     setFormSubmitting(true);
     setFormError(null);
     try {
+      // Persist entry-based definition only. Clear legacy protocol/transfer/result
+      // and sign-off counters so activation is never blocked by unused formats.
+      const template_definition: Record<string, unknown> = {
+        experiment_name: formDef.experiment_name.trim(),
+        description: formDef.description || undefined,
+        plate_layout: formDef.plate_layout || null,
+        acceptance_criteria: formDef.acceptance_criteria || undefined,
+        entries: (formDef.entries ?? []).map((e, i) => ({
+          ...e,
+          sort_order: e.sort_order ?? i,
+        })),
+        protocol_steps: [],
+        transfer_steps: [],
+        result_columns: [],
+        mandatory_review_count: 0,
+      };
       const payload = {
         name: formName.trim(),
         description: formDescription.trim() || undefined,
         lifecycle_type: formLifecycleType,
-        template_definition: {
-          ...formDef,
-          mandatory_review_count: formDef.transfer_steps.filter((s) => s.mandatory_review).length,
-        } as unknown as Record<string, unknown>,
+        template_definition,
       };
       if (selectedTemplate) {
         await apiService.updateExperimentTemplate(String(selectedTemplate.id), {
@@ -512,49 +616,6 @@ const ExperimentTemplatesManagement: React.FC = () => {
     }
   };
 
-  // ── Transfer step helpers ─────────────────────────────────────────────────
-
-  const addTransferStep = () => {
-    const nextStep = formDef.transfer_steps.length + 1;
-    setFormDef((d) => ({
-      ...d,
-      transfer_steps: [...d.transfer_steps, { step: nextStep, mandatory_review: true }],
-    }));
-  };
-
-  const updateTransferStep = (index: number, patch: Partial<TransferStep>) => {
-    setFormDef((d) => {
-      const updated = [...d.transfer_steps];
-      updated[index] = { ...updated[index], ...patch };
-      return { ...d, transfer_steps: updated };
-    });
-  };
-
-  const removeTransferStep = (index: number) => {
-    setFormDef((d) => {
-      const updated = d.transfer_steps.filter((_, i) => i !== index).map((s, i) => ({ ...s, step: i + 1 }));
-      return { ...d, transfer_steps: updated };
-    });
-  };
-
-  // ── Protocol step helpers ─────────────────────────────────────────────────
-
-  const addProtocolStep = () => {
-    setFormDef((d) => ({ ...d, protocol_steps: [...d.protocol_steps, ''] }));
-  };
-
-  const updateProtocolStep = (index: number, value: string) => {
-    setFormDef((d) => {
-      const updated = [...d.protocol_steps];
-      updated[index] = value;
-      return { ...d, protocol_steps: updated };
-    });
-  };
-
-  const removeProtocolStep = (index: number) => {
-    setFormDef((d) => ({ ...d, protocol_steps: d.protocol_steps.filter((_, i) => i !== index) }));
-  };
-
   // ── Delete ────────────────────────────────────────────────────────────────
 
   const handleDeleteConfirm = async () => {
@@ -570,55 +631,6 @@ const ExperimentTemplatesManagement: React.FC = () => {
       setDeleteDialogOpen(false);
     } finally {
       setDeleteSubmitting(false);
-    }
-  };
-
-  // ── Sign-off ──────────────────────────────────────────────────────────────
-
-  const openSignoff = (row: ExperimentTemplateRow) => {
-    setSignoffTemplate(row);
-    setSignoffConfirmed(new Set());
-    setSignoffCloseWarning(false);
-    setSignoffOpen(true);
-  };
-
-  const handleSignoffClose = () => {
-    const pendingSteps = (signoffTemplate?.template_definition.transfer_steps ?? [])
-      .filter((s) => s.mandatory_review && !signoffConfirmed.has(s.step));
-    if (pendingSteps.length > 0 && !signoffCloseWarning) {
-      setSignoffCloseWarning(true);
-      return;
-    }
-    setSignoffOpen(false);
-    setSignoffCloseWarning(false);
-  };
-
-  const confirmStep = (step: number) => {
-    setSignoffConfirmed((prev) => new Set([...prev, step]));
-    setSignoffCloseWarning(false);
-  };
-
-  const handleSignoffComplete = async () => {
-    if (!signoffTemplate) return;
-    setSignoffSubmitting(true);
-    try {
-      const updatedSteps = signoffTemplate.template_definition.transfer_steps.map((s) =>
-        s.mandatory_review ? { ...s, mandatory_review: false } : s
-      );
-      const updatedDef: TemplateDefinition = {
-        ...signoffTemplate.template_definition,
-        transfer_steps: updatedSteps,
-        mandatory_review_count: 0,
-      };
-      await apiService.updateExperimentTemplate(String(signoffTemplate.id), {
-        template_definition: updatedDef as unknown as Record<string, unknown>,
-      });
-      await loadTemplates();
-      setSignoffOpen(false);
-    } catch (err: unknown) {
-      setError(apiErrorMsg(err, (err as any)?.message || 'Failed to complete sign-off'));
-    } finally {
-      setSignoffSubmitting(false);
     }
   };
 
@@ -784,25 +796,12 @@ const ExperimentTemplatesManagement: React.FC = () => {
         row.template_definition?.plate_layout ?? '—',
     },
     {
-      field: 'status',
-      headerName: 'Status',
-      width: 170,
-      renderCell: (params) => {
-        const row = params.row as ExperimentTemplateRow;
-        const count = row.template_definition?.mandatory_review_count ?? 0;
-        if (count > 0) {
-          return (
-            <Chip
-              label={`${count} pending sign-off${count !== 1 ? 's' : ''}`}
-              size="small"
-              color="warning"
-              variant="filled"
-              sx={{ cursor: 'pointer' }}
-              onClick={() => openSignoff(row)}
-            />
-          );
-        }
-        return <Chip label="Ready" size="small" color="success" variant="outlined" />;
+      field: 'entries',
+      headerName: 'Tables & forms',
+      width: 130,
+      valueGetter: (_: unknown, row: ExperimentTemplateRow) => {
+        const n = row.template_definition?.entries?.length ?? 0;
+        return n === 0 ? '—' : `${n}`;
       },
     },
     {
@@ -811,24 +810,15 @@ const ExperimentTemplatesManagement: React.FC = () => {
       width: 90,
       renderCell: (params) => {
         const row = params.row as ExperimentTemplateRow;
-        const needsSignoff = (row.template_definition?.mandatory_review_count ?? 0) > 0;
-        const toggle = (
+        return (
           <Switch
             size="small"
             checked={row.active}
             onChange={() => handleActivationToggle(row)}
-            disabled={needsSignoff || !canManage}
+            disabled={!canManage}
             color="success"
           />
         );
-        if (needsSignoff) {
-          return (
-            <Tooltip title="Sign-off required before activating this template">
-              <span>{toggle}</span>
-            </Tooltip>
-          );
-        }
-        return toggle;
       },
     },
     {
@@ -850,33 +840,19 @@ const ExperimentTemplatesManagement: React.FC = () => {
       width: 120,
       getActions: (params: GridRowParams) => {
         const row = params.row as ExperimentTemplateRow;
-        const pendingSignoffs = (row.template_definition?.mandatory_review_count ?? 0) > 0;
-        const actions: React.ReactElement[] = [];
-        if (pendingSignoffs) {
-          actions.push(
-            <GridActionsCellItem
-              key="signoff"
-              icon={<RateReview />}
-              label="Review Sign-offs"
-              onClick={() => openSignoff(row)}
-            />
-          );
-        }
-        if (canManage) {
-          actions.push(
-            <GridActionsCellItem key="edit" icon={<Edit />} label="Edit" onClick={() => openEdit(row)} />,
-            <GridActionsCellItem
-              key="delete"
-              icon={<Delete />}
-              label="Delete"
-              onClick={() => {
-                setDeleteTarget(row);
-                setDeleteDialogOpen(true);
-              }}
-            />
-          );
-        }
-        return actions;
+        if (!canManage) return [];
+        return [
+          <GridActionsCellItem key="edit" icon={<Edit />} label="Edit" onClick={() => openEdit(row)} />,
+          <GridActionsCellItem
+            key="delete"
+            icon={<Delete />}
+            label="Delete"
+            onClick={() => {
+              setDeleteTarget(row);
+              setDeleteDialogOpen(true);
+            }}
+          />,
+        ];
       },
     },
   ];
@@ -895,12 +871,6 @@ const ExperimentTemplatesManagement: React.FC = () => {
   }
 
   // ── Render ────────────────────────────────────────────────────────────────
-
-  const pendingReviewSteps = signoffTemplate?.template_definition.transfer_steps.filter(
-    (s) => s.mandatory_review
-  ) ?? [];
-  const allConfirmed =
-    pendingReviewSteps.length > 0 && pendingReviewSteps.every((s) => signoffConfirmed.has(s.step));
 
   return (
     <FillHeightPage
@@ -983,12 +953,12 @@ const ExperimentTemplatesManagement: React.FC = () => {
           {/* Tab-level error summary */}
           {tabErrors.some(Boolean) && (
             <Alert severity="error" sx={{ mb: 2 }}>
-              {tabErrors[0] && <div>Tab 1 (Basic Info): Name and Experiment Name are required.</div>}
-              {tabErrors[1] && <div>Tab 2 (Protocol Steps): Check for empty steps.</div>}
-              {tabErrors[2] && <div>Tab 3 (Transfer Steps): Check step entries.</div>}
-              {tabErrors[3] && <div>Tab 4 (Result Columns): Check column entries.</div>}
-              {tabErrors[4] && (
-                <div>Tab 5 (Tables &amp; forms): Each entry needs a name and type.</div>
+              {tabErrors[0] && <div>Basic Info: Template name and experiment name are required.</div>}
+              {tabErrors[1] && (
+                <div>
+                  Tables &amp; forms: Add at least one entry; each needs a name and type. These are the
+                  reusable capture places instantiated when an experiment is created from this template.
+                </div>
               )}
             </Alert>
           )}
@@ -1006,13 +976,10 @@ const ExperimentTemplatesManagement: React.FC = () => {
               icon={tabErrors[0] ? <span style={{ color: 'red', fontSize: 10 }}>●</span> : undefined}
               iconPosition="end"
             />
-            <Tab label="Protocol Steps" />
-            <Tab label="Transfer Steps" />
-            <Tab label="Result Columns" />
             <Tab
               label="Tables & forms"
-              sx={{ color: tabErrors[4] ? 'error.main' : undefined }}
-              icon={tabErrors[4] ? <span style={{ color: 'red', fontSize: 10 }}>●</span> : undefined}
+              sx={{ color: tabErrors[1] ? 'error.main' : undefined }}
+              icon={tabErrors[1] ? <span style={{ color: 'red', fontSize: 10 }}>●</span> : undefined}
               iconPosition="end"
             />
           </Tabs>
@@ -1097,202 +1064,19 @@ const ExperimentTemplatesManagement: React.FC = () => {
             )}
           </TabPanel>
 
-          {/* Tab 2: Protocol Steps */}
+          {/* Tab 2: Tables & forms (ELN entries — reusable template body) */}
           <TabPanel value={activeTab} index={1}>
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-              {formDef.protocol_steps.map((step, i) => (
-                <Box key={i} sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-                  <Typography variant="body2" sx={{ minWidth: 24, color: 'text.secondary' }}>
-                    {i + 1}.
-                  </Typography>
-                  <TextField
-                    fullWidth
-                    size="small"
-                    value={step}
-                    onChange={(e) => updateProtocolStep(i, e.target.value)}
-                    placeholder={`Step ${i + 1}`}
-                  />
-                  <IconButton size="small" onClick={() => removeProtocolStep(i)} color="error">
-                    <Delete fontSize="small" />
-                  </IconButton>
-                </Box>
-              ))}
-              <Button
-                startIcon={<Add />}
-                onClick={addProtocolStep}
-                variant="outlined"
-                size="small"
-                sx={{ alignSelf: 'flex-start', mt: 1 }}
-              >
-                Add Step
-              </Button>
-            </Box>
-          </TabPanel>
-
-          {/* Tab 3: Transfer Steps */}
-          <TabPanel value={activeTab} index={2}>
-            <Table size="small">
-              <TableHead>
-                <TableRow>
-                  <TableCell width={40}>#</TableCell>
-                  <TableCell>Source Plate</TableCell>
-                  <TableCell>Source Well</TableCell>
-                  <TableCell>Dest Plate</TableCell>
-                  <TableCell>Dest Well</TableCell>
-                  <TableCell width={90}>Vol (µL)</TableCell>
-                  <TableCell>
-                    <Tooltip title="When checked, a lab manager must review this step before the template can be activated">
-                      <span>Requires sign-off</span>
-                    </Tooltip>
-                  </TableCell>
-                  <TableCell width={48} />
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {formDef.transfer_steps.map((s, i) => (
-                  <TableRow key={i}>
-                    <TableCell>{s.step}</TableCell>
-                    <TableCell>
-                      <TextField
-                        size="small"
-                        value={s.source_plate ?? ''}
-                        onChange={(e) => updateTransferStep(i, { source_plate: e.target.value })}
-                        sx={{ width: 100 }}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <TextField
-                        size="small"
-                        value={s.source_well ?? ''}
-                        onChange={(e) => updateTransferStep(i, { source_well: e.target.value })}
-                        sx={{ width: 80 }}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <TextField
-                        size="small"
-                        value={s.dest_plate ?? ''}
-                        onChange={(e) => updateTransferStep(i, { dest_plate: e.target.value })}
-                        sx={{ width: 100 }}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <TextField
-                        size="small"
-                        value={s.dest_well ?? ''}
-                        onChange={(e) => updateTransferStep(i, { dest_well: e.target.value })}
-                        sx={{ width: 80 }}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <TextField
-                        size="small"
-                        type="number"
-                        value={s.volume_ul ?? ''}
-                        onChange={(e) =>
-                          updateTransferStep(i, {
-                            volume_ul: e.target.value ? parseFloat(e.target.value) : undefined,
-                          })
-                        }
-                        sx={{ width: 80 }}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Switch
-                        size="small"
-                        checked={s.mandatory_review}
-                        onChange={(e) => updateTransferStep(i, { mandatory_review: e.target.checked })}
-                        color="warning"
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <IconButton size="small" onClick={() => removeTransferStep(i)} color="error">
-                        <Delete fontSize="small" />
-                      </IconButton>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-            <Button
-              startIcon={<Add />}
-              onClick={addTransferStep}
-              variant="outlined"
-              size="small"
-              sx={{ mt: 2 }}
-            >
-              Add Transfer Step
-            </Button>
-          </TabPanel>
-
-          {/* Tab 4: Result Columns */}
-          <TabPanel value={activeTab} index={3}>
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-              {formDef.result_columns.map((col, i) => (
-                <Box key={i} sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-                  <TextField
-                    size="small"
-                    label="Column name"
-                    value={(col.name as string) ?? ''}
-                    onChange={(e) => {
-                      const updated = [...formDef.result_columns];
-                      updated[i] = { ...updated[i], name: e.target.value };
-                      setFormDef((d) => ({ ...d, result_columns: updated }));
-                    }}
-                    sx={{ flex: 1 }}
-                  />
-                  <TextField
-                    size="small"
-                    label="Type / unit"
-                    value={(col.type as string) ?? ''}
-                    onChange={(e) => {
-                      const updated = [...formDef.result_columns];
-                      updated[i] = { ...updated[i], type: e.target.value };
-                      setFormDef((d) => ({ ...d, result_columns: updated }));
-                    }}
-                    sx={{ flex: 1 }}
-                  />
-                  <IconButton
-                    size="small"
-                    onClick={() =>
-                      setFormDef((d) => ({
-                        ...d,
-                        result_columns: d.result_columns.filter((_, j) => j !== i),
-                      }))
-                    }
-                    color="error"
-                  >
-                    <Delete fontSize="small" />
-                  </IconButton>
-                </Box>
-              ))}
-              <Button
-                startIcon={<Add />}
-                onClick={() =>
-                  setFormDef((d) => ({ ...d, result_columns: [...d.result_columns, { name: '', type: '' }] }))
-                }
-                variant="outlined"
-                size="small"
-                sx={{ alignSelf: 'flex-start', mt: 1 }}
-              >
-                Add Column
-              </Button>
-            </Box>
-          </TabPanel>
-
-          {/* Tab 5: Tables & forms (ELN entries) */}
-          <TabPanel value={activeTab} index={4}>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              Pre-configured capture places for experiments created from this template. Instantiated
-              automatically on experiment create. <strong>Sample data</strong> = one row per cohort
-              sample; <strong>Experiment data</strong> = purpose table/form (plans, headers). Write-back
+              These <strong>entries</strong> are the reusable template. They are instantiated
+              automatically when an experiment is created from this template.{' '}
+              <strong>Sample data</strong> = one row per cohort sample;{' '}
+              <strong>Experiment data</strong> = purpose table/form (plans, headers). Write-back
               targets apply on <strong>Submit</strong> only (not Save).
             </Typography>
 
             {(formDef.entries ?? []).length === 0 && (
-              <Alert severity="info" sx={{ mb: 2 }}>
-                No tables or forms yet. Add at least one entry if this template should capture structured
-                data (or leave empty for transfer/protocol-only templates).
+              <Alert severity="warning" sx={{ mb: 2 }}>
+                Add at least one table or form (or use a preset below). Empty templates cannot be saved.
               </Alert>
             )}
 
@@ -1300,8 +1084,18 @@ const ExperimentTemplatesManagement: React.FC = () => {
               {(formDef.entries ?? []).map((entry, ei) => {
                 const isSample =
                   entry.entry_type === 'experiment_sample_data' || entry.entry_type === 'sample_data';
+                const isDataTable =
+                  isSample ||
+                  entry.entry_type === 'experiment_data' ||
+                  entry.entry_type === 'experiment_detail';
+                const fieldEntity = fieldEntityTypeForEntry(entry.entry_type);
                 const usedFieldIds = new Set((entry.fields || []).map((f) => f.field_definition_id));
-                const availableFields = fieldDefOptions.filter((f) => !usedFieldIds.has(f.id));
+                const availableFields = fieldDefOptions.filter(
+                  (f) =>
+                    !usedFieldIds.has(f.id) &&
+                    fieldEntity != null &&
+                    (f.entity_type || '').toLowerCase() === fieldEntity,
+                );
 
                 return (
                   <Box
@@ -1328,7 +1122,7 @@ const ExperimentTemplatesManagement: React.FC = () => {
                         label="Entry name"
                         value={entry.name}
                         onChange={(e) => updateEntry(ei, { name: e.target.value })}
-                        error={tabErrors[4] && !entry.name.trim()}
+                        error={tabErrors[1] && !entry.name.trim()}
                         sx={{ minWidth: 180, flex: 1 }}
                       />
                       <FormControl size="small" sx={{ minWidth: 200 }}>
@@ -1436,89 +1230,112 @@ const ExperimentTemplatesManagement: React.FC = () => {
                       </Box>
                     )}
 
-                    <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
-                      Custom columns (Field Definitions)
-                    </Typography>
-                    {(entry.fields || []).length === 0 ? (
-                      <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                        No custom columns — add Field Definitions used as capture columns.
-                      </Typography>
-                    ) : (
-                      <Table size="small" sx={{ mb: 1 }}>
-                        <TableHead>
-                          <TableRow>
-                            <TableCell>Field</TableCell>
-                            <TableCell width={200}>Write-back (on Submit)</TableCell>
-                            <TableCell width={48} />
-                          </TableRow>
-                        </TableHead>
-                        <TableBody>
-                          {(entry.fields || []).map((f, fi) => (
-                            <TableRow key={f.field_definition_id}>
-                              <TableCell>
-                                <Typography variant="body2">{fieldLabel(f.field_definition_id)}</Typography>
-                                <Typography variant="caption" color="text.secondary">
-                                  {f.field_definition_id.slice(0, 8)}…
-                                </Typography>
-                              </TableCell>
-                              <TableCell>
-                                <FormControl size="small" fullWidth disabled={!isSample}>
-                                  <Select
-                                    displayEmpty
-                                    value={f.write_back_target ?? ''}
-                                    onChange={(e) =>
-                                      updateEntryField(ei, fi, {
-                                        write_back_target: e.target.value || null,
-                                      })
-                                    }
-                                  >
-                                    {WRITE_BACK_TARGETS.map((t) => (
-                                      <MenuItem key={t.value || 'none'} value={t.value}>
-                                        {t.label}
-                                      </MenuItem>
-                                    ))}
-                                  </Select>
-                                </FormControl>
-                              </TableCell>
-                              <TableCell>
-                                <IconButton
-                                  size="small"
-                                  color="error"
-                                  onClick={() => removeEntryField(ei, fi)}
-                                >
-                                  <Delete fontSize="small" />
-                                </IconButton>
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    )}
-
-                    <FormControl size="small" sx={{ minWidth: 280 }}>
-                      <InputLabel>Add field</InputLabel>
-                      <Select
-                        label="Add field"
-                        value=""
-                        onChange={(e) => addEntryField(ei, String(e.target.value))}
-                        disabled={availableFields.length === 0}
-                      >
-                        {availableFields.length === 0 ? (
-                          <MenuItem value="" disabled>
-                            {fieldDefOptions.length === 0
-                              ? 'No field definitions loaded'
-                              : 'All available fields added'}
-                          </MenuItem>
+                    {isDataTable && (
+                      <>
+                        <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
+                          Table columns (entry field definitions)
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1 }}>
+                          Not Custom Fields on Sample/Test. Entity type:{' '}
+                          <code>{fieldEntity || '—'}</code>. These columns appear as the entry table.
+                        </Typography>
+                        {(entry.fields || []).length === 0 ? (
+                          <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                            No columns yet — create a field or add an existing one below.
+                          </Typography>
                         ) : (
-                          availableFields.map((fd) => (
-                            <MenuItem key={fd.id} value={fd.id}>
-                              {fd.display_name || fd.name} ({fd.data_type}
-                              {fd.entity_type ? ` · ${fd.entity_type}` : ''})
-                            </MenuItem>
-                          ))
+                          <Table size="small" sx={{ mb: 1 }}>
+                            <TableHead>
+                              <TableRow>
+                                <TableCell>Field</TableCell>
+                                <TableCell width={200}>Write-back (on Submit)</TableCell>
+                                <TableCell width={48} />
+                              </TableRow>
+                            </TableHead>
+                            <TableBody>
+                              {(entry.fields || []).map((f, fi) => (
+                                <TableRow key={f.field_definition_id}>
+                                  <TableCell>
+                                    <Typography variant="body2">
+                                      {fieldLabel(f.field_definition_id)}
+                                    </Typography>
+                                    <Typography variant="caption" color="text.secondary">
+                                      {f.field_definition_id.slice(0, 8)}…
+                                    </Typography>
+                                  </TableCell>
+                                  <TableCell>
+                                    <FormControl size="small" fullWidth disabled={!isSample}>
+                                      <Select
+                                        displayEmpty
+                                        value={f.write_back_target ?? ''}
+                                        onChange={(e) =>
+                                          updateEntryField(ei, fi, {
+                                            write_back_target: e.target.value || null,
+                                          })
+                                        }
+                                      >
+                                        {WRITE_BACK_TARGETS.map((t) => (
+                                          <MenuItem key={t.value || 'none'} value={t.value}>
+                                            {t.label}
+                                          </MenuItem>
+                                        ))}
+                                      </Select>
+                                    </FormControl>
+                                  </TableCell>
+                                  <TableCell>
+                                    <IconButton
+                                      size="small"
+                                      color="error"
+                                      onClick={() => removeEntryField(ei, fi)}
+                                    >
+                                      <Delete fontSize="small" />
+                                    </IconButton>
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
                         )}
-                      </Select>
-                    </FormControl>
+
+                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, alignItems: 'center' }}>
+                          <FormControl size="small" sx={{ minWidth: 280 }}>
+                            <InputLabel>Add existing field</InputLabel>
+                            <Select
+                              label="Add existing field"
+                              value=""
+                              onChange={(e) => addEntryField(ei, String(e.target.value))}
+                              disabled={availableFields.length === 0}
+                            >
+                              {availableFields.length === 0 ? (
+                                <MenuItem value="" disabled>
+                                  No fields for {fieldEntity} — create one
+                                </MenuItem>
+                              ) : (
+                                availableFields.map((fd) => (
+                                  <MenuItem key={fd.id} value={fd.id}>
+                                    {fd.display_name || fd.name} ({fd.data_type})
+                                  </MenuItem>
+                                ))
+                              )}
+                            </Select>
+                          </FormControl>
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            startIcon={<Add />}
+                            onClick={() => openCreateField(ei)}
+                          >
+                            Create field
+                          </Button>
+                        </Box>
+                      </>
+                    )}
+                    {!isDataTable && entry.entry_type === 'predefined_action' && (
+                      <Typography variant="body2" color="text.secondary">
+                        Aliquot/pool uses the plan editor at runtime — no table columns here. Set
+                        predefined key to <code>aliquot_pool_plan</code> if needed.
+                      </Typography>
+                    )}
                   </Box>
                 );
               })}
@@ -1585,8 +1402,9 @@ const ExperimentTemplatesManagement: React.FC = () => {
         <DialogTitle>Upload SOP to Create Template</DialogTitle>
         <DialogContent>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Upload your SOP document and an example instrument CSV. Claude will extract the template
-            definition automatically. You can review and edit all fields before activating.
+            Upload your SOP document and an example instrument CSV. Extraction may pre-fill basic
+            fields; review and author <strong>Tables &amp; forms</strong> (entries) before activating.
+            Legacy protocol/transfer lists are no longer used.
           </Typography>
 
           {sopUploadError && (
@@ -1711,80 +1529,91 @@ const ExperimentTemplatesManagement: React.FC = () => {
         </DialogActions>
       </Dialog>
 
-      {/* ── Sign-off Dialog ──────────────────────────────────────────────── */}
-      <Dialog open={signoffOpen} onClose={handleSignoffClose} maxWidth="md" fullWidth>
-        <DialogTitle>
-          Review Sign-offs — {signoffTemplate?.name}
-        </DialogTitle>
+      {/* ── Create entry FieldDefinition ─────────────────────────────────── */}
+      <Dialog
+        open={createFieldOpen}
+        onClose={() => !createFieldSubmitting && setCreateFieldOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Create entry field</DialogTitle>
         <DialogContent>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Review each robot-affecting transfer step below. Confirm each step individually before
-            this template can be activated.
+            Defines a column for this entry table (stored as a FieldDefinition with entity type{' '}
+            <code>
+              {createFieldEntryIndex != null
+                ? fieldEntityTypeForEntry(entriesList[createFieldEntryIndex]?.entry_type || '') ||
+                  '—'
+                : '—'}
+            </code>
+            ). This is <strong>not</strong> a Custom Field on Sample/Test database tables.
           </Typography>
-
-          {signoffCloseWarning && (
-            <Alert severity="warning" sx={{ mb: 2 }}>
-              You have {pendingReviewSteps.filter((s) => !signoffConfirmed.has(s.step)).length} unconfirmed
-              step(s). Progress will not be saved if you close now.
+          {createFieldError && (
+            <Alert severity="error" sx={{ mb: 2 }} onClose={() => setCreateFieldError(null)}>
+              {createFieldError}
             </Alert>
           )}
-
-          <Table size="small">
-            <TableHead>
-              <TableRow>
-                <TableCell width={40}>#</TableCell>
-                <TableCell>Source</TableCell>
-                <TableCell>Destination</TableCell>
-                <TableCell width={90}>Volume</TableCell>
-                <TableCell width={120}>Action</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {pendingReviewSteps.map((s) => {
-                const confirmed = signoffConfirmed.has(s.step);
-                return (
-                  <TableRow
-                    key={s.step}
-                    sx={{ backgroundColor: confirmed ? 'success.light' : undefined, opacity: confirmed ? 0.7 : 1 }}
-                  >
-                    <TableCell>{s.step}</TableCell>
-                    <TableCell>
-                      {s.source_plate && s.source_well
-                        ? `${s.source_plate}, ${s.source_well}`
-                        : s.source_plate || s.source_well || '—'}
-                    </TableCell>
-                    <TableCell>
-                      {s.dest_plate && s.dest_well
-                        ? `${s.dest_plate}, ${s.dest_well}`
-                        : s.dest_plate || s.dest_well || '—'}
-                    </TableCell>
-                    <TableCell>{s.volume_ul != null ? `${s.volume_ul} µL` : '—'}</TableCell>
-                    <TableCell>
-                      {confirmed ? (
-                        <Chip label="Confirmed" size="small" color="success" />
-                      ) : (
-                        <Button size="small" variant="outlined" color="success" onClick={() => confirmStep(s.step)}>
-                          Confirm
-                        </Button>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
+          <TextField
+            fullWidth
+            required
+            label="Internal name"
+            helperText="snake_case, unique per entity type"
+            value={createFieldName}
+            onChange={(e) => setCreateFieldName(e.target.value)}
+            margin="normal"
+            placeholder="elution_volume"
+          />
+          <TextField
+            fullWidth
+            label="Display name"
+            value={createFieldDisplay}
+            onChange={(e) => setCreateFieldDisplay(e.target.value)}
+            margin="normal"
+            placeholder="Elution volume"
+          />
+          <FormControl fullWidth margin="normal">
+            <InputLabel>Data type</InputLabel>
+            <Select
+              label="Data type"
+              value={createFieldDataType}
+              onChange={(e) =>
+                setCreateFieldDataType(e.target.value as typeof createFieldDataType)
+              }
+            >
+              <MenuItem value="text">Text</MenuItem>
+              <MenuItem value="number">Number</MenuItem>
+              <MenuItem value="date">Date</MenuItem>
+              <MenuItem value="boolean">Boolean</MenuItem>
+              <MenuItem value="list">List</MenuItem>
+            </Select>
+          </FormControl>
+          {createFieldDataType === 'list' && (
+            <FormControl fullWidth margin="normal">
+              <InputLabel>Source list</InputLabel>
+              <Select
+                label="Source list"
+                value={createFieldListId}
+                onChange={(e) => setCreateFieldListId(e.target.value)}
+              >
+                {createFieldLists.map((l) => (
+                  <MenuItem key={l.id} value={l.id}>
+                    {l.name}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleSignoffClose}>
-            {signoffCloseWarning ? 'Close Anyway' : 'Close'}
+          <Button onClick={() => setCreateFieldOpen(false)} disabled={createFieldSubmitting}>
+            Cancel
           </Button>
           <Button
             variant="contained"
-            color="success"
-            onClick={handleSignoffComplete}
-            disabled={!allConfirmed || signoffSubmitting}
+            onClick={handleCreateField}
+            disabled={createFieldSubmitting || !createFieldName.trim()}
           >
-            {signoffSubmitting ? 'Saving...' : 'Complete Sign-off'}
+            {createFieldSubmitting ? 'Creating…' : 'Create & add to entry'}
           </Button>
         </DialogActions>
       </Dialog>

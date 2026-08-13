@@ -125,6 +125,7 @@ Long-form tech designs stay in [design/](design/). UI review was previously `ui-
 
 | Doc | Topic | Status |
 |-----|--------|--------|
+| [ideas/system-managed-status.md](ideas/system-managed-status.md) | Sample/experiment **status** owned by system (not user at create); manager/admin override | **Priority — High** |
 | [ideas/run-results.md](ideas/run-results.md) | LimsRun JSONB → Results on **publish** | **Shipped v1** (P0–P4); see reviews + [manuals/lims-runs.md](manuals/lims-runs.md) |
 | [ideas/ai-analyte-resolution.md](ideas/ai-analyte-resolution.md) | AI help when analyte alias list misses | Exploratory follow-on |
 | [ideas/ai-data-import.md](ideas/ai-data-import.md) | Deterministic parsers (analysis+instrument/CRO); AI only for setup | **Requirements in review** |
@@ -134,8 +135,16 @@ Long-form tech designs stay in [design/](design/). UI review was previously `ui-
 | [ideas/orders-and-projects.md](ideas/orders-and-projects.md) | Rename today’s `projects` → **orders**; keep **client_projects** (CRO reporting); new **lab projects** (method-dev etc.) | **Placeholder** |
 | [ideas/accessioning-and-workflows-revisit.md](ideas/accessioning-and-workflows-revisit.md) | Revisit accessioning workflows: sample manifest upload + receive verification (continuous vs discontinuous) | **Placeholder — OOS experiment entries** |
 | [ideas/materials-and-lot-tracking.md](ideas/materials-and-lot-tracking.md) | Materials/reagents + lot inventory and use on experiments | **Placeholder — not in NimbleLIMS today** |
+| [ideas/containers-model-update.md](ideas/containers-model-update.md) | Nested containers; type rows×columns; contents only on 1×1; solute mass / derived volume | **Placeholder — rules Decided; schema/UI not implemented** |
 | [ideas/index-sets-and-sequencing-setup.md](ideas/index-sets-and-sequencing-setup.md) | Index set catalog, index assignment entry, sequencer sample sheets / flow cell loading | **Placeholder** |
 | [ideas/ui-tabbed-admin-catalogs.md](ideas/ui-tabbed-admin-catalogs.md) | Tabbed shells + menu names: Assay catalog, Customers, Work, Instruments, Access control; CRO separate | **Placeholder** |
+| [ideas/list-page-search.md](ideas/list-page-search.md) | Consistent search / filter on Samples, Experiments, Processes, and other list pages | **Placeholder** |
+
+### Priority backlog (ideas)
+
+| Priority | Idea | Why |
+|----------|------|-----|
+| **High** | [system-managed-status.md](ideas/system-managed-status.md) | Status is critical tracking; must not be free-form at accessioning/create |
 | [ideas/model-fine-tune.md](ideas/model-fine-tune.md) | Model fine-tune notes | See `sop-rag` for related SOP/RAG work |
 
 ## Reviews (run-results) — complete

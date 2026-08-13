@@ -26,7 +26,7 @@ Phase 1–2 shipped ad hoc process create as a provisional MVP; Phase 3 made def
 |-------------|-----------------------------------------------------------------------------|
 | **Process** | An ordered collection of Experiments.                                       |
 | **Step**    | An individual Experiment within a Process (position in the sequence matters). |
-| **Sample Assignment** | Samples are assigned to a Process via `ProcessSample`, then queued into specific Steps (Experiments) where `ExperimentSampleExecution` tracks detailed per-experiment data. |
+| **Sample Assignment** | Samples are assigned to a Process via `ELNProcessSample` (`status`: assigned / in_progress / …, optional `current_step_id`). Starting a step experiment uses **explicit select** from eligible process samples (**Decision #24**). Per-experiment cohort is `ExperimentSampleExecution`. |
 
 ### Process vs. Experiment
 
@@ -43,7 +43,7 @@ ELN Processes are first-class (distinct from LIMS run checklists). Definitions �
 | Tables | Definitions: `eln_process_definitions`, `eln_process_definition_steps`. Instances: `eln_processes`, `eln_process_steps`, `eln_process_samples`, `eln_process_step_lims_runs` (migrations `0047` + `0051`) |
 | API | `/v1/eln-process-definitions`, `/v1/eln-processes`, `GET /v1/samples/{id}/journey` |
 | Step kinds | `eln_experiment` (creates Experiment) · `lims_run` (lazy LimsRun + history; soft advance gates) |
-| UI | `/experiments/processes` — Instances + Definitions tabs; start step; sample dialog journey panel |
+| UI | `/experiments/processes` — Instances + Definitions tabs; start step; sample assign; journey panel. **Also:** Samples list (`/samples`) → select rows → **Assign to process** |
 | Permission | Manage: `experiment:manage`. Journey: sample visibility (RLS) |
 | Checklist | [`.docs/checklist/experiment-checklist.md`](../checklist/experiment-checklist.md) |
 
@@ -71,6 +71,23 @@ See [experiments.md](experiments.md) for `experiment_link` lineage and [checklis
 3. As work completes in one experiment, samples can be advanced/queued into subsequent experiments in the defined order.
 4. Per-experiment sample details (roles, conditions, replicates) continue to be tracked via `ExperimentSampleExecution`.
 5. The process provides visibility into overall progress across all its steps.
+
+### Starting work from a process (product target — Sapio-aligned)
+
+**Locked:** [open-questions Decision #24](../open-questions/experiments.md).
+
+1. Open the **process** instance.  
+2. Steps under an **accordion**.  
+3. **Click** step/experiment to start → **start dialog opens** (not a permanent experiment-detail panel).  
+4. **Dual list (primary; no barcode required):**
+   - **Available:** process samples with **Sample.status = Available for Testing**  
+   - **Selected:** empty → `<< < > >>` / search  
+   - Optional scan only for eligible samples  
+5. **Start** → create/start experiment instance + cohort; dialog **closes**.  
+6. **Process sample rows** for selected samples: `status = in_progress`, `current_step_id = this step`.  
+7. Experiment detail shows cohort as **read-only** (no add-samples UI).
+
+Nimble today: process assignment exists; cohort UI is still a standing panel on experiment detail without gates or process status updates.
 
 ### UI Requirements
 

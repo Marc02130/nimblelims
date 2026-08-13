@@ -40,10 +40,10 @@ When resolving: fill **Decision**, **Date**, **Owner**, and one line of **Ration
 | 5 | Workflow integration depth for Processes | **Decided (provisional)** | — | Phase 2 actions only: `create_process`, `add_step_to_process`, `assign_samples_to_process`, `instantiate_process_step`. No deep orchestration / gates. | 2026-07-11 | | Matches “new actions only” recommendation |
 | 6 | Reusable Process definitions (first-class) — shape and when? | **Decided** | Phase 3 implementation of process definitions | See **Decision #6** below. Processes are **always defined** (first-class reusable definitions). Experiments remain ad hoc **or** template-based. | 2026-07-11 | Product | Product rule: multi-step work is governed by a definition; single experiments stay flexible |
 | 7 | How is process progress / sample step surfaced to non-admin users? | **Decided** | Phase 3 journey UI | See **Decision #7** below. Progress is visible to anyone with access to the relevant samples; client isolation enforced (no cross-client progress). | 2026-07-11 | Product | Sample-scoped visibility, not manage-permission-only |
-| 8 | Should instantiate-step auto-create ExperimentSampleExecution rows for process samples? | **Open** | Phase 3 polish / sample journey | — Phase 2: assign at process level only; step instantiate creates Experiment + entries, does not auto-link all process samples into the experiment | | | |
+| 8 | Should instantiate-step auto-create ExperimentSampleExecution rows for process samples? | **Decided (refined)** | Start cohort / process journey | **No auto-link all process samples.** Start dialog requires **explicit selection**. Eligible set = process-assigned samples (when experiment is under a process) + gates in **Decision #24**. | 2026-08-12 | Product | Explicit select remains; eligibility replaces open scan |
 | 9 | Entry capture: who can edit values (experiment:manage only vs lab roles / status gates)? | **Decided** | Hardening / multi-role UX | See **Decision #9** below. **Lab personnel only** edit experimental / entry data. Clients do **not** edit lab data; if client ordering ships later, clients may **create orders** only. | 2026-07-11 | Product | Lab SoT for data integrity; ordering is a separate client capability |
 | 10 | Deprecate or coexist long-term with `ExperimentDetail` `experiment_link` lineage? | **Open** | Lineage cleanup (not Phase 3) | — Phase 1–3: **coexist** with ELN Processes. See explanation under **#10 notes** below. | | | |
-| 11 | Keep Protocol/Transfer tabs alongside Entries, or merge? | **Decided** (refined) | Template Entries P0 UI | **Entries are the product surface.** Transfer/aliquot **plan** = **`experiment_detail`** (columns: source, dest, volume/mass/conc, …). **Results** = following **`sample_data`**. Legacy Transfer Steps tab is transitional (sign-off/SOP only); robot worklist stays on `robot_worklist_configs`. Demote/hide Transfer tab as Entries ship. Protocol free-text optional. See **Decision #15**. | 2026-07-29 | Product | Transfer is experiment detail, not a parallel step list |
+| 11 | Keep Protocol/Transfer tabs alongside Entries, or merge? | **Decided** (refined 2026-08-11) | Template Entries UI | **Entries are the product surface.** Protocol / Transfer / Result Columns tabs **removed** from template UI (dev — never used in prod). Author **Tables & forms** only; save clears legacy arrays + `mandatory_review_count`. Aliquot plan = predefined entry. Robot worklist stays on `robot_worklist_configs`. See **Decision #15**. | 2026-07-29 / 08-11 | Product | Transfer is not a parallel step list |
 | 12 | Sample starting-table type: `sample_roster` vs `display_table`? | **Superseded** | — | Use **`sample_table`** substrate + sample_field columns; full catalog is Q17. | 2026-07-29 | Product | Building-block refine |
 | 13 | Sample system field allowlist for display columns? | **Decided** | Substrate | Server allowlist of Sample OOB + Path-1; fail closed. | 2026-07-29 | Architecture + Security | Projection safety |
 | 14 | Force sample picker at experiment create? | **Decided** | Start UX | **No** forced picker; empty until samples linked. Q8/Q22 for process path. | 2026-07-29 | Product | Progressive flow |
@@ -54,8 +54,9 @@ When resolving: fill **Decision**, **Date**, **Owner**, and one line of **Ration
 | 19 | How **plates** enter experiments? | **Open** | Sequencing/prep | — | | Lab Ops | Plate maps / NGS |
 | 20 | Entry **complete/submit** + unlock reason in v1? | **Open** | GxP habits | — | | Lab Ops + Security | Sapio submit/lock |
 | 21 | **Material/lot** tracking in v1 vs defer? | **Open** | Chemistry ops | — | | Lab Ops | Quality-sensitive labs |
-| 22 | Process→experiment sample fill (Q8) with Entries P0? | **Open** | Process labs | — | | Lab Ops + Eng | Multi-step SOPs |
+| 22 | Process→experiment sample fill (Q8) with Entries P0? | **Decided** | Start UX | See **Decision #24** — eligible queue dual-list + optional scan; status + process-sample gates. | 2026-08-12 | Product | Aligns Sapio start without barcode mandate |
 | 23 | Entry kinds + storage + grid/export access? | **Decided** | Substrate (all entry work) | See **Decision #23**. Kinds `experiment_sample_data` / `experiment_data`; storage `entries`+`entry_field_*`; grid wide + export long. | 2026-07-29 | Product + Eng | Locked in tech sketch §0 |
+| 24 | Cohort eligibility + start UX without mandatory barcode? | **Decided** | StartCohort / process start | See **Decision #24**. | 2026-08-12 | Product | Early labs lack scanners; dual-list is primary |
 
 **Template entries packet:** [tech-sketch §0 locked](../tech-sketch/experiment-template-entries.md) · [Lab Ops Hold on catalog](../lab-ops-review/experiment-template-entries.md) · substrate locked; full P0 still needs Q17+
 
@@ -310,7 +311,7 @@ When samples are brought into the experiment, **plan rows populate** from that s
 
 ### Legacy
 
-Transfer Steps tab / `transfer_steps` JSON: transitional (sign-off, SOP). Robot worklist: `robot_worklist_configs`.
+Transfer Steps tab / protocol / result-column authoring: **removed from UI** (2026-08-11). Save clears `transfer_steps` / `protocol_steps` / `result_columns` and `mandatory_review_count`. Robot worklist: `robot_worklist_configs`.
 
 ### Dev
 
@@ -355,12 +356,12 @@ Reuse `entries` / `entry_field_definitions` / `entry_field_values`. No new value
 
 | Kind | Rows |
 |------|------|
-| **`experiment_sample_data`** | One row per **sample in the experiment** (per entry). Many entries per experiment. |
-| **`experiment_data`** | Purpose-specific; rows **not automatic** (manual/code). Optional `sample_id` for subsets. |
+| **`experiment_sample_data`** | **Table**: one row per **sample in the experiment** (per entry). Many entries per experiment. |
+| **`experiment_data`** | **Table only** (no form): multi-row free rows via **`row_key`**. Experiment Header is this kind + predefined key. |
 
 ### Storage
 
-Logical kinds only (v1). Physical: `entries` + `entry_field_definitions` + `entry_field_values` with **typed value columns** (not a single JSON blob for the grid). `value_json` optional for complex fields. `entries.config` JSON for settings only.
+Logical kinds only. Physical: `entries` + `entry_field_definitions` + `entry_field_values` with **typed value columns** and **`row_key`** (migration `0057`). FieldDefinitions for entry columns use `entity_type` `experiment_sample_data` \| `experiment_data` (not Custom Fields on Sample/Test). `entries.config` JSON for settings / sample_columns / plan only.
 
 ### Access (locked APIs)
 
@@ -372,7 +373,112 @@ Logical kinds only (v1). Physical: `entries` + `entry_field_definitions` + `entr
 
 ### Still gated
 
-Predefined catalog, aliquot derivatives, plates, submit/lock, materials, process sample auto-link — Lab Ops Q17–Q22.
+Predefined catalog, aliquot derivatives, plates, submit/lock, materials — Lab Ops Q17–Q21. Cohort eligibility: **#24**.
+
+---
+
+## Decision #24 — Cohort eligibility + start UX (no barcode mandate)
+
+**Status:** Decided  
+**Date:** 2026-08-12  
+**Owner:** Product  
+**Implements later:** Start dialog + server gates on resolve/start  
+**Related:** `Sample.status`, `eln_process_samples`, [experiments.md](../manuals/experiments.md), [processes.md](../manuals/processes.md)
+
+### Problem
+
+Today `StartCohortPanel` accepts any resolvable plate/tube/sample (open scan). Labs already **assign samples to processes**. Without gates, experiments can start with samples that are not ready or not on the process. Many early / startup labs **do not barcode or scan** — start UX must work by mouse/keyboard only.
+
+### Eligibility gates (server-enforced on add / start)
+
+When adding samples to an experiment cohort (link or start):
+
+| Gate | Rule |
+|------|------|
+| **1. Sample status** | `Sample.status` must be **Available for Testing** (list `sample_status`). Other statuses → reject with clear error. |
+| **2. Process sample** | If the experiment is under an **ELN process step**, sample must have an **`eln_process_samples`** row for that process (status not `removed`). Not on process → reject. |
+| **3. Explicit select** | Never auto-link entire process; user selects 1..N from eligible set. |
+| **4. After start** | Cohort remains **locked** (existing rule). |
+
+**Ad hoc experiment (no process):** Gate **1** still applies. Gate **2** does not (no process membership). Optional later: project-scoped eligible list.
+
+**Scan / resolve:** If barcode resolves a sample that fails gates, do **not** add to selected cohort; show *why* (status / not on process). Optionally still show as ineligible for transparency.
+
+### Start UX — dual list is primary (Sapio-aligned); **start-only surface**
+
+**Where it appears (locked):**
+
+| Surface | Dual-list / start cohort UI? |
+|---------|------------------------------|
+| **Process accordion → click step/experiment to start** | **Yes** — modal/dialog opens with dual list → Start |
+| **Experiment detail (after create / after start)** | **No** — do **not** leave `StartCohortPanel` (or dual list) permanently on the experiment. Users would expect mid-flight adds. |
+| After successful Start | Dialog **closes**; experiment opens with cohort fixed; no add-samples control on detail |
+
+Rationale: cohort is locked after start. A persistent “add samples” panel on experiment detail trains the wrong mental model.
+
+**Primary control (required for non-barcode labs):**
+
+```
+Process accordion
+  └── click experiment/step “Start”
+        └── dialog (ephemeral):
+┌─────────────────────────────┐  << < > >>  ┌─────────────────────────────┐
+│ Available (eligible queue)  │ ──────────► │ Selected for this experiment│
+│ Filter / search             │ ◄────────── │ (starts empty)              │
+└─────────────────────────────┘             └─────────────────────────────┘
+     optional scan/paste → eligible only → Selected
+                        [ Start experiment ]  → dialog disappears
+```
+
+| Control | Behavior |
+|---------|----------|
+| **Available** | Eligible only (status + process gates). Process steps: process samples ready for this step when filtering is defined. |
+| **Selected** | Cohort to start (starts empty). |
+| **> / < / >> / <<** | Move highlighted / all (filtered) between lists. |
+| **Search / filter** | No scanner required. |
+| **Scan / paste (optional)** | Accelerator only; ineligible → error, not selected. |
+
+**Not required to start:** barcode hardware.
+
+**Ad hoc experiment (no process):** Same dual-list dialog at **first Start** (e.g. from “Start experiment” action), not a permanent tab panel. Eligible set without process = Available for Testing (scope: project / lab — implement detail). Still **not** a sticky panel on detail after start.
+
+### On Start — process sample status update (locked)
+
+When Start succeeds for an experiment that belongs to a **process step**:
+
+| Update | Rule |
+|--------|------|
+| **Cohort** | Selected samples → `ExperimentSampleExecution` + experiment `started_at`; cohort locked |
+| **Process sample status** | For each selected sample’s `eln_process_samples` row: set **`status = in_progress`** (or keep `in_progress` if already) |
+| **current_step_id** | Set to **this process step** for selected samples |
+| **Not selected** | Unchanged (remain `assigned` / prior status on process) |
+| **Sample.status** (global) | **Unchanged** by start — remains Available for Testing until lab workflow advances it elsewhere |
+
+Later (not this decision): complete step → process sample `completed` or advance to next step.
+
+### Is dual-list the best approach?
+
+| Approach | Verdict |
+|----------|---------|
+| **A. Dual list in start dialog** | **Primary — adopt** |
+| **B. Single checkbox table in same dialog** | OK dense variant |
+| **C. Scan-only permanent panel** | **Reject as sole path**; reject permanent panel on experiment detail |
+| **D. Auto-start all process samples** | **Reject** |
+
+### Today vs target
+
+| | Today | Target |
+|--|--------|--------|
+| Eligible set | Open scan | Available for Testing + process membership |
+| Primary UX | Persistent `StartCohortPanel` on experiment detail | **Ephemeral start dialog** (process accordion click); then gone |
+| Process sample status on start | Not updated | **`in_progress` + `current_step_id`** for selected |
+| Mid-flight add UI | Panel suggests adds possible | **No add UI** after start |
+
+### Open for implement (non-blocking product)
+
+- Exact process-step filter for Available: all process samples vs only those with `current_step_id` null/this step / status `assigned`.
+- Whether “Available for Testing” is hard-coded name or configurable status id(s).
+- Ad hoc experiment: where “Start” is launched (list action vs empty state once).
 
 ---
 

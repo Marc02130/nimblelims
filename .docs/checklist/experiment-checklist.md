@@ -159,6 +159,7 @@ Legacy `experiment_link` via `ExperimentDetail` **coexists** in Phase 1; no forc
 - [x] Types + grid/export/save/submit APIs (`experiment_sample_data` / `experiment_data` + aliases)
 - [x] Write-back map (submit only, SAMPLE_WRITE_BACK_COLUMNS allowlist)
 - [x] Template UI: Tables & forms tab (entries, columns, sample RO fields, write-back map)
+- [x] Template UI: **remove** Protocol Steps / Transfer Steps / Result Columns tabs + transfer sign-off gate (entries-only authoring; new templates seed Header + Samples)
 - [x] Capture UI: Save (draft) + Submit (write-back) on EntryCapturePanel
 - [x] Queue + scan plate/tube + start experiment (resolve-scan, start, cohort lock UI)
 - [x] Header + Samples predefined (keys + template presets + instantiate defaults)
@@ -167,7 +168,16 @@ Legacy `experiment_link` via `ExperimentDetail` **coexists** in Phase 1; no forc
 - [x] Queue/start for LIMS run (cohort + scan UI; locked at start; migration 0056)
 - [x] Template UI: entry dependencies (`depends_on`) + submit gate
 - [x] Aliquot plan editor UI (method-driven columns + pool group)
+- [x] Experiment data = multi-row **table** only (`row_key`, migration `0057`; no form layout)
+- [x] Template **Create field** for entry FieldDefinitions (`entity_type` experiment_sample_data \| experiment_data; not Custom Fields DB entities)
+- [x] Docs: experiments/processes manuals + start cohort Sapio-aligned product target
 - [ ] UAT spine demo end-to-end
+- [x] **Decision #24** start cohort (ephemeral dialog, not experiment-detail panel):
+  - [x] Dual-list Available ↔ Selected (`StartExperimentDialog`) from process **Start** (dialog closes after Start)
+  - [x] Removed permanent `StartCohortPanel` on experiment detail; ad hoc start is one-shot dialog only
+  - [x] Gates: Sample.status=Available for Testing + process sample membership; scan optional (eligible only)
+  - [x] On Start: set selected `eln_process_samples` → `status=in_progress`, `current_step_id=this step`
+  - [x] Server enforce eligibility on resolve-scan / start / link-sample; `GET .../eligible-samples`
 
 ---
 

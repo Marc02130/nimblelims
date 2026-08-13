@@ -195,11 +195,22 @@ def start_step(
     data: ELNProcessStepInstantiateRequest = ELNProcessStepInstantiateRequest(),
     service: ELNProcessService = Depends(get_service),
 ):
-    """Start step: create Experiment or lazy LimsRun (typed steps, Decision #1)."""
+    """Start step: create Experiment or lazy LimsRun; optional sample_ids start cohort (#24)."""
     return service.instantiate_step(process_id, step_id, data)
 
 
 # ---------- Samples ----------
+
+
+@router.get("/{process_id}/steps/{step_id}/eligible-samples")
+def list_eligible_samples_for_step(
+    process_id: UUID,
+    step_id: UUID,
+    service: ELNProcessService = Depends(get_service),
+):
+    """Decision #24: samples available for dual-list start dialog (Available for Testing + on process)."""
+    rows = service.list_eligible_for_step(process_id, step_id)
+    return {"samples": rows, "total": len(rows)}
 
 
 @router.get("/{process_id}/samples", response_model=List[ELNProcessSampleRead])

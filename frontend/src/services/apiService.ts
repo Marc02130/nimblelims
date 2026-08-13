@@ -1375,9 +1375,12 @@ export class ApiService {
     return response.data;
   }
 
-  /** Resolve plate/tube barcode or client_sample_id to samples for queue start. */
-  async resolveExperimentScan(barcode: string) {
-    const response: AxiosResponse = await this.api.post('v1/experiments/resolve-scan', { barcode });
+  /** Resolve plate/tube barcode or client_sample_id; optional process_id for eligibility (#24). */
+  async resolveExperimentScan(barcode: string, opts?: { process_id?: string }) {
+    const response: AxiosResponse = await this.api.post('v1/experiments/resolve-scan', {
+      barcode,
+      process_id: opts?.process_id,
+    });
     return response.data as {
       barcode: string;
       match_type: 'container' | 'sample' | 'none';
@@ -1389,12 +1392,15 @@ export class ApiService {
         sample_name?: string;
         container_id?: string;
         container_name?: string;
+        eligible?: boolean;
+        ineligible_reason?: string;
       }>;
       total: number;
+      eligible_total?: number;
     };
   }
 
-  /** Link cohort samples and start experiment (locks cohort). */
+  /** Link cohort samples and start experiment (locks cohort; Decision #24 gates). */
   async startExperiment(experimentId: string, data: { sample_ids: string[]; set_started_at?: boolean }) {
     const response: AxiosResponse = await this.api.post(`v1/experiments/${experimentId}/start`, data);
     return response.data as {
@@ -1402,6 +1408,7 @@ export class ApiService {
       linked_count: number;
       already_linked_count: number;
       cohort_locked: boolean;
+      process_samples_updated?: number;
     };
   }
 
@@ -1557,11 +1564,11 @@ export class ApiService {
     return response.data;
   }
 
-  /** Start/materialize a step (Experiment or lazy LimsRun). */
+  /** Start/materialize a step (Experiment or lazy LimsRun); sample_ids start cohort (Decision #24). */
   async startElnProcessStep(
     processId: string,
     stepId: string,
-    data?: { name?: string; force_new?: boolean },
+    data?: { name?: string; force_new?: boolean; sample_ids?: string[] },
   ) {
     const response: AxiosResponse = await this.api.post(
       `v1/eln-processes/${processId}/steps/${stepId}/start`,
@@ -1574,9 +1581,21 @@ export class ApiService {
   async instantiateElnProcessStep(
     processId: string,
     stepId: string,
-    data?: { name?: string; force_new?: boolean },
+    data?: { name?: string; force_new?: boolean; sample_ids?: string[] },
   ) {
     return this.startElnProcessStep(processId, stepId, data);
+  }
+
+  async getElnProcessStepEligibleSamples(processId: string, stepId: string) {
+    const response: AxiosResponse = await this.api.get(
+      `v1/eln-processes/${processId}/steps/${stepId}/eligible-samples`,
+    );
+    return response.data;
+  }
+
+  async getCohortEligibleSamples() {
+    const response: AxiosResponse = await this.api.get('v1/experiments/cohort-eligible-samples');
+    return response.data;
   }
 
   async getElnProcessSamples(
@@ -1789,6 +1808,7 @@ export class ApiService {
     values: Array<{
       field_definition_id: string;
       sample_id?: string;
+      row_key?: string;
       value_text?: string;
       value_number?: number;
       value_list_entry_id?: string;
@@ -1801,6 +1821,13 @@ export class ApiService {
     const response: AxiosResponse = await this.api.put(`v1/entries/${entryId}/values`, {
       values,
     });
+    return response.data;
+  }
+
+  async deleteEntryRow(entryId: string, rowKey: string) {
+    const response: AxiosResponse = await this.api.delete(
+      `v1/entries/${entryId}/rows/${encodeURIComponent(rowKey)}`,
+    );
     return response.data;
   }
 

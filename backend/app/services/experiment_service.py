@@ -29,6 +29,11 @@ from models.experiment import ExperimentTemplate, Experiment, ExperimentDetail, 
 from models.container import Container, Contents
 from models.sample import Sample
 from models.user import User
+from models.list import List as ListModel, ListEntry
+from models.entry import ELNProcessStep, ELNProcessSample
+
+# Decision #24 — sample must be Available for Testing (list entry name)
+AVAILABLE_FOR_TESTING_STATUS_NAME = "Available for Testing"
 
 
 class ExperimentService:
@@ -48,6 +53,144 @@ class ExperimentService:
 
     def _user_id(self) -> Optional[UUID]:
         return self.current_user.id if self.current_user else None
+
+    def _available_for_testing_status_ids(self) -> set:
+        """ListEntry ids whose name is Available for Testing (prefer sample_status list)."""
+        q = (
+            self.db.query(ListEntry.id)
+            .join(ListModel, ListModel.id == ListEntry.list_id)
+            .filter(ListEntry.name == AVAILABLE_FOR_TESTING_STATUS_NAME)
+        )
+        ids = {row[0] for row in q.all()}
+        return ids
+
+    def _sample_status_name(self, sample: Sample) -> Optional[str]:
+        if not sample.status:
+            return None
+        le = self.db.query(ListEntry).filter(ListEntry.id == sample.status).first()
+        return le.name if le else None
+
+    def check_sample_eligibility(
+        self,
+        sample: Sample,
+        *,
+        process_id: Optional[UUID] = None,
+    ) -> Tuple[bool, Optional[str]]:
+        """
+        Decision #24 gates.
+        Returns (eligible, reason_if_not).
+        """
+        available_ids = self._available_for_testing_status_ids()
+        if not available_ids:
+            return False, (
+                f"System list entry '{AVAILABLE_FOR_TESTING_STATUS_NAME}' is not configured"
+            )
+        if sample.status not in available_ids:
+            name = self._sample_status_name(sample) or "unknown"
+            return False, (
+                f"Sample status must be '{AVAILABLE_FOR_TESTING_STATUS_NAME}' "
+                f"(current: {name})"
+            )
+        if process_id is not None:
+            ps = (
+                self.db.query(ELNProcessSample)
+                .filter(
+                    ELNProcessSample.process_id == process_id,
+                    ELNProcessSample.sample_id == sample.id,
+                )
+                .first()
+            )
+            if not ps or ps.status == "removed":
+                return False, "Sample is not assigned to this process"
+        return True, None
+
+    def _process_step_for_experiment(self, experiment_id: UUID) -> Optional[ELNProcessStep]:
+        return (
+            self.db.query(ELNProcessStep)
+            .filter(ELNProcessStep.experiment_id == experiment_id)
+            .first()
+        )
+
+    def _annotate_scan_sample(
+        self,
+        sample: Sample,
+        *,
+        container_id: Optional[UUID] = None,
+        container_name: Optional[str] = None,
+        process_id: Optional[UUID] = None,
+    ) -> ResolveScanSample:
+        eligible, reason = self.check_sample_eligibility(sample, process_id=process_id)
+        return ResolveScanSample(
+            sample_id=sample.id,
+            client_sample_id=getattr(sample, "client_sample_id", None),
+            sample_name=getattr(sample, "name", None),
+            container_id=container_id,
+            container_name=container_name,
+            eligible=eligible,
+            ineligible_reason=None if eligible else reason,
+        )
+
+    def list_cohort_eligible_for_process(
+        self,
+        process_id: UUID,
+        step_id: Optional[UUID] = None,
+    ) -> List[Dict[str, Any]]:
+        """Eligible process samples for start dialog (status + not removed)."""
+        available_ids = self._available_for_testing_status_ids()
+        q = (
+            self.db.query(ELNProcessSample, Sample)
+            .join(Sample, Sample.id == ELNProcessSample.sample_id)
+            .filter(
+                ELNProcessSample.process_id == process_id,
+                ELNProcessSample.status != "removed",
+            )
+        )
+        if available_ids:
+            q = q.filter(Sample.status.in_(available_ids))
+        # Prefer samples at this step or not yet placed (null current_step) or assigned
+        rows = q.order_by(ELNProcessSample.assigned_at).all()
+        out: List[Dict[str, Any]] = []
+        for ps, sample in rows:
+            if step_id is not None:
+                # Eligible if not locked to a different step as completed elsewhere
+                # Allow: current_step null, or current_step == this step, or status assigned
+                if (
+                    ps.current_step_id is not None
+                    and ps.current_step_id != step_id
+                    and ps.status == "completed"
+                ):
+                    continue
+            out.append({
+                "sample_id": sample.id,
+                "client_sample_id": sample.client_sample_id,
+                "sample_name": sample.name,
+                "process_sample_status": ps.status,
+                "current_step_id": ps.current_step_id,
+            })
+        return out
+
+    def list_cohort_eligible_ad_hoc(self, limit: int = 200) -> List[Dict[str, Any]]:
+        """Ad hoc experiment: Available for Testing samples (no process)."""
+        available_ids = self._available_for_testing_status_ids()
+        if not available_ids:
+            return []
+        samples = (
+            self.db.query(Sample)
+            .filter(Sample.active == True, Sample.status.in_(available_ids))  # noqa: E712
+            .order_by(Sample.created_at.desc())
+            .limit(limit)
+            .all()
+        )
+        return [
+            {
+                "sample_id": s.id,
+                "client_sample_id": s.client_sample_id,
+                "sample_name": s.name,
+                "process_sample_status": None,
+                "current_step_id": None,
+            }
+            for s in samples
+        ]
 
     def _commit_refresh(self, *objects: Any) -> None:
         """Flush so IDs are set; refresh objects; commit only if auto_commit (False when used from workflow)."""
@@ -264,6 +407,11 @@ class ExperimentService:
         sample = self.repo.get_sample_by_id(data.sample_id)
         if not sample:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sample not found")
+        process_step = self._process_step_for_experiment(experiment_id)
+        process_id = process_step.process_id if process_step else None
+        ok, reason = self.check_sample_eligibility(sample, process_id=process_id)
+        if not ok:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=reason)
         existing = self.repo.find_execution(
             experiment_id=experiment_id,
             sample_id=data.sample_id,
@@ -294,6 +442,7 @@ class ExperimentService:
         barcode = (data.barcode or "").strip()
         if not barcode:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="barcode is required")
+        process_id = data.process_id
 
         # Prefer exact container name match (plate → all contents; tube → contents, may be pool)
         container = (
@@ -314,13 +463,16 @@ class ExperimentService:
                     continue
                 seen.add(c.sample_id)
                 sample = self.repo.get_sample_by_id(c.sample_id)
-                samples_out.append(ResolveScanSample(
-                    sample_id=c.sample_id,
-                    client_sample_id=getattr(sample, 'client_sample_id', None) if sample else None,
-                    sample_name=getattr(sample, 'name', None) if sample else None,
-                    container_id=container.id,
-                    container_name=container.name,
-                ))
+                if not sample:
+                    continue
+                samples_out.append(
+                    self._annotate_scan_sample(
+                        sample,
+                        container_id=container.id,
+                        container_name=container.name,
+                        process_id=process_id,
+                    )
+                )
             return ResolveScanResponse(
                 barcode=barcode,
                 match_type='container',
@@ -328,6 +480,7 @@ class ExperimentService:
                 container_name=container.name,
                 samples=samples_out,
                 total=len(samples_out),
+                eligible_total=sum(1 for s in samples_out if s.eligible),
             )
 
         # Fallback: client_sample_id or sample name
@@ -343,15 +496,13 @@ class ExperimentService:
                 .first()
             )
         if sample:
+            row = self._annotate_scan_sample(sample, process_id=process_id)
             return ResolveScanResponse(
                 barcode=barcode,
                 match_type='sample',
-                samples=[ResolveScanSample(
-                    sample_id=sample.id,
-                    client_sample_id=sample.client_sample_id,
-                    sample_name=sample.name,
-                )],
+                samples=[row],
                 total=1,
+                eligible_total=1 if row.eligible else 0,
             )
 
         return ResolveScanResponse(
@@ -359,6 +510,7 @@ class ExperimentService:
             match_type='none',
             samples=[],
             total=0,
+            eligible_total=0,
         )
 
     def start_experiment(
@@ -409,6 +561,9 @@ class ExperimentService:
                         ),
                     )
 
+        process_step = self._process_step_for_experiment(experiment_id)
+        process_id = process_step.process_id if process_step else None
+
         linked = 0
         already = 0
         for sid in sample_ids:
@@ -417,6 +572,12 @@ class ExperimentService:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail=f"Sample {sid} not found",
+                )
+            ok, reason = self.check_sample_eligibility(sample, process_id=process_id)
+            if not ok:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Sample {sid}: {reason}",
                 )
             existing = self.repo.find_execution(
                 experiment_id=experiment_id,
@@ -449,6 +610,26 @@ class ExperimentService:
                 modified_by=self._user_id(),
             )
 
+        # Decision #24: update process sample status for selected cohort
+        process_samples_updated = 0
+        if process_step is not None:
+            for sid in sample_ids:
+                ps = (
+                    self.db.query(ELNProcessSample)
+                    .filter(
+                        ELNProcessSample.process_id == process_step.process_id,
+                        ELNProcessSample.sample_id == sid,
+                    )
+                    .first()
+                )
+                if not ps or ps.status == "removed":
+                    continue
+                ps.status = "in_progress"
+                ps.current_step_id = process_step.id
+                ps.modified_by = self._user_id()
+                process_samples_updated += 1
+            self.db.flush()
+
         self._commit_refresh(experiment)
         full = self.get_experiment(experiment_id, load_details=True, load_sample_executions=True)
         return StartExperimentResponse(
@@ -456,6 +637,7 @@ class ExperimentService:
             linked_count=linked,
             already_linked_count=already,
             cohort_locked=full.started_at is not None,
+            process_samples_updated=process_samples_updated,
         )
 
     # ---------- Link experiments (store as detail type experiment_link) ----------

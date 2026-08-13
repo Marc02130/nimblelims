@@ -6,15 +6,24 @@ import {
   Dialog,
   DialogTitle,
   DialogContent,
+  DialogActions,
+  DialogContentText,
   Alert,
   CircularProgress,
   Tooltip,
   Chip,
   Divider,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  FormControlLabel,
+  Checkbox,
 } from '@mui/material';
-import { DataGrid, GridColDef, GridActionsCellItem } from '@mui/x-data-grid';
+import { DataGrid, GridColDef, GridActionsCellItem, GridRowSelectionModel } from '@mui/x-data-grid';
 import EditIcon from '@mui/icons-material/Edit';
 import VisibilityIcon from '@mui/icons-material/Visibility';
+import AccountTreeIcon from '@mui/icons-material/AccountTree';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import SampleForm from '../components/samples/SampleForm';
 import { apiService, addClientFilterIfNeeded } from '../services/apiService';
@@ -83,7 +92,23 @@ const SamplesManagement: React.FC = () => {
     projects: [],
   });
 
+  // Assign selected samples to an ELN process (MUI X v8 selection model)
+  const [rowSelection, setRowSelection] = useState<GridRowSelectionModel>({
+    type: 'include',
+    ids: new Set(),
+  });
+  const [assignOpen, setAssignOpen] = useState(false);
+  const [processes, setProcesses] = useState<{ id: string; name: string }[]>([]);
+  const [assignProcessId, setAssignProcessId] = useState('');
+  const [assignToFirstStep, setAssignToFirstStep] = useState(true);
+  const [assignLoading, setAssignLoading] = useState(false);
+  const [assignError, setAssignError] = useState<string | null>(null);
+  const [assignSuccess, setAssignSuccess] = useState<string | null>(null);
+
   const canUpdate = hasPermission('sample:update');
+  const canManageProcesses = hasPermission('experiment:manage');
+  const selectedIds = Array.from(rowSelection.ids).map(String);
+  const selectedCount = selectedIds.length;
 
   useEffect(() => {
     loadData();
@@ -239,6 +264,58 @@ const SamplesManagement: React.FC = () => {
     }
   };
 
+  const openAssignDialog = async () => {
+    if (!selectedCount) {
+      setError('Select one or more samples to assign to a process');
+      return;
+    }
+    setAssignError(null);
+    setAssignProcessId('');
+    setAssignToFirstStep(true);
+    setAssignOpen(true);
+    try {
+      const res: any = await apiService.getElnProcesses({ active: true, page: 1, size: 100 });
+      const items = res?.items ?? res?.processes ?? (Array.isArray(res) ? res : []);
+      setProcesses(
+        items.map((p: any) => ({
+          id: p.id,
+          name: p.name + (p.sample_count != null ? ` (${p.sample_count} samples)` : ''),
+        })),
+      );
+    } catch (err: any) {
+      setAssignError(err.response?.data?.detail || 'Failed to load processes');
+      setProcesses([]);
+    }
+  };
+
+  const handleAssignToProcess = async () => {
+    if (!assignProcessId || !selectedCount) return;
+    setAssignLoading(true);
+    setAssignError(null);
+    try {
+      await apiService.assignElnProcessSamples(assignProcessId, {
+        sample_ids: selectedIds,
+        set_to_first_step: assignToFirstStep,
+      });
+      setAssignOpen(false);
+      setRowSelection({ type: 'include', ids: new Set() });
+      setAssignSuccess(
+        `Assigned ${selectedIds.length} sample${selectedIds.length === 1 ? '' : 's'} to the process`,
+      );
+    } catch (err: any) {
+      const detail = err.response?.data?.detail;
+      setAssignError(
+        typeof detail === 'string'
+          ? detail
+          : Array.isArray(detail)
+            ? detail.map((d: any) => d.msg || d).join('; ')
+            : 'Failed to assign samples (they may already be on this process)',
+      );
+    } finally {
+      setAssignLoading(false);
+    }
+  };
+
   const columns: GridColDef[] = [
     { field: 'name', headerName: 'Name', width: 200, flex: 1 },
     { 
@@ -308,15 +385,28 @@ const SamplesManagement: React.FC = () => {
     <FillHeightPage
       header={
         <>
-          <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+          <Box display="flex" justifyContent="space-between" alignItems="center" mb={2} flexWrap="wrap" gap={1}>
             <Typography variant="h4">Samples Management</Typography>
-            <Button
-              variant="contained"
-              onClick={() => navigate('/accessioning')}
-              aria-label="Navigate to accessioning form"
-            >
-              Create Sample
-            </Button>
+            <Box display="flex" gap={1} flexWrap="wrap">
+              {canManageProcesses && (
+                <Button
+                  variant="outlined"
+                  startIcon={<AccountTreeIcon />}
+                  onClick={() => void openAssignDialog()}
+                  disabled={selectedCount === 0}
+                  aria-label="Assign selected samples to a process"
+                >
+                  Assign to process{selectedCount > 0 ? ` (${selectedCount})` : ''}
+                </Button>
+              )}
+              <Button
+                variant="contained"
+                onClick={() => navigate('/accessioning')}
+                aria-label="Navigate to accessioning form"
+              >
+                Create Sample
+              </Button>
+            </Box>
           </Box>
 
           {error && (
@@ -324,11 +414,22 @@ const SamplesManagement: React.FC = () => {
               {error}
             </Alert>
           )}
+          {assignSuccess && (
+            <Alert severity="success" sx={{ mb: 2 }} onClose={() => setAssignSuccess(null)}>
+              {assignSuccess}
+            </Alert>
+          )}
 
           {!canUpdate && (
             <Alert severity="info" sx={{ mb: 2 }}>
               You have read-only access. Contact your administrator for update permissions.
             </Alert>
+          )}
+          {canManageProcesses && selectedCount === 0 && (
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+              Select one or more rows, then <strong>Assign to process</strong> to put samples on an ELN
+              process queue.
+            </Typography>
           )}
         </>
       }
@@ -348,10 +449,78 @@ const SamplesManagement: React.FC = () => {
                 paginationModel: { page: 0, pageSize: 25 },
               },
             }}
+            checkboxSelection={canManageProcesses}
+            rowSelectionModel={rowSelection}
+            onRowSelectionModelChange={(m) => setRowSelection(m)}
             disableRowSelectionOnClick
           />
         </FillHeightTable>
       )}
+
+      {/* Assign to process dialog */}
+      <Dialog
+        open={assignOpen}
+        onClose={() => !assignLoading && setAssignOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Assign samples to process</DialogTitle>
+        <DialogContent>
+          <DialogContentText sx={{ mb: 2 }}>
+            Assign <strong>{selectedCount}</strong> selected sample
+            {selectedCount === 1 ? '' : 's'} to an ELN process. They become available in that
+            process queue when starting experiments (status Available for Testing required at start).
+          </DialogContentText>
+          {assignError && (
+            <Alert severity="error" sx={{ mb: 2 }} onClose={() => setAssignError(null)}>
+              {assignError}
+            </Alert>
+          )}
+          <FormControl fullWidth margin="normal" required>
+            <InputLabel>Process</InputLabel>
+            <Select
+              label="Process"
+              value={assignProcessId}
+              onChange={(e) => setAssignProcessId(e.target.value)}
+              disabled={assignLoading}
+            >
+              {processes.length === 0 ? (
+                <MenuItem value="" disabled>
+                  No active processes — create one under Experiments → Processes
+                </MenuItem>
+              ) : (
+                processes.map((p) => (
+                  <MenuItem key={p.id} value={p.id}>
+                    {p.name}
+                  </MenuItem>
+                ))
+              )}
+            </Select>
+          </FormControl>
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={assignToFirstStep}
+                onChange={(e) => setAssignToFirstStep(e.target.checked)}
+                disabled={assignLoading}
+              />
+            }
+            label="Set current step to first process step"
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setAssignOpen(false)} disabled={assignLoading}>
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            onClick={() => void handleAssignToProcess()}
+            disabled={assignLoading || !assignProcessId}
+          >
+            {assignLoading ? 'Assigning…' : 'Assign'}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Sample Form Dialog */}
       <Dialog

@@ -4,7 +4,7 @@
 
 **Optional:** `ANTHROPIC_API_KEY` set on the backend for end-to-end SOP extraction. Without it, SOP jobs should fail with a clear error — still valid UAT for configuration and UX.
 
-**Objective:** Verify experiment template CRUD, navigation, mandatory review sign-off, activation rules, RBAC, and (when configured) SOP upload → apply → pre-filled edit dialog.
+**Objective:** Verify experiment template CRUD, **Tables & forms (entries)** authoring, activation, RBAC, and (when configured) SOP upload → apply → review dialog.
 
 ---
 
@@ -20,61 +20,53 @@
 
 ---
 
-## 2. Manual template create & edit
+## 2. Manual template create & edit (entries)
 
 | Step | Action | Expected Result |
 |------|--------|-----------------|
-| 2.1 | Click **New Template** | Dialog opens with tabs (e.g. Basic Info, Protocol Steps, Transfer Steps, Result Columns). |
-| 2.2 | Leave outer **name** empty, try Save | Save disabled or validation prevents submit until required fields satisfied. |
-| 2.3 | Fill **name** (outer), **experiment name** (in definition), add at least one protocol step, save | Template created; appears in grid; no raw JSON required in UI. |
-| 2.4 | Click **Edit** on the row | Dialog opens with existing data; save updates template. |
-| 2.5 | Add a transfer step with **Requires sign-off before activation** checked | Save; row shows pending sign-offs chip / non-zero mandatory review count. |
-| 2.6 | **Active** toggle on row | Disabled (or blocked) while mandatory reviews pending; tooltip mentions sign-off if implemented. |
+| 2.1 | Click **New Template** | Dialog opens with **two** tabs only: **Basic Info** and **Tables & forms**. No Protocol Steps, Transfer Steps, or Result Columns. |
+| 2.2 | Open **Tables & forms** | Pre-seeded with **Experiment header** and **Samples** presets (or equivalent spine). |
+| 2.3 | Leave outer **name** empty, try Save | Save disabled or validation prevents submit until required fields satisfied. |
+| 2.4 | Fill **name** (outer), **experiment name** (Basic Info), ensure at least one entry with name + type, save | Template created; grid shows entry count under **Tables & forms** column; no raw JSON required. |
+| 2.5 | Click **Edit** on the row | Dialog opens; Tables & forms shows existing entries; save updates template. |
+| 2.6 | Add **Aliquot/pool plan** (and optionally Aliquots/pools results) via presets; save | Entries persisted; experiment created from this template later instantiates them. |
+| 2.7 | Remove all entries and try Save | Validation error on Tables & forms: at least one entry required. |
+| 2.8 | **Active** toggle on row | Can toggle on/off without sign-off dialog (no transfer mandatory-review gate). |
 
 ---
 
-## 3. Sign-off & activation
+## 3. Delete
 
 | Step | Action | Expected Result |
 |------|--------|-----------------|
-| 3.1 | Click pending sign-offs chip (or equivalent control) | Sign-off dialog opens listing mandatory transfer steps. |
-| 3.2 | Confirm **one** step, try closing dialog | Warning about unconfirmed steps if closing without completing all. |
-| 3.3 | Confirm **each** remaining step individually (no single “confirm all”) | After all confirmed, complete action saves template with reviews cleared / count zero. |
-| 3.4 | **Active** toggle | Can be turned on when sign-offs complete. |
+| 3.1 | Delete a template (with confirmation) | Template removed from list or soft-deleted per product rules; no server 500. |
 
 ---
 
-## 4. Delete
+## 4. Upload SOP (AI) — when `ANTHROPIC_API_KEY` is set
 
 | Step | Action | Expected Result |
 |------|--------|-----------------|
-| 4.1 | Delete a template (with confirmation) | Template removed from list or soft-deleted per product rules; no server 500. |
+| 4.1 | Open **Upload SOP** (or equivalent) | Dialog requires **two** files: SOP + instrument CSV. |
+| 4.2 | Submit both files | Job starts; progress or polling UI; status moves toward complete or failed. |
+| 4.3 | On **complete**, apply | Apply creates template; edit dialog opens; review **Tables & forms** (entries may need manual authoring if extract only filled legacy keys). |
+| 4.4 | Save template | Legacy protocol/transfer arrays cleared; `mandatory_review_count` 0; activation not blocked. |
+| 4.5 | Apply again same job | 409 or idempotent handling — user not left with duplicate templates without warning. |
 
 ---
 
-## 5. Upload SOP (AI) — when `ANTHROPIC_API_KEY` is set
+## 5. Upload SOP — without API key (negative / config)
 
 | Step | Action | Expected Result |
 |------|--------|-----------------|
-| 5.1 | Open **Upload SOP** (or equivalent) | Dialog requires **two** files: SOP + instrument CSV. |
-| 5.2 | Submit both files | Job starts; progress or polling UI; status moves toward complete or failed. |
-| 5.3 | On **complete**, apply | Apply creates template (and related records); list refreshes; edit dialog can open with SOP-highlighted fields. |
-| 5.4 | Apply again same job | 409 or idempotent handling — user not left with duplicate templates without warning. |
-
----
-
-## 6. Upload SOP — without API key (negative / config)
-
-| Step | Action | Expected Result |
-|------|--------|-----------------|
-| 6.1 | With `ANTHROPIC_API_KEY` empty, run upload | Job fails with explicit configuration/error message; **Fill in manually** or similar path available. |
+| 5.1 | With `ANTHROPIC_API_KEY` empty, run upload | Job fails with explicit configuration/error message; **Fill in Manually** or similar path available. |
 
 ---
 
 ## Pass criteria
 
 - All RBAC steps behave as expected for Admin / Lab Manager / Lab Tech vs Client.
-- Manual CRUD and sign-off/activation rules work without console errors.
+- Manual CRUD is **entries-only** (Basic Info + Tables & forms); activation works without transfer sign-off.
 - SOP flow matches backend contract (two files, poll, apply) when key is set; degrades clearly when not.
 
 ---
