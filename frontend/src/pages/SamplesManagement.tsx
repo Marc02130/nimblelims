@@ -29,6 +29,7 @@ import SampleForm from '../components/samples/SampleForm';
 import { apiService, addClientFilterIfNeeded } from '../services/apiService';
 import { useUser } from '../contexts/UserContext';
 import { FillHeightPage, FillHeightTable } from '../components/common/FillHeightPage';
+import ListFilterChips from '../components/common/ListFilterChips';
 
 interface JourneyItem {
   process_id: string;
@@ -69,7 +70,8 @@ interface LookupItem {
 const SamplesManagement: React.FC = () => {
   const { hasPermission, user } = useUser();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const statusFilter = searchParams.get('status') || '';
   const [samples, setSamples] = useState<Sample[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -431,6 +433,25 @@ const SamplesManagement: React.FC = () => {
               process queue.
             </Typography>
           )}
+
+          <ListFilterChips
+            label="Status"
+            value={statusFilter}
+            onChange={(value) => {
+              const next = new URLSearchParams(searchParams);
+              if (value) next.set('status', value);
+              else next.delete('status');
+              // Keep other params (project_id, highlight, …)
+              setSearchParams(next);
+              setRowSelection({ type: 'include', ids: new Set() });
+            }}
+            options={lookupData.statuses.map((s) => ({
+              value: s.id,
+              label: s.name,
+            }))}
+            allLabel="All"
+            disabled={loading}
+          />
         </>
       }
     >
@@ -468,8 +489,8 @@ const SamplesManagement: React.FC = () => {
         <DialogContent>
           <DialogContentText sx={{ mb: 2 }}>
             Assign <strong>{selectedCount}</strong> selected sample
-            {selectedCount === 1 ? '' : 's'} to an ELN process. They become available in that
-            process queue when starting experiments (status Available for Testing required at start).
+            {selectedCount === 1 ? '' : 's'} to an ELN process as <strong>queued</strong>. Sample
+            lab status is unchanged — start still requires <strong>Available for Testing</strong>.
           </DialogContentText>
           {assignError && (
             <Alert severity="error" sx={{ mb: 2 }} onClose={() => setAssignError(null)}>

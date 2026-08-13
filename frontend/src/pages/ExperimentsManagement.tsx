@@ -49,6 +49,7 @@ import { useUser } from '../contexts/UserContext';
 import EntryCapturePanel from '../components/experiments/EntryCapturePanel';
 import StartExperimentDialog from '../components/experiments/StartExperimentDialog';
 import { FillHeightPage, FillHeightTable } from '../components/common/FillHeightPage';
+import ListFilterChips from '../components/common/ListFilterChips';
 
 const apiErrorMsg = (err: any, fallback: string): string => {
   const detail = err?.response?.data?.detail;
@@ -179,12 +180,13 @@ const ExperimentsManagement: React.FC = () => {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
+  /** URL-synced filters (list-page-search stack: D) */
+  const statusFilter = searchParams.get('status') || '';
   const mineFilter = searchParams.get('mine') === 'true';
   const [view, setView] = useState<'list' | 'detail'>('list');
   const [experiments, setExperiments] = useState<ExperimentListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [statusFilter, setStatusFilter] = useState<string>('');
   const [templateFilter, setTemplateFilter] = useState<string>('');
   const [nameSearch, setNameSearch] = useState('');
   const [templates, setTemplates] = useState<{ id: string; name: string }[]>([]);
@@ -205,6 +207,16 @@ const ExperimentsManagement: React.FC = () => {
   const [showStartDialog, setShowStartDialog] = useState(false);
 
   const canManage = hasPermission('experiment:manage');
+
+  const patchListParams = (patch: Record<string, string | null>) => {
+    const next = new URLSearchParams(searchParams);
+    Object.entries(patch).forEach(([key, val]) => {
+      if (val == null || val === '') next.delete(key);
+      else next.set(key, val);
+    });
+    setSearchParams(next);
+    setPagination((p) => ({ ...p, page: 1 }));
+  };
 
   useEffect(() => {
     if (id && id !== 'new') {
@@ -713,7 +725,7 @@ const ExperimentsManagement: React.FC = () => {
             </Alert>
           )}
 
-          <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+          <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center', mb: 1 }}>
             <TextField
               size="small"
               label="Search by name"
@@ -721,27 +733,15 @@ const ExperimentsManagement: React.FC = () => {
               onChange={(e) => setNameSearch(e.target.value)}
               sx={{ minWidth: 200 }}
             />
-            <FormControl size="small" sx={{ minWidth: 180 }}>
-              <InputLabel>Status</InputLabel>
-              <Select
-                value={statusFilter}
-                label="Status"
-                onChange={(e) => setStatusFilter(e.target.value)}
-              >
-                <MenuItem value="">All</MenuItem>
-                {statuses.map((s) => (
-                  <MenuItem key={s.id} value={s.id}>
-                    {s.name}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
             <FormControl size="small" sx={{ minWidth: 200 }}>
               <InputLabel>Type (Template)</InputLabel>
               <Select
                 value={templateFilter}
                 label="Type (Template)"
-                onChange={(e) => setTemplateFilter(e.target.value)}
+                onChange={(e) => {
+                  setTemplateFilter(e.target.value);
+                  setPagination((p) => ({ ...p, page: 1 }));
+                }}
               >
                 <MenuItem value="">All</MenuItem>
                 {templates.map((t) => (
@@ -751,20 +751,32 @@ const ExperimentsManagement: React.FC = () => {
                 ))}
               </Select>
             </FormControl>
+          </Box>
+          <ListFilterChips
+            label="Status"
+            value={statusFilter}
+            onChange={(value) => patchListParams({ status: value || null })}
+            options={statuses.map((s) => ({ value: s.id, label: s.name }))}
+            allLabel="All"
+            disabled={loading}
+          />
+          <Box display="flex" flexWrap="wrap" alignItems="center" gap={0.75} sx={{ mb: 1.5 }}>
+            <Typography variant="body2" color="text.secondary" sx={{ mr: 0.5 }}>
+              Scope
+            </Typography>
             <Chip
-              label="My Experiments"
+              size="small"
+              label="My experiments"
               color={mineFilter ? 'primary' : 'default'}
               variant={mineFilter ? 'filled' : 'outlined'}
-              onClick={() => {
-                const next = new URLSearchParams(searchParams);
-                if (mineFilter) next.delete('mine');
-                else next.set('mine', 'true');
-                setSearchParams(next);
-                setPagination((p) => ({ ...p, page: 1 }));
-              }}
-              sx={{ alignSelf: 'center' }}
+              onClick={() => patchListParams({ mine: mineFilter ? null : 'true' })}
+              disabled={loading}
               aria-pressed={mineFilter}
-              aria-label={mineFilter ? 'Filter: my experiments (click to clear)' : 'Show only my experiments'}
+              aria-label={
+                mineFilter
+                  ? 'Filter: my experiments (click to clear)'
+                  : 'Show only my experiments'
+              }
             />
           </Box>
         </>
