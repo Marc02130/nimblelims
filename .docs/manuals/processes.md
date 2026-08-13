@@ -26,7 +26,7 @@ Phase 1–2 shipped ad hoc process create as a provisional MVP; Phase 3 made def
 |-------------|-----------------------------------------------------------------------------|
 | **Process** | An ordered collection of Experiments.                                       |
 | **Step**    | An individual Experiment within a Process (position in the sequence matters). |
-| **Sample Assignment** | Samples are assigned to a Process via `ELNProcessSample` (`status`: assigned / in_progress / …, optional `current_step_id`). Starting a step experiment uses **explicit select** from eligible process samples (**Decision #24**). Per-experiment cohort is `ExperimentSampleExecution`. |
+| **Sample Assignment** | `ELNProcessSample`: **queued** on assign → **in_progress** when experiment starts → **queued** on next step after advance → **completed** on last step. Separate from `Sample.status` (e.g. Available for Testing). See Decision #24. |
 
 ### Process vs. Experiment
 
@@ -84,8 +84,9 @@ See [experiments.md](experiments.md) for `experiment_link` lineage and [checklis
    - **Selected:** empty → `<< < > >>` / search  
    - Optional scan only for eligible samples  
 5. **Start** → create/start experiment instance + cohort; dialog **closes**.  
-6. **Process sample rows** for selected samples: `status = in_progress`, `current_step_id = this step`.  
-7. Experiment detail shows cohort as **read-only** (no add-samples UI).
+6. **Process sample rows** for selected samples: `status = in_progress`, `current_step_id = this step` (assign alone leaves them **queued**).  
+7. Experiment detail shows cohort as **read-only** (no add-samples UI).  
+8. **Advance** sample after a step → **queued** on next step, or **completed** if last step.
 
 Nimble today: process assignment exists; cohort UI is still a standing panel on experiment detail without gates or process status updates.
 

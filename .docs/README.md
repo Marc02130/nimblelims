@@ -138,13 +138,14 @@ Long-form tech designs stay in [design/](design/). UI review was previously `ui-
 | [ideas/containers-model-update.md](ideas/containers-model-update.md) | Nested containers; type rows×columns; contents only on 1×1; solute mass / derived volume | **Placeholder — rules Decided; schema/UI not implemented** |
 | [ideas/index-sets-and-sequencing-setup.md](ideas/index-sets-and-sequencing-setup.md) | Index set catalog, index assignment entry, sequencer sample sheets / flow cell loading | **Placeholder** |
 | [ideas/ui-tabbed-admin-catalogs.md](ideas/ui-tabbed-admin-catalogs.md) | Tabbed shells + menu names: Assay catalog, Customers, Work, Instruments, Access control; CRO separate | **Placeholder** |
-| [ideas/list-page-search.md](ideas/list-page-search.md) | Consistent search / filter on Samples, Experiments, Processes, and other list pages | **Placeholder** |
+| [ideas/list-page-search.md](ideas/list-page-search.md) | Shared list filters (search + status/project chips); Samples “Available for Testing” first | **Placeholder — Samples status filter next** |
 
 ### Priority backlog (ideas)
 
 | Priority | Idea | Why |
 |----------|------|-----|
 | **High** | [system-managed-status.md](ideas/system-managed-status.md) | Status is critical tracking; must not be free-form at accessioning/create |
+| **High** | [list-page-search.md](ideas/list-page-search.md) (Samples status filter first) | Find “ready for testing” / reusable filter bar for all lists |
 | [ideas/model-fine-tune.md](ideas/model-fine-tune.md) | Model fine-tune notes | See `sop-rag` for related SOP/RAG work |
 
 ## Reviews (run-results) — complete

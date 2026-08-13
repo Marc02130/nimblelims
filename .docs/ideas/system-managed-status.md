@@ -62,7 +62,7 @@ Suggested default transitions (product to refine):
 ## Open when prioritized
 
 - Exact default accession status and transition map.  
-- Whether process assign auto-moves sample to Available for Testing.  
+- Process assign does **not** change Sample.status (Available for Testing remains a separate gate). Process-sample status uses **queued / in_progress / completed** (see Decision #24).  
 - UI: hide status on accessioning; show read-only + “Override status” for managers on sample detail.  
 - Same pattern for experiment and process instance status lists.
 

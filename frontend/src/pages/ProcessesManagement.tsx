@@ -818,7 +818,23 @@ const ProcessesManagement: React.FC = () => {
                           </Button>
                         </TableCell>
                         <TableCell>
-                          <Chip size="small" label={ps.status} />
+                          <Chip
+                            size="small"
+                            color={
+                              ps.status === 'completed'
+                                ? 'success'
+                                : ps.status === 'in_progress'
+                                  ? 'warning'
+                                  : 'default'
+                            }
+                            label={
+                              ps.status === 'assigned'
+                                ? 'queued'
+                                : ps.status === 'in_progress'
+                                  ? 'in progress'
+                                  : ps.status
+                            }
+                          />
                         </TableCell>
                         <TableCell>
                           {step ? (

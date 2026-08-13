@@ -70,6 +70,42 @@ class ExperimentService:
         le = self.db.query(ListEntry).filter(ListEntry.id == sample.status).first()
         return le.name if le else None
 
+    def ensure_available_for_testing(self, sample_id: UUID) -> bool:
+        """
+        System transition: if sample is Received (or not Available for Testing),
+        set status to Available for Testing when queueing for process work.
+        Returns True if status was changed.
+        """
+        sample = self.repo.get_sample_by_id(sample_id)
+        if not sample:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sample not found")
+        available_ids = self._available_for_testing_status_ids()
+        if not available_ids:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"List entry '{AVAILABLE_FOR_TESTING_STATUS_NAME}' is not configured",
+            )
+        if sample.status in available_ids:
+            return False
+        # Prefer canonical Available for Testing from sample_status list
+        target = (
+            self.db.query(ListEntry)
+            .join(ListModel, ListModel.id == ListEntry.list_id)
+            .filter(
+                ListModel.name == "sample_status",
+                ListEntry.name == AVAILABLE_FOR_TESTING_STATUS_NAME,
+            )
+            .first()
+        )
+        if not target:
+            target_id = next(iter(available_ids))
+        else:
+            target_id = target.id
+        sample.status = target_id
+        sample.modified_by = self._user_id()
+        self.db.flush()
+        return True
+
     def check_sample_eligibility(
         self,
         sample: Sample,
@@ -135,8 +171,12 @@ class ExperimentService:
         process_id: UUID,
         step_id: Optional[UUID] = None,
     ) -> List[Dict[str, Any]]:
-        """Eligible process samples for start dialog (status + not removed)."""
-        available_ids = self._available_for_testing_status_ids()
+        """
+        Process samples for start dialog (Decision #24).
+
+        Returns *all* non-removed process samples with eligible/ineligible_reason
+        so the UI can show why a sample is not startable (e.g. status Received).
+        """
         q = (
             self.db.query(ELNProcessSample, Sample)
             .join(Sample, Sample.id == ELNProcessSample.sample_id)
@@ -145,27 +185,35 @@ class ExperimentService:
                 ELNProcessSample.status != "removed",
             )
         )
-        if available_ids:
-            q = q.filter(Sample.status.in_(available_ids))
-        # Prefer samples at this step or not yet placed (null current_step) or assigned
         rows = q.order_by(ELNProcessSample.assigned_at).all()
         out: List[Dict[str, Any]] = []
         for ps, sample in rows:
-            if step_id is not None:
-                # Eligible if not locked to a different step as completed elsewhere
-                # Allow: current_step null, or current_step == this step, or status assigned
-                if (
-                    ps.current_step_id is not None
-                    and ps.current_step_id != step_id
-                    and ps.status == "completed"
-                ):
-                    continue
+            ok, reason = self.check_sample_eligibility(sample, process_id=process_id)
+            # Process-sample lifecycle gates for this step
+            if ps.status == "completed":
+                ok = False
+                reason = "Sample already completed on this process"
+            elif ps.status == "in_progress":
+                if step_id is not None and ps.current_step_id == step_id:
+                    ok = False
+                    reason = "Sample already in progress on this step"
+                elif step_id is not None and ps.current_step_id != step_id:
+                    ok = False
+                    reason = "Sample is in progress on a different step"
+            elif step_id is not None and ps.current_step_id is not None and ps.current_step_id != step_id:
+                # Queued for a different step — not for this experiment start
+                if ps.status in ("queued", "assigned"):
+                    ok = False
+                    reason = "Sample is queued for a different process step"
             out.append({
                 "sample_id": sample.id,
                 "client_sample_id": sample.client_sample_id,
                 "sample_name": sample.name,
-                "process_sample_status": ps.status,
+                "process_sample_status": ps.status if ps.status != "assigned" else "queued",
                 "current_step_id": ps.current_step_id,
+                "sample_status_name": self._sample_status_name(sample),
+                "eligible": ok,
+                "ineligible_reason": None if ok else reason,
             })
         return out
 

@@ -41,6 +41,9 @@ export interface EligibleSample {
   client_sample_id?: string | null;
   sample_name?: string | null;
   process_sample_status?: string | null;
+  sample_status_name?: string | null;
+  eligible?: boolean;
+  ineligible_reason?: string | null;
 }
 
 export interface StartExperimentDialogProps {
@@ -94,6 +97,9 @@ const StartExperimentDialog: React.FC<StartExperimentDialogProps> = ({
           client_sample_id: r.client_sample_id,
           sample_name: r.sample_name,
           process_sample_status: r.process_sample_status,
+          sample_status_name: r.sample_status_name,
+          eligible: r.eligible !== false,
+          ineligible_reason: r.ineligible_reason,
         }));
       } else {
         const res: any = await apiService.getCohortEligibleSamples();
@@ -101,6 +107,7 @@ const StartExperimentDialog: React.FC<StartExperimentDialogProps> = ({
           sample_id: r.sample_id,
           client_sample_id: r.client_sample_id,
           sample_name: r.sample_name,
+          eligible: true,
         }));
       }
       setAvailable(rows);
@@ -154,7 +161,25 @@ const StartExperimentDialog: React.FC<StartExperimentDialogProps> = ({
   const moveToSelected = (ids: string[]) => {
     if (!ids.length) return;
     const idSet = new Set(ids);
-    const moving = available.filter((s) => idSet.has(s.sample_id) && !selectedIds.has(s.sample_id));
+    const moving = available.filter(
+      (s) =>
+        idSet.has(s.sample_id) &&
+        !selectedIds.has(s.sample_id) &&
+        s.eligible !== false,
+    );
+    const blocked = available.filter(
+      (s) => idSet.has(s.sample_id) && s.eligible === false,
+    );
+    if (blocked.length && !moving.length) {
+      setError(
+        blocked[0].ineligible_reason ||
+          'Selected sample(s) are not eligible (must be Available for Testing)',
+      );
+    } else if (blocked.length) {
+      setError(
+        `${blocked.length} sample(s) skipped — not Available for Testing or not ready for this step`,
+      );
+    }
     setSelected((prev) => [...prev, ...moving]);
     setHighlightAvail(new Set());
   };
@@ -261,6 +286,7 @@ const StartExperimentDialog: React.FC<StartExperimentDialogProps> = ({
     items: EligibleSample[],
     highlight: Set<string>,
     onToggle: (id: string) => void,
+    opts?: { showEligibility?: boolean },
   ) => (
     <Box
       sx={{
@@ -275,30 +301,51 @@ const StartExperimentDialog: React.FC<StartExperimentDialogProps> = ({
       }}
     >
       <Typography variant="subtitle2" sx={{ px: 1.5, py: 1, borderBottom: 1, borderColor: 'divider' }}>
-        {title} ({items.length})
+        {title} ({items.length}
+        {opts?.showEligibility
+          ? ` · ${items.filter((s) => s.eligible !== false).length} eligible`
+          : ''}
+        )
       </Typography>
       <List dense sx={{ overflow: 'auto', flex: 1, py: 0 }}>
         {items.length === 0 ? (
           <ListItem>
-            <ListItemText secondary="None" />
+            <ListItemText
+              secondary={
+                processId
+                  ? 'No samples on this process. Assign samples from Samples list first.'
+                  : 'None'
+              }
+            />
           </ListItem>
         ) : (
-          items.map((s) => (
-            <ListItemButton
-              key={s.sample_id}
-              selected={highlight.has(s.sample_id)}
-              onClick={() => onToggle(s.sample_id)}
-            >
-              <ListItemText
-                primary={sampleLabel(s)}
-                secondary={
-                  s.process_sample_status
-                    ? `${s.process_sample_status} · ${s.sample_id.slice(0, 8)}…`
-                    : `${s.sample_id.slice(0, 8)}…`
-                }
-              />
-            </ListItemButton>
-          ))
+          items.map((s) => {
+            const blocked = opts?.showEligibility && s.eligible === false;
+            return (
+              <ListItemButton
+                key={s.sample_id}
+                selected={highlight.has(s.sample_id)}
+                disabled={Boolean(blocked)}
+                onClick={() => !blocked && onToggle(s.sample_id)}
+                sx={blocked ? { opacity: 0.55 } : undefined}
+              >
+                <ListItemText
+                  primary={sampleLabel(s)}
+                  secondary={
+                    blocked
+                      ? s.ineligible_reason ||
+                        `Not eligible (status: ${s.sample_status_name || 'unknown'})`
+                      : s.sample_status_name
+                        ? `${s.sample_status_name}${s.process_sample_status ? ` · ${s.process_sample_status}` : ''}`
+                        : s.process_sample_status || `${s.sample_id.slice(0, 8)}…`
+                  }
+                  secondaryTypographyProps={
+                    blocked ? { color: 'error' } : undefined
+                  }
+                />
+              </ListItemButton>
+            );
+          })
         )}
       </List>
     </Box>
@@ -311,10 +358,10 @@ const StartExperimentDialog: React.FC<StartExperimentDialogProps> = ({
       </DialogTitle>
       <DialogContent>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          Move samples from <strong>Available</strong> (eligible queue) to <strong>Selected</strong>,
-          then Start. Only samples with status <strong>Available for Testing</strong>
-          {processId ? ' that are assigned to this process' : ''} can be selected. Cohort is fixed
-          after start.
+          Move samples from <strong>Available</strong> to <strong>Selected</strong>, then Start.
+          Eligible = process status <strong>queued</strong> for this step and sample status{' '}
+          <strong>Available for Testing</strong>. Start sets process status to{' '}
+          <strong>in progress</strong>. Cohort is fixed after start.
         </Typography>
 
         {error && (
@@ -365,8 +412,12 @@ const StartExperimentDialog: React.FC<StartExperimentDialogProps> = ({
           </Box>
         ) : (
           <Box display="flex" gap={1} alignItems="stretch">
-            {listBox('Available', filteredAvailable, highlightAvail, (id) =>
-              toggleHighlight(id, setHighlightAvail),
+            {listBox(
+              'Available',
+              filteredAvailable,
+              highlightAvail,
+              (id) => toggleHighlight(id, setHighlightAvail),
+              { showEligibility: Boolean(processId) },
             )}
             <Stack spacing={0.5} justifyContent="center" alignItems="center" sx={{ px: 0.5 }}>
               <IconButton
@@ -379,9 +430,15 @@ const StartExperimentDialog: React.FC<StartExperimentDialogProps> = ({
               </IconButton>
               <IconButton
                 size="small"
-                onClick={() => moveToSelected(filteredAvailable.map((s) => s.sample_id))}
-                disabled={!filteredAvailable.length}
-                aria-label="Move all available to Selected"
+                onClick={() =>
+                  moveToSelected(
+                    filteredAvailable
+                      .filter((s) => s.eligible !== false)
+                      .map((s) => s.sample_id),
+                  )
+                }
+                disabled={!filteredAvailable.some((s) => s.eligible !== false)}
+                aria-label="Move all eligible to Selected"
               >
                 <KeyboardDoubleArrowRightIcon />
               </IconButton>
@@ -407,6 +464,16 @@ const StartExperimentDialog: React.FC<StartExperimentDialogProps> = ({
             )}
           </Box>
         )}
+        {processId &&
+          !loading &&
+          available.length > 0 &&
+          available.every((s) => s.eligible === false) && (
+            <Alert severity="warning" sx={{ mt: 2 }}>
+              Samples are on this process but none are eligible to start. Start requires sample status{' '}
+              <strong>Available for Testing</strong>. Re-assign from the Samples list (assign now
+              promotes Received → Available for Testing), or a manager can update sample status.
+            </Alert>
+          )}
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose} disabled={starting}>

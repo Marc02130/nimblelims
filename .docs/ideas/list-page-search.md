@@ -1,60 +1,97 @@
-# Idea: Search on list pages
+# Idea: List page search & filters (all DataGrids)
 
-**Status:** Placeholder — not implemented  
-**Date:** 2026-08-12  
-**Related:** Samples Management, Experiments, Processes, Clients, Projects, admin DataGrids; [ui-tabbed-admin-catalogs.md](ui-tabbed-admin-catalogs.md)
+**Status:** **In progress** — chips on Samples + Experiments (2026-08-13); full bar rollout pending  
+**Date:** 2026-08-12 · **Updated:** 2026-08-13  
+**Related:** Samples, Experiments, Processes, Clients, Projects, admin catalogs; [system-managed-status.md](system-managed-status.md); Decision #24 (Available for Testing)
 
 ## One-liner
 
-Add consistent **text search / filter** across major list pages so users can find rows by name, ID, or key metadata without relying only on column sort or URL query params.
+A **shared filter pattern** for every list page: free-text search + structured filters (status chips, project, type, …), reusable across Samples and all management grids.
 
-## Why
+## Immediate need (addressed first)
 
-- Labs accumulate many samples, experiments, processes, and config rows.
-- Today most list pages load a page of rows with little or no global search (some support URL filters like `?project_id=` only).
-- Users expect a search box (and optionally filters) on every primary list, similar to industry LIMS/ELN UIs.
+**Samples ready for testing:** status chips on `/samples` including **Available for Testing** (server `?status=`).  
+**Experiments:** status chips + My experiments chip (aligned UI).
 
-## Current state (NimbleLIMS)
+---
 
-| Exists | Gap |
-|--------|-----|
-| DataGrid column sort / client pagination on many pages | No shared search field pattern |
-| Samples: optional URL filters (`project_id`, `status`, `custom.*`) | No free-text search box on `/samples` |
-| Some admin pages have local filter text | Inconsistent; not applied to all list pages |
+## Recommended stack (locked direction)
 
-## Direction (when prioritized)
+| Layer | Choice | Why |
+|-------|--------|-----|
+| **UX shell** | **Toolbar filter bar** + **chips** for high-frequency values (status, Mine) | Familiar; works on every page; chips for speed |
+| **State** | **URL query params** where the list is primary (`?status=`, `?mine=`) | Shareable, back button, deep links |
+| **Data** | **Server filters** for status/project/mine; **client** text search until `q=` exists | Correct totals with pagination; text can start client-side |
+| **Grid extras** | Optional MUI column filters **later** | Power users only; not the main chrome |
+| **Saved views** | **Later** | After bar + chips are consistent |
 
-1. **UX pattern (shared)**  
-   - Search field above each primary DataGrid (name / ID / common fields).  
-   - Optional: filter chips (status, project, type).  
-   - Debounced input; clear button; preserve selection when filtering if feasible.
+**Locked stack summary:** **A** (toolbar) + **C** (chips) + **D** (URL) + **E** (server for structured filters). **B** and **F** deferred.
 
-2. **Implementation options**  
-   - **Client-side filter** on already-loaded rows — fine for small pages / current page-size.  
-   - **Server-side** `?q=` or field filters — needed when lists are large or paginated from API.  
-   Prefer server-side for Samples / Experiments / Processes once volume grows.
+### Not chosen as sole path
 
-3. **Pages in scope (suggested order)**  
-   - Samples (`/samples`)  
-   - Experiments (`/experiments`)  
-   - Processes (`/experiments/processes`)  
-   - Clients, Projects, admin catalogs (analyses, instruments, data parsers, field management)
+| Option | Verdict |
+|--------|---------|
+| DataGrid-only column filters | Inconsistent; weak for FK lists without valueOptions |
+| Separate “ready samples” page | Prefer one list + chip |
+| Client-only status filter for Samples | Wrong once API paginates / incomplete page load |
 
-4. **API**  
-   - Extend list endpoints with `q` (ilike on name / client_sample_id / description) and document in manuals.  
-   - Keep existing structured filters (`status`, `project_id`, …).
+---
 
-## Non-goals (this idea)
+## Options catalog (reference)
 
-- Full advanced query builder / saved searches (later).  
-- Replacing DataGrid column filters entirely.
+| Option | What | Role in stack |
+|--------|------|----------------|
+| **A. Toolbar filter bar** | Search + selects above grid | Baseline shell |
+| **B. DataGrid column filters** | Built-in operators | Optional later |
+| **C. Preset / status chips** | One-click filters | **Shipped pattern** (`ListFilterChips`) |
+| **D. URL-synced filters** | `?status=&mine=` | **Samples + Experiments** |
+| **E. Client vs server** | Loaded rows vs API | Status/mine = server; name search = client until `q=` |
+| **F. Saved views** | Named filter sets | Deferred |
 
-## Open when prioritized
+---
 
-- Client-only vs server `q=` for each page.  
-- Search across related names (e.g. sample shows project name — join vs denormalized display).  
-- Accessibility and mobile layout of the shared search bar.
+## Implementation status
+
+| Piece | Status |
+|-------|--------|
+| Shared component `ListFilterChips` | **Done** — `frontend/src/components/common/ListFilterChips.tsx` |
+| Samples: status chips → `?status=<uuid>` → `GET /samples?status=` | **Done** |
+| Experiments: status chips → `?status=` + My experiments `?mine=true` | **Done** (server filters; name search client) |
+| Experiments: template still Select (not chips) | Intentional — many templates |
+| Processes / Clients / Projects / admin | **Todo** |
+| Server `q=` free-text | **Todo** |
+| Full `ListPageFilters` (text + selects wrapper) | **Todo** |
+
+### Samples chips
+
+- **All** + each `sample_status` list entry (e.g. Received, **Available for Testing**, Testing Complete, …)
+- Click sets/clears `status` query param and reloads from API
+
+### Experiments chips
+
+- **All** + each `experiment_status` entry (`?status=<uuid>` → `status_id` on API)  
+- **My experiments** toggle chip (`?mine=true`)  
+- Name search + template dropdown remain in the toolbar row  
+
+---
+
+## Rollout order (remaining)
+
+1. ~~Samples status chips~~  
+2. ~~Experiments status + mine chips~~  
+3. Processes (status / mine)  
+4. Clients, Projects  
+5. Admin catalogs  
+6. Server `q=` where lists are large  
+
+---
+
+## Non-goals
+
+- Full BI query builder  
+- Replacing RBAC / RLS with filters  
+- Per-user saved views in first slices  
 
 ## Suggested process
 
-Ideation (this doc) → small requirements slice → implement Samples first as template → roll out to other list pages → docs sync.
+Continue rolling **ListFilterChips** (+ URL) page by page → then shared text search bar → docs sync manuals.
