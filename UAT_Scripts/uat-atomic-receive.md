@@ -1,18 +1,19 @@
 # UAT: Atomic receive
 
 **Stem:** `atomic-receive`  
-**Phase:** P0 receive loop (docs ahead of implement)  
-**Requirements:** [PR 30 sketch](https://github.com/Marc02130/nimblelims/pull/30); US-2 / US-30 alignment pending BA  
+**Phase:** P0 receive loop  
+**Requirements:** Merged PR 30 sketch on main; stories from [PR 32](https://github.com/Marc02130/nimblelims/pull/32) until it merges (not main)  
 **QA review:** `.docs/qa-review/atomic-receive.md`  
 **Test data:** Anton fixtures share these IDs  
+**Implement gate:** OPEN (CEO merged PR 30)  
 **Env:**  
 **Build / commit:**  
 **Executor:**  
 **Date:**  
 
-Replaces the **receive happy path** in `uat-sample-accessioning.md` when this packet ships. Do not run the old wizard cases (typed sample name, status Received, In Process, aliquot dialog) as the atomic-receive sign-off.
+Replaces the **receive happy path** in `uat-sample-accessioning.md` when this packet ships. Do not run the old wizard cases (typed sample name, status Received, In Process, aliquot dialog) as the atomic-receive sign-off. Wilhelmina is rewriting US-1 onto this path.
 
-## ID map (old → shared)
+## ID map (old AR-01–AR-15 → shared)
 
 | Old | Shared |
 |-----|--------|
@@ -74,7 +75,7 @@ Anton owns realistic seed coverage for the above.
 
 | ID | Why parked |
 |----|------------|
-| AR-MU-02 | US-10 second-person review (reviewer ≠ enterer). Later packet. Q1 parallel. |
+| AR-MU-02 | US-10 second-person review (reviewer ≠ enterer). Catalog-only until Q2 has a schema home. |
 
 ### Automated only (implement gate, not a human skip)
 
