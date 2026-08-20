@@ -2,15 +2,17 @@
 
 **Stem:** `atomic-receive`  
 **Phase:** P0 receive loop (docs ahead of implement)  
-**Requirements:** [PR 30 sketch](https://github.com/Marc02130/nimblelims/pull/30); US-2 / US-30 alignment pending BA  
+**Requirements:** [PR 30 sketch](https://github.com/Marc02130/nimblelims/pull/30); US-1 / US-7 / US-8 / US-30 on merged [PR 32](https://github.com/Marc02130/nimblelims/pull/32) (`main`).  
 **QA review:** `.docs/qa-review/atomic-receive.md`  
-**Test data:** Anton fixtures share these IDs  
+**Test data:** [PR 35](https://github.com/Marc02130/nimblelims/pull/35) (`testdata/atomic-receive-p0`). Same IDs as this script. No third scheme.  
 **Env:**  
 **Build / commit:**  
 **Executor:**  
 **Date:**  
 
 Replaces the **receive happy path** in `uat-sample-accessioning.md` when this packet ships. Do not run the old wizard cases (typed sample name, status Received, In Process, aliquot dialog) as the atomic-receive sign-off.
+
+Receive UAT of `/api/samples/receive` is catalog-only until that endpoint exists. AR-RES-01/02 stay catalog-only until then. Packet implement gate is **OPEN** (product code may start). This script is not an implement-gate close.
 
 ## ID map (old → shared)
 
@@ -33,50 +35,73 @@ Replaces the **receive happy path** in `uat-sample-accessioning.md` when this pa
 | AR-14 | AR-RBAC-01 |
 | AR-15 | AR-MU-01 |
 
+## Fixture lock (Anton / PR 35)
+
+| Need | Seed |
+|------|------|
+| Actors | `alice-tech` / `alice123` (mAb-2301 PK); `bob-tech` / `bob123` (CAR-T); `david-cro` / `david123` (AR-RBAC-01) |
+| Name template | Assigns `samples.name` with no typed sample ID |
+| Default tube (off form) | Cryovial 2mL |
+| Sample status | Available for Testing |
+| Test status | Assigned/Pending |
+| Analysis A (`units_default` set) | ELISA (Human IgG) / IgG Concentration |
+| Analysis B (`units_default` missing) | Cell Viability (Trypan Blue) / Total Cell Count |
+| Alice wave (AR-HV-01) | `NBIO-AR-0001` … `NBIO-AR-0024`. Human sign-off: `0001` then `0002`. Rest is automation. |
+| Keyboard barcode (AR-HV-05) | `NBIO-AR-KB-0001` (not in the 0001–0024 wave) |
+| Alice sticky | Plasma / Plasma (K2EDTA) / mAb-2301 PK Study |
+| Bob wave (AR-MU-01 happy path) | `CART-AR-0001` … `CART-AR-0008`; sticky PBMC / Cell Supernatant / CAR-T In-Process Testing |
+| Client / no receive (AR-RBAC-01) | `david-cro` POST `NBIO-AR-CLIENT-0001` → 403 (barcode optional; 403 anyway) |
+| Two techs (AR-MU-01) | Happy path: alice → mAb / `NBIO-AR-*`; bob → CAR-T / `CART-AR-*`. 403 is the reverse (alice→CAR-T, bob→mAb). |
+| Aliquots | None in P0. Do not use 0059 lifecycle samples as receive fixtures. |
+| AR-T1 | Implement-side pytest (txn rollback). Not a seed ID. |
+
+### Barcode 1:1
+
+| Case | Barcode |
+|------|---------|
+| AR-HV-01 first + second | `NBIO-AR-0001` then `NBIO-AR-0002` |
+| AR-DUP-01 | replay `NBIO-AR-0001` |
+| AR-TST-01 | `NBIO-AR-0009` (`analysis_ids: []`) |
+| AR-RES-01 | ELISA / IgG on `NBIO-AR-0001` |
+| AR-RES-02 | Total Cell Count on `CART-AR-0001` |
+| AR-HV-05 | `NBIO-AR-KB-0001` |
+| AR-RBAC-01 | `NBIO-AR-CLIENT-0001` (optional) |
+
 ## Preconditions
 
-- App running. Logins from `AGENTS.md`: `admin` / `admin123`, `lab-tech` / `labtech123`, `client` / `client123`. Second lab-tech for AR-MU-01.
-- Seeded: sample type, matrix, at least one project lab-tech A can access, one project they cannot, one project for lab-tech B.
-- Sample **name template** assigns `samples.name` without a typed sample ID.
-- Default **tube** container type (off the form).
-- Sample status list includes **Available for Testing**.
-- Test status list includes **Assigned/Pending** (or the agreed slug from implement).
+- App running. Load PR 35 seed (0058 actors/projects + 0060 lists).
 - Unique constraint on `containers.name`.
-- Analysis A: analyte with `units_default` set.
-- Analysis B: analyte with `units_default` missing (for AR-RES-02).
-- Qualifier list entries: `<LOD`, `ND` (optional for AR-RES-01).
+- Qualifier list entries: `<LOD`, `ND`.
 - No parent/child aliquot fixtures in P0.
-
-Anton owns realistic seed coverage for the above.
 
 ## Cases
 
 | ID | Steps | Expected | Pass/Fail | Notes |
 |----|-------|----------|-----------|-------|
-| AR-HV-01 | Log in as lab-tech A. Open receive. Scan a new barcode. Set type, matrix, project. Leave tests empty. Submit. Immediately scan a **second** new barcode without navigating away. | First and second samples created. Stay on receive. Toast. Barcode clears and is focused. Type/matrix/project sticky. No sample-detail redirect. No aliquot dialog. | | QA2, QA5 |
-| AR-HV-02 | Receive a new barcode with analysis A attached. | Tests created, status assigned/pending (not In Process). | | QA6 |
-| AR-HV-03 | Receive with temperature omitted. | Succeeds. Temperature not required. | | |
-| AR-HV-04 | Receive once with `client_sample_id` set, once omitted. | Both succeed. External ID stored as-is when present; not required. | | |
-| AR-HV-05 | Type a new barcode on the keyboard (no scanner). Same sticky fields. Submit. | Same success as AR-HV-01 first tube. | | Keyboard fallback |
-| AR-VAL-01 | Submit with barcode empty, or type/matrix/project missing. | **422**. No sample or container row. | | |
-| AR-DUP-01 | Rescan or retype a barcode already received. | **409** on `containers.name` only. Toast. Stay on receive. No second sample. `samples.name` was never the barcode. | | QA3 |
+| AR-HV-01 | Log in as `alice-tech`. Open receive. Scan `NBIO-AR-0001`. Sticky Plasma / Plasma (K2EDTA) / mAb-2301. Leave tests empty (or follow catalog overlay). Submit. Immediately scan `NBIO-AR-0002` without navigating away. | Both created. Stay on receive. Toast. Barcode clears and is focused. Type/matrix/project sticky. No sample-detail redirect. No aliquot dialog. Catalog wave is 24 tubes; two is the human loop. | | QA2, QA5 |
+| AR-HV-02 | Receive with ELISA (Human IgG) attached (catalog: first 8 of the wave). | Tests created, status assigned/pending (not In Process). | | QA6 |
+| AR-HV-03 | Receive with temperature omitted (catalog: even barcodes). | Succeeds. Temperature not required. | | |
+| AR-HV-04 | Receive once with `client_sample_id` (`EXT-PK-001` on `NBIO-AR-0001`), once omitted. | Both succeed. External ID stored as-is when present; not required. | | |
+| AR-HV-05 | Type barcode `NBIO-AR-KB-0001` (no scanner). Same alice sticky. Same POST as scan. Submit. | Same success as AR-HV-01 first tube. `containers.name` = `NBIO-AR-KB-0001` and is unique. | | Keyboard fallback |
+| AR-VAL-01 | Four POSTs, each missing one required field: barcode, type, matrix, project. | Each → **422**. No sample or container row. | | |
+| AR-DUP-01 | Replay `NBIO-AR-0001` after it exists. | **409** on `containers.name` only. Toast. Stay on receive. No second sample. `samples.name` was never the barcode. | | QA3 |
 | AR-ID-01 | Inspect the receive form and the AR-HV-01 payload/response. | **No sample-ID field** on the form or body. `samples.name` is template-generated and **not** the barcode. `containers.name` = barcode. | | QA2 |
-| AR-ST-01 | Inspect the sample from AR-HV-01. | Status = **Available for Testing**. `received_date` set. No Received hop. Request had no status field. | | QA4 |
-| AR-TST-01 | Open a sample received with no tests. Add analysis A. | POST succeeds. Test status assigned/pending. | | QA6 |
+| AR-ST-01 | Inspect the sample from `NBIO-AR-0001`. | Status = **Available for Testing**. `received_date` set. No Received hop. Request had no status field. | | QA4 |
+| AR-TST-01 | Open the sample from `NBIO-AR-0009` (received with `analysis_ids: []`). Add ELISA (Human IgG). | POST succeeds. Test status assigned/pending. | | QA6 |
 | AR-TST-02 | Delete the test from AR-TST-01 (no results). | DELETE succeeds. | | QA6 |
-| AR-TST-03 | DELETE a test that has results (after AR-RES-01). | **400**. Test and result remain. | | QA6 |
-| AR-RES-01 | On a test with analysis A (`units_default` present), enter a typed number and optional qualifier `<LOD` or `ND`. Do not pick a unit. | Result saved. Assert **`reported_result`** equals the typed number and **`qualifiers`** is set. `raw_result` may copy the same value. Do not assert a new column. Unit from `analytes.units_default`. No unit picker. | | QA7 |
-| AR-RES-02 | On a test with analysis B (no `units_default`), enter a typed number. | **422**. No result row. | | QA7 |
-| AR-RBAC-01 | Log in as client. Open receive or POST `/api/samples/receive`. | No receive UI, or **403**. | | QA8 |
-| AR-MU-01 | Two lab-techs, each with their own sticky project. Each receives a unique barcode. Lab-tech A POSTs `project_id` they are not on. | Each tech only sees/creates in their project. Foreign project → **403**, no row. | | QA8 |
+| AR-TST-03 | DELETE the ELISA test on `NBIO-AR-0001` after AR-RES-01. | **400**. Test and result remain. | | QA6 |
+| AR-RES-01 | On ELISA / IgG Concentration for `NBIO-AR-0001` (`units_default` present), enter a typed number and optional qualifier `<LOD` or `ND`. Do not pick a unit. Catalog-only until `/receive` exists. | Result saved. Assert **`reported_result`** equals the typed value and **`qualifiers`** is set. `raw_result` may copy the same value. No `unit_id`. Unit from `analytes.units_default`. | | QA7 |
+| AR-RES-02 | On Total Cell Count for `CART-AR-0001` (no `units_default`), enter a typed number. Catalog-only until `/receive` exists. | **422**. No result row. | | QA7 |
+| AR-RBAC-01 | Log in as `david-cro`. Open receive or POST `/api/samples/receive` with `NBIO-AR-CLIENT-0001` (barcode optional). | No receive UI, or **403**. | | QA8 |
+| AR-MU-01 | Happy path: `alice-tech` receives `NBIO-AR-*` on mAb-2301; `bob-tech` receives `CART-AR-0001`…`0008` on CAR-T. Then the reverse: alice POSTs CAR-T `project_id`, bob POSTs mAb `project_id`. | Happy path: each tech only creates in their project. Reverse → **403**, no row. | | QA8 |
 
 ### Out of P0 receive (do not seed as must-pass)
 
 | ID | Why parked |
 |----|------------|
-| AR-MU-02 | US-10 second-person review (reviewer ≠ enterer). Later packet. Q1 parallel. |
+| AR-MU-02 | US-10 second-person review (reviewer ≠ enterer). Later / Q1. Not a receive gate. |
 
-### Automated only (implement gate, not a human skip)
+### Automated only (implement-side pytest, not a seed ID)
 
 | ID | Steps | Expected |
 |----|-------|----------|
