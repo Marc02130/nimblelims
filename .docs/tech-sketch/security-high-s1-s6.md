@@ -58,20 +58,35 @@ Ship code changes that make S1–S6 **Met**. This sketch is *how*, not product j
 
 ---
 
-## 6. S2 — Password hashing
+## 6. S2 — Password hashing + must-change + complexity (Q2 / Q7)
 
-**File:** `backend/app/core/security.py`
+**Files:** `backend/app/core/security.py`, `backend/app/routers/auth.py`, `models/user.py`, frontend login/change-password
 
-- Use `passlib` bcrypt (or `bcrypt` library). Prefer passlib `CryptContext(schemes=["bcrypt"], deprecated="auto")`.  
-- `verify_password`:  
-  - If hash looks like bcrypt (`$2b$` / `$2a$`), verify bcrypt.  
-  - Else if 64-char hex, treat as legacy SHA256; on success return True and caller **rehashes** (login path updates `user.password_hash`).  
-- Seed migrations:  
-  - **Do not rewrite historical migration hashes in place** if already applied in the wild; add a **new** migration or seed gate:  
-    - Dev/UAT: `ALLOW_DEV_SEED_USERS=true` (compose default for local) continues to ensure known users exist with **bcrypt** hashes of known passwords.  
-    - Production compose profile: omit seed users or require random passwords from secrets manager.  
-- Update `0058` / any future seeds to use `get_password_hash` only after bcrypt lands.  
-- Tests in `test_auth.py` already expect `$2b$` — align implementation with tests.
+### 6.1 Hashing
+
+- Use `passlib` bcrypt (`CryptContext(schemes=["bcrypt"], deprecated="auto")`).  
+- `verify_password`: bcrypt if `$2b$`/`$2a$`; else 64-char hex = legacy SHA256; on success login path **rehashes** to bcrypt.  
+- Seeds: new migration / gate with `ALLOW_DEV_SEED_USERS`; production = bootstrap wizard, not README passwords.
+
+### 6.2 `must_change_password`
+
+- Column `users.must_change_password BOOLEAN NOT NULL DEFAULT true`.  
+- Migration backfill: set `false` for existing non-seed users; seeds/bootstrap stay `true`.  
+- Login: if credentials OK and flag true → return `access_token` with claim `pwd_change=true` (or separate short-lived token type) **and** `must_change_password: true` in JSON body.  
+- Dependency `get_current_user`: if claim/flag set and path ∉ allowlist (`/auth/change-password`, `/auth/logout`, `/auth/me`), raise **403** `password_change_required`.  
+- `POST /auth/change-password`: `{current_password, new_password}` → verify current, validate complexity, hash, set flag false, return normal token.
+
+### 6.3 Complexity helper
+
+```text
+validate_password_complexity(password, *, username, current_password=None) -> list[str]  # empty = ok
+# rules: len>=12; [A-Z]; [a-z]; [0-9]; [^A-Za-z0-9]; lower(password)!=lower(username);
+#        password != current_password
+```
+
+### 6.4 Frontend
+
+- Login response with `must_change_password` → navigate to Change Password; block app routes until success.
 
 ---
 
