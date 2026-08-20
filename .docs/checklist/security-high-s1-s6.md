@@ -19,10 +19,10 @@
 
 ## P0a — S3 JWT + S4 logging
 
-- [ ] Resolve SECRET_KEY / JWT_SECRET_KEY; refuse defaults  
-- [ ] Align docker-compose + env examples  
-- [ ] Remove body logging from middleware  
-- [ ] Tests  
+- [x] Resolve SECRET_KEY / JWT_SECRET_KEY; refuse defaults  
+- [x] Align docker-compose + env examples  
+- [x] Remove body logging from middleware  
+- [x] Tests (`tests/test_security_config_s3_s4.py`)
 
 ## P0b — S2 passwords
 

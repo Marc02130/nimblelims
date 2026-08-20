@@ -3,6 +3,12 @@ Pytest configuration and fixtures.
 Uses testcontainers-python (PostgreSQL 15) to prevent SQLite/JSONB divergence.
 """
 import os
+
+# S3: allow tests to import app.core.config before any other imports
+os.environ.setdefault("ENVIRONMENT", "test")
+os.environ.setdefault("ALLOW_INSECURE_DEFAULTS", "true")
+os.environ.setdefault("SECRET_KEY", "pytest-secret-key-not-for-production")
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, text
