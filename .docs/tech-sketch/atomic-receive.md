@@ -1,7 +1,7 @@
 # Tech sketch: Atomic receive
 
 **Date:** 2026-08-20  
-**Status:** **Draft — waiting Lab Ops re-walk. Implement gate CLOSED.**  
+**Status:** **Draft — waiting Lab Ops re-walk after this lock. Implement gate CLOSED.**  
 **Requirements:** (not written; locked packet from CEO)  
 **Process:** [`.docs/development-process/README.md`](../development-process/README.md)
 
@@ -20,15 +20,15 @@
 
 **Goals**
 
-- **Atomic receive endpoint**: one POST creates sample + container + contents + tests in a **single DB transaction**
-- **System-set status**: `Received` status applied automatically (tech does not pick status)
-- **Barcode happy path**: scan barcode as container name (stored as-is; do not append timestamp suffix — Lab Ops L8 flag)
+- **Atomic receive endpoint**: one POST creates sample + container + contents + tests in a **single DB transaction** (locked)
+- **System-set status**: system writes status **`Received` then `Available for Testing`** (locked). Drop status from request payload. Techs do not pick status.
+- **Barcode unique**: scan writes unique container `name` as-is (locked). No timestamp suffix. Duplicate → HTTP 409.
 - **Keyboard fallback**: type container name if scan fails
-- **Few fields**: barcode/lab id, optional external id, sample type, project (if required by schema), analysis/tests to attach
+- **Few fields**: barcode/lab id, optional external id, sample type, project (if required by schema), optional analysis/tests to attach
 - **Optional temperature**: remove any `nullable=False` or validation requiring temperature
-- **Tests at accession**: attach tests (analyses) immediately; no wizard
-- **Add/remove tests later**: POST/DELETE (or equivalent) tests on an existing sample (no wizard)
-- **Results entry**: POST result on a test with raw value, unit, optional qualifier (`<LOD`, `ND`)
+- **Tests at receive**: optional (locked). Add/remove later from sample with no wizard.
+- **Results entry**: POST result on a test with raw value, unit (defaults from `analytes.units_default`), optional qualifier (`<LOD`, `ND`) (locked)
+- **High-volume scan UX** (locked): after successful receive, **stay on receive screen**. Toast success, **clear barcode**, **keep sticky** sample type/matrix/project, **focus barcode field**. Do not redirect to sample detail. Do not open aliquot dialog.
 
 **Non-goals (parked features)**
 
@@ -50,7 +50,7 @@ Reuse existing tables; no new receive-specific tables:
 ┌────────────────────┐
 │ samples            │  existing (name, sample_type, status, matrix, project_id,
 │                    │           temperature NULLABLE, parent_sample_id, etc.)
-│                    │  ← system sets status = 'Received' (list entry)
+│                    │  ← system sets status = 'Received' then 'Available for Testing'
 └──────────┬─────────┘
            │ 1:N
            ▼
@@ -101,7 +101,7 @@ def downgrade():
 - `Test` (backend/models/test.py) — attach via `sample_id` + `analysis_id`
 - `Result` (backend/models/result.py) — created later (not at receive time)
 
-**Status list entry:** "Received" must exist in `list_entries` (list "Sample Status"). If UAT statuses include "Received", reuse; else add via seed or migration.
+**Status list entries:** "Received" and "Available for Testing" must exist in `list_entries` (list "Sample Status"). If UAT statuses include these, reuse; else add via seed or migration.
 
 ## 5. Key contracts
 
@@ -118,10 +118,11 @@ class SampleReceiveRequest(BaseModel):
     sample_type: UUID  # list entry ID
     matrix: UUID  # list entry ID
     project_id: UUID  # required (or auto-create if product decides)
-    analysis_ids: List[UUID] = Field(default_factory=list)  # tests to attach
+    analysis_ids: List[UUID] = Field(default_factory=list)  # optional tests to attach
     temperature: Optional[float] = None  # optional
     client_id: Optional[UUID] = None  # if multi-client
     client_project_id: Optional[UUID] = None  # if grouping
+    # NO status field — system writes "Received" then "Available for Testing"
     # Open question: other "few fields" (date_sampled, qc_type, etc.)
 ```
 
@@ -129,7 +130,7 @@ class SampleReceiveRequest(BaseModel):
 
 ```python
 class SampleReceiveResponse(BaseModel):
-    sample: SampleResponse  # includes id, name, status="Received"
+    sample: SampleResponse  # includes id, name, status="Available for Testing"
     container: ContainerResponse
     tests: List[TestResponse]
 ```
@@ -145,15 +146,16 @@ class ReceiveService:
         db: AsyncSession
     ) -> SampleReceiveResponse:
         async with db.begin():  # single transaction
-            # 1. Get "Received" status list entry
-            received_status = await self._get_received_status(db)
+            # 1. Get status list entries
+            received_status = await self._get_status_by_name(db, "Received")
+            available_status = await self._get_status_by_name(db, "Available for Testing")
             
             # 2. Create sample (system sets status = "Received")
             sample = Sample(
                 name=generate_name_for_sample(...),  # or passed in
                 sample_type=receive_data.sample_type,
                 matrix=receive_data.matrix,
-                status=received_status.id,
+                status=received_status.id,  # initially "Received"
                 project_id=receive_data.project_id,
                 temperature=receive_data.temperature,  # nullable
                 client_sample_id=receive_data.client_sample_id,
@@ -162,9 +164,9 @@ class ReceiveService:
             db.add(sample)
             await db.flush()  # get sample.id
             
-            # 3. Create container (barcode as name, no timestamp suffix)
+            # 3. Create container (barcode as name, no timestamp suffix, unique)
             container = Container(
-                name=receive_data.container_barcode,
+                name=receive_data.container_barcode,  # unique; duplicate → 409
                 type_id=...,  # default or from request
                 created_by=user_id,
             )
@@ -178,7 +180,7 @@ class ReceiveService:
             )
             db.add(contents)
             
-            # 5. Create tests (no wizard)
+            # 5. Create tests (optional; no wizard)
             tests = []
             for analysis_id in receive_data.analysis_ids:
                 test = Test(
@@ -189,6 +191,9 @@ class ReceiveService:
                 )
                 db.add(test)
                 tests.append(test)
+            
+            # 6. Update sample status to "Available for Testing"
+            sample.status = available_status.id
             
             await db.flush()
             # Commit happens at context exit; rollback if any failure
@@ -218,7 +223,7 @@ class ResultEntryRequest(BaseModel):
     test_id: UUID
     analyte_id: UUID  # from analysis.analytes
     raw_result: str  # typed number (or text if data_type='text')
-    unit_id: Optional[UUID] = None  # from units table
+    unit_id: Optional[UUID] = None  # from units table; defaults from analytes.units_default
     qualifier: Optional[UUID] = None  # list entry: '<LOD', 'ND', etc.
 ```
 
@@ -236,21 +241,26 @@ class ResultResponse(BaseModel):
     entry_date: datetime
 ```
 
-Service validates `analyte_id` exists in `analysis.analytes` for `test.analysis_id`. No US-28 batch ceremony; one-off result entry only.
+Service validates `analyte_id` exists in `analysis.analytes` for `test.analysis_id`. If `unit_id` is null, defaults from `analytes.units_default` (locked). No US-28 batch ceremony; one-off result entry only.
 
 ## 6. Runtime flows
 
-### 6.1 Atomic receive (barcode scan happy path)
+### 6.1 Atomic receive (barcode scan happy path / high-volume scan loop)
 
 1. Tech opens receive UI
 2. Scan barcode → populate `container_barcode`
-3. Select sample type, matrix, project (or auto-create project)
+3. Select sample type, matrix, project (sticky across scans)
 4. Optionally select analyses (tests) from dropdown
 5. Submit → **POST /api/samples/receive**
-6. Backend: single transaction creates sample (status=`Received`), container (name=barcode), contents, tests
-7. UI: redirect to sample detail or show success toast
+6. Backend: single transaction creates sample (status=`Received` then `Available for Testing`), container (name=barcode, unique), contents, optional tests
+7. UI: **stay on receive screen**. Toast success (e.g., "Sample [name] received"). **Clear barcode field**. **Keep sticky** sample type, matrix, project. **Focus barcode field** for next scan.
+8. Repeat: scan next tube (step 2)
+
+**Do NOT redirect to sample detail.** Do NOT open aliquot dialog. High-volume scan: next tube is the next action.
 
 **Keyboard fallback:** If barcode scanner unavailable, type container name manually (same field).
+
+**Duplicate barcode:** Unique constraint on `Container.name` → HTTP 409. UI shows error toast; tech re-scans or corrects.
 
 ### 6.2 Add/remove tests from sample (after receive)
 
@@ -270,36 +280,44 @@ No wizard; immediate add/remove.
 ## 7. Migration / compatibility
 
 - **Existing UAT samples/tests:** remain unchanged
-- **Status picker UI:** hide status field on receive form (system sets `Received`); existing sample edit forms may keep status picker for other workflows (or remove based on RBAC)
+- **Status picker UI:** hide status field on receive form (system sets `Received` then `Available for Testing`); existing sample edit forms may keep status picker for other workflows (or remove based on RBAC)
 - **Temperature validation:** if Pydantic validators currently require `temperature`, remove validation or make optional
 - **Bulk accession (US-24):** may coexist or be deprecated in favor of atomic receive; product decides
-- **Barcode uniqueness:** existing `Container.name` unique constraint (if any) enforced; duplicate barcode → HTTP 409
+- **Barcode uniqueness:** `Container.name` unique constraint enforced (locked). Duplicate barcode → HTTP 409.
 
-## 8. Open technical risks
+## 8. Locked decisions (not open)
+
+- **One DB transaction** for sample + container + contents + tests (locked)
+- **System sets status** "Received" then "Available for Testing" (locked). Drop status from request payload.
+- **Barcode unique** (locked): `Container.name` unique constraint enforced. Duplicate → HTTP 409. No timestamp suffix disambiguation.
+- **Unit defaults** from `analytes.units_default` (locked). If analyte has no default, unit selection required (edge case).
+- **Tests at receive** are optional (locked)
+- **Existing tables only** (locked). No new tables for parked features.
+
+## 9. Open technical risks
 
 | Risk | Mitigation |
 |------|-----------|
 | **Required fields on `Sample` block "few fields" flow** | Audit `Sample` model: if `matrix`, `sample_type`, `project_id` are nullable=False, they are already "few fields". If other columns (e.g., `due_date`, `qc_type`) are not-null, either: (1) make nullable, or (2) add to "few fields" list. **Open question for Heidi/Deiter: which fields beyond barcode/sample_type/matrix/project are required?** |
-| **Barcode uniqueness across containers** | If `Container.name` has unique constraint, duplicate scans fail (409). If no constraint, duplicate barcodes allowed but may confuse downstream. **Open question: enforce unique barcodes or allow duplicates with timestamp disambiguation?** |
 | **Project auto-creation vs required project_id** | Current bulk accessioning auto-creates projects if `project_id=None`. Atomic receive may follow same pattern or require explicit project. **Open question: require project or auto-create?** |
 | **Transaction boundaries with async SQLAlchemy** | Use `async with db.begin()` context manager (SQLAlchemy 2.0 async). Existing codebase may use sync `Session`; audit and refactor service layer to async if needed. |
 | **Container type default** | If `container_type_id` is required on `Container`, either: (1) add `container_type_id` to request, or (2) use lab-wide default. **Open question: which container type for receive?** |
 | **Test status default** | Tests created at receive must have valid status (list entry). Use existing test status "In Process" or create "Pending" status. **Open question: which test status at receive?** |
-| **Result unit default** | If `unit_id` is null, use `analyte.units_default` or require explicit unit selection. **Open question: require unit or default from analyte?** |
 
-**Not inventing field list:** This sketch assumes "few fields" = barcode + sample_type + matrix + project + analyses. If product requires additional fields (date_sampled, qc_type, client_id, client_project_id, description, etc.), add them to `SampleReceiveRequest` schema after Lab Ops re-walk.
+**Not inventing field list:** This sketch assumes "few fields" = barcode + sample_type + matrix + project + optional analyses. If product requires additional fields (date_sampled, qc_type, client_id, client_project_id, description, etc.), add them to `SampleReceiveRequest` schema after Lab Ops re-walk.
 
-## 9. Phase mapping
+## 10. Phase mapping
 
 **P0 (atomic loop):**
 
-- Backend: `/api/samples/receive` endpoint (atomic transaction)
+- Backend: `/api/samples/receive` endpoint (atomic transaction, system-set status, unique barcode)
 - Backend: `/api/samples/{sample_id}/tests` POST/DELETE (add/remove tests)
-- Backend: `/api/tests/{test_id}/results` POST (result entry)
-- Frontend: receive form (scan barcode, select sample type/matrix/project/analyses)
+- Backend: `/api/tests/{test_id}/results` POST (result entry, unit defaults from analyte)
+- Frontend: receive form (scan barcode, sticky fields, stay-on-receive loop, focus barcode after success)
 - Frontend: sample detail "Add Test" / "Remove Test" buttons
-- Frontend: result entry form (raw value, unit, qualifier)
+- Frontend: result entry form (raw value, unit defaults from analyte, qualifier)
 - Migration: make `temperature` nullable (if not already)
+- Migration: ensure `Container.name` unique constraint exists
 
 **Deferred (not P0):**
 
@@ -313,4 +331,4 @@ No wizard; immediate add/remove.
 
 ---
 
-**Next step:** Lab Ops re-walk to resolve open questions (required fields, barcode uniqueness, project auto-create, container/test/unit defaults).
+**Next step:** Lab Ops Accepts with conditions (bench lock folded in). Remaining open questions: required fields beyond barcode/sample_type/matrix/project, project auto-create vs required, container type default, test status default.
