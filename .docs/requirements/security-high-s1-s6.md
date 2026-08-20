@@ -66,8 +66,9 @@ NimbleLIMS claims client isolation (RLS) and controlled lab write paths (entries
 | FR-S1.2 | Migrations / DDL shall continue to use an elevated role (owner/migrator); runtime app traffic shall not use that role. |
 | FR-S1.3 | On authenticated requests, the app shall set session GUCs used by RLS policies (at minimum `app.current_user_id`; `app.client_id` where policies require it) via `SET LOCAL` (or equivalent transaction-scoped bind) before business queries. |
 | FR-S1.4 | Unauthenticated / background paths shall not inherit another user’s GUC; default must fail closed (no rows / explicit denial), not “see all.” |
-| FR-S1.5 | Docker Compose / `.env.example` shall document `DATABASE_URL` for the **app** role separately from migrator credentials. |
+| FR-S1.5 | Docker Compose / `.env.example` shall document `DATABASE_URL` for the **app** role separately from migrator credentials (`MIGRATE_DATABASE_URL` + `LIMS_APP_PASSWORD`). |
 | FR-S1.6 | Automated tests shall demonstrate RLS isolation using the app role (extend existing `test_rls_*` patterns). |
+| FR-S1.7 | **Q1 Option C:** Backend entrypoint shall idempotently ensure role `lims_app`: create with password from `LIMS_APP_PASSWORD` only when missing; if role exists, ensure grants only and **do not** change password on normal starts. Explicit rotate is out-of-band / one-shot. |
 
 ### FR-S2 — Password hashing, seeds, first-login change, complexity
 
