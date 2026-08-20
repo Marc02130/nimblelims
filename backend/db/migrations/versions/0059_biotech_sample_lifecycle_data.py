@@ -19,6 +19,57 @@ from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 from datetime import datetime, timedelta
+import uuid
+
+_SEED_NS = uuid.UUID("6ba7b810-9dad-11d1-80b4-00c04fd430c8")
+_ID_KEYS = (
+    "id",
+    "client_id",
+    "project_id",
+    "user_id",
+    "analysis_id",
+    "analyte_id",
+    "battery_id",
+    "type_id",
+    "created_by",
+    "modified_by",
+    "sample_type",
+    "matrix",
+    "status",
+    "parent_sample_id",
+    "container_id",
+    "sample_id",
+    "technician_id",
+    "test_id",
+    "batch_id",
+    "entered_by",
+    "qc_type",
+    "concentration_units",
+    "amount_units",
+)
+
+
+def as_id(value):
+    """Turn a seed slug into a stable UUID; leave real UUIDs alone."""
+    if value is None:
+        return None
+    text = str(value)
+    try:
+        return str(uuid.UUID(text))
+    except ValueError:
+        return str(uuid.uuid5(_SEED_NS, f"nimblelims.seed.{text}"))
+
+
+def seed_params(data):
+    """Copy a seed dict, converting slug PK/FK fields to UUIDs."""
+    if data is None:
+        return None
+    out = dict(data)
+    for key in _ID_KEYS:
+        if key in out and out[key] is not None:
+            out[key] = as_id(out[key])
+    return out
+
 
 # revision identifiers, used by Alembic.
 revision = '0059'
@@ -116,10 +167,10 @@ def upgrade() -> None:
     plate96 = connection.execute(sa.text("SELECT id FROM container_types WHERE name = '96-Well Plate' LIMIT 1")).fetchone()
     microtube = connection.execute(sa.text("SELECT id FROM container_types WHERE name = 'Microcentrifuge Tube (1.5mL)' LIMIT 1")).fetchone()
     
-    cryovial_id = str(cryovial[0]) if cryovial else 'ctype-001-cryovial'
-    conical15_id = str(conical15[0]) if conical15 else 'ctype-002-conical15'
-    plate96_id = str(plate96[0]) if plate96 else 'ctype-004-plate96'
-    microtube_id = str(microtube[0]) if microtube else 'ctype-006-microtube'
+    cryovial_id = str(cryovial[0]) if cryovial else as_id('ctype-001-cryovial')
+    conical15_id = str(conical15[0]) if conical15 else as_id('ctype-002-conical15')
+    plate96_id = str(plate96[0]) if plate96 else as_id('ctype-004-plate96')
+    microtube_id = str(microtube[0]) if microtube else as_id('ctype-006-microtube')
     
     # Units
     ng_ul = connection.execute(sa.text("SELECT id FROM units WHERE name = 'ng/µL' LIMIT 1")).fetchone()
@@ -138,10 +189,10 @@ def upgrade() -> None:
     viability_analysis = connection.execute(sa.text("SELECT id FROM analyses WHERE name = 'Cell Viability (Trypan Blue)' LIMIT 1")).fetchone()
     identity_analysis = connection.execute(sa.text("SELECT id FROM analyses WHERE name = 'Identity (Sanger Sequencing)' LIMIT 1")).fetchone()
     
-    elisa_id = str(elisa_analysis[0]) if elisa_analysis else 'analysis-elisa-001'
-    qpcr_id = str(qpcr_analysis[0]) if qpcr_analysis else 'analysis-qpcr-001'
-    viability_id = str(viability_analysis[0]) if viability_analysis else 'analysis-viability-001'
-    identity_id = str(identity_analysis[0]) if identity_analysis else 'analysis-identity-seq-001'
+    elisa_id = str(elisa_analysis[0]) if elisa_analysis else as_id('analysis-elisa-001')
+    qpcr_id = str(qpcr_analysis[0]) if qpcr_analysis else as_id('analysis-qpcr-001')
+    viability_id = str(viability_analysis[0]) if viability_analysis else as_id('analysis-viability-001')
+    identity_id = str(identity_analysis[0]) if identity_analysis else as_id('analysis-identity-seq-001')
     
     # Analytes
     igg_conc_analyte = connection.execute(sa.text("SELECT id FROM analytes WHERE name = 'IgG Concentration' LIMIT 1")).fetchone()
@@ -149,10 +200,10 @@ def upgrade() -> None:
     cell_count_analyte = connection.execute(sa.text("SELECT id FROM analytes WHERE name = 'Total Cell Count' LIMIT 1")).fetchone()
     plasmid_copies_analyte = connection.execute(sa.text("SELECT id FROM analytes WHERE name = 'Plasmid Copy Number' LIMIT 1")).fetchone()
     
-    igg_conc_analyte_id = str(igg_conc_analyte[0]) if igg_conc_analyte else 'analyte-igg-conc'
-    viability_analyte_id = str(viability_analyte[0]) if viability_analyte else 'analyte-viability'
-    cell_count_analyte_id = str(cell_count_analyte[0]) if cell_count_analyte else 'analyte-cell-count'
-    plasmid_copies_analyte_id = str(plasmid_copies_analyte[0]) if plasmid_copies_analyte else 'analyte-plasmid-copies'
+    igg_conc_analyte_id = str(igg_conc_analyte[0]) if igg_conc_analyte else as_id('analyte-igg-conc')
+    viability_analyte_id = str(viability_analyte[0]) if viability_analyte else as_id('analyte-viability')
+    cell_count_analyte_id = str(cell_count_analyte[0]) if cell_count_analyte else as_id('analyte-cell-count')
+    plasmid_copies_analyte_id = str(plasmid_copies_analyte[0]) if plasmid_copies_analyte else as_id('analyte-plasmid-copies')
     
     # Compute dates
     today = datetime.utcnow()
@@ -187,7 +238,7 @@ def upgrade() -> None:
                 VALUES (:id, :name, true, NOW(), NOW(), :type_id, :row, :column, :concentration, :concentration_units, :amount, :amount_units, :created_by, :created_by)
                 ON CONFLICT (id) DO NOTHING
             """),
-            cont
+            seed_params(cont)
         )
     
     # ========================================================================
@@ -313,7 +364,7 @@ def upgrade() -> None:
                 VALUES (:id, :name, :description, true, :received_date, :received_date, :project_id, :sample_type, :matrix, :status, :received_date, :due_date, :temperature, :qc_type, :parent_sample_id, :created_by, :created_by)
                 ON CONFLICT (id) DO NOTHING
             """),
-            sample
+            seed_params(sample)
         )
     
     # ========================================================================
@@ -336,7 +387,7 @@ def upgrade() -> None:
                 VALUES (:container_id, :sample_id, :concentration, :concentration_units, :amount, :amount_units)
                 ON CONFLICT (container_id, sample_id) DO NOTHING
             """),
-            content
+            seed_params(content)
         )
     
     # ========================================================================
@@ -352,6 +403,7 @@ def upgrade() -> None:
             'status': test_complete_id,
             'technician_id': alice_id,
             'test_date': two_days_ago,
+            'review_date': None,
         },
         # mAb PK T1: ELISA test (in analysis, no results yet)
         {
@@ -362,6 +414,7 @@ def upgrade() -> None:
             'status': test_in_analysis_id,
             'technician_id': alice_id,
             'test_date': yesterday,
+            'review_date': None,
         },
         # mAb PK T2: ELISA test (just ordered, in process)
         {
@@ -372,6 +425,7 @@ def upgrade() -> None:
             'status': test_in_process_id,
             'technician_id': alice_id,
             'test_date': None,
+            'review_date': None,
         },
         # CAR-T: Cell viability test (in analysis)
         {
@@ -382,6 +436,7 @@ def upgrade() -> None:
             'status': test_in_analysis_id,
             'technician_id': bob_id,
             'test_date': yesterday,
+            'review_date': None,
         },
         # CAR-T Blank: Viability test (complete)
         {
@@ -392,6 +447,7 @@ def upgrade() -> None:
             'status': test_complete_id,
             'technician_id': bob_id,
             'test_date': yesterday,
+            'review_date': None,
         },
         # Plasmid: qPCR test (complete, reviewed)
         {
@@ -413,7 +469,7 @@ def upgrade() -> None:
                 VALUES (:id, :name, true, NOW(), NOW(), :sample_id, :analysis_id, :status, :technician_id, :test_date, :review_date, :technician_id, :technician_id)
                 ON CONFLICT (id) DO NOTHING
             """),
-            test
+            seed_params(test)
         )
     
     # ========================================================================
@@ -473,7 +529,7 @@ def upgrade() -> None:
                 VALUES (gen_random_uuid(), true, NOW(), NOW(), :test_id, :analyte_id, :raw_result, :reported_result, :qualifiers, :notes, :entry_date, :entered_by, :entered_by, :entered_by)
                 ON CONFLICT DO NOTHING
             """),
-            result
+            seed_params(result)
         )
     
     # ========================================================================
@@ -503,7 +559,7 @@ def upgrade() -> None:
                 VALUES (:id, :name, :description, true, NOW(), NOW(), :status, :created_by, :created_by)
                 ON CONFLICT (id) DO NOTHING
             """),
-            batch
+            seed_params(batch)
         )
     
     # Link containers to batches via batch_containers
@@ -522,7 +578,7 @@ def upgrade() -> None:
                 VALUES (:batch_id, :container_id, NOW())
                 ON CONFLICT (batch_id, container_id) DO NOTHING
             """),
-            bc
+            seed_params(bc)
         )
     
     print("✓ BioTech/Pharma sample lifecycle data loaded successfully")
@@ -537,14 +593,63 @@ def upgrade() -> None:
 def downgrade() -> None:
     """Rollback sample lifecycle data."""
     connection = op.get_bind()
-    
-    # Delete in reverse dependency order
-    connection.execute(sa.text("DELETE FROM batch_containers WHERE batch_id IN ('batch-mab-elisa-001', 'batch-cart-qc-001')"))
-    connection.execute(sa.text("DELETE FROM batches WHERE id IN ('batch-mab-elisa-001', 'batch-cart-qc-001')"))
-    connection.execute(sa.text("DELETE FROM results WHERE test_id IN ('test-mab-pk-t0-elisa', 'test-mab-pk-t1-elisa', 'test-mab-pk-t2-elisa', 'test-cart-viability', 'test-cart-blank-viability', 'test-plasmid-qpcr')"))
-    connection.execute(sa.text("DELETE FROM tests WHERE id IN ('test-mab-pk-t0-elisa', 'test-mab-pk-t1-elisa', 'test-mab-pk-t2-elisa', 'test-cart-viability', 'test-cart-blank-viability', 'test-plasmid-qpcr')"))
-    connection.execute(sa.text("DELETE FROM contents WHERE sample_id IN ('sample-mab-pk-t0', 'sample-mab-pk-t1', 'sample-mab-pk-t2', 'sample-mab-pk-t0-aliquot', 'sample-cart-batch1', 'sample-cart-blank', 'sample-plasmid-lot1')"))
-    connection.execute(sa.text("DELETE FROM samples WHERE id IN ('sample-mab-pk-t0', 'sample-mab-pk-t1', 'sample-mab-pk-t2', 'sample-mab-pk-t0-aliquot', 'sample-cart-batch1', 'sample-cart-blank', 'sample-plasmid-lot1')"))
-    connection.execute(sa.text("DELETE FROM containers WHERE id IN ('cont-mab-pk-t0', 'cont-mab-pk-t1', 'cont-mab-pk-t2', 'cont-mab-pk-t0-aliq', 'cont-cart-batch1', 'cont-cart-blank', 'cont-plasmid-lot1', 'cont-plate96-elisa')"))
-    
+
+    batch_ids = [as_id("batch-mab-elisa-001"), as_id("batch-cart-qc-001")]
+    test_ids = [
+        as_id("test-mab-pk-t0-elisa"),
+        as_id("test-mab-pk-t1-elisa"),
+        as_id("test-mab-pk-t2-elisa"),
+        as_id("test-cart-viability"),
+        as_id("test-cart-blank-viability"),
+        as_id("test-plasmid-qpcr"),
+    ]
+    sample_ids = [
+        as_id("sample-mab-pk-t0"),
+        as_id("sample-mab-pk-t1"),
+        as_id("sample-mab-pk-t2"),
+        as_id("sample-mab-pk-t0-aliquot"),
+        as_id("sample-cart-batch1"),
+        as_id("sample-cart-blank"),
+        as_id("sample-plasmid-lot1"),
+    ]
+    container_ids = [
+        as_id("cont-mab-pk-t0"),
+        as_id("cont-mab-pk-t1"),
+        as_id("cont-mab-pk-t2"),
+        as_id("cont-mab-pk-t0-aliq"),
+        as_id("cont-cart-batch1"),
+        as_id("cont-cart-blank"),
+        as_id("cont-plasmid-lot1"),
+        as_id("cont-plate96-elisa"),
+    ]
+
+    connection.execute(
+        sa.text("DELETE FROM batch_containers WHERE batch_id = ANY(:ids)"),
+        {"ids": batch_ids},
+    )
+    connection.execute(
+        sa.text("DELETE FROM batches WHERE id = ANY(:ids)"),
+        {"ids": batch_ids},
+    )
+    connection.execute(
+        sa.text("DELETE FROM results WHERE test_id = ANY(:ids)"),
+        {"ids": test_ids},
+    )
+    connection.execute(
+        sa.text("DELETE FROM tests WHERE id = ANY(:ids)"),
+        {"ids": test_ids},
+    )
+    connection.execute(
+        sa.text("DELETE FROM contents WHERE sample_id = ANY(:ids)"),
+        {"ids": sample_ids},
+    )
+    connection.execute(
+        sa.text("DELETE FROM samples WHERE id = ANY(:ids)"),
+        {"ids": sample_ids},
+    )
+    connection.execute(
+        sa.text("DELETE FROM containers WHERE id = ANY(:ids)"),
+        {"ids": container_ids},
+    )
+
     print("✓ BioTech/Pharma sample lifecycle data rolled back")

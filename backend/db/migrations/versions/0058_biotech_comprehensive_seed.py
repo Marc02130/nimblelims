@@ -246,7 +246,7 @@ def upgrade() -> None:
         connection.execute(
             sa.text("""
                 INSERT INTO clients (id, name, abbreviation, description, active, created_at, modified_at, billing_info)
-                VALUES (:id, :name, :abbreviation, :description, true, NOW(), NOW(), :billing_info::jsonb)
+                VALUES (:id, :name, :abbreviation, :description, true, NOW(), NOW(), CAST(:billing_info AS jsonb))
                 ON CONFLICT (id) DO NOTHING
             """),
             seed_params(client)
