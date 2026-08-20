@@ -21,6 +21,42 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 from datetime import datetime, timedelta
 
+import uuid
+
+_SEED_NS = uuid.UUID("6ba7b810-9dad-11d1-80b4-00c04fd430c8")
+_ID_KEYS = (
+    "id",
+    "client_id",
+    "project_id",
+    "user_id",
+    "analysis_id",
+    "analyte_id",
+    "battery_id",
+)
+
+
+def as_id(value):
+    """Turn a seed slug into a stable UUID; leave real UUIDs alone."""
+    if value is None:
+        return None
+    text = str(value)
+    try:
+        return str(uuid.UUID(text))
+    except ValueError:
+        return str(uuid.uuid5(_SEED_NS, f"nimblelims.seed.{text}"))
+
+
+def seed_params(data):
+    """Copy a seed dict, converting slug PK/FK fields to UUIDs."""
+    if data is None:
+        return None
+    out = dict(data)
+    for key in _ID_KEYS:
+        if key in out and out[key] is not None:
+            out[key] = as_id(out[key])
+    return out
+
+
 # revision identifiers, used by Alembic.
 revision = '0058'
 down_revision = '0057'
@@ -131,7 +167,7 @@ def upgrade() -> None:
                 VALUES (:id, :name, :description, :capacity, :material, :dimensions, :preservative, true, NOW(), NOW())
                 ON CONFLICT (id) DO NOTHING
             """),
-            ctype
+            seed_params(ctype)
         )
     
     # ========================================================================
@@ -213,7 +249,7 @@ def upgrade() -> None:
                 VALUES (:id, :name, :abbreviation, :description, true, NOW(), NOW(), :billing_info::jsonb)
                 ON CONFLICT (id) DO NOTHING
             """),
-            client
+            seed_params(client)
         )
     
     # ========================================================================
@@ -282,7 +318,7 @@ def upgrade() -> None:
                 VALUES (:id, :name, :username, :email, :password_hash, true, NOW(), NOW(), :role_id, :client_id)
                 ON CONFLICT (id) DO NOTHING
             """),
-            {
+            seed_params({
                 'id': user_data['id'],
                 'name': user_data['name'],
                 'username': user_data['username'],
@@ -290,7 +326,7 @@ def upgrade() -> None:
                 'password_hash': password_hash,
                 'role_id': user_data['role_id'],
                 'client_id': user_data['client_id'],
-            }
+            })
         )
     
     # ========================================================================
@@ -359,7 +395,7 @@ def upgrade() -> None:
                 VALUES (:id, :name, :description, true, NOW(), NOW(), :client_id, :status, :created_by, :modified_by)
                 ON CONFLICT (id) DO NOTHING
             """),
-            {
+            seed_params({
                 'id': project['id'],
                 'name': project['name'],
                 'description': project['description'],
@@ -367,7 +403,7 @@ def upgrade() -> None:
                 'status': project['status'],
                 'created_by': admin_user_id,
                 'modified_by': admin_user_id,
-            }
+            })
         )
     
     # ========================================================================
@@ -420,7 +456,7 @@ def upgrade() -> None:
                     VALUES (:project_id, :user_id, NOW())
                     ON CONFLICT (project_id, user_id) DO NOTHING
                 """),
-                pu
+                seed_params(pu)
             )
     
     # ========================================================================
@@ -501,7 +537,7 @@ def upgrade() -> None:
                 VALUES (:id, :name, :description, :method, :turnaround_time, :cost, :shelf_life, true, NOW(), NOW(), '{}')
                 ON CONFLICT (id) DO NOTHING
             """),
-            analysis
+            seed_params(analysis)
         )
     
     # ========================================================================
@@ -561,7 +597,7 @@ def upgrade() -> None:
                 VALUES (:id, :name, :description, true, NOW(), NOW(), :cas_number, :units_default, :data_type, '{}')
                 ON CONFLICT (id) DO NOTHING
             """),
-            analyte
+            seed_params(analyte)
         )
     
     # ========================================================================
@@ -591,7 +627,7 @@ def upgrade() -> None:
                 VALUES (:analysis_id, :analyte_id, :data_type, NULL, :high_value, :low_value, :significant_figures, NULL, NULL, :display_order, :is_required, NULL)
                 ON CONFLICT (analysis_id, analyte_id) DO NOTHING
             """),
-            junction
+            seed_params(junction)
         )
     
     # ========================================================================
@@ -610,7 +646,7 @@ def upgrade() -> None:
             VALUES (:id, :name, :description, :active, NOW(), NOW())
             ON CONFLICT (id) DO NOTHING
         """),
-        battery_data
+        seed_params(battery_data)
     )
     
     # Link analyses to battery with sequence
@@ -627,7 +663,7 @@ def upgrade() -> None:
                 VALUES (:battery_id, :analysis_id, :sequence, :is_optional, NOW())
                 ON CONFLICT (battery_id, analysis_id) DO NOTHING
             """),
-            ba
+            seed_params(ba)
         )
     
     print("✓ BioTech/Pharma comprehensive seed data loaded successfully")
@@ -644,18 +680,95 @@ def upgrade() -> None:
 def downgrade() -> None:
     """Rollback comprehensive seed data (deletes seeded records by known IDs)."""
     connection = op.get_bind()
-    
-    # Delete in reverse dependency order
-    connection.execute(sa.text("DELETE FROM battery_analyses WHERE battery_id = 'battery-cart-qc-001'"))
-    connection.execute(sa.text("DELETE FROM test_batteries WHERE id = 'battery-cart-qc-001'"))
-    connection.execute(sa.text("DELETE FROM analysis_analytes WHERE analysis_id IN ('analysis-elisa-001', 'analysis-qpcr-001', 'analysis-hplc-001', 'analysis-endotoxin-001', 'analysis-viability-001', 'analysis-identity-seq-001', 'analysis-epa-8080-legacy')"))
-    connection.execute(sa.text("DELETE FROM analytes WHERE id LIKE 'analyte-%'"))
-    connection.execute(sa.text("DELETE FROM analyses WHERE id LIKE 'analysis-%'"))
-    connection.execute(sa.text("DELETE FROM project_users WHERE project_id IN ('proj-mab-pk-001', 'proj-cell-therapy-002', 'proj-plasmid-003', 'proj-cro-sponsor-004', 'proj-alpha-legacy', 'proj-beta-legacy')"))
-    connection.execute(sa.text("DELETE FROM projects WHERE id LIKE 'proj-%'"))
-    connection.execute(sa.text("DELETE FROM users WHERE id LIKE 'user-%'"))
-    connection.execute(sa.text("DELETE FROM clients WHERE id IN ('client-biotech-001', 'client-cro-002')"))
-    connection.execute(sa.text("DELETE FROM container_types WHERE id LIKE 'ctype-%'"))
-    # Don't delete list_entries or units (may be used by other data)
-    
+
+    analysis_ids = [
+        as_id("analysis-elisa-001"),
+        as_id("analysis-qpcr-001"),
+        as_id("analysis-hplc-001"),
+        as_id("analysis-endotoxin-001"),
+        as_id("analysis-viability-001"),
+        as_id("analysis-identity-seq-001"),
+        as_id("analysis-epa-8080-legacy"),
+    ]
+    analyte_ids = [
+        as_id("analyte-igg-conc"),
+        as_id("analyte-plasmid-copies"),
+        as_id("analyte-purity-percent"),
+        as_id("analyte-endotoxin"),
+        as_id("analyte-viability"),
+        as_id("analyte-cell-count"),
+        as_id("analyte-identity-pass"),
+        as_id("analyte-a260-280"),
+    ]
+    project_ids = [
+        as_id("proj-mab-pk-001"),
+        as_id("proj-cell-therapy-002"),
+        as_id("proj-plasmid-003"),
+        as_id("proj-cro-sponsor-004"),
+        as_id("proj-alpha-legacy"),
+        as_id("proj-beta-legacy"),
+    ]
+    user_ids = [
+        as_id("user-tech-alice"),
+        as_id("user-tech-bob"),
+        as_id("user-manager-carol"),
+        as_id("user-client-cro"),
+    ]
+    client_ids = [
+        as_id("client-biotech-001"),
+        as_id("client-cro-002"),
+    ]
+    container_type_ids = [
+        as_id("ctype-001-cryovial"),
+        as_id("ctype-002-conical15"),
+        as_id("ctype-003-conical50"),
+        as_id("ctype-004-plate96"),
+        as_id("ctype-005-plate384"),
+        as_id("ctype-006-microtube"),
+        as_id("ctype-007-serum-tube"),
+        as_id("ctype-008-edta-tube"),
+    ]
+    battery_id = as_id("battery-cart-qc-001")
+
+    connection.execute(
+        sa.text("DELETE FROM battery_analyses WHERE battery_id = :id"),
+        {"id": battery_id},
+    )
+    connection.execute(
+        sa.text("DELETE FROM test_batteries WHERE id = :id"),
+        {"id": battery_id},
+    )
+    connection.execute(
+        sa.text("DELETE FROM analysis_analytes WHERE analysis_id = ANY(:ids)"),
+        {"ids": analysis_ids},
+    )
+    connection.execute(
+        sa.text("DELETE FROM analytes WHERE id = ANY(:ids)"),
+        {"ids": analyte_ids},
+    )
+    connection.execute(
+        sa.text("DELETE FROM analyses WHERE id = ANY(:ids)"),
+        {"ids": analysis_ids},
+    )
+    connection.execute(
+        sa.text("DELETE FROM project_users WHERE project_id = ANY(:ids)"),
+        {"ids": project_ids},
+    )
+    connection.execute(
+        sa.text("DELETE FROM projects WHERE id = ANY(:ids)"),
+        {"ids": project_ids},
+    )
+    connection.execute(
+        sa.text("DELETE FROM users WHERE id = ANY(:ids)"),
+        {"ids": user_ids},
+    )
+    connection.execute(
+        sa.text("DELETE FROM clients WHERE id = ANY(:ids)"),
+        {"ids": client_ids},
+    )
+    connection.execute(
+        sa.text("DELETE FROM container_types WHERE id = ANY(:ids)"),
+        {"ids": container_type_ids},
+    )
+
     print("✓ BioTech/Pharma comprehensive seed data rolled back")
