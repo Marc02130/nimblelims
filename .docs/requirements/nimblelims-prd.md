@@ -3,44 +3,45 @@
 ## 1. Introduction
 
 ### 1.1 Purpose
-This Product Requirements Document (PRD) outlines the requirements for the Minimum Viable Product (MVP) of an API-first Laboratory Information Management System (LIMS). The LIMS is designed to support core laboratory operations across various industries (e.g., clinical, research, environmental), focusing on sample tracking, test ordering, and results entry. This MVP emphasizes essential functionality, data security, and scalability, with configurable workflows for processes like aliquoting.
+This Product Requirements Document (PRD) outlines the requirements for the Minimum Viable Product (MVP) of an API-first Laboratory Information Management System (LIMS). NimbleLIMS is purpose-built for BioTech and Pharma startups, supporting core discovery and early-development laboratory operations: sample tracking, assay execution, dose-response analysis, and structured results management. This MVP emphasizes essential functionality for small research teams running iterative experiments, with configurable workflows for sample processing, aliquoting, and CRO collaboration.
 
-The system will be built using PostgreSQL as the database, Python (e.g., FastAPI with SQLAlchemy) for the backend, and React for the frontend. The API-first approach ensures all interactions occur via RESTful endpoints, enabling easy integration and frontend decoupling.
+The system will be built using PostgreSQL as the database, Python (FastAPI with SQLAlchemy) for the backend, and React for the frontend. The API-first approach ensures all interactions occur via RESTful endpoints, enabling easy integration and frontend decoupling.
 
 ### 1.2 Project Overview
-NimbleLIMS enables labs to manage samples from receipt to reporting, including tracking statuses, containers, aliquots/derivatives, and QC elements. It supports role-based access control (RBAC) to ensure data privacy, particularly for clients viewing only their own projects. Post-MVP expansions (e.g., instrument integration, result calculations) are noted but out of scope.
+NimbleLIMS enables BioTech and Pharma startup labs to manage compound and biological samples from receipt to results, including tracking statuses, containers, aliquots/derivatives, dose-response curves, and QC controls. It supports role-based access control (RBAC) to ensure data privacy for internal teams and external CRO partners. Post-MVP expansions (e.g., advanced instrument integration, multi-parameter calculations) are noted but out of scope.
 
 ### 1.3 Stakeholders
-- **Lab Technician**: Handles sample accessioning, test assignment, and results entry.
-- **Lab Manager**: Oversees workflows, reviews tests/results, manages batches.
-- **Administrator**: Manages users, roles, permissions, and system configurations.
-- **Client**: Views their samples, tests, and results within assigned projects.
+- **Lab Technician**: Handles compound/sample accessioning, assay assignment, dose-response execution, and results entry.
+- **Lab Manager**: Oversees experimental workflows, reviews assay results and curves, manages batch processing.
+- **Administrator**: Manages users, roles, permissions, and system configurations (assays, analytes, templates).
+- **CRO Partner**: Views shared project samples, assay results, and dose-response data within assigned collaborations.
 
 ### 1.4 Version History
 - Version 1.0: Initial draft based on planning discussions (October 21, 2025).
 - Version 1.1: Added admin configuration features (analyses, analytes, users, roles management) - December 2025.
-- Version 1.2: Added test batteries feature (grouped analyses with sequence ordering) - December 2025.
+- Version 1.2: Added assay panels feature (grouped analyses with sequence ordering) - December 2025.
 - Version 1.3: Added EAV (Entity-Attribute-Value) model for custom fields configurability - December 2025.
+- Version 1.4: Repositioned for BioTech and Pharma startups; updated seed data with drug discovery assays - August 2026.
 
 ## 2. Goals and Objectives
 
 ### 2.1 Business Goals
-- Streamline lab operations by automating sample tracking and results management.
-- Ensure data security and compliance with role-based and project-based access.
-- Provide a flexible, configurable system for common lab workflows.
-- Enable quick MVP launch to validate core features before expansions.
+- Accelerate drug discovery workflows for BioTech and Pharma startups by automating compound/sample tracking, assay execution, and dose-response analysis.
+- Ensure data security and IP protection with role-based access and CRO-partner isolation.
+- Provide a flexible, experiment-centric system tailored to early-stage R&D teams.
+- Enable rapid iteration and validation of assay protocols and screening campaigns.
 
 ### 2.2 User Goals
-- Efficiently accession and track samples through their lifecycle.
-- Order and assign tests seamlessly during sample intake.
-- Enter and review results in batches/plates with validation.
-- Securely access data based on roles and projects.
+- Efficiently accession compounds and biological samples with lineage tracking (aliquots, derivatives).
+- Execute dose-response assays (screening, hit validation, IC50 determination) with automated curve fitting.
+- Enter and review results in batch/plate formats with built-in QC validation.
+- Securely share assay data with external CRO partners while maintaining IP boundaries.
 
 ### 2.3 Success Metrics
-- 100% coverage of MVP features: sample tracking, test ordering, results entry.
-- User satisfaction: Measured via feedback on usability (e.g., <5 minutes for accessioning a sample).
-- Performance: API responses <500ms; handle 1,000 samples/projects without degradation.
-- Security: No unauthorized data access in testing.
+- 100% coverage of MVP features: sample tracking, assay execution, dose-response analysis, structured results.
+- User satisfaction: <5 minutes for compound accessioning; <10 minutes for dose-response review and approval.
+- Performance: API responses <500ms; handle 1,000+ compounds and 100+ experiments without degradation.
+- Security: No unauthorized data access; CRO partners see only assigned projects.
 
 ## 3. Scope
 
