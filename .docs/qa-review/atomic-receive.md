@@ -4,16 +4,16 @@
 **Status:** Accept with conditions  
 **Reviewer persona:** Testing / QA Lead (Tobias)  
 **Tech sketch:** [PR 30](https://github.com/Marc02130/nimblelims/pull/30) — `.docs/tech-sketch/atomic-receive.md` (C1 dropped; ignore merged #28)  
-**Related reviews:** Lab Ops L2–L4 (L1 retracted); CSO Accept; Architecture re-read requested; CEO Accept (PR 30 merged)  
-**Stories:** [PR 32](https://github.com/Marc02130/nimblelims/pull/32) — US-1 / US-7 / US-8 / US-30 rewritten to the receive loop. Do **not** UAT from `main` until 32 merges. Catalog restore after US-10 is in flight; do not rewrite coverage from a truncated file.  
+**Related reviews:** Lab Ops L2–L4 (L1 retracted); CSO Accept; Architecture re-read requested; CEO Accept (PR 30 merged; stamp [PR 33](https://github.com/Marc02130/nimblelims/pull/33))  
+**Stories:** [PR 32](https://github.com/Marc02130/nimblelims/pull/32) **merged** — full catalog on `main`. US-1 / US-7 / US-8 / US-30 match the receive loop.  
 **UAT script:** [`UAT_Scripts/uat-atomic-receive.md`](../../UAT_Scripts/uat-atomic-receive.md)  
 **Test data IDs:** shared with Anton (AR-HV / AR-DUP / AR-ID / AR-ST / AR-TST / AR-RES / AR-RBAC / AR-MU)
 
 ## Executive summary
 
-The PR 30 sketch is testable. Receive is a high-volume scan loop: one transaction, two identities, one status (**Available for Testing**), stay on the screen. On PR 32, US-1 is the receive happy path (no wizard, no sample-ID box, no status picker). US-7 / US-8 start tests at Assigned/Pending. US-30 is two identities. US-31 / US-33 / US-34 are parked for AR-01–AR-15.
+The PR 30 sketch is testable. Receive is a high-volume scan loop: one transaction, two identities, one status (**Available for Testing**), stay on the screen. US-1 is that happy path (no wizard, no sample-ID box, no status picker). US-7 / US-8 start tests at Assigned/Pending. US-30 is two identities. US-31 / US-33 / US-34 are parked for AR-01–AR-15.
 
-Implement gate is **OPEN** (CEO merged PR 30). QA review is not a substitute for the post-implement UAT pass. Hold human UAT against `main` stories until PR 32 merges and Wilhelmina finishes the US-11+ restore.
+Implement gate is **OPEN** (CEO merged PR 30). QA review is not a substitute for the post-implement UAT pass. Human UAT uses the merged PR 32 catalog on `main`. No third identity.
 
 Architecture lock on result persist: typed number → `results.reported_result` + `qualifiers`. `raw_result` may copy the same value. UAT asserts `reported_result`, not a new column.
 
@@ -26,7 +26,7 @@ Architecture lock on result persist: typed number → `results.reported_result` 
 | Negative paths | Duplicate barcode 409, missing required field 422, missing units_default 422, DELETE-with-results 400, RLS 403. |
 | UAT readiness | Lab-tech happy path + client/foreign-project denial. Manager override is out of this packet. |
 | Docs and Cursor | Implement prompt must update receive manuals and `uat-atomic-receive.md` (QA10). |
-| Story alignment | US-1 / US-7 / US-8 / US-30 match the sketch on PR 32. Do not UAT a hybrid from `main`. |
+| Story alignment | US-1 / US-7 / US-8 / US-30 match the sketch on merged PR 32. |
 | Results persist | Assert `reported_result` + `qualifiers`. Do not require a new column. |
 
 ## Conditions (must land with implement)
@@ -67,17 +67,17 @@ Do **not** fail atomic-receive UAT on:
 
 ## BA gaps (Wilhelmina)
 
-Resolved on PR 32 (US-1 through US-10 and SOP stories). Do not invent a third model.
+Resolved on merged PR 32. No third identity.
 
 | Was | Now |
 |-----|-----|
-| US-1 old wizard | Rewritten: atomic-receive happy path. AR-01–AR-15 replaces it. |
+| US-1 old wizard | Atomic-receive happy path. AR-01–AR-15 replaces it. |
 | US-7 In Process at create | Assigned/Pending at receive/add-test. |
 | US-30 lab_id on sample | Two identities. No `lab_id` column. |
 | US-31 / US-33 new tables | Parked. Not in AR-01–AR-15. |
 | Q3 user-entered lab_id | Closed. System sample ID + container barcode. |
 
-**Hold:** do not execute UAT against `main` stories until PR 32 merges. If the stories file is truncated after US-10, wait for the catalog restore. Do not rewrite AR coverage from a stub.
+Q1 (Tobias): this packet only sets **Available for Testing**. Dual path until US-10 result-level review UAT records a pass, then retire Reviewed/Reported on Sample.status.
 
 ## Verdict
 
@@ -85,5 +85,5 @@ Resolved on PR 32 (US-1 through US-10 and SOP stories). Do not invent a third mo
 |-------|--------|
 | **Verdict** | Accept with conditions |
 | **Date** | 2026-08-20 |
-| **Implement gate** | **OPEN** (CEO merged PR 30) |
-| **UAT pass** | Still required after implement, before merge. Hold vs `main` until PR 32 merges. |
+| **Implement gate** | **OPEN** (CEO merged PR 30; stamp PR 33) |
+| **UAT pass** | Still required after implement, before merge. Source: merged PR 32 catalog on `main`. |
