@@ -1,0 +1,89 @@
+# Schema changes: security-high-s1-s6
+
+**Feature / cycle:** High security remediation (S1–S6)  
+**Phases covered:** P0a–P0d  
+**Status:** Draft — ready for architecture review  
+**Alembic revisions:** _(fill when implemented)_  
+**Requirements:** [`.docs/requirements/security-high-s1-s6.md`](../requirements/security-high-s1-s6.md)  
+**Tech sketch:** [`.docs/tech-sketch/security-high-s1-s6.md`](../tech-sketch/security-high-s1-s6.md)  
+**Architecture review:** [`.docs/architecture-review/security-high-s1-s6.md`](../architecture-review/security-high-s1-s6.md)
+
+## 1. Summary
+
+This cycle is primarily **roles, grants, and application AuthN/AuthZ**. Table shapes for samples/entries/aliquots do **not** change. Expected DB work: create runtime role `lims_app`, grants, optional password_hash rehash for seed users, no new business tables.
+
+## 2. Delta (authoritative list)
+
+### 2.1 New tables
+
+| Table | Purpose | Key columns |
+|-------|---------|-------------|
+| — | None | — |
+
+### 2.2 Altered tables
+
+| Table | Change | Notes |
+|-------|--------|-------|
+| `users` | Optional data update: `password_hash` values | Rehash seeds / login upgrade; column type unchanged (`String(255)` — confirm bcrypt fit; widen if needed) |
+
+### 2.3 Constraints & indexes
+
+| Name | Definition | Why |
+|------|------------|-----|
+| — | None required for S1–S6 | — |
+
+### 2.4 Enums / types
+
+| Type | Change |
+|------|--------|
+| — | None |
+
+### 2.5 Roles / grants (DB objects)
+
+| Object | Change | Why |
+|--------|--------|-----|
+| Role `lims_app` | CREATE LOGIN role | S1 runtime non-owner |
+| Grants on `public` tables/sequences | SELECT, INSERT, UPDATE, DELETE, USAGE | App least privilege |
+| Privileges | No SUPERUSER, no BYPASSRLS, not OWNER | So FORCE RLS applies |
+
+Exact password bootstrap: open question Q1 (compose secret vs migration).
+
+## 3. RLS
+
+| Object | Policy change | Notes |
+|--------|---------------|-------|
+| Existing policies | **No rewrite required** for S1–S6 | Making app role non-owner is the fix |
+| FORCE RLS | Keep as-is on ELN/entry tables | Already present; ineffective today for owner |
+| GUC bind | Application `set_config(..., true)` | Not a DDL change |
+
+**Explicitly deferred to Med follow-up (S11):** FORCE RLS on samples/tests/results; fix `is_admin() OR true`; contents RLS.
+
+## 4. Data migration / backfill
+
+- [x] None for schema shape  
+- [ ] Optional: UPDATE seed users’ `password_hash` to bcrypt when `ALLOW_DEV_SEED_USERS`  
+- [ ] Login-time upgrade for legacy SHA256 (app-layer, not Alembic)
+
+## 5. Rollback
+
+- Role `lims_app`: DROP ROLE after revoking grants (forward-only preferred in prod).  
+- Password hashes: bcrypt-only is forward-compatible; keep SHA256 verify until all users upgraded, then remove.
+
+## 6. Explicitly out of scope (this cycle)
+
+- New audit event tables  
+- Changing RLS policy expressions (S11)  
+- Dropping published port 5432 (S12)  
+- Altering entry/aliquot table columns  
+
+## 7. Open schema blockers
+
+- [open-questions/security-high-s1-s6.md](../open-questions/security-high-s1-s6.md) **Q1** (role bootstrap) blocks P0d migration authoring.  
+- **Q2** affects whether production DBs delete seed users (data op, not schema).
+
+## 8. Implementation checklist
+
+- [ ] Migration(s) match this doc  
+- [ ] Models unchanged (or `password_hash` length only)  
+- [ ] RLS tested with `lims_app`  
+- [ ] This file updated with revision id(s)  
