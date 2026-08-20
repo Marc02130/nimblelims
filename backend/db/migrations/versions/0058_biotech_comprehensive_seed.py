@@ -316,7 +316,7 @@ def upgrade() -> None:
             sa.text("""
                 INSERT INTO users (id, name, username, email, password_hash, active, created_at, modified_at, role_id, client_id)
                 VALUES (:id, :name, :username, :email, :password_hash, true, NOW(), NOW(), :role_id, :client_id)
-                ON CONFLICT (id) DO NOTHING
+                ON CONFLICT (username) DO NOTHING
             """),
             seed_params({
                 'id': user_data['id'],
@@ -391,9 +391,9 @@ def upgrade() -> None:
     for project in projects_data:
         connection.execute(
             sa.text("""
-                INSERT INTO projects (id, name, description, active, created_at, modified_at, client_id, status, created_by, modified_by)
-                VALUES (:id, :name, :description, true, NOW(), NOW(), :client_id, :status, :created_by, :modified_by)
-                ON CONFLICT (id) DO NOTHING
+                INSERT INTO projects (id, name, description, active, created_at, modified_at, client_id, status, created_by, modified_by, start_date)
+                VALUES (:id, :name, :description, true, NOW(), NOW(), :client_id, :status, :created_by, :modified_by, NOW())
+                ON CONFLICT (name) DO NOTHING
             """),
             seed_params({
                 'id': project['id'],
@@ -452,7 +452,7 @@ def upgrade() -> None:
         if pu:  # Skip None entries
             connection.execute(
                 sa.text("""
-                    INSERT INTO project_users (project_id, user_id, created_at)
+                    INSERT INTO project_users (project_id, user_id, granted_at)
                     VALUES (:project_id, :user_id, NOW())
                     ON CONFLICT (project_id, user_id) DO NOTHING
                 """),
@@ -535,7 +535,7 @@ def upgrade() -> None:
             sa.text("""
                 INSERT INTO analyses (id, name, description, method, turnaround_time, cost, shelf_life, active, created_at, modified_at, custom_attributes)
                 VALUES (:id, :name, :description, :method, :turnaround_time, :cost, :shelf_life, true, NOW(), NOW(), '{}')
-                ON CONFLICT (id) DO NOTHING
+                ON CONFLICT (name) DO NOTHING
             """),
             seed_params(analysis)
         )
@@ -595,7 +595,7 @@ def upgrade() -> None:
             sa.text("""
                 INSERT INTO analytes (id, name, description, active, created_at, modified_at, cas_number, units_default, data_type, custom_attributes)
                 VALUES (:id, :name, :description, true, NOW(), NOW(), :cas_number, :units_default, :data_type, '{}')
-                ON CONFLICT (id) DO NOTHING
+                ON CONFLICT (name) DO NOTHING
             """),
             seed_params(analyte)
         )
@@ -644,23 +644,23 @@ def upgrade() -> None:
         sa.text("""
             INSERT INTO test_batteries (id, name, description, active, created_at, modified_at)
             VALUES (:id, :name, :description, :active, NOW(), NOW())
-            ON CONFLICT (id) DO NOTHING
+            ON CONFLICT (name) DO NOTHING
         """),
         seed_params(battery_data)
     )
     
     # Link analyses to battery with sequence
     battery_analyses = [
-        {'battery_id': 'battery-cart-qc-001', 'analysis_id': 'analysis-viability-001', 'sequence': 1, 'is_optional': False},
-        {'battery_id': 'battery-cart-qc-001', 'analysis_id': 'analysis-identity-seq-001', 'sequence': 2, 'is_optional': False},
-        {'battery_id': 'battery-cart-qc-001', 'analysis_id': 'analysis-endotoxin-001', 'sequence': 3, 'is_optional': False},
+        {'battery_id': 'battery-cart-qc-001', 'analysis_id': 'analysis-viability-001', 'sequence': 1, 'optional': False},
+        {'battery_id': 'battery-cart-qc-001', 'analysis_id': 'analysis-identity-seq-001', 'sequence': 2, 'optional': False},
+        {'battery_id': 'battery-cart-qc-001', 'analysis_id': 'analysis-endotoxin-001', 'sequence': 3, 'optional': False},
     ]
     
     for ba in battery_analyses:
         connection.execute(
             sa.text("""
-                INSERT INTO battery_analyses (battery_id, analysis_id, sequence, is_optional, created_at)
-                VALUES (:battery_id, :analysis_id, :sequence, :is_optional, NOW())
+                INSERT INTO battery_analyses (battery_id, analysis_id, sequence, optional)
+                VALUES (:battery_id, :analysis_id, :sequence, :optional)
                 ON CONFLICT (battery_id, analysis_id) DO NOTHING
             """),
             seed_params(ba)

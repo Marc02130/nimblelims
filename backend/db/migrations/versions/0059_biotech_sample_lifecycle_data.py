@@ -525,7 +525,7 @@ def upgrade() -> None:
     for result in results_data:
         connection.execute(
             sa.text("""
-                INSERT INTO results (id, active, created_at, modified_at, test_id, analyte_id, raw_result, reported_result, qualifiers, notes, entry_date, entered_by, created_by, modified_by)
+                INSERT INTO results (id, active, created_at, modified_at, test_id, analyte_id, raw_result, reported_result, qualifiers, description, entry_date, entered_by, created_by, modified_by)
                 VALUES (gen_random_uuid(), true, NOW(), NOW(), :test_id, :analyte_id, :raw_result, :reported_result, :qualifiers, :notes, :entry_date, :entered_by, :entered_by, :entered_by)
                 ON CONFLICT DO NOTHING
             """),
@@ -574,8 +574,8 @@ def upgrade() -> None:
     for bc in batch_containers_data:
         connection.execute(
             sa.text("""
-                INSERT INTO batch_containers (batch_id, container_id, created_at)
-                VALUES (:batch_id, :container_id, NOW())
+                INSERT INTO batch_containers (batch_id, container_id)
+                VALUES (:batch_id, :container_id)
                 ON CONFLICT (batch_id, container_id) DO NOTHING
             """),
             seed_params(bc)

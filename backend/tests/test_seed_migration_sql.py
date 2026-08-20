@@ -85,6 +85,39 @@ def test_0059_seed_params_converts_sample_and_parent_ids():
     assert out["name"] == "mAb-2301-PK-T0-Aliq"
 
 
+def test_0058_unique_name_tables_conflict_on_name():
+    source = MIGRATION_0058.read_text()
+    assert "INSERT INTO analyses" in source
+    analyses_block = source.split("INSERT INTO analyses", 1)[1].split("for analysis in", 1)[0]
+    assert "ON CONFLICT (name) DO NOTHING" in analyses_block
+
+    source = MIGRATION_0058.read_text()
+    assert "start_date" in source
+    assert "INSERT INTO projects" in source
+
+
+def test_0058_project_users_uses_granted_at():
+    source = MIGRATION_0058.read_text()
+    assert "INSERT INTO project_users (project_id, user_id, granted_at)" in source
+    assert "INSERT INTO project_users (project_id, user_id, created_at)" not in source
+
+
+def test_0058_battery_analyses_uses_optional_column():
+    source = MIGRATION_0058.read_text()
+    assert "INSERT INTO battery_analyses (battery_id, analysis_id, sequence, optional)" in source
+    assert "is_optional" not in source
+
+
+def test_0059_results_use_description_not_notes_column():
+    source = MIGRATION_0059.read_text()
+    assert "qualifiers, description, entry_date" in source
+    assert "qualifiers, notes, entry_date" not in source
+
+    source = MIGRATION_0059.read_text()
+    assert "INSERT INTO batch_containers (batch_id, container_id)" in source
+    assert "INSERT INTO batch_containers (batch_id, container_id, created_at)" not in source
+
+
 def test_0059_tests_include_review_date_bind():
     source = MIGRATION_0059.read_text()
     assert "'review_date': None" in source
