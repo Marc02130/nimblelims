@@ -916,11 +916,11 @@ List analyses with optional filtering, search, and pagination.
   "analyses": [
     {
       "id": "uuid",
-      "name": "EPA 8080",
-      "description": "Organochlorine pesticides analysis",
-      "method": "EPA 8080",
-      "turnaround_time": 5,
-      "cost": 100.00,
+      "name": "Dose-Response Screening",
+      "description": "10-point dose-response for IC50 determination",
+      "method": "384-well dose-response with curve fitting",
+      "turnaround_time": 2,
+      "cost": 120.00,
       "shelf_life": 14,
       "active": true,
       "created_at": "2026-01-01T00:00:00Z",
@@ -1450,8 +1450,8 @@ Create a new test battery.
 **Request:**
 ```json
 {
-  "name": "EPA 8080 Full",
-  "description": "Full EPA Method 8080 battery"
+  "name": "ADME Panel",
+  "description": "Complete ADME profiling panel for drug discovery"
 }
 ```
 

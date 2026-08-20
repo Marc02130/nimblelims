@@ -1,4 +1,4 @@
-"""Add seed data for initial tests: pH, EPA 8080, Total Coliform
+"""Add seed data for BioTech/Pharma startup assays: Cell Viability, Binding Affinity, ADME Panel
 
 Revision ID: 0027
 Revises: 0026
@@ -20,38 +20,50 @@ def upgrade() -> None:
     # Create connection for data insertion
     connection = op.get_bind()
 
-    # Resolve µg/L, cfm, ml unit ID (0004 seeds units with gen_random_uuid(), so we look up by name)
-    ng_per_l_row = connection.execute(
-        sa.text("SELECT id FROM units WHERE name = 'ng/L' LIMIT 1")
+    # Resolve unit IDs (µM, nM, %, cells/mL from migration 0004)
+    um_row = connection.execute(
+        sa.text("SELECT id FROM units WHERE name = 'µM' LIMIT 1")
     ).fetchone()
-    ng_per_l_id = str(ng_per_l_row[0]) if ng_per_l_row else None
+    um_id = str(um_row[0]) if um_row else None
 
-    cfm_row = connection.execute(
-        sa.text("SELECT id FROM units WHERE name = 'cfu' LIMIT 1")
+    nm_row = connection.execute(
+        sa.text("SELECT id FROM units WHERE name = 'nM' LIMIT 1")
     ).fetchone()
-    cfm_id = str(cfm_row[0]) if cfm_row else None
+    nm_id = str(nm_row[0]) if nm_row else None
 
-    ml_row = connection.execute(
-        sa.text("SELECT id FROM units WHERE name = 'mL' LIMIT 1")
+    percent_row = connection.execute(
+        sa.text("SELECT id FROM units WHERE name = '%' LIMIT 1")
     ).fetchone()
-    ml_id = str(ml_row[0]) if ml_row else None
+    percent_id = str(percent_row[0]) if percent_row else None
 
-    # Seed analytes (from schema dump); units_default uses ng/L when present
+    cells_ml_row = connection.execute(
+        sa.text("SELECT id FROM units WHERE name = 'cells/mL' LIMIT 1")
+    ).fetchone()
+    cells_ml_id = str(cells_ml_row[0]) if cells_ml_row else None
+
+    # Seed analytes for BioTech/Pharma assays
     analytes_data = [
-        {'id': 'a0000001-a000-a000-a000-a00000000001', 'name': 'pH', 'description': 'pH value', 'cas_number': None, 'units_default': None, 'data_type': 'numeric'},
-        {'id': 'a0000005-a000-a000-a000-a00000000005', 'name': 'Total Coliforms', 'description': 'Coliform bacteria count', 'cas_number': None, 'units_default': cfm_id, 'data_type': 'numeric'},
-        {'id': 'a0000002-a000-a000-a000-a00000000002', 'name': 'Aldrin', 'description': 'Organochlorine pesticide', 'cas_number': None, 'units_default': ng_per_l_id, 'data_type': 'numeric'},
-        {'id': 'a0000004-a000-a000-a000-a00000000005', 'name': 'Initial Volume (mL)', 'description': 'Sample volume extracted', 'cas_number': None, 'units_default': ml_id, 'data_type': 'numeric'},
-        {'id': 'a0000006-a000-a000-a000-a00000000006', 'name': 'E. coli', 'description': 'Escherichia coli count', 'cas_number': None, 'units_default': cfm_id, 'data_type': 'numeric'},
-        {'id': 'a0000003-a000-a000-a000-a00000000003', 'name': 'DDT', 'description': 'Organochlorine pesticide', 'cas_number': None, 'units_default': ng_per_l_id, 'data_type': 'numeric'},
-        {'id': 'a0000004-a000-a000-a000-a00000000004', 'name': 'Aroclor-1016', 'description': 'Polychlorinated biphenyl', 'cas_number': None, 'units_default': ng_per_l_id, 'data_type': 'numeric'},
-        {'id': 'a29d9fde-b207-480a-80b7-e7130fdd8841', 'name': 'Aroclor-1254', 'description': None, 'cas_number': None, 'units_default': ng_per_l_id, 'data_type': 'numeric'},
-        {'id': 'd1b0e504-04d5-4142-9031-7d6e894e3771', 'name': 'Aroclor-1242', 'description': None, 'cas_number': None, 'units_default': ng_per_l_id, 'data_type': 'numeric'},
-        {'id': '742ee5ab-b398-41a3-a8c2-c0b4a92d2aa2', 'name': 'Aroclor-1260', 'description': None, 'cas_number': None, 'units_default': ng_per_l_id, 'data_type': 'numeric'},
-        {'id': 'e956c850-6c4b-48f4-b60e-db791988cfba', 'name': 'Aroclor-1248', 'description': None, 'cas_number': None, 'units_default': ng_per_l_id, 'data_type': 'numeric'},
-        {'id': 'ec8e95ba-e2db-4b4a-aba3-7544725c4eee', 'name': 'Aroclor-1221', 'description': None, 'cas_number': None, 'units_default': ng_per_l_id, 'data_type': 'numeric'},
-        {'id': 'd408fae9-284c-4bf3-9086-a5937557abad', 'name': 'DDD', 'description': None, 'cas_number': None, 'units_default': ng_per_l_id, 'data_type': 'numeric'},
-        {'id': '046d7933-c8ae-48a5-998d-7613c8220d48', 'name': 'DDE', 'description': None, 'cas_number': None, 'units_default': ng_per_l_id, 'data_type': 'numeric'},
+        # Cell Viability Assay
+        {'id': 'a0000001-a000-a000-a000-a00000000001', 'name': 'Cell Viability (%)', 'description': 'Percent viable cells (ATP luminescence or MTT)', 'cas_number': None, 'units_default': percent_id, 'data_type': 'numeric'},
+        {'id': 'a0000002-a000-a000-a000-a00000000002', 'name': 'IC50', 'description': 'Half-maximal inhibitory concentration', 'cas_number': None, 'units_default': um_id, 'data_type': 'numeric'},
+        {'id': 'a0000003-a000-a000-a000-a00000000003', 'name': 'Emax', 'description': 'Maximum effect / % inhibition at highest dose', 'cas_number': None, 'units_default': percent_id, 'data_type': 'numeric'},
+        
+        # Binding Affinity Assay
+        {'id': 'a0000004-a000-a000-a000-a00000000004', 'name': 'Kd', 'description': 'Dissociation constant (binding affinity)', 'cas_number': None, 'units_default': nm_id, 'data_type': 'numeric'},
+        {'id': 'a0000005-a000-a000-a000-a00000000005', 'name': 'Bmax', 'description': 'Maximum binding capacity', 'cas_number': None, 'units_default': None, 'data_type': 'numeric'},
+        
+        # Kinase Activity Assay
+        {'id': 'a0000006-a000-a000-a000-a00000000006', 'name': 'Kinase Inhibition (%)', 'description': 'Percent kinase activity inhibition', 'cas_number': None, 'units_default': percent_id, 'data_type': 'numeric'},
+        {'id': 'a0000007-a000-a000-a000-a00000000007', 'name': 'Ki', 'description': 'Inhibitor constant', 'cas_number': None, 'units_default': nm_id, 'data_type': 'numeric'},
+        
+        # ADME Panel
+        {'id': 'a0000008-a000-a000-a000-a00000000008', 'name': 'Clearance', 'description': 'Metabolic clearance rate (µL/min/mg protein)', 'cas_number': None, 'units_default': None, 'data_type': 'numeric'},
+        {'id': 'a0000009-a000-a000-a000-a00000000009', 'name': 'Permeability', 'description': 'Caco-2 permeability (nm/s)', 'cas_number': None, 'units_default': None, 'data_type': 'numeric'},
+        {'id': 'a0000010-a000-a000-a000-a00000000010', 'name': 'Plasma Protein Binding (%)', 'description': 'Percent bound to plasma proteins', 'cas_number': None, 'units_default': percent_id, 'data_type': 'numeric'},
+        {'id': 'a0000011-a000-a000-a000-a00000000011', 'name': 'Solubility', 'description': 'Aqueous solubility (µg/mL)', 'cas_number': None, 'units_default': None, 'data_type': 'numeric'},
+        
+        # Cell Count / Seeding
+        {'id': 'a0000012-a000-a000-a000-a00000000012', 'name': 'Cell Count', 'description': 'Initial cell seeding density', 'cas_number': None, 'units_default': cells_ml_id, 'data_type': 'numeric'},
     ]
 
     for analyte in analytes_data:
@@ -64,13 +76,13 @@ def upgrade() -> None:
             analyte
         )
 
-    # Seed analyses (from schema dump)
+    # Seed analyses for BioTech/Pharma workflows
     analyses_data = [
-        {'id': 'b0000003-b000-b000-b000-b00000000003', 'name': 'Total Coliform Enumeration', 'description': None, 'method': 'Colilert or Membrane Filtration', 'turnaround_time': 2, 'cost': 50.00, 'shelf_life': None},
-        {'id': 'b0000002-b000-b000-b000-b00000000004', 'name': 'EPA Method 8080 Prep', 'description': None, 'method': 'Sample Extractionfor Organochlorine Pesticides and PCBs', 'turnaround_time': 7, 'cost': 25.00, 'shelf_life': None},
-        {'id': 'b0000001-b000-b000-b000-b00000000001', 'name': 'pH Measurement', 'description': None, 'method': 'Electrometric', 'turnaround_time': 1, 'cost': 10.00, 'shelf_life': None},
-        {'id': 'b0000002-b000-b000-b000-b00000000002', 'name': 'EPA Method 8080', 'description': 'test', 'method': 'GC/ECD for Organochlorine PCBs', 'turnaround_time': 14, 'cost': 150.00, 'shelf_life': None},
-        {'id': 'aa12ed7f-282b-46bc-80da-d00fe61d59c4', 'name': 'EPA Method 8080 Pest', 'description': None, 'method': 'GC/ECD for Organochlorine Pesticides', 'turnaround_time': 14, 'cost': 180.00, 'shelf_life': None},
+        {'id': 'b0000001-b000-b000-b000-b00000000001', 'name': 'Cell Viability Assay (ATP)', 'description': 'CellTiter-Glo luminescent cell viability', 'method': 'ATP luminescence (96-well plate reader)', 'turnaround_time': 1, 'cost': 50.00, 'shelf_life': None},
+        {'id': 'b0000002-b000-b000-b000-b00000000002', 'name': 'Dose-Response Screening', 'description': '10-point dose-response for IC50 determination', 'method': '384-well dose-response with curve fitting', 'turnaround_time': 2, 'cost': 120.00, 'shelf_life': None},
+        {'id': 'b0000003-b000-b000-b000-b00000000003', 'name': 'Target Binding Assay', 'description': 'Fluorescence polarization binding assay', 'method': 'FP or SPR for Kd determination', 'turnaround_time': 3, 'cost': 200.00, 'shelf_life': None},
+        {'id': 'b0000004-b000-b000-b000-b00000000004', 'name': 'Kinase Selectivity Panel', 'description': 'Multi-kinase inhibition profiling', 'method': 'Radiometric or HTRF kinase assay', 'turnaround_time': 5, 'cost': 350.00, 'shelf_life': None},
+        {'id': 'b0000005-b000-b000-b000-b00000000005', 'name': 'ADME Profiling', 'description': 'In vitro ADME panel (clearance, permeability, solubility)', 'method': 'Liver microsome stability + Caco-2', 'turnaround_time': 7, 'cost': 450.00, 'shelf_life': None},
     ]
 
     for analysis in analyses_data:
@@ -83,22 +95,29 @@ def upgrade() -> None:
             analysis
         )
 
-    # Seed analysis_analytes (from schema dump)
+    # Seed analysis_analytes (link analytes to assays with validation rules)
     analysis_analytes_data = [
-        {'analysis_id': 'b0000002-b000-b000-b000-b00000000002', 'analyte_id': 'a0000004-a000-a000-a000-a00000000004', 'data_type': 'numeric', 'list_id': None, 'high_value': None, 'low_value': 0.0, 'significant_figures': 3, 'calculation': None, 'reported_name': None, 'display_order': None, 'is_required': True, 'default_value': None},
-        {'analysis_id': 'b0000002-b000-b000-b000-b00000000004', 'analyte_id': 'a0000004-a000-a000-a000-a00000000005', 'data_type': 'numeric', 'list_id': None, 'high_value': None, 'low_value': 0.0, 'significant_figures': 3, 'calculation': None, 'reported_name': None, 'display_order': None, 'is_required': True, 'default_value': None},
-        {'analysis_id': 'b0000003-b000-b000-b000-b00000000003', 'analyte_id': 'a0000005-a000-a000-a000-a00000000005', 'data_type': 'count', 'list_id': None, 'high_value': None, 'low_value': 0.0, 'significant_figures': 0, 'calculation': None, 'reported_name': None, 'display_order': None, 'is_required': True, 'default_value': None},
-        {'analysis_id': 'b0000003-b000-b000-b000-b00000000003', 'analyte_id': 'a0000006-a000-a000-a000-a00000000006', 'data_type': 'count', 'list_id': None, 'high_value': None, 'low_value': 0.0, 'significant_figures': 0, 'calculation': None, 'reported_name': None, 'display_order': None, 'is_required': True, 'default_value': None},
-        {'analysis_id': 'b0000001-b000-b000-b000-b00000000001', 'analyte_id': 'a0000001-a000-a000-a000-a00000000001', 'data_type': None, 'list_id': None, 'high_value': None, 'low_value': None, 'significant_figures': None, 'calculation': None, 'reported_name': None, 'display_order': None, 'is_required': False, 'default_value': None},
-        {'analysis_id': 'aa12ed7f-282b-46bc-80da-d00fe61d59c4', 'analyte_id': 'd408fae9-284c-4bf3-9086-a5937557abad', 'data_type': None, 'list_id': None, 'high_value': None, 'low_value': None, 'significant_figures': None, 'calculation': None, 'reported_name': None, 'display_order': None, 'is_required': False, 'default_value': None},
-        {'analysis_id': 'aa12ed7f-282b-46bc-80da-d00fe61d59c4', 'analyte_id': 'a0000003-a000-a000-a000-a00000000003', 'data_type': None, 'list_id': None, 'high_value': None, 'low_value': None, 'significant_figures': None, 'calculation': None, 'reported_name': None, 'display_order': None, 'is_required': False, 'default_value': None},
-        {'analysis_id': 'aa12ed7f-282b-46bc-80da-d00fe61d59c4', 'analyte_id': '046d7933-c8ae-48a5-998d-7613c8220d48', 'data_type': None, 'list_id': None, 'high_value': None, 'low_value': None, 'significant_figures': None, 'calculation': None, 'reported_name': None, 'display_order': None, 'is_required': False, 'default_value': None},
-        {'analysis_id': 'aa12ed7f-282b-46bc-80da-d00fe61d59c4', 'analyte_id': 'a0000002-a000-a000-a000-a00000000002', 'data_type': None, 'list_id': None, 'high_value': None, 'low_value': None, 'significant_figures': None, 'calculation': None, 'reported_name': None, 'display_order': None, 'is_required': False, 'default_value': None},
-        {'analysis_id': 'b0000002-b000-b000-b000-b00000000002', 'analyte_id': 'ec8e95ba-e2db-4b4a-aba3-7544725c4eee', 'data_type': None, 'list_id': None, 'high_value': None, 'low_value': None, 'significant_figures': None, 'calculation': None, 'reported_name': None, 'display_order': None, 'is_required': False, 'default_value': None},
-        {'analysis_id': 'b0000002-b000-b000-b000-b00000000002', 'analyte_id': 'd1b0e504-04d5-4142-9031-7d6e894e3771', 'data_type': None, 'list_id': None, 'high_value': None, 'low_value': None, 'significant_figures': None, 'calculation': None, 'reported_name': None, 'display_order': None, 'is_required': False, 'default_value': None},
-        {'analysis_id': 'b0000002-b000-b000-b000-b00000000002', 'analyte_id': 'e956c850-6c4b-48f4-b60e-db791988cfba', 'data_type': None, 'list_id': None, 'high_value': None, 'low_value': None, 'significant_figures': None, 'calculation': None, 'reported_name': None, 'display_order': None, 'is_required': False, 'default_value': None},
-        {'analysis_id': 'b0000002-b000-b000-b000-b00000000002', 'analyte_id': 'a29d9fde-b207-480a-80b7-e7130fdd8841', 'data_type': None, 'list_id': None, 'high_value': None, 'low_value': None, 'significant_figures': None, 'calculation': None, 'reported_name': None, 'display_order': None, 'is_required': False, 'default_value': None},
-        {'analysis_id': 'b0000002-b000-b000-b000-b00000000002', 'analyte_id': '742ee5ab-b398-41a3-a8c2-c0b4a92d2aa2', 'data_type': None, 'list_id': None, 'high_value': None, 'low_value': None, 'significant_figures': None, 'calculation': None, 'reported_name': None, 'display_order': None, 'is_required': False, 'default_value': None},
+        # Cell Viability Assay
+        {'analysis_id': 'b0000001-b000-b000-b000-b00000000001', 'analyte_id': 'a0000012-a000-a000-a000-a00000000012', 'data_type': 'numeric', 'list_id': None, 'high_value': None, 'low_value': 0.0, 'significant_figures': 3, 'calculation': None, 'reported_name': None, 'display_order': 1, 'is_required': True, 'default_value': None},
+        {'analysis_id': 'b0000001-b000-b000-b000-b00000000001', 'analyte_id': 'a0000001-a000-a000-a000-a00000000001', 'data_type': 'numeric', 'list_id': None, 'high_value': 100.0, 'low_value': 0.0, 'significant_figures': 2, 'calculation': None, 'reported_name': None, 'display_order': 2, 'is_required': True, 'default_value': None},
+        
+        # Dose-Response Screening
+        {'analysis_id': 'b0000002-b000-b000-b000-b00000000002', 'analyte_id': 'a0000002-a000-a000-a000-a00000000002', 'data_type': 'numeric', 'list_id': None, 'high_value': None, 'low_value': 0.0, 'significant_figures': 3, 'calculation': None, 'reported_name': None, 'display_order': 1, 'is_required': False, 'default_value': None},
+        {'analysis_id': 'b0000002-b000-b000-b000-b00000000002', 'analyte_id': 'a0000003-a000-a000-a000-a00000000003', 'data_type': 'numeric', 'list_id': None, 'high_value': 100.0, 'low_value': 0.0, 'significant_figures': 2, 'calculation': None, 'reported_name': None, 'display_order': 2, 'is_required': False, 'default_value': None},
+        
+        # Target Binding Assay
+        {'analysis_id': 'b0000003-b000-b000-b000-b00000000003', 'analyte_id': 'a0000004-a000-a000-a000-a00000000004', 'data_type': 'numeric', 'list_id': None, 'high_value': None, 'low_value': 0.0, 'significant_figures': 3, 'calculation': None, 'reported_name': None, 'display_order': 1, 'is_required': True, 'default_value': None},
+        {'analysis_id': 'b0000003-b000-b000-b000-b00000000003', 'analyte_id': 'a0000005-a000-a000-a000-a00000000005', 'data_type': 'numeric', 'list_id': None, 'high_value': None, 'low_value': 0.0, 'significant_figures': 3, 'calculation': None, 'reported_name': None, 'display_order': 2, 'is_required': False, 'default_value': None},
+        
+        # Kinase Selectivity Panel
+        {'analysis_id': 'b0000004-b000-b000-b000-b00000000004', 'analyte_id': 'a0000006-a000-a000-a000-a00000000006', 'data_type': 'numeric', 'list_id': None, 'high_value': 100.0, 'low_value': 0.0, 'significant_figures': 2, 'calculation': None, 'reported_name': None, 'display_order': 1, 'is_required': True, 'default_value': None},
+        {'analysis_id': 'b0000004-b000-b000-b000-b00000000004', 'analyte_id': 'a0000007-a000-a000-a000-a00000000007', 'data_type': 'numeric', 'list_id': None, 'high_value': None, 'low_value': 0.0, 'significant_figures': 3, 'calculation': None, 'reported_name': None, 'display_order': 2, 'is_required': False, 'default_value': None},
+        
+        # ADME Profiling
+        {'analysis_id': 'b0000005-b000-b000-b000-b00000000005', 'analyte_id': 'a0000008-a000-a000-a000-a00000000008', 'data_type': 'numeric', 'list_id': None, 'high_value': None, 'low_value': 0.0, 'significant_figures': 2, 'calculation': None, 'reported_name': None, 'display_order': 1, 'is_required': True, 'default_value': None},
+        {'analysis_id': 'b0000005-b000-b000-b000-b00000000005', 'analyte_id': 'a0000009-a000-a000-a000-a00000000009', 'data_type': 'numeric', 'list_id': None, 'high_value': None, 'low_value': 0.0, 'significant_figures': 2, 'calculation': None, 'reported_name': None, 'display_order': 2, 'is_required': True, 'default_value': None},
+        {'analysis_id': 'b0000005-b000-b000-b000-b00000000005', 'analyte_id': 'a0000010-a000-a000-a000-a00000000010', 'data_type': 'numeric', 'list_id': None, 'high_value': 100.0, 'low_value': 0.0, 'significant_figures': 2, 'calculation': None, 'reported_name': None, 'display_order': 3, 'is_required': True, 'default_value': None},
+        {'analysis_id': 'b0000005-b000-b000-b000-b00000000005', 'analyte_id': 'a0000011-a000-a000-a000-a00000000011', 'data_type': 'numeric', 'list_id': None, 'high_value': None, 'low_value': 0.0, 'significant_figures': 2, 'calculation': None, 'reported_name': None, 'display_order': 4, 'is_required': True, 'default_value': None},
     ]
 
     for junction in analysis_analytes_data:
@@ -111,13 +130,12 @@ def upgrade() -> None:
             junction
         )
 
-    # Create 'EPA 8080 Full' battery
-    # This battery groups the EPA Method 8080 analytical analysis
-    # Note: Prep analyses can be added to batteries via admin interface
+    # Create 'ADME Panel' test battery
+    # This battery groups ADME profiling assays commonly run together for early-stage compound characterization
     battery_data = {
         'id': 'c0000001-c000-c000-c000-c00000000001',
-        'name': 'EPA 8080 Full',
-        'description': 'Complete EPA Method 8080 test battery for Organochlorine Pesticides and PCBs',
+        'name': 'ADME Panel',
+        'description': 'Complete ADME profiling panel for drug discovery (clearance, permeability, solubility, plasma protein binding)',
         'active': True
     }
     
@@ -130,16 +148,10 @@ def upgrade() -> None:
         battery_data
     )
     
-    # Link EPA Method 8080 analysis to the battery
-    # Using the analysis ID from migration 0009: 'b0000002-b000-b000-b000-b00000000002'
+    # Link ADME Profiling analysis to the battery
     battery_analysis_data = [{
         'battery_id': 'c0000001-c000-c000-c000-c00000000001',
-        'analysis_id': 'b0000002-b000-b000-b000-b00000000002',
-        'sequence': 2,
-        'optional': False
-    }, {
-        'battery_id': 'c0000001-c000-c000-c000-c00000000001',
-        'analysis_id': 'b0000002-b000-b000-b000-b00000000004',
+        'analysis_id': 'b0000005-b000-b000-b000-b00000000005',
         'sequence': 1,
         'optional': False
     }]
@@ -157,13 +169,13 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    # Remove seeded data in reverse order (matches schema dump IDs)
+    # Remove seeded data in reverse order
     connection = op.get_bind()
 
     analysis_ids = (
         "'b0000001-b000-b000-b000-b00000000001', 'b0000002-b000-b000-b000-b00000000002', "
-        "'b0000003-b000-b000-b000-b00000000003', 'b0000002-b000-b000-b000-b00000000004', "
-        "'aa12ed7f-282b-46bc-80da-d00fe61d59c4'"
+        "'b0000003-b000-b000-b000-b00000000003', 'b0000004-b000-b000-b000-b00000000004', "
+        "'b0000005-b000-b000-b000-b00000000005'"
     )
     connection.execute(sa.text(f"DELETE FROM analysis_analytes WHERE analysis_id IN ({analysis_ids})"))
 
@@ -173,10 +185,9 @@ def downgrade() -> None:
         "'a0000001-a000-a000-a000-a00000000001', 'a0000002-a000-a000-a000-a00000000002', "
         "'a0000003-a000-a000-a000-a00000000003', 'a0000004-a000-a000-a000-a00000000004', "
         "'a0000005-a000-a000-a000-a00000000005', 'a0000006-a000-a000-a000-a00000000006', "
-        "'a0000004-a000-a000-a000-a00000000005', 'a29d9fde-b207-480a-80b7-e7130fdd8841', "
-        "'d1b0e504-04d5-4142-9031-7d6e894e3771', '742ee5ab-b398-41a3-a8c2-c0b4a92d2aa2', "
-        "'e956c850-6c4b-48f4-b60e-db791988cfba', 'ec8e95ba-e2db-4b4a-aba3-7544725c4eee', "
-        "'d408fae9-284c-4bf3-9086-a5937557abad', '046d7933-c8ae-48a5-998d-7613c8220d48'"
+        "'a0000007-a000-a000-a000-a00000000007', 'a0000008-a000-a000-a000-a00000000008', "
+        "'a0000009-a000-a000-a000-a00000000009', 'a0000010-a000-a000-a000-a00000000010', "
+        "'a0000011-a000-a000-a000-a00000000011', 'a0000012-a000-a000-a000-a00000000012'"
     )
     connection.execute(sa.text(f"DELETE FROM analytes WHERE id IN ({analyte_ids})"))
 
@@ -189,4 +200,3 @@ def downgrade() -> None:
     connection.execute(
         sa.text("DELETE FROM test_batteries WHERE id = 'c0000001-c000-c000-c000-c00000000001'")
     )
-    
