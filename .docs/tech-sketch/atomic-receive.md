@@ -49,9 +49,10 @@ Reuse existing tables; no new receive-specific tables:
 ```
 ┌────────────────────┐
 │ samples            │  existing (name = barcode [L1+Arch], sample_type, matrix,
-│                    │           status, project_id REQUIRED [L2], temperature NULLABLE)
-│                    │  ← system sets status = 'Available for Testing' [Arch]
-│                    │     (no Received hop; would need event log)
+│                    │           status, project_id REQUIRED [L2], temperature NULLABLE,
+│                    │           received_date [Arch+Lab Ops: tracks receipt])
+│                    │  ← system sets status = 'Available for Testing' [Arch+Lab Ops: one status only]
+│                    │  ← system sets received_date = now() [Arch+Lab Ops: receipt = datetime, not status hop]
 └──────────┬─────────┘
            │ 1:N
            ▼
@@ -105,7 +106,7 @@ def downgrade():
 - `Test` (backend/models/test.py) — **no new fields**. Attach via `sample_id` + `analysis_id`.
 - `Result` (backend/models/result.py) — **no new fields**. Do NOT add `unit_id` column (Architecture lock). Unit comes from `analytes.units_default`; if missing, service returns 422.
 
-**Status list entry:** "Available for Testing" must exist in `list_entries` (list "Sample Status"). If UAT statuses include it, reuse; else add via seed or migration. Do NOT add "Received" status (Architecture lock: skip the hop; would need event log).
+**Status list entry:** "Available for Testing" must exist in `list_entries` (list "Sample Status"). If UAT statuses include it, reuse; else add via seed or migration. Do NOT add "Received" status (Architecture + Lab Ops lock: receipt tracked via `received_date` datetime, not a status hop; status hop would need event log).
 
 ## 5. Key contracts
 
@@ -139,7 +140,7 @@ class SampleReceiveRequest(BaseModel):
 
 ```python
 class SampleReceiveResponse(BaseModel):
-    sample: SampleResponse  # includes id, name (= barcode), status="Available for Testing"
+    sample: SampleResponse  # includes id, name (= barcode), status="Available for Testing", received_date (set)
     container: ContainerResponse  # includes id, name (= barcode, same string)
     tests: List[TestResponse]  # optional, status = "Assigned/Pending"
 ```
@@ -160,12 +161,13 @@ class ReceiveService:
             assigned_pending_status = await self._get_test_status_by_name(db, "Assigned/Pending")  # L4
             default_tube_type_id = await self._get_default_tube_type(db)  # L3
             
-            # 2. Create sample (L1+Arch: name = barcode; Arch: status = Available for Testing directly)
+            # 2. Create sample (L1+Arch: name = barcode; Arch+Lab Ops: status = Available for Testing, received_date tracks receipt)
             sample = Sample(
                 name=receive_data.container_barcode,  # L1+Arch: Sample.name = scanned barcode
                 sample_type=receive_data.sample_type,
                 matrix=receive_data.matrix,
-                status=available_status.id,  # Arch: persist one status only (Available for Testing)
+                status=available_status.id,  # Arch+Lab Ops: persist one status only (Available for Testing)
+                received_date=datetime.utcnow(),  # Arch+Lab Ops: receipt tracked via datetime, not status hop
                 project_id=receive_data.project_id,  # L2+Arch: required, never auto-create
                 temperature=receive_data.temperature,  # nullable
                 client_sample_id=receive_data.client_sample_id,
@@ -309,9 +311,9 @@ No wizard; immediate add/remove.
 - **L3 Container type**: default tube, off the form. Do not ask the tech.
 - **L4 Test status**: tests created at receive use "Assigned/Pending" status (not "In Process"). Refuse DELETE if test already has results.
 
-**Architecture (Heidi):**
+**Architecture (Heidi) + Lab Ops (Deiter) agree:**
 - **One DB transaction** for sample + container + contents + tests.
-- **System sets status**: persist **one** status on commit: **`Available for Testing`**. Do not write `Received` then overwrite it (it never lands in the DB). Lab Ops wanted Received→Available; architecture lock is the durable end state only. A Received hop would need an event log, which this packet does not add. **No `status_history` table.**
+- **System sets status** (locked): persist **one** status on commit: **`Available for Testing`**. Do **not** write `Received` then overwrite it (it never lands in the DB). Receipt is tracked via existing **`received_date`** field (datetime), **not** a zero-duration `Sample.status` hop. **No `status_history` table.** Lab Ops agrees with Architecture on this design.
 - **No new columns**: Do NOT add `results.unit_id`. Unit comes from `analytes.units_default`; if missing, HTTP 422. Do NOT add reported/review/curve fields.
 - **No new tables. No wizard.** Existing tables only.
 - **Receive body exact**: required: `barcode`, `sample_type`, `matrix`, `project_id`; optional: `analysis_ids`, `temperature`, `client_sample_id`. Drop `client_id` and `container_type_id` from request.
