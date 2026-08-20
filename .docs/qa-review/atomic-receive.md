@@ -4,8 +4,8 @@
 **Status:** Accept with conditions  
 **Reviewer persona:** Testing / QA Lead (Tobias)  
 **Tech sketch:** [PR 30](https://github.com/Marc02130/nimblelims/pull/30) — `.docs/tech-sketch/atomic-receive.md` (C1 dropped; ignore merged #28)  
-**Related reviews:** Lab Ops L2–L4 (L1 retracted); CSO Accept; Architecture re-read requested; CEO Accept (PR 30 merged; stamp [PR 33](https://github.com/Marc02130/nimblelims/pull/33))  
-**Stories:** [PR 32](https://github.com/Marc02130/nimblelims/pull/32) **merged** — full catalog on `main`. US-1 / US-7 / US-8 / US-30 match the receive loop.  
+**Related reviews:** Lab Ops L2–L4 (L1 retracted); CSO Accept; Architecture Accept (PR 30 + persist lock); CEO Open on the sketch. Stamp is [PR 33](https://github.com/Marc02130/nimblelims/pull/33). QA does **not** open the implement gate.  
+**Stories:** [PR 32](https://github.com/Marc02130/nimblelims/pull/32) **merged** — full catalog on `main`. US-1 / US-7 / US-8 / US-30 match the receive loop. Not PR 29.  
 **UAT script:** [`UAT_Scripts/uat-atomic-receive.md`](../../UAT_Scripts/uat-atomic-receive.md)  
 **Test data IDs:** shared with Anton (AR-HV / AR-DUP / AR-ID / AR-ST / AR-TST / AR-RES / AR-RBAC / AR-MU)
 
@@ -13,7 +13,9 @@
 
 The PR 30 sketch is testable. Receive is a high-volume scan loop: one transaction, two identities, one status (**Available for Testing**), stay on the screen. US-1 is that happy path (no wizard, no sample-ID box, no status picker). US-7 / US-8 start tests at Assigned/Pending. US-30 is two identities. US-31 / US-33 / US-34 are parked for AR-01–AR-15.
 
-Implement gate is **OPEN** (CEO merged PR 30). QA review is not a substitute for the post-implement UAT pass. Human UAT uses the merged PR 32 catalog on `main`. No third identity.
+QA review is Accept with conditions. It is **not** an implement-gate open and **not** a substitute for the post-implement UAT pass. The sketch still says no product code until CEO passes. That stamp is PR 33.
+
+Human UAT uses the merged PR 32 catalog on `main`. No third identity.
 
 Architecture lock on result persist: typed number → `results.reported_result` + `qualifiers`. `raw_result` may copy the same value. UAT asserts `reported_result`, not a new column.
 
@@ -65,12 +67,12 @@ Do **not** fail atomic-receive UAT on:
 - Sample.status = Reviewed or Reported (see Q1)
 - US-10 second-person review (AR-MU-02)
 
-## BA gaps (Wilhelmina)
+## BA gaps
 
-Resolved on merged PR 32. No third identity.
+**Struck.** Closed on merged PR 32. Stories pointer is 32, not 29. No third identity.
 
-| Was | Now |
-|-----|-----|
+| Was (open on PR 31) | Now |
+|---------------------|-----|
 | US-1 old wizard | Atomic-receive happy path. AR-01–AR-15 replaces it. |
 | US-7 In Process at create | Assigned/Pending at receive/add-test. |
 | US-30 lab_id on sample | Two identities. No `lab_id` column. |
@@ -85,5 +87,5 @@ Q1 (Tobias): this packet only sets **Available for Testing**. Dual path until US
 |-------|--------|
 | **Verdict** | Accept with conditions |
 | **Date** | 2026-08-20 |
-| **Implement gate** | **OPEN** (CEO merged PR 30; stamp PR 33) |
+| **Implement gate** | Follows the sketch. **No product code until CEO passes.** QA does not open this. Stamp is PR 33. |
 | **UAT pass** | Still required after implement, before merge. Source: merged PR 32 catalog on `main`. |
