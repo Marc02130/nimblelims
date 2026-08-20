@@ -2,7 +2,6 @@
 
 **Date:** 2026-08-20  
 **Status:** **CEO Accept (PR 30 merged). Implement gate OPEN for this packet only. Lab Ops L2–L4 + L1 retracted. CSO Accept. Architecture Accept.**  
-**Status:** **Architecture Accept (PR 30 + persist lock). Lab Ops L2–L4 + L1 retracted. CSO Accept. Packet signed. No product code until CEO passes.**  
 **Stem:** `atomic-receive`  
 **Process:** [`.docs/development-process/README.md`](../development-process/README.md)
 
@@ -114,7 +113,6 @@ Do not redirect to sample detail. Do not open an aliquot dialog. Duplicate barco
 |--------|--------|
 | Lab Ops | L2–L4 hold. **L1 retracted.** Two IDs correct. Receive must not show a sample-ID field. |
 | CSO | Accept. DELETE-with-results is data integrity. Classic results only. |
-| Architecture | **Accept on PR 30.** C1 gone. Two IDs. 409 on `Container.name`. System-assigned `samples.name`. One status: Available for Testing. Short receive body. No new tables / no `results.unit_id`. **Persist lock:** typed number → `reported_result` + `qualifiers`; `raw_result` may copy. |
-| CEO | **Accept. PR 30 merged.** Implement gate OPEN for this packet only: one sample + first tube. No aliquot UI, no ELN, no IC50. Product code may start. Heidi bounces tables, a sample-ID field, a Received hop, or `results.unit_id`. |
 | Architecture | **Accept on PR 30.** C1 gone. Two IDs. 409 on `Container.name`. System-assigned `samples.name`. One status: Available for Testing. Short receive body. No new tables / no `results.unit_id`. **Persist lock:** typed number → `reported_result` + `qualifiers`; `raw_result` may copy. Packet signed. |
-| CEO | Open. No product code until CEO passes. |
+| UI | **Accept.** New receive loop, not AccessioningForm. Scan writes the tube. Sticky type/matrix/project. No sample-ID, status, or tube-type field. Stay on screen. Bounce a sample-ID box, wizard, sample-detail redirect, or timestamp-suffix. |
+| CEO | **Accept. PR 30 merged.** Implement gate OPEN for this packet only: one sample + first tube. No aliquot UI, no ELN, no IC50. Product code may start. Heidi bounces tables, a sample-ID field, a Received hop, or `results.unit_id`. |
