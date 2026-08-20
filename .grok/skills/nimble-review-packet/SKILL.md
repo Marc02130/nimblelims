@@ -2,7 +2,7 @@
 name: nimble-review-packet
 description: >
   Orchestrate formal NimbleLIMS reviews for a feature stem in gate order:
-  Lab Ops → CEO / UI / Arch / CSO. Summarizes implement gate. Use when:
+  Lab Ops → CEO / UI / Arch / Security / Scientific CSO / BA / QA. Summarizes implement gate. Use when:
   "run all reviews", "review packet", "nimble review packet", "formal reviews for".
 user-invocable: true
 ---
@@ -42,6 +42,9 @@ For each missing or stale review (user may say “all” or name subset), load a
 | UI | `.grok/skills/nimble-ui-review/SKILL.md` |
 | Architecture | `.grok/skills/nimble-arch-review/SKILL.md` |
 | Security (CSO packet) | `.grok/skills/nimble-cso-review/SKILL.md` |
+| Scientific CSO | `.grok/skills/nimble-scientific-cso-review/SKILL.md` |
+| BA | `.grok/skills/nimble-ba-review/SKILL.md` |
+| QA | `.grok/skills/nimble-qa-review/SKILL.md` |
 
 Ask user before deep Layer B CSO.
 
@@ -59,6 +62,9 @@ CEO: {status} | missing
 UI: {status} | missing
 ARCH: {status} | missing
 SECURITY: {status} | missing
+SCIENTIFIC CSO: {status} | missing
+BA: {status} | missing
+QA: {status} | missing (or required)
 OPEN QUESTIONS: blockers? 
 
 IMPLEMENT GATE: OPEN | CLOSED
@@ -69,6 +75,7 @@ REASON: …
 
 - Tech sketch present  
 - Lab Ops Accept or Accept-with-conditions (or n/a)  
+- QA Accept or Accept-with-conditions when QA is required (see PACKET.md)
 - No Hold/Revise from any required review  
 - Conditions either already reflected in sketch/checklist or explicitly accepted by user for same-phase implement  
 

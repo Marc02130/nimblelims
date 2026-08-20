@@ -92,6 +92,24 @@ For ELN experiments, templates, entries, processes, sample journey, LIMS runs, p
 - Lab Ops **Hold** or missing → **implement gate closed**
 - Other reviews Accept without Lab Ops Accept / Accept-with-conditions on lab-facing work → **invalid for implementation**
 
+## QA review gate
+
+QA review is **recommended** before implement for any full-pipeline feature. QA review is **required** when work touches:
+
+- Sample tracking (accessioning, containers, aliquots, derivatives, status transitions)
+- Test ordering workflows
+- Results entry / results integrity
+- Audit trails
+- Security / RBAC / RLS changes
+
+When QA review is required:
+
+- QA **Hold** or **Revise** → **implement gate closed**
+- QA **Accept with conditions** → listed UAT / testability conditions must land in the same implement phase
+- Implement / Cursor prompts for full-pipeline work must include required documentation updates + UAT script create-or-update at `UAT_Scripts/uat-{stem}.md`
+
+QA review is not a substitute for the post-implement UAT pass. QA reviews the packet for testability and UAT readiness; UAT validates the shipped code.
+
 ## gstack path resolution
 
 Prefer, in order:
