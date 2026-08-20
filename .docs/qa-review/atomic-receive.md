@@ -6,7 +6,8 @@
 **Tech sketch:** [PR 30](https://github.com/Marc02130/nimblelims/pull/30) — `.docs/tech-sketch/atomic-receive.md` (C1 dropped; ignore merged #28)  
 **Related reviews:** Lab Ops L2–L4 (L1 retracted); CSO Accept; Architecture re-read requested; CEO open  
 **Stories:** [PR 29](https://github.com/Marc02130/nimblelims/pull/29) — US-2, US-10, US-30–US-38 in `.docs/user-stories/nimblelims-user.md`  
-**UAT script:** [`UAT_Scripts/uat-atomic-receive.md`](../../UAT_Scripts/uat-atomic-receive.md)
+**UAT script:** [`UAT_Scripts/uat-atomic-receive.md`](../../UAT_Scripts/uat-atomic-receive.md)  
+**Test data IDs:** shared with Anton (AR-HV / AR-DUP / AR-ID / AR-ST / AR-TST / AR-RES / AR-RBAC / AR-MU)
 
 ## Executive summary
 
@@ -20,7 +21,7 @@ QA review is not a substitute for the post-implement UAT pass.
 
 | Dimension | Notes |
 |-----------|--------|
-| Testability | Every locked goal maps to an AR-* case or a pytest txn-rollback gate. |
+| Testability | Every locked goal maps to a shared AR-* case or a pytest txn-rollback gate. |
 | Sample lifecycle | Receive → Available for Testing → optional tests → result entry. No Received hop. |
 | Negative paths | Duplicate barcode 409, missing required field 422, missing units_default 422, DELETE-with-results 400, RLS 403. |
 | UAT readiness | Lab-tech happy path + client/foreign-project denial. Manager override is out of this packet. |
@@ -38,8 +39,8 @@ QA review is not a substitute for the post-implement UAT pass.
 | QA4 | Commit writes Sample.status = **Available for Testing** only. Sets `received_date`. Request has no status field. No Received hop. | System-owned status. |
 | QA5 | After success: stay on receive, toast, clear barcode, sticky type/matrix/project, focus barcode. No sample-detail redirect. No aliquot dialog. | High-volume loop. |
 | QA6 | Tests optional at receive; status **assigned/pending**, not In Process. POST add later. DELETE without results ok. DELETE with results → **400**. | L4 + CSO. |
-| QA7 | Typed number persists to `results.reported_result` + `qualifiers`. `raw_result` may copy the same value. Assert `reported_result`, not a new column. Unit from `analytes.units_default`. Missing default → **422**. No unit picker. No `results.unit_id`. | Architecture lock (Wilhelmina / Heidi). |
-| QA8 | `sample:create` required. Project list/API scoped by `project_users`. Client cannot receive. Foreign project → **403**, no row. | RLS. |
+| QA7 | Typed number persists to `results.reported_result` + `qualifiers`. `raw_result` may copy the same value. Assert `reported_result`, not a new column. Unit from `analytes.units_default`. Missing default → **422**. No unit picker. No `results.unit_id`. | Architecture lock. |
+| QA8 | `sample:create` required. Project list/API scoped by `project_users`. Client cannot receive. Foreign project → **403**, no row. Two techs keep separate sticky projects. | RLS. |
 | QA9 | Seed: Available for Testing; Assigned/Pending (or agreed slug); default tube; sample name template that assigns without a typed name; unique `containers.name`. | Otherwise UAT is blocked on data. |
 | QA10 | Cursor implement prompt updates receive/accessioning manuals **and** `UAT_Scripts/uat-atomic-receive.md`. After ship, `uat-sample-accessioning.md` is not the receive happy path. | Docs + UAT gate. |
 
@@ -47,7 +48,9 @@ Automated gate (pytest, not a human case): QA1 rollback after sample insert, bef
 
 ## Suggested UAT scenarios
 
-Must-pass AR-01–AR-15 in [`UAT_Scripts/uat-atomic-receive.md`](../../UAT_Scripts/uat-atomic-receive.md): scan and keyboard receive, sticky second tube, 409 no orphan, two IDs, add/remove tests, DELETE-with-results 400, `reported_result` + unit default or 422, client/RLS denial.
+Must-pass in [`UAT_Scripts/uat-atomic-receive.md`](../../UAT_Scripts/uat-atomic-receive.md): AR-HV-01–05, AR-VAL-01, AR-DUP-01, AR-ID-01, AR-ST-01, AR-TST-01–03, AR-RES-01–02, AR-RBAC-01, AR-MU-01.
+
+**Not P0:** AR-MU-02 (US-10 second-person review).
 
 ## Out of this packet
 
@@ -60,6 +63,7 @@ Do **not** fail atomic-receive UAT on:
 - US-38 aliquot remaining quantity (no aliquot UI)
 - ELN, LimsRuns, dose-response, parsers
 - Sample.status = Reviewed or Reported (see Q1)
+- US-10 second-person review (AR-MU-02)
 
 ## BA gaps (Wilhelmina)
 
