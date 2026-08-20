@@ -12,14 +12,19 @@ This implementation provides a complete authentication system for the NimbleLIMS
 - **Routers**: `app/routers/auth.py` - Authentication endpoints
 
 ### 2. Authentication Endpoints
-- **POST /auth/login**: User authentication with username/password
+- **POST /auth/login**: User authentication with username/password (returns `must_change_password`)
+- **POST /auth/change-password**: Change password; clears `must_change_password` (Q7)
+- **GET /auth/me**: Current user (includes `must_change_password`)
 - **POST /auth/verify-email**: Email verification (stub implementation)
 
 ### 3. Security Features
-- **Password Hashing**: bcrypt for secure password storage
-- **JWT Tokens**: PyJWT for stateless authentication
+- **Password Hashing**: bcrypt (legacy unsalted SHA256 verified once, then upgraded on login)
+- **Must change password**: `users.must_change_password` — while true, only change-password / me / logout; other routes **403** `password_change_required`
+- **Complexity**: min 12 chars; upper, lower, digit, symbol; ≠ username; ≠ current password
+- **JWT Tokens**: PyJWT; claim `pwd_change` when change required. `SECRET_KEY` (alias `JWT_SECRET_KEY`); refuse defaults unless `ALLOW_INSECURE_DEFAULTS` in development/test
 - **RBAC**: 17 core permissions for granular access control (with additional permissions added in migrations)
 - **Token Validation**: Secure token verification with expiration
+- **Bootstrap**: `BOOTSTRAP_ADMIN_PASSWORD` for production admin create; `ALLOW_DEV_SEED_USERS` for local/demo temporary seeds
 
 ### 4. Core Permissions (17 total)
 ```

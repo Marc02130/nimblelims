@@ -185,6 +185,13 @@ export class ApiService {
             window.location.href = '/login';
           }
         }
+        // Q7: constrained session until password change — let UI handle (no logout)
+        if (
+          error.response?.status === 403 &&
+          error.response?.data?.detail?.code === 'password_change_required'
+        ) {
+          return Promise.reject(error);
+        }
         return Promise.reject(error);
       }
     );
@@ -203,6 +210,14 @@ export class ApiService {
     const response: AxiosResponse = await this.api.post('/auth/login', {
       username,
       password,
+    });
+    return response.data;
+  }
+
+  async changePassword(currentPassword: string, newPassword: string) {
+    const response: AxiosResponse = await this.api.post('/auth/change-password', {
+      current_password: currentPassword,
+      new_password: newPassword,
     });
     return response.data;
   }

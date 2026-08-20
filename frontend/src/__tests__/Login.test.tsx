@@ -9,6 +9,9 @@ import { UserProvider } from '../contexts/UserContext';
 jest.mock('../services/apiService', () => ({
   apiService: {
     login: jest.fn(),
+    getCurrentUser: jest.fn(),
+    changePassword: jest.fn(),
+    setAuthToken: jest.fn(),
   },
 }));
 
@@ -31,14 +34,21 @@ describe('Login', () => {
     // Mock API responses
     const { apiService } = require('../services/apiService');
     apiService.login.mockResolvedValue({
-      token: 'mock-token',
-      user: {
-        id: '1',
-        username: 'testuser',
-        email: 'test@example.com',
-        role: 'Lab Technician',
-        permissions: ['sample:create'],
-      },
+      access_token: 'mock-token',
+      user_id: '1',
+      username: 'testuser',
+      email: 'test@example.com',
+      role: 'Lab Technician',
+      permissions: ['sample:create'],
+      must_change_password: false,
+    });
+    apiService.getCurrentUser.mockResolvedValue({
+      id: '1',
+      username: 'testuser',
+      email: 'test@example.com',
+      role: 'Lab Technician',
+      permissions: ['sample:create'],
+      must_change_password: false,
     });
   });
 

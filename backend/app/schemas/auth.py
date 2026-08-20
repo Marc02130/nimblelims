@@ -1,7 +1,7 @@
 """
 Pydantic schemas for authentication
 """
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 from typing import List, Optional
 from datetime import datetime
 
@@ -21,6 +21,21 @@ class LoginResponse(BaseModel):
     email: str
     role: str
     permissions: List[str]
+    must_change_password: bool = False
+
+
+class ChangePasswordRequest(BaseModel):
+    """Request schema for changing password (Q7)"""
+    current_password: str
+    new_password: str = Field(..., min_length=1)
+
+
+class ChangePasswordResponse(BaseModel):
+    """Response after successful password change"""
+    access_token: str
+    token_type: str = "bearer"
+    must_change_password: bool = False
+    message: str = "Password updated"
 
 
 class VerifyEmailRequest(BaseModel):
@@ -41,3 +56,4 @@ class TokenData(BaseModel):
     username: str
     role: str
     permissions: List[str]
+    must_change_password: bool = False

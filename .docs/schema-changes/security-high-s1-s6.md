@@ -3,7 +3,7 @@
 **Feature / cycle:** High security remediation (S1–S6)  
 **Phases covered:** P0a–P0d  
 **Status:** Draft — ready for architecture review  
-**Alembic revisions:** _(fill when implemented)_  
+**Alembic revisions:** `0061` (`must_change_password` + seed bcrypt rehash) — P0b; P0d role ensure TBD  
 **Requirements:** [`.docs/requirements/security-high-s1-s6.md`](../requirements/security-high-s1-s6.md)  
 **Tech sketch:** [`.docs/tech-sketch/security-high-s1-s6.md`](../tech-sketch/security-high-s1-s6.md)  
 **Architecture review:** [`.docs/architecture-review/security-high-s1-s6.md`](../architecture-review/security-high-s1-s6.md)

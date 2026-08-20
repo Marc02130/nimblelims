@@ -192,6 +192,7 @@ def test_user(db_session, test_org):
         password_hash=get_password_hash("testpassword"),
         role_id=test_role.id,
         client_id=test_org.id,
+        must_change_password=False,
     )
     db_session.add(user)
     db_session.commit()
@@ -229,6 +230,7 @@ def test_admin_user(db_session, test_org):
         password_hash=get_password_hash("adminpassword"),
         role_id=admin_role.id,
         client_id=test_org.id,
+        must_change_password=False,
     )
     db_session.add(admin_user)
     db_session.commit()

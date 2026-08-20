@@ -24,12 +24,12 @@
 
 ## P0b — S2 passwords (+ Q2/Q7)
 
-- [ ] bcrypt hash/verify + SHA256 upgrade path  
-- [ ] Gate persona seeds behind ALLOW_DEV_SEED_USERS; prod bootstrap path  
-- [ ] `users.must_change_password` migration + login gate + change-password API  
-- [ ] Complexity rules (12+ / upper / lower / digit / symbol / ≠ username / ≠ current)  
-- [ ] Frontend change-password gate  
-- [ ] Tests (`test_auth` bcrypt + must-change + complexity)  
+- [x] bcrypt hash/verify + SHA256 upgrade path  
+- [x] Gate persona seeds behind ALLOW_DEV_SEED_USERS; prod bootstrap via `BOOTSTRAP_ADMIN_PASSWORD` (`create_admin.py`)  
+- [x] `users.must_change_password` migration `0061` + login gate + change-password API  
+- [x] Complexity rules (12+ / upper / lower / digit / symbol / ≠ username / ≠ current)  
+- [x] Frontend change-password gate  
+- [x] Tests (`test_password_policy_p0b.py`)  
 
 ## P0c — S5 aliquot + S6 cohort write
 
