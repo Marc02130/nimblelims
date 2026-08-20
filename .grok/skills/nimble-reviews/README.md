@@ -4,22 +4,27 @@ Slash-friendly skills for the NimbleLIMS development process. Each skill produce
 
 ## Skills
 
-| Slash / name | Persona | Artifact | gstack template |
-|--------------|---------|----------|-----------------|
-| `/nimble-lab-ops-review` | SVP Lab Ops | `.docs/lab-ops-review/{stem}.md` | Custom (no gstack analog) |
-| `/nimble-ceo-review` | Founder / product | `.docs/ceo-review/{stem}.md` | `plan-ceo-review` |
-| `/nimble-ui-review` | UX / lab workflow UI | `.docs/ui-review/{stem}.md` | `plan-design-review` |
-| `/nimble-arch-review` | Systems architecture | `.docs/architecture-review/{stem}.md` | `plan-eng-review` |
-| `/nimble-cso-review` | Feature security + optional deep CSO | `.docs/security-review/{stem}.md` | `cso` (feature-scoped + optional full) |
-| `/nimble-scientific-cso-review` | Chief Scientific Officer (assays, results, QC, data integrity) | `.docs/scientific-cso-review/{stem}.md` | Custom (Nimble-native) |
-| `/nimble-review-packet` | Orchestrator | Runs gate order, points at all artifacts | — |
+| Slash / name | Persona | Artifact | Type |
+|--------------|---------|----------|------|
+| `/nimble-lab-ops-review` | SVP Lab Ops | `.docs/lab-ops-review/{stem}.md` | Formal gate (required) |
+| `/nimble-ceo-review` | Founder / product | `.docs/ceo-review/{stem}.md` | Formal parallel |
+| `/nimble-ui-review` | UX / lab workflow UI | `.docs/ui-review/{stem}.md` | Formal parallel |
+| `/nimble-arch-review` | Systems architecture | `.docs/architecture-review/{stem}.md` | Formal parallel |
+| `/nimble-cso-review` | Feature security + optional deep CSO | `.docs/security-review/{stem}.md` | Formal parallel (Security) |
+| `/nimble-scientific-cso-review` | Chief Scientific Officer (assays, results, QC, data integrity) | `.docs/scientific-cso-review/{stem}.md` | Formal parallel |
+| `/nimble-ba-review` | Business Analyst | `.docs/ba-review/{stem}.md` | Formal parallel |
+| `/nimble-qa-review` | Testing / QA Lead | `.docs/qa-review/{stem}.md` | Formal parallel |
+| `/nimble-test-data` | Test Data Developer | `.docs/test-data/{stem}.md` | Supporting / generative |
+| `/nimble-sop-researcher` | SOP Researcher | `.docs/sop-research/{stem-or-topic}.md` | Supporting / generative |
+| `/nimble-review-packet` | Orchestrator | Runs gate order, points at all artifacts | Orchestrator |
 
 ## Recommended order (ELN / LIMS)
 
 1. **Lab Ops** (required gate)  
-2. **CEO** + **UI** + **Arch** + **Security CSO** + **Scientific CSO** (parallel after Lab Ops has spoken)  
-3. Resolve **open questions**  
-4. Implement only when implement gate is open  
+2. **CEO** + **UI** + **Arch** + **Security CSO** + **Scientific CSO** + **BA** + **QA** (parallel after Lab Ops has spoken)  
+3. Supporting skills as needed: **Test Data** and **SOP Researcher**  
+4. Resolve **open questions**  
+5. Implement only when implement gate is open  
 
 ## Invocation examples
 
@@ -27,6 +32,10 @@ Slash-friendly skills for the NimbleLIMS development process. Each skill produce
 /nimble-lab-ops-review experiment-template-entries
 /nimble-ceo-review experiment-template-entries
 /nimble-scientific-cso-review experiment-template-entries
+/nimble-ba-review experiment-template-entries
+/nimble-qa-review experiment-template-entries
+/nimble-test-data experiment-template-entries
+/nimble-sop-researcher aliquoting plasma samples
 /nimble-review-packet experiment-template-entries
 ```
 
