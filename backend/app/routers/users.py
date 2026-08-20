@@ -13,7 +13,7 @@ from app.schemas.user import (
     UserCreate,
     UserUpdate,
 )
-from app.core.security import get_current_user, get_password_hash
+from app.core.security import get_current_user, get_password_hash, validate_password_complexity
 from app.core.rbac import require_any_permission
 from uuid import UUID
 
@@ -126,7 +126,15 @@ async def create_user(
                 detail="Invalid client_id"
             )
     
-    # Create user
+    # Create user — enforce complexity; require change on first login (Q7)
+    complexity_errors = validate_password_complexity(
+        user_data.password, username=user_data.username
+    )
+    if complexity_errors:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"code": "password_complexity", "errors": complexity_errors},
+        )
     password_hash = get_password_hash(user_data.password)
     new_user = User(
         name=user_data.name,
@@ -136,6 +144,7 @@ async def create_user(
         password_hash=password_hash,
         role_id=user_data.role_id,
         client_id=user_data.client_id,
+        must_change_password=True,
         created_by=current_user.id,
         modified_by=current_user.id,
     )
@@ -199,9 +208,18 @@ async def update_user(
     if user_data.description is not None:
         user.description = user_data.description
     
-    # Update password if provided
+    # Update password if provided — complexity + force change on next login
     if user_data.password:
+        complexity_errors = validate_password_complexity(
+            user_data.password, username=user_data.username or user.username
+        )
+        if complexity_errors:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={"code": "password_complexity", "errors": complexity_errors},
+            )
         user.password_hash = get_password_hash(user_data.password)
+        user.must_change_password = True
     
     # Update role if provided
     if user_data.role_id:

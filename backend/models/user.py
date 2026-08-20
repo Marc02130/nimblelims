@@ -23,6 +23,8 @@ class User(BaseModel):
     role_id = Column(PostgresUUID(as_uuid=True), ForeignKey('roles.id'), nullable=False)
     client_id = Column(PostgresUUID(as_uuid=True), ForeignKey('clients.id'), nullable=False)
     last_login = Column(DateTime)
+    # Q7: seeded/bootstrap users must change password before using the app
+    must_change_password = Column(Boolean, nullable=False, default=False, server_default='false')
     
     # Relationships - explicitly specify foreign keys
     role = relationship("Role", foreign_keys=[role_id], back_populates="users")

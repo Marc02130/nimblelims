@@ -32,7 +32,7 @@ class TestLogin:
         assert "sample:read" in data["permissions"]
         assert "result:enter" in data["permissions"]
     
-    def test_login_invalid_username(self, client: TestClient):
+    def test_login_invalid_username(self, client: TestClient, test_user):
         """Test login with invalid username"""
         response = client.post(
             "/auth/login",
