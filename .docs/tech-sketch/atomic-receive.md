@@ -1,7 +1,7 @@
 # Tech sketch: Atomic receive
 
 **Date:** 2026-08-20  
-**Status:** **Lab Ops Accept with conditions (L1–L4). Implement gate OPEN for Heidi / Hans / CEO reviews. No product code until those pass.**  
+**Status:** **Lab Ops L1–L4 Accept · CSO Accept · Architecture Accept pending this fold · Implement gate OPEN for CEO review. No product code until CEO passes and this sketch is tight.**  
 **Requirements:** (not written; locked packet from CEO)  
 **Process:** [`.docs/development-process/README.md`](../development-process/README.md)
 
@@ -21,16 +21,12 @@
 **Goals**
 
 - **Atomic receive endpoint**: one POST creates sample + container + contents + tests in a **single DB transaction** (locked)
-- **System-set status**: system writes status **`Received` then `Available for Testing`** (locked). Drop status from request payload. Techs do not pick status.
-- **Barcode unique**: scan writes unique container `name` as-is (locked). No timestamp suffix. Duplicate → HTTP 409.
-- **Sample.name = barcode** (L1, locked): `Sample.name` set to scanned barcode (same string as `Container.name`). One identity string. Drop `generate_name_for_sample`.
-- **Keyboard fallback**: type container name if scan fails
-- **Few fields**: barcode (becomes sample name + container name), optional external id, sample type, matrix, **project (required, sticky)** (L2, locked), optional analysis/tests to attach
-- **Optional temperature**: remove any `nullable=False` or validation requiring temperature
-- **Container type default** (L3, locked): default tube, **off the form**. Do not ask the tech.
-- **Tests at receive**: optional (locked). Add/remove later from sample with no wizard.
-- **Test status** (L4, locked): tests created at receive use **assigned/pending** status (not "In Process"). **Refuse DELETE** if test already has results.
-- **Results entry**: POST result on a test with raw value, unit (defaults from `analytes.units_default`), optional qualifier (`<LOD`, `ND`) (locked)
+- **System-set status** (Architecture lock): system writes **one** status on commit: **`Available for Testing`**. Do not write `Received` then overwrite it in the same transaction (it never lands in the DB). Techs do not pick status. Drop status from request payload. **Note:** Lab Ops wanted Received→Available; architecture lock is the durable end state only (Available for Testing). A Received hop would need an event log, which this packet does not add. No `status_history` table.
+- **Identity** (L1 + Architecture lock): `Sample.name` and `Container.name` are **both** the scanned barcode (same string). Duplicate → HTTP 409. Drop `generate_name_for_sample`.
+- **Keyboard fallback**: type barcode if scan fails
+- **Receive body exact** (Architecture lock): required: `barcode`, `sample_type`, `matrix`, `project_id`; optional: `analysis_ids`, `temperature`, `client_sample_id`. Project required and sticky (L2). Container type = default tube, off the form (L3). Never auto-create project per tube.
+- **Tests at receive**: optional (locked). Add/remove later from sample with no wizard. Status = assigned/pending, not In Process (L4). **Refuse DELETE** if test already has results (L4 + CSO data integrity).
+- **Results entry** (Architecture lock): POST result on a test with raw value, optional qualifier (`<LOD`, `ND`). Unit from `analytes.units_default`; if missing, **422** the result. **Do not add `results.unit_id` column.** Do not add reported/review/curve fields.
 - **High-volume scan UX** (locked): after successful receive, **stay on receive screen**. Toast success, **clear barcode**, **keep sticky** sample type/matrix/project, **focus barcode field**. Do not redirect to sample detail. Do not open aliquot dialog.
 
 **Non-goals (parked features)**
@@ -51,32 +47,36 @@ Reuse existing tables; no new receive-specific tables:
 
 ```
 ┌────────────────────┐
-│ samples            │  existing (name = barcode [L1], sample_type, status, matrix,
-│                    │           project_id REQUIRED [L2], temperature NULLABLE, etc.)
-│                    │  ← system sets status = 'Received' then 'Available for Testing'
+│ samples            │  existing (name = barcode [L1+Arch], sample_type, matrix,
+│                    │           status, project_id REQUIRED [L2], temperature NULLABLE)
+│                    │  ← system sets status = 'Available for Testing' [Arch]
+│                    │     (no Received hop; would need event log)
 └──────────┬─────────┘
            │ 1:N
            ▼
 ┌────────────────────┐     ┌────────────────────┐
-│ contents (M2M)     │────►│ containers         │  existing (name as barcode, same string)
-│  sample_id         │     │  type_id = default tube [L3]
+│ contents (M2M)     │────►│ containers         │  existing (name = barcode, same string [L1+Arch])
+│  sample_id         │     │  type_id = default tube [L3], off form
 │  container_id      │     └────────────────────┘
 └────────────────────┘
            │
            │ tests attached to sample (via tests.sample_id)
            ▼
 ┌────────────────────┐
-│ tests              │  existing (sample_id, analysis_id, status, ...)
+│ tests              │  existing (sample_id, analysis_id, status = assigned/pending [L4])
 └──────────┬─────────┘
            │ 1:N
            ▼
 ┌────────────────────┐
-│ results            │  existing (test_id, analyte_id, raw_result, qualifiers, etc.)
+│ results            │  existing (test_id, analyte_id, raw_result, qualifiers)
+│                    │  NO new unit_id column [Arch] — use analytes.units_default
 │                    │  (created later via result entry, not at receive time)
 └────────────────────┘
 ```
 
 **Atomic boundary:** `ReceiveService.atomic_receive(...)` wraps sample, container, contents, tests creation in one transaction. Rollback if any insert fails.
+
+**No new tables. No new columns. No wizard.** (Architecture lock)
 
 ## 4. Data model
 
@@ -96,15 +96,15 @@ def downgrade():
                     nullable=False)
 ```
 
-**Reuse existing models:**
+**Reuse existing models (Architecture lock: no new columns):**
 
-- `Sample` (backend/models/sample.py) — no new fields
-- `Container` (backend/models/container.py) — `name` stores barcode as-is
-- `Contents` (backend/models/container.py) — M2M join
-- `Test` (backend/models/test.py) — attach via `sample_id` + `analysis_id`
-- `Result` (backend/models/result.py) — created later (not at receive time)
+- `Sample` (backend/models/sample.py) — **no new fields**. `name` = barcode.
+- `Container` (backend/models/container.py) — **no new fields**. `name` = barcode (same string).
+- `Contents` (backend/models/container.py) — M2M join, no changes.
+- `Test` (backend/models/test.py) — **no new fields**. Attach via `sample_id` + `analysis_id`.
+- `Result` (backend/models/result.py) — **no new fields**. Do NOT add `unit_id` column (Architecture lock). Unit comes from `analytes.units_default`; if missing, service returns 422.
 
-**Status list entries:** "Received" and "Available for Testing" must exist in `list_entries` (list "Sample Status"). If UAT statuses include these, reuse; else add via seed or migration.
+**Status list entry:** "Available for Testing" must exist in `list_entries` (list "Sample Status"). If UAT statuses include it, reuse; else add via seed or migration. Do NOT add "Received" status (Architecture lock: skip the hop; would need event log).
 
 ## 5. Key contracts
 
@@ -112,31 +112,35 @@ def downgrade():
 
 **POST /api/samples/receive** (new endpoint, distinct from `/api/samples/accession`)
 
-**Request (Pydantic):**
+**Request (Pydantic) — Architecture exact contract:**
 
 ```python
 class SampleReceiveRequest(BaseModel):
-    container_barcode: str  # scanned or typed; becomes Sample.name and Container.name (L1)
-    client_sample_id: Optional[str] = None  # external ID
+    # REQUIRED fields
+    container_barcode: str  # scanned or typed; becomes Sample.name and Container.name (L1+Arch)
     sample_type: UUID  # list entry ID
     matrix: UUID  # list entry ID
-    project_id: UUID  # REQUIRED, sticky (L2)
+    project_id: UUID  # REQUIRED, sticky (L2+Arch)
+    
+    # OPTIONAL fields
     analysis_ids: List[UUID] = Field(default_factory=list)  # optional tests to attach
     temperature: Optional[float] = None  # optional
-    client_id: Optional[UUID] = None  # if multi-client
-    client_project_id: Optional[UUID] = None  # if grouping
-    # NO status field — system writes "Received" then "Available for Testing"
-    # NO container_type_id field — default tube (L3)
-    # Open question: other "few fields" (date_sampled, qc_type, etc.)
+    client_sample_id: Optional[str] = None  # external ID
+    
+    # DROPPED from request (Architecture lock):
+    # - status (system writes "Available for Testing" only)
+    # - container_type_id (default tube, off form [L3])
+    # - client_id (not in exact contract)
+    # - auto-create project flag (never auto-create per tube [L2])
 ```
 
 **Response (Pydantic):**
 
 ```python
 class SampleReceiveResponse(BaseModel):
-    sample: SampleResponse  # includes id, name, status="Available for Testing"
-    container: ContainerResponse
-    tests: List[TestResponse]
+    sample: SampleResponse  # includes id, name (= barcode), status="Available for Testing"
+    container: ContainerResponse  # includes id, name (= barcode, same string)
+    tests: List[TestResponse]  # optional, status = "Assigned/Pending"
 ```
 
 **Service logic:**
@@ -150,19 +154,18 @@ class ReceiveService:
         db: AsyncSession
     ) -> SampleReceiveResponse:
         async with db.begin():  # single transaction
-            # 1. Get status list entries
-            received_status = await self._get_status_by_name(db, "Received")
-            available_status = await self._get_status_by_name(db, "Available for Testing")
+            # 1. Get status list entries and defaults
+            available_status = await self._get_status_by_name(db, "Available for Testing")  # Arch: only one status
             assigned_pending_status = await self._get_test_status_by_name(db, "Assigned/Pending")  # L4
             default_tube_type_id = await self._get_default_tube_type(db)  # L3
             
-            # 2. Create sample (L1: name = barcode)
+            # 2. Create sample (L1+Arch: name = barcode; Arch: status = Available for Testing directly)
             sample = Sample(
-                name=receive_data.container_barcode,  # L1: Sample.name = scanned barcode
+                name=receive_data.container_barcode,  # L1+Arch: Sample.name = scanned barcode
                 sample_type=receive_data.sample_type,
                 matrix=receive_data.matrix,
-                status=received_status.id,  # initially "Received"
-                project_id=receive_data.project_id,  # L2: required
+                status=available_status.id,  # Arch: persist one status only (Available for Testing)
+                project_id=receive_data.project_id,  # L2+Arch: required, never auto-create
                 temperature=receive_data.temperature,  # nullable
                 client_sample_id=receive_data.client_sample_id,
                 created_by=user_id,
@@ -170,10 +173,10 @@ class ReceiveService:
             db.add(sample)
             await db.flush()  # get sample.id
             
-            # 3. Create container (L1: name = barcode, same string; L3: default tube type)
+            # 3. Create container (L1+Arch: name = barcode, same string; L3+Arch: default tube, off form)
             container = Container(
-                name=receive_data.container_barcode,  # unique; duplicate → 409
-                type_id=default_tube_type_id,  # L3: default tube, off the form
+                name=receive_data.container_barcode,  # Arch: unique; duplicate → 409
+                type_id=default_tube_type_id,  # L3+Arch: default tube, off the form
                 created_by=user_id,
             )
             db.add(container)
@@ -186,20 +189,17 @@ class ReceiveService:
             )
             db.add(contents)
             
-            # 5. Create tests (optional; no wizard; L4: assigned/pending status)
+            # 5. Create tests (optional; no wizard; L4+Arch: assigned/pending status)
             tests = []
             for analysis_id in receive_data.analysis_ids:
                 test = Test(
                     sample_id=sample.id,
                     analysis_id=analysis_id,
-                    status=assigned_pending_status.id,  # L4: assigned/pending, not In Process
+                    status=assigned_pending_status.id,  # L4+Arch: assigned/pending, not In Process
                     created_by=user_id,
                 )
                 db.add(test)
                 tests.append(test)
-            
-            # 6. Update sample status to "Available for Testing"
-            sample.status = available_status.id
             
             await db.flush()
             # Commit happens at context exit; rollback if any failure
@@ -231,8 +231,8 @@ class ResultEntryRequest(BaseModel):
     test_id: UUID
     analyte_id: UUID  # from analysis.analytes
     raw_result: str  # typed number (or text if data_type='text')
-    unit_id: Optional[UUID] = None  # from units table; defaults from analytes.units_default
     qualifier: Optional[UUID] = None  # list entry: '<LOD', 'ND', etc.
+    # NO unit_id field (Architecture lock: do not add results.unit_id column)
 ```
 
 **Response:**
@@ -243,13 +243,19 @@ class ResultResponse(BaseModel):
     test_id: UUID
     analyte_id: UUID
     raw_result: str
-    reported_result: Optional[str]
+    reported_result: Optional[str]  # existing column only
     qualifiers: Optional[UUID]
     entered_by: UUID
     entry_date: datetime
+    # NO unit field returned (Architecture lock: no new columns)
 ```
 
-Service validates `analyte_id` exists in `analysis.analytes` for `test.analysis_id`. If `unit_id` is null, defaults from `analytes.units_default` (locked). No US-28 batch ceremony; one-off result entry only.
+**Service logic (Architecture lock):**
+
+- Validate `analyte_id` exists in `analysis.analytes` for `test.analysis_id`.
+- Check `analytes.units_default` for the analyte. If missing, **HTTP 422** with message "Analyte has no default unit."
+- Do NOT add `results.unit_id` column. Do NOT add reported/review/curve fields (Architecture + CSO lock).
+- No US-28 batch ceremony; one-off result entry only.
 
 ## 6. Runtime flows
 
@@ -288,23 +294,33 @@ No wizard; immediate add/remove.
 ## 7. Migration / compatibility
 
 - **Existing UAT samples/tests:** remain unchanged
-- **Status picker UI:** hide status field on receive form (system sets `Received` then `Available for Testing`); existing sample edit forms may keep status picker for other workflows (or remove based on RBAC)
+- **Status picker UI:** hide status field on receive form (system sets `Available for Testing` only); existing sample edit forms may keep status picker for other workflows (or remove based on RBAC)
 - **Temperature validation:** if Pydantic validators currently require `temperature`, remove validation or make optional
 - **Bulk accession (US-24):** may coexist or be deprecated in favor of atomic receive; product decides
-- **Barcode uniqueness:** `Container.name` unique constraint enforced (locked). Duplicate barcode → HTTP 409.
+- **Barcode uniqueness:** `Container.name` unique constraint enforced (L1+Arch). Duplicate barcode → HTTP 409.
+- **Unit handling:** existing `analytes.units_default` column used; no schema change. Service validates default exists (422 if missing).
 
 ## 8. Locked decisions (not open)
 
-- **One DB transaction** for sample + container + contents + tests (locked)
-- **System sets status** "Received" then "Available for Testing" (locked). Drop status from request payload.
-- **Barcode unique** (locked): `Container.name` unique constraint enforced. Duplicate → HTTP 409. No timestamp suffix disambiguation.
-- **Sample.name = barcode** (L1, locked): `Sample.name` set to scanned barcode (same string as `Container.name`). Drop `generate_name_for_sample`.
-- **Project required** (L2, locked): `project_id` required and sticky. Never auto-create a project per tube.
-- **Container type default** (L3, locked): default tube, off the form. Do not ask the tech.
-- **Test status** (L4, locked): tests created at receive use "Assigned/Pending" status (not "In Process"). Refuse DELETE if test already has results.
-- **Unit defaults** from `analytes.units_default` (locked). If analyte has no default, unit selection required (edge case).
-- **Tests at receive** are optional (locked)
-- **Existing tables only** (locked). No new tables for parked features.
+**Lab Ops L1–L4:**
+- **L1 Identity**: `Sample.name` and `Container.name` are **both** the scanned barcode (same string). Duplicate → HTTP 409. Drop `generate_name_for_sample`.
+- **L2 Project**: `project_id` required and sticky. Never auto-create a project per tube.
+- **L3 Container type**: default tube, off the form. Do not ask the tech.
+- **L4 Test status**: tests created at receive use "Assigned/Pending" status (not "In Process"). Refuse DELETE if test already has results.
+
+**Architecture (Heidi):**
+- **One DB transaction** for sample + container + contents + tests.
+- **System sets status**: persist **one** status on commit: **`Available for Testing`**. Do not write `Received` then overwrite it (it never lands in the DB). Lab Ops wanted Received→Available; architecture lock is the durable end state only. A Received hop would need an event log, which this packet does not add. **No `status_history` table.**
+- **No new columns**: Do NOT add `results.unit_id`. Unit comes from `analytes.units_default`; if missing, HTTP 422. Do NOT add reported/review/curve fields.
+- **No new tables. No wizard.** Existing tables only.
+- **Receive body exact**: required: `barcode`, `sample_type`, `matrix`, `project_id`; optional: `analysis_ids`, `temperature`, `client_sample_id`. Drop `client_id` and `container_type_id` from request.
+
+**CSO + L4:**
+- **Data integrity**: Refuse DELETE test if test already has results.
+
+**All reviews:**
+- **Tests at receive** are optional.
+- **High-volume scan UX**: stay on receive screen; toast success; clear barcode; sticky type/matrix/project; focus barcode. No sample-detail redirect. No aliquot dialog.
 
 ## 9. Open technical risks
 
@@ -319,15 +335,17 @@ No wizard; immediate add/remove.
 
 **P0 (atomic loop):**
 
-- Backend: `/api/samples/receive` endpoint (atomic transaction, system-set status, unique barcode, L1: Sample.name = barcode, L2: project required, L3: default tube, L4: test status assigned/pending)
-- Backend: `/api/samples/{sample_id}/tests` POST/DELETE (add/remove tests; L4: refuse DELETE if test has results)
-- Backend: `/api/tests/{test_id}/results` POST (result entry, unit defaults from analyte)
-- Frontend: receive form (scan barcode → sample name + container name [L1], sticky project [L2], container type off form [L3], stay-on-receive loop, focus barcode after success)
-- Frontend: sample detail "Add Test" / "Remove Test" buttons (L4: disable Remove if test has results)
-- Frontend: result entry form (raw value, unit defaults from analyte, qualifier)
+- Backend: `/api/samples/receive` endpoint (atomic transaction, system-set status = "Available for Testing" [Arch], unique barcode, L1+Arch: Sample.name = Container.name = barcode, L2+Arch: project required/no auto-create, L3+Arch: default tube off form, L4: test status assigned/pending)
+- Backend: `/api/samples/{sample_id}/tests` POST/DELETE (add/remove tests; L4+CSO: refuse DELETE if test has results)
+- Backend: `/api/tests/{test_id}/results` POST (result entry; Arch: unit from analytes.units_default, 422 if missing; no new columns)
+- Frontend: receive form (scan barcode → sample name + container name [L1+Arch], sticky project [L2], container type off form [L3+Arch], stay-on-receive loop, focus barcode after success)
+- Frontend: sample detail "Add Test" / "Remove Test" buttons (L4+CSO: disable Remove if test has results)
+- Frontend: result entry form (raw value, qualifier; Arch: no unit selector, defaults from analyte)
 - Migration: make `temperature` nullable (if not already)
-- Migration: ensure `Container.name` unique constraint exists
+- Migration: ensure `Container.name` unique constraint exists (L1+Arch)
+- Seed/migration: ensure "Available for Testing" sample status exists (Arch)
 - Seed/migration: ensure "Assigned/Pending" test status exists (L4)
+- **Do NOT add:** `status_history` table, `results.unit_id` column, reported/review/curve fields (Arch lock)
 
 **Deferred (not P0):**
 
@@ -341,4 +359,4 @@ No wizard; immediate add/remove.
 
 ---
 
-**Next step:** Lab Ops Accept with conditions L1–L4 (folded in). Implement gate OPEN for Heidi / Hans / CEO reviews. Remaining open question: required fields beyond barcode (→ sample name)/sample_type/matrix/project. No product code until Heidi/Hans/CEO reviews pass.
+**Next step:** Lab Ops L1–L4 Accept · CSO Accept · Architecture Accept (all folded in). Implement gate OPEN for CEO review. Remaining open question: required fields beyond barcode (→ sample name)/sample_type/matrix/project. No product code until CEO passes and this sketch is tight. Heidi bounces the sketch if it grows a table or a wizard.
