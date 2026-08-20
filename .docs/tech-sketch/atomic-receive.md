@@ -1,11 +1,11 @@
 # Tech sketch: Atomic receive
 
 **Date:** 2026-08-20  
-**Status:** **C1 dropped. Architecture re-read requested. Lab Ops L2–L4 + L1 retracted. CSO Accept. No product code until Heidi signs and CEO passes.**  
+**Status:** **Architecture Accept (PR 30 + persist lock). Lab Ops L2–L4 + L1 retracted. CSO Accept. Packet signed. No product code until CEO passes.**  
 **Stem:** `atomic-receive`  
 **Process:** [`.docs/development-process/README.md`](../development-process/README.md)
 
-C1 (`samples.name` = barcode = `containers.name`) is **gone**. Two identities. Heidi will not sign the old C1 sketch.
+C1 (`samples.name` = barcode = `containers.name`) is **gone**. Two identities.
 
 ## 1. Problem
 
@@ -26,7 +26,7 @@ Receive must create sample + first container + contents + optional tests in **on
 - Container type = default tube, **off the form** (L3).
 - One status on commit: **Available for Testing**. No Received hop. Receipt is existing `received_date`. No `status_history` table. Techs do not pick status.
 - Tests optional at receive. Status = assigned/pending, not In Process (L4). **Refuse DELETE** if the test has results (L4 + CSO).
-- Results: raw value, optional qualifier (`<LOD`, `ND`). Unit from `analytes.units_default`; if missing, **422**. Do **not** add `results.unit_id`.
+- **Results persist (Architecture same-phase lock):** typed number lands in `results.reported_result` and `results.qualifiers`. `raw_result` **may copy the same value**. Unit from `analytes.units_default`; if missing, **422**. Do **not** add `results.unit_id`. No unit picker.
 - Stay on receive after success: toast, clear barcode, sticky type/matrix/project, focus barcode. No sample-detail redirect. No aliquot dialog.
 
 **Non-goals (this packet)**
@@ -46,7 +46,10 @@ containers.name           ← scanned barcode (unique; 409 on duplicate)
 containers.type_id        ← default tube (off form)
 contents                  ← sample_id + container_id
 tests                     ← optional; status assigned/pending
-results                   ← later; no unit_id column
+results.reported_result   ← typed number (Architecture persist lock)
+results.qualifiers        ← optional <LOD / ND
+results.raw_result        ← may copy the same typed value
+                          no unit_id column
 ```
 
 Make `samples.temperature` nullable if it is not already. Unique constraint on `containers.name` if missing. Do not add `status_history` or `results.unit_id`.
@@ -75,7 +78,15 @@ No wizard. DELETE → 400 if any `results` exist for that test.
 
 ### POST /api/tests/{id}/results
 
-`analyte_id` must belong to the test's analysis. Raw value + optional qualifier. Unit from `analytes.units_default`; missing → 422. No unit picker. No `results.unit_id`.
+```python
+class ResultEntryRequest(BaseModel):
+    analyte_id: UUID                # must belong to test.analysis
+    reported_result: str            # typed number — persist lock
+    qualifier: UUID | None = None   # <LOD, ND
+    # no unit_id; no raw_result in the request
+```
+
+Service: write `results.reported_result` and `results.qualifiers`. `raw_result` may copy `reported_result`. Unit from `analytes.units_default`; missing → 422. No unit picker. No `results.unit_id`.
 
 ## 5. Receive loop (UI)
 
@@ -94,6 +105,7 @@ Do not redirect to sample detail. Do not open an aliquot dialog. Duplicate barco
 | One sample + first container + contents + optional tests, one txn | Aliquot: another container + contents on same sample |
 | System sample ID + container barcode | Derivative: new sample + `parent_sample_id` |
 | Scan lookup, no sample-ID field on receive | Aliquot UI |
+| Typed number → `reported_result` + `qualifiers` (`raw_result` may copy) | Review/release ceremony |
 
 ## 7. Reviews
 
@@ -101,5 +113,5 @@ Do not redirect to sample detail. Do not open an aliquot dialog. Duplicate barco
 |--------|--------|
 | Lab Ops | L2–L4 hold. **L1 retracted.** Two IDs correct. Receive must not show a sample-ID field. |
 | CSO | Accept. DELETE-with-results is data integrity. Classic results only. |
-| Architecture | **Will not sign until C1 is gone (this file).** Two IDs; 409 on container; system-assigned `samples.name`. |
-| CEO | Open. No product code until Heidi signs and CEO passes. |
+| Architecture | **Accept on PR 30.** C1 gone. Two IDs. 409 on `Container.name`. System-assigned `samples.name`. One status: Available for Testing. Short receive body. No new tables / no `results.unit_id`. **Persist lock:** typed number → `reported_result` + `qualifiers`; `raw_result` may copy. Packet signed. |
+| CEO | Open. No product code until CEO passes. |
