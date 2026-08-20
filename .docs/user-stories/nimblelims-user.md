@@ -21,11 +21,15 @@ User stories are written in Agile format: "As a [role], I want [feature] so that
 - **US-2: Sample Status Management** **[MVP]**  
   As a Lab Technician or Lab Manager, I want to update sample statuses throughout the lifecycle so that progress is tracked accurately.  
   *Acceptance Criteria*:  
-  - Statuses: Received, Available for Testing, Testing Complete, Reviewed, Reported (from lists).  
-  - Updates trigger audit logs.  
+  - Statuses: Received, Available for Testing, Testing Complete, Reviewed, Reported (from lists; existing UAT values remain valid).  
+  - Additional sample dispositions: Quarantined, Rejected, Discarded.  
+  - Direction: Sample.status tracks specimen state; Reviewed/Reported belong on the result/report (compatibility: both approaches work during transition).  
+  - Updates trigger audit events (not only modified_at).  
   - Filtered views by status/project.  
   - API: PATCH /samples/{id}/status; RBAC: sample:update.  
-  *Priority*: High | *Estimate*: 5 points
+  - UAT compatibility: Existing five status names continue to work; product direction shifts review/release to result-level controls without breaking current workflows.  
+  *Priority*: High | *Estimate*: 5 points  
+  *Related*: Issues #22, #23
 
 - **US-3: Create Aliquots/Derivatives** **[MVP]**  
   As a Lab Technician, I want to create aliquots or derivatives from parent samples during workflows so that sub-samples are linked and inherit properties.  
@@ -94,13 +98,19 @@ User stories are written in Agile format: "As a [role], I want [feature] so that
   - API: POST /results; RBAC: result:enter.  
   *Priority*: High | *Estimate*: 8 points
 
-- **US-10: Results Review** **[MVP]**  
-  As a Lab Manager, I want to review and approve results at the test level so that quality is ensured.  
+- **US-10: Results Review and Release** **[MVP]**  
+  As a Lab Manager, I want to review and approve results at the test level so that quality is ensured before release.  
   *Acceptance Criteria*:  
-  - Batch view for review; update test status to Complete.  
-  - Record review_date.  
+  - Batch view for review; update test/result status to reviewed and reported states.  
+  - Record review_date and reviewer.  
+  - **Second-person review gate is tenant-configurable**: default OFF for pure R&D labs, default ON for GxP/CRO-release workflows.  
+  - When second-person gate is ON: reviewer cannot be the same user who entered the result.  
+  - When second-person gate is OFF: self-review is permitted (pure R&D use case).  
+  - Direction: result-level review/release states (not only Sample.status = Reviewed/Reported).  
   - API: PATCH /tests/{id}/review; RBAC: result:review.  
-  *Priority*: High | *Estimate*: 5 points
+  - UAT: When gate is ON, self-review is blocked; verify reviewer ≠ enterer enforcement.  
+  *Priority*: High | *Estimate*: 8 points (increased for configurability + validation)  
+  *Related*: Issues #22, #26
 
 ## 4. Batches and Plates
 
@@ -372,3 +382,141 @@ As an Administrator, I want to create and manage workflow templates (steps with 
 *Priority*: Medium | *Estimate*: 8 points | *Status*: Implemented (Post-MVP)
 
 Future: Instrument integration, automated calculations.
+
+---
+
+# SOP-Derived User Stories (Issues #22–#26)
+
+These stories address sample identity, dispositions, audit trails, and result review/amendment requirements derived from laboratory SOP analysis.
+
+## Sample Identity and Accessioning
+
+- **US-30: Immutable Lab ID with Separate External ID** **[MVP]**  
+  As a Lab Technician, I want to assign a unique, immutable lab ID to each sample while preserving the submitter's external ID so that sample identity is never altered and mix-ups are prevented.  
+  *Acceptance Criteria*:  
+  - Submitter/external ID stored as-is in a separate field (no mutation).  
+  - Lab assigns a new unique `lab_id` (barcode) that never changes throughout the sample's lifecycle.  
+  - Duplicate lab barcode is **rejected** (no collision algorithm; system refuses duplicates).  
+  - Receipt **datetime** (date and time, not date-only) stored as a separate field, not encoded in the identifier.  
+  - Each aliquot/derivative gets a **new** lab ID (not shared with parent).  
+  - Lab ID must not encode location, PHI, or other variable data.  
+  - Typed entry is acceptable; barcode scanning is supported but not mandated.  
+  - API: POST/PATCH /samples with lab_id and external_id fields; lab_id uniqueness enforced at database level.  
+  - **Blocking gate**: Deiter (Lab Ops) must review mix-up risk mitigation before this story is marked implement-ready.  
+  *Priority*: High | *Estimate*: 8 points  
+  *Related*: Issue #24
+
+- **US-31: Receipt Event with Condition and Disposition** **[MVP]**  
+  As a Lab Technician, I want to record comprehensive receipt details including condition, manifest match, and disposition so that acceptance/rejection decisions are documented.  
+  *Acceptance Criteria*:  
+  - Receipt event captures: **datetime** (date and time), who received, condition (intact/leaking/damaged/tampered), manifest match (yes/no/partial), temperature or "dry ice sufficient".  
+  - Disposition at receipt: Accept, Reject, or Quarantine with reason.  
+  - Manifest mismatch can still create a receipt event (discrepancy is recorded, not blocked).  
+  - Rejected samples are **not hard-deleted**; record survives physical disposal.  
+  - Quarantine is a real disposition (not a comment field); samples remain segregated until ID/quality checks resolve.  
+  - API: POST /samples/receipt-event or extend POST /samples with receipt_event nested object.  
+  *Priority*: High | *Estimate*: 5 points  
+  *Related*: Issues #23, #24
+
+- **US-32: Sample Dispositions (Quarantined, Rejected, Discarded)** **[MVP]**  
+  As a Lab Technician or Lab Manager, I want to mark samples as Quarantined, Rejected, or Discarded so that disposition is first-class and auditable.  
+  *Acceptance Criteria*:  
+  - Add Quarantined, Rejected, Discarded to sample status/disposition options (list-backed).  
+  - Quarantined: sample segregated until checks complete; cannot be used for test ordering.  
+  - Rejected: sample not acceptable; reason required; record survives physical destruction.  
+  - Discarded: disposal event with remaining quantity = 0; who, when, method, justification.  
+  - Rejected and Discarded samples remain searchable by lab_id (not hard-deleted from database).  
+  - Cancelled belongs on the **order**, not the sample (future: order cancellation story).  
+  - "On hold" status: no public SOP found; remains optional/parked.  
+  - API: PATCH /samples/{id} with status; POST /samples/{id}/disposal-event for Discarded.  
+  - UAT: Rejected sample records survive deletion; quarantined samples blocked from test assignment; disposal leaves durable record.  
+  *Priority*: High | *Estimate*: 5 points  
+  *Related*: Issue #23
+
+## Audit Trail and Data Integrity
+
+- **US-33: Append-Only Audit Events** **[MVP]**  
+  As a Lab Manager or Administrator, I want an append-only audit trail for all critical changes so that compliance requirements are met and data integrity is ensured.  
+  *Acceptance Criteria*:  
+  - Audit events table: entity type, entity_id, event_type (created/updated/deleted/reviewed/reported), old_value, new_value, changed_by (user_id), changed_at (timestamp with time zone), reason (required once result is reviewed/reported).  
+  - Events captured for: sample, order/test, result, spec/analysis, user account changes.  
+  - Append-only: admin users **cannot edit or delete** audit log entries.  
+  - Users cannot disable audit logging.  
+  - Unique users required: no shared lab login accounts permitted.  
+  - Disabled users remain in historical audit records (not deleted).  
+  - Server-generated timestamps (not user-editable without creating a new audit event).  
+  - Reason field required for changes to reviewed/reported results.  
+  - API: GET /audit-events with filters; no DELETE or PATCH endpoints for audit events.  
+  - Database: append-only constraint; admin role cannot bypass.  
+  - **Important**: Do NOT claim "21 CFR Part 11 certified" compliance. E-signatures with meaning and re-authentication are post-MVP.  
+  - UAT: Verify admin cannot edit audit log; verify reason required for post-review changes; verify disabled user still appears on historical actions.  
+  *Priority*: High | *Estimate*: 13 points  
+  *Related*: Issue #25
+
+- **US-34: Audit Event Reconstruction for Compliance** **[MVP]**  
+  As a Lab Manager or Auditor, I want to reconstruct the complete history of any sample, test, or result so that regulatory compliance (ISO 20387, GTEx, 21 CFR) is supported.  
+  *Acceptance Criteria*:  
+  - History view shows all audit events for an entity in chronological order.  
+  - Display: timestamp (with timezone), user, action, old→new values, reason (if provided).  
+  - Filterable by entity type, date range, user, event type.  
+  - Export capability for audit trail (CSV/JSON).  
+  - API: GET /samples/{id}/audit-trail, /tests/{id}/audit-trail, /results/{id}/audit-trail.  
+  - UI: Audit History tab on detail views; admin Audit Log page with global search.  
+  *Priority*: Medium | *Estimate*: 5 points  
+  *Related*: Issue #25
+
+## Test Ordering and Results
+
+- **US-35: Test Ordering Against Accepted Samples Only** **[MVP]**  
+  As a Lab Technician, I want test ordering to be restricted to accepted/available samples so that tests are not assigned to quarantined or rejected specimens.  
+  *Acceptance Criteria*:  
+  - Test ordering (assign analysis to sample) requires sample status = Available for Testing (or equivalent accepted/available state).  
+  - Quarantined or Rejected samples cannot have tests assigned (validation error).  
+  - Catalog test (analysis) is required; free-text "other" is optional and should prompt confirmation.  
+  - API: POST /tests validates sample status before creating test instance.  
+  - UI: Test assignment form filters eligible samples to accepted/available only.  
+  *Priority*: Medium | *Estimate*: 3 points  
+  *Related*: Issue #26
+
+- **US-36: Result Amendment After Reporting** **[MVP]**  
+  As a Lab Manager, I want to amend a reported result so that corrections are tracked without overwriting the original value.  
+  *Acceptance Criteria*:  
+  - After a result is marked Reported: amendment creates a **new version** linked to the original.  
+  - Original result remains retrievable and visible (not overwritten or soft-deleted).  
+  - Amendment requires: reason, amended_by, amended_at.  
+  - Both original and amended results are returned by API (with version/amendment markers).  
+  - A transcription fix **before** Reported status is an audited change (via US-33), not necessarily a formal amendment.  
+  - Silent overwrite is forbidden (validation error if attempted).  
+  - API: POST /results/{id}/amend with new_value and reason; GET /results/{id}/history returns all versions.  
+  - UI: Amendment form; result detail view shows "Original" and "Amended" versions with clear labeling.  
+  - UAT: Verify original result remains after amendment; verify both versions retrievable; verify amendment without reason is rejected.  
+  *Priority*: High | *Estimate*: 8 points  
+  *Related*: Issue #26
+
+- **US-37: Retest/Repeat Linked to Original Result** **[MVP]**  
+  As a Lab Technician or Lab Manager, I want to create a retest order linked to the original test so that repeat analyses are traceable and the original result is preserved.  
+  *Acceptance Criteria*:  
+  - Retest creates a **new test/order** on the same sample with link to original test.  
+  - Reason required for retest (e.g., "OOS investigation", "confirmatory").  
+  - Original result remains visible and is not replaced.  
+  - No automatic reflex-rules engine (clinical overkill for MVP).  
+  - API: POST /tests/{id}/retest with reason; creates new test with parent_test_id.  
+  - UI: Retest button on result detail; retest form prompts for reason.  
+  - UAT: Verify original result visible after retest; verify retest linked to original.  
+  *Priority*: Medium | *Estimate*: 5 points  
+  *Related*: Issue #26
+
+- **US-38: Aliquot Remaining Quantity Tracking** **[MVP]**  
+  As a Lab Technician, I want to track remaining quantity when creating aliquots so that depletion is visible and over-aliquoting is prevented.  
+  *Acceptance Criteria*:  
+  - Parent sample has quantity and remaining_quantity fields.  
+  - Creating aliquot decreases parent remaining_quantity by aliquot volume/amount.  
+  - Cannot aliquot more than remaining quantity (validation error).  
+  - Each aliquot gets a **new lab_id** (not shared with parent barcode).  
+  - Parent history survives deleting a child aliquot.  
+  - Remaining quantity = 0 signals depletion (optional link to Discarded disposition).  
+  - API: POST /samples/aliquot validates remaining quantity; updates parent.  
+  - UI: Aliquot form shows parent remaining quantity; validates against available amount.  
+  - Parked: Numeric freeze-thaw limits (no public SOP found); robotic worklist integration.  
+  *Priority*: Medium | *Estimate*: 5 points  
+  *Related*: Issue #24 (aliquot identity)
