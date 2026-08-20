@@ -9,14 +9,18 @@ User stories are written in Agile format: "As a [role], I want [feature] so that
 ## 1. Sample Tracking
 
 - **US-1: Sample Accessioning** **[MVP]**  
-  As a Lab Technician, I want to accession new samples including inspection notes, test assignment, and optional double-entry so that samples are accurately entered and ready for testing.  
+  As a Lab Technician, I want to receive a sample by scanning the tube and filling a few sticky fields so that the sample, first container, and optional tests land in one transaction and I can scan the next tube.  
   *Acceptance Criteria*:  
-  - Form fields: due_date, received_date, sample_type, status, matrix, temperature, anomalies notes.  
-  - Assign tests from manifest at entry.  
-  - Double-entry validation for key fields (optional toggle).  
-  - Review step before release (updates status to 'Available for Testing').  
-  - API: POST /samples with validation; RBAC: sample:create permission.  
-  *Priority*: High | *Estimate*: 8 points
+  - Happy path is **atomic-receive** (tech sketch, PR 30): scan (or type) barcode; sticky sample type, matrix, project; optional tests; optional temperature; optional external id.  
+  - **No sample-ID field.** `samples.name` is system-assigned from the name template.  
+  - **No status picker.** System writes **Available for Testing**. Receipt is existing `received_date`.  
+  - **No wizard. No aliquot dialog. No sample-detail redirect.** Stay on receive: toast, clear barcode, keep sticky fields, focus barcode.  
+  - One DB transaction: sample + first container + contents + optional tests. Duplicate barcode → 409 on container; no orphan rows.  
+  - Tests at receive are optional; status **Assigned/Pending**.  
+  - Old `/samples` accession (typed sample name, status picker, review-to-Available, 3-step wizard, aliquot dialog) is **not** this packet’s happy path. Atomic-receive UAT **AR-01–AR-15** replaces it.  
+  - API: POST /api/samples/receive; RBAC: sample:create.  
+  *Priority*: High | *Estimate*: 8 points  
+  *Related*: atomic-receive tech sketch
 
 - **US-2: Sample Status Management** **[MVP]**  
   As a Lab Technician or Lab Manager, I want to update sample statuses throughout the lifecycle so that progress is tracked accurately.  
@@ -24,6 +28,7 @@ User stories are written in Agile format: "As a [role], I want [feature] so that
   - Statuses: Received, Available for Testing, Testing Complete, Reviewed, Reported (from lists; existing UAT values remain valid).  
   - Additional sample dispositions: Quarantined, Rejected, Discarded.  
   - Direction: Sample.status tracks specimen state; Reviewed/Reported belong on the result/report (compatibility: both approaches work during transition).  
+  - This packet’s UAT (AR-01–AR-15) only sets **Available for Testing**. It does not set Reviewed/Reported on Sample.status (Q1 parallel).  
   - Updates trigger audit events (not only modified_at).  
   - Filtered views by status/project.  
   - API: PATCH /samples/{id}/status; RBAC: sample:update.  
@@ -39,6 +44,7 @@ User stories are written in Agile format: "As a [role], I want [feature] so that
   - Inherit project_id, client_id; configurable workflow steps.  
   - Example: DNA extraction from blood.  
   - API: POST /samples/aliquot or /derivative with parent_id; RBAC: sample:create.  
+  - **Not in atomic-receive P0.** No aliquot UI this packet.  
   *Priority*: Medium | *Estimate*: 8 points
 
 - **US-4: QC Sample Handling** **[Shipped, Not MVP]**  
@@ -73,7 +79,7 @@ User stories are written in Agile format: "As a [role], I want [feature] so that
 - **US-7: Assign Tests to Samples** **[MVP]**  
   As a Lab Technician, I want to order tests during accessioning so that analyses are linked to samples.  
   *Acceptance Criteria*:  
-  - Select analysis_id → Create test instance with status 'In Process'.  
+  - Select analysis_id → Create test instance with status 'Assigned/Pending' (atomic-receive L4). Later lifecycle may still use In Process / In Analysis / Complete (US-8).  
   - Analyses fields: method, turnaround_time, cost.  
   - API: POST /tests; RBAC: test:assign.  
   *Priority*: High | *Estimate*: 5 points
@@ -81,7 +87,7 @@ User stories are written in Agile format: "As a [role], I want [feature] so that
 - **US-8: Test Status Management** **[MVP]**  
   As a Lab Technician or Lab Manager, I want to update test statuses so that analysis progress is visible.  
   *Acceptance Criteria*:  
-  - Statuses: In Process, In Analysis, Complete (from lists).  
+  - Statuses: Assigned/Pending (create-at-receive and add-test; atomic-receive L4), then In Process, In Analysis, Complete (from lists). Do not drop the existing three UAT names.  
   - Fields: review_date, test_date, technician_id.  
   - API: PATCH /tests/{id}; RBAC: test:update.  
   *Priority*: Medium | *Estimate*: 3 points
@@ -109,6 +115,7 @@ User stories are written in Agile format: "As a [role], I want [feature] so that
   - Direction: result-level review/release states (not only Sample.status = Reviewed/Reported).  
   - API: PATCH /tests/{id}/review; RBAC: result:review.  
   - UAT: When gate is ON, self-review is blocked; verify reviewer ≠ enterer enforcement.  
+  - **Not in atomic-receive P0**: no schema flag for this gate (no new columns). AR-MU-02 stays catalog-only until Q2 lands a home.  
   *Priority*: High | *Estimate*: 8 points (increased for configurability + validation)  
   *Related*: Issues #22, #26
 
@@ -387,28 +394,34 @@ Future: Instrument integration, automated calculations.
 
 # SOP-Derived User Stories (Issues #22–#26)
 
+Atomic-receive P0 (PR 30) is accession/order/results only. UAT for that packet follows the sketch, not US-31 receipt-event or US-38 remaining-qty.
+
 These stories address sample identity, dispositions, audit trails, and result review/amendment requirements derived from laboratory SOP analysis.
 
 ## Sample Identity and Accessioning
 
 - **US-30: Immutable Lab ID with Separate External ID** **[MVP]**  
-  As a Lab Technician, I want to assign a unique, immutable lab ID to each sample while preserving the submitter's external ID so that sample identity is never altered and mix-ups are prevented.  
+  As a Lab Technician, I want the system to assign a unique, immutable sample ID while I scan the tube barcode, and to keep any submitter external ID separate, so that sample identity and tube identity cannot be mixed up.  
   *Acceptance Criteria*:  
-  - Submitter/external ID stored as-is in a separate field (no mutation).  
-  - Lab assigns a new unique `lab_id` (barcode) that never changes throughout the sample's lifecycle.  
-  - Duplicate lab barcode is **rejected** (no collision algorithm; system refuses duplicates).  
-  - Receipt **datetime** (date and time, not date-only) stored as a separate field, not encoded in the identifier.  
-  - Each aliquot/derivative gets a **new** lab ID (not shared with parent).  
+  - Two identities (atomic-receive PR 30; Lab Ops L1 retracted):  
+    - `samples.name` is the lab sample ID, **system-assigned** from the existing name template/sequence. Tech does **not** type it. Receive screen has **no sample-ID field**.  
+    - `containers.name` is the scanned (or typed) tube barcode. Duplicate scan → HTTP 409 on the container only.  
+    - `samples.name` 409 only if the generated sample ID itself collides.  
+  - Submitter/external ID stored as-is in existing `client_sample_id` (optional; unique if present). Never mutated into the sample ID or barcode.  
+  - Receipt **datetime** stored in existing `received_date` (not encoded in either identifier).  
+  - Lookup is scan the tube. Mix-up is unacceptable if receive or lookup makes the tech hunt or type the sample ID.  
+  - Aliquot later (not atomic-receive): another container + contents row on the **same** sample (new barcode, same sample ID).  
+  - Derivative later (not atomic-receive): new sample with `parent_sample_id` (new system sample ID).  
   - Lab ID must not encode location, PHI, or other variable data.  
-  - Typed entry is acceptable; barcode scanning is supported but not mandated.  
-  - API: POST/PATCH /samples with lab_id and external_id fields; lab_id uniqueness enforced at database level.  
-  - **Blocking gate**: Deiter (Lab Ops) must review mix-up risk mitigation before this story is marked implement-ready.  
+  - API: POST /api/samples/receive. Do **not** add `lab_id` or `external_id` columns.  
+  - **Lab Ops gate**: Deiter retracted L1; two IDs accepted 2026-08-20. Receive must not show a sample-ID field.  
   *Priority*: High | *Estimate*: 8 points  
   *Related*: Issue #24
 
 - **US-31: Receipt Event with Condition and Disposition** **[MVP]**  
   As a Lab Technician, I want to record comprehensive receipt details including condition, manifest match, and disposition so that acceptance/rejection decisions are documented.  
   *Acceptance Criteria*:  
+  - Not in atomic-receive P0 receive body. P0 records receipt as `received_date` only. Do not seed a receipt-event table for that packet.  
   - Receipt event captures: **datetime** (date and time), who received, condition (intact/leaking/damaged/tampered), manifest match (yes/no/partial), temperature or "dry ice sufficient".  
   - Disposition at receipt: Accept, Reject, or Quarantine with reason.  
   - Manifest mismatch can still create a receipt event (discrepancy is recorded, not blocked).  
@@ -425,7 +438,7 @@ These stories address sample identity, dispositions, audit trails, and result re
   - Quarantined: sample segregated until checks complete; cannot be used for test ordering.  
   - Rejected: sample not acceptable; reason required; record survives physical destruction.  
   - Discarded: disposal event with remaining quantity = 0; who, when, method, justification.  
-  - Rejected and Discarded samples remain searchable by lab_id (not hard-deleted from database).  
+  - Rejected and Discarded samples remain searchable by `samples.name` (not hard-deleted from database).  
   - Cancelled belongs on the **order**, not the sample (future: order cancellation story).  
   - "On hold" status: no public SOP found; remains optional/parked.  
   - API: PATCH /samples/{id} with status; POST /samples/{id}/disposal-event for Discarded.  
@@ -437,6 +450,7 @@ These stories address sample identity, dispositions, audit trails, and result re
 
 - **US-33: Append-Only Audit Events** **[MVP]**  
   As a Lab Manager or Administrator, I want an append-only audit trail for all critical changes so that compliance requirements are met and data integrity is ensured.  
+  *Not in atomic-receive P0.* New audit tables/events are out of AR-01–AR-15 (no new tables this packet).  
   *Acceptance Criteria*:  
   - Audit events table: entity type, entity_id, event_type (created/updated/deleted/reviewed/reported), old_value, new_value, changed_by (user_id), changed_at (timestamp with time zone), reason (required once result is reviewed/reported).  
   - Events captured for: sample, order/test, result, spec/analysis, user account changes.  
@@ -455,6 +469,7 @@ These stories address sample identity, dispositions, audit trails, and result re
 
 - **US-34: Audit Event Reconstruction for Compliance** **[MVP]**  
   As a Lab Manager or Auditor, I want to reconstruct the complete history of any sample, test, or result so that regulatory compliance (ISO 20387, GTEx, 21 CFR) is supported.  
+  *Not in atomic-receive P0.* Out of AR-01–AR-15.  
   *Acceptance Criteria*:  
   - History view shows all audit events for an entity in chronological order.  
   - Display: timestamp (with timezone), user, action, old→new values, reason (if provided).  
@@ -512,7 +527,7 @@ These stories address sample identity, dispositions, audit trails, and result re
   - Parent sample has quantity and remaining_quantity fields.  
   - Creating aliquot decreases parent remaining_quantity by aliquot volume/amount.  
   - Cannot aliquot more than remaining quantity (validation error).  
-  - Each aliquot gets a **new lab_id** (not shared with parent barcode).  
+  - Aliquot (later): new container barcode on the **same** sample ID. Derivative (later): new system sample ID. Not in atomic-receive P0.  
   - Parent history survives deleting a child aliquot.  
   - Remaining quantity = 0 signals depletion (optional link to Discarded disposition).  
   - API: POST /samples/aliquot validates remaining quantity; updates parent.  
