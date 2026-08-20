@@ -1,7 +1,7 @@
 # Tech sketch: Atomic receive
 
 **Date:** 2026-08-20  
-**Status:** **Lab Ops L1–L4 Accept · CSO Accept · Architecture Accept pending this fold · Implement gate OPEN for CEO review. No product code until CEO passes and this sketch is tight.**  
+**Status:** **Lab Ops L1–L4 Accept · CSO Accept (condition = L4 DELETE refuse) · Architecture Accept · Implement gate OPEN for CEO review. No product code until CEO passes and this sketch is tight.**  
 **Requirements:** (not written; locked packet from CEO)  
 **Process:** [`.docs/development-process/README.md`](../development-process/README.md)
 
@@ -32,7 +32,8 @@
 **Non-goals (parked features)**
 
 - **ELN / method-matrix execute / aliquot execute** — sample and test models exist; execute/method-matrix stays parked
-- **IC50 / dose-response / curve fitting** — not this cycle
+- **IC50 / dose-response / curve fitting** — not this cycle (CSO locked scientific bar: classic results only)
+- **Method/QC/review ceremony** — no `reported_result` / review fields on this spine (CSO locked)
 - **Parsers / instrument/CRO import** — see [data-parsers-lims-runs.md](data-parsers-lims-runs.md)
 - **US-28 batch ceremony** — simple one-off result entry only
 - **Manifests / materials / multi-tenant** — not in scope
@@ -315,8 +316,11 @@ No wizard; immediate add/remove.
 - **No new tables. No wizard.** Existing tables only.
 - **Receive body exact**: required: `barcode`, `sample_type`, `matrix`, `project_id`; optional: `analysis_ids`, `temperature`, `client_sample_id`. Drop `client_id` and `container_type_id` from request.
 
-**CSO + L4:**
-- **Data integrity**: Refuse DELETE test if test already has results.
+**CSO (Hans):**
+- **Classic results only** (locked scientific bar): raw value, unit default from `analytes.units_default`, optional qualifier (`<LOD`, `ND`). Analyte must belong to test's analysis.
+- **No IC50, no dose-response, no method/QC/review ceremony** on this spine (locked). No `reported_result` / review fields.
+- **DELETE /tests must refuse when test already has results** (data integrity, CSO condition = L4). Not optional, not scope creep.
+- **Sample.name = barcode** (L1) is the right identity (CSO concurs).
 
 **All reviews:**
 - **Tests at receive** are optional.
