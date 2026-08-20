@@ -42,6 +42,9 @@ For each missing or stale review (user may say “all” or name subset), load a
 | UI | `.grok/skills/nimble-ui-review/SKILL.md` |
 | Architecture | `.grok/skills/nimble-arch-review/SKILL.md` |
 | Security (CSO packet) | `.grok/skills/nimble-cso-review/SKILL.md` |
+| Scientific CSO | `.grok/skills/nimble-scientific-cso-review/SKILL.md` |
+| BA | `.grok/skills/nimble-ba-review/SKILL.md` |
+| QA | `.grok/skills/nimble-qa-review/SKILL.md` |
 
 Ask user before deep Layer B CSO.
 
