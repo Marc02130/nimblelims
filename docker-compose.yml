@@ -54,11 +54,16 @@ services:
       DB_NAME: lims_db
       DB_USER: lims_user
       DB_PASSWORD: lims_password
+      # S3: app reads SECRET_KEY (JWT_SECRET_KEY accepted as alias). Local compose
+      # allows the placeholder only because ALLOW_INSECURE_DEFAULTS=true.
+      SECRET_KEY: your-secret-key-change-in-production
       JWT_SECRET_KEY: your-secret-key-change-in-production
       JWT_ALGORITHM: HS256
       JWT_ACCESS_TOKEN_EXPIRE_MINUTES: 30
       DEBUG: "True"
       ENVIRONMENT: development
+      ALLOW_INSECURE_DEFAULTS: "true"
+      ALLOW_DEV_SEED_USERS: "true"
       R_CALCULATOR_URL: http://r-calculator:8000
     ports:
       - "8000:8000"
