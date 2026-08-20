@@ -11,12 +11,13 @@ Slash-friendly skills for the NimbleLIMS development process. Each skill produce
 | `/nimble-ui-review` | UX / lab workflow UI | `.docs/ui-review/{stem}.md` | `plan-design-review` |
 | `/nimble-arch-review` | Systems architecture | `.docs/architecture-review/{stem}.md` | `plan-eng-review` |
 | `/nimble-cso-review` | Feature security + optional deep CSO | `.docs/security-review/{stem}.md` | `cso` (feature-scoped + optional full) |
+| `/nimble-scientific-cso-review` | Chief Scientific Officer (assays, results, QC, data integrity) | `.docs/scientific-cso-review/{stem}.md` | Custom (Nimble-native) |
 | `/nimble-review-packet` | Orchestrator | Runs gate order, points at all artifacts | — |
 
 ## Recommended order (ELN / LIMS)
 
 1. **Lab Ops** (required gate)  
-2. **CEO** + **UI** + **Arch** + **CSO** (parallel after Lab Ops has spoken)  
+2. **CEO** + **UI** + **Arch** + **Security CSO** + **Scientific CSO** (parallel after Lab Ops has spoken)  
 3. Resolve **open questions**  
 4. Implement only when implement gate is open  
 
@@ -25,6 +26,7 @@ Slash-friendly skills for the NimbleLIMS development process. Each skill produce
 ```
 /nimble-lab-ops-review experiment-template-entries
 /nimble-ceo-review experiment-template-entries
+/nimble-scientific-cso-review experiment-template-entries
 /nimble-review-packet experiment-template-entries
 ```
 
