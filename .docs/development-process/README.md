@@ -19,12 +19,15 @@ Requirements
     ↓
 Tech sketch                          ← how (lightweight)
     ↓
-Reviews (parallel when possible; see lab-ops gate below)
+Reviews (parallel when possible; see lab-ops and QA gates below)
     ├── Lab operations (SVP Lab Ops)   ← required for ELN/LIMS lab workflows  → /nimble-lab-ops-review
     ├── CEO / product                  → /nimble-ceo-review
     ├── Security                       → /nimble-cso-review
     ├── UI design                      → /nimble-ui-review
-    └── Architecture design            → /nimble-arch-review
+    ├── Architecture design            → /nimble-arch-review
+    ├── Scientific CSO                 → /nimble-scientific-cso-review
+    ├── BA                             → /nimble-ba-review
+    └── QA / Testing                   → /nimble-qa-review (required when touching sample tracking / results / audit / security)
     (orchestrate: /nimble-review-packet)
     ↓
 Developer reviews review docs
@@ -84,6 +87,7 @@ Tiny/small must **not** skip security or product decisions on sensitive changes 
 | **Security review** | Trust boundaries, STRIDE, authZ, AI/data | [`.docs/security-review/`](../security-review/) · skill `/nimble-cso-review` |
 | **UI design review** | Personas, flows, empty states | [`.docs/ui-review/`](../ui-review/) · skill `/nimble-ui-review` |
 | **Architecture design review** | Schema, APIs, migration | [`.docs/architecture-review/`](../architecture-review/) · skill `/nimble-arch-review` |
+| **QA / Testing review** | Testability, UAT readiness, acceptance criteria quality; required when touching sample tracking / results / audit / security | [`.docs/qa-review/`](../qa-review/) · skill `/nimble-qa-review` |
 | **Review skills (how agents run reviews)** | Formal Grok skills + packet rules | [`.grok/skills/nimble-reviews/`](../../.grok/skills/nimble-reviews/) |
 | **Open questions** | Decision log; phase gate | [`.docs/open-questions/`](../open-questions/) |
 | **Implementation tracking** | Phase checklists / tasks | [`.docs/checklist/`](../checklist/) |
@@ -109,6 +113,24 @@ For work that changes **how labs run experiments, processes, samples, plates, or
 
 **Anti-pattern:** Rapid rename cycles + “Accept with conditions” from four tech reviews while the lab entry catalog is still undefined. That is rushing.
 
+
+### QA / Testing review gate (testability & UAT readiness)
+
+QA review ([qa-review/README.md](../qa-review/README.md)) is **recommended** before implement for any full-pipeline feature. QA review is **required** when work touches:
+
+- Sample tracking (accessioning, containers, aliquots, derivatives, status transitions)
+- Test ordering workflows
+- Results entry / results integrity
+- Audit trails
+- Security / RBAC / RLS changes
+
+When QA review is required:
+
+1. QA **Hold** or **Revise** → **implement gate closed**  
+2. QA **Accept with conditions** → listed UAT / testability conditions must land in the same implement phase  
+3. **Implement / Cursor prompts for full-pipeline work must include:** required documentation updates + UAT script create-or-update at `UAT_Scripts/uat-{stem}.md`
+
+**Important:** QA review is **not a substitute** for the post-implement UAT pass. QA reviews the packet for testability and UAT readiness; UAT validates the shipped code. Both are required for full-pipeline work.
 ### Tech sketch vs schema-changes vs architecture review
 
 | Artifact | Role |
@@ -279,10 +301,12 @@ After merge: **monitor** production, then **update requirements** with learnings
 | `requirements/<stem>.md` | Requirements |
 | `tech-sketch/<stem>.md` | Tech sketch |
 | `schema-changes/<stem>.md` | **DB delta** (if migrations in scope) |
+| `lab-ops-review/<stem>.md` | Lab Ops verdict |
 | `ceo-review/<stem>.md` | CEO verdict |
 | `security-review/<stem>.md` | Security verdict |
 | `ui-review/<stem>.md` | UI verdict |
 | `architecture-review/<stem>.md` | Architecture verdict |
+| `qa-review/<stem>.md` | QA / Testing verdict |
 | `open-questions/<stem>.md` | Decision log |
 | `checklist/<stem>.md` (optional) | Phase tasks |
 | `UAT_Scripts/uat-<stem>.md` | UAT script |

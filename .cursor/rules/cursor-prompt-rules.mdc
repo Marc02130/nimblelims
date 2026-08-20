@@ -41,3 +41,13 @@ Match the codebase exactly for:
 
 - Keep features **sample-centric**: samples are the core entity; relate new behavior to samples where relevant.
 - Keep flows **bidirectional** where applicable (e.g. list ↔ detail, create ↔ edit, backend ↔ frontend) so create/read/update and navigation are consistent.
+
+## 6. Documentation and UAT requirements (full-pipeline features)
+
+For **full-pipeline features** (not tiny typos / one-line fixes), implement work **must include**:
+
+1. **Documentation sync** — update relevant manuals, README, or `.docs/` as applicable so others can understand and use the feature
+2. **UAT script** — create or update `UAT_Scripts/uat-{stem}.md` with concrete acceptance test steps
+3. **QA review conditions** — when `.docs/qa-review/{stem}.md` exists, implement all listed **QA*** conditions in the same phase
+
+**Note:** QA review (testability / UAT readiness gate) happens **before implement**. The UAT pass (validates shipped code) happens **after implement**, before merge to `main`. Both are required for full-pipeline work.

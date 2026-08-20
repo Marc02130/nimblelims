@@ -12,7 +12,18 @@ Summary:
 |------|---------|
 | **Tiny** | Skip formal docs → implement |
 | **Small** | Idea optional → implement |
-| **Everything else** | Ideation → requirements → tech sketch → reviews → open questions → implement → **docs sync** → **dogfood** → **UAT** → **merge to main (production)** → monitor → requirements update |
+| **Everything else** | Ideation → requirements → tech sketch → reviews (Lab Ops / CEO / UI / Arch / Security / Scientific CSO / BA / QA) → open questions → implement (with docs + UAT updates) → **docs sync** → **dogfood** → **UAT pass** → **merge to main (production)** → monitor → requirements update |
+
+**Formal review skills:** Lab Ops (`/nimble-lab-ops-review`), CEO (`/nimble-ceo-review`), UI (`/nimble-ui-review`), Architecture (`/nimble-arch-review`), Security CSO (`/nimble-cso-review`), Scientific CSO (`/nimble-scientific-cso-review`), BA (`/nimble-ba-review`), QA (`/nimble-qa-review`). Orchestrator: `/nimble-review-packet`. Artifacts live at `.docs/{review-type}-review/{stem}.md`.
+
+**QA review:** Testing / QA Lead (Tobias persona). Testability, UAT readiness, acceptance criteria quality. **Required** for work touching sample tracking / test ordering / results entry / audit / security/RBAC/RLS. Reviews `.docs/qa-review/{stem}.md` before implement; not a substitute for post-implement UAT pass. Both are required for full-pipeline work.
+
+**Implement requirements (full-pipeline work):**
+1. Documentation sync (manuals / README / `.docs/` as applicable)
+2. UAT script create-or-update at `UAT_Scripts/uat-{stem}.md`
+3. Awareness of QA review conditions (**QA*** prefix) when QA review exists
+
+**UAT pass gate:** Merge to `main` (production) requires UAT pass for full-pipeline features.
 
 ## Open questions gate
 
