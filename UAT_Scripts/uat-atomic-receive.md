@@ -40,8 +40,8 @@ Anton owns realistic seed coverage for the above.
 | AR-08 | Inspect the receive form. | **No sample-ID / sample name input.** Lookup is the barcode field only. | | QA2 |
 | AR-09 | Open the sample from AR-01. Add analysis A. | POST succeeds. Test status assigned/pending. | | QA6 |
 | AR-10 | Delete the test from AR-09 (no results). | DELETE succeeds. | | QA6 |
-| AR-11 | On a test with analysis A (units_default present), enter raw value and optional qualifier `<LOD` or `ND`. Do not pick a unit. | Result saved. Unit taken from `analytes.units_default`. No unit picker on the form. | | QA7 |
-| AR-12 | On a test with analysis B (no units_default), enter a raw value. | **422**. No result row. | | QA7 |
+| AR-11 | On a test with analysis A (`units_default` present), enter a typed number and optional qualifier `<LOD` or `ND`. Do not pick a unit. | Result saved. Assert **`reported_result`** equals the typed number and **`qualifiers`** is set. `raw_result` may copy the same value. Do not assert a new column. Unit from `analytes.units_default`. No unit picker. | | QA7 |
+| AR-12 | On a test with analysis B (no `units_default`), enter a typed number. | **422**. No result row. | | QA7 |
 | AR-13 | DELETE the test used in AR-11 (has results). | **400**. Test and result remain. | | QA6 |
 | AR-14 | Log in as client. Open receive or POST `/api/samples/receive`. | No receive UI, or **403**. | | QA8 |
 | AR-15 | As lab-tech, POST `/api/samples/receive` with `project_id` of a project not in `project_users`. | **403**. No row. | | QA8 |

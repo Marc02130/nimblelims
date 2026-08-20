@@ -12,6 +12,8 @@
 
 The PR 30 sketch is testable. Receive is a high-volume scan loop: one transaction, two identities, one status (**Available for Testing**), stay on the screen. Living stories still describe the old accessioning wizard (typed sample name, Received hop, In Process tests). That drift is a BA gap, not a third design. Implement gate stays **CLOSED** until Heidi signs PR 30 and CEO passes.
 
+Architecture lock on result persist: typed number → `results.reported_result` + `qualifiers`. `raw_result` may copy the same value. UAT asserts `reported_result`, not a new column.
+
 QA review is not a substitute for the post-implement UAT pass.
 
 ## Testability and coverage
@@ -24,6 +26,7 @@ QA review is not a substitute for the post-implement UAT pass.
 | UAT readiness | Lab-tech happy path + client/foreign-project denial. Manager override is out of this packet. |
 | Docs and Cursor | Implement prompt must update receive manuals and `uat-atomic-receive.md` (QA10). |
 | Story alignment | US-1, US-7, US-30 still contradict the sketch. Do not UAT a hybrid. |
+| Results persist | Assert `reported_result` + `qualifiers`. Do not require a new column. |
 
 ## Conditions (must land with implement)
 
@@ -35,7 +38,7 @@ QA review is not a substitute for the post-implement UAT pass.
 | QA4 | Commit writes Sample.status = **Available for Testing** only. Sets `received_date`. Request has no status field. No Received hop. | System-owned status. |
 | QA5 | After success: stay on receive, toast, clear barcode, sticky type/matrix/project, focus barcode. No sample-detail redirect. No aliquot dialog. | High-volume loop. |
 | QA6 | Tests optional at receive; status **assigned/pending**, not In Process. POST add later. DELETE without results ok. DELETE with results → **400**. | L4 + CSO. |
-| QA7 | Result: raw value + optional qualifier. Unit from `analytes.units_default`. Missing default → **422**. No unit picker. No `results.unit_id`. | Classic results only. |
+| QA7 | Typed number persists to `results.reported_result` + `qualifiers`. `raw_result` may copy the same value. Assert `reported_result`, not a new column. Unit from `analytes.units_default`. Missing default → **422**. No unit picker. No `results.unit_id`. | Architecture lock (Wilhelmina / Heidi). |
 | QA8 | `sample:create` required. Project list/API scoped by `project_users`. Client cannot receive. Foreign project → **403**, no row. | RLS. |
 | QA9 | Seed: Available for Testing; Assigned/Pending (or agreed slug); default tube; sample name template that assigns without a typed name; unique `containers.name`. | Otherwise UAT is blocked on data. |
 | QA10 | Cursor implement prompt updates receive/accessioning manuals **and** `UAT_Scripts/uat-atomic-receive.md`. After ship, `uat-sample-accessioning.md` is not the receive happy path. | Docs + UAT gate. |
@@ -44,7 +47,7 @@ Automated gate (pytest, not a human case): QA1 rollback after sample insert, bef
 
 ## Suggested UAT scenarios
 
-Must-pass AR-01–AR-15 in [`UAT_Scripts/uat-atomic-receive.md`](../../UAT_Scripts/uat-atomic-receive.md): scan and keyboard receive, sticky second tube, 409 no orphan, two IDs, add/remove tests, DELETE-with-results 400, unit default or 422, client/RLS denial.
+Must-pass AR-01–AR-15 in [`UAT_Scripts/uat-atomic-receive.md`](../../UAT_Scripts/uat-atomic-receive.md): scan and keyboard receive, sticky second tube, 409 no orphan, two IDs, add/remove tests, DELETE-with-results 400, `reported_result` + unit default or 422, client/RLS denial.
 
 ## Out of this packet
 
