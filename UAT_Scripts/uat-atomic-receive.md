@@ -4,7 +4,7 @@
 **Phase:** P0 receive loop (docs ahead of implement)  
 **Requirements:** [PR 30 sketch](https://github.com/Marc02130/nimblelims/pull/30); US-1 / US-7 / US-8 / US-30 on merged [PR 32](https://github.com/Marc02130/nimblelims/pull/32) (`main`).  
 **QA review:** `.docs/qa-review/atomic-receive.md`  
-**Test data:** Anton fixtures share these IDs  
+**Test data:** Anton fixtures. Same IDs as this script. No third scheme.  
 **Env:**  
 **Build / commit:**  
 **Executor:**  
@@ -33,48 +33,57 @@ Replaces the **receive happy path** in `uat-sample-accessioning.md` when this pa
 | AR-14 | AR-RBAC-01 |
 | AR-15 | AR-MU-01 |
 
+## Fixture lock (Anton)
+
+| Need | Seed |
+|------|------|
+| Name template | Assigns `samples.name` with no typed sample ID |
+| Default tube (off form) | Cryovial 2mL |
+| Sample status | Available for Testing |
+| Test status | Assigned/Pending |
+| Analysis A (`units_default` set) | IgG |
+| Analysis B (`units_default` missing) | Total Cell Count |
+| Keyboard barcode (AR-HV-05) | `NBIO-AR-KB-0001` |
+| Sticky type / matrix / project (keyboard) | Plasma / K2EDTA / mAb-2301 |
+| Client / no receive (AR-RBAC-01) | `david-cro` |
+| Two techs (AR-MU-01) | alice → CAR-T; bob → mAb (foreign project → 403) |
+| Aliquots | None in P0 |
+
+UI logins from `AGENTS.md` still work (`admin` / `lab-tech` / `client`). API cases use the named Anton users above.
+
 ## Preconditions
 
-- App running. Logins from `AGENTS.md`: `admin` / `admin123`, `lab-tech` / `labtech123`, `client` / `client123`. Second lab-tech for AR-MU-01.
-- Seeded: sample type, matrix, at least one project lab-tech A can access, one project they cannot, one project for lab-tech B.
-- Sample **name template** assigns `samples.name` without a typed sample ID.
-- Default **tube** container type (off the form).
-- Sample status list includes **Available for Testing**.
-- Test status list includes **Assigned/Pending** (or the agreed slug from implement).
+- App running.
 - Unique constraint on `containers.name`.
-- Analysis A: analyte with `units_default` set.
-- Analysis B: analyte with `units_default` missing (for AR-RES-02).
 - Qualifier list entries: `<LOD`, `ND` (optional for AR-RES-01).
 - No parent/child aliquot fixtures in P0.
-
-Anton owns realistic seed coverage for the above.
 
 ## Cases
 
 | ID | Steps | Expected | Pass/Fail | Notes |
 |----|-------|----------|-----------|-------|
 | AR-HV-01 | Log in as lab-tech A. Open receive. Scan a new barcode. Set type, matrix, project. Leave tests empty. Submit. Immediately scan a **second** new barcode without navigating away. | First and second samples created. Stay on receive. Toast. Barcode clears and is focused. Type/matrix/project sticky. No sample-detail redirect. No aliquot dialog. | | QA2, QA5 |
-| AR-HV-02 | Receive a new barcode with analysis A attached. | Tests created, status assigned/pending (not In Process). | | QA6 |
+| AR-HV-02 | Receive a new barcode with IgG attached. | Tests created, status assigned/pending (not In Process). | | QA6 |
 | AR-HV-03 | Receive with temperature omitted. | Succeeds. Temperature not required. | | |
 | AR-HV-04 | Receive once with `client_sample_id` set, once omitted. | Both succeed. External ID stored as-is when present; not required. | | |
-| AR-HV-05 | Type a new barcode on the keyboard (no scanner). Same sticky fields. Submit. | Same success as AR-HV-01 first tube. | | Keyboard fallback |
-| AR-VAL-01 | Submit with barcode empty, or type/matrix/project missing. | **422**. No sample or container row. | | |
+| AR-HV-05 | Type barcode `NBIO-AR-KB-0001` (no scanner). Sticky Plasma / K2EDTA / mAb-2301. Same POST as scan. Submit. | Same success as AR-HV-01 first tube. `containers.name` = `NBIO-AR-KB-0001` and is unique. | | Keyboard fallback |
+| AR-VAL-01 | Four POSTs, each missing one required field: barcode, type, matrix, project. | Each → **422**. No sample or container row. | | |
 | AR-DUP-01 | Rescan or retype a barcode already received. | **409** on `containers.name` only. Toast. Stay on receive. No second sample. `samples.name` was never the barcode. | | QA3 |
 | AR-ID-01 | Inspect the receive form and the AR-HV-01 payload/response. | **No sample-ID field** on the form or body. `samples.name` is template-generated and **not** the barcode. `containers.name` = barcode. | | QA2 |
 | AR-ST-01 | Inspect the sample from AR-HV-01. | Status = **Available for Testing**. `received_date` set. No Received hop. Request had no status field. | | QA4 |
-| AR-TST-01 | Open a sample received with no tests. Add analysis A. | POST succeeds. Test status assigned/pending. | | QA6 |
+| AR-TST-01 | Open a sample received with no tests. Add IgG. | POST succeeds. Test status assigned/pending. | | QA6 |
 | AR-TST-02 | Delete the test from AR-TST-01 (no results). | DELETE succeeds. | | QA6 |
 | AR-TST-03 | DELETE a test that has results (after AR-RES-01). | **400**. Test and result remain. | | QA6 |
-| AR-RES-01 | On a test with analysis A (`units_default` present), enter a typed number and optional qualifier `<LOD` or `ND`. Do not pick a unit. | Result saved. Assert **`reported_result`** equals the typed number and **`qualifiers`** is set. `raw_result` may copy the same value. Do not assert a new column. Unit from `analytes.units_default`. No unit picker. | | QA7 |
-| AR-RES-02 | On a test with analysis B (no `units_default`), enter a typed number. | **422**. No result row. | | QA7 |
-| AR-RBAC-01 | Log in as client. Open receive or POST `/api/samples/receive`. | No receive UI, or **403**. | | QA8 |
-| AR-MU-01 | Two lab-techs, each with their own sticky project. Each receives a unique barcode. Lab-tech A POSTs `project_id` they are not on. | Each tech only sees/creates in their project. Foreign project → **403**, no row. | | QA8 |
+| AR-RES-01 | On a test with IgG (`units_default` present), enter a typed number and optional qualifier `<LOD` or `ND`. Do not pick a unit. | Result saved. Assert **`reported_result`** equals the typed number and **`qualifiers`** is set. `raw_result` may copy the same value. Do not assert a new column. Unit from `analytes.units_default`. No unit picker. | | QA7 |
+| AR-RES-02 | On a test with Total Cell Count (no `units_default`), enter a typed number. | **422**. No result row. | | QA7 |
+| AR-RBAC-01 | Log in as `david-cro` (or `client`). Open receive or POST `/api/samples/receive`. | No receive UI, or **403**. | | QA8 |
+| AR-MU-01 | alice receives on CAR-T. bob receives on mAb. alice POSTs bob's project (or the reverse). | Each tech only sees/creates in their project. Foreign project → **403**, no row. | | QA8 |
 
 ### Out of P0 receive (do not seed as must-pass)
 
 | ID | Why parked |
 |----|------------|
-| AR-MU-02 | US-10 second-person review (reviewer ≠ enterer). Later packet. Q1 parallel. |
+| AR-MU-02 | US-10 second-person review (reviewer ≠ enterer). Later / Q1. Not a receive gate. |
 
 ### Automated only (implement gate, not a human skip)
 
