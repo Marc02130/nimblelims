@@ -2,7 +2,7 @@
 
 **Stem:** `atomic-receive`  
 **Phase:** P0 receive loop (docs ahead of implement)  
-**Requirements:** [PR 30 sketch](https://github.com/Marc02130/nimblelims/pull/30); US-2 / US-30 alignment pending BA  
+**Requirements:** [PR 30 sketch](https://github.com/Marc02130/nimblelims/pull/30); US-1 / US-7 / US-8 / US-30 on [PR 32](https://github.com/Marc02130/nimblelims/pull/32). **Do not UAT from `main` until 32 merges.**  
 **QA review:** `.docs/qa-review/atomic-receive.md`  
 **Test data:** Anton fixtures share these IDs  
 **Env:**  
@@ -11,6 +11,8 @@
 **Date:**  
 
 Replaces the **receive happy path** in `uat-sample-accessioning.md` when this packet ships. Do not run the old wizard cases (typed sample name, status Received, In Process, aliquot dialog) as the atomic-receive sign-off.
+
+If `.docs/user-stories/nimblelims-user.md` looks truncated after US-10, wait. Do not rewrite this script from a stub catalog.
 
 ## ID map (old → shared)
 

@@ -4,18 +4,18 @@
 **Status:** Accept with conditions  
 **Reviewer persona:** Testing / QA Lead (Tobias)  
 **Tech sketch:** [PR 30](https://github.com/Marc02130/nimblelims/pull/30) — `.docs/tech-sketch/atomic-receive.md` (C1 dropped; ignore merged #28)  
-**Related reviews:** Lab Ops L2–L4 (L1 retracted); CSO Accept; Architecture re-read requested; CEO open  
-**Stories:** [PR 29](https://github.com/Marc02130/nimblelims/pull/29) — US-2, US-10, US-30–US-38 in `.docs/user-stories/nimblelims-user.md`  
+**Related reviews:** Lab Ops L2–L4 (L1 retracted); CSO Accept; Architecture re-read requested; CEO Accept (PR 30 merged)  
+**Stories:** [PR 32](https://github.com/Marc02130/nimblelims/pull/32) — US-1 / US-7 / US-8 / US-30 rewritten to the receive loop. Do **not** UAT from `main` until 32 merges. Catalog restore after US-10 is in flight; do not rewrite coverage from a truncated file.  
 **UAT script:** [`UAT_Scripts/uat-atomic-receive.md`](../../UAT_Scripts/uat-atomic-receive.md)  
 **Test data IDs:** shared with Anton (AR-HV / AR-DUP / AR-ID / AR-ST / AR-TST / AR-RES / AR-RBAC / AR-MU)
 
 ## Executive summary
 
-The PR 30 sketch is testable. Receive is a high-volume scan loop: one transaction, two identities, one status (**Available for Testing**), stay on the screen. Living stories still describe the old accessioning wizard (typed sample name, Received hop, In Process tests). That drift is a BA gap, not a third design. Implement gate stays **CLOSED** until Heidi signs PR 30 and CEO passes.
+The PR 30 sketch is testable. Receive is a high-volume scan loop: one transaction, two identities, one status (**Available for Testing**), stay on the screen. On PR 32, US-1 is the receive happy path (no wizard, no sample-ID box, no status picker). US-7 / US-8 start tests at Assigned/Pending. US-30 is two identities. US-31 / US-33 / US-34 are parked for AR-01–AR-15.
+
+Implement gate is **OPEN** (CEO merged PR 30). QA review is not a substitute for the post-implement UAT pass. Hold human UAT against `main` stories until PR 32 merges and Wilhelmina finishes the US-11+ restore.
 
 Architecture lock on result persist: typed number → `results.reported_result` + `qualifiers`. `raw_result` may copy the same value. UAT asserts `reported_result`, not a new column.
-
-QA review is not a substitute for the post-implement UAT pass.
 
 ## Testability and coverage
 
@@ -26,7 +26,7 @@ QA review is not a substitute for the post-implement UAT pass.
 | Negative paths | Duplicate barcode 409, missing required field 422, missing units_default 422, DELETE-with-results 400, RLS 403. |
 | UAT readiness | Lab-tech happy path + client/foreign-project denial. Manager override is out of this packet. |
 | Docs and Cursor | Implement prompt must update receive manuals and `uat-atomic-receive.md` (QA10). |
-| Story alignment | US-1, US-7, US-30 still contradict the sketch. Do not UAT a hybrid. |
+| Story alignment | US-1 / US-7 / US-8 / US-30 match the sketch on PR 32. Do not UAT a hybrid from `main`. |
 | Results persist | Assert `reported_result` + `qualifiers`. Do not require a new column. |
 
 ## Conditions (must land with implement)
@@ -67,13 +67,17 @@ Do **not** fail atomic-receive UAT on:
 
 ## BA gaps (Wilhelmina)
 
-Resolve before implement. QA will not invent a third model.
+Resolved on PR 32 (US-1 through US-10 and SOP stories). Do not invent a third model.
 
-1. **US-30** puts `lab_id` on the sample. Sketch: barcode = `containers.name`, `samples.name` = name template. UAT treats lab barcode = `containers.name` until the story is rewritten.
-2. **US-7** AC still says tests start **In Process**. L4 is **assigned/pending**.
-3. **US-1** still describes typed sample name, status picker, review-to-Available, 3-step wizard, aliquot dialog. That is `uat-sample-accessioning`. This packet replaces that happy path.
-4. **US-31 / US-33** need new events or tables. Sketch says none. Confirm parked for this packet.
-5. **Q3** provisional “user-entered lab_id” vs system-assigned `samples.name`. Same as (1).
+| Was | Now |
+|-----|-----|
+| US-1 old wizard | Rewritten: atomic-receive happy path. AR-01–AR-15 replaces it. |
+| US-7 In Process at create | Assigned/Pending at receive/add-test. |
+| US-30 lab_id on sample | Two identities. No `lab_id` column. |
+| US-31 / US-33 new tables | Parked. Not in AR-01–AR-15. |
+| Q3 user-entered lab_id | Closed. System sample ID + container barcode. |
+
+**Hold:** do not execute UAT against `main` stories until PR 32 merges. If the stories file is truncated after US-10, wait for the catalog restore. Do not rewrite AR coverage from a stub.
 
 ## Verdict
 
@@ -81,5 +85,5 @@ Resolve before implement. QA will not invent a third model.
 |-------|--------|
 | **Verdict** | Accept with conditions |
 | **Date** | 2026-08-20 |
-| **Implement gate** | CLOSED until Heidi signs PR 30 and CEO passes |
-| **UAT pass** | Still required after implement, before merge |
+| **Implement gate** | **OPEN** (CEO merged PR 30) |
+| **UAT pass** | Still required after implement, before merge. Hold vs `main` until PR 32 merges. |
