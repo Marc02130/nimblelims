@@ -20,10 +20,11 @@ All product and engineering docs live under this directory, organized by purpose
 | [`architecture-review/`](architecture-review/) | Architecture design reviews |
 | [`security-review/`](security-review/) | Security reviews |
 | [`lab-ops-review/`](lab-ops-review/) | **SVP Lab Ops** — target-customer lab workflows (required for ELN/experiments) |
+| [`qa-review/`](qa-review/) | **Testing / QA Lead** — testability, UAT readiness, acceptance criteria quality |
 | [`ideas/`](ideas/) | Exploratory notes — not commitments |
 | `private/` | Local-only materials (gitignored) |
 
-**Formal review skills (Grok):** [`.grok/skills/nimble-reviews/README.md`](../.grok/skills/nimble-reviews/README.md) — Lab Ops, CEO, UI, Arch, CSO packet + orchestrator (`/nimble-*-review`, `/nimble-review-packet`). Shared rules: [PACKET.md](../.grok/skills/nimble-reviews/PACKET.md).
+**Formal review skills (Grok):** [`.grok/skills/nimble-reviews/README.md`](../.grok/skills/nimble-reviews/README.md) — Lab Ops, CEO, UI, Arch, Security CSO, Scientific CSO, BA, QA packet + orchestrator (`/nimble-*-review`, `/nimble-review-packet`). Shared rules: [PACKET.md](../.grok/skills/nimble-reviews/PACKET.md).
 
 **Index rule:** do not leave new docs at `.docs/` root. Put them in the folder that matches their role.
 
@@ -114,10 +115,12 @@ Do not confuse with the platform Field Management design ([design/schema-evoluti
 
 | Track | Folder |
 |-------|--------|
+| **Lab Ops** | [lab-ops-review/](lab-ops-review/) |
 | **CEO / product** | [ceo-review/](ceo-review/) |
 | **UI / UX** | [ui-review/](ui-review/) |
 | **Architecture** | [architecture-review/](architecture-review/) |
 | **Security** | [security-review/](security-review/) |
+| **QA / Testing** | [qa-review/](qa-review/) |
 
 Long-form tech designs stay in [design/](design/). UI review was previously `ui-review/`.
 
