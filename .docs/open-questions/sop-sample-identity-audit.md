@@ -9,14 +9,21 @@ Decision log for SOP-derived requirements (Issues #22–#26). Tracks questions t
 
 ## Q1: When can UAT stop using Reviewed/Reported as Sample.status?
 
-**Status**: Open  
+**Status**: Decided (provisional)  
 **Blocks**: UAT cutover (not blocking MVP implementation)  
 **Owner**: Tobias  
 **Context**: Current product has Sample.status with five values including `Reviewed` and `Reported`. Product direction shifts review/release to result-level controls (US-10, US-36), but UAT currently relies on the sample-status approach.
 
 **Question**: When can UAT transition from setting Sample.status = Reviewed/Reported to using result-level review/release states instead?
 
-**Options**:
+**Decision (2026-08-20, Tobias):** **Parallel operation** for this cycle.
+
+- Atomic-receive UAT (`UAT_Scripts/uat-atomic-receive.md`) uses Sample.status = **Available for Testing** only. It does **not** set Reviewed or Reported on the sample.
+- The five existing sample status names remain valid list values so old scripts do not break overnight.
+- **Cutover trigger:** first recorded **pass** of result-level review UAT (US-10; successor to / companion of `uat-results-entry-review.md`). Then retire Reviewed/Reported *sample* cases from `uat-sample-status-editing.md`.
+- No calendar date now. Indefinite dual-path is **not** the product goal.
+
+**Options** (historical):
 1. **Parallel operation**: Implement result-level review/release; keep sample status values working; UAT decides when to cut over (no forced migration).
 2. **Guided migration**: Provide migration tool/documentation; set cutover date with UAT.
 3. **Indefinite compatibility**: Support both approaches permanently (product direction favors result-level, but sample status remains valid).
@@ -25,10 +32,6 @@ Decision log for SOP-derived requirements (Issues #22–#26). Tracks questions t
 - Must not break existing UAT workflows without notice.
 - Product direction is clear (result-level review), but forcing immediate cutover risks UAT disruption.
 - Existing five status names remain valid list values during transition.
-
-**Next Steps**:
-- Tobias to confirm UAT preference for cutover timing or indefinite compatibility.
-- Document UAT validation scenarios for both approaches.
 
 ---
 
