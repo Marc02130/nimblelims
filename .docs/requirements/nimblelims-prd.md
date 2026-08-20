@@ -16,10 +16,12 @@ This MVP emphasizes essential functionality that can be built upon when specific
 NimbleLIMS enables BioTech and Pharma startup labs to manage compound and biological samples from receipt to results. The codebase contains additional shipped features (ELN experiments, dose-response analysis, LimsRuns/parsers, workflow templates, etc.) that demonstrate the platform's extensibility but are **not the MVP release bar**. Those adjacent features remain documented as shipped/in-the-tree but are clearly labeled as post-release enhancements.
 
 ### 1.3 Stakeholders
-- **Lab Technician**: Handles compound/sample accessioning, assay assignment, dose-response execution, and results entry.
-- **Lab Manager**: Oversees experimental workflows, reviews assay results and curves, manages batch processing.
-- **Administrator**: Manages users, roles, permissions, and system configurations (assays, analytes, templates).
-- **CRO Partner**: Views shared project samples, assay results, and dose-response data within assigned collaborations.
+- **Lab Technician**: Handles daily sample accessioning, assigns analyses (test batteries) to samples, enters results with validation, and updates sample/test statuses throughout the workflow.
+- **Lab Manager**: Oversees lab operations, reviews and approves test results, manages batch processing workflows, and monitors sample throughput.
+- **Administrator**: Manages users, roles, permissions, and system configurations (analyses, analytes, test batteries, container types, lists).
+- **CRO Partner**: Views shared project samples and test results within assigned collaborations; maintains data privacy boundaries.
+
+*Note:* The codebase includes optional shipped capabilities (dose-response curve fitting, ELN experiment tracking) available for labs with those needs, but daily role work centers on the three-pillar MVP.
 
 ### 1.4 Version History
 - Version 1.0: Initial draft based on planning discussions (October 21, 2025).
@@ -27,20 +29,21 @@ NimbleLIMS enables BioTech and Pharma startup labs to manage compound and biolog
 - Version 1.2: Added assay panels feature (grouped analyses with sequence ordering) - December 2025.
 - Version 1.3: Added EAV (Entity-Attribute-Value) model for custom fields configurability - December 2025.
 - Version 1.4: Repositioned for BioTech and Pharma startups; updated seed data with drug discovery assays - August 2026.
+- Version 1.5: Defined MVP release bar (3 pillars: sample tracking, test ordering, results entry); labeled shipped features as adjacent enhancements - August 20, 2026.
 
 ## 2. Goals and Objectives
 
 ### 2.1 Business Goals
-- Accelerate drug discovery workflows for BioTech and Pharma startups by automating compound/sample tracking, assay execution, and dose-response analysis.
+- Provide BioTech and Pharma startups with **basic LIMS capability** to track samples, order tests, and enter results—the foundation for lab operations.
 - Ensure data security and IP protection with role-based access and CRO-partner isolation.
-- Provide a flexible, experiment-centric system tailored to early-stage R&D teams.
-- Enable rapid iteration and validation of assay protocols and screening campaigns.
+- Enable labs to start managing samples and test data without extensive setup or customer-specific customization.
+- Build a platform that can be extended with customer-driven enhancements (dose-response, ELN, instrument integration) when specific requirements emerge.
 
 ### 2.2 User Goals
 - Efficiently accession compounds and biological samples with lineage tracking (aliquots, derivatives).
-- Execute dose-response assays (screening, hit validation, IC50 determination) with automated curve fitting.
-- Enter and review results in batch/plate formats with built-in QC validation.
-- Securely share assay data with external CRO partners while maintaining IP boundaries.
+- Assign analyses (or test batteries) to samples and track test execution progress.
+- Enter and review results with validation rules (data types, ranges, significant figures).
+- Securely share sample and test data with external CRO partners while maintaining IP boundaries.
 
 ### 2.3 Success Metrics
 - 100% coverage of MVP release bar: sample tracking, test ordering, results entry.
