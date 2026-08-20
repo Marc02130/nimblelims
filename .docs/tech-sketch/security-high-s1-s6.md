@@ -115,19 +115,22 @@ validate_password_complexity(password, *, username, current_password=None) -> li
 
 ## 9. S1 — App role + SET LOCAL
 
-### 9.1 Roles
+### 9.1 Roles (Q1 = Option C)
 
 | Role | Use |
 |------|-----|
-| `lims_user` (or rename clarity later) | DB owner / migrations (elevated) |
+| `lims_user` | DB owner / migrations (elevated) |
 | `lims_app` | Runtime FastAPI `DATABASE_URL` |
 
-Migration (Alembic):
+**Bootstrap (Decided C):** idempotent script in backend entrypoint, connected as owner:
 
-- `CREATE ROLE lims_app LOGIN PASSWORD …` (password from env at migrate time or compose init script).  
-- `GRANT CONNECT`, `USAGE` on schema, `SELECT/INSERT/UPDATE/DELETE` on app tables; **no** BYPASSRLS; **not** SUPERUSER; **not** table owner.  
-- `GRANT USAGE, SELECT` on sequences.  
-- Ensure FORCE RLS tables stay FORCE’d.
+1. If `lims_app` **missing** → `CREATE ROLE lims_app LOGIN PASSWORD` from `LIMS_APP_PASSWORD` + grants.  
+2. If **exists** → ensure grants only; **do not** `ALTER PASSWORD` on every start.  
+3. Optional later: explicit rotate flag/script.
+
+Grants: `CONNECT`, schema `USAGE`, table `SELECT/INSERT/UPDATE/DELETE`, sequence `USAGE/SELECT`; **no** SUPERUSER / BYPASSRLS; **not** table owner.
+
+Optional Alembic revision may duplicate “CREATE IF NOT EXISTS + grants” for DBs that only run migrations; entrypoint ensure remains source of truth for upgrades.
 
 ### 9.2 Session GUC
 
@@ -142,15 +145,16 @@ Migration (Alembic):
 ```yaml
 # backend runtime
 DATABASE_URL: postgresql://lims_app:${LIMS_APP_PASSWORD}@db:5432/lims_db
-# migrate job / entrypoint uses owner URL
+LIMS_APP_PASSWORD: ${LIMS_APP_PASSWORD}
+# migrate / ensure script uses owner URL
 MIGRATE_DATABASE_URL: postgresql://lims_user:${POSTGRES_PASSWORD}@db:5432/lims_db
 ```
 
-Entrypoint: run Alembic with migrator URL, then start uvicorn with app URL.
+Entrypoint: Alembic (owner) → `ensure_lims_app_role` (owner) → uvicorn (app URL).
 
 ### 9.4 Risk note
 
-Some code paths may assume owner privileges (e.g. creating extensions). Those stay on migrator. If app needs a privilege it lacks, **grant least privilege**, do not elevate app to owner.
+Some code paths may assume owner privileges (e.g. creating extensions). Those stay on migrator. If app needs a privilege it lacks, **grant least privilege**, do not elevate app to owner. Password stable across updates unless ops runs explicit rotate.
 
 ---
 

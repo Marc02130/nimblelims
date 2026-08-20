@@ -40,7 +40,7 @@ AuthZ (DB-layer): RLS for client isolation once S1 lands
 | **A2** | Use transaction-local `set_config(..., true)` tied to request/session transaction; document interaction with `get_db` commit boundaries. |
 | **A3** | Entrypoint: migrate with owner URL, run app with app URL — never flip at runtime mid-request. |
 | **A4** | No business table DDL in this cycle except optional `password_hash` length increase if bcrypt strings exceed 255. |
-| **A5** | P0d migration blocked until open-questions **Q1** (bootstrap) decided; grants list must be enumerated in migration PR (table-by-table or schema-wide with comment). |
+| **A5** | P0d uses **Q1 Option C** (entrypoint ensure: create-once password, idempotent grants, no alter-on-start); grants list enumerated in ensure script / optional Alembic companion. |
 | **A6** | S5: single `commit` at end of successful execute; tests must prove rollback leaves zero orphan samples/containers. |
 | **A7** | S6: reuse `_experiment_sample_ids`; do not invent a second cohort source of truth. |
 

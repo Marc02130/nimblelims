@@ -3,11 +3,11 @@
 **Status:** Living decision log  
 **Date:** 2026-08-20 · **Updated:** 2026-08-20  
 **Requirements:** [`.docs/requirements/security-high-s1-s6.md`](../requirements/security-high-s1-s6.md)  
-**Blocks:** P0d (S1) until **Q1** decided; P0b includes Q2/Q7 password policy
+**Blocks:** P0d unblocked (Q1 decided); P0b includes Q2/Q7 password policy
 
 | ID | Question | Status | Blocks | Answer / notes | Date | Owner |
 |----|----------|--------|--------|----------------|------|-------|
-| Q1 | How to bootstrap `lims_app` password in Docker — Alembic with env, `init.sql`, or compose `POST_INIT`? | **Open** | P0d | Prefer: create role in Alembic reading `LIMS_APP_PASSWORD` from env at migrate time; document required env. Alternative: db Dockerfile init. | | Eng + Arch |
+| Q1 | How to bootstrap `lims_app` password in Docker? | **Decided** | P0d | **Option C — idempotent ensure script** in backend entrypoint (owner URL): if `lims_app` missing → `CREATE ROLE … PASSWORD` from `LIMS_APP_PASSWORD` + grants; if exists → **do not** alter password (only ensure grants). Password set on **first create** only; rotation via explicit one-shot flag/script later. Optional Alembic grants migration as supplement; not initdb-only (B). Prod: password from secret (E wrapper). Local: may share a known app password only with insecure/dev flags. | 2026-08-20 | Eng + Arch |
 | Q2 | Production seed / starter users (LIMS vendor)? | **Decided** | P0b | **Vendor profiles:** (1) Always seed **roles/permissions**. (2) **dev / demo / UAT:** persona users allowed when `ALLOW_DEV_SEED_USERS=true` (or `DEPLOYMENT_PROFILE=demo\|uat`). (3) **production:** no well-known README passwords; **bootstrap/wizard** creates admin (and optional staff) with customer-controlled secrets. (4) **All** seeded/bootstrap users: `must_change_password=true` until first successful change. See **Q7** for complexity. | 2026-08-20 | Product |
 | Q3 | May `ENVIRONMENT=development` alone allow default JWT, or require explicit `ALLOW_INSECURE_DEFAULTS=true`? | **Decided (provisional)** | P0a | **Require both** `ENVIRONMENT=development` (or `test`) **and** `ALLOW_INSECURE_DEFAULTS=true` for default secret. Compose local sets both. Production never sets the flag. | 2026-08-20 | Security |
 | Q4 | bcrypt vs argon2? | **Decided (provisional)** | P0b | **bcrypt** — README/UAT/tests already assume bcrypt (`$2b$`). | 2026-08-20 | Eng |
@@ -20,8 +20,25 @@
 - **P0a:** done (S3/S4).  
 - **P0b:** includes bcrypt + Q2/Q7 (must-change + complexity); unblocked.  
 - **P0c:** unblocked (reviews Accept).  
-- **P0d:** blocked on **Q1** only (Q2 decided).  
+- **P0d:** **unblocked** (Q1 = C ensure script; Q2 decided).  
 - New blockers discovered in implement → add rows here; pause that phase.
+
+## Decision detail — Q1 (Option C)
+
+```text
+entrypoint:
+  1. migrate with MIGRATE_DATABASE_URL (owner)
+  2. ensure_lims_app_role.py with owner connection:
+       IF role missing → CREATE LOGIN + PASSWORD from LIMS_APP_PASSWORD + GRANTs
+       ELSE            → GRANT idempotent only (NO ALTER PASSWORD)
+  3. start uvicorn with DATABASE_URL (lims_app)
+```
+
+| Event | Password |
+|-------|----------|
+| First run / upgrade when role missing | Set from `LIMS_APP_PASSWORD` |
+| Normal restart / image update | Unchanged |
+| Intentional rotation | Separate one-shot (`ENSURE_LIMS_APP_PASSWORD_ROTATE=true` or admin script) — not default |
 
 ## Decision detail — Q2 + Q7 (vendor LIMS)
 

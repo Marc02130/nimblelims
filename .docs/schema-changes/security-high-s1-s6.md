@@ -47,7 +47,7 @@ This cycle is primarily **roles, grants, and application AuthN/AuthZ**, plus a s
 | Grants on `public` tables/sequences | SELECT, INSERT, UPDATE, DELETE, USAGE | App least privilege |
 | Privileges | No SUPERUSER, no BYPASSRLS, not OWNER | So FORCE RLS applies |
 
-Exact password bootstrap: open question Q1 (compose secret vs migration).
+Password bootstrap: **Q1 Decided = Option C** (entrypoint ensure; create-once password from `LIMS_APP_PASSWORD`; no alter on every start). Alembic may add grants; ensure script is authoritative for upgrades.
 
 ## 3. RLS
 
@@ -79,8 +79,7 @@ Exact password bootstrap: open question Q1 (compose secret vs migration).
 
 ## 7. Open schema blockers
 
-- [open-questions/security-high-s1-s6.md](../open-questions/security-high-s1-s6.md) **Q1** (role bootstrap) blocks P0d migration authoring.  
-- **Q2** affects whether production DBs delete seed users (data op, not schema).
+- None for P0d bootstrap path — **Q1/Q2 decided**. Implement ensure script + grants; optional Alembic companion revision.
 
 ## 8. Implementation checklist
 

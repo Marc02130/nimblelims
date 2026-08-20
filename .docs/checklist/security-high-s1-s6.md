@@ -13,7 +13,7 @@
 - [x] Open questions  
 - [x] CEO / Arch / Security / QA reviews drafted (Accept with conditions)  
 - [x] Q2 / Q7 decided (vendor seeds + must-change + complexity)  
-- [ ] Q1 decided before P0d  
+- [x] Q1 decided (Option C — ensure script, create-once password)  
 
 ## P0a — S3 JWT + S4 logging
 
@@ -40,10 +40,11 @@
 
 ## P0d — S1 app role
 
-- [ ] Q1 decided  
-- [ ] Create `lims_app` + grants migration  
+- [x] Q1 decided (C)  
+- [ ] Entrypoint `ensure_lims_app_role` (create-once + idempotent grants; no password alter by default)  
+- [ ] Optional Alembic grants companion  
 - [ ] SET LOCAL / set_config GUCs on request  
-- [ ] Dual DATABASE_URL in compose/entrypoint  
+- [ ] Dual DATABASE_URL + `LIMS_APP_PASSWORD` in compose  
 - [ ] RLS tests as app role  
 
 ## Docs / UAT / merge
