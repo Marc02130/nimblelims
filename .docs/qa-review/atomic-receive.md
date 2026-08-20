@@ -4,7 +4,7 @@
 **Status:** Accept with conditions  
 **Reviewer persona:** Testing / QA Lead (Tobias)  
 **Tech sketch:** [PR 30](https://github.com/Marc02130/nimblelims/pull/30) — `.docs/tech-sketch/atomic-receive.md` (C1 dropped; ignore merged #28)  
-**Related reviews:** Lab Ops L2–L4 (L1 retracted); CSO Accept; Architecture Accept (PR 30 + persist lock); CEO Open on the sketch. Stamp is [PR 33](https://github.com/Marc02130/nimblelims/pull/33). QA does **not** open the implement gate.  
+**Related reviews:** Lab Ops L2–L4 (L1 retracted); CSO Accept; Architecture Accept (PR 30 + persist lock); CEO Accept when PR 30 merged. [PR 33](https://github.com/Marc02130/nimblelims/pull/33) is stamp paperwork only. QA records the gate; it does not open it.  
 **Stories:** [PR 32](https://github.com/Marc02130/nimblelims/pull/32) **merged** — full catalog on `main`. US-1 / US-7 / US-8 / US-30 match the receive loop. Not PR 29.  
 **UAT script:** [`UAT_Scripts/uat-atomic-receive.md`](../../UAT_Scripts/uat-atomic-receive.md)  
 **Test data IDs:** shared with Anton (AR-HV / AR-DUP / AR-ID / AR-ST / AR-TST / AR-RES / AR-RBAC / AR-MU)
@@ -13,9 +13,9 @@
 
 The PR 30 sketch is testable. Receive is a high-volume scan loop: one transaction, two identities, one status (**Available for Testing**), stay on the screen. US-1 is that happy path (no wizard, no sample-ID box, no status picker). US-7 / US-8 start tests at Assigned/Pending. US-30 is two identities. US-31 / US-33 / US-34 are parked for AR-01–AR-15.
 
-QA review is Accept with conditions. It is **not** an implement-gate open and **not** a substitute for the post-implement UAT pass. The sketch still says no product code until CEO passes. That stamp is PR 33.
+Implement gate is **OPEN for this packet only**. CEO accepted when PR 30 merged. Product code may start against the sketch: one sample + first tube. Heidi still bounces new tables, a sample-ID field, a Received hop, or `results.unit_id`.
 
-Human UAT uses the merged PR 32 catalog on `main`. No third identity.
+QA review is Accept with conditions. It is not a substitute for the post-implement UAT pass. Human UAT uses the merged PR 32 catalog on `main`. No third identity.
 
 Architecture lock on result persist: typed number → `results.reported_result` + `qualifiers`. `raw_result` may copy the same value. UAT asserts `reported_result`, not a new column.
 
@@ -87,5 +87,5 @@ Q1 (Tobias): this packet only sets **Available for Testing**. Dual path until US
 |-------|--------|
 | **Verdict** | Accept with conditions |
 | **Date** | 2026-08-20 |
-| **Implement gate** | Follows the sketch. **No product code until CEO passes.** QA does not open this. Stamp is PR 33. |
+| **Implement gate** | **OPEN for this packet only.** CEO accepted when PR 30 merged. PR 33 is stamp paperwork. QA does not flip this back to CLOSED. |
 | **UAT pass** | Still required after implement, before merge. Source: merged PR 32 catalog on `main`. |
