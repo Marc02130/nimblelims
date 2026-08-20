@@ -62,6 +62,62 @@ This project uses a four-container Docker setup:
    ```
    This ensures all migrations are applied, including the latest `batch:read` permission.
 
+## Test Data and Scenarios
+
+NimbleLIMS includes comprehensive BioTech/Pharma test data for UAT and automated testing. See **[UAT_Scripts/test-data-scenarios.md](UAT_Scripts/test-data-scenarios.md)** for the full catalog.
+
+### Quick Start with Test Data
+
+The test dataset is automatically loaded when running database migrations:
+
+```bash
+# Docker environment (recommended)
+sudo docker compose up -d --build
+
+# Database migrations apply automatically on startup
+```
+
+### What's Included
+
+- **2 clients** (NovaBio Therapeutics, PharmaTest CRO) with RLS isolation
+- **8 users** across 4 roles: admin, lab techs, managers, client
+  - Default logins: `admin/admin123`, `lab-tech/labtech123`, `alice-tech/alice123`, `bob-tech/bob123`, etc.
+- **6 projects** (mAb PK study, CAR-T in-process, plasmid lot release, CRO services)
+- **7 samples** spanning full lifecycle (Received → Available → Testing Complete → Reviewed)
+- **Parent/aliquot chains**, **QC samples**, **batches**, **tests**, **results**
+- **Edge cases**: depleted parent (50µL remaining), QC blanks, zero results
+
+### Using Test Data
+
+**For UAT**: Login with any test user and explore realistic lab data:
+```
+alice-tech / alice123    → Lab Technician (mAb PK project)
+bob-tech / bob123        → Lab Technician (CAR-T project)
+carol-manager / carol123 → Lab Manager (all NovaBio projects)
+```
+
+**For Automated Tests**: Import fixtures from `tests/fixtures/seed_data_fixtures.py`:
+```python
+from tests.fixtures.seed_data_fixtures import alice_user, mab_pk_sample
+
+def test_sample_access(db_session, alice_user, mab_pk_sample):
+    assert mab_pk_sample.created_by == alice_user.id
+```
+
+See `backend/tests/test_seed_data_usage_example.py` for example tests.
+
+### Data Scenarios
+
+Full catalog with 10+ scenarios covering:
+- Sample lifecycle workflows (accessioning → aliquots → tests → results → review)
+- Multi-user RBAC (project isolation, permission enforcement)
+- QC sample handling (blanks, controls)
+- Edge cases (depleted parents, zero results, incomplete tests)
+
+See **[test-data-scenarios.md](UAT_Scripts/test-data-scenarios.md)** for details.
+
+---
+
 ### Development
 
 #### Backend Development
