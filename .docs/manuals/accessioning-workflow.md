@@ -304,9 +304,9 @@ The workflow requires the following configured lists and types:
   - Includes fields: name, description, capacity, material, dimensions, preservative
 - **units**: List of measurement units for concentration and amount
 - **analyses**: Available analyses for test assignment (admin-managed via `/analyses` endpoint)
-- **test_batteries**: Optional pre-configured test batteries (admin-managed via `/test-batteries` endpoint)
+- **test_batteries**: Optional pre-configured assay panels (admin-managed via `/test-batteries` endpoint)
   - Groups multiple analyses with sequence ordering and optional flags
-  - Example: "EPA 8080 Full" battery containing EPA Method 8080 analysis
+  - Example: "ADME Panel" battery containing ADME profiling assays
 
 **Note**: Container types are managed separately from lists and must be pre-setup by administrators via the admin interface. Lists are also editable by administrators but are used for dropdown options throughout the system.
 

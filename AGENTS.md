@@ -43,7 +43,7 @@ Default logins (development/UAT):
 - **Admin**: `admin` / `admin123`
 - **Lab Technician**: `lab-tech` / `labtech123`
 - **Lab Manager**: `lab-manager` / `labmanager123`
-- **Client**: `client` / `client123`
+- **CRO Partner**: `client` / `client123`
 
 ### Important Gotchas
 
