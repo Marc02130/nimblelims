@@ -9,9 +9,11 @@ lists, analyses, analytes, container types). Migration **0059** seeds lifecycle
 samples **with aliquots / `parent_sample_id`** — those rows are **not** receive
 fixtures. P0 receive uses **payloads only**.
 
-Implement gate: **CLOSED**. Live `POST /api/samples/receive` is not on main.
-UAT of the receive API itself cannot pass until the feature PR lands. Schema
-invariants (this pack's pytest) and list seeds (migration 0060) can run now.
+This pack does **not** implement receive. Product-code gate for the atomic-receive
+packet is **OPEN** (CEO accepted; stamp [PR 33](https://github.com/Marc02130/nimblelims/pull/33)).
+This testdata PR must not re-close that gate. Live `POST /api/samples/receive`
+is still absent on main until the feature PR; catalog HTTP codes are the contract.
+Schema invariants (this pack's pytest) and list seeds (migration 0060) can run now.
 
 ---
 
@@ -59,12 +61,12 @@ Data source for actors/projects/lists: **migration 0058**, not 0059 samples.
 
 ---
 
-## Implement gate (CLOSED)
+## This pack vs the feature
 
 | Surface | Status |
 |---------|--------|
-| `POST /api/samples/receive` | **Not implemented.** Expect 404/405 until the feature PR. |
-| Receive UAT (AR-HV-*, AR-DUP-*, AR-ID-*, AR-ST-*) | Blocked on the gate. Use `payloads.json` as the contract. |
+| `POST /api/samples/receive` | **Not in this pack.** Feature implement is OPEN (PR 33 stamp). Expect 404/405 on main until the feature PR. |
+| Receive UAT (AR-HV-*, AR-VAL-01, AR-DUP-*, AR-ID-*, AR-ST-*, AR-RBAC-01, AR-MU-01) | No live `/receive` yet. Use `payloads.json` as the contract. IDs match `UAT_Scripts/uat-atomic-receive.md`. |
 | Follow-up test/result APIs (`POST /tests/`, `POST /tests/assign`, `DELETE /tests/{id}`, `POST /results/`, `PATCH /tests/{id}/review`) | Exist today; P0 expected codes (DELETE → 400 when results exist; result unit from `analytes.units_default` → 422 if missing) may still be unimplemented. Catalog documents **target** behavior. |
 | Schema invariants | Runnable now: `pytest backend/tests/test_atomic_receive_p0_invariants.py` (needs `migrated_engine` / testcontainers). |
 
@@ -82,14 +84,14 @@ execution log. Do not remap them to legacy `TC-ACC-*` numbers.
 |------|--------|
 | Scenario ID | Exact string: `AR-HV-01`, `AR-DUP-01`, … (keep hyphens and zero-padding) |
 | Catalog | `UAT_Scripts/atomic-receive/scenarios.md` — one `## AR-…` section per ID |
-| Payloads | `UAT_Scripts/atomic-receive/payloads.json` — top-level keys by the same ID |
+| Payloads | `UAT_Scripts/atomic-receive/payloads.json` — `scenarios` keyed by the same ID |
 | Pytest | Comments / test names in `backend/tests/test_atomic_receive_p0_invariants.py` (schema only; no receive HTTP) |
 
 **Execution rules**
 
 1. Copy the AR-* ID into the UAT log "Test Case ID" column verbatim.
 2. High-volume `AR-HV-01` … `AR-HV-04` is **one 24-tube receive wave**. POST the
-   combined bodies under `AR-HV-01.receives`. Treat HV-02/03/04 as
+   combined bodies under `AR-HV-01.requests`. Treat HV-02/03/04 as
    overlay checklists against those same POSTs (do not replay barcodes).
 3. After a successful receive, resolve the sample/test by
    **`containers.name` = scanned barcode** (e.g. `NBIO-AR-0001`).
@@ -115,7 +117,8 @@ execution log. Do not remap them to legacy `TC-ACC-*` numbers.
 | `admin` | `admin123` | Administrator | System | Global (not an AR-* actor) |
 
 P0 receive actors: **alice-tech** (NBIO-AR-\*) and **bob-tech** (CART-AR-\*).
-**carol-manager** is the reviewer in `AR-MU-02` (must be ≠ enterer).
+**david-cro** is the client in `AR-RBAC-01`.
+**carol-manager** remains in seed for later US-10 (`AR-MU-02` is **not** P0 must-pass).
 
 Alice must not POST `project_id` for CAR-T. Bob must not POST `project_id`
 for mAb PK.
@@ -162,7 +165,7 @@ Unit from `analytes.units_default`; if NULL → **422** and no row.
 | Path | Role |
 |------|------|
 | `UAT_Scripts/atomic-receive/scenarios.md` | Per-ID actor, sticky fields, HTTP+DB, not-in-P0 |
-| `UAT_Scripts/atomic-receive/payloads.json` | Machine-readable bodies keyed by AR-* ID (top-level) |
+| `UAT_Scripts/atomic-receive/payloads.json` | Machine-readable bodies under `scenarios` keyed by AR-* ID |
 | `backend/tests/fixtures/atomic_receive.py` | 0058 resolvers + barcode constants (no sample inserts) |
 | `backend/tests/test_atomic_receive_p0_invariants.py` | Schema invariants via `migrated_engine` |
 | `backend/db/migrations/versions/0060_atomic_receive_p0_lists.py` | Idempotent Assigned/Pending + Qualifiers |
