@@ -10,7 +10,7 @@
 
 ## 1. Summary
 
-This cycle is primarily **roles, grants, and application AuthN/AuthZ**. Table shapes for samples/entries/aliquots do **not** change. Expected DB work: create runtime role `lims_app`, grants, optional password_hash rehash for seed users, no new business tables.
+This cycle is primarily **roles, grants, and application AuthN/AuthZ**, plus a small **users** column for first-login password change. Expected DB work: `users.must_change_password`, create runtime role `lims_app`, grants, password_hash rehash for seeds.
 
 ## 2. Delta (authoritative list)
 
@@ -24,7 +24,8 @@ This cycle is primarily **roles, grants, and application AuthN/AuthZ**. Table sh
 
 | Table | Change | Notes |
 |-------|--------|-------|
-| `users` | Optional data update: `password_hash` values | Rehash seeds / login upgrade; column type unchanged (`String(255)` — confirm bcrypt fit; widen if needed) |
+| `users` | **ADD** `must_change_password BOOLEAN NOT NULL DEFAULT true` | Q7 — cleared after successful change-password; backfill existing users `false` except known seed usernames if still on published passwords |
+| `users` | Optional data update: `password_hash` values | Rehash seeds / login upgrade; confirm `String(255)` fits bcrypt; widen if needed |
 
 ### 2.3 Constraints & indexes
 

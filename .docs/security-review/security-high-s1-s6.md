@@ -37,6 +37,7 @@ After ship, update **codebase.md** finding table: S1–S6 → Met (or Met with r
 | **Sec5** | High | Aliquot execute authZ: source ∈ cohort **and** existing RBAC (`experiment:manage` or current execute permission) retained. |
 | **Sec6** | Med | After S1, grep docs/comments for “RLS enforces” and align language (S10 hygiene). |
 | **Sec7** | Med | Do not claim “production ready” in README until UAT for this stem passes. |
+| **Sec8** | High | **Q7:** Enforce must-change-password server-side (not UI-only); complexity on all set/change paths including bootstrap and admin reset. |
 
 ## Explicit non-fixes this cycle
 

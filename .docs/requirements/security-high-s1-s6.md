@@ -69,14 +69,18 @@ NimbleLIMS claims client isolation (RLS) and controlled lab write paths (entries
 | FR-S1.5 | Docker Compose / `.env.example` shall document `DATABASE_URL` for the **app** role separately from migrator credentials. |
 | FR-S1.6 | Automated tests shall demonstrate RLS isolation using the app role (extend existing `test_rls_*` patterns). |
 
-### FR-S2 — Password hashing and seed credentials
+### FR-S2 — Password hashing, seeds, first-login change, complexity
 
 | ID | Requirement |
 |----|-------------|
-| FR-S2.1 | `get_password_hash` / `verify_password` shall use **bcrypt** or **argon2** (prefer bcrypt for parity with README/UAT docs that already claim bcrypt). |
-| FR-S2.2 | System shall verify existing SHA256 hex hashes for a **one-time upgrade path** on successful login (rehash to bcrypt) **or** provide a migration that rehashes known seed users; no plaintext passwords in migrations. |
-| FR-S2.3 | Well-known UAT passwords (`admin123`, etc.) shall be seeded **only** when `ENVIRONMENT`/`ALLOW_DEV_SEED_USERS` (name TBD) is explicitly set for development/UAT—not for production images. |
-| FR-S2.4 | Production startup shall refuse or warn loudly if default seed users with published passwords are present (exact mechanism in tech sketch). |
+| FR-S2.1 | `get_password_hash` / `verify_password` shall use **bcrypt** (Q4). |
+| FR-S2.2 | System shall verify existing SHA256 hex hashes for a **one-time upgrade path** on successful login (rehash to bcrypt) **or** migrate known seed hashes; no plaintext passwords in migrations. |
+| FR-S2.3 | **Deployment profiles (Q2):** always seed roles/permissions. Persona users with well-known passwords only when `ALLOW_DEV_SEED_USERS=true` (dev/demo/UAT). Production uses bootstrap/wizard admin with customer-controlled secret — not README passwords. |
+| FR-S2.4 | Production shall not rely on published default passwords; startup checks / docs per tech sketch. |
+| FR-S2.5 | **Must change password (Q7):** `users.must_change_password` boolean. Seeded and bootstrap users created with `true`. While `true`, after successful credential check the API issues only a constrained session (or equivalent) that may call **change-password**; all other authenticated routes return **403** with code `password_change_required`. |
+| FR-S2.6 | Successful change-password clears `must_change_password` and returns a normal access token. |
+| FR-S2.7 | **Complexity (Q7)** on every password set/change (bootstrap, admin reset, self-change): minimum **12** characters; at least one uppercase, one lowercase, one digit, one symbol; must not equal username (case-insensitive); must not equal current password. Clear error messages listing failed rules (no password echoed). |
+| FR-S2.8 | Frontend: on `password_change_required`, route user to change-password screen; block navigation to the app shell until cleared. |
 
 ### FR-S3 — JWT secret configuration
 

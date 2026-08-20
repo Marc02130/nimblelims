@@ -11,11 +11,9 @@
 - [x] Tech sketch  
 - [x] Schema-changes doc  
 - [x] Open questions  
-- [ ] CEO review Accept  
-- [ ] Architecture review Accept  
-- [ ] Security review Accept  
-- [ ] QA review Accept  
-- [ ] Q1–Q2 decided before P0d  
+- [x] CEO / Arch / Security / QA reviews drafted (Accept with conditions)  
+- [x] Q2 / Q7 decided (vendor seeds + must-change + complexity)  
+- [ ] Q1 decided before P0d  
 
 ## P0a — S3 JWT + S4 logging
 
@@ -24,11 +22,14 @@
 - [x] Remove body logging from middleware  
 - [x] Tests (`tests/test_security_config_s3_s4.py`)
 
-## P0b — S2 passwords
+## P0b — S2 passwords (+ Q2/Q7)
 
 - [ ] bcrypt hash/verify + SHA256 upgrade path  
-- [ ] Gate seed users behind ALLOW_DEV_SEED_USERS  
-- [ ] Tests (`test_auth` bcrypt expectations)  
+- [ ] Gate persona seeds behind ALLOW_DEV_SEED_USERS; prod bootstrap path  
+- [ ] `users.must_change_password` migration + login gate + change-password API  
+- [ ] Complexity rules (12+ / upper / lower / digit / symbol / ≠ username / ≠ current)  
+- [ ] Frontend change-password gate  
+- [ ] Tests (`test_auth` bcrypt + must-change + complexity)  
 
 ## P0c — S5 aliquot + S6 cohort write
 
@@ -39,7 +40,7 @@
 
 ## P0d — S1 app role
 
-- [ ] Q1/Q2 decided  
+- [ ] Q1 decided  
 - [ ] Create `lims_app` + grants migration  
 - [ ] SET LOCAL / set_config GUCs on request  
 - [ ] Dual DATABASE_URL in compose/entrypoint  
