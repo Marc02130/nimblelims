@@ -135,27 +135,29 @@ nimblelims/
 
 ## Features (MVP Scope)
 
-### Core Workflows for BioTech/Pharma Startups
-- **Compound & Sample Tracking**: Accessioning (single and bulk), status management, lineage (aliquots/derivatives), container hierarchy
-- **Assay Execution**: Assign analyses or assay panels to samples; status tracking from prep through instrument run
-- **Results Entry**: Batch-based results entry with real-time validation and QC checks for plate-based assays
-- **Batch Management**: Create and manage batches with cross-project support, automatic QC generation, and sample prioritization by expiration/due date
-- **Sample Prioritization** (US-11): Sort compounds and biological samples by shelf-life expiration and assay deadlines during batch creation
-- **Aliquots/Derivatives**: Create daughter vials, working stocks, or processed samples (e.g., lysates, extracts) with full lineage
-- **Bulk Accessioning** (US-24): Accession multiple compounds or samples with shared metadata and per-item identifiers
-- **Cross-Project Batching** (US-26): Batch samples from multiple discovery projects with compatibility validation
-- **QC at Batch Creation** (US-27): Automatically generate control wells (blanks, spikes, standards) when creating assay batches
-- **Batch Results Entry** (US-28): Enter plate-reader or instrument results for multiple samples/wells atomically
-- **Workflow Templates** (US-29): Define reusable protocols (e.g., cell-based assay SOPs) and apply from accessioning, batch, or results entry. Requires config:edit (template CRUD) and workflow:execute (apply template) permissions.
+**Note:** This section describes **all implemented features in the codebase**. However, the **MVP release bar** focuses on three core pillars: (1) **track samples** (accessioning, status, lineage), (2) **order tests** (assign analyses), and (3) **enter results** (capture and review). Additional features listed below (ELN experiments, dose-response analysis, LimsRuns/parsers, workflow templates, custom fields) are **shipped/in-tree but not the MVP release bar**—they are enhancements that demonstrate platform capability and remain available for users who need them. See [`.docs/requirements/nimblelims-prd.md`](.docs/requirements/nimblelims-prd.md) for the complete MVP definition.
 
-### Dose-Response Analysis (Core BioTech/Pharma Feature)
+### Core Workflows for BioTech/Pharma Startups (**MVP Release Bar** + Shipped Enhancements)
+- **Compound & Sample Tracking** **(MVP)**: Accessioning, status management, lineage (aliquots/derivatives), container hierarchy
+- **Assay Execution** **(MVP)**: Assign analyses or assay panels to samples; status tracking
+- **Results Entry** **(MVP)**: Manual results entry with real-time validation
+- **Batch Management** **(MVP + Enhancements)**: Create and manage batches (basic is MVP; cross-project support, automatic QC generation, and sample prioritization are shipped enhancements)
+- **Sample Prioritization** **(Shipped, Not MVP)** (US-11): Sort compounds and biological samples by shelf-life expiration and assay deadlines during batch creation
+- **Aliquots/Derivatives** **(MVP)**: Create daughter vials, working stocks, or processed samples (e.g., lysates, extracts) with full lineage
+- **Bulk Accessioning** **(Shipped, Not MVP)** (US-24): Accession multiple compounds or samples with shared metadata and per-item identifiers
+- **Cross-Project Batching** **(Shipped, Not MVP)** (US-26): Batch samples from multiple discovery projects with compatibility validation
+- **QC at Batch Creation** **(Shipped, Not MVP)** (US-27): Automatically generate control wells (blanks, spikes, standards) when creating assay batches
+- **Batch Results Entry** **(Shipped, Not MVP)** (US-28): Enter plate-reader or instrument results for multiple samples/wells atomically
+- **Workflow Templates** **(Shipped, Not MVP)** (US-29): Define reusable protocols (e.g., cell-based assay SOPs) and apply from accessioning, batch, or results entry. Requires config:edit (template CRUD) and workflow:execute (apply template) permissions.
+
+### Dose-Response Analysis **(Shipped, Not MVP)** (BioTech/Pharma Enhancement)
 - **Curve Fitting**: Trigger 4-parameter logistic (4PL) curve fitting on dose-response data via R calculator microservice. Supports percent-inhibition normalization using positive/negative control wells.
 - **CRO Lifecycle**: Experiment templates support `cro` lifecycle for externally managed experiments with CRO partner ordering workflow.
 - **Curve Curator**: Tabbed review UI (`/runs/:id/dose-response`) with category sidebar (Sigmoid, Inactive, Inverse Agonist, Hook Effect, etc.), curve grid with SVG thumbnails, per-compound detail view with Plotly chart, batch approve/reject, and data point knockout (exclude individual wells with reason—critical for screening QC).
 - **IC50 Summary**: Dashboard summary of fit results by category and review status; re-fit and reset-in-progress controls.
 - **Audit Trail**: Every curve fit is versioned (`fit_version`); superseded results preserved. Data exclusions are soft (reason-tracked), control-well exclusions apply to normalization means.
 
-### LIMS Runs → Structured Results (promote-on-publish)
+### LIMS Runs → Structured Results **(Shipped, Not MVP)** (promote-on-publish)
 - **Analysis required**: Every LimsRun (e.g., plate reader output, screening campaign) has an **Analysis** from create (no non-reportable path).
 - **Import remains flexible JSONB** (`lims_run_data`); parsers/import are analysis-scoped for different instrument vendors.
 - **Promote on publish**: Status → `published` maps columns to analytes (name + **aliases** for CRO/instrument vendor column names), ensures Tests per sample, writes **Results** (`raw_result`, `replicate`, `lims_run_id`).
@@ -163,7 +165,7 @@ nimblelims/
 - **Preview**: Publish confirmation dry-runs create/update/conflict/unresolved columns (`GET /v1/lims-runs/{id}/promotion/preview`).
 - **Docs**: [`.docs/ideas/run-results.md`](.docs/ideas/run-results.md), [`.docs/manuals/lims-runs.md`](.docs/manuals/lims-runs.md).
 
-### Experiment Management (ELN-style Process Tracking)
+### Experiment Management **(Shipped, Not MVP)** (ELN-style Process Tracking)
 - **Experiments**: Full CRUD for experiments; list/detail UI with tabs (Overview, Sample Executions, Details/Steps, Lineage, Linked Processes). Permission: `experiment:manage` (Administrator, Lab Manager, Lab Technician).
 - **Experiment Templates**: `/experiments/templates` — **Basic Info** + **Tables & forms** (`entries[]`: experiment sample metadata, multi-row protocol tables, aliquot/pool steps). **Create field** defines entry columns (`field_definitions` for entity types `experiment_sample_data` / `experiment_data`—not Custom Fields on Sample/Test). Instantiate on experiment create/start. Cohort start: scan/select samples (`StartCohortPanel`); target is accordion-style process → queue dual-list start dialog. Permission: `experiment:manage`.
 - **ELN Processes (Phases 1–3)**: Definitions → instances with typed steps (`eln_experiment` \| `lims_run`). APIs: `/v1/eln-process-definitions`, `/v1/eln-processes`, sample journey `GET /v1/samples/{id}/journey`. UI at `/experiments/processes` (Instances + Definitions). Soft advance gates; lazy LimsRun start; run history. Migrations `0047`–`0051`. Distinct from LIMS run checklists under `/v1/processes`. Checklist: [`.docs/checklist/experiment-checklist.md`](.docs/checklist/experiment-checklist.md).
@@ -173,14 +175,14 @@ nimblelims/
 - **My Experiments filter**: List page supports `?mine=true` to show only experiments created by the current user.
 - **Workflow integration**: Workflow actions `create_experiment`, `create_experiment_from_template`, `link_sample_to_experiment`, `add_experiment_detail_step`, `link_experiments`, `update_experiment_status`; context carries `experiment_id` and `execution_id` for downstream steps.
 
-### Container System
-- **Container Types**: Pre-setup by administrators (CRUD via admin interface)
-- **Container Instances**: Created dynamically during workflows (accessioning, aliquoting)
-- **Hierarchical Support**: Parent-child relationships (plates → wells, racks → tubes)
-- **Pooled Samples**: Multiple samples per container with concentration/amount tracking
-- **Units Integration**: Concentration and amount with unit conversions
+### Container System **(MVP + Shipped Enhancements)**
+- **Container Types** **(MVP)**: Pre-setup by administrators (CRUD via admin interface)
+- **Container Instances** **(MVP)**: Created dynamically during workflows (accessioning, aliquoting)
+- **Hierarchical Support** **(MVP)**: Parent-child relationships (plates → wells, racks → tubes)
+- **Pooled Samples** **(Shipped, Not MVP)**: Multiple samples per container with concentration/amount tracking
+- **Units Integration** **(Shipped, Not MVP)**: Concentration and amount with unit conversions
 
-### Configuration Management
+### Configuration Management **(MVP + Shipped Enhancements)**
 - **Name Templates**: Configurable entity naming (sample, project, batch, etc.) with placeholders ({SEQ}, {PROJECT}, {CLIENT}/{CLIABV}, {YYYY}, {YY}, seq_padding_digits). {SEQ} is scoped by “name without SEQ” (e.g. per project for samples), so each project gets its own sequence (01, 02, …). Sequence start API (admin interface removed; use API directly).
 - **Field Management** (replaces legacy Custom Attributes): Unified admin UI for OOB (built-in/list-backed) + Custom fields per entity. Prefers list-backed fields (source list from central Lists system) for reusability across Samples and Entries/Processes. Validation rules for scalars. OOB fields denoted and editable for rules. Legacy admin UIs for Custom Attributes and Name Templates have been removed from sidebar (routes deprecated).
 - **Lists Management**: Full CRUD for lists and list entries via admin interface - create lists, add/edit/delete entries for statuses, assay types, QC types, compound matrices (solvent, buffer, cell media), etc. Empty lists display expand arrows to add entries. Used to back list fields in Field Management.
@@ -195,9 +197,9 @@ nimblelims/
 - **Users Management**: Create and manage users with role assignments (CRUD)
 - **Roles & Permissions**: Manage roles and assign permissions (CRUD)
 - **Units Management**: Unit definitions with multipliers for conversions
-- **Workflow Templates Management**: Create, edit, and deactivate workflow templates (JSON steps with actions). Execute templates from the admin list with optional context, or use "Apply Template" on Accessioning (context empty), Batch details (context batch_id), and Results Entry (context batch_id, test_id). Visible only with config:edit (admin) and workflow:execute (apply).
+- **Workflow Templates Management** **(Shipped, Not MVP)**: Create, edit, and deactivate workflow templates (JSON steps with actions). Execute templates from the admin list with optional context, or use "Apply Template" on Accessioning (context empty), Batch details (context batch_id), and Results Entry (context batch_id, test_id). Visible only with config:edit (admin) and workflow:execute (apply).
 
-### Security & Access
+### Security & Access **(MVP)**
 - **Authentication**: JWT token-based authentication
 - **Authorization**: Role-Based Access Control (RBAC) with 17 granular permissions (sample:create, result:enter, experiment:manage, etc.)
 - **Data Isolation**: CRO partner and client-specific data access controls via project_users junction table
