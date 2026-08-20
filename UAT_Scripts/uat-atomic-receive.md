@@ -46,13 +46,26 @@ Receive UAT of `/api/samples/receive` is catalog-only until that endpoint exists
 | Test status | Assigned/Pending |
 | Analysis A (`units_default` set) | ELISA (Human IgG) / IgG Concentration |
 | Analysis B (`units_default` missing) | Cell Viability (Trypan Blue) / Total Cell Count |
-| Alice wave (AR-HV-01) | `NBIO-AR-0001` … `NBIO-AR-0024`. Human sign-off: first two tubes are enough for the sticky loop. |
+| Alice wave (AR-HV-01) | `NBIO-AR-0001` … `NBIO-AR-0024`. Human sign-off: `0001` then `0002`. Rest is automation. |
 | Keyboard barcode (AR-HV-05) | `NBIO-AR-KB-0001` (not in the 0001–0024 wave) |
 | Alice sticky | Plasma / Plasma (K2EDTA) / mAb-2301 PK Study |
-| Bob wave (AR-MU-01) | `CART-AR-0001` … `CART-AR-0008`; sticky PBMC / Cell Supernatant / CAR-T In-Process Testing |
-| Client / no receive (AR-RBAC-01) | `david-cro` → 403 |
-| Two techs (AR-MU-01) | alice → mAb only; bob → CAR-T only; foreign `project_id` → **403** |
+| Bob wave (AR-MU-01 happy path) | `CART-AR-0001` … `CART-AR-0008`; sticky PBMC / Cell Supernatant / CAR-T In-Process Testing |
+| Client / no receive (AR-RBAC-01) | `david-cro` POST `NBIO-AR-CLIENT-0001` → 403 (barcode optional; 403 anyway) |
+| Two techs (AR-MU-01) | Happy path: alice → mAb / `NBIO-AR-*`; bob → CAR-T / `CART-AR-*`. 403 is the reverse (alice→CAR-T, bob→mAb). |
 | Aliquots | None in P0. Do not use 0059 lifecycle samples as receive fixtures. |
+| AR-T1 | Implement-side pytest (txn rollback). Not a seed ID. |
+
+### Barcode 1:1
+
+| Case | Barcode |
+|------|---------|
+| AR-HV-01 first + second | `NBIO-AR-0001` then `NBIO-AR-0002` |
+| AR-DUP-01 | replay `NBIO-AR-0001` |
+| AR-TST-01 | `NBIO-AR-0009` (`analysis_ids: []`) |
+| AR-RES-01 | ELISA / IgG on `NBIO-AR-0001` |
+| AR-RES-02 | Total Cell Count on `CART-AR-0001` |
+| AR-HV-05 | `NBIO-AR-KB-0001` |
+| AR-RBAC-01 | `NBIO-AR-CLIENT-0001` (optional) |
 
 ## Preconditions
 
@@ -73,14 +86,14 @@ Receive UAT of `/api/samples/receive` is catalog-only until that endpoint exists
 | AR-VAL-01 | Four POSTs, each missing one required field: barcode, type, matrix, project. | Each → **422**. No sample or container row. | | |
 | AR-DUP-01 | Replay `NBIO-AR-0001` after it exists. | **409** on `containers.name` only. Toast. Stay on receive. No second sample. `samples.name` was never the barcode. | | QA3 |
 | AR-ID-01 | Inspect the receive form and the AR-HV-01 payload/response. | **No sample-ID field** on the form or body. `samples.name` is template-generated and **not** the barcode. `containers.name` = barcode. | | QA2 |
-| AR-ST-01 | Inspect the sample from AR-HV-01. | Status = **Available for Testing**. `received_date` set. No Received hop. Request had no status field. | | QA4 |
-| AR-TST-01 | Open the sample from `NBIO-AR-0009` (received with no tests). Add ELISA (Human IgG). | POST succeeds. Test status assigned/pending. | | QA6 |
+| AR-ST-01 | Inspect the sample from `NBIO-AR-0001`. | Status = **Available for Testing**. `received_date` set. No Received hop. Request had no status field. | | QA4 |
+| AR-TST-01 | Open the sample from `NBIO-AR-0009` (received with `analysis_ids: []`). Add ELISA (Human IgG). | POST succeeds. Test status assigned/pending. | | QA6 |
 | AR-TST-02 | Delete the test from AR-TST-01 (no results). | DELETE succeeds. | | QA6 |
 | AR-TST-03 | DELETE the ELISA test on `NBIO-AR-0001` after AR-RES-01. | **400**. Test and result remain. | | QA6 |
-| AR-RES-01 | On IgG Concentration (`units_default` present), enter a typed number and optional qualifier `<LOD` or `ND`. Do not pick a unit. Catalog-only until `/receive` exists. | Result saved. Assert **`reported_result`** equals the typed value and **`qualifiers`** is set. `raw_result` may copy the same value. No `unit_id`. Unit from `analytes.units_default`. | | QA7 |
-| AR-RES-02 | On Total Cell Count (no `units_default`), enter a typed number. Catalog-only until `/receive` exists. | **422**. No result row. | | QA7 |
-| AR-RBAC-01 | Log in as `david-cro`. Open receive or POST `/api/samples/receive`. | No receive UI, or **403**. | | QA8 |
-| AR-MU-01 | `alice-tech` receives `NBIO-AR-*` on mAb-2301. `bob-tech` receives `CART-AR-0001` on CAR-T. Alice POSTs Bob's `project_id` (or the reverse). | Each tech only sees/creates in their project. Foreign project → **403**, no row. | | QA8 |
+| AR-RES-01 | On ELISA / IgG Concentration for `NBIO-AR-0001` (`units_default` present), enter a typed number and optional qualifier `<LOD` or `ND`. Do not pick a unit. Catalog-only until `/receive` exists. | Result saved. Assert **`reported_result`** equals the typed value and **`qualifiers`** is set. `raw_result` may copy the same value. No `unit_id`. Unit from `analytes.units_default`. | | QA7 |
+| AR-RES-02 | On Total Cell Count for `CART-AR-0001` (no `units_default`), enter a typed number. Catalog-only until `/receive` exists. | **422**. No result row. | | QA7 |
+| AR-RBAC-01 | Log in as `david-cro`. Open receive or POST `/api/samples/receive` with `NBIO-AR-CLIENT-0001` (barcode optional). | No receive UI, or **403**. | | QA8 |
+| AR-MU-01 | Happy path: `alice-tech` receives `NBIO-AR-*` on mAb-2301; `bob-tech` receives `CART-AR-0001`…`0008` on CAR-T. Then the reverse: alice POSTs CAR-T `project_id`, bob POSTs mAb `project_id`. | Happy path: each tech only creates in their project. Reverse → **403**, no row. | | QA8 |
 
 ### Out of P0 receive (do not seed as must-pass)
 
@@ -88,7 +101,7 @@ Receive UAT of `/api/samples/receive` is catalog-only until that endpoint exists
 |----|------------|
 | AR-MU-02 | US-10 second-person review (reviewer ≠ enterer). Later / Q1. Not a receive gate. |
 
-### Automated only (implement gate, not a human skip)
+### Automated only (implement-side pytest, not a seed ID)
 
 | ID | Steps | Expected |
 |----|-------|----------|
