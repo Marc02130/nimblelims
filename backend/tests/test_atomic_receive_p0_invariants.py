@@ -1,7 +1,7 @@
 """Schema invariants for P0 atomic-receive datasets.
 
 Uses migrated_engine so Alembic 0058/0060 seed is present.
-Does not call POST /api/samples/receive (implement gate CLOSED).
+Does not call POST /api/samples/receive (this pack does not implement receive).
 """
 import inspect
 
