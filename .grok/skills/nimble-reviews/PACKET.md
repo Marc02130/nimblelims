@@ -19,6 +19,7 @@ One slug for the cycle, e.g. `experiment-template-entries`, `data-parsers-lims-r
 | Scientific CSO review | `.docs/scientific-cso-review/{stem}.md` |
 | BA review | `.docs/ba-review/{stem}.md` |
 | QA review | `.docs/qa-review/{stem}.md` |
+| Developer review | `.docs/developer-review/{stem}.md` |
 | Open questions | `.docs/open-questions/` (decision log) |
 | Checklist | `.docs/checklist/` as applicable |
 
@@ -27,7 +28,7 @@ One slug for the cycle, e.g. `experiment-template-entries`, `data-parsers-lims-r
 ```
 Requirements → Tech sketch
     → Lab Ops (required for ELN/LIMS lab workflows)
-    → CEO / UI / Architecture / Security / Scientific CSO / BA / QA (parallel after Lab Ops has spoken when possible)
+    → CEO / UI / Architecture / Security / Scientific CSO / BA / QA / Developer (parallel after Lab Ops has spoken when possible)
     → Open questions cleared
     → Implement (phased)
     → Dogfood → UAT → merge main
@@ -56,6 +57,7 @@ Condition ID prefixes by review:
 | Scientific CSO | SC1, SC2, … |
 | BA | BA1, BA2, … |
 | QA | QA1, QA2, … |
+| Developer | D1, D2, … |
 
 ## Artifact header (minimum)
 
