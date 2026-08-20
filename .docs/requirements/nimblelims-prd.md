@@ -30,6 +30,7 @@ NimbleLIMS enables BioTech and Pharma startup labs to manage compound and biolog
 - Version 1.3: Added EAV (Entity-Attribute-Value) model for custom fields configurability - December 2025.
 - Version 1.4: Repositioned for BioTech and Pharma startups; updated seed data with drug discovery assays - August 2026.
 - Version 1.5: Defined MVP release bar (3 pillars: sample tracking, test ordering, results entry); labeled shipped features as adjacent enhancements - August 20, 2026.
+- Version 1.6: Added SOP-derived requirements (Issues #22–#26): immutable lab ID, sample dispositions (quarantine/reject/discard), append-only audit trail, result review/amendment, status model reconciliation, second-person review configurability - August 20, 2026.
 
 ## 2. Goals and Objectives
 
@@ -103,9 +104,25 @@ Work that is explicitly **not required** to release a basic LIMS and should **no
 
 ### 4.1 Sample Tracking (MVP Release Bar + Shipped Enhancements)
 **MVP Core:**
-- **Accessioning**: Receive, inspect, note anomalies, assign tests, review/release. Required fields: due_date, received_date, sample_type, status, matrix, temperature.
-- **Status management**: Received, Available for Testing, Testing Complete, Reviewed, Reported.
+- **Accessioning**: Receive, inspect, note anomalies, assign tests, review/release. Required fields: due_date, received_datetime (date **and time**), sample_type, status, matrix, temperature.
+- **Receipt Event**: Datetime (not date-only), who received, condition (intact/leaking/damaged/tampered), manifest match, accept|reject|quarantine + reason. Manifest mismatch can still create a receipt event.
+- **Identity Management**: 
+  - Submitter/external ID stored as-is (no mutation).
+  - Separate immutable `lab_id` (barcode) assigned by lab; never changes.
+  - Duplicate lab barcode rejected (no collision algorithm; system refuses duplicates).
+  - Receipt timestamp is a field, not encoded in the identifier.
+  - Each aliquot gets a **new** lab_id (not shared with parent).
+  - Lab ID must not encode location or PHI.
+  - Typed entry acceptable; scan supported but not mandated.
+- **Status management**: Received, Available for Testing, Testing Complete, Reviewed, Reported (existing UAT values remain valid).
+  - **Direction**: Sample.status tracks specimen state; Reviewed/Reported belong on result/report (compatibility path: both approaches work during transition).
+  - **Additional dispositions**: Quarantined (segregated until checks complete), Rejected (not acceptable; reason required), Discarded (disposal event with remaining qty = 0).
+  - Rejected/Discarded samples **not hard-deleted**; records survive physical destruction.
+  - **Cancel** belongs on the order, not the sample.
+  - "On hold": no public SOP found; remains optional/parked.
 - **Aliquots/Derivatives**: Linked via parent_sample_id; inheritance of project/client; created in workflows (e.g., DNA extraction).
+  - Parent remaining_quantity decreases; cannot aliquot more than remaining.
+  - Child has new lab_id; parent history survives deleting child.
 - **Containers (basic)**: Tubes and plates with hierarchical nesting (self-referential); contents linking samples to containers.
 
 **Shipped Enhancements (Not MVP):**
@@ -113,6 +130,15 @@ Work that is explicitly **not required** to release a basic LIMS and should **no
 - Multi-element container auto-spawn, solute mass vs diluent modeling, derived volume calculations
 - QC sample types with batch integration (Blank, Control, Spike, Duplicate)
 - Bulk accessioning with common/unique fields and sequential name generation
+
+**Parked (Out of MVP):**
+- Forensic chain-of-custody every-handoff forms
+- Live freezer probe integration and mapping
+- Numeric freeze-thaw limits (no public SOP specifying "max N")
+- After-hours accessioning SOP (no public procedure found)
+- Duplicate-barcode collision algorithm (product refuses; no resolution algorithm sourced)
+- CGT chain of identity / ISBT 128 (autologous cell therapy; not in research MVP)
+- CLIA retention clocks, 21 CFR 58.195 hardcoded retention math
 
 ### 4.2 Test Ordering (MVP Release Bar)
 **MVP Core:**
@@ -122,24 +148,63 @@ Work that is explicitly **not required** to release a basic LIMS and should **no
 
 ### 4.3 Results Entry (MVP Release Bar + Shipped Enhancements)
 **MVP Core:**
-- Batch/plate-based entry: Select batch (container collection), test; display analytes for entry
-- Fields: raw_result, reported_result, qualifiers
-- Validation: Per analyte (data type, ranges, sig figs)
-- Review: Lab manager at test level; updates statuses
+- **Entry**: Batch/plate-based entry: Select batch (container collection), test; display analytes for entry.
+- **Fields**: raw_result, reported_result, qualifiers, unit (where applicable; qualitative coded values may omit unit), analyst, **server timestamp** (not user-editable without audit trail).
+- **Validation**: Per analyte (data type, ranges, sig figs).
+- **Test Ordering**: Only against existing, accepted/available samples (not quarantined or rejected; not unknown ID). Catalog test required.
+- **Review and Release**:
+  - Result-level review/release states (direction: not only Sample.status = Reviewed/Reported).
+  - **Second-person review gate is tenant-configurable**: default OFF for pure R&D, default ON for GxP/CRO-release.
+  - When gate is ON: reviewer ≠ enterer (same user blocked from reviewing own result).
+  - When gate is OFF: self-review permitted (pure R&D use case).
+  - Lab manager reviews at test/result level; updates review statuses.
+- **Amendment**:
+  - After Reported: amendment creates a **new version** linked to original; both remain retrievable.
+  - Silent overwrite forbidden; reason required for amendment.
+  - A transcription fix **before** Reported is an audited change, not necessarily a formal amendment.
+- **Retest**: Linked new order on same sample, reason required, original result kept. No reflex-rules engine.
+- **OOS/Failing Results**: Flag result vs spec (pass/fail/unknown); keep failing data (no silent delete); reason + investigation link. Full OOS module (Phase I/II investigation) is post-MVP.
+- **Cancel After Reported**: Blocked or becomes amendment (label as unverified practice / open question if not sourced in SOP).
 
 **Shipped Enhancements (Not MVP):**
 - Batch results entry with tabular UI and atomic submit
-- QC validation with failing QC flags/blocks
+- QC validation with failing QC flags/blocks (optional "block report if QC failed" for GxP/CLIA tenants)
 - LimsRun promote-on-publish: structured Results from instrument/CRO data (import remains flexible JSONB)
 - Replicate tracking, conflict resolution (same-run update vs other-run fail), lineage via lims_run_id
 
-### 4.4 Security and Auth (MVP Required)
-- RBAC with 17 permissions (e.g., sample:create, result:enter, batch:manage)
+**Parked (Out of MVP):**
+- Full OOS/OOT investigation module (Director-gated Phase I/II, Material Review Board)
+- Reflex-rules engine (automatic additional testing; clinical overkill)
+- Instrument data parsers (LimsRuns exist but not MVP path; manual entry is release bar)
+- Westgard multi-rules, control charts (QC depth beyond basic pass/fail)
+
+### 4.4 Audit Trail and Data Integrity (MVP Required)
+**GxP-Ready Data Model (Not a Part 11 Certification Claim):**
+- **Append-only audit events** on sample, order/test, result, spec/analysis, user account changes.
+- **Event fields**: entity_type, entity_id, event_type (created/updated/deleted/reviewed/reported), old_value, new_value, changed_by (user_id), changed_at (timestamp **with time zone**), reason (required once result is reviewed/reported).
+- **Immutable log**: Admin users **cannot edit or delete** audit events.
+- **User accountability**: Unique users required (no shared lab login); disabled users remain in historical records (not deleted).
+- **Server timestamps**: System-generated (not user-editable without creating new audit event).
+- **Reason on GxP changes**: Reason field required for changes to reviewed/reported results.
+- **History reconstruction**: GET endpoints for audit trails per entity; export capability (CSV/JSON).
+- **Do NOT claim "21 CFR Part 11 certified"**: FDA does not certify software. E-signatures with meaning (review/approval/authorship) and re-authentication (11.50, 11.200) are post-MVP.
+
+**Post-MVP (GxP-Path Later):**
+- E-signatures with meaning and re-authentication
+- Signature bound to record (11.70)
+- Printouts showing if data changed since original entry (Annex 11 §8.2)
+- Validated backup/restore evidence pack
+- Audit-trail review workspace
+
+### 4.5 Security and Auth (MVP Required)
+- RBAC with 17 permissions (e.g., sample:create, result:enter, batch:manage, result:review)
 - User auth: Username/password + email verification
+- **Unique users**: No shared lab login accounts permitted (data integrity requirement).
 - Client isolation: View own projects/samples only; project_users junction for access
 - Row-Level Security (PostgreSQL RLS policies) for multi-tenant data protection
+- **Disabled users**: Account deactivation (not deletion); historical actions remain attributed
 
-### 4.5 Configurable Elements (MVP Required + Shipped Enhancements)
+### 4.6 Configurable Elements (MVP Required + Shipped Enhancements)
 **MVP Core:**
 - **Lists**: Statuses, types, matrices (admin-editable via UI/API)
 - **Analyses**: Admin-configurable with methods, turnaround times, costs
@@ -156,10 +221,55 @@ Work that is explicitly **not required** to release a basic LIMS and should **no
 - **Name Templates**: Configurable entity naming with placeholders ({SEQ}, {PROJECT}, etc.)
 - **Client Projects**: Hierarchical grouping of LIMS projects
 
-### 4.6 Data Model (MVP Required)
+### 4.7 Status Model Reconciliation and Compatibility
+
+**Background**: The current Sample.status list (`Received → Available for Testing → Testing Complete → Reviewed → Reported`) mixes **sample lifecycle** with **result review/release** states. SOP analysis shows these are distinct concerns.
+
+**Product Direction**:
+- **Sample.status**: Tracks specimen state (Received, Available for Testing, Quarantined, Rejected, Discarded, etc.).
+- **Result/Report states**: Review and release tracking belongs on the result/report entity (not Sample.status).
+- **Testing Complete**: This reflects order/work status, not specimen identity. Direction is to track testing progress on test/order entities.
+
+**Compatibility Path (Does Not Break UAT)**:
+- The existing five status names (`Received`, `Available for Testing`, `Testing Complete`, `Reviewed`, `Reported`) remain valid list values.
+- Product implementation shifts review/release controls to result-level (US-10, US-36) without removing the UAT-familiar status names.
+- Free-form status updates (any `sample:update` user can set status) are **not** second-person review; product direction adds proper review gates on results (tenant-configurable).
+- **Open question for Tobias**: When can UAT stop treating `Reviewed`/`Reported` as Sample.status values and rely on result-level review/release instead?
+
+**Additional Sample Dispositions (From SOP Analysis)**:
+- **Quarantined**: Segregated until ID/quality checks complete; cannot be used for test ordering.
+- **Rejected**: Not acceptable; reason required; record survives physical destruction.
+- **Discarded**: Disposal event with remaining quantity = 0; who, when, method, justification.
+
+**Cancel vs Disposition**:
+- **Cancel** belongs on the **order**, not the sample (no public SOP for order cancellation found; unverified practice).
+- **On hold**: No public SOP found; remains optional/parked.
+
+**UAT Validation**:
+- Verify existing five status names continue to work.
+- Verify result-level review/release operates independently of Sample.status.
+- Verify quarantined samples blocked from test assignment.
+- Verify rejected/discarded samples remain searchable (not hard-deleted).
+
+### 4.8 Data Model (MVP Required)
 - Normalized Postgres schema with standard fields (id UUID, name unique, description, active, audit timestamps/users)
-- Key tables: Samples, Containers, Contents, Analyses, Analytes, Analysis_Analytes, Tests, Results, Batches, Projects, Clients, Users, Roles, Permissions, Lists
-- Relationships: Normalized with FKs (e.g., samples → projects, tests → samples/analyses)
+- **Key tables**: Samples, Containers, Contents, Analyses, Analytes, Analysis_Analytes, Tests, Results, Batches, Projects, Clients, Users, Roles, Permissions, Lists, **Audit_Events**
+- **New/Updated Sample fields**:
+  - `lab_id`: Immutable unique barcode assigned by lab (indexed, unique constraint)
+  - `external_id`: Submitter/client identifier stored as-is (no mutation)
+  - `received_datetime`: Timestamp with timezone (not date-only)
+  - `receipt_condition`: Enum (intact/leaking/damaged/tampered) or list FK
+  - `manifest_match`: Boolean or enum (yes/no/partial)
+  - `disposition_reason`: Text field for reject/quarantine justification
+  - `remaining_quantity`: Numeric (decreases with aliquoting; 0 = depleted)
+- **Audit_Events table** (append-only):
+  - `id`, `entity_type`, `entity_id`, `event_type`, `old_value` (JSONB), `new_value` (JSONB), `changed_by` (user_id FK), `changed_at` (timestamp with timezone), `reason` (text, required for reviewed/reported changes)
+  - Database constraint: no UPDATE or DELETE on audit_events (append-only enforcement)
+- **Result versioning** (for amendments):
+  - Results table: add `version` (integer), `parent_result_id` (self-referential FK), `amendment_reason` (text)
+  - Original result: version=1, parent_result_id=null
+  - Amended result: version=2+, parent_result_id points to original
+- Relationships: Normalized with FKs (e.g., samples → projects, tests → samples/analyses, audit_events → users)
 
 ## 5. Out of Scope for MVP Release (Defer Until Customer Need)
 The following are explicitly **not required** to ship a basic LIMS and should be deferred until specific customer requirements are validated:
