@@ -35,9 +35,11 @@ Decision log for SOP-derived requirements (Issues #22–#26). Tracks questions t
 ## Q2: Tenant configuration grain for second-person review gate
 
 **Status**: Open  
-**Blocks**: Implementation of US-10 (review configurability)  
+**Blocks**: Implementation of US-10 (review configurability). **Does not block atomic-receive P0.**  
 **Owner**: Product / Wilhelmina  
 **Context**: Second-person review gate (reviewer ≠ enterer) should be tenant-configurable: default OFF for pure R&D, default ON for GxP/CRO-release. SOP sources do not specify configuration granularity.
+
+**Atomic-receive packet:** Heidi locked **no new columns** on that stem. There is no schema flag for this gate in P0. Anton seeds distinct enterer vs reviewer users; AR-MU-02 stays catalog-only until this question has a home.
 
 **Question**: At what level is the second-person review gate configured?
 
@@ -52,39 +54,29 @@ Decision log for SOP-derived requirements (Issues #22–#26). Tracks questions t
 - Project-level or GxP flag: More flexible, common pattern (clinical trials project vs R&D project in same org).
 - Analysis-level: Maximum flexibility, but adds complexity to catalog management.
 
-**Recommendation (provisional)**: Start with **GxP flag on project** (simplest step beyond org-level that covers common "this project ships to FDA" use case). Can enhance to analysis-level later if customer requests.
+**Recommendation (provisional)**: Start with **GxP flag on project** (simplest step beyond org-level that covers common "this project ships to FDA" use case). Can enhance to analysis-level later if customer requests. Not part of atomic-receive; do not add the column on that packet.
 
 **Next Steps**:
 - Confirm with product/stakeholders if project-level GxP flag is sufficient for MVP.
 - Document as "project.gxp_mode boolean; when true, result review requires reviewer ≠ enterer."
+- AR-MU-02 executes only after the setting exists.
 
 ---
 
 ## Q3: Lab ID format and generation algorithm
 
-**Status**: Open (uniqueness decided; format open)  
-**Blocks**: Implementation of US-30 (immutable lab ID)  
-**Owner**: Product / Deiter (Lab Ops review)  
-**Context**: SOP sources require unique, immutable lab ID per container. Must not encode location or PHI. No public SOP specifies format (no "must be Code 128" or "must be 10 alphanumeric").
+**Status**: **Closed 2026-08-20** (identity model locked on atomic-receive PR 30)  
+**Blocks**: —  
+**Owner**: Product / Deiter (Lab Ops)  
+**Decision**: Two identities. Do **not** treat lab ID as the barcode.
 
-**Question**: What is the format and generation algorithm for `lab_id`?
+- `samples.name` = lab sample ID, **system-assigned** from the existing name template/sequence. Tech does not type it. Receive screen has no sample-ID field.
+- `containers.name` = scanned (or typed) tube barcode. Duplicate scan → 409 on the container only.
+- `samples.name` 409 only if the generated sample ID itself collides.
+- External ID stays in existing `client_sample_id` (optional; unique if present).
+- Receipt datetime stays in existing `received_date`.
 
-**Options**:
-1. **Sequential integer with prefix**: e.g., `NL-000001`, `NL-000002`. Simple, human-readable, easy to implement. Risk: predictable (minor; research lab, not a security token).
-2. **UUID or ULID**: Globally unique, sortable (ULID), but less human-friendly (long strings).
-3. **User-entered**: Technician types barcode from pre-printed labels. Product validates uniqueness but does not generate. Common in cores with existing label stock.
-4. **Hybrid**: User can enter or system can generate (flexibility for labs with/without label stock).
-
-**Trade-offs**:
-- Sequential: Easy to read/say over phone; sufficient for startup with <10k samples/year.
-- UUID/ULID: Handles distributed/offline entry; overkill for single-site startup.
-- User-entered: Matches existing lab label workflow; requires validation only (no generation logic).
-
-**Recommendation (provisional)**: Start with **user-entered** (simplest; matches existing accessioning workflow where techs scan/type pre-printed barcodes). System enforces uniqueness via database constraint. Add optional auto-generation (sequential with prefix) as enhancement if requested.
-
-**Next Steps**:
-- Deiter to confirm user-entered with uniqueness check covers Lab Ops workflow.
-- Document as "lab_id: unique string, technician-entered (scan or type), validated at accession."
+User-entered lab_id (old provisional Q3) is **retracted** with Lab Ops L1.
 
 ---
 
@@ -95,7 +87,7 @@ Decision log for SOP-derived requirements (Issues #22–#26). Tracks questions t
 **Owner**: Product  
 **Context**: No public SOP found for cancelling a test order after a result is reported. CLIA documents add-ons (additional testing), not cancellations. Common unverified practice: cancel before result entry; after results exist, void/amend with reason; never silent-delete.
 
-**Question**: What happens when user tries to cancel an order after result is reported?
+**Question**: What happens when user tries to cancel an order after a result is reported?
 
 **Options**:
 1. **Block**: Cannot cancel after Reported; use amendment (US-36) if result is incorrect.
@@ -114,24 +106,12 @@ Decision log for SOP-derived requirements (Issues #22–#26). Tracks questions t
 
 ## Q5: Deiter Lab Ops gate on immutable lab ID (Issue #24)
 
-**Status**: Open (blocking implement-ready, not blocking requirements)  
-**Blocks**: US-30 marked as implement-ready  
+**Status**: **Closed 2026-08-20** (identity model; not implement-ready)  
+**Blocks**: US-30 marked as implement-ready — remaining: CEO pass on atomic-receive; product code still gated.  
 **Owner**: Deiter (Lab Ops)  
-**Context**: Issue #24 requires stopping barcode timestamp-suffix mutation and implementing immutable lab ID. This is a mix-up risk mitigation; Deiter must review before implementation begins.
+**Decision**: L1 retracted. Two IDs is correct lab identity. Mix-up is unacceptable only if receive or lookup makes techs hunt or type the sample ID. Lookup is scan the tube. Receive screen does not show a sample-ID field.
 
-**Question**: Does the proposed approach (user-entered unique lab_id + separate external_id + no timestamp suffix) adequately mitigate mix-up risk?
-
-**Review scope for Deiter**:
-- External ID stored separately from lab ID (no mutation).
-- Duplicate lab barcode rejected (no collision resolution algorithm).
-- Receipt timestamp is a field, not encoded in the identifier.
-- Each aliquot gets a new lab ID.
-- Typed entry acceptable; scan supported.
-
-**Next Steps**:
-- Schedule Lab Ops review with Deiter before marking US-30 as implement-ready.
-- Deiter provides sign-off or requests changes to mitigate mix-up risk.
-- Document review outcome as "Deiter Lab Ops gate: [Approved / Revisions Requested]."
+Aliquot later = another container on the same sample. Derivative later = new sample with `parent_sample_id`. No aliquot UI on atomic-receive.
 
 ---
 
@@ -159,9 +139,9 @@ The following are **not open questions**; they are confirmed out-of-scope and sh
 | Open Question | Blocks | Owner | Status |
 |---------------|--------|-------|--------|
 | Q1: UAT cutover for Reviewed/Reported | UAT cutover (not MVP implementation) | Tobias | Open |
-| Q2: Second-person review config grain | US-10 implementation | Product | Open (provisional: project-level GxP flag) |
-| Q3: Lab ID format | US-30 implementation | Product + Deiter | Open (provisional: user-entered) |
+| Q2: Second-person review config grain | US-10 implementation. Not atomic-receive P0. | Product | Open (provisional: project-level GxP flag; no column on receive packet) |
+| Q3: Lab ID format | — | Product + Deiter | **Closed**: system sample ID + container barcode |
 | Q4: Cancel after report | Order management behavior | Product | Open (provisional: block, direct to amendment) |
-| Q5: Deiter Lab Ops gate | US-30 implement-ready | Deiter | Open (review pending) |
+| Q5: Deiter Lab Ops gate | US-30 implement-ready (CEO still open) | Deiter | **Closed** for identity: L1 retracted, two IDs accepted |
 
-**Gate rule**: Q1 does not block MVP implementation (compatibility path allows both approaches). Q2–Q4 need decisions before implementation; provisional answers provided for velocity. Q5 must complete before US-30 is marked implement-ready.
+**Gate rule**: Q1 does not block MVP implementation (compatibility path allows both approaches). Q2 needs a home before US-10 / AR-MU-02 can execute; not in atomic-receive. Q3 and Q5 identity model closed 2026-08-20. Q4 still needs a decision before cancel/retest behavior ships.
