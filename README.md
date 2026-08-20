@@ -1,6 +1,6 @@
 # NimbleLIMS - Laboratory Information Management System
 
-A modern, API-first LIMS built specifically for BioTech and Pharma startups. NimbleLIMS accelerates drug discovery by managing compound samples, dose-response screening, experiment tracking, and structured assay results—all powered by FastAPI, React, and PostgreSQL. Purpose-built for small R&D teams running iterative experiments, with native support for CRO collaboration and ELN-style process documentation.
+A modern, API-first LIMS built specifically for BioTech and Pharma startups. NimbleLIMS provides the **core foundation for lab operations**: track samples (accessioning, status, lineage), order tests (assign analyses), and enter results (capture and review). Purpose-built for small R&D teams with basic LIMS needs, featuring role-based access, CRO partner isolation, and an extensible platform that supports optional enhancements (dose-response analysis, ELN experiment tracking, instrument data import) when customer requirements emerge. Powered by FastAPI, React, and PostgreSQL.
 
 ## License
 
@@ -15,7 +15,7 @@ This project uses a four-container Docker setup:
 - **Database (PostgreSQL 15+)**: Data persistence with Row-Level Security
 - **Backend (FastAPI + Python 3.10+)**: RESTful API with JWT authentication and RBAC
 - **Frontend (React 18+)**: Modern web interface with TypeScript
-- **R Calculator (Plumber API)**: Curve fitting microservice for dose-response analysis (4PL model, IC50, SVG generation)
+- **R Calculator (Plumber API)**: Optional microservice for dose-response curve fitting (4PL model, IC50, SVG generation) — shipped enhancement, not MVP
 
 ## Quick Start
 
