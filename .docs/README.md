@@ -20,6 +20,7 @@ All product and engineering docs live under this directory, organized by purpose
 | [`architecture-review/`](architecture-review/) | Architecture design reviews |
 | [`security-review/`](security-review/) | Security reviews |
 | [`lab-ops-review/`](lab-ops-review/) | **SVP Lab Ops** — target-customer lab workflows (required for ELN/experiments) |
+| [`sop/`](sop/) | Public BioTech/Pharma lab SOP packs (source for requirements; not product reqs) |
 | [`ideas/`](ideas/) | Exploratory notes — not commitments |
 | `private/` | Local-only materials (gitignored) |
 
@@ -41,6 +42,7 @@ All product and engineering docs live under this directory, organized by purpose
 | User stories | [user-stories/nimblelims-user.md](user-stories/nimblelims-user.md) |
 | ELN processes / experiments work | [checklist/experiment-checklist.md](checklist/experiment-checklist.md), [open-questions/experiments.md](open-questions/experiments.md) |
 | CLI snippets | [manuals/useful-command-line.md](manuals/useful-command-line.md) |
+| **SOP source packs** | [sop/README.md](sop/README.md) |
 
 ## Manuals (domain + ops)
 
