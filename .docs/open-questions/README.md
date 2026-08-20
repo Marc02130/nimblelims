@@ -11,6 +11,7 @@ Decision logs for workstreams that must not proceed until product/architecture q
 | [run-results.md](run-results.md) | LimsRun → structured Results on publish | **No** — LimsRuns/parsers are shipped but not the MVP release path; manual results entry is the release bar |
 | [data-parsers-lims-runs.md](data-parsers-lims-runs.md) | Parsers (analysis×instrument/CRO), run lineage, AI setup schema | **No** — Data parsers are shipped but not required for release; instrument integration is a post-release enhancement |
 | [sop-sample-identity-audit.md](sop-sample-identity-audit.md) | Sample identity, dispositions, audit trail, review/amendment (Issues #22–#26) — **Q1–Q5 open** | **Partially** — Implementation can proceed with provisional answers; Q1 (UAT cutover) and Q5 (Deiter gate) do not block MVP implementation but must resolve before UAT/production use |
+| [security-high-s1-s6.md](security-high-s1-s6.md) | High security remediation — **Q1–Q2 open** (app role bootstrap, prod seed users); Q3–Q6 provisional | **Yes for production** — S1–S6 block treating the stack as production; P0a–P0c unblocked after reviews; P0d needs Q1–Q2 |
 
 ## Gate rule
 

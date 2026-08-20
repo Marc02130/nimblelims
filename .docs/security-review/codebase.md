@@ -3,6 +3,7 @@
 **Date:** 2026-08-20  
 **Status:** Revise  
 **Tech sketch:** n/a — shipped tree, not a feature packet  
+**Remediation packet (High S1–S6):** [requirements/security-high-s1-s6.md](../requirements/security-high-s1-s6.md) · [security-review/security-high-s1-s6.md](security-high-s1-s6.md) · branch `security/high-s1-s6`  
 **Related reviews:** [data-parsers-lims-runs](data-parsers-lims-runs.md) · [experiment-template-entries](experiment-template-entries.md) · [process-and-experiment](process-and-experiment.md) · [run-results](run-results.md) · [schema-evolution](schema-evolution.md)  
 **Scope:** Feature packet (STRIDE) over HEAD `6a21c947` (2026-08-20 17:27 ET). DEEP CSO: skipped (gstack skill present, `/cso` not run).
 
@@ -13,6 +14,8 @@ NimbleLIMS has real RBAC on most mutating FastAPI routes, a CSV parser engine (n
 The application database user is the PostgreSQL Docker superuser (`lims_user`). RLS — including `FORCE ROW LEVEL SECURITY` on later ELN tables — does not apply to FastAPI. Migrations always seed well-known passwords hashed with unsalted SHA256. Docker Compose sets `JWT_SECRET_KEY` while the app reads `SECRET_KEY`, so the signing key stays the hardcoded default. Request middleware logs login bodies.
 
 Until S1–S6 are fixed, do not treat this stack as production or as enforcing client isolation.
+
+**Remediation:** Full pipeline packet **security-high-s1-s6** (CEO · Arch · Security · QA Accept with conditions). Implement P0a–P0c after gate; P0d (S1 app role) after open questions Q1–Q2.
 
 ## Surface delta
 
