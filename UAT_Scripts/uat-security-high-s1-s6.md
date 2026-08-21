@@ -2,7 +2,7 @@
 
 **Stem:** `security-high-s1-s6`  
 **Branch:** `security/high-s1-s6`  
-**Date:** 2026-08-20  
+**Date:** 2026-08-21 (second completed run; earlier Tobias stamp 2026-08-20 plus CSO UAT remain on this branch history)  
 **Requirements:** [`.docs/requirements/security-high-s1-s6.md`](../.docs/requirements/security-high-s1-s6.md)  
 **Source audit:** [`.docs/security-review/codebase.md`](../.docs/security-review/codebase.md)  
 **Related:** [uat-security-rbac.md](uat-security-rbac.md) (broader RBAC; this script is High-finding focused)
@@ -31,7 +31,7 @@ Accept that production-blocking High findings S1–S6 are fixed before merge to 
 | App | `docker compose up -d --build` from repo root (or equivalent staging) |
 | Frontend | `http://localhost:3000` |
 | API | `http://localhost:8000` |
-| Branch / build | Includes P0a–P0d on `security/high-s1-s6` @ `7f84b31` (observed) |
+| Branch / build | Includes P0a–P0d on `security/high-s1-s6` @ `d97e756` (observed) |
 
 ### Local / UAT flags (required for dogfood)
 
@@ -49,7 +49,7 @@ LIMS_APP_PASSWORD=…
 
 **Do not** run production-like UAT with well-known JWT secrets or `ALLOW_INSECURE_DEFAULTS=true`.
 
-**Observed this run (dogfood, not production):** `ENVIRONMENT=development`, `ALLOW_INSECURE_DEFAULTS=true`. Branch `security/high-s1-s6` @ `7f84b31`. Do not claim production sign-off.
+**Observed this run (dogfood, not production):** Tobias box compose at `/workspace/nimblelims` (not Marc dogfood). After restore: `ENVIRONMENT=development`, `ALLOW_INSECURE_DEFAULTS=true`. Branch `security/high-s1-s6` @ `d97e756`. Do not claim production sign-off.
 
 ### Seed / bootstrap users
 
@@ -102,7 +102,7 @@ Script is idempotent (resets those four usernames’ passwords only).
 
 | Result | Pass / Fail | Tester | Date | Notes |
 |--------|-------------|--------|------|-------|
-| Pass (step 1) / Skip (step 2–3) | Pass (step 1) / Skip (step 2–3) | Tobias | 2026-08-20 | `SECRET_KEY` set; app starts; `GET /health` 200. Step 2 not run on dogfood (would restart into `ENVIRONMENT=production` + default secret). Refuse-default covered by pytest `test_security_config_s3_s4.py`. |
+| Pass | Pass | Tobias | 2026-08-21 | Including step 2. Step 2: production + default secret, backend Exited (1), RuntimeError refusing missing or default JWT secret. Step 3: development restored, `GET /health` 200. |
 
 ---
 
@@ -119,7 +119,7 @@ Script is idempotent (resets those four usernames’ passwords only).
 
 | Result | Pass / Fail | Tester | Date | Notes |
 |--------|-------------|--------|------|-------|
-| Pass | Pass | Tobias | 2026-08-20 | After `uat-labtech` login, backend logs show method/path/status only. No `Body:` dump, no `password=` , no literal password strings. |
+| Pass | Pass | Tobias | 2026-08-21 | method/path/status only. No `Body:`, no `password=`, no literal passwords. |
 
 ---
 
@@ -140,7 +140,7 @@ Script is idempotent (resets those four usernames’ passwords only).
 
 | Result | Pass / Fail | Tester | Date | Notes |
 |--------|-------------|--------|------|-------|
-| Pass | Pass | Tobias | 2026-08-20 | `uat-admin` temp login 200, `must_change_password=true`. `POST /auth/change-password` `short` → 400 `password_complexity`. Exact username → 400 must not match username. Padded username → 400 complexity only (API exact-match). Valid new complex password → 200, `must_change_password=false`. Old temp login → 401. New login + `GET /auth/me` → `must_change_password=false`. |
+| Pass | Pass | Tobias | 2026-08-21 | `uat-admin` must-change, complexity rejects, rotate, old temp 401, new login `must_change_password` false. |
 
 ---
 
@@ -155,7 +155,7 @@ Script is idempotent (resets those four usernames’ passwords only).
 
 | Result | Pass / Fail | Tester | Date | Notes |
 |--------|-------------|--------|------|-------|
-| Pass | Pass | Tobias | 2026-08-20 | pytest `test_password_policy_p0b.py` pass. Live: `left(password_hash,4)` for `uat-admin` is `$2b$`. |
+| Pass | Pass | Tobias | 2026-08-21 | live hash prefix `$2b$` for `uat-admin` / labtech / client-a / client-b. |
 
 ---
 
@@ -173,7 +173,7 @@ Use only when staging runs with a **non-default** `SECRET_KEY`.
 
 | Result | Pass / Fail / N/A | Tester | Date | Notes |
 |--------|-------------------|--------|------|-------|
-| N/A | N/A | Tobias | 2026-08-20 | Script allows N/A unless staging uses a non-default `SECRET_KEY`. This dogfood stack still uses the well-known default because `ALLOW_INSECURE_DEFAULTS=true`. Wrong-key JWT → 401. Default-secret token is accepted then 500 on invalid UUID sub (quality nit, not S3 fail on this profile). |
+| Pass | Pass | Tobias | 2026-08-21 | No longer N/A. Run on prod-like non-default secret. Forged JWT with well-known default secret → 401. Wrong-key JWT → 401. Real token → 200. |
 
 ---
 
@@ -191,7 +191,7 @@ Use only when staging runs with a **non-default** `SECRET_KEY`.
 
 | Result | Pass / Fail | Tester | Date | Notes |
 |--------|-------------|--------|------|-------|
-| Pass (partial / steps 2–4) | Pass (partial / steps 2–4) | Tobias | 2026-08-20 | Role `lims_app` exists, not Superuser. Runtime `DATABASE_URL` user is the app role `lims_app`; `MIGRATE_DATABASE_URL` uses the migrator/owner role (as scripted, not the runtime app role). Restart-twice / password-not-rotated (step 5) not run. Startup “Ensuring lims_app role” line not confirmed in the log tail used. |
+| Pass | Pass | Tobias | 2026-08-21 | Including restart-twice. First start Ensuring/Created `lims_app`; role exists not Superuser; runtime DB user `lims_app`; migrate URL user is the owner role. Second start: role already exists; password not rotated. |
 
 ---
 
@@ -210,7 +210,7 @@ Prefer two client orgs if available (see [uat-security-rbac.md](uat-security-rba
 
 | Result | Pass / Fail | Tester | Date | Notes |
 |--------|-------------|--------|------|-------|
-| Pass | Pass | Tobias | 2026-08-20 | Seeded `uat-client-a` / `uat-client-b`. Accessioned sample `UAT-CLIENT-A-CONFIDENTIAL` on a Client A project. Client A `GET /samples` sees it. Client B `GET /samples` `total=0`. Client B `GET /samples/{id}` → 404 Sample not found (no payload). Client A `GET` same id → 200. Distinct `client_id`s. |
+| Pass | Pass | Tobias | 2026-08-21 | `UAT-CLIENT-A-CONFIDENTIAL`. Client A list 1 / GET 200. Client B list 0 / GET 404 no payload. |
 
 ---
 
@@ -227,7 +227,7 @@ Prefer two client orgs if available (see [uat-security-rbac.md](uat-security-rba
 
 | Result | Pass / Fail | Tester | Date | Notes |
 |--------|-------------|--------|------|-------|
-| Pass | Pass | Tobias | 2026-08-20 | Experiment started with cohort S1 only. `PUT /v1/entries/{id}/values` sample S2 → 400 `detail.code=sample_not_in_cohort`. Same PUT S1 → 200. |
+| Pass | Pass | Tobias | 2026-08-21 | S2 PUT 400 `sample_not_in_cohort`; S1 200. |
 
 ---
 
@@ -243,7 +243,7 @@ Prefer two client orgs if available (see [uat-security-rbac.md](uat-security-rba
 
 | Result | Pass / Fail | Tester | Date | Notes |
 |--------|-------------|--------|------|-------|
-| Pass | Pass | Tobias | 2026-08-20 | Submit 200, `write_backs_applied=1`. S1 `temperature=12.5`; S2 `temperature` still null. |
+| Pass | Pass | Tobias | 2026-08-21 | submit `write_backs_applied=1`; S1 temperature 12.5; S2 still null. |
 
 ---
 
@@ -259,7 +259,7 @@ Prefer two client orgs if available (see [uat-security-rbac.md](uat-security-rba
 
 | Result | Pass / Fail | Tester | Date | Notes |
 |--------|-------------|--------|------|-------|
-| Pass | Pass | Tobias | 2026-08-20 | labtech execute source not in cohort → 400 `source_not_in_cohort`. No dest sample created. |
+| Pass | Pass | Tobias | 2026-08-21 | labtech 400 `source_not_in_cohort`. |
 
 ---
 
@@ -275,7 +275,7 @@ Prefer two client orgs if available (see [uat-security-rbac.md](uat-security-rba
 
 | Result | Pass / Fail | Tester | Date | Notes |
 |--------|-------------|--------|------|-------|
-| Pass | Pass | Tobias | 2026-08-20 | labtech execute null source amount → 400 `source_amount_null`. |
+| Pass | Pass | Tobias | 2026-08-21 | labtech 400 `source_amount_null`. |
 
 ---
 
@@ -291,7 +291,7 @@ Prefer two client orgs if available (see [uat-security-rbac.md](uat-security-rba
 
 | Result | Pass / Fail | Tester | Date | Notes |
 |--------|-------------|--------|------|-------|
-| Pass | Pass | Tobias | 2026-08-20 | labtech `by_mass` 99 from amount 5 → 400 insufficient (have 5.0, need 99.0). Source still 5.0; no dest. |
+| Pass | Pass | Tobias | 2026-08-21 | labtech insufficient 99 from 5; source still 5; no dest. |
 
 ---
 
@@ -307,7 +307,7 @@ Prefer two client orgs if available (see [uat-security-rbac.md](uat-security-rba
 
 | Result | Pass / Fail | Tester | Date | Notes |
 |--------|-------------|--------|------|-------|
-| Pass (admin execute) | Pass (admin execute) | Tobias | 2026-08-20 | labtech execute → 500 RLS InsufficientPrivilege on INSERT containers (dest tube). Admin retry → 200 `success_count=1`, source 50→35, dest exists, `parent_sample_id`=source, dest amount 15. Residual: labtech happy path blocked by containers RLS; 500 not 403. |
+| Pass (admin execute) | Pass (admin execute) | Tobias | 2026-08-21 | labtech 500 RLS InsufficientPrivilege on INSERT containers; source stayed 50. Admin 200 `success_count=1`, 50 to 35, dest parent set. |
 
 ---
 
@@ -323,7 +323,7 @@ Prefer two client orgs if available (see [uat-security-rbac.md](uat-security-rba
 
 | Result | Pass / Fail / N/A | Tester | Date | Notes |
 |--------|-------------------|--------|------|-------|
-| N/A | N/A | Tobias | 2026-08-20 | Not a production claim. Did not switch this dogfood compose to `ENVIRONMENT=production`. |
+| Pass | Pass | Tobias | 2026-08-21 | Prod + strong non-default `SECRET_KEY`, no `ALLOW_INSECURE_DEFAULTS` / `ALLOW_DEV_SEED_USERS` → starts, `GET /health` 200. Default placeholder refuses (same as S3-001 step 2). `create_admin` else-branch fail-closed when production, no bootstrap, `ALLOW_DEV_SEED_USERS=false`. Quality nit: `create_admin.py` ImportError (`Client` from `models.user`) if run as a script on this image; fail-closed decision still shown. |
 
 ---
 
@@ -343,7 +343,7 @@ ENVIRONMENT=test ALLOW_INSECURE_DEFAULTS=true SECRET_KEY=pytest-secret-key-not-f
 
 | Suite | Pass / Fail | Notes |
 |-------|-------------|-------|
-| Above pytest set | Pass | 23 passed: `tests/test_security_config_s3_s4.py`, `test_password_policy_p0b.py`, `test_security_p0c_cohort.py`, `test_aliquot_plan.py`, `test_ensure_lims_app_role.py` |
+| Above pytest set | Pass | 24 passed (host venv + sudo Docker/testcontainers): `test_security_config_s3_s4.py`, `test_password_policy_p0b.py`, `test_security_p0c_cohort.py`, `test_aliquot_plan.py`, `test_ensure_lims_app_role.py` |
 
 ---
 
@@ -351,16 +351,16 @@ ENVIRONMENT=test ALLOW_INSECURE_DEFAULTS=true SECRET_KEY=pytest-secret-key-not-f
 
 | Role | Name | Date | Verdict |
 |------|------|------|---------|
-| Tester | Tobias | 2026-08-20 | Accept with conditions |
+| Tester | Tobias | 2026-08-21 | Accept with conditions |
 | Product / Lab Ops (optional) | | | |
 | Eng | | | |
 
 **Conditions / residuals (this stamp):**
 
-1. Not a production sign-off. TC-S3-001 step 2 and TC-PROD-001 not run on dogfood.
-2. TC-S3-002 N/A on default JWT secret + `ALLOW_INSECURE_DEFAULTS`.
-3. Residual: labtech aliquot happy path (TC-S5-004) 500 RLS on INSERT containers; refuse paths S5-001–003 pass as labtech. Not an S1–S6 refuse-path fail.
-4. Merge of this stamp is not merge of S1–S6 to `main`.
+1. Residual: labtech TC-S5-004 happy path 500 RLS on INSERT containers (not 403). Refuse paths S5-001–003 pass as labtech. Not an S1–S6 refuse-path fail.
+2. `create_admin.py` ImportError quality nit if executed as a script; fail-closed path still demonstrated.
+3. Parked stack after restore is still dogfood flags. Not a production deploy claim.
+4. This stamp is not merge of S1–S6 to `main`.
 
 **Merge to `main` only if Required cases Pass** (or Fail with written waiver — not recommended for High).
 
