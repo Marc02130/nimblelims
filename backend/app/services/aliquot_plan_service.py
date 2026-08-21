@@ -15,6 +15,7 @@ from decimal import Decimal
 from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import DBAPIError, IntegrityError, ProgrammingError
 from fastapi import HTTPException, status
 
 from app.schemas.aliquot_plan import (
@@ -284,6 +285,15 @@ class AliquotPlanService:
                 },
             )
 
+        if not self._user_id():
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={
+                    "code": "auth_required",
+                    "message": "Authenticated user required to execute aliquot plan",
+                },
+            )
+
         pool_containers: Dict[str, UUID] = {}
         try:
             for r in resolved:
@@ -308,6 +318,30 @@ class AliquotPlanService:
             self.db.flush()
             if self.auto_commit:
                 self.db.commit()
+        except HTTPException:
+            self.db.rollback()
+            raise
+        except (IntegrityError, ProgrammingError, DBAPIError) as e:
+            self.db.rollback()
+            orig = str(getattr(e, "orig", e)).lower()
+            if (
+                "row-level security" in orig
+                or "insufficient_privilege" in orig
+                or "permission denied" in orig
+            ):
+                # Sec9: never surface RLS as 500
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail={
+                        "code": "rls_denied",
+                        "message": (
+                            "Database policy denied creating aliquot destination "
+                            "(containers/samples). Ensure created_by is set and "
+                            "project access is valid."
+                        ),
+                    },
+                ) from e
+            raise
         except Exception:
             self.db.rollback()
             raise

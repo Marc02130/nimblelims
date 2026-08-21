@@ -48,7 +48,7 @@ The High S1–S6 packet is **Accept with conditions** (Sec9 only). This stamp do
 | S2 | High | **Met** | bcrypt + must-change + complexity. |
 | S3 | High | **Met** | Live refuse default JWT (Exited 1). Forged default-secret token → 401. TC-PROD-001 passed. |
 | S4 | High | **Met** | No login body / password in logs. |
-| S5 | High | **Refuse Met** | Cohort / null amount / insufficient fail closed. **Sec9:** labtech execute 500 on `INSERT containers`. |
+| S5 | High | **Met** | Cohort / null amount / insufficient fail closed. Sec9: containers RLS allows `created_by = current_user_id()` (migration `0062`); RLS denials map to 403. |
 | S6 | High | **Met** | Off-cohort upsert 400; write-back cohort only. |
 | S7 | Med | Open | Start experiment/run: enforce client/project. |
 | S8 | Med | Open | Cap `import-file` and SOP uploads (10 MB). |

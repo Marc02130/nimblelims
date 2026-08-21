@@ -36,7 +36,8 @@
 - [x] Entry cohort check on upsert / write-back  
 - [x] Aliquot execute single transaction (fail → rollback; no partial commit)  
 - [x] Source ∈ cohort; refuse null amount  
-- [x] Tests (`test_aliquot_plan.py`, `test_security_p0c_cohort.py`)
+- [x] Tests (`test_aliquot_plan.py`, `test_security_p0c_cohort.py`)  
+- [x] **Sec9:** containers RLS `created_by` INSERT (`0062`) + RLS→403 mapping (`test_containers_rls_sec9.py`)
 
 ## P0d — S1 app role
 
