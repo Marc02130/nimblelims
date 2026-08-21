@@ -68,7 +68,8 @@ All product and engineering docs live under this directory, organized by purpose
 | [experiment-processes-entries.md](requirements/experiment-processes-entries.md) | Processes, entries, experiments requirements |
 | [schema-evolution.md](requirements/schema-evolution.md) | FieldDefinitions / schema evolution requirements |
 | [data-parsers-lims-runs.md](requirements/data-parsers-lims-runs.md) | Parsers (analysis×instrument/CRO), run lineage, optional AI setup — **in review** |
-| [security-high-s1-s6.md](requirements/security-high-s1-s6.md) | **P0** — High security remediation (S1–S6); blocks production |
+| [security-high-s1-s6.md](requirements/security-high-s1-s6.md) | High security remediation (S1–S6) — **Accept / Met** |
+| [security-med-low-s7-s15.md](requirements/security-med-low-s7-s15.md) | Med/Low security remediation (S7–S15) — **In review** |
 
 ## Tech sketches
 
@@ -78,7 +79,8 @@ Lightweight *how* (see [tech-sketch/README.md](tech-sketch/README.md)). Feature 
 |-------|-----|--------|
 | data-parsers-lims-runs | [tech-sketch/data-parsers-lims-runs.md](tech-sketch/data-parsers-lims-runs.md) | Accepted |
 | experiment-template-entries | [tech-sketch/experiment-template-entries.md](tech-sketch/experiment-template-entries.md) | **Hold** — Lab Ops revise (2026-07-29) |
-| security-high-s1-s6 | [tech-sketch/security-high-s1-s6.md](tech-sketch/security-high-s1-s6.md) | **In review** — P0 production blockers |
+| security-high-s1-s6 | [tech-sketch/security-high-s1-s6.md](tech-sketch/security-high-s1-s6.md) | Implemented / Accept |
+| security-med-low-s7-s15 | [tech-sketch/security-med-low-s7-s15.md](tech-sketch/security-med-low-s7-s15.md) | **In review** — Med/Low S7–S15 |
 
 ## Schema changes (per cycle)
 
@@ -90,6 +92,7 @@ Do not confuse with the platform Field Management design ([design/schema-evoluti
 | data-parsers-lims-runs | [schema-changes/data-parsers-lims-runs.md](schema-changes/data-parsers-lims-runs.md) |
 | experiment-template-entries | [schema-changes/experiment-template-entries.md](schema-changes/experiment-template-entries.md) |
 | security-high-s1-s6 | [schema-changes/security-high-s1-s6.md](schema-changes/security-high-s1-s6.md) |
+| security-med-low-s7-s15 | [schema-changes/security-med-low-s7-s15.md](schema-changes/security-med-low-s7-s15.md) |
 
 ## Design (long-form)
 
