@@ -337,6 +337,9 @@ class EntryService:
             cfg['status'] = 'draft'
             self.repo.update_entry(entry, config=cfg, modified_by=self._user_id())
 
+        # S6: cohort membership for any sample_id write / write-back
+        cohort = set(self._experiment_sample_ids(entry.experiment_id))
+
         results: List[EntryFieldValue] = []
         for item in values:
             link = self.repo.get_field_link(entry_id, item.field_definition_id)
@@ -359,6 +362,9 @@ class EntryService:
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="experiment_data row_key values cannot also set sample_id",
                 )
+
+            if item.sample_id is not None:
+                self._assert_sample_in_cohort(item.sample_id, cohort, entry.experiment_id)
 
             value_kwargs = {
                 'value_text': item.value_text,
@@ -390,7 +396,9 @@ class EntryService:
 
             do_wb = apply_write_back if apply_write_back is not None else item.apply_write_back
             if do_wb and link.write_back_target and item.sample_id:
-                self._apply_write_back(val, item.sample_id, link.write_back_target, item)
+                self._apply_write_back(
+                    val, item.sample_id, link.write_back_target, item, cohort=cohort
+                )
 
             results.append(val)
 
@@ -413,6 +421,7 @@ class EntryService:
             )
         # Template entry dependencies: depends_on names / predefined keys must be submitted first
         self._assert_dependencies_met(entry)
+        cohort = set(self._experiment_sample_ids(entry.experiment_id))
         write_backs = 0
         values = self.repo.list_values(entry_id)
         for val in values:
@@ -434,7 +443,9 @@ class EntryService:
                 value_json=val.value_json,
                 apply_write_back=True,
             )
-            self._apply_write_back(val, val.sample_id, link.write_back_target, item)
+            self._apply_write_back(
+                val, val.sample_id, link.write_back_target, item, cohort=cohort
+            )
             write_backs += 1
 
         cfg = dict(entry.config or {})
@@ -692,6 +703,25 @@ class EntryService:
                 ids.append(r.sample_id)
         return ids
 
+    def _assert_sample_in_cohort(
+        self,
+        sample_id: UUID,
+        cohort: set,
+        experiment_id: UUID,
+    ) -> None:
+        """S6: sample_id must be on the experiment cohort."""
+        if sample_id not in cohort:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={
+                    "code": "sample_not_in_cohort",
+                    "message": (
+                        f"sample_id {sample_id} is not in the experiment cohort "
+                        f"({experiment_id})"
+                    ),
+                },
+            )
+
     def _load_samples(self, sample_ids: List[UUID]) -> Dict[UUID, Sample]:
         if not sample_ids:
             return {}
@@ -817,9 +847,20 @@ class EntryService:
         sample_id: UUID,
         target_column: str,
         item: EntryFieldValueUpsert,
+        *,
+        cohort: Optional[set] = None,
+        experiment_id: Optional[UUID] = None,
     ) -> None:
         if target_column not in SAMPLE_WRITE_BACK_COLUMNS:
             return
+        # S6: refuse write-back outside experiment cohort
+        if cohort is not None:
+            exp_id = experiment_id
+            if exp_id is None:
+                entry = self.db.query(Entry).filter(Entry.id == value_row.entry_id).first()
+                exp_id = entry.experiment_id if entry else None
+            if exp_id is not None:
+                self._assert_sample_in_cohort(sample_id, cohort, exp_id)
         sample = self.db.query(Sample).filter(Sample.id == sample_id).first()
         if not sample:
             raise HTTPException(
