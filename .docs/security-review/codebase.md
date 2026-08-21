@@ -5,62 +5,60 @@
 **Tech sketch:** n/a — shipped tree, not a feature packet  
 **Remediation packet (High S1–S6):** [requirements/security-high-s1-s6.md](../requirements/security-high-s1-s6.md) · [security-review/security-high-s1-s6.md](security-high-s1-s6.md) · branch `security/high-s1-s6`  
 **Related reviews:** [data-parsers-lims-runs](data-parsers-lims-runs.md) · [experiment-template-entries](experiment-template-entries.md) · [process-and-experiment](process-and-experiment.md) · [run-results](run-results.md) · [schema-evolution](schema-evolution.md)  
-**Scope:** Feature packet (STRIDE) over HEAD `6a21c947` (2026-08-20 17:27 ET). DEEP CSO: skipped (gstack skill present, `/cso` not run).
+**Scope:** Feature packet (STRIDE) over HEAD `6a21c947`, plus dogfood UAT of `security/high-s1-s6` @ `7f84b31`. DEEP CSO: skipped.
 
 ## Executive summary
 
-NimbleLIMS has real RBAC on most mutating FastAPI routes, a CSV parser engine (no user code exec), and several entry-path controls that match the 2026-08-10 packet (submit-only write-back, sample-scoped grid from experiment membership, Client denied `experiment:manage`). Those are not enough for the product’s isolation claim.
+The original audit (HEAD `6a21c947`) found the app connected as the Postgres superuser, seeded SHA256 defaults, a JWT env mismatch, body logging, unbound aliquot execute, and write-back by raw `sample_id`.
 
-The application database user is the PostgreSQL Docker superuser (`lims_user`). RLS — including `FORCE ROW LEVEL SECURITY` on later ELN tables — does not apply to FastAPI. Migrations always seed well-known passwords hashed with unsalted SHA256. Docker Compose sets `JWT_SECRET_KEY` while the app reads `SECRET_KEY`, so the signing key stays the hardcoded default. Request middleware logs login bodies.
+Tobias UAT on `security/high-s1-s6` (dogfood, not production): **S2, S4, S6 Met.** **S1 Met with residual** (Client B cannot read Client A sample under `lims_app`). **S3 open for production** (refuse-default not run live; stack still uses `ALLOW_INSECURE_DEFAULTS`). **S5 refuse Met**; labtech happy path 500 on `INSERT containers` (new Sec9 on the packet review).
 
-Until S1–S6 are fixed, do not treat this stack as production or as enforcing client isolation.
-
-**Remediation:** Full pipeline packet **security-high-s1-s6** (CEO · Arch · Security · QA Accept with conditions). Implement P0a–P0c after gate; P0d (S1 app role) after open questions Q1–Q2.
+This stamp does **not** merge the remediation to `main` and is **not** a production sign-off. S7–S15 stay open.
 
 ## Surface delta
 
-| Surface | Risk |
-|---------|------|
-| AuthN (JWT, SHA256, seeded users) | Forged/guessed admin |
-| RLS / `is_admin()` / FORCE RLS | Not felt by app role |
-| Entry grid/export | Cohort OK for sample-scoped; upsert IDs not constrained |
-| Save / submit / write-back | Save OK; submit can miss cohort |
-| Aliquot execute | Partial commit; unbound sources |
-| Experiment/run start | No client check |
-| Parsers / SOP / import | Engine OK; run/SOP size uncapped |
-| Frontend token + `hasPermission` | UI-only |
-| Compose / logs | Defaults and password logs |
+| Surface | Risk after UAT |
+|---------|----------------|
+| AuthN (JWT, bcrypt, must-change) | S2 Met. S3 still default-secret on dogfood flags. |
+| RLS / `lims_app` | Isolation smoke held. Residual: ensure-log / restart-twice not run. |
+| Entry grid/export | Unchanged this cycle |
+| Save / submit / write-back | S6 Met (cohort) |
+| Aliquot execute | Refuse Met. Labtech execute 500 on dest container. |
+| Experiment/run start | S7 still open |
+| Parsers / SOP / import | S8 still open |
+| Frontend token + `hasPermission` | S10 still open |
+| Compose / logs | S4 Met. S12 still open. |
 
 ## STRIDE (scoped)
 
 | Threat | Control |
 |--------|---------|
-| Spoofing | JWT + DB lookup; defeated by default HMAC secret and SHA256+seeded accounts |
-| Tampering | RBAC; write-back allowlist; execute/write-back not cohort-transactional |
-| Repudiation | `modified_by` / `write_back_previous` / config timestamps; no submit/execute audit table |
-| Info disclosure | RLS bypassed for app; body logs; unauthenticated `/results/validate` |
-| DoS | Parser setup capped; run import and SOP not |
-| Elevation | Client lacks `experiment:manage`; System client = full `has_project_access`; `config:edit` can mint admins |
+| Spoofing | bcrypt + must-change Met. Default JWT still accepted when insecure flags on. |
+| Tampering | Cohort write-back Met. Aliquot refuse Met; labtech execute broken. |
+| Repudiation | Unchanged |
+| Info disclosure | No body logs. Client isolation felt under `lims_app`. |
+| DoS | S8 still open |
+| Elevation | App role is not Superuser. Seed flags still mint known users in dogfood. |
 
 ## Findings / conditions
 
-| ID | Severity | Condition |
-|----|----------|-----------|
-| S1 | High | App must use a non-superuser, non-owner DB role so RLS/FORCE RLS apply. **Remediation on branch `security/high-s1-s6` (P0d):** `lims_app` + ensure script — verify on deploy before marking Met. |
-| S2 | High | bcrypt/argon2; do not seed well-known UAT passwords except explicit dev. |
-| S3 | High | Read one JWT secret env; refuse default. Compose sets `JWT_SECRET_KEY`; app reads `SECRET_KEY`. |
-| S4 | High | Stop logging request bodies. |
-| S5 | High | Aliquot execute: one transaction; source ∈ experiment; refuse null source amount. |
-| S6 | High | Write-back/upsert only for experiment cohort samples. |
-| S7 | Med | Start experiment/run: enforce client/project, not merely sample exists. |
-| S8 | Med | Cap `import-file` and SOP uploads (10 MB). |
-| S9 | Med | Authenticate `POST /results/validate`. |
-| S10 | Med | `localStorage` JWT + client `hasPermission` are not AuthZ; comments must not claim RLS works until S1. |
-| S11 | Med | FORCE RLS on samples/tests/results/…; RLS on `contents`; replace `is_admin() OR true`; `SET LOCAL` + bind GUC. |
-| S12 | Med | Do not publish `:5432` with default password; `start.sh` must use `DATABASE_URL`. |
-| S13 | Low | Tighten verify-email and GET `/roles` `/permissions`. |
-| S14 | Low | `specimen_biotype_id` / `temperature` cannot be both system-RO and write-back. |
-| S15 | Low | Login rate limit / lockout. |
+| ID | Severity | Status | Condition |
+|----|----------|--------|-----------|
+| S1 | High | **Met with residual** | `lims_app` not Superuser; Client B 404 on Client A sample. Restart-twice / ensure-log not confirmed. |
+| S2 | High | **Met** | bcrypt + must-change + complexity (TC-S2-001/002). |
+| S3 | High | **Open (prod)** | Refuse default JWT not live-tested. Dogfood still `ALLOW_INSECURE_DEFAULTS`. |
+| S4 | High | **Met** | No login body / password in logs. |
+| S5 | High | **Refuse Met** | Cohort / null amount / insufficient fail closed. **Sec9:** labtech execute 500 on `INSERT containers`. |
+| S6 | High | **Met** | Off-cohort upsert 400; write-back S1 only. |
+| S7 | Med | Open | Start experiment/run: enforce client/project. |
+| S8 | Med | Open | Cap `import-file` and SOP uploads (10 MB). |
+| S9 | Med | Open | Authenticate `POST /results/validate`. |
+| S10 | Med | Open | `localStorage` JWT + client `hasPermission` are not AuthZ. |
+| S11 | Med | Open | FORCE RLS on remaining tenant tables; `SET LOCAL` + bind GUC. |
+| S12 | Med | Open | Do not publish `:5432` with default password. |
+| S13 | Low | Open | Tighten verify-email and GET `/roles` `/permissions`. |
+| S14 | Low | Open | `specimen_biotype_id` / `temperature` cannot be both system-RO and write-back. |
+| S15 | Low | Open | Login rate limit / lockout. |
 
 ## Not in scope this review
 
@@ -72,24 +70,18 @@ Until S1–S6 are fixed, do not treat this stack as production or as enforcing c
 
 ## Prior packet conditions still open in shipped code
 
-| Packet | ID | Status in HEAD |
-|--------|-----|----------------|
-| experiment-template-entries | S1 grid/export cohort | **Mostly met** for sample-scoped (`_experiment_sample_ids`). **Open** for upsert of arbitrary `sample_id`. |
-| experiment-template-entries | S2 write-back allowlist / no identity | **Mostly met** (`client_sample_id` excluded). **Open:** `specimen_biotype_id` in both system and allowlist. |
-| experiment-template-entries | S3 write-back only on submit | **Met** on HTTP save (`apply_write_back=False`). |
-| experiment-template-entries | S4 aliquot txn / authz / amount | **Open** (partial commit, unbound source, null amount). |
-| experiment-template-entries | S5 export ACL | **Met** (`experiment:manage`; Client cannot call). |
-| experiment-template-entries | S6 write-back map = experiment:manage | **Met**. |
-| experiment-template-entries | S7 audit submit/execute | **Partial** (config + `write_back_previous`; no event table). |
-| data-parsers-lims-runs | S1 no user code in parser_config | **Met** (`ParserConfig` `extra=forbid`, CSV engine). |
-| data-parsers-lims-runs | S2 no LLM on import | **Met** for run import; SOP parse is a separate LLM path. |
-| data-parsers-lims-runs | S3 10 files / 10 MB | **Met** on setup/test; **open** on run `import-file`. |
-| data-parsers-lims-runs | S4 `config:edit` for catalog mutate | **Met**; list is any authenticated user. |
-| data-parsers-lims-runs | S5 parser audit | **Partial**. |
-| data-parsers-lims-runs | S6–S8 P2 AI | SOP uses server `ANTHROPIC_API_KEY` (S6 direction OK); not a full P2 close. |
-| process-and-experiment | RLS on new ELN tables | Policies + FORCE exist; **ineffective** for app superuser (this S1). |
-| run-results | RLS + lab-only publish | Publish permission checked; **RLS bypassed** (S1). `experiment:publish` not found in role-seed migrations (fail-closed). |
-| schema-evolution | RLS on new fields / schema admin blast | FieldDefinitions mutate is `config:edit`; isolation still S1. |
+| Packet | ID | Status |
+|--------|-----|--------|
+| experiment-template-entries | S1 grid/export cohort | **Mostly met** sample-scoped. Upsert of arbitrary `sample_id` **Met** on remediation branch (this S6). |
+| experiment-template-entries | S2 write-back allowlist | **Mostly met.** `specimen_biotype_id` dual-list still this S14. |
+| experiment-template-entries | S3 write-back only on submit | **Met.** |
+| experiment-template-entries | S4 aliquot txn / authz / amount | **Refuse Met** on remediation branch. Happy path residual Sec9. |
+| experiment-template-entries | S5 export ACL | **Met.** |
+| experiment-template-entries | S6 write-back map = experiment:manage | **Met.** |
+| experiment-template-entries | S7 audit submit/execute | **Partial.** |
+| data-parsers-lims-runs | S1–S2, S4 | **Met** (unchanged). |
+| data-parsers-lims-runs | S3 10 MB | **Open** on run `import-file`. |
+| process-and-experiment / run-results / schema-evolution | RLS | **Improved** under `lims_app` (this S1). S11 residuals remain. |
 
 ## Verdict
 
@@ -97,5 +89,5 @@ Until S1–S6 are fixed, do not treat this stack as production or as enforcing c
 |-------|--------|
 | **Verdict** | **Revise** |
 | **Date** | 2026-08-20 |
-| **Block production?** | **Yes** until S1–S6 |
-| **Reviewer** | Security (CSO posture), HEAD `6a21c947` |
+| **Block production?** | **Yes** until S3 live refuse-default and S5/Sec9 labtech execute |
+| **Reviewer** | CSO, UAT by Tobias, remediation branch `security/high-s1-s6` |
