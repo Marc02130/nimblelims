@@ -25,6 +25,7 @@ This implementation provides a complete authentication system for the NimbleLIMS
 - **RBAC**: 17 core permissions for granular access control (with additional permissions added in migrations)
 - **Token Validation**: Secure token verification with expiration
 - **Bootstrap**: `BOOTSTRAP_ADMIN_PASSWORD` for production admin create; `ALLOW_DEV_SEED_USERS` for local/demo temporary seeds
+- **DB roles (P0d)**: runtime `DATABASE_URL` → **`lims_app`** (non-superuser); migrations/ensure → **`MIGRATE_DATABASE_URL`** (owner `lims_user`). `start.sh` runs Alembic then `ensure_lims_app_role.py` (create-once password from `LIMS_APP_PASSWORD`; grants idempotent; rotate only with `ENSURE_LIMS_APP_PASSWORD_ROTATE=true`). RLS GUCs: `app.current_user_id` / `app.client_id` via `set_config(..., true)`
 
 ### 4. Core Permissions (17 total)
 ```

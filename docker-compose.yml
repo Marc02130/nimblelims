@@ -48,12 +48,15 @@ services:
       dockerfile: Dockerfile
     container_name: lims-backend
     environment:
-      DATABASE_URL: postgresql://lims_user:lims_password@db:5432/lims_db
+      # P0d: runtime app uses lims_app; migrations/ensure use owner lims_user
+      DATABASE_URL: postgresql://lims_app:lims_app_password@db:5432/lims_db
+      MIGRATE_DATABASE_URL: postgresql://lims_user:lims_password@db:5432/lims_db
+      LIMS_APP_PASSWORD: lims_app_password
       DB_HOST: db
       DB_PORT: 5432
       DB_NAME: lims_db
-      DB_USER: lims_user
-      DB_PASSWORD: lims_password
+      DB_USER: lims_app
+      DB_PASSWORD: lims_app_password
       # S3: app reads SECRET_KEY (JWT_SECRET_KEY accepted as alias). Local compose
       # allows the placeholder only because ALLOW_INSECURE_DEFAULTS=true.
       SECRET_KEY: your-secret-key-change-in-production

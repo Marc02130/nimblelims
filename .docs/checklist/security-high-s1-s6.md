@@ -41,11 +41,11 @@
 ## P0d — S1 app role
 
 - [x] Q1 decided (C)  
-- [ ] Entrypoint `ensure_lims_app_role` (create-once + idempotent grants; no password alter by default)  
-- [ ] Optional Alembic grants companion  
-- [ ] SET LOCAL / set_config GUCs on request  
-- [ ] Dual DATABASE_URL + `LIMS_APP_PASSWORD` in compose  
-- [ ] RLS tests as app role  
+- [x] Entrypoint `ensure_lims_app_role` (create-once + idempotent grants; no password alter by default)  
+- [x] Optional Alembic grants companion — skipped (ensure script authoritative)  
+- [x] `set_config(..., true)` RLS GUCs via `set_rls_context` + `after_begin`  
+- [x] Dual DATABASE_URL + `LIMS_APP_PASSWORD` in compose / env examples  
+- [x] Tests (`test_ensure_lims_app_role.py`)
 
 ## Docs / UAT / merge
 

@@ -10,8 +10,7 @@ import bcrypt
 from fastapi import HTTPException, status, Depends, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import text
-from app.database import get_db
+from app.database import get_db, set_rls_context
 from models.user import User, Role, Permission
 from app.schemas.auth import TokenData
 from app.core.config import SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES
@@ -195,7 +194,11 @@ def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    set_current_user_id(str(user.id), db)
+    set_current_user_id(
+        str(user.id),
+        db,
+        client_id=str(user.client_id) if getattr(user, "client_id", None) else None,
+    )
 
     must_change = bool(getattr(user, "must_change_password", False)) or token_data.must_change_password
     if must_change and not _path_allowed_during_password_change(request.url.path):
@@ -236,8 +239,6 @@ def require_permission(permission: str):
     return permission_checker
 
 
-def set_current_user_id(user_id: str, db: Session):
-    """Set current user ID in database session for RLS"""
-    # Use SET (session-level) not SET LOCAL (transaction-level)
-    db.execute(text(f"SET app.current_user_id = '{user_id}'"))
-    db.flush()
+def set_current_user_id(user_id: str, db: Session, client_id: Optional[str] = None):
+    """Set RLS GUCs for the current request (P0d — transaction-local via set_config)."""
+    set_rls_context(db, user_id=user_id, client_id=client_id)
