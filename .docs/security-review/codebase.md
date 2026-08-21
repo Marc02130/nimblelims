@@ -46,7 +46,7 @@ Until S1–S6 are fixed, do not treat this stack as production or as enforcing c
 
 | ID | Severity | Condition |
 |----|----------|-----------|
-| S1 | High | App must use a non-superuser, non-owner DB role so RLS/FORCE RLS apply. |
+| S1 | High | App must use a non-superuser, non-owner DB role so RLS/FORCE RLS apply. **Remediation on branch `security/high-s1-s6` (P0d):** `lims_app` + ensure script — verify on deploy before marking Met. |
 | S2 | High | bcrypt/argon2; do not seed well-known UAT passwords except explicit dev. |
 | S3 | High | Read one JWT secret env; refuse default. Compose sets `JWT_SECRET_KEY`; app reads `SECRET_KEY`. |
 | S4 | High | Stop logging request bodies. |
