@@ -33,10 +33,10 @@
 
 ## P0c — S5 aliquot + S6 cohort write
 
-- [ ] Entry cohort check on upsert / write-back  
-- [ ] Aliquot execute single transaction  
-- [ ] Source ∈ cohort; refuse null amount  
-- [ ] Tests  
+- [x] Entry cohort check on upsert / write-back  
+- [x] Aliquot execute single transaction (fail → rollback; no partial commit)  
+- [x] Source ∈ cohort; refuse null amount  
+- [x] Tests (`test_aliquot_plan.py`, `test_security_p0c_cohort.py`)
 
 ## P0d — S1 app role
 
