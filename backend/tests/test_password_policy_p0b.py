@@ -60,6 +60,25 @@ class TestComplexity:
         assert any("current" in e.lower() for e in errs)
 
 
+class TestInvalidTokenSub:
+    def test_invalid_uuid_sub_returns_401_not_500(self, client: TestClient, test_user):
+        """Forged/malformed sub must not 500 on UUID cast."""
+        from datetime import timedelta
+        from app.core.security import create_access_token
+
+        token = create_access_token(
+            {
+                "sub": "not-a-uuid",
+                "username": "x",
+                "role": "Lab Technician",
+                "permissions": [],
+            },
+            expires_delta=timedelta(minutes=5),
+        )
+        r = client.get("/auth/me", headers={"Authorization": f"Bearer {token}"})
+        assert r.status_code == 401, r.text
+
+
 class TestMustChangePassword:
     def test_login_returns_flag(self, client: TestClient, db_session: Session, test_user: User):
         test_user.must_change_password = True
