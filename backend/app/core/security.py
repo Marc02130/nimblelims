@@ -3,6 +3,7 @@ Security utilities for authentication and authorization
 """
 from datetime import datetime, timedelta
 from typing import Optional, List
+from uuid import UUID
 import jwt
 import hashlib
 import re
@@ -181,10 +182,20 @@ def get_current_user(
     token = credentials.credentials
     token_data = verify_token(token)
 
+    # Invalid sub must be 401 (not 500 from DB UUID cast)
+    try:
+        user_uuid = UUID(str(token_data.user_id))
+    except (ValueError, TypeError, AttributeError):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token payload",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
     user = (
         db.query(User)
         .options(joinedload(User.role))
-        .filter(User.id == token_data.user_id)
+        .filter(User.id == user_uuid)
         .first()
     )
     if user is None:
