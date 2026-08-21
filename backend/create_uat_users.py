@@ -23,15 +23,33 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+import os
+
 backend_dir = Path(__file__).parent
 sys.path.insert(0, str(backend_dir))
 
-from app.database import SessionLocal
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+
 from models.user import User, Role
 from models.client import Client
 from app.core.security import get_password_hash
 
 TEMP_PASSWORD = "UatTemp1!xxxx"
+
+
+def _session():
+    """
+    Prefer owner/migrator URL so RLS does not hide clients/users when no
+    app.current_user_id is set (runtime DATABASE_URL is lims_app).
+    """
+    url = (
+        os.getenv("MIGRATE_DATABASE_URL")
+        or os.getenv("DATABASE_URL")
+        or "postgresql://lims_user:lims_password@db:5432/lims_db"
+    )
+    engine = create_engine(url)
+    return sessionmaker(bind=engine)(), engine
 
 
 def _get_or_create_client(db, name: str) -> Client:
@@ -79,7 +97,7 @@ def _upsert_user(
 
 
 def main() -> None:
-    db = SessionLocal()
+    db, engine = _session()
     try:
         admin_role = db.query(Role).filter(Role.name == "Administrator").first()
         tech_role = db.query(Role).filter(Role.name == "Lab Technician").first()
@@ -157,6 +175,7 @@ def main() -> None:
         raise
     finally:
         db.close()
+        engine.dispose()
 
 
 if __name__ == "__main__":

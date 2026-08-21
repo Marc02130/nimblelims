@@ -61,7 +61,8 @@ LIMS_APP_PASSWORD=…
 If seed `admin` already completed must-change, create throwaway personas:
 
 ```bash
-docker compose exec lims-backend python create_uat_users.py
+# Service name is `backend` (container name is lims-backend)
+docker compose exec backend python create_uat_users.py
 ```
 
 | Username | Role / org | Password | Use for |
