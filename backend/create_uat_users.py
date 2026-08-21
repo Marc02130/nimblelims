@@ -15,20 +15,23 @@ Temporary password (all): UatTemp1!xxxx
   - Meets complexity; uat-admin still has must_change=true for TC-S2-001
 
 Usage:
-  docker compose exec lims-backend python create_uat_users.py
-  # or locally with DATABASE_URL / MIGRATE_DATABASE_URL set
+  docker compose exec backend python create_uat_users.py
 """
 from __future__ import annotations
 
-import sys
-from pathlib import Path
-
 import os
+import sys
+import warnings
+from pathlib import Path
+from uuid import UUID
 
 backend_dir = Path(__file__).parent
 sys.path.insert(0, str(backend_dir))
 
-from sqlalchemy import create_engine
+# Quiet noisy mapper overlap warnings for this one-shot script
+warnings.filterwarnings("ignore", category=Warning, module="sqlalchemy")
+
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 
 from models.user import User, Role
@@ -36,29 +39,56 @@ from models.client import Client
 from app.core.security import get_password_hash
 
 TEMP_PASSWORD = "UatTemp1!xxxx"
+SYSTEM_CLIENT_ID = UUID("00000000-0000-0000-0000-000000000001")
 
 
-def _session():
+def _owner_url() -> str:
     """
     Prefer owner/migrator URL so RLS does not hide clients/users when no
     app.current_user_id is set (runtime DATABASE_URL is lims_app).
     """
-    url = (
+    return (
         os.getenv("MIGRATE_DATABASE_URL")
         or os.getenv("DATABASE_URL")
         or "postgresql://lims_user:lims_password@db:5432/lims_db"
     )
+
+
+def _session():
+    url = _owner_url()
+    host = url.split("@")[-1] if "@" in url else url
+    user = "unknown"
+    if "://" in url and "@" in url:
+        user = url.split("://", 1)[1].split(":", 1)[0]
+    print(f"Connecting as DB user '{user}' → {host}")
+    if user == "lims_app":
+        print(
+            "WARNING: connected as lims_app — RLS may hide clients. "
+            "Set MIGRATE_DATABASE_URL to lims_user for this script."
+        )
     engine = create_engine(url)
     return sessionmaker(bind=engine)(), engine
 
 
-def _get_or_create_client(db, name: str) -> Client:
+def _get_or_create_client(db, name: str, *, client_id: UUID | None = None) -> Client:
     c = db.query(Client).filter(Client.name == name).first()
     if c:
         return c
-    c = Client(name=name, description=f"UAT throwaway org ({name})", active=True)
+    kwargs = {
+        "name": name,
+        "description": f"UAT / system client ({name})",
+        "active": True,
+    }
+    if client_id is not None:
+        kwargs["id"] = client_id
+    # billing_info required on some schemas
+    try:
+        c = Client(**kwargs, billing_info={})
+    except TypeError:
+        c = Client(**kwargs)
     db.add(c)
     db.flush()
+    print(f"Created client: {name}")
     return c
 
 
@@ -99,6 +129,11 @@ def _upsert_user(
 def main() -> None:
     db, engine = _session()
     try:
+        # Sanity: can we see anything at all?
+        role_count = db.execute(text("SELECT count(*) FROM roles")).scalar()
+        client_count = db.execute(text("SELECT count(*) FROM clients")).scalar()
+        print(f"DB visible: roles={role_count}, clients={client_count}")
+
         admin_role = db.query(Role).filter(Role.name == "Administrator").first()
         tech_role = db.query(Role).filter(Role.name == "Lab Technician").first()
         client_role = db.query(Role).filter(Role.name == "Client").first()
@@ -108,13 +143,11 @@ def main() -> None:
         if not client_role:
             print("WARNING: Client role missing — skipping uat-client-a/b")
 
-        system = (
-            db.query(Client).filter(Client.name == "System").first()
-            or db.query(Client).first()
-        )
+        system = db.query(Client).filter(Client.name == "System").first()
         if not system:
-            print("ERROR: No clients found. Run migrations/seeds first.")
-            sys.exit(1)
+            system = db.query(Client).filter(Client.id == SYSTEM_CLIENT_ID).first()
+        if not system:
+            system = _get_or_create_client(db, "System", client_id=SYSTEM_CLIENT_ID)
 
         _upsert_user(
             db,
