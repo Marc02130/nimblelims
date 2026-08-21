@@ -23,7 +23,7 @@
 | S2 | bcrypt + must-change + complexity | **Met.** |
 | S3 | JWT secret; refuse default | **Met.** TC-S3-001 step 2: backend Exited 1 on default JWT. TC-S3-002: forged default-secret token → 401. TC-PROD-001 passed. Pytest complement 24 passed. |
 | S4 | No request body logging | **Met.** |
-| S5 | Aliquot execute cohort + null amount + txn | **Refuse Met.** Labtech happy path **500** RLS on `INSERT containers` (Sec9). Admin execute 200. |
+| S5 | Aliquot execute cohort + null amount + txn | **Met** (refuse + Sec9). Migration `0062` allows container INSERT when `created_by = current_user_id()`; RLS → 403 not 500. |
 | S6 | Entry upsert/write-back cohort only | **Met.** |
 
 `create_admin.py` ImportError if run as a script on this image is a quality nit, fail-closed, not a High.
@@ -33,7 +33,7 @@
 | Threat | Control after restamp |
 |--------|------------------------|
 | Spoofing | S2 Met. S3 refuse-default proven live. |
-| Tampering | S6 Met. S5 refuse Met; labtech execute 500 (Sec9). |
+| Tampering | S6 Met. S5 Met (refuse + Sec9 container INSERT policy). |
 | Repudiation | Unchanged this cycle |
 | Info disclosure | S4 Met. S1 isolation felt under `lims_app`. |
 | DoS | Out of scope (S8 Med) |
@@ -48,7 +48,7 @@
 | **Sec3** | High | Login must not log plaintext passwords. **Met.** |
 | **Sec4** | High | Cohort checks server-side only. **Met** (S6). |
 | **Sec5** | High | Aliquot execute: source ∈ cohort and `experiment:manage` retained. Refuse **Met.** |
-| **Sec9** | High | Lab Technician with `experiment:manage` must complete aliquot execute happy path. `INSERT containers` must be allowed or **403**, never **500**. Fail-closed today. Not holding this packet. |
+| **Sec9** | High | Lab Technician with `experiment:manage` aliquot execute happy path. **Fixed** in `0062` (`created_by = current_user_id()` on containers policy) + execute maps RLS to **403**. |
 | **Sec6** | Med | Align docs that claimed RLS before S1 (S10 hygiene). |
 | **Sec7** | Med | Do not claim the whole product production-ready until Sec9 and remaining codebase Med (S7–S15) are closed. |
 | **Sec8** | High | Must-change-password server-side + complexity. **Met.** |
@@ -63,7 +63,7 @@ S7–S15 remain open on codebase.md. This stamp does not merge `security/high-s1
 |-------|--------|
 | **Verdict** | **Accept with conditions** |
 | **Date** | 2026-08-21 |
-| **Hold S1–S6 packet?** | **No.** Residual is Sec9 only. |
+| **Hold S1–S6 packet?** | **No.** Sec9 closed via `0062` (verify live labtech execute after migrate). |
 | **Reviewer** | CSO, UAT by Tobias @ `d97e756` / [PR 41](https://github.com/Marc02130/nimblelims/pull/41) |
 | **Deep `/cso`** | skipped |
 
