@@ -49,9 +49,10 @@
 
 ## Docs / UAT / merge
 
-- [ ] manuals/backend-auth + README security claims  
+- [x] manuals/backend-auth (+ env examples)  
+- [ ] README security claims polish (optional before merge)  
 - [ ] Update codebase.md S1–S6 status after ship  
-- [ ] `UAT_Scripts/uat-security-high-s1-s6.md`  
+- [x] `UAT_Scripts/uat-security-high-s1-s6.md`  
 - [ ] Dogfood local compose  
 - [ ] UAT pass  
 - [ ] Merge to `main`  
