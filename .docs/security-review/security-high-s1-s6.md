@@ -5,7 +5,7 @@
 **Packet:** Remediation of [codebase.md](codebase.md) High findings  
 **Requirements:** [`.docs/requirements/security-high-s1-s6.md`](../requirements/security-high-s1-s6.md)  
 **Tech sketch:** [`.docs/tech-sketch/security-high-s1-s6.md`](../tech-sketch/security-high-s1-s6.md)  
-**UAT:** [`UAT_Scripts/uat-security-high-s1-s6.md`](../../UAT_Scripts/uat-security-high-s1-s6.md) (Tobias restamp, 2026-08-21, Accept with conditions)  
+**UAT:** [`UAT_Scripts/uat-security-high-s1-s6.md`](../../UAT_Scripts/uat-security-high-s1-s6.md) ([PR 41](https://github.com/Marc02130/nimblelims/pull/41), Tobias restamp, Accept with conditions)  
 **Scope:** Post-implement stamp of `security/high-s1-s6` @ `d97e756`. Not a product-wide production sign-off. DEEP CSO: skipped.
 
 ## Relationship to codebase audit
@@ -19,7 +19,7 @@
 
 | ID | Theme | Status |
 |----|--------|--------|
-| S1 | `lims_app` so RLS applies | **Met with residual.** Isolation passed. |
+| S1 | `lims_app` so RLS applies | **Met.** Isolation passed. Restart-twice confirmed (TC-S1-001). |
 | S2 | bcrypt + must-change + complexity | **Met.** |
 | S3 | JWT secret; refuse default | **Met.** TC-S3-001 step 2: backend Exited 1 on default JWT. TC-S3-002: forged default-secret token → 401. TC-PROD-001 passed. Pytest complement 24 passed. |
 | S4 | No request body logging | **Met.** |
@@ -64,7 +64,7 @@ S7–S15 remain open on codebase.md. This stamp does not merge `security/high-s1
 | **Verdict** | **Accept with conditions** |
 | **Date** | 2026-08-21 |
 | **Hold S1–S6 packet?** | **No.** Residual is Sec9 only. |
-| **Reviewer** | CSO, UAT by Tobias @ `d97e756` |
+| **Reviewer** | CSO, UAT by Tobias @ `d97e756` / [PR 41](https://github.com/Marc02130/nimblelims/pull/41) |
 | **Deep `/cso`** | skipped |
 
 SECURITY REVIEW: Accept with conditions  
