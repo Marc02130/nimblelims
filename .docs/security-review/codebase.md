@@ -3,7 +3,8 @@
 **Date:** 2026-08-21  
 **Status:** Revise  
 **Tech sketch:** n/a — shipped tree, not a feature packet  
-**Remediation packet (High S1–S6):** [requirements/security-high-s1-s6.md](../requirements/security-high-s1-s6.md) · [security-review/security-high-s1-s6.md](security-high-s1-s6.md) · branch `security/high-s1-s6` @ `1d3762a`  
+**Remediation packet (High S1–S6):** [requirements/security-high-s1-s6.md](../requirements/security-high-s1-s6.md) · [security-review/security-high-s1-s6.md](security-high-s1-s6.md) · branch `security/high-s1-s6` @ `1d3762a` — **Accept**  
+**Remediation packet (Med/Low S7–S15):** [requirements/security-med-low-s7-s15.md](../requirements/security-med-low-s7-s15.md) · [security-review/security-med-low-s7-s15.md](security-med-low-s7-s15.md) · branch `security/med-low-s7-s15` — **In review**  
 **Related reviews:** [data-parsers-lims-runs](data-parsers-lims-runs.md) · [experiment-template-entries](experiment-template-entries.md) · [process-and-experiment](process-and-experiment.md) · [run-results](run-results.md) · [schema-evolution](schema-evolution.md)  
 **Scope:** STRIDE over HEAD `6a21c947`, plus Tobias live UAT of `security/high-s1-s6` through Sec9 @ `1d3762a`. DEEP CSO: skipped.
 
@@ -11,7 +12,7 @@
 
 The original audit (HEAD `6a21c947`) found the app connected as the Postgres superuser, seeded SHA256 defaults, a JWT env mismatch, body logging, unbound aliquot execute, and write-back by raw `sample_id`.
 
-Tobias live UAT on `security/high-s1-s6` @ `1d3762a`: **S1–S6 Met**, including Sec9 (labtech TC-S5-004 200 after 0062). The High packet is **Accept**. This stamp does **not** merge the remediation to `main` and does not make the whole product production-ready. S7–S15 stay open. Med follow-on: 0062 `created_by` is FOR ALL (Sec10 on the packet).
+Tobias live UAT on `security/high-s1-s6` @ `1d3762a`: **S1–S6 Met**, including Sec9 (labtech TC-S5-004 200 after 0062). The High packet is **Accept**. This stamp does **not** merge the remediation to `main` and does not make the whole product production-ready. **S7–S15** stay Open — tracked in packet **security-med-low-s7-s15** (phased P1–P4). Med residual note: 0062 `created_by` FOR ALL → OQ-S11a in that packet.
 
 ## Surface delta
 
