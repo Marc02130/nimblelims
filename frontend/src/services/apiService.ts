@@ -138,23 +138,44 @@ export interface BatchCompatibilityResult {
   warnings?: BatchCompatibilityWarning[];
 }
 
+/** Read a non-httpOnly cookie (CSRF double-submit). */
+function readCookie(name: string): string | null {
+  if (typeof document === 'undefined') return null;
+  const escaped = name.replace(/([.$?*|{}()[\]\\/+^])/g, '\\$1');
+  const match = document.cookie.match(new RegExp(`(?:^|; )${escaped}=([^;]*)`));
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
+const CSRF_COOKIE = 'nimble_csrf';
+const CSRF_HEADER = 'X-CSRF-Token';
+const MUTATING = new Set(['post', 'put', 'patch', 'delete']);
+
 export class ApiService {
   private api: AxiosInstance;
 
   constructor() {
+    // P4 / S10: cookie session via credentials; no localStorage JWT
     this.api = axios.create({
       baseURL: API_BASE_URL,
+      withCredentials: true,
       headers: {
         'Content-Type': 'application/json',
       },
     });
 
-    // Request interceptor: auth token + multipart FormData handling
+    // Request interceptor: CSRF for cookie auth + multipart FormData handling
     this.api.interceptors.request.use(
       (config) => {
-        const token = localStorage.getItem('token');
-        if (token) {
-          config.headers.Authorization = `Bearer ${token}`;
+        const method = (config.method || 'get').toLowerCase();
+        if (MUTATING.has(method)) {
+          const csrf = readCookie(CSRF_COOKIE);
+          if (csrf) {
+            if (config.headers && typeof (config.headers as any).set === 'function') {
+              (config.headers as any).set(CSRF_HEADER, csrf);
+            } else if (config.headers) {
+              (config.headers as any)[CSRF_HEADER] = csrf;
+            }
+          }
         }
         // Default Content-Type is application/json. For FormData the browser must set
         // multipart/form-data WITH boundary — otherwise FastAPI returns 422 on File/Form.
@@ -179,23 +200,33 @@ export class ApiService {
       (error) => {
         // Don't auto-redirect on 401 during login - let the login page handle it
         if (error.response?.status === 401 && !error.config?.url?.includes('/auth/login')) {
-          localStorage.removeItem('token');
-          // Only redirect if not already on login page
+          // Clear legacy token if present (migration from pre-P4)
+          try {
+            localStorage.removeItem('token');
+          } catch {
+            /* ignore */
+          }
           if (window.location.pathname !== '/login') {
             window.location.href = '/login';
           }
+        }
+        // Q7: constrained session until password change — let UI handle (no logout)
+        if (
+          error.response?.status === 403 &&
+          error.response?.data?.detail?.code === 'password_change_required'
+        ) {
+          return Promise.reject(error);
         }
         return Promise.reject(error);
       }
     );
   }
 
-  setAuthToken(token: string | null) {
-    if (token) {
-      this.api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-    } else {
-      delete this.api.defaults.headers.common['Authorization'];
-    }
+  /**
+   * @deprecated P4 cookie AuthN — SPA must not stash JWTs. Kept as no-op for tests.
+   */
+  setAuthToken(_token: string | null) {
+    // Intentionally empty: auth is httpOnly cookie + credentials
   }
 
   // Auth endpoints
@@ -204,7 +235,39 @@ export class ApiService {
       username,
       password,
     });
+    // Drop any legacy localStorage JWT — cookie is SoT for SPA
+    try {
+      localStorage.removeItem('token');
+    } catch {
+      /* ignore */
+    }
     return response.data;
+  }
+
+  async changePassword(currentPassword: string, newPassword: string) {
+    const response: AxiosResponse = await this.api.post('/auth/change-password', {
+      current_password: currentPassword,
+      new_password: newPassword,
+    });
+    try {
+      localStorage.removeItem('token');
+    } catch {
+      /* ignore */
+    }
+    return response.data;
+  }
+
+  async logout() {
+    try {
+      await this.api.post('/auth/logout');
+    } catch {
+      // Still clear client state even if logout request fails
+    }
+    try {
+      localStorage.removeItem('token');
+    } catch {
+      /* ignore */
+    }
   }
 
   async getCurrentUser() {

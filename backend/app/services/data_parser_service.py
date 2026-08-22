@@ -24,8 +24,10 @@ from models.flexible_experiment import DataParser, ParserAnalysis, ParserSetupFi
 from models.instrument import CroSource, Instrument
 from models.user import User
 
+from app.core.uploads import MAX_UPLOAD_FILE_BYTES
+
 MAX_SETUP_FILES = 10
-MAX_SETUP_FILE_BYTES = 10 * 1024 * 1024
+MAX_SETUP_FILE_BYTES = MAX_UPLOAD_FILE_BYTES  # S8 parity
 
 
 class DataParserService:

@@ -71,8 +71,28 @@ class TestAliquotMethods:
 
 
 class TestAliquotPlanExecute:
+    def _link_cohort(self, db_session, experiment_id, sample_id, user_id):
+        from models.experiment import ExperimentSampleExecution
+
+        db_session.add(
+            ExperimentSampleExecution(
+                experiment_id=experiment_id,
+                sample_id=sample_id,
+                created_by=user_id,
+                modified_by=user_id,
+            )
+        )
+        db_session.commit()
+
     def _seed_sample_with_content(
-        self, db_session, test_admin_user, test_org, amount=100.0
+        self,
+        db_session,
+        test_admin_user,
+        test_org,
+        amount=100.0,
+        *,
+        experiment_id=None,
+        amount_null=False,
     ):
         from models.sample import Sample
         from models.list import List, ListEntry
@@ -144,18 +164,23 @@ class TestAliquotPlanExecute:
             Contents(
                 container_id=tube.id,
                 sample_id=sample.id,
-                amount=Decimal(str(amount)),
+                amount=None if amount_null else Decimal(str(amount)),
                 concentration=Decimal("10"),
             )
         )
         db_session.commit()
+        if experiment_id is not None:
+            self._link_cohort(
+                db_session, experiment_id, sample.id, test_admin_user.id
+            )
         return sample, tube, ctype
 
     def test_method_resolve_by_volume_dry_run(
         self, client, auth_headers, plan_entry, db_session, test_admin_user, test_org
     ):
+        exp_id = plan_entry["experiment"]["id"]
         sample, tube, ctype = self._seed_sample_with_content(
-            db_session, test_admin_user, test_org
+            db_session, test_admin_user, test_org, experiment_id=exp_id
         )
         entry_id = plan_entry["entry"]["id"]
         # volume 2, conc 10 → mass 20
@@ -188,8 +213,9 @@ class TestAliquotPlanExecute:
         from models.container import Contents
         from models.sample import Sample
 
+        exp_id = plan_entry["experiment"]["id"]
         sample, tube, ctype = self._seed_sample_with_content(
-            db_session, test_admin_user, test_org, amount=50.0
+            db_session, test_admin_user, test_org, amount=50.0, experiment_id=exp_id
         )
         entry_id = plan_entry["entry"]["id"]
 
@@ -239,8 +265,9 @@ class TestAliquotPlanExecute:
     def test_insufficient_amount(
         self, client, auth_headers, plan_entry, db_session, test_admin_user, test_org
     ):
+        exp_id = plan_entry["experiment"]["id"]
         sample, tube, ctype = self._seed_sample_with_content(
-            db_session, test_admin_user, test_org, amount=5.0
+            db_session, test_admin_user, test_org, amount=5.0, experiment_id=exp_id
         )
         entry_id = plan_entry["entry"]["id"]
         r = client.post(
@@ -258,6 +285,62 @@ class TestAliquotPlanExecute:
             },
             headers=auth_headers,
         )
-        assert r.status_code == 200, r.text
-        assert r.json()["error_count"] == 1
-        assert "Insufficient" in (r.json()["results"][0]["message"] or "")
+        # S5: fail closed — entire execute rolls back (no partial result payload)
+        assert r.status_code == 400, r.text
+        detail = r.json()["detail"]
+        assert "Insufficient" in str(detail)
+
+    def test_source_not_in_cohort_refused(
+        self, client, auth_headers, plan_entry, db_session, test_admin_user, test_org
+    ):
+        sample, tube, ctype = self._seed_sample_with_content(
+            db_session, test_admin_user, test_org, amount=50.0
+        )
+        entry_id = plan_entry["entry"]["id"]
+        r = client.post(
+            f"/v1/entries/{entry_id}/execute",
+            json={
+                "lines": [
+                    {
+                        "method": "by_mass",
+                        "source_sample_id": str(sample.id),
+                        "source_container_id": str(tube.id),
+                        "amount": 5,
+                        "dest_container_type_id": str(ctype.id),
+                    }
+                ]
+            },
+            headers=auth_headers,
+        )
+        assert r.status_code == 400, r.text
+        assert r.json()["detail"]["code"] == "source_not_in_cohort"
+
+    def test_null_source_amount_refused(
+        self, client, auth_headers, plan_entry, db_session, test_admin_user, test_org
+    ):
+        exp_id = plan_entry["experiment"]["id"]
+        sample, tube, ctype = self._seed_sample_with_content(
+            db_session,
+            test_admin_user,
+            test_org,
+            experiment_id=exp_id,
+            amount_null=True,
+        )
+        entry_id = plan_entry["entry"]["id"]
+        r = client.post(
+            f"/v1/entries/{entry_id}/execute",
+            json={
+                "lines": [
+                    {
+                        "method": "by_mass",
+                        "source_sample_id": str(sample.id),
+                        "source_container_id": str(tube.id),
+                        "amount": 5,
+                        "dest_container_type_id": str(ctype.id),
+                    }
+                ]
+            },
+            headers=auth_headers,
+        )
+        assert r.status_code == 400, r.text
+        assert r.json()["detail"]["code"] == "source_amount_null"

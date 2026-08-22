@@ -452,9 +452,9 @@ class ExperimentService:
                     "Cancel/restart or create a new experiment to change samples."
                 ),
             )
-        sample = self.repo.get_sample_by_id(data.sample_id)
-        if not sample:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sample not found")
+        from app.services.sample_access import require_accessible_sample
+
+        sample = require_accessible_sample(self.db, data.sample_id)
         process_step = self._process_step_for_experiment(experiment_id)
         process_id = process_step.process_id if process_step else None
         ok, reason = self.check_sample_eligibility(sample, process_id=process_id)
@@ -612,15 +612,13 @@ class ExperimentService:
         process_step = self._process_step_for_experiment(experiment_id)
         process_id = process_step.process_id if process_step else None
 
+        from app.services.sample_access import require_accessible_sample
+
         linked = 0
         already = 0
         for sid in sample_ids:
-            sample = self.repo.get_sample_by_id(sid)
-            if not sample:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail=f"Sample {sid} not found",
-                )
+            # S7: RLS + has_project_access — not merely "row exists"
+            sample = require_accessible_sample(self.db, sid)
             ok, reason = self.check_sample_eligibility(sample, process_id=process_id)
             if not ok:
                 raise HTTPException(

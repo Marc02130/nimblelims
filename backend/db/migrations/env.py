@@ -33,10 +33,13 @@ target_metadata = Base.metadata
 
 
 def get_url():
-    """Get database URL from environment variables or config."""
-    return os.getenv(
+    """Get database URL from environment variables or config.
+
+    Prefer MIGRATE_DATABASE_URL (owner) so Alembic never runs as lims_app (P0d).
+    """
+    return os.getenv("MIGRATE_DATABASE_URL") or os.getenv(
         "DATABASE_URL",
-        "postgresql://lims_user:lims_password@localhost:5432/lims_db"
+        "postgresql://lims_user:lims_password@localhost:5432/lims_db",
     )
 
 

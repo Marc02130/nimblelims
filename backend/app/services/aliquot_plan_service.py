@@ -15,6 +15,7 @@ from decimal import Decimal
 from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import DBAPIError, IntegrityError, ProgrammingError
 from fastapi import HTTPException, status
 
 from app.schemas.aliquot_plan import (
@@ -33,6 +34,7 @@ from models.sample import Sample
 from models.container import Container, Contents, ContainerType
 from models.user import User
 from models.list import ListEntry, List as ListModel
+from models.experiment import ExperimentSampleExecution
 
 
 class AliquotPlanService:
@@ -196,7 +198,22 @@ class AliquotPlanService:
             warnings=warnings,
         )
 
+    def _experiment_cohort_ids(self, experiment_id: UUID) -> set:
+        rows = (
+            self.db.query(ExperimentSampleExecution.sample_id)
+            .filter(ExperimentSampleExecution.experiment_id == experiment_id)
+            .all()
+        )
+        return {r[0] for r in rows if r[0]}
+
     def execute(self, entry_id: UUID, data: AliquotExecuteRequest) -> AliquotExecuteResponse:
+        """
+        Execute aliquot/pool plan.
+
+        S5: one transaction for real execute (any failure rolls back);
+        every source_sample_id must be in the experiment cohort;
+        null source contents.amount is refused.
+        """
         entry = self._get_plan_entry(entry_id)
         if data.lines is not None:
             plan_lines = data.lines
@@ -206,14 +223,30 @@ class AliquotPlanService:
         if not plan_lines:
             raise HTTPException(400, detail="No plan lines to execute")
 
+        cohort = self._experiment_cohort_ids(entry.experiment_id)
+        # S5: all sources must be on the experiment cohort (before mutations)
+        for line in plan_lines:
+            if line.source_sample_id not in cohort:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail={
+                        "code": "source_not_in_cohort",
+                        "message": (
+                            f"source_sample_id {line.source_sample_id} is not in the "
+                            f"experiment cohort ({entry.experiment_id})"
+                        ),
+                        "line_id": line.line_id,
+                    },
+                )
+
         results: List[AliquotExecuteLineResult] = []
-        # Pre-resolve all lines
+        resolve_errors: List[AliquotExecuteLineResult] = []
         resolved: List[ResolvedTransfer] = []
         for line in plan_lines:
             try:
                 resolved.append(self.resolve_line(line))
             except HTTPException as e:
-                results.append(AliquotExecuteLineResult(
+                resolve_errors.append(AliquotExecuteLineResult(
                     line_id=line.line_id,
                     source_sample_id=line.source_sample_id,
                     transfer_amount=0,
@@ -222,6 +255,7 @@ class AliquotPlanService:
                 ))
 
         if data.dry_run:
+            results.extend(resolve_errors)
             for r in resolved:
                 results.append(AliquotExecuteLineResult(
                     line_id=r.line_id,
@@ -240,11 +274,29 @@ class AliquotPlanService:
                 error_count=sum(1 for x in results if x.status == "error"),
             )
 
-        # Group by pool_group for multi-content dest
-        pool_containers: Dict[str, UUID] = {}
+        # Real execute: fail closed if any line cannot resolve — no partial commit (S5)
+        if resolve_errors:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={
+                    "code": "aliquot_resolve_failed",
+                    "message": "One or more plan lines failed to resolve; nothing executed",
+                    "errors": [x.model_dump(mode="json") for x in resolve_errors],
+                },
+            )
 
-        for r in resolved:
-            try:
+        if not self._user_id():
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={
+                    "code": "auth_required",
+                    "message": "Authenticated user required to execute aliquot plan",
+                },
+            )
+
+        pool_containers: Dict[str, UUID] = {}
+        try:
+            for r in resolved:
                 dest_sample, dest_c = self._execute_transfer(r, pool_containers)
                 results.append(AliquotExecuteLineResult(
                     line_id=r.line_id,
@@ -257,31 +309,42 @@ class AliquotPlanService:
                     status="ok",
                     message="; ".join(r.warnings) if r.warnings else None,
                 ))
-            except HTTPException as e:
-                results.append(AliquotExecuteLineResult(
-                    line_id=r.line_id,
-                    source_sample_id=r.source_sample_id,
-                    transfer_amount=r.transfer_amount,
-                    status="error",
-                    message=str(e.detail),
-                ))
-            except Exception as e:
-                results.append(AliquotExecuteLineResult(
-                    line_id=r.line_id,
-                    source_sample_id=r.source_sample_id,
-                    transfer_amount=r.transfer_amount,
-                    status="error",
-                    message=str(e),
-                ))
 
-        cfg = dict(entry.config or {})
-        cfg["last_execute_at"] = datetime.now(timezone.utc).isoformat()
-        cfg["last_execute_results"] = [x.model_dump(mode="json") for x in results]
-        entry.config = cfg
-        entry.modified_by = self._user_id()
-        self.db.flush()
-        if self.auto_commit:
-            self.db.commit()
+            cfg = dict(entry.config or {})
+            cfg["last_execute_at"] = datetime.now(timezone.utc).isoformat()
+            cfg["last_execute_results"] = [x.model_dump(mode="json") for x in results]
+            entry.config = cfg
+            entry.modified_by = self._user_id()
+            self.db.flush()
+            if self.auto_commit:
+                self.db.commit()
+        except HTTPException:
+            self.db.rollback()
+            raise
+        except (IntegrityError, ProgrammingError, DBAPIError) as e:
+            self.db.rollback()
+            orig = str(getattr(e, "orig", e)).lower()
+            if (
+                "row-level security" in orig
+                or "insufficient_privilege" in orig
+                or "permission denied" in orig
+            ):
+                # Sec9: never surface RLS as 500
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail={
+                        "code": "rls_denied",
+                        "message": (
+                            "Database policy denied creating aliquot destination "
+                            "(containers/samples). Ensure created_by is set and "
+                            "project access is valid."
+                        ),
+                    },
+                ) from e
+            raise
+        except Exception:
+            self.db.rollback()
+            raise
 
         return AliquotExecuteResponse(
             entry_id=entry_id,
@@ -346,8 +409,20 @@ class AliquotPlanService:
             raise HTTPException(404, detail=f"Source sample {r.source_sample_id} not found")
 
         content = self._find_source_content(r.source_sample_id, r.source_container_id)
-        current = float(content.amount) if content.amount is not None else None
-        if current is not None and r.transfer_amount > current:
+        # S5: refuse null source amount (no silent create-dest-without-debit)
+        if content.amount is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={
+                    "code": "source_amount_null",
+                    "message": (
+                        f"Source contents amount is null for sample {r.source_sample_id}; "
+                        "set a tracked amount before execute"
+                    ),
+                },
+            )
+        current = float(content.amount)
+        if r.transfer_amount > current:
             raise HTTPException(
                 400,
                 detail=(
@@ -355,9 +430,7 @@ class AliquotPlanService:
                     f"need {r.transfer_amount}"
                 ),
             )
-        if current is not None:
-            content.amount = Decimal(str(current - r.transfer_amount))
-        # If amount was null, still create dest (lab may not track source amount yet)
+        content.amount = Decimal(str(current - r.transfer_amount))
 
         # Destination container
         dest_c: Optional[Container] = None

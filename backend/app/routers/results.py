@@ -24,6 +24,7 @@ from app.schemas.batch import BatchResponse, BatchContainerResponse
 from app.core.rbac import (
     require_result_enter, require_result_read, require_result_update,
     require_result_delete, require_result_review, require_permission,
+    require_any_permission,
     validate_client_access
 )
 from app.core.security import get_current_user
@@ -578,10 +579,14 @@ async def enter_batch_results_us28(
 @router.post("/validate", response_model=ResultValidationResponse)
 async def validate_result(
     validation_data: ResultValidationRequest,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(
+        require_any_permission(["result:enter", "result:review"])
+    ),
 ):
     """
     Validate a result against analysis_analytes rules.
+    Requires authentication and result:enter or result:review (S9).
     """
     # Get analysis_analytes configuration
     analysis_analyte = db.query(AnalysisAnalyte).filter(

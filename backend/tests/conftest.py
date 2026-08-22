@@ -3,6 +3,12 @@ Pytest configuration and fixtures.
 Uses testcontainers-python (PostgreSQL 15) to prevent SQLite/JSONB divergence.
 """
 import os
+
+# S3: allow tests to import app.core.config before any other imports
+os.environ.setdefault("ENVIRONMENT", "test")
+os.environ.setdefault("ALLOW_INSECURE_DEFAULTS", "true")
+os.environ.setdefault("SECRET_KEY", "pytest-secret-key-not-for-production")
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, text
@@ -186,6 +192,7 @@ def test_user(db_session, test_org):
         password_hash=get_password_hash("testpassword"),
         role_id=test_role.id,
         client_id=test_org.id,
+        must_change_password=False,
     )
     db_session.add(user)
     db_session.commit()
@@ -223,6 +230,7 @@ def test_admin_user(db_session, test_org):
         password_hash=get_password_hash("adminpassword"),
         role_id=admin_role.id,
         client_id=test_org.id,
+        must_change_password=False,
     )
     db_session.add(admin_user)
     db_session.commit()

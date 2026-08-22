@@ -20,11 +20,12 @@ router = APIRouter()
 
 @router.get("", response_model=List[PermissionResponse])
 async def get_permissions(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_any_permission(["user:manage", "config:edit"])),
     db: Session = Depends(get_db)
 ):
     """
     Get all active permissions.
+    Requires user:manage or config:edit (S13).
     """
     permissions = db.query(Permission).filter(Permission.active == True).order_by(Permission.name).all()
     return [PermissionResponse.from_orm(perm) for perm in permissions]

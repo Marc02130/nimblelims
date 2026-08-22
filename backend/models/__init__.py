@@ -3,6 +3,8 @@ from .base import Base
 
 # Import all models
 from .user import User, Role, Permission
+from .login_throttle import LoginThrottle
+from .revoked_token import RevokedToken
 from .client import Client, Location, Person, PeopleLocation, ContactMethod, ClientProject
 from .project import Project, ProjectUser
 from .sample import Sample
