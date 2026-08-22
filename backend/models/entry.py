@@ -81,10 +81,9 @@ SAMPLE_SYSTEM_FIELDS = {
 }
 
 # Experiment-mutable Sample columns eligible for write-back on entry submit
-# (identity/accessioning fields excluded; config may expand later via FieldDefinition flags)
+# (identity/accessioning + system display fields excluded — S14 / OQ-S14)
+# specimen_biotype_id and temperature stay in SAMPLE_SYSTEM_FIELDS (RO display only)
 SAMPLE_WRITE_BACK_COLUMNS = frozenset({
-    'specimen_biotype_id',
-    'temperature',
     'due_date',
     'report_date',
 })

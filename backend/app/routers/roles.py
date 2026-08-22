@@ -26,11 +26,12 @@ router = APIRouter()
 # Roles endpoints
 @router.get("", response_model=List[RoleResponse])
 async def get_roles(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_any_permission(["user:manage", "config:edit"])),
     db: Session = Depends(get_db)
 ):
     """
     Get all active roles.
+    Requires user:manage or config:edit (S13).
     """
     roles = db.query(Role).filter(Role.active == True).order_by(Role.name).all()
     return [RoleResponse.from_orm(role) for role in roles]
