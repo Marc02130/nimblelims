@@ -235,15 +235,12 @@ class LimsRunService:
                         "Cancel and create a new run to change samples."
                     ),
                 )
-            from models.sample import Sample
             from datetime import datetime, timezone
+            from app.services.sample_access import require_accessible_sample
 
             for sid in sample_ids:
-                if not self.db.query(Sample.id).filter(Sample.id == sid).first():
-                    raise HTTPException(
-                        status_code=status.HTTP_404_NOT_FOUND,
-                        detail=f"Sample {sid} not found",
-                    )
+                # S7: accessible under current session (RLS / project), not mere existence
+                require_accessible_sample(self.db, sid)
             run.cohort = {
                 "sample_ids": ids,
                 "locked_at": datetime.now(timezone.utc).isoformat(),
@@ -292,8 +289,8 @@ class LimsRunService:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Cohort is locked",
             )
-        from models.sample import Sample
         from datetime import datetime, timezone
+        from app.services.sample_access import require_accessible_sample
 
         seen = set()
         ids: List[str] = []
@@ -302,11 +299,7 @@ class LimsRunService:
             if s not in seen:
                 seen.add(s)
                 ids.append(s)
-            if not self.db.query(Sample.id).filter(Sample.id == sid).first():
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail=f"Sample {sid} not found",
-                )
+            require_accessible_sample(self.db, sid)
         if not ids:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,

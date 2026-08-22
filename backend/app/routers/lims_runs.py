@@ -241,7 +241,9 @@ async def import_file(
     Multipart import: file + instrument_id XOR cro_source_id + optional parser_id.
     Uses active data parser for run.analysis_id + source.
     """
-    content = await file.read()
+    from app.core.uploads import read_upload_capped
+
+    content = await read_upload_capped(file, field_name=file.filename or "import-file")
     return service.import_file(
         run_id,
         content,

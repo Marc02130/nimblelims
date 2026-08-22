@@ -17,10 +17,10 @@ def run_migrations():
     # Set up Alembic configuration
     alembic_cfg = Config("alembic.ini")
     
-    # Set database URL from environment or use default
-    database_url = os.getenv(
+    # Prefer migrator/owner URL (P0d); fall back to DATABASE_URL for local scripts
+    database_url = os.getenv("MIGRATE_DATABASE_URL") or os.getenv(
         "DATABASE_URL",
-        "postgresql://lims_user:lims_password@localhost:5432/lims_db"
+        "postgresql://lims_user:lims_password@localhost:5432/lims_db",
     )
     alembic_cfg.set_main_option("sqlalchemy.url", database_url)
     

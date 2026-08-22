@@ -9,6 +9,7 @@ import ContainerManagement from './pages/ContainerManagement';
 import BatchManagement from './pages/BatchManagement';
 import ResultsManagement from './pages/ResultsManagement';
 import Login from './pages/Login';
+import ChangePassword from './pages/ChangePassword';
 import AdminOverview from './pages/admin/AdminOverview';
 import ListsAdmin from './pages/admin/ListsAdmin';
 import ContainerTypesManagement from './pages/admin/ContainerTypesManagement';
@@ -430,7 +431,7 @@ function AppRoutes() {
 }
 
 function App() {
-  const { user, loading } = useUser();
+  const { user, loading, mustChangePassword } = useUser();
 
   if (loading) {
     return <div>Loading...</div>;
@@ -438,6 +439,10 @@ function App() {
 
   if (!user) {
     return <Login />;
+  }
+
+  if (mustChangePassword) {
+    return <ChangePassword />;
   }
 
   return <AppRoutes />;

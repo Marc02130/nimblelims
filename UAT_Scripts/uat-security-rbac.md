@@ -59,7 +59,7 @@ Verify user authentication with username/password, JWT token generation, token v
 | 4 | **Verify Login Response** | |
 | 4.1 | Verify JWT token received | Response contains `access_token` field (JWT string) |
 | 4.2 | Verify user information | Response contains:<br>- `user_id`: UUID<br>- `username`: "testuser"<br>- `email`: user's email<br>- `role`: role name (e.g., "Lab Technician")<br>- `permissions`: array of permission strings |
-| 4.3 | Verify token stored | Token stored in `localStorage` (key: "token") |
+| 4.3 | Verify session cookies | `nimble_access` (HttpOnly) + `nimble_csrf` set; **no** `localStorage.token` (P4 / S10) |
 | 4.4 | Verify token added to API requests | Authorization header set: `Bearer {token}` |
 | 5 | **Verify Token Validation** | |
 | 5.1 | Make authenticated API call: GET `/auth/me` | API call succeeds (HTTP 200) |
@@ -67,7 +67,7 @@ Verify user authentication with username/password, JWT token generation, token v
 | 5.3 | Verify `last_login` updated | User's `last_login` field updated in database |
 | 6 | **Test Logout** | |
 | 6.1 | Click "Logout" button or navigate to logout | Logout action triggered |
-| 6.2 | Verify token removed | Token removed from `localStorage` |
+| 6.2 | Verify session cleared | Auth cookies cleared; no `localStorage.token` |
 | 6.3 | Verify API token cleared | Authorization header no longer sent |
 | 6.4 | Verify redirect to login | User redirected to login page |
 | 6.5 | Attempt authenticated API call: GET `/auth/me` | API call fails (HTTP 401 Unauthorized) |
@@ -94,9 +94,9 @@ Verify user authentication with username/password, JWT token generation, token v
   "permissions": ["sample:create", "sample:read", "sample:update", "test:assign", "test:update", "result:enter", "batch:manage", "batch:read"]
 }
 ```<br>- HTTP 200 OK |
-| **Token Storage** | - Token stored in browser `localStorage` with key "token"<br>- Token added to all subsequent API requests as: `Authorization: Bearer {token}` |
+| **Token Storage** | - SPA: JWT in httpOnly `nimble_access` cookie + `nimble_csrf` double-submit (P4)<br>- Scripts may still use `Authorization: Bearer` from login JSON<br>- Mutating cookie-auth requests send `X-CSRF-Token` |
 | **Token Validation** | - GET `/auth/me` endpoint validates token:<br>   - Decode JWT token<br>   - Verify signature with SECRET_KEY<br>   - Check expiration<br>   - Return user information if valid<br>   - Return 401 if invalid/expired |
-| **Logout** | - Token removed from `localStorage`<br> - API service clears Authorization header<br> - User redirected to login page<br> - Subsequent API calls return 401 |
+| **Logout** | - `POST /auth/logout` clears cookies<br> - User redirected to login page<br> - Subsequent `/auth/me` returns 401 |
 
 ### Test Steps - Invalid Credentials (Negative Test)
 
@@ -131,7 +131,7 @@ Verify user authentication with username/password, JWT token generation, token v
 | Login succeeds with valid credentials | ✓ | ✗ |
 | JWT token received in response | ✓ | ✗ |
 | Token contains user_id, username, role, permissions | ✓ | ✗ |
-| Token stored in localStorage | ✓ | ✗ |
+| Session cookies (httpOnly access); no localStorage JWT | ✓ | ✗ |
 | Token added to API requests | ✓ | ✗ |
 | GET /auth/me succeeds with valid token | ✓ | ✗ |
 | last_login updated in database | ✓ | ✗ |

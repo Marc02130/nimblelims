@@ -3,9 +3,12 @@ FastAPI application for NimbleLims
 """
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from app.core.config import validate_security_config
 from app.routers import auth, samples, tests, containers, batches, results, aliquots, lists, projects, analyses, analytes, units, users, roles, permissions, clients, test_batteries, client_projects, custom_attributes, help, admin, sequences, workflows, experiments, lims_runs, sop_parse, lims_run_checklists, dose_response, field_definitions, eln_processes, eln_process_definitions, entries, sample_journey, instrument_catalog, data_parsers
-import os
 import logging
+
+# S3: refuse missing/default JWT secret unless explicit local insecure flags
+validate_security_config()
 
 # Configure logging
 logging.basicConfig(
@@ -28,36 +31,29 @@ app = FastAPI(
     redirect_slashes=False  # Don't redirect URLs with/without trailing slashes
 )
 
-# Request logging middleware
+# Request logging middleware (S4: never log bodies — passwords / PII)
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 import sys
 
 class LoggingMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
+        # Method + path only; do not read body or Authorization
         print(f"=== REQUEST: {request.method} {request.url.path} ===", file=sys.stderr, flush=True)
-        logger.info(f"=== REQUEST: {request.method} {request.url.path} ===")
-        logger.info(f"Query params: {dict(request.query_params)}")
-        if request.method in ["POST", "PUT", "PATCH"]:
-            try:
-                body = await request.body()
-                body_str = body.decode()[:500]
-                print(f"Body: {body_str}", file=sys.stderr, flush=True)
-                logger.info(f"Body: {body_str}")
-            except Exception as e:
-                print(f"Could not read body: {e}", file=sys.stderr, flush=True)
-                logger.warning(f"Could not read body: {e}")
+        logger.info("REQUEST %s %s", request.method, request.url.path)
         response = await call_next(request)
         print(f"=== RESPONSE: {response.status_code} ===", file=sys.stderr, flush=True)
-        logger.info(f"=== RESPONSE: {response.status_code} ===")
+        logger.info("RESPONSE %s %s -> %s", request.method, request.url.path, response.status_code)
         return response
 
 app.add_middleware(LoggingMiddleware)
 
-# CORS middleware
+# CORS middleware (credentials required for P4 cookie AuthN)
+from app.core.config import CORS_ORIGINS
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],  # React frontend
+    allow_origins=CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

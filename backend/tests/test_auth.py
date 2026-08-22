@@ -32,7 +32,7 @@ class TestLogin:
         assert "sample:read" in data["permissions"]
         assert "result:enter" in data["permissions"]
     
-    def test_login_invalid_username(self, client: TestClient):
+    def test_login_invalid_username(self, client: TestClient, test_user):
         """Test login with invalid username"""
         response = client.post(
             "/auth/login",
@@ -90,11 +90,11 @@ class TestEmailVerification:
         
         assert response.status_code == 200
         data = response.json()
-        assert data["message"] == "Email verification successful"
         assert data["verified"] is True
+        assert "email" in data["message"].lower() or "verification" in data["message"].lower()
     
     def test_verify_email_user_not_found(self, client: TestClient):
-        """Test email verification with non-existent user"""
+        """S13: stub must not leak whether email exists"""
         response = client.post(
             "/auth/verify-email",
             json={
@@ -103,8 +103,8 @@ class TestEmailVerification:
             }
         )
         
-        assert response.status_code == 404
-        assert "User not found" in response.json()["detail"]
+        assert response.status_code == 200
+        assert response.json()["verified"] is True
 
 class TestJWTToken:
     """Test JWT token functionality"""

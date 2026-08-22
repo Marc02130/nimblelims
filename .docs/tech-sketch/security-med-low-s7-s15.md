@@ -1,0 +1,135 @@
+# Tech sketch: Med/Low security remediation (S7–S15)
+
+**Date:** 2026-08-21  
+**Status:** Implemented through P4 (cookie AuthN design locked + shipped on branch)   
+**Requirements:** [`.docs/requirements/security-med-low-s7-s15.md`](../requirements/security-med-low-s7-s15.md)  
+**Schema:** [`.docs/schema-changes/security-med-low-s7-s15.md`](../schema-changes/security-med-low-s7-s15.md)  
+**Audit:** [`.docs/security-review/codebase.md`](../security-review/codebase.md)
+
+## 1. Context
+
+High S1–S6 Met on `security/high-s1-s6`. This sketch is *how* to close S7–S15 in phases P1–P4.
+
+## 2. Phase mapping → code touchpoints
+
+### P1 — Quick harden
+
+| Finding | Approach |
+|---------|----------|
+| **S8** | Shared helper `assert_upload_max_bytes(file, max=10_485_760)` used by `lims_runs.import-file`, `sop_parse` uploads; nginx `client_max_body_size 10m` on API location. |
+| **S9** | Add `Depends(get_current_user)` + `require_any_permission(["result:enter","result:review"])` on `POST /results/validate`. |
+| **S13** | `GET /roles`, `GET /permissions` → `require_any_permission(["user:manage","config:edit"])`. `verify-email`: if stub, return generic message always; gate behind `ENVIRONMENT!=production` or require signed token; rate-limit with S15 helper if available. |
+| **S14** | Remove `specimen_biotype_id` and `temperature` from `SAMPLE_WRITE_BACK_COLUMNS`; keep in `SAMPLE_SYSTEM_FIELDS` as display. Fail closed in `_apply_write_back`. |
+
+### P2 — Access & abuse
+
+| Finding | Approach |
+|---------|----------|
+| **S7** | In `ExperimentService.start_experiment` / `link_sample_to_experiment` / lims run start: after sample fetch, assert access using existing RLS (query sample as current user—if invisible, 404) **or** explicit `has_project_access` check mirroring DB function. Prefer “select sample under current session GUC” so RLS is single source of truth. Same for run cohort start. |
+| **S15** | Table `login_throttle` (username PK/unique, failure_count, window_started_at, locked_until). On failed login upsert/increment; on success delete/clear. Config: `LOGIN_MAX_FAILURES=5`, `LOGIN_LOCKOUT_MINUTES=15`. Return **429** + `Retry-After` when locked. |
+
+### P3 — Platform
+
+| Finding | Approach |
+|---------|----------|
+| **S11** | FORCE RLS on tenant tables with policies. Tighten containers: `created_by` on **INSERT WITH CHECK** only; SELECT via admin/project/contents. Aliquot dest: one txn, rollback if no contents. Enable **contents** RLS + policy (sample/project). Re-test as `lims_app`. |
+| **S12** | `docker-compose.prod.yml` overlay omits `db.ports`; requires secrets. Local compose may keep 5432. |
+
+### P4 — Cookie AuthN (expanded S10) — **design locked 2026-08-21**
+
+| Finding | Approach |
+|---------|----------|
+| **S10** | See §8 below (httpOnly cookie + SameSite=Lax + double-submit CSRF). |
+
+## 8. P4 AuthN design (locked)
+
+**Decision (CEO/product):** OQ-S10 Yes — implement this cycle.  
+**CSRF (user-confirmed):** SameSite=Lax + **double-submit CSRF**.
+
+### Cookies
+
+| Cookie | httpOnly | Secure | SameSite | Purpose |
+|--------|----------|--------|----------|---------|
+| `nimble_access` | **yes** | prod / `COOKIE_SECURE` | **Lax** | JWT (same claims as today) |
+| `nimble_csrf` | **no** | same | **Lax** | Double-submit token; SPA sends as `X-CSRF-Token` |
+
+- **Path:** `/` (works through nginx `/api/` same-origin proxy).  
+- **Max-Age:** aligned with `ACCESS_TOKEN_EXPIRE_MINUTES` (JWT `exp`).  
+- **Secure:** `true` when `ENVIRONMENT` is `production`/`prod`, or `COOKIE_SECURE=true`; `false` on local HTTP.
+
+### Auth acceptance (no silent dual forever for the SPA)
+
+1. **SPA:** cookie credentials only — **no** `localStorage` JWT; axios `withCredentials: true`; do not set `Authorization` from storage.  
+2. **API clients / pytest / UAT scripts:** `Authorization: Bearer` still accepted (login JSON still returns `access_token` for scripts).  
+3. **CSRF:** required only when the request is authenticated via **cookie** and method is `POST|PUT|PATCH|DELETE`. Bearer-authenticated requests skip CSRF.  
+4. Compare CSRF cookie ↔ `X-CSRF-Token` header with `secrets.compare_digest`.
+
+### Endpoints
+
+| Endpoint | Behavior |
+|----------|----------|
+| `POST /auth/login` | Issue JWT; `Set-Cookie` both cookies; body still includes `access_token` for scripts |
+| `POST /auth/change-password` | Re-issue JWT + refresh both cookies |
+| `POST /auth/logout` | Clear both cookies (CSRF if cookie session present) |
+| `GET /auth/me` | Works with cookie **or** Bearer |
+
+### Frontend
+
+- `UserContext`: boot with `GET /auth/me` (cookie may exist); login/logout no `localStorage` token.  
+- Interceptor: attach `X-CSRF-Token` from `nimble_csrf` on mutating methods.  
+- `hasPermission` remains **UX only**; server RBAC/RLS is AuthZ (manuals honesty).
+
+### Migration
+
+Cut over SPA in one PR on this branch — remove token from `localStorage`. No long dual-read of storage + cookie in the browser.
+
+## 3. S7 access check (preferred)
+
+```
+start_experiment(sample_ids):
+  for sid in sample_ids:
+    sample = db.query(Sample).filter(Sample.id == sid).first()
+    # With lims_app + GUC set, RLS already filters; if None → 404
+    if not sample:
+      raise 404
+    # existing Decision #24 eligibility…
+```
+
+If any code path uses migrator URL or bypasses GUC, add explicit service-layer check—do not rely on “sample exists” via owner connection.
+
+## 4. S15 sketch (Postgres)
+
+```sql
+CREATE TABLE login_throttle (
+  username_normalized TEXT PRIMARY KEY,
+  failure_count INT NOT NULL DEFAULT 0,
+  window_started_at TIMESTAMPTZ NOT NULL,
+  locked_until TIMESTAMPTZ NULL
+);
+```
+
+Service: `check` / `record_failure` / `record_success` in `auth.login`. No password stored.
+
+## 5. S11 containers + empty-container product rule (Decided)
+
+- **INSERT WITH CHECK:** `is_admin() OR created_by = current_user_id()`  
+- **USING (SELECT/UPDATE/DELETE):** `is_admin() OR EXISTS (contents→sample→has_project_access)`  
+- Aliquot execute: single transaction; if contents insert fails → rollback (no committed empty container).
+
+## 6. Tests
+
+| Finding | Test |
+|---------|------|
+| S7 | Lab user cannot start with other-client sample UUID |
+| S8 | Upload 10MB+1 → 413/400 |
+| S9 | No auth → 401; with auth → 200 |
+| S13 | Client role GET /roles → 403 |
+| S14 | write-back forbidden column rejected |
+| S15 | 5 failures → lock; success clears |
+| S11 | FORCE true on listed tables; RLS tests still pass as app role |
+| S12 | Compose config lint / doc checklist |
+
+## 7. Rollout / UAT
+
+New script: `UAT_Scripts/uat-security-med-low-s7-s15.md` (per phase).  
+Do not regress High UAT spine.
