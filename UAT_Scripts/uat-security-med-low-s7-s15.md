@@ -121,13 +121,18 @@ This case is **entry `write_back_target`**, not accessioning receive-temperature
 
 **Maps to:** S7 / FR-S7.1–4  
 
-Folded deny path: `alice-tech` is **not** on `project_users` for Bob’s CAR-T project; both users are NovaBio (same client). Fixture **0058** is clean.
+Folded deny path: `alice-tech` is **not** on `project_users` for Bob’s CAR-T project; both users are NovaBio (same client). Fixture **0058** is clean for the same-client beat.
+
+**Other-client beat (0067):** sample name exactly `XYZ-BA-0001` on `Sponsor XYZ - Bioanalytical Services` (PharmaTest CRO; advertised id `proj-cro-sponsor-004`). Status **Available for Testing**. Optional container barcode `XYZ-BA-0001`. No parent / no aliquot. Alice is NovaBio; this sample is CRO — true other-client.
 
 | Step | Action | Expected |
 |------|--------|----------|
 | 1 | As `alice-tech`, `GET` sample `CAR-T-Batch-001` | **403/404** (no existence oracle preferred: 404) |
 | 2 | Start experiment with that sample ID | **403/404** |
 | 3 | Link that sample to an experiment | **403/404** |
+| 4 | As `alice-tech`, `GET` sample `XYZ-BA-0001` | **403/404** |
+| 5 | Start experiment with `XYZ-BA-0001` | **403/404** |
+| 6 | Link `XYZ-BA-0001` to an experiment | **403/404** |
 
 **Retest bar (Deiter/Gunter):** unassigned **same-client** start **and** other-client start both **403/404**.
 
@@ -388,11 +393,11 @@ This stamp does **not** merge S7–S15 to `main`.
 
 ## Retest log (post hold fixes)
 
-**Code:** `0065` (`has_project_access` project_users for lab staff); `docker-compose.prod.yml` `ports: !reset []`; `0066` (`revoked_tokens` / logout jti denylist).
+**Code:** `0065` (`has_project_access` project_users for lab staff); `docker-compose.prod.yml` `ports: !reset []`; `0066` (`revoked_tokens` / logout jti denylist); `0067` (UAT seed `XYZ-BA-0001` on Sponsor XYZ bioanalytical project).
 
 | ID | Retest bar | Result | Tester | Date | Notes |
 |----|------------|--------|--------|------|-------|
-| TC-S7-001 | alice GET/start/link CAR-T → 403/404; bob still 200 | | | | |
+| TC-S7-001 | alice GET/start/link CAR-T → 403/404; alice GET/start/link `XYZ-BA-0001` → 403/404; bob still 200 | | | | |
 | TC-S12-001 | `compose … prod config` — no host 5432 | | | | |
 | TC-S10-005+ | logout → resent Bearer → 401 | | | | |
 

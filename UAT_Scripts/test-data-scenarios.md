@@ -109,6 +109,7 @@ cd backend && alembic upgrade head
 - **Analyses**: ELISA, qPCR, HPLC
 - **Users**: david-cro, admin
 - **Status**: Active
+- **Samples (0067):** `XYZ-BA-0001` — Plasma / Plasma (K2EDTA), **Available for Testing**, parent none. Matching container barcode `XYZ-BA-0001`. TC-S7-001 other-client beat (alice-tech NovaBio vs CRO sample).
 
 ### 5. Project Alpha (`proj-alpha-legacy`) — **Backward Compat Alias**
 - **Client**: NovaBio Therapeutics
