@@ -1,7 +1,7 @@
 # Requirements: Med/Low security remediation (S7–S15)
 
 **Date:** 2026-08-21  
-**Status:** **Ready for reviews** — security-focused packet (CEO · Architecture · Security · QA)  
+**Status:** **Implemented on branch** (P1–P4) — live UAT / merge pending  
 **Branch:** `security/med-low-s7-s15`  
 **Source audit:** [`.docs/security-review/codebase.md`](../security-review/codebase.md)  
 **Idea:** [`.docs/ideas/security-med-low-s7-s15.md`](../ideas/security-med-low-s7-s15.md)  
@@ -53,10 +53,10 @@ High findings are closed. Remaining risks:
 
 ## 3. Non-goals
 
-- Cookie/session migration for JWT (product decision deferred; S10 documents truth)  
 - Full WAF / CDN rate limiting (app-level + optional reverse-proxy notes)  
 - Rewriting all RLS policy expressions beyond FORCE + documented residuals  
 - Changing High S1–S6 behavior  
+- Opaque server-side session store (JWT-in-cookie is sufficient for this cycle)  
 
 ---
 

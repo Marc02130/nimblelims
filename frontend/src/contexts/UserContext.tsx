@@ -57,54 +57,47 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
   const [mustChangePassword, setMustChangePassword] = useState(false);
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (token) {
-      apiService.setAuthToken(token);
-      apiService
-        .getCurrentUser()
-        .then((userData) => {
-          const mapped = mapUser(userData);
-          setUser(mapped);
-          setMustChangePassword(Boolean(mapped.must_change_password));
-        })
-        .catch((err: any) => {
-          const detail = err?.response?.data?.detail;
-          if (detail?.code === 'password_change_required') {
-            // Token valid but constrained — keep session for change-password UI
-            setMustChangePassword(true);
-            setUser({
-              id: '',
-              username: '',
-              email: '',
-              role: '',
-              permissions: [],
-              must_change_password: true,
-            });
-            return;
-          }
-          localStorage.removeItem('token');
-          apiService.setAuthToken(null);
-          setMustChangePassword(false);
-        })
-        .finally(() => {
-          setLoading(false);
-        });
-    } else {
-      setLoading(false);
+    // P4 / S10: session lives in httpOnly cookie — probe /auth/me with credentials
+    try {
+      localStorage.removeItem('token');
+    } catch {
+      /* ignore */
     }
+
+    apiService
+      .getCurrentUser()
+      .then((userData) => {
+        const mapped = mapUser(userData);
+        setUser(mapped);
+        setMustChangePassword(Boolean(mapped.must_change_password));
+      })
+      .catch((err: any) => {
+        const detail = err?.response?.data?.detail;
+        if (detail?.code === 'password_change_required') {
+          setMustChangePassword(true);
+          setUser({
+            id: '',
+            username: '',
+            email: '',
+            role: '',
+            permissions: [],
+            must_change_password: true,
+          });
+          return;
+        }
+        setUser(null);
+        setMustChangePassword(false);
+      })
+      .finally(() => {
+        setLoading(false);
+      });
   }, []);
 
   const login = async (username: string, password: string) => {
     const response = await apiService.login(username, password);
-    const { access_token, must_change_password } = response;
+    const { must_change_password } = response;
 
-    if (!access_token) {
-      throw new Error('No access token received from server');
-    }
-
-    localStorage.setItem('token', access_token);
-    apiService.setAuthToken(access_token);
-
+    // Cookie is set by Set-Cookie; do not store JWT in localStorage
     if (must_change_password) {
       setMustChangePassword(true);
       setUser({
@@ -125,24 +118,23 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
   };
 
   const changePassword = async (currentPassword: string, newPassword: string) => {
-    const response = await apiService.changePassword(currentPassword, newPassword);
-    if (!response?.access_token) {
-      throw new Error('No access token received after password change');
-    }
-    localStorage.setItem('token', response.access_token);
-    apiService.setAuthToken(response.access_token);
+    await apiService.changePassword(currentPassword, newPassword);
     const userData = await apiService.getCurrentUser();
     setUser(mapUser(userData, false));
     setMustChangePassword(false);
   };
 
   const logout = () => {
-    localStorage.removeItem('token');
-    apiService.setAuthToken(null);
-    setUser(null);
-    setMustChangePassword(false);
+    void apiService.logout().finally(() => {
+      setUser(null);
+      setMustChangePassword(false);
+    });
   };
 
+  /**
+   * UX-only gate for showing/hiding UI. Server RBAC + RLS are AuthZ.
+   * Do not treat this as a security boundary.
+   */
   const hasPermission = (permission: string): boolean => {
     if (!user) return false;
     return user.permissions.includes(permission) || user.role === 'Administrator';

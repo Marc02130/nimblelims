@@ -96,3 +96,12 @@ ALLOW_DEV_SEED_USERS = _env_flag("ALLOW_DEV_SEED_USERS")
 LOGIN_MAX_FAILURES = int(os.getenv("LOGIN_MAX_FAILURES") or "5")
 LOGIN_LOCKOUT_MINUTES = int(os.getenv("LOGIN_LOCKOUT_MINUTES") or "15")
 LOGIN_FAILURE_WINDOW_MINUTES = int(os.getenv("LOGIN_FAILURE_WINDOW_MINUTES") or "15")
+
+# P4 / S10 cookie AuthN
+AUTH_COOKIE_NAME = os.getenv("AUTH_COOKIE_NAME") or "nimble_access"
+CSRF_COOKIE_NAME = os.getenv("CSRF_COOKIE_NAME") or "nimble_csrf"
+CSRF_HEADER_NAME = "X-CSRF-Token"
+COOKIE_PATH = "/"
+COOKIE_SAMESITE = "lax"
+# Secure cookies on production, or when explicitly forced (HTTPS local)
+COOKIE_SECURE = ENVIRONMENT in ("production", "prod") or _env_flag("COOKIE_SECURE")

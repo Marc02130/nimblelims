@@ -2,11 +2,12 @@
 Security utilities for authentication and authorization
 """
 from datetime import datetime, timedelta
-from typing import Optional, List
+from typing import Optional, List, Tuple
 from uuid import UUID
 import jwt
 import hashlib
 import re
+import secrets
 import bcrypt
 from fastapi import HTTPException, status, Depends, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -14,7 +15,16 @@ from sqlalchemy.orm import Session, joinedload
 from app.database import get_db, set_rls_context
 from models.user import User, Role, Permission
 from app.schemas.auth import TokenData
-from app.core.config import SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES
+from app.core.config import (
+    SECRET_KEY,
+    ALGORITHM,
+    ACCESS_TOKEN_EXPIRE_MINUTES,
+    CSRF_HEADER_NAME,
+)
+from app.core.auth_cookies import (
+    get_access_token_from_cookie,
+    get_csrf_from_cookie,
+)
 
 # Paths allowed while must_change_password is set (Q7)
 _PASSWORD_CHANGE_ALLOWLIST = frozenset(
@@ -91,8 +101,10 @@ def validate_password_complexity(
     return errors
 
 
-# JWT Bearer token
-security = HTTPBearer()
+# JWT Bearer optional — cookie AuthN is preferred for SPA (P4 / S10)
+security = HTTPBearer(auto_error=False)
+
+_UNSAFE_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
 
 # Define the core permissions for NimbleLims
 CORE_PERMISSIONS = [
@@ -173,13 +185,61 @@ def _path_allowed_during_password_change(path: str) -> bool:
     return False
 
 
+def _extract_token(
+    request: Request,
+    credentials: Optional[HTTPAuthorizationCredentials],
+) -> Tuple[str, str]:
+    """
+    Resolve JWT from Authorization Bearer (scripts/API) or httpOnly cookie (SPA).
+    Returns (token, auth_via) where auth_via is "bearer" or "cookie".
+    """
+    if credentials and credentials.credentials:
+        return credentials.credentials, "bearer"
+    cookie_token = get_access_token_from_cookie(request)
+    if cookie_token:
+        return cookie_token, "cookie"
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Not authenticated",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+
+
+def require_csrf_for_cookie_auth(request: Request, auth_via: str) -> None:
+    """
+    Double-submit CSRF: cookie auth + unsafe method requires X-CSRF-Token == nimble_csrf.
+    Bearer-authenticated clients skip CSRF (pytest / UAT scripts).
+    """
+    if auth_via != "cookie":
+        return
+    if request.method.upper() not in _UNSAFE_METHODS:
+        return
+    csrf_cookie = get_csrf_from_cookie(request)
+    csrf_header = request.headers.get(CSRF_HEADER_NAME) or request.headers.get(
+        CSRF_HEADER_NAME.lower()
+    )
+    if (
+        not csrf_cookie
+        or not csrf_header
+        or not secrets.compare_digest(str(csrf_cookie), str(csrf_header))
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "code": "csrf_failed",
+                "message": "CSRF token missing or invalid",
+            },
+        )
+
+
 def get_current_user(
     request: Request,
-    credentials: HTTPAuthorizationCredentials = Depends(security),
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
     db: Session = Depends(get_db),
 ) -> User:
     """Get the current authenticated user; enforce must-change-password gate."""
-    token = credentials.credentials
+    token, auth_via = _extract_token(request, credentials)
+    require_csrf_for_cookie_auth(request, auth_via)
     token_data = verify_token(token)
 
     # Invalid sub must be 401 (not 500 from DB UUID cast)

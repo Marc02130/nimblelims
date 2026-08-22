@@ -1,7 +1,7 @@
 # Tech sketch: Med/Low security remediation (S7–S15)
 
 **Date:** 2026-08-21  
-**Status:** Draft for architecture / security review  
+**Status:** Implemented through P4 (cookie AuthN design locked + shipped on branch)   
 **Requirements:** [`.docs/requirements/security-med-low-s7-s15.md`](../requirements/security-med-low-s7-s15.md)  
 **Schema:** [`.docs/schema-changes/security-med-low-s7-s15.md`](../schema-changes/security-med-low-s7-s15.md)  
 **Audit:** [`.docs/security-review/codebase.md`](../security-review/codebase.md)
@@ -35,11 +35,53 @@ High S1–S6 Met on `security/high-s1-s6`. This sketch is *how* to close S7–S1
 | **S11** | FORCE RLS on tenant tables with policies. Tighten containers: `created_by` on **INSERT WITH CHECK** only; SELECT via admin/project/contents. Aliquot dest: one txn, rollback if no contents. Enable **contents** RLS + policy (sample/project). Re-test as `lims_app`. |
 | **S12** | `docker-compose.prod.yml` overlay omits `db.ports`; requires secrets. Local compose may keep 5432. |
 
-### P4 — Cookie AuthN (expanded S10)
+### P4 — Cookie AuthN (expanded S10) — **design locked 2026-08-21**
 
 | Finding | Approach |
 |---------|----------|
-| **S10** | Issue JWT (or opaque session) in **httpOnly Secure SameSite** cookie on login; stop storing token in `localStorage`. Axios `withCredentials`. CSRF strategy (SameSite=Lax + careful mutations, or CSRF token). Logout clears cookie. Docs: `hasPermission` remains UX only. |
+| **S10** | See §8 below (httpOnly cookie + SameSite=Lax + double-submit CSRF). |
+
+## 8. P4 AuthN design (locked)
+
+**Decision (CEO/product):** OQ-S10 Yes — implement this cycle.  
+**CSRF (user-confirmed):** SameSite=Lax + **double-submit CSRF**.
+
+### Cookies
+
+| Cookie | httpOnly | Secure | SameSite | Purpose |
+|--------|----------|--------|----------|---------|
+| `nimble_access` | **yes** | prod / `COOKIE_SECURE` | **Lax** | JWT (same claims as today) |
+| `nimble_csrf` | **no** | same | **Lax** | Double-submit token; SPA sends as `X-CSRF-Token` |
+
+- **Path:** `/` (works through nginx `/api/` same-origin proxy).  
+- **Max-Age:** aligned with `ACCESS_TOKEN_EXPIRE_MINUTES` (JWT `exp`).  
+- **Secure:** `true` when `ENVIRONMENT` is `production`/`prod`, or `COOKIE_SECURE=true`; `false` on local HTTP.
+
+### Auth acceptance (no silent dual forever for the SPA)
+
+1. **SPA:** cookie credentials only — **no** `localStorage` JWT; axios `withCredentials: true`; do not set `Authorization` from storage.  
+2. **API clients / pytest / UAT scripts:** `Authorization: Bearer` still accepted (login JSON still returns `access_token` for scripts).  
+3. **CSRF:** required only when the request is authenticated via **cookie** and method is `POST|PUT|PATCH|DELETE`. Bearer-authenticated requests skip CSRF.  
+4. Compare CSRF cookie ↔ `X-CSRF-Token` header with `secrets.compare_digest`.
+
+### Endpoints
+
+| Endpoint | Behavior |
+|----------|----------|
+| `POST /auth/login` | Issue JWT; `Set-Cookie` both cookies; body still includes `access_token` for scripts |
+| `POST /auth/change-password` | Re-issue JWT + refresh both cookies |
+| `POST /auth/logout` | Clear both cookies (CSRF if cookie session present) |
+| `GET /auth/me` | Works with cookie **or** Bearer |
+
+### Frontend
+
+- `UserContext`: boot with `GET /auth/me` (cookie may exist); login/logout no `localStorage` token.  
+- Interceptor: attach `X-CSRF-Token` from `nimble_csrf` on mutating methods.  
+- `hasPermission` remains **UX only**; server RBAC/RLS is AuthZ (manuals honesty).
+
+### Migration
+
+Cut over SPA in one PR on this branch — remove token from `localStorage`. No long dual-read of storage + cookie in the browser.
 
 ## 3. S7 access check (preferred)
 

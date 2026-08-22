@@ -10,8 +10,8 @@
 
 | Doc | Role |
 |-----|------|
-| [codebase.md](codebase.md) | Finding list (S1–S6 Met; S7–S15 Open) |
-| **This packet** | How Med/Low closes |
+| [codebase.md](codebase.md) | Finding list (S1–S6 Met; S7–S15 Met on remediation branch) |
+| **This packet** | How Med/Low closes (P1–P4 implemented; live UAT pending) |
 
 ## STRIDE (this packet)
 
