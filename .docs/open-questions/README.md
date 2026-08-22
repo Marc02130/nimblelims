@@ -13,6 +13,7 @@ Decision logs for workstreams that must not proceed until product/architecture q
 | [sop-sample-identity-audit.md](sop-sample-identity-audit.md) | Sample identity, dispositions, audit trail, review/amendment (Issues #22–#26) — **Q1–Q5 open** | **Partially** — Implementation can proceed with provisional answers; Q1 (UAT cutover) and Q5 (Deiter gate) do not block MVP implementation but must resolve before UAT/production use |
 | [security-high-s1-s6.md](security-high-s1-s6.md) | High security remediation — **Q1–Q7 decided**; S1–S6 **Met** | No longer blocks (High Met) |
 | [security-med-low-s7-s15.md](security-med-low-s7-s15.md) | Med/Low S7–S15 — OQ-S9/S11/S14/S15 open; P1–P4 plan | **Partially** — whole-product “production ready” still needs P1+P2+S12 at minimum |
+| [extract-then-qubit-testdata-gap.md](extract-then-qubit-testdata-gap.md) | Extract-then-Qubit Hold — 0058/0059 catalog map (findings only; not an SOP pack) | **No** — Hold; testdata will not invent blood/DNA/Qubit IDs until Hold ships; Compose stays down |
 
 ## Gate rule
 
