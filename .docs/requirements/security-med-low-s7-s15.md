@@ -85,25 +85,27 @@ High findings are closed. Remaining risks:
 | ID | Requirement |
 |----|-------------|
 | FR-S9.1 | `POST /results/validate` shall require authenticated user (`get_current_user`). |
-| FR-S9.2 | Permission: at least one of `result:enter`, `result:review`, `result:read` (product may tighten to enter/review only—see OQ). |
-| FR-S9.3 | Unauthenticated call → **401**. |
+| FR-S9.2 | Permission: **`result:enter` OR `result:review`** only (OQ-S9). Not `result:read` alone. |
+| FR-S9.3 | Unauthenticated call → **401**; insufficient permission → **403**. |
 
-### FR-S10 — Frontend AuthZ honesty
+### FR-S10 — httpOnly cookie AuthN + AuthZ honesty (OQ-S10 expanded)
 
 | ID | Requirement |
 |----|-------------|
-| FR-S10.1 | Manuals + README: JWT in `localStorage` and client `hasPermission` are **not** security boundaries; server enforces RBAC/RLS. |
-| FR-S10.2 | Code comments near `hasPermission` / api interceptor shall not claim “RLS protects this UI.” |
-| FR-S10.3 | Optional later: httpOnly cookie / BFF—**out of this cycle** unless CEO expands. |
+| FR-S10.1 | Replace (or dual-run then cut over) `localStorage` JWT with **httpOnly, Secure, SameSite** cookie session (or BFF pattern) so XSS cannot read the token. |
+| FR-S10.2 | Frontend `hasPermission` remains UX only; manuals state server RBAC/RLS is AuthZ. |
+| FR-S10.3 | CORS / CSRF: cookie auth shall include CSRF defense appropriate to SameSite choice (e.g. SameSite=Lax + state-changing POST checks, or double-submit token). |
+| FR-S10.4 | Login/logout set/clear cookie; `/auth/me` works with cookie credentials (`credentials: include`). |
+| FR-S10.5 | Tech sketch shall detail cookie name, TTL alignment with JWT exp, and migration from localStorage (no silent dual-auth forever). |
 
-### FR-S11 — FORCE RLS + GUC + containers residual
+### FR-S11 — FORCE RLS + GUC + containers/contents
 
 | ID | Requirement |
 |----|-------------|
 | FR-S11.1 | For tables that already have RLS policies but `relforcerowsecurity = false` among tenant data tables (samples, tests, results, projects, batches, containers, …), enable **FORCE ROW LEVEL SECURITY** where safe for `lims_app` (not migrator). |
 | FR-S11.2 | Confirm request path continues to bind `app.current_user_id` / `app.client_id` via `set_config` (already P0d); fix any code paths that skip bind. |
-| FR-S11.3 | **Containers `created_by` FOR ALL (0062):** decide whether to narrow INSERT/UPDATE so creators cannot forever bypass project-based SELECT for unrelated rows—or document as accepted residual (OQ-S11a). |
-| FR-S11.4 | `contents` RLS: decide enable vs leave app-layer only (OQ-S11b). |
+| FR-S11.3 | **Containers (OQ-S11a):** Tighten 0062 so `created_by = current_user_id()` applies to **INSERT WITH CHECK** only; SELECT/UPDATE/DELETE via admin OR contents→sample→project. Aliquot dest create remains **one transaction**; **never commit** a container without contents (product: no empty tube/plate/box outcome). |
+| FR-S11.4 | **`contents` RLS (OQ-S11b):** ENABLE (+ FORCE as appropriate) with policy mirroring sample/project access; aliquot INSERT contents must succeed for eligible labtech. |
 
 ### FR-S12 — Postgres publish / defaults
 
@@ -125,18 +127,18 @@ High findings are closed. Remaining risks:
 
 | ID | Requirement |
 |----|-------------|
-| FR-S14.1 | Fields in `SAMPLE_SYSTEM_FIELDS` that are system-managed display shall **not** appear in `SAMPLE_WRITE_BACK_COLUMNS`, **or** write-back of those columns shall be rejected at link/submit. |
-| FR-S14.2 | Prefer: remove `specimen_biotype_id` and `temperature` from write-back allowlist **or** remove from “system RO” semantics—product pick one source of truth (OQ-S14). |
-| FR-S14.3 | Tests: attempting write-back to forbidden column fails closed. |
+| FR-S14.1 | `specimen_biotype_id` and `temperature` shall be **removed from `SAMPLE_WRITE_BACK_COLUMNS`** (OQ-S14). |
+| FR-S14.2 | They remain in sample system display fields for RO grids. |
+| FR-S14.3 | Tests: write-back / link targeting those columns fails closed. |
 
 ### FR-S15 — Login rate limit / lockout
 
 | ID | Requirement |
 |----|-------------|
-| FR-S15.1 | After **N** consecutive failed logins per username (default **5**) within window **W** (default **15 min**), further attempts return **429** or **401** with lock message until unlock time. |
-| FR-S15.2 | Optional IP bucket (same limits) to reduce spray—memory or Redis; v1 may be in-process + optional Redis. |
+| FR-S15.1 | After **N** consecutive failed logins per username (default **5**) within window **W** (default **15 min**), further attempts return **429** (preferred) with lock message until unlock time. |
+| FR-S15.2 | Persistence: **Postgres table** (OQ-S15)—no Redis. Survives restarts and multiple workers. |
 | FR-S15.3 | Successful login clears failure counter for that username. |
-| FR-S15.4 | Does not log passwords (S4 remains). |
+| FR-S15.4 | Does not log passwords (S4 remains). Optional IP bucket can share the same table. |
 
 ---
 
@@ -144,12 +146,13 @@ High findings are closed. Remaining risks:
 
 | Phase | Findings | Exit |
 |-------|----------|------|
-| **P1 — Quick harden** | S8, S9, S13, S14 | Caps live; validate auth’d; GETs tightened; write-back allowlist consistent |
-| **P2 — Access & abuse** | S7, S15 | Start gates + login lockout; tests |
-| **P3 — Platform** | S11, S12 | FORCE RLS migration(s); prod compose overlay |
-| **P4 — Honesty** | S10 | Docs/comments only (or expand if CEO wants cookie work) |
+| **P1 — Quick harden** | S8, S9, S13, S14 | Caps live; validate auth’d (enter\|review); GETs tightened; write-back allowlist consistent |
+| **P2 — Access & abuse** | S7, S15 | Start gates + DB-backed login lockout; tests |
+| **P3 — Platform** | S11, S12 | FORCE RLS; contents RLS; containers INSERT-only `created_by`; prod compose overlay |
+| **P4 — Cookie AuthN** | S10 | httpOnly cookie (or BFF) cutover + CSRF + docs honesty |
 
-**Recommended implement order:** P1 → P2 → P3 → P4.
+**Recommended implement order:** P1 → P2 → P3 → P4.  
+**Note:** P4 is a **scope expansion** vs original docs-only S10 (OQ-S10 Decided Yes).
 
 ---
 
@@ -167,4 +170,5 @@ High findings are closed. Remaining risks:
 | FORCE RLS breaks background jobs | Jobs use migrator URL or explicit SET ROLE + GUC |
 | Lockout DoS against admin username | Longer unlock + admin unlock endpoint later; alert |
 | Tightening GET /roles breaks UI | Grant config users permission; smoke admin Users page |
-| S14 product conflict | OQ before code |
+| S14 product conflict | **Decided** — drop write-back |
+| P4 cookie AuthN complexity | CSRF + SameSite design in tech sketch before code; phased dual-run if needed |

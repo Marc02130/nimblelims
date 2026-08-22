@@ -1,21 +1,27 @@
 # Open questions: security-med-low-s7-s15
 
-**Status:** Living decision log  
-**Date:** 2026-08-21  
+**Status:** Living decision log — **decisions stamped 2026-08-21**  
 **Requirements:** [`.docs/requirements/security-med-low-s7-s15.md`](../requirements/security-med-low-s7-s15.md)
 
 | ID | Question | Status | Blocks | Answer / notes | Date | Owner |
 |----|----------|--------|--------|----------------|------|-------|
-| OQ-S9 | Permission for `/results/validate`: enter\|review\|read vs enter\|review only? | **Open** | P1 S9 | Lean: enter + review + read (validate is read-ish). | | Product + Security |
-| OQ-S11a | Narrow containers 0062 `created_by` FOR ALL vs accept residual? | **Open** | P3 S11 | Lean: tighten WITH CHECK to INSERT-only path; SELECT via project/contents. | | Arch + Security |
-| OQ-S11b | Enable RLS on `contents`? | **Open** | P3 | Lean: enable + policy mirroring containers/samples in same phase if low risk; else Deferred. | | Arch |
-| OQ-S12 | Prod compose: separate file vs Compose profiles? | **Decided (provisional)** | P3 | Prefer `docker-compose.prod.yml` overlay; local keeps published 5432. | 2026-08-21 | Eng |
-| OQ-S14 | biotype/temperature: drop from write-back allowlist or from system-RO? | **Open** | P1 S14 | Lean: **drop from write-back allowlist**; keep as sample system display fields. | | Product |
-| OQ-S15 | In-memory throttle vs Redis/table for multi-worker? | **Open** | P2 | Lean: in-memory v1 + note for multi-replica; Redis later. | | Eng |
-| OQ-S10 | Expand S10 to httpOnly cookie JWT this cycle? | **Decided** | — | **No** — docs honesty only. | 2026-08-21 | CEO |
+| OQ-S9 | Who may call `/results/validate` after AuthN? | **Decided** | P1 | **`result:enter` OR `result:review` only** (not read-only). | 2026-08-21 | Product + Security |
+| OQ-S10 | httpOnly cookie JWT / BFF this cycle? | **Decided** | P4 → expands | **Yes — design httpOnly cookies / BFF this cycle** (not docs-only). Scope expansion: see requirements § FR-S10. | 2026-08-21 | CEO + Security |
+| OQ-S11a | Containers `created_by` / empty containers | **Decided** | P3 (+ aliquot path) | **Atomic dest create:** one transaction; RLS allows **INSERT** when `created_by = current_user_id()`; SELECT/UPDATE/DELETE via admin or contents→sample→project (tighten off FOR ALL). **Never commit** a container without contents. Product rule: no empty tube/plate/box as an outcome—empty wells on a plate are fine; creating a barren container is not. | 2026-08-21 | Product + Arch |
+| OQ-S11b | Enable RLS on `contents`? | **Decided** | P3 | **Enable + policy in P3** mirroring sample/project access; aliquot INSERT contents must still work for labtech. | 2026-08-21 | Arch + Security |
+| OQ-S12 | Prod DB port exposure | **Decided** | P3 | **`docker-compose.prod.yml` overlay**; no host `:5432`. Local compose may keep published port. | 2026-08-21 | Eng |
+| OQ-S14 | biotype / temperature dual role | **Decided** | P1 | **Drop from `SAMPLE_WRITE_BACK_COLUMNS`**; keep as sample system display (RO in grids). | 2026-08-21 | Product |
+| OQ-S15 | Login lockout storage | **Decided** | P2 | **Postgres table** (no Redis). Survives restarts/workers. | 2026-08-21 | Eng |
 
 ## Gate rule
 
-- **P1:** can start after reviews Accept; **OQ-S14** and **OQ-S9** should be Decided before coding those FRs (or ship provisional lean).  
-- **P3:** blocked on **OQ-S11a/b**.  
-- **P2 S15:** provisional in-memory OK if OQ-S15 undecided.
+- **P1:** Unblocked (S8, S9, S13, S14 decided).  
+- **P2:** Unblocked (S7, S15 decided — lockout table in schema).  
+- **P3:** Unblocked (S11a/b, S12 decided).  
+- **P4:** Now includes **httpOnly cookie / BFF design + implement** (larger than original docs-only S10).
+
+## Decision detail — OQ-S11a (empty containers)
+
+**Product:** Do not create empty containers as a LIMS outcome. Plates/boxes may have empty wells/slots as structure; a new tube/plate/box with no contents should not be committed.
+
+**Eng:** Aliquot dest create stays one DB transaction: INSERT container (WITH CHECK via `created_by`) → INSERT contents → INSERT/link sample. If contents step fails → full rollback (already S5). Policy tighten: `created_by` for INSERT path only; ongoing visibility via project/contents.

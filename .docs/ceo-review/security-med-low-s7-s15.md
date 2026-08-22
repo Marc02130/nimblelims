@@ -25,12 +25,13 @@ High closed the isolation/AuthN disasters. Remaining items are what questionnair
 
 | ID | Condition |
 |----|-----------|
-| **C1** | Do **not** expand into httpOnly JWT / BFF this cycle (OQ-S10 Decided No). |
-| **C2** | Phase order P1→P2→P3→P4; P1 can ship/merge independently if reviews allow. |
-| **C3** | Do not claim whole-product production-ready until P1+P2 Met and S12 prod profile exists. |
+| **C1** | **OQ-S10 Decided Yes:** P4 includes httpOnly cookie / BFF — treat as real AuthN work, not docs-only. |
+| **C2** | Phase order P1→P2→P3→P4; P1–P2 can ship before cookies if reviews allow. |
+| **C3** | Do not claim whole-product production-ready until P1+P2 Met, S12 prod profile exists, and cookie cutover plan is clear. |
 | **C4** | Keep High S1–S6 behavior unchanged. |
-| **C5** | S14: prefer drop write-back for biotype/temperature unless Lab Ops objects. |
+| **C5** | S14 Decided: drop biotype/temperature from write-back. |
+| **C6** | Empty containers: never commit barren tube/plate/box (OQ-S11a). |
 
 ## Decision
 
-**Proceed** to Arch · Security · QA; implement P1 after Accept.
+**Proceed** with OQs stamped; implement **P1** after any review re-confirm on P4 cookie scope.
