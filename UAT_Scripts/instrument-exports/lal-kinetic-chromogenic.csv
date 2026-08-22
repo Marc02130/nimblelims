@@ -1,0 +1,17 @@
+instrument,method,plate_id,well,sample_id,lims_sample,project,role,nominal_eu_ml,onset_sec,result_eu_ml,units
+Charles River Sunrise / Endoscan-V,Kinetic chromogenic LAL,NBIO-LAL-96-001,A01,STD-5,,,STD,5,416,5.199,EU/mL
+Charles River Sunrise / Endoscan-V,Kinetic chromogenic LAL,NBIO-LAL-96-001,A02,STD-5,,,STD,5,424,4.81,EU/mL
+Charles River Sunrise / Endoscan-V,Kinetic chromogenic LAL,NBIO-LAL-96-001,B01,STD-0.5,,,STD,0.5,752,0.5199,EU/mL
+Charles River Sunrise / Endoscan-V,Kinetic chromogenic LAL,NBIO-LAL-96-001,B02,STD-0.5,,,STD,0.5,767,0.481,EU/mL
+Charles River Sunrise / Endoscan-V,Kinetic chromogenic LAL,NBIO-LAL-96-001,C01,STD-0.05,,,STD,0.05,1358,0.05199,EU/mL
+Charles River Sunrise / Endoscan-V,Kinetic chromogenic LAL,NBIO-LAL-96-001,C02,STD-0.05,,,STD,0.05,1386,0.0481,EU/mL
+Charles River Sunrise / Endoscan-V,Kinetic chromogenic LAL,NBIO-LAL-96-001,D01,STD-0.005,,,STD,0.005,2455,0.005199,EU/mL
+Charles River Sunrise / Endoscan-V,Kinetic chromogenic LAL,NBIO-LAL-96-001,D02,STD-0.005,,,STD,0.005,2505,0.00481,EU/mL
+Charles River Sunrise / Endoscan-V,Kinetic chromogenic LAL,NBIO-LAL-96-001,E01,BLANK,,,BLANK,0,,,EU/mL
+Charles River Sunrise / Endoscan-V,Kinetic chromogenic LAL,NBIO-LAL-96-001,E02,BLANK,,,BLANK,0,,,EU/mL
+Charles River Sunrise / Endoscan-V,Kinetic chromogenic LAL,NBIO-LAL-96-001,F01,CAR-T-Batch-001,CAR-T-Batch-001,CAR-T In-Process Testing,SAMPLE,,1078,0.128,EU/mL
+Charles River Sunrise / Endoscan-V,Kinetic chromogenic LAL,NBIO-LAL-96-001,F02,CAR-T-Batch-001,CAR-T-Batch-001,CAR-T In-Process Testing,SAMPLE,,1065,0.134,EU/mL
+Charles River Sunrise / Endoscan-V,Kinetic chromogenic LAL,NBIO-LAL-96-001,G01,Plasmid-Lot-2025-001,Plasmid-Lot-2025-001,Plasmid Lot Release Testing,SAMPLE,,1268,0.068,EU/mL
+Charles River Sunrise / Endoscan-V,Kinetic chromogenic LAL,NBIO-LAL-96-001,G02,Plasmid-Lot-2025-001,Plasmid-Lot-2025-001,Plasmid Lot Release Testing,SAMPLE,,1245,0.073,EU/mL
+Charles River Sunrise / Endoscan-V,Kinetic chromogenic LAL,NBIO-LAL-96-001,H01,CAR-T-Batch-001-PPC,CAR-T-Batch-001,CAR-T In-Process Testing,PPC,0.5,721,0.61,EU/mL
+Charles River Sunrise / Endoscan-V,Kinetic chromogenic LAL,NBIO-LAL-96-001,H02,CAR-T-Batch-001-PPC,CAR-T-Batch-001,CAR-T In-Process Testing,PPC,0.5,707,0.66,EU/mL
