@@ -51,9 +51,16 @@ async def login(
     """
     Authenticate user and return JWT token with permissions.
     May set must_change_password and issue a constrained token (Q7).
+    S15: Postgres-backed lockout after repeated failures.
     """
     import logging
+    from app.services.login_throttle import LoginThrottleService
+
     logger = logging.getLogger(__name__)
+    throttle = LoginThrottleService(db)
+
+    # Fail closed if locked (before password check)
+    throttle.check_allowed(login_data.username)
 
     user_count = db.query(User).count()
     if user_count == 0:
@@ -72,6 +79,10 @@ async def login(
 
     if not user:
         logger.warning("User not found: %s", login_data.username)
+        locked = throttle.record_failure(login_data.username)
+        db.commit()
+        if locked:
+            throttle.check_allowed(login_data.username)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",
@@ -80,6 +91,10 @@ async def login(
 
     if not verify_password(login_data.password, user.password_hash):
         logger.warning("Password verification failed for user: %s", login_data.username)
+        locked = throttle.record_failure(login_data.username)
+        db.commit()
+        if locked:
+            throttle.check_allowed(login_data.username)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",
@@ -97,6 +112,8 @@ async def login(
     if needs_rehash(user.password_hash):
         user.password_hash = get_password_hash(login_data.password)
 
+    throttle.record_success(login_data.username)
+
     permissions = get_user_permissions(user, db)
     must_change = bool(getattr(user, "must_change_password", False))
     access_token = _issue_token(user, permissions, must_change=must_change)
@@ -104,7 +121,11 @@ async def login(
     user.last_login = func.now()
     db.commit()
 
-    set_current_user_id(str(user.id), db)
+    set_current_user_id(
+        str(user.id),
+        db,
+        client_id=str(user.client_id) if user.client_id else None,
+    )
 
     return LoginResponse(
         access_token=access_token,

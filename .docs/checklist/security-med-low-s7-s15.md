@@ -25,9 +25,9 @@
 
 ## P2 — Access & abuse (S7, S15)
 
-- [ ] Start/link sample access via RLS/session  
-- [ ] `login_throttle` table + lockout service  
-- [ ] Tests  
+- [x] Start/link/run cohort sample access via `require_accessible_sample` (RLS + has_project_access)  
+- [x] `login_throttle` table (0063) + lockout service  
+- [x] Tests (`test_security_p2_s7_s15.py`)  
 
 ## P3 — Platform (S11, S12)
 
