@@ -13,7 +13,7 @@ Idempotent: resolve project / types / status / units by name at runtime
 (0058 advertised ids are not always RFC-4122). Do not seed users. Do not
 touch has_project_access or compose.
 """
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
 from alembic import op
@@ -190,7 +190,7 @@ def upgrade() -> None:
         connection, "SELECT id FROM users WHERE username = 'david-cro' LIMIT 1"
     )
 
-    today = datetime.utcnow()
+    today = datetime.now(timezone.utc)
     received_date = today - timedelta(days=2)
     due_date = today + timedelta(days=14)
 
