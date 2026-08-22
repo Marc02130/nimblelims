@@ -6,7 +6,8 @@
 
 services:
   db:
-    ports: []
+    # Compose merges ports by key; empty list does NOT clear base. !reset drops host 5432.
+    ports: !reset []
     environment:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD for production}
 

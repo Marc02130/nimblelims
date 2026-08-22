@@ -1,9 +1,9 @@
 """
 Security utilities for authentication and authorization
 """
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, List, Tuple
-from uuid import UUID
+from uuid import UUID, uuid4
 import jwt
 import hashlib
 import re
@@ -130,20 +130,20 @@ CORE_PERMISSIONS = [
 
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
-    """Create a JWT access token"""
+    """Create a JWT access token (includes unique jti for logout denylist)."""
     to_encode = data.copy()
     if expires_delta:
         expire = datetime.utcnow() + expires_delta
     else:
         expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
 
-    to_encode.update({"exp": expire})
+    to_encode.update({"exp": expire, "jti": to_encode.get("jti") or str(uuid4())})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
 
-def verify_token(token: str) -> TokenData:
-    """Verify and decode a JWT token"""
+def verify_token(token: str, db: Optional[Session] = None) -> TokenData:
+    """Verify and decode a JWT token; reject revoked jti when db is provided."""
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         user_id: str = payload.get("sub")
@@ -151,6 +151,13 @@ def verify_token(token: str) -> TokenData:
         role: str = payload.get("role")
         permissions: List[str] = payload.get("permissions", [])
         must_change = bool(payload.get("pwd_change") or payload.get("must_change_password"))
+        jti = payload.get("jti")
+        exp_raw = payload.get("exp")
+        exp_dt = None
+        if isinstance(exp_raw, (int, float)):
+            exp_dt = datetime.fromtimestamp(exp_raw, tz=timezone.utc)
+        elif isinstance(exp_raw, datetime):
+            exp_dt = exp_raw
 
         if user_id is None or username is None or role is None:
             raise HTTPException(
@@ -159,13 +166,27 @@ def verify_token(token: str) -> TokenData:
                 headers={"WWW-Authenticate": "Bearer"},
             )
 
+        if db is not None and jti:
+            from app.services.token_revoke import is_token_revoked
+
+            if is_token_revoked(db, str(jti)):
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Token has been revoked",
+                    headers={"WWW-Authenticate": "Bearer"},
+                )
+
         return TokenData(
             user_id=user_id,
             username=username,
             role=role,
             permissions=permissions,
             must_change_password=must_change,
+            jti=str(jti) if jti else None,
+            exp=exp_dt,
         )
+    except HTTPException:
+        raise
     except jwt.PyJWTError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -240,7 +261,7 @@ def get_current_user(
     """Get the current authenticated user; enforce must-change-password gate."""
     token, auth_via = _extract_token(request, credentials)
     require_csrf_for_cookie_auth(request, auth_via)
-    token_data = verify_token(token)
+    token_data = verify_token(token, db=db)
 
     # Invalid sub must be 401 (not 500 from DB UUID cast)
     try:

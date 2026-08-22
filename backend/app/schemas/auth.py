@@ -57,3 +57,5 @@ class TokenData(BaseModel):
     role: str
     permissions: List[str]
     must_change_password: bool = False
+    jti: Optional[str] = None
+    exp: Optional[datetime] = None

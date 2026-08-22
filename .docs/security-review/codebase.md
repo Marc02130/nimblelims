@@ -48,12 +48,12 @@ Tobias live UAT on `security/high-s1-s6` @ `1d3762a`: **S1–S6 Met**, including
 | S4 | High | **Met** | No login body / password in logs. |
 | S5 | High | **Met** | Cohort / null / insufficient fail closed. Labtech dest INSERT via 0062. Live TC-S5-004 200. |
 | S6 | High | **Met** | Off-cohort upsert 400; write-back cohort only. |
-| S7 | Med | **Met (P2)** | Start/link/run cohort: `require_accessible_sample` (RLS + has_project_access). |
+| S7 | Med | **Met (P2+0065)** | Start/link + RLS: lab staff need `project_users` (UAT hold fix; no same-client short-circuit). |
 | S8 | Med | **Met (P1)** | Cap `import-file` and SOP uploads (10 MB) + nginx. |
 | S9 | Med | **Met (P1)** | Authenticate `POST /results/validate` (`result:enter`\|`review`). |
-| S10 | Med | **Met (P4)** | httpOnly `nimble_access` + double-submit CSRF; SPA dropped `localStorage` JWT. `hasPermission` remains UX only (documented). |
+| S10 | Med | **Met (P4+0066)** | httpOnly cookies + CSRF; JWT `jti` denylist on logout; `hasPermission` UX only. |
 | S11 | Med | **Met (P3)** | FORCE RLS on samples/tests/results/projects/batches/containers/client_projects; contents RLS; containers INSERT vs SELECT/UPDATE/DELETE split (`0064`). |
-| S12 | Med | **Met (P3)** | `docker-compose.prod.yml` clears DB host ports; requires secrets. |
+| S12 | Med | **Met (P3+!reset)** | `docker-compose.prod.yml` uses `ports: !reset []` so host `5432` is actually dropped. |
 | S13 | Low | **Met (P1)** | verify-email no existence leak; GET `/roles` `/permissions` need manage/config. |
 | S14 | Low | **Met (P1)** | biotype/temperature removed from write-back allowlist; remain system display. |
 | S15 | Low | **Met (P2)** | Postgres `login_throttle`; lock after N failures (429). |

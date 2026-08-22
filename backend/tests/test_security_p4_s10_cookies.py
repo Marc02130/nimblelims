@@ -101,3 +101,29 @@ class TestCookieAuthN:
         client.cookies.clear()
         r = client.get("/auth/me")
         assert r.status_code == 401
+
+    def test_logout_revokes_bearer_jti(self, client: TestClient, test_user):
+        """TC-S10-005 residual: resent Bearer after logout must 401."""
+        login = _login(client)
+        assert login.status_code == 200
+        token = login.json()["access_token"]
+        # Decode should include jti
+        import jwt
+        from app.core.config import SECRET_KEY, ALGORITHM
+
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        assert payload.get("jti")
+
+        client.cookies.clear()
+        r = client.post(
+            "/auth/logout",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert r.status_code == 200
+
+        me = client.get(
+            "/auth/me",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert me.status_code == 401
+        assert "revoked" in me.json()["detail"].lower()

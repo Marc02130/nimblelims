@@ -383,3 +383,17 @@ API / curl this run. **No browser DevTools panel.** Frontend source remains cook
 - **TC-S10-005** no JWT denylist — resent Bearer still 200 after logout.
 
 This stamp does **not** merge S7–S15 to `main`.
+
+---
+
+## Retest log (post hold fixes)
+
+**Code:** `0065` (`has_project_access` project_users for lab staff); `docker-compose.prod.yml` `ports: !reset []`; `0066` (`revoked_tokens` / logout jti denylist).
+
+| ID | Retest bar | Result | Tester | Date | Notes |
+|----|------------|--------|--------|------|-------|
+| TC-S7-001 | alice GET/start/link CAR-T → 403/404; bob still 200 | | | | |
+| TC-S12-001 | `compose … prod config` — no host 5432 | | | | |
+| TC-S10-005+ | logout → resent Bearer → 401 | | | | |
+
+**Deferred (not this retest):** TC-S11-003 own empty-tube PATCH 500 → Sec10 follow-on.

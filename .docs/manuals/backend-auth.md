@@ -24,6 +24,8 @@ This implementation provides a complete authentication system for the NimbleLIMS
 - **Complexity**: min 12 chars; upper, lower, digit, symbol; ≠ username; ≠ current password
 - **JWT Tokens**: PyJWT; claim `pwd_change` when change required. `SECRET_KEY` (alias `JWT_SECRET_KEY`); refuse defaults unless `ALLOW_INSECURE_DEFAULTS` in development/test
 - **Cookie AuthN (P4 / S10)**: SPA uses `nimble_access` (httpOnly, SameSite=Lax, Secure in prod) — **not** `localStorage`. Double-submit CSRF: `nimble_csrf` cookie + `X-CSRF-Token` header on mutating requests when authenticated via cookie. Bearer still accepted for scripts/API (CSRF skipped).
+- **JWT denylist**: each token has a `jti`; logout (and password change) inserts into `revoked_tokens`. Resent Bearer after logout → **401**.
+- **Project access (S7)**: Lab Technician / Lab Manager on a tenant client need a `project_users` row (no same-client short-circuit). Client role keeps same-client isolation. System-client lab users and admins unchanged.
 - **RBAC**: 17 core permissions for granular access control (with additional permissions added in migrations). **Frontend `hasPermission` is UX only** — server RBAC + Postgres RLS are AuthZ.
 - **Token Validation**: Secure token verification with expiration
 - **Bootstrap**: `BOOTSTRAP_ADMIN_PASSWORD` for production admin create; `ALLOW_DEV_SEED_USERS` for local/demo temporary seeds
