@@ -4,7 +4,7 @@
 **Branch:** `security/med-low-s7-s15`  
 **Date:** 2026-08-21 (completed live run)  
 **Tester:** Tobias  
-**Observed:** `security/med-low-s7-s15` @ `71d8a0b`  
+**Observed:** `security/med-low-s7-s15` @ `e47f1ab` (alembic `0067`; compose down after the beat)  
 **Requirements:** [`.docs/requirements/security-med-low-s7-s15.md`](../.docs/requirements/security-med-low-s7-s15.md)  
 **Prerequisite:** High S1–S6 Met  
 **Related:** [uat-security-high-s1-s6.md](uat-security-high-s1-s6.md)
@@ -13,7 +13,7 @@
 
 Accept that Med/Low findings S7–S15 are fixed before merge to `main`. This stamp is the live UAT pass on the feature branch.
 
-**QA verdict (this run): Fail for merge.** Holds: **TC-S7-001**, **TC-S12-001**. Residuals (not holds): **TC-S11-003** own `created_by` SELECT 200 / PATCH 500; **TC-S10-005** no JWT denylist.
+**QA verdict (this run): Accept with residual.** Residual (not a hold): **TC-S11-003** own `created_by` empty tube GET **200** / PATCH **500**. P1–P4 Pass including both S7 beats.
 
 ## Environment
 
@@ -22,8 +22,8 @@ Accept that Med/Low findings S7–S15 are fixed before merge to `main`. This sta
 | Stack | `docker compose up -d --build` from repo root |
 | Frontend | `http://localhost:3000` |
 | API | `http://localhost:8000` |
-| Branch / SHA | `security/med-low-s7-s15` @ `71d8a0b` |
-| After run | Compose **down** |
+| Branch / SHA | `security/med-low-s7-s15` @ `e47f1ab` (alembic `0067`) |
+| After run | Compose **down** after the beat |
 
 Seed / fixture personas used this run (no passwords recorded):
 
@@ -138,7 +138,7 @@ Folded deny path: `alice-tech` is **not** on `project_users` for Bob’s CAR-T p
 
 | Result | Pass / Fail | Tester | Date | Notes |
 |--------|-------------|--------|------|-------|
-| Fail | Fail | Tobias | 2026-08-21 | `alice-tech` GET / start / link `CAR-T-Batch-001` all **succeeded**. Not on `project_users`; `has_project_access` same-client short-circuit (both NovaBio). Fixture 0058 is clean; this is AuthZ. Deiter/Gunter: unassigned same-client start must 403 too. |
+| Pass | Pass | Tobias | 2026-08-21 | Same-client (`9d583ac`): `alice-tech` GET/start/link `CAR-T-Batch-001` → 404/404/404. Other-client (`e47f1ab` / 0067): `alice-tech` GET/start/link `XYZ-BA-0001` → 404/404/404. No payload. Sample present on Sponsor XYZ - Bioanalytical Services. 0067 seed unblocked the other-client beat. Compose down after the beat. |
 
 ### TC-S7-002 — Assigned tech happy path (Required, folded)
 
@@ -255,7 +255,7 @@ Folded: **cross-client deny** on empty tube, not only dest INSERT.
 
 | Result | Pass / Fail | Tester | Date | Notes |
 |--------|-------------|--------|------|-------|
-| Fail | Fail | Tobias | 2026-08-21 | `docker compose -f docker-compose.yml -f docker-compose.prod.yml config` still has `db.ports` published **5432**. Overlay `ports: []` does not unset base. Not a seed miss. |
+| Pass | Pass | Tobias | 2026-08-21 | Retest `9d583ac`: `docker compose -f docker-compose.yml -f docker-compose.prod.yml config` — no host `5432`. |
 
 ---
 
@@ -321,11 +321,11 @@ API / curl this run. **No browser DevTools panel.** Frontend source remains cook
 | 1 | Logout | **200**; cookies `Max-Age=0` |
 | 2 | `GET /auth/me` with no cookie | **401** |
 
-**Residual (not a hold):** old JWT still **200** if resent (no denylist).
+Logout then resent Bearer must **401** (denylist).
 
 | Result | Pass / Fail | Tester | Date | Notes |
 |--------|-------------|--------|------|-------|
-| Pass | Pass | Tobias | 2026-08-21 | logout 200 cookies `Max-Age=0`; `/auth/me` no cookie 401. Residual: old JWT still 200 if resent (no denylist) |
+| Pass | Pass | Tobias | 2026-08-21 | logout 200 cookies `Max-Age=0`; `/auth/me` no cookie 401. Denylist (`9d583ac`): resent Bearer → 401 |
 
 ### TC-S10-006 — Bearer skips CSRF (Required)
 
@@ -361,33 +361,24 @@ API / curl this run. **No browser DevTools panel.** Frontend source remains cook
 
 | Phase | Tester | Date | Pass? | Notes |
 |-------|--------|------|-------|-------|
-| P1 | Tobias | 2026-08-21 | **Pass** | S8 / S9 / S13 / S14 |
-| P2 | Tobias | 2026-08-21 | **Fail** | **TC-S7-001** |
-| P3 | Tobias | 2026-08-21 | **Fail** | **TC-S12-001** |
-| P4 | Tobias | 2026-08-21 | **Pass** | API/curl; no browser DevTools panel |
+| P1 | Tobias | 2026-08-21 | **Pass** | S8 / S9 / S13 / S14 (kept from prior stamp / `9d583ac` retest) |
+| P2 | Tobias | 2026-08-21 | **Pass** | Both S7 beats (same-client 404; other-client `XYZ-BA-0001` 404/404/404). S15 lockout. |
+| P3 | Tobias | 2026-08-21 | **Pass** | S12 prod overlay no host 5432; S11 / S5 (kept) |
+| P4 | Tobias | 2026-08-21 | **Pass** | API/curl; denylist resent Bearer 401 |
 
 | Role | Name | Date | Verdict |
 |------|------|------|---------|
-| Tester / QA | Tobias | 2026-08-21 | **Fail for merge** |
+| Tester / QA | Tobias | 2026-08-21 | **Accept with residual** |
 | Product / Lab Ops (optional) | | | |
 | Eng | | | |
 
-**Holds (block merge to `main`):**
-
-1. **TC-S7-001** — unassigned same-client start/link must 403/404. Observed: alice GET/start/link `CAR-T-Batch-001` succeeded via `has_project_access` same-client short-circuit (both NovaBio). Fixture 0058 clean; AuthZ defect.
-2. **TC-S12-001** — prod overlay must actually drop host `5432`. Observed: merged compose still publishes `db.ports` 5432 because overlay `ports: []` does not unset base.
-
-**Retest bar:**
-
-- Unassigned **same-client** start **and** other-client start both **403/404**.
-- Prod overlay must **actually drop** host **5432**.
+**Holds:** none. Prior TC-S7-001 / TC-S12-001 holds cleared on `9d583ac` retest; other-client S7 beat Pass at `e47f1ab` (0067).
 
 **Residuals (not holds):**
 
-- **TC-S11-003** own `created_by` empty tube SELECT **200** / PATCH **500** (Sec10, not a hold). Cross-client deny 404/404 passed.
-- **TC-S10-005** no JWT denylist — resent Bearer still 200 after logout.
+- **TC-S11-003** own `created_by` empty tube GET **200** / PATCH **500** (Sec10 follow-on, not a hold). Cross-client deny 404/404 passed.
 
-This stamp does **not** merge S7–S15 to `main`.
+This stamp is **Accept with residual**. Residual is not a hold.
 
 ---
 
@@ -397,8 +388,8 @@ This stamp does **not** merge S7–S15 to `main`.
 
 | ID | Retest bar | Result | Tester | Date | Notes |
 |----|------------|--------|--------|------|-------|
-| TC-S7-001 | alice GET/start/link CAR-T → 403/404; alice GET/start/link `XYZ-BA-0001` → 403/404; bob still 200 | | | | |
-| TC-S12-001 | `compose … prod config` — no host 5432 | | | | |
-| TC-S10-005+ | logout → resent Bearer → 401 | | | | |
+| TC-S7-001 | alice GET/start/link CAR-T → 403/404; alice GET/start/link `XYZ-BA-0001` → 403/404; bob still 200 | Pass | Tobias | 2026-08-21 | Same-client (`9d583ac`): CAR-T GET/start/link 404/404/404; bob start 200. Other-client (`e47f1ab` / 0067): `alice-tech` GET/start/link `XYZ-BA-0001` → 404/404/404. No payload. Sample present on Sponsor XYZ - Bioanalytical Services. 0067 seed unblocked the other-client beat. Compose down after the beat. |
+| TC-S12-001 | `compose … prod config` — no host 5432 | Pass | Tobias | 2026-08-21 | `9d583ac`: prod overlay no host 5432 |
+| TC-S10-005+ | logout → resent Bearer → 401 | Pass | Tobias | 2026-08-21 | `9d583ac`: denylist — resent Bearer 401 |
 
 **Deferred (not this retest):** TC-S11-003 own empty-tube PATCH 500 → Sec10 follow-on.
