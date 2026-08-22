@@ -19,6 +19,7 @@ Note: These fixtures assume migrations 0058 and 0059 have been applied.
 If using testcontainers with Base.metadata.create_all() (not Alembic),
 you'll need to manually seed the data or use the migrated_engine fixture
 from conftest.py.
+0067 adds XYZ-BA-0001 on the CRO bioanalytical project (lookup by name).
 """
 import pytest
 from sqlalchemy.orm import Session
@@ -193,6 +194,14 @@ def plasmid_lot_sample(db_session: Session) -> Sample:
     ).first()
 
 
+@pytest.fixture(scope="function")
+def xyz_ba_other_client_sample(db_session: Session) -> Sample:
+    """CRO other-client plasma sample for TC-S7-001 (0067; lookup by exact name)."""
+    return db_session.query(Sample).filter(
+        Sample.name == "XYZ-BA-0001"
+    ).first()
+
+
 # ============================================================================
 # Container Fixtures
 # ============================================================================
@@ -343,12 +352,12 @@ def cart_qc_batch(db_session: Session) -> Batch:
 # ============================================================================
 
 @pytest.fixture(scope="function")
-def mab_pk_full_scenario(db_session: Session, alice_user, mab_pk_project, 
+def mab_pk_full_scenario(db_session: Session, alice_user, mab_pk_project,
                          mab_pk_t0_sample, mab_pk_t1_sample, mab_pk_t2_sample,
                          mab_pk_t0_elisa_test, mab_elisa_batch):
     """
     Full mAb PK study scenario: project, samples, tests, batch.
-    
+
     Returns dict with:
     - user: alice_user (Lab Technician)
     - project: mAb-2301 PK Study
@@ -378,7 +387,7 @@ def cart_qc_scenario(db_session: Session, bob_user, cart_project,
                      cart_qc_batch):
     """
     CAR-T In-Process QC scenario: project, samples (regular + QC blank), tests, batch.
-    
+
     Returns dict with:
     - user: bob_user (Lab Technician)
     - project: CAR-T In-Process Testing
@@ -400,12 +409,12 @@ def cart_qc_scenario(db_session: Session, bob_user, cart_project,
 
 
 @pytest.fixture(scope="function")
-def multi_user_rbac_scenario(db_session: Session, alice_user, bob_user, 
+def multi_user_rbac_scenario(db_session: Session, alice_user, bob_user,
                               carol_manager, david_cro_client,
                               mab_pk_project, cart_project, cro_sponsor_project):
     """
     Multi-user RBAC scenario: 4 users with different roles and project access.
-    
+
     Returns dict with:
     - alice: Lab Tech (mAb PK project only)
     - bob: Lab Tech (CAR-T project only)
