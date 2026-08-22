@@ -39,15 +39,16 @@
 
 ## P4 — Cookie AuthN (S10 expanded)
 
-- [ ] httpOnly Secure SameSite cookie (or BFF) design in tech sketch detail  
-- [ ] Login/logout/me + frontend credentials  
-- [ ] CSRF strategy  
-- [ ] Remove localStorage token reliance  
-- [ ] manuals/backend-auth + README honesty  
+- [x] httpOnly Secure SameSite cookie design in tech sketch §8 (locked 2026-08-21)  
+- [x] Login/logout/me + frontend `withCredentials`  
+- [x] CSRF: SameSite=Lax + double-submit (`nimble_csrf` + `X-CSRF-Token`)  
+- [x] Remove localStorage token reliance (SPA)  
+- [x] manuals/backend-auth + hasPermission UX-only honesty  
+- [x] Tests (`test_security_p4_s10_cookies.py`)  
 
 ## Docs / UAT / merge
 
-- [ ] `UAT_Scripts/uat-security-med-low-s7-s15.md`  
-- [ ] Update codebase.md S7–S15 statuses  
-- [ ] UAT pass per phase  
+- [x] `UAT_Scripts/uat-security-med-low-s7-s15.md`  
+- [x] Update codebase.md S7–S15 statuses (all Met on branch)  
+- [ ] UAT pass per phase (live dogfood)  
 - [ ] Merge to `main` (after High branch merge strategy decided)  

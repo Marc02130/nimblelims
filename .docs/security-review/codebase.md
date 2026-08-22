@@ -12,20 +12,20 @@
 
 The original audit (HEAD `6a21c947`) found the app connected as the Postgres superuser, seeded SHA256 defaults, a JWT env mismatch, body logging, unbound aliquot execute, and write-back by raw `sample_id`.
 
-Tobias live UAT on `security/high-s1-s6` @ `1d3762a`: **S1–S6 Met**, including Sec9 (labtech TC-S5-004 200 after 0062). The High packet is **Accept**. This stamp does **not** merge the remediation to `main` and does not make the whole product production-ready. **S7–S15** stay Open — tracked in packet **security-med-low-s7-s15** (phased P1–P4). Med residual note: 0062 `created_by` FOR ALL → OQ-S11a in that packet.
+Tobias live UAT on `security/high-s1-s6` @ `1d3762a`: **S1–S6 Met**, including Sec9 (labtech TC-S5-004 200 after 0062). The High packet is **Accept**. Med/Low **S7–S15** implemented on `security/med-low-s7-s15` (P1–P4 including cookie AuthN); live UAT / merge to `main` still pending. This stamp does **not** make the whole product production-ready until High+Med land and UAT signs off.
 
 ## Surface delta
 
 | Surface | Risk after restamp |
 |---------|---------------------|
-| AuthN | S2 + S3 Met |
-| RLS / `lims_app` | S1 Met |
-| Save / submit / write-back | S6 Met |
+| AuthN | S2 + S3 Met; S10 cookie AuthN Met (P4); S15 lockout Met |
+| RLS / `lims_app` | S1 Met; S11 FORCE + contents Met (P3) |
+| Save / submit / write-back | S6 Met; S14 allowlist Met |
 | Aliquot execute | S5 Met including dest INSERT |
-| Experiment/run start | S7 still open |
-| Parsers / SOP / import | S8 still open |
-| Frontend token + `hasPermission` | S10 still open |
-| Compose / logs | S4 Met. S12 still open. |
+| Experiment/run start | S7 Met (P2 access gate) |
+| Parsers / SOP / import | S8 Met (10 MB caps) |
+| Frontend token + `hasPermission` | S10 Met (P4 cookie AuthN; `hasPermission` UX only) |
+| Compose / logs | S4 Met; S12 prod overlay Met |
 
 ## STRIDE (scoped)
 
@@ -51,7 +51,7 @@ Tobias live UAT on `security/high-s1-s6` @ `1d3762a`: **S1–S6 Met**, including
 | S7 | Med | **Met (P2)** | Start/link/run cohort: `require_accessible_sample` (RLS + has_project_access). |
 | S8 | Med | **Met (P1)** | Cap `import-file` and SOP uploads (10 MB) + nginx. |
 | S9 | Med | **Met (P1)** | Authenticate `POST /results/validate` (`result:enter`\|`review`). |
-| S10 | Med | Open | `localStorage` JWT + client `hasPermission` are not AuthZ. |
+| S10 | Med | **Met (P4)** | httpOnly `nimble_access` + double-submit CSRF; SPA dropped `localStorage` JWT. `hasPermission` remains UX only (documented). |
 | S11 | Med | **Met (P3)** | FORCE RLS on samples/tests/results/projects/batches/containers/client_projects; contents RLS; containers INSERT vs SELECT/UPDATE/DELETE split (`0064`). |
 | S12 | Med | **Met (P3)** | `docker-compose.prod.yml` clears DB host ports; requires secrets. |
 | S13 | Low | **Met (P1)** | verify-email no existence leak; GET `/roles` `/permissions` need manage/config. |
@@ -69,7 +69,7 @@ Tobias live UAT on `security/high-s1-s6` @ `1d3762a`: **S1–S6 Met**, including
 
 | Field | Value |
 |-------|--------|
-| **Verdict** | **Revise** (whole product; S7–S15 remain) |
+| **Verdict** | **Revise** (whole product until High+Med merge + live UAT; findings Met on remediation branches) |
 | **High S1–S6 packet** | **Accept** |
 | **Date** | 2026-08-21 |
 | **Hold S1–S6 packet?** | **No** |

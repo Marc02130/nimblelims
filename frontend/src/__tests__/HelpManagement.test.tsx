@@ -15,6 +15,7 @@ jest.mock('../services/apiService', () => ({
     updateHelpEntry: jest.fn(),
     deleteHelpEntry: jest.fn(),
     setAuthToken: jest.fn(),
+    logout: jest.fn().mockResolvedValue(undefined),
     getCurrentUser: jest.fn(),
   },
 }));

@@ -23,7 +23,7 @@
 P1: routers (upload, validate, roles) + entry allowlist constants
 P2: experiment_service / lims_run start + login_throttle
 P3: Alembic FORCE RLS + compose.prod.yml
-P4: docs only
+P4: httpOnly cookie AuthN + SameSite=Lax + double-submit CSRF (OQ-S10 expanded)
 ```
 
 S7 must not invent a second authorization model: prefer “query Sample under current GUC / lims_app” so RLS remains SoT.

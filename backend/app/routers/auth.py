@@ -2,7 +2,7 @@
 Authentication router for NimbleLims
 """
 from datetime import timedelta
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
 from app.database import get_db
@@ -24,8 +24,14 @@ from app.core.security import (
     get_user_permissions,
     set_current_user_id,
     get_current_user,
+    require_csrf_for_cookie_auth,
 )
 from app.core.config import ACCESS_TOKEN_EXPIRE_MINUTES
+from app.core.auth_cookies import (
+    set_auth_cookies,
+    clear_auth_cookies,
+    get_access_token_from_cookie,
+)
 
 router = APIRouter()
 
@@ -46,6 +52,7 @@ def _issue_token(user: User, permissions: list, *, must_change: bool) -> str:
 @router.post("/login", response_model=LoginResponse)
 async def login(
     login_data: LoginRequest,
+    response: Response,
     db: Session = Depends(get_db),
 ):
     """
@@ -127,6 +134,9 @@ async def login(
         client_id=str(user.client_id) if user.client_id else None,
     )
 
+    # P4 / S10: httpOnly access + double-submit CSRF cookies for SPA
+    set_auth_cookies(response, access_token)
+
     return LoginResponse(
         access_token=access_token,
         user_id=str(user.id),
@@ -141,6 +151,7 @@ async def login(
 @router.post("/change-password", response_model=ChangePasswordResponse)
 async def change_password(
     body: ChangePasswordRequest,
+    response: Response,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -170,6 +181,7 @@ async def change_password(
 
     permissions = get_user_permissions(current_user, db)
     token = _issue_token(current_user, permissions, must_change=False)
+    set_auth_cookies(response, token)
 
     return ChangePasswordResponse(
         access_token=token,
@@ -178,13 +190,25 @@ async def change_password(
     )
 
 
+@router.post("/logout")
+async def logout(request: Request, response: Response):
+    """
+    Clear auth cookies. If a cookie session is present, require CSRF (double-submit).
+    Always clears cookies so the SPA can recover from a half-expired session.
+    """
+    if get_access_token_from_cookie(request):
+        require_csrf_for_cookie_auth(request, "cookie")
+    clear_auth_cookies(response)
+    return {"message": "Logged out"}
+
+
 @router.get("/me")
 async def get_me(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """
-    Get current authenticated user information
+    Get current authenticated user information (cookie or Bearer).
     """
     permissions = get_user_permissions(current_user, db)
 
