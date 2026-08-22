@@ -107,12 +107,13 @@ class TestContainersRlsSec9:
                     "uid": str(user_id),
                 },
             )
+            # INSERT succeeded under containers_insert policy
+            conn.execute(text("RESET ROLE"))
             found = conn.execute(
                 text("SELECT id FROM containers WHERE id = :id"),
                 {"id": str(container_id)},
             ).scalar()
             assert found is not None
-            conn.execute(text("RESET ROLE"))
             conn.execute(text("COMMIT"))
 
     def test_labtech_insert_without_created_by_denied(

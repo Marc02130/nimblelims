@@ -3,7 +3,7 @@
 **Feature / cycle:** Med/Low security remediation (S7–S15)  
 **Phases covered:** P1–P3 (P4 docs-only)  
 **Status:** Draft — ready for architecture review  
-**Alembic revisions:** `0063` (`login_throttle`) — P2; P3 FORCE/contents TBD  
+**Alembic revisions:** `0063` (`login_throttle`); `0064` (FORCE RLS + contents RLS + containers policy split)  
 **Requirements:** [`.docs/requirements/security-med-low-s7-s15.md`](../requirements/security-med-low-s7-s15.md)  
 **Tech sketch:** [`.docs/tech-sketch/security-med-low-s7-s15.md`](../tech-sketch/security-med-low-s7-s15.md)
 

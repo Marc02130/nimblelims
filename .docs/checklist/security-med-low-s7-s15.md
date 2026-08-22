@@ -31,11 +31,11 @@
 
 ## P3 — Platform (S11, S12)
 
-- [ ] FORCE RLS migration(s)  
-- [ ] Containers policy: INSERT-only `created_by`; no committed empty containers  
-- [ ] `contents` RLS + policy  
-- [ ] Prod compose overlay (no published 5432)  
-- [ ] RLS regression tests  
+- [x] FORCE RLS migration `0064`  
+- [x] Containers policies split (INSERT `created_by`; UPDATE/DELETE via contents/project)  
+- [x] `contents` RLS + FORCE + policy  
+- [x] `docker-compose.prod.yml` (ports: [] on db)  
+- [x] Tests (`test_security_p3_s11_s12.py`)  
 
 ## P4 — Cookie AuthN (S10 expanded)
 

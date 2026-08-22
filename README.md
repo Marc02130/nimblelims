@@ -48,7 +48,7 @@ This project uses a four-container Docker setup:
    - Frontend: http://localhost:3000
    - Backend API: http://localhost:8000
    - API Documentation: http://localhost:8000/docs
-   - Database: localhost:5432
+   - Database: localhost:5432 (local compose only — **S12:** production uses `docker-compose.prod.yml` which does **not** publish Postgres)
 
 4. **Login with admin credentials**
    - Username: `admin`

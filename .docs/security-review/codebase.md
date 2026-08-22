@@ -52,8 +52,8 @@ Tobias live UAT on `security/high-s1-s6` @ `1d3762a`: **S1–S6 Met**, including
 | S8 | Med | **Met (P1)** | Cap `import-file` and SOP uploads (10 MB) + nginx. |
 | S9 | Med | **Met (P1)** | Authenticate `POST /results/validate` (`result:enter`\|`review`). |
 | S10 | Med | Open | `localStorage` JWT + client `hasPermission` are not AuthZ. |
-| S11 | Med | Open | FORCE RLS on remaining tenant tables; `SET LOCAL` + bind GUC. |
-| S12 | Med | Open | Do not publish `:5432` with default password. |
+| S11 | Med | **Met (P3)** | FORCE RLS on samples/tests/results/projects/batches/containers/client_projects; contents RLS; containers INSERT vs SELECT/UPDATE/DELETE split (`0064`). |
+| S12 | Med | **Met (P3)** | `docker-compose.prod.yml` clears DB host ports; requires secrets. |
 | S13 | Low | **Met (P1)** | verify-email no existence leak; GET `/roles` `/permissions` need manage/config. |
 | S14 | Low | **Met (P1)** | biotype/temperature removed from write-back allowlist; remain system display. |
 | S15 | Low | **Met (P2)** | Postgres `login_throttle`; lock after N failures (429). |
