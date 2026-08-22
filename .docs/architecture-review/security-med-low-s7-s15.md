@@ -14,7 +14,8 @@
 | 3 | S9 auth on validate | **Accept** |
 | 4 | S11 FORCE RLS + OQ on contents/containers | **Accept — conditions** |
 | 5 | S12 prod overlay without published 5432 | **Accept** |
-| 6 | S15 in-memory throttle v1 | **Accept provisional** |
+| 6 | S15 Postgres `login_throttle` | **Accept** (OQ-S15 Decided) |
+| 7 | S10 httpOnly cookies | **Accept with conditions** — CSRF + SameSite design before code (OQ-S10 expanded) |
 
 ## Architecture notes
 

@@ -12,9 +12,8 @@
 - [x] Schema-changes  
 - [x] Open questions  
 - [x] CEO / Arch / Security / QA reviews drafted  
-- [ ] Reviews Accept  
-- [ ] OQ-S9 / OQ-S14 decided (or provisional lean accepted)  
-- [ ] OQ-S11a/b decided before P3  
+- [ ] Reviews Accept (re-confirm P4 cookie scope with CEO if needed)  
+- [x] OQs decided (2026-08-21) — S9 enter\|review; S10 cookies; S11a atomic+INSERT-only created_by; S11b contents RLS; S12 prod overlay; S14 drop write-back; S15 Postgres table  
 
 ## P1 — Quick harden (S8, S9, S13, S14)
 
@@ -27,19 +26,24 @@
 ## P2 — Access & abuse (S7, S15)
 
 - [ ] Start/link sample access via RLS/session  
-- [ ] Login throttle / lockout  
+- [ ] `login_throttle` table + lockout service  
 - [ ] Tests  
 
 ## P3 — Platform (S11, S12)
 
 - [ ] FORCE RLS migration(s)  
-- [ ] Containers created_by residual decision implemented  
+- [ ] Containers policy: INSERT-only `created_by`; no committed empty containers  
+- [ ] `contents` RLS + policy  
 - [ ] Prod compose overlay (no published 5432)  
 - [ ] RLS regression tests  
 
-## P4 — Honesty (S10)
+## P4 — Cookie AuthN (S10 expanded)
 
-- [ ] manuals/backend-auth + README + frontend comments  
+- [ ] httpOnly Secure SameSite cookie (or BFF) design in tech sketch detail  
+- [ ] Login/logout/me + frontend credentials  
+- [ ] CSRF strategy  
+- [ ] Remove localStorage token reliance  
+- [ ] manuals/backend-auth + README honesty  
 
 ## Docs / UAT / merge
 

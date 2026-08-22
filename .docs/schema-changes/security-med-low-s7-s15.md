@@ -17,7 +17,7 @@ Mostly **policy / FORCE RLS / compose**—few or no new business tables. Optiona
 
 | Table | Purpose | Notes |
 |-------|---------|-------|
-| _(optional)_ `login_throttle` | Persist failures/lockouts across workers | Only if in-memory rejected for multi-replica |
+| `login_throttle` | Persist login failures/lockouts (S15) | Decided — Postgres, not Redis/memory |
 
 ### 2.2 Altered tables
 
@@ -25,13 +25,14 @@ Mostly **policy / FORCE RLS / compose**—few or no new business tables. Optiona
 |-------|--------|-------|
 | — | None required for P1 | S14 is allowlist code constant |
 | Various tenant tables | `FORCE ROW LEVEL SECURITY` | S11 |
+| `contents` | ENABLE RLS (+ FORCE) + policy | OQ-S11b Decided |
 
 ### 2.3 RLS
 
 | Object | Policy change | Notes |
 |--------|---------------|-------|
-| `containers` | Optional tighten of 0062 `created_by` FOR ALL | OQ-S11a |
-| `contents` | Optional ENABLE (+ FORCE) + policy | OQ-S11b |
+| `containers` | Tighten 0062: `created_by` on INSERT WITH CHECK only | OQ-S11a Decided |
+| `contents` | New policy (sample/project access) | OQ-S11b Decided |
 | samples, tests, results, projects, batches, containers, … | FORCE where policies exist | S11 |
 
 ### 2.4 Compose / infra (not Alembic)

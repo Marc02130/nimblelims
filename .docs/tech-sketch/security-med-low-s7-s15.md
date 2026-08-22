@@ -17,29 +17,29 @@ High S1–S6 Met on `security/high-s1-s6`. This sketch is *how* to close S7–S1
 | Finding | Approach |
 |---------|----------|
 | **S8** | Shared helper `assert_upload_max_bytes(file, max=10_485_760)` used by `lims_runs.import-file`, `sop_parse` uploads; nginx `client_max_body_size 10m` on API location. |
-| **S9** | Add `Depends(get_current_user)` + `require_any_permission(["result:enter","result:review","result:read"])` on `POST /results/validate`. |
+| **S9** | Add `Depends(get_current_user)` + `require_any_permission(["result:enter","result:review"])` on `POST /results/validate`. |
 | **S13** | `GET /roles`, `GET /permissions` → `require_any_permission(["user:manage","config:edit"])`. `verify-email`: if stub, return generic message always; gate behind `ENVIRONMENT!=production` or require signed token; rate-limit with S15 helper if available. |
-| **S14** | Remove `specimen_biotype_id` and `temperature` from `SAMPLE_WRITE_BACK_COLUMNS` **or** from system-RO labeling per OQ-S14; fail closed in `_apply_write_back` if somehow linked. |
+| **S14** | Remove `specimen_biotype_id` and `temperature` from `SAMPLE_WRITE_BACK_COLUMNS`; keep in `SAMPLE_SYSTEM_FIELDS` as display. Fail closed in `_apply_write_back`. |
 
 ### P2 — Access & abuse
 
 | Finding | Approach |
 |---------|----------|
 | **S7** | In `ExperimentService.start_experiment` / `link_sample_to_experiment` / lims run start: after sample fetch, assert access using existing RLS (query sample as current user—if invisible, 404) **or** explicit `has_project_access` check mirroring DB function. Prefer “select sample under current session GUC” so RLS is single source of truth. Same for run cohort start. |
-| **S15** | In-memory dict `(username_normalized → {count, locked_until})` + optional Redis later. On failed login increment; on success clear. Config: `LOGIN_MAX_FAILURES=5`, `LOGIN_LOCKOUT_MINUTES=15`. Return 429 with `Retry-After` when locked. |
+| **S15** | Table `login_throttle` (username PK/unique, failure_count, window_started_at, locked_until). On failed login upsert/increment; on success delete/clear. Config: `LOGIN_MAX_FAILURES=5`, `LOGIN_LOCKOUT_MINUTES=15`. Return **429** + `Retry-After` when locked. |
 
 ### P3 — Platform
 
 | Finding | Approach |
 |---------|----------|
-| **S11** | Alembic: `ALTER TABLE … FORCE ROW LEVEL SECURITY` for tenant tables that have policies but FORCE off (`samples`, `tests`, `results`, `projects`, `batches`, `containers`, …). Migrator stays table owner/superuser path. Re-test RLS suite as `lims_app` / `app_test_role`. Resolve OQ-S11a/b (containers created_by scope; contents RLS). |
-| **S12** | Add `docker-compose.prod.yml` (or profile `prod`) that omits `db.ports` and requires secrets; keep base compose for local with published 5432 + warning in README. |
+| **S11** | FORCE RLS on tenant tables with policies. Tighten containers: `created_by` on **INSERT WITH CHECK** only; SELECT via admin/project/contents. Aliquot dest: one txn, rollback if no contents. Enable **contents** RLS + policy (sample/project). Re-test as `lims_app`. |
+| **S12** | `docker-compose.prod.yml` overlay omits `db.ports`; requires secrets. Local compose may keep 5432. |
 
-### P4 — Honesty
+### P4 — Cookie AuthN (expanded S10)
 
 | Finding | Approach |
 |---------|----------|
-| **S10** | Update `manuals/backend-auth.md`, README security bullets, `UserContext.hasPermission` comment, apiService interceptor comment. |
+| **S10** | Issue JWT (or opaque session) in **httpOnly Secure SameSite** cookie on login; stop storing token in `localStorage`. Axios `withCredentials`. CSRF strategy (SameSite=Lax + careful mutations, or CSRF token). Logout clears cookie. Docs: `hasPermission` remains UX only. |
 
 ## 3. S7 access check (preferred)
 
@@ -55,24 +55,24 @@ start_experiment(sample_ids):
 
 If any code path uses migrator URL or bypasses GUC, add explicit service-layer check—do not rely on “sample exists” via owner connection.
 
-## 4. S15 sketch
+## 4. S15 sketch (Postgres)
 
-```python
-# app/core/login_throttle.py
-class LoginThrottle:
-    def check(self, username: str) -> None:  # raises 429 if locked
-    def record_failure(self, username: str) -> None
-    def record_success(self, username: str) -> None
+```sql
+CREATE TABLE login_throttle (
+  username_normalized TEXT PRIMARY KEY,
+  failure_count INT NOT NULL DEFAULT 0,
+  window_started_at TIMESTAMPTZ NOT NULL,
+  locked_until TIMESTAMPTZ NULL
+);
 ```
 
-Wire in `auth.login` only; no password in keys/logs.
+Service: `check` / `record_failure` / `record_success` in `auth.login`. No password stored.
 
-## 5. S11 containers residual (0062)
+## 5. S11 containers + empty-container product rule (Decided)
 
-**Option A (tighten):** policy USING for SELECT stays project/contents OR admin; WITH CHECK for INSERT = created_by OR admin; UPDATE/DELETE require project link or admin.  
-**Option B (accept):** document that creator can always see containers they created even without contents yet—acceptable for aliquot dest lifecycle.
-
-Default recommendation: **A** if cheap; else **B** Deferred with residual on codebase.md.
+- **INSERT WITH CHECK:** `is_admin() OR created_by = current_user_id()`  
+- **USING (SELECT/UPDATE/DELETE):** `is_admin() OR EXISTS (contents→sample→has_project_access)`  
+- Aliquot execute: single transaction; if contents insert fails → rollback (no committed empty container).
 
 ## 6. Tests
 
