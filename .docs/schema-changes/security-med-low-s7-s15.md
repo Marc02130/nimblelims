@@ -1,15 +1,15 @@
 # Schema changes: security-med-low-s7-s15
 
 **Feature / cycle:** Med/Low security remediation (S7–S15)  
-**Phases covered:** P1–P3 (P4 docs-only)  
-**Status:** Draft — ready for architecture review  
-**Alembic revisions:** `0063` (`login_throttle`); `0064` (FORCE RLS + contents RLS + containers policy split)  
+**Phases covered:** P1–P4 + UAT hold fixes  
+**Status:** Implemented on branch  
+**Alembic revisions:** `0063` (`login_throttle`); `0064` (FORCE RLS + contents + containers); **`0065`** (`has_project_access` project_users for lab staff); **`0066`** (`revoked_tokens`)  
 **Requirements:** [`.docs/requirements/security-med-low-s7-s15.md`](../requirements/security-med-low-s7-s15.md)  
 **Tech sketch:** [`.docs/tech-sketch/security-med-low-s7-s15.md`](../tech-sketch/security-med-low-s7-s15.md)
 
 ## 1. Summary
 
-Mostly **policy / FORCE RLS / compose**—few or no new business tables. Optional lockout persistence table if not in-memory-only for S15.
+Policy / FORCE RLS / compose / cookie AuthN, plus UAT hold fixes: role-aware `has_project_access`, JWT jti denylist.
 
 ## 2. Delta
 
@@ -17,7 +17,8 @@ Mostly **policy / FORCE RLS / compose**—few or no new business tables. Optiona
 
 | Table | Purpose | Notes |
 |-------|---------|-------|
-| `login_throttle` | Persist login failures/lockouts (S15) | Decided — Postgres, not Redis/memory |
+| `login_throttle` | Persist login failures/lockouts (S15) | Postgres, not Redis |
+| `revoked_tokens` | JWT `jti` denylist on logout (S10 residual) | `0066` |
 
 ### 2.2 Altered tables
 
@@ -27,19 +28,20 @@ Mostly **policy / FORCE RLS / compose**—few or no new business tables. Optiona
 | Various tenant tables | `FORCE ROW LEVEL SECURITY` | S11 |
 | `contents` | ENABLE RLS (+ FORCE) + policy | OQ-S11b Decided |
 
-### 2.3 RLS
+### 2.3 RLS / functions
 
 | Object | Policy change | Notes |
 |--------|---------------|-------|
 | `containers` | Tighten 0062: `created_by` on INSERT WITH CHECK only | OQ-S11a Decided |
 | `contents` | New policy (sample/project access) | OQ-S11b Decided |
 | samples, tests, results, projects, batches, containers, … | FORCE where policies exist | S11 |
+| `has_project_access` | Lab staff → `project_users` only; Client keeps same-client | `0065` / TC-S7-001 |
 
 ### 2.4 Compose / infra (not Alembic)
 
 | Object | Change |
 |--------|--------|
-| `docker-compose.prod.yml` or profile | No host bind for 5432; secrets required |
+| `docker-compose.prod.yml` | `ports: !reset []` — plain `ports: []` does **not** clear base `5432` |
 
 ## 3. Data migration / backfill
 

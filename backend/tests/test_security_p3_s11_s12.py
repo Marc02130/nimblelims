@@ -64,9 +64,61 @@ class TestS11ForceRls:
 
 class TestS12ProdCompose:
     def test_prod_overlay_clears_db_ports(self):
+        """Overlay must use !reset — plain ports: [] does not unset base 5432."""
+        import subprocess
+
         root = Path(__file__).resolve().parents[2]
         prod = (root / "docker-compose.prod.yml").read_text()
-        assert "ports: []" in prod or "ports:[]" in prod.replace(" ", "")
-        assert "ENVIRONMENT: production" in prod or 'ENVIRONMENT: production' in prod
+        assert "!reset" in prod
+        assert "ENVIRONMENT: production" in prod
         assert "ALLOW_INSECURE_DEFAULTS" in prod
         assert "POSTGRES_PASSWORD" in prod
+
+        # Live merge check (Compose v2+); skip if docker unavailable
+        import os
+
+        try:
+            result = subprocess.run(
+                [
+                    "docker",
+                    "compose",
+                    "-f",
+                    str(root / "docker-compose.yml"),
+                    "-f",
+                    str(root / "docker-compose.prod.yml"),
+                    "config",
+                ],
+                capture_output=True,
+                text=True,
+                timeout=60,
+                cwd=str(root),
+                env={
+                    **os.environ,
+                    "POSTGRES_PASSWORD": "test-only",
+                    "SECRET_KEY": "test-only-secret-key-not-prod",
+                    "LIMS_APP_PASSWORD": "test-only",
+                },
+            )
+        except (FileNotFoundError, subprocess.TimeoutExpired):
+            pytest.skip("docker compose not available")
+        if result.returncode != 0:
+            pytest.skip(f"compose config failed: {result.stderr[:200]}")
+
+        # Extract db service block; must not publish host 5432
+        in_db = False
+        db_lines = []
+        for line in result.stdout.splitlines():
+            if line.startswith("  db:"):
+                in_db = True
+                db_lines.append(line)
+                continue
+            if in_db:
+                if (
+                    line.startswith("  ")
+                    and not line.startswith("    ")
+                    and line.strip().endswith(":")
+                ):
+                    break
+                db_lines.append(line)
+        db_text = "\n".join(db_lines)
+        assert "5432" not in db_text, f"prod merge still mentions 5432 under db:\n{db_text}"

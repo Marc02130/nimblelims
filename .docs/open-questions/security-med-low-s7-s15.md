@@ -12,6 +12,8 @@
 | OQ-S12 | Prod DB port exposure | **Decided** | P3 | **`docker-compose.prod.yml` overlay**; no host `:5432`. Local compose may keep published port. | 2026-08-21 | Eng |
 | OQ-S14 | biotype / temperature dual role | **Decided** | P1 | **Drop from `SAMPLE_WRITE_BACK_COLUMNS`**; keep as sample system display (RO in grids). | 2026-08-21 | Product |
 | OQ-S15 | Login lockout storage | **Decided** | P2 | **Postgres table** (no Redis). Survives restarts/workers. | 2026-08-21 | Eng |
+| OQ-S7-retest | Unassigned same-client lab access | **Decided** | UAT hold fix | **Lab Technician / Lab Manager** (non-System): **`project_users` only** — no same-client / `client_projects` short-circuit. **Client** role keeps same-client. Admin + System client unchanged. Migration `0065`. | 2026-08-21 | Product + Security |
+| OQ-S10-denylist | Logout revoke JWT | **Decided** | UAT residual | **Postgres `revoked_tokens` (jti)** on logout (+ password change). No Redis. Migration `0066`. | 2026-08-21 | Security |
 
 ## Gate rule
 

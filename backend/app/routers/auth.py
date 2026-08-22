@@ -151,6 +151,7 @@ async def login(
 @router.post("/change-password", response_model=ChangePasswordResponse)
 async def change_password(
     body: ChangePasswordRequest,
+    request: Request,
     response: Response,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -173,6 +174,19 @@ async def change_password(
             detail={"code": "password_complexity", "errors": errors},
         )
 
+    # Revoke the presenting token so prior Bearer/cookie JWT cannot linger
+    from app.services.token_revoke import revoke_raw_jwt
+    from fastapi.security.utils import get_authorization_scheme_param
+
+    presenting = get_access_token_from_cookie(request)
+    if not presenting:
+        auth = request.headers.get("Authorization")
+        scheme, param = get_authorization_scheme_param(auth)
+        if scheme.lower() == "bearer" and param:
+            presenting = param
+    if presenting:
+        revoke_raw_jwt(db, presenting)
+
     current_user.password_hash = get_password_hash(body.new_password)
     current_user.must_change_password = False
     db.add(current_user)
@@ -191,13 +205,32 @@ async def change_password(
 
 
 @router.post("/logout")
-async def logout(request: Request, response: Response):
+async def logout(
+    request: Request,
+    response: Response,
+    db: Session = Depends(get_db),
+):
     """
-    Clear auth cookies. If a cookie session is present, require CSRF (double-submit).
-    Always clears cookies so the SPA can recover from a half-expired session.
+    Revoke current JWT (jti denylist) and clear auth cookies.
+    Cookie sessions require CSRF; Bearer logout skips CSRF.
     """
-    if get_access_token_from_cookie(request):
+    from app.services.token_revoke import revoke_raw_jwt
+    from fastapi.security.utils import get_authorization_scheme_param
+
+    cookie_token = get_access_token_from_cookie(request)
+    bearer_token = None
+    auth = request.headers.get("Authorization")
+    scheme, param = get_authorization_scheme_param(auth)
+    if scheme.lower() == "bearer" and param:
+        bearer_token = param
+
+    if cookie_token and not bearer_token:
         require_csrf_for_cookie_auth(request, "cookie")
+
+    for tok in (cookie_token, bearer_token):
+        if tok:
+            revoke_raw_jwt(db, tok)
+
     clear_auth_cookies(response)
     return {"message": "Logged out"}
 

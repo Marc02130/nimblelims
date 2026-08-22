@@ -50,5 +50,7 @@
 
 - [x] `UAT_Scripts/uat-security-med-low-s7-s15.md`  
 - [x] Update codebase.md S7–S15 statuses (all Met on branch)  
-- [ ] UAT pass per phase (live dogfood)  
-- [ ] Merge to `main` (after High branch merge strategy decided)  
+- [ ] UAT pass per phase (live dogfood) — **2026-08-21 Fail for merge** (TC-S7-001, TC-S12-001); fixes on branch pending retest  
+- [x] UAT hold fixes: `0065` project_users AuthZ; `ports: !reset []`; `0066` JWT denylist  
+- [ ] Retest TC-S7-001 / TC-S12-001 / logout Bearer 401  
+- [ ] Merge to `main` (after retest Pass)  
