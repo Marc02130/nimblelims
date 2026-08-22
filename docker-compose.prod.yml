@@ -1,0 +1,24 @@
+# Production overlay — use with:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# S12: do NOT publish Postgres to the host; require real secrets via env/`.env`.
+# Local dogfood continues to use docker-compose.yml alone (5432 published).
+
+services:
+  db:
+    ports: []
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD for production}
+
+  backend:
+    environment:
+      ENVIRONMENT: production
+      ALLOW_INSECURE_DEFAULTS: "false"
+      ALLOW_DEV_SEED_USERS: "false"
+      SECRET_KEY: ${SECRET_KEY:?Set a strong SECRET_KEY}
+      JWT_SECRET_KEY: ${SECRET_KEY}
+      LIMS_APP_PASSWORD: ${LIMS_APP_PASSWORD:?Set LIMS_APP_PASSWORD}
+      DATABASE_URL: postgresql://lims_app:${LIMS_APP_PASSWORD}@db:5432/lims_db
+      MIGRATE_DATABASE_URL: postgresql://lims_user:${POSTGRES_PASSWORD}@db:5432/lims_db
+      DB_PASSWORD: ${LIMS_APP_PASSWORD}
+      DEBUG: "False"
