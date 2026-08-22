@@ -91,3 +91,8 @@ CORS_ORIGINS = [
 
 ENVIRONMENT = (os.getenv("ENVIRONMENT") or "development").strip().lower()
 ALLOW_DEV_SEED_USERS = _env_flag("ALLOW_DEV_SEED_USERS")
+
+# S15 login lockout
+LOGIN_MAX_FAILURES = int(os.getenv("LOGIN_MAX_FAILURES") or "5")
+LOGIN_LOCKOUT_MINUTES = int(os.getenv("LOGIN_LOCKOUT_MINUTES") or "15")
+LOGIN_FAILURE_WINDOW_MINUTES = int(os.getenv("LOGIN_FAILURE_WINDOW_MINUTES") or "15")

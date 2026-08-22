@@ -67,4 +67,5 @@ from .entry import (
 # Additional models referenced via relationships or used in the app
 from .dose_response import DoseResponseResult, LimsRunDataExclusion
 from .template_well import TemplateWellDefinition
+from .login_throttle import LoginThrottle
 
