@@ -184,17 +184,21 @@ async def verify_email(
     db: Session = Depends(get_db),
 ):
     """
-    Verify user email address (stub implementation)
-    """
-    user = db.query(User).filter(User.email == verify_data.email).first()
+    Verify user email address (stub).
 
-    if not user:
+    S13: do not leak whether the email exists. Production disables the stub.
+    """
+    from app.core.config import ENVIRONMENT
+
+    if ENVIRONMENT in ("production", "prod"):
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found",
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            detail="Email verification is not configured",
         )
 
+    # Always same response shape — no user-existence oracle
+    _ = db.query(User).filter(User.email == verify_data.email).first()
     return VerifyEmailResponse(
-        message="Email verification successful",
+        message="If an account exists for that email, verification instructions apply",
         verified=True,
     )

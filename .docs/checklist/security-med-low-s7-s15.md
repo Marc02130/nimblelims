@@ -17,11 +17,11 @@
 
 ## P1 — Quick harden (S8, S9, S13, S14)
 
-- [ ] Upload 10 MB caps (import-file + SOP) + nginx align  
-- [ ] AuthN + permission on `/results/validate`  
-- [ ] Tighten GET `/roles` `/permissions`; verify-email hygiene  
-- [ ] Write-back allowlist vs system fields (S14)  
-- [ ] Tests  
+- [x] Upload 10 MB caps (import-file + SOP) + nginx `client_max_body_size 10m`  
+- [x] AuthN + `result:enter`|`review` on `/results/validate`  
+- [x] Tighten GET `/roles` `/permissions`; verify-email no existence leak  
+- [x] Drop biotype/temperature from write-back allowlist (S14)  
+- [x] Tests (`test_security_p1_s8_s9_s13_s14.py`)  
 
 ## P2 — Access & abuse (S7, S15)
 

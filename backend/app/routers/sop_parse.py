@@ -41,8 +41,12 @@ async def create_parse_job(
     Returns 202 Accepted with job_id immediately.
     Poll GET /sop-parse/{id} to check status.
     """
-    sop_bytes = await sop_file.read()
-    instrument_bytes = await instrument_file.read()
+    from app.core.uploads import read_upload_capped
+
+    sop_bytes = await read_upload_capped(sop_file, field_name=sop_file.filename or "sop_file")
+    instrument_bytes = await read_upload_capped(
+        instrument_file, field_name=instrument_file.filename or "instrument_file"
+    )
 
     # Decode file bytes to text (UTF-8 with BOM stripping)
     sop_text = sop_bytes.decode("utf-8-sig", errors="replace")

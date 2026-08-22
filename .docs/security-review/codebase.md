@@ -49,13 +49,13 @@ Tobias live UAT on `security/high-s1-s6` @ `1d3762a`: **S1–S6 Met**, including
 | S5 | High | **Met** | Cohort / null / insufficient fail closed. Labtech dest INSERT via 0062. Live TC-S5-004 200. |
 | S6 | High | **Met** | Off-cohort upsert 400; write-back cohort only. |
 | S7 | Med | Open | Start experiment/run: enforce client/project. |
-| S8 | Med | Open | Cap `import-file` and SOP uploads (10 MB). |
-| S9 | Med | Open | Authenticate `POST /results/validate`. |
+| S8 | Med | **Met (P1)** | Cap `import-file` and SOP uploads (10 MB) + nginx. |
+| S9 | Med | **Met (P1)** | Authenticate `POST /results/validate` (`result:enter`\|`review`). |
 | S10 | Med | Open | `localStorage` JWT + client `hasPermission` are not AuthZ. |
 | S11 | Med | Open | FORCE RLS on remaining tenant tables; `SET LOCAL` + bind GUC. |
 | S12 | Med | Open | Do not publish `:5432` with default password. |
-| S13 | Low | Open | Tighten verify-email and GET `/roles` `/permissions`. |
-| S14 | Low | Open | `specimen_biotype_id` / `temperature` cannot be both system-RO and write-back. |
+| S13 | Low | **Met (P1)** | verify-email no existence leak; GET `/roles` `/permissions` need manage/config. |
+| S14 | Low | **Met (P1)** | biotype/temperature removed from write-back allowlist; remain system display. |
 | S15 | Low | Open | Login rate limit / lockout. |
 
 ## Not in scope this review
