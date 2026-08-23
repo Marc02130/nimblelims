@@ -1,4 +1,5 @@
 """Schemas for ELN aliquot/pool plan + execute (P0, all methods)."""
+
 from enum import Enum
 from typing import Optional, List, Any, Dict
 from uuid import UUID
@@ -7,6 +8,7 @@ from pydantic import BaseModel, Field
 
 class AliquotMethod(str, Enum):
     """Full v1 method matrix (Lab Ops L9 / Arch A6)."""
+
     by_mass = "by_mass"
     by_volume = "by_volume"  # inbound volume + conc → store mass
     by_count = "by_count"
@@ -14,6 +16,13 @@ class AliquotMethod(str, Enum):
     target_volume = "target_volume"  # target vol + source conc → mass
     target_concentration = "target_concentration"
     target_count = "target_count"
+
+
+class AliquotOperation(str, Enum):
+    """Destination transition operation."""
+
+    aliquot = "aliquot"
+    pool = "pool"
 
 
 # Columns / inputs expected per method (for UI)
@@ -56,7 +65,13 @@ METHOD_PROFILES: Dict[str, Dict[str, Any]] = {
     AliquotMethod.target_concentration.value: {
         "label": "Target concentration",
         "required_inputs": ["target_concentration", "concentration_unit_id"],
-        "optional_inputs": ["amount", "target_amount", "volume", "target_volume", "amount_unit_id"],
+        "optional_inputs": [
+            "amount",
+            "target_amount",
+            "volume",
+            "target_volume",
+            "amount_unit_id",
+        ],
         "stores": ["amount", "concentration"],
         "description": "Set dest concentration; amount from mass or volume rule",
     },
@@ -72,7 +87,10 @@ METHOD_PROFILES: Dict[str, Dict[str, Any]] = {
 
 class AliquotPlanLine(BaseModel):
     """One plan row: source → dest transfer using a method."""
-    line_id: Optional[str] = Field(None, description="Client-stable id for the plan row")
+
+    line_id: Optional[str] = Field(
+        None, description="Client-stable id for the plan row"
+    )
     method: AliquotMethod
     source_sample_id: UUID
     source_container_id: Optional[UUID] = None
@@ -90,6 +108,7 @@ class AliquotPlanLine(BaseModel):
     dest_container_id: Optional[UUID] = None
     dest_container_type_id: Optional[UUID] = None
     dest_container_name: Optional[str] = None
+    dest_sample_type: Optional[UUID] = None
     pool_group: Optional[str] = Field(
         None,
         description="Same pool_group → multi-content dest tube (one container, multiple samples)",
@@ -120,11 +139,13 @@ class ResolvedTransfer(BaseModel):
     dest_container_id: Optional[UUID] = None
     dest_container_type_id: Optional[UUID] = None
     dest_container_name: Optional[str] = None
+    dest_sample_type: Optional[UUID] = None
     warnings: List[str] = Field(default_factory=list)
 
 
 class AliquotExecuteRequest(BaseModel):
     """Execute plan lines (defaults to all saved plan lines on the entry)."""
+
     dry_run: bool = False
     lines: Optional[List[AliquotPlanLine]] = Field(
         None,
@@ -154,3 +175,14 @@ class AliquotExecuteResponse(BaseModel):
 
 class AliquotMethodListResponse(BaseModel):
     methods: List[Dict[str, Any]]
+
+
+class SampleTypeOption(BaseModel):
+    id: UUID
+    name: str
+
+
+class DestSampleTypeOptionsResponse(BaseModel):
+    source_sample_type: SampleTypeOption
+    operation: AliquotOperation
+    options: List[SampleTypeOption]
