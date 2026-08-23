@@ -1,7 +1,7 @@
 # Tech sketch: Extract-hold dest sample type
 
 **Date:** 2026-08-23  
-**Status:** **Implement gate HOLD (re-stamp).** Architecture + UI re-stamp pending on atomic-pair fold. Prior Accept stands on METHOD_CATALOG fold until re-stamp. Land S3 + L2 + seeds + `dest_sample_type` + METHOD_CATALOG + atomic pair on add.  
+**Status:** **Implement gate OPEN** (docs). Architecture + UI Accept on atomic-pair fold. Coding stays Grok Build unless Marc/Rolf asks. Land S3 + L2 + seeds + `dest_sample_type` + METHOD_CATALOG + atomic pair on add.  
 **Stem:** `extract-hold-dest-type`  
 **Requirements:** [`.docs/requirements/extract-hold-dest-type.md`](../requirements/extract-hold-dest-type.md)  
 **Lab Ops:** [`.docs/lab-ops-review/extract-hold-dest-type.md`](../lab-ops-review/extract-hold-dest-type.md)  
@@ -24,6 +24,8 @@ Aliquot/pool execute creates a dest that inherits parent identity and does not j
 **Atomic pair on add (Rolf CEO + Heidi + Mathilda 2026-08-23):** When adding aliquot/pool to a **template** or **ad hoc** experiment, **both** entries are created together. UI must not offer adding only one. One “Add aliquot/pool” action → pair. Dest entry stays **empty until after execute**. No new plan object.
 
 **Flow:** Add → both entries exist (dest empty) → Execute reads `aliquot_pool_plan` → mints dests → L1/S1 join → `aliquots_pools` lists them. **No re-prompt.** No new experiment-plan object.
+
+**Parked (separate entries docs fold):** Header-pins-to-top (Add Header → always pins to top of entries list; no drag below). Not this packet.
 
 ## 3. A + line override (Marc lock 2026-08-23)
 
@@ -217,12 +219,12 @@ Populate aliquots_pools  # dest entry already exists (atomic pair); was empty un
 | Review | Verdict |
 |--------|--------|
 | CEO | **Accept** — A + line override; concrete methods + Method≠dest type; **atomic pair on add** (Rolf CEO + Heidi + Mathilda 2026-08-23) |
-| Architecture | **Pending re-stamp** (atomic-pair fold) — prior Accept Heidi 2026-08-23: METHOD_CATALOG implies one mint op; Method ≠ dest type; A + line override; cancel not warn/wipe (no un-mint); bounce dual mint, silent reshape, free type-in parent conc, Sample/`material_class` |
-| UI | **Pending re-stamp** (atomic-pair fold) — prior Accept Mathilda 2026-08-23: METHOD_CATALOG (Deiter IN); Method ≠ dest type; A + line override; mid-flight = cancel (no un-mint); bounce dual mint, silent reshape, CUT methods, free type-in parent conc |
+| Architecture | **Accept** (Heidi re-stamp 2026-08-23 on atomic-pair) — one Add → both entries; dest empty until execute; never plan-only/dest-only; bounce bars stand |
+| UI | **Accept** (Mathilda re-stamp 2026-08-23 on atomic-pair) — same; Header-pins-to-top parked for separate entries fold |
 | Lab Ops | **Accept** (L1 Met; L2); Deiter cut list folded |
 | Security / CSO | **Accept** (S1 Met; S3) |
 
-**Implement gate:** **HOLD** until Architecture + UI re-stamp on atomic-pair. Bounce bars otherwise stand. Coding stays Grok Build. Not IC50.
+**Implement gate:** **OPEN** (docs). Coding stays Grok Build unless Marc/Rolf asks. Not IC50.
 
 ## 11. Relationship to Hold
 
