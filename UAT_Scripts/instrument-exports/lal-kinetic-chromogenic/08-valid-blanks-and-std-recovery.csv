@@ -1,0 +1,11 @@
+example_id,example_class,example_note,instrument,method,plate_id,well,sample_id,lims_sample,project,role,nominal_eu_ml,dilution,onset_sec,result_eu_ml,units,ppc_recovery_pct
+08,valid,"blanks 0, std recoveries ~100%",Charles River Sunrise / Endoscan-V,kinetic chromogenic LAL,NBIO-LAL-08,A01,STD-5,,,STD,5.0,,312,5.12,EU/mL,
+08,valid,"blanks 0, std recoveries ~100%",Charles River Sunrise / Endoscan-V,kinetic chromogenic LAL,NBIO-LAL-08,A02,STD-5,,,STD,5.0,,298,4.88,EU/mL,
+08,valid,"blanks 0, std recoveries ~100%",Charles River Sunrise / Endoscan-V,kinetic chromogenic LAL,NBIO-LAL-08,B01,STD-0.5,,,STD,0.5,,612,0.51,EU/mL,
+08,valid,"blanks 0, std recoveries ~100%",Charles River Sunrise / Endoscan-V,kinetic chromogenic LAL,NBIO-LAL-08,B02,STD-0.5,,,STD,0.5,,631,0.48,EU/mL,
+08,valid,"blanks 0, std recoveries ~100%",Charles River Sunrise / Endoscan-V,kinetic chromogenic LAL,NBIO-LAL-08,C01,STD-0.05,,,STD,0.05,,1104,0.052,EU/mL,
+08,valid,"blanks 0, std recoveries ~100%",Charles River Sunrise / Endoscan-V,kinetic chromogenic LAL,NBIO-LAL-08,C02,STD-0.05,,,STD,0.05,,1148,0.047,EU/mL,
+08,valid,"blanks 0, std recoveries ~100%",Charles River Sunrise / Endoscan-V,kinetic chromogenic LAL,NBIO-LAL-08,D01,STD-0.005,,,STD,0.005,,1820,0.0053,EU/mL,
+08,valid,"blanks 0, std recoveries ~100%",Charles River Sunrise / Endoscan-V,kinetic chromogenic LAL,NBIO-LAL-08,D02,STD-0.005,,,STD,0.005,,1895,0.0047,EU/mL,
+08,valid,"blanks 0, std recoveries ~100%",Charles River Sunrise / Endoscan-V,kinetic chromogenic LAL,NBIO-LAL-08,E01,BLK,,,BLANK,,,,0.0,EU/mL,
+08,valid,"blanks 0, std recoveries ~100%",Charles River Sunrise / Endoscan-V,kinetic chromogenic LAL,NBIO-LAL-08,E02,BLK,,,BLANK,,,,0.0,EU/mL,

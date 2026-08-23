@@ -1,0 +1,11 @@
+example_id,example_class,example_note,instrument,method,plate_id,well,sample_id,lims_sample,project,role,nominal_eu_ml,dilution,onset_sec,result_eu_ml,units,ppc_recovery_pct
+10,edge,blank contaminated (result >0) → run fail,Charles River Sunrise / Endoscan-V,kinetic chromogenic LAL,NBIO-LAL-10,A01,STD-5,,,STD,5.0,,312,5.12,EU/mL,
+10,edge,blank contaminated (result >0) → run fail,Charles River Sunrise / Endoscan-V,kinetic chromogenic LAL,NBIO-LAL-10,A02,STD-5,,,STD,5.0,,298,4.88,EU/mL,
+10,edge,blank contaminated (result >0) → run fail,Charles River Sunrise / Endoscan-V,kinetic chromogenic LAL,NBIO-LAL-10,B01,STD-0.5,,,STD,0.5,,612,0.51,EU/mL,
+10,edge,blank contaminated (result >0) → run fail,Charles River Sunrise / Endoscan-V,kinetic chromogenic LAL,NBIO-LAL-10,B02,STD-0.5,,,STD,0.5,,631,0.48,EU/mL,
+10,edge,blank contaminated (result >0) → run fail,Charles River Sunrise / Endoscan-V,kinetic chromogenic LAL,NBIO-LAL-10,C01,STD-0.05,,,STD,0.05,,1104,0.052,EU/mL,
+10,edge,blank contaminated (result >0) → run fail,Charles River Sunrise / Endoscan-V,kinetic chromogenic LAL,NBIO-LAL-10,C02,STD-0.05,,,STD,0.05,,1148,0.047,EU/mL,
+10,edge,blank contaminated (result >0) → run fail,Charles River Sunrise / Endoscan-V,kinetic chromogenic LAL,NBIO-LAL-10,D01,STD-0.005,,,STD,0.005,,1820,0.0053,EU/mL,
+10,edge,blank contaminated (result >0) → run fail,Charles River Sunrise / Endoscan-V,kinetic chromogenic LAL,NBIO-LAL-10,D02,STD-0.005,,,STD,0.005,,1895,0.0047,EU/mL,
+10,edge,blank contaminated (result >0) → run fail,Charles River Sunrise / Endoscan-V,kinetic chromogenic LAL,NBIO-LAL-10,E01,BLK,,,BLANK,,,1400,0.018,EU/mL,
+10,edge,blank contaminated (result >0) → run fail,Charles River Sunrise / Endoscan-V,kinetic chromogenic LAL,NBIO-LAL-10,E02,BLK,,,BLANK,,,1360,0.021,EU/mL,
