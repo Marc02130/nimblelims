@@ -45,6 +45,7 @@ All product and engineering docs live under this directory, organized by purpose
 | CLI snippets | [manuals/useful-command-line.md](manuals/useful-command-line.md) |
 | **SOP source packs** | [sop/README.md](sop/README.md) |
 | **SOP + AI → process (locked)** | [open-questions/sop-ai-to-process.md](open-questions/sop-ai-to-process.md) |
+| **Extract-hold dest type** | [requirements/extract-hold-dest-type.md](requirements/extract-hold-dest-type.md) · [tech-sketch/extract-hold-dest-type.md](tech-sketch/extract-hold-dest-type.md) |
 
 ## Manuals (domain + ops)
 
@@ -69,6 +70,7 @@ All product and engineering docs live under this directory, organized by purpose
 | [experiment-processes-entries.md](requirements/experiment-processes-entries.md) | Processes, entries, experiments requirements |
 | [schema-evolution.md](requirements/schema-evolution.md) | FieldDefinitions / schema evolution requirements |
 | [data-parsers-lims-runs.md](requirements/data-parsers-lims-runs.md) | Parsers (analysis×instrument/CRO), run lineage, optional AI setup — **in review** |
+| [extract-hold-dest-type.md](requirements/extract-hold-dest-type.md) | Optional dest sample_type on aliquot/pool; process-sample on execute — **in review** |
 | [security-high-s1-s6.md](requirements/security-high-s1-s6.md) | High security remediation (S1–S6) — **Accept / Met** |
 | [security-med-low-s7-s15.md](requirements/security-med-low-s7-s15.md) | Med/Low security remediation (S7–S15) — **In review** |
 
@@ -80,6 +82,7 @@ Lightweight *how* (see [tech-sketch/README.md](tech-sketch/README.md)). Feature 
 |-------|-----|--------|
 | data-parsers-lims-runs | [tech-sketch/data-parsers-lims-runs.md](tech-sketch/data-parsers-lims-runs.md) | Accepted |
 | experiment-template-entries | [tech-sketch/experiment-template-entries.md](tech-sketch/experiment-template-entries.md) | **Hold** — Lab Ops revise (2026-07-29) |
+| extract-hold-dest-type | [tech-sketch/extract-hold-dest-type.md](tech-sketch/extract-hold-dest-type.md) | **In review** — Leadership before implement |
 | security-high-s1-s6 | [tech-sketch/security-high-s1-s6.md](tech-sketch/security-high-s1-s6.md) | Implemented / Accept |
 | security-med-low-s7-s15 | [tech-sketch/security-med-low-s7-s15.md](tech-sketch/security-med-low-s7-s15.md) | **In review** — Med/Low S7–S15 |
 
