@@ -1,7 +1,7 @@
 # Tech sketch: Extract-hold dest sample type
 
 **Date:** 2026-08-23  
-**Status:** **Implement gate OPEN.** Architecture Accept + UI Accept on A + line override. Pending: concrete method (implies one mint op) when Deiter cut list lands. Land S3 + L2 + seeds + `dest_sample_type`.  
+**Status:** **Implement gate OPEN.** Concrete methods (Deiter cut) + A/line override + Method≠dest type folded. Architecture + UI: shape Accept; **re-stamp pending** on this PR. Land S3 + L2 + seeds + `dest_sample_type` + METHOD_CATALOG.  
 **Stem:** `extract-hold-dest-type`  
 **Requirements:** [`.docs/requirements/extract-hold-dest-type.md`](../requirements/extract-hold-dest-type.md)  
 **Lab Ops:** [`.docs/lab-ops-review/extract-hold-dest-type.md`](../lab-ops-review/extract-hold-dest-type.md)  
@@ -12,7 +12,7 @@
 
 ## 1. Problem
 
-Aliquot/pool execute creates a dest that inherits parent identity and does not join `eln_process_samples`. Dest type must be chosen on the **plan entry** before execute. Main today: no `dest_sample_type` on plan lines; execute copies `parent.sample_type` — Heidi bounce.
+Aliquot/pool execute creates a dest that inherits parent identity and does not join `eln_process_samples`. Dest type must be chosen on the **plan entry** before execute. Main today: no `dest_sample_type` on plan lines; execute copies `parent.sample_type` — Heidi bounce. Entry method must be **concrete** (not only aliquot|pool) so columns and mint op stay coherent.
 
 ## 2. Two entries (no plan object)
 
@@ -21,7 +21,7 @@ Aliquot/pool execute creates a dest that inherits parent identity and does not j
 | **Plan entry** | `aliquot_pool_plan` | `experiment_data` | Before / at execute | Entry config + plan lines (below) |
 | **Dest sample entry** | `aliquots_pools` | `experiment_sample_data` | **AFTER execute only** | Lists minted daughters. No method/type picker. |
 
-**Flow:** Execute reads `aliquot_pool_plan` → mints dests → L1/S1 join → `aliquots_pools` lists them. **No re-prompt.**
+**Flow:** Execute reads `aliquot_pool_plan` → mints dests → L1/S1 join → `aliquots_pools` lists them. **No re-prompt.** No new experiment-plan object.
 
 ## 3. A + line override (Marc lock 2026-08-23)
 
@@ -29,27 +29,28 @@ Aliquot/pool execute creates a dest that inherits parent identity and does not j
 
 | Field | Rule |
 |-------|------|
-| **Method** | Exactly **one** op for the whole entry: **aliquot OR pool**. Drives columns + mint. Set at template or add-time prompt. |
-| **Default dest type** | Optional. Template pre-fill OK or prompt at add-time. Catalog limits. Blank/clear = Same as parent. |
+| **Method** | Concrete method id from METHOD_CATALOG. Implies exactly one `mint_op` ∈ {aliquot, pool}. Drives columns + which mint op. Set at template or add-time. |
+| **Default dest type** | Optional. **Separate** control from method (Method ≠ dest type). Template pre-fill OK or prompt at add-time. Catalog limits. Blank/clear = Same as parent. |
 
-**No mid-flight method change.** Once the entry exists with lines, changing method is **not** warn/wipe — **cancel the experiment**. Ops do not rewind.
+**One mint op per entry.** Aliquot XOR pool — never both.
 
-**Pending tighten (Heidi):** entry `method` is the concrete method (by volume, …), which implies exactly one mint op — not only `Literal["aliquot"\|"pool"]`, or columns cannot shift. Fold when Deiter’s cut list lands.
+**No mid-flight method change.** Once the entry exists with lines, changing method is **not** warn/wipe — **cancel the experiment**. Cancel does **not** un-mint already-minted daughters. Ops do not rewind.
 
 ### Plan lines
 
 | Field | Rule |
 |-------|------|
-| `dest_sample_type` | Optional **line override**. May clear (= Same as parent) or set another catalog-allowed dest for this source × entry op. |
+| `dest_sample_type` | Optional **line override**. May clear (= Same as parent) or set another catalog-allowed dest for this source × entry `mint_op`. Independent of method. |
 
 **Resolve at execute:**
 
 ```text
+mint_op = METHOD_CATALOG[entry.method].mint_op   # exactly one
 type_id =
   line.dest_sample_type if set
   else entry.default_dest_sample_type if set
   else source.sample_type   # Same as parent
-if type_id != source.sample_type and no catalog_row(source, entry.op, type_id): refuse
+if type_id != source.sample_type and no catalog_row(source, mint_op, type_id): refuse
 ```
 
 ### Bounce bars (Marc + Heidi + Mathilda)
@@ -57,18 +58,68 @@ if type_id != source.sample_type and no catalog_row(source, entry.op, type_id): 
 - One entry minting **both** aliquot and pool (dual mint).
 - **Silent reshape** of columns/mint after lines already exist (method change mid-flight).
 - Warn/wipe instead of cancel.
+- Un-minting daughters on cancel.
+- Collapsing method and dest type into one control.
 - Method/type picker on `aliquots_pools`.
 - New experiment-plan object.
+- Offering CUT methods (fraction, contribution ratio, plate map, serial dilution).
+- Free type-in parent concentration on normalization.
+- Equimolar-by-size without a size/bp sample/result path (Hans gate).
 - Sample/`material_class` column; matrix drop; receive/mid-entry type gate; if-blood-then; transitions on `template_definition`.
 
-## 4. Goals (remainder)
+## 4. METHOD_CATALOG (Deiter cut list)
+
+Entry `method` is a concrete id. `mint_op = METHOD_CATALOG[method].mint_op` — exactly one.
+
+### Aliquot (IN)
+
+| method id | Display | Required columns (sketch) |
+|-----------|---------|---------------------------|
+| `aliquot_by_volume` | by volume | source vol / dest vol |
+| `aliquot_by_target_amount` | by target amount | target amount (+ vol or conc as needed) |
+| `aliquot_by_target_concentration` | by target concentration (normalization) | see §4.1 |
+| `aliquot_n_way_equal_split` | N-way equal split | N, equal split fields |
+
+### Pool (IN)
+
+| method id | Display | Required columns (sketch) |
+|-----------|---------|---------------------------|
+| `pool_by_volume_per_source` | by volume per source | per-source volume |
+| `pool_equal_volume_each` | equal volume from each | shared volume |
+| `pool_by_target_amount_per_source` | by target amount per source | per-source target amount |
+| `pool_consolidate_remaining` | consolidate remaining | remaining / consolidate fields |
+
+### CUT (out of this packet)
+
+| Out | Notes |
+|-----|-------|
+| fraction | Parked |
+| contribution ratio | Parked |
+| plate map | Parked |
+| serial dilution | Parked |
+
+### 4.1 Normalization (`aliquot_by_target_concentration`)
+
+| Rule | Detail |
+|------|--------|
+| Parent concentration | **Required** |
+| Source of conc | Prefer **prior result on that sample** — **not** free type-in |
+| Dest vol **or** target amount | At least one required |
+
+### 4.2 Equimolar (Hans lock)
+
+**Sketch stance (this packet):** rename equimolar → **`aliquot_by_target_amount`** (“by target amount”). No size/bp required on sample/result path today, so equimolar-by-size is **not** a separate IN method.
+
+**Hans gate:** if size/bp later exists on the sample/result path, Leadership may re-open a distinct equimolar-by-size method; until then, target amount covers the need.
+
+## 5. Goals (remainder)
 
 - Catalog many-to-many; multi-hop = process steps.
-- Pool: one shared source `sample_type` or refuse; then catalog lookup for entry op.
+- Pool: one shared source `sample_type` or refuse; then catalog lookup for entry `mint_op`.
 - L1/S1 join; L2 no execute re-prompt; S3 `config:edit` on catalog; C2 key off `sample_type`.
 - **Seed:** Blood × aliquot → DNA; DNA × pool → pooled DNA.
 
-## 5. Data model
+## 6. Data model
 
 ```
 samples.sample_type / parent_sample_id / matrix   ← existing (matrix unchanged)
@@ -76,73 +127,95 @@ eln_process_samples                               ← L1/S1 join
 template_definition.accepted_sample_types         ← start entry allow-list
 sample_type_transitions                           ← NEW catalog (many-to-many)
 aliquot_pool_plan entry config:
-  method                                          ← exactly one of aliquot|pool
-  default_dest_sample_type                        ← optional
+  method                                          ← concrete METHOD_CATALOG id
+  default_dest_sample_type                        ← optional (separate from method)
 AliquotPlanLine.dest_sample_type                  ← optional line override (MUST land)
 ```
 
 ```python
-# entry config on aliquot_pool_plan
+# mint_op implied by method — never Literal["aliquot","pool"] alone on the entry
+METHOD_CATALOG = {
+    "aliquot_by_volume": {"mint_op": "aliquot", "columns": [...]},
+    "aliquot_by_target_amount": {"mint_op": "aliquot", "columns": [...]},
+    "aliquot_by_target_concentration": {"mint_op": "aliquot", "columns": [...]},
+    "aliquot_n_way_equal_split": {"mint_op": "aliquot", "columns": [...]},
+    "pool_by_volume_per_source": {"mint_op": "pool", "columns": [...]},
+    "pool_equal_volume_each": {"mint_op": "pool", "columns": [...]},
+    "pool_by_target_amount_per_source": {"mint_op": "pool", "columns": [...]},
+    "pool_consolidate_remaining": {"mint_op": "pool", "columns": [...]},
+    # CUT: fraction, contribution_ratio, plate_map, serial_dilution — not in catalog
+}
+
 class AliquotPoolPlanConfig(BaseModel):
-    method: Literal["aliquot", "pool"]  # one op; drives columns + mint
-    # PENDING Heidi: concrete method (by volume, …) implies one mint op — fold with Deiter cut list
+    method: str  # concrete method id; implies mint_op in {aliquot, pool}
     default_dest_sample_type: UUID | None = None  # blank = Same as parent
+# mint_op = METHOD_CATALOG[method].mint_op  # exactly one
 
 class AliquotPlanLine(BaseModel):
     source_sample_id: UUID
-    # … amount / dest container fields (shape from entry.method) …
+    # … amount / dest container fields (shape from METHOD_CATALOG[entry.method]) …
     dest_sample_type: UUID | None = None  # override or clear → Same as parent
 ```
 
-## 6. Execute
+Transition catalog rows still key off `mint_op` (aliquot|pool), not concrete method id.
+
+## 7. Execute
 
 ```text
-op = entry.method  # never dual mint
+mint_op = METHOD_CATALOG[entry.method].mint_op  # never dual mint
+validate method-specific required fields (incl. normalization rules)
 Read aliquot_pool_plan lines
 for each line:
-  if op is pool and sources do not share one sample_type: refuse
+  if mint_op is pool and sources do not share one sample_type: refuse
   type_id = line.dest_sample_type or entry.default_dest_sample_type or source.sample_type
-  if type_id != source.sample_type and no catalog_row(source, op, type_id): refuse
+  if type_id != source.sample_type and no catalog_row(source, mint_op, type_id): refuse
   mint dest; L1/S1 join if under process
 Populate aliquots_pools
 # never prompt for dest type at execute
 # never change entry.method mid-flight — cancel experiment instead
+# cancel does not un-mint already-minted daughters
 ```
 
-## 7. Entry setup UX
+## 8. Entry setup UX
 
 | Surface | Rule |
 |---------|------|
-| Entry add / template | Method (one op) + default dest type; catalog limits |
-| Plan lines | May clear/override dest type within catalog |
-| After lines exist | Method locked — change requires cancel experiment (no warn/wipe reshape) |
+| Entry add / template | Concrete method picker **and** default dest type (two controls); catalog limits dest |
+| Plan lines | May clear/override dest type within catalog; columns follow method |
+| After lines exist | Method locked — change requires cancel experiment (no warn/wipe reshape; no un-mint) |
 | `aliquots_pools` | After-execute daughters only |
 
-## 8. Tests
+## 9. Tests
 
 | Case | Expect |
 |------|--------|
-| Entry method aliquot; default DNA; line blank | Dest DNA |
+| Entry method `aliquot_by_volume`; default DNA; line blank | Dest DNA |
 | Entry default DNA; line clears | Dest = parent (Same as parent) |
 | Line overrides to catalog-allowed type | That type |
 | Line overrides off-catalog | Refuse |
 | Dual mint (aliquot+pool one entry) | Bounce |
 | Mid-flight method change | Refuse / cancel path — no silent reshape |
+| Cancel after partial mint | Daughters remain minted |
+| Method picker vs dest type | Independent controls |
+| CUT method selected | Not offered / refuse |
+| Normalization without prior conc result | Refuse (no free type-in) |
+| Normalization missing dest vol and target amount | Refuse |
+| Equimolar / target amount | Stored as `aliquot_by_target_amount`; no size/bp required |
 | Seeds Blood×aliquot→DNA; DNA×pool→pooled DNA | OK |
 | Catalog mutate without config:edit | 403 |
 
-## 9. Reviews
+## 10. Reviews
 
 | Review | Verdict |
 |--------|--------|
-| CEO | **Accept** — A + line override lock |
-| Architecture | **Accept** (Heidi re-read 2026-08-23 on A + line override) — one op per entry; line clear/override; mid-flight method = cancel; bounce dual mint / silent reshape. Pending: concrete method fold with Deiter cut list |
-| UI | **Accept** (Mathilda re-read 2026-08-23 on A + line override) |
-| Lab Ops | **Accept** (L1 Met; L2) |
+| CEO | **Accept** — A + line override; concrete methods + Method≠dest type (Marc 2026-08-23) |
+| Architecture | Shape **Accept**; **re-stamp pending** when this PR lands (Heidi) — one mint op via concrete method; line clear/override; mid-flight = cancel (no un-mint); bounce dual mint / silent reshape / Method=dest collapse |
+| UI | Agrees / shape **Accept**; **re-stamp pending** when this PR lands (Mathilda) |
+| Lab Ops | **Accept** (L1 Met; L2); Deiter cut list folded |
 | Security / CSO | **Accept** (S1 Met; S3) |
 
 **Implement gate:** **OPEN.** Not IC50.
 
-## 10. Relationship to Hold
+## 11. Relationship to Hold
 
 Lifts Extract-then-Qubit Hold once implemented. Not SOP+AI → live process (PR 51).

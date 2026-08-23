@@ -1,7 +1,7 @@
 # Requirements: Extract-hold dest sample type
 
 **Date:** 2026-08-23  
-**Status:** **Implement gate OPEN** — A + line override; Architecture + UI Accept (re-read). Pending concrete method with Deiter cut list.  
+**Status:** **Implement gate OPEN** — concrete methods (Deiter cut) + A/line override + Method≠dest type folded. Architecture + UI: shape Accept; **re-stamp pending** on this PR.  
 **Stem:** `extract-hold-dest-type`  
 **Tech sketch:** [`.docs/tech-sketch/extract-hold-dest-type.md`](../tech-sketch/extract-hold-dest-type.md)  
 **Lab Ops:** [`.docs/lab-ops-review/extract-hold-dest-type.md`](../lab-ops-review/extract-hold-dest-type.md)  
@@ -10,61 +10,82 @@
 
 ## 1. Purpose
 
-Dest type on `aliquot_pool_plan` (entry default + line override); daughters on `aliquots_pools` after execute. One method/op per plan entry. Catalog + L1 + start allow-list.
+Dest type on `aliquot_pool_plan` (entry default + line override); daughters on `aliquots_pools` after execute. Entry `method` is a **concrete method** that implies exactly one mint op (aliquot XOR pool). Method picker and dest type are **separate** controls. Catalog + L1 + start allow-list.
 
 ## 2. Leadership locks (cite)
 
 | Lock | Source |
 |------|--------|
-| **A + line override:** entry config = method + default dest type; lines may clear/override within catalog | Marc 2026-08-23 |
-| Method = exactly one op (aliquot OR pool); drives columns + mint | Marc + Heidi |
-| **No mid-flight method change** — cancel experiment, not warn/wipe | Marc + Heidi + Mathilda |
-| Bounce: dual mint (one entry both ops); silent reshape after lines exist | Marc + Heidi |
+| **A + line override:** entry = method + default dest type; lines may clear/override within catalog; resolve line → entry default → parent | Marc 2026-08-23 |
+| **One mint op per entry:** aliquot XOR pool; no mid-flight method change — **cancel experiment** (no warn/wipe); cancel does **not** un-mint already-minted daughters | Marc + Heidi + Mathilda |
+| Bounce: dual mint; silent reshape after lines exist | Marc + Heidi |
+| **Method ≠ dest type:** separate controls; method drives columns + mint op; dest type is independent catalog control | Marc 2026-08-23 |
+| **Concrete methods (Deiter cut list):** entry `method` is concrete id → exactly one `mint_op`; CUT fraction / contribution ratio / plate map / serial dilution | Deiter + Marc 2026-08-23 |
+| **Normalization:** parent concentration required; prefer prior result on that sample (not free type-in); dest vol **or** target amount required | Marc 2026-08-23 |
+| **Equimolar (Hans):** rename equimolar → **by target amount** for this packet (no size/bp path yet); Hans gate if size/bp lands later | Hans + Marc 2026-08-23 |
 | Two keys: `aliquot_pool_plan` / `aliquots_pools`; no new plan object | Prior map |
 | `dest_sample_type` must land on plan line/config (Heidi bounce vs main copy-parent) | Heidi |
-| Seeds Blood×aliquot→DNA, DNA×pool→pooled DNA; S3; L1; L2; start allow-list | Prior |
-| Architecture Accept on A + line override; concrete method tighten pending Deiter cut list | Heidi 2026-08-23 |
-| UI Accept on A + line override | Mathilda re-read 2026-08-23 |
+| Seeds Blood×aliquot→DNA, DNA×pool→pooled DNA; S3 config:edit; L1/S1; L2; start allow-list; catalog many-to-many; pool same-type | Prior |
+| Bounce Sample/`material_class`, matrix drop, receive/mid-entry gates, if-blood-then, transitions on `template_definition` | Prior |
 | Not IC50 | Marc |
 
-## 3. Goals
+## 3. Concrete methods (IN)
 
-- Entry: method (one op) + optional default dest type (template or add-time).
+| Mint op | Method id (sketch) | Display |
+|---------|--------------------|---------|
+| aliquot | `aliquot_by_volume` | by volume |
+| aliquot | `aliquot_by_target_amount` | by target amount |
+| aliquot | `aliquot_by_target_concentration` | by target concentration (normalization) |
+| aliquot | `aliquot_n_way_equal_split` | N-way equal split |
+| pool | `pool_by_volume_per_source` | by volume per source |
+| pool | `pool_equal_volume_each` | equal volume from each |
+| pool | `pool_by_target_amount_per_source` | by target amount per source |
+| pool | `pool_consolidate_remaining` | consolidate remaining |
+
+**CUT (out of this packet):** fraction; contribution ratio; plate map; serial dilution.
+
+## 4. Goals
+
+- Entry: concrete method + optional default dest type (template or add-time).
 - Lines: optional dest type clear/override if catalog allows.
 - Execute resolve: line → entry default → parent; no re-prompt.
-- Cancel experiment to change method; never silent reshape.
+- Cancel experiment to change method; already-minted daughters stay minted.
+- Normalization method enforces parent conc from prior result + dest vol or target amount.
 
-## 4. Non-goals
+## 5. Non-goals
 
-Dual mint; mid-flight method warn/wipe; method/type on `aliquots_pools`; new experiment-plan object; Sample/`material_class`; matrix drop; if-blood-then; IC50.
+Dual mint; mid-flight method warn/wipe; un-mint on cancel; method/type on `aliquots_pools`; new experiment-plan object; equimolar-by-size (parked until size/bp path); CUT methods above; Sample/`material_class`; matrix drop; if-blood-then; IC50.
 
-## 5. Acceptance criteria
+## 6. Acceptance criteria
 
 | ID | Criterion |
 |----|-----------|
 | AC1 | `aliquot_pool_plan` + `aliquots_pools` only; no new plan object. |
-| AC2 | Entry config has method (aliquot\|pool exactly one) + optional default dest type. |
-| AC3 | Plan line optional `dest_sample_type` clear/override within catalog. |
-| AC4 | Execute resolve line → default → parent; catalog enforce; no re-prompt. |
-| AC5 | Mid-flight method change refused — cancel experiment path only (no warn/wipe reshape). |
-| AC6 | Dual mint (aliquot+pool one entry) refused / not offered. |
-| AC7 | `aliquots_pools` after-execute daughters only — no method/type controls. |
-| AC8 | L1/S1 join; pool same-type; S3 config:edit; both seeds. |
-| AC9 | Start `accepted_sample_types`; C2 key off `sample_type`. |
-| AC10 | No Sample/`material_class` column. |
+| AC2 | Entry config has concrete `method` (implies exactly one `mint_op`) + optional default dest type. |
+| AC3 | Method picker and dest-type control are separate (Method ≠ dest type). |
+| AC4 | Plan line optional `dest_sample_type` clear/override within catalog. |
+| AC5 | Execute resolve line → default → parent; catalog enforce; no re-prompt (L2). |
+| AC6 | Mid-flight method change refused — cancel experiment only (no warn/wipe); cancel does not un-mint daughters. |
+| AC7 | Dual mint refused / not offered. |
+| AC8 | `aliquots_pools` after-execute daughters only — no method/type controls. |
+| AC9 | METHOD_CATALOG IN set only; CUT methods not offered. |
+| AC10 | Normalization: parent conc required from prior result (not free type-in); dest vol or target amount required. |
+| AC11 | Equimolar labeled/stored as target-amount method; no size/bp requirement in this packet. |
+| AC12 | L1/S1 join; pool same-type; S3 config:edit; both seeds; start `accepted_sample_types`; C2 key off `sample_type`. |
+| AC13 | No Sample/`material_class` column. |
 
-## 6. Path exercised
+## 7. Path exercised
 
-Plan entry method=aliquot, default DNA → execute → daughters on `aliquots_pools` → separate plan entry method=pool for DNA→pooled DNA.
+Plan entry method=`aliquot_by_volume`, default DNA → execute → daughters on `aliquots_pools` → separate plan entry method=`pool_equal_volume_each` for DNA→pooled DNA.
 
-## 7. Sign-off
+## 8. Sign-off
 
 | Review | Verdict |
 |--------|--------|
-| CEO | **Accept** — A + line override |
-| Architecture | **Accept** (Heidi re-read on A + line override 2026-08-23); concrete method pending Deiter cut list |
-| UI | **Accept** (Mathilda re-read on A + line override 2026-08-23) |
-| Lab Ops | **Accept** (L1 Met; L2) |
+| CEO | **Accept** — A + line override; concrete methods + Method≠dest type (Marc 2026-08-23) |
+| Architecture | Shape **Accept**; **re-stamp pending** when this PR lands (Heidi) |
+| UI | Agrees / shape **Accept**; **re-stamp pending** when this PR lands (Mathilda) |
+| Lab Ops | **Accept** (L1 Met; L2); Deiter cut list folded |
 | Security / CSO | **Accept** (S1 Met; S3) |
 
 **Implement gate:** **OPEN.** Not IC50.
