@@ -1,7 +1,7 @@
 # Tech sketch: Extract-hold dest sample type
 
 **Date:** 2026-08-23  
-**Status:** **Architecture Accept (re-stamp). UI re-stamp pending same-type pool fold. Implement gate CLOSED until Lab Ops + CSO + UI re-Accept.**  
+**Status:** **Architecture Accept + UI Accept (conditions, U6 stamped). Implement gate CLOSED until Lab Ops + CSO.**  
 **Stem:** `extract-hold-dest-type`  
 **Supersedes on main:** PR 52 docs (merged without Marc fold)  
 **Requirements:** [`.docs/requirements/extract-hold-dest-type.md`](../requirements/extract-hold-dest-type.md)  
@@ -138,6 +138,12 @@ if accepted_sample_types non-empty and sample.sample_type not in list: refuse st
 | Pool | Enable dest select only when all sources share one type; else block / refuse |
 | Bounce | Free-text; receive gate; mid-entry type check; sample-ID box; wizard; detail hop |
 
+**Mathilda UI Accept conditions (U6 stamped 2026-08-23)**
+
+- Pool needs one shared source type; mixed types refuse; then one catalog row.
+- Dest type beside Method; catalog options only; blank = Same as parent.
+- Bounce free-text, receive gate, mid-entry type check.
+
 ## 6. Locked vs parked
 
 | Locked | Parked |
@@ -169,11 +175,11 @@ if accepted_sample_types non-empty and sample.sample_type not in list: refuse st
 |--------|--------|
 | CEO | **Accept** + same-type pool fold (Marc 2026-08-23) |
 | Architecture | **Accept (re-stamp)** (Heidi 2026-08-23) — system-wide config table; blank always allowed; pool one shared source type; bounce Sample/`material_class`, template JSON transitions, if-blood-then |
-| UI | Prior Accept (conditions); **re-stamp pending** (Mathilda U6: same-type pool; filtered catalog select; bounce free-text / receive / mid-entry) |
+| UI | **Accept with conditions** (Mathilda 2026-08-23, **U6 stamped**) — pool one shared source type; mixed refuse; one catalog row; dest type beside Method; catalog options only; blank = Same as parent; bounce free-text / receive / mid-entry |
 | Lab Ops | Open |
 | CSO | Open |
 
-**Implement gate:** CLOSED until Lab Ops + CSO + UI re-Accept.
+**Implement gate:** CLOSED until Lab Ops + CSO sign.
 
 ## 9. Relationship to Hold
 
