@@ -1,7 +1,7 @@
 # Tech sketch: Extract-hold dest sample type
 
 **Date:** 2026-08-23  
-**Status:** **Implement gate OPEN.** UI Accept (re-read). Architecture re-read pending on two-entry fold. Land S3 + L2 + seeds + `dest_sample_type` on `AliquotPlanLine`.  
+**Status:** **Implement gate OPEN.** Architecture Accept + UI Accept on two-entry fold. **A + line override** locked (Marc). Land S3 + L2 + seeds + `dest_sample_type`.  
 **Stem:** `extract-hold-dest-type`  
 **Requirements:** [`.docs/requirements/extract-hold-dest-type.md`](../requirements/extract-hold-dest-type.md)  
 **Lab Ops:** [`.docs/lab-ops-review/extract-hold-dest-type.md`](../lab-ops-review/extract-hold-dest-type.md)  
@@ -12,129 +12,134 @@
 
 ## 1. Problem
 
-Aliquot/pool execute creates a dest that inherits parent identity and does not join `eln_process_samples`. Extract-then-Qubit cannot run. Dest type must be chosen on the **plan entry** before execute — not on the after-execute daughter list.
+Aliquot/pool execute creates a dest that inherits parent identity and does not join `eln_process_samples`. Dest type must be chosen on the **plan entry** before execute. Main today: no `dest_sample_type` on plan lines; execute copies `parent.sample_type` — Heidi bounce.
 
-**Heidi bounce (main today):** plan lines have no `dest_sample_type`; execute still copies `parent.sample_type`. That field must land on `AliquotPlanLine` / plan config — not a new plan object, not on `aliquots_pools`.
-
-## 2. Two entries (Marc + Heidi map — no plan object)
-
-Aliquot/pool is **two predefined entries**, not a new experiment-plan object.
+## 2. Two entries (no plan object)
 
 | Role | `predefined_entry_key` | Kind | When | Owns |
 |------|------------------------|------|------|------|
-| **Plan entry** | `aliquot_pool_plan` | `experiment_data` | Before / at execute | **Method** + **dest sample_type** beside each other on each plan line. Template pre-fill OK. Clear = Same as parent. Catalog limits options. Method drives default columns and aliquot vs pool (incl. pool count). |
-| **Dest sample entry** | `aliquots_pools` | `experiment_sample_data` | **AFTER execute only** | Lists minted daughter samples. **Not** where method/type are chosen. No method/type picker. |
+| **Plan entry** | `aliquot_pool_plan` | `experiment_data` | Before / at execute | Entry config + plan lines (below) |
+| **Dest sample entry** | `aliquots_pools` | `experiment_sample_data` | **AFTER execute only** | Lists minted daughters. No method/type picker. |
 
-**Flow:** Execute reads `aliquot_pool_plan` → mints dests (type from plan line or parent if blank) → L1/S1 join → `aliquots_pools` lists them. **No re-prompt.**
+**Flow:** Execute reads `aliquot_pool_plan` → mints dests → L1/S1 join → `aliquots_pools` lists them. **No re-prompt.**
 
-## 3. Goals and non-goals
+## 3. A + line override (Marc lock 2026-08-23)
 
-**Goals (locked)**
+### Entry config (`aliquot_pool_plan`)
 
-- Optional `dest_sample_type` on each **`AliquotPlanLine`** (plan entry), beside Method.
-- Blank / clear = Same as parent — always allowed.
-- Catalog many-to-many limits the select; multi-hop = process steps.
-- Pool: one shared source `sample_type` or refuse; then catalog lookup.
-- Execute: write `samples.sample_type`, `parent_sample_id`; L1 join; no type re-prompt (**L2**).
-- Start-time `template_definition.accepted_sample_types`; **C2** key off `sample_type`.
-- **S3:** catalog mutate = `config:edit` only.
-- **Seed:** Blood × aliquot → DNA; DNA × pool → pooled DNA.
+| Field | Rule |
+|-------|------|
+| **Method** | Exactly **one** op for the whole entry: **aliquot OR pool**. Drives columns + mint. Set at template or add-time prompt. |
+| **Default dest type** | Optional. Template pre-fill OK or prompt at add-time. Catalog limits. Blank/clear = Same as parent. |
 
-**Non-goals / bounce bars**
+**No mid-flight method change.** Once the entry exists with lines, changing method is **not** warn/wipe — **cancel the experiment**. Ops do not rewind.
 
-- No new experiment-plan object.
-- No Method / dest-type picker on `aliquots_pools`.
-- No Sample / `material_class` column; no matrix drop; no receive/mid-entry type gate; no if-blood-then; no transitions on `template_definition`.
-- TruSeq; SOP+AI Apply; IC50.
+### Plan lines
 
-## 4. Data model
+| Field | Rule |
+|-------|------|
+| `dest_sample_type` | Optional **line override**. May clear (= Same as parent) or set another catalog-allowed dest for this source × entry op. |
 
-```
-samples.sample_type                       ← existing; dest write target
-samples.parent_sample_id                  ← existing
-samples.matrix                            ← unchanged
-eln_process_samples                       ← L1/S1 execute-minted join
-template_definition.accepted_sample_types ← step ENTRY allow-list only
-sample_type_transitions                   ← NEW catalog (many-to-many)
-AliquotPlanLine.dest_sample_type          ← NEW optional field on plan line (Heidi bounce)
-```
-
-### Plan line contract
-
-```python
-class AliquotPlanLine(BaseModel):  # on aliquot_pool_plan experiment_data
-    method: str                         # existing — drives aliquot vs pool + columns
-    source_sample_id: UUID
-    # … existing amount / dest container fields …
-    dest_sample_type: UUID | None = None  # MUST land here — blank = parent
-```
-
-### Catalog (many-to-many)
-
-| Column | Notes |
-|--------|--------|
-| `source_sample_type` | FK |
-| `operation` | `aliquot` \| `pool` (from Method / line) |
-| `allowed_dest_sample_type` | FK — one dest per row |
-
-**Seed:** Blood×aliquot→DNA; DNA×pool→pooled DNA.
-
-### AuthZ
-
-| Surface | Who |
-|---------|-----|
-| Catalog mutate | `config:edit` only (S3) |
-| Execute-minted process-sample join | This instance, same client, `experiment:manage` (S1) |
-| Arbitrary append | 403/404 |
-
-## 5. Execute
+**Resolve at execute:**
 
 ```text
-Read aliquot_pool_plan lines (not aliquots_pools)
-for each line:
-  if pool and sources do not share one sample_type: refuse
-  type_id = line.dest_sample_type or source.sample_type
-  if type_id != source.sample_type and no catalog_row(...): refuse
-  mint dest; L1/S1 join if under process
-Refresh / populate aliquots_pools with minted daughters
-# never prompt for dest type at execute
+type_id =
+  line.dest_sample_type if set
+  else entry.default_dest_sample_type if set
+  else source.sample_type   # Same as parent
+if type_id != source.sample_type and no catalog_row(source, entry.op, type_id): refuse
 ```
 
-## 6. Entry setup UX (Mathilda)
+### Bounce bars (Marc + Heidi + Mathilda)
+
+- One entry minting **both** aliquot and pool (dual mint).
+- **Silent reshape** of columns/mint after lines already exist (method change mid-flight).
+- Warn/wipe instead of cancel.
+- Method/type picker on `aliquots_pools`.
+- New experiment-plan object.
+- Sample/`material_class` column; matrix drop; receive/mid-entry type gate; if-blood-then; transitions on `template_definition`.
+
+## 4. Goals (remainder)
+
+- Catalog many-to-many; multi-hop = process steps.
+- Pool: one shared source `sample_type` or refuse; then catalog lookup for entry op.
+- L1/S1 join; L2 no execute re-prompt; S3 `config:edit` on catalog; C2 key off `sample_type`.
+- **Seed:** Blood × aliquot → DNA; DNA × pool → pooled DNA.
+
+## 5. Data model
+
+```
+samples.sample_type / parent_sample_id / matrix   ← existing (matrix unchanged)
+eln_process_samples                               ← L1/S1 join
+template_definition.accepted_sample_types         ← start entry allow-list
+sample_type_transitions                           ← NEW catalog (many-to-many)
+aliquot_pool_plan entry config:
+  method                                          ← exactly one of aliquot|pool
+  default_dest_sample_type                        ← optional
+AliquotPlanLine.dest_sample_type                  ← optional line override (MUST land)
+```
+
+```python
+# entry config on aliquot_pool_plan
+class AliquotPoolPlanConfig(BaseModel):
+    method: Literal["aliquot", "pool"]  # one op; drives columns + mint
+    default_dest_sample_type: UUID | None = None  # blank = Same as parent
+
+class AliquotPlanLine(BaseModel):
+    source_sample_id: UUID
+    # … amount / dest container fields (shape from entry.method) …
+    dest_sample_type: UUID | None = None  # override or clear → Same as parent
+```
+
+## 6. Execute
+
+```text
+op = entry.method  # never dual mint
+Read aliquot_pool_plan lines
+for each line:
+  if op is pool and sources do not share one sample_type: refuse
+  type_id = line.dest_sample_type or entry.default_dest_sample_type or source.sample_type
+  if type_id != source.sample_type and no catalog_row(source, op, type_id): refuse
+  mint dest; L1/S1 join if under process
+Populate aliquots_pools
+# never prompt for dest type at execute
+# never change entry.method mid-flight — cancel experiment instead
+```
+
+## 7. Entry setup UX
 
 | Surface | Rule |
 |---------|------|
-| `aliquot_pool_plan` | Method + dest type beside each other; catalog options; clear = Same as parent; template pre-fill OK |
-| `aliquots_pools` | After-execute daughters only — no method/type picker |
-| Bounce | Method/type on daughters; new plan object; free-text; execute re-prompt; receive/mid-entry gate; sample-ID box |
+| Entry add / template | Method (one op) + default dest type; catalog limits |
+| Plan lines | May clear/override dest type within catalog |
+| After lines exist | Method locked — change requires cancel experiment (no warn/wipe reshape) |
+| `aliquots_pools` | After-execute daughters only |
 
-**UI Accept (re-read 2026-08-23):** Method + dest type only on `aliquot_pool_plan`; `aliquots_pools` after-execute only; clear = Same as parent. Bounce method/type on daughters or a new plan object.
-
-## 7. Tests
+## 8. Tests
 
 | Case | Expect |
 |------|--------|
-| Plan line has `dest_sample_type` field | Present on AliquotPlanLine / plan config |
-| Blood×aliquot→DNA (seeded) | Dest type DNA after execute |
-| DNA×pool→pooled DNA (seeded) | OK |
-| Blank dest type | Dest = parent type |
-| Execute still copies parent only (no field) | **Fail** — Heidi bounce |
-| Method/type on aliquots_pools | Bounce / absent |
+| Entry method aliquot; default DNA; line blank | Dest DNA |
+| Entry default DNA; line clears | Dest = parent (Same as parent) |
+| Line overrides to catalog-allowed type | That type |
+| Line overrides off-catalog | Refuse |
+| Dual mint (aliquot+pool one entry) | Bounce |
+| Mid-flight method change | Refuse / cancel path — no silent reshape |
+| Seeds Blood×aliquot→DNA; DNA×pool→pooled DNA | OK |
 | Catalog mutate without config:edit | 403 |
-| New experiment-plan object | Bounce |
 
-## 8. Reviews
+## 9. Reviews
 
 | Review | Verdict |
 |--------|--------|
-| CEO | **Accept** — two-entry lock |
-| Architecture | Map + bounce issued; **re-read** of this fold |
-| UI | **Accept** (Mathilda re-read 2026-08-23) — Method + dest type on `aliquot_pool_plan` only; `aliquots_pools` after-execute only; clear = Same as parent; bounce method/type on daughters or new plan object |
+| CEO | **Accept** — A + line override lock |
+| Architecture | **Accept** (PR 58 two-entry) + **agree** A + line override / no mid-flight method |
+| UI | **Accept** (re-read) + **agree** A + line override |
 | Lab Ops | **Accept** (L1 Met; L2) |
 | Security / CSO | **Accept** (S1 Met; S3) |
 
-**Implement gate:** **OPEN.** Land `dest_sample_type` on plan line, S3, L2, both seeds. Compose up only while implementing/testing, then down. Not IC50.
+**Implement gate:** **OPEN.** Not IC50.
 
-## 9. Relationship to Hold
+## 10. Relationship to Hold
 
 Lifts Extract-then-Qubit Hold once implemented. Not SOP+AI → live process (PR 51).
