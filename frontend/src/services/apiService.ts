@@ -76,6 +76,15 @@ export interface EligibleSamplesResponse {
 }
 
 export type AliquotOperation = 'aliquot' | 'pool';
+export type AliquotMethod =
+  | 'aliquot_by_volume'
+  | 'aliquot_by_target_amount'
+  | 'aliquot_by_target_concentration'
+  | 'aliquot_n_way_equal_split'
+  | 'pool_by_volume_per_source'
+  | 'pool_equal_volume_each'
+  | 'pool_by_target_amount_per_source'
+  | 'pool_consolidate_remaining';
 
 export interface SampleTypeOption {
   id: string;
@@ -1951,10 +1960,18 @@ export class ApiService {
     return response.data;
   }
 
-  async saveAliquotPlan(entryId: string, lines: Array<Record<string, unknown>>) {
-    const response: AxiosResponse = await this.api.put(`v1/entries/${entryId}/aliquot-plan`, {
-      lines,
-    });
+  async saveAliquotPlan(
+    entryId: string,
+    data: {
+      method: AliquotMethod;
+      default_dest_sample_type: string | null;
+      lines: Array<Record<string, unknown>>;
+    },
+  ) {
+    const response: AxiosResponse = await this.api.put(
+      `v1/entries/${entryId}/aliquot-plan`,
+      data,
+    );
     return response.data;
   }
 

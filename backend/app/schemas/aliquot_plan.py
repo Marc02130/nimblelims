@@ -1,4 +1,4 @@
-"""Schemas for ELN aliquot/pool plan + execute (P0, all methods)."""
+"""Schemas for concrete-method ELN aliquot/pool planning and execution."""
 
 from enum import Enum
 from typing import Optional, List, Any, Dict
@@ -7,15 +7,16 @@ from pydantic import BaseModel, Field
 
 
 class AliquotMethod(str, Enum):
-    """Full v1 method matrix (Lab Ops L9 / Arch A6)."""
+    """Concrete Deiter IN methods; each implies exactly one mint operation."""
 
-    by_mass = "by_mass"
-    by_volume = "by_volume"  # inbound volume + conc → store mass
-    by_count = "by_count"
-    target_mass = "target_mass"
-    target_volume = "target_volume"  # target vol + source conc → mass
-    target_concentration = "target_concentration"
-    target_count = "target_count"
+    aliquot_by_volume = "aliquot_by_volume"
+    aliquot_by_target_amount = "aliquot_by_target_amount"
+    aliquot_by_target_concentration = "aliquot_by_target_concentration"
+    aliquot_n_way_equal_split = "aliquot_n_way_equal_split"
+    pool_by_volume_per_source = "pool_by_volume_per_source"
+    pool_equal_volume_each = "pool_equal_volume_each"
+    pool_by_target_amount_per_source = "pool_by_target_amount_per_source"
+    pool_consolidate_remaining = "pool_consolidate_remaining"
 
 
 class AliquotOperation(str, Enum):
@@ -25,73 +26,76 @@ class AliquotOperation(str, Enum):
     pool = "pool"
 
 
-# Columns / inputs expected per method (for UI)
+# Concrete method catalog. CUT methods are intentionally absent.
 METHOD_PROFILES: Dict[str, Dict[str, Any]] = {
-    AliquotMethod.by_mass.value: {
-        "label": "By mass",
-        "required_inputs": ["amount", "amount_unit_id"],
-        "optional_inputs": ["concentration", "concentration_unit_id"],
-        "stores": ["amount", "concentration"],
-        "description": "Transfer mass from source; optional copy concentration to dest",
-    },
-    AliquotMethod.by_volume.value: {
-        "label": "By volume",
-        "required_inputs": ["volume", "concentration", "concentration_unit_id"],
+    AliquotMethod.aliquot_by_volume.value: {
+        "label": "Aliquot — by volume",
+        "mint_op": AliquotOperation.aliquot.value,
+        "required_inputs": ["volume"],
         "optional_inputs": ["volume_unit_id", "amount_unit_id"],
-        "stores": ["amount", "concentration"],
-        "description": "Inbound volume + concentration → mass; volume not stored",
+        "description": "Transfer a volume using tracked source concentration",
     },
-    AliquotMethod.by_count.value: {
-        "label": "By count",
-        "required_inputs": ["amount", "amount_unit_id"],
-        "optional_inputs": [],
-        "stores": ["amount"],
-        "description": "Transfer count (cells, colonies, etc.)",
+    AliquotMethod.aliquot_by_target_amount.value: {
+        "label": "Aliquot — by target amount",
+        "mint_op": AliquotOperation.aliquot.value,
+        "required_inputs": ["target_amount"],
+        "optional_inputs": ["amount_unit_id"],
+        "description": "Transfer the requested target amount",
     },
-    AliquotMethod.target_mass.value: {
-        "label": "Target mass",
-        "required_inputs": ["target_amount", "amount_unit_id"],
-        "optional_inputs": ["concentration", "concentration_unit_id"],
-        "stores": ["amount", "concentration"],
-        "description": "Dest should receive target mass",
+    AliquotMethod.aliquot_by_target_concentration.value: {
+        "label": "Aliquot — by target concentration (normalization)",
+        "mint_op": AliquotOperation.aliquot.value,
+        "required_inputs": ["target_concentration"],
+        "optional_inputs": ["target_volume", "target_amount", "amount_unit_id"],
+        "description": (
+            "Normalize from a prior concentration result; requires destination "
+            "volume or target amount"
+        ),
     },
-    AliquotMethod.target_volume.value: {
-        "label": "Target volume",
-        "required_inputs": ["target_volume", "concentration", "concentration_unit_id"],
+    AliquotMethod.aliquot_n_way_equal_split.value: {
+        "label": "Aliquot — N-way equal split",
+        "mint_op": AliquotOperation.aliquot.value,
+        "required_inputs": ["split_count"],
+        "optional_inputs": ["amount_unit_id"],
+        "description": "Transfer one equal share of the tracked source amount",
+    },
+    AliquotMethod.pool_by_volume_per_source.value: {
+        "label": "Pool — by volume per source",
+        "mint_op": AliquotOperation.pool.value,
+        "required_inputs": ["volume"],
         "optional_inputs": ["volume_unit_id", "amount_unit_id"],
-        "stores": ["amount", "concentration"],
-        "description": "Target volume at known conc → mass to transfer",
+        "description": "Transfer a specified volume from each source",
     },
-    AliquotMethod.target_concentration.value: {
-        "label": "Target concentration",
-        "required_inputs": ["target_concentration", "concentration_unit_id"],
-        "optional_inputs": [
-            "amount",
-            "target_amount",
-            "volume",
-            "target_volume",
-            "amount_unit_id",
-        ],
-        "stores": ["amount", "concentration"],
-        "description": "Set dest concentration; amount from mass or volume rule",
+    AliquotMethod.pool_equal_volume_each.value: {
+        "label": "Pool — equal volume from each",
+        "mint_op": AliquotOperation.pool.value,
+        "required_inputs": ["volume"],
+        "optional_inputs": ["volume_unit_id", "amount_unit_id"],
+        "description": "Transfer the same volume from every source",
     },
-    AliquotMethod.target_count.value: {
-        "label": "Target count",
-        "required_inputs": ["target_amount", "amount_unit_id"],
+    AliquotMethod.pool_by_target_amount_per_source.value: {
+        "label": "Pool — by target amount per source",
+        "mint_op": AliquotOperation.pool.value,
+        "required_inputs": ["target_amount"],
+        "optional_inputs": ["amount_unit_id"],
+        "description": "Transfer a target amount from each source",
+    },
+    AliquotMethod.pool_consolidate_remaining.value: {
+        "label": "Pool — consolidate remaining",
+        "mint_op": AliquotOperation.pool.value,
+        "required_inputs": [],
         "optional_inputs": [],
-        "stores": ["amount"],
-        "description": "Dest should receive target count",
+        "description": "Transfer all remaining tracked source amount",
     },
 }
 
 
 class AliquotPlanLine(BaseModel):
-    """One plan row: source → dest transfer using a method."""
+    """One source-to-destination row under the entry's concrete method."""
 
     line_id: Optional[str] = Field(
         None, description="Client-stable id for the plan row"
     )
-    method: AliquotMethod
     source_sample_id: UUID
     source_container_id: Optional[UUID] = None
     # Transfer inputs (method-specific)
@@ -104,11 +108,19 @@ class AliquotPlanLine(BaseModel):
     target_amount: Optional[float] = None
     target_volume: Optional[float] = None
     target_concentration: Optional[float] = None
+    split_count: Optional[int] = Field(None, ge=2)
     # Destination
     dest_container_id: Optional[UUID] = None
     dest_container_type_id: Optional[UUID] = None
     dest_container_name: Optional[str] = None
     dest_sample_type: Optional[UUID] = None
+    inherit_entry_dest_sample_type: bool = Field(
+        True,
+        description=(
+            "True uses entry default; false with null dest_sample_type explicitly "
+            "means Same as parent"
+        ),
+    )
     pool_group: Optional[str] = Field(
         None,
         description="Same pool_group → multi-content dest tube (one container, multiple samples)",
@@ -117,11 +129,15 @@ class AliquotPlanLine(BaseModel):
 
 
 class AliquotPlanSaveRequest(BaseModel):
+    method: AliquotMethod
+    default_dest_sample_type: Optional[UUID] = None
     lines: List[AliquotPlanLine] = Field(default_factory=list)
 
 
 class AliquotPlanSaveResponse(BaseModel):
     entry_id: UUID
+    method: AliquotMethod
+    default_dest_sample_type: Optional[UUID] = None
     lines: List[AliquotPlanLine]
     line_count: int
 
