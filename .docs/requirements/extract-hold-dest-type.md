@@ -1,7 +1,7 @@
 # Requirements: Extract-hold dest sample type
 
 **Date:** 2026-08-23  
-**Status:** **Implement gate OPEN** — A + line override locked; Architecture + UI Accept (re-read)  
+**Status:** **Implement gate OPEN** — A + line override; Architecture + UI Accept (re-read). Pending concrete method with Deiter cut list.  
 **Stem:** `extract-hold-dest-type`  
 **Tech sketch:** [`.docs/tech-sketch/extract-hold-dest-type.md`](../tech-sketch/extract-hold-dest-type.md)  
 **Lab Ops:** [`.docs/lab-ops-review/extract-hold-dest-type.md`](../lab-ops-review/extract-hold-dest-type.md)  
@@ -23,6 +23,7 @@ Dest type on `aliquot_pool_plan` (entry default + line override); daughters on `
 | Two keys: `aliquot_pool_plan` / `aliquots_pools`; no new plan object | Prior map |
 | `dest_sample_type` must land on plan line/config (Heidi bounce vs main copy-parent) | Heidi |
 | Seeds Blood×aliquot→DNA, DNA×pool→pooled DNA; S3; L1; L2; start allow-list | Prior |
+| Architecture Accept on A + line override; concrete method tighten pending Deiter cut list | Heidi 2026-08-23 |
 | UI Accept on A + line override | Mathilda re-read 2026-08-23 |
 | Not IC50 | Marc |
 
@@ -61,7 +62,7 @@ Plan entry method=aliquot, default DNA → execute → daughters on `aliquots_po
 | Review | Verdict |
 |--------|--------|
 | CEO | **Accept** — A + line override |
-| Architecture | **Accept** (PR 58) + agree A + line override |
+| Architecture | **Accept** (Heidi re-read on A + line override 2026-08-23); concrete method pending Deiter cut list |
 | UI | **Accept** (Mathilda re-read on A + line override 2026-08-23) |
 | Lab Ops | **Accept** (L1 Met; L2) |
 | Security / CSO | **Accept** (S1 Met; S3) |

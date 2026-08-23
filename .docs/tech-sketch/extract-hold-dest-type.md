@@ -1,7 +1,7 @@
 # Tech sketch: Extract-hold dest sample type
 
 **Date:** 2026-08-23  
-**Status:** **Implement gate OPEN.** Architecture Accept + UI Accept (A + line override re-read). Land S3 + L2 + seeds + `dest_sample_type`.  
+**Status:** **Implement gate OPEN.** Architecture Accept + UI Accept on A + line override. Pending: concrete method (implies one mint op) when Deiter cut list lands. Land S3 + L2 + seeds + `dest_sample_type`.  
 **Stem:** `extract-hold-dest-type`  
 **Requirements:** [`.docs/requirements/extract-hold-dest-type.md`](../requirements/extract-hold-dest-type.md)  
 **Lab Ops:** [`.docs/lab-ops-review/extract-hold-dest-type.md`](../lab-ops-review/extract-hold-dest-type.md)  
@@ -33,6 +33,8 @@ Aliquot/pool execute creates a dest that inherits parent identity and does not j
 | **Default dest type** | Optional. Template pre-fill OK or prompt at add-time. Catalog limits. Blank/clear = Same as parent. |
 
 **No mid-flight method change.** Once the entry exists with lines, changing method is **not** warn/wipe — **cancel the experiment**. Ops do not rewind.
+
+**Pending tighten (Heidi):** entry `method` is the concrete method (by volume, …), which implies exactly one mint op — not only `Literal["aliquot"\|"pool"]`, or columns cannot shift. Fold when Deiter’s cut list lands.
 
 ### Plan lines
 
@@ -83,6 +85,7 @@ AliquotPlanLine.dest_sample_type                  ← optional line override (MU
 # entry config on aliquot_pool_plan
 class AliquotPoolPlanConfig(BaseModel):
     method: Literal["aliquot", "pool"]  # one op; drives columns + mint
+    # PENDING Heidi: concrete method (by volume, …) implies one mint op — fold with Deiter cut list
     default_dest_sample_type: UUID | None = None  # blank = Same as parent
 
 class AliquotPlanLine(BaseModel):
@@ -133,8 +136,8 @@ Populate aliquots_pools
 | Review | Verdict |
 |--------|--------|
 | CEO | **Accept** — A + line override lock |
-| Architecture | **Accept** (PR 58 two-entry) + agree A + line override |
-| UI | **Accept** (Mathilda re-read 2026-08-23 on A + line override) — one op per entry; line clear/override in catalog; mid-flight method = cancel; bounce dual mint and silent reshape |
+| Architecture | **Accept** (Heidi re-read 2026-08-23 on A + line override) — one op per entry; line clear/override; mid-flight method = cancel; bounce dual mint / silent reshape. Pending: concrete method fold with Deiter cut list |
+| UI | **Accept** (Mathilda re-read 2026-08-23 on A + line override) |
 | Lab Ops | **Accept** (L1 Met; L2) |
 | Security / CSO | **Accept** (S1 Met; S3) |
 
