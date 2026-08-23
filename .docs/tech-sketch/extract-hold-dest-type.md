@@ -1,7 +1,7 @@
 # Tech sketch: Extract-hold dest sample type
 
 **Date:** 2026-08-23  
-**Status:** **C3 retracted (Marc). Architecture Accept pending re-read after pool dest-type flip. UI re-read. Implement gate CLOSED until Lab Ops + CSO + Architecture/UI Accept.**  
+**Status:** **UI Accept (conditions). Architecture Accept pending. Implement gate CLOSED until Lab Ops + CSO + Architecture Accept.**  
 **Stem:** `extract-hold-dest-type`  
 **Supersedes on main:** PR 52 docs (merged without Marc 2026-08-23 fold)  
 **Requirements:** [`.docs/requirements/extract-hold-dest-type.md`](../requirements/extract-hold-dest-type.md)  
@@ -144,17 +144,14 @@ Next step (e.g. Qubit LimsRun / experiment) eligibility: Available for Testing +
 | Blank | Placeholder **“Same as parent.”** |
 | Template authoring | Optional `accepted_sample_types` on step template (list multi-select) — docs only here |
 
-**UI bounce bars (Mathilda)**
+**Mathilda UI Accept conditions (2026-08-23) — bounce bars**
 
-- Dest type control sits beside Method on **aliquot and pool**.
-- Blank label is **“Same as parent.”**
-- **No sample-ID box** on this surface.
-- **No wizard** for dest type.
-- **No hop** to sample detail to set type.
-- **No receive gate** for type.
-- **No mid-entry** type check (gate is start only).
-
-No product UI code until Leadership Accept + implement packet.
+- Dest type beside Method on **aliquot and pool**.
+- Blank = **“Same as parent.”**
+- **Start-time gate only** (experiment + LimsRun start).
+- **Bounce** a receive gate, mid-entry type check, or sample-ID box.
+- **No wizard** / **no hop** to sample detail for dest type.
+- No product UI code in this packet.
 
 ## 6. Locked vs parked
 
@@ -192,12 +189,12 @@ No product UI code until Leadership Accept + implement packet.
 | Review | Verdict |
 |--------|--------|
 | CEO | **Accept** (Marc 2026-08-23) — fold required; **C3 retracted** (pool may set dest type ≠ parent) |
-| Architecture | **Almost** (Heidi) — L1/C2/start gate/`accepted_sample_types` present; Accept after C3 flip to pool = aliquot | pending this push |
-| UI | **Hold** (Mathilda) — re-read after pool dest-type restored; bounce receive gate, sample-ID box, mid-entry type check |
+| Architecture | **Almost** (Heidi) — L1/C2/start gate/`accepted_sample_types` present; Accept after C3 flip | waiting re-Accept after flip |
+| UI | **Accept with conditions** (Mathilda 2026-08-23) — dest type beside Method on aliquot and pool; blank = Same as parent; start-time gate only; bounce receive gate, mid-entry type check, or sample-ID box; no product UI code |
 | Lab Ops | Open — Leadership |
 | CSO | Open — Leadership |
 
-**Implement gate:** CLOSED until Architecture + UI Accept and Lab Ops + CSO sign.
+**Implement gate:** CLOSED until Architecture Accept and Lab Ops + CSO sign.
 
 ## 9. Relationship to Hold
 
