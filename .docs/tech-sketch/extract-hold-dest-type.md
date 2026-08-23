@@ -1,7 +1,7 @@
 # Tech sketch: Extract-hold dest sample type
 
 **Date:** 2026-08-23  
-**Status:** **Implement gate OPEN.** Land S3 (`config:edit` on catalog mutate) + Lab Ops L2 + Blood×aliquot→DNA seed. Security/CSO Accept with conditions ([PR 55](https://github.com/Marc02130/nimblelims/pull/55)).  
+**Status:** **Implement gate OPEN.** Land S3 + L2 + seeds (Blood×aliquot→DNA, DNA×pool→pooled DNA). Security/CSO Accept ([PR 55](https://github.com/Marc02130/nimblelims/pull/55)).  
 **Stem:** `extract-hold-dest-type`  
 **Requirements:** [`.docs/requirements/extract-hold-dest-type.md`](../requirements/extract-hold-dest-type.md)  
 **Lab Ops:** [`.docs/lab-ops-review/extract-hold-dest-type.md`](../lab-ops-review/extract-hold-dest-type.md)  
@@ -16,27 +16,28 @@ Aliquot/pool execute creates a dest that inherits parent identity and does not j
 
 ## 2. Goals and non-goals
 
-**Goals (locked)**
+**Goals (locked — Marc implement order 2026-08-23)**
 
 - Sample type can change through a process (gate, not extract-by-rename).
 - Optional dest `sample_type` on **aliquot and pool** beside Method. Blank = “Same as parent.” — always allowed.
-- **Catalog = many-to-many:** one source × operation → many dests via **separate rows** (e.g. Blood × aliquot → plasma | DNA | RBC | WBC | buffy coat). Not a chained single row.
-- **Multi-hop = process steps** (Blood → plasma, then plasma → cfDNA), not one catalog edge that skips intermediates.
-- **L2 (Lab Ops):** dest type only on the **plan entry**. Execute does **not** re-prompt type.
-- Pool: all sources share one `sample_type` or refuse; then catalog lookup for that type × pool → dest.
-- Execute: write `samples.sample_type`, `parent_sample_id`; **L1 / S1** join execute-minted dest onto this instance after start; append 403.
-- Start-time entry gate: `template_definition.accepted_sample_types` (not the transition catalog).
+- **Catalog = many-to-many:** separate rows per dest. Multi-hop = process steps.
+- **L2:** dest type only on the **plan entry**. Execute does **not** re-prompt type.
+- Pool: all sources share one `sample_type` or refuse; then catalog lookup.
+- Execute: write `samples.sample_type`, `parent_sample_id`; **L1/S1** join execute-minted dest onto this instance after start; append 403.
+- Start-time entry gate: `template_definition.accepted_sample_types`.
 - **C2:** eligibility / Qubit key off `sample_type`, not matrix.
-- **S3:** `sample_type_transitions` mutate is **`config:edit` only** — not Client, not `experiment:manage` alone.
-- **Seed with implement:** Blood × aliquot → DNA.
+- **S3:** `sample_type_transitions` mutate is **`config:edit` only**.
+- **Seed with implement:** Blood × aliquot → DNA **and** DNA × pool → pooled DNA.
 
-**Non-goals**
+**Non-goals / bounce bars (Heidi + Marc)**
 
-- Matrix drop; TruSeq; SOP+AI Apply; IC50.
-- Transition rules on entries or template JSON.
-- Hardcoded if-blood-then.
-- Mixed container contents as pool.
-- Receive / mid-entry type gates; execute re-prompt for dest type.
+- No new Sample / `material_class` column.
+- No matrix drop.
+- No receive / mid-entry type gate.
+- No if-blood-then.
+- No transitions on `template_definition`.
+- **No new experiment-plan object** — extend existing aliquot/pool plan entry only.
+- TruSeq; SOP+AI Apply; IC50; mixed container contents as pool.
 
 ## 3. Data model
 
@@ -46,7 +47,7 @@ samples.parent_sample_id                  ← existing
 samples.matrix                            ← unchanged
 eln_process_samples                       ← L1/S1 execute-minted join
 template_definition.accepted_sample_types ← step ENTRY allow-list only
-sample_type_transitions                   ← NEW system-wide client catalog (many-to-many rows)
+sample_type_transitions                   ← NEW system-wide client catalog (many-to-many)
 ```
 
 ### Catalog table (many-to-many)
@@ -57,24 +58,28 @@ sample_type_transitions                   ← NEW system-wide client catalog (ma
 | `operation` | `aliquot` \| `pool` |
 | `allowed_dest_sample_type` | FK — one dest per row |
 
-Unique `(client_id, source, operation, dest)`. One source may have many rows for the same operation.
+Unique `(client_id, source, operation, dest)`.
 
-**Seed with implement:** Blood × aliquot → DNA.  
-**Multi-hop:** Blood→plasma then plasma→cfDNA = two process steps + catalog rows — not one chained edge unless CSO adds a direct row.
+**Seed with implement:**
+
+| source | operation | allowed dest |
+|--------|-----------|--------------|
+| Blood | aliquot | DNA |
+| DNA | pool | pooled DNA |
 
 ### AuthZ
 
 | Surface | Who |
 |---------|-----|
-| Transition catalog mutate (create/update/delete) | **`config:edit` only** (**S3**) — not Client, not `experiment:manage` alone |
-| Execute-minted process-sample join | This instance, same client, `experiment:manage` (**S1** Met) |
+| Catalog mutate | **`config:edit` only** (S3) |
+| Execute-minted process-sample join | This instance, same client, `experiment:manage` (S1) |
 | Arbitrary append | 403/404 |
 
 ## 4. Contracts
 
 ### Plan entry (L2)
 
-Dest type select beside Method on aliquot/pool plan. Options = all catalog dests for source × op (+ Same as parent). **No execute re-prompt.**
+Dest type beside Method on existing aliquot/pool plan lines (no new experiment-plan object). Options = catalog dests for source × op (+ Same as parent). No execute re-prompt.
 
 ### Execute
 
@@ -83,53 +88,50 @@ if pool and sources do not share one sample_type: refuse
 type_id = dest_sample_type or source_type
 if type_id != source_type and no catalog_row(source, op, type_id): refuse
 create dest; L1/S1 join if under process
-# never prompt for dest type at execute
 ```
 
 ## 5. Entry setup UX
 
 | Rule | Detail |
 |------|--------|
-| Dest type | Plan entry only, beside Method |
-| Options | Many-to-many catalog rows for that source × op |
-| Blank | Same as parent (always) |
-| Execute | No type re-prompt (L2) |
-| Bounce | Free-text; receive/mid-entry gate; sample-ID box; wizard; detail hop |
+| Dest type | Existing plan entry only, beside Method |
+| Options | Catalog rows for source × op |
+| Blank | Same as parent |
+| Pool | One shared source type or refuse |
+| Bounce | Free-text; execute re-prompt; receive/mid-entry gate; sample-ID box |
 
 ## 6. Locked vs parked
 
 | Locked | Parked |
 |--------|--------|
-| Many-to-many catalog rows | Full fraction seed beyond Blood→DNA |
-| Multi-hop = process steps | TruSeq; matrix drop |
-| L1/S1 Met; L2; S3 config:edit | |
-| Seed Blood×aliquot→DNA with implement | |
-| Gate OPEN | |
+| Seeds Blood×aliquot→DNA + DNA×pool→pooled DNA | Full fraction catalog |
+| Existing aliquot/pool entry only | New experiment-plan object |
+| L1/S1; L2; S3; start allow-list | Matrix drop; TruSeq |
 
 ## 7. Tests
 
 | Case | Expect |
 |------|--------|
 | Blood×aliquot→DNA (seeded) | OK |
+| DNA×pool→pooled DNA (seeded) | OK |
 | Off-table dest | Refuse |
 | Execute type prompt | Absent (L2) |
 | Pool mixed source types | Refuse |
-| L1/S1 join after start | Dest on process samples |
-| Catalog mutate without config:edit | **403** (S3) |
-| Catalog mutate with experiment:manage only | **403** (S3) |
+| Catalog mutate without config:edit | 403 (S3) |
+| New experiment-plan object | Bounce |
 
 ## 8. Reviews
 
 | Review | Verdict |
 |--------|--------|
-| CEO | **Accept** |
-| Architecture | **Accept** |
-| UI | **Accept (U6)** |
-| Lab Ops | **Accept with conditions** (L1 Met; L2) |
-| Security / CSO | **Accept with conditions** (S1 Met; S3) — [PR 55](https://github.com/Marc02130/nimblelims/pull/55) |
+| CEO | **Accept** — implement order 2026-08-23 |
+| Architecture | **Accept** — bounce bars stand |
+| UI | **Accept (U6)** — entry setup as sketched |
+| Lab Ops | **Accept** (L1 Met; L2) |
+| Security / CSO | **Accept** (S1 Met; S3) — PR 55 |
 
-**Implement gate:** **OPEN.** Implement must land **S3** + **L2** + Blood×aliquot→DNA seed. Not IC50.
+**Implement gate:** **OPEN.** Land S3 + L2 + both seeds. Compose up only while implementing/testing, then down. Not IC50.
 
 ## 9. Relationship to Hold
 
-Lifts Extract-then-Qubit Hold for dest type + process membership once implemented. Not SOP+AI → live process (PR 51).
+Lifts Extract-then-Qubit Hold once implemented. Not SOP+AI → live process (PR 51).
