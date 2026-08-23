@@ -4,6 +4,8 @@ Findings only. Not an SOP pack and not an implement packet. Leadership lock stil
 
 Anton mapped existing 0058/0059 catalog names onto the locked Extract-then-Qubit Hold SOP path (intake sample → one process instance → experiment extract step and/or Qubit LimsRun). The catalog can bind some nearby objects by name; it does not contain the hops this path needs.
 
+Related UAT-path note: [blood-dnatruseq-testdata-gap.md](blood-dnatruseq-testdata-gap.md) (blood → DNA daughter → TruSeq Nano; same Hold holes on dest DNA; capture is a parked second branch).
+
 ## Path lock (do not reopen)
 
 One process instance. Blood (or intake matrix) is assigned to extract. Execute mints a dest DNA sample with `parent_sample_id`. Qubit Tests are written at the Qubit LimsRun start on the daughters, never on the parent and never at plan-save. Experiment never writes results. LimsRun publish writes results only on an existing Test. Dest is the product of the step, not a second batch.
