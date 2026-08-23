@@ -1,4 +1,4 @@
-# UI / UX Review: Extract-hold dest sample type (PR 54 config-table fold)
+# UI / UX Review: Extract-hold dest sample type (PR 54)
 
 **Date:** 2026-08-23  
 **Status:** **Accept with conditions**  
@@ -7,23 +7,9 @@
 
 ## Executive summary
 
-Re-read after system-wide config table. Dest type select beside Method on aliquot and pool. Options come from the **lab-wide** catalog (`source × aliquot|pool × allowed dest`), not from the entry or template. Blank = “Same as parent.” always present. Start-time entry gate stays separate (`accepted_sample_types`). No free-text type. No receive / mid-entry type check.
+Re-stamp after Marc same-type pool rule. Dest type beside Method. Options from system-wide catalog for source × aliquot|pool. Blank = “Same as parent.” always. Pool: enable dest select only when all sources share one type; mixed source types refuse. Start-time entry gate only. No free-text, receive gate, or mid-entry type check.
 
-**Verdict: Accept with conditions.** No product UI code in this packet.
-
-## Flows reviewed
-
-### A. Plan line
-
-```
-Method  |  Dest sample type
-           Same as parent.  (always)
-           + catalog rows for this source × this operation only
-```
-
-### B. Mixed-source pool (Hans / Heidi)
-
-If UI shows one dest type for a multi-source pool, every source must have a catalog row for that op → dest, or execute refuses. Prefer disable Start / Execute with a clear message when the chosen dest is not allowed for all sources.
+**Verdict: Accept with conditions.** No product UI code.
 
 ## Conditions
 
@@ -31,10 +17,10 @@ If UI shows one dest type for a multi-source pool, every source must have a cata
 |----|-----------|
 | **U1** | Dest type beside Method on aliquot and pool. |
 | **U2** | Blank placeholder **“Same as parent.”** always present / always allowed. |
-| **U3** | Options = system-wide catalog for that source × operation only — not per-entry, not template JSON. |
+| **U3** | Options = system-wide catalog for that source × operation only. |
 | **U4** | No free-text type, sample-ID box, wizard, or hop to sample detail. |
-| **U5** | Type **entry** gate is start only. Bounce receive gate or mid-entry type check. |
-| **U6** | Mixed-source pool: do not present a dest type that is illegal for any source; or block execute with a lab-readable error. |
+| **U5** | Type entry gate is **start only**. Bounce receive gate or mid-entry type check. |
+| **U6** | Pool: all sources must share one `sample_type`; mixed types refuse. Dest select enabled only after that; then one catalog row for that type × pool → dest. |
 
 ## Verdict
 
