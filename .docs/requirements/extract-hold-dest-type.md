@@ -1,7 +1,7 @@
 # Requirements: Extract-hold dest sample type
 
 **Date:** 2026-08-23  
-**Status:** **Implement gate OPEN** — concrete methods (Deiter cut) + A/line override + Method≠dest type folded. Architecture + UI: shape Accept; **re-stamp pending** on this PR.  
+**Status:** **Implement gate OPEN** — Architecture + UI Accept (re-stamp) on METHOD_CATALOG fold.  
 **Stem:** `extract-hold-dest-type`  
 **Tech sketch:** [`.docs/tech-sketch/extract-hold-dest-type.md`](../tech-sketch/extract-hold-dest-type.md)  
 **Lab Ops:** [`.docs/lab-ops-review/extract-hold-dest-type.md`](../lab-ops-review/extract-hold-dest-type.md)  
@@ -27,6 +27,8 @@ Dest type on `aliquot_pool_plan` (entry default + line override); daughters on `
 | `dest_sample_type` must land on plan line/config (Heidi bounce vs main copy-parent) | Heidi |
 | Seeds Blood×aliquot→DNA, DNA×pool→pooled DNA; S3 config:edit; L1/S1; L2; start allow-list; catalog many-to-many; pool same-type | Prior |
 | Bounce Sample/`material_class`, matrix drop, receive/mid-entry gates, if-blood-then, transitions on `template_definition` | Prior |
+| Architecture Accept (re-stamp) on METHOD_CATALOG fold | Heidi 2026-08-23 |
+| UI Accept (re-stamp) on METHOD_CATALOG fold | Mathilda 2026-08-23 |
 | Not IC50 | Marc |
 
 ## 3. Concrete methods (IN)
@@ -83,8 +85,8 @@ Plan entry method=`aliquot_by_volume`, default DNA → execute → daughters on 
 | Review | Verdict |
 |--------|--------|
 | CEO | **Accept** — A + line override; concrete methods + Method≠dest type (Marc 2026-08-23) |
-| Architecture | Shape **Accept**; **re-stamp pending** when this PR lands (Heidi) |
-| UI | Agrees / shape **Accept**; **re-stamp pending** when this PR lands (Mathilda) |
+| Architecture | **Accept** (Heidi re-stamp 2026-08-23) |
+| UI | **Accept** (Mathilda re-stamp 2026-08-23) |
 | Lab Ops | **Accept** (L1 Met; L2); Deiter cut list folded |
 | Security / CSO | **Accept** (S1 Met; S3) |
 

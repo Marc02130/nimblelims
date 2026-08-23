@@ -1,7 +1,7 @@
 # Tech sketch: Extract-hold dest sample type
 
 **Date:** 2026-08-23  
-**Status:** **Implement gate OPEN.** Concrete methods (Deiter cut) + A/line override + Method≠dest type folded. Architecture + UI: shape Accept; **re-stamp pending** on this PR. Land S3 + L2 + seeds + `dest_sample_type` + METHOD_CATALOG.  
+**Status:** **Implement gate OPEN.** Architecture Accept + UI Accept (re-stamp) on METHOD_CATALOG fold. Land S3 + L2 + seeds + `dest_sample_type` + METHOD_CATALOG.  
 **Stem:** `extract-hold-dest-type`  
 **Requirements:** [`.docs/requirements/extract-hold-dest-type.md`](../requirements/extract-hold-dest-type.md)  
 **Lab Ops:** [`.docs/lab-ops-review/extract-hold-dest-type.md`](../lab-ops-review/extract-hold-dest-type.md)  
@@ -209,8 +209,8 @@ Populate aliquots_pools
 | Review | Verdict |
 |--------|--------|
 | CEO | **Accept** — A + line override; concrete methods + Method≠dest type (Marc 2026-08-23) |
-| Architecture | Shape **Accept**; **re-stamp pending** when this PR lands (Heidi) — one mint op via concrete method; line clear/override; mid-flight = cancel (no un-mint); bounce dual mint / silent reshape / Method=dest collapse |
-| UI | Agrees / shape **Accept**; **re-stamp pending** when this PR lands (Mathilda) |
+| Architecture | **Accept** (Heidi re-stamp 2026-08-23) — METHOD_CATALOG implies one mint op; Method ≠ dest type; A + line override; cancel not warn/wipe (no un-mint); bounce dual mint, silent reshape, free type-in parent conc, Sample/`material_class` |
+| UI | **Accept** (Mathilda re-stamp 2026-08-23) — METHOD_CATALOG (Deiter IN); Method ≠ dest type; A + line override; mid-flight = cancel (no un-mint); bounce dual mint, silent reshape, CUT methods, free type-in parent conc |
 | Lab Ops | **Accept** (L1 Met; L2); Deiter cut list folded |
 | Security / CSO | **Accept** (S1 Met; S3) |
 
