@@ -274,7 +274,7 @@ const EntryCapturePanel: React.FC<EntryCapturePanelProps> = ({
           active: true,
           include_values: true,
         }),
-        apiService.getFieldDefinitions({ active: true, page: 1, size: 500 }),
+        apiService.getFieldDefinitions({ active: true, page: 1, size: 200 }),
         apiService.getLists().catch(() => []),
       ]);
 
