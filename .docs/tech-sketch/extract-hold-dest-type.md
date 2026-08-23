@@ -1,142 +1,186 @@
 # Tech sketch: Extract-hold dest sample type
 
 **Date:** 2026-08-23  
-**Status:** **Architecture Accept + UI Accept (conditions). Implement gate CLOSED until Leadership Accept.**  
+**Status:** **Architecture Accept + UI Accept (conditions, U6 stamped). Implement gate CLOSED until Lab Ops + CSO.**  
 **Stem:** `extract-hold-dest-type`  
+**Supersedes on main:** PR 52 docs (merged without Marc fold)  
 **Requirements:** [`.docs/requirements/extract-hold-dest-type.md`](../requirements/extract-hold-dest-type.md)  
 **Hold:** [`.docs/open-questions/sop-ai-to-process.md`](../open-questions/sop-ai-to-process.md) (PR 51)  
-**Spine:** [`.docs/tech-sketch/experiment-template-entries.md`](experiment-template-entries.md) §0.8 aliquot/pool  
+**Spine:** [`.docs/tech-sketch/experiment-template-entries.md`](experiment-template-entries.md) §0.1b / §0.8  
 **Process:** [`.docs/development-process/README.md`](../development-process/README.md)
 
 ## 1. Problem
 
-Aliquot/pool execute creates a dest sample that inherits parent identity fields and **does not** join `eln_process_samples`. Extract-then-Qubit (blood → DNA → Qubit on DNA) cannot run: the daughter looks like blood and is not on the process instance.
+Aliquot/pool execute creates a dest sample that inherits parent identity fields and **does not** join `eln_process_samples`. Extract-then-Qubit cannot run. Allowed dest-type transitions must be **system-wide configuration**, not hardcoded if-blood-then, not per-entry, not on `template_definition`.
 
 ## 2. Goals and non-goals
 
-**Goals (locked)**
+**Goals (locked — Marc + Heidi 2026-08-23)**
 
-- Optional dest `sample_type` on **aliquot and pool** plan lines, same control cluster as **method**.
-- Blank / omitted → dest `sample_type` = parent `sample_type`.
-- Execute (one transaction with existing aliquot/pool execute):
-  1. Create dest sample with `parent_sample_id` = source.
-  2. Set `samples.sample_type` from the plan line (or parent if blank).
-  3. If the experiment is under an ELN process step, insert dest into `eln_process_samples` for **that process instance** (status `queued` / waiting for next step — match existing assign semantics).
-- Use existing `samples.sample_type` (list FK). **No new Sample column.**
+- **Sample type can change through a process** (gate, not extract-by-rename).
+- Optional dest `sample_type` on **aliquot and pool** beside **method**. Blank = “Same as parent.” — **always allowed**; no same-type catalog row.
+- **C3 retracted:** Pool may set dest type ≠ parent when the catalog allows it.
+- **Transitions = system-wide / client catalog table** (not per entry, not on `template_definition`):
+  - `source_sample_type` × `operation` (`aliquot` | `pool`) × `allowed_dest_sample_type`
+  - Entry setup offers only matching dests for that source × operation
+  - Execute refuses off-table dest types
+  - Seed examples (config rows, not code): Blood × aliquot → DNA; DNA × pool → pooled DNA
+- **Pool same-type rule (Marc; supersedes every-source-has-a-row for mixed types):**
+  - All source samples on a pool plan must share **one** `sample_type`
+  - Mixed source types → **refuse**
+  - Then **one** catalog row: that type × `pool` → dest
+- Execute:
+  1. Pool: assert single shared source type (else refuse).
+  2. Resolve dest type (blank → parent).
+  3. If dest ≠ parent: require catalog row `(source_type, op, dest_type)`; else refuse.
+  4. Create dest (`parent_sample_id`, `samples.sample_type`).
+  5. **L1/C1/S1:** under process → insert execute-minted dest into `eln_process_samples` for **this** instance after start.
+- **Start-time entry gate:** `template_definition.accepted_sample_types` at experiment + LimsRun start only. Not receive. Not mid-entry. Separate from the transition catalog.
+- **C2:** Eligibility / Qubit key off `sample_type`, not matrix.
+- Existing `samples.sample_type` only. No Sample / `material_class` column.
 
 **Non-goals**
 
-- Dropping or rewriting `samples.matrix`.
-- TruSeq / library dest-type (same rule later).
-- SOP+AI Apply → process / parser.
-- New tables. New Sample columns. IC50.
-- Product UI code in this PR (docs only). Entry-setup UX called out for Mathilda review.
+- Matrix drop; TruSeq; SOP+AI Apply; IC50; product UI code.
+- Transition rules on entries or as JSON on `template_definition`.
+- Hardcoded if-blood-then.
+- **Mixed container contents** (cells, compound, buffer) — that is experiment contents, **not** pool. Out of this packet.
+- Receive / mid-entry type gates; free-text dest type; arbitrary process append (403).
 
-## 3. Data model (existing only)
+## 3. Data model
 
 ```
-samples.sample_type       ← existing list FK; dest write target
-samples.parent_sample_id  ← existing; set on dest
-samples.matrix            ← unchanged this packet (still copies parent / current execute)
-eln_process_samples       ← existing; insert dest for current process instance
-entries / entry config    ← aliquot|pool plan line gains optional dest_sample_type
+samples.sample_type                          ← existing; dest write; eligibility / Qubit (C2)
+samples.parent_sample_id                     ← existing
+samples.matrix                               ← unchanged
+eln_process_samples                          ← L1 execute-minted join
+entries                                      ← optional dest_sample_type on aliquot|pool lines
+template_definition.accepted_sample_types    ← step ENTRY allow-list only
+sample_type_transitions                      ← NEW system-wide client catalog table
 ```
 
-Heidi bounces: any migration that adds a Sample column, or any change that drops `samples.matrix` in this packet.
+### Catalog table (system-wide client catalog)
+
+| Column | Type | Notes |
+|--------|------|--------|
+| `source_sample_type` | FK → sample_type list | |
+| `operation` | `aliquot` \| `pool` | |
+| `allowed_dest_sample_type` | FK → sample_type list | |
+
+Unique `(client_id, source_sample_type, operation, allowed_dest_sample_type)`. Not on Sample. Not on entries. Not on `template_definition`.
+
+### `template_definition.accepted_sample_types`
+
+Step **entry** allow-list at start only. Empty/absent → no entry-type refuse.
+
+Heidi bounces: Sample/`material_class` column; template JSON transitions; if-blood-then; mixed source types on pool without refuse.
 
 ## 4. Contracts
 
-### Plan line (aliquot and pool)
-
-Extend the existing aliquot/pool plan row shape (entry `experiment_data` / predefined aliquot-pool plan):
+### Plan line
 
 ```python
 class AliquotPoolPlanLine(BaseModel):
-    method: str                         # existing (by mass, by volume, …)
+    method: str
     source_sample_id: UUID
-    # … existing amount / dest container fields …
-    dest_sample_type: UUID | None = None  # optional list entry id; blank = parent
+    dest_sample_type: UUID | None = None  # blank = parent (always allowed)
 ```
 
-Same field on **pool** lines. UI: control sits next to method (Mathilda: entry setup only).
+### Entry setup
+
+```text
+# Aliquot: source = that line's parent type
+# Pool: only after sources share one type; options for that type × pool
+options = catalog rows WHERE source = shared_source_type AND operation = this_op
+UI: beside Method; Blank = "Same as parent."; options only — no free-text
+```
 
 ### Execute
 
 ```text
-In one DB transaction (existing aliquot/pool execute):
-  for each plan line:
-    parent = source sample
-    type_id = line.dest_sample_type or parent.sample_type
-    dest = Sample(
-      parent_sample_id=parent.id,
-      sample_type=type_id,
-      # matrix / project / other fields: existing execute rules (matrix NOT in scope to change)
-    )
-    create dest 1×1 container + contents (existing)
-    if experiment has process_id / process step:
-      upsert eln_process_samples(
-        process_id=current,
-        sample_id=dest.id,
-        status=queued,           # waiting for next step start
-        # do not mark removed
-      )
+In one DB transaction:
+  if op is pool:
+    source_types = distinct sample_type of all pool sources
+    if len(source_types) != 1:
+      refuse  # mixed source types — Marc same-type rule
+    source_type = that one type
+  else:
+    source_type = parent.sample_type
+
+  type_id = line.dest_sample_type or source_type
+  if type_id != source_type:
+    if not catalog_row(source_type, op, type_id):
+      refuse
+
+  create dest Sample(parent_sample_id=…, sample_type=type_id, …)
+  if under process: upsert eln_process_samples(this_instance, dest, queued)  # L1
 ```
 
-Ad hoc experiment (no process): skip the process-sample insert.
+### L1 AuthZ
 
-### Lookup after execute
+| Path | Verdict |
+|------|--------|
+| Execute-minted dest joins this instance after start | Allowed |
+| Arbitrary append | **403** |
+| AuthZ | This instance, same client, `experiment:manage` |
 
-Next step (e.g. Qubit LimsRun / experiment) uses Decision #24 eligibility: Available for Testing + on `eln_process_samples`. Dest must appear in the process queue after extract.
+### Start-time entry gate
 
-## 5. Entry setup UX (review only — no product code here)
+```text
+if accepted_sample_types non-empty and sample.sample_type not in list: refuse start
+```
 
-| Surface | Change |
-|---------|--------|
-| Aliquot/pool plan entry | Optional “Dest sample type” select (sample_type list), **beside Method** |
-| Blank | Placeholder **“Same as parent.”** |
-| Pool | Same control; one dest type per pool dest sample |
+## 5. Entry setup UX (review only)
 
-**Mathilda UI Accept conditions (2026-08-23) — bounce bars**
+| Surface | Rule |
+|---------|------|
+| Dest type | Beside Method; catalog options for source × aliquot\|pool; Blank = Same as parent |
+| Pool | Enable dest select only when all sources share one type; else block / refuse |
+| Bounce | Free-text; receive gate; mid-entry type check; sample-ID box; wizard; detail hop |
 
-- Dest type control sits beside Method on the plan line.
-- Blank label is **“Same as parent.”** (not empty silence).
-- Same control on aliquot **and** pool.
-- **No sample-ID box** on this surface.
-- **No wizard** for dest type.
-- **No hop** to sample detail to set type.
+**Mathilda UI Accept conditions (U6 stamped 2026-08-23)**
 
-Mathilda reviews this sketch for entry setup. No product UI code until Leadership Accept + implement packet.
+- Pool needs one shared source type; mixed types refuse; then one catalog row.
+- Dest type beside Method; catalog options only; blank = Same as parent.
+- Bounce free-text, receive gate, mid-entry type check.
 
 ## 6. Locked vs parked
 
-| Locked now | Later, not this packet |
-|------------|------------------------|
-| Optional dest `sample_type` on aliquot + pool | TruSeq / library dest-type UI |
-| Execute → `samples.sample_type` + `parent_sample_id` | Drop / remodel `samples.matrix` |
-| Dest on `eln_process_samples` for this instance | SOP+AI Apply → process definition |
-| Existing columns only | New Sample columns |
-| UI: beside Method; blank = “Same as parent.”; no sample-ID box / wizard / detail hop | Product UI code |
+| Locked | Parked |
+|--------|--------|
+| System-wide config table | Full CSO seed beyond examples |
+| Blank always allowed | TruSeq; matrix drop |
+| Pool: one shared source type or refuse; one catalog row | Mixed container contents (cells/compound/buffer) |
+| L1; C2; entry allow-list on template | Product UI code; template JSON transitions |
+| C3 retracted | Sample/`material_class` column |
 
-## 7. Tests (when implement opens)
+## 7. Tests
 
 | Case | Expect |
 |------|--------|
-| Aliquot, dest type set | Dest `sample_type` = chosen; `parent_sample_id` set; on process samples |
-| Aliquot, dest type blank | Dest `sample_type` = parent |
-| Pool, dest type set | Same as aliquot for the pool dest |
-| Ad hoc experiment | Dest created; no process-sample row |
-| Migration scan | No new Sample column |
-| Entry setup | Dest type beside Method; blank = “Same as parent.”; no sample-ID box / wizard / sample-detail hop |
+| Aliquot blank | OK → parent type |
+| Aliquot Blood→DNA with row | OK |
+| Aliquot Blood→DNA without row | Refuse |
+| Pool all DNA → pooled DNA with row | OK |
+| Pool mixed Blood+DNA sources | **Refuse** (same-type rule) |
+| Pool Blood→DNA (no pool row) | Refuse |
+| Entry select | Catalog dests only + Same as parent |
+| Free-text / receive / mid-entry gate | Bounce / absent |
+| Append | 403 |
+| Migration | Catalog table OK; no Sample/`material_class` column |
 
 ## 8. Reviews
 
 | Review | Verdict |
 |--------|--------|
-| Architecture | **Accept** (Heidi 2026-08-23) — optional dest `sample_type` on plan line; blank = parent; execute writes existing `samples.sample_type`, keeps `parent_sample_id`, adds dest to `eln_process_samples`; no new Sample column; matrix drop stays out |
-| UI | **Accept with conditions** (Mathilda 2026-08-23) — dest type beside Method; blank = “Same as parent.”; same on aliquot and pool; no sample-ID box, no wizard, no hop to sample detail; no product UI code |
+| CEO | **Accept** + same-type pool fold (Marc 2026-08-23) |
+| Architecture | **Accept (re-stamp)** (Heidi 2026-08-23) — system-wide config table; blank always allowed; pool one shared source type; bounce Sample/`material_class`, template JSON transitions, if-blood-then |
+| UI | **Accept with conditions** (Mathilda 2026-08-23, **U6 stamped**) — pool one shared source type; mixed refuse; one catalog row; dest type beside Method; catalog options only; blank = Same as parent; bounce free-text / receive / mid-entry |
 | Lab Ops | Open |
-| CEO | Open — no implement until Accept |
+| CSO | Open |
+
+**Implement gate:** CLOSED until Lab Ops + CSO sign.
 
 ## 9. Relationship to Hold
 
-This packet is the **minimum** to lift Extract-then-Qubit Hold for dest **type** and process membership. It does **not** claim SOP+AI → live process (still a lie per PR 51). Matrix remainders and TruSeq stay out.
+Minimum to lift Extract-then-Qubit Hold for dest type + process membership + start entry gate, with transitions as system-wide config. Not SOP+AI → live process (PR 51). Matrix and TruSeq out.
