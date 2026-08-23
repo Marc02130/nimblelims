@@ -71,9 +71,7 @@ class AliquotPlanService:
 
     @staticmethod
     def _configured_method(entry: Entry) -> AliquotMethod:
-        raw = (entry.config or {}).get(
-            "method", AliquotMethod.aliquot_by_volume.value
-        )
+        raw = (entry.config or {}).get("method", AliquotMethod.aliquot_by_volume.value)
         try:
             return AliquotMethod(raw)
         except ValueError as exc:
@@ -518,8 +516,7 @@ class AliquotPlanService:
                     SampleTypeTransition.client_id == client_id,
                     SampleTypeTransition.source_sample_type == source_type,
                     SampleTypeTransition.operation == operation.value,
-                    SampleTypeTransition.allowed_dest_sample_type
-                    == destination_type,
+                    SampleTypeTransition.allowed_dest_sample_type == destination_type,
                     SampleTypeTransition.active.is_(True),
                 )
             ).scalar_one_or_none()
@@ -671,9 +668,7 @@ class AliquotPlanService:
         for line in plan_lines:
             try:
                 source_type = self.db.execute(
-                    select(Sample.sample_type).where(
-                        Sample.id == line.source_sample_id
-                    )
+                    select(Sample.sample_type).where(Sample.id == line.source_sample_id)
                 ).scalar_one()
                 dest_type = self._resolved_dest_sample_type(
                     line,
