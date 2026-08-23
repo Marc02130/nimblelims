@@ -1,135 +1,221 @@
 # Tech sketch: Extract-hold dest sample type
 
 **Date:** 2026-08-23  
-**Status:** **Implement gate OPEN.** Land S3 (`config:edit` on catalog mutate) + Lab Ops L2 + Blood×aliquot→DNA seed. Security/CSO Accept with conditions ([PR 55](https://github.com/Marc02130/nimblelims/pull/55)).  
+**Status:** **Implement gate OPEN.** Architecture Accept + UI Accept (re-stamp) on METHOD_CATALOG fold. Land S3 + L2 + seeds + `dest_sample_type` + METHOD_CATALOG.  
 **Stem:** `extract-hold-dest-type`  
 **Requirements:** [`.docs/requirements/extract-hold-dest-type.md`](../requirements/extract-hold-dest-type.md)  
 **Lab Ops:** [`.docs/lab-ops-review/extract-hold-dest-type.md`](../lab-ops-review/extract-hold-dest-type.md)  
 **Security:** [`.docs/security-review/extract-hold-dest-type.md`](../security-review/extract-hold-dest-type.md)  
 **Hold:** [`.docs/open-questions/sop-ai-to-process.md`](../open-questions/sop-ai-to-process.md) (PR 51)  
-**Spine:** [`.docs/tech-sketch/experiment-template-entries.md`](experiment-template-entries.md) §0.1b / §0.8  
+**Spine:** [`.docs/tech-sketch/experiment-template-entries.md`](experiment-template-entries.md) §0.8 / §0.9  
 **Process:** [`.docs/development-process/README.md`](../development-process/README.md)
 
 ## 1. Problem
 
-Aliquot/pool execute creates a dest that inherits parent identity and does not join `eln_process_samples`. Extract-then-Qubit cannot run. Allowed dest-type transitions are **system-wide configuration** (many-to-many rows), not hardcoded if-blood-then.
+Aliquot/pool execute creates a dest that inherits parent identity and does not join `eln_process_samples`. Dest type must be chosen on the **plan entry** before execute. Main today: no `dest_sample_type` on plan lines; execute copies `parent.sample_type` — Heidi bounce. Entry method must be **concrete** (not only aliquot|pool) so columns and mint op stay coherent.
 
-## 2. Goals and non-goals
+## 2. Two entries (no plan object)
 
-**Goals (locked)**
+| Role | `predefined_entry_key` | Kind | When | Owns |
+|------|------------------------|------|------|------|
+| **Plan entry** | `aliquot_pool_plan` | `experiment_data` | Before / at execute | Entry config + plan lines (below) |
+| **Dest sample entry** | `aliquots_pools` | `experiment_sample_data` | **AFTER execute only** | Lists minted daughters. No method/type picker. |
 
-- Sample type can change through a process (gate, not extract-by-rename).
-- Optional dest `sample_type` on **aliquot and pool** beside Method. Blank = “Same as parent.” — always allowed.
-- **Catalog = many-to-many:** one source × operation → many dests via **separate rows** (e.g. Blood × aliquot → plasma | DNA | RBC | WBC | buffy coat). Not a chained single row.
-- **Multi-hop = process steps** (Blood → plasma, then plasma → cfDNA), not one catalog edge that skips intermediates.
-- **L2 (Lab Ops):** dest type only on the **plan entry**. Execute does **not** re-prompt type.
-- Pool: all sources share one `sample_type` or refuse; then catalog lookup for that type × pool → dest.
-- Execute: write `samples.sample_type`, `parent_sample_id`; **L1 / S1** join execute-minted dest onto this instance after start; append 403.
-- Start-time entry gate: `template_definition.accepted_sample_types` (not the transition catalog).
-- **C2:** eligibility / Qubit key off `sample_type`, not matrix.
-- **S3:** `sample_type_transitions` mutate is **`config:edit` only** — not Client, not `experiment:manage` alone.
-- **Seed with implement:** Blood × aliquot → DNA.
+**Flow:** Execute reads `aliquot_pool_plan` → mints dests → L1/S1 join → `aliquots_pools` lists them. **No re-prompt.** No new experiment-plan object.
 
-**Non-goals**
+## 3. A + line override (Marc lock 2026-08-23)
 
-- Matrix drop; TruSeq; SOP+AI Apply; IC50.
-- Transition rules on entries or template JSON.
-- Hardcoded if-blood-then.
-- Mixed container contents as pool.
-- Receive / mid-entry type gates; execute re-prompt for dest type.
+### Entry config (`aliquot_pool_plan`)
 
-## 3. Data model
+| Field | Rule |
+|-------|------|
+| **Method** | Concrete method id from METHOD_CATALOG. Implies exactly one `mint_op` ∈ {aliquot, pool}. Drives columns + which mint op. Set at template or add-time. |
+| **Default dest type** | Optional. **Separate** control from method (Method ≠ dest type). Template pre-fill OK or prompt at add-time. Catalog limits. Blank/clear = Same as parent. |
 
-```
-samples.sample_type                       ← existing
-samples.parent_sample_id                  ← existing
-samples.matrix                            ← unchanged
-eln_process_samples                       ← L1/S1 execute-minted join
-template_definition.accepted_sample_types ← step ENTRY allow-list only
-sample_type_transitions                   ← NEW system-wide client catalog (many-to-many rows)
-```
+**One mint op per entry.** Aliquot XOR pool — never both.
 
-### Catalog table (many-to-many)
+**No mid-flight method change.** Once the entry exists with lines, changing method is **not** warn/wipe — **cancel the experiment**. Cancel does **not** un-mint already-minted daughters. Ops do not rewind.
 
-| Column | Notes |
-|--------|--------|
-| `source_sample_type` | FK |
-| `operation` | `aliquot` \| `pool` |
-| `allowed_dest_sample_type` | FK — one dest per row |
+### Plan lines
 
-Unique `(client_id, source, operation, dest)`. One source may have many rows for the same operation.
+| Field | Rule |
+|-------|------|
+| `dest_sample_type` | Optional **line override**. May clear (= Same as parent) or set another catalog-allowed dest for this source × entry `mint_op`. Independent of method. |
 
-**Seed with implement:** Blood × aliquot → DNA.  
-**Multi-hop:** Blood→plasma then plasma→cfDNA = two process steps + catalog rows — not one chained edge unless CSO adds a direct row.
-
-### AuthZ
-
-| Surface | Who |
-|---------|-----|
-| Transition catalog mutate (create/update/delete) | **`config:edit` only** (**S3**) — not Client, not `experiment:manage` alone |
-| Execute-minted process-sample join | This instance, same client, `experiment:manage` (**S1** Met) |
-| Arbitrary append | 403/404 |
-
-## 4. Contracts
-
-### Plan entry (L2)
-
-Dest type select beside Method on aliquot/pool plan. Options = all catalog dests for source × op (+ Same as parent). **No execute re-prompt.**
-
-### Execute
+**Resolve at execute:**
 
 ```text
-if pool and sources do not share one sample_type: refuse
-type_id = dest_sample_type or source_type
-if type_id != source_type and no catalog_row(source, op, type_id): refuse
-create dest; L1/S1 join if under process
-# never prompt for dest type at execute
+mint_op = METHOD_CATALOG[entry.method].mint_op   # exactly one
+type_id =
+  line.dest_sample_type if set
+  else entry.default_dest_sample_type if set
+  else source.sample_type   # Same as parent
+if type_id != source.sample_type and no catalog_row(source, mint_op, type_id): refuse
 ```
 
-## 5. Entry setup UX
+### Bounce bars (Marc + Heidi + Mathilda)
+
+- One entry minting **both** aliquot and pool (dual mint).
+- **Silent reshape** of columns/mint after lines already exist (method change mid-flight).
+- Warn/wipe instead of cancel.
+- Un-minting daughters on cancel.
+- Collapsing method and dest type into one control.
+- Method/type picker on `aliquots_pools`.
+- New experiment-plan object.
+- Offering CUT methods (fraction, contribution ratio, plate map, serial dilution).
+- Free type-in parent concentration on normalization.
+- Equimolar-by-size without a size/bp sample/result path (Hans gate).
+- Sample/`material_class` column; matrix drop; receive/mid-entry type gate; if-blood-then; transitions on `template_definition`.
+
+## 4. METHOD_CATALOG (Deiter cut list)
+
+Entry `method` is a concrete id. `mint_op = METHOD_CATALOG[method].mint_op` — exactly one.
+
+### Aliquot (IN)
+
+| method id | Display | Required columns (sketch) |
+|-----------|---------|---------------------------|
+| `aliquot_by_volume` | by volume | source vol / dest vol |
+| `aliquot_by_target_amount` | by target amount | target amount (+ vol or conc as needed) |
+| `aliquot_by_target_concentration` | by target concentration (normalization) | see §4.1 |
+| `aliquot_n_way_equal_split` | N-way equal split | N, equal split fields |
+
+### Pool (IN)
+
+| method id | Display | Required columns (sketch) |
+|-----------|---------|---------------------------|
+| `pool_by_volume_per_source` | by volume per source | per-source volume |
+| `pool_equal_volume_each` | equal volume from each | shared volume |
+| `pool_by_target_amount_per_source` | by target amount per source | per-source target amount |
+| `pool_consolidate_remaining` | consolidate remaining | remaining / consolidate fields |
+
+### CUT (out of this packet)
+
+| Out | Notes |
+|-----|-------|
+| fraction | Parked |
+| contribution ratio | Parked |
+| plate map | Parked |
+| serial dilution | Parked |
+
+### 4.1 Normalization (`aliquot_by_target_concentration`)
 
 | Rule | Detail |
 |------|--------|
-| Dest type | Plan entry only, beside Method |
-| Options | Many-to-many catalog rows for that source × op |
-| Blank | Same as parent (always) |
-| Execute | No type re-prompt (L2) |
-| Bounce | Free-text; receive/mid-entry gate; sample-ID box; wizard; detail hop |
+| Parent concentration | **Required** |
+| Source of conc | Prefer **prior result on that sample** — **not** free type-in |
+| Dest vol **or** target amount | At least one required |
 
-## 6. Locked vs parked
+### 4.2 Equimolar (Hans lock)
 
-| Locked | Parked |
-|--------|--------|
-| Many-to-many catalog rows | Full fraction seed beyond Blood→DNA |
-| Multi-hop = process steps | TruSeq; matrix drop |
-| L1/S1 Met; L2; S3 config:edit | |
-| Seed Blood×aliquot→DNA with implement | |
-| Gate OPEN | |
+**Sketch stance (this packet):** rename equimolar → **`aliquot_by_target_amount`** (“by target amount”). No size/bp required on sample/result path today, so equimolar-by-size is **not** a separate IN method.
 
-## 7. Tests
+**Hans gate:** if size/bp later exists on the sample/result path, Leadership may re-open a distinct equimolar-by-size method; until then, target amount covers the need.
+
+## 5. Goals (remainder)
+
+- Catalog many-to-many; multi-hop = process steps.
+- Pool: one shared source `sample_type` or refuse; then catalog lookup for entry `mint_op`.
+- L1/S1 join; L2 no execute re-prompt; S3 `config:edit` on catalog; C2 key off `sample_type`.
+- **Seed:** Blood × aliquot → DNA; DNA × pool → pooled DNA.
+
+## 6. Data model
+
+```
+samples.sample_type / parent_sample_id / matrix   ← existing (matrix unchanged)
+eln_process_samples                               ← L1/S1 join
+template_definition.accepted_sample_types         ← start entry allow-list
+sample_type_transitions                           ← NEW catalog (many-to-many)
+aliquot_pool_plan entry config:
+  method                                          ← concrete METHOD_CATALOG id
+  default_dest_sample_type                        ← optional (separate from method)
+AliquotPlanLine.dest_sample_type                  ← optional line override (MUST land)
+```
+
+```python
+# mint_op implied by method — never Literal["aliquot","pool"] alone on the entry
+METHOD_CATALOG = {
+    "aliquot_by_volume": {"mint_op": "aliquot", "columns": [...]},
+    "aliquot_by_target_amount": {"mint_op": "aliquot", "columns": [...]},
+    "aliquot_by_target_concentration": {"mint_op": "aliquot", "columns": [...]},
+    "aliquot_n_way_equal_split": {"mint_op": "aliquot", "columns": [...]},
+    "pool_by_volume_per_source": {"mint_op": "pool", "columns": [...]},
+    "pool_equal_volume_each": {"mint_op": "pool", "columns": [...]},
+    "pool_by_target_amount_per_source": {"mint_op": "pool", "columns": [...]},
+    "pool_consolidate_remaining": {"mint_op": "pool", "columns": [...]},
+    # CUT: fraction, contribution_ratio, plate_map, serial_dilution — not in catalog
+}
+
+class AliquotPoolPlanConfig(BaseModel):
+    method: str  # concrete method id; implies mint_op in {aliquot, pool}
+    default_dest_sample_type: UUID | None = None  # blank = Same as parent
+# mint_op = METHOD_CATALOG[method].mint_op  # exactly one
+
+class AliquotPlanLine(BaseModel):
+    source_sample_id: UUID
+    # … amount / dest container fields (shape from METHOD_CATALOG[entry.method]) …
+    dest_sample_type: UUID | None = None  # override or clear → Same as parent
+```
+
+Transition catalog rows still key off `mint_op` (aliquot|pool), not concrete method id.
+
+## 7. Execute
+
+```text
+mint_op = METHOD_CATALOG[entry.method].mint_op  # never dual mint
+validate method-specific required fields (incl. normalization rules)
+Read aliquot_pool_plan lines
+for each line:
+  if mint_op is pool and sources do not share one sample_type: refuse
+  type_id = line.dest_sample_type or entry.default_dest_sample_type or source.sample_type
+  if type_id != source.sample_type and no catalog_row(source, mint_op, type_id): refuse
+  mint dest; L1/S1 join if under process
+Populate aliquots_pools
+# never prompt for dest type at execute
+# never change entry.method mid-flight — cancel experiment instead
+# cancel does not un-mint already-minted daughters
+```
+
+## 8. Entry setup UX
+
+| Surface | Rule |
+|---------|------|
+| Entry add / template | Concrete method picker **and** default dest type (two controls); catalog limits dest |
+| Plan lines | May clear/override dest type within catalog; columns follow method |
+| After lines exist | Method locked — change requires cancel experiment (no warn/wipe reshape; no un-mint) |
+| `aliquots_pools` | After-execute daughters only |
+
+## 9. Tests
 
 | Case | Expect |
 |------|--------|
-| Blood×aliquot→DNA (seeded) | OK |
-| Off-table dest | Refuse |
-| Execute type prompt | Absent (L2) |
-| Pool mixed source types | Refuse |
-| L1/S1 join after start | Dest on process samples |
-| Catalog mutate without config:edit | **403** (S3) |
-| Catalog mutate with experiment:manage only | **403** (S3) |
+| Entry method `aliquot_by_volume`; default DNA; line blank | Dest DNA |
+| Entry default DNA; line clears | Dest = parent (Same as parent) |
+| Line overrides to catalog-allowed type | That type |
+| Line overrides off-catalog | Refuse |
+| Dual mint (aliquot+pool one entry) | Bounce |
+| Mid-flight method change | Refuse / cancel path — no silent reshape |
+| Cancel after partial mint | Daughters remain minted |
+| Method picker vs dest type | Independent controls |
+| CUT method selected | Not offered / refuse |
+| Normalization without prior conc result | Refuse (no free type-in) |
+| Normalization missing dest vol and target amount | Refuse |
+| Equimolar / target amount | Stored as `aliquot_by_target_amount`; no size/bp required |
+| Seeds Blood×aliquot→DNA; DNA×pool→pooled DNA | OK |
+| Catalog mutate without config:edit | 403 |
 
-## 8. Reviews
+## 10. Reviews
 
 | Review | Verdict |
 |--------|--------|
-| CEO | **Accept** |
-| Architecture | **Accept** |
-| UI | **Accept (U6)** |
-| Lab Ops | **Accept with conditions** (L1 Met; L2) |
-| Security / CSO | **Accept with conditions** (S1 Met; S3) — [PR 55](https://github.com/Marc02130/nimblelims/pull/55) |
+| CEO | **Accept** — A + line override; concrete methods + Method≠dest type (Marc 2026-08-23) |
+| Architecture | **Accept** (Heidi re-stamp 2026-08-23) — METHOD_CATALOG implies one mint op; Method ≠ dest type; A + line override; cancel not warn/wipe (no un-mint); bounce dual mint, silent reshape, free type-in parent conc, Sample/`material_class` |
+| UI | **Accept** (Mathilda re-stamp 2026-08-23) — METHOD_CATALOG (Deiter IN); Method ≠ dest type; A + line override; mid-flight = cancel (no un-mint); bounce dual mint, silent reshape, CUT methods, free type-in parent conc |
+| Lab Ops | **Accept** (L1 Met; L2); Deiter cut list folded |
+| Security / CSO | **Accept** (S1 Met; S3) |
 
-**Implement gate:** **OPEN.** Implement must land **S3** + **L2** + Blood×aliquot→DNA seed. Not IC50.
+**Implement gate:** **OPEN.** Not IC50.
 
-## 9. Relationship to Hold
+## 11. Relationship to Hold
 
-Lifts Extract-then-Qubit Hold for dest type + process membership once implemented. Not SOP+AI → live process (PR 51).
+Lifts Extract-then-Qubit Hold once implemented. Not SOP+AI → live process (PR 51).
