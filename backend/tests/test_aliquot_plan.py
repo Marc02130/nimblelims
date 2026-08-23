@@ -238,7 +238,7 @@ class TestAliquotPlanExecute:
                         "dest_container_type_id": str(ctype.id),
                         "dest_container_name": f"DEST-{uuid4().hex[:6]}",
                     }
-                ]
+                ],
             },
             headers=auth_headers,
         )
@@ -476,6 +476,33 @@ class TestAliquotPlanExecute:
         assert response.status_code == 400, response.text
         assert response.json()["detail"]["code"] == "mixed_pool_source_types"
 
+    def test_aliquot_entry_refuses_pool_lines(
+        self, client, auth_headers, plan_entry, db_session, test_admin_user, test_org
+    ):
+        exp_id = plan_entry["experiment"]["id"]
+        sample, tube, ctype = self._seed_sample_with_content(
+            db_session, test_admin_user, test_org, amount=50.0, experiment_id=exp_id
+        )
+
+        response = client.post(
+            f"/v1/entries/{plan_entry['entry']['id']}/execute",
+            json={
+                "lines": [
+                    {
+                        "source_sample_id": str(sample.id),
+                        "source_container_id": str(tube.id),
+                        "volume": 0.5,
+                        "dest_container_type_id": str(ctype.id),
+                        "pool_group": "not-allowed",
+                    }
+                ]
+            },
+            headers=auth_headers,
+        )
+
+        assert response.status_code == 400, response.text
+        assert response.json()["detail"]["code"] == "dual_mint_not_allowed"
+
     def test_entry_default_line_clear_and_method_lock(
         self, client, auth_headers, plan_entry, db_session, test_admin_user, test_org
     ):
@@ -581,10 +608,7 @@ class TestAliquotPlanExecute:
             headers=auth_headers,
         )
         assert method_change.status_code == 409, method_change.text
-        assert (
-            method_change.json()["detail"]["code"]
-            == "method_change_requires_cancel"
-        )
+        assert method_change.json()["detail"]["code"] == "method_change_requires_cancel"
 
     def test_normalization_requires_prior_result_and_rejects_free_concentration(
         self, client, auth_headers, plan_entry, db_session, test_admin_user, test_org
@@ -670,10 +694,7 @@ class TestAliquotPlanExecute:
             headers=auth_headers,
         )
         assert refused.status_code == 400, refused.text
-        assert (
-            refused.json()["detail"]["code"]
-            == "free_text_concentration_not_allowed"
-        )
+        assert refused.json()["detail"]["code"] == "free_text_concentration_not_allowed"
 
         accepted = client.put(
             f"/v1/entries/{entry_id}/aliquot-plan",
@@ -717,9 +738,7 @@ class TestAliquotPlanExecute:
         db_session.add(step)
         db_session.flush()
         entry = (
-            db_session.query(Entry)
-            .filter(Entry.id == plan_entry["entry"]["id"])
-            .one()
+            db_session.query(Entry).filter(Entry.id == plan_entry["entry"]["id"]).one()
         )
         entry.process_step_id = step.id
         db_session.commit()

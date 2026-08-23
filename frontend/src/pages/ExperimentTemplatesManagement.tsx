@@ -36,10 +36,29 @@ import { useUser } from '../contexts/UserContext';
 import { apiService } from '../services/apiService';
 import { FillHeightPage, FillHeightTable } from '../components/common/FillHeightPage';
 
-const apiErrorMsg = (err: any, fallback: string): string => {
-  const detail = err?.response?.data?.detail;
+interface ApiError {
+  response?: {
+    data?: {
+      detail?: unknown;
+    };
+  };
+  message?: string;
+}
+
+const apiErrorMsg = (err: unknown, fallback: string): string => {
+  const detail = (err as ApiError)?.response?.data?.detail;
   if (typeof detail === 'string') return detail;
-  if (Array.isArray(detail) && detail.length > 0) return detail[0]?.msg || fallback;
+  if (Array.isArray(detail) && detail.length > 0) {
+    const first = detail[0];
+    if (
+      typeof first === 'object' &&
+      first !== null &&
+      'msg' in first &&
+      typeof first.msg === 'string'
+    ) {
+      return first.msg;
+    }
+  }
   return fallback;
 };
 
@@ -512,8 +531,11 @@ const ExperimentTemplatesManagement: React.FC = () => {
     setCreateFieldOpen(true);
     try {
       const lists = await apiService.getLists();
-      const arr = Array.isArray(lists) ? lists : lists?.lists ?? [];
-      setCreateFieldLists(arr.map((l: any) => ({ id: l.id, name: l.name })));
+      const arr = (Array.isArray(lists) ? lists : lists?.lists ?? []) as Array<{
+        id: string;
+        name: string;
+      }>;
+      setCreateFieldLists(arr.map((list) => ({ id: list.id, name: list.name })));
     } catch {
       setCreateFieldLists([]);
     }
@@ -635,7 +657,9 @@ const ExperimentTemplatesManagement: React.FC = () => {
       await loadTemplates();
       setFormOpen(false);
     } catch (err: unknown) {
-      setFormError(apiErrorMsg(err, (err as any)?.message || 'Failed to save template'));
+      setFormError(
+        apiErrorMsg(err, (err as ApiError)?.message || 'Failed to save template'),
+      );
     } finally {
       setFormSubmitting(false);
     }
@@ -694,7 +718,7 @@ const ExperimentTemplatesManagement: React.FC = () => {
       jobId = job.id;
       setSopJobId(jobId);
     } catch (err: unknown) {
-      setSopUploadError(apiErrorMsg(err, (err as any)?.message || 'Upload failed'));
+      setSopUploadError(apiErrorMsg(err, (err as ApiError)?.message || 'Upload failed'));
       setSopPhase('idle');
       return;
     }
@@ -733,7 +757,12 @@ const ExperimentTemplatesManagement: React.FC = () => {
               await loadTemplates();
               setSopUploadOpen(false);
             } else {
-              setSopUploadError(apiErrorMsg(applyErr, (applyErr as any)?.message || 'Apply failed'));
+              setSopUploadError(
+                apiErrorMsg(
+                  applyErr,
+                  (applyErr as ApiError)?.message || 'Apply failed',
+                ),
+              );
               setSopPhase('idle');
             }
           }
