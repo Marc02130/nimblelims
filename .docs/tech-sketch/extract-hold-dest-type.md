@@ -1,7 +1,7 @@
 # Tech sketch: Extract-hold dest sample type
 
 **Date:** 2026-08-23  
-**Status:** **Implement gate OPEN.** Architecture Accept + UI Accept on two-entry fold. **A + line override** locked (Marc). Land S3 + L2 + seeds + `dest_sample_type`.  
+**Status:** **Implement gate OPEN.** Architecture Accept + UI Accept (A + line override re-read). Land S3 + L2 + seeds + `dest_sample_type`.  
 **Stem:** `extract-hold-dest-type`  
 **Requirements:** [`.docs/requirements/extract-hold-dest-type.md`](../requirements/extract-hold-dest-type.md)  
 **Lab Ops:** [`.docs/lab-ops-review/extract-hold-dest-type.md`](../lab-ops-review/extract-hold-dest-type.md)  
@@ -133,8 +133,8 @@ Populate aliquots_pools
 | Review | Verdict |
 |--------|--------|
 | CEO | **Accept** — A + line override lock |
-| Architecture | **Accept** (PR 58 two-entry) + **agree** A + line override / no mid-flight method |
-| UI | **Accept** (re-read) + **agree** A + line override |
+| Architecture | **Accept** (PR 58 two-entry) + agree A + line override |
+| UI | **Accept** (Mathilda re-read 2026-08-23 on A + line override) — one op per entry; line clear/override in catalog; mid-flight method = cancel; bounce dual mint and silent reshape |
 | Lab Ops | **Accept** (L1 Met; L2) |
 | Security / CSO | **Accept** (S1 Met; S3) |
 
