@@ -1,76 +1,74 @@
 # Requirements: Extract-hold dest sample type
 
 **Date:** 2026-08-23  
-**Status:** Architecture Accept + UI Accept (conditions, U6) — Lab Ops + CSO before implement  
+**Status:** Lab Ops Accept (L1 Met; L2) — gate CLOSED until Günter `config:edit`  
 **Stem:** `extract-hold-dest-type`  
 **Tech sketch:** [`.docs/tech-sketch/extract-hold-dest-type.md`](../tech-sketch/extract-hold-dest-type.md)  
+**Lab Ops:** [`.docs/lab-ops-review/extract-hold-dest-type.md`](../lab-ops-review/extract-hold-dest-type.md)  
 **Hold source:** [`.docs/open-questions/sop-ai-to-process.md`](../open-questions/sop-ai-to-process.md) (PR 51)
 
 ## 1. Purpose
 
-Dest `sample_type` on aliquot/pool, process membership for execute-minted dests, start-time step entry allow-list, and a **system-wide transition catalog**. Pool sources must share one type. Not SOP+AI Apply, parsers, or matrix.
+Dest `sample_type` on aliquot/pool, L1 process membership for execute-minted dests, start-time entry allow-list, and a **many-to-many** system-wide transition catalog. Not SOP+AI Apply, parsers, or matrix.
 
 ## 2. Leadership locks (cite)
 
 | Lock | Source |
 |------|--------|
-| Transitions: lab-wide / system-wide config table (source × aliquot\|pool × allowed dest) | Marc + Heidi |
-| Not per entry; not on `template_definition` for transitions | Marc + Heidi |
-| Blank = Same as parent always allowed; no config row | Heidi |
-| **Pool: all sources share one `sample_type`; mixed → refuse; then one catalog row for that type × pool → dest** | Marc 2026-08-23 (supersedes every-source-has-a-row for mixed types) |
-| Mixed container contents (cells, compound, buffer) = experiment contents, not pool; **out** | Marc |
-| `accepted_sample_types` still on `template_definition` (entry allow-list) | Marc + Heidi |
-| L1/S1, C2; C3 retracted | Marc fold |
-| Bounce Sample/`material_class` column; template JSON transitions; if-blood-then; free-text; receive/mid-entry gates | Heidi + Mathilda |
-| Dest type beside Method; catalog options only; blank = Same as parent; U6 same-type pool | Mathilda UI Accept 2026-08-23 |
+| Lab Ops Accept with conditions; **L1 Met**; **L2** = dest type only on plan entry, no execute re-prompt | Deiter / Marc 2026-08-23 |
+| Seed Blood × aliquot → DNA with implement | Marc / Lab Ops |
+| Catalog is **many-to-many**: one source → many dests via separate rows | Marc + Heidi |
+| Multi-hop = process steps, not one chained catalog row | Marc + Heidi |
+| Gate opens when Günter stamps `config:edit` on the catalog | Marc |
+| No product code until gate opens | Marc + Mathilda |
+| System-wide config table; blank always allowed; pool same-type rule; L1/C2; C3 retracted | Prior PR 54 locks |
 | Not IC50 | Marc |
 
 ## 3. Goals
 
-- Optional dest type beside Method on aliquot and pool; blank → parent (always OK).
-- System-wide catalog drives allowed dests; entry select filtered; execute refuses off-table.
-- Pool requires one shared source type; then one catalog lookup.
-- L1 join-after-start; start entry gate; C2 key off `sample_type`.
+- Optional dest type beside Method on aliquot and pool; blank → parent.
+- Many-to-many catalog rows; entry select shows all allowed dests for source × op.
+- Dest type set only on plan entry (**L2**); execute never re-prompts.
+- Multi-hop via process steps (Blood→plasma then plasma→cfDNA).
+- L1 join-after-start; start entry allow-list; C2 key off `sample_type`.
+- Seed Blood×aliquot→DNA with implement; further rows via `config:edit`.
 
 ## 4. Non-goals
 
+- No product code before Günter stamp.
 - No Sample/`material_class` column; no template JSON transitions; no if-blood-then.
-- No mixed-container-contents-as-pool; no matrix drop; no TruSeq; no SOP+AI Apply; no IC50.
-- No receive/mid-entry type gate; no free-text dest type; no product UI code here.
+- No execute re-prompt for dest type; no matrix drop; no TruSeq; no IC50.
 
 ## 5. Acceptance criteria
 
 | ID | Criterion |
 |----|-----------|
-| AC1 | Aliquot and pool accept optional dest `sample_type` beside Method. |
-| AC2 | Blank → parent; always allowed without a same-type catalog row. |
-| AC3 | Set dest → write only if catalog row `(source type, op, dest)` exists. |
+| AC1 | Dest type on plan entry beside Method (aliquot and pool); blank = Same as parent. |
+| AC2 | Execute does **not** re-prompt dest type (**L2**). |
+| AC3 | Catalog many-to-many: separate rows per allowed dest; select lists all for source × op. |
 | AC4 | Off-table dest → refuse. |
-| AC5 | Entry select lists only catalog dests for source × op, plus Same as parent. No free-text. |
-| AC6 | Catalog is system-wide client table — not per entry, not on `template_definition`. |
-| AC7 | Pool: if sources do not share one `sample_type` → refuse. |
-| AC8 | Pool: after same-type check, one catalog row for that type × pool → dest. |
-| AC9 | No hardcoded if-blood-then. Seed examples as rows: Blood×aliquot→DNA; DNA×pool→pooled DNA. |
-| AC10 | Dest has `parent_sample_id` = source. |
-| AC11 | Under process: execute-minted dest joins this instance after start (L1). Append → 403. |
-| AC12 | `accepted_sample_types` gates experiment + LimsRun start only. |
-| AC13 | No receive gate; no mid-entry type check. |
-| AC14 | Eligibility / Qubit key off `sample_type` (C2). |
-| AC15 | No Sample/`material_class` column. Catalog table allowed. |
-| AC16 | Mixed container contents out of packet. Matrix on dest unchanged. |
+| AC5 | Multi-hop is process steps, not a single chained catalog row. |
+| AC6 | Pool: one shared source type or refuse; then catalog lookup. |
+| AC7 | L1: execute-minted dest joins this instance after start; append 403. |
+| AC8 | `accepted_sample_types` gates start only. |
+| AC9 | Seed with implement includes Blood × aliquot → DNA. |
+| AC10 | Catalog CRUD requires `config:edit` (Günter). |
+| AC11 | C2: eligibility/Qubit key off `sample_type`. |
+| AC12 | No Sample/`material_class` column. |
 
 ## 6. Path exercised
 
-Blood → DNA (aliquot row) → DNA → pooled DNA (pool row, same-type sources) → next step entry allow-list. Mixed-type pool refuse. Katinka links in `sop-ai-to-process.md`; SOP PDFs out of git.
+Blood → DNA (aliquot seed row) → Qubit. Optional later: Blood → plasma → cfDNA as two steps. Mixed-type pool refuse.
 
 ## 7. Sign-off
 
-| Review | Role | Verdict |
-|--------|------|--------|
-| CEO | Marc | **Accept** + same-type pool fold |
-| Architecture | Heidi | **Accept (re-stamp)** 2026-08-23 |
-| UI | Mathilda | **Accept with conditions** 2026-08-23 (**U6 stamped**) |
-| Lab Ops | Deiter | Open |
-| CSO | Hans | Open |
+| Review | Verdict |
+|--------|--------|
+| CEO | **Accept** |
+| Architecture | **Accept** (many-to-many; multi-hop = steps) |
+| UI | **Accept (U6)** — plan entry only; many select options; no product UI until gate |
+| Lab Ops | **Accept with conditions** (L1 Met; L2) |
+| Security | **Open** — Günter `config:edit` opens implement gate |
+| CSO | Open |
 
-**Implement gate:** CLOSED until Lab Ops + CSO sign.
+**Implement gate:** CLOSED until Günter stamps `config:edit` on the catalog. Then implement L2 + seed. Not IC50.
