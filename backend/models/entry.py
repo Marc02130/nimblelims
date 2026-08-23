@@ -17,43 +17,60 @@ Custom columns use FieldDefinitions; values in EntryFieldValue (typed columns).
 """
 
 import uuid
-from sqlalchemy import Column, String, Integer, ForeignKey, Boolean, DateTime, Text, Numeric, UniqueConstraint
+from sqlalchemy import (
+    Column,
+    String,
+    Integer,
+    ForeignKey,
+    Boolean,
+    DateTime,
+    Text,
+    Numeric,
+    UniqueConstraint,
+)
 from sqlalchemy.dialects.postgresql import UUID as PostgresUUID, JSONB
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
 from .base import Base, BaseModel
 
-
 # Canonical + legacy aliases (legacy accepted, normalized to canonical on create/instantiate)
-ENTRY_TYPES = frozenset({
-    'experiment_sample_data',
-    'experiment_data',
-    'predefined_action',
-    'display_table',
-    # legacy
-    'sample_data',
-    'experiment_detail',
-})
+ENTRY_TYPES = frozenset(
+    {
+        "experiment_sample_data",
+        "experiment_data",
+        "predefined_action",
+        "display_table",
+        # legacy
+        "sample_data",
+        "experiment_detail",
+    }
+)
 
 ENTRY_TYPE_ALIASES = {
-    'sample_data': 'experiment_sample_data',
-    'experiment_detail': 'experiment_data',
+    "sample_data": "experiment_sample_data",
+    "experiment_detail": "experiment_data",
 }
 
-SAMPLE_SCOPED_ENTRY_TYPES = frozenset({
-    'experiment_sample_data',
-    'sample_data',
-})
+SAMPLE_SCOPED_ENTRY_TYPES = frozenset(
+    {
+        "experiment_sample_data",
+        "sample_data",
+    }
+)
 
-EXPERIMENT_SCOPED_ENTRY_TYPES = frozenset({
-    'experiment_data',
-    'experiment_detail',
-})
+EXPERIMENT_SCOPED_ENTRY_TYPES = frozenset(
+    {
+        "experiment_data",
+        "experiment_detail",
+    }
+)
 
-READ_ONLY_ENTRY_TYPES = frozenset({
-    'display_table',
-})
+READ_ONLY_ENTRY_TYPES = frozenset(
+    {
+        "display_table",
+    }
+)
 
 
 def normalize_entry_type(entry_type: str) -> str:
@@ -61,71 +78,83 @@ def normalize_entry_type(entry_type: str) -> str:
 
 
 def is_sample_scoped_entry(entry_type: str) -> bool:
-    return normalize_entry_type(entry_type) == 'experiment_sample_data'
+    return normalize_entry_type(entry_type) == "experiment_sample_data"
 
 
 def is_experiment_scoped_entry(entry_type: str) -> bool:
-    return normalize_entry_type(entry_type) == 'experiment_data'
+    return normalize_entry_type(entry_type) == "experiment_data"
 
 
 # Display-only Sample system fields (accessioning SoT — never write-back)
 SAMPLE_SYSTEM_FIELDS = {
-    'client_sample_id': {'label': 'Client Sample ID', 'data_type': 'text'},
-    'received_date': {'label': 'Received date', 'data_type': 'date'},
-    'date_sampled': {'label': 'Date sampled', 'data_type': 'date'},
-    'specimen_biotype_id': {'label': 'Biotype', 'data_type': 'list'},
-    'sample_type': {'label': 'Sample type', 'data_type': 'list'},
-    'status': {'label': 'Status', 'data_type': 'list'},
-    'matrix': {'label': 'Matrix', 'data_type': 'list'},
-    'temperature': {'label': 'Temperature', 'data_type': 'number'},
+    "client_sample_id": {"label": "Client Sample ID", "data_type": "text"},
+    "received_date": {"label": "Received date", "data_type": "date"},
+    "date_sampled": {"label": "Date sampled", "data_type": "date"},
+    "specimen_biotype_id": {"label": "Biotype", "data_type": "list"},
+    "sample_type": {"label": "Sample type", "data_type": "list"},
+    "status": {"label": "Status", "data_type": "list"},
+    "matrix": {"label": "Matrix", "data_type": "list"},
+    "temperature": {"label": "Temperature", "data_type": "number"},
 }
 
 # Experiment-mutable Sample columns eligible for write-back on entry submit
 # (identity/accessioning + system display fields excluded — S14 / OQ-S14)
 # specimen_biotype_id and temperature stay in SAMPLE_SYSTEM_FIELDS (RO display only)
-SAMPLE_WRITE_BACK_COLUMNS = frozenset({
-    'due_date',
-    'report_date',
-})
+SAMPLE_WRITE_BACK_COLUMNS = frozenset(
+    {
+        "due_date",
+        "report_date",
+    }
+)
 
 # v1 predefined entry keys (functionality wrappers; columns via field defs / config)
-PREDEFINED_ENTRY_KEYS = frozenset({
-    'experiment_header',  # experiment_data — start context
-    'samples',            # experiment_sample_data — cohort display
-    'aliquot_pool_plan',  # experiment_data — plan lines + execute
-    'aliquots_pools',     # experiment_sample_data — post-execute view
-})
+PREDEFINED_ENTRY_KEYS = frozenset(
+    {
+        "experiment_header",  # experiment_data — start context
+        "samples",  # experiment_sample_data — cohort display
+        "aliquot_pool_plan",  # experiment_data — plan lines + execute
+        "aliquots_pools",  # experiment_sample_data — post-execute view
+    }
+)
 
 PREDEFINED_ENTRY_DEFAULTS = {
-    'experiment_header': {
-        'entry_type': 'experiment_data',
-        'name': 'Experiment header',
-        'description': 'Start context for the experiment',
+    "experiment_header": {
+        "entry_type": "experiment_data",
+        "name": "Experiment header",
+        "description": "Start context for the experiment",
     },
-    'samples': {
-        'entry_type': 'experiment_sample_data',
-        'name': 'Samples',
-        'description': 'Cohort selected at experiment start (queue / scan)',
-        'config': {
-            'sample_columns': [
-                'client_sample_id',
-                'specimen_biotype_id',
-                'received_date',
-                'sample_type',
-                'status',
+    "samples": {
+        "entry_type": "experiment_sample_data",
+        "name": "Samples",
+        "description": "Cohort selected at experiment start (queue / scan)",
+        "config": {
+            "sample_columns": [
+                "client_sample_id",
+                "specimen_biotype_id",
+                "received_date",
+                "sample_type",
+                "status",
             ],
         },
     },
-    'aliquot_pool_plan': {
-        'entry_type': 'experiment_data',
-        'name': 'Aliquot / pool plan',
-        'description': 'Plan amounts to remove/add; execute creates dest samples',
+    "aliquot_pool_plan": {
+        "entry_type": "experiment_data",
+        "name": "Aliquot / pool plan",
+        "description": "Plan amounts to remove/add; execute creates dest samples",
+        "config": {
+            "method": "aliquot_by_volume",
+            "default_dest_sample_type": None,
+        },
     },
-    'aliquots_pools': {
-        'entry_type': 'experiment_sample_data',
-        'name': 'Aliquots / pools',
-        'description': 'Post-execute view of resulting samples',
-        'config': {'sample_columns': ['client_sample_id']},
+    "aliquots_pools": {
+        "entry_type": "experiment_sample_data",
+        "name": "Aliquots / pools",
+        "description": "Post-execute view of resulting samples",
+        "config": {
+            "sample_columns": ["client_sample_id", "sample_type"],
+            "minted_sample_ids": [],
+            "populated_after_execute": False,
+        },
     },
 }
 
@@ -139,13 +168,13 @@ class Entry(Base):
     and instantiated when an Experiment is created / a process step is instantiated.
     """
 
-    __tablename__ = 'entries'
+    __tablename__ = "entries"
 
     id = Column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
 
     experiment_id = Column(
         PostgresUUID(as_uuid=True),
-        ForeignKey('experiments.id', ondelete='CASCADE'),
+        ForeignKey("experiments.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
@@ -153,7 +182,7 @@ class Entry(Base):
     # Optional link to an ELN process step (when experiment lives inside a process)
     process_step_id = Column(
         PostgresUUID(as_uuid=True),
-        ForeignKey('eln_process_steps.id', ondelete='SET NULL'),
+        ForeignKey("eln_process_steps.id", ondelete="SET NULL"),
         nullable=True,
         index=True,
     )
@@ -163,14 +192,20 @@ class Entry(Base):
     description = Column(Text)
 
     predefined_entry_key = Column(String(128), nullable=True, index=True)
-    sort_order = Column(Integer, nullable=False, server_default='0', default=0)
-    config = Column(JSONB, nullable=True, server_default='{}')
-    active = Column(Boolean, nullable=False, server_default='true', default=True)
+    sort_order = Column(Integer, nullable=False, server_default="0", default=0)
+    config = Column(JSONB, nullable=True, server_default="{}")
+    active = Column(Boolean, nullable=False, server_default="true", default=True)
 
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
-    created_by = Column(PostgresUUID(as_uuid=True), ForeignKey('users.id'), nullable=True)
-    modified_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
-    modified_by = Column(PostgresUUID(as_uuid=True), ForeignKey('users.id'), nullable=True)
+    created_by = Column(
+        PostgresUUID(as_uuid=True), ForeignKey("users.id"), nullable=True
+    )
+    modified_at = Column(
+        DateTime, server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+    modified_by = Column(
+        PostgresUUID(as_uuid=True), ForeignKey("users.id"), nullable=True
+    )
 
     experiment = relationship("Experiment", back_populates="entries")
     process_step = relationship("ELNProcessStep", back_populates="entries")
@@ -197,20 +232,20 @@ class Entry(Base):
 class EntryFieldDefinition(Base):
     """Junction: which FieldDefinitions are columns on this Entry instance."""
 
-    __tablename__ = 'entry_field_definitions'
+    __tablename__ = "entry_field_definitions"
 
     entry_id = Column(
         PostgresUUID(as_uuid=True),
-        ForeignKey('entries.id', ondelete='CASCADE'),
+        ForeignKey("entries.id", ondelete="CASCADE"),
         primary_key=True,
     )
     field_definition_id = Column(
         PostgresUUID(as_uuid=True),
-        ForeignKey('field_definitions.id'),
+        ForeignKey("field_definitions.id"),
         primary_key=True,
     )
-    sort_order = Column(Integer, nullable=False, server_default='0', default=0)
-    visible = Column(Boolean, nullable=False, server_default='true', default=True)
+    sort_order = Column(Integer, nullable=False, server_default="0", default=0)
+    visible = Column(Boolean, nullable=False, server_default="true", default=True)
     # If set, upserting a value for this field may write through to Sample.<column>
     # Must be in SAMPLE_WRITE_BACK_COLUMNS.
     write_back_target = Column(String(128), nullable=True)
@@ -235,25 +270,25 @@ class EntryFieldValue(Base):
       sample_id optional (purpose subset). Legacy single cell: both null.
     """
 
-    __tablename__ = 'entry_field_values'
+    __tablename__ = "entry_field_values"
 
     id = Column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
 
     entry_id = Column(
         PostgresUUID(as_uuid=True),
-        ForeignKey('entries.id', ondelete='CASCADE'),
+        ForeignKey("entries.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
     field_definition_id = Column(
         PostgresUUID(as_uuid=True),
-        ForeignKey('field_definitions.id'),
+        ForeignKey("field_definitions.id"),
         nullable=False,
         index=True,
     )
     sample_id = Column(
         PostgresUUID(as_uuid=True),
-        ForeignKey('samples.id'),
+        ForeignKey("samples.id"),
         nullable=True,
         index=True,
     )
@@ -264,7 +299,7 @@ class EntryFieldValue(Base):
     value_number = Column(Numeric(precision=20, scale=10))
     value_list_entry_id = Column(
         PostgresUUID(as_uuid=True),
-        ForeignKey('list_entries.id'),
+        ForeignKey("list_entries.id"),
     )
     value_date = Column(DateTime(timezone=True))
     value_boolean = Column(Boolean)
@@ -275,9 +310,15 @@ class EntryFieldValue(Base):
     write_back_previous = Column(JSONB, nullable=True)
 
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
-    created_by = Column(PostgresUUID(as_uuid=True), ForeignKey('users.id'), nullable=True)
-    modified_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
-    modified_by = Column(PostgresUUID(as_uuid=True), ForeignKey('users.id'), nullable=True)
+    created_by = Column(
+        PostgresUUID(as_uuid=True), ForeignKey("users.id"), nullable=True
+    )
+    modified_at = Column(
+        DateTime, server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+    modified_by = Column(
+        PostgresUUID(as_uuid=True), ForeignKey("users.id"), nullable=True
+    )
 
     entry = relationship("Entry", back_populates="values")
     field_definition = relationship("FieldDefinition")
@@ -358,14 +399,14 @@ class EntryFieldValue(Base):
 # Decision #1: typed steps eln_experiment | lims_run.
 # ---------------------------------------------------------------------------
 
-STEP_KINDS = frozenset({'eln_experiment', 'lims_run'})
-EXECUTION_MODES = frozenset({'eln_experiment', 'lims_run'})
+STEP_KINDS = frozenset({"eln_experiment", "lims_run"})
+EXECUTION_MODES = frozenset({"eln_experiment", "lims_run"})
 
 
 class ELNProcessDefinition(BaseModel):
     """Reusable multi-step protocol (first-class definition)."""
 
-    __tablename__ = 'eln_process_definitions'
+    __tablename__ = "eln_process_definitions"
 
     # name, description, active, audit from BaseModel
     steps = relationship(
@@ -380,29 +421,45 @@ class ELNProcessDefinition(BaseModel):
 class ELNProcessDefinitionStep(Base):
     """One ordered step in a process definition (typed)."""
 
-    __tablename__ = 'eln_process_definition_steps'
+    __tablename__ = "eln_process_definition_steps"
 
     id = Column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     process_definition_id = Column(
         PostgresUUID(as_uuid=True),
-        ForeignKey('eln_process_definitions.id', ondelete='CASCADE'),
+        ForeignKey("eln_process_definitions.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
-    step_kind = Column(String(32), nullable=False, server_default='eln_experiment', default='eln_experiment')
-    execution_mode = Column(String(32), nullable=False, server_default='eln_experiment', default='eln_experiment')
+    step_kind = Column(
+        String(32),
+        nullable=False,
+        server_default="eln_experiment",
+        default="eln_experiment",
+    )
+    execution_mode = Column(
+        String(32),
+        nullable=False,
+        server_default="eln_experiment",
+        default="eln_experiment",
+    )
     experiment_template_id = Column(
         PostgresUUID(as_uuid=True),
-        ForeignKey('experiment_templates.id'),
+        ForeignKey("experiment_templates.id"),
         nullable=False,
         index=True,
     )
     name = Column(String(255), nullable=True)
     sort_order = Column(Integer, nullable=False, default=0)
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
-    created_by = Column(PostgresUUID(as_uuid=True), ForeignKey('users.id'), nullable=True)
-    modified_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
-    modified_by = Column(PostgresUUID(as_uuid=True), ForeignKey('users.id'), nullable=True)
+    created_by = Column(
+        PostgresUUID(as_uuid=True), ForeignKey("users.id"), nullable=True
+    )
+    modified_at = Column(
+        DateTime, server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+    modified_by = Column(
+        PostgresUUID(as_uuid=True), ForeignKey("users.id"), nullable=True
+    )
 
     process_definition = relationship("ELNProcessDefinition", back_populates="steps")
     experiment_template = relationship("ExperimentTemplate")
@@ -412,23 +469,26 @@ class ELNProcess(BaseModel):
     """
     Process *instance* — one execution of a process definition.
     """
-    __tablename__ = 'eln_processes'
+
+    __tablename__ = "eln_processes"
 
     status_id = Column(
         PostgresUUID(as_uuid=True),
-        ForeignKey('list_entries.id'),
+        ForeignKey("list_entries.id"),
         nullable=True,
         index=True,
     )
     process_definition_id = Column(
         PostgresUUID(as_uuid=True),
-        ForeignKey('eln_process_definitions.id'),
+        ForeignKey("eln_process_definitions.id"),
         nullable=True,
         index=True,
     )
 
     status = relationship("ListEntry", foreign_keys=[status_id])
-    process_definition = relationship("ELNProcessDefinition", back_populates="instances")
+    process_definition = relationship(
+        "ELNProcessDefinition", back_populates="instances"
+    )
     steps = relationship(
         "ELNProcessStep",
         back_populates="process",
@@ -449,41 +509,58 @@ class ELNProcessStep(Base):
     """
     One ordered step in a process instance (snapshot from definition).
     """
-    __tablename__ = 'eln_process_steps'
+
+    __tablename__ = "eln_process_steps"
 
     id = Column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     process_id = Column(
         PostgresUUID(as_uuid=True),
-        ForeignKey('eln_processes.id', ondelete='CASCADE'),
+        ForeignKey("eln_processes.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
-    step_kind = Column(String(32), nullable=False, server_default='eln_experiment', default='eln_experiment')
-    execution_mode = Column(String(32), nullable=False, server_default='eln_experiment', default='eln_experiment')
+    step_kind = Column(
+        String(32),
+        nullable=False,
+        server_default="eln_experiment",
+        default="eln_experiment",
+    )
+    execution_mode = Column(
+        String(32),
+        nullable=False,
+        server_default="eln_experiment",
+        default="eln_experiment",
+    )
     experiment_template_id = Column(
         PostgresUUID(as_uuid=True),
-        ForeignKey('experiment_templates.id'),
+        ForeignKey("experiment_templates.id"),
         nullable=False,
         index=True,
     )
     experiment_id = Column(
         PostgresUUID(as_uuid=True),
-        ForeignKey('experiments.id'),
+        ForeignKey("experiments.id"),
         nullable=True,
         index=True,
     )
     current_lims_run_id = Column(
         PostgresUUID(as_uuid=True),
-        ForeignKey('lims_runs.id', ondelete='SET NULL'),
+        ForeignKey("lims_runs.id", ondelete="SET NULL"),
         nullable=True,
         index=True,
     )
     name = Column(String(255), nullable=True)
     sort_order = Column(Integer, nullable=False, default=0)
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
-    created_by = Column(PostgresUUID(as_uuid=True), ForeignKey('users.id'), nullable=True)
-    modified_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
-    modified_by = Column(PostgresUUID(as_uuid=True), ForeignKey('users.id'), nullable=True)
+    created_by = Column(
+        PostgresUUID(as_uuid=True), ForeignKey("users.id"), nullable=True
+    )
+    modified_at = Column(
+        DateTime, server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+    modified_by = Column(
+        PostgresUUID(as_uuid=True), ForeignKey("users.id"), nullable=True
+    )
 
     process = relationship("ELNProcess", back_populates="steps")
     experiment_template = relationship("ExperimentTemplate")
@@ -500,23 +577,25 @@ class ELNProcessStep(Base):
 class ELNProcessStepLimsRun(Base):
     """History of LimsRuns attached to a process step instance."""
 
-    __tablename__ = 'eln_process_step_lims_runs'
+    __tablename__ = "eln_process_step_lims_runs"
 
     id = Column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     process_step_id = Column(
         PostgresUUID(as_uuid=True),
-        ForeignKey('eln_process_steps.id', ondelete='CASCADE'),
+        ForeignKey("eln_process_steps.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
     lims_run_id = Column(
         PostgresUUID(as_uuid=True),
-        ForeignKey('lims_runs.id', ondelete='CASCADE'),
+        ForeignKey("lims_runs.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
-    created_by = Column(PostgresUUID(as_uuid=True), ForeignKey('users.id'), nullable=True)
+    created_by = Column(
+        PostgresUUID(as_uuid=True), ForeignKey("users.id"), nullable=True
+    )
 
     process_step = relationship("ELNProcessStep", back_populates="lims_run_links")
     lims_run = relationship("LimsRun")
@@ -529,38 +608,49 @@ class ELNProcessSample(Base):
     Authoritative for "this sample belongs to this process".
     Per-step execution detail remains ExperimentSampleExecution / Entry (Phase 2).
     """
-    __tablename__ = 'eln_process_samples'
+
+    __tablename__ = "eln_process_samples"
     __table_args__ = (
-        UniqueConstraint('process_id', 'sample_id', name='uq_eln_process_samples_process_sample'),
+        UniqueConstraint(
+            "process_id", "sample_id", name="uq_eln_process_samples_process_sample"
+        ),
     )
 
     id = Column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     process_id = Column(
         PostgresUUID(as_uuid=True),
-        ForeignKey('eln_processes.id', ondelete='CASCADE'),
+        ForeignKey("eln_processes.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
     sample_id = Column(
         PostgresUUID(as_uuid=True),
-        ForeignKey('samples.id'),
+        ForeignKey("samples.id"),
         nullable=False,
         index=True,
     )
     # queued (ready/waiting) | in_progress (experiment started) | completed | removed
     # legacy: "assigned" treated as queued
-    status = Column(String(32), nullable=False, server_default='queued', default='queued')
+    status = Column(
+        String(32), nullable=False, server_default="queued", default="queued"
+    )
     current_step_id = Column(
         PostgresUUID(as_uuid=True),
-        ForeignKey('eln_process_steps.id', ondelete='SET NULL'),
+        ForeignKey("eln_process_steps.id", ondelete="SET NULL"),
         nullable=True,
         index=True,
     )
     assigned_at = Column(DateTime(timezone=True), server_default=func.now())
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
-    created_by = Column(PostgresUUID(as_uuid=True), ForeignKey('users.id'), nullable=True)
-    modified_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
-    modified_by = Column(PostgresUUID(as_uuid=True), ForeignKey('users.id'), nullable=True)
+    created_by = Column(
+        PostgresUUID(as_uuid=True), ForeignKey("users.id"), nullable=True
+    )
+    modified_at = Column(
+        DateTime, server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+    modified_by = Column(
+        PostgresUUID(as_uuid=True), ForeignKey("users.id"), nullable=True
+    )
 
     process = relationship("ELNProcess", back_populates="process_samples")
     sample = relationship("Sample")
@@ -569,7 +659,6 @@ class ELNProcessSample(Base):
 
 # Backward-compatible alias
 ProcessSample = ELNProcessSample
-
 
 
 # ---------------------------------------------------------------------------

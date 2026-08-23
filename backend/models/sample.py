@@ -1,40 +1,65 @@
-from sqlalchemy import Column, String, DateTime, ForeignKey, Boolean, Numeric
+import uuid
+
+from sqlalchemy import (
+    Boolean,
+    CheckConstraint,
+    Column,
+    DateTime,
+    ForeignKey,
+    Numeric,
+    String,
+    UniqueConstraint,
+)
 from sqlalchemy.dialects.postgresql import UUID as PostgresUUID, JSONB
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
-from .base import BaseModel
+from .base import Base, BaseModel
 
 
 class Sample(BaseModel):
-    __tablename__ = 'samples'
-    
+    __tablename__ = "samples"
+
     # Sample-specific fields
     due_date = Column(DateTime)
     received_date = Column(DateTime)
     report_date = Column(DateTime)
-    date_sampled = Column(DateTime, nullable=True)  # When sample was collected (for expiration calc)
-    sample_type = Column(PostgresUUID(as_uuid=True), ForeignKey('list_entries.id'), nullable=False)
-    status = Column(PostgresUUID(as_uuid=True), ForeignKey('list_entries.id'), nullable=False)
-    matrix = Column(PostgresUUID(as_uuid=True), ForeignKey('list_entries.id'), nullable=False)
+    date_sampled = Column(
+        DateTime, nullable=True
+    )  # When sample was collected (for expiration calc)
+    sample_type = Column(
+        PostgresUUID(as_uuid=True), ForeignKey("list_entries.id"), nullable=False
+    )
+    status = Column(
+        PostgresUUID(as_uuid=True), ForeignKey("list_entries.id"), nullable=False
+    )
+    matrix = Column(
+        PostgresUUID(as_uuid=True), ForeignKey("list_entries.id"), nullable=False
+    )
     temperature = Column(Numeric(10, 2))
-    parent_sample_id = Column(PostgresUUID(as_uuid=True), ForeignKey('samples.id'), nullable=True)
-    project_id = Column(PostgresUUID(as_uuid=True), ForeignKey('projects.id'), nullable=False)
-    qc_type = Column(PostgresUUID(as_uuid=True), ForeignKey('list_entries.id'), nullable=True)
+    parent_sample_id = Column(
+        PostgresUUID(as_uuid=True), ForeignKey("samples.id"), nullable=True
+    )
+    project_id = Column(
+        PostgresUUID(as_uuid=True), ForeignKey("projects.id"), nullable=False
+    )
+    qc_type = Column(
+        PostgresUUID(as_uuid=True), ForeignKey("list_entries.id"), nullable=True
+    )
     client_sample_id = Column(String(255), nullable=True, unique=True)
-    custom_attributes = Column(JSONB, nullable=True, server_default='{}')  # legacy - phased out for modeled fields via hard cutover
+    custom_attributes = Column(
+        JSONB, nullable=True, server_default="{}"
+    )  # legacy - phased out for modeled fields via hard cutover
 
     # Path 1: direct column for top-level list-backed field (specimen_biotype)
     # Defined via FieldDefinition (data_type='list', source_list=...), added via migration.
     # This replaces any previous hack in custom_attributes['specimen_biotype'].
     specimen_biotype_id = Column(
         PostgresUUID(as_uuid=True),
-        ForeignKey('list_entries.id'),
+        ForeignKey("list_entries.id"),
         nullable=True,
-        index=True
+        index=True,
     )
-    specimen_biotype = relationship(
-        "ListEntry", foreign_keys=[specimen_biotype_id]
-    )
+    specimen_biotype = relationship("ListEntry", foreign_keys=[specimen_biotype_id])
 
     # Example simple scalar (text) - also via FieldDefinition + direct column
     # lot_number = Column(Text)
@@ -64,11 +89,15 @@ class Sample(BaseModel):
     #     if self.specimen_biotype_id:
     #         return self.specimen_biotype.name
     #     return self.custom_attributes.get('specimen_biotype')
-    
+
     # Relationships
     project = relationship("Project", back_populates="samples")
-    parent_sample = relationship("Sample", primaryjoin="Sample.parent_sample_id == Sample.id")
-    child_samples = relationship("Sample", primaryjoin="Sample.id == Sample.parent_sample_id")
+    parent_sample = relationship(
+        "Sample", primaryjoin="Sample.parent_sample_id == Sample.id"
+    )
+    child_samples = relationship(
+        "Sample", primaryjoin="Sample.id == Sample.parent_sample_id"
+    )
     tests = relationship("Test", back_populates="sample")
     contents = relationship("Contents", back_populates="sample")
     experiment_sample_executions = relationship(
@@ -76,5 +105,81 @@ class Sample(BaseModel):
         back_populates="sample",
         foreign_keys="ExperimentSampleExecution.sample_id",
     )
-    creator = relationship("User", foreign_keys="Sample.created_by", back_populates="created_samples")
-    modifier = relationship("User", foreign_keys="Sample.modified_by", back_populates="modified_samples")
+    creator = relationship(
+        "User", foreign_keys="Sample.created_by", back_populates="created_samples"
+    )
+    modifier = relationship(
+        "User", foreign_keys="Sample.modified_by", back_populates="modified_samples"
+    )
+
+
+class SampleTypeTransition(Base):
+    """Client catalog edge for an allowed aliquot or pool destination type."""
+
+    __tablename__ = "sample_type_transitions"
+    __table_args__ = (
+        CheckConstraint(
+            "operation IN ('aliquot', 'pool')",
+            name="ck_sample_type_transitions_operation",
+        ),
+        UniqueConstraint(
+            "client_id",
+            "source_sample_type",
+            "operation",
+            "allowed_dest_sample_type",
+            name="uq_sample_type_transitions_client_source_operation_dest",
+        ),
+    )
+
+    id = Column(
+        PostgresUUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+    client_id = Column(
+        PostgresUUID(as_uuid=True),
+        ForeignKey("clients.id"),
+        nullable=False,
+        index=True,
+    )
+    source_sample_type = Column(
+        PostgresUUID(as_uuid=True),
+        ForeignKey("list_entries.id"),
+        nullable=False,
+        index=True,
+    )
+    operation = Column(String(16), nullable=False, index=True)
+    allowed_dest_sample_type = Column(
+        PostgresUUID(as_uuid=True),
+        ForeignKey("list_entries.id"),
+        nullable=False,
+        index=True,
+    )
+    active = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime, nullable=False, server_default=func.now())
+    created_by = Column(
+        PostgresUUID(as_uuid=True),
+        ForeignKey("users.id"),
+        nullable=True,
+    )
+    modified_at = Column(
+        DateTime,
+        nullable=False,
+        server_default=func.now(),
+        onupdate=func.now(),
+    )
+    modified_by = Column(
+        PostgresUUID(as_uuid=True),
+        ForeignKey("users.id"),
+        nullable=True,
+    )
+
+    client = relationship("Client", foreign_keys=[client_id])
+    source_type = relationship(
+        "ListEntry",
+        foreign_keys=[source_sample_type],
+    )
+    allowed_dest_type = relationship(
+        "ListEntry",
+        foreign_keys=[allowed_dest_sample_type],
+    )

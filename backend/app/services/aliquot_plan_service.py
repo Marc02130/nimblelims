@@ -1,25 +1,20 @@
-"""
-Aliquot/pool plan resolution and execute (ELN entry predefined_action / plan).
+"""Concrete-method aliquot/pool planning and transactional execution."""
 
-Rules (Lab Ops L3–L4, L9):
-  - Amount stored = mass or count only — never volume
-  - by_volume / target_volume: convert via concentration → mass
-  - Execute: reduce source Contents.amount; create dest sample + contents
-  - pool_group: one dest container, multiple content rows
-"""
 from __future__ import annotations
 
-from typing import Optional, List, Dict, Any, Tuple
+from typing import Optional, List, Dict, Any, Sequence, Tuple
 from uuid import UUID, uuid4
 from decimal import Decimal
 from datetime import datetime, timezone
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import DBAPIError, IntegrityError, ProgrammingError
 from fastapi import HTTPException, status
 
 from app.schemas.aliquot_plan import (
     AliquotMethod,
+    AliquotOperation,
     AliquotPlanLine,
     AliquotPlanSaveRequest,
     AliquotPlanSaveResponse,
@@ -27,14 +22,26 @@ from app.schemas.aliquot_plan import (
     AliquotExecuteRequest,
     AliquotExecuteResponse,
     AliquotExecuteLineResult,
+    DestSampleTypeOptionsResponse,
+    SampleTypeOption,
     METHOD_PROFILES,
 )
-from models.entry import Entry, normalize_entry_type
-from models.sample import Sample
+from app.core.rbac import validate_client_access
+from models.entry import (
+    ELNProcessSample,
+    ELNProcessStep,
+    Entry,
+    normalize_entry_type,
+)
+from models.sample import Sample, SampleTypeTransition
 from models.container import Container, Contents, ContainerType
+from models.project import Project
 from models.user import User
 from models.list import ListEntry, List as ListModel
 from models.experiment import ExperimentSampleExecution
+from models.result import Result
+from models.test import Test
+from models.analysis import Analyte
 
 
 class AliquotPlanService:
@@ -58,12 +65,90 @@ class AliquotPlanService:
             out.append({"method": key, **prof})
         return out
 
+    @staticmethod
+    def _method_operation(method: AliquotMethod) -> AliquotOperation:
+        return AliquotOperation(METHOD_PROFILES[method.value]["mint_op"])
+
+    @staticmethod
+    def _configured_method(entry: Entry) -> AliquotMethod:
+        raw = (entry.config or {}).get("method", AliquotMethod.aliquot_by_volume.value)
+        try:
+            return AliquotMethod(raw)
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={
+                    "code": "invalid_aliquot_method",
+                    "message": f"Unknown concrete aliquot/pool method: {raw}",
+                },
+            ) from exc
+
+    def list_dest_sample_types(
+        self,
+        source_sample_id: UUID,
+        operation: AliquotOperation,
+    ) -> DestSampleTypeOptionsResponse:
+        """List catalog destinations for the source sample's type and operation."""
+        source_row = self.db.execute(
+            select(Sample, Project.client_id)
+            .join(Project, Project.id == Sample.project_id)
+            .where(Sample.id == source_sample_id)
+        ).first()
+        if not source_row:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Source sample not found",
+            )
+
+        source, client_id = source_row
+        if self.current_user:
+            validate_client_access(self.current_user, client_id)
+
+        source_type = self.db.execute(
+            select(ListEntry).where(ListEntry.id == source.sample_type)
+        ).scalar_one()
+        destination_types = (
+            self.db.execute(
+                select(ListEntry)
+                .join(
+                    SampleTypeTransition,
+                    SampleTypeTransition.allowed_dest_sample_type == ListEntry.id,
+                )
+                .where(
+                    SampleTypeTransition.client_id == client_id,
+                    SampleTypeTransition.source_sample_type == source.sample_type,
+                    SampleTypeTransition.operation == operation.value,
+                    SampleTypeTransition.active.is_(True),
+                    ListEntry.active.is_(True),
+                )
+                .order_by(ListEntry.name.asc())
+            )
+            .scalars()
+            .all()
+        )
+
+        return DestSampleTypeOptionsResponse(
+            source_sample_type=SampleTypeOption(
+                id=source_type.id,
+                name=source_type.name,
+            ),
+            operation=operation,
+            options=[
+                SampleTypeOption(id=destination.id, name=destination.name)
+                for destination in destination_types
+            ],
+        )
+
     def _get_plan_entry(self, entry_id: UUID) -> Entry:
         entry = self.db.query(Entry).filter(Entry.id == entry_id).first()
         if not entry:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Entry not found")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Entry not found"
+            )
         key = entry.predefined_entry_key
-        if key not in (None, "aliquot_pool_plan") and normalize_entry_type(entry.entry_type) not in (
+        if key not in (None, "aliquot_pool_plan") and normalize_entry_type(
+            entry.entry_type
+        ) not in (
             "experiment_data",
             "predefined_action",
         ):
@@ -72,24 +157,59 @@ class AliquotPlanService:
                 detail="Entry is not an aliquot/pool plan entry",
             )
         # Allow experiment_data or predefined_action with aliquot key
-        if key and key != "aliquot_pool_plan" and entry.entry_type == "predefined_action":
+        if (
+            key
+            and key != "aliquot_pool_plan"
+            and entry.entry_type == "predefined_action"
+        ):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"predefined_entry_key {key} does not support aliquot execute",
             )
         return entry
 
-    def save_plan(self, entry_id: UUID, data: AliquotPlanSaveRequest) -> AliquotPlanSaveResponse:
+    def save_plan(
+        self, entry_id: UUID, data: AliquotPlanSaveRequest
+    ) -> AliquotPlanSaveResponse:
         entry = self._get_plan_entry(entry_id)
+        cfg = dict(entry.config or {})
+        existing_lines = cfg.get("plan_lines") or []
+        current_method = self._configured_method(entry)
+        if existing_lines and data.method != current_method:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "code": "method_change_requires_cancel",
+                    "message": (
+                        "Method cannot change after plan lines exist. Cancel the "
+                        "experiment and create a new plan; minted daughters are not removed."
+                    ),
+                },
+            )
+        self._validate_plan_shape(data.method, data.lines)
+        self._validate_dest_sample_types(
+            data.lines,
+            data.method,
+            data.default_dest_sample_type,
+        )
         lines = []
         for line in data.lines:
             d = line.model_dump(mode="json")
             if not d.get("line_id"):
                 d["line_id"] = str(uuid4())
-            # Validate method resolves (raises if invalid inputs)
-            self.resolve_line(AliquotPlanLine.model_validate(d))
+            validated_line = AliquotPlanLine.model_validate(d)
+            dest_type = self._resolved_dest_sample_type(
+                validated_line,
+                data.default_dest_sample_type,
+            )
+            self.resolve_line(data.method, validated_line, dest_type)
             lines.append(d)
-        cfg = dict(entry.config or {})
+        cfg["method"] = data.method.value
+        cfg["default_dest_sample_type"] = (
+            str(data.default_dest_sample_type)
+            if data.default_dest_sample_type
+            else None
+        )
         cfg["plan_lines"] = lines
         cfg["plan_updated_at"] = datetime.now(timezone.utc).isoformat()
         entry.config = cfg
@@ -100,82 +220,167 @@ class AliquotPlanService:
             self.db.refresh(entry)
         return AliquotPlanSaveResponse(
             entry_id=entry.id,
+            method=data.method,
+            default_dest_sample_type=data.default_dest_sample_type,
             lines=[AliquotPlanLine.model_validate(x) for x in lines],
             line_count=len(lines),
         )
 
     def get_plan(self, entry_id: UUID) -> AliquotPlanSaveResponse:
         entry = self._get_plan_entry(entry_id)
-        raw = (entry.config or {}).get("plan_lines") or []
+        cfg = entry.config or {}
+        raw = cfg.get("plan_lines") or []
         lines = [AliquotPlanLine.model_validate(x) for x in raw]
-        return AliquotPlanSaveResponse(entry_id=entry.id, lines=lines, line_count=len(lines))
+        default_dest_sample_type = cfg.get("default_dest_sample_type")
+        return AliquotPlanSaveResponse(
+            entry_id=entry.id,
+            method=self._configured_method(entry),
+            default_dest_sample_type=default_dest_sample_type,
+            lines=lines,
+            line_count=len(lines),
+        )
 
-    def resolve_line(self, line: AliquotPlanLine) -> ResolvedTransfer:
-        """Compute transfer_amount (mass or count) from method inputs. Never stores volume."""
+    def _prior_concentration_result(self, sample_id: UUID) -> float:
+        """Return the newest numeric concentration result recorded for a sample."""
+        rows = (
+            self.db.query(Result)
+            .join(Test, Test.id == Result.test_id)
+            .join(Analyte, Analyte.id == Result.analyte_id)
+            .filter(
+                Test.sample_id == sample_id,
+                Result.active.is_(True),
+                Analyte.name.ilike("%concentration%"),
+            )
+            .order_by(Result.entry_date.desc(), Result.created_at.desc())
+            .all()
+        )
+        for result in rows:
+            for raw_value in (
+                result.calculated_result,
+                result.reported_result,
+                result.raw_result,
+            ):
+                if raw_value is None:
+                    continue
+                try:
+                    value = float(raw_value)
+                except (TypeError, ValueError):
+                    continue
+                if value > 0:
+                    return value
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "code": "prior_concentration_required",
+                "message": (
+                    "Normalization requires a prior numeric concentration result "
+                    "on the source sample."
+                ),
+            },
+        )
+
+    def resolve_line(
+        self,
+        method: AliquotMethod,
+        line: AliquotPlanLine,
+        dest_sample_type: Optional[UUID],
+    ) -> ResolvedTransfer:
+        """Resolve one transfer using the entry method and tracked source data."""
         warnings: List[str] = []
-        method = line.method
         amount: Optional[float] = None
-        conc = line.concentration
+        conc: Optional[float] = None
         conc_unit = line.concentration_unit_id
         amount_unit = line.amount_unit_id
+        content = self._find_source_content(
+            line.source_sample_id,
+            line.source_container_id,
+        )
+        if line.concentration is not None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={
+                    "code": "free_text_concentration_not_allowed",
+                    "message": (
+                        "Source concentration cannot be entered on a plan line; "
+                        "use a prior result on the source sample."
+                    ),
+                },
+            )
 
-        if method == AliquotMethod.by_mass:
-            if line.amount is None:
-                raise HTTPException(400, detail="by_mass requires amount")
-            amount = float(line.amount)
-        elif method == AliquotMethod.by_count:
-            if line.amount is None:
-                raise HTTPException(400, detail="by_count requires amount (count)")
-            amount = float(line.amount)
-        elif method == AliquotMethod.target_mass:
-            if line.target_amount is None:
-                raise HTTPException(400, detail="target_mass requires target_amount")
-            amount = float(line.target_amount)
-        elif method == AliquotMethod.target_count:
-            if line.target_amount is None:
-                raise HTTPException(400, detail="target_count requires target_amount")
-            amount = float(line.target_amount)
-        elif method == AliquotMethod.by_volume:
-            if line.volume is None or line.concentration is None:
+        volume_methods = {
+            AliquotMethod.aliquot_by_volume,
+            AliquotMethod.pool_by_volume_per_source,
+            AliquotMethod.pool_equal_volume_each,
+        }
+        target_amount_methods = {
+            AliquotMethod.aliquot_by_target_amount,
+            AliquotMethod.pool_by_target_amount_per_source,
+        }
+        if method in volume_methods:
+            if line.volume is None:
+                raise HTTPException(400, detail=f"{method.value} requires volume")
+            if content.concentration is None or float(content.concentration) <= 0:
                 raise HTTPException(
                     400,
-                    detail="by_volume requires volume and concentration (mass = volume × conc)",
+                    detail=(
+                        f"{method.value} requires tracked source concentration "
+                        "on container contents"
+                    ),
                 )
-            # amount = volume * concentration (same numeric base units assumed in v1)
-            amount = float(line.volume) * float(line.concentration)
-            conc = float(line.concentration)
-            warnings.append("Volume not stored; mass computed as volume × concentration")
-        elif method == AliquotMethod.target_volume:
-            if line.target_volume is None or line.concentration is None:
+            conc = float(content.concentration)
+            conc_unit = content.concentration_units
+            amount = float(line.volume) * conc
+            warnings.append(
+                "Volume converted to tracked amount using source concentration"
+            )
+        elif method in target_amount_methods:
+            if line.target_amount is None:
                 raise HTTPException(
-                    400,
-                    detail="target_volume requires target_volume and concentration",
+                    400, detail=f"{method.value} requires target_amount"
                 )
-            amount = float(line.target_volume) * float(line.concentration)
-            conc = float(line.concentration)
-            warnings.append("Target volume converted to mass via concentration")
-        elif method == AliquotMethod.target_concentration:
+            amount = float(line.target_amount)
+        elif method == AliquotMethod.aliquot_by_target_concentration:
             if line.target_concentration is None:
-                raise HTTPException(400, detail="target_concentration requires target_concentration")
+                raise HTTPException(
+                    400,
+                    detail=(
+                        "aliquot_by_target_concentration requires "
+                        "target_concentration"
+                    ),
+                )
+            parent_concentration = self._prior_concentration_result(
+                line.source_sample_id
+            )
             conc = float(line.target_concentration)
-            if line.amount is not None:
-                amount = float(line.amount)
-            elif line.target_amount is not None:
+            if line.target_amount is not None:
                 amount = float(line.target_amount)
-            elif line.volume is not None:
-                amount = float(line.volume) * conc
-                warnings.append("Mass from volume × target concentration")
             elif line.target_volume is not None:
                 amount = float(line.target_volume) * conc
-                warnings.append("Mass from target_volume × target concentration")
             else:
                 raise HTTPException(
                     400,
                     detail=(
-                        "target_concentration requires amount, target_amount, "
-                        "volume, or target_volume to size the transfer"
+                        "aliquot_by_target_concentration requires target_volume "
+                        "or target_amount"
                     ),
                 )
+            warnings.append(
+                "Normalization used prior source concentration result "
+                f"{parent_concentration:g}"
+            )
+        elif method == AliquotMethod.aliquot_n_way_equal_split:
+            if not line.split_count or line.split_count < 2:
+                raise HTTPException(
+                    400,
+                    detail="aliquot_n_way_equal_split requires split_count of at least 2",
+                )
+            if content.amount is None:
+                raise HTTPException(400, detail="Tracked source amount is required")
+            amount = float(content.amount) / line.split_count
+        elif method == AliquotMethod.pool_consolidate_remaining:
+            if content.amount is None:
+                raise HTTPException(400, detail="Tracked source amount is required")
+            amount = float(content.amount)
         else:
             raise HTTPException(400, detail=f"Unknown method {method}")
 
@@ -195,8 +400,138 @@ class AliquotPlanService:
             dest_container_id=line.dest_container_id,
             dest_container_type_id=line.dest_container_type_id,
             dest_container_name=line.dest_container_name,
+            dest_sample_type=dest_sample_type,
             warnings=warnings,
         )
+
+    def _validate_plan_shape(
+        self,
+        method: AliquotMethod,
+        plan_lines: Sequence[AliquotPlanLine],
+    ) -> None:
+        """Enforce the entry's single mint operation across every line."""
+        operation = self._method_operation(method)
+        for line in plan_lines:
+            has_pool_group = bool(line.pool_group and line.pool_group.strip())
+            if operation == AliquotOperation.pool and not has_pool_group:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail={
+                        "code": "pool_group_required",
+                        "message": (
+                            f"{method.value} is a pool method; every line requires "
+                            "a pool group."
+                        ),
+                    },
+                )
+            if operation == AliquotOperation.aliquot and has_pool_group:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail={
+                        "code": "dual_mint_not_allowed",
+                        "message": (
+                            f"{method.value} is an aliquot method and cannot contain "
+                            "pool lines. Use a separate pool plan entry."
+                        ),
+                    },
+                )
+
+    @staticmethod
+    def _resolved_dest_sample_type(
+        line: AliquotPlanLine,
+        default_dest_sample_type: Optional[UUID],
+        source_sample_type: Optional[UUID] = None,
+    ) -> Optional[UUID]:
+        if line.inherit_entry_dest_sample_type:
+            return default_dest_sample_type or source_sample_type
+        return line.dest_sample_type or source_sample_type
+
+    def _validate_dest_sample_types(
+        self,
+        plan_lines: Sequence[AliquotPlanLine],
+        method: AliquotMethod,
+        default_dest_sample_type: Optional[UUID],
+    ) -> None:
+        """Validate pool source homogeneity and all non-parent catalog choices."""
+        sample_ids = {line.source_sample_id for line in plan_lines}
+        source_rows = self.db.execute(
+            select(Sample, Project.client_id)
+            .join(Project, Project.id == Sample.project_id)
+            .where(Sample.id.in_(sample_ids))
+        ).all()
+        source_data = {
+            sample.id: (sample.sample_type, client_id)
+            for sample, client_id in source_rows
+        }
+        missing_ids = sample_ids.difference(source_data)
+        if missing_ids:
+            missing = sorted(str(sample_id) for sample_id in missing_ids)
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={
+                    "code": "source_sample_not_found",
+                    "message": f"Source sample(s) not found: {', '.join(missing)}",
+                },
+            )
+
+        operation = self._method_operation(method)
+        if operation == AliquotOperation.pool:
+            pool_types: Dict[str, set] = {}
+            for line in plan_lines:
+                group = (line.pool_group or "").strip()
+                pool_types.setdefault(group, set()).add(
+                    source_data[line.source_sample_id][0]
+                )
+            mixed_groups = sorted(
+                group
+                for group, sample_types in pool_types.items()
+                if len(sample_types) > 1
+            )
+            if mixed_groups:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail={
+                        "code": "mixed_pool_source_types",
+                        "message": (
+                            "Each pool must use one source sample type. Mixed types "
+                            f"found in pool(s): {', '.join(mixed_groups)}"
+                        ),
+                        "pool_groups": mixed_groups,
+                    },
+                )
+
+        for line in plan_lines:
+            source_type, client_id = source_data[line.source_sample_id]
+            if self.current_user:
+                validate_client_access(self.current_user, client_id)
+            destination_type = self._resolved_dest_sample_type(
+                line,
+                default_dest_sample_type,
+                source_type,
+            )
+            if destination_type is None or destination_type == source_type:
+                continue
+            transition = self.db.execute(
+                select(SampleTypeTransition.id).where(
+                    SampleTypeTransition.client_id == client_id,
+                    SampleTypeTransition.source_sample_type == source_type,
+                    SampleTypeTransition.operation == operation.value,
+                    SampleTypeTransition.allowed_dest_sample_type == destination_type,
+                    SampleTypeTransition.active.is_(True),
+                )
+            ).scalar_one_or_none()
+            if transition is None:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail={
+                        "code": "dest_sample_type_not_allowed",
+                        "message": (
+                            "Destination sample type is not allowed for this "
+                            f"source sample and {operation.value} operation"
+                        ),
+                        "line_id": line.line_id,
+                    },
+                )
 
     def _experiment_cohort_ids(self, experiment_id: UUID) -> set:
         rows = (
@@ -206,7 +541,80 @@ class AliquotPlanService:
         )
         return {r[0] for r in rows if r[0]}
 
-    def execute(self, entry_id: UUID, data: AliquotExecuteRequest) -> AliquotExecuteResponse:
+    def _join_minted_destination(self, entry: Entry, sample: Sample) -> None:
+        """Join an execute-minted daughter to its experiment and process instance."""
+        execution = (
+            self.db.query(ExperimentSampleExecution)
+            .filter(
+                ExperimentSampleExecution.experiment_id == entry.experiment_id,
+                ExperimentSampleExecution.sample_id == sample.id,
+            )
+            .first()
+        )
+        if not execution:
+            self.db.add(
+                ExperimentSampleExecution(
+                    experiment_id=entry.experiment_id,
+                    sample_id=sample.id,
+                    processing_conditions={
+                        "source": "aliquot_pool_execute",
+                        "entry_id": str(entry.id),
+                    },
+                    created_by=self._user_id(),
+                    modified_by=self._user_id(),
+                )
+            )
+
+        if entry.process_step_id:
+            process_step = (
+                self.db.query(ELNProcessStep)
+                .filter(ELNProcessStep.id == entry.process_step_id)
+                .first()
+            )
+            if process_step:
+                process_sample = (
+                    self.db.query(ELNProcessSample)
+                    .filter(
+                        ELNProcessSample.process_id == process_step.process_id,
+                        ELNProcessSample.sample_id == sample.id,
+                    )
+                    .first()
+                )
+                if not process_sample:
+                    self.db.add(
+                        ELNProcessSample(
+                            process_id=process_step.process_id,
+                            sample_id=sample.id,
+                            status="in_progress",
+                            current_step_id=process_step.id,
+                            created_by=self._user_id(),
+                            modified_by=self._user_id(),
+                        )
+                    )
+
+        destination_entries = (
+            self.db.query(Entry)
+            .filter(
+                Entry.experiment_id == entry.experiment_id,
+                Entry.predefined_entry_key == "aliquots_pools",
+                Entry.active.is_(True),
+            )
+            .all()
+        )
+        for destination_entry in destination_entries:
+            cfg = dict(destination_entry.config or {})
+            minted_ids = list(cfg.get("minted_sample_ids") or [])
+            sample_id = str(sample.id)
+            if sample_id not in minted_ids:
+                minted_ids.append(sample_id)
+            cfg["minted_sample_ids"] = minted_ids
+            cfg["populated_after_execute"] = True
+            destination_entry.config = cfg
+            destination_entry.modified_by = self._user_id()
+
+    def execute(
+        self, entry_id: UUID, data: AliquotExecuteRequest
+    ) -> AliquotExecuteResponse:
         """
         Execute aliquot/pool plan.
 
@@ -215,6 +623,15 @@ class AliquotPlanService:
         null source contents.amount is refused.
         """
         entry = self._get_plan_entry(entry_id)
+        method = self._configured_method(entry)
+        raw_default_dest_sample_type = (entry.config or {}).get(
+            "default_dest_sample_type"
+        )
+        default_dest_sample_type = (
+            UUID(str(raw_default_dest_sample_type))
+            if raw_default_dest_sample_type
+            else None
+        )
         if data.lines is not None:
             plan_lines = data.lines
         else:
@@ -223,6 +640,12 @@ class AliquotPlanService:
         if not plan_lines:
             raise HTTPException(400, detail="No plan lines to execute")
 
+        self._validate_plan_shape(method, plan_lines)
+        self._validate_dest_sample_types(
+            plan_lines,
+            method,
+            default_dest_sample_type,
+        )
         cohort = self._experiment_cohort_ids(entry.experiment_id)
         # S5: all sources must be on the experiment cohort (before mutations)
         for line in plan_lines:
@@ -244,28 +667,40 @@ class AliquotPlanService:
         resolved: List[ResolvedTransfer] = []
         for line in plan_lines:
             try:
-                resolved.append(self.resolve_line(line))
+                source_type = self.db.execute(
+                    select(Sample.sample_type).where(Sample.id == line.source_sample_id)
+                ).scalar_one()
+                dest_type = self._resolved_dest_sample_type(
+                    line,
+                    default_dest_sample_type,
+                    source_type,
+                )
+                resolved.append(self.resolve_line(method, line, dest_type))
             except HTTPException as e:
-                resolve_errors.append(AliquotExecuteLineResult(
-                    line_id=line.line_id,
-                    source_sample_id=line.source_sample_id,
-                    transfer_amount=0,
-                    status="error",
-                    message=str(e.detail),
-                ))
+                resolve_errors.append(
+                    AliquotExecuteLineResult(
+                        line_id=line.line_id,
+                        source_sample_id=line.source_sample_id,
+                        transfer_amount=0,
+                        status="error",
+                        message=str(e.detail),
+                    )
+                )
 
         if data.dry_run:
             results.extend(resolve_errors)
             for r in resolved:
-                results.append(AliquotExecuteLineResult(
-                    line_id=r.line_id,
-                    source_sample_id=r.source_sample_id,
-                    transfer_amount=r.transfer_amount,
-                    amount_unit_id=r.amount_unit_id,
-                    concentration=r.concentration,
-                    status="dry_run",
-                    message="; ".join(r.warnings) if r.warnings else None,
-                ))
+                results.append(
+                    AliquotExecuteLineResult(
+                        line_id=r.line_id,
+                        source_sample_id=r.source_sample_id,
+                        transfer_amount=r.transfer_amount,
+                        amount_unit_id=r.amount_unit_id,
+                        concentration=r.concentration,
+                        status="dry_run",
+                        message="; ".join(r.warnings) if r.warnings else None,
+                    )
+                )
             return AliquotExecuteResponse(
                 entry_id=entry_id,
                 dry_run=True,
@@ -298,21 +733,25 @@ class AliquotPlanService:
         try:
             for r in resolved:
                 dest_sample, dest_c = self._execute_transfer(r, pool_containers)
-                results.append(AliquotExecuteLineResult(
-                    line_id=r.line_id,
-                    source_sample_id=r.source_sample_id,
-                    dest_sample_id=dest_sample.id if dest_sample else None,
-                    dest_container_id=dest_c.id if dest_c else None,
-                    transfer_amount=r.transfer_amount,
-                    amount_unit_id=r.amount_unit_id,
-                    concentration=r.concentration,
-                    status="ok",
-                    message="; ".join(r.warnings) if r.warnings else None,
-                ))
+                self._join_minted_destination(entry, dest_sample)
+                results.append(
+                    AliquotExecuteLineResult(
+                        line_id=r.line_id,
+                        source_sample_id=r.source_sample_id,
+                        dest_sample_id=dest_sample.id if dest_sample else None,
+                        dest_container_id=dest_c.id if dest_c else None,
+                        transfer_amount=r.transfer_amount,
+                        amount_unit_id=r.amount_unit_id,
+                        concentration=r.concentration,
+                        status="ok",
+                        message="; ".join(r.warnings) if r.warnings else None,
+                    )
+                )
 
             cfg = dict(entry.config or {})
             cfg["last_execute_at"] = datetime.now(timezone.utc).isoformat()
             cfg["last_execute_results"] = [x.model_dump(mode="json") for x in results]
+            cfg["executed_method"] = method.value
             entry.config = cfg
             entry.modified_by = self._user_id()
             self.db.flush()
@@ -406,7 +845,9 @@ class AliquotPlanService:
     ) -> Tuple[Sample, Container]:
         parent = self.db.query(Sample).filter(Sample.id == r.source_sample_id).first()
         if not parent:
-            raise HTTPException(404, detail=f"Source sample {r.source_sample_id} not found")
+            raise HTTPException(
+                404, detail=f"Source sample {r.source_sample_id} not found"
+            )
 
         content = self._find_source_content(r.source_sample_id, r.source_container_id)
         # S5: refuse null source amount (no silent create-dest-without-debit)
@@ -435,22 +876,31 @@ class AliquotPlanService:
         # Destination container
         dest_c: Optional[Container] = None
         if r.pool_group and r.pool_group in pool_containers:
-            dest_c = self.db.query(Container).filter(
-                Container.id == pool_containers[r.pool_group]
-            ).first()
+            dest_c = (
+                self.db.query(Container)
+                .filter(Container.id == pool_containers[r.pool_group])
+                .first()
+            )
         elif r.dest_container_id:
-            dest_c = self.db.query(Container).filter(
-                Container.id == r.dest_container_id, Container.active == True  # noqa: E712
-            ).first()
+            dest_c = (
+                self.db.query(Container)
+                .filter(
+                    Container.id == r.dest_container_id,
+                    Container.active == True,  # noqa: E712
+                )
+                .first()
+            )
             if not dest_c:
                 raise HTTPException(400, detail="dest_container_id not found")
         else:
             type_id = r.dest_container_type_id
             if not type_id:
                 # default to source container type
-                src_c = self.db.query(Container).filter(
-                    Container.id == content.container_id
-                ).first()
+                src_c = (
+                    self.db.query(Container)
+                    .filter(Container.id == content.container_id)
+                    .first()
+                )
                 type_id = src_c.type_id if src_c else None
             if not type_id:
                 raise HTTPException(
@@ -473,9 +923,13 @@ class AliquotPlanService:
         # New dest sample (child of source)
         status_id = self._available_status_id()
         dest_sample = Sample(
-            name=f"{parent.name}-ALQ-{uuid4().hex[:6]}" if parent.name else f"ALQ-{uuid4().hex[:8]}",
+            name=(
+                f"{parent.name}-ALQ-{uuid4().hex[:6]}"
+                if parent.name
+                else f"ALQ-{uuid4().hex[:8]}"
+            ),
             description=f"Aliquot from {parent.name or parent.id} ({r.method.value})",
-            sample_type=parent.sample_type,
+            sample_type=r.dest_sample_type or parent.sample_type,
             status=status_id,
             matrix=parent.matrix,
             temperature=parent.temperature,
@@ -492,7 +946,11 @@ class AliquotPlanService:
 
         # Dest contents amount = transfer (mass/count); conc from plan when present
         dest_amount = Decimal(str(r.transfer_amount))
-        dest_conc = Decimal(str(r.concentration)) if r.concentration is not None else content.concentration
+        dest_conc = (
+            Decimal(str(r.concentration))
+            if r.concentration is not None
+            else content.concentration
+        )
         dest_conc_units = r.concentration_unit_id or content.concentration_units
         amount_units = r.amount_unit_id or content.amount_units
 
@@ -507,17 +965,21 @@ class AliquotPlanService:
         )
         if existing_dest:
             if existing_dest.amount is not None:
-                existing_dest.amount = Decimal(str(float(existing_dest.amount) + float(dest_amount)))
+                existing_dest.amount = Decimal(
+                    str(float(existing_dest.amount) + float(dest_amount))
+                )
             else:
                 existing_dest.amount = dest_amount
         else:
-            self.db.add(Contents(
-                container_id=dest_c.id,
-                sample_id=dest_sample.id,
-                amount=dest_amount,
-                amount_units=amount_units,
-                concentration=dest_conc,
-                concentration_units=dest_conc_units,
-            ))
+            self.db.add(
+                Contents(
+                    container_id=dest_c.id,
+                    sample_id=dest_sample.id,
+                    amount=dest_amount,
+                    amount_units=amount_units,
+                    concentration=dest_conc,
+                    concentration_units=dest_conc_units,
+                )
+            )
         self.db.flush()
         return dest_sample, dest_c

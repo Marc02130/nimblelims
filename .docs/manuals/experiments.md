@@ -79,6 +79,33 @@ It is **not** the primary home for large-scale result data analysis or dose-resp
 - **Instantiate from template** if entries not yet created (also auto on create when template has `entries`).
 - Sample data: table by cohort. Experiment data: multi-row table + Add/Delete row. Aliquot: `AliquotPlanEditor`.
 
+### Aliquot / pool destination sample type
+
+The **Aliquot / pool plan** entry has two separate controls:
+
+- **Method** is one concrete Deiter IN method. It implies exactly one mint
+  operation (`aliquot` or `pool`) and controls every line's input columns.
+- **Default dest sample type** is optional. **Same as parent.** is always
+  available. Catalog choices are the destinations shared by the selected source
+  samples for the entry's mint operation.
+
+Each plan line can **Use entry default**, explicitly clear to **Same as
+parent.**, or select a catalog-allowed destination override. Type values cannot
+be entered as free text. The concrete method is locked after plan lines are
+saved; changing it requires canceling the experiment, and cancellation does not
+remove already-minted daughters.
+
+All lines in one pool group must have source samples of the same sample type.
+The destination selector remains unavailable and a warning identifies the pool
+when its source types differ. Saving and executing also enforce this rule.
+
+Execute resolves line override → entry default → parent, without prompting
+again. `aliquot_by_target_concentration` requires a prior numeric concentration
+result on the source sample plus destination volume or target amount; the plan
+does not accept free-typed source concentration. Execute-minted daughters join
+the current process and populate the read-only **Aliquots / pools** entry after
+execute. Matrix behavior is unchanged.
+
 ## Starting an experiment (cohort)
 
 **Canonical product rules:** [open-questions/experiments.md Decision #24](../open-questions/experiments.md)
@@ -156,6 +183,7 @@ Permission: `experiment:manage` for manage surfaces.
 | `DELETE /v1/entries/{id}/rows/{row_key}` | Delete experiment_data table row |
 | `POST /v1/entries/{id}/submit` | Submit + write-back |
 | `GET /v1/entries/{id}/grid` | Wide grid (sample RO + field cols) |
+| `GET /v1/entries/dest-sample-types` | Allowed destination sample types for `source_sample_id` + `operation` |
 | Aliquot plan / execute | Under `/v1/entries/...` |
 
 ## Design Goals
