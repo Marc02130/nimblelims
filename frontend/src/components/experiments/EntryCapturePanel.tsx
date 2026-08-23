@@ -691,9 +691,10 @@ const EntryCapturePanel: React.FC<EntryCapturePanelProps> = ({
                   <Alert severity="info" sx={{ mb: 2 }}>
                     {entry.predefined_entry_key === 'aliquot_pool_plan' ? (
                       <>
-                        Aliquot/pool plan — methods: by mass, by volume (→ mass), by count, target
-                        mass/volume/concentration/count. <strong>Execute</strong> reduces source
-                        contents and creates dest samples.
+                        Aliquot/pool plan — one concrete entry method controls aliquot or pool
+                        columns. Destination sample type is configured separately.{' '}
+                        <strong>Execute</strong> reduces source contents and creates destination
+                        samples.
                       </>
                     ) : (
                       <>

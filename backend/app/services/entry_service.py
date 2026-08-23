@@ -32,6 +32,7 @@ from app.schemas.entry import (
     EntrySubmitResponse,
     EntryRead,
 )
+from app.schemas.aliquot_plan import AliquotMethod
 from models.entry import (
     Entry,
     EntryFieldValue,
@@ -167,6 +168,49 @@ class EntryService:
         for field in ('name', 'description', 'active', 'sort_order', 'config', 'process_step_id'):
             val = getattr(data, field)
             if val is not None:
+                if (
+                    field == 'config'
+                    and entry.predefined_entry_key == 'aliquot_pool_plan'
+                ):
+                    next_config = dict(val)
+                    method_raw = next_config.get(
+                        'method',
+                        (entry.config or {}).get(
+                            'method',
+                            AliquotMethod.aliquot_by_volume.value,
+                        ),
+                    )
+                    try:
+                        AliquotMethod(method_raw)
+                    except ValueError as exc:
+                        raise HTTPException(
+                            status_code=status.HTTP_400_BAD_REQUEST,
+                            detail={
+                                'code': 'invalid_aliquot_method',
+                                'message': (
+                                    f'Unknown concrete aliquot/pool method: {method_raw}'
+                                ),
+                            },
+                        ) from exc
+                    current_method = (entry.config or {}).get(
+                        'method',
+                        AliquotMethod.aliquot_by_volume.value,
+                    )
+                    if (
+                        (entry.config or {}).get('plan_lines')
+                        and method_raw != current_method
+                    ):
+                        raise HTTPException(
+                            status_code=status.HTTP_409_CONFLICT,
+                            detail={
+                                'code': 'method_change_requires_cancel',
+                                'message': (
+                                    'Method cannot change after plan lines exist. '
+                                    'Cancel the experiment and create a new plan; '
+                                    'minted daughters are not removed.'
+                                ),
+                            },
+                        )
                 kwargs[field] = val
         self.repo.update_entry(entry, **kwargs)
         self._commit_refresh(entry)
@@ -499,7 +543,17 @@ class EntryService:
 
         if is_sample_scoped_entry(entry.entry_type):
             row_policy = 'experiment_samples'
-            sample_ids = self._experiment_sample_ids(entry.experiment_id)
+            if entry.predefined_entry_key == 'aliquots_pools':
+                sample_ids = [
+                    UUID(str(sample_id))
+                    for sample_id in (entry.config or {}).get(
+                        'minted_sample_ids',
+                        [],
+                    )
+                ]
+                row_policy = 'execute_minted_samples'
+            else:
+                sample_ids = self._experiment_sample_ids(entry.experiment_id)
             if not sample_ids:
                 empty_reason = 'no_samples_on_experiment'
             samples = self._load_samples(sample_ids)
@@ -588,7 +642,16 @@ class EntryService:
         out: List[EntryExportRow] = []
 
         if is_sample_scoped_entry(entry.entry_type):
-            sample_ids = self._experiment_sample_ids(entry.experiment_id)
+            if entry.predefined_entry_key == 'aliquots_pools':
+                sample_ids = [
+                    UUID(str(sample_id))
+                    for sample_id in (entry.config or {}).get(
+                        'minted_sample_ids',
+                        [],
+                    )
+                ]
+            else:
+                sample_ids = self._experiment_sample_ids(entry.experiment_id)
             samples = self._load_samples(sample_ids)
             values = self.repo.list_values(entry_id)
             by_sf: Dict[Tuple[Optional[UUID], UUID], EntryFieldValue] = {

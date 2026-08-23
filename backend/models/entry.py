@@ -120,12 +120,20 @@ PREDEFINED_ENTRY_DEFAULTS = {
         'entry_type': 'experiment_data',
         'name': 'Aliquot / pool plan',
         'description': 'Plan amounts to remove/add; execute creates dest samples',
+        'config': {
+            'method': 'aliquot_by_volume',
+            'default_dest_sample_type': None,
+        },
     },
     'aliquots_pools': {
         'entry_type': 'experiment_sample_data',
         'name': 'Aliquots / pools',
         'description': 'Post-execute view of resulting samples',
-        'config': {'sample_columns': ['client_sample_id']},
+        'config': {
+            'sample_columns': ['client_sample_id', 'sample_type'],
+            'minted_sample_ids': [],
+            'populated_after_execute': False,
+        },
     },
 }
 

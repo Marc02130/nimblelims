@@ -81,20 +81,30 @@ It is **not** the primary home for large-scale result data analysis or dose-resp
 
 ### Aliquot / pool destination sample type
 
-Each aliquot or pool plan line has an optional **Dest sample type** beside
-**Method**. **Same as parent.** is always available and leaves the destination
-sample type unchanged. Other choices come from the client-scoped
-`sample_type_transitions` catalog for the source sample type and the line's
-operation (`aliquot` when no pool group is set, otherwise `pool`). Type values
-cannot be entered as free text.
+The **Aliquot / pool plan** entry has two separate controls:
+
+- **Method** is one concrete Deiter IN method. It implies exactly one mint
+  operation (`aliquot` or `pool`) and controls every line's input columns.
+- **Default dest sample type** is optional. **Same as parent.** is always
+  available. Catalog choices are the destinations shared by the selected source
+  samples for the entry's mint operation.
+
+Each plan line can **Use entry default**, explicitly clear to **Same as
+parent.**, or select a catalog-allowed destination override. Type values cannot
+be entered as free text. The concrete method is locked after plan lines are
+saved; changing it requires canceling the experiment, and cancellation does not
+remove already-minted daughters.
 
 All lines in one pool group must have source samples of the same sample type.
 The destination selector remains unavailable and a warning identifies the pool
 when its source types differ. Saving and executing also enforce this rule.
 
-The selected `dest_sample_type` is saved on the plan line. Execute uses that
-saved value without prompting again; a blank value inherits the parent sample
-type. Matrix behavior is unchanged.
+Execute resolves line override → entry default → parent, without prompting
+again. `aliquot_by_target_concentration` requires a prior numeric concentration
+result on the source sample plus destination volume or target amount; the plan
+does not accept free-typed source concentration. Execute-minted daughters join
+the current process and populate the read-only **Aliquots / pools** entry after
+execute. Matrix behavior is unchanged.
 
 ## Starting an experiment (cohort)
 

@@ -17,6 +17,7 @@ depends_on = None
 SAMPLE_TYPES_LIST_ID = "55555555-5555-5555-5555-555555555555"
 SYSTEM_CLIENT_ID = "00000000-0000-0000-0000-000000000001"
 DNA_SAMPLE_TYPE_ID = "55555555-5555-4555-8555-555555555501"
+POOLED_DNA_SAMPLE_TYPE_ID = "55555555-5555-4555-8555-555555555502"
 
 
 def upgrade() -> None:
@@ -182,6 +183,37 @@ def upgrade() -> None:
     )
     connection.execute(
         sa.text("""
+            INSERT INTO list_entries (
+                id,
+                name,
+                description,
+                active,
+                created_at,
+                modified_at,
+                list_id
+            )
+            SELECT
+                CAST(:pooled_dna_id AS uuid),
+                'Pooled DNA',
+                'DNA combined from multiple source samples',
+                true,
+                NOW(),
+                NOW(),
+                CAST(:list_id AS uuid)
+            WHERE NOT EXISTS (
+                SELECT 1
+                FROM list_entries
+                WHERE list_id = CAST(:list_id AS uuid)
+                  AND name = 'Pooled DNA'
+            )
+            """),
+        {
+            "list_id": SAMPLE_TYPES_LIST_ID,
+            "pooled_dna_id": POOLED_DNA_SAMPLE_TYPE_ID,
+        },
+    )
+    connection.execute(
+        sa.text("""
             INSERT INTO sample_type_transitions (
                 client_id,
                 source_sample_type,
@@ -215,6 +247,41 @@ def upgrade() -> None:
             """),
         {"list_id": SAMPLE_TYPES_LIST_ID},
     )
+    connection.execute(
+        sa.text("""
+            INSERT INTO sample_type_transitions (
+                client_id,
+                source_sample_type,
+                operation,
+                allowed_dest_sample_type,
+                active,
+                created_at,
+                modified_at
+            )
+            SELECT
+                clients.id,
+                source_type.id,
+                'pool',
+                destination_type.id,
+                true,
+                NOW(),
+                NOW()
+            FROM clients
+            JOIN list_entries source_type
+              ON source_type.list_id = CAST(:list_id AS uuid)
+             AND source_type.name = 'DNA'
+            JOIN list_entries destination_type
+              ON destination_type.list_id = CAST(:list_id AS uuid)
+             AND destination_type.name = 'Pooled DNA'
+            ON CONFLICT (
+                client_id,
+                source_sample_type,
+                operation,
+                allowed_dest_sample_type
+            ) DO NOTHING
+            """),
+        {"list_id": SAMPLE_TYPES_LIST_ID},
+    )
 
 
 def downgrade() -> None:
@@ -235,7 +302,10 @@ def downgrade() -> None:
     connection.execute(
         sa.text("""
             DELETE FROM list_entries
-            WHERE id = CAST(:dna_id AS uuid)
+            WHERE id IN (
+                CAST(:dna_id AS uuid),
+                CAST(:pooled_dna_id AS uuid)
+              )
               AND list_id = CAST(:list_id AS uuid)
               AND NOT EXISTS (
                 SELECT 1
@@ -245,6 +315,7 @@ def downgrade() -> None:
             """),
         {
             "dna_id": DNA_SAMPLE_TYPE_ID,
+            "pooled_dna_id": POOLED_DNA_SAMPLE_TYPE_ID,
             "list_id": SAMPLE_TYPES_LIST_ID,
         },
     )
