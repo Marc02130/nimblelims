@@ -1,7 +1,7 @@
 # Requirements: Extract-hold dest sample type
 
 **Date:** 2026-08-23  
-**Status:** **Implement gate OPEN** — two predefined entries; `dest_sample_type` on plan line  
+**Status:** **Implement gate OPEN** — UI Accept (re-read); Architecture re-read pending  
 **Stem:** `extract-hold-dest-type`  
 **Tech sketch:** [`.docs/tech-sketch/extract-hold-dest-type.md`](../tech-sketch/extract-hold-dest-type.md)  
 **Lab Ops:** [`.docs/lab-ops-review/extract-hold-dest-type.md`](../lab-ops-review/extract-hold-dest-type.md)  
@@ -20,6 +20,7 @@ Dest `sample_type` chosen on the **aliquot/pool plan entry** before execute; dau
 | Plan = `predefined_entry_key=aliquot_pool_plan` (`experiment_data`); dest list = `aliquots_pools` (`experiment_sample_data`) | Heidi Architecture map |
 | **Bounce:** today no `dest_sample_type` on plan lines; execute copies parent — field must land on `AliquotPlanLine` / plan config | Heidi |
 | Clear = Same as parent; catalog limits; template pre-fill OK; Method drives aliquot vs pool | Marc + Mathilda |
+| UI Accept: Method + dest type only on `aliquot_pool_plan`; bounce method/type on daughters or new plan object | Mathilda re-read 2026-08-23 |
 | Seeds Blood×aliquot→DNA and DNA×pool→pooled DNA; S3 config:edit; L1; start allow-list | Prior implement order |
 | No Sample/`material_class`; no matrix drop; no receive/mid-entry gate; no if-blood-then; no transitions on `template_definition` | Heidi bounce |
 | Not IC50 | Marc |
@@ -59,8 +60,8 @@ Plan on `aliquot_pool_plan` (Blood→DNA) → execute → daughters on `aliquots
 | Review | Verdict |
 |--------|--------|
 | CEO | **Accept** — two-entry lock |
-| Architecture | **Accept** + map + bounce |
-| UI | **Accept** — locked to Heidi map |
+| Architecture | Map + bounce issued; **re-read** of this fold |
+| UI | **Accept** (Mathilda re-read 2026-08-23) |
 | Lab Ops | **Accept** (L1 Met; L2) |
 | Security / CSO | **Accept** (S1 Met; S3) |
 

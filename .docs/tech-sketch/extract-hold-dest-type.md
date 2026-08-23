@@ -1,7 +1,7 @@
 # Tech sketch: Extract-hold dest sample type
 
 **Date:** 2026-08-23  
-**Status:** **Implement gate OPEN.** Land S3 + L2 + seeds + `dest_sample_type` on `AliquotPlanLine`. Two predefined entries only — no new plan object.  
+**Status:** **Implement gate OPEN.** UI Accept (re-read). Architecture re-read pending on two-entry fold. Land S3 + L2 + seeds + `dest_sample_type` on `AliquotPlanLine`.  
 **Stem:** `extract-hold-dest-type`  
 **Requirements:** [`.docs/requirements/extract-hold-dest-type.md`](../requirements/extract-hold-dest-type.md)  
 **Lab Ops:** [`.docs/lab-ops-review/extract-hold-dest-type.md`](../lab-ops-review/extract-hold-dest-type.md)  
@@ -106,7 +106,9 @@ Refresh / populate aliquots_pools with minted daughters
 |---------|------|
 | `aliquot_pool_plan` | Method + dest type beside each other; catalog options; clear = Same as parent; template pre-fill OK |
 | `aliquots_pools` | After-execute daughters only — no method/type picker |
-| Bounce | Free-text; execute re-prompt; receive/mid-entry gate; sample-ID box; new plan object |
+| Bounce | Method/type on daughters; new plan object; free-text; execute re-prompt; receive/mid-entry gate; sample-ID box |
+
+**UI Accept (re-read 2026-08-23):** Method + dest type only on `aliquot_pool_plan`; `aliquots_pools` after-execute only; clear = Same as parent. Bounce method/type on daughters or a new plan object.
 
 ## 7. Tests
 
@@ -126,8 +128,8 @@ Refresh / populate aliquots_pools with minted daughters
 | Review | Verdict |
 |--------|--------|
 | CEO | **Accept** — two-entry lock |
-| Architecture | **Accept** + map + bounce (dest_sample_type on plan line) |
-| UI | **Accept** — locked to Heidi map |
+| Architecture | Map + bounce issued; **re-read** of this fold |
+| UI | **Accept** (Mathilda re-read 2026-08-23) — Method + dest type on `aliquot_pool_plan` only; `aliquots_pools` after-execute only; clear = Same as parent; bounce method/type on daughters or new plan object |
 | Lab Ops | **Accept** (L1 Met; L2) |
 | Security / CSO | **Accept** (S1 Met; S3) |
 
