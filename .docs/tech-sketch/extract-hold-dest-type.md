@@ -1,7 +1,7 @@
 # Tech sketch: Extract-hold dest sample type
 
 **Date:** 2026-08-23  
-**Status:** **UI Accept (conditions). Architecture Accept pending. Implement gate CLOSED until Lab Ops + CSO + Architecture Accept.**  
+**Status:** **Architecture Accept + UI Accept (conditions). Implement gate CLOSED until Lab Ops + CSO.**  
 **Stem:** `extract-hold-dest-type`  
 **Supersedes on main:** PR 52 docs (merged without Marc 2026-08-23 fold)  
 **Requirements:** [`.docs/requirements/extract-hold-dest-type.md`](../requirements/extract-hold-dest-type.md)  
@@ -23,7 +23,8 @@ Aliquot/pool execute creates a dest sample that inherits parent identity fields 
 - Execute (one transaction with existing aliquot/pool execute):
   1. Create dest sample with `parent_sample_id` = source.
   2. Set `samples.sample_type` from the plan line (or parent if blank) for **both** aliquot and pool.
-  3. **L1/C1/S1:** If the experiment is under an ELN process step, insert **execute-minted** dest into `eln_process_samples` for **this process instance** (product of the step, **after start**). Status `queued` / waiting for next step — match existing assign semantics.
+  3. **Gate-label vs extract (CSO / Heidi):** execute check on **`sample_type` only** — no `material_class` column. DNA → pooled DNA OK (gate-label). Blood → DNA **by pool** refuse (that is extract, not a pool type override). Extract remains an aliquot/extract path, not pool-rename.
+  4. **L1/C1/S1:** If the experiment is under an ELN process step, insert **execute-minted** dest into `eln_process_samples` for **this process instance** (product of the step, **after start**). Status `queued` / waiting for next step — match existing assign semantics.
 - **Start-time type gate:** At **experiment start** and **LimsRun start**, if the step template’s allow-list does not include this sample’s `sample_type`, start refuses. **Not** a receive gate. **Not** mid-entry.
 - Allow-list lives on the step template as **`template_definition.accepted_sample_types`** (list of sample_type list-entry UUIDs). Existing JSONB key on template — **no new Sample column**. Not on analysis.
 - **C2:** While `samples.matrix` still copies parent, eligibility and Qubit key off **`sample_type`**, not matrix.
@@ -34,7 +35,7 @@ Aliquot/pool execute creates a dest sample that inherits parent identity fields 
 - Dropping or rewriting `samples.matrix`.
 - TruSeq / library dest-type (same rule later).
 - SOP+AI Apply → process / parser.
-- New tables. New Sample columns. IC50.
+- New tables. New Sample columns. **`material_class` column.** IC50.
 - Receive-time type gate. Mid-entry type check.
 - Arbitrary append of samples onto a running process instance (stays refuse / 403).
 - Product UI code in this PR (docs only).
@@ -42,13 +43,15 @@ Aliquot/pool execute creates a dest sample that inherits parent identity fields 
 ## 3. Data model (existing only)
 
 ```
-samples.sample_type                          ← existing list FK; dest write target; eligibility / Qubit key (C2)
+samples.sample_type                          ← existing list FK; dest write target; eligibility / Qubit / execute gate-label check (C2)
 samples.parent_sample_id                     ← existing; set on dest
 samples.matrix                               ← unchanged this packet (still copies parent / current execute)
 eln_process_samples                          ← existing; insert execute-minted dest for this instance only (L1)
 entries / entry config                       ← aliquot AND pool plan lines gain optional dest_sample_type
 experiment_templates.template_definition     ← existing JSONB; add accepted_sample_types[] allow-list
 ```
+
+No `material_class` (or equivalent) Sample column — Heidi / CSO bounce.
 
 ### `template_definition.accepted_sample_types` (Heidi)
 
@@ -67,7 +70,7 @@ experiment_templates.template_definition     ← existing JSONB; add accepted_sa
 | Non-empty | Start refuses any sample whose `sample_type` ∉ the list |
 | Storage | JSONB key only — **no** new Sample / Process column |
 
-Heidi bounces: new Sample column, matrix drop, receive gate, mid-entry type gate.
+Heidi bounces: new Sample column, matrix drop, receive gate, mid-entry type gate, `material_class`.
 
 ## 4. Contracts
 
@@ -83,13 +86,21 @@ class AliquotPoolPlanLine(BaseModel):
 
 Same field on **aliquot and pool**. UI: control beside Method. Blank label **“Same as parent.”**
 
-### Execute + L1 join-after-start
+### Execute + gate-label vs extract + L1 join-after-start
 
 ```text
 In one DB transaction (existing aliquot/pool execute):
   for each plan line:  # aliquot OR pool
     parent = source sample
     type_id = line.dest_sample_type or parent.sample_type
+
+    # CSO / Heidi — execute check on sample_type only (no material_class):
+    #   gate-label OK:     DNA → pooled DNA (and similar label refinements)
+    #   extract-by-pool refuse: blood → DNA via pool dest type
+    #   extract stays on aliquot/extract path, not pool-rename
+    if line is pool and transition(parent.sample_type → type_id) is extract_not_gate_label:
+      refuse execute
+
     dest = Sample(
       parent_sample_id=parent.id,
       sample_type=type_id,
@@ -106,6 +117,8 @@ In one DB transaction (existing aliquot/pool execute):
 ```
 
 Ad hoc experiment (no process): skip the process-sample insert.
+
+CSO owns the concrete allowed/refused `sample_type` transition pairs for implement (examples above are normative illustrations). Still **only** `sample_type` — no new column.
 
 ### L1/C1/S1 — join AuthZ
 
@@ -159,6 +172,7 @@ Next step (e.g. Qubit LimsRun / experiment) eligibility: Available for Testing +
 |------------|------------------------|
 | Sample type may change through a process (gate, not rename) | TruSeq / library dest-type UI |
 | Optional dest `sample_type` on **aliquot and pool** (C3 retracted) | Drop / remodel `samples.matrix` |
+| Execute gate-label vs extract on `sample_type` only (no `material_class`) | Full CSO transition catalog beyond examples |
 | Execute → `samples.sample_type` + `parent_sample_id` | SOP+AI Apply → process definition |
 | Execute-minted dest joins this instance after start (L1); arbitrary append 403 | New Sample columns |
 | `template_definition.accepted_sample_types` + start gate (not analysis) | Receive-time or mid-entry type gate |
@@ -171,7 +185,8 @@ Next step (e.g. Qubit LimsRun / experiment) eligibility: Available for Testing +
 |------|--------|
 | Aliquot, dest type set | Dest `sample_type` = chosen; `parent_sample_id` set; on process samples |
 | Aliquot, dest type blank | Dest `sample_type` = parent |
-| Pool, dest type set (e.g. pooled DNA) | Dest `sample_type` = chosen; joins process samples if under process |
+| Pool, dest type DNA → pooled DNA | OK (gate-label); dest type set; joins process samples if under process |
+| Pool, dest type blood → DNA | **Refuse** (extract-by-pool) |
 | Pool, dest type blank | Dest `sample_type` = parent |
 | Ad hoc experiment | Dest created; no process-sample row |
 | Arbitrary append to running instance | 403 (L1) |
@@ -181,7 +196,7 @@ Next step (e.g. Qubit LimsRun / experiment) eligibility: Available for Testing +
 | Receive with mismatched type | **No** type gate |
 | Mid-entry type check | **No** gate |
 | Eligibility / Qubit | Keys off `sample_type`, not matrix (C2) |
-| Migration scan | No new Sample column; only `template_definition` JSON key |
+| Migration scan | No new Sample column; no `material_class`; only `template_definition` JSON key |
 | Entry setup | Dest type beside Method on aliquot **and** pool; blank = “Same as parent.”; no sample-ID box / wizard / detail hop / receive gate |
 
 ## 8. Reviews
@@ -189,12 +204,12 @@ Next step (e.g. Qubit LimsRun / experiment) eligibility: Available for Testing +
 | Review | Verdict |
 |--------|--------|
 | CEO | **Accept** (Marc 2026-08-23) — fold required; **C3 retracted** (pool may set dest type ≠ parent) |
-| Architecture | **Almost** (Heidi) — L1/C2/start gate/`accepted_sample_types` present; Accept after C3 flip | waiting re-Accept after flip |
+| Architecture | **Accept** (Heidi 2026-08-23) — optional dest type on aliquot and pool; L1/C1/S1, C2, start-time gate, `template_definition.accepted_sample_types`; existing Sample columns only; bounce new Sample column, matrix drop, receive/mid-entry gates; CSO note: gate-label vs extract on `sample_type` only (no `material_class`) |
 | UI | **Accept with conditions** (Mathilda 2026-08-23) — dest type beside Method on aliquot and pool; blank = Same as parent; start-time gate only; bounce receive gate, mid-entry type check, or sample-ID box; no product UI code |
 | Lab Ops | Open — Leadership |
-| CSO | Open — Leadership |
+| CSO | Open — Leadership (gate-label vs extract examples folded for Hans) |
 
-**Implement gate:** CLOSED until Architecture Accept and Lab Ops + CSO sign.
+**Implement gate:** CLOSED until Lab Ops + CSO sign.
 
 ## 9. Relationship to Hold
 
