@@ -1,0 +1,15 @@
+example_id,example_class,example_note,instrument,method,plate_id,well,sample_id,lims_sample,project,role,nominal_eu_ml,dilution,onset_sec,result_eu_ml,units,ppc_recovery_pct
+02,valid,"plasmid ~0.07 EU/mL, PPC pass",Charles River Sunrise / Endoscan-V,kinetic chromogenic LAL,NBIO-LAL-02,A01,STD-5,,,STD,5.0,,312,5.12,EU/mL,
+02,valid,"plasmid ~0.07 EU/mL, PPC pass",Charles River Sunrise / Endoscan-V,kinetic chromogenic LAL,NBIO-LAL-02,A02,STD-5,,,STD,5.0,,298,4.88,EU/mL,
+02,valid,"plasmid ~0.07 EU/mL, PPC pass",Charles River Sunrise / Endoscan-V,kinetic chromogenic LAL,NBIO-LAL-02,B01,STD-0.5,,,STD,0.5,,612,0.51,EU/mL,
+02,valid,"plasmid ~0.07 EU/mL, PPC pass",Charles River Sunrise / Endoscan-V,kinetic chromogenic LAL,NBIO-LAL-02,B02,STD-0.5,,,STD,0.5,,631,0.48,EU/mL,
+02,valid,"plasmid ~0.07 EU/mL, PPC pass",Charles River Sunrise / Endoscan-V,kinetic chromogenic LAL,NBIO-LAL-02,C01,STD-0.05,,,STD,0.05,,1104,0.052,EU/mL,
+02,valid,"plasmid ~0.07 EU/mL, PPC pass",Charles River Sunrise / Endoscan-V,kinetic chromogenic LAL,NBIO-LAL-02,C02,STD-0.05,,,STD,0.05,,1148,0.047,EU/mL,
+02,valid,"plasmid ~0.07 EU/mL, PPC pass",Charles River Sunrise / Endoscan-V,kinetic chromogenic LAL,NBIO-LAL-02,D01,STD-0.005,,,STD,0.005,,1820,0.0053,EU/mL,
+02,valid,"plasmid ~0.07 EU/mL, PPC pass",Charles River Sunrise / Endoscan-V,kinetic chromogenic LAL,NBIO-LAL-02,D02,STD-0.005,,,STD,0.005,,1895,0.0047,EU/mL,
+02,valid,"plasmid ~0.07 EU/mL, PPC pass",Charles River Sunrise / Endoscan-V,kinetic chromogenic LAL,NBIO-LAL-02,E01,BLK,,,BLANK,,,,0.0,EU/mL,
+02,valid,"plasmid ~0.07 EU/mL, PPC pass",Charles River Sunrise / Endoscan-V,kinetic chromogenic LAL,NBIO-LAL-02,E02,BLK,,,BLANK,,,,0.0,EU/mL,
+02,valid,"plasmid ~0.07 EU/mL, PPC pass",Charles River Sunrise / Endoscan-V,kinetic chromogenic LAL,NBIO-LAL-02,G01,Plasmid-Lot-2025-001,Plasmid-Lot-2025-001,Plasmid Lot Release Testing,SAMPLE,,,1024,0.068,EU/mL,
+02,valid,"plasmid ~0.07 EU/mL, PPC pass",Charles River Sunrise / Endoscan-V,kinetic chromogenic LAL,NBIO-LAL-02,G02,Plasmid-Lot-2025-001,Plasmid-Lot-2025-001,Plasmid Lot Release Testing,SAMPLE,,,998,0.074,EU/mL,
+02,valid,"plasmid ~0.07 EU/mL, PPC pass",Charles River Sunrise / Endoscan-V,kinetic chromogenic LAL,NBIO-LAL-02,H01,Plasmid-Lot-2025-001-PPC,Plasmid-Lot-2025-001,Plasmid Lot Release Testing,PPC,0.5,,605,0.58,EU/mL,102
+02,valid,"plasmid ~0.07 EU/mL, PPC pass",Charles River Sunrise / Endoscan-V,kinetic chromogenic LAL,NBIO-LAL-02,H02,Plasmid-Lot-2025-001-PPC,Plasmid-Lot-2025-001,Plasmid Lot Release Testing,PPC,0.5,,618,0.55,EU/mL,96

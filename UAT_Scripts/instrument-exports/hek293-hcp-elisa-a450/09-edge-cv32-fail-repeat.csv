@@ -1,0 +1,17 @@
+example_id,example_class,example_note,plate_id,kit,well,sample_id,lims_sample,project,replicate,role,nominal_ng_ml,dilution,a450,a620,a450_corr,conc_ng_ml,avg_ng_ml,pct_cv
+09,edge,%CV ~32% on sample >4 ng/mL → fail/repeat (SOP 23103),NBIO-HCP-09,Cygnus F650S HEK 293 HCP ELISA,A01,STD-0,,,1,STD,0,,0.052,0.021,0.031,0.0,,
+09,edge,%CV ~32% on sample >4 ng/mL → fail/repeat (SOP 23103),NBIO-HCP-09,Cygnus F650S HEK 293 HCP ELISA,A02,STD-0,,,2,STD,0,,0.049,0.02,0.029,0.0,0.0,0.0
+09,edge,%CV ~32% on sample >4 ng/mL → fail/repeat (SOP 23103),NBIO-HCP-09,Cygnus F650S HEK 293 HCP ELISA,B01,STD-2,,,1,STD,2,,0.184,0.022,0.162,2.1,,
+09,edge,%CV ~32% on sample >4 ng/mL → fail/repeat (SOP 23103),NBIO-HCP-09,Cygnus F650S HEK 293 HCP ELISA,B02,STD-2,,,2,STD,2,,0.176,0.021,0.155,1.9,2.0,7.1
+09,edge,%CV ~32% on sample >4 ng/mL → fail/repeat (SOP 23103),NBIO-HCP-09,Cygnus F650S HEK 293 HCP ELISA,C01,STD-4,,,1,STD,4,,0.311,0.023,0.288,4.2,,
+09,edge,%CV ~32% on sample >4 ng/mL → fail/repeat (SOP 23103),NBIO-HCP-09,Cygnus F650S HEK 293 HCP ELISA,C02,STD-4,,,2,STD,4,,0.298,0.022,0.276,3.9,4.05,5.2
+09,edge,%CV ~32% on sample >4 ng/mL → fail/repeat (SOP 23103),NBIO-HCP-09,Cygnus F650S HEK 293 HCP ELISA,D01,STD-8,,,1,STD,8,,0.542,0.024,0.518,8.3,,
+09,edge,%CV ~32% on sample >4 ng/mL → fail/repeat (SOP 23103),NBIO-HCP-09,Cygnus F650S HEK 293 HCP ELISA,D02,STD-8,,,2,STD,8,,0.521,0.023,0.498,7.8,8.05,4.4
+09,edge,%CV ~32% on sample >4 ng/mL → fail/repeat (SOP 23103),NBIO-HCP-09,Cygnus F650S HEK 293 HCP ELISA,E01,STD-16,,,1,STD,16,,0.891,0.025,0.866,16.4,,
+09,edge,%CV ~32% on sample >4 ng/mL → fail/repeat (SOP 23103),NBIO-HCP-09,Cygnus F650S HEK 293 HCP ELISA,E02,STD-16,,,2,STD,16,,0.862,0.024,0.838,15.6,16.0,3.5
+09,edge,%CV ~32% on sample >4 ng/mL → fail/repeat (SOP 23103),NBIO-HCP-09,Cygnus F650S HEK 293 HCP ELISA,F01,STD-32,,,1,STD,32,,1.412,0.026,1.386,33.1,,
+09,edge,%CV ~32% on sample >4 ng/mL → fail/repeat (SOP 23103),NBIO-HCP-09,Cygnus F650S HEK 293 HCP ELISA,F02,STD-32,,,2,STD,32,,1.368,0.025,1.343,31.2,32.15,4.2
+09,edge,%CV ~32% on sample >4 ng/mL → fail/repeat (SOP 23103),NBIO-HCP-09,Cygnus F650S HEK 293 HCP ELISA,G01,STD-64,,,1,STD,64,,2.051,0.028,2.023,65.8,,
+09,edge,%CV ~32% on sample >4 ng/mL → fail/repeat (SOP 23103),NBIO-HCP-09,Cygnus F650S HEK 293 HCP ELISA,G02,STD-64,,,2,STD,64,,1.989,0.027,1.962,62.4,64.1,3.8
+09,edge,%CV ~32% on sample >4 ng/mL → fail/repeat (SOP 23103),NBIO-HCP-09,Cygnus F650S HEK 293 HCP ELISA,H03,CAR-T-Batch-001-cvfail,CAR-T-Batch-001,CAR-T In-Process Testing,1,SAMPLE,,neat,0.618,0.023,0.595,10.1,,
+09,edge,%CV ~32% on sample >4 ng/mL → fail/repeat (SOP 23103),NBIO-HCP-09,Cygnus F650S HEK 293 HCP ELISA,H04,CAR-T-Batch-001-cvfail,CAR-T-Batch-001,CAR-T In-Process Testing,2,SAMPLE,,neat,0.878,0.025,0.853,16.1,13.1,32.4
