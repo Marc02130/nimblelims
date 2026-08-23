@@ -1,7 +1,7 @@
 # Requirements: Extract-hold dest sample type
 
 **Date:** 2026-08-23  
-**Status:** C3 retracted (Marc) — Architecture Accept pending re-read; UI re-read; Lab Ops + CSO before implement  
+**Status:** UI Accept (conditions) — Architecture Accept pending; Lab Ops + CSO before implement  
 **Stem:** `extract-hold-dest-type`  
 **Tech sketch:** [`.docs/tech-sketch/extract-hold-dest-type.md`](../tech-sketch/extract-hold-dest-type.md)  
 **Hold source:** [`.docs/open-questions/sop-ai-to-process.md`](../open-questions/sop-ai-to-process.md) (PR 51, CEO Accept)  
@@ -32,8 +32,7 @@ This packet unlocks **dest sample type** on aliquot **and** pool execute, proces
 | **L1/C1/S1:** execute-minted dest joins this instance **after start**; arbitrary append refuse/403; AuthZ: this instance, same client, `experiment:manage` | Marc 2026-08-23 fold |
 | **C2:** while matrix copies parent, eligibility and Qubit key off `sample_type`, not matrix | Marc 2026-08-23 fold |
 | **C3 retracted:** aliquot-only dest type ≠ parent is **void**; pool same as aliquot | Marc 2026-08-23 |
-| Dest type beside Method; blank “Same as parent.”; no sample-ID box / wizard / sample-detail hop | Mathilda UI |
-| Bounce receive gate, sample-ID box, mid-entry type check | Mathilda |
+| Dest type beside Method on aliquot and pool; blank “Same as parent.”; start-time gate only; bounce receive gate / mid-entry type check / sample-ID box | Mathilda UI Accept conditions 2026-08-23 |
 | Bounce new Sample column, matrix drop, receive/mid-entry gates | Heidi |
 | Not IC50 | Marc / PR 51 |
 
@@ -79,7 +78,7 @@ This packet unlocks **dest sample type** on aliquot **and** pool execute, proces
 | AC14 | Eligibility and Qubit key off `sample_type`, not matrix (**C2**). |
 | AC15 | No migration that adds a Sample column. Heidi bounces a new Sample column, a matrix drop, or a receive/mid-entry gate. |
 | AC16 | Matrix on dest is unchanged by this packet (still copies parent or existing execute behavior). |
-| AC17 | Entry setup: dest type beside Method on **aliquot and pool**; blank shows “Same as parent.”; no sample-ID box, wizard, sample-detail hop, receive gate, or mid-entry type check. |
+| AC17 | Entry setup: dest type beside Method on **aliquot and pool**; blank shows “Same as parent.”; start-time gate only; no sample-ID box, wizard, sample-detail hop, receive gate, or mid-entry type check. |
 
 ## 6. Path exercised (catalog, not SOP text)
 
@@ -90,9 +89,9 @@ Blood intake → DNA daughter (aliquot dest type ≠ blood) → optional pool to
 | Review | Role | Verdict |
 |--------|------|--------|
 | CEO | Marc — scope freeze; C3 retracted | **Accept** 2026-08-23 (fold + pool dest type) |
-| Architecture | Heidi — L1/C2 + `template_definition.accepted_sample_types`; Accept after pool = aliquot | **Almost** → Accept pending this C3 flip |
-| UI | Mathilda — dest type on aliquot and pool; bounce receive gate / sample-ID box / mid-entry type check | **Hold** until re-read of this flip |
+| Architecture | Heidi — L1/C2 + `template_definition.accepted_sample_types`; bounce new Sample column / matrix drop / receive-mid-entry | **Almost** — Accept pending after C3 flip |
+| UI | Mathilda — entry setup; no product UI code | **Accept with conditions** 2026-08-23 (beside Method on aliquot and pool; Same as parent; start-time only; bounce receive / mid-entry / sample-ID box) |
 | Lab Ops | Deiter — Leadership | Open |
 | CSO | Hans — Leadership | Open |
 
-**Implement gate:** CLOSED until Architecture/UI Accept and Lab Ops + CSO sign.
+**Implement gate:** CLOSED until Architecture Accept and Lab Ops + CSO sign.
