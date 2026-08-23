@@ -1,7 +1,7 @@
 # Tech sketch: Extract-hold dest sample type
 
 **Date:** 2026-08-23  
-**Status:** **In review. Implement gate CLOSED until Leadership Accept.**  
+**Status:** **Architecture Accept + UI Accept (conditions). Implement gate CLOSED until Leadership Accept.**  
 **Stem:** `extract-hold-dest-type`  
 **Requirements:** [`.docs/requirements/extract-hold-dest-type.md`](../requirements/extract-hold-dest-type.md)  
 **Hold:** [`.docs/open-questions/sop-ai-to-process.md`](../open-questions/sop-ai-to-process.md) (PR 51)  
@@ -92,9 +92,18 @@ Next step (e.g. Qubit LimsRun / experiment) uses Decision #24 eligibility: Avail
 
 | Surface | Change |
 |---------|--------|
-| Aliquot/pool plan entry | Optional “Dest sample type” select (sample_type list), beside Method |
-| Blank | Placeholder “Same as parent” |
+| Aliquot/pool plan entry | Optional “Dest sample type” select (sample_type list), **beside Method** |
+| Blank | Placeholder **“Same as parent.”** |
 | Pool | Same control; one dest type per pool dest sample |
+
+**Mathilda UI Accept conditions (2026-08-23) — bounce bars**
+
+- Dest type control sits beside Method on the plan line.
+- Blank label is **“Same as parent.”** (not empty silence).
+- Same control on aliquot **and** pool.
+- **No sample-ID box** on this surface.
+- **No wizard** for dest type.
+- **No hop** to sample detail to set type.
 
 Mathilda reviews this sketch for entry setup. No product UI code until Leadership Accept + implement packet.
 
@@ -106,6 +115,7 @@ Mathilda reviews this sketch for entry setup. No product UI code until Leadershi
 | Execute → `samples.sample_type` + `parent_sample_id` | Drop / remodel `samples.matrix` |
 | Dest on `eln_process_samples` for this instance | SOP+AI Apply → process definition |
 | Existing columns only | New Sample columns |
+| UI: beside Method; blank = “Same as parent.”; no sample-ID box / wizard / detail hop | Product UI code |
 
 ## 7. Tests (when implement opens)
 
@@ -116,13 +126,14 @@ Mathilda reviews this sketch for entry setup. No product UI code until Leadershi
 | Pool, dest type set | Same as aliquot for the pool dest |
 | Ad hoc experiment | Dest created; no process-sample row |
 | Migration scan | No new Sample column |
+| Entry setup | Dest type beside Method; blank = “Same as parent.”; no sample-ID box / wizard / sample-detail hop |
 
 ## 8. Reviews
 
 | Review | Verdict |
 |--------|--------|
-| Architecture | Open — bounce new Sample column or matrix drop |
-| UI | Open — entry setup only if needed; no product UI code |
+| Architecture | **Accept** (Heidi 2026-08-23) — optional dest `sample_type` on plan line; blank = parent; execute writes existing `samples.sample_type`, keeps `parent_sample_id`, adds dest to `eln_process_samples`; no new Sample column; matrix drop stays out |
+| UI | **Accept with conditions** (Mathilda 2026-08-23) — dest type beside Method; blank = “Same as parent.”; same on aliquot and pool; no sample-ID box, no wizard, no hop to sample detail; no product UI code |
 | Lab Ops | Open |
 | CEO | Open — no implement until Accept |
 

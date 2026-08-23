@@ -1,7 +1,7 @@
 # Requirements: Extract-hold dest sample type
 
 **Date:** 2026-08-23  
-**Status:** In review — Leadership signs before implement  
+**Status:** Architecture Accept + UI Accept (conditions) — Leadership signs before implement  
 **Stem:** `extract-hold-dest-type`  
 **Tech sketch:** [`.docs/tech-sketch/extract-hold-dest-type.md`](../tech-sketch/extract-hold-dest-type.md)  
 **Hold source:** [`.docs/open-questions/sop-ai-to-process.md`](../open-questions/sop-ai-to-process.md) (PR 51, CEO Accept)
@@ -24,6 +24,7 @@ This packet unlocks **dest sample type** on aliquot/pool execute only. It does n
 | Existing columns only; no new Sample column | Marc + Heidi bounce |
 | Dropping `samples.matrix` is **not** this packet | Marc 2026-08-23 |
 | TruSeq library = same dest-type rule **later**, not this packet | Marc 2026-08-23 |
+| Dest type beside Method; blank label “Same as parent.”; no sample-ID box / wizard / sample-detail hop | Mathilda UI Accept conditions 2026-08-23 |
 | Not IC50 | Marc / PR 51 |
 
 ## 3. Goals
@@ -42,6 +43,7 @@ This packet unlocks **dest sample type** on aliquot/pool execute only. It does n
 - No SOP bodies in git. No SOP+AI Apply → process work.
 - No IC50 / dose-response.
 - No product UI beyond what the tech sketch needs for entry setup (Mathilda reviews sketch only).
+- No sample-ID box, wizard, or hop to sample detail for dest type (Mathilda bounce).
 - Compose stays down unless checking docs against the app.
 
 ## 5. Acceptance criteria
@@ -57,6 +59,7 @@ This packet unlocks **dest sample type** on aliquot/pool execute only. It does n
 | AC7 | Ad hoc experiment (no process): dest sample still created; no process-sample row required. |
 | AC8 | No migration that adds a Sample column. Heidi bounces a new Sample column or a matrix drop. |
 | AC9 | Matrix on dest is unchanged by this packet (still copies parent or existing execute behavior). |
+| AC10 | Entry setup: dest type beside Method; blank shows “Same as parent.”; no sample-ID box, no wizard, no hop to sample detail. |
 
 ## 6. Path exercised (catalog, not SOP text)
 
@@ -64,11 +67,11 @@ Blood intake → DNA daughter (dest type ≠ blood) → Qubit analysis on the da
 
 ## 7. Sign-off
 
-| Review | Role |
-|--------|------|
-| Architecture | Heidi — existing columns only; bounce new Sample column or matrix drop |
-| UI | Mathilda — entry setup UX only if sketch needs it; no product UI code |
-| Lab Ops | Deiter — lab fit for dest type on aliquot/pool |
-| CEO | Marc — scope freeze before implement |
+| Review | Role | Verdict |
+|--------|------|--------|
+| Architecture | Heidi — existing columns only; bounce new Sample column or matrix drop | **Accept** 2026-08-23 |
+| UI | Mathilda — entry setup UX only; no product UI code | **Accept with conditions** 2026-08-23 (beside Method; “Same as parent.”; no sample-ID box / wizard / detail hop) |
+| Lab Ops | Deiter — lab fit for dest type on aliquot/pool | Open |
+| CEO | Marc — scope freeze before implement | Open |
 
 **Implement gate:** CLOSED until Leadership Accept on the sketch.
