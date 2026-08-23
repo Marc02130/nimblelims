@@ -4,19 +4,15 @@
 **Status:** **Accept with conditions** (L1 Met; L2 stands)  
 **Reviewer persona:** SVP Lab Ops (Deiter)  
 **Packet:** [tech-sketch/extract-hold-dest-type.md](../tech-sketch/extract-hold-dest-type.md) · [requirements/extract-hold-dest-type.md](../requirements/extract-hold-dest-type.md)  
-**Related:** Architecture Accept · UI Accept (U6) · Hold [sop-ai-to-process.md](../open-questions/sop-ai-to-process.md)
+**Related:** Architecture Accept · UI Accept (U6) · Security/CSO [PR 55](https://github.com/Marc02130/nimblelims/pull/55) · Hold [sop-ai-to-process.md](../open-questions/sop-ai-to-process.md)
 
 ## 1. Executive summary
 
 Dest type on the aliquot/pool **plan entry** (beside Method), blank = Same as parent, execute writing `samples.sample_type` + `parent_sample_id` + `eln_process_samples` is the right bench shape. Template owns extract DNA; the tech under time pressure does **not** re-pick type on execute.
 
-**L1 is Met** in the folded sketch: execute-minted dest joins this process instance after start (product of the step); arbitrary append stays refuse.
+**L1 is Met.** **L2 stands** (land with implement). Catalog is many-to-many. Seed Blood × aliquot → DNA with implement.
 
-**L2 stands:** dest type only on the plan entry — no execute re-prompt, sample-ID box, wizard, or hop to sample detail.
-
-Catalog is **many-to-many** (separate rows per dest). Seed **Blood × aliquot → DNA** with implement. Multi-hop (e.g. Blood → plasma → cfDNA) is **process steps**, not one chained catalog row.
-
-**Verdict: Accept with conditions (L1 Met; L2).** Implement gate stays CLOSED until Günter stamps `config:edit` on the catalog. Not IC50.
+**Verdict: Accept with conditions (L1 Met; L2).** Leadership opened the implement gate (Günter PR 55) for S3 + L2 + seed. Not IC50.
 
 ## 2. Lab fit assessment
 
@@ -36,24 +32,23 @@ Catalog is **many-to-many** (separate rows per dest). Seed **Blood × aliquot �
 
 | ID | Condition | Status |
 |----|-----------|--------|
-| **L1** | Execute-minted dest for **this** process instance may join `eln_process_samples` even when the instance/step has already started (product of the step). Arbitrary append stays refuse. | **Met** (folded into sketch/AC) |
-| **L2** | Dest type is set **only** on the plan entry (beside Method). Execute does **not** re-prompt type, open a sample-ID box, wizard, or hop to sample detail. | **Stands** — land with implement |
+| **L1** | Execute-minted dest for **this** process instance may join `eln_process_samples` even when the instance/step has already started. Arbitrary append stays refuse. | **Met** |
+| **L2** | Dest type set **only** on the plan entry. Execute does **not** re-prompt type. | **Stands** — land with implement |
 
-**With implement (not a Lab Ops revise):** seed at least **Blood × aliquot → DNA**. Additional many-to-many rows (plasma, RBC, WBC, buffy coat, …) are catalog config after Günter `config:edit`.
+**With implement:** seed at least **Blood × aliquot → DNA**.
 
 ## 4. Risks / watch items (non-blocking)
 
-- Matrix still copies parent until a later packet; eligibility/Qubit key off `sample_type` (C2).
+- Matrix still copies parent; eligibility/Qubit key off `sample_type` (C2).
 - Multi-hop is process design, not a single catalog edge.
-- Clearing this Hold unlocks Qubit on DNA; not TruSeq end-to-end.
 
 ## 5. Verdict
 
 | Field | Value |
 |-------|--------|
 | **Verdict** | **Accept with conditions** (L1 Met; L2) |
-| **Implement gate** | CLOSED until Günter stamps `config:edit` on the transition catalog; then OPEN for implement that lands L2 + seed Blood×aliquot→DNA |
-| **Not in scope** | Matrix drop · TruSeq library · SOP+AI Apply · IC50 · Mixed container contents as pool |
+| **Implement gate** | **OPEN** (Leadership / Günter PR 55) — implement lands L2 + S3 + Blood×aliquot→DNA seed |
+| **Not in scope** | Matrix drop · TruSeq · SOP+AI Apply · IC50 · Mixed container contents as pool |
 
 ```
 LAB OPS REVIEW: Accept with conditions (L1 Met; L2)

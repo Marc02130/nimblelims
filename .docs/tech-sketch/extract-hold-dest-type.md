@@ -1,10 +1,11 @@
 # Tech sketch: Extract-hold dest sample type
 
 **Date:** 2026-08-23  
-**Status:** **Lab Ops Accept (L1 Met; L2). Architecture + UI Accept. Implement gate CLOSED until Günter stamps `config:edit` on the catalog.**  
+**Status:** **Implement gate OPEN.** Land S3 (`config:edit` on catalog mutate) + Lab Ops L2 + Blood×aliquot→DNA seed. Security/CSO Accept with conditions ([PR 55](https://github.com/Marc02130/nimblelims/pull/55)).  
 **Stem:** `extract-hold-dest-type`  
 **Requirements:** [`.docs/requirements/extract-hold-dest-type.md`](../requirements/extract-hold-dest-type.md)  
 **Lab Ops:** [`.docs/lab-ops-review/extract-hold-dest-type.md`](../lab-ops-review/extract-hold-dest-type.md)  
+**Security:** [`.docs/security-review/extract-hold-dest-type.md`](../security-review/extract-hold-dest-type.md)  
 **Hold:** [`.docs/open-questions/sop-ai-to-process.md`](../open-questions/sop-ai-to-process.md) (PR 51)  
 **Spine:** [`.docs/tech-sketch/experiment-template-entries.md`](experiment-template-entries.md) §0.1b / §0.8  
 **Process:** [`.docs/development-process/README.md`](../development-process/README.md)
@@ -23,14 +24,15 @@ Aliquot/pool execute creates a dest that inherits parent identity and does not j
 - **Multi-hop = process steps** (Blood → plasma, then plasma → cfDNA), not one catalog edge that skips intermediates.
 - **L2 (Lab Ops):** dest type only on the **plan entry**. Execute does **not** re-prompt type.
 - Pool: all sources share one `sample_type` or refuse; then catalog lookup for that type × pool → dest.
-- Execute: write `samples.sample_type`, `parent_sample_id`; **L1** join execute-minted dest onto this instance after start; append 403.
+- Execute: write `samples.sample_type`, `parent_sample_id`; **L1 / S1** join execute-minted dest onto this instance after start; append 403.
 - Start-time entry gate: `template_definition.accepted_sample_types` (not the transition catalog).
 - **C2:** eligibility / Qubit key off `sample_type`, not matrix.
-- **Seed with implement:** at least Blood × aliquot → DNA. More rows via catalog after Günter `config:edit`.
+- **S3:** `sample_type_transitions` mutate is **`config:edit` only** — not Client, not `experiment:manage` alone.
+- **Seed with implement:** Blood × aliquot → DNA.
 
 **Non-goals**
 
-- Matrix drop; TruSeq; SOP+AI Apply; IC50; product code until gate opens.
+- Matrix drop; TruSeq; SOP+AI Apply; IC50.
 - Transition rules on entries or template JSON.
 - Hardcoded if-blood-then.
 - Mixed container contents as pool.
@@ -42,7 +44,7 @@ Aliquot/pool execute creates a dest that inherits parent identity and does not j
 samples.sample_type                       ← existing
 samples.parent_sample_id                  ← existing
 samples.matrix                            ← unchanged
-eln_process_samples                       ← L1 execute-minted join
+eln_process_samples                       ← L1/S1 execute-minted join
 template_definition.accepted_sample_types ← step ENTRY allow-list only
 sample_type_transitions                   ← NEW system-wide client catalog (many-to-many rows)
 ```
@@ -58,15 +60,15 @@ sample_type_transitions                   ← NEW system-wide client catalog (ma
 Unique `(client_id, source, operation, dest)`. One source may have many rows for the same operation.
 
 **Seed with implement:** Blood × aliquot → DNA.  
-**Example many-to-many (config after `config:edit`):** Blood × aliquot → plasma; Blood × aliquot → DNA; Blood × aliquot → RBC; …  
-**Multi-hop:** Blood→plasma then plasma→cfDNA = two process steps + two (or more) catalog rows — not Blood→cfDNA in one row unless CSO adds that direct edge.
+**Multi-hop:** Blood→plasma then plasma→cfDNA = two process steps + catalog rows — not one chained edge unless CSO adds a direct row.
 
-### AuthZ / gate
+### AuthZ
 
 | Surface | Who |
 |---------|-----|
-| Transition catalog CRUD | `config:edit` (Günter stamps) |
-| Implement gate | Opens when Günter stamps `config:edit` on this catalog |
+| Transition catalog mutate (create/update/delete) | **`config:edit` only** (**S3**) — not Client, not `experiment:manage` alone |
+| Execute-minted process-sample join | This instance, same client, `experiment:manage` (**S1** Met) |
+| Arbitrary append | 403/404 |
 
 ## 4. Contracts
 
@@ -80,7 +82,7 @@ Dest type select beside Method on aliquot/pool plan. Options = all catalog dests
 if pool and sources do not share one sample_type: refuse
 type_id = dest_sample_type or source_type
 if type_id != source_type and no catalog_row(source, op, type_id): refuse
-create dest; L1 join if under process
+create dest; L1/S1 join if under process
 # never prompt for dest type at execute
 ```
 
@@ -100,33 +102,33 @@ create dest; L1 join if under process
 |--------|--------|
 | Many-to-many catalog rows | Full fraction seed beyond Blood→DNA |
 | Multi-hop = process steps | TruSeq; matrix drop |
-| L1 Met; L2 no execute re-prompt | Product code before Günter stamp |
+| L1/S1 Met; L2; S3 config:edit | |
 | Seed Blood×aliquot→DNA with implement | |
+| Gate OPEN | |
 
 ## 7. Tests
 
 | Case | Expect |
 |------|--------|
 | Blood×aliquot→DNA (seeded) | OK |
-| Blood×aliquot→plasma (extra row) | OK when row exists; many options in select |
 | Off-table dest | Refuse |
 | Execute type prompt | Absent (L2) |
 | Pool mixed source types | Refuse |
-| L1 join after start | Dest on process samples |
-| Catalog mutate without config:edit | 403 |
+| L1/S1 join after start | Dest on process samples |
+| Catalog mutate without config:edit | **403** (S3) |
+| Catalog mutate with experiment:manage only | **403** (S3) |
 
 ## 8. Reviews
 
 | Review | Verdict |
 |--------|--------|
 | CEO | **Accept** |
-| Architecture | **Accept** — many-to-many rows; multi-hop = process steps; seed with implement |
-| UI | **Accept (U6)** — plan entry only; many options; no execute re-prompt; no product UI until gate |
-| Lab Ops | **Accept with conditions** (L1 Met; L2) — Deiter |
-| Security | **Open** — Günter `config:edit` on catalog opens implement gate |
-| CSO | Open — owns catalog content beyond seed |
+| Architecture | **Accept** |
+| UI | **Accept (U6)** |
+| Lab Ops | **Accept with conditions** (L1 Met; L2) |
+| Security / CSO | **Accept with conditions** (S1 Met; S3) — [PR 55](https://github.com/Marc02130/nimblelims/pull/55) |
 
-**Implement gate:** CLOSED until Günter stamps `config:edit`. Then implement lands L2 + seed Blood×aliquot→DNA. No product code before that. Not IC50.
+**Implement gate:** **OPEN.** Implement must land **S3** + **L2** + Blood×aliquot→DNA seed. Not IC50.
 
 ## 9. Relationship to Hold
 
