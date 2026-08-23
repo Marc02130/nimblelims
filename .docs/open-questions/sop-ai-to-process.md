@@ -44,6 +44,8 @@ Dest copies the parent’s matrix and never lands on `eln_process_samples`. Even
 
 Do not reopen IC50.
 
+**Follow-on packet (docs only, implement gate CLOSED):** [requirements/extract-hold-dest-type.md](../requirements/extract-hold-dest-type.md) · [tech-sketch/extract-hold-dest-type.md](../tech-sketch/extract-hold-dest-type.md). Optional dest `sample_type` on aliquot/pool; execute writes type + `parent_sample_id` + `eln_process_samples`. Matrix drop and TruSeq are out.
+
 ## Catalog gap (this path, not PR 48)
 
 PR 48 CSVs are HCP / LAL / NCI-60. They do **not** exercise this SOP path.
