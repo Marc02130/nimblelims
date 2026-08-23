@@ -1,7 +1,7 @@
 # Requirements: Extract-hold dest sample type
 
 **Date:** 2026-08-23  
-**Status:** UI Accept (conditions) — Architecture Accept pending; Lab Ops + CSO before implement  
+**Status:** Architecture Accept + UI Accept (conditions) — Lab Ops + CSO before implement  
 **Stem:** `extract-hold-dest-type`  
 **Tech sketch:** [`.docs/tech-sketch/extract-hold-dest-type.md`](../tech-sketch/extract-hold-dest-type.md)  
 **Hold source:** [`.docs/open-questions/sop-ai-to-process.md`](../open-questions/sop-ai-to-process.md) (PR 51, CEO Accept)  
@@ -11,7 +11,7 @@
 
 Extract-then-Qubit Hold: dest copies the parent’s type/matrix and never lands on `eln_process_samples`. Blood → DNA daughter → Qubit on the daughter cannot ship.
 
-This packet unlocks **dest sample type** on aliquot **and** pool execute, process membership for execute-minted dests, a **start-time** accepted-type gate, and the allow-list on **`template_definition.accepted_sample_types`**. Type change through the process is a **gate** (so the allow-list can refuse wrong material), not an extract-by-rename. It does not fix SOP+AI Apply, parsers, or matrix.
+This packet unlocks **dest sample type** on aliquot **and** pool execute, process membership for execute-minted dests, a **start-time** accepted-type gate, and the allow-list on **`template_definition.accepted_sample_types`**. Type change through the process is a **gate** (so the allow-list can refuse wrong material), not an extract-by-rename. Execute also distinguishes **gate-label** (DNA → pooled DNA OK) from **extract-by-pool** (blood → DNA refuse), checking **`sample_type` only** — no `material_class` column. It does not fix SOP+AI Apply, parsers, or matrix.
 
 ## 2. Leadership locks (cite)
 
@@ -32,14 +32,16 @@ This packet unlocks **dest sample type** on aliquot **and** pool execute, proces
 | **L1/C1/S1:** execute-minted dest joins this instance **after start**; arbitrary append refuse/403; AuthZ: this instance, same client, `experiment:manage` | Marc 2026-08-23 fold |
 | **C2:** while matrix copies parent, eligibility and Qubit key off `sample_type`, not matrix | Marc 2026-08-23 fold |
 | **C3 retracted:** aliquot-only dest type ≠ parent is **void**; pool same as aliquot | Marc 2026-08-23 |
+| **Gate-label vs extract:** DNA → pooled DNA OK; blood → DNA by pool refuse; execute check on `sample_type` only; **no `material_class`** | Heidi for CSO/Hans 2026-08-23 |
 | Dest type beside Method on aliquot and pool; blank “Same as parent.”; start-time gate only; bounce receive gate / mid-entry type check / sample-ID box | Mathilda UI Accept conditions 2026-08-23 |
-| Bounce new Sample column, matrix drop, receive/mid-entry gates | Heidi |
+| Bounce new Sample column, matrix drop, receive/mid-entry gates | Heidi Architecture Accept |
 | Not IC50 | Marc / PR 51 |
 
 ## 3. Goals
 
 - On **aliquot and pool** plan lines: optional dest `sample_type` (list), co-located with method. Blank → parent type.
 - On **execute**: create dest with that type (or parent if blank); set `parent_sample_id`; keep existing amount/container rules.
+- On **execute**: refuse extract-by-pool type changes (e.g. blood → DNA); allow gate-label changes (e.g. DNA → pooled DNA). Check **`sample_type` only** — no `material_class`.
 - On **execute** under a process: insert **execute-minted** dest into `eln_process_samples` for **this** instance **after start** (**L1**). Arbitrary append stays 403.
 - Step templates carry **`template_definition.accepted_sample_types`** (UUID list). At **experiment start** and **LimsRun start**: refuse if sample’s `sample_type` ∉ allow-list when the list is non-empty. Not receive. Not mid-entry. Not analysis.
 - Eligibility and Qubit key off `sample_type`, not matrix (**C2**).
@@ -47,7 +49,7 @@ This packet unlocks **dest sample type** on aliquot **and** pool execute, proces
 
 ## 4. Non-goals
 
-- No new Sample columns or tables.
+- No new Sample columns or tables (including **no `material_class`**).
 - Do **not** drop or rewrite `samples.matrix` in this packet.
 - No TruSeq / library-prep dest-type UI beyond the shared rule reserved for later.
 - No SOP bodies in git. No SOP+AI Apply → process work.
@@ -65,7 +67,7 @@ This packet unlocks **dest sample type** on aliquot **and** pool execute, proces
 | AC1 | Aliquot plan line accepts optional dest `sample_type` next to method. |
 | AC2 | Pool plan line accepts the **same** optional dest `sample_type` next to method (**C3 retracted**). |
 | AC3 | Blank dest type (aliquot or pool) → execute writes parent’s `sample_type` onto the dest sample. |
-| AC4 | Set dest type (aliquot or pool) → execute writes that list value onto `samples.sample_type`. |
+| AC4 | Set dest type (aliquot or pool) → execute writes that list value onto `samples.sample_type` when the transition is allowed. |
 | AC5 | Dest sample has `parent_sample_id` = source sample. |
 | AC6 | When experiment is under an ELN process, execute adds **execute-minted** dest to `eln_process_samples` for that process instance **after start** (not removed) — **L1**. |
 | AC7 | Ad hoc experiment (no process): dest sample still created; no process-sample row required. |
@@ -76,22 +78,23 @@ This packet unlocks **dest sample type** on aliquot **and** pool execute, proces
 | AC12 | Empty / absent allow-list → no type refuse at start. |
 | AC13 | No type gate at receive. No type gate mid-entry. |
 | AC14 | Eligibility and Qubit key off `sample_type`, not matrix (**C2**). |
-| AC15 | No migration that adds a Sample column. Heidi bounces a new Sample column, a matrix drop, or a receive/mid-entry gate. |
-| AC16 | Matrix on dest is unchanged by this packet (still copies parent or existing execute behavior). |
-| AC17 | Entry setup: dest type beside Method on **aliquot and pool**; blank shows “Same as parent.”; start-time gate only; no sample-ID box, wizard, sample-detail hop, receive gate, or mid-entry type check. |
+| AC15 | Pool execute DNA → pooled DNA (gate-label) allowed; blood → DNA by pool refused (extract). Check uses `sample_type` only — **no `material_class`**. |
+| AC16 | No migration that adds a Sample column (including `material_class`). Heidi bounces a new Sample column, a matrix drop, or a receive/mid-entry gate. |
+| AC17 | Matrix on dest is unchanged by this packet (still copies parent or existing execute behavior). |
+| AC18 | Entry setup: dest type beside Method on **aliquot and pool**; blank shows “Same as parent.”; start-time gate only; no sample-ID box, wizard, sample-detail hop, receive gate, or mid-entry type check. |
 
 ## 6. Path exercised (catalog, not SOP text)
 
-Blood intake → DNA daughter (aliquot dest type ≠ blood) → optional pool to pooled DNA → Qubit / next step with `accepted_sample_types` set so wrong material refuses at start. Source links stay Katinka’s NCI Frederick URLs in `sop-ai-to-process.md`. Anton’s catalog for this path may live in repo; SOP PDFs do not.
+Blood intake → DNA daughter (**aliquot** dest type ≠ blood) → optional pool to pooled DNA (gate-label) → Qubit / next step with `accepted_sample_types` set so wrong material refuses at start. Blood → DNA **via pool** must refuse. Source links stay Katinka’s NCI Frederick URLs in `sop-ai-to-process.md`. Anton’s catalog for this path may live in repo; SOP PDFs do not.
 
 ## 7. Sign-off
 
 | Review | Role | Verdict |
 |--------|------|--------|
 | CEO | Marc — scope freeze; C3 retracted | **Accept** 2026-08-23 (fold + pool dest type) |
-| Architecture | Heidi — L1/C2 + `template_definition.accepted_sample_types`; bounce new Sample column / matrix drop / receive-mid-entry | **Almost** — Accept pending after C3 flip |
+| Architecture | Heidi — L1/C2 + `template_definition.accepted_sample_types`; bounce new Sample column / matrix drop / receive-mid-entry / `material_class` | **Accept** 2026-08-23 |
 | UI | Mathilda — entry setup; no product UI code | **Accept with conditions** 2026-08-23 (beside Method on aliquot and pool; Same as parent; start-time only; bounce receive / mid-entry / sample-ID box) |
 | Lab Ops | Deiter — Leadership | Open |
-| CSO | Hans — Leadership | Open |
+| CSO | Hans — Leadership; gate-label vs extract on `sample_type` | Open (examples folded) |
 
-**Implement gate:** CLOSED until Architecture Accept and Lab Ops + CSO sign.
+**Implement gate:** CLOSED until Lab Ops + CSO sign.
