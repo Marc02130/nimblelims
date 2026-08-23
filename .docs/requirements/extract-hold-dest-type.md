@@ -1,7 +1,7 @@
 # Requirements: Extract-hold dest sample type
 
 **Date:** 2026-08-23  
-**Status:** **Implement gate OPEN** — Architecture + UI Accept (re-stamp) on METHOD_CATALOG fold.  
+**Status:** **Implement gate HOLD (re-stamp)** — Architecture + UI re-stamp pending on atomic-pair fold. Prior Accept stands on METHOD_CATALOG fold until re-stamp.  
 **Stem:** `extract-hold-dest-type`  
 **Tech sketch:** [`.docs/tech-sketch/extract-hold-dest-type.md`](../tech-sketch/extract-hold-dest-type.md)  
 **Lab Ops:** [`.docs/lab-ops-review/extract-hold-dest-type.md`](../lab-ops-review/extract-hold-dest-type.md)  
@@ -10,7 +10,7 @@
 
 ## 1. Purpose
 
-Dest type on `aliquot_pool_plan` (entry default + line override); daughters on `aliquots_pools` after execute. Entry `method` is a **concrete method** that implies exactly one mint op (aliquot XOR pool). Method picker and dest type are **separate** controls. Catalog + L1 + start allow-list.
+Dest type on `aliquot_pool_plan` (entry default + line override); daughters on `aliquots_pools` after execute. Entry `method` is a **concrete method** that implies exactly one mint op (aliquot XOR pool). Method picker and dest type are **separate** controls. Catalog + L1 + start allow-list. Adding aliquot/pool creates the **atomic pair** (plan + dest-sample entries) together.
 
 ## 2. Leadership locks (cite)
 
@@ -23,12 +23,14 @@ Dest type on `aliquot_pool_plan` (entry default + line override); daughters on `
 | **Concrete methods (Deiter cut list):** entry `method` is concrete id → exactly one `mint_op`; CUT fraction / contribution ratio / plate map / serial dilution | Deiter + Marc 2026-08-23 |
 | **Normalization:** parent concentration required; prefer prior result on that sample (not free type-in); dest vol **or** target amount required | Marc 2026-08-23 |
 | **Equimolar (Hans):** rename equimolar → **by target amount** for this packet (no size/bp path yet); Hans gate if size/bp lands later | Hans + Marc 2026-08-23 |
+| **Atomic pair (add):** adding aliquot/pool to template or ad hoc creates **both** entries together — plan (`aliquot_pool_plan` / `experiment_data`) **and** dest-sample (`aliquots_pools` / `experiment_sample_data`); UI must not offer adding only one; one “Add aliquot/pool” action → pair; dest entry stays empty until after execute; no new plan object | Rolf CEO + Heidi + Mathilda 2026-08-23 |
 | Two keys: `aliquot_pool_plan` / `aliquots_pools`; no new plan object | Prior map |
 | `dest_sample_type` must land on plan line/config (Heidi bounce vs main copy-parent) | Heidi |
 | Seeds Blood×aliquot→DNA, DNA×pool→pooled DNA; S3 config:edit; L1/S1; L2; start allow-list; catalog many-to-many; pool same-type | Prior |
 | Bounce Sample/`material_class`, matrix drop, receive/mid-entry gates, if-blood-then, transitions on `template_definition` | Prior |
 | Architecture Accept (re-stamp) on METHOD_CATALOG fold | Heidi 2026-08-23 |
 | UI Accept (re-stamp) on METHOD_CATALOG fold | Mathilda 2026-08-23 |
+| Architecture + UI re-stamp pending on atomic-pair fold | Pending |
 | Not IC50 | Marc |
 
 ## 3. Concrete methods (IN)
@@ -48,6 +50,8 @@ Dest type on `aliquot_pool_plan` (entry default + line override); daughters on `
 
 ## 4. Goals
 
+- **Atomic pair on add:** one “Add aliquot/pool” action creates both `aliquot_pool_plan` and `aliquots_pools` together (template or ad hoc); UI never offers plan-only or dest-only add.
+- Dest-sample entry present from add, **empty until after execute**.
 - Entry: concrete method + optional default dest type (template or add-time).
 - Lines: optional dest type clear/override if catalog allows.
 - Execute resolve: line → entry default → parent; no re-prompt.
@@ -56,13 +60,15 @@ Dest type on `aliquot_pool_plan` (entry default + line override); daughters on `
 
 ## 5. Non-goals
 
-Dual mint; mid-flight method warn/wipe; un-mint on cancel; method/type on `aliquots_pools`; new experiment-plan object; equimolar-by-size (parked until size/bp path); CUT methods above; Sample/`material_class`; matrix drop; if-blood-then; IC50.
+Dual mint; mid-flight method warn/wipe; un-mint on cancel; method/type on `aliquots_pools`; new experiment-plan object; adding only one of the pair; equimolar-by-size (parked until size/bp path); CUT methods above; Sample/`material_class`; matrix drop; if-blood-then; IC50.
 
 ## 6. Acceptance criteria
 
 | ID | Criterion |
 |----|-----------|
 | AC1 | `aliquot_pool_plan` + `aliquots_pools` only; no new plan object. |
+| AC1b | Adding aliquot/pool (template or ad hoc) always creates **both** entries as an atomic pair; UI does not offer plan-only or dest-only; one “Add aliquot/pool” → pair. |
+| AC1c | Dest-sample entry (`aliquots_pools`) stays empty until after execute. |
 | AC2 | Entry config has concrete `method` (implies exactly one `mint_op`) + optional default dest type. |
 | AC3 | Method picker and dest-type control are separate (Method ≠ dest type). |
 | AC4 | Plan line optional `dest_sample_type` clear/override within catalog. |
@@ -78,16 +84,16 @@ Dual mint; mid-flight method warn/wipe; un-mint on cancel; method/type on `aliqu
 
 ## 7. Path exercised
 
-Plan entry method=`aliquot_by_volume`, default DNA → execute → daughters on `aliquots_pools` → separate plan entry method=`pool_equal_volume_each` for DNA→pooled DNA.
+Add aliquot/pool → both entries created (dest empty) → plan entry method=`aliquot_by_volume`, default DNA → execute → daughters on `aliquots_pools` → separate add for pool creates another atomic pair with method=`pool_equal_volume_each` for DNA→pooled DNA.
 
 ## 8. Sign-off
 
 | Review | Verdict |
 |--------|--------|
-| CEO | **Accept** — A + line override; concrete methods + Method≠dest type (Marc 2026-08-23) |
-| Architecture | **Accept** (Heidi re-stamp 2026-08-23) |
-| UI | **Accept** (Mathilda re-stamp 2026-08-23) |
+| CEO | **Accept** — A + line override; concrete methods + Method≠dest type; **atomic pair on add** (Rolf CEO + Heidi + Mathilda 2026-08-23) |
+| Architecture | **Pending re-stamp** (atomic-pair fold) — prior Accept Heidi 2026-08-23 on METHOD_CATALOG |
+| UI | **Pending re-stamp** (atomic-pair fold) — prior Accept Mathilda 2026-08-23 on METHOD_CATALOG |
 | Lab Ops | **Accept** (L1 Met; L2); Deiter cut list folded |
 | Security / CSO | **Accept** (S1 Met; S3) |
 
-**Implement gate:** **OPEN.** Not IC50.
+**Implement gate:** **HOLD** until Architecture + UI re-stamp on atomic-pair. Coding stays Grok Build. Not IC50.

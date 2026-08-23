@@ -1,7 +1,7 @@
 # Tech sketch: Extract-hold dest sample type
 
 **Date:** 2026-08-23  
-**Status:** **Implement gate OPEN.** Architecture Accept + UI Accept (re-stamp) on METHOD_CATALOG fold. Land S3 + L2 + seeds + `dest_sample_type` + METHOD_CATALOG.  
+**Status:** **Implement gate HOLD (re-stamp).** Architecture + UI re-stamp pending on atomic-pair fold. Prior Accept stands on METHOD_CATALOG fold until re-stamp. Land S3 + L2 + seeds + `dest_sample_type` + METHOD_CATALOG + atomic pair on add.  
 **Stem:** `extract-hold-dest-type`  
 **Requirements:** [`.docs/requirements/extract-hold-dest-type.md`](../requirements/extract-hold-dest-type.md)  
 **Lab Ops:** [`.docs/lab-ops-review/extract-hold-dest-type.md`](../lab-ops-review/extract-hold-dest-type.md)  
@@ -12,16 +12,18 @@
 
 ## 1. Problem
 
-Aliquot/pool execute creates a dest that inherits parent identity and does not join `eln_process_samples`. Dest type must be chosen on the **plan entry** before execute. Main today: no `dest_sample_type` on plan lines; execute copies `parent.sample_type` — Heidi bounce. Entry method must be **concrete** (not only aliquot|pool) so columns and mint op stay coherent.
+Aliquot/pool execute creates a dest that inherits parent identity and does not join `eln_process_samples`. Dest type must be chosen on the **plan entry** before execute. Main today: no `dest_sample_type` on plan lines; execute copies `parent.sample_type` — Heidi bounce. Entry method must be **concrete** (not only aliquot|pool) so columns and mint op stay coherent. Adding aliquot/pool must create **both** plan and dest-sample entries together (atomic pair).
 
-## 2. Two entries (no plan object)
+## 2. Two entries (no plan object) — atomic pair
 
 | Role | `predefined_entry_key` | Kind | When | Owns |
 |------|------------------------|------|------|------|
 | **Plan entry** | `aliquot_pool_plan` | `experiment_data` | Before / at execute | Entry config + plan lines (below) |
-| **Dest sample entry** | `aliquots_pools` | `experiment_sample_data` | **AFTER execute only** | Lists minted daughters. No method/type picker. |
+| **Dest sample entry** | `aliquots_pools` | `experiment_sample_data` | Created at add (empty); populated **AFTER execute only** | Lists minted daughters. No method/type picker. |
 
-**Flow:** Execute reads `aliquot_pool_plan` → mints dests → L1/S1 join → `aliquots_pools` lists them. **No re-prompt.** No new experiment-plan object.
+**Atomic pair on add (Rolf CEO + Heidi + Mathilda 2026-08-23):** When adding aliquot/pool to a **template** or **ad hoc** experiment, **both** entries are created together. UI must not offer adding only one. One “Add aliquot/pool” action → pair. Dest entry stays **empty until after execute**. No new plan object.
+
+**Flow:** Add → both entries exist (dest empty) → Execute reads `aliquot_pool_plan` → mints dests → L1/S1 join → `aliquots_pools` lists them. **No re-prompt.** No new experiment-plan object.
 
 ## 3. A + line override (Marc lock 2026-08-23)
 
@@ -53,7 +55,7 @@ type_id =
 if type_id != source.sample_type and no catalog_row(source, mint_op, type_id): refuse
 ```
 
-### Bounce bars (Marc + Heidi + Mathilda)
+### Bounce bars (Marc + Heidi + Mathilda; atomic pair Rolf CEO + Heidi + Mathilda)
 
 - One entry minting **both** aliquot and pool (dual mint).
 - **Silent reshape** of columns/mint after lines already exist (method change mid-flight).
@@ -62,6 +64,7 @@ if type_id != source.sample_type and no catalog_row(source, mint_op, type_id): r
 - Collapsing method and dest type into one control.
 - Method/type picker on `aliquots_pools`.
 - New experiment-plan object.
+- **Adding only one of the pair** (plan-only or dest-only); UI offering separate add for each.
 - Offering CUT methods (fraction, contribution ratio, plate map, serial dilution).
 - Free type-in parent concentration on normalization.
 - Equimolar-by-size without a size/bp sample/result path (Hans gate).
@@ -114,6 +117,7 @@ Entry `method` is a concrete id. `mint_op = METHOD_CATALOG[method].mint_op` — 
 
 ## 5. Goals (remainder)
 
+- **Atomic pair:** one “Add aliquot/pool” → both entries; dest empty until execute.
 - Catalog many-to-many; multi-hop = process steps.
 - Pool: one shared source `sample_type` or refuse; then catalog lookup for entry `mint_op`.
 - L1/S1 join; L2 no execute re-prompt; S3 `config:edit` on catalog; C2 key off `sample_type`.
@@ -170,7 +174,7 @@ for each line:
   type_id = line.dest_sample_type or entry.default_dest_sample_type or source.sample_type
   if type_id != source.sample_type and no catalog_row(source, mint_op, type_id): refuse
   mint dest; L1/S1 join if under process
-Populate aliquots_pools
+Populate aliquots_pools  # dest entry already exists (atomic pair); was empty until here
 # never prompt for dest type at execute
 # never change entry.method mid-flight — cancel experiment instead
 # cancel does not un-mint already-minted daughters
@@ -180,15 +184,19 @@ Populate aliquots_pools
 
 | Surface | Rule |
 |---------|------|
-| Entry add / template | Concrete method picker **and** default dest type (two controls); catalog limits dest |
+| Entry add / template | **One** “Add aliquot/pool” action creates **both** entries (atomic pair). No plan-only or dest-only add. Concrete method picker **and** default dest type (two controls); catalog limits dest |
+| Dest entry at add | Present, **empty** until after execute |
 | Plan lines | May clear/override dest type within catalog; columns follow method |
 | After lines exist | Method locked — change requires cancel experiment (no warn/wipe reshape; no un-mint) |
-| `aliquots_pools` | After-execute daughters only |
+| `aliquots_pools` | After-execute daughters only; no method/type picker |
 
 ## 9. Tests
 
 | Case | Expect |
 |------|--------|
+| Add aliquot/pool (template or ad hoc) | Both `aliquot_pool_plan` and `aliquots_pools` created together |
+| UI offer plan-only or dest-only add | Not offered / bounce |
+| Dest entry before execute | Empty |
 | Entry method `aliquot_by_volume`; default DNA; line blank | Dest DNA |
 | Entry default DNA; line clears | Dest = parent (Same as parent) |
 | Line overrides to catalog-allowed type | That type |
@@ -208,13 +216,13 @@ Populate aliquots_pools
 
 | Review | Verdict |
 |--------|--------|
-| CEO | **Accept** — A + line override; concrete methods + Method≠dest type (Marc 2026-08-23) |
-| Architecture | **Accept** (Heidi re-stamp 2026-08-23) — METHOD_CATALOG implies one mint op; Method ≠ dest type; A + line override; cancel not warn/wipe (no un-mint); bounce dual mint, silent reshape, free type-in parent conc, Sample/`material_class` |
-| UI | **Accept** (Mathilda re-stamp 2026-08-23) — METHOD_CATALOG (Deiter IN); Method ≠ dest type; A + line override; mid-flight = cancel (no un-mint); bounce dual mint, silent reshape, CUT methods, free type-in parent conc |
+| CEO | **Accept** — A + line override; concrete methods + Method≠dest type; **atomic pair on add** (Rolf CEO + Heidi + Mathilda 2026-08-23) |
+| Architecture | **Pending re-stamp** (atomic-pair fold) — prior Accept Heidi 2026-08-23: METHOD_CATALOG implies one mint op; Method ≠ dest type; A + line override; cancel not warn/wipe (no un-mint); bounce dual mint, silent reshape, free type-in parent conc, Sample/`material_class` |
+| UI | **Pending re-stamp** (atomic-pair fold) — prior Accept Mathilda 2026-08-23: METHOD_CATALOG (Deiter IN); Method ≠ dest type; A + line override; mid-flight = cancel (no un-mint); bounce dual mint, silent reshape, CUT methods, free type-in parent conc |
 | Lab Ops | **Accept** (L1 Met; L2); Deiter cut list folded |
 | Security / CSO | **Accept** (S1 Met; S3) |
 
-**Implement gate:** **OPEN.** Not IC50.
+**Implement gate:** **HOLD** until Architecture + UI re-stamp on atomic-pair. Bounce bars otherwise stand. Coding stays Grok Build. Not IC50.
 
 ## 11. Relationship to Hold
 
