@@ -1,7 +1,7 @@
 # Requirements: Extract-hold dest sample type
 
 **Date:** 2026-08-23  
-**Status:** Architecture Accept (re-stamp) — UI re-stamp pending; Lab Ops + CSO before implement  
+**Status:** Architecture Accept + UI Accept (conditions, U6) — Lab Ops + CSO before implement  
 **Stem:** `extract-hold-dest-type`  
 **Tech sketch:** [`.docs/tech-sketch/extract-hold-dest-type.md`](../tech-sketch/extract-hold-dest-type.md)  
 **Hold source:** [`.docs/open-questions/sop-ai-to-process.md`](../open-questions/sop-ai-to-process.md) (PR 51)
@@ -22,6 +22,7 @@ Dest `sample_type` on aliquot/pool, process membership for execute-minted dests,
 | `accepted_sample_types` still on `template_definition` (entry allow-list) | Marc + Heidi |
 | L1/S1, C2; C3 retracted | Marc fold |
 | Bounce Sample/`material_class` column; template JSON transitions; if-blood-then; free-text; receive/mid-entry gates | Heidi + Mathilda |
+| Dest type beside Method; catalog options only; blank = Same as parent; U6 same-type pool | Mathilda UI Accept 2026-08-23 |
 | Not IC50 | Marc |
 
 ## 3. Goals
@@ -68,8 +69,8 @@ Blood → DNA (aliquot row) → DNA → pooled DNA (pool row, same-type sources)
 |--------|------|--------|
 | CEO | Marc | **Accept** + same-type pool fold |
 | Architecture | Heidi | **Accept (re-stamp)** 2026-08-23 |
-| UI | Mathilda | **Re-stamp pending** (U6 same-type pool) |
+| UI | Mathilda | **Accept with conditions** 2026-08-23 (**U6 stamped**) |
 | Lab Ops | Deiter | Open |
 | CSO | Hans | Open |
 
-**Implement gate:** CLOSED until Lab Ops + CSO + UI re-Accept.
+**Implement gate:** CLOSED until Lab Ops + CSO sign.
