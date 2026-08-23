@@ -1,7 +1,7 @@
 # Requirements: Extract-hold dest sample type
 
 **Date:** 2026-08-23  
-**Status:** **Implement gate OPEN** (docs) — Architecture + UI Accept on METHOD_CATALOG dual-map. Coding stays Grok Build unless Marc/Rolf asks.  
+**Status:** **Implement gate OPEN** (docs) — Architecture + UI Accept on METHOD_CATALOG dual-map. Coding stays Grok Build unless Marc/Rolf asks.
 **Stem:** `extract-hold-dest-type`  
 **Tech sketch:** [`.docs/tech-sketch/extract-hold-dest-type.md`](../tech-sketch/extract-hold-dest-type.md)  
 **Lab Ops:** [`.docs/lab-ops-review/extract-hold-dest-type.md`](../lab-ops-review/extract-hold-dest-type.md)  
@@ -32,9 +32,9 @@ Dest type on `aliquot_pool_plan` (entry default + line override); daughters on `
 | Seeds Blood×aliquot→DNA, DNA×pool→pooled DNA; S3 config:edit; L1/S1; L2; start allow-list; catalog many-to-many; pool same-type | Prior |
 | Bounce Sample/`material_class`, matrix drop, receive/mid-entry gates, if-blood-then, transitions on `template_definition` | Prior |
 | Architecture Accept on atomic-pair fold | Heidi 2026-08-23 |
-| UI Accept on atomic-pair fold | Mathilda 2026-08-23 |
 | Architecture Accept on METHOD_CATALOG dual-map | Heidi 2026-08-23 |
 | UI Accept on METHOD_CATALOG dual-map | Mathilda 2026-08-23 |
+| UI Accept on atomic-pair fold; **re-stamp pending** for METHOD_CATALOG dual-map | Mathilda 2026-08-23 |
 | Header-pins-to-top | Parked — separate entries docs fold |
 | Not IC50 | Marc |
 
