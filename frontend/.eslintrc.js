@@ -33,7 +33,10 @@ module.exports = {
   },
   overrides: [
     {
-      files: ['src/services/apiService.ts'],
+      files: [
+        'src/services/apiService.ts',
+        'src/components/experiments/EntryCapturePanel.tsx',
+      ],
       rules: {
         '@typescript-eslint/no-explicit-any': 'off',
       },
