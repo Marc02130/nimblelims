@@ -9,6 +9,7 @@ Write-back policy:
   - SAMPLE_WRITE_BACK_COLUMNS allowlist (identity/accessioning excluded)
   - Last write wins; previous value on EntryFieldValue.write_back_previous
 """
+
 from typing import Optional, List, Dict, Any, Tuple
 from uuid import UUID
 from datetime import datetime, timezone, date
@@ -32,6 +33,7 @@ from app.schemas.entry import (
     EntrySubmitResponse,
     EntryRead,
 )
+from app.schemas.aliquot_plan import AliquotMethod
 from models.entry import (
     Entry,
     EntryFieldValue,
@@ -80,7 +82,9 @@ class EntryService:
     def get_entry(self, entry_id: UUID) -> Entry:
         e = self.repo.get_entry(entry_id)
         if not e:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Entry not found")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Entry not found"
+            )
         return e
 
     def list_entries(
@@ -113,7 +117,7 @@ class EntryService:
                 detail="Experiment not found",
             )
         config = dict(data.config or {})
-        config.setdefault('status', 'draft')
+        config.setdefault("status", "draft")
         entry = self.repo.create_entry(
             experiment_id=data.experiment_id,
             entry_type=entry_type,
@@ -128,7 +132,13 @@ class EntryService:
         )
         if data.fields:
             for f in data.fields:
-                self._add_field_link(entry.id, f.field_definition_id, f.sort_order or 0, f.visible, f.write_back_target)
+                self._add_field_link(
+                    entry.id,
+                    f.field_definition_id,
+                    f.sort_order or 0,
+                    f.visible,
+                    f.write_back_target,
+                )
         self._commit_refresh(entry)
         return self.get_entry(entry.id)
 
@@ -163,10 +173,59 @@ class EntryService:
 
     def update_entry(self, entry_id: UUID, data: EntryUpdate) -> Entry:
         entry = self.get_entry(entry_id)
-        kwargs: Dict[str, Any] = {'modified_by': self._user_id()}
-        for field in ('name', 'description', 'active', 'sort_order', 'config', 'process_step_id'):
+        kwargs: Dict[str, Any] = {"modified_by": self._user_id()}
+        for field in (
+            "name",
+            "description",
+            "active",
+            "sort_order",
+            "config",
+            "process_step_id",
+        ):
             val = getattr(data, field)
             if val is not None:
+                if (
+                    field == "config"
+                    and entry.predefined_entry_key == "aliquot_pool_plan"
+                ):
+                    next_config = dict(val)
+                    method_raw = next_config.get(
+                        "method",
+                        (entry.config or {}).get(
+                            "method",
+                            AliquotMethod.aliquot_by_volume.value,
+                        ),
+                    )
+                    try:
+                        AliquotMethod(method_raw)
+                    except ValueError as exc:
+                        raise HTTPException(
+                            status_code=status.HTTP_400_BAD_REQUEST,
+                            detail={
+                                "code": "invalid_aliquot_method",
+                                "message": (
+                                    f"Unknown concrete aliquot/pool method: {method_raw}"
+                                ),
+                            },
+                        ) from exc
+                    current_method = (entry.config or {}).get(
+                        "method",
+                        AliquotMethod.aliquot_by_volume.value,
+                    )
+                    if (entry.config or {}).get(
+                        "plan_lines"
+                    ) and method_raw != current_method:
+                        raise HTTPException(
+                            status_code=status.HTTP_409_CONFLICT,
+                            detail={
+                                "code": "method_change_requires_cancel",
+                                "message": (
+                                    "Method cannot change after plan lines exist. "
+                                    "Cancel the experiment and create a new plan; "
+                                    "minted daughters are not removed."
+                                ),
+                            },
+                        )
                 kwargs[field] = val
         self.repo.update_entry(entry, **kwargs)
         self._commit_refresh(entry)
@@ -192,7 +251,9 @@ class EntryService:
                 detail="Experiment not found",
             )
         if data.skip_if_exists and self.repo.count_for_experiment(experiment_id) > 0:
-            return self.repo.list_for_experiment(experiment_id, active=None, load_values=False)
+            return self.repo.list_for_experiment(
+                experiment_id, active=None, load_values=False
+            )
 
         if not experiment.experiment_template_id:
             raise HTTPException(
@@ -207,7 +268,7 @@ class EntryService:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Experiment template not found",
             )
-        decls = (template.template_definition or {}).get('entries') or []
+        decls = (template.template_definition or {}).get("entries") or []
         if not isinstance(decls, list) or not decls:
             # No declarations — nothing to create
             return []
@@ -216,41 +277,48 @@ class EntryService:
         for i, raw in enumerate(decls):
             if not isinstance(raw, dict):
                 continue
-            predef_key = raw.get('predefined_entry_key')
+            predef_key = raw.get("predefined_entry_key")
             defaults = PREDEFINED_ENTRY_DEFAULTS.get(predef_key) if predef_key else None
-            entry_type = raw.get('entry_type') or (defaults or {}).get('entry_type') or 'experiment_data'
+            entry_type = (
+                raw.get("entry_type")
+                or (defaults or {}).get("entry_type")
+                or "experiment_data"
+            )
             if entry_type not in ENTRY_TYPES:
                 continue
             entry_type = normalize_entry_type(entry_type)
-            name = raw.get('name') or (defaults or {}).get('name') or f'Entry {i + 1}'
-            fields = raw.get('fields') or []
-            config = dict((defaults or {}).get('config') or {})
-            config.update(raw.get('config') or {})
-            config.setdefault('status', 'draft')
+            name = raw.get("name") or (defaults or {}).get("name") or f"Entry {i + 1}"
+            fields = raw.get("fields") or []
+            config = dict((defaults or {}).get("config") or {})
+            config.update(raw.get("config") or {})
+            config.setdefault("status", "draft")
             # Template-level depends_on → instance config (names or predefined keys)
-            deps = raw.get('depends_on')
+            deps = raw.get("depends_on")
             if deps is None:
-                deps = (raw.get('config') or {}).get('depends_on')
+                deps = (raw.get("config") or {}).get("depends_on")
             if deps:
-                config['depends_on'] = list(deps) if isinstance(deps, list) else [deps]
-            description = raw.get('description')
+                config["depends_on"] = list(deps) if isinstance(deps, list) else [deps]
+            description = raw.get("description")
             if description is None and defaults:
-                description = defaults.get('description')
+                description = defaults.get("description")
             # Prefer columns[] sample_field keys into config for grid RO fields
-            columns = raw.get('columns') or []
+            columns = raw.get("columns") or []
             sample_field_keys = [
-                c.get('key') for c in columns
-                if isinstance(c, dict) and c.get('kind') == 'sample_field' and c.get('key')
+                c.get("key")
+                for c in columns
+                if isinstance(c, dict)
+                and c.get("kind") == "sample_field"
+                and c.get("key")
             ]
             if sample_field_keys:
-                config['sample_columns'] = sample_field_keys
+                config["sample_columns"] = sample_field_keys
             entry = self.repo.create_entry(
                 experiment_id=experiment_id,
                 entry_type=entry_type,
                 name=name,
                 description=description,
                 predefined_entry_key=predef_key,
-                sort_order=int(raw.get('sort_order', i)),
+                sort_order=int(raw.get("sort_order", i)),
                 config=config,
                 process_step_id=data.process_step_id,
                 created_by=self._user_id(),
@@ -258,41 +326,41 @@ class EntryService:
             )
             # Also accept columns[] with field_definition kind
             for j, c in enumerate(columns):
-                if not isinstance(c, dict) or c.get('kind') != 'field_definition':
+                if not isinstance(c, dict) or c.get("kind") != "field_definition":
                     continue
-                if not c.get('field_definition_id'):
+                if not c.get("field_definition_id"):
                     continue
                 try:
-                    fid = UUID(str(c['field_definition_id']))
+                    fid = UUID(str(c["field_definition_id"]))
                 except (ValueError, TypeError):
                     continue
-                wb = c.get('write_back_target')
+                wb = c.get("write_back_target")
                 if wb and wb not in SAMPLE_WRITE_BACK_COLUMNS:
                     wb = None
                 if self.repo.field_definition_exists(fid):
                     self.repo.add_field_link(
                         entry_id=entry.id,
                         field_definition_id=fid,
-                        sort_order=int(c.get('sort_order', j)),
-                        visible=bool(c.get('visible', True)),
+                        sort_order=int(c.get("sort_order", j)),
+                        visible=bool(c.get("visible", True)),
                         write_back_target=wb,
                     )
             for j, f in enumerate(fields):
-                if not isinstance(f, dict) or not f.get('field_definition_id'):
+                if not isinstance(f, dict) or not f.get("field_definition_id"):
                     continue
                 try:
-                    fid = UUID(str(f['field_definition_id']))
+                    fid = UUID(str(f["field_definition_id"]))
                 except (ValueError, TypeError):
                     continue
-                wb = f.get('write_back_target')
+                wb = f.get("write_back_target")
                 if wb and wb not in SAMPLE_WRITE_BACK_COLUMNS:
                     wb = None
                 if self.repo.field_definition_exists(fid):
                     self.repo.add_field_link(
                         entry_id=entry.id,
                         field_definition_id=fid,
-                        sort_order=int(f.get('sort_order', j)),
-                        visible=bool(f.get('visible', True)),
+                        sort_order=int(f.get("sort_order", j)),
+                        visible=bool(f.get("visible", True)),
                         write_back_target=wb,
                     )
             created.append(entry)
@@ -310,7 +378,9 @@ class EntryService:
                 detail="Row delete is only for experiment_data entries",
             )
         if not row_key or not str(row_key).strip():
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="row_key required")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail="row_key required"
+            )
         n = self.repo.delete_values_for_row(entry_id, str(row_key).strip())
         if self.auto_commit:
             self.db.commit()
@@ -330,11 +400,11 @@ class EntryService:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Cannot write values to {entry.entry_type} entries",
             )
-        status_cfg = (entry.config or {}).get('status') or 'draft'
-        if status_cfg == 'submitted' and apply_write_back is not True:
+        status_cfg = (entry.config or {}).get("status") or "draft"
+        if status_cfg == "submitted" and apply_write_back is not True:
             # Allow re-save after submit for free-edit-until-done; clear submitted → draft on edit
             cfg = dict(entry.config or {})
-            cfg['status'] = 'draft'
+            cfg["status"] = "draft"
             self.repo.update_entry(entry, config=cfg, modified_by=self._user_id())
 
         # S6: cohort membership for any sample_id write / write-back
@@ -354,26 +424,36 @@ class EntryService:
                     detail="sample_id is required for experiment_sample_data entry values",
                 )
             # experiment_data multi-row tables use row_key; sample_id optional for purpose subset
-            if is_experiment_scoped_entry(entry.entry_type) and not item.row_key and not item.sample_id:
+            if (
+                is_experiment_scoped_entry(entry.entry_type)
+                and not item.row_key
+                and not item.sample_id
+            ):
                 # Allow legacy single-cell (both null) or require row_key for multi-row
                 pass
-            if is_experiment_scoped_entry(entry.entry_type) and item.row_key and item.sample_id:
+            if (
+                is_experiment_scoped_entry(entry.entry_type)
+                and item.row_key
+                and item.sample_id
+            ):
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="experiment_data row_key values cannot also set sample_id",
                 )
 
             if item.sample_id is not None:
-                self._assert_sample_in_cohort(item.sample_id, cohort, entry.experiment_id)
+                self._assert_sample_in_cohort(
+                    item.sample_id, cohort, entry.experiment_id
+                )
 
             value_kwargs = {
-                'value_text': item.value_text,
-                'value_number': item.value_number,
-                'value_list_entry_id': item.value_list_entry_id,
-                'value_date': item.value_date,
-                'value_boolean': item.value_boolean,
-                'value_json': item.value_json,
-                'modified_by': self._user_id(),
+                "value_text": item.value_text,
+                "value_number": item.value_number,
+                "value_list_entry_id": item.value_list_entry_id,
+                "value_date": item.value_date,
+                "value_boolean": item.value_boolean,
+                "value_json": item.value_json,
+                "modified_by": self._user_id(),
             }
             existing = self.repo.get_value(
                 entry_id,
@@ -390,11 +470,15 @@ class EntryService:
                     sample_id=item.sample_id,
                     row_key=item.row_key,
                     created_by=self._user_id(),
-                    **{k: v for k, v in value_kwargs.items() if k != 'modified_by'},
+                    **{k: v for k, v in value_kwargs.items() if k != "modified_by"},
                     modified_by=self._user_id(),
                 )
 
-            do_wb = apply_write_back if apply_write_back is not None else item.apply_write_back
+            do_wb = (
+                apply_write_back
+                if apply_write_back is not None
+                else item.apply_write_back
+            )
             if do_wb and link.write_back_target and item.sample_id:
                 self._apply_write_back(
                     val, item.sample_id, link.write_back_target, item, cohort=cohort
@@ -436,7 +520,9 @@ class EntryService:
                 field_definition_id=val.field_definition_id,
                 sample_id=val.sample_id,
                 value_text=val.value_text,
-                value_number=float(val.value_number) if val.value_number is not None else None,
+                value_number=(
+                    float(val.value_number) if val.value_number is not None else None
+                ),
                 value_list_entry_id=val.value_list_entry_id,
                 value_date=val.value_date,
                 value_boolean=val.value_boolean,
@@ -449,8 +535,8 @@ class EntryService:
             write_backs += 1
 
         cfg = dict(entry.config or {})
-        cfg['status'] = 'submitted'
-        cfg['submitted_at'] = datetime.now(timezone.utc).isoformat()
+        cfg["status"] = "submitted"
+        cfg["submitted_at"] = datetime.now(timezone.utc).isoformat()
         self.repo.update_entry(entry, config=cfg, modified_by=self._user_id())
         self._commit_refresh(entry)
         return self.get_entry(entry_id), write_backs
@@ -460,10 +546,12 @@ class EntryService:
         Gate submit when config.depends_on lists other entry names or predefined keys.
         Example: depends_on: ["Experiment header"] or ["experiment_header"].
         """
-        deps = (entry.config or {}).get('depends_on') or []
+        deps = (entry.config or {}).get("depends_on") or []
         if not deps:
             return
-        siblings = self.repo.list_for_experiment(entry.experiment_id, active=True, load_values=False)
+        siblings = self.repo.list_for_experiment(
+            entry.experiment_id, active=True, load_values=False
+        )
         by_name = {e.name: e for e in siblings}
         by_key = {e.predefined_entry_key: e for e in siblings if e.predefined_entry_key}
         missing: List[str] = []
@@ -476,8 +564,8 @@ class EntryService:
                 continue
             if target.id == entry.id:
                 continue
-            status_cfg = (target.config or {}).get('status') or 'draft'
-            if status_cfg != 'submitted':
+            status_cfg = (target.config or {}).get("status") or "draft"
+            if status_cfg != "submitted":
                 missing.append(target.name or dep)
         if missing:
             raise HTTPException(
@@ -495,13 +583,23 @@ class EntryService:
         columns = self._grid_columns(entry)
         rows: List[EntryGridRow] = []
         empty_reason = None
-        row_policy = 'manual'
+        row_policy = "manual"
 
         if is_sample_scoped_entry(entry.entry_type):
-            row_policy = 'experiment_samples'
-            sample_ids = self._experiment_sample_ids(entry.experiment_id)
+            row_policy = "experiment_samples"
+            if entry.predefined_entry_key == "aliquots_pools":
+                sample_ids = [
+                    UUID(str(sample_id))
+                    for sample_id in (entry.config or {}).get(
+                        "minted_sample_ids",
+                        [],
+                    )
+                ]
+                row_policy = "execute_minted_samples"
+            else:
+                sample_ids = self._experiment_sample_ids(entry.experiment_id)
             if not sample_ids:
-                empty_reason = 'no_samples_on_experiment'
+                empty_reason = "no_samples_on_experiment"
             samples = self._load_samples(sample_ids)
             values = self.repo.list_values(entry_id)
             by_sample_field: Dict[Tuple[Optional[UUID], UUID], EntryFieldValue] = {
@@ -511,16 +609,18 @@ class EntryService:
                 sample = samples.get(sid)
                 cells: Dict[str, EntryGridCell] = {}
                 for col in columns:
-                    if col.kind == 'sample_field':
+                    if col.kind == "sample_field":
                         cells[col.key] = self._sample_field_cell(sample, col.key)
                     elif col.field_definition_id:
                         v = by_sample_field.get((sid, col.field_definition_id))
                         cells[col.key] = self._value_to_cell(v, col.data_type)
-                rows.append(EntryGridRow(
-                    row_id=str(sid),
-                    sample_id=sid,
-                    cells=cells,
-                ))
+                rows.append(
+                    EntryGridRow(
+                        row_id=str(sid),
+                        sample_id=sid,
+                        cells=cells,
+                    )
+                )
         else:
             # experiment_data: multi-row table keyed by row_key (preferred)
             # or legacy: one row per sample_id / single null row
@@ -554,7 +654,9 @@ class EntryService:
                             if col.field_definition_id:
                                 v = by_key.get((sid, col.field_definition_id))
                                 cells[col.key] = self._value_to_cell(v, col.data_type)
-                        rows.append(EntryGridRow(row_id=str(sid), sample_id=sid, cells=cells))
+                        rows.append(
+                            EntryGridRow(row_id=str(sid), sample_id=sid, cells=cells)
+                        )
                 else:
                     cells = {}
                     for col in columns:
@@ -562,9 +664,13 @@ class EntryService:
                             v = by_key.get((None, col.field_definition_id))
                             cells[col.key] = self._value_to_cell(v, col.data_type)
                     if columns:
-                        rows.append(EntryGridRow(row_id='experiment', sample_id=None, cells=cells))
+                        rows.append(
+                            EntryGridRow(
+                                row_id="experiment", sample_id=None, cells=cells
+                            )
+                        )
 
-        status_cfg = (entry.config or {}).get('status') or 'draft'
+        status_cfg = (entry.config or {}).get("status") or "draft"
         return EntryGridResponse(
             entry_id=entry.id,
             experiment_id=entry.experiment_id,
@@ -583,12 +689,21 @@ class EntryService:
     def export_entry(self, entry_id: UUID) -> EntryExportResponse:
         entry = self.get_entry(entry_id)
         experiment = self.repo.get_experiment(entry.experiment_id)
-        exp_name = getattr(experiment, 'name', None) if experiment else None
+        exp_name = getattr(experiment, "name", None) if experiment else None
         columns = self._grid_columns(entry)
         out: List[EntryExportRow] = []
 
         if is_sample_scoped_entry(entry.entry_type):
-            sample_ids = self._experiment_sample_ids(entry.experiment_id)
+            if entry.predefined_entry_key == "aliquots_pools":
+                sample_ids = [
+                    UUID(str(sample_id))
+                    for sample_id in (entry.config or {}).get(
+                        "minted_sample_ids",
+                        [],
+                    )
+                ]
+            else:
+                sample_ids = self._experiment_sample_ids(entry.experiment_id)
             samples = self._load_samples(sample_ids)
             values = self.repo.list_values(entry_id)
             by_sf: Dict[Tuple[Optional[UUID], UUID], EntryFieldValue] = {
@@ -596,33 +711,53 @@ class EntryService:
             }
             for sid in sample_ids:
                 sample = samples.get(sid)
-                client_sid = getattr(sample, 'client_sample_id', None) if sample else None
+                client_sid = (
+                    getattr(sample, "client_sample_id", None) if sample else None
+                )
                 for col in columns:
-                    if col.kind == 'sample_field':
+                    if col.kind == "sample_field":
                         cell = self._sample_field_cell(sample, col.key)
-                        out.append(EntryExportRow(
-                            experiment_id=entry.experiment_id,
-                            experiment_name=exp_name,
-                            entry_id=entry.id,
-                            entry_name=entry.name,
-                            entry_type=normalize_entry_type(entry.entry_type),
-                            sample_id=sid,
-                            client_sample_id=client_sid,
-                            field_definition_id=None,
-                            field_name=col.key,
-                            field_display_name=col.label,
-                            column_kind='sample_field',
-                            data_type=col.data_type,
-                            value_text=str(cell.value) if cell.value is not None and col.data_type == 'text' else None,
-                            value_number=cell.value if col.data_type == 'number' else None,
-                            value_date=cell.value if col.data_type == 'date' else None,
-                            display_value=cell.display,
-                        ))
+                        out.append(
+                            EntryExportRow(
+                                experiment_id=entry.experiment_id,
+                                experiment_name=exp_name,
+                                entry_id=entry.id,
+                                entry_name=entry.name,
+                                entry_type=normalize_entry_type(entry.entry_type),
+                                sample_id=sid,
+                                client_sample_id=client_sid,
+                                field_definition_id=None,
+                                field_name=col.key,
+                                field_display_name=col.label,
+                                column_kind="sample_field",
+                                data_type=col.data_type,
+                                value_text=(
+                                    str(cell.value)
+                                    if cell.value is not None
+                                    and col.data_type == "text"
+                                    else None
+                                ),
+                                value_number=(
+                                    cell.value if col.data_type == "number" else None
+                                ),
+                                value_date=(
+                                    cell.value if col.data_type == "date" else None
+                                ),
+                                display_value=cell.display,
+                            )
+                        )
                     elif col.field_definition_id:
                         v = by_sf.get((sid, col.field_definition_id))
-                        out.append(self._export_from_value(
-                            entry, exp_name, sid, client_sid, col, v,
-                        ))
+                        out.append(
+                            self._export_from_value(
+                                entry,
+                                exp_name,
+                                sid,
+                                client_sid,
+                                col,
+                                v,
+                            )
+                        )
         else:
             values = self.repo.list_values(entry_id)
             by_key = {(v.sample_id, v.field_definition_id): v for v in values}
@@ -635,31 +770,35 @@ class EntryService:
                     if not col.field_definition_id:
                         continue
                     v = by_key.get((sid, col.field_definition_id))
-                    out.append(self._export_from_value(entry, exp_name, sid, None, col, v))
+                    out.append(
+                        self._export_from_value(entry, exp_name, sid, None, col, v)
+                    )
 
         return EntryExportResponse(entry_id=entry.id, rows=out, total=len(out))
 
     def _grid_columns(self, entry: Entry) -> List[EntryGridColumn]:
         cols: List[EntryGridColumn] = []
         config = entry.config or {}
-        sample_keys = config.get('sample_columns') or []
+        sample_keys = config.get("sample_columns") or []
         # Default RO fields for sample-scoped entries if not configured
         if is_sample_scoped_entry(entry.entry_type) and not sample_keys:
-            sample_keys = ['client_sample_id', 'specimen_biotype_id', 'received_date']
+            sample_keys = ["client_sample_id", "specimen_biotype_id", "received_date"]
         order = 0
         for key in sample_keys:
             meta = SAMPLE_SYSTEM_FIELDS.get(key)
             if not meta:
                 continue
-            cols.append(EntryGridColumn(
-                key=key,
-                kind='sample_field',
-                field_definition_id=None,
-                label=meta['label'],
-                data_type=meta['data_type'],
-                editable=False,
-                sort_order=order,
-            ))
+            cols.append(
+                EntryGridColumn(
+                    key=key,
+                    kind="sample_field",
+                    field_definition_id=None,
+                    label=meta["label"],
+                    data_type=meta["data_type"],
+                    editable=False,
+                    sort_order=order,
+                )
+            )
             order += 1
         links = sorted(
             entry.field_definition_links or [],
@@ -669,18 +808,24 @@ class EntryService:
             if link.visible is False:
                 continue
             fd = self.repo.get_field_definition(link.field_definition_id)
-            label = (fd.display_name or fd.name) if fd else str(link.field_definition_id)
-            data_type = fd.data_type if fd else 'text'
-            cols.append(EntryGridColumn(
-                key=str(link.field_definition_id),
-                kind='field_definition',
-                field_definition_id=link.field_definition_id,
-                label=label,
-                data_type=data_type,
-                editable=True,
-                sort_order=order if link.sort_order is None else link.sort_order + 100,
-                write_back_target=link.write_back_target,
-            ))
+            label = (
+                (fd.display_name or fd.name) if fd else str(link.field_definition_id)
+            )
+            data_type = fd.data_type if fd else "text"
+            cols.append(
+                EntryGridColumn(
+                    key=str(link.field_definition_id),
+                    kind="field_definition",
+                    field_definition_id=link.field_definition_id,
+                    label=label,
+                    data_type=data_type,
+                    editable=True,
+                    sort_order=(
+                        order if link.sort_order is None else link.sort_order + 100
+                    ),
+                    write_back_target=link.write_back_target,
+                )
+            )
             order += 1
         cols.sort(key=lambda c: c.sort_order)
         return cols
@@ -729,80 +874,96 @@ class EntryService:
         return {s.id: s for s in samples}
 
     def _sample_field_cell(self, sample: Optional[Sample], key: str) -> EntryGridCell:
-        if not sample or not hasattr(sample, key) and key not in (
-            'sample_type', 'status', 'matrix', 'specimen_biotype_id',
+        if (
+            not sample
+            or not hasattr(sample, key)
+            and key
+            not in (
+                "sample_type",
+                "status",
+                "matrix",
+                "specimen_biotype_id",
+            )
         ):
             # FK fields may use different attr names
             pass
-        meta = SAMPLE_SYSTEM_FIELDS.get(key) or {'data_type': 'text'}
+        meta = SAMPLE_SYSTEM_FIELDS.get(key) or {"data_type": "text"}
         raw = None
         if sample is not None:
-            if key == 'sample_type':
-                raw = getattr(sample, 'sample_type', None)
-            elif key == 'status':
-                raw = getattr(sample, 'status', None)
-            elif key == 'matrix':
-                raw = getattr(sample, 'matrix', None)
+            if key == "sample_type":
+                raw = getattr(sample, "sample_type", None)
+            elif key == "status":
+                raw = getattr(sample, "status", None)
+            elif key == "matrix":
+                raw = getattr(sample, "matrix", None)
             elif hasattr(sample, key):
                 raw = getattr(sample, key)
         display = None
         value = raw
-        if meta['data_type'] == 'list' and raw is not None:
+        if meta["data_type"] == "list" and raw is not None:
             le = self.db.query(ListEntry).filter(ListEntry.id == raw).first()
             display = le.name if le else str(raw)
             value = str(raw)
         elif isinstance(raw, (datetime, date)):
-            display = raw.isoformat() if hasattr(raw, 'isoformat') else str(raw)
+            display = raw.isoformat() if hasattr(raw, "isoformat") else str(raw)
             value = display
         elif raw is not None:
             display = str(raw)
         return EntryGridCell(
             value=value,
             display=display,
-            value_type=meta['data_type'],
+            value_type=meta["data_type"],
         )
 
-    def _value_to_cell(self, v: Optional[EntryFieldValue], data_type: str) -> EntryGridCell:
+    def _value_to_cell(
+        self, v: Optional[EntryFieldValue], data_type: str
+    ) -> EntryGridCell:
         if not v:
             return EntryGridCell(value=None, display=None, value_type=data_type)
-        if data_type in ('list', 'lookup') and v.value_list_entry_id:
-            le = self.db.query(ListEntry).filter(ListEntry.id == v.value_list_entry_id).first()
+        if data_type in ("list", "lookup") and v.value_list_entry_id:
+            le = (
+                self.db.query(ListEntry)
+                .filter(ListEntry.id == v.value_list_entry_id)
+                .first()
+            )
             return EntryGridCell(
                 value=str(v.value_list_entry_id),
                 display=le.name if le else str(v.value_list_entry_id),
                 value_type=data_type,
                 value_id=v.id,
             )
-        if data_type == 'number':
+        if data_type == "number":
             num = float(v.value_number) if v.value_number is not None else None
             return EntryGridCell(
                 value=num,
                 display=str(num) if num is not None else None,
-                value_type='number',
+                value_type="number",
                 value_id=v.id,
             )
-        if data_type == 'boolean':
+        if data_type == "boolean":
             return EntryGridCell(
                 value=v.value_boolean,
                 display=str(v.value_boolean) if v.value_boolean is not None else None,
-                value_type='boolean',
+                value_type="boolean",
                 value_id=v.id,
             )
-        if data_type == 'date':
+        if data_type == "date":
             d = v.value_date
-            disp = d.isoformat() if d is not None and hasattr(d, 'isoformat') else None
-            return EntryGridCell(value=disp, display=disp, value_type='date', value_id=v.id)
-        if data_type == 'json':
+            disp = d.isoformat() if d is not None and hasattr(d, "isoformat") else None
+            return EntryGridCell(
+                value=disp, display=disp, value_type="date", value_id=v.id
+            )
+        if data_type == "json":
             return EntryGridCell(
                 value=v.value_json,
                 display=None,
-                value_type='json',
+                value_type="json",
                 value_id=v.id,
             )
         return EntryGridCell(
             value=v.value_text,
             display=v.value_text,
-            value_type='text',
+            value_type="text",
             value_id=v.id,
         )
 
@@ -830,9 +991,13 @@ class EntryService:
             column_kind=col.kind,
             data_type=col.data_type,
             value_text=v.value_text if v else None,
-            value_number=float(v.value_number) if v and v.value_number is not None else None,
+            value_number=(
+                float(v.value_number) if v and v.value_number is not None else None
+            ),
             value_list_entry_id=v.value_list_entry_id if v else None,
-            value_list_entry_name=cell.display if col.data_type in ('list', 'lookup') else None,
+            value_list_entry_name=(
+                cell.display if col.data_type in ("list", "lookup") else None
+            ),
             value_date=v.value_date if v else None,
             value_boolean=v.value_boolean if v else None,
             value_json=v.value_json if v else None,
@@ -857,7 +1022,9 @@ class EntryService:
         if cohort is not None:
             exp_id = experiment_id
             if exp_id is None:
-                entry = self.db.query(Entry).filter(Entry.id == value_row.entry_id).first()
+                entry = (
+                    self.db.query(Entry).filter(Entry.id == value_row.entry_id).first()
+                )
                 exp_id = entry.experiment_id if entry else None
             if exp_id is not None:
                 self._assert_sample_in_cohort(sample_id, cohort, exp_id)
@@ -877,23 +1044,25 @@ class EntryService:
         prev_serializable = previous
         if isinstance(previous, (datetime, Decimal)):
             prev_serializable = str(previous)
-        elif previous is not None and not isinstance(previous, (str, int, float, bool, dict, list)):
+        elif previous is not None and not isinstance(
+            previous, (str, int, float, bool, dict, list)
+        ):
             prev_serializable = str(previous)
 
         self.repo.update_value(
             value_row,
             write_back_at=datetime.now(timezone.utc),
-            write_back_previous={'column': target_column, 'value': prev_serializable},
+            write_back_previous={"column": target_column, "value": prev_serializable},
             modified_by=self._user_id(),
         )
         self.db.flush()
 
     def _coerce_write_back_value(self, column: str, item: EntryFieldValueUpsert) -> Any:
-        if column.endswith('_id') or column in ('specimen_biotype_id',):
+        if column.endswith("_id") or column in ("specimen_biotype_id",):
             return item.value_list_entry_id
-        if column in ('temperature',):
+        if column in ("temperature",):
             return item.value_number
-        if column in ('date_sampled', 'received_date', 'due_date', 'report_date'):
+        if column in ("date_sampled", "received_date", "due_date", "report_date"):
             return item.value_date
         # Prefer list entry, then text, then number
         if item.value_list_entry_id is not None:

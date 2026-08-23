@@ -75,6 +75,28 @@ export interface EligibleSamplesResponse {
   warnings: string[];
 }
 
+export type AliquotOperation = 'aliquot' | 'pool';
+export type AliquotMethod =
+  | 'aliquot_by_volume'
+  | 'aliquot_by_target_amount'
+  | 'aliquot_by_target_concentration'
+  | 'aliquot_n_way_equal_split'
+  | 'pool_by_volume_per_source'
+  | 'pool_equal_volume_each'
+  | 'pool_by_target_amount_per_source'
+  | 'pool_consolidate_remaining';
+
+export interface SampleTypeOption {
+  id: string;
+  name: string;
+}
+
+export interface DestSampleTypeOptionsResponse {
+  source_sample_type: SampleTypeOption;
+  operation: AliquotOperation;
+  options: SampleTypeOption[];
+}
+
 // Types for batch compatibility validation with expiration warnings
 export interface ExpiredSampleWarning {
   sample_id: string;
@@ -1922,10 +1944,34 @@ export class ApiService {
     return response.data;
   }
 
-  async saveAliquotPlan(entryId: string, lines: Array<Record<string, unknown>>) {
-    const response: AxiosResponse = await this.api.put(`v1/entries/${entryId}/aliquot-plan`, {
-      lines,
-    });
+  async getDestSampleTypes(
+    sourceSampleId: string,
+    operation: AliquotOperation,
+  ): Promise<DestSampleTypeOptionsResponse> {
+    const response: AxiosResponse<DestSampleTypeOptionsResponse> = await this.api.get(
+      'v1/entries/dest-sample-types',
+      {
+        params: {
+          source_sample_id: sourceSampleId,
+          operation,
+        },
+      },
+    );
+    return response.data;
+  }
+
+  async saveAliquotPlan(
+    entryId: string,
+    data: {
+      method: AliquotMethod;
+      default_dest_sample_type: string | null;
+      lines: Array<Record<string, unknown>>;
+    },
+  ) {
+    const response: AxiosResponse = await this.api.put(
+      `v1/entries/${entryId}/aliquot-plan`,
+      data,
+    );
     return response.data;
   }
 

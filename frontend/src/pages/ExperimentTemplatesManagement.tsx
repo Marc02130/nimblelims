@@ -36,10 +36,29 @@ import { useUser } from '../contexts/UserContext';
 import { apiService } from '../services/apiService';
 import { FillHeightPage, FillHeightTable } from '../components/common/FillHeightPage';
 
-const apiErrorMsg = (err: any, fallback: string): string => {
-  const detail = err?.response?.data?.detail;
+interface ApiError {
+  response?: {
+    data?: {
+      detail?: unknown;
+    };
+  };
+  message?: string;
+}
+
+const apiErrorMsg = (err: unknown, fallback: string): string => {
+  const detail = (err as ApiError)?.response?.data?.detail;
   if (typeof detail === 'string') return detail;
-  if (Array.isArray(detail) && detail.length > 0) return detail[0]?.msg || fallback;
+  if (Array.isArray(detail) && detail.length > 0) {
+    const first = detail[0];
+    if (
+      typeof first === 'object' &&
+      first !== null &&
+      'msg' in first &&
+      typeof first.msg === 'string'
+    ) {
+      return first.msg;
+    }
+  }
   return fallback;
 };
 
@@ -144,6 +163,23 @@ const WRITE_BACK_TARGETS = [
   { value: 'report_date', label: 'Sample.report_date' },
 ];
 
+const ALIQUOT_POOL_METHOD_OPTIONS = [
+  { value: 'aliquot_by_volume', label: 'Aliquot — by volume' },
+  { value: 'aliquot_by_target_amount', label: 'Aliquot — by target amount' },
+  {
+    value: 'aliquot_by_target_concentration',
+    label: 'Aliquot — by target concentration (normalization)',
+  },
+  { value: 'aliquot_n_way_equal_split', label: 'Aliquot — N-way equal split' },
+  { value: 'pool_by_volume_per_source', label: 'Pool — by volume per source' },
+  { value: 'pool_equal_volume_each', label: 'Pool — equal volume from each' },
+  {
+    value: 'pool_by_target_amount_per_source',
+    label: 'Pool — by target amount per source',
+  },
+  { value: 'pool_consolidate_remaining', label: 'Pool — consolidate remaining' },
+] as const;
+
 interface TemplateDefinition {
   experiment_name: string;
   description?: string;
@@ -238,6 +274,10 @@ const PREDEFINED_PRESETS: {
       name: 'Aliquot / pool plan',
       description: 'Plan amounts; execute creates dest samples (methods in v1)',
       predefined_entry_key: 'aliquot_pool_plan',
+      config: {
+        method: 'aliquot_by_volume',
+        default_dest_sample_type: null,
+      },
       fields: [],
     },
   },
@@ -249,7 +289,11 @@ const PREDEFINED_PRESETS: {
       name: 'Aliquots / pools',
       description: 'Post-execute view of resulting samples',
       predefined_entry_key: 'aliquots_pools',
-      config: { sample_columns: ['client_sample_id'] },
+      config: {
+        sample_columns: ['client_sample_id', 'sample_type'],
+        minted_sample_ids: [],
+        populated_after_execute: false,
+      },
       fields: [],
     },
   },
@@ -487,8 +531,11 @@ const ExperimentTemplatesManagement: React.FC = () => {
     setCreateFieldOpen(true);
     try {
       const lists = await apiService.getLists();
-      const arr = Array.isArray(lists) ? lists : lists?.lists ?? [];
-      setCreateFieldLists(arr.map((l: any) => ({ id: l.id, name: l.name })));
+      const arr = (Array.isArray(lists) ? lists : lists?.lists ?? []) as Array<{
+        id: string;
+        name: string;
+      }>;
+      setCreateFieldLists(arr.map((list) => ({ id: list.id, name: list.name })));
     } catch {
       setCreateFieldLists([]);
     }
@@ -610,7 +657,9 @@ const ExperimentTemplatesManagement: React.FC = () => {
       await loadTemplates();
       setFormOpen(false);
     } catch (err: unknown) {
-      setFormError(apiErrorMsg(err, (err as any)?.message || 'Failed to save template'));
+      setFormError(
+        apiErrorMsg(err, (err as ApiError)?.message || 'Failed to save template'),
+      );
     } finally {
       setFormSubmitting(false);
     }
@@ -669,7 +718,7 @@ const ExperimentTemplatesManagement: React.FC = () => {
       jobId = job.id;
       setSopJobId(jobId);
     } catch (err: unknown) {
-      setSopUploadError(apiErrorMsg(err, (err as any)?.message || 'Upload failed'));
+      setSopUploadError(apiErrorMsg(err, (err as ApiError)?.message || 'Upload failed'));
       setSopPhase('idle');
       return;
     }
@@ -708,7 +757,12 @@ const ExperimentTemplatesManagement: React.FC = () => {
               await loadTemplates();
               setSopUploadOpen(false);
             } else {
-              setSopUploadError(apiErrorMsg(applyErr, (applyErr as any)?.message || 'Apply failed'));
+              setSopUploadError(
+                apiErrorMsg(
+                  applyErr,
+                  (applyErr as ApiError)?.message || 'Apply failed',
+                ),
+              );
               setSopPhase('idle');
             }
           }
@@ -1164,6 +1218,43 @@ const ExperimentTemplatesManagement: React.FC = () => {
                       {ENTRY_TYPE_OPTIONS.find((o) => o.value === entry.entry_type)?.helper ||
                         entry.entry_type}
                     </Typography>
+
+                    {entry.predefined_entry_key === 'aliquot_pool_plan' && (
+                      <Box sx={{ mb: 1.5 }}>
+                        <FormControl size="small" sx={{ minWidth: 360 }}>
+                          <InputLabel>Plan method</InputLabel>
+                          <Select
+                            label="Plan method"
+                            value={String(entry.config?.method || 'aliquot_by_volume')}
+                            onChange={(event) =>
+                              updateEntry(ei, {
+                                config: {
+                                  ...(entry.config || {}),
+                                  method: event.target.value,
+                                  default_dest_sample_type:
+                                    entry.config?.default_dest_sample_type ?? null,
+                                },
+                              })
+                            }
+                          >
+                            {ALIQUOT_POOL_METHOD_OPTIONS.map((option) => (
+                              <MenuItem key={option.value} value={option.value}>
+                                {option.label}
+                              </MenuItem>
+                            ))}
+                          </Select>
+                        </FormControl>
+                        <Typography
+                          variant="caption"
+                          color="text.secondary"
+                          display="block"
+                          sx={{ mt: 0.5 }}
+                        >
+                          One concrete method fixes aliquot or pool for the entry. The catalog-limited
+                          default destination type is selected from source samples in the runtime plan.
+                        </Typography>
+                      </Box>
+                    )}
 
                     <TextField
                       size="small"
