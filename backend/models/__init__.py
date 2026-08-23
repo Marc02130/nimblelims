@@ -5,9 +5,16 @@ from .base import Base
 from .user import User, Role, Permission
 from .login_throttle import LoginThrottle
 from .revoked_token import RevokedToken
-from .client import Client, Location, Person, PeopleLocation, ContactMethod, ClientProject
+from .client import (
+    Client,
+    Location,
+    Person,
+    PeopleLocation,
+    ContactMethod,
+    ClientProject,
+)
 from .project import Project, ProjectUser
-from .sample import Sample
+from .sample import Sample, SampleTypeTransition
 from .container import Container, ContainerType, Contents
 from .analysis import Analysis, Analyte, AnalysisAnalyte, AnalyteAlias
 from .test import Test
@@ -69,4 +76,3 @@ from .entry import (
 # Additional models referenced via relationships or used in the app
 from .dose_response import DoseResponseResult, LimsRunDataExclusion
 from .template_well import TemplateWellDefinition
-

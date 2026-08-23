@@ -75,6 +75,19 @@ export interface EligibleSamplesResponse {
   warnings: string[];
 }
 
+export type AliquotOperation = 'aliquot' | 'pool';
+
+export interface SampleTypeOption {
+  id: string;
+  name: string;
+}
+
+export interface DestSampleTypeOptionsResponse {
+  source_sample_type: SampleTypeOption;
+  operation: AliquotOperation;
+  options: SampleTypeOption[];
+}
+
 // Types for batch compatibility validation with expiration warnings
 export interface ExpiredSampleWarning {
   sample_id: string;
@@ -1919,6 +1932,22 @@ export class ApiService {
 
   async getAliquotPlan(entryId: string) {
     const response: AxiosResponse = await this.api.get(`v1/entries/${entryId}/aliquot-plan`);
+    return response.data;
+  }
+
+  async getDestSampleTypes(
+    sourceSampleId: string,
+    operation: AliquotOperation,
+  ): Promise<DestSampleTypeOptionsResponse> {
+    const response: AxiosResponse<DestSampleTypeOptionsResponse> = await this.api.get(
+      'v1/entries/dest-sample-types',
+      {
+        params: {
+          source_sample_id: sourceSampleId,
+          operation,
+        },
+      },
+    );
     return response.data;
   }
 

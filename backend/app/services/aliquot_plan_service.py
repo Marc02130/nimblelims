@@ -7,19 +7,22 @@ Rules (Lab Ops L3–L4, L9):
   - Execute: reduce source Contents.amount; create dest sample + contents
   - pool_group: one dest container, multiple content rows
 """
+
 from __future__ import annotations
 
-from typing import Optional, List, Dict, Any, Tuple
+from typing import Optional, List, Dict, Any, Sequence, Tuple
 from uuid import UUID, uuid4
 from decimal import Decimal
 from datetime import datetime, timezone
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import DBAPIError, IntegrityError, ProgrammingError
 from fastapi import HTTPException, status
 
 from app.schemas.aliquot_plan import (
     AliquotMethod,
+    AliquotOperation,
     AliquotPlanLine,
     AliquotPlanSaveRequest,
     AliquotPlanSaveResponse,
@@ -27,11 +30,15 @@ from app.schemas.aliquot_plan import (
     AliquotExecuteRequest,
     AliquotExecuteResponse,
     AliquotExecuteLineResult,
+    DestSampleTypeOptionsResponse,
+    SampleTypeOption,
     METHOD_PROFILES,
 )
+from app.core.rbac import validate_client_access
 from models.entry import Entry, normalize_entry_type
-from models.sample import Sample
+from models.sample import Sample, SampleTypeTransition
 from models.container import Container, Contents, ContainerType
+from models.project import Project
 from models.user import User
 from models.list import ListEntry, List as ListModel
 from models.experiment import ExperimentSampleExecution
@@ -58,12 +65,72 @@ class AliquotPlanService:
             out.append({"method": key, **prof})
         return out
 
+    def list_dest_sample_types(
+        self,
+        source_sample_id: UUID,
+        operation: AliquotOperation,
+    ) -> DestSampleTypeOptionsResponse:
+        """List catalog destinations for the source sample's type and operation."""
+        source_row = self.db.execute(
+            select(Sample, Project.client_id)
+            .join(Project, Project.id == Sample.project_id)
+            .where(Sample.id == source_sample_id)
+        ).first()
+        if not source_row:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Source sample not found",
+            )
+
+        source, client_id = source_row
+        if self.current_user:
+            validate_client_access(self.current_user, client_id)
+
+        source_type = self.db.execute(
+            select(ListEntry).where(ListEntry.id == source.sample_type)
+        ).scalar_one()
+        destination_types = (
+            self.db.execute(
+                select(ListEntry)
+                .join(
+                    SampleTypeTransition,
+                    SampleTypeTransition.allowed_dest_sample_type == ListEntry.id,
+                )
+                .where(
+                    SampleTypeTransition.client_id == client_id,
+                    SampleTypeTransition.source_sample_type == source.sample_type,
+                    SampleTypeTransition.operation == operation.value,
+                    SampleTypeTransition.active.is_(True),
+                    ListEntry.active.is_(True),
+                )
+                .order_by(ListEntry.name.asc())
+            )
+            .scalars()
+            .all()
+        )
+
+        return DestSampleTypeOptionsResponse(
+            source_sample_type=SampleTypeOption(
+                id=source_type.id,
+                name=source_type.name,
+            ),
+            operation=operation,
+            options=[
+                SampleTypeOption(id=destination.id, name=destination.name)
+                for destination in destination_types
+            ],
+        )
+
     def _get_plan_entry(self, entry_id: UUID) -> Entry:
         entry = self.db.query(Entry).filter(Entry.id == entry_id).first()
         if not entry:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Entry not found")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Entry not found"
+            )
         key = entry.predefined_entry_key
-        if key not in (None, "aliquot_pool_plan") and normalize_entry_type(entry.entry_type) not in (
+        if key not in (None, "aliquot_pool_plan") and normalize_entry_type(
+            entry.entry_type
+        ) not in (
             "experiment_data",
             "predefined_action",
         ):
@@ -72,15 +139,22 @@ class AliquotPlanService:
                 detail="Entry is not an aliquot/pool plan entry",
             )
         # Allow experiment_data or predefined_action with aliquot key
-        if key and key != "aliquot_pool_plan" and entry.entry_type == "predefined_action":
+        if (
+            key
+            and key != "aliquot_pool_plan"
+            and entry.entry_type == "predefined_action"
+        ):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"predefined_entry_key {key} does not support aliquot execute",
             )
         return entry
 
-    def save_plan(self, entry_id: UUID, data: AliquotPlanSaveRequest) -> AliquotPlanSaveResponse:
+    def save_plan(
+        self, entry_id: UUID, data: AliquotPlanSaveRequest
+    ) -> AliquotPlanSaveResponse:
         entry = self._get_plan_entry(entry_id)
+        self._validate_dest_sample_types(data.lines)
         lines = []
         for line in data.lines:
             d = line.model_dump(mode="json")
@@ -108,7 +182,9 @@ class AliquotPlanService:
         entry = self._get_plan_entry(entry_id)
         raw = (entry.config or {}).get("plan_lines") or []
         lines = [AliquotPlanLine.model_validate(x) for x in raw]
-        return AliquotPlanSaveResponse(entry_id=entry.id, lines=lines, line_count=len(lines))
+        return AliquotPlanSaveResponse(
+            entry_id=entry.id, lines=lines, line_count=len(lines)
+        )
 
     def resolve_line(self, line: AliquotPlanLine) -> ResolvedTransfer:
         """Compute transfer_amount (mass or count) from method inputs. Never stores volume."""
@@ -144,7 +220,9 @@ class AliquotPlanService:
             # amount = volume * concentration (same numeric base units assumed in v1)
             amount = float(line.volume) * float(line.concentration)
             conc = float(line.concentration)
-            warnings.append("Volume not stored; mass computed as volume × concentration")
+            warnings.append(
+                "Volume not stored; mass computed as volume × concentration"
+            )
         elif method == AliquotMethod.target_volume:
             if line.target_volume is None or line.concentration is None:
                 raise HTTPException(
@@ -156,7 +234,9 @@ class AliquotPlanService:
             warnings.append("Target volume converted to mass via concentration")
         elif method == AliquotMethod.target_concentration:
             if line.target_concentration is None:
-                raise HTTPException(400, detail="target_concentration requires target_concentration")
+                raise HTTPException(
+                    400, detail="target_concentration requires target_concentration"
+                )
             conc = float(line.target_concentration)
             if line.amount is not None:
                 amount = float(line.amount)
@@ -195,8 +275,91 @@ class AliquotPlanService:
             dest_container_id=line.dest_container_id,
             dest_container_type_id=line.dest_container_type_id,
             dest_container_name=line.dest_container_name,
+            dest_sample_type=line.dest_sample_type,
             warnings=warnings,
         )
+
+    def _validate_dest_sample_types(
+        self,
+        plan_lines: Sequence[AliquotPlanLine],
+    ) -> None:
+        """Validate pool source homogeneity and all non-parent catalog choices."""
+        sample_ids = {line.source_sample_id for line in plan_lines}
+        source_rows = self.db.execute(
+            select(Sample, Project.client_id)
+            .join(Project, Project.id == Sample.project_id)
+            .where(Sample.id.in_(sample_ids))
+        ).all()
+        source_data = {
+            sample.id: (sample.sample_type, client_id)
+            for sample, client_id in source_rows
+        }
+        missing_ids = sample_ids.difference(source_data)
+        if missing_ids:
+            missing = sorted(str(sample_id) for sample_id in missing_ids)
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={
+                    "code": "source_sample_not_found",
+                    "message": f"Source sample(s) not found: {', '.join(missing)}",
+                },
+            )
+
+        pool_types: Dict[str, set] = {}
+        for line in plan_lines:
+            if line.pool_group:
+                group = line.pool_group.strip()
+                if group:
+                    pool_types.setdefault(group, set()).add(
+                        source_data[line.source_sample_id][0]
+                    )
+        mixed_groups = sorted(
+            group for group, sample_types in pool_types.items() if len(sample_types) > 1
+        )
+        if mixed_groups:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={
+                    "code": "mixed_pool_source_types",
+                    "message": (
+                        "Each pool must use one source sample type. Mixed types found "
+                        f"in pool(s): {', '.join(mixed_groups)}"
+                    ),
+                    "pool_groups": mixed_groups,
+                },
+            )
+
+        for line in plan_lines:
+            source_type, client_id = source_data[line.source_sample_id]
+            if self.current_user:
+                validate_client_access(self.current_user, client_id)
+            if line.dest_sample_type is None or line.dest_sample_type == source_type:
+                continue
+            operation = (
+                "pool" if line.pool_group and line.pool_group.strip() else "aliquot"
+            )
+            transition = self.db.execute(
+                select(SampleTypeTransition.id).where(
+                    SampleTypeTransition.client_id == client_id,
+                    SampleTypeTransition.source_sample_type == source_type,
+                    SampleTypeTransition.operation == operation,
+                    SampleTypeTransition.allowed_dest_sample_type
+                    == line.dest_sample_type,
+                    SampleTypeTransition.active.is_(True),
+                )
+            ).scalar_one_or_none()
+            if transition is None:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail={
+                        "code": "dest_sample_type_not_allowed",
+                        "message": (
+                            "Destination sample type is not allowed for this "
+                            f"source sample and {operation} operation"
+                        ),
+                        "line_id": line.line_id,
+                    },
+                )
 
     def _experiment_cohort_ids(self, experiment_id: UUID) -> set:
         rows = (
@@ -206,7 +369,9 @@ class AliquotPlanService:
         )
         return {r[0] for r in rows if r[0]}
 
-    def execute(self, entry_id: UUID, data: AliquotExecuteRequest) -> AliquotExecuteResponse:
+    def execute(
+        self, entry_id: UUID, data: AliquotExecuteRequest
+    ) -> AliquotExecuteResponse:
         """
         Execute aliquot/pool plan.
 
@@ -223,6 +388,7 @@ class AliquotPlanService:
         if not plan_lines:
             raise HTTPException(400, detail="No plan lines to execute")
 
+        self._validate_dest_sample_types(plan_lines)
         cohort = self._experiment_cohort_ids(entry.experiment_id)
         # S5: all sources must be on the experiment cohort (before mutations)
         for line in plan_lines:
@@ -246,26 +412,30 @@ class AliquotPlanService:
             try:
                 resolved.append(self.resolve_line(line))
             except HTTPException as e:
-                resolve_errors.append(AliquotExecuteLineResult(
-                    line_id=line.line_id,
-                    source_sample_id=line.source_sample_id,
-                    transfer_amount=0,
-                    status="error",
-                    message=str(e.detail),
-                ))
+                resolve_errors.append(
+                    AliquotExecuteLineResult(
+                        line_id=line.line_id,
+                        source_sample_id=line.source_sample_id,
+                        transfer_amount=0,
+                        status="error",
+                        message=str(e.detail),
+                    )
+                )
 
         if data.dry_run:
             results.extend(resolve_errors)
             for r in resolved:
-                results.append(AliquotExecuteLineResult(
-                    line_id=r.line_id,
-                    source_sample_id=r.source_sample_id,
-                    transfer_amount=r.transfer_amount,
-                    amount_unit_id=r.amount_unit_id,
-                    concentration=r.concentration,
-                    status="dry_run",
-                    message="; ".join(r.warnings) if r.warnings else None,
-                ))
+                results.append(
+                    AliquotExecuteLineResult(
+                        line_id=r.line_id,
+                        source_sample_id=r.source_sample_id,
+                        transfer_amount=r.transfer_amount,
+                        amount_unit_id=r.amount_unit_id,
+                        concentration=r.concentration,
+                        status="dry_run",
+                        message="; ".join(r.warnings) if r.warnings else None,
+                    )
+                )
             return AliquotExecuteResponse(
                 entry_id=entry_id,
                 dry_run=True,
@@ -298,17 +468,19 @@ class AliquotPlanService:
         try:
             for r in resolved:
                 dest_sample, dest_c = self._execute_transfer(r, pool_containers)
-                results.append(AliquotExecuteLineResult(
-                    line_id=r.line_id,
-                    source_sample_id=r.source_sample_id,
-                    dest_sample_id=dest_sample.id if dest_sample else None,
-                    dest_container_id=dest_c.id if dest_c else None,
-                    transfer_amount=r.transfer_amount,
-                    amount_unit_id=r.amount_unit_id,
-                    concentration=r.concentration,
-                    status="ok",
-                    message="; ".join(r.warnings) if r.warnings else None,
-                ))
+                results.append(
+                    AliquotExecuteLineResult(
+                        line_id=r.line_id,
+                        source_sample_id=r.source_sample_id,
+                        dest_sample_id=dest_sample.id if dest_sample else None,
+                        dest_container_id=dest_c.id if dest_c else None,
+                        transfer_amount=r.transfer_amount,
+                        amount_unit_id=r.amount_unit_id,
+                        concentration=r.concentration,
+                        status="ok",
+                        message="; ".join(r.warnings) if r.warnings else None,
+                    )
+                )
 
             cfg = dict(entry.config or {})
             cfg["last_execute_at"] = datetime.now(timezone.utc).isoformat()
@@ -406,7 +578,9 @@ class AliquotPlanService:
     ) -> Tuple[Sample, Container]:
         parent = self.db.query(Sample).filter(Sample.id == r.source_sample_id).first()
         if not parent:
-            raise HTTPException(404, detail=f"Source sample {r.source_sample_id} not found")
+            raise HTTPException(
+                404, detail=f"Source sample {r.source_sample_id} not found"
+            )
 
         content = self._find_source_content(r.source_sample_id, r.source_container_id)
         # S5: refuse null source amount (no silent create-dest-without-debit)
@@ -435,22 +609,31 @@ class AliquotPlanService:
         # Destination container
         dest_c: Optional[Container] = None
         if r.pool_group and r.pool_group in pool_containers:
-            dest_c = self.db.query(Container).filter(
-                Container.id == pool_containers[r.pool_group]
-            ).first()
+            dest_c = (
+                self.db.query(Container)
+                .filter(Container.id == pool_containers[r.pool_group])
+                .first()
+            )
         elif r.dest_container_id:
-            dest_c = self.db.query(Container).filter(
-                Container.id == r.dest_container_id, Container.active == True  # noqa: E712
-            ).first()
+            dest_c = (
+                self.db.query(Container)
+                .filter(
+                    Container.id == r.dest_container_id,
+                    Container.active == True,  # noqa: E712
+                )
+                .first()
+            )
             if not dest_c:
                 raise HTTPException(400, detail="dest_container_id not found")
         else:
             type_id = r.dest_container_type_id
             if not type_id:
                 # default to source container type
-                src_c = self.db.query(Container).filter(
-                    Container.id == content.container_id
-                ).first()
+                src_c = (
+                    self.db.query(Container)
+                    .filter(Container.id == content.container_id)
+                    .first()
+                )
                 type_id = src_c.type_id if src_c else None
             if not type_id:
                 raise HTTPException(
@@ -473,9 +656,13 @@ class AliquotPlanService:
         # New dest sample (child of source)
         status_id = self._available_status_id()
         dest_sample = Sample(
-            name=f"{parent.name}-ALQ-{uuid4().hex[:6]}" if parent.name else f"ALQ-{uuid4().hex[:8]}",
+            name=(
+                f"{parent.name}-ALQ-{uuid4().hex[:6]}"
+                if parent.name
+                else f"ALQ-{uuid4().hex[:8]}"
+            ),
             description=f"Aliquot from {parent.name or parent.id} ({r.method.value})",
-            sample_type=parent.sample_type,
+            sample_type=r.dest_sample_type or parent.sample_type,
             status=status_id,
             matrix=parent.matrix,
             temperature=parent.temperature,
@@ -492,7 +679,11 @@ class AliquotPlanService:
 
         # Dest contents amount = transfer (mass/count); conc from plan when present
         dest_amount = Decimal(str(r.transfer_amount))
-        dest_conc = Decimal(str(r.concentration)) if r.concentration is not None else content.concentration
+        dest_conc = (
+            Decimal(str(r.concentration))
+            if r.concentration is not None
+            else content.concentration
+        )
         dest_conc_units = r.concentration_unit_id or content.concentration_units
         amount_units = r.amount_unit_id or content.amount_units
 
@@ -507,17 +698,21 @@ class AliquotPlanService:
         )
         if existing_dest:
             if existing_dest.amount is not None:
-                existing_dest.amount = Decimal(str(float(existing_dest.amount) + float(dest_amount)))
+                existing_dest.amount = Decimal(
+                    str(float(existing_dest.amount) + float(dest_amount))
+                )
             else:
                 existing_dest.amount = dest_amount
         else:
-            self.db.add(Contents(
-                container_id=dest_c.id,
-                sample_id=dest_sample.id,
-                amount=dest_amount,
-                amount_units=amount_units,
-                concentration=dest_conc,
-                concentration_units=dest_conc_units,
-            ))
+            self.db.add(
+                Contents(
+                    container_id=dest_c.id,
+                    sample_id=dest_sample.id,
+                    amount=dest_amount,
+                    amount_units=amount_units,
+                    concentration=dest_conc,
+                    concentration_units=dest_conc_units,
+                )
+            )
         self.db.flush()
         return dest_sample, dest_c

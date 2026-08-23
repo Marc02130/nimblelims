@@ -79,6 +79,23 @@ It is **not** the primary home for large-scale result data analysis or dose-resp
 - **Instantiate from template** if entries not yet created (also auto on create when template has `entries`).
 - Sample data: table by cohort. Experiment data: multi-row table + Add/Delete row. Aliquot: `AliquotPlanEditor`.
 
+### Aliquot / pool destination sample type
+
+Each aliquot or pool plan line has an optional **Dest sample type** beside
+**Method**. **Same as parent.** is always available and leaves the destination
+sample type unchanged. Other choices come from the client-scoped
+`sample_type_transitions` catalog for the source sample type and the line's
+operation (`aliquot` when no pool group is set, otherwise `pool`). Type values
+cannot be entered as free text.
+
+All lines in one pool group must have source samples of the same sample type.
+The destination selector remains unavailable and a warning identifies the pool
+when its source types differ. Saving and executing also enforce this rule.
+
+The selected `dest_sample_type` is saved on the plan line. Execute uses that
+saved value without prompting again; a blank value inherits the parent sample
+type. Matrix behavior is unchanged.
+
 ## Starting an experiment (cohort)
 
 **Canonical product rules:** [open-questions/experiments.md Decision #24](../open-questions/experiments.md)
@@ -156,6 +173,7 @@ Permission: `experiment:manage` for manage surfaces.
 | `DELETE /v1/entries/{id}/rows/{row_key}` | Delete experiment_data table row |
 | `POST /v1/entries/{id}/submit` | Submit + write-back |
 | `GET /v1/entries/{id}/grid` | Wide grid (sample RO + field cols) |
+| `GET /v1/entries/dest-sample-types` | Allowed destination sample types for `source_sample_id` + `operation` |
 | Aliquot plan / execute | Under `/v1/entries/...` |
 
 ## Design Goals

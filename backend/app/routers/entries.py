@@ -8,6 +8,7 @@ Experiment Entries API (P0 foundation)
   /v1/entries/{entry_id}/grid     — wide UI
   /v1/entries/{entry_id}/export   — long report
 """
+
 from typing import Optional, List
 from uuid import UUID
 from fastapi import APIRouter, Depends, Query, status
@@ -32,11 +33,13 @@ from app.schemas.entry import (
     EntrySubmitResponse,
 )
 from app.schemas.aliquot_plan import (
+    AliquotOperation,
     AliquotPlanSaveRequest,
     AliquotPlanSaveResponse,
     AliquotExecuteRequest,
     AliquotExecuteResponse,
     AliquotMethodListResponse,
+    DestSampleTypeOptionsResponse,
 )
 from models.user import User
 from sqlalchemy.orm import Session
@@ -89,7 +92,7 @@ def create_entry(
     data: EntryCreate,
     service: EntryService = Depends(get_service),
 ):
-    payload = data.model_copy(update={'experiment_id': experiment_id})
+    payload = data.model_copy(update={"experiment_id": experiment_id})
     entry = service.create_entry(payload)
     return EntryRead.model_validate(entry)
 
@@ -124,6 +127,19 @@ def list_aliquot_methods(
 ):
     """Return full v1 aliquot/pool method matrix (Lab Ops L9)."""
     return AliquotMethodListResponse(methods=service.list_methods())
+
+
+@router.get(
+    "/entries/dest-sample-types",
+    response_model=DestSampleTypeOptionsResponse,
+)
+def list_dest_sample_types(
+    source_sample_id: UUID = Query(...),
+    operation: AliquotOperation = Query(...),
+    service: AliquotPlanService = Depends(get_aliquot_service),
+):
+    """Return allowed destination types for one source sample and operation."""
+    return service.list_dest_sample_types(source_sample_id, operation)
 
 
 @router.get("/entries/{entry_id}", response_model=EntryRead)
@@ -222,11 +238,27 @@ def export_entry(
     if format == "csv":
         buf = io.StringIO()
         fieldnames = [
-            "experiment_id", "experiment_name", "entry_id", "entry_name", "entry_type",
-            "sample_id", "client_sample_id", "field_definition_id", "field_name",
-            "field_display_name", "column_kind", "data_type", "value_text", "value_number",
-            "value_list_entry_id", "value_list_entry_name", "value_date", "value_boolean",
-            "display_value", "modified_at", "modified_by",
+            "experiment_id",
+            "experiment_name",
+            "entry_id",
+            "entry_name",
+            "entry_type",
+            "sample_id",
+            "client_sample_id",
+            "field_definition_id",
+            "field_name",
+            "field_display_name",
+            "column_kind",
+            "data_type",
+            "value_text",
+            "value_number",
+            "value_list_entry_id",
+            "value_list_entry_name",
+            "value_date",
+            "value_boolean",
+            "display_value",
+            "modified_at",
+            "modified_by",
         ]
         writer = csv.DictWriter(buf, fieldnames=fieldnames, extrasaction="ignore")
         writer.writeheader()
