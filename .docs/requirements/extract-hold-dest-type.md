@@ -1,7 +1,7 @@
 # Requirements: Extract-hold dest sample type
 
 **Date:** 2026-08-23  
-**Status:** **Implement gate HOLD (re-stamp)** — Architecture + UI re-stamp pending on atomic-pair fold. Prior Accept stands on METHOD_CATALOG fold until re-stamp.  
+**Status:** **Implement gate OPEN** (docs) — Architecture + UI Accept on atomic-pair fold. Coding stays Grok Build unless Marc/Rolf asks.  
 **Stem:** `extract-hold-dest-type`  
 **Tech sketch:** [`.docs/tech-sketch/extract-hold-dest-type.md`](../tech-sketch/extract-hold-dest-type.md)  
 **Lab Ops:** [`.docs/lab-ops-review/extract-hold-dest-type.md`](../lab-ops-review/extract-hold-dest-type.md)  
@@ -28,9 +28,9 @@ Dest type on `aliquot_pool_plan` (entry default + line override); daughters on `
 | `dest_sample_type` must land on plan line/config (Heidi bounce vs main copy-parent) | Heidi |
 | Seeds Blood×aliquot→DNA, DNA×pool→pooled DNA; S3 config:edit; L1/S1; L2; start allow-list; catalog many-to-many; pool same-type | Prior |
 | Bounce Sample/`material_class`, matrix drop, receive/mid-entry gates, if-blood-then, transitions on `template_definition` | Prior |
-| Architecture Accept (re-stamp) on METHOD_CATALOG fold | Heidi 2026-08-23 |
-| UI Accept (re-stamp) on METHOD_CATALOG fold | Mathilda 2026-08-23 |
-| Architecture + UI re-stamp pending on atomic-pair fold | Pending |
+| Architecture Accept on atomic-pair fold | Heidi 2026-08-23 |
+| UI Accept on atomic-pair fold | Mathilda 2026-08-23 |
+| Header-pins-to-top | Parked — separate entries docs fold |
 | Not IC50 | Marc |
 
 ## 3. Concrete methods (IN)
@@ -60,7 +60,7 @@ Dest type on `aliquot_pool_plan` (entry default + line override); daughters on `
 
 ## 5. Non-goals
 
-Dual mint; mid-flight method warn/wipe; un-mint on cancel; method/type on `aliquots_pools`; new experiment-plan object; adding only one of the pair; equimolar-by-size (parked until size/bp path); CUT methods above; Sample/`material_class`; matrix drop; if-blood-then; IC50.
+Dual mint; mid-flight method warn/wipe; un-mint on cancel; method/type on `aliquots_pools`; new experiment-plan object; adding only one of the pair; Header-pins-to-top (parked); equimolar-by-size (parked until size/bp path); CUT methods above; Sample/`material_class`; matrix drop; if-blood-then; IC50.
 
 ## 6. Acceptance criteria
 
@@ -91,9 +91,9 @@ Add aliquot/pool → both entries created (dest empty) → plan entry method=`al
 | Review | Verdict |
 |--------|--------|
 | CEO | **Accept** — A + line override; concrete methods + Method≠dest type; **atomic pair on add** (Rolf CEO + Heidi + Mathilda 2026-08-23) |
-| Architecture | **Pending re-stamp** (atomic-pair fold) — prior Accept Heidi 2026-08-23 on METHOD_CATALOG |
-| UI | **Pending re-stamp** (atomic-pair fold) — prior Accept Mathilda 2026-08-23 on METHOD_CATALOG |
+| Architecture | **Accept** (Heidi re-stamp 2026-08-23 on atomic-pair) |
+| UI | **Accept** (Mathilda re-stamp 2026-08-23 on atomic-pair) |
 | Lab Ops | **Accept** (L1 Met; L2); Deiter cut list folded |
 | Security / CSO | **Accept** (S1 Met; S3) |
 
-**Implement gate:** **HOLD** until Architecture + UI re-stamp on atomic-pair. Coding stays Grok Build. Not IC50.
+**Implement gate:** **OPEN** (docs). Coding stays Grok Build unless Marc/Rolf asks. Not IC50.
