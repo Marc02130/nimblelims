@@ -1,7 +1,7 @@
 # Tech sketch: Configurable-entry framework
 
 **Date:** 2026-08-24  
-**Status:** **Design Group + CEO Agree (locked)**  
+**Status:** **Mint proof + open holes** — not a general framework lock
 **Audience:** Design Group — Heidi (Architecture), Hans (Scientific CSO), Deiter (Lab Ops); CEO Rolf  
 **Stem:** `configurable-entries-framework`  
 **This PR:** docs only. No application/product code. **Not IC50.**  
@@ -15,6 +15,9 @@
 | [`.docs/tech-sketch/extract-hold-dest-type.md`](extract-hold-dest-type.md) | Aliquot/pool atomic pair, METHOD_CATALOG dual-map, dest type, execute/mint |
 | [`.docs/requirements/extract-hold-dest-type.md`](../requirements/extract-hold-dest-type.md) | Acceptance criteria and leadership locks for dest type + pair |
 | [`.docs/open-questions/sop-ai-to-process.md`](../open-questions/sop-ai-to-process.md) | PR 51 / SOP→AI Apply Hold |
+| [`.docs/tech-sketch/mass-concentration-contents.md`](mass-concentration-contents.md) | Four write targets; per-row Contents amount; vessel totals/concentration; Result locks |
+| [`.docs/tech-sketch/sample-container-queue.md`](sample-container-queue.md) | Merged PR 65 discussion; source vessel binding remains open |
+| [`.docs/tech-sketch/experiment-entries-gap.md`](experiment-entries-gap.md) | Current implementation gaps and order to get an experiment running |
 
 ---
 
@@ -22,12 +25,13 @@
 
 Aliquot/pool is the **first preconfigured proof** of a **configurable-entry framework**, not a one-off special type.
 
-Design Group + CEO need one place that states:
+Design Group need one place that separates the proven mint spine from the holes still required for a general framework:
 
 1. What the framework **is** (two kinds + predefined wrappers + product execute).
 2. How aliquot/pool **proves** it (atomic pair + METHOD_CATALOG dual-map + mint integrity).
 3. How we **differ from Sapio** on purpose.
-4. What the **north star** is, and what we **bounce** until the proof works.
+4. Which non-mint wrappers reuse kind + FieldDefinitions without METHOD_CATALOG.
+5. What remains open and in what order Grok Build should later implement it.
 
 This document **does not invent** beyond locks already in the related docs. It folds them so the framework is visible.
 
@@ -46,19 +50,21 @@ Without a named framework, aliquot/pool looks like a special-case pair of entrie
 
 Those paths break sample-centric integrity and make every later preconfigured entry a new one-off.
 
-**Ask of this review:** agree that aliquot/pool is **wrapper + catalogs + product execute** on the **same two kinds** every future minting entry must reuse.
+**Current status:** the aliquot/pool design is the first mint proof: **wrapper + catalogs + product execute** on the same two kinds. It is not evidence that the general wrapper framework is complete or fully locked.
+
+**Standing order:** produce one coherent experiment system, not a requirements checklist whose independently implemented rows create parallel designs.
 
 ---
 
 ## 2. Goals and non-goals
 
-### Goals (this agree)
+### Goals (this fold)
 
 - Name the framework: two base kinds only; predefined wrappers; catalogs that attach columns/FieldDefinitions; product execute for mint.
 - Treat aliquot/pool as the first proof of that pattern (atomic pair).
 - Keep dest rows `sample_id`-linked; mint via product execute; lineage + L1 join non-optional for any minting entry.
 - Record north star (more wrappers → lab-authored behavior → SOP→AI as a **later consumer**) without opening those slices now.
-- Stamp Design Group + CEO Accept (locked 2026-08-24).
+- Expose the open holes that still prevent a general framework claim.
 
 ### Non-goals
 
@@ -68,6 +74,8 @@ Those paths break sample-centric integrity and make every later preconfigured en
 - Shipping lab-authored entry behavior or customer Python.
 - SOP+AI Apply writing a live process / parser (PR 51 Hold stands).
 - Experiment Header pin-to-top as the subject of this agree (related UX lock only).
+- Resolving the queue/vessel choice from merged PR 65.
+- Inventing pool composition lineage or moving storage browse into experiments.
 
 ---
 
@@ -113,7 +121,18 @@ Flow: Add → both entries exist (dest empty) → operator selects **method** �
 
 **Experiment Header** = `experiment_data` + `predefined_entry_key = experiment_header`. When added, it **pins to the top** of the entry list (no drag below). Parked as a separate entries-docs fold; mentioned so it is not mistaken for a third kind.
 
-Other v1 wrappers (Samples cohort display, generic plating/LH as `experiment_data`, LIMS Run for instrument primary data) remain as in experiment-template-entries §0.9. Instrument primary data is **not** an ELN instrument entry.
+Other v1 surfaces (Samples cohort display, generic plating/LH as `experiment_data`, LIMS Run for instrument primary data) remain as in experiment-template-entries §0.9. Instrument primary data is **not** an ELN instrument entry.
+
+### 4.3 Non-mint wrappers (open implementation hole)
+
+Header, instrument-used, reagent-used, and review are **non-mint wrappers**. Each is one of the two kinds plus `predefined_entry_key` and kind-scoped FieldDefinitions. They do **not** use `METHOD_CATALOG`, because they do not choose a mint operation or attach plan/destination maps.
+
+- **Header:** `experiment_data`; context fields. Existing pin-to-top UX lock remains.
+- **Instrument-used:** process capture/reference only. Instrument primary files and Results remain on the LIMS Run.
+- **Reagent-used:** process capture/reference only; it does not create a parallel materials inventory.
+- **Review:** review capture/status fields; it does not create a third entry kind.
+
+These wrappers are a framework hole, not part of the implemented mint proof.
 
 ---
 
@@ -163,7 +182,9 @@ These rules apply to **any minting entry**, including future custom wrappers. Th
 | Process join | Dest joins **`eln_process_samples` (L1)** when the parent is under process. |
 | Dest type | From plan: **line override → entry default → parent**. Catalog: **`sample_type_transitions`** (many-to-many), mutate with **`config:edit`**. |
 | Pool sources | Must share **one** `sample_type` or refuse; then catalog lookup for that `mint_op`. |
-| Dest amount / vol / conc | **FieldDefinitions on the dest entry**, not new Sample columns. Process values only — **not** Sample identity (`sample_type`, `parent_sample_id`, barcode / container). |
+| Dest amount / vol / conc | **FieldDefinitions on the dest entry**, not new Sample columns. They are RO projections by default or same-transaction write-throughs to the owning `Contents` / 1×1 `Container`; never a second ledger. |
+
+**Four targets:** Sample, Contents, 1×1 Container, and Entry cells. Sample owns identity and allowlisted attributes, never mass/concentration. `Contents.amount` owns per-row mass/count. `Container.amount` is the compatible-unit sum of contents, and `Container.concentration` is vessel inventory concentration. Entry cells capture process data or project/write through to those owners. See [mass-concentration-contents.md](mass-concentration-contents.md).
 
 Execute resolve (same as extract-hold; not a new rule):
 
@@ -197,10 +218,12 @@ We keep sample-centric FKs and product mint **on purpose**. That is the competit
 
 Order is intentional. Later slices **consume** this framework; they do not replace it.
 
-1. **Now / next proof:** aliquot/pool atomic pair + METHOD_CATALOG dual-map + dest type + L1 mint (extract-hold packet). Coding paused unless Marc instructs.
-2. **More preconfigured entries** reuse the same pattern (wrapper key + kind + catalogs + product behavior). No new base type per workflow.
-3. **Later:** labs may **author entry behavior on this substrate** (still two kinds, still `sample_id` / execute / catalogs for mint).
-4. **Ultimately:** AI reads an SOP and **configures** entries / experiments / LIMS runs so the tech **executes and captures**.
+1. **Finish the mint proof:** atomic pair + METHOD_CATALOG dual-map + dest type + inventory write targets + L1 mint.
+2. **Resolve safe physical execution:** choose and implement the queue/vessel direction from [sample-container-queue.md](sample-container-queue.md) / merged PR 65.
+3. **Close lineage integrity:** agree multi-source pool composition; the plan remains the only multi-source record until then.
+4. **Add non-mint wrappers:** Header, instrument-used, reagent-used, and review reuse kind + FieldDefinitions only; no METHOD_CATALOG.
+5. **Later:** labs may author behavior on this substrate; storage browse remains outside experiments.
+6. **Ultimately:** AI reads an SOP and configures entries / experiments / LIMS runs so the tech executes and captures.
 
 **SOP→AI is a later consumer of this framework.** It is not a bypass.
 
@@ -215,7 +238,7 @@ Order is intentional. Later slices **consume** this framework; they do not repla
 
 ## 9. Bounce bars
 
-Do not reopen without a new product decision. **Design Group bounce bars (2026-08-24)** folded here with the prior spine — one row per bar, sources in the last column. **Not IC50.**
+The rows below are locked bars for the **mint proof** and inherited product spine. They do not close the general-framework holes listed in this fold. **Not IC50.**
 
 **Design Group (this fold):** Heidi (Architecture) · Hans (CSO) · Deiter (Lab Ops). Overlaps are merged (e.g. customer Python v1 is Heidi **and** Deiter).
 
@@ -241,6 +264,9 @@ Do not reopen without a new product decision. **Design Group bounce bars (2026-0
 | **METHOD_CATALOG inventing fields outside the kind’s FieldDefinition catalog** | Predefined plan fields are existing `entity_type = experiment_data`; dest fields on `aliquots_pools` are existing `entity_type = experiment_sample_data`. | Marc 2026-08-24 |
 | **Dest FieldDefinitions that duplicate Sample identity** | Do not put `sample_type`, `parent_sample_id`, barcode, or container identity on the dest entry as FieldDefinitions. Those come from **execute** (and accessioning). Grids may show Sample identity as **read-only projections**. | Heidi PR 63 |
 | **Treating `experiment_data` / `experiment_sample_data` as a duplicate Sample record** | Those kinds capture **processing data** during the experiment, not a copy of Sample. Writable FieldDefinitions are process values only. | Marc CEO 2026-08-24 |
+| **Entry cells as an independent mass/concentration ledger** | Project read-only or write through in the same transaction to `Contents.amount`, `Container.amount`, or `Container.concentration`. Never write inventory to Sample. | Mass/concentration fold |
+| **Using METHOD_CATALOG for non-mint wrappers** | Header, instrument-used, reagent-used, and review are kind + FieldDefinitions only. | This fold |
+| **Storage browse inside experiments** | Storage browse/move remains outside experiments; at most an explicit one-shot put-away write-through. | Mass/concentration fold |
 
 Also still bounced in the extract-hold packet (not reopened here): CUT methods; free type-in parent concentration on normalization; equimolar-by-size without size/bp path; matrix drop; receive/mid-entry type gate; if-blood-then; transitions on `template_definition`. Sample/`material_class` for dest fields is in the table above (Heidi), not only this footnote.
 
@@ -274,29 +300,35 @@ This sketch does **not** replace extract-hold requirements or METHOD_CATALOG tab
 
 ---
 
-## 12. Status and coding gate
+## 12. Status, open holes, and coding gate
 
 | Item | Value |
 |------|--------|
-| Status | **Design Group + CEO Agree (locked)** |
-| Status line | **Design Group + CEO Agree (locked)** |
+| Status | **Mint proof + open holes** |
+| Status line | **Not a general framework lock** |
 | IC50 | **Not IC50** |
 | Code in this PR | **None** (docs only) |
 | Application coding | **Grok Build / paused** unless Marc instructs |
+
+Open before this can be called a general framework:
+
+1. queue/vessel choice and execute-time source binding (merged PR 65);
+2. multi-source pool lineage;
+3. non-mint wrapper definitions and runtime behavior;
+4. inventory projection/write-through implementation against the four targets; and
+5. coherent completion/review behavior.
 
 ---
 
 ## 13. Reviews
 
-Stamped 2026-08-24. Framework agree is **locked**. **Not IC50.** Docs only. Coding stays paused unless Marc instructs.
+Prior mint-spine decisions are folded in the body. The broader framework verdict is **pending Design Group re-stamp after this coherence fold**. Do not read the prior proof decisions as a general-framework Accept. **Not IC50.** Docs only.
 
 | Review | Reviewer | Verdict | Date | Notes |
 |--------|----------|---------|------|-------|
-| **CEO** | Rolf | **Accept** | 2026-08-24 | Framework agree; aliquot/pool as first proof |
-| **CEO (Marc lock)** | Marc | **Accept** | 2026-08-24 | Entries are not copies of Sample; writable FieldDefinitions = process values; Sample identity may be RO grid projections |
-| **Architecture** | Heidi | **Accept** | 2026-08-24 | Two kinds; no Sample/`material_class` dest columns; no customer Python v1 |
-| **Architecture (PR 63)** | Heidi | **Accept** | 2026-08-24 | Field-picker fold; bounce dest FieldDefinitions that duplicate Sample identity (`sample_type`, `parent_sample_id`, barcode / container) |
-| **Lab Ops** | Deiter | **Accept** | 2026-08-24 | Dest empty until execute; dest type on plan; no mid-flight method change; no customer Python v1 |
-| **CSO** | Hans | **Accept** | 2026-08-24 | `sample_id` linkage; mint requires transition catalog / `sample_id` / L1; SOP→AI must not bypass |
+| **CEO** | Rolf | _pending re-stamp_ | | General status corrected to mint proof + holes |
+| **Architecture** | Heidi | _pending re-stamp_ | | Four write targets; queue/vessel; non-mint wrappers |
+| **Lab Ops** | Deiter | _pending re-stamp_ | | Runnable order and bench-safe vessel selection |
+| **CSO** | Hans | _pending re-stamp_ | | Result locks preserved; pool lineage remains open |
 
-**Implement gate for this framework agree:** **open (docs lock)**. Extract-hold implement gate remains as documented on that packet. This PR does not unpause coding.
+**Implement gate:** this coherence fold does not authorize general-framework coding. The extract-hold mint proof remains the implementation packet once Marc instructs; application coding stays Grok Build / paused.

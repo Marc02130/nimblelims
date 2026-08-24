@@ -1,7 +1,7 @@
-# Tech sketch: Mass and concentration live on Contents (not Sample)
+# Tech sketch: Mass and concentration ownership (not Sample)
 
 **Date:** 2026-08-24  
-**Status:** **Draft for Design Group agree** — Design Group review  
+**Status:** **Draft — Design Group coherence fold; pending re-stamp**
 **Audience:** Design Group — Heidi (Architecture), Hans (Scientific CSO), Deiter (Lab Ops); CEO Rolf  
 **Stem:** `mass-concentration-contents`  
 **This PR:** docs only. No application/product code. **Not IC50.**  
@@ -17,7 +17,7 @@
 | [`.docs/tech-sketch/extract-hold-dest-type.md`](extract-hold-dest-type.md) | Aliquot/pool execute; dest fields on dest entry; normalization bounce free type-in |
 | [`.docs/ideas/containers-model-update.md`](../ideas/containers-model-update.md) | Implement slice still pending for rows×columns / 1×1 enforce |
 
-This document **does not invent** past those locks. It states **why** amount/mass and **inventory** concentration belong on **Contents**, why Contents always hang on a parent **Container**, and how write-back / dest fields / normalization must not put mass or concentration on **Sample**.
+This document folds the existing container locks with the Result decisions recorded for this packet. It states why per-sample amount belongs on **Contents**, why vessel total amount and inventory concentration belong on the **1×1 Container**, and why write-back / destination fields / normalization must not put mass or concentration on **Sample**.
 
 ---
 
@@ -30,7 +30,7 @@ Labs talk about “the sample’s concentration” and “how much DNA we have.�
 - Normalization free-types a number that is neither a Result nor inventory.
 - A plate looks like it “contains” liquid, so pooling and well-level inventory break.
 
-**Ask of this review:** agree that **Sample has no mass and no concentration**; **Contents** (always on a 1×1 parent Container) is the inventory SoT for amount/mass and inventory concentration (with units FKs); dest entry cells are capture or RO projection, never a second ledger.
+**Ask of this review:** re-stamp the coherent ownership model: **Sample has no mass and no concentration**; `Contents.amount` is per-row mass/count; 1×1 `Container.amount` is the compatible-unit sum of Contents rows; 1×1 `Container.concentration` is vessel inventory concentration; destination entry cells are capture or RO projection/write-through, never a second ledger.
 
 ---
 
@@ -39,39 +39,41 @@ Labs talk about “the sample’s concentration” and “how much DNA we have.�
 | # | Lock | Source |
 |---|------|--------|
 | 1 | **Sample** = identity + `sample_type` + lineage (`parent_sample_id`). **No mass. No concentration.** | This agree; extract-hold bounce of new Sample columns for amount/vol/conc |
-| 2 | Something *in a vessel* has mass/amount and possibly concentration → that is **Contents** (units FKs). | containers.md; this agree (inventory SoT on Contents) |
+| 2 | **`Contents.amount`** is the per-row mass/count for one Sample in the vessel. `Contents.concentration` is **not** the inventory-concentration SoT. | containers.md; Marc fold |
 | 3 | Contents always hang on a **1×1 parent Container** (`rows=1`, `columns=1`): tube, well, vial, test tube. Multi-element (plate/rack/box) = **structure only**; contents only on children. | containers.md §0.2–0.6; experiment-template-entries §0.8 |
 | 4 | **Volume is not primary SoT** when mass + conc allow \( V = m / C \) (**Option A**). Inbound volume + conc → store mass + conc; drop volume. **Do not reopen.** | containers.md §0.1 |
-| 5 | Four write-back targets (Heidi) — §5 | This agree |
-| 6 | Dest FieldDefinitions after mint: **RO projections of contents** by default; writable only if write-through to contents **same txn**. **Bounce Sample write-back of mass/conc.** | This agree; extract-hold dest fields on `aliquots_pools` |
-| 7 | Normalization (`aliquot_by_target_concentration`): read **prior Result** (assay conc); on execute write-through to contents (or **refuse** if no Result). **Bounce free type-in.** | extract-hold §4.1 |
-| 8 | Hans holes — **OPEN**, do not fake-close — §8 | This agree |
+| 5 | **1×1 `Container.amount`** = compatible-unit sum of `Contents.amount`; **1×1 `Container.concentration`** = vessel inventory concentration. Update with Contents in the same transaction or derive; never maintain an independent conflicting total. | containers.md; Marc fold |
+| 6 | Four write-back targets (Heidi) — §5 | This fold |
+| 7 | Dest FieldDefinitions after mint: **RO projections** by default; writable only with a same-transaction write-through to the owning Contents or Container field. **Bounce Sample write-back of mass/conc.** | This fold; extract-hold dest fields on `aliquots_pools` |
+| 8 | Normalization and Result publication follow **Hans §10 LOCKED**. | Hans fold |
 | 9 | Pool multi-source lineage still **open** (composition on plan; one `parent_sample_id` is not full lineage) — pointer only | extract-hold mint; experiments Q18 |
 | 10 | Not IC50. Coding paused / Grok Build unless Marc instructs. | This packet |
 
 ---
 
-## 2. Why amount/mass and inventory concentration live on Contents
+## 2. Why amount is per Contents row and concentration is vessel-scoped
 
 **Sample answers “what is this material?”** Type, identity, parent lineage. Those facts survive a move between tubes and a split into daughters. Putting grams or ng/µL on Sample pretends inventory is a property of identity.
 
-**Contents answers “how much of that identity is in *this* vessel *now*?”** Amount/mass (solute mass or count — Option A) and inventory concentration (mass/volume of the defined solute at that vessel), each with units FKs. Dilute changes concentration, not solute amount. Transfer/aliquot execute mutates source and dest **contents**, not Sample rows’ identity fields.
+**Contents answers “how much of that identity is in this vessel now?”** `Contents.amount` is the per-row solute mass or count for one Sample. Transfer/aliquot execute mutates the affected Contents rows and updates the 1×1 vessel totals in the same transaction.
 
-**Assay concentration is not inventory concentration.** A Qubit (or other analysis) **Result** is a measurement event. Inventory conc on Contents is the working stock number used for \( V = m / C \) and aliquot math. Collapsing both onto Sample (or treating `contents.concentration` as the assay number) is how stale Qubit vs stock happens — Hans hole, §8.
+**The 1×1 Container answers “what is true of the vessel as a whole?”** `Container.amount` is the compatible-unit sum of its Contents rows. `Container.concentration` is the vessel inventory concentration used for \( V = m / C \) and transfer math. **Bounce `Contents.concentration` as the inventory-concentration SoT.**
 
-**Pooling.** Multiple Contents rows on **one** 1×1 vessel (pool tube), each row = one source sample’s solute in that tube. Sample cannot hold “the pool’s mass” without erasing per-source inventory. Vessel-level total on Container (containers.md §0.3) stays a **consistency** rule with contents sums — **not** a second independent ledger and **not** Sample. This sketch does not reopen that 2026-08-11 consistency row and does not move inventory SoT off Contents.
+**Assay concentration is not inventory concentration.** A Qubit (or other analysis) **Result** is a measurement event. Result publication may update the bound 1×1 vessel inventory concentration under §10, but normalization still selects the Result, not a vessel or Contents value.
+
+**Pooling.** Multiple Contents rows on one 1×1 vessel preserve each source Sample’s contribution. The Container total is the sum, not a separately editable second ledger. Sample cannot hold the pool’s mass without erasing per-source inventory.
 
 ---
 
 ## 3. Why Contents always need a parent Container
 
-Contents is **not** a free-floating inventory row. Mass/concentration without a vessel has no location, no barcode, no well coordinate, and no unit of account for put-away or pipette-from.
+Contents is **not** a free-floating inventory row. Amount without a vessel has no location, no barcode, no well coordinate, and no unit of account for put-away or pipette-from.
 
 | Layer | Role | Holds Contents? |
 |-------|------|-----------------|
 | Multi-element Container (plate, rack, box) | Structure: child positions (`row`/`column` on children). | **No** |
 | **1×1 Container** (tube, plate well, vial, test tube) | Liquid-bearing unit of account. Location (and optional put-away write-through). | **Yes** |
-| **Contents** | Sample in that vessel + amount/mass + inventory conc + units FKs. | — |
+| **Contents** | Sample in that vessel + per-row amount/mass/count + unit FK. | — |
 
 A 96-well plate is not a bottle. Liquid lives in **wells** (1×1 children). Pooling is many contents on one 1×1 tube, not contents on the plate.
 
@@ -90,7 +92,7 @@ Atomic receive already creates **sample + first container + contents** in one tr
 
 Execute may set `sample_type` / `parent_sample_id` on mint. It must **not** write mass or concentration onto Sample.
 
-Existing product bounce (extract-hold / framework): dest amount/volume/concentration are **entry FieldDefinitions** on `aliquots_pools`, not Sample schema and not a Sample/`material_class` column. This sketch adds the SoT behind those fields: **Contents**, via RO projection or same-txn write-through.
+Existing product bounce (extract-hold / framework): destination amount/volume/concentration are **entry FieldDefinitions** on `aliquots_pools`, not Sample schema and not a Sample/`material_class` column. This sketch states the owners behind those cells: per-row mass/count projects or writes through to Contents; total mass and vessel concentration project or write through to the 1×1 Container.
 
 ---
 
@@ -101,13 +103,13 @@ Exactly four. Entry cells are not a fifth inventory table.
 | Target | Owns | Does not own |
 |--------|------|----------------|
 | **Sample** | Identity + **allowlisted** attributes. Execute sets `sample_type` / `parent_sample_id`. | Mass, inventory conc, volume, location |
-| **Contents** | **SoT** for mass/amount, inventory concentration, units FKs. Aliquot execute **mutates contents**. | Identity, assay Result, storage browse tree |
-| **Container** | Location; optional **put-away write-through**. Storage browse lives **outside** experiments. | Inventory SoT (contents); Sample identity |
+| **Contents** | Per-row mass/count and amount unit FK. Aliquot execute mutates source/destination rows. | Identity, vessel concentration, assay Result, storage browse tree |
+| **Container** | 1×1 total amount (= compatible-unit sum of Contents), vessel inventory concentration, location, and optional one-shot put-away write-through. Storage browse lives **outside** experiments. | Per-source contribution; Sample identity |
 | **Entry cells** | Process **capture** **or** **RO projection** of SoT. | A second ledger of mass/conc |
 
 **Bounce:** Sample write-back of mass or concentration. Last-write-wins Sample allowlist (experiments Q4) does not grow to include mass/conc.
 
-**Dest FieldDefinitions after mint:** default **read-only projections** of contents. Writable **only** if the same transaction write-throughs to contents. Otherwise operators edit a ghost number that execute and storage will not see.
+**Destination FieldDefinitions after mint:** default **read-only projections**. Per-row mass/count projects `Contents.amount`; total mass and vessel concentration project the 1×1 Container. A writable cell is allowed only when the same transaction writes through to the owning field and preserves `Container.amount = Σ Contents.amount`. Otherwise the operator would edit a ghost number that execute and storage cannot trust.
 
 ---
 
@@ -130,23 +132,17 @@ Fold extract-hold §4.1; do not duplicate METHOD_CATALOG tables.
 | Rule | Detail |
 |------|--------|
 | Parent / source assay conc | **Required** |
-| Source of that number | **Prior Result** on that sample — **not** free type-in on the plan line |
-| On execute | Write-through inventory to **contents** (dest amount/conc as the method requires), or **refuse** if no Result |
+| Source of that number | Eligible **prior Result** selected under §10 — not free type-in, `Contents.concentration`, or `Container.concentration` |
+| On execute | Use the selected Result; update destination Contents amount and 1×1 Container amount/concentration in the same transaction, or refuse |
 | Dest FieldDefinitions | Projection / write-through per §5 — not Sample |
 
 **Bounce:** typing a concentration on the plan because “we know it from the Qubit printout.” If the Result is missing, execute refuses.
 
 ---
 
-## 8. Hans open holes — **OPEN** (do not fake-close)
+## 8. Result questions superseded by §10
 
-These block a clean implement of normalization + inventory conc. Design Group may decide later; this PR does **not** pick winners.
-
-| Hole | Why it is open | Must not do until decided |
-|------|----------------|---------------------------|
-| **Which Result when replicates exist?** Latest vs approved vs same analysis only. | Extract-hold says “prior result”; replicate / review semantics are unspecified. | Invent a silent pick (e.g. “newest float named concentration”). |
-| **Result unit ≠ contents unit** | Assay units and inventory units FKs can disagree. | **Refuse.** Do **not** convert silently. |
-| **Stale `contents.conc` between Qubit publish and next aliquot** | Result publish and inventory SoT can diverge. | Either: Result entry/path **also write-throughs inventory** on Contents, **or** UI **never** treats `contents.concentration` as the assay number. Pick one in a later agree — both remain OPEN here. |
+The earlier draft left Result choice, units, and stale inventory concentration open. Those questions are now resolved by **Hans §10 LOCKED**. Pool multi-source lineage remains open in §9.
 
 ---
 
@@ -158,7 +154,18 @@ Do not invent a composition table, JSON parent list, or “primary parent” rul
 
 ---
 
-## 10. Bounce bars (this agree)
+## 10. Hans §10 LOCKED — Result publication and normalization
+
+These four rules are visible here and in [open-questions/containers.md](../open-questions/containers.md). Implement them as one contract:
+
+1. **Which Result:** normalization may select only a concentration Result from the **same analysis** (or that analysis’s designated concentration analyte) for the source Sample. Prefer an approved/reviewed matching Result; if none is approved/reviewed, use the latest matching Result by entry date. Zero matches → **refuse**.
+2. **Units:** if the selected Result unit does not equal the configured vessel inventory-concentration unit, **refuse**. Do not silently convert.
+3. **Publish write-through:** publishing that Result writes its concentration and unit to the bound **1×1 `Container.concentration`** in the same transaction. It does not write concentration to Sample or make `Contents.concentration` the SoT.
+4. **Normalization picker:** `aliquot_by_target_concentration` offers eligible **Results only**. It never offers free text, `Contents.concentration`, or `Container.concentration` as the assay measurement.
+
+---
+
+## 11. Bounce bars (this agree)
 
 | Bounce | Why |
 |--------|-----|
@@ -166,21 +173,24 @@ Do not invent a composition table, JSON parent list, or “primary parent” rul
 | Sample write-back of mass/conc | Wrong target (Heidi §5) |
 | Contents on multi-element parent (plate/rack) | Structure only; contents on 1×1 children |
 | Contents with no parent Container | No vessel = no inventory |
-| Dest FieldDefinitions as a writable second ledger | Must RO-project or same-txn write-through to contents |
+| `Contents.concentration` as inventory-concentration SoT | Vessel inventory concentration belongs on the 1×1 Container |
+| Independently editable `Container.amount` | It must equal the compatible-unit sum of `Contents.amount` |
+| Dest FieldDefinitions as a writable second ledger | Must RO-project or same-txn write-through to the owning Contents/Container field |
 | Free type-in parent conc on normalization | Prior Result or refuse |
-| Silent unit conversion Result → contents | Hans: refuse |
+| Normalization from vessel/Contents concentration | Picker offers eligible Results only |
+| Silent Result-unit conversion | Hans: refuse |
 | Reopening Option A / storing volume as SoT | Locked 2026-08-11 |
-| Closing Hans holes or pool composition in this PR | Stay OPEN |
+| Inventing pool composition in this PR | Pool lineage stays OPEN |
 | IC50 / coding this packet | Docs only; Grok Build unless Marc instructs |
 
 ---
 
-## 11. Status and coding gate
+## 12. Status and coding gate
 
 | Item | Value |
 |------|--------|
-| Status | **Draft for Design Group agree** |
-| Status line | **Design Group review** |
+| Status | **Draft — Design Group coherence fold** |
+| Status line | **Pending re-stamp after fold** |
 | IC50 | **Not IC50** |
 | Code in this PR | **None** (docs only) |
 | Application coding | **Grok Build / paused** unless Marc instructs |
@@ -189,15 +199,15 @@ Schema implement for rows×columns / 1×1 Contents enforce remains the container
 
 ---
 
-## 12. Reviews
+## 13. Reviews
 
-Empty stamps for Design Group + CEO to fill later. Do not treat this table as Accept until stamped.
+Pending Design Group re-stamp after the body was corrected from Contents concentration to 1×1 Container concentration. Heidi’s prior Architecture verdict was **Revise until the sketch matched**; the body now matches and awaits her new verdict. Do not infer Accept from the fold.
 
 | Review | Reviewer | Verdict | Date | Notes |
 |--------|----------|---------|------|-------|
-| **CEO** | Rolf | _pending_ | | |
-| **Architecture** | Heidi | _pending_ | | Four write-back targets; Contents SoT; dest projection/write-through |
-| **Lab Ops** | Deiter | _pending_ | | 1×1 vessel; contents not on plates |
-| **CSO** | Hans | _pending_ | | Holes in §8 remain OPEN |
+| **CEO** | Rolf | _pending re-stamp_ | | |
+| **Architecture** | Heidi | _pending re-stamp_ | | Prior Revise condition addressed: per-row Contents amount; vessel total/concentration |
+| **Lab Ops** | Deiter | _pending re-stamp_ | | Storage outside experiments; one-shot put-away only |
+| **CSO** | Hans | _pending re-stamp_ | | §10 locked Result contract folded |
 
 **Implement gate for this agree:** closed until Design Group + CEO stamp. This PR does not unpause application coding.
