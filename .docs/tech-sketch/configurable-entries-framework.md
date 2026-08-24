@@ -1,7 +1,7 @@
 # Tech sketch: Configurable-entry framework
 
 **Date:** 2026-08-24  
-**Status:** **Draft for Design Group agree** — Design Group review  
+**Status:** **Design Group + CEO Agree (locked)**  
 **Audience:** Design Group — Heidi (Architecture), Hans (Scientific CSO), Deiter (Lab Ops); CEO Rolf  
 **Stem:** `configurable-entries-framework`  
 **This PR:** docs only. No application/product code. **Not IC50.**  
@@ -58,7 +58,7 @@ Those paths break sample-centric integrity and make every later preconfigured en
 - Treat aliquot/pool as the first proof of that pattern (atomic pair).
 - Keep dest rows `sample_id`-linked; mint via product execute; lineage + L1 join non-optional for any minting entry.
 - Record north star (more wrappers → lab-authored behavior → SOP→AI as a **later consumer**) without opening those slices now.
-- Leave empty review stamps for CEO / Architecture / Lab Ops / CSO (Hans).
+- Stamp Design Group + CEO Accept (locked 2026-08-24).
 
 ### Non-goals
 
@@ -85,6 +85,12 @@ Legacy API strings `sample_data` / `experiment_detail` **normalize** to these na
 Storage, grid (`GET /v1/entries/{id}/grid`), save/submit, and export stay as locked in [experiment-template-entries.md](experiment-template-entries.md) §0.2–§0.4. This framework sketch does not reopen those contracts.
 
 **No new physical tables** named `experiment_sample_data` / `experiment_data` — those are **entry types** (logical). Columns are FieldDefinitions on the entry (`entity_type` ∈ those two kinds), not Custom Fields on Sample.
+
+### 3.1 Entries are not copies of Sample (Marc CEO lock 2026-08-24)
+
+`experiment_data` and `experiment_sample_data` are **not copies of Sample**. They capture **processing data** during the experiment. They must not be treated as a duplicate Sample record.
+
+Sample **read-only projections** on grids may display identity for the tech (type, parent, barcode / container). **Writable** entry FieldDefinitions are **process values only** (e.g. dest amount / vol / conc on `aliquots_pools`).
 
 ---
 
@@ -124,6 +130,21 @@ Other v1 wrappers (Samples cohort display, generic plating/LH as `experiment_dat
 
 **Method ≠ dest sample type.** Separate controls. Method drives columns + mint op + dest FieldDefinitions. Dest type is an independent catalog control (`sample_type_transitions`).
 
+### 5.1 Field picker / FieldDefinitions (Marc lock 2026-08-24)
+
+When authoring an entry, **Add existing field** is populated only with existing FieldDefinitions for the **selected entry kind** (`experiment_data` **OR** `experiment_sample_data`).
+
+Aliquot/pool METHOD_CATALOG predefined fields must be **existing fields for their source kind**:
+
+| Surface | Kind / `entity_type` |
+|---------|----------------------|
+| Plan-line / plan-side fields | `experiment_data` |
+| Dest FieldDefinitions on `aliquots_pools` | `experiment_sample_data` |
+
+They are **not** Sample Custom Fields and **not** fields of the other kind. METHOD_CATALOG attaches those existing kind-scoped FieldDefinitions; it does not invent fields outside that kind’s catalog.
+
+**Dest FieldDefinitions must not duplicate Sample identity** (Heidi Architecture Accept, PR 63): do not attach `sample_type`, `parent_sample_id`, barcode, or container identity as dest FieldDefinitions. Those come from **execute** (and accessioning), not from entry FieldDefinitions. Grids may **project** Sample identity read-only; writable dest fields stay process values (§3.1).
+
 **Mid-flight method change:** not warn/wipe and not silent reshape. **Cancel the experiment.** Cancel does **not** un-mint already-minted daughters.
 
 Transition catalog rows still key off `mint_op` (aliquot|pool), not concrete method id. Concrete methods (Deiter IN list) live in METHOD_CATALOG; CUT methods (fraction, contribution ratio, plate map, serial dilution) stay out of this proof.
@@ -142,7 +163,7 @@ These rules apply to **any minting entry**, including future custom wrappers. Th
 | Process join | Dest joins **`eln_process_samples` (L1)** when the parent is under process. |
 | Dest type | From plan: **line override → entry default → parent**. Catalog: **`sample_type_transitions`** (many-to-many), mutate with **`config:edit`**. |
 | Pool sources | Must share **one** `sample_type` or refuse; then catalog lookup for that `mint_op`. |
-| Dest amount / vol / conc | **FieldDefinitions on the dest entry**, not new Sample columns. |
+| Dest amount / vol / conc | **FieldDefinitions on the dest entry**, not new Sample columns. Process values only — **not** Sample identity (`sample_type`, `parent_sample_id`, barcode / container). |
 
 Execute resolve (same as extract-hold; not a new rule):
 
@@ -216,6 +237,10 @@ Do not reopen without a new product decision. **Design Group bounce bars (2026-0
 | **New experiment-plan object** | Plan is `experiment_data` + `aliquot_pool_plan`. | Spine |
 | **Adding only one of the pair** | Atomic pair; no plan-only or dest-only UI. | Spine |
 | **Optional later wiring of METHOD_CATALOG maps** | Both maps attach **immediately** on method select. | Spine |
+| **Add existing field showing the wrong kind / Sample fields** | Dropdown lists only existing FieldDefinitions for the **selected entry kind**. Not Sample Custom Fields and not the other kind. | Marc 2026-08-24 |
+| **METHOD_CATALOG inventing fields outside the kind’s FieldDefinition catalog** | Predefined plan fields are existing `entity_type = experiment_data`; dest fields on `aliquots_pools` are existing `entity_type = experiment_sample_data`. | Marc 2026-08-24 |
+| **Dest FieldDefinitions that duplicate Sample identity** | Do not put `sample_type`, `parent_sample_id`, barcode, or container identity on the dest entry as FieldDefinitions. Those come from **execute** (and accessioning). Grids may show Sample identity as **read-only projections**. | Heidi PR 63 |
+| **Treating `experiment_data` / `experiment_sample_data` as a duplicate Sample record** | Those kinds capture **processing data** during the experiment, not a copy of Sample. Writable FieldDefinitions are process values only. | Marc CEO 2026-08-24 |
 
 Also still bounced in the extract-hold packet (not reopened here): CUT methods; free type-in parent concentration on normalization; equimolar-by-size without size/bp path; matrix drop; receive/mid-entry type gate; if-blood-then; transitions on `template_definition`. Sample/`material_class` for dest fields is in the table above (Heidi), not only this footnote.
 
@@ -230,8 +255,10 @@ Any future minting or plan/dest pair should answer the same questions:
 3. If minting: which **catalog** supplies plan columns and dest FieldDefinitions, and when do they attach?
 4. Does **product execute** mint `sample_id`-linked dests with `parent_sample_id` and L1 join?
 5. Are dest quantitative fields **entry FieldDefinitions**, not Sample schema?
+6. Does **Add existing field** list only FieldDefinitions for that entry’s kind (Marc lock §5.1)?
+7. Are writable FieldDefinitions **process values only** (not a duplicate Sample record; not Sample identity — Heidi / Marc CEO)?
 
-If a proposed entry cannot answer those without a third kind, a webhook mint, or unlinked identifiers, it is **out of framework**.
+If a proposed entry cannot answer those without a third kind, a webhook mint, unlinked identifiers, Sample-identity dest fields, or fields from Sample / the other kind, it is **out of framework**.
 
 ---
 
@@ -251,8 +278,8 @@ This sketch does **not** replace extract-hold requirements or METHOD_CATALOG tab
 
 | Item | Value |
 |------|--------|
-| Status | **Draft for Design Group agree** |
-| Status line | **Design Group review** |
+| Status | **Design Group + CEO Agree (locked)** |
+| Status line | **Design Group + CEO Agree (locked)** |
 | IC50 | **Not IC50** |
 | Code in this PR | **None** (docs only) |
 | Application coding | **Grok Build / paused** unless Marc instructs |
@@ -261,13 +288,15 @@ This sketch does **not** replace extract-hold requirements or METHOD_CATALOG tab
 
 ## 13. Reviews
 
-Empty stamps for Design Group + CEO to fill later. Do not treat this table as Accept until stamped.
+Stamped 2026-08-24. Framework agree is **locked**. **Not IC50.** Docs only. Coding stays paused unless Marc instructs.
 
 | Review | Reviewer | Verdict | Date | Notes |
 |--------|----------|---------|------|-------|
-| **CEO** | Rolf | _pending_ | | |
-| **Architecture** | Heidi | _pending_ | | |
-| **Lab Ops** | Deiter | _pending_ | | |
-| **CSO** | Hans | _pending_ | | |
+| **CEO** | Rolf | **Accept** | 2026-08-24 | Framework agree; aliquot/pool as first proof |
+| **CEO (Marc lock)** | Marc | **Accept** | 2026-08-24 | Entries are not copies of Sample; writable FieldDefinitions = process values; Sample identity may be RO grid projections |
+| **Architecture** | Heidi | **Accept** | 2026-08-24 | Two kinds; no Sample/`material_class` dest columns; no customer Python v1 |
+| **Architecture (PR 63)** | Heidi | **Accept** | 2026-08-24 | Field-picker fold; bounce dest FieldDefinitions that duplicate Sample identity (`sample_type`, `parent_sample_id`, barcode / container) |
+| **Lab Ops** | Deiter | **Accept** | 2026-08-24 | Dest empty until execute; dest type on plan; no mid-flight method change; no customer Python v1 |
+| **CSO** | Hans | **Accept** | 2026-08-24 | `sample_id` linkage; mint requires transition catalog / `sample_id` / L1; SOP→AI must not bypass |
 
-**Implement gate for this framework agree:** closed until Design Group + CEO stamp. Extract-hold implement gate remains as documented on that packet; this PR does not unpause coding.
+**Implement gate for this framework agree:** **open (docs lock)**. Extract-hold implement gate remains as documented on that packet. This PR does not unpause coding.

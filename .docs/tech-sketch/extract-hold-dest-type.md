@@ -73,6 +73,10 @@ if type_id != source.sample_type and no catalog_row(source, mint_op, type_id): r
 - Equimolar-by-size without a size/bp sample/result path (Hans gate).
 - **New Sample columns** for dest amount/volume/concentration — dest fields are **entry FieldDefinitions** on `aliquots_pools` (`experiment_sample_data`), not Sample schema.
 - **Optional / later wiring** of plan columns or dest FieldDefinitions after method select — catalog attaches **immediately** and automatically.
+- **Add existing field showing the wrong kind / Sample fields** — dropdown is existing FieldDefinitions for the selected entry kind only (Marc lock 2026-08-24; see configurable-entries-framework §5.1).
+- **METHOD_CATALOG inventing fields outside the kind’s FieldDefinition catalog** — plan fields `entity_type = experiment_data`; dest on `aliquots_pools` `entity_type = experiment_sample_data`.
+- **Dest FieldDefinitions that duplicate Sample identity** (`sample_type`, `parent_sample_id`, barcode / container) — those come from execute / accessioning, not dest FieldDefinitions (Heidi PR 63).
+- **Treating dest/plan entries as a duplicate Sample record** — kinds capture processing data; writable FieldDefinitions are process values only (Marc CEO).
 - Sample/`material_class` column; matrix drop; receive/mid-entry type gate; if-blood-then; transitions on `template_definition`.
 
 ## 4. METHOD_CATALOG (Deiter cut list) — owns both maps
@@ -86,6 +90,10 @@ Entry `method` is a concrete id. Each catalog row owns:
 **UX (Heidi + Mathilda 2026-08-23):** Method select → METHOD_CATALOG attaches plan columns **and** dest FieldDefinitions **immediately**. Not optional later wiring. Method ≠ dest type (dest type stays a separate control).
 
 **Dest FieldDefinitions live on the dest entry**, not on Sample. Sketch-level required fields below — not product schema invention beyond the FieldDefinition attachment pattern.
+
+**Marc lock (field picker / FieldDefinitions, 2026-08-24):** **Add existing field** lists only existing FieldDefinitions for the **selected entry kind**. METHOD_CATALOG predefined fields must already exist for that kind: plan-line / plan-side = `entity_type = experiment_data`; dest FieldDefinitions on `aliquots_pools` = `entity_type = experiment_sample_data`. Not Sample Custom Fields and not the other kind. Canonical write-up: [configurable-entries-framework.md](configurable-entries-framework.md) §5.1.
+
+**Heidi Architecture Accept (PR 63) + Marc CEO:** Dest FieldDefinitions must **not** duplicate Sample identity (`sample_type`, `parent_sample_id`, barcode / container). Those come from **execute** (and accessioning). `experiment_data` / `experiment_sample_data` capture **processing data**, not a copy of Sample. Grids may show Sample identity as read-only projections; writable dest fields are process values only. See configurable-entries-framework §3.1 / §5.1.
 
 ### 4.0 Catalog shape (sketch)
 
