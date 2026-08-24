@@ -24,6 +24,8 @@ share/python-wheels/
 MANIFEST
 .docs/container-logs/
 .docs/private/
+.docs-review/container-logs/
+.docs-review/private/
 .docs-internal/
 
 # PyInstaller

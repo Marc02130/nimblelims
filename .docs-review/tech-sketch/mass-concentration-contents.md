@@ -11,11 +11,11 @@
 
 | Doc | Role |
 |-----|------|
-| [`.docs/open-questions/containers.md`](../open-questions/containers.md) | Option A (solute mass); nesting; Contents only on 1×1; volume not stored |
-| [`.docs/tech-sketch/experiment-template-entries.md`](experiment-template-entries.md) §0.8 | Same container/amount/aliquot spine |
-| [`.docs/tech-sketch/configurable-entries-framework.md`](configurable-entries-framework.md) | Two kinds; dest FieldDefinitions not Sample schema |
-| [`.docs/tech-sketch/extract-hold-dest-type.md`](extract-hold-dest-type.md) | Aliquot/pool execute; dest fields on dest entry; normalization bounce free type-in |
-| [`.docs/ideas/containers-model-update.md`](../ideas/containers-model-update.md) | Implement slice still pending for rows×columns / 1×1 enforce |
+| [`.docs-review/open-questions/containers.md`](../open-questions/containers.md) | Option A (solute mass); nesting; Contents only on 1×1; volume not stored |
+| [`.docs-review/tech-sketch/experiment-template-entries.md`](experiment-template-entries.md) §0.8 | Same container/amount/aliquot spine |
+| [`.docs-review/tech-sketch/configurable-entries-framework.md`](configurable-entries-framework.md) | Two kinds; dest FieldDefinitions not Sample schema |
+| [`.docs-review/tech-sketch/extract-hold-dest-type.md`](extract-hold-dest-type.md) | Aliquot/pool execute; dest fields on dest entry; normalization bounce free type-in |
+| local `.docs-internal/ideas/containers-model-update.md` (not committed) | Implement slice still pending for rows×columns / 1×1 enforce |
 
 This document folds the existing container locks with the Result decisions recorded for this packet. It states why per-sample amount belongs on **Contents**, why vessel total amount and inventory concentration belong on the **1×1 Container**, and why write-back / destination fields / normalization must not put mass or concentration on **Sample**.
 
@@ -115,7 +115,7 @@ Exactly four. Entry cells are not a fifth inventory table.
 
 ## 6. Option A (mention only — already locked)
 
-Canonical: [`.docs/open-questions/containers.md`](../open-questions/containers.md) §0.1.
+Canonical: [`.docs-review/open-questions/containers.md`](../open-questions/containers.md) §0.1.
 
 - Amount = **solute mass** (or count for cells/colonies) — never volume, never diluent mass.
 - Volume **never stored** as primary SoT; derive \( V = m_{\text{solute}} / C \) when units convert cleanly.

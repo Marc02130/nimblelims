@@ -1,8 +1,8 @@
 # Open Questions — LimsRun → Results
 
 **Status:** Living decision log  
-**Idea:** [`.docs/ideas/run-results.md`](../ideas/run-results.md)  
-**Reviews:** [CEO](../ceo-review/run-results.md) · [UI](../ui-review/run-results.md) · [Tech](../design/run-results.md) · [Security](../security-review/run-results.md)  
+**Idea:** local `.docs-internal/ideas/run-results.md` (not committed)  
+**Reviews:** [CEO](../ceo-review/run-results.md) · [UI](../ui-review/run-results.md) · local `.docs-internal/design/run-results.md` (not committed) · [Security](../security-review/run-results.md)  
 **Branch:** `run-results`
 
 ## Gate rule
@@ -30,7 +30,7 @@ Do not implement a phase until questions that block it are **Decided** (or provi
 | 6 | Always promote on publish, or opt-in? | **Decided** | Publish hook | See **Decision #6**. Promote when run has **`analysis_id` set** and status → **published**. | 2026-07-11 | Product | Analysis association is the opt-in |
 | 7 | Missing tests on sample: block vs auto-create? | **Decided** | Promote readiness | See **Decision #7**. Analysis/analyte = catalog objects; test/result = instances. If analysis is on the run, tests are **ensured** (find-or-create)—there is no “missing test” failure mode for a defined analysis. | 2026-07-11 | Product | Objects vs instances |
 | 8 | Existing results conflict policy? | **Decided** | Idempotency | See **Decision #8**. Same run re-publish/edit → **update**. Different run promoting same sample/analyte/replicate → **fail + notify**. | 2026-07-11 | Product | Lineage distinguishes runs |
-| 9 | Alias storage / matching? | **Decided** | P0 aliases | **Maintained list on analyte** (no pattern matching). AI assist for misses = **later idea** ([ai-analyte-resolution](../ideas/ai-analyte-resolution.md)) | 2026-07-11 | Product | EtOH / C2H5OH / ethanol have no pattern |
+| 9 | Alias storage / matching? | **Decided** | P0 aliases | **Maintained list on analyte** (no pattern matching). AI assist for misses = **later idea** (local `.docs-internal/ideas/ai-analyte-resolution.md` (not committed)) | 2026-07-11 | Product | EtOH / C2H5OH / ethanol have no pattern |
 | 15 | Replicate number when JSONB has none? | **Decided** | Promote | Use **row order** (1..n) among rows for that sample+analyte | 2026-07-11 | Product | Deterministic without instrument replicate column |
 | 16 | Promote batch size? | **Decided** | Ops | **Configurable** (admin Lims Runs settings); **default 200** | 2026-07-11 | Product | Large imports |
 | 10 | Permissions: publish alone vs + result:enter? | **Decided** | AuthZ | **Publish alone is enough** to write tests/results on promote | 2026-07-11 | Product | Publish is the official gate |
@@ -53,7 +53,7 @@ Do not implement a phase until questions that block it are **Decided** (or provi
 | **P4** | Preview UX, conflict notifications | **Shipped** |
 | **P5** | Optional JSONB → result custom fields | Deferred |
 
-**v1 product policy + implementation complete.** Follow-ons: [ai-analyte-resolution](../ideas/ai-analyte-resolution.md), [ai-data-import](../ideas/ai-data-import.md), [ai-data-analysis](../ideas/ai-data-analysis.md).
+**v1 product policy + implementation complete.** Follow-ons: local `.docs-internal/ideas/ai-analyte-resolution.md` (not committed), local `.docs-internal/ideas/ai-data-import.md` (not committed), local `.docs-internal/ideas/ai-data-analysis.md` (not committed).
 
 ---
 
@@ -123,7 +123,7 @@ There is no separate “promote_on_publish” boolean and **no** “continue wit
 4. **Test target:** For each distinct `sample_id` in `lims_run_data`, **ensure** a **test** instance for that sample + analysis (see **#7**).  
 5. **Analyte scope:** Prefer analytes on that analysis (via `analysis_analytes`); aliases on analyte.  
 6. **Template default:** Optional default `analysis_id` from template for convenience; run can override to another analysis.  
-7. **Method-dev / scratch:** Deferred to [lab projects](../ideas/orders-and-projects.md) — still use a real analysis (e.g. draft), not null.
+7. **Method-dev / scratch:** Deferred to local `.docs-internal/ideas/orders-and-projects.md` (not committed) — still use a real analysis (e.g. draft), not null.
 
 ### Superseded (do not reintroduce)
 
@@ -186,7 +186,7 @@ Store CRO/instrument alternate names as a **maintained list on the analyte** (ar
 Matching is **list membership** (after light normalize: trim, casefold)—**not** chemical heuristics or regex patterns. Names like `ethanol` / `EtOH` / `C2H5OH` have no discoverable pattern; labs already maintain synonym lists for this reason.
 
 **v1:** unresolved column → surface in preview/errors (skip or block per policy).  
-**Later:** AI-assisted resolution / suggest alias — [ideas/ai-analyte-resolution.md](../ideas/ai-analyte-resolution.md).
+**Later:** AI-assisted resolution / suggest alias — local `.docs-internal/ideas/ai-analyte-resolution.md` (not committed).
 
 ---
 

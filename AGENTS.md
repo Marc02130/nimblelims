@@ -4,7 +4,9 @@
 
 Full pipeline (proportional), folders, phased implementation, and review handling:
 
-→ **[`.docs/development-process/README.md`](.docs/development-process/README.md)**
+→ **[`.docs-review/development-process/README.md`](.docs-review/development-process/README.md)**
+
+**Docs trees:** `.docs-review/` is committed (reviews, manuals, process, cycle requirements). `.docs-internal/` is local-only (umbrella PRD, design, ideas, SOP packs, user stories, private) — never commit it.
 
 Summary:
 
@@ -14,12 +16,12 @@ Summary:
 | **Small** | Idea optional → implement |
 | **Everything else** | Ideation → requirements → tech sketch → reviews (Lab Ops / CEO / UI / Arch / Security / Scientific CSO / BA / QA) → open questions → implement (with docs + UAT updates) → **docs sync** → **dogfood** → **UAT pass** → **merge to main (production)** → monitor → requirements update |
 
-**Formal review skills:** Lab Ops (`/nimble-lab-ops-review`), CEO (`/nimble-ceo-review`), UI (`/nimble-ui-review`), Architecture (`/nimble-arch-review`), Security CSO (`/nimble-cso-review`), Scientific CSO (`/nimble-scientific-cso-review`), BA (`/nimble-ba-review`), QA (`/nimble-qa-review`). Orchestrator: `/nimble-review-packet`. Artifacts live at `.docs/{review-type}-review/{stem}.md`.
+**Formal review skills:** Lab Ops (`/nimble-lab-ops-review`), CEO (`/nimble-ceo-review`), UI (`/nimble-ui-review`), Architecture (`/nimble-arch-review`), Security CSO (`/nimble-cso-review`), Scientific CSO (`/nimble-scientific-cso-review`), BA (`/nimble-ba-review`), QA (`/nimble-qa-review`). Orchestrator: `/nimble-review-packet`. Artifacts live at `.docs-review/{review-type}-review/{stem}.md`.
 
-**QA review:** Testing / QA Lead (Tobias persona). Testability, UAT readiness, acceptance criteria quality. **Required** for work touching sample tracking / test ordering / results entry / audit / security/RBAC/RLS. Reviews `.docs/qa-review/{stem}.md` before implement; not a substitute for post-implement UAT pass. Both are required for full-pipeline work.
+**QA review:** Testing / QA Lead (Tobias persona). Testability, UAT readiness, acceptance criteria quality. **Required** for work touching sample tracking / test ordering / results entry / audit / security/RBAC/RLS. Reviews `.docs-review/qa-review/{stem}.md` before implement; not a substitute for post-implement UAT pass. Both are required for full-pipeline work.
 
 **Implement requirements (full-pipeline work):**
-1. Documentation sync (manuals / README / `.docs/` as applicable)
+1. Documentation sync (manuals / README / `.docs-review/` as applicable)
 2. UAT script create-or-update at `UAT_Scripts/uat-{stem}.md`
 3. Awareness of QA review conditions (**QA*** prefix) when QA review exists
 
@@ -29,12 +31,12 @@ Summary:
 
 **Do not start a new phase (or a major feature within a phase) until open questions that block that work are resolved.**
 
-- Living decision logs live under [`.docs/open-questions/`](.docs/open-questions/) (e.g. experiments: [`.docs/open-questions/experiments.md`](.docs/open-questions/experiments.md), parsers: [`.docs/open-questions/data-parsers-lims-runs.md`](.docs/open-questions/data-parsers-lims-runs.md)).
-- Checklists (e.g. [`.docs/checklist/experiment-checklist.md`](.docs/checklist/experiment-checklist.md)) track tasks; **open questions are not owned by the checklist** — they are owned by the open-questions docs.
+- Living decision logs live under [`.docs-review/open-questions/`](.docs-review/open-questions/) (e.g. experiments: [`.docs-review/open-questions/experiments.md`](.docs-review/open-questions/experiments.md), parsers: [`.docs-review/open-questions/data-parsers-lims-runs.md`](.docs-review/open-questions/data-parsers-lims-runs.md)).
+- Checklists (e.g. [`.docs-review/checklist/experiment-checklist.md`](.docs-review/checklist/experiment-checklist.md)) track tasks; **open questions are not owned by the checklist** — they are owned by the open-questions docs.
 - Status labels: **Open** (blocks related work), **Decided (provisional)** (shipped temporary rule), **Decided**, **Deferred**.
 - If coding surfaces a new product/architecture question, add it to the relevant open-questions doc and **pause** if it blocks the current slice.
 - Phases 1–3 of the experiments refactor have shipped (definitions, typed steps, sample journey). Future work still uses the open-questions gate before expanding scope.
-- After implement (full pipeline): **docs sync** → **dogfood** → **UAT pass** → **merge to `main`** (production) → monitor → requirements update. See [`.docs/development-process/`](.docs/development-process/).
+- After implement (full pipeline): **docs sync** → **dogfood** → **UAT pass** → **merge to `main`** (production) → monitor → requirements update. See [`.docs-review/development-process/`](.docs-review/development-process/).
 
 ## Cursor Cloud specific instructions
 

@@ -42,7 +42,7 @@ Overall direction is sound: move from "everything in JSONB" toward controlled ex
 - Retire "custom attributes" completely as an extension mechanism.
 - JSONB strictly limited to OOB unstructured data (no UI for defining new unstructured extensibility).
 - Hard cutover (not gradual dual-write) when moving data out of custom_attributes.
-- Full glossary + relationship explanation is in `.docs/design/schema-evolution.md`.
+- Full glossary + relationship explanation is in `.docs-internal/design/schema-evolution.md`.
 
 **FieldDefinition vs Entry relationship (clarified):**
 
@@ -185,9 +185,9 @@ With the issues above addressed, this is a viable foundation for the JSONB refac
 ---
 
 **Related Documents**
-- `.docs/design/schema-evolution.md`
-- `.docs/requirements/schema-evolution.md`
-- `.docs/user-stories/schema-modification.md`
-- `.docs/design/jsonb-usage-analysis.md`
-- `.docs/manuals/processes.md`
-- `.docs/manuals/experiments.md`
+- `.docs-internal/design/schema-evolution.md`
+- `.docs-review/requirements/schema-evolution.md`
+- `.docs-internal/user-stories/schema-modification.md`
+- `.docs-internal/design/jsonb-usage-analysis.md`
+- `.docs-review/manuals/processes.md`
+- `.docs-review/manuals/experiments.md`

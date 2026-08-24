@@ -11,13 +11,13 @@
 
 | Doc | Role |
 |-----|------|
-| [`.docs/tech-sketch/experiment-template-entries.md`](experiment-template-entries.md) | Two base kinds, storage, grid contract, v1 predefined wrappers (§0.8 / §0.9) |
-| [`.docs/tech-sketch/extract-hold-dest-type.md`](extract-hold-dest-type.md) | Aliquot/pool atomic pair, METHOD_CATALOG dual-map, dest type, execute/mint |
-| [`.docs/requirements/extract-hold-dest-type.md`](../requirements/extract-hold-dest-type.md) | Acceptance criteria and leadership locks for dest type + pair |
-| [`.docs/open-questions/sop-ai-to-process.md`](../open-questions/sop-ai-to-process.md) | PR 51 / SOP→AI Apply Hold |
-| [`.docs/tech-sketch/mass-concentration-contents.md`](mass-concentration-contents.md) | Four write targets; per-row Contents amount; vessel totals/concentration; Result locks |
-| [`.docs/tech-sketch/sample-container-queue.md`](sample-container-queue.md) | Merged PR 65 discussion; source vessel binding remains open |
-| [`.docs/tech-sketch/experiment-entries-gap.md`](experiment-entries-gap.md) | Current implementation gaps and order to get an experiment running |
+| [`.docs-review/tech-sketch/experiment-template-entries.md`](experiment-template-entries.md) | Two base kinds, storage, grid contract, v1 predefined wrappers (§0.8 / §0.9) |
+| [`.docs-review/tech-sketch/extract-hold-dest-type.md`](extract-hold-dest-type.md) | Aliquot/pool atomic pair, METHOD_CATALOG dual-map, dest type, execute/mint |
+| [`.docs-review/requirements/extract-hold-dest-type.md`](../requirements/extract-hold-dest-type.md) | Acceptance criteria and leadership locks for dest type + pair |
+| [`.docs-review/open-questions/sop-ai-to-process.md`](../open-questions/sop-ai-to-process.md) | PR 51 / SOP→AI Apply Hold |
+| [`.docs-review/tech-sketch/mass-concentration-contents.md`](mass-concentration-contents.md) | Four write targets; per-row Contents amount; vessel totals/concentration; Result locks |
+| [`.docs-review/tech-sketch/sample-container-queue.md`](sample-container-queue.md) | Merged PR 65 discussion; source vessel binding remains open |
+| [`.docs-review/tech-sketch/experiment-entries-gap.md`](experiment-entries-gap.md) | Current implementation gaps and order to get an experiment running |
 
 ---
 

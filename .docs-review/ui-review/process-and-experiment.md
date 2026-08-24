@@ -3,7 +3,7 @@
 **Date:** 2026-07-09  
 **Branch:** refactor/experiments  
 **Reviewer:** Design / UX  
-**Scope:** UX, mental models, interface patterns, and product design implications of the experiment + process + entries work. Based on `.docs/manuals/experiments.md`, `.docs/manuals/processes.md`, `.docs/design/gap-analysis-process-and-experiment.md`, `.docs/requirements/experiment-processes-entries.md`, and related Field Management work.
+**Scope:** UX, mental models, interface patterns, and product design implications of the experiment + process + entries work. Based on `.docs-review/manuals/experiments.md`, `.docs-review/manuals/processes.md`, `.docs-internal/design/gap-analysis-process-and-experiment.md`, `.docs-review/requirements/experiment-processes-entries.md`, and related Field Management work.
 
 ## Executive Summary
 
@@ -155,9 +155,9 @@ Write-back from sample entries to core Sample fields is powerful but potentially
 
 ## References
 
-- `.docs/requirements/experiment-processes-entries.md`
-- `.docs/design/gap-analysis-process-and-experiment.md`
-- `.docs/manuals/experiments.md` and `.docs/manuals/processes.md`
+- `.docs-review/requirements/experiment-processes-entries.md`
+- `.docs-internal/design/gap-analysis-process-and-experiment.md`
+- `.docs-review/manuals/experiments.md` and `.docs-review/manuals/processes.md`
 - Field Management design docs (unified OOB + custom via lists)
 - Existing ExperimentsManagement and ExperimentTemplatesManagement UI patterns
 

@@ -26,4 +26,4 @@ Decision logs for workstreams that must not proceed until product/architecture q
 
 ## Docs layout
 
-Project documentation is organized under [`.docs/README.md`](../README.md). Checklists track *tasks*; this folder owns *decisions*.
+Project documentation is organized under [`.docs-review/README.md`](../README.md). Checklists track *tasks*; this folder owns *decisions*.

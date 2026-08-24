@@ -3,7 +3,7 @@
 **Date:** 2026-08-20  
 **Status:** Accept with conditions  
 **Reviewer persona:** Testing / QA Lead (Tobias)  
-**Tech sketch:** [PR 30](https://github.com/Marc02130/nimblelims/pull/30) — `.docs/tech-sketch/atomic-receive.md` (C1 dropped; ignore merged #28)  
+**Tech sketch:** [PR 30](https://github.com/Marc02130/nimblelims/pull/30) — `.docs-review/tech-sketch/atomic-receive.md` (C1 dropped; ignore merged #28)  
 **Related reviews:** Lab Ops L2–L4 (L1 retracted); CSO Accept; Architecture Accept (PR 30 + persist lock); CEO Accept when PR 30 merged. [PR 33](https://github.com/Marc02130/nimblelims/pull/33) is stamp paperwork only. QA records the gate; it does not open it.  
 **Stories:** [PR 32](https://github.com/Marc02130/nimblelims/pull/32) **merged** — full catalog on `main`. US-1 / US-7 / US-8 / US-30 match the receive loop. Not PR 29.  
 **UAT script:** [`UAT_Scripts/uat-atomic-receive.md`](../../UAT_Scripts/uat-atomic-receive.md)  

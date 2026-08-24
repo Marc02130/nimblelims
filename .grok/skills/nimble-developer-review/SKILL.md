@@ -5,7 +5,7 @@ description: >
   Concrete implementability for Cursor: module/file mapping, coding conventions
   (PEP8, ESLint, existing FastAPI/React patterns), migration safety, incremental
   delivery order, test scaffolding notes, and clean hand-off that supports the
-  required documentation + UAT + README updates. Writes .docs/developer-review/{stem}.md.
+  required documentation + UAT + README updates. Writes .docs-review/developer-review/{stem}.md.
   Use when: "developer review", "dev review", "implementation readiness",
   "Cursor hand-off", "coding standards", "nimble developer".
 user-invocable: true
@@ -56,7 +56,7 @@ Conditions: **D1, D2, …**
 
 ### 4. Write formal artifact
 
-Create or update `.docs/developer-review/{stem}.md`:
+Create or update `.docs-review/developer-review/{stem}.md`:
 
 ```markdown
 # Developer Review: {Title}
