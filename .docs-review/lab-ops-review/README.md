@@ -25,7 +25,7 @@
 ## Artifact location
 
 ```
-.docs/lab-ops-review/{feature-stem}.md
+.docs-review/lab-ops-review/{feature-stem}.md
 ```
 
 Same stem as requirements / tech sketch / other reviews.
@@ -52,5 +52,5 @@ Premature “Accept” from eng/product without lab ops is **invalid for impleme
 ## Reference materials
 
 - Customer/competitor: `manuals/Sapio Experiments Guide.pdf` (entry catalog, templates, submit/lock, process stringing)  
-- Product: `.docs/manuals/experiments.md`, `processes.md`, `lims-runs.md`  
-- Requirements: `.docs/requirements/experiment-processes-entries.md`
+- Product: `.docs-review/manuals/experiments.md`, `processes.md`, `lims-runs.md`  
+- Requirements: `.docs-review/requirements/experiment-processes-entries.md`

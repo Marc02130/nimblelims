@@ -4,7 +4,7 @@ description: >
   Formal NimbleLIMS Testing / QA Lead review of a feature packet.
   Testability, UAT scenarios, acceptance criteria quality, coverage of sample
   lifecycle / results integrity / audit, readiness for Cursor docs + UAT updates.
-  Writes .docs/qa-review/{stem}.md.
+  Writes .docs-review/qa-review/{stem}.md.
   Use when: "QA review", "testing review", "UAT review", "testability",
   "acceptance criteria", "nimble qa", "nimble testing".
 user-invocable: true
@@ -52,7 +52,7 @@ Conditions: **QA1, QA2, …** (see PACKET.md)
 
 ### 4. Write formal artifact
 
-Create or update `.docs/qa-review/{stem}.md`:
+Create or update `.docs-review/qa-review/{stem}.md`:
 
 ```markdown
 # QA Review: {Title}

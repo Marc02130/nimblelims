@@ -1,8 +1,8 @@
 # Open Questions — Experiments / Processes / Entries
 
 **Status:** Living decision log  
-**Checklist:** [`.docs/checklist/experiment-checklist.md`](../checklist/experiment-checklist.md)  
-**Requirements:** [`.docs/requirements/experiment-processes-entries.md`](../requirements/experiment-processes-entries.md)
+**Checklist:** [`.docs-review/checklist/experiment-checklist.md`](../checklist/experiment-checklist.md)  
+**Requirements:** [`.docs-review/requirements/experiment-processes-entries.md`](../requirements/experiment-processes-entries.md)
 
 ## Gate rule
 
@@ -491,8 +491,8 @@ Process accordion
 
 ## Related
 
-- Checklist: [`.docs/checklist/experiment-checklist.md`](../checklist/experiment-checklist.md)
-- Processes: [`.docs/manuals/processes.md`](../manuals/processes.md)
-- Template entries: [`.docs/tech-sketch/experiment-template-entries.md`](../tech-sketch/experiment-template-entries.md)
-- Experiments (ELN): [`.docs/manuals/experiments.md`](../manuals/experiments.md)
-- Runs (LIMS): [`.docs/manuals/lims-runs.md`](../manuals/lims-runs.md)
+- Checklist: [`.docs-review/checklist/experiment-checklist.md`](../checklist/experiment-checklist.md)
+- Processes: [`.docs-review/manuals/processes.md`](../manuals/processes.md)
+- Template entries: [`.docs-review/tech-sketch/experiment-template-entries.md`](../tech-sketch/experiment-template-entries.md)
+- Experiments (ELN): [`.docs-review/manuals/experiments.md`](../manuals/experiments.md)
+- Runs (LIMS): [`.docs-review/manuals/lims-runs.md`](../manuals/lims-runs.md)

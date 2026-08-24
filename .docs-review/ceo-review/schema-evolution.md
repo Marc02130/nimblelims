@@ -122,10 +122,10 @@ This direction makes sense — with disciplined scoping.
 ---
 
 **Related Documents**
-- `.docs/design/schema-evolution.md`
-- `.docs/security-review/schema-evolution.md`
-- `.docs/requirements/schema-evolution.md`
-- `.docs/user-stories/schema-modification.md`
-- `.docs/design/jsonb-usage-analysis.md`
-- `.docs/manuals/processes.md`
-- `.docs/manuals/experiments.md`
+- `.docs-internal/design/schema-evolution.md`
+- `.docs-review/security-review/schema-evolution.md`
+- `.docs-review/requirements/schema-evolution.md`
+- `.docs-internal/user-stories/schema-modification.md`
+- `.docs-internal/design/jsonb-usage-analysis.md`
+- `.docs-review/manuals/processes.md`
+- `.docs-review/manuals/experiments.md`
