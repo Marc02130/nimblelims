@@ -78,7 +78,7 @@ Lightweight *how* (see [tech-sketch/README.md](tech-sketch/README.md)). Feature 
 
 | Cycle | Doc | Status |
 |-------|-----|--------|
-| atomic-receive | [tech-sketch/atomic-receive.md](tech-sketch/atomic-receive.md) | CEO Accept (PR 30). **AuthZ fold 2026-08-24** — §4b Heidi/Günter |
+| atomic-receive | [tech-sketch/atomic-receive.md](tech-sketch/atomic-receive.md) | Design: CEO Accept (PR 30). AuthZ docs gate **satisfied** (Heidi/Günter Accept with conditions, PR 68). **Product code waits on Marc** |
 | data-parsers-lims-runs | [tech-sketch/data-parsers-lims-runs.md](tech-sketch/data-parsers-lims-runs.md) | Accepted |
 | experiment-template-entries | [tech-sketch/experiment-template-entries.md](tech-sketch/experiment-template-entries.md) | **Hold** — Lab Ops revise (2026-07-29) |
 | extract-hold-dest-type | [tech-sketch/extract-hold-dest-type.md](tech-sketch/extract-hold-dest-type.md) | **In review** — Leadership before implement |
@@ -131,14 +131,14 @@ Long-form tech designs live under local `.docs-internal/design/` (not committed)
 
 Tech design for this cycle: local `.docs-internal/design/run-results.md` (not committed).
 
-## Reviews (atomic-receive) — CEO Accept; AuthZ docs gate closed 2026-08-24
+## Reviews (atomic-receive) — AuthZ docs gate satisfied; product code gated on Marc
 
-- **Tech sketch:** [tech-sketch/atomic-receive.md](tech-sketch/atomic-receive.md) — §4b AuthZ spine (Heidi/Günter)
+- **Tech sketch:** [tech-sketch/atomic-receive.md](tech-sketch/atomic-receive.md) — §4b AuthZ spine (Heidi/Günter **Accept with conditions**, PR 68)
 - **Security stamp:** [security-review/atomic-receive.md](security-review/atomic-receive.md) — S-AR-1..5 (same as sample create; project RLS; one path/one txn; refuse orphan multi-call; no client bypass)
 - [lab-ops-review/atomic-receive.md](lab-ops-review/atomic-receive.md)
 - [qa-review/atomic-receive.md](qa-review/atomic-receive.md)
 
-Product implement of receive still waits on Marc green-light for the accessioning P0 refactor. Not IC50.
+Packet **design** still CEO Accept (PR 30). AuthZ **docs** gate **satisfied**. Product **implement waits on Marc** green-light for the accessioning P0 refactor. Not IC50.
 
 ## Reviews (data parsers / LimsRun import) — **CEO Accept; other reviews open**
 

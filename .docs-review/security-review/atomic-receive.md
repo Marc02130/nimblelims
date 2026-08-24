@@ -1,12 +1,21 @@
 # Security Review: Atomic receive AuthZ spine
 
 **Date:** 2026-08-24  
-**Status:** **Accept** — AuthZ **docs** gate CLOSED (sketch §4b + this stamp). Product **implement** still waits on Marc green-light for the accessioning P0 refactor.  
+**Status:** **Accept with conditions** (Heidi/Günter)  
 **Stem:** `atomic-receive`  
 **Tech sketch:** [`.docs-review/tech-sketch/atomic-receive.md`](../tech-sketch/atomic-receive.md) §4b  
 **Related:** [Lab Ops](../lab-ops-review/atomic-receive.md) · [QA](../qa-review/atomic-receive.md)  
 **Scope:** Feature packet (STRIDE) — receive path AuthZ only. DEEP CSO: skipped.  
 **Not this packet:** IC50, dose-response, extract-hold, ELN execute.
+
+## Gate
+
+| Gate | State |
+|------|--------|
+| **AuthZ docs gate** | **Satisfied** — Heidi/Günter Accept with conditions on sketch §4b + this stamp (PR 68). |
+| **Product implement** | **Gated on Marc green-light** for the accessioning P0 refactor. Do **not** read PR 30 “Implement gate OPEN” as permission to write product code. |
+
+Packet **design** Accepts still stand (CEO PR 30, Lab Ops L2–L4 / L1 retracted, scientific CSO, Architecture, UI). Code stays gated until Marc says go.
 
 ## Executive summary
 
@@ -14,9 +23,7 @@ Heidi / Günter locked receive AuthZ on 2026-08-24. Until that spine lived in th
 
 `POST /api/samples/receive` is **not** a second permission world. It uses the **same AuthZ as sample create** plus **project RLS** (`has_project_access` / `lims_app`). There is one receive API and one DB transaction for sample + first container + contents (+ optional tests). Orphan multi-call (create sample → create container → link) is refused. The UI must not be the AuthZ gate.
 
-**AuthZ docs gate:** satisfied once sketch §4b and this stamp exist. **Implement** of receive product code still waits on Marc green-light for the accessioning P0 refactor. Not IC50.
-
-**Verdict: Accept** (docs gate). Conditions **S-AR-1..5** are implement-time locks, not a revise of the packet.
+**Verdict: Accept with conditions.** Conditions **S-AR-1..5** land with product implement (when Marc green-lights accessioning P0). Not IC50.
 
 ## Surface delta
 
@@ -59,13 +66,13 @@ Heidi / Günter locked receive AuthZ on 2026-08-24. Until that spine lived in th
 
 | Field | Value |
 |-------|--------|
-| **Verdict** | **Accept** |
+| **Verdict** | **Accept with conditions** (Heidi/Günter) |
 | **Date** | 2026-08-24 |
-| **AuthZ docs gate** | **CLOSED** — sketch §4b + this stamp |
-| **Product implement** | **Waits** on Marc green-light for accessioning P0 refactor |
+| **AuthZ docs gate** | **Satisfied** — sketch §4b + this stamp (PR 68) |
+| **Product implement** | **Gated on Marc** green-light for accessioning P0 refactor |
 | **Deep `/cso`** | skipped |
 
 ```
-SECURITY REVIEW: Accept
+SECURITY REVIEW: Accept with conditions
 DEEP CSO: skipped
 ```

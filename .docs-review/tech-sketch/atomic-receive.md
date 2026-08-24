@@ -1,10 +1,12 @@
 # Tech sketch: Atomic receive
 
 **Date:** 2026-08-20  
-**Status:** **CEO Accept (PR 30 merged). Implement gate OPEN for this packet only. Lab Ops L2–L4 + L1 retracted. CSO Accept. Architecture Accept.**  
+**Updated:** 2026-08-24 (AuthZ fold, PR 68)  
 **Stem:** `atomic-receive`  
 **Process:** [`.docs-review/development-process/README.md`](../development-process/README.md)  
-**AuthZ fold:** 2026-08-24 — receive = sample create + project RLS; one txn; no parallel path (Heidi/Günter).
+**AuthZ docs gate:** **Satisfied** — Heidi/Günter **Accept with conditions** on §4b + [security-review/atomic-receive.md](../security-review/atomic-receive.md) (PR 68). Receive = sample create + project RLS; one txn; no parallel path.  
+**Product implement:** **Waits on Marc green-light** for the accessioning P0 refactor. Do **not** treat PR 30 “Implement gate OPEN” as an active product-code green light.  
+**Packet design (historical, still stands):** CEO Accept (PR 30 merged). Lab Ops L2–L4 + L1 retracted. Scientific CSO Accept. Architecture Accept. UI Accept. Design locks remain; **code stays gated until Marc says go.**
 
 C1 (`samples.name` = barcode = `containers.name`) is **gone**. Two identities.
 
@@ -91,7 +93,7 @@ Service: write `results.reported_result` and `results.qualifiers`. `raw_result` 
 
 ## 4b. AuthZ and receive path (Leadership 2026-08-24)
 
-**Gate:** Heidi / Günter — CLOSED until this spine is in the formal sketch (this section).
+**AuthZ docs gate:** **Satisfied** (this section + [security-review/atomic-receive.md](../security-review/atomic-receive.md), PR 68). Heidi/Günter **Accept with conditions**. **Product code** stays gated on Marc green-light for accessioning P0 — not an implement-open.
 
 | Lock | Detail |
 |------|--------|
@@ -130,7 +132,7 @@ Do not redirect to sample detail. Do not open an aliquot dialog. Duplicate barco
 |--------|--------|
 | Lab Ops | L2–L4 hold. **L1 retracted.** Two IDs correct. Receive must not show a sample-ID field. |
 | CSO | Accept. DELETE-with-results is data integrity. Classic results only. |
-| Security (Heidi/Günter AuthZ) | **Docs gate CLOSED 2026-08-24** — sketch §4b + [security-review/atomic-receive.md](../security-review/atomic-receive.md). Receive = sample create + project RLS; one API; one txn; no parallel path. Product implement still waits on Marc green-light for accessioning P0 refactor. |
+| Security (Heidi/Günter AuthZ) | **Accept with conditions** (PR 68). AuthZ **docs** gate **satisfied** — sketch §4b + [security-review/atomic-receive.md](../security-review/atomic-receive.md). Receive = sample create + project RLS; one API; one txn; no parallel path. **Product implement waits on Marc.** |
 | Architecture | **Accept on PR 30.** C1 gone. Two IDs. 409 on `Container.name`. System-assigned `samples.name`. One status: Available for Testing. Short receive body. No new tables / no `results.unit_id`. **Persist lock:** typed number → `reported_result` + `qualifiers`; `raw_result` may copy. Packet signed. |
 | UI | **Accept.** New receive loop, not AccessioningForm. Scan writes the tube. Sticky type/matrix/project. No sample-ID, status, or tube-type field. Stay on screen. Bounce a sample-ID box, wizard, sample-detail redirect, or timestamp-suffix. |
-| CEO | **Accept. PR 30 merged.** Implement gate OPEN for this packet only: one sample + first tube. No aliquot UI, no ELN, no IC50. Product code may start. Heidi bounces tables, a sample-ID field, a Received hop, or `results.unit_id`. |
+| CEO | **Accept. PR 30 merged** (packet **design**). One sample + first tube. No aliquot UI, no ELN, no IC50. Heidi bounces tables, a sample-ID field, a Received hop, or `results.unit_id`. Historical “Implement gate OPEN” is **not** the active product-code light — **code waits on Marc** for accessioning P0. |
