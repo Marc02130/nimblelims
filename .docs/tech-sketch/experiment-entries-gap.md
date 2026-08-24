@@ -1,10 +1,10 @@
 # Experiment entries gap: get an experiment running
 
-**Date:** 2026-08-24  
-**Status:** **Draft Design Group**  
-**Audience:** Design Group; future Grok Build implementation  
-**Stem:** `experiment-entries-gap`  
-**This PR:** docs only. No application/product code. **Not IC50.**  
+**Date:** 2026-08-24
+**Status:** **Draft Design Group**
+**Audience:** Design Group; future Grok Build implementation
+**Stem:** `experiment-entries-gap`
+**This PR:** docs only. No application/product code. **Not IC50.**
 **Coding:** remains **Grok Build / paused unless Marc instructs**.
 
 ## 1. Purpose / goal

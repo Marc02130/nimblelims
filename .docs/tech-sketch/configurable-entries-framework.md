@@ -1,7 +1,7 @@
 # Tech sketch: Configurable-entry framework
 
 **Date:** 2026-08-24  
-**Status:** **Mint proof + open holes** — not a general framework lock  
+**Status:** **Mint proof + open holes** — not a general framework lock
 **Audience:** Design Group — Heidi (Architecture), Hans (Scientific CSO), Deiter (Lab Ops); CEO Rolf  
 **Stem:** `configurable-entries-framework`  
 **This PR:** docs only. No application/product code. **Not IC50.**  

@@ -1,7 +1,7 @@
 # Tech sketch: Extract-hold dest sample type
 
 **Date:** 2026-08-23  
-**Status:** **Mint proof packet — coherence folded; Design Group re-stamp pending.** Coding stays Grok Build unless Marc/Rolf asks.  
+**Status:** **Mint proof packet — coherence folded; Design Group re-stamp pending.** Coding stays Grok Build unless Marc/Rolf asks.
 **Stem:** `extract-hold-dest-type`  
 **Requirements:** [`.docs/requirements/extract-hold-dest-type.md`](../requirements/extract-hold-dest-type.md)  
 **Lab Ops:** [`.docs/lab-ops-review/extract-hold-dest-type.md`](../lab-ops-review/extract-hold-dest-type.md)  
