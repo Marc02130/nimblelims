@@ -1,7 +1,7 @@
 # Tech sketch: Configurable-entry framework
 
 **Date:** 2026-08-24  
-**Status:** **Draft for Design Group agree** — Design Group review  
+**Status:** **Design Group + CEO Agree (locked)**  
 **Audience:** Design Group — Heidi (Architecture), Hans (Scientific CSO), Deiter (Lab Ops); CEO Rolf  
 **Stem:** `configurable-entries-framework`  
 **This PR:** docs only. No application/product code. **Not IC50.**  
@@ -58,7 +58,7 @@ Those paths break sample-centric integrity and make every later preconfigured en
 - Treat aliquot/pool as the first proof of that pattern (atomic pair).
 - Keep dest rows `sample_id`-linked; mint via product execute; lineage + L1 join non-optional for any minting entry.
 - Record north star (more wrappers → lab-authored behavior → SOP→AI as a **later consumer**) without opening those slices now.
-- Leave empty review stamps for CEO / Architecture / Lab Ops / CSO (Hans).
+- Stamp Design Group + CEO Accept (locked 2026-08-24).
 
 ### Non-goals
 
@@ -123,6 +123,19 @@ Other v1 wrappers (Samples cohort display, generic plating/LH as `experiment_dat
 **Method select attaches both maps immediately.** Not optional later wiring.
 
 **Method ≠ dest sample type.** Separate controls. Method drives columns + mint op + dest FieldDefinitions. Dest type is an independent catalog control (`sample_type_transitions`).
+
+### 5.1 Field picker / FieldDefinitions (Marc lock 2026-08-24)
+
+When authoring an entry, **Add existing field** is populated only with existing FieldDefinitions for the **selected entry kind** (`experiment_data` **OR** `experiment_sample_data`).
+
+Aliquot/pool METHOD_CATALOG predefined fields must be **existing fields for their source kind**:
+
+| Surface | Kind / `entity_type` |
+|---------|----------------------|
+| Plan-line / plan-side fields | `experiment_data` |
+| Dest FieldDefinitions on `aliquots_pools` | `experiment_sample_data` |
+
+They are **not** Sample Custom Fields and **not** fields of the other kind. METHOD_CATALOG attaches those existing kind-scoped FieldDefinitions; it does not invent fields outside that kind’s catalog.
 
 **Mid-flight method change:** not warn/wipe and not silent reshape. **Cancel the experiment.** Cancel does **not** un-mint already-minted daughters.
 
@@ -216,6 +229,8 @@ Do not reopen without a new product decision. **Design Group bounce bars (2026-0
 | **New experiment-plan object** | Plan is `experiment_data` + `aliquot_pool_plan`. | Spine |
 | **Adding only one of the pair** | Atomic pair; no plan-only or dest-only UI. | Spine |
 | **Optional later wiring of METHOD_CATALOG maps** | Both maps attach **immediately** on method select. | Spine |
+| **Add existing field showing the wrong kind / Sample fields** | Dropdown lists only existing FieldDefinitions for the **selected entry kind**. Not Sample Custom Fields and not the other kind. | Marc 2026-08-24 |
+| **METHOD_CATALOG inventing fields outside the kind’s FieldDefinition catalog** | Predefined plan fields are existing `entity_type = experiment_data`; dest fields on `aliquots_pools` are existing `entity_type = experiment_sample_data`. | Marc 2026-08-24 |
 
 Also still bounced in the extract-hold packet (not reopened here): CUT methods; free type-in parent concentration on normalization; equimolar-by-size without size/bp path; matrix drop; receive/mid-entry type gate; if-blood-then; transitions on `template_definition`. Sample/`material_class` for dest fields is in the table above (Heidi), not only this footnote.
 
@@ -230,8 +245,9 @@ Any future minting or plan/dest pair should answer the same questions:
 3. If minting: which **catalog** supplies plan columns and dest FieldDefinitions, and when do they attach?
 4. Does **product execute** mint `sample_id`-linked dests with `parent_sample_id` and L1 join?
 5. Are dest quantitative fields **entry FieldDefinitions**, not Sample schema?
+6. Does **Add existing field** list only FieldDefinitions for that entry’s kind (Marc lock §5.1)?
 
-If a proposed entry cannot answer those without a third kind, a webhook mint, or unlinked identifiers, it is **out of framework**.
+If a proposed entry cannot answer those without a third kind, a webhook mint, unlinked identifiers, or fields from Sample / the other kind, it is **out of framework**.
 
 ---
 
@@ -251,8 +267,8 @@ This sketch does **not** replace extract-hold requirements or METHOD_CATALOG tab
 
 | Item | Value |
 |------|--------|
-| Status | **Draft for Design Group agree** |
-| Status line | **Design Group review** |
+| Status | **Design Group + CEO Agree (locked)** |
+| Status line | **Design Group + CEO Agree (locked)** |
 | IC50 | **Not IC50** |
 | Code in this PR | **None** (docs only) |
 | Application coding | **Grok Build / paused** unless Marc instructs |
@@ -261,13 +277,13 @@ This sketch does **not** replace extract-hold requirements or METHOD_CATALOG tab
 
 ## 13. Reviews
 
-Empty stamps for Design Group + CEO to fill later. Do not treat this table as Accept until stamped.
+Stamped 2026-08-24. Framework agree is **locked**. **Not IC50.** Docs only. Coding stays paused unless Marc instructs.
 
 | Review | Reviewer | Verdict | Date | Notes |
 |--------|----------|---------|------|-------|
-| **CEO** | Rolf | _pending_ | | |
-| **Architecture** | Heidi | _pending_ | | |
-| **Lab Ops** | Deiter | _pending_ | | |
-| **CSO** | Hans | _pending_ | | |
+| **CEO** | Rolf | **Accept** | 2026-08-24 | Framework agree; aliquot/pool as first proof |
+| **Architecture** | Heidi | **Accept** | 2026-08-24 | Two kinds; no Sample/`material_class` dest columns; no customer Python v1 |
+| **Lab Ops** | Deiter | **Accept** | 2026-08-24 | Dest empty until execute; dest type on plan; no mid-flight method change; no customer Python v1 |
+| **CSO** | Hans | **Accept** | 2026-08-24 | `sample_id` linkage; mint requires transition catalog / `sample_id` / L1; SOP→AI must not bypass |
 
-**Implement gate for this framework agree:** closed until Design Group + CEO stamp. Extract-hold implement gate remains as documented on that packet; this PR does not unpause coding.
+**Implement gate for this framework agree:** **open (docs lock)**. Extract-hold implement gate remains as documented on that packet. This PR does not unpause coding.
