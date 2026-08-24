@@ -50,10 +50,11 @@ It is **not** the primary home for large-scale result data analysis or dose-resp
 |------|-----------------|--------|------|
 | **`experiment_sample_data`** | Per-sample process data | **Table** | One row per sample in the experiment cohort |
 | **`experiment_data`** | Experiment-level / purpose tables (incl. **Experiment Header**) | **Table only** (no form layout) | Multi-row free rows (`row_key`); user adds rows |
-| **`predefined_action`** | Built-in behavior | Special UI | e.g. **Aliquot / pool** plan + execute |
-| Legacy | `sample_data` → sample data; `experiment_detail` → experiment data | — | Normalized on write |
+| Legacy/runtime compatibility | `sample_data`, `experiment_detail`, `predefined_action`, `display_table` | — | Do not use as new product kinds |
 
 **Experiment Header** = experiment data with `predefined_entry_key = experiment_header` (same kind as other experiment data tables; not a separate “Overview” product type).
+
+There are **two product kinds only**. Built-in behavior is a **predefined wrapper** (`predefined_entry_key`) on one of those kinds, not a third kind. Entries capture process data; they are not copies of Sample.
 
 ### Columns
 
@@ -61,7 +62,7 @@ It is **not** the primary home for large-scale result data analysis or dose-resp
 |---------------|---------|---------|
 | **Sample RO columns** (`config.sample_columns`) | experiment_sample_data | Read from `samples` (template chips); capture UI may still lag on full RO projection |
 | **Entry field definitions** | experiment_sample_data, experiment_data | `field_definitions` with `entity_type` = `experiment_sample_data` \| `experiment_data`, `is_materialized_column = false`; linked via `entry_field_definitions`; values in `entry_field_values` (typed cells) |
-| **Aliquot plan** | aliquot_pool_plan | Plan lines in entry `config` + execute service — not FieldDefinition columns |
+| **Aliquot plan** | aliquot_pool_plan | Plan lines plus kind-scoped fields attached from `METHOD_CATALOG`; current runtime still stores plan lines in entry `config` |
 
 **Custom Fields** (`/admin/custom-fields`) = extend **DB entities** (Sample, Test, …).  
 **Not** for defining entry table columns. Entry columns are created from the **template** dialog: **Create field** (scoped entity type) or **Add existing field**.
@@ -80,6 +81,8 @@ It is **not** the primary home for large-scale result data analysis or dose-resp
 - Sample data: table by cohort. Experiment data: multi-row table + Add/Delete row. Aliquot: `AliquotPlanEditor`.
 
 ### Aliquot / pool destination sample type
+
+One **Add aliquot/pool** action creates the `aliquot_pool_plan` (`experiment_data`) and empty `aliquots_pools` (`experiment_sample_data`) entries together. The UI must not offer plan-only or destination-only authoring. Selecting a concrete method immediately attaches both `METHOD_CATALOG` maps: plan columns and destination FieldDefinitions. The destination entry is populated only after execute.
 
 The **Aliquot / pool plan** entry has two separate controls:
 
@@ -106,11 +109,19 @@ does not accept free-typed source concentration. Execute-minted daughters join
 the current process and populate the read-only **Aliquots / pools** entry after
 execute. Matrix behavior is unchanged.
 
+Destination quantitative cells are not an inventory ledger. Per-row mass/count projects or writes through to `Contents.amount`; total mass and vessel inventory concentration project or write through to the 1×1 Container in the same transaction. Sample never owns mass/concentration, and `Contents.concentration` is not the inventory-concentration SoT. See [mass-concentration-contents.md](../tech-sketch/mass-concentration-contents.md).
+
+Normalization offers an eligible prior Result only: same analysis/designated concentration analyte, approved/reviewed first or otherwise latest by entry date. No match or unit mismatch refuses. Publishing the Result writes its value/unit to the bound 1×1 `Container.concentration` in the same transaction.
+
+Non-mint wrappers (Header, instrument-used, reagent-used, review) use a kind plus FieldDefinitions only; they do not use `METHOD_CATALOG`. Instrument primary files and Results remain on the LIMS Run.
+
+Storage browse/move remains outside Experiments. An entry may request an explicit one-shot put-away write-through; it is not a storage entry.
+
 ## Starting an experiment (cohort)
 
 **Canonical product rules:** [open-questions/experiments.md Decision #24](../open-questions/experiments.md)
 
-### Eligibility (required — not yet fully enforced in code)
+### Eligibility
 
 When adding samples to an experiment:
 
@@ -189,6 +200,7 @@ Permission: `experiment:manage` for manage surfaces.
 ## Design Goals
 
 - Template-driven **entries** as the ELN body (tables + predefined actions).
+- Two product kinds with predefined wrappers; no third action kind.
 - Sapio-aligned **start**: process → choose experiment → select from queue → instance + cohort.
 - Clear separation from **LIMS Runs**.
 - Containers/amount: solute mass only; see [open-questions/containers.md](../open-questions/containers.md).
