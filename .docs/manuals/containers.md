@@ -124,6 +124,8 @@ Pooling = multiple content rows on one **tube/well (1×1)**:
 
 ## Amount, concentration, and volume (locked)
 
+**SoT (Design Group 2026-08-23/24):** Sample has **no** mass and **no** concentration. Per-row mass is `Contents.amount`. On a **1×1** vessel, `Container.amount` is total mass (= `sum(Contents.amount)`, same-txn or derived — not an independent edit) and `Container.concentration` is inventory concentration SoT. Multi-element parents have no inventory. Decision log: [open-questions/containers.md](../open-questions/containers.md) §5. Why / write-back: [tech-sketch/mass-concentration-contents.md](../tech-sketch/mass-concentration-contents.md). Where this manual still shows volume as amount or treats contents concentration as the assay number, **the decision log wins**.
+
 **Option A (solute mass)** — full rules in [open-questions/containers.md](../open-questions/containers.md):
 
 | Store | Where |

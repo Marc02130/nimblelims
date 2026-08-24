@@ -1,7 +1,7 @@
 # Containers — decision log
 
-**Status:** Core inventory model **Decided** (2026-08-11)  
-**Related:** [experiments.md](experiments.md) (aliquot/pool), [ideas/containers-model-update.md](../ideas/containers-model-update.md) (implement slice), [ideas/materials-and-lot-tracking.md](../ideas/materials-and-lot-tracking.md), tech sketch §0.8 containers/amount/aliquot
+**Status:** Core inventory model **Decided** (2026-08-11). Design Group fold **2026-08-23 / 2026-08-24** (§5) — Sample vs Contents vs 1×1 Container SoT; Lab Ops L1 locked; L2 lean OPEN with Hans.  
+**Related:** [experiments.md](experiments.md) (aliquot/pool), [ideas/containers-model-update.md](../ideas/containers-model-update.md) (implement slice), [ideas/materials-and-lot-tracking.md](../ideas/materials-and-lot-tracking.md), [tech-sketch/experiment-template-entries.md](../tech-sketch/experiment-template-entries.md) §0.8, **[tech-sketch/mass-concentration-contents.md](../tech-sketch/mass-concentration-contents.md)** (Design Group agree + four write-back targets)
 
 ## Gate rule
 
@@ -47,6 +47,8 @@ Container (multi-element parent)     e.g. plate, rack, box
 6. **Multi-element containers** do not hold amount/concentration inventory and **must not** have `Contents` rows.  
 7. On aliquot / dilute / transfer **execute**: update content amount(s) and vessel amount/conc **together** so derived volume stays consistent.  
 8. **Diluent actions** change **concentration** (and thus derived volume); they do **not** increase stored solute amount. Sample mass on contents stays unless sample is transferred out.
+
+**2026-08-24 (does not replace the list):** total vs sum is **mandatory** (`Container.amount` = Σ `Contents.amount`, same-txn or derived — bounce independent total). Inventory conc SoT is 1×1 `Container.concentration`. Sample has no mass/conc. Details: **§5**.
 
 ### 0.4 Container type shape — rows × columns (not dimensions)
 
@@ -140,6 +142,11 @@ Open for implement slice (non-blocking for this decision): whether multi-element
 | Contents only on 1×1 types | **Decided** (enforce pending) |
 | Materials/diluent lots | **Deferred** (idea) |
 | Polymorphic contents beyond sample | **Deferred** (sketch later) |
+| Sample has no mass / no concentration | **Decided** (2026-08-24 Marc) |
+| `Contents.amount` = per-row mass; 1×1 `Container.amount` = total = Σ contents | **Decided** (2026-08-24 Marc; bounce independent total vs sum) |
+| 1×1 `Container.concentration` = vessel inventory conc SoT | **Decided** (2026-08-24 Marc) |
+| Put-away / storage browse (Lab Ops L1) | **Decided** (2026-08-24 Deiter) |
+| Result publish write-through + normalize picker (Lab Ops L2) | **Open** (Deiter lean; Hans not stamped) |
 
 ---
 
@@ -148,3 +155,78 @@ Open for implement slice (non-blocking for this decision): whether multi-element
 | Date | Event |
 |------|--------|
 | 2026-08-11 | Locked Option A, consistency rules, rows×columns type shape, contents only on single-element containers |
+| 2026-08-23 / 2026-08-24 | Design Group fold (§5): Sample ≠ inventory; Contents per-row mass; 1×1 Container total mass + inventory conc; Deiter L1 Accept; L2 lean OPEN with Hans. Sketch: [mass-concentration-contents.md](../tech-sketch/mass-concentration-contents.md) |
+
+---
+
+## 5. Design Group locks (2026-08-23 / 2026-08-24)
+
+**Does not replace §0.** Option A, nesting, rows×columns, Contents-only-on-1×1, and volume-not-stored stay as locked 2026-08-11. This section names **where mass and concentration live**, how total vs per-row stay consistent, and Lab Ops conditions.
+
+Canonical sketch (why + four write-back targets + dest FieldDefinitions): [`.docs/tech-sketch/mass-concentration-contents.md`](../tech-sketch/mass-concentration-contents.md). **Not IC50.** Coding not unpaused by this fold.
+
+### 5.1 Sample is not inventory (Marc)
+
+**Sample** = identity + type + lineage (`parent_sample_id`) only. **No mass. No concentration.** Execute may set type / parent on mint. Bounce Sample columns and Sample write-back of mass or conc.
+
+### 5.2 SoT split — Contents vs 1×1 Container (Marc)
+
+| Field | Where | Meaning |
+|-------|--------|---------|
+| `Contents.amount` (+ units FK) | Each content row on a **1×1** vessel | **Per-content mass** (solute mass or count). Pool = one row per contribution. |
+| `Container.amount` (+ units FK) | **1×1 Container only** | **Total mass** of solute of interest in that vessel. |
+| `Container.concentration` (+ units FK) | **1×1 Container only** | **Vessel inventory concentration** SoT (working stock \( C \) for \( V = m / C \)). |
+| Multi-element parent (plate/rack/box) | Structure only | **No** `Contents`. **No** amount. **No** concentration. Inventory lives on 1×1 children. |
+
+### 5.3 Total mass = sum of contents (same txn)
+
+On a 1×1 vessel:
+
+\[
+\texttt{Container.amount} = \sum \texttt{Contents.amount}
+\]
+
+(same mass basis / convertible units.)
+
+**Maintain in the same transaction** as content-row edits **or** treat container total as **derived**. **Bounce** independent edit of `Container.amount` that disagrees with the sum. Aliquot / pool / dilute execute already must update content amounts and vessel amount/conc **together** (§0.3 item 7) — this names the equality.
+
+### 5.4 Concentration — vessel SoT; do not fork on Contents
+
+| Case | Rule |
+|------|------|
+| **Result write-through** | Inventory conc lands on the **1×1 Container** (`Container.concentration`), not on Sample. |
+| **Single-content tube** | Do **not** let `Contents.concentration` and `Container.concentration` diverge. `Contents.concentration` is **optional / read-only** or a **same-txn mirror** of the vessel. Vessel remains SoT. |
+| **Multi-content pool** | Vessel conc on **Container only**. **Bounce** inventing mixture concentration by summing or averaging content concs. Per-row mass stays on Contents; there is no per-row inventory conc SoT for the pool. |
+
+Assay concentration remains a **Result**. Inventory conc is not the assay number (L2 lean, §5.6).
+
+### 5.5 Four write-back targets (Heidi) — pointer
+
+Do not duplicate the table here. **Sample** (identity + allowlist), **Contents** (per-row mass), **1×1 Container** (total mass + inventory conc + location), **entry cells** (capture or RO projection — **never a second ledger**). Dest FieldDefinitions after mint: RO of the matching SoT unless same-txn write-through. Full table: [mass-concentration-contents.md](../tech-sketch/mass-concentration-contents.md) §6.
+
+### 5.6 Lab Ops (Deiter)
+
+**L1 — put-away / storage (Accept / locked):**
+
+- Put-away write-through is **optional one-shot** onto Container location.
+- Storage browse lives **outside** experiments.
+- **Bounce storage-as-entry.**
+
+**L2 — Result vs normalize (proposed lean; OPEN with Hans):**
+
+- Result publish write-throughs **inventory conc onto the 1×1 Container**, **same transaction**.
+- Aliquot normalize offers **prior Result only** — **never** vessel (`Container.concentration`) or contents conc as the assay number.
+- Result unit ≠ inventory conc unit → **refuse** (no silent convert).
+- Does **not** close Hans holes (which Result on replicates; stale conc until Hans stamps L2).
+
+### 5.7 Bounce bars added by this fold
+
+| Bounce | Why |
+|--------|-----|
+| Mass/conc on Sample | Identity ≠ inventory |
+| Independent `Container.amount` ≠ Σ `Contents.amount` | Total is sum (or derived); not a second mass ledger |
+| Mixture conc by summing content concs | Vessel conc on Container only |
+| Divergent Contents.conc vs Container.conc on a single-content tube | Vessel SoT; mirror or RO |
+| Inventory on multi-element parent | Structure only |
+| Storage-as-entry | L1 |
+| Normalize from vessel/contents conc | L2 lean: prior Result only |
