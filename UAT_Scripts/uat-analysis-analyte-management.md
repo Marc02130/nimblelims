@@ -355,6 +355,6 @@ This UAT script validates the Analyses and Analytes management functionality, in
 ---
 
 ## Related Documentation
-- [API Endpoints](../.docs/manuals/api-endpoints.md) - Analyses and Analytes API documentation
-- [Navigation](../.docs/manuals/navigation.md) - Sidebar navigation structure
-- [Batches](../.docs/manuals/batches.md) - Batch management documentation
+- [API Endpoints](../.docs-review/manuals/api-endpoints.md) - Analyses and Analytes API documentation
+- [Navigation](../.docs-review/manuals/navigation.md) - Sidebar navigation structure
+- [Batches](../.docs-review/manuals/batches.md) - Batch management documentation

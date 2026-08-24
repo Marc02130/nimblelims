@@ -3,7 +3,7 @@ name: nimble-arch-review
 description: >
   Formal NimbleLIMS architecture review of a feature packet. Thin wrap of gstack
   plan-eng-review: data model, APIs, migrations, contracts, failure modes, tests.
-  Writes .docs/architecture-review/{stem}.md and verifies schema-changes when needed.
+  Writes .docs-review/architecture-review/{stem}.md and verifies schema-changes when needed.
   Use when: "architecture review", "arch review", "nimble arch", "eng review of the sketch",
   "lock the architecture".
 user-invocable: true
@@ -24,10 +24,10 @@ Staff/systems engineer: boundaries, contracts, migrations, observability, blast 
 
 1. Feature **stem**.
 2. Read:
-   - `.docs/tech-sketch/{stem}.md`
-   - `.docs/schema-changes/{stem}.md` (required if DB claims)
+   - `.docs-review/tech-sketch/{stem}.md`
+   - `.docs-review/schema-changes/{stem}.md` (required if DB claims)
    - Requirements, Lab Ops/CEO conditions that bind implement
-   - Prior `.docs/architecture-review/{stem}.md`
+   - Prior `.docs-review/architecture-review/{stem}.md`
 3. Flag if schema-changes missing but sketch implies migrations → condition **A\*** or Revise.
 
 ### 2. Nimble architecture checklist
@@ -58,7 +58,7 @@ Plan under review = tech sketch + schema-changes. Emphasize architecture + tests
 
 ### 4. Write formal artifact
 
-`.docs/architecture-review/{stem}.md`:
+`.docs-review/architecture-review/{stem}.md`:
 
 ```markdown
 # Architecture Review: {Title}
@@ -90,7 +90,7 @@ Plan under review = tech sketch + schema-changes. Emphasize architecture + tests
 
 ### 5. Schema-changes alignment
 
-If DB work: confirm `.docs/schema-changes/{stem}.md` lists every delta; if sketch drifted, require update (Revise or A\* condition).
+If DB work: confirm `.docs-review/schema-changes/{stem}.md` lists every delta; if sketch drifted, require update (Revise or A\* condition).
 
 ### 6. Exit line
 

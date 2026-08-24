@@ -2,7 +2,7 @@
 name: nimble-cso-review
 description: >
   Formal NimbleLIMS security review of a feature packet (STRIDE, authZ, write-back,
-  export, execute). Writes .docs/security-review/{stem}.md. Optionally runs deep
+  export, execute). Writes .docs-review/security-review/{stem}.md. Optionally runs deep
   gstack /cso after the packet review. Use when: "security review", "CSO review",
   "nimble cso", "STRIDE", "threat model this packet".
 user-invocable: true
@@ -16,7 +16,7 @@ Two layers:
 
 | Layer | Skill path | Output |
 |-------|------------|--------|
-| **A. Feature packet (default)** | This skill | `.docs/security-review/{stem}.md` |
+| **A. Feature packet (default)** | This skill | `.docs-review/security-review/{stem}.md` |
 | **B. Deep posture (optional)** | gstack `cso` | `.gstack/security-reports/` or chat summary |
 
 Default = **A only**. Run B only if user asks (`--deep`, “full cso”, “repo audit”).
@@ -65,7 +65,7 @@ Do **not** dump full CSO into the packet doc — link or summarize; keep packet 
 
 ### 5. Write formal artifact
 
-`.docs/security-review/{stem}.md`:
+`.docs-review/security-review/{stem}.md`:
 
 ```markdown
 # Security Review: {Title}

@@ -2,9 +2,9 @@
 
 **Date:** 2026-08-20  
 **Status:** Draft for architecture / security review  
-**Requirements:** [`.docs/requirements/security-high-s1-s6.md`](../requirements/security-high-s1-s6.md)  
-**Schema:** [`.docs/schema-changes/security-high-s1-s6.md`](../schema-changes/security-high-s1-s6.md)  
-**Audit:** [`.docs/security-review/codebase.md`](../security-review/codebase.md)
+**Requirements:** [`.docs-review/requirements/security-high-s1-s6.md`](../requirements/security-high-s1-s6.md)  
+**Schema:** [`.docs-review/schema-changes/security-high-s1-s6.md`](../schema-changes/security-high-s1-s6.md)  
+**Audit:** [`.docs-review/security-review/codebase.md`](../security-review/codebase.md)
 
 ## 1. Problem / link
 

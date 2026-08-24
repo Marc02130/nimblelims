@@ -1,6 +1,8 @@
-# NimbleLIMS documentation
+# NimbleLIMS review documentation
 
-All product and engineering docs live under this directory, organized by purpose.
+This tree is **review + manuals + process** only. It holds review stamps, tech sketches, cycle requirements, schema deltas, open-question logs, checklists, development-process notes, and operator manuals.
+
+Umbrella product PRD, long-form design, ideas, SOP packs, user stories, and private materials live under **local** `.docs-internal/` (**not committed**). Hand-offs must never add `.docs-internal/` to git.
 
 ## Layout
 
@@ -8,11 +10,9 @@ All product and engineering docs live under this directory, organized by purpose
 |-----------|---------|
 | [`development-process/`](development-process/) | **How we build** — ideation → production (includes dogfood/UAT) |
 | [`manuals/`](manuals/) | Day-to-day reference: setup, API, navigation, domain handbooks |
-| [`requirements/`](requirements/) | PRD and feature requirements |
+| [`requirements/`](requirements/) | Cycle feature requirements (not the umbrella PRD) |
 | [`tech-sketch/`](tech-sketch/) | Lightweight *how* before architecture/UI review |
 | [`schema-changes/`](schema-changes/) | **Per-cycle DB delta** (architecture schema checklist) |
-| [`design/`](design/) | Longer-form architecture / tech specs |
-| [`user-stories/`](user-stories/) | User stories and acceptance criteria |
 | [`checklist/`](checklist/) | Implementation checklists (task tracking) |
 | [`open-questions/`](open-questions/) | **Decision logs** — gate phases until blockers are Decided |
 | [`ceo-review/`](ceo-review/) | CEO / product strategy reviews |
@@ -21,15 +21,16 @@ All product and engineering docs live under this directory, organized by purpose
 | [`security-review/`](security-review/) | Security reviews |
 | [`lab-ops-review/`](lab-ops-review/) | **SVP Lab Ops** — target-customer lab workflows (required for ELN/experiments) |
 | [`qa-review/`](qa-review/) | **Testing / QA Lead** — testability, UAT readiness, acceptance criteria quality |
-| [`sop/`](sop/) | Public BioTech/Pharma lab SOP packs (source for requirements; not product reqs) |
-| [`ideas/`](ideas/) | Exploratory notes — not commitments |
-| `private/` | Local-only materials (gitignored) |
+
+**Local only (not in this repo):** `.docs-internal/prd/`, `.docs-internal/design/`, `.docs-internal/ideas/`, `.docs-internal/sop/`, `.docs-internal/user-stories/`, `.docs-internal/private/`, plus specs and decision-logs.
 
 **Formal review skills (Grok):** [`.grok/skills/nimble-reviews/README.md`](../.grok/skills/nimble-reviews/README.md) — Lab Ops, CEO, UI, Arch, Security CSO, Scientific CSO, BA, QA packet + orchestrator (`/nimble-*-review`, `/nimble-review-packet`). Shared rules: [PACKET.md](../.grok/skills/nimble-reviews/PACKET.md).
 
-**Index rule:** do not leave new docs at `.docs/` root. Put them in the folder that matches their role.
+**Index rule:** do not leave new docs at `.docs-review/` root. Put them in the folder that matches their role. Do not commit `.docs-internal/`.
 
 ## Start here
+
+Umbrella PRD and long-form design live under local `.docs-internal/` (not committed).
 
 | Need | Doc |
 |------|-----|
@@ -38,12 +39,8 @@ All product and engineering docs live under this directory, organized by purpose
 | Admin password / first login | [manuals/admin-setup.md](manuals/admin-setup.md) |
 | API reference | [manuals/api-endpoints.md](manuals/api-endpoints.md) |
 | Navigation / sidebar | [manuals/navigation.md](manuals/navigation.md) |
-| Product requirements | [requirements/nimblelims-prd.md](requirements/nimblelims-prd.md) |
-| Technical blueprint | [design/nimblelims-tech.md](design/nimblelims-tech.md) |
-| User stories | [user-stories/nimblelims-user.md](user-stories/nimblelims-user.md) |
 | ELN processes / experiments work | [checklist/experiment-checklist.md](checklist/experiment-checklist.md), [open-questions/experiments.md](open-questions/experiments.md) |
 | CLI snippets | [manuals/useful-command-line.md](manuals/useful-command-line.md) |
-| **SOP source packs** | [sop/README.md](sop/README.md) |
 | **SOP + AI → process (locked)** | [open-questions/sop-ai-to-process.md](open-questions/sop-ai-to-process.md) |
 | **Extract-hold dest type** | [requirements/extract-hold-dest-type.md](requirements/extract-hold-dest-type.md) · [tech-sketch/extract-hold-dest-type.md](tech-sketch/extract-hold-dest-type.md) |
 
@@ -62,11 +59,12 @@ All product and engineering docs live under this directory, organized by purpose
 | [lims-runs.md](manuals/lims-runs.md) | LIMS runs boundary |
 | [backend-auth.md](manuals/backend-auth.md) | Auth / JWT / RBAC notes |
 
-## Requirements
+## Cycle requirements
+
+Feature-cycle requirements remain here. The umbrella PRD is local `.docs-internal/prd/nimblelims-prd.md` (not committed).
 
 | Doc | Topic |
 |-----|--------|
-| [nimblelims-prd.md](requirements/nimblelims-prd.md) | Product requirements (MVP+) |
 | [experiment-processes-entries.md](requirements/experiment-processes-entries.md) | Processes, entries, experiments requirements |
 | [schema-evolution.md](requirements/schema-evolution.md) | FieldDefinitions / schema evolution requirements |
 | [data-parsers-lims-runs.md](requirements/data-parsers-lims-runs.md) | Parsers (analysis×instrument/CRO), run lineage, optional AI setup — **in review** |
@@ -89,7 +87,7 @@ Lightweight *how* (see [tech-sketch/README.md](tech-sketch/README.md)). Feature 
 ## Schema changes (per cycle)
 
 **Single place** for “what migrations does this feature need?” — [schema-changes/README.md](schema-changes/README.md).  
-Do not confuse with the platform Field Management design ([design/schema-evolution.md](design/schema-evolution.md)).
+Do not confuse with the platform Field Management design (local `.docs-internal/design/schema-evolution.md`, not committed).
 
 | Cycle | Doc |
 |-------|-----|
@@ -97,20 +95,6 @@ Do not confuse with the platform Field Management design ([design/schema-evoluti
 | experiment-template-entries | [schema-changes/experiment-template-entries.md](schema-changes/experiment-template-entries.md) |
 | security-high-s1-s6 | [schema-changes/security-high-s1-s6.md](schema-changes/security-high-s1-s6.md) |
 | security-med-low-s7-s15 | [schema-changes/security-med-low-s7-s15.md](schema-changes/security-med-low-s7-s15.md) |
-
-## Design (long-form)
-
-| Doc | Topic |
-|-----|--------|
-| [nimblelims-tech.md](design/nimblelims-tech.md) | Technical document |
-| [schema-evolution.md](design/schema-evolution.md) | Schema evolution design |
-| [field-management-oob-harmonization.md](design/field-management-oob-harmonization.md) | Field management design |
-| [migration-strategy-schema-evolution.md](design/migration-strategy-schema-evolution.md) | Migration strategy |
-| [jsonb-usage-analysis.md](design/jsonb-usage-analysis.md) | JSONB usage analysis |
-| [gap-analysis-process-and-experiment.md](design/gap-analysis-process-and-experiment.md) | Process/experiment gaps |
-| [experiment-planning.md](design/experiment-planning.md) | Chunk 1–2 planning history |
-| [technical-accessioning-to-reporting.md](design/technical-accessioning-to-reporting.md) | Accessioning→report technical design |
-| [ui-accessioning-to-reporting.md](design/ui-accessioning-to-reporting.md) | Accessioning→report UI design |
 
 ## Checklists & decisions
 
@@ -135,42 +119,16 @@ Do not confuse with the platform Field Management design ([design/schema-evoluti
 | **Security** | [security-review/](security-review/) |
 | **QA / Testing** | [qa-review/](qa-review/) |
 
-Long-form tech designs stay in [design/](design/). UI review was previously `ui-review/`.
-
-## Ideas
-
-| Doc | Topic | Status |
-|-----|--------|--------|
-| [ideas/system-managed-status.md](ideas/system-managed-status.md) | Sample/experiment **status** owned by system (not user at create); manager/admin override | **Priority — High** |
-| [ideas/run-results.md](ideas/run-results.md) | LimsRun JSONB → Results on **publish** | **Shipped v1** (P0–P4); see reviews + [manuals/lims-runs.md](manuals/lims-runs.md) |
-| [ideas/ai-analyte-resolution.md](ideas/ai-analyte-resolution.md) | AI help when analyte alias list misses | Exploratory follow-on |
-| [ideas/ai-data-import.md](ideas/ai-data-import.md) | Deterministic parsers (analysis+instrument/CRO); AI only for setup | **Requirements in review** |
-| [ideas/ai-data-analysis.md](ideas/ai-data-analysis.md) | AI-assisted query / anomaly / summary of run+result data | **Placeholder** |
-| [ideas/multi-tenant.md](ideas/multi-tenant.md) | Org segregation / true multi-tenant isolation | **Placeholder — OOS until real multi-org users** |
-| [ideas/lab-locations.md](ideas/lab-locations.md) | Lab buildings/rooms; rename client `locations` → `addresses` | **Placeholder** |
-| [ideas/orders-and-projects.md](ideas/orders-and-projects.md) | Rename today’s `projects` → **orders**; keep **client_projects** (CRO reporting); new **lab projects** (method-dev etc.) | **Placeholder** |
-| [ideas/accessioning-and-workflows-revisit.md](ideas/accessioning-and-workflows-revisit.md) | Revisit accessioning workflows: sample manifest upload + receive verification (continuous vs discontinuous) | **Placeholder — OOS experiment entries** |
-| [ideas/materials-and-lot-tracking.md](ideas/materials-and-lot-tracking.md) | Materials/reagents + lot inventory and use on experiments | **Placeholder — not in NimbleLIMS today** |
-| [ideas/containers-model-update.md](ideas/containers-model-update.md) | Nested containers; type rows×columns; contents only on 1×1; solute mass / derived volume | **Placeholder — rules Decided; schema/UI not implemented** |
-| [ideas/index-sets-and-sequencing-setup.md](ideas/index-sets-and-sequencing-setup.md) | Index set catalog, index assignment entry, sequencer sample sheets / flow cell loading | **Placeholder** |
-| [ideas/ui-tabbed-admin-catalogs.md](ideas/ui-tabbed-admin-catalogs.md) | Tabbed shells + menu names: Assay catalog, Customers, Work, Instruments, Access control; CRO separate | **Placeholder** |
-| [ideas/list-page-search.md](ideas/list-page-search.md) | Shared list filters (search + status/project chips); Samples “Available for Testing” first | **Placeholder — Samples status filter next** |
-
-### Priority backlog (ideas)
-
-| Priority | Idea | Why |
-|----------|------|-----|
-| **High** | [system-managed-status.md](ideas/system-managed-status.md) | Status is critical tracking; must not be free-form at accessioning/create |
-| **High** | [list-page-search.md](ideas/list-page-search.md) (Samples status filter first) | Find “ready for testing” / reusable filter bar for all lists |
-| [ideas/model-fine-tune.md](ideas/model-fine-tune.md) | Model fine-tune notes | See `sop-rag` for related SOP/RAG work |
+Long-form tech designs live under local `.docs-internal/design/` (not committed).
 
 ## Reviews (run-results) — complete
 
 - [ceo-review/run-results.md](ceo-review/run-results.md)
 - [ui-review/run-results.md](ui-review/run-results.md)
-- [design/run-results.md](design/run-results.md) (tech design)
 - [security-review/run-results.md](security-review/run-results.md)
 - [open-questions/run-results.md](open-questions/run-results.md)
+
+Tech design for this cycle: local `.docs-internal/design/run-results.md` (not committed).
 
 ## Reviews (data parsers / LimsRun import) — **CEO Accept; other reviews open**
 
@@ -188,6 +146,7 @@ See root [`AGENTS.md`](../AGENTS.md): open questions live in `open-questions/`; 
 
 ## What does *not* belong here
 
+- Product PRD, long-form design, ideas, SOP packs, user stories, private notes → local `.docs-internal/` (not committed).
 - Ephemeral logs, DB dumps, one-off debug writeups → keep out of git (use `/tmp` or local ignored paths).
-- Product decisions → `open-questions/` (or promote into manuals/requirements after Decided).
+- Product decisions → `open-questions/` (or promote into manuals/cycle requirements after Decided).
 - Formal reviews → the matching `*-review/` folder, not root.

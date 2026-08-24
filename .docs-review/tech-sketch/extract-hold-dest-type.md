@@ -3,13 +3,13 @@
 **Date:** 2026-08-23  
 **Status:** **Mint proof packet — coherence folded; Design Group re-stamp pending.** Coding stays Grok Build unless Marc/Rolf asks.
 **Stem:** `extract-hold-dest-type`  
-**Requirements:** [`.docs/requirements/extract-hold-dest-type.md`](../requirements/extract-hold-dest-type.md)  
-**Lab Ops:** [`.docs/lab-ops-review/extract-hold-dest-type.md`](../lab-ops-review/extract-hold-dest-type.md)  
-**Security:** [`.docs/security-review/extract-hold-dest-type.md`](../security-review/extract-hold-dest-type.md)  
-**Hold:** [`.docs/open-questions/sop-ai-to-process.md`](../open-questions/sop-ai-to-process.md) (PR 51)  
-**Spine:** [`.docs/tech-sketch/experiment-template-entries.md`](experiment-template-entries.md) §0.8 / §0.9  
-**Process:** [`.docs/development-process/README.md`](../development-process/README.md)
-**Inventory ownership:** [`.docs/tech-sketch/mass-concentration-contents.md`](mass-concentration-contents.md) §5 / §10
+**Requirements:** [`.docs-review/requirements/extract-hold-dest-type.md`](../requirements/extract-hold-dest-type.md)  
+**Lab Ops:** [`.docs-review/lab-ops-review/extract-hold-dest-type.md`](../lab-ops-review/extract-hold-dest-type.md)  
+**Security:** [`.docs-review/security-review/extract-hold-dest-type.md`](../security-review/extract-hold-dest-type.md)  
+**Hold:** [`.docs-review/open-questions/sop-ai-to-process.md`](../open-questions/sop-ai-to-process.md) (PR 51)  
+**Spine:** [`.docs-review/tech-sketch/experiment-template-entries.md`](experiment-template-entries.md) §0.8 / §0.9  
+**Process:** [`.docs-review/development-process/README.md`](../development-process/README.md)
+**Inventory ownership:** [`.docs-review/tech-sketch/mass-concentration-contents.md`](mass-concentration-contents.md) §5 / §10
 
 ## 1. Problem
 

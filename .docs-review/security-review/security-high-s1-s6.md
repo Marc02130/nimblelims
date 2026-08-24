@@ -3,8 +3,8 @@
 **Date:** 2026-08-21  
 **Status:** **Accept**  
 **Packet:** Remediation of [codebase.md](codebase.md) High findings  
-**Requirements:** [`.docs/requirements/security-high-s1-s6.md`](../requirements/security-high-s1-s6.md)  
-**Tech sketch:** [`.docs/tech-sketch/security-high-s1-s6.md`](../tech-sketch/security-high-s1-s6.md)  
+**Requirements:** [`.docs-review/requirements/security-high-s1-s6.md`](../requirements/security-high-s1-s6.md)  
+**Tech sketch:** [`.docs-review/tech-sketch/security-high-s1-s6.md`](../tech-sketch/security-high-s1-s6.md)  
 **UAT:** [`UAT_Scripts/uat-security-high-s1-s6.md`](../../UAT_Scripts/uat-security-high-s1-s6.md)  
 **Scope:** `security/high-s1-s6` @ `1d3762a` (0062 + live TC-S5-004). Not a product-wide production sign-off. DEEP CSO: skipped.
 

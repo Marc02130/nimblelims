@@ -2,9 +2,9 @@
 
 **Date:** 2026-08-20  
 **Status:** **Accept with conditions**  
-**Tech sketch:** [`.docs/tech-sketch/security-high-s1-s6.md`](../tech-sketch/security-high-s1-s6.md)  
-**Schema:** [`.docs/schema-changes/security-high-s1-s6.md`](../schema-changes/security-high-s1-s6.md)  
-**Requirements:** [`.docs/requirements/security-high-s1-s6.md`](../requirements/security-high-s1-s6.md)
+**Tech sketch:** [`.docs-review/tech-sketch/security-high-s1-s6.md`](../tech-sketch/security-high-s1-s6.md)  
+**Schema:** [`.docs-review/schema-changes/security-high-s1-s6.md`](../schema-changes/security-high-s1-s6.md)  
+**Requirements:** [`.docs-review/requirements/security-high-s1-s6.md`](../requirements/security-high-s1-s6.md)
 
 ## Ask results
 

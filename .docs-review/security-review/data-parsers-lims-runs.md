@@ -4,10 +4,10 @@
 **Resubmitted:** 2026-07-19  
 **Verdict date:** 2026-07-19  
 **Status:** **Accepted with conditions** (P1 clear; P2 conditional)  
-**Requirements:** [`.docs/requirements/data-parsers-lims-runs.md`](../requirements/data-parsers-lims-runs.md)  
-**Tech sketch:** [`.docs/tech-sketch/data-parsers-lims-runs.md`](../tech-sketch/data-parsers-lims-runs.md)  
-**Schema changes:** [`.docs/schema-changes/data-parsers-lims-runs.md`](../schema-changes/data-parsers-lims-runs.md)  
-**Open questions:** [`.docs/open-questions/data-parsers-lims-runs.md`](../open-questions/data-parsers-lims-runs.md)
+**Requirements:** [`.docs-review/requirements/data-parsers-lims-runs.md`](../requirements/data-parsers-lims-runs.md)  
+**Tech sketch:** [`.docs-review/tech-sketch/data-parsers-lims-runs.md`](../tech-sketch/data-parsers-lims-runs.md)  
+**Schema changes:** [`.docs-review/schema-changes/data-parsers-lims-runs.md`](../schema-changes/data-parsers-lims-runs.md)  
+**Open questions:** [`.docs-review/open-questions/data-parsers-lims-runs.md`](../open-questions/data-parsers-lims-runs.md)
 
 ## Trust boundaries (accepted)
 

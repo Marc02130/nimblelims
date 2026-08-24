@@ -1,7 +1,7 @@
 # Open questions: security-med-low-s7-s15
 
 **Status:** Living decision log — **decisions stamped 2026-08-21**  
-**Requirements:** [`.docs/requirements/security-med-low-s7-s15.md`](../requirements/security-med-low-s7-s15.md)
+**Requirements:** [`.docs-review/requirements/security-med-low-s7-s15.md`](../requirements/security-med-low-s7-s15.md)
 
 | ID | Question | Status | Blocks | Answer / notes | Date | Owner |
 |----|----------|--------|--------|----------------|------|-------|
