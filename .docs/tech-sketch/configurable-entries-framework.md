@@ -194,24 +194,30 @@ Order is intentional. Later slices **consume** this framework; they do not repla
 
 ## 9. Bounce bars
 
-Do not reopen without a new product decision. Combined from this spine + extract-hold / entries locks:
+Do not reopen without a new product decision. **Design Group bounce bars (2026-08-24)** folded here with the prior spine — one row per bar, sources in the last column. **Not IC50.**
 
-| Bounce | Why |
-|--------|-----|
-| **Third base type** | Wrappers sit on the two kinds. |
-| **Dual mint on one entry** | One method → exactly one `mint_op`. |
-| **Silent reshape mid-flight** | Method change after lines exist = **cancel experiment**. |
-| **Un-mint on cancel** | Already-minted daughters stay minted. |
-| **Collapsing method + dest type** | Separate controls. |
-| **Method picker on dest entry** | Method lives on the plan entry. |
-| **New experiment-plan object** | Plan is `experiment_data` + `aliquot_pool_plan`. |
-| **Adding only one of the pair** | Atomic pair; no plan-only or dest-only UI. |
-| **Optional later wiring of METHOD_CATALOG maps** | Both maps attach **immediately** on method select. |
-| **New Sample columns** for dest amount / vol / conc | Use FieldDefinitions on the dest entry. |
-| **Sapio-style webhook-required mint** | Product execute. |
-| **AI that bypasses catalog / `sample_id` / L1** | SOP→AI consumes the framework; it does not skip integrity. |
+**Design Group (this fold):** Heidi (Architecture) · Hans (CSO) · Deiter (Lab Ops). Overlaps are merged (e.g. customer Python v1 is Heidi **and** Deiter).
 
-Also still bounced in the extract-hold packet (not reopened here): CUT methods; free type-in parent concentration on normalization; equimolar-by-size without size/bp path; Sample/`material_class` column; matrix drop; receive/mid-entry type gate; if-blood-then; transitions on `template_definition`.
+| Bounce | Why | Source |
+|--------|-----|--------|
+| **Third base kind** | Wrappers sit on the two kinds only. | Heidi; spine |
+| **Sample / `material_class` column for dest fields** | Dest amount / vol / conc are **FieldDefinitions on the dest entry**, not Sample schema and not a Sample/`material_class` column. | Heidi |
+| **Customer Python as v1** | Mint is **product execute**, not customer Python / Sapio-style webhooks on entry or experiment events. | Heidi; Deiter |
+| **Unlinked working tables** | Dest (and cohort) rows stay **`sample_id`-linked**. No identifier-only working table. | Hans |
+| **Mint without transition catalog / `sample_id` / L1** | Every mint (including future custom) requires `sample_type_transitions`, `sample_id` dest rows, and L1 `eln_process_samples` join when under process. | Hans |
+| **SOP→AI that bypasses catalog / `sample_id` / L1** | SOP→AI is a later **consumer** of this framework; it does not skip those integrity bars. PR 51 Apply Hold stands. | Hans |
+| **Fill dest before execute** | Dest entry (`aliquots_pools`) is created at add but stays **empty until after execute**. | Deiter |
+| **Dest type at execute** | Dest type stays on the **plan** (line override → entry default → parent). Execute does not prompt or set type. | Deiter |
+| **Mid-flight method change / silent reshape** | After lines exist, changing method is **not** warn/wipe and not silent reshape — **cancel the experiment**. Cancel does not un-mint. | Deiter; spine |
+| **Dual mint on one entry** | One method → exactly one `mint_op`. | Spine |
+| **Un-mint on cancel** | Already-minted daughters stay minted. | Spine |
+| **Collapsing method + dest type** | Separate controls. | Spine |
+| **Method picker on dest entry** | Method lives on the plan entry. | Spine |
+| **New experiment-plan object** | Plan is `experiment_data` + `aliquot_pool_plan`. | Spine |
+| **Adding only one of the pair** | Atomic pair; no plan-only or dest-only UI. | Spine |
+| **Optional later wiring of METHOD_CATALOG maps** | Both maps attach **immediately** on method select. | Spine |
+
+Also still bounced in the extract-hold packet (not reopened here): CUT methods; free type-in parent concentration on normalization; equimolar-by-size without size/bp path; matrix drop; receive/mid-entry type gate; if-blood-then; transitions on `template_definition`. Sample/`material_class` for dest fields is in the table above (Heidi), not only this footnote.
 
 ---
 
