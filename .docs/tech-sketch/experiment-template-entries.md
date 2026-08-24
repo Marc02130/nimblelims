@@ -7,7 +7,7 @@
 **Schema changes:** [`.docs/schema-changes/experiment-template-entries.md`](../schema-changes/experiment-template-entries.md)  
 **Reviews:** [Lab Ops](../lab-ops-review/experiment-template-entries.md) · [CEO](../ceo-review/experiment-template-entries.md) · [UI](../ui-review/experiment-template-entries.md) · [Architecture](../architecture-review/experiment-template-entries.md) · [Security](../security-review/experiment-template-entries.md)  
 **Ideas (OOS):** [accessioning](../ideas/accessioning-and-workflows-revisit.md) · [materials/lots](../ideas/materials-and-lot-tracking.md) · [index sets / sample sheets](../ideas/index-sets-and-sequencing-setup.md)  
-**Reference:** [`manuals/Sapio Experiments Guide.pdf`](../../manuals/Sapio%20Experiments%20Guide.pdf)  
+**Reference:** Sapio Experiments Guide (external reference; PDF is not present in this repository snapshot)  
 **Related manuals:** [experiments.md](../manuals/experiments.md), [processes.md](../manuals/processes.md), [lims-runs.md](../manuals/lims-runs.md)  
 **Process:** Lab Ops first, then other reviews ([lab-ops-review/README.md](../lab-ops-review/README.md))
 
