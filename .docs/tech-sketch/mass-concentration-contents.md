@@ -1,7 +1,7 @@
 # Tech sketch: Mass and concentration ownership (not Sample)
 
 **Date:** 2026-08-24  
-**Status:** **Draft — Design Group coherence fold; pending re-stamp**  
+**Status:** **Draft — Design Group coherence fold; pending re-stamp**
 **Audience:** Design Group — Heidi (Architecture), Hans (Scientific CSO), Deiter (Lab Ops); CEO Rolf  
 **Stem:** `mass-concentration-contents`  
 **This PR:** docs only. No application/product code. **Not IC50.**  
