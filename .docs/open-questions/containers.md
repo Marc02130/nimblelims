@@ -1,6 +1,6 @@
 # Containers — decision log
 
-**Status:** Core inventory model **Decided** (2026-08-11). Design Group fold **2026-08-23 / 2026-08-24** (§5) — Sample vs Contents vs 1×1 Container SoT; Lab Ops L1 locked; L2 lean OPEN with Hans.  
+**Status:** Core inventory model **Decided** (2026-08-11). Design Group fold **2026-08-23 / 2026-08-24** (§5) — Sample vs Contents vs 1×1 Container SoT; Lab Ops L1 locked; L2 + Hans Result picker **LOCKED**.  
 **Related:** [experiments.md](experiments.md) (aliquot/pool), [ideas/containers-model-update.md](../ideas/containers-model-update.md) (implement slice), [ideas/materials-and-lot-tracking.md](../ideas/materials-and-lot-tracking.md), [tech-sketch/experiment-template-entries.md](../tech-sketch/experiment-template-entries.md) §0.8, **[tech-sketch/mass-concentration-contents.md](../tech-sketch/mass-concentration-contents.md)** (Design Group agree + four write-back targets)
 
 ## Gate rule
@@ -146,7 +146,8 @@ Open for implement slice (non-blocking for this decision): whether multi-element
 | `Contents.amount` = per-row mass; 1×1 `Container.amount` = total = Σ contents | **Decided** (2026-08-24 Marc; bounce independent total vs sum) |
 | 1×1 `Container.concentration` = vessel inventory conc SoT | **Decided** (2026-08-24 Marc) |
 | Put-away / storage browse (Lab Ops L1) | **Decided** (2026-08-24 Deiter) |
-| Result publish write-through + normalize picker (Lab Ops L2) | **Open** (Deiter lean; Hans not stamped) |
+| Result publish write-through + normalize picker (Lab Ops L2) | **Decided** (2026-08-24 Deiter + Hans) |
+| Which Result for normalize; unit mismatch refuse | **Decided** (2026-08-24 Hans CSO) |
 
 ---
 
@@ -155,7 +156,7 @@ Open for implement slice (non-blocking for this decision): whether multi-element
 | Date | Event |
 |------|--------|
 | 2026-08-11 | Locked Option A, consistency rules, rows×columns type shape, contents only on single-element containers |
-| 2026-08-23 / 2026-08-24 | Design Group fold (§5): Sample ≠ inventory; Contents per-row mass; 1×1 Container total mass + inventory conc; Deiter L1 Accept; L2 lean OPEN with Hans. Sketch: [mass-concentration-contents.md](../tech-sketch/mass-concentration-contents.md) |
+| 2026-08-23 / 2026-08-24 | Design Group fold (§5): Sample ≠ inventory; Contents per-row mass; 1×1 Container total mass + inventory conc; Deiter L1 Accept; L2 + Hans Result picker LOCKED. Sketch: [mass-concentration-contents.md](../tech-sketch/mass-concentration-contents.md) |
 
 ---
 
@@ -198,7 +199,7 @@ On a 1×1 vessel:
 | **Single-content tube** | Do **not** let `Contents.concentration` and `Container.concentration` diverge. `Contents.concentration` is **optional / read-only** or a **same-txn mirror** of the vessel. Vessel remains SoT. |
 | **Multi-content pool** | Vessel conc on **Container only**. **Bounce** inventing mixture concentration by summing or averaging content concs. Per-row mass stays on Contents; there is no per-row inventory conc SoT for the pool. |
 
-Assay concentration remains a **Result**. Inventory conc is not the assay number (L2 lean, §5.6).
+Assay concentration remains a **Result**. Inventory conc is not the assay number (L2 + Hans §5.8 locked).
 
 ### 5.5 Four write-back targets (Heidi) — pointer
 
@@ -212,12 +213,11 @@ Do not duplicate the table here. **Sample** (identity + allowlist), **Contents**
 - Storage browse lives **outside** experiments.
 - **Bounce storage-as-entry.**
 
-**L2 — Result vs normalize (proposed lean; OPEN with Hans):**
+**L2 — Result vs normalize (LOCKED with Hans 2026-08-24):**
 
 - Result publish write-throughs **inventory conc onto the 1×1 Container**, **same transaction**.
-- Aliquot normalize offers **prior Result only** — **never** vessel (`Container.concentration`) or contents conc as the assay number.
+- Aliquot plan / normalize offers **that prior Result only** (picker §5.8) — **never** vessel (`Container.concentration`) or contents conc as the assay number.
 - Result unit ≠ inventory conc unit → **refuse** (no silent convert).
-- Does **not** close Hans holes (which Result on replicates; stale conc until Hans stamps L2).
 
 ### 5.7 Bounce bars added by this fold
 
@@ -229,4 +229,18 @@ Do not duplicate the table here. **Sample** (identity + allowlist), **Contents**
 | Divergent Contents.conc vs Container.conc on a single-content tube | Vessel SoT; mirror or RO |
 | Inventory on multi-element parent | Structure only |
 | Storage-as-entry | L1 |
-| Normalize from vessel/contents conc | L2 lean: prior Result only |
+| Normalize from vessel/contents conc | L2 + Hans: prior Result only (§5.8) |
+| Result outside same analysis / concentration analyte | Hans §5.8 |
+| Silent unit convert Result → inventory conc | Hans: refuse |
+
+### 5.8 Hans CSO locks (2026-08-24) — **LOCKED**
+
+No longer OPEN. Hans **Accept**. Canonical wording also in [mass-concentration-contents.md](../tech-sketch/mass-concentration-contents.md) §10.
+
+| Lock | Rule |
+|------|------|
+| **Which Result** | Same **analysis** (or that analysis’s **concentration analyte**) only. If an **approved/reviewed** row exists → use it; else **latest by entry date**. **Zero matching → refuse** normalize. |
+| **Unit mismatch** | Result unit ≠ 1×1 `Container.concentration` unit → **refuse**. No silent convert. |
+| **L2 / stale** | Result publish write-throughs inventory conc onto the **1×1 Container** (same txn). Aliquot plan offers **only that Result** as the assay number — never vessel conc. |
+
+Unchanged SoT (Marc): Sample has no mass/conc; `Contents.amount` = per-row mass; `Container.amount` = Σ contents; `Container.concentration` = vessel inventory conc.

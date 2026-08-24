@@ -21,7 +21,9 @@ This document **does not invent** past those locks. It states **why** per-row am
 
 **Marc lock (2026-08-24, critical refine):** Mass **can** live on **Contents** (per content row — e.g. each pool contribution). The **1×1 Container** stores **total mass** (sum of contents for pools) **and concentration**. Sample still has neither. Multi-element containers remain structure only.
 
-**Deiter Lab Ops (2026-08-24):** **Accept with conditions** — L1 locked below; L2 lean proposed (still **OPEN with Hans** until locked).
+**Deiter Lab Ops (2026-08-24):** **Accept with conditions** — L1 locked; L2 now **LOCKED with Hans** (§10).
+
+**Hans CSO (2026-08-24):** **Accept** with §10 locks (which Result; unit mismatch refuse; L2/stale write-through). No longer OPEN.
 
 ---
 
@@ -51,8 +53,8 @@ If **all** mass **and** concentration were forced onto Contents only, a pool tub
 | 5 | **Volume is not primary SoT** when mass + conc allow \( V = m / C \) (**Option A**). Inbound volume + conc → store mass + conc; drop volume. **Do not reopen.** | containers.md §0.1 |
 | 6 | Four write-back targets (Heidi), SoT split per §5 | This agree; Marc refine |
 | 7 | Dest FieldDefinitions after mint: **RO projections of the matching SoT** by default (per-row mass ← Contents; total mass + inventory conc ← 1×1 Container); writable only if write-through to that SoT **same txn**. **Bounce Sample write-back of mass/conc.** | This agree; extract-hold dest fields on `aliquots_pools`; Marc refine |
-| 8 | Normalization (`aliquot_by_target_concentration`): read **prior Result** (assay conc) only; **never** offer container/contents conc as the assay number. On execute / Result publish: see L2 lean. **Bounce free type-in.** | extract-hold §4.1; **Deiter L2 lean** (OPEN with Hans) |
-| 9 | Hans holes — **OPEN**, do not fake-close — §8. L2 lean does not close them until Hans locks. | This agree; Deiter L2 |
+| 8 | Normalization (`aliquot_by_target_concentration`): assay number is **prior Result** only, picker per **§10** (same analysis / concentration analyte; approved else latest by entry date; zero match → refuse). **Never** offer container/contents conc as the assay number. **Bounce free type-in.** | extract-hold §4.1; **Hans §10 LOCK**; Deiter L2 |
+| 9 | Hans CSO §10 — **LOCKED** (2026-08-24): which Result; unit mismatch refuse; L2/stale write-through to 1×1 Container. | **Hans Accept** |
 | 10 | Pool multi-source **lineage** still **open** (composition on plan; one `parent_sample_id` is not full lineage) — pointer only. Per-row **mass** on Contents is locked; lineage graph is not. | extract-hold mint; experiments Q18; Marc lock |
 | 11 | Put-away: optional **one-shot** write-through; storage browse **outside** experiments; **bounce storage-as-entry**. | **Deiter L1** (locked) |
 | 12 | Not IC50. Coding paused / Grok Build unless Marc instructs. | This packet |
@@ -67,7 +69,7 @@ If **all** mass **and** concentration were forced onto Contents only, a pool tub
 
 **Pooling.** Multiple Contents rows on **one** 1×1 vessel (pool tube), each row = one source sample’s solute mass in that tube. Sample cannot hold “the pool’s mass” without erasing per-source inventory. Contents **can** hold those contribution masses — that is the Marc refine.
 
-**Assay concentration is not inventory concentration.** A Qubit (or other analysis) **Result** is a measurement event. Inventory conc lives on the **1×1 Container** (§3), not on Sample and not as the assay number in the normalize picker (Deiter L2 lean).
+**Assay concentration is not inventory concentration.** A Qubit (or other analysis) **Result** is a measurement event. Inventory conc lives on the **1×1 Container** (§3), not on Sample and not as the assay number in the normalize picker (**Hans §10 / L2 locked**).
 
 ---
 
@@ -80,7 +82,7 @@ A pool (or any multi-content vessel) is one physical liquid body. Pipette-from, 
 | Per-contribution mass | **Contents** row | Each source’s solute in the vessel (pool contributions). |
 | **Total mass** | **1×1 Container** | Sum of contents masses for pools; the vessel’s solute total for \( V = m / C \). |
 | **Inventory concentration** | **1×1 Container** | Working stock \( C \) of the defined solute at that vessel. Not Sample. Not the assay Result. |
-| Assay concentration | **Result** | Measurement event. Normalize reads this (L2 lean). |
+| Assay concentration | **Result** | Measurement event. Normalize reads this (Hans §10 / L2 locked). |
 
 This matches [containers.md](../open-questions/containers.md) §0.3 and **§5** (2026-08-23/24) and **does not reopen Option A**. It **does** correct an earlier draft of this sketch that over-stated “all mass and conc only on Contents.”
 
@@ -94,11 +96,11 @@ Aliquot / pool / dilute execute already updates content amounts and vessel amoun
 
 | Case | Rule |
 |------|------|
-| Result write-through | Inventory conc → **1×1 `Container.concentration`** (same txn as publish — L2 lean). Not Sample. Not Contents as SoT. |
+| Result write-through | Inventory conc → **1×1 `Container.concentration`** (same txn as publish — **L2 locked**). Not Sample. Not Contents as SoT. |
 | Single-content tube | Do **not** let `Contents.concentration` and `Container.concentration` diverge. Contents conc is **optional / RO** or a **same-txn mirror**. Vessel remains SoT. |
 | Multi-content pool | Vessel conc on **Container only**. **Bounce** inventing mixture conc by summing or averaging content concs. |
 
-Assay conc remains a **Result**. Normalize never offers vessel/contents conc as the assay number (L2 lean).
+Assay conc remains a **Result**. Normalize never offers vessel/contents conc as the assay number (**L2 locked**).
 
 ---
 
@@ -162,14 +164,14 @@ Exactly four. Entry cells are not a fifth inventory table.
 | Storage browse | Lives **outside** experiments. |
 | Bounce | **Storage-as-entry** — do not model the freezer/rack tree as an experiment entry kind. |
 
-### L2 — Result publish vs normalize picker (**proposed Lab Ops lean; OPEN with Hans until locked**)
+### L2 — Result publish vs normalize picker (**LOCKED** — Hans 2026-08-24)
 
 | Rule | Detail |
 |------|--------|
 | Result publish | Write-throughs **inventory concentration onto the 1×1 Container**, **same transaction** as Result publish. |
-| Aliquot normalize UI | Offers **only prior Result** as the assay number. **Never** container conc or contents conc as the assay number. |
+| Aliquot plan / normalize UI | Offers **only that prior Result** as the assay number (picker in §10). **Never** vessel (`Container.concentration`) or contents conc as the assay number. |
 | Unit mismatch | Result unit ≠ inventory conc unit → **refuse**. Do **not** convert silently. |
-| Status | **Proposed lean**, not a Hans lock. Holes in §10 stay **OPEN** until Hans stamps. |
+| Status | **Locked** (Deiter L2 + Hans CSO). Not OPEN. |
 
 ---
 
@@ -192,25 +194,41 @@ Fold extract-hold §4.1; do not duplicate METHOD_CATALOG tables.
 | Rule | Detail |
 |------|--------|
 | Parent / source assay conc | **Required** |
-| Source of that number | **Prior Result** on that sample — **not** free type-in, **not** 1×1 container inventory conc, **not** a contents row conc |
-| On execute | Mutate dest/source **content masses** and 1×1 **total mass + inventory conc** as the method requires, or **refuse** if no Result |
+| Source of that number | **Prior Result** only — picker **§10**. **Not** free type-in, **not** 1×1 container inventory conc, **not** a contents row conc |
+| On execute | Mutate dest/source **content masses** and 1×1 **total mass + inventory conc** as the method requires, or **refuse** if zero matching Result |
 | Dest FieldDefinitions | Projection / write-through per §6 — not Sample |
 
-**Bounce:** typing a concentration on the plan because “we know it from the Qubit printout.” If the Result is missing, execute refuses.
+**Bounce:** typing a concentration on the plan because “we know it from the Qubit printout.” Zero matching Result → refuse.
 
-L2 lean (Result publish write-throughs inventory conc onto the 1×1 Container) is how stock stays current after Qubit — **OPEN with Hans** (§10). Until locked, do not treat container conc as the assay picker value.
+L2 **locked:** Result publish write-throughs inventory conc onto the 1×1 Container (same txn). The aliquot plan offers only the §10 Result as the assay number — never vessel conc.
 
 ---
 
-## 10. Hans open holes — **OPEN** (do not fake-close)
+## 10. Hans CSO locks — **LOCKED** (2026-08-24)
 
-These block a clean implement of normalization + inventory conc. Design Group may decide later; this PR does **not** pick winners. **Deiter L2 lean is a proposal toward hole 3; it does not close the table.**
+No longer OPEN. Hans **Accept** with these rules. Pool **lineage** (§11) stays open; these inventory/normalize rules do not.
 
-| Hole | Why it is open | Must not do until decided |
-|------|----------------|---------------------------|
-| **Which Result when replicates exist?** Latest vs approved vs same analysis only. | Extract-hold says “prior result”; replicate / review semantics are unspecified. | Invent a silent pick (e.g. “newest float named concentration”). |
-| **Result unit ≠ inventory conc unit** | Assay units and 1×1 Container conc units FKs can disagree. | **Refuse.** Do **not** convert silently. (L2 lean same rule; still not a Hans stamp.) |
-| **Stale inventory conc between Qubit publish and next aliquot** | Result publish and vessel inventory can diverge. | L2 lean: Result path write-throughs inventory conc onto the **1×1 Container** (same txn), **and** UI **never** treats container/contents conc as the assay number. **Still OPEN until Hans locks.** Do not invent write-through onto Contents conc as the inventory SoT. |
+### 10.1 Which Result for normalize
+
+Restrict to Results for **the same analysis** (or **that analysis’s concentration analyte**) only.
+
+Then pick:
+
+1. If an **approved / reviewed** row exists in that set → use it.
+2. Else → **latest by entry date**.
+3. **Zero matching** → **refuse** normalize (do not invent a pick; do not free type-in).
+
+### 10.2 Unit mismatch
+
+Result unit ≠ 1×1 Container inventory conc unit → **refuse**. **No silent convert.**
+
+### 10.3 L2 / stale inventory conc
+
+**Locked** with Deiter L2:
+
+- Result publish write-throughs **inventory conc onto the 1×1 Container**, **same transaction**.
+- Aliquot plan / normalize offers **only that prior Result** as the assay number — **never** vessel conc (or contents conc) as the assay number.
+- Do **not** write-through inventory conc onto Contents as SoT.
 
 ---
 
@@ -237,10 +255,12 @@ Per-row **mass** on Contents for each contribution is **locked** (Marc). Lineage
 | Dest FieldDefinitions as a writable second ledger | Must RO-project or same-txn write-through to the matching SoT |
 | Storage-as-entry | Deiter L1: browse outside experiments; put-away optional one-shot |
 | Free type-in parent conc on normalization | Prior Result or refuse |
-| Offering container or contents conc as the assay number in normalize | Deiter L2 lean |
-| Silent unit conversion Result → inventory conc | Hans / L2: refuse |
+| Offering container or contents conc as the assay number in normalize | Hans §10 / L2 locked: prior Result only |
+| Silent unit conversion Result → inventory conc | Hans §10.2: refuse |
+| Picking a Result outside the same analysis / concentration analyte | Hans §10.1 |
 | Reopening Option A / storing volume as SoT | Locked 2026-08-11 |
-| Closing Hans holes or pool **lineage** in this PR | Stay OPEN (L2 lean does not fake-close) |
+| Treating Hans §10 as still OPEN | Locked 2026-08-24 |
+| Closing pool **lineage** in this PR | Still OPEN (§11) |
 | IC50 / coding this packet | Docs only; Grok Build unless Marc instructs |
 
 ---
@@ -254,7 +274,8 @@ Per-row **mass** on Contents for each contribution is **locked** (Marc). Lineage
 | IC50 | **Not IC50** |
 | Code in this PR | **None** (docs only) |
 | Application coding | **Grok Build / paused** unless Marc instructs |
-| Lab Ops | **Accept with conditions** (L1 locked; L2 lean OPEN with Hans) |
+| Lab Ops | **Accept with conditions** (L1 locked; L2 **LOCKED** with Hans §10) |
+| CSO | **Accept** (Hans §10 locks) |
 
 Schema implement for rows×columns / 1×1 Contents enforce remains the containers idea slice — **not** unpaused by this agree.
 
@@ -266,7 +287,7 @@ Schema implement for rows×columns / 1×1 Contents enforce remains the container
 |--------|----------|---------|------|-------|
 | **CEO** | Rolf | _pending_ | | |
 | **Architecture** | Heidi | _pending_ | | Four write-back targets; SoT split Contents (per-row mass) vs 1×1 Container (total mass + inventory conc); dest projection/write-through |
-| **Lab Ops** | Deiter | **Accept with conditions** | 2026-08-24 | **L1 locked:** optional one-shot put-away write-through; storage browse outside experiments; bounce storage-as-entry. **L2 lean (OPEN with Hans):** Result publish write-throughs inventory conc onto the 1×1 Container (same txn); normalize offers only prior Result — never container/contents conc as the assay number; unit mismatch refuse. |
-| **CSO** | Hans | _pending_ | | Holes in §10 remain OPEN; L2 is lean only until Hans locks |
+| **Lab Ops** | Deiter | **Accept with conditions** | 2026-08-24 | **L1 locked:** optional one-shot put-away write-through; storage browse outside experiments; bounce storage-as-entry. **L2 locked with Hans:** Result publish write-throughs inventory conc onto the 1×1 Container (same txn); normalize offers only the §10 Result — never vessel/contents conc as the assay number; unit mismatch refuse. |
+| **CSO** | Hans | **Accept** | 2026-08-24 | **§10 locked:** same analysis (or that analysis’s concentration analyte) only; approved/reviewed else latest by entry date; zero match → refuse. Unit mismatch refuse (no silent convert). L2/stale: Result publish write-throughs inventory conc onto 1×1 Container (same txn); aliquot plan offers only that Result — never vessel conc as assay number. |
 
-**Implement gate for this agree:** closed until remaining Design Group + CEO stamp. This PR does not unpause application coding.
+**Implement gate for this agree:** closed until remaining Design Group (Heidi) + CEO stamp. This PR does not unpause application coding.
