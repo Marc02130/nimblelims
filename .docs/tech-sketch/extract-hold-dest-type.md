@@ -1,7 +1,7 @@
 # Tech sketch: Extract-hold dest sample type
 
 **Date:** 2026-08-23  
-**Status:** **Implement gate OPEN** (docs). Architecture + UI Accept on METHOD_CATALOG dual-map. Coding stays Grok Build unless Marc/Rolf asks. Land S3 + L2 + seeds + `dest_sample_type` + METHOD_CATALOG (both maps) + atomic pair on add.  
+**Status:** **Mint proof packet — coherence folded; Design Group re-stamp pending.** Coding stays Grok Build unless Marc/Rolf asks.
 **Stem:** `extract-hold-dest-type`  
 **Requirements:** [`.docs/requirements/extract-hold-dest-type.md`](../requirements/extract-hold-dest-type.md)  
 **Lab Ops:** [`.docs/lab-ops-review/extract-hold-dest-type.md`](../lab-ops-review/extract-hold-dest-type.md)  
@@ -9,6 +9,7 @@
 **Hold:** [`.docs/open-questions/sop-ai-to-process.md`](../open-questions/sop-ai-to-process.md) (PR 51)  
 **Spine:** [`.docs/tech-sketch/experiment-template-entries.md`](experiment-template-entries.md) §0.8 / §0.9  
 **Process:** [`.docs/development-process/README.md`](../development-process/README.md)
+**Inventory ownership:** [`.docs/tech-sketch/mass-concentration-contents.md`](mass-concentration-contents.md) §5 / §10
 
 ## 1. Problem
 
@@ -93,7 +94,7 @@ Entry `method` is a concrete id. Each catalog row owns:
 
 **Marc lock (field picker / FieldDefinitions, 2026-08-24):** **Add existing field** lists only existing FieldDefinitions for the **selected entry kind**. METHOD_CATALOG predefined fields must already exist for that kind: plan-line / plan-side = `entity_type = experiment_data`; dest FieldDefinitions on `aliquots_pools` = `entity_type = experiment_sample_data`. Not Sample Custom Fields and not the other kind. Canonical write-up: [configurable-entries-framework.md](configurable-entries-framework.md) §5.1.
 
-**Heidi Architecture Accept (PR 63) + Marc CEO:** Dest FieldDefinitions must **not** duplicate Sample identity (`sample_type`, `parent_sample_id`, barcode / container). Those come from **execute** (and accessioning). `experiment_data` / `experiment_sample_data` capture **processing data**, not a copy of Sample. Grids may show Sample identity as read-only projections; writable dest fields are process values only. See configurable-entries-framework §3.1 / §5.1.
+**Architecture/Marc ownership fold:** Destination FieldDefinitions must **not** duplicate Sample identity (`sample_type`, `parent_sample_id`, barcode / container). Those come from **execute** (and accessioning). `experiment_data` / `experiment_sample_data` capture processing data, not a copy of Sample. Quantitative destination cells are RO projections by default or same-transaction write-throughs: per-row mass/count → `Contents.amount`; total mass → 1×1 `Container.amount` (= compatible-unit Contents sum); vessel inventory concentration → 1×1 `Container.concentration`. Never Sample, never `Contents.concentration` as SoT, and never a second ledger. See configurable-entries-framework §3.1 / §6 and mass-concentration-contents §5.
 
 ### 4.0 Catalog shape (sketch)
 
@@ -145,10 +146,14 @@ METHOD_CATALOG = {
 
 | Rule | Detail |
 |------|--------|
-| Parent concentration | **Required** |
-| Source of conc | Prefer **prior result on that sample** — **not** free type-in |
+| Parent concentration Result | **Required** |
+| Source of conc | Eligible prior **Result** under mass-concentration-contents §10 — not free type-in and not vessel/Contents inventory conc |
 | Dest vol **or** target amount | At least one required on plan line |
-| Dest FieldDefinitions | concentration required on dest entry; volume/amount optional as filled by execute |
+| Result choice | Same analysis/designated concentration analyte; approved/reviewed first, otherwise latest matching by entry date; no match → refuse |
+| Units | Result unit mismatch → refuse; no silent conversion |
+| Result publish | Same transaction writes value/unit to the bound 1×1 `Container.concentration` |
+| Normalize picker | Offers eligible Results only |
+| Dest FieldDefinitions | concentration required on dest entry; volume/amount optional as process display/projection; ownership follows mass-concentration-contents §5 |
 
 ### 4.2 Equimolar (Hans lock)
 
@@ -246,13 +251,14 @@ Transition catalog rows still key off `mint_op` (aliquot|pool), not concrete met
 ```text
 mint_op = METHOD_CATALOG[entry.method].mint_op  # never dual mint
 validate method-specific required plan_columns (incl. normalization rules)
+for normalization, select eligible Result under Hans §10; unit mismatch or no match → refuse
 Read aliquot_pool_plan lines
 for each line:
   if mint_op is pool and sources do not share one sample_type: refuse
   type_id = line.dest_sample_type or entry.default_dest_sample_type or source.sample_type
   if type_id != source.sample_type and no catalog_row(source, mint_op, type_id): refuse
   mint dest; L1/S1 join if under process
-Populate aliquots_pools  # dest entry already exists (atomic pair); was empty until here
+Populate aliquots_pools  # RO projection or same-txn write-through to Contents/1×1 Container
 # dest FieldDefinitions already attached at method select; values filled after mint
 # never prompt for dest type at execute
 # never change entry.method mid-flight — cancel experiment instead
@@ -297,15 +303,17 @@ Populate aliquots_pools  # dest entry already exists (atomic pair); was empty un
 
 ## 10. Reviews
 
-| Review | Verdict |
-|--------|--------|
-| CEO | **Accept** — A + line override; concrete methods + Method≠dest type; **atomic pair on add**; METHOD_CATALOG dual-map |
-| Architecture | **Accept** (Heidi re-stamp 2026-08-23 on dual-map) — METHOD_CATALOG owns plan columns + dest FieldDefinitions; attach on method select; dest fields on `aliquots_pools` (`experiment_sample_data`), not Sample columns; Method ≠ dest type; bounce later wiring and new Sample columns |
-| UI | **Accept** (Mathilda re-stamp 2026-08-23 on dual-map) — method select attaches plan columns + dest FieldDefinitions immediately; dest fields on `aliquots_pools`; Method ≠ dest type; bounce later wiring |
-| Lab Ops | **Accept** (L1 Met; L2); Deiter cut list folded |
-| Security / CSO | **Accept** (S1 Met; S3) |
+Prior METHOD_CATALOG and atomic-pair decisions remain recorded in history. The packet is pending Design Group re-stamp after the mass/concentration ownership fold. Heidi’s prior Architecture verdict was **Revise until the sketch matched**; §§4 and 7 now match and await a new verdict.
 
-**Implement gate:** **OPEN** (docs). Coding stays Grok Build unless Marc/Rolf asks. Not IC50.
+| Review | Verdict |
+|--------|---------|
+| CEO | _pending re-stamp_ |
+| Architecture (Heidi) | _pending re-stamp_ — prior Revise condition addressed in body |
+| UI | _pending re-stamp_ |
+| Lab Ops | _pending re-stamp_ |
+| Security / CSO | _pending re-stamp_ — Hans Result contract folded |
+
+**Implement gate:** pending re-stamp. Coding stays Grok Build unless Marc/Rolf asks. Not IC50.
 
 ## 11. Relationship to Hold
 

@@ -7,7 +7,7 @@
 **Schema changes:** [`.docs/schema-changes/experiment-template-entries.md`](../schema-changes/experiment-template-entries.md)  
 **Reviews:** [Lab Ops](../lab-ops-review/experiment-template-entries.md) · [CEO](../ceo-review/experiment-template-entries.md) · [UI](../ui-review/experiment-template-entries.md) · [Architecture](../architecture-review/experiment-template-entries.md) · [Security](../security-review/experiment-template-entries.md)  
 **Ideas (OOS):** [accessioning](../ideas/accessioning-and-workflows-revisit.md) · [materials/lots](../ideas/materials-and-lot-tracking.md) · [index sets / sample sheets](../ideas/index-sets-and-sequencing-setup.md)  
-**Reference:** [`manuals/Sapio Experiments Guide.pdf`](../../manuals/Sapio%20Experiments%20Guide.pdf)  
+**Reference:** Sapio Experiments Guide (external reference; PDF is not present in this repository snapshot)
 **Related manuals:** [experiments.md](../manuals/experiments.md), [processes.md](../manuals/processes.md), [lims-runs.md](../manuals/lims-runs.md)  
 **Process:** Lab Ops first, then other reviews ([lab-ops-review/README.md](../lab-ops-review/README.md))
 
@@ -18,6 +18,8 @@
 > **Do not reopen without product decision.**  
 > This section is the authoritative lock from Q&A sets A–H.  
 > Sketch scope = **two base kinds + columns/population + v1 predefined wrappers + template UI** — not full Sapio catalog.
+
+**Coherence fold (2026-08-24):** §0 is the current source of truth. Later `sample_table` / `experiment_table` examples are historical substrate language, not API kinds and not the aliquot/pool design. The current mint proof is the atomic `aliquot_pool_plan` + `aliquots_pools` wrapper pair in [configurable-entries-framework.md](configurable-entries-framework.md) and [extract-hold-dest-type.md](extract-hold-dest-type.md).
 
 ### 0.1 Two entry kinds (product names)
 
@@ -42,7 +44,7 @@ Legacy API strings `sample_data` / `experiment_detail` **alias →** these names
 | When | **Start of experiment** or **start of LIMS run** only — not on individual entries |
 | Eligibility | **`Sample.status` = Available for Testing**; if under process → sample on **`eln_process_samples`** (not removed). Server-enforced. |
 | UI (product target) | **Start dialog only** (process accordion click): dual list Available ↔ Selected; then dialog **gone**. **Not** a permanent panel on experiment detail. Scan optional. |
-| UI (current) | `StartCohortPanel` stuck on experiment detail — **wrong long-term** (implies mid-flight adds) |
+| UI (current) | Ephemeral `StartExperimentDialog` from process/ad hoc Start; permanent add-samples panel removed |
 | On start | Process samples selected → `in_progress` + `current_step_id` = this step |
 | After start | Cohort **fixed**; experiment detail has **no** add-samples control |
 | Process auto-link | **No** — explicit select only |
@@ -253,7 +255,8 @@ Admin defines FieldDefinitions. Template picks columns + write-back. Instance ma
 | Contents eligibility | **Only single-element types** (`rows=1` and `columns=1`) may have `Contents`. Multi-element = structure only |
 | Contents | samples (cells/compounds-as-samples later); multi-content on one **1×1** vessel (pool tube / multi-sample well) allowed |
 | **Amount** | **Solute mass or count only — never volume.** **Liquid/diluent is not mass** (Option A) |
-| Vessel amount + conc | On 1×1 container: total solute mass of interest + concentration; multi-element has no liquid inventory |
+| Contents amount | `Contents.amount` is the per-Sample mass/count contribution in its 1×1 vessel |
+| Vessel amount + conc | On a 1×1 Container: `amount` = compatible-unit sum of Contents rows; `concentration` = vessel inventory concentration. `Contents.concentration` is not the concentration SoT. Multi-element has no liquid inventory |
 | Volume | **Not stored.** \( V = m_{\text{solute}} / C \) when units allow. Inbound volume+conc → mass; store amount+conc |
 | Diluent | Changes concentration (derived volume); does **not** increase stored solute amount |
 | Pool in tube | 1 tube (1×1), **x** content rows (x samples) |
@@ -273,6 +276,10 @@ Admin defines FieldDefinitions. Template picks columns + write-back. Instance ma
 | Instrument primary data | **LIMS Run** | Analysis required; no ELN instrument entry |
 
 **Predefined = functionality** (e.g. execute aliquot), not only a default column pack. Columns depend on method.
+
+**Aliquot/pool atomic pair:** one Add action creates the plan and destination entries together; the destination starts empty. A concrete method selects exactly one mint operation and `METHOD_CATALOG` immediately attaches plan columns plus destination FieldDefinitions. Destination quantitative cells project or write through in the same transaction to the owner described in [mass-concentration-contents.md](mass-concentration-contents.md); never Sample and never a second ledger.
+
+**Non-mint wrappers:** Header, instrument-used, reagent-used, and review are kind + FieldDefinitions only. They do not use `METHOD_CATALOG`. Instrument primary data remains on the LIMS Run.
 
 **Out of v1 / ideas:** materials/lots, index sets + assignment entry, sequencer-specific sample sheets, accessioning manifest/verify revisit.
 
@@ -338,6 +345,8 @@ Template authors need **places to display and capture data** on experiment insta
 Process steps still choose template + kind (ELN experiment \| LIMS run). This sketch is about the **interior** of an ELN experiment template: ordered entry blocks.
 
 ## 2. Goals / non-goals (technical)
+
+> **Historical substrate detail:** §§2–15 preserve the implementation history that led to §0. Where these sections say `sample_table` / `experiment_table`, show two sample-table aliquot entries, permit mid-flight cohort growth, or close the gate, §0 and the 2026-08-24 coherence packets supersede them. Do not implement those stale shapes.
 
 **Goals**
 
@@ -572,7 +581,7 @@ When `row_source = experiment_samples`:
 3. Load `entry_field_values` for those samples; empty cells until edited  
 4. Sample system columns projected from Sample (not stored as entry values unless write-back)
 
-When samples are **added later** to the experiment, sample tables re-query executions — new rows appear (no re-instantiate of entry shell required).
+The experiment cohort is fixed after start. Re-query may refresh values for that fixed cohort; it must not expose a mid-flight add path.
 
 When `row_source = none` (experiment_table): render a form of editable FieldDefinition columns; values have `sample_id = null`.
 
@@ -750,7 +759,7 @@ Logged in [open-questions/experiments.md](../open-questions/experiments.md):
 | **Q12** | **Superseded** | Roster is sample_table + sample_field columns, not separate type |
 | **Q13** | **Decided** | Server Sample field allowlist for `kind: sample_field` |
 | **Q14** | **Decided** | No forced sample picker; empty sample_table until samples linked |
-| **Q15** | **Decided** | Plan = sample_table (row_source=experiment_samples); results = another sample_table |
+| **Q15** | **Superseded** | Atomic predefined pair: plan = `experiment_data`; destinations = `experiment_sample_data`; see §0.9 |
 | **Q16** | **Decided** | Product names **Sample table** / **Experiment table** (`sample_table` / `experiment_table`); not sample_detail / experiment_detail |
 
 Related still open: **Q8** (auto sample executions from process).
@@ -793,7 +802,7 @@ Prior review IDs A*/U*/S*/C* still apply in spirit; B1–B10 are the implement c
 | Capture UI | `EntryCapturePanel.tsx` |
 | Manuals | `experiments.md` |
 
-**Gate:** **CLOSED for implementation.** Lab Ops **Revise/Hold** (2026-07-29). Complete entry catalog + 2–3 SOP workflow briefs + Q17–Q22 before re-open. Generic `sample_table` / `experiment_table` remain a **substrate**, not the full lab product.
+**Historical gate note:** the 2026-07-29 Lab Ops Hold below applied to the incomplete generic-table proposal. It is superseded by the 2026-08-10 Accepted-with-conditions header and the narrower 2026-08-24 mint-proof packets. The broader configurable framework is still **mint proof + open holes** and awaits Design Group re-stamp; coding remains Grok Build / paused unless Marc instructs.
 
 ---
 
@@ -807,4 +816,4 @@ Prior review IDs A*/U*/S*/C* still apply in spirit; B1–B10 are the implement c
 | Eng / Architecture | plan review | Architecture | 1 | SUPERSEDED for gate | Engine OK; product incomplete |
 | Security | plan review | Threat model | 1 | SUPERSEDED for gate | Stand when design re-locks |
 
-**VERDICT:** **NOT CLEARED** — Lab Ops Hold. Do not implement Phase 4 until Lab Ops Accept (or Accept with conditions) after requirements revise.
+**Historical verdict (superseded):** NOT CLEARED on 2026-07-29. Retained as review history, not the current status line.

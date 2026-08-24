@@ -104,11 +104,13 @@ The `contents` table is a junction table linking samples to **single-element** c
 
 - **container_id**: FK to containers.id (primary key) — must be single-element type
 - **sample_id**: FK to samples.id (primary key)
-- **concentration**: Numeric(15,6) — optional per content; vessel-level conc preferred for mixture volume
+- **concentration**: Legacy-compatible column only; **not** the inventory-concentration SoT for new product behavior
 - **concentration_units**: FK to units.id
 - **amount**: Numeric(15,6) — **solute mass or count** (never volume; diluent is not mass)
 - **amount_units**: FK to units.id
 - **Unique Constraint**: (container_id, sample_id)
+
+Inventory ownership is strict: `Contents.amount` is the per-Sample contribution; 1×1 `Container.amount` is the compatible-unit sum of Contents rows; 1×1 `Container.concentration` is vessel inventory concentration. Do not read or write `Contents.concentration` as the inventory SoT.
 
 **Implementation**: `backend/models/container.py::Contents`
 
@@ -135,6 +137,8 @@ Pooling = multiple content rows on one **tube/well (1×1)**:
 
 - **Liquid / diluent is not mass.** Dilution updates concentration (and derived volume), not solute amount.
 - Inbound volume + concentration → compute mass; store amount + conc.
+
+**Result/normalization lock:** publishing the selected concentration Result writes value/unit to the bound 1×1 `Container.concentration` in the same transaction. Normalization offers eligible Results only (same analysis/designated analyte; approved/reviewed first, otherwise latest by entry date), refuses no match, and refuses unit mismatch without silent conversion. See [mass-concentration-contents.md §10](../tech-sketch/mass-concentration-contents.md).
 
 ### Unit Types
 
@@ -235,12 +239,14 @@ Pooling = multiple content rows on one **tube/well (1×1)**:
 {
     "container_id": UUID,           # Required (in path)
     "sample_id": UUID,              # Required
-    "concentration": Optional[float], # Min: 0
-    "concentration_units": Optional[UUID],
+    "concentration": Optional[float], # Legacy compatibility; do not use as inventory SoT
+    "concentration_units": Optional[UUID], # Legacy compatibility
     "amount": Optional[float],      # Min: 0
     "amount_units": Optional[UUID]
 }
 ```
+
+The current request schema retains Contents concentration fields for compatibility. New flows write vessel inventory concentration to the 1×1 Container and leave these legacy fields unset.
 
 **Implementation**: `backend/app/schemas/container.py`
 
@@ -266,7 +272,7 @@ Containers are created and linked to samples during the accessioning process.
      - **Concentration**: Optional concentration value
      - **Concentration Units**: Dropdown (e.g., g/L, mg/mL)
      - **Amount**: Optional amount value
-     - **Amount Units**: Dropdown (e.g., mL, µL)
+     - **Amount Units**: Mass/count units (e.g., ng, µg, cells) — never mL/µL
 
 3. **Submit Accessioning**
    - On form submission, the system:
@@ -296,12 +302,12 @@ const container = await apiService.createContainer(containerData);
 await apiService.createContent({
   container_id: container.id,
   sample_id: sample.id,
-  concentration: values.concentration,
-  concentration_units: values.concentration_units,
   amount: values.amount,
   amount_units: values.amount_units,
 });
 ```
+
+The snippet shows the target ownership. Any current accessioning implementation that writes concentration to Contents is implementation lag; concentration belongs on the created 1×1 Container.
 
 ### 2. Container Management Page
 
@@ -339,12 +345,12 @@ The Container Management page provides a centralized interface for viewing and m
     - Created timestamp
     - Edit button
   - **Right**: Contents (samples in container)
-    - List of samples with concentration/amount
+    - List of samples with per-row amount; vessel concentration shown from the 1×1 Container
     - "Add Sample" button
     - Remove sample buttons
 - "Add Sample" dialog allows:
   - Selecting sample from dropdown
-  - Entering concentration/amount for that sample
+  - Entering per-row amount for that sample; vessel concentration is edited on the 1×1 Container
   - Creating contents relationship
 
 **Implementation**: `frontend/src/pages/ContainerManagement.tsx`
@@ -451,8 +457,6 @@ Users can view and manage container contents (samples in containers).
    - Click "Add Sample" button in Contents section
    - Dialog opens with:
      - Sample dropdown (all accessible samples)
-     - Concentration field
-     - Concentration units dropdown
      - Amount field
      - Amount units dropdown
 
@@ -665,7 +669,7 @@ When creating aliquots or derivatives:
 - **Container**: Must exist and be active
 - **Sample**: Must exist and be active
 - **Concentration/Amount**: Must be >= 0 if provided
-- **Units**: Must match unit type (concentration units for concentration, mass/volume for amount)
+- **Units**: Container concentration uses concentration units; Contents amount uses mass/count units (never volume)
 
 ## Permissions
 
@@ -710,8 +714,8 @@ When creating aliquots or derivatives:
 
 1. Create container (type: "pool tube")
 2. Add multiple samples via contents
-3. Each sample has its own concentration/amount
-4. Backend calculates total volume using unit conversions
+3. Each Contents row has its own amount contribution
+4. Container amount is their compatible-unit sum; derived volume uses the vessel `Container.concentration`
 
 ### 4. Batch Processing
 
