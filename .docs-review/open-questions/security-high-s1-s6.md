@@ -2,7 +2,7 @@
 
 **Status:** Living decision log  
 **Date:** 2026-08-20 · **Updated:** 2026-08-20  
-**Requirements:** [`.docs/requirements/security-high-s1-s6.md`](../requirements/security-high-s1-s6.md)  
+**Requirements:** [`.docs-review/requirements/security-high-s1-s6.md`](../requirements/security-high-s1-s6.md)  
 **Blocks:** P0d unblocked (Q1 decided); P0b includes Q2/Q7 password policy
 
 | ID | Question | Status | Blocks | Answer / notes | Date | Owner |

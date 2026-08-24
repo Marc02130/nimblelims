@@ -3,7 +3,7 @@
 **Date:** 2026-08-20  
 **Status:** **CEO Accept (PR 30 merged). Implement gate OPEN for this packet only. Lab Ops L2–L4 + L1 retracted. CSO Accept. Architecture Accept.**  
 **Stem:** `atomic-receive`  
-**Process:** [`.docs/development-process/README.md`](../development-process/README.md)
+**Process:** [`.docs-review/development-process/README.md`](../development-process/README.md)
 
 C1 (`samples.name` = barcode = `containers.name`) is **gone**. Two identities.
 

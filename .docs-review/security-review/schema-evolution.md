@@ -137,8 +137,8 @@ This change is supportable from a security standpoint **if** the above issues ar
 ---
 
 **Related Documents**
-- `.docs/design/schema-evolution.md`
-- `.docs/ceo-review/schema-evolution.md`
-- `.docs/requirements/schema-evolution.md`
-- `.docs/design/jsonb-usage-analysis.md`
-- `.docs/ui-review/schema-evolution.md` (prior version)
+- `.docs-internal/design/schema-evolution.md`
+- `.docs-review/ceo-review/schema-evolution.md`
+- `.docs-review/requirements/schema-evolution.md`
+- `.docs-internal/design/jsonb-usage-analysis.md`
+- `.docs-review/ui-review/schema-evolution.md` (prior version)

@@ -3,7 +3,7 @@
 **Stem:** `atomic-receive`  
 **Phase:** P0 receive loop (docs ahead of implement)  
 **Requirements:** [PR 30 sketch](https://github.com/Marc02130/nimblelims/pull/30); US-1 / US-7 / US-8 / US-30 on merged [PR 32](https://github.com/Marc02130/nimblelims/pull/32) (`main`).  
-**QA review:** `.docs/qa-review/atomic-receive.md`  
+**QA review:** `.docs-review/qa-review/atomic-receive.md`  
 **Test data:** [PR 35](https://github.com/Marc02130/nimblelims/pull/35) (`testdata/atomic-receive-p0`). Same IDs as this script. No third scheme.  
 **Env:**  
 **Build / commit:**  
@@ -111,7 +111,7 @@ Receive UAT of `/api/samples/receive` is catalog-only until that endpoint exists
 
 Pass / Fail — signature
 
-QA1–QA10 in `.docs/qa-review/atomic-receive.md` must be met for a full-pipeline merge. This script is the human UAT pass, not a substitute for pytest AR-T1.
+QA1–QA10 in `.docs-review/qa-review/atomic-receive.md` must be met for a full-pipeline merge. This script is the human UAT pass, not a substitute for pytest AR-T1.
 
 ## Cutover
 

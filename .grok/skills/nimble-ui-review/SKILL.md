@@ -2,7 +2,7 @@
 name: nimble-ui-review
 description: >
   Formal NimbleLIMS UI/UX review of a feature packet. Thin wrap of gstack
-  plan-design-review with lab-tech workflow focus and .docs/ui-review artifact.
+  plan-design-review with lab-tech workflow focus and .docs-review/ui-review artifact.
   Use when: "UI review", "UX review", "nimble ui", "design review of the packet",
   "empty states", "lab technician flow".
 user-invocable: true
@@ -21,7 +21,7 @@ Product/UX for **lab technicians and managers**: bench speed, scan-first, low ja
 ### 1. Resolve packet
 
 1. Feature **stem**.
-2. Read tech sketch, requirements, prior `.docs/ui-review/{stem}.md`, related Lab Ops notes on workflow.
+2. Read tech sketch, requirements, prior `.docs-review/ui-review/{stem}.md`, related Lab Ops notes on workflow.
 3. Note personas: lab tech, lab manager, admin, client (if client-facing).
 
 ### 2. Nimble UI checklist (always cover)
@@ -53,7 +53,7 @@ If sketch has no UI surface: write brief Accept / N/A and skip deep gstack pass.
 
 ### 4. Write formal artifact
 
-`.docs/ui-review/{stem}.md`:
+`.docs-review/ui-review/{stem}.md`:
 
 ```markdown
 # UI / UX Review: {Title}

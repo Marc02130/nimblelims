@@ -4,7 +4,7 @@
 **Status:** **Locked** (Marc). Findings only. No code. No SOP bodies in git. Not IC50.  
 **Selling point tested:** SOP + instrument data + AI → process definition, experiment steps, LimsRuns.
 
-Source is Katinka’s public links, not files in git. Existing `.docs/sop/` stays mapping/synthesis only.
+Source is Katinka’s public links, not files in git. Existing `.docs-internal/sop/` stays mapping/synthesis only.
 
 ## Source (links only — do not check in PDFs)
 

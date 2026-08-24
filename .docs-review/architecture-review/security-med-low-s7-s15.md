@@ -2,8 +2,8 @@
 
 **Date:** 2026-08-21  
 **Status:** **Accept with conditions**  
-**Tech sketch:** [`.docs/tech-sketch/security-med-low-s7-s15.md`](../tech-sketch/security-med-low-s7-s15.md)  
-**Schema:** [`.docs/schema-changes/security-med-low-s7-s15.md`](../schema-changes/security-med-low-s7-s15.md)
+**Tech sketch:** [`.docs-review/tech-sketch/security-med-low-s7-s15.md`](../tech-sketch/security-med-low-s7-s15.md)  
+**Schema:** [`.docs-review/schema-changes/security-med-low-s7-s15.md`](../schema-changes/security-med-low-s7-s15.md)
 
 ## Ask results
 

@@ -2,7 +2,7 @@
 name: nimble-ceo-review
 description: >
   Formal NimbleLIMS CEO/product review of a feature packet. Thin wrap of gstack
-  plan-ceo-review with LIMS defaults, Lab Ops gate, and .docs/ceo-review artifact.
+  plan-ceo-review with LIMS defaults, Lab Ops gate, and .docs-review/ceo-review artifact.
   Use when: "CEO review", "product review", "scope freeze", "nimble ceo",
   "think bigger about this packet", "is this ambitious enough" (Nimble).
 user-invocable: true
@@ -22,10 +22,10 @@ Founder/product: scope, wedge, freeze, 10-star product **within** LIMS honesty. 
 
 1. Feature **stem** from user.
 2. Read:
-   - `.docs/tech-sketch/{stem}.md`
-   - `.docs/lab-ops-review/{stem}.md` (status)
+   - `.docs-review/tech-sketch/{stem}.md`
+   - `.docs-review/lab-ops-review/{stem}.md` (status)
    - Matching requirements
-   - Prior `.docs/ceo-review/{stem}.md` if any
+   - Prior `.docs-review/ceo-review/{stem}.md` if any
 3. **Lab Ops gate:** If lab-facing work and Lab Ops is Hold/missing/Revise, surface that first. Do not grant implement-ready Accept while Lab Ops is Hold.
 
 ### 2. Nimble defaults (override gstack mode bias)
@@ -53,7 +53,7 @@ Apply Nimble defaults when choosing mode: recommend HOLD SCOPE for locked spines
 
 ### 4. Write formal artifact
 
-After the gstack pass, write `.docs/ceo-review/{stem}.md`:
+After the gstack pass, write `.docs-review/ceo-review/{stem}.md`:
 
 ```markdown
 # CEO / Product Review: {Title}

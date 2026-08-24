@@ -3,7 +3,7 @@ name: nimble-lab-ops-review
 description: >
   Formal SVP Lab Ops review of a NimbleLIMS feature packet (tech sketch + requirements).
   Bench reality, sample/container integrity, SOP gates, template→instance, competitive floor.
-  Required for ELN/LIMS lab workflows. Writes .docs/lab-ops-review/{stem}.md.
+  Required for ELN/LIMS lab workflows. Writes .docs-review/lab-ops-review/{stem}.md.
   Use when: "lab ops review", "lab operations review", "SVP lab ops", "nimble lab ops",
   "is this usable on the bench".
 user-invocable: true
@@ -32,12 +32,12 @@ If not required: write a one-line note in the chat and do **not** invent a false
 
 1. Feature **stem** from user args or path (e.g. `experiment-template-entries`).
 2. Read:
-   - `.docs/tech-sketch/{stem}.md` (required for full pipeline)
-   - Matching `.docs/requirements/*`
-   - `.docs/schema-changes/{stem}.md` if present
-   - `.docs/lab-ops-review/README.md` (role)
-   - Prior `.docs/lab-ops-review/{stem}.md` if re-review
-   - Sapio / manuals only as needed: `.docs/manuals/experiments.md`, `processes.md`, `lims-runs.md`, `containers.md`
+   - `.docs-review/tech-sketch/{stem}.md` (required for full pipeline)
+   - Matching `.docs-review/requirements/*`
+   - `.docs-review/schema-changes/{stem}.md` if present
+   - `.docs-review/lab-ops-review/README.md` (role)
+   - Prior `.docs-review/lab-ops-review/{stem}.md` if re-review
+   - Sapio / manuals only as needed: `.docs-review/manuals/experiments.md`, `processes.md`, `lims-runs.md`, `containers.md`
 3. If tech sketch missing: **BLOCKED** — ask for sketch or stem.
 
 ### 2. Review dimensions (score or prose)
@@ -62,7 +62,7 @@ Evaluate each; flag gaps as conditions (L1…):
 
 ### 4. Write artifact
 
-Create or update `.docs/lab-ops-review/{stem}.md`:
+Create or update `.docs-review/lab-ops-review/{stem}.md`:
 
 ```markdown
 # Lab Ops Review (SVP): {Title}

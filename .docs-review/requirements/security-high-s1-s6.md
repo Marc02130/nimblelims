@@ -3,12 +3,12 @@
 **Date:** 2026-08-20  
 **Status:** **Ready for reviews** — security-focused packet (CEO · Architecture · Security · QA)  
 **Branch:** `security/high-s1-s6`  
-**Source audit:** [`.docs/security-review/codebase.md`](../security-review/codebase.md)  
-**Idea:** [`.docs/ideas/security-high-s1-s6.md`](../ideas/security-high-s1-s6.md)  
-**Tech sketch:** [`.docs/tech-sketch/security-high-s1-s6.md`](../tech-sketch/security-high-s1-s6.md)  
-**Schema changes:** [`.docs/schema-changes/security-high-s1-s6.md`](../schema-changes/security-high-s1-s6.md)  
-**Open questions:** [`.docs/open-questions/security-high-s1-s6.md`](../open-questions/security-high-s1-s6.md)  
-**Checklist:** [`.docs/checklist/security-high-s1-s6.md`](../checklist/security-high-s1-s6.md)
+**Source audit:** [`.docs-review/security-review/codebase.md`](../security-review/codebase.md)  
+**Idea:** local `.docs-internal/ideas/security-high-s1-s6.md` (not committed)  
+**Tech sketch:** [`.docs-review/tech-sketch/security-high-s1-s6.md`](../tech-sketch/security-high-s1-s6.md)  
+**Schema changes:** [`.docs-review/schema-changes/security-high-s1-s6.md`](../schema-changes/security-high-s1-s6.md)  
+**Open questions:** [`.docs-review/open-questions/security-high-s1-s6.md`](../open-questions/security-high-s1-s6.md)  
+**Checklist:** [`.docs-review/checklist/security-high-s1-s6.md`](../checklist/security-high-s1-s6.md)
 
 ## Review packet
 

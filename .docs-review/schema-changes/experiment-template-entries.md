@@ -3,7 +3,7 @@
 **Date:** 2026-07-28 · **Updated:** 2026-08-12  
 **Status:** Foundation locked + multi-row experiment_data shipped  
 Kinds are logical (`entry_type`); storage remains `entries` / `entry_field_definitions` / `entry_field_values`.  
-**Tech sketch:** [`.docs/tech-sketch/experiment-template-entries.md`](../tech-sketch/experiment-template-entries.md)
+**Tech sketch:** [`.docs-review/tech-sketch/experiment-template-entries.md`](../tech-sketch/experiment-template-entries.md)
 
 ## 1. Scope
 

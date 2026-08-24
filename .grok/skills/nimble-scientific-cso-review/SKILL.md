@@ -3,7 +3,7 @@ name: nimble-scientific-cso-review
 description: >
   Formal NimbleLIMS Chief Scientific Officer review of a feature packet.
   Scientific validity of assays, result data models, QC, scientific metadata,
-  and data integrity for BioTech/Pharma. Writes .docs/scientific-cso-review/{stem}.md.
+  and data integrity for BioTech/Pharma. Writes .docs-review/scientific-cso-review/{stem}.md.
   Use when: "scientific cso", "chief scientific officer", "scientific review",
   "assay data model", "results integrity", "QC review", "scientific metadata",
   "nimble scientific cso".
@@ -38,10 +38,10 @@ If not required: write a one-line note in the chat and do **not** invent a false
 
 1. Feature **stem** from user args or path.
 2. Read:
-   - `.docs/tech-sketch/{stem}.md` (required for full pipeline)
-   - Matching `.docs/requirements/*`
-   - `.docs/schema-changes/{stem}.md` if present
-   - Prior `.docs/scientific-cso-review/{stem}.md` if re-review
+   - `.docs-review/tech-sketch/{stem}.md` (required for full pipeline)
+   - Matching `.docs-review/requirements/*`
+   - `.docs-review/schema-changes/{stem}.md` if present
+   - Prior `.docs-review/scientific-cso-review/{stem}.md` if re-review
    - Related Lab Ops review (status and L* conditions)
    - Relevant manuals (results, analyses, experiments, lims-runs) as needed
 3. If tech sketch missing: **BLOCKED** — ask for sketch or stem.
@@ -66,7 +66,7 @@ Evaluate each; flag gaps as conditions (SC1…):
 
 ### 4. Write formal artifact
 
-Create or update `.docs/scientific-cso-review/{stem}.md`:
+Create or update `.docs-review/scientific-cso-review/{stem}.md`:
 
 ```markdown
 # Scientific CSO Review: {Title}

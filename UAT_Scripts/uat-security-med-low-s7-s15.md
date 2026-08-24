@@ -5,7 +5,7 @@
 **Date:** 2026-08-21 (completed live run)  
 **Tester:** Tobias  
 **Observed:** `security/med-low-s7-s15` @ `e47f1ab` (alembic `0067`; compose down after the beat)  
-**Requirements:** [`.docs/requirements/security-med-low-s7-s15.md`](../.docs/requirements/security-med-low-s7-s15.md)  
+**Requirements:** [`.docs-review/requirements/security-med-low-s7-s15.md`](../.docs-review/requirements/security-med-low-s7-s15.md)  
 **Prerequisite:** High S1–S6 Met  
 **Related:** [uat-security-high-s1-s6.md](uat-security-high-s1-s6.md)
 
@@ -349,11 +349,11 @@ Logout then resent Bearer must **401** (denylist).
 
 | Step | Action | Expected |
 |------|--------|----------|
-| 1 | Read [`.docs/manuals/backend-auth.md`](../.docs/manuals/backend-auth.md) | States frontend `hasPermission` is UX only; server RBAC/RLS is AuthZ |
+| 1 | Read [`.docs-review/manuals/backend-auth.md`](../.docs-review/manuals/backend-auth.md) | States frontend `hasPermission` is UX only; server RBAC/RLS is AuthZ |
 
 | Result | Pass / Fail | Tester | Date | Notes |
 |--------|-------------|--------|------|-------|
-| Pass | Pass | Tobias | 2026-08-21 | `.docs/manuals/backend-auth.md` hasPermission UX only |
+| Pass | Pass | Tobias | 2026-08-21 | `.docs-review/manuals/backend-auth.md` hasPermission UX only |
 
 ---
 

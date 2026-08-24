@@ -34,7 +34,7 @@ Add **instrument types** + **instances**; **CRO sources**; **RENAME `instrument_
 | **Type** | vendor, model | Agilent 6495C |
 | **Instance** | type FK, serial, lab name | “LCMS-1”, serial `US123456` |
 
-**Location:** Do **not** FK instruments → client **`locations`**. That table should become **`addresses`** (rename idea). Lab **buildings/rooms** → [ideas/lab-locations.md](../ideas/lab-locations.md). No instrument location this cycle.
+**Location:** Do **not** FK instruments → client **`locations`**. That table should become **`addresses`** (rename idea). Lab **buildings/rooms** → local `.docs-internal/ideas/lab-locations.md` (not committed). No instrument location this cycle.
 
 ### 2.2 Altered tables
 
@@ -120,7 +120,7 @@ Required:
 |--------|-------|
 | Import-time `parser_config_snapshot` JSONB | **Rejected** (Decision #5) — use versioned parser rows instead |
 | Dual-write / gradual production cutover of template parsers | **Out of scope** — pre-release; simple migrate-or-delete |
-| **`instruments.room_id` / location** | Lab buildings/rooms + rename `locations`→`addresses` — [ideas/lab-locations.md](../ideas/lab-locations.md) |
+| **`instruments.room_id` / location** | Lab buildings/rooms + rename `locations`→`addresses` — local `.docs-internal/ideas/lab-locations.md` (not committed) |
 | Parser keyed only by **instrument_type** | Out of scope this cycle; parsers/runs use **instance** (type available via join) |
 
 ## 3. RLS
@@ -136,7 +136,7 @@ Required:
 | `lims_run_imports` | Via parent run RLS | Same access as lims_run / run data |
 | `lims_run_data.import_id` | Existing run data RLS | |
 
-**Multi-tenant / org segregation:** out of scope — [ideas/multi-tenant.md](../ideas/multi-tenant.md). Do not add tenant keys “for later” in this feature.
+**Multi-tenant / org segregation:** out of scope — local `.docs-internal/ideas/multi-tenant.md` (not committed). Do not add tenant keys “for later” in this feature.
 
 ## 4. Data migration / backfill
 
@@ -166,7 +166,7 @@ Do **not** change as part of data-parsers P0/P1:
 | `experiment_templates` structure | Unchanged (still used for protocol/lifecycle on the **run**) |
 | Parser ↔ template link | **Removed** — not “nullable legacy” |
 | Executable parser storage | Forbidden |
-| **Multi-tenant / org segregation** | **Out of scope** — [ideas/multi-tenant.md](../ideas/multi-tenant.md) |
+| **Multi-tenant / org segregation** | **Out of scope** — local `.docs-internal/ideas/multi-tenant.md` (not committed) |
 
 ## 6b. Multi-tenant readiness (not implementation)
 

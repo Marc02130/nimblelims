@@ -3,10 +3,10 @@
 **Date:** 2026-08-23  
 **Status:** **Implement gate OPEN** (docs) — Architecture + UI Accept on METHOD_CATALOG dual-map. Coding stays Grok Build unless Marc/Rolf asks.  
 **Stem:** `extract-hold-dest-type`  
-**Tech sketch:** [`.docs/tech-sketch/extract-hold-dest-type.md`](../tech-sketch/extract-hold-dest-type.md)  
-**Lab Ops:** [`.docs/lab-ops-review/extract-hold-dest-type.md`](../lab-ops-review/extract-hold-dest-type.md)  
-**Security:** [`.docs/security-review/extract-hold-dest-type.md`](../security-review/extract-hold-dest-type.md)  
-**Hold source:** [`.docs/open-questions/sop-ai-to-process.md`](../open-questions/sop-ai-to-process.md) (PR 51)
+**Tech sketch:** [`.docs-review/tech-sketch/extract-hold-dest-type.md`](../tech-sketch/extract-hold-dest-type.md)  
+**Lab Ops:** [`.docs-review/lab-ops-review/extract-hold-dest-type.md`](../lab-ops-review/extract-hold-dest-type.md)  
+**Security:** [`.docs-review/security-review/extract-hold-dest-type.md`](../security-review/extract-hold-dest-type.md)  
+**Hold source:** [`.docs-review/open-questions/sop-ai-to-process.md`](../open-questions/sop-ai-to-process.md) (PR 51)
 
 ## 1. Purpose
 
