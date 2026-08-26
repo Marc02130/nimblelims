@@ -8,21 +8,23 @@ One slug for the cycle, e.g. `experiment-template-entries`, `data-parsers-lims-r
 
 | Role | Path |
 |------|------|
-| Requirements | `.docs-review/requirements/{stem}.md` (umbrella PRD is local `.docs-internal/prd/`, not committed) |
-| Tech sketch | `.docs-review/tech-sketch/{stem}.md` |
-| Schema delta | `.docs-review/schema-changes/{stem}.md` (if DB) |
-| Lab Ops review | `.docs-review/lab-ops-review/{stem}.md` |
-| CEO review | `.docs-review/ceo-review/{stem}.md` |
-| UI review | `.docs-review/ui-review/{stem}.md` |
-| Architecture review | `.docs-review/architecture-review/{stem}.md` |
-| Security review | `.docs-review/security-review/{stem}.md` |
-| Scientific CSO review | `.docs-review/scientific-cso-review/{stem}.md` |
-| BA review | `.docs-review/ba-review/{stem}.md` |
-| QA review | `.docs-review/qa-review/{stem}.md` |
-| Developer review | `.docs-review/developer-review/{stem}.md` |
-| Documentarian review | `.docs-review/docs-review/{stem}.md` |
-| Open questions | `.docs-review/open-questions/` (decision log) |
-| Checklist | `.docs-review/checklist/` as applicable |
+| Requirements | `.docs/review/requirements/{stem}.md` (umbrella PRD: `.docs/internal/prd/`) |
+| Tech sketch | `.docs/review/tech-sketch/{stem}.md` |
+| Schema delta | `.docs/review/schema-changes/{stem}.md` (if DB) |
+| Lab Ops review | `.docs/review/lab-ops-review/{stem}.md` |
+| CEO review | `.docs/review/ceo-review/{stem}.md` |
+| UI review | `.docs/review/ui-review/{stem}.md` |
+| Architecture review | `.docs/review/architecture-review/{stem}.md` |
+| Security review | `.docs/review/security-review/{stem}.md` |
+| Scientific CSO review | `.docs/review/scientific-cso-review/{stem}.md` |
+| BA review | `.docs/review/ba-review/{stem}.md` |
+| QA review | `.docs/review/qa-review/{stem}.md` |
+| Developer review | `.docs/review/developer-review/{stem}.md` |
+| Documentarian review | `.docs/review/docs-review/{stem}.md` |
+| Open questions | `.docs/review/open-questions/` (decision log) |
+| Framework stamps | `.docs/decision-logs/` · discussions `.docs/discussions/` |
+| Checklist | `.docs/review/checklist/` as applicable |
+| Domain PRDs / specs | `.docs/internal/prd/` · `.docs/internal/specs/` |
 
 ## Pipeline order (full path)
 
@@ -35,7 +37,7 @@ Requirements → Tech sketch
     → Dogfood → UAT → merge main
 ```
 
-See `.docs-review/development-process/README.md`.
+See `.docs/review/development-process/README.md`. Docs root: `.docs/README.md`. Teams: `.grok/teams/`.
 
 ## Verdict language (all formal reviews)
 
