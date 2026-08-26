@@ -1,41 +1,43 @@
 # Tech sketch: Atomic receive
 
 **Date:** 2026-08-20  
-**Updated:** 2026-08-24 (AuthZ fold, PR 68)  
+**Updated:** 2026-08-26 (multi-container receive: 1..N vessels) · 2026-08-24 (AuthZ fold, PR 68)  
 **Stem:** `atomic-receive`  
-**Process:** [`.docs-review/development-process/README.md`](../development-process/README.md)  
+**Process:** [`.docs/review/development-process/README.md`](../development-process/README.md)  
 **AuthZ docs gate:** **Satisfied** — Heidi/Günter **Accept with conditions** on §4b + [security-review/atomic-receive.md](../security-review/atomic-receive.md) (PR 68). Receive = sample create + project RLS; one txn; no parallel path.  
 **Product implement:** **Waits on Marc green-light** for the accessioning P0 refactor. Do **not** treat PR 30 “Implement gate OPEN” as an active product-code green light.  
-**Packet design (historical, still stands):** CEO Accept (PR 30 merged). Lab Ops L2–L4 + L1 retracted. Scientific CSO Accept. Architecture Accept. UI Accept. Design locks remain; **code stays gated until Marc says go.**
+**Packet design (historical, still stands):** CEO Accept (PR 30 merged). Lab Ops L2–L4 + L1 retracted. Scientific CSO Accept. Architecture Accept. UI Accept. Design locks remain; **code stays gated until Marc says go.**  
+**Multi-container (2026-08-26):** One sample + **1..N containers** in the same txn (primary barcode + optional additional barcodes). Not limited to a single vessel.
 
 C1 (`samples.name` = barcode = `containers.name`) is **gone**. Two identities.
 
 ## 1. Problem
 
-Receive must create sample + first container + contents + optional tests in **one DB transaction**, or a mid-rack failure orphans rows. Techs scan; they do not pick status and they do not type a sample ID.
+Receive must create sample + **one or more** containers + contents (+ optional tests) in **one DB transaction**, or a mid-rack failure orphans rows. It is common to receive more than one tube for the same sample. Techs scan; they do not pick status and they do not type a sample ID.
 
 ## 2. Goals and non-goals
 
 **Goals (locked)**
 
-- One POST: sample + first container + contents + optional tests, one transaction.
+- One POST: sample + **1..N containers** + contents for each (+ optional tests), one transaction.
+- UX: **primary barcode** required + **optional additional barcodes** on the same commit.
 - **Two identities (C1 dropped, Lab Ops L1 retracted):**
   - `containers.name` = scanned barcode. Duplicate scan → **409 on container only**.
   - `samples.name` = system-assigned sample ID from the **existing name template/sequence**. Tech does **not** type it.
   - `samples.name` 409 only if that sample ID itself collides.
 - Receive screen: **no sample-ID field**. Lookup is scan the tube. Keyboard still works on the barcode field.
-- Receive body, exact: required `barcode`, `sample_type`, `matrix`, `project_id`; optional `analysis_ids`, `temperature`, `client_sample_id`.
+- Receive body: required primary `container_barcode`, `sample_type`, `matrix`, `project_id`; optional `additional_container_barcodes[]`, `analysis_ids`, `temperature`, `client_sample_id`.
 - Project required and sticky. Never auto-create per tube (L2).
-- Container type = default tube, **off the form** (L3).
+- Container type = default tube, **off the form** (L3) — applies to all vessels on the call.
 - One status on commit: **Available for Testing**. No Received hop. Receipt is existing `received_date`. No `status_history` table. Techs do not pick status.
-- Tests optional at receive. Status = assigned/pending, not In Process (L4). **Refuse DELETE** if the test has results (L4 + CSO).
+- Tests optional at receive (prefer omit as work plan). If present: assigned/pending, not In Process (L4). **Refuse DELETE** if the test has results (L4 + CSO).
 - **Results persist (Architecture same-phase lock):** typed number lands in `results.reported_result` and `results.qualifiers`. `raw_result` **may copy the same value**. Unit from `analytes.units_default`; if missing, **422**. Do **not** add `results.unit_id`. No unit picker.
-- Stay on receive after success: toast, clear barcode, sticky type/matrix/project, focus barcode. No sample-detail redirect. No aliquot dialog.
+- Stay on receive after success: toast, clear barcode field(s), sticky type/matrix/project, focus primary barcode. No sample-detail redirect. No aliquot dialog.
 
 **Non-goals (this packet)**
 
 - No new tables. No new columns. No wizard.
-- No aliquot UI. Aliquot **later** = another container + another contents row on the **same** sample. Derivative **later** = new sample with `parent_sample_id`.
+- No aliquot UI. Aliquot **later** (new dest vessel after process) remains separate from **multi-tube receive at intake**. Derivative **later** = new sample with `parent_sample_id`.
 - No ELN, parsers, IC50, dose-response, method/QC/review ceremony, US-28 batch, manifests, materials, multi-tenant.
 
 ## 3. Data model (existing tables only)
@@ -63,17 +65,18 @@ Make `samples.temperature` nullable if it is not already. Unique constraint on `
 
 ```python
 class SampleReceiveRequest(BaseModel):
-    container_barcode: str          # scan or keyboard → containers.name
+    container_barcode: str                    # primary vessel (required)
+    additional_container_barcodes: list[str] = []  # optional extra vessels, same sample
     sample_type: UUID
     matrix: UUID
     project_id: UUID                # required, sticky; never auto-create
-    analysis_ids: list[UUID] = []   # optional
+    analysis_ids: list[UUID] = []   # optional; prefer omit as work plan
     temperature: float | None = None
     client_sample_id: str | None = None
     # no status, no sample name, no container_type_id, no client_id
 ```
 
-In one transaction: assign `samples.name` from the existing name template; set status Available for Testing and `received_date`; insert container with `name = barcode` (409 on duplicate); insert contents; insert optional tests as assigned/pending.
+In one transaction: assign `samples.name` from the existing name template; set status Available for Testing and `received_date`; for **primary + each additional** barcode insert container (`name = barcode`, 409 on any duplicate) + contents → same sample; insert optional tests as assigned/pending.
 
 ### POST /api/samples/{id}/tests  and  DELETE /api/samples/{id}/tests/{test_id}
 
@@ -100,28 +103,28 @@ Service: write `results.reported_result` and `results.qualifiers`. `raw_result` 
 | **Permission** | `POST /api/samples/receive` uses the **same AuthZ as sample create** + **project RLS** (`has_project_access` / `lims_app`). |
 | **No parallel path** | No separate receive permission, no client-only bypass, no second AuthZ spine. |
 | **One API** | One receive endpoint. Bounce a parallel orphan multi-call (create sample → create container → link) and bounce a second receive API. |
-| **One txn** | Sample + first Container + Contents (+ optional tests) in a **single DB transaction**. Clients that drop mid-sequence are refused by design — there is no safe multi-call substitute. |
-| **Containers first vessel** | First-vessel create shares that same txn (not a follow-up call). |
+| **One txn** | Sample + **1..N Containers** + Contents each (+ optional tests) in a **single DB transaction**. Clients that drop mid-sequence are refused by design — there is no safe multi-call substitute. |
+| **Containers at receive** | All intake vessels for this sample share that same txn (not follow-up calls). Primary + optional additional barcodes. |
 
 Implementers: enforce AuthZ/RLS **inside** the receive service before/with the txn; do not rely on the UI to gate project access.
 
-Formal CSO stamp: [`.docs-review/security-review/atomic-receive.md`](../security-review/atomic-receive.md).
+Formal CSO stamp: [`.docs/review/security-review/atomic-receive.md`](../security-review/atomic-receive.md).
 
 ## 5. Receive loop (UI)
 
-1. Scan (or type) barcode. **No sample-ID field.**
-2. Sticky sample type, matrix, project. Optional tests. Temperature optional.
+1. Scan (or type) **primary** barcode. **No sample-ID field.** Optionally add more barcodes for the same sample.
+2. Sticky sample type, matrix, project. Temperature optional. Prefer no test assignment on default profile.
 3. Submit.
-4. Stay on the screen. Toast. Clear barcode. Keep sticky fields. Focus barcode.
-5. Next tube.
+4. Stay on the screen. Toast. Clear barcode field(s). Keep sticky fields. Focus primary barcode.
+5. Next sample (or next primary tube).
 
-Do not redirect to sample detail. Do not open an aliquot dialog. Duplicate barcode → 409 toast, stay on screen.
+Do not redirect to sample detail. Do not open an aliquot dialog. Duplicate barcode → 409 toast, stay on screen (no partial commit).
 
 ## 6. Locked vs parked later
 
 | Locked now | Later, not this packet |
 |------------|------------------------|
-| One sample + first container + contents + optional tests, one txn | Aliquot: another container + contents on same sample |
+| One sample + **1..N containers** + contents (+ optional tests), one txn | Aliquot **after** process (new dest vessel) — distinct from multi-tube **receive** |
 | System sample ID + container barcode | Derivative: new sample + `parent_sample_id` |
 | Scan lookup, no sample-ID field on receive | Aliquot UI |
 | Typed number → `reported_result` + `qualifiers` (`raw_result` may copy) | Review/release ceremony |
