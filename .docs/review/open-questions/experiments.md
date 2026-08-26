@@ -49,12 +49,12 @@ When resolving: fill **Decision**, **Date**, **Owner**, and one line of **Ration
 | 14 | Force sample picker at experiment create? | **Decided** | Start UX | **No** forced picker; empty until samples linked. Q8/Q22 for process path. | 2026-07-29 | Product | Progressive flow |
 | 15 | Transfer/aliquot modeling | **Decided** (provisional) | — | Plan/results via tables as *direction*; **Lab Ops requires Q18** (derivatives) before treat as complete. | 2026-07-29 | Product → Lab Ops | Hold implement until Q18 |
 | 16 | Names sample_table / experiment_table? | **Decided** (substrate only) | — | Engine shapes, **not** full entry catalog (Q17). | 2026-07-29 | Product + Lab Ops | Lab Ops: tables ≠ product |
-| 17 | v1 **entry catalog** beyond two generic tables? | **Open** | **Hold Phase 4** | Samples intake, Plates, Aliquot/Pool, Materials, Notes, … | | Lab Ops | Sapio-like customer floor |
+| 17 | v1 **entry catalog** beyond two generic tables? | **Open** | **Hold Phase 4** | Samples intake, Plates, Aliquot/Pool, Materials, Notes, … | | Lab Ops | commercial-LIMS-like customer floor |
 | 18 | Aliquot creates **child samples** / volume effects? | **Open** | **Hold Phase 4** | — | | Lab Ops + Product | Lineage integrity |
 | 19 | How **plates** enter experiments? | **Open** | Sequencing/prep | — | | Lab Ops | Plate maps / NGS |
-| 20 | Entry **complete/submit** + unlock reason in v1? | **Open** | GxP habits | — | | Lab Ops + Security | Sapio submit/lock |
+| 20 | Entry **complete/submit** + unlock reason in v1? | **Open** | GxP habits | — | | Lab Ops + Security | commercial LIMS tools submit/lock |
 | 21 | **Material/lot** tracking in v1 vs defer? | **Open** | Chemistry ops | — | | Lab Ops | Quality-sensitive labs |
-| 22 | Process→experiment sample fill (Q8) with Entries P0? | **Decided** | Start UX | See **Decision #24** — eligible queue dual-list + optional scan; status + process-sample gates. | 2026-08-12 | Product | Aligns Sapio start without barcode mandate |
+| 22 | Process→experiment sample fill (Q8) with Entries P0? | **Decided** | Start UX | See **Decision #24** — eligible queue dual-list + optional scan; status + process-sample gates. | 2026-08-12 | Product | Aligns commercial LIMS tools start without barcode mandate |
 | 23 | Entry kinds + storage + grid/export access? | **Decided** | Substrate (all entry work) | See **Decision #23**. Kinds `experiment_sample_data` / `experiment_data`; storage `entries`+`entry_field_*`; grid wide + export long. | 2026-07-29 | Product + Eng | Locked in tech sketch §0 |
 | 24 | Cohort eligibility + start UX without mandatory barcode? | **Decided** | StartCohort / process start | See **Decision #24**. | 2026-08-12 | Product | Early labs lack scanners; dual-list is primary |
 
@@ -404,7 +404,7 @@ When adding samples to an experiment cohort (link or start):
 
 **Scan / resolve:** If barcode resolves a sample that fails gates, do **not** add to selected cohort; show *why* (status / not on process). Optionally still show as ineligible for transparency.
 
-### Start UX — dual list is primary (Sapio-aligned); **start-only surface**
+### Start UX — dual list is primary (product-target); **start-only surface**
 
 **Where it appears (locked):**
 

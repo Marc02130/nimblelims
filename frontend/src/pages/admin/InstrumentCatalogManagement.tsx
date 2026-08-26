@@ -463,7 +463,7 @@ const InstrumentCatalogManagement: React.FC = () => {
         </DialogTitle>
         <DialogContent>
           <DialogContentText sx={{ mb: 2 }}>
-            {tab === 'types' && 'Vendor/model class (e.g. Agilent 6495C).'}
+            {tab === 'types' && 'Vendor/model class (e.g. VendorModel-X).'}
             {tab === 'instances' && 'Physical or named unit (e.g. LCMS-1) linked to a type.'}
             {tab === 'cro' && 'External lab export source for file lineage. Client is optional label only.'}
           </DialogContentText>

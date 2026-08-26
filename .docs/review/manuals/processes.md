@@ -72,7 +72,7 @@ See [experiments.md](experiments.md) for `experiment_link` lineage and [checklis
 4. Per-experiment sample details (roles, conditions, replicates) continue to be tracked via `ExperimentSampleExecution`.
 5. The process provides visibility into overall progress across all its steps.
 
-### Starting work from a process (product target — Sapio-aligned)
+### Starting work from a process (product target — product-target)
 
 **Locked:** [open-questions Decision #24](../open-questions/experiments.md).
 

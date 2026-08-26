@@ -109,7 +109,7 @@ For work that changes **how labs run experiments, processes, samples, plates, or
 2. **Lab ops review is required** ([lab-ops-review/README.md](../lab-ops-review/README.md)). Persona: SVP Lab Ops (biology PhD, chemistry/sequencing, decades biotech/pharma).  
 3. Lab ops may **Revise / Hold** and send work **back** to requirements or tech sketch—even if architecture already accepted a schema shape.  
 4. Prefer a **first lab ops pass early** (after sketch exists) so we do not polish the wrong abstraction.  
-5. Competitive/reference manuals (e.g. Sapio Experiments Guide under `manuals/`) inform catalog depth; we do not copy blindly.
+5. Competitive/reference manuals (e.g. external competitive reference (not stored in repo) under `manuals/`) inform catalog depth; we do not copy blindly.
 
 **Anti-pattern:** Rapid rename cycles + “Accept with conditions” from four tech reviews while the lab entry catalog is still undefined. That is rushing.
 

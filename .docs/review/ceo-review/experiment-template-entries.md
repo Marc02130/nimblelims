@@ -20,7 +20,7 @@ This is the right product cut for ELN data capture: **two base entry kinds**, a 
 | Queue + scan plate/tube + start experiment/run | Index sets / assignment entry |
 | Header, Samples, Aliquot/pool plan+results (all methods) | Sequencer-specific sample sheet product |
 | Grid + export + save/submit + write-back map | Accessioning manifest/verify rewrite |
-| Template UI (entries, columns, deps, methods) | Full Sapio entry catalog |
+| Template UI (entries, columns, deps, methods) | Full commercial-LIMS entry catalog |
 | LIMS Run + analysis required | Mid-flight add samples to experiment |
 
 ## Conditions

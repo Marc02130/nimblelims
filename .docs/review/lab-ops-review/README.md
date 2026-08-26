@@ -20,7 +20,7 @@
 3. **Sequencing / chemistry specifics** — Indexing, plates, pooling, reagent use (where in scope)  
 4. **Gating & compliance habits** — Complete step before next; unlock with reason; audit  
 5. **Template → instance** — Pre-built procedure labs actually reuse  
-6. **Competitive floor** — At least the entry catalog depth customers expect from tools like Sapio (without copying blindly)
+6. **Competitive floor** — At least the entry catalog depth customers expect from commercial LIMS products (without copying blindly)
 
 ## Artifact location
 
@@ -51,6 +51,7 @@ Premature “Accept” from eng/product without lab ops is **invalid for impleme
 
 ## Reference materials
 
-- Customer/competitor: `manuals/Sapio Experiments Guide.pdf` (entry catalog, templates, submit/lock, process stringing)  
+- Competitive reference: external commercial LIMS docs (not stored in this repository) for entry catalog depth, templates, submit/lock, process stringing  
+
 - Product: `.docs-review/manuals/experiments.md`, `processes.md`, `lims-runs.md`  
 - Requirements: `.docs-review/requirements/experiment-processes-entries.md`

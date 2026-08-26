@@ -31,7 +31,7 @@ Add **instrument types** + **instances**; **CRO sources**; **RENAME `instrument_
 
 | Entity | Holds | Example |
 |--------|--------|---------|
-| **Type** | vendor, model | Agilent 6495C |
+| **Type** | vendor, model | VendorModel-X |
 | **Instance** | type FK, serial, lab name | “LCMS-1”, serial `US123456` |
 
 **Location:** Do **not** FK instruments → client **`locations`**. That table should become **`addresses`** (rename idea). Lab **buildings/rooms** → local `.docs-internal/ideas/lab-locations.md` (not committed). No instrument location this cycle.
