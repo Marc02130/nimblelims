@@ -1,0 +1,23 @@
+# Compose build contexts are per-service (./backend, ./frontend, ./db, ./services/*).
+# This root file only applies if someone builds with context=.
+# Prefer backend/.dockerignore and frontend/.dockerignore.
+
+.git
+.docs
+.grok
+.claude
+.gstack
+manuals
+TestData
+UAT_Scripts
+venv
+**/node_modules
+**/__pycache__
+**/.pytest_cache
+**/.venv
+**/.env
+**/.env.*
+**/build
+**/coverage
+**/*.md
+!README.md
