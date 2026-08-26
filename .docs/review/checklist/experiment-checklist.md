@@ -170,7 +170,7 @@ Legacy `experiment_link` via `ExperimentDetail` **coexists** in Phase 1; no forc
 - [x] Aliquot plan editor UI (method-driven columns + pool group)
 - [x] Experiment data = multi-row **table** only (`row_key`, migration `0057`; no form layout)
 - [x] Template **Create field** for entry FieldDefinitions (`entity_type` experiment_sample_data \| experiment_data; not Custom Fields DB entities)
-- [x] Docs: experiments/processes manuals + start cohort Sapio-aligned product target
+- [x] Docs: experiments/processes manuals + start cohort product-target product target
 - [ ] UAT spine demo end-to-end
 - [x] **Decision #24** start cohort (ephemeral dialog, not experiment-detail panel):
   - [x] Dual-list Available ↔ Selected (`StartExperimentDialog`) from process **Start** (dialog closes after Start)
@@ -230,5 +230,5 @@ Rule: no new phase / major feature until blocking questions for that work are re
 | 2026-07-11 | **Phase 3 shipped:** migration 0051, definitions API, typed start-step, soft advance, sample journey, Processes UI + journey on sample dialog |
 | 2026-07-28 | **Phase 4 packet ready for review:** template Entries authoring + sample roster tech sketch, schema-changes, CEO/UI/arch/security review stubs, Q11–Q14 |
 | 2026-07-29 | Phase 4 tech reviews Accept; then **Lab Ops Hold** — implement gate closed; Q17–Q22; process + lab-ops-review role added |
-| 2026-07-29 | SVP Lab Ops review written; Sapio Experiments Guide used as competitive floor; slow-down on ELN entry rush |
+| 2026-07-29 | SVP Lab Ops review written; external competitive reference (not stored in repo) used as competitive floor; slow-down on ELN entry rush |
 | 2026-07-29 | **Decision #23:** lock experiment_sample_data / experiment_data kinds, EAV storage, grid+export contracts (tech sketch §0) |

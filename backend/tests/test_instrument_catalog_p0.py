@@ -26,7 +26,7 @@ def test_instrument_type_crud(client, config_headers):
         headers=config_headers,
         json={
             "name": f"Type-{uuid.uuid4().hex[:8]}",
-            "vendor": "Agilent",
+            "vendor": "VendorA",
             "model": "6495C",
             "description": "LCMS",
         },
@@ -34,7 +34,7 @@ def test_instrument_type_crud(client, config_headers):
     assert r.status_code == status.HTTP_201_CREATED, r.text
     data = r.json()
     type_id = data["id"]
-    assert data["vendor"] == "Agilent"
+    assert data["vendor"] == "VendorA"
     assert data["active"] is True
 
     r = client.get("/v1/instrument-types", headers=config_headers)
@@ -65,7 +65,7 @@ def test_instrument_instance_requires_type(client, config_headers):
     t = client.post(
         "/v1/instrument-types",
         headers=config_headers,
-        json={"name": f"T-{uuid.uuid4().hex[:8]}", "vendor": "Thermo"},
+        json={"name": f"T-{uuid.uuid4().hex[:8]}", "vendor": "VendorB"},
     ).json()
 
     r = client.post(

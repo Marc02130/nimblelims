@@ -7,7 +7,7 @@
 **Schema changes:** [`.docs-review/schema-changes/experiment-template-entries.md`](../schema-changes/experiment-template-entries.md)  
 **Reviews:** [Lab Ops](../lab-ops-review/experiment-template-entries.md) · [CEO](../ceo-review/experiment-template-entries.md) · [UI](../ui-review/experiment-template-entries.md) · [Architecture](../architecture-review/experiment-template-entries.md) · [Security](../security-review/experiment-template-entries.md)  
 **Ideas (OOS):** local `.docs-internal/ideas/accessioning-and-workflows-revisit.md` (not committed) · local `.docs-internal/ideas/materials-and-lot-tracking.md` (not committed) · local `.docs-internal/ideas/index-sets-and-sequencing-setup.md` (not committed)  
-**Reference:** Sapio Experiments Guide (external reference; PDF is not present in this repository snapshot)
+**Reference:** external competitive reference (not stored in repo) (external reference; PDF is not present in this repository snapshot)
 **Related manuals:** [experiments.md](../manuals/experiments.md), [processes.md](../manuals/processes.md), [lims-runs.md](../manuals/lims-runs.md)  
 **Process:** Lab Ops first, then other reviews ([lab-ops-review/README.md](../lab-ops-review/README.md))
 
@@ -17,7 +17,7 @@
 
 > **Do not reopen without product decision.**  
 > This section is the authoritative lock from Q&A sets A–H.  
-> Sketch scope = **two base kinds + columns/population + v1 predefined wrappers + template UI** — not full Sapio catalog.
+> Sketch scope = **two base kinds + columns/population + v1 predefined wrappers + template UI** — not full commercial-LIMS catalog.
 
 **Coherence fold (2026-08-24):** §0 is the current source of truth. Later `sample_table` / `experiment_table` examples are historical substrate language, not API kinds and not the aliquot/pool design. The current mint proof is the atomic `aliquot_pool_plan` + `aliquots_pools` wrapper pair in [configurable-entries-framework.md](configurable-entries-framework.md) and [extract-hold-dest-type.md](extract-hold-dest-type.md).
 

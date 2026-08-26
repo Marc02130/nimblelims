@@ -132,7 +132,7 @@ When adding samples to an experiment:
 
 Scan/resolve of a sample that fails these gates must **not** enter the selected cohort (clear error).
 
-### Product target start UX (Sapio-aligned dual list)
+### Product target start UX (product-target dual list)
 
 **Canonical:** [Decision #24](../open-questions/experiments.md). Early labs often **lack barcode scanners**.
 
@@ -201,6 +201,6 @@ Permission: `experiment:manage` for manage surfaces.
 
 - Template-driven **entries** as the ELN body (tables + predefined actions).
 - Two product kinds with predefined wrappers; no third action kind.
-- Sapio-aligned **start**: process → choose experiment → select from queue → instance + cohort.
+- product-target **start**: process → choose experiment → select from queue → instance + cohort.
 - Clear separation from **LIMS Runs**.
 - Containers/amount: solute mass only; see [open-questions/containers.md](../open-questions/containers.md).

@@ -52,7 +52,7 @@ Thumbs.db
 # Local working PRDs/specs/private: keep out of git
 .docs/internal/
 
-# Local 
+# Local third-party PDF dumps at repo root (not .docs/review/manuals/)
 /manuals/
 
 # --- Tooling ---

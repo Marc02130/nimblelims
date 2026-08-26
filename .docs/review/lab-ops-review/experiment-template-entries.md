@@ -51,8 +51,8 @@ That matches how target labs actually work and correctly keeps accessioning, mat
 | No queue / intake | **Addressed** — start of experiment/run only |
 | Process auto-link ambiguity | **Addressed** — explicit select; process filters queue only |
 | Write-back vs accessioning | **Addressed** — RO identity; config map; submit only |
-| Volume on sample like Sapio | **Addressed** — amount never volume; containers own metrics |
-| Full Sapio catalog pressure | **Addressed** — deferred with ideas |
+| Volume on sample like commercial LIMS tools | **Addressed** — amount never volume; containers own metrics |
+| Full commercial-LIMS catalog pressure | **Addressed** — deferred with ideas |
 
 ---
 

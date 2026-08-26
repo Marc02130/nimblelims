@@ -29,7 +29,7 @@ Design Group need one place that separates the proven mint spine from the holes 
 
 1. What the framework **is** (two kinds + predefined wrappers + product execute).
 2. How aliquot/pool **proves** it (atomic pair + METHOD_CATALOG dual-map + mint integrity).
-3. How we **differ from Sapio** on purpose.
+3. How we **differ from commercial LIMS tools** on purpose.
 4. Which non-mint wrappers reuse kind + FieldDefinitions without METHOD_CATALOG.
 5. What remains open and in what order Grok Build should later implement it.
 
@@ -201,9 +201,9 @@ Seeds already locked for the proof: Blood × aliquot → DNA; DNA × pool → po
 
 ---
 
-## 7. Framework vs Sapio
+## 7. Framework vs commercial LIMS tools
 
-| Sapio (typical) | NimbleLIMS (this framework) |
+| Commercial LIMS (typical) | NimbleLIMS (this framework) |
 |-----------------|-----------------------------|
 | OOB ≈ Sample Details / Experiment Details | Same idea as our **two kinds**: `experiment_sample_data` / `experiment_data`. |
 | Working tables with identifiers **not** FK-linked to Sample | Dest (and cohort) rows stay **`sample_id`-linked**. |
@@ -246,7 +246,7 @@ The rows below are locked bars for the **mint proof** and inherited product spin
 |--------|-----|--------|
 | **Third base kind** | Wrappers sit on the two kinds only. | Heidi; spine |
 | **Sample / `material_class` column for dest fields** | Dest amount / vol / conc are **FieldDefinitions on the dest entry**, not Sample schema and not a Sample/`material_class` column. | Heidi |
-| **Customer Python as v1** | Mint is **product execute**, not customer Python / Sapio-style webhooks on entry or experiment events. | Heidi; Deiter |
+| **Customer Python as v1** | Mint is **product execute**, not customer Python / commercial-LIMS-style webhooks on entry or experiment events. | Heidi; Deiter |
 | **Unlinked working tables** | Dest (and cohort) rows stay **`sample_id`-linked**. No identifier-only working table. | Hans |
 | **Mint without transition catalog / `sample_id` / L1** | Every mint (including future custom) requires `sample_type_transitions`, `sample_id` dest rows, and L1 `eln_process_samples` join when under process. | Hans |
 | **SOP→AI that bypasses catalog / `sample_id` / L1** | SOP→AI is a later **consumer** of this framework; it does not skip those integrity bars. PR 51 Apply Hold stands. | Hans |
