@@ -1,59 +1,41 @@
 # Nimble formal review skills
 
-Slash-friendly skills for the NimbleLIMS development process. Each skill produces a **versioned review artifact** under `.docs-review/` using shared packet rules in [PACKET.md](./PACKET.md).
+Slash-friendly skills for the NimbleLIMS development process. Each skill produces a **versioned review artifact** under `.docs/review/` using shared packet rules in [PACKET.md](./PACKET.md).
+
+**Teams:** [`.grok/teams/`](../../teams/) — Leadership · BA · Dev · QA · Docs.  
+**Docs root:** [`.docs/README.md`](../../../.docs/README.md).
 
 ## Skills
 
-| Slash / name | Persona | Artifact | Type |
-|--------------|---------|----------|------|
-| `/nimble-lab-ops-review` | SVP Lab Ops | `.docs-review/lab-ops-review/{stem}.md` | Formal gate (required) |
-| `/nimble-ceo-review` | Founder / product | `.docs-review/ceo-review/{stem}.md` | Formal parallel |
-| `/nimble-ui-review` | UX / lab workflow UI | `.docs-review/ui-review/{stem}.md` | Formal parallel |
-| `/nimble-arch-review` | Systems architecture | `.docs-review/architecture-review/{stem}.md` | Formal parallel |
-| `/nimble-cso-review` | Feature security + optional deep CSO | `.docs-review/security-review/{stem}.md` | Formal parallel (Security) |
-| `/nimble-scientific-cso-review` | Chief Scientific Officer (assays, results, QC, data integrity) | `.docs-review/scientific-cso-review/{stem}.md` | Formal parallel |
-| `/nimble-ba-review` | Business Analyst | `.docs-review/ba-review/{stem}.md` | Formal parallel |
-| `/nimble-qa-review` | Testing / QA Lead | `.docs-review/qa-review/{stem}.md` | Formal parallel |
-| `/nimble-developer-review` | Skilled Developer (Cursor implementability) | `.docs-review/developer-review/{stem}.md` | Formal parallel |
-| `/nimble-documentarian` | Documentarian (docs quality & Cursor hand-off) | `.docs-review/docs-review/{stem}.md` | Formal parallel |
-| `/nimble-test-data` | Test Data Developer | `.docs-review/test-data/{stem}.md` | Supporting / generative |
-| `/nimble-sop-researcher` | SOP Researcher | `.docs-review/sop-research/{stem-or-topic}.md` | Supporting / generative |
-| `/nimble-review-packet` | Orchestrator | Runs gate order, points at all artifacts | Orchestrator |
+| Slash / name | Persona | Artifact | Type | Team |
+|--------------|---------|----------|------|------|
+| `/nimble-lab-ops-review` | SVP Lab Ops | `.docs/review/lab-ops-review/{stem}.md` | Formal gate | Leadership |
+| `/nimble-ceo-review` | Founder / product | `.docs/review/ceo-review/{stem}.md` | Formal | Leadership |
+| `/nimble-cso-review` | Security CSO | `.docs/review/security-review/{stem}.md` | Formal | Leadership |
+| `/nimble-scientific-cso-review` | Scientific CSO | `.docs/review/scientific-cso-review/{stem}.md` | Formal | Leadership |
+| `/nimble-ba-review` | Business Analyst | `.docs/review/ba-review/{stem}.md` | Formal | **BA** |
+| `/nimble-arch-review` | Architecture | `.docs/review/architecture-review/{stem}.md` | Formal | Dev |
+| `/nimble-developer-review` | Developer | `.docs/review/developer-review/{stem}.md` | Formal | Dev |
+| `/nimble-ui-review` | UI / UX | `.docs/review/ui-review/{stem}.md` | Formal | Dev |
+| `/nimble-qa-review` | QA / Testing | `.docs/review/qa-review/{stem}.md` | Formal | QA |
+| `/nimble-test-data` | Test Data | `.docs/review/test-data/{stem}.md` | Supporting | QA |
+| `/nimble-documentarian` | Documentarian | `.docs/review/docs-review/{stem}.md` | Formal | Docs |
+| `/nimble-sop-researcher` | SOP Researcher | `.docs/review/sop-research/{stem-or-topic}.md` | Supporting | Docs |
+| `/nimble-review-packet` | Orchestrator | Gate order | Orchestrator | Leadership |
 
 ## Recommended order (ELN / LIMS)
 
-1. **Lab Ops** (required gate)  
-2. **CEO** + **UI** + **Arch** + **Security CSO** + **Scientific CSO** + **BA** + **QA** + **Developer** + **Documentarian** (parallel after Lab Ops has spoken)  
-3. Supporting skills as needed: **Test Data** and **SOP Researcher**  
-4. Resolve **open questions**  
-5. Implement only when implement gate is open  
+1. **Leadership:** Lab Ops → CEO + CSOs  
+2. **BA:** requirements / AC / stories  
+3. **Dev:** Arch + Developer (+ UI)  
+4. **QA:** QA + Test Data  
+5. **Docs:** Documentarian  
+6. Open questions cleared → implement when gate open  
 
-## Invocation examples
-
-```
-/nimble-lab-ops-review experiment-template-entries
-/nimble-ceo-review experiment-template-entries
-/nimble-scientific-cso-review experiment-template-entries
-/nimble-ba-review experiment-template-entries
-/nimble-qa-review experiment-template-entries
-/nimble-developer-review experiment-template-entries
-/nimble-documentarian experiment-template-entries
-/nimble-test-data experiment-template-entries
-/nimble-sop-researcher aliquoting plasma samples
-/nimble-review-packet experiment-template-entries
-```
-
-Or: “Run Lab Ops review on the experiment template entries tech sketch.”
-
-## Relationship to gstack
-
-- **Wraps** do not fork gstack skill bodies. They load gstack SKILL.md at runtime and add Nimble defaults + artifact paths.  
-- Upgrade gstack separately; these skills stay thin.  
-- Diff-level **code review** remains gstack `/review` (not a formal packet review).  
-- Full infra **CSO** remains available via gstack `/cso`; `/nimble-cso-review` is the **packet** security review with optional deep pass.
+Or: `/nimble-review-packet {stem}`.
 
 ## Process docs
 
-- Pipeline: `.docs-review/development-process/README.md`  
-- Lab Ops role: `.docs-review/lab-ops-review/README.md`  
-- Doc index: `.docs-review/README.md`
+- Pipeline: `.docs/review/development-process/README.md`  
+- Doc index: `.docs/README.md`  
+- Teams: `.grok/teams/README.md`  

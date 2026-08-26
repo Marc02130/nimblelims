@@ -12,7 +12,7 @@ Full pipeline (proportional), folders, phased implementation, and review handlin
 - **`.docs/discussions/`**, **`.docs/decision-logs/`** — Leadership discussions and stamps.  
 See [`.docs/README.md`](.docs/README.md). Do not use the old `.docs-review/` / `.docs-internal/` paths.
 
-**Grok teams:** [`.grok/teams/`](.grok/teams/) — Leadership · Dev · QA · Docs.
+**Grok teams:** [`.grok/teams/`](.grok/teams/) — Leadership · BA · Dev · QA · Docs.
 
 Summary:
 
