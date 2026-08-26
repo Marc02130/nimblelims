@@ -52,7 +52,7 @@ Thumbs.db
 # Local working PRDs/specs/private: keep out of git
 .docs/internal/
 
-# Local Sapio / vendor PDF dumps at repo root (not .docs/review/manuals/)
+# Local 
 /manuals/
 
 # --- Tooling ---
