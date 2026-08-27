@@ -14,7 +14,7 @@
 
 This script is the **receive happy path** sign-off. Do **not** use `uat-sample-accessioning.md` (wizard) as receive SoT.
 
-**CORE must-pass:** identity + **1..N vessels**, sticky project, Available for Testing, AuthZ.  
+**CORE must-pass:** identity + **1..N vessels**, sticky project, Available for Testing, zero Tests at receive, AuthZ.
 **Follow-on (not CORE blockers):** AR-RES-01/02 results-entry.
 
 ---
@@ -67,7 +67,7 @@ This script is the **receive happy path** sign-off. Do **not** use `uat-sample-a
 | AR-HV-01 first + second | `NBIO-AR-0001` then `NBIO-AR-0002` (two commits) |
 | **AR-HV-MC** | Primary `NBIO-AR-MC-P` + additional `NBIO-AR-MC-A1`, `NBIO-AR-MC-A2` (**one** commit) |
 | AR-DUP-01 | replay `NBIO-AR-0001` |
-| AR-TST-01 | `NBIO-AR-0009` (`analysis_ids: []`) |
+| AR-TST-01 | `NBIO-AR-0009` (legacy POST with a valid `analysis_ids` value) |
 | AR-HV-05 | `NBIO-AR-KB-0001` |
 | AR-RBAC-01 | `NBIO-AR-CLIENT-0001` (optional) |
 
@@ -82,9 +82,9 @@ This script is the **receive happy path** sign-off. Do **not** use `uat-sample-a
 
 | ID | Steps | Expected | Pass/Fail | Notes |
 |----|-------|----------|-----------|-------|
-| AR-HV-01 | Log in as `alice-tech`. Open **Receive** (`/receive`). Scan `NBIO-AR-0001`. Sticky Plasma / Plasma (K2EDTA) / mAb-2301. Leave asked-for empty. Submit. Immediately scan `NBIO-AR-0002` without navigating away. | Both created. Stay on receive. Toast. Barcode clears and is focused. Type/matrix/project sticky. No sample-detail redirect. No aliquot dialog. | | QA2, QA5 |
+| AR-HV-01 | Log in as `alice-tech`. Open **Receive** (`/receive`). Scan `NBIO-AR-0001`. Sticky Plasma / Plasma (K2EDTA) / mAb-2301. Submit. Immediately scan `NBIO-AR-0002` without navigating away. | Both created. Stay on receive. Toast. Barcode clears and is focused. Type/matrix/project sticky. No sample-detail redirect. No analyses picker. No aliquot dialog. | | QA2, QA5, QA6 |
 | **AR-HV-MC** | Same sticky. Primary `NBIO-AR-MC-P`. Add additional barcodes `NBIO-AR-MC-A1` and `NBIO-AR-MC-A2`. Submit once. | **One** sample; **three** containers + contents → same sample; status Available for Testing; stay on form. | | RQ-AR-2/3, A-18 |
-| AR-HV-02 | Receive with ELISA (Human IgG) in asked-for (optional). | Tests created, status **Assigned/Pending** (not In Process). | | QA6 |
+| AR-HV-02 | Inspect the UI, then POST receive with ELISA (Human IgG) in legacy `analysis_ids`. | UI has no analyses picker. Receive succeeds, response `tests` is empty, and the sample has **zero Test rows**. | | QA6 / A-15 parked |
 | AR-HV-03 | Receive with temperature omitted. | Succeeds. | | |
 | AR-HV-04 | Receive once with `client_sample_id`, once omitted. | Both succeed. | | |
 | AR-HV-05 | Type barcode `NBIO-AR-KB-0001` (no scanner). Submit. | Same success; `containers.name` = typed barcode. | | Keyboard |
@@ -92,7 +92,7 @@ This script is the **receive happy path** sign-off. Do **not** use `uat-sample-a
 | AR-DUP-01 | Replay `NBIO-AR-0001` after it exists. | **409**. Toast. Stay on receive. No second sample. | | QA3 |
 | AR-ID-01 | Inspect `/receive` form and AR-HV-01 response. | **No sample-ID field**. `samples.name` ≠ barcode (unless template coincides). `containers.name` = barcode. No status / tube-type fields. | | QA2 |
 | AR-ST-01 | Inspect sample from `NBIO-AR-0001`. | Status = **Available for Testing**. `received_date` set. No Received hop. | | QA4 |
-| AR-TST-01 | Sample from empty `analysis_ids` receive. Add ELISA later via tests UI/API. | Test status Assigned/Pending. | | QA6 |
+| AR-TST-01 | Inspect the sample from AR-HV-02, then add ELISA later via the separate tests UI/API. | Zero Tests immediately after receive. The later explicit add creates the test with its normal pending status. | | QA6 |
 | AR-TST-02 | DELETE that test (no results). | DELETE succeeds. | | QA6 / A-14 |
 | AR-TST-03 | After a test has results, DELETE it. | **400**. Test and result remain. | | QA6 / A-14 |
 | AR-RBAC-01 | Log in as `david-cro`. Open Receive or POST `/samples/receive`. | No receive UI, or **403**. | | QA8 |
@@ -109,7 +109,7 @@ This script is the **receive happy path** sign-off. Do **not** use `uat-sample-a
 
 | ID | Steps | Expected |
 |----|-------|----------|
-| AR-T1 | Phases 1–3 pytest (`test_atomic_receive_phase*.py`) | Rollback / 409 / RBAC / asked-for / field hygiene |
+| AR-T1 | Phases 1–3 pytest (`test_atomic_receive_phase*.py`) | Rollback / 409 / RBAC / ignored `analysis_ids` with zero Tests / field hygiene |
 
 ## Sign-off
 

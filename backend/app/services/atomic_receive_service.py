@@ -19,7 +19,6 @@ from app.core.name_generation import generate_name_for_sample
 from app.core.rbac import validate_client_access
 from app.schemas.sample import (
     ReceivedContainerInfo,
-    ReceivedTestInfo,
     SampleReceiveRequest,
     SampleReceiveResponse,
 )
@@ -27,13 +26,11 @@ from models.container import Container, ContainerType, Contents
 from models.list import List, ListEntry
 from models.project import Project, ProjectUser
 from models.sample import Sample
-from models.test import Test
 from models.user import User
 
 logger = logging.getLogger(__name__)
 
 AVAILABLE_FOR_TESTING = "Available for Testing"
-ASSIGNED_PENDING_CANDIDATES = ("Assigned/Pending", "Assigned", "Pending")
 
 
 def _list_entry_by_names(
@@ -91,41 +88,6 @@ def resolve_default_tube_type(db: Session) -> ContainerType:
     raise HTTPException(
         status_code=status.HTTP_400_BAD_REQUEST,
         detail="Default tube container type not found in configuration",
-    )
-
-
-def resolve_assigned_pending_status(db: Session) -> ListEntry:
-    """Prefer Assigned/Pending (not In Process) for asked-for receive tests."""
-    for list_name in ("Test Status", "test_status"):
-        lst = db.query(List).filter(List.name == list_name).first()
-        if not lst:
-            continue
-        # Prefer combined Assigned/Pending first
-        preferred = (
-            db.query(ListEntry)
-            .filter(ListEntry.list_id == lst.id, ListEntry.name == "Assigned/Pending")
-            .first()
-        )
-        if preferred:
-            return preferred
-        for entry_name in ("Assigned", "Pending"):
-            entry = (
-                db.query(ListEntry)
-                .filter(ListEntry.list_id == lst.id, ListEntry.name == entry_name)
-                .first()
-            )
-            if entry:
-                return entry
-    preferred = db.query(ListEntry).filter(ListEntry.name == "Assigned/Pending").first()
-    if preferred:
-        return preferred
-    for entry_name in ("Assigned", "Pending"):
-        entry = db.query(ListEntry).filter(ListEntry.name == entry_name).first()
-        if entry:
-            return entry
-    raise HTTPException(
-        status_code=status.HTTP_400_BAD_REQUEST,
-        detail="Test status Assigned/Pending not found in configuration",
     )
 
 
@@ -201,67 +163,14 @@ def _assert_barcodes_available(db: Session, barcodes: Sequence[str]) -> None:
         )
 
 
-def _create_asked_for_tests(
-    db: Session,
-    *,
-    sample: Sample,
-    analysis_ids: Sequence[UUID],
-    current_user: User,
-) -> List[ReceivedTestInfo]:
-    """Create optional asked-for tests at Assigned/Pending — not In Process / not work plan."""
-    if not analysis_ids:
-        return []
-    from models.analysis import Analysis
-
-    status_entry = resolve_assigned_pending_status(db)
-    if status_entry.name == "In Process":
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Asked-for receive must not use In Process test status",
-        )
-
-    created: List[ReceivedTestInfo] = []
-    for analysis_id in analysis_ids:
-        analysis = (
-            db.query(Analysis)
-            .filter(Analysis.id == analysis_id, Analysis.active == True)  # noqa: E712
-            .first()
-        )
-        if not analysis:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Analysis not found or inactive: {analysis_id}",
-            )
-        test = Test(
-            name=f"{sample.name}_{analysis.name}",
-            sample_id=sample.id,
-            analysis_id=analysis_id,
-            status=status_entry.id,
-            technician_id=current_user.id,
-            created_by=current_user.id,
-            modified_by=current_user.id,
-        )
-        db.add(test)
-        db.flush()
-        created.append(
-            ReceivedTestInfo(
-                id=test.id,
-                analysis_id=analysis_id,
-                status=status_entry.id,
-                status_name=status_entry.name,
-            )
-        )
-    return created
-
-
 def receive_sample(
     db: Session,
     req: SampleReceiveRequest,
     current_user: User,
 ) -> SampleReceiveResponse:
     """
-    One transaction: system sample name + Available for Testing + 1..N vessels
-    (+ optional asked-for tests). Full rollback on any failure.
+    One transaction: system sample name + Available for Testing + 1..N vessels.
+    CORE never creates tests; legacy analysis_ids are accepted and ignored.
     """
     barcodes = _normalize_barcodes(req)
     project = require_project_for_receive(db, current_user, req.project_id)
@@ -321,7 +230,6 @@ def receive_sample(
     db.add(sample)
 
     created_containers: List[Container] = []
-    created_tests: List[ReceivedTestInfo] = []
     try:
         db.flush()  # sample.id
 
@@ -338,13 +246,6 @@ def receive_sample(
             db.flush()
             db.add(Contents(container_id=container.id, sample_id=sample.id))
             created_containers.append(container)
-
-        created_tests = _create_asked_for_tests(
-            db,
-            sample=sample,
-            analysis_ids=req.analysis_ids or [],
-            current_user=current_user,
-        )
 
         db.commit()
     except HTTPException:
@@ -378,5 +279,5 @@ def receive_sample(
         containers=[
             ReceivedContainerInfo(id=c.id, barcode=c.name) for c in created_containers
         ],
-        tests=created_tests,
+        tests=[],
     )
