@@ -173,15 +173,15 @@ describe('MainLayout', () => {
       expect(screen.getByText('Dashboard')).toBeInTheDocument();
     });
 
-    test('displays correct title for /accessioning', () => {
+    test('displays correct title for /receive', () => {
       renderWithProviders(
         <MainLayout>
           <div>Test</div>
         </MainLayout>,
-        ['/accessioning']
+        ['/receive']
       );
 
-      expect(screen.getByText('Accessioning')).toBeInTheDocument();
+      expect(screen.getByText('Receive')).toBeInTheDocument();
     });
 
     test('displays correct title for /admin', () => {
