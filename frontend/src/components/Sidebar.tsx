@@ -97,12 +97,13 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onMobileClose, collapsed 
     isExperimentsRoute(location.pathname)
   );
   const [sampleMgmtExpanded, setSampleMgmtExpanded] = useState(
-    location.pathname.startsWith('/accessioning') || 
-    location.pathname.startsWith('/samples') || 
-    location.pathname.startsWith('/tests') || 
-    location.pathname.startsWith('/containers') || 
-    location.pathname.startsWith('/batches') || 
-    location.pathname.startsWith('/results')
+    location.pathname.startsWith('/receive') ||
+      location.pathname.startsWith('/accessioning') ||
+      location.pathname.startsWith('/samples') ||
+      location.pathname.startsWith('/tests') ||
+      location.pathname.startsWith('/containers') ||
+      location.pathname.startsWith('/batches') ||
+      location.pathname.startsWith('/results')
   );
 
   // Collapse accordions when sidebar collapses
@@ -141,8 +142,8 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onMobileClose, collapsed 
 
   const SampleMgmtItems: SampleMgmtNavItem[] = [
     {
-      text: 'Accessioning',
-      path: '/accessioning',
+      text: 'Receive',
+      path: '/receive',
       icon: <ScienceIcon />,
       permission: 'sample:create',
     },
@@ -259,7 +260,7 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onMobileClose, collapsed 
         setLabMgmtExpanded(true);
       } else if (isExperimentsRoute(path)) {
         setExperimentsExpanded(true);
-      } else if (path.startsWith('/accessioning') || path.startsWith('/samples') || path.startsWith('/tests') || path.startsWith('/containers') || path.startsWith('/batches') || path.startsWith('/results')) {
+      } else if (path.startsWith('/receive') || path.startsWith('/accessioning') || path.startsWith('/samples') || path.startsWith('/tests') || path.startsWith('/containers') || path.startsWith('/batches') || path.startsWith('/results')) {
         setSampleMgmtExpanded(true);
       }
     }
@@ -303,13 +304,14 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onMobileClose, collapsed 
     setLabMgmtExpanded(isLabMgmtRoute(location.pathname));
     setExperimentsExpanded(isExperimentsRoute(location.pathname));
     setSampleMgmtExpanded(
-      location.pathname.startsWith('/accessioning') || 
-      location.pathname.startsWith('/samples') || 
-      location.pathname.startsWith('/tests') || 
-      location.pathname.startsWith('/containers') || 
-      location.pathname.startsWith('/batches') || 
-      location.pathname.startsWith('/results')
-    );  
+      location.pathname.startsWith('/receive') ||
+        location.pathname.startsWith('/accessioning') ||
+        location.pathname.startsWith('/samples') ||
+        location.pathname.startsWith('/tests') ||
+        location.pathname.startsWith('/containers') ||
+        location.pathname.startsWith('/batches') ||
+        location.pathname.startsWith('/results')
+    );
   }, [location.pathname]);
 
   const drawerContent = (
@@ -441,11 +443,12 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onMobileClose, collapsed 
                     <Tooltip title="Sample Management" placement="right" arrow>
                       <ScienceIcon
                         color={
-                          location.pathname.startsWith('/accessioning') || 
-                          location.pathname.startsWith('/samples') || 
-                          location.pathname.startsWith('/tests') || 
-                          location.pathname.startsWith('/containers') || 
-                          location.pathname.startsWith('/batches') || 
+                          location.pathname.startsWith('/receive') ||
+                          location.pathname.startsWith('/accessioning') ||
+                          location.pathname.startsWith('/samples') ||
+                          location.pathname.startsWith('/tests') ||
+                          location.pathname.startsWith('/containers') ||
+                          location.pathname.startsWith('/batches') ||
                           location.pathname.startsWith('/results')
                             ? 'primary'
                             : 'inherit'
@@ -455,11 +458,12 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onMobileClose, collapsed 
                   ) : (
                     <ScienceIcon
                       color={
-                        location.pathname.startsWith('/accessioning') || 
-                        location.pathname.startsWith('/samples') || 
-                        location.pathname.startsWith('/tests') || 
-                        location.pathname.startsWith('/containers') || 
-                        location.pathname.startsWith('/batches') || 
+                        location.pathname.startsWith('/receive') ||
+                        location.pathname.startsWith('/accessioning') ||
+                        location.pathname.startsWith('/samples') ||
+                        location.pathname.startsWith('/tests') ||
+                        location.pathname.startsWith('/containers') ||
+                        location.pathname.startsWith('/batches') ||
                         location.pathname.startsWith('/results')
                           ? 'primary'
                           : 'inherit'
