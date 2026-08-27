@@ -330,7 +330,6 @@ export class ApiService {
     container_barcode: string;
     additional_container_barcodes?: string[];
     sample_type: string;
-    matrix: string;
     project_id: string;
     container_type_id: string;
     analysis_ids?: string[];

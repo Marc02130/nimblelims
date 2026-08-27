@@ -116,7 +116,6 @@ Create a new sample.
   "container_barcode": "NBIO-AR-0001",
   "additional_container_barcodes": ["NBIO-AR-0001B"],
   "sample_type": "uuid",
-  "matrix": "uuid",
   "project_id": "uuid",
   "container_type_id": "uuid",
   "temperature": 4.0,
@@ -125,7 +124,8 @@ Create a new sample.
 ```
 
 **Rules:**
-- No sample name / status / due_date / qc_type / client_id in body (`extra=forbid` → 422)
+- No sample name / status / **matrix** / due_date / qc_type / client_id in body (`extra=forbid` → 422)
+- **`sample_type` required** (sticky); matrix is not part of intake (`samples.matrix` nullable)
 - **`container_type_id` required** — active **1×1** type only (`rows=1` and `columns=1`); plates / multi-well → **400**
 - `samples.name` from name template; each barcode → `containers.name` (409 on collision, full rollback)
 - Status → **Available for Testing**; `received_date` set

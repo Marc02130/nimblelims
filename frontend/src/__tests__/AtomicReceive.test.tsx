@@ -53,12 +53,7 @@ describe('AtomicReceive', () => {
   beforeEach(() => {
     sessionStorage.clear();
     jest.clearAllMocks();
-    mockGetListEntries.mockImplementation(async (name: string) => {
-      if (String(name).toLowerCase().includes('sample')) {
-        return [{ id: 'type-1', name: 'Blood' }];
-      }
-      return [{ id: 'matrix-1', name: 'Serum' }];
-    });
+    mockGetListEntries.mockResolvedValue([{ id: 'type-1', name: 'Blood' }]);
     mockGetProjects.mockImplementation(async (filters?: { size?: number }) => {
       if (filters?.size != null && filters.size > 100) {
         const err: any = new Error('Unprocessable Entity');
@@ -100,6 +95,8 @@ describe('AtomicReceive', () => {
     expect(screen.getByTestId('container-type')).toBeInTheDocument();
     expect(screen.queryByLabelText(/lab sample id/i)).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/^status$/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole('combobox', { name: /^matrix$/i })).not.toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: /sample type/i })).toBeInTheDocument();
     // Plate must not appear in options
     fireEvent.mouseDown(screen.getByRole('combobox', { name: /container type/i }));
     expect(screen.queryByRole('option', { name: /96-Well Plate/i })).not.toBeInTheDocument();
@@ -122,8 +119,6 @@ describe('AtomicReceive', () => {
 
     fireEvent.mouseDown(screen.getByRole('combobox', { name: /sample type/i }));
     fireEvent.click(await screen.findByRole('option', { name: 'Blood' }));
-    fireEvent.mouseDown(screen.getByRole('combobox', { name: /^matrix$/i }));
-    fireEvent.click(await screen.findByRole('option', { name: 'Serum' }));
     fireEvent.mouseDown(screen.getByRole('combobox', { name: /^project$/i }));
     fireEvent.click(await screen.findByRole('option', { name: 'Study A' }));
     // Cryovial auto-selected as sticky default among 1×1 types
@@ -136,11 +131,11 @@ describe('AtomicReceive', () => {
         expect.objectContaining({
           container_barcode: 'NBIO-1',
           sample_type: 'type-1',
-          matrix: 'matrix-1',
           project_id: 'proj-1',
           container_type_id: 'ct-cryo',
         })
       );
+      expect(mockReceiveSample.mock.calls[0][0].matrix).toBeUndefined();
     });
 
     await waitFor(() => {

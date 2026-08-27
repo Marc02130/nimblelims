@@ -1,6 +1,6 @@
 /**
  * Atomic receive CORE UI (Phase 4).
- * Scan loop: sticky type/matrix/project, primary + optional additional barcodes,
+ * Scan loop: sticky type/project/container type, primary + optional additional barcodes,
  * stay on form after success. No sample-ID, status, tube-type, or aliquot dialog.
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
@@ -30,7 +30,6 @@ type LookupItem = { id: string; name: string };
 
 type StickyState = {
   sample_type: string;
-  matrix: string;
   project_id: string;
   container_type_id: string;
 };
@@ -46,17 +45,16 @@ function loadSticky(): StickyState {
   try {
     const raw = sessionStorage.getItem(STICKY_KEY);
     if (!raw) {
-      return { sample_type: '', matrix: '', project_id: '', container_type_id: '' };
+      return { sample_type: '', project_id: '', container_type_id: '' };
     }
     const parsed = JSON.parse(raw);
     return {
       sample_type: parsed.sample_type || '',
-      matrix: parsed.matrix || '',
       project_id: parsed.project_id || '',
       container_type_id: parsed.container_type_id || '',
     };
   } catch {
-    return { sample_type: '', matrix: '', project_id: '', container_type_id: '' };
+    return { sample_type: '', project_id: '', container_type_id: '' };
   }
 }
 
@@ -96,7 +94,6 @@ const AtomicReceive: React.FC = () => {
   const primaryRef = useRef<HTMLInputElement>(null);
 
   const [sampleTypes, setSampleTypes] = useState<LookupItem[]>([]);
-  const [matrices, setMatrices] = useState<LookupItem[]>([]);
   const [projects, setProjects] = useState<LookupItem[]>([]);
   const [containerTypes, setContainerTypes] = useState<ContainerTypeItem[]>([]);
   const [loadingLookups, setLoadingLookups] = useState(true);
@@ -104,7 +101,6 @@ const AtomicReceive: React.FC = () => {
 
   const sticky = loadSticky();
   const [sampleType, setSampleType] = useState(sticky.sample_type);
-  const [matrix, setMatrix] = useState(sticky.matrix);
   const [projectId, setProjectId] = useState(sticky.project_id);
   const [containerTypeId, setContainerTypeId] = useState(sticky.container_type_id);
   const [primaryBarcode, setPrimaryBarcode] = useState('');
@@ -126,12 +122,9 @@ const AtomicReceive: React.FC = () => {
     setLookupError(null);
     try {
       // projects.size max is 100 (backend Query le=100) — size=200 caused 422 and blank page
-      const [typesRaw, matricesRaw, projectsRaw, containerTypesRaw] = await Promise.all([
+      const [typesRaw, projectsRaw, containerTypesRaw] = await Promise.all([
         apiService.getListEntries('sample_types').catch(() =>
           apiService.getListEntries('Sample Type')
-        ),
-        apiService.getListEntries('matrix_types').catch(() =>
-          apiService.getListEntries('Matrix')
         ),
         apiService.getProjects({ page: 1, size: 100 }),
         apiService.getContainerTypes(),
@@ -145,7 +138,6 @@ const AtomicReceive: React.FC = () => {
       };
 
       setSampleTypes(toItems(typesRaw));
-      setMatrices(toItems(matricesRaw));
       const projList = Array.isArray(projectsRaw)
         ? projectsRaw
         : projectsRaw?.projects || [];
@@ -192,11 +184,10 @@ const AtomicReceive: React.FC = () => {
   useEffect(() => {
     saveSticky({
       sample_type: sampleType,
-      matrix,
       project_id: projectId,
       container_type_id: containerTypeId,
     });
-  }, [sampleType, matrix, projectId, containerTypeId]);
+  }, [sampleType, projectId, containerTypeId]);
 
   const addExtraBarcode = () => {
     const value = extraDraft.trim();
@@ -221,7 +212,7 @@ const AtomicReceive: React.FC = () => {
     setExtraDraft('');
     setClientSampleId('');
     setTemperature('');
-    // Keep sticky type/matrix/project.
+    // Keep sticky type/project/container type.
     setTimeout(() => primaryRef.current?.focus(), 0);
   };
 
@@ -235,8 +226,8 @@ const AtomicReceive: React.FC = () => {
       primaryRef.current?.focus();
       return;
     }
-    if (!sampleType || !matrix || !projectId || !containerTypeId) {
-      setFormError('Sample type, matrix, project, and container type are required (sticky)');
+    if (!sampleType || !projectId || !containerTypeId) {
+      setFormError('Sample type, project, and container type are required (sticky)');
       return;
     }
 
@@ -263,7 +254,6 @@ const AtomicReceive: React.FC = () => {
         container_barcode: primary,
         additional_container_barcodes: extras,
         sample_type: sampleType,
-        matrix,
         project_id: projectId,
         container_type_id: containerTypeId,
         temperature: temp,
@@ -397,22 +387,6 @@ const AtomicReceive: React.FC = () => {
             </Select>
           </FormControl>
 
-          <FormControl fullWidth required>
-            <InputLabel id="receive-matrix-label">Matrix</InputLabel>
-            <Select
-              labelId="receive-matrix-label"
-              label="Matrix"
-              value={matrix}
-              onChange={(e) => setMatrix(String(e.target.value))}
-              inputProps={{ 'data-testid': 'matrix' }}
-            >
-              {matrices.map((m) => (
-                <MenuItem key={m.id} value={m.id}>
-                  {m.name}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
 
           <FormControl fullWidth required>
             <InputLabel id="receive-project-label">Project</InputLabel>

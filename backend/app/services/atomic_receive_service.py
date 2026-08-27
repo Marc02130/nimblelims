@@ -182,12 +182,11 @@ def receive_sample(
     _assert_barcodes_available(db, barcodes)
 
     # Validate list FKs exist when possible (create_all may use orphan entries)
-    for field_name, entry_id in (("sample_type", req.sample_type), ("matrix", req.matrix)):
-        if not db.query(ListEntry).filter(ListEntry.id == entry_id).first():
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Invalid {field_name}",
-            )
+    if not db.query(ListEntry).filter(ListEntry.id == req.sample_type).first():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid sample_type",
+        )
 
     if req.client_sample_id:
         clash = (
@@ -221,7 +220,7 @@ def receive_sample(
     sample = Sample(
         name=sample_name,
         sample_type=req.sample_type,
-        matrix=req.matrix,
+        matrix=None,  # matrix dropped from intake; sample_type is SoT
         status=available_status.id,
         project_id=project.id,
         received_date=received_at,
