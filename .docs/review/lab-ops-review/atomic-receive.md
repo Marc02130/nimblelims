@@ -65,7 +65,7 @@ No Lab Ops gap that blocks coding. Watch item only: UI must make “add another 
 
 ### 2.3 Results-entry OUT of CORE — Lab Ops confirm
 
-**Confirmed correct.** Receive ≠ order ≠ execute ≠ results. Techs dogfood receive by scanning vessels and checking sample/container integrity — not by entering analyte values. The 2026-08-26 Heidi punch supersedes ignore/silent-drop: CORE creates zero Tests; non-empty `analysis_ids` → **422**; hide the analyses picker. A-15 is parked.
+**Confirmed correct.** Receive ≠ order ≠ execute ≠ results. Techs dogfood receive by scanning vessels and checking sample/container integrity — not by entering analyte values. The Heidi Architecture lock supersedes L4: CORE returns 422 before the transaction for non-empty `analysis_ids`, creates zero Tests, and hides the analyses picker. A-15 is parked.
 
 **Do not** pull `POST /tests/{id}/results` into CORE ship/UAT blockers so that “receive can be dogfooded.” That path is unnecessary for accessioning acceptance.
 
@@ -94,7 +94,7 @@ No Lab Ops gap that blocks coding. Watch item only: UI must make “add another 
 | **L1** | **Retracted.** Barcode ≠ sample ID. Two identities. | Sample ID is material; barcode is the tube. | Retracted (2026-08-20); still retracted |
 | **L2** | Project **required** and **session-sticky**. Never auto-create a project per tube / commit. | Auto-create dumps garbage projects and breaks RLS hygiene. | **RQ-AR-7** / SPEC §3 |
 | **L3** | Container type = **lab default tube**, applied to **all** vessels on the call, **off the form** (no type picker on the scan loop). | Asking type on every scan (or per additional barcode) breaks the loop. | **RQ-AR-8** / SPEC §3.2 |
-| **L4** | **Superseded 2026-08-26 Heidi:** CORE receive creates zero Tests. Non-empty `analysis_ids` → **422** (refuse, do not ignore). **DELETE** remains refused if an independently created test has results. | Receive does not imply an order or work plan; silent drop hides a client that still thinks Tests were created. A-15 is parked. | Heidi lock / A-14 light-ride |
+| **L4** | **Superseded by Architecture lock:** non-empty `analysis_ids` → **422 before the receive transaction**. Empty/omitted creates zero Tests. Do not ignore or persist asked-for analyses. **DELETE** remains refused if an independently created test has results. | Receive does not imply an order or work plan; silent drop hides a client that still thinks Tests were created. A-15 is parked. | Heidi Architecture lock / A-14 light-ride |
 
 No new L* required for multi-tube: **RQ-AR-2/3** and bounce #2 already encode Lab Ops intent (primary + additional; not single-vessel-only).
 
