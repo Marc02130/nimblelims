@@ -453,10 +453,34 @@ class SampleReceiveRequest(BaseModel):
             raise ValueError("Temperature must be between -273.15°C and 1000°C")
         return v
 
+    @validator("analysis_ids")
+    def dedupe_analysis_ids(cls, v: List[UUID]) -> List[UUID]:
+        if not v:
+            return []
+        seen = set()
+        out: List[UUID] = []
+        for aid in v:
+            if aid not in seen:
+                seen.add(aid)
+                out.append(aid)
+        return out
+
 
 class ReceivedContainerInfo(BaseModel):
     id: UUID
     barcode: str
+
+    class Config:
+        from_attributes = True
+
+
+class ReceivedTestInfo(BaseModel):
+    """Asked-for test created at receive (Assigned/Pending only)."""
+
+    id: UUID
+    analysis_id: UUID
+    status: UUID
+    status_name: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -471,6 +495,7 @@ class SampleReceiveResponse(BaseModel):
     project_id: UUID
     received_date: Optional[datetime] = None
     containers: List[ReceivedContainerInfo]
+    tests: List[ReceivedTestInfo] = Field(default_factory=list)
 
     class Config:
         from_attributes = True
