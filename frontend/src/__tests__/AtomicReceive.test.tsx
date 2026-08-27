@@ -58,8 +58,27 @@ describe('AtomicReceive', () => {
       }
       return [{ id: 'matrix-1', name: 'Serum' }];
     });
-    mockGetProjects.mockResolvedValue({
-      projects: [{ id: 'proj-1', name: 'Study A' }],
+    mockGetProjects.mockImplementation(async (filters?: { size?: number }) => {
+      // Guard: backend le=100 — UI must not request size > 100
+      if (filters?.size != null && filters.size > 100) {
+        const err: any = new Error('Unprocessable Entity');
+        err.response = {
+          status: 422,
+          data: {
+            detail: [
+              {
+                type: 'less_than_equal',
+                loc: ['query', 'size'],
+                msg: 'Input should be less than or equal to 100',
+                input: filters.size,
+                ctx: { le: 100 },
+              },
+            ],
+          },
+        };
+        throw err;
+      }
+      return { projects: [{ id: 'proj-1', name: 'Study A' }] };
     });
     mockReceiveSample.mockResolvedValue({
       sample_id: 's1',
