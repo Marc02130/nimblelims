@@ -87,9 +87,9 @@ That matches how target labs actually work and correctly keeps accessioning, mat
 
 | Idea | Lab ops view |
 |------|----------------|
-| local `.docs-internal/ideas/accessioning-and-workflows-revisit.md` (not committed) | **Critical next workflow** after entries spine |
-| local `.docs-internal/ideas/materials-and-lot-tracking.md` (not committed) | Needed for many SOPs; not blocking this foundation |
-| local `.docs-internal/ideas/index-sets-and-sequencing-setup.md` (not committed) | NGS must-have later; experiment_data OK interim |
+| local `.docs/internal/ideas/accessioning-and-workflows-revisit.md` (not committed) | **Critical next workflow** after entries spine |
+| local `.docs/internal/ideas/materials-and-lot-tracking.md` (not committed) | Needed for many SOPs; not blocking this foundation |
+| local `.docs/internal/ideas/index-sets-and-sequencing-setup.md` (not committed) | NGS must-have later; experiment_data OK interim |
 
 ---
 

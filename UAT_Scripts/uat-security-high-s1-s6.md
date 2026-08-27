@@ -3,8 +3,8 @@
 **Stem:** `security-high-s1-s6`  
 **Branch:** `security/high-s1-s6`  
 **Date:** 2026-08-21 (second completed run; earlier Tobias stamp 2026-08-20 plus CSO UAT remain on this branch history)  
-**Requirements:** [`.docs-review/requirements/security-high-s1-s6.md`](../.docs-review/requirements/security-high-s1-s6.md)  
-**Source audit:** [`.docs-review/security-review/codebase.md`](../.docs-review/security-review/codebase.md)  
+**Requirements:** [`.docs/review/requirements/security-high-s1-s6.md`](../.docs/review/requirements/security-high-s1-s6.md)  
+**Source audit:** [`.docs/review/security-review/codebase.md`](../.docs/review/security-review/codebase.md)  
 **Related:** [uat-security-rbac.md](uat-security-rbac.md) (broader RBAC; this script is High-finding focused)
 
 ## Purpose
@@ -364,4 +364,4 @@ ENVIRONMENT=test ALLOW_INSECURE_DEFAULTS=true SECRET_KEY=pytest-secret-key-not-f
 
 **Merge to `main` only if Required cases Pass** (or Fail with written waiver — not recommended for High).
 
-After Pass: update [`.docs-review/security-review/codebase.md`](../.docs-review/security-review/codebase.md) S1–S6 → **Met**, then merge. This UAT stamp does not flip those Met flags and does not merge S1–S6 to `main`.
+After Pass: update [`.docs/review/security-review/codebase.md`](../.docs/review/security-review/codebase.md) S1–S6 → **Met**, then merge. This UAT stamp does not flip those Met flags and does not merge S1–S6 to `main`.

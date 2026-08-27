@@ -4,7 +4,7 @@ description: >
   Produce realistic, comprehensive test datasets and multi-user scenarios for a
   NimbleLIMS feature packet. Covers accessioning, containers, aliquots/derivatives,
   test ordering, results entry, edge cases, and status workflows for BioTech/Pharma
-  startups and CROs. Writes .docs-review/test-data/{stem}.md.
+  startups and CROs. Writes .docs/review/test-data/{stem}.md.
   Use when: "test data", "test datasets", "seed data", "UAT data", "test scenarios",
   "nimble test data", "generate test data for".
 user-invocable: true
@@ -43,7 +43,7 @@ Produce data that reflects real BioTech/Pharma variety:
 
 ### 3. Write artifact
 
-Create or update `.docs-review/test-data/{stem}.md`:
+Create or update `.docs/review/test-data/{stem}.md`:
 
 ```markdown
 # Test Data: {Title}

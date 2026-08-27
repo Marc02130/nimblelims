@@ -2,8 +2,8 @@
 
 **Branch:** `refactor/experiments` / `run-results`  
 **Last updated:** 2026-07-28  
-**Primary requirements:** [`.docs-review/requirements/experiment-processes-entries.md`](../requirements/experiment-processes-entries.md)  
-**Template entries tech sketch (in review):** [`.docs-review/tech-sketch/experiment-template-entries.md`](../tech-sketch/experiment-template-entries.md)
+**Primary requirements:** [`.docs/review/requirements/experiment-processes-entries.md`](../requirements/experiment-processes-entries.md)  
+**Template entries tech sketch (in review):** [`.docs/review/tech-sketch/experiment-template-entries.md`](../tech-sketch/experiment-template-entries.md)
 
 ## Status legend
 
@@ -80,7 +80,7 @@ Legacy `experiment_link` via `ExperimentDetail` **coexists** in Phase 1; no forc
 
 - [x] This checklist
 - [x] Point planning / requirements at Phase 1 API paths
-- [x] Update `.docs-review/manuals/processes.md` with ELN table names + endpoints
+- [x] Update `.docs/review/manuals/processes.md` with ELN table names + endpoints
 - [x] README / api_endpoints note (follow-up polish)
 - [x] Frontend `apiService` ELN process methods (UI still Phase 2)
 
@@ -183,7 +183,7 @@ Legacy `experiment_link` via `ExperimentDetail` **coexists** in Phase 1; no forc
 
 ## Open questions
 
-**Canonical decision log:** [`.docs-review/open-questions/experiments.md`](../open-questions/experiments.md)
+**Canonical decision log:** [`.docs/review/open-questions/experiments.md`](../open-questions/experiments.md)
 
 Rule: no new phase / major feature until blocking questions for that work are resolved. See `AGENTS.md` → *Open questions gate*.
 
@@ -202,14 +202,14 @@ Rule: no new phase / major feature until blocking questions for that work are re
 | [manuals/processes.md](../manuals/processes.md) | Process concept |
 | [manuals/experiments.md](../manuals/experiments.md) | ELN Experiments |
 | [manuals/lims-runs.md](../manuals/lims-runs.md) | LIMS Runs boundary |
-| local `.docs-internal/design/gap-analysis-process-and-experiment.md` (not committed) | Gaps |
+| local `.docs/internal/design/gap-analysis-process-and-experiment.md` (not committed) | Gaps |
 | [experiment-rework-prerequisites.md](experiment-rework-prerequisites.md) | Pre-rework issues |
 | [ceo-review/process-and-experiment.md](../ceo-review/process-and-experiment.md) | CEO review (Phase 1–3) |
 | [ceo-review/experiment-template-entries.md](../ceo-review/experiment-template-entries.md) | CEO review (template entries) |
 | [ui-review/experiment-template-entries.md](../ui-review/experiment-template-entries.md) | UI review (template entries) |
 | [architecture-review/experiment-template-entries.md](../architecture-review/experiment-template-entries.md) | Architecture review |
 | [security-review/experiment-template-entries.md](../security-review/experiment-template-entries.md) | Security review |
-| local `.docs-internal/design/experiment-planning.md` (not committed) | Chunk 1–2 history |
+| local `.docs/internal/design/experiment-planning.md` (not committed) | Chunk 1–2 history |
 | [Docs index](../README.md) | Full documentation map |
 
 ---
@@ -223,7 +223,7 @@ Rule: no new phase / major feature until blocking questions for that work are re
 | 2026-07-11 | Phase 1 polish: docs, apiService, instantiate, status seed, RLS tests |
 | 2026-07-11 | Phase 2 started: entries 0048, APIs, Process UI, workflow actions |
 | 2026-07-11 | Entry capture UI: EntryCapturePanel on experiment detail |
-| 2026-07-11 | Open questions moved to .docs-review/open-questions/; Phase 3 gated on Q#1,6,7 |
+| 2026-07-11 | Open questions moved to .docs/review/open-questions/; Phase 3 gated on Q#1,6,7 |
 | 2026-07-11 | Decision #6: processes always defined (first-class reusable definitions); experiments ad hoc or templated |
 | 2026-07-11 | Decision #7: progress visibility sample-scoped (no cross-client) |
 | 2026-07-11 | Decision #1: typed process steps (C) + 1a–1g + 1h-A hybrid in Phase 3 v1 |

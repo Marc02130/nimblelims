@@ -3,7 +3,7 @@
 **Date:** 2026-08-24  
 **Status:** **Accept with conditions** (Heidi/Günter)  
 **Stem:** `atomic-receive`  
-**Tech sketch:** [`.docs-review/tech-sketch/atomic-receive.md`](../tech-sketch/atomic-receive.md) §4b  
+**Tech sketch:** [`.docs/review/tech-sketch/atomic-receive.md`](../tech-sketch/atomic-receive.md) §4b  
 **Related:** [Lab Ops](../lab-ops-review/atomic-receive.md) · [QA](../qa-review/atomic-receive.md)  
 **Scope:** Feature packet (STRIDE) — receive path AuthZ only. DEEP CSO: skipped.  
 **Not this packet:** IC50, dose-response, extract-hold, ELN execute.

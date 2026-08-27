@@ -2,8 +2,8 @@
 
 **Date:** 2026-08-23  
 **Status:** **Accept with conditions** — gate **OPEN**  
-**Tech sketch:** [`.docs-review/tech-sketch/extract-hold-dest-type.md`](../tech-sketch/extract-hold-dest-type.md)  
-**Requirements:** [`.docs-review/requirements/extract-hold-dest-type.md`](../requirements/extract-hold-dest-type.md)  
+**Tech sketch:** [`.docs/review/tech-sketch/extract-hold-dest-type.md`](../tech-sketch/extract-hold-dest-type.md)  
+**Requirements:** [`.docs/review/requirements/extract-hold-dest-type.md`](../requirements/extract-hold-dest-type.md)  
 **Related:** [Lab Ops](../lab-ops-review/extract-hold-dest-type.md) · Hold [sop-ai-to-process.md](../open-questions/sop-ai-to-process.md)  
 **Artifact:** [PR 55](https://github.com/Marc02130/nimblelims/pull/55)  
 **Scope:** Feature packet (STRIDE). DEEP CSO: skipped.

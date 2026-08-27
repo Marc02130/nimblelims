@@ -36,7 +36,7 @@ Optional: Alembic revision ids filled in at implement time (`0054_…`).
 4. **Backfill / dual-write** — if any  
 5. **Rollback** — how to reverse or why forward-only  
 6. **Out of scope** — schema explicitly **not** changing this cycle  
-7. **Multi-tenant readiness** (optional short §) — lab-global now? what stays additive later? See local `.docs-internal/ideas/multi-tenant.md` (not committed)  
+7. **Multi-tenant readiness** (optional short §) — lab-global now? what stays additive later? See local `.docs/internal/ideas/multi-tenant.md` (not committed)  
 8. **Links** — requirements + tech sketch (context only; do not duplicate product prose)
 
 ## What does **not** go here
@@ -68,4 +68,4 @@ Copy [\_TEMPLATE.md](./_TEMPLATE.md) to `<stem>.md`.
 ## Related
 
 - [development-process](../development-process/README.md)  
-- Long-form field-management / schema **product** design (platform): local `.docs-internal/design/schema-evolution.md` (not committed) — different from per-cycle deltas  
+- Long-form field-management / schema **product** design (platform): local `.docs/internal/design/schema-evolution.md` (not committed) — different from per-cycle deltas  

@@ -17,12 +17,12 @@ Copyright (c) 2025 Marc Breneiser
 - **Batch Management**: Create and manage batches with container tracking
 - **Container Management**: Container types (admin-managed) and dynamic instance creation
 - **Lists Management**: Configurable lists and entries (admin-editable, full CRUD)
-- **Name Templates**: Configurable entity naming; placeholder resolution: {YY} = str(now.year % 100).zfill(2), {SEQ} = str(seq).zfill(template.seq_padding_digits); sequence start via POST /admin/sequences/{entity_type}/start (see `app/core/name_generation.py`, `.docs-review/manuals/ids-and-configuration.md`)
+- **Name Templates**: Configurable entity naming; placeholder resolution: {YY} = str(now.year % 100).zfill(2), {SEQ} = str(seq).zfill(template.seq_padding_digits); sequence start via POST /admin/sequences/{entity_type}/start (see `app/core/name_generation.py`, `.docs/review/manuals/ids-and-configuration.md`)
 - **Analyses Management**: CRUD operations for analyses (admin-only)
 - **Analytes Management**: CRUD operations for analytes (admin-only)
 - **Analysis-Analyte Configuration**: Configure validation rules for analytes in analyses (admin-only)
 - **Test Batteries Management**: Group analyses into reusable batteries with sequence and optional flags (admin-only)
-- **Field Management / Custom Fields**: Unified management of OOB (built-in) and custom fields. List-backed preferred (via Lists) for options/selects to enable reuse (e.g. one list for Sample + Entry fields). See frontend and .docs-review/ for details. Legacy custom-attributes endpoints/UI still present.
+- **Field Management / Custom Fields**: Unified management of OOB (built-in) and custom fields. List-backed preferred (via Lists) for options/selects to enable reuse (e.g. one list for Sample + Entry fields). See frontend and .docs/review/ for details. Legacy custom-attributes endpoints/UI still present.
 - **Users Management**: CRUD operations for users (admin-only)
 - **Roles & Permissions Management**: CRUD operations for roles and permission assignments (admin-only)
 - **Authentication**: JWT-based authentication with RBAC
@@ -174,7 +174,7 @@ Copyright (c) 2025 Marc Breneiser
 - Definitions: `GET/POST /v1/eln-process-definitions`, instantiate from definition
 - Instances: `GET/POST /v1/eln-processes`, steps (typed `eln_experiment` \| `lims_run`), samples assign/advance
 - Start step: Experiment or lazy LimsRun; soft advance warnings; journey: `GET /v1/samples/{id}/journey`
-- Distinct from LIMS `/v1/processes` (run checklists). Migrations `0047`–`0051`. Checklist: [`.docs-review/checklist/experiment-checklist.md`](../.docs-review/checklist/experiment-checklist.md).
+- Distinct from LIMS `/v1/processes` (run checklists). Migrations `0047`–`0051`. Checklist: [`.docs/review/checklist/experiment-checklist.md`](../.docs/review/checklist/experiment-checklist.md).
 
 #### SOP parse — AI-assisted template extraction (requires experiment:manage)
 - `POST /v1/sop-parse` - Multipart: `sop_file`, `instrument_file` — returns 202, job id for polling
@@ -402,11 +402,11 @@ The `start.sh` script:
 
 ## Related Documentation
 
-- [API Endpoints Reference](../.docs-review/manuals/api-endpoints.md)
-- local `.docs-internal/design/experiment-planning.md` (not committed)
-- [Authentication Implementation](../.docs-review/manuals/backend-auth.md)
-- local `.docs-internal/design/nimblelims-tech.md` (not committed)
-- [Accessioning Workflow](../.docs-review/manuals/accessioning-workflow.md)
-- [Container Management](../.docs-review/manuals/containers.md)
-- [Lists System](../.docs-review/manuals/lists.md)
+- [API Endpoints Reference](../.docs/review/manuals/api-endpoints.md)
+- local `.docs/internal/design/experiment-planning.md` (not committed)
+- [Authentication Implementation](../.docs/review/manuals/backend-auth.md)
+- local `.docs/internal/design/nimblelims-tech.md` (not committed)
+- [Accessioning Workflow](../.docs/review/manuals/accessioning-workflow.md)
+- [Container Management](../.docs/review/manuals/containers.md)
+- [Lists System](../.docs/review/manuals/lists.md)
 

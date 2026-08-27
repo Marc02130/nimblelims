@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-21  
 **Status:** **Accept with conditions**  
-**Requirements:** [`.docs-review/requirements/security-med-low-s7-s15.md`](../requirements/security-med-low-s7-s15.md)  
+**Requirements:** [`.docs/review/requirements/security-med-low-s7-s15.md`](../requirements/security-med-low-s7-s15.md)  
 **Prerequisite:** High S1–S6 Met
 
 ## Ask

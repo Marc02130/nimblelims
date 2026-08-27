@@ -2,11 +2,11 @@
 
 **Date:** 2026-07-28 · **Updated:** 2026-08-10  
 **Status:** **Accepted with conditions** (2026-08-10) — Lab Ops L1–L9 (all aliquot methods); CEO/UI/Arch/Security Accept; **implement gate open**  
-**Requirements:** [`.docs-review/requirements/experiment-processes-entries.md`](../requirements/experiment-processes-entries.md) §4.3 Entries  
-**Open questions:** [`.docs-review/open-questions/experiments.md`](../open-questions/experiments.md) (Decision #23 + session locks below)  
-**Schema changes:** [`.docs-review/schema-changes/experiment-template-entries.md`](../schema-changes/experiment-template-entries.md)  
+**Requirements:** [`.docs/review/requirements/experiment-processes-entries.md`](../requirements/experiment-processes-entries.md) §4.3 Entries  
+**Open questions:** [`.docs/review/open-questions/experiments.md`](../open-questions/experiments.md) (Decision #23 + session locks below)  
+**Schema changes:** [`.docs/review/schema-changes/experiment-template-entries.md`](../schema-changes/experiment-template-entries.md)  
 **Reviews:** [Lab Ops](../lab-ops-review/experiment-template-entries.md) · [CEO](../ceo-review/experiment-template-entries.md) · [UI](../ui-review/experiment-template-entries.md) · [Architecture](../architecture-review/experiment-template-entries.md) · [Security](../security-review/experiment-template-entries.md)  
-**Ideas (OOS):** local `.docs-internal/ideas/accessioning-and-workflows-revisit.md` (not committed) · local `.docs-internal/ideas/materials-and-lot-tracking.md` (not committed) · local `.docs-internal/ideas/index-sets-and-sequencing-setup.md` (not committed)  
+**Ideas (OOS):** local `.docs/internal/ideas/accessioning-and-workflows-revisit.md` (not committed) · local `.docs/internal/ideas/materials-and-lot-tracking.md` (not committed) · local `.docs/internal/ideas/index-sets-and-sequencing-setup.md` (not committed)  
 **Reference:** external competitive reference (not stored in repo) (external reference; PDF is not present in this repository snapshot)
 **Related manuals:** [experiments.md](../manuals/experiments.md), [processes.md](../manuals/processes.md), [lims-runs.md](../manuals/lims-runs.md)  
 **Process:** Lab Ops first, then other reviews ([lab-ops-review/README.md](../lab-ops-review/README.md))
@@ -246,7 +246,7 @@ Admin defines FieldDefinitions. Template picks columns + write-back. Instance ma
 
 ### 0.8 Containers, amount, aliquot/pool
 
-**Canonical locks:** [`.docs-review/open-questions/containers.md`](../open-questions/containers.md) (2026-08-11).
+**Canonical locks:** [`.docs/review/open-questions/containers.md`](../open-questions/containers.md) (2026-08-11).
 
 | Rule | Detail |
 |------|--------|

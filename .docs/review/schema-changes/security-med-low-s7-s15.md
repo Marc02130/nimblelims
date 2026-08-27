@@ -4,8 +4,8 @@
 **Phases covered:** P1–P4 + UAT hold fixes  
 **Status:** Implemented on branch  
 **Alembic revisions:** `0063` (`login_throttle`); `0064` (FORCE RLS + contents + containers); **`0065`** (`has_project_access` project_users for lab staff); **`0066`** (`revoked_tokens`); **`0067`** (UAT seed `XYZ-BA-0001` on Sponsor XYZ bioanalytical project)  
-**Requirements:** [`.docs-review/requirements/security-med-low-s7-s15.md`](../requirements/security-med-low-s7-s15.md)  
-**Tech sketch:** [`.docs-review/tech-sketch/security-med-low-s7-s15.md`](../tech-sketch/security-med-low-s7-s15.md)
+**Requirements:** [`.docs/review/requirements/security-med-low-s7-s15.md`](../requirements/security-med-low-s7-s15.md)  
+**Tech sketch:** [`.docs/review/tech-sketch/security-med-low-s7-s15.md`](../tech-sketch/security-med-low-s7-s15.md)
 
 ## 1. Summary
 

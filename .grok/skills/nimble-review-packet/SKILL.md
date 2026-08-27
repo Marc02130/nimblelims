@@ -13,7 +13,7 @@ Shared packet rules: `.grok/skills/nimble-reviews/PACKET.md`.
 
 ## Purpose
 
-Run (or resume) the **formal review set** for one feature stem. Prefer **sequential Lab Ops first**, then parallel remaining reviews. Produce/update artifacts under `.docs-review/*-review/`.
+Run (or resume) the **formal review set** for one feature stem. Prefer **sequential Lab Ops first**, then parallel remaining reviews. Produce/update artifacts under `.docs/review/*-review/`.
 
 ## Steps
 
@@ -81,7 +81,7 @@ REASON: …
 
 ### 5. Checklist
 
-Point user at `.docs-review/checklist/` to mark review rows if applicable. Do not invent phases.
+Point user at `.docs/review/checklist/` to mark review rows if applicable. Do not invent phases.
 
 ## What not to do
 

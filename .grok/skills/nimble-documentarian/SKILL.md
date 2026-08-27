@@ -4,7 +4,7 @@ description: >
   Formal NimbleLIMS Documentarian review of a feature packet.
   Documentation quality, completeness, consistency, living-doc hygiene,
   cross-references, and Cursor hand-off readiness (mandatory docs + UAT +
-  README updates). Writes .docs-review/docs-review/{stem}.md.
+  README updates). Writes .docs/review/docs-review/{stem}.md.
   Use when: "documentarian", "docs review", "documentation review",
   "docs hygiene", "README update", "nimble documentarian".
 user-invocable: true
@@ -34,22 +34,22 @@ NimbleLIMS Documentarian. Keeps all project documentation accurate, complete, co
 
 1. Feature **stem**.
 2. Read:
-   - `.docs-review/tech-sketch/{stem}.md`
+   - `.docs/review/tech-sketch/{stem}.md`
    - Matching requirements, schema-changes (if present)
    - All formal review artifacts for the stem (Lab Ops, CEO, UI, Arch, Security, Scientific CSO, BA, QA, Developer)
    - Open questions, checklists, related manuals
-   - Prior `.docs-review/docs-review/{stem}.md` if re-review
+   - Prior `.docs/review/docs-review/{stem}.md` if re-review
 3. If core docs (requirements or tech sketch) are missing for a full-pipeline item: **BLOCKED**.
 
 ### 2. Review dimensions
 
 1. **Completeness** — Are all required docs present for the packet (requirements, tech sketch, schema-changes when needed, review artifacts)?
-2. **Consistency** — Terminology, status labels, naming, and structure are coherent across `.docs-review/`.
+2. **Consistency** — Terminology, status labels, naming, and structure are coherent across `.docs/review/`.
 3. **Cross-references & links** — Review artifacts ↔ sketch ↔ requirements ↔ open questions ↔ UAT are properly linked.
 4. **Living-doc hygiene** — Open questions correctly statused (Open / Decided / Deferred); no orphaned or contradictory content; checklists updated.
 5. **Review-artifact quality** — Formal review docs follow the shared PACKET template and header.
 6. **Cursor hand-off readiness** — Packet supports a clean final Cursor prompt that includes the mandatory directive to update documentation, UAT test scripts, and README files.
-7. **Discoverability** — Docs are findable via clear naming or `.docs-review/README.md` / development-process index.
+7. **Discoverability** — Docs are findable via clear naming or `.docs/review/README.md` / development-process index.
 
 Conditions: **DOC1, DOC2, …**
 
@@ -61,7 +61,7 @@ Conditions: **DOC1, DOC2, …**
 
 ### 4. Write formal artifact
 
-Create or update `.docs-review/docs-review/{stem}.md`:
+Create or update `.docs/review/docs-review/{stem}.md`:
 
 ```markdown
 # Documentarian Review: {Title}
