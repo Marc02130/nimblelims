@@ -122,11 +122,12 @@ This script is the **receive happy path** sign-off. Do **not** use `uat-sample-a
 **CORE pass** requires CORE must-pass rows above (not AR-RES).  
 QA1–QA6, QA8–QA10 in `.docs/review/qa-review/atomic-receive.md` apply to CORE. QA7 = results follow-on.
 
-### Concerns (non-blockers)
+### Concerns (non-blockers) — close-out
 
-1. **AR-MU-01 status code:** cross-client `project_id` returns **404** (project not visible under RLS), not **403**. Access still denied.
-2. **`client_sample_id` on GET:** value persists in DB and on receive, but `GET /samples/{id}` serializes `client_sample_id: null` (list/detail response gap).
+1. **AR-MU-01 status code:** UAT observed **404** under RLS; fixed to **403** (`require_project_for_receive`) on close-out.
+2. **`client_sample_id` on GET:** DB had the value but `SampleBase` omitted the field so responses dropped it; fixed on close-out.
 3. **Create Sample** on Samples page correctly routes to `/receive` (regression check from post-merge fix).
+4. Open PR **#73** (API-only stamp, “UI not run”) is **superseded** by this full browse+API CORE Pass — close without merge.
 
 ## Cutover
 

@@ -95,12 +95,16 @@ def resolve_receive_container_type(db: Session, container_type_id: UUID) -> Cont
 
 
 def require_project_for_receive(db: Session, user: User, project_id: UUID) -> Project:
-    """Project required + sticky. Enforce client access and project RLS when available."""
+    """Project required + sticky. Enforce client access and project RLS when available.
+
+    Under RLS, an inaccessible project looks like a miss. Atomic receive always
+    returns 403 (not 404) so AuthZ failures match AR-MU-01 / sample:create gates.
+    """
     project = db.query(Project).filter(Project.id == project_id).first()
     if not project:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Project not found",
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied: insufficient project permissions",
         )
 
     validate_client_access(user, project.client_id)
