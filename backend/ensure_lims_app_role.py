@@ -84,7 +84,7 @@ def ensure_lims_app_role() -> None:
         conn.execute(text(f"GRANT CONNECT ON DATABASE {dbname} TO {APP_ROLE}"))
 
         # Schema + objects
-        conn.execute(text(f"GRANT USAGE ON SCHEMA public TO {APP_ROLE}"))
+        conn.execute(text(f"GRANT USAGE, CREATE ON SCHEMA public TO {APP_ROLE}"))
         conn.execute(
             text(
                 f"GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO {APP_ROLE}"
@@ -95,6 +95,13 @@ def ensure_lims_app_role() -> None:
         )
         conn.execute(
             text(f"GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO {APP_ROLE}")
+        )
+        # Name templates lazily CREATE SEQUENCE; lims_app must own/use those.
+        conn.execute(
+            text(
+                f"ALTER DEFAULT PRIVILEGES IN SCHEMA public "
+                f"GRANT USAGE, SELECT ON SEQUENCES TO {APP_ROLE}"
+            )
         )
 
         # Future objects created by table owner (typical Docker lims_user)

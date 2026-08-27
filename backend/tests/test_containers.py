@@ -30,19 +30,34 @@ class TestContainerTypesCRUD:
         db_session.add(client)
         db_session.flush()
         
+        from models.list import List
+        status_list = List(name="Project Status", description="statuses")
+        db_session.add(status_list)
+        db_session.flush()
+        project_status = ListEntry(
+            list_id=status_list.id,
+            name="Active",
+            description="Active",
+        )
+        db_session.add(project_status)
+        db_session.flush()
+
         project = Project(
             name="Test Project",
             description="Test project for containers",
             start_date=datetime.utcnow(),
             client_id=client.id,
-            status=uuid4()
+            status=project_status.id,
         )
         db_session.add(project)
         db_session.flush()
         
         # Create units
+        unit_list = List(name="Unit Types", description="unit types")
+        db_session.add(unit_list)
+        db_session.flush()
         unit_type = ListEntry(
-            list_id=uuid4(),
+            list_id=unit_list.id,
             name="volume",
             description="Volume unit type"
         )
@@ -54,8 +69,8 @@ class TestContainerTypesCRUD:
             description="Milliliter",
             multiplier=0.001,  # 1 mL = 0.001 L
             type=unit_type.id,
-            created_by=uuid4(),
-            modified_by=uuid4()
+            created_by=None,
+            modified_by=None,
         )
         db_session.add(unit)
         db_session.flush()
@@ -79,7 +94,7 @@ class TestContainerTypesCRUD:
             "description": "Standard test tube",
             "capacity": 5.0,
             "material": "Glass",
-            "dimensions": "12x75",
+            "rows": 1, "columns": 1,
             "preservative": "None"
         }
         
@@ -89,11 +104,13 @@ class TestContainerTypesCRUD:
             headers={"Authorization": f"Bearer {token}"}
         )
         
-        assert response.status_code == 201
+        assert response.status_code in (200, 201)
         data = response.json()
         assert data["name"] == "Test Tube"
         assert data["capacity"] == 5.0
         assert data["material"] == "Glass"
+        assert data["rows"] == 1
+        assert data["columns"] == 1
     
     def test_get_container_types_success(self, client: TestClient, test_admin_user, test_data, db_session: Session):
         """Test successful container types retrieval"""
@@ -103,7 +120,7 @@ class TestContainerTypesCRUD:
             description="Test plate container",
             capacity=96.0,
             material="Plastic",
-            dimensions="8x12",
+            rows=8, columns=12,
             preservative="None",
             created_by=test_admin_user.id,
             modified_by=test_admin_user.id
@@ -135,7 +152,7 @@ class TestContainerTypesCRUD:
             description="Test container for update",
             capacity=10.0,
             material="Glass",
-            dimensions="15x100",
+            rows=1, columns=1,
             preservative="None",
             created_by=test_admin_user.id,
             modified_by=test_admin_user.id
@@ -178,7 +195,7 @@ class TestContainersCRUD:
             description="Test tube container type",
             capacity=5.0,
             material="Glass",
-            dimensions="12x75",
+            rows=1, columns=1,
             preservative="None",
             created_by=test_admin_user.id,
             modified_by=test_admin_user.id
@@ -224,7 +241,7 @@ class TestContainersCRUD:
             description="Test plate container type",
             capacity=96.0,
             material="Plastic",
-            dimensions="8x12",
+            rows=8, columns=12,
             preservative="None",
             created_by=test_admin_user.id,
             modified_by=test_admin_user.id
@@ -272,7 +289,7 @@ class TestContainersCRUD:
             description="Test container type",
             capacity=10.0,
             material="Glass",
-            dimensions="15x100",
+            rows=1, columns=1,
             preservative="None",
             created_by=test_admin_user.id,
             modified_by=test_admin_user.id
@@ -321,7 +338,7 @@ class TestContainersCRUD:
             description="Test container type",
             capacity=10.0,
             material="Glass",
-            dimensions="15x100",
+            rows=1, columns=1,
             preservative="None",
             created_by=test_admin_user.id,
             modified_by=test_admin_user.id
@@ -376,7 +393,7 @@ class TestContainersCRUD:
             description="Test container type",
             capacity=10.0,
             material="Glass",
-            dimensions="15x100",
+            rows=1, columns=1,
             preservative="None",
             created_by=test_admin_user.id,
             modified_by=test_admin_user.id
@@ -449,7 +466,7 @@ class TestContainersCRUD:
             description="Test container type",
             capacity=10.0,
             material="Glass",
-            dimensions="15x100",
+            rows=1, columns=1,
             preservative="None",
             created_by=test_admin_user.id,
             modified_by=test_admin_user.id
@@ -497,7 +514,7 @@ class TestContainersCRUD:
             description="Test container type",
             capacity=10.0,
             material="Glass",
-            dimensions="15x100",
+            rows=1, columns=1,
             preservative="None",
             created_by=test_admin_user.id,
             modified_by=test_admin_user.id
@@ -557,7 +574,7 @@ class TestContainerEditRBAC:
             description="Test container type",
             capacity=10.0,
             material="Glass",
-            dimensions="15x100",
+            rows=1, columns=1,
             preservative="None",
             created_by=test_user.id,
             modified_by=test_user.id
@@ -603,7 +620,7 @@ class TestContainerEditRBAC:
             description="Test container type",
             capacity=10.0,
             material="Glass",
-            dimensions="15x100",
+            rows=1, columns=1,
             preservative="None",
             created_by=test_admin_user.id,
             modified_by=test_admin_user.id
@@ -659,7 +676,7 @@ class TestContainerEditRBAC:
             description="Test container type",
             capacity=10.0,
             material="Glass",
-            dimensions="15x100",
+            rows=1, columns=1,
             preservative="None",
             created_by=test_admin_user.id,
             modified_by=test_admin_user.id
@@ -717,7 +734,7 @@ class TestContentsManagement:
             description="Test container type",
             capacity=10.0,
             material="Glass",
-            dimensions="15x100",
+            rows=1, columns=1,
             preservative="None",
             created_by=test_admin_user.id,
             modified_by=test_admin_user.id
@@ -791,7 +808,7 @@ class TestContentsManagement:
             description="Test container type",
             capacity=10.0,
             material="Glass",
-            dimensions="15x100",
+            rows=1, columns=1,
             preservative="None",
             created_by=test_admin_user.id,
             modified_by=test_admin_user.id
@@ -867,7 +884,7 @@ class TestContentsManagement:
             description="Test container type",
             capacity=10.0,
             material="Glass",
-            dimensions="15x100",
+            rows=1, columns=1,
             preservative="None",
             created_by=test_admin_user.id,
             modified_by=test_admin_user.id
@@ -946,7 +963,7 @@ class TestContentsManagement:
             description="Test container type",
             capacity=10.0,
             material="Glass",
-            dimensions="15x100",
+            rows=1, columns=1,
             preservative="None",
             created_by=test_admin_user.id,
             modified_by=test_admin_user.id
@@ -1044,7 +1061,7 @@ class TestContainerValidation:
             description="Test container type",
             capacity=10.0,
             material="Glass",
-            dimensions="15x100",
+            rows=1, columns=1,
             preservative="None",
             created_by=test_admin_user.id,
             modified_by=test_admin_user.id

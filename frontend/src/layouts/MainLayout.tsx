@@ -33,7 +33,8 @@ interface MainLayoutProps {
 const getRouteTitle = (pathname: string): string => {
   const routeMap: Record<string, string> = {
     '/dashboard': 'Dashboard',
-    '/accessioning': 'Accessioning',
+    '/receive': 'Receive',
+    '/accessioning': 'Accessioning (legacy)',
     '/samples': 'Samples Management',
     '/tests': 'Tests Management',
     '/containers': 'Containers',

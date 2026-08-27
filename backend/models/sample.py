@@ -33,8 +33,8 @@ class Sample(BaseModel):
         PostgresUUID(as_uuid=True), ForeignKey("list_entries.id"), nullable=False
     )
     matrix = Column(
-        PostgresUUID(as_uuid=True), ForeignKey("list_entries.id"), nullable=False
-    )
+        PostgresUUID(as_uuid=True), ForeignKey("list_entries.id"), nullable=True
+    )  # nullable: matrix being dropped from intake; sample_type is SoT at receive
     temperature = Column(Numeric(10, 2))
     parent_sample_id = Column(
         PostgresUUID(as_uuid=True), ForeignKey("samples.id"), nullable=True

@@ -16,7 +16,8 @@ from models.analysis import Analysis
 from app.schemas.sample import (
     SampleCreate, SampleUpdate, SampleResponse, SampleListResponse,
     SampleAccessioningRequest, BulkSampleAccessioningRequest,
-    EligibleSampleResponse, EligibleSamplesResponse
+    EligibleSampleResponse, EligibleSamplesResponse,
+    SampleReceiveRequest, SampleReceiveResponse,
 )
 from app.core.rbac import (
     require_sample_create, require_sample_read, require_sample_update,
@@ -482,12 +483,15 @@ async def get_samples(
     
     total = count_query.scalar()
     
+    # Newest first so atomic-receive results appear at the top of the list
+    query = query.order_by(Sample.created_at.desc(), Sample.name.asc())
+
     # Apply pagination
     offset = (page - 1) * size
     samples = query.offset(offset).limit(size).all()
     
     # Calculate pages
-    pages = (total + size - 1) // size
+    pages = (total + size - 1) // size if total else 0
     
     return SampleListResponse(
         samples=[SampleResponse.model_validate(sample) for sample in samples],
@@ -593,6 +597,26 @@ async def create_sample(
     db.refresh(sample)
     
     return SampleResponse.model_validate(sample)
+
+
+@router.post(
+    "/receive",
+    response_model=SampleReceiveResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def receive_sample(
+    receive_data: SampleReceiveRequest,
+    current_user: User = Depends(require_sample_create),
+    db: Session = Depends(get_db),
+):
+    """
+    Atomic receive CORE (RQ-AR-1..11): one txn creates Sample + 1..N Containers
+    + Contents. Status = Available for Testing. No sample-ID field; no project
+    auto-create. AuthZ = sample:create + project access/RLS in the service.
+    """
+    from app.services.atomic_receive_service import receive_sample as receive_sample_svc
+
+    return receive_sample_svc(db, receive_data, current_user)
 
 
 @router.post("/accession", response_model=SampleResponse)

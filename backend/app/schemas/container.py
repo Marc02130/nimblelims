@@ -13,7 +13,8 @@ class ContainerTypeBase(BaseModel):
     description: Optional[str] = None
     capacity: Optional[float] = Field(None, ge=0, description="Capacity in base units")
     material: Optional[str] = Field(None, max_length=255)
-    dimensions: Optional[str] = Field(None, max_length=50, description="e.g., '8x12'")
+    rows: int = Field(1, ge=1, description="Grid rows; 1×1 = single-position vessel")
+    columns: int = Field(1, ge=1, description="Grid columns; plates e.g. 8×12")
     preservative: Optional[str] = Field(None, max_length=255)
 
 
@@ -28,7 +29,8 @@ class ContainerTypeUpdate(BaseModel):
     description: Optional[str] = None
     capacity: Optional[float] = Field(None, ge=0)
     material: Optional[str] = Field(None, max_length=255)
-    dimensions: Optional[str] = Field(None, max_length=50)
+    rows: Optional[int] = Field(None, ge=1)
+    columns: Optional[int] = Field(None, ge=1)
     preservative: Optional[str] = Field(None, max_length=255)
 
 

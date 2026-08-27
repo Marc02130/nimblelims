@@ -178,7 +178,7 @@ Verify that users without required permissions are denied access to protected en
 | 2.2 | Navigate directly to `/admin` via URL bar | User is redirected to `/dashboard` |
 | 2.3 | Verify sidebar does not show Admin section | Admin accordion not visible (no `config:edit` permission) |
 | 3 | **Test Allowed Action (Sample Creation)** | |
-| 3.1 | Navigate to accessioning page (`/accessioning`) | Page loads (user has `sample:create` permission) |
+| 3.1 | Navigate to Receive (`/receive`) or legacy `/accessioning` | Page loads (user has `sample:create` permission). Prefer `/receive` (CORE). |
 | 3.2 | Fill in sample creation form with valid data | Form accepts input |
 | 3.3 | Submit the form | Action succeeds (HTTP 201 Created) |
 | 3.4 | Verify sample created | Sample appears in samples list |
@@ -194,7 +194,7 @@ Verify that users without required permissions are denied access to protected en
 |----------|------------------|
 | **Route Protection** | - Frontend routes check `hasPermission('config:edit')` before rendering admin pages<br>- Users without permission are automatically redirected to `/dashboard`<br>- No error message shown (seamless redirect) |
 | **Sidebar Visibility** | - Admin section hidden from users without `config:edit` permission<br>- Lab Technician sees: Dashboard, Accessioning, Samples, Tests, Containers, Batches, Results, Help |
-| **Allowed Action** | - User can access `/accessioning` (requires `sample:create`)<br>- Sample creation succeeds (HTTP 201)<br>- Sample appears in samples list |
+| **Allowed Action** | - User can access `/receive` (requires `sample:create`)<br>- Atomic receive succeeds (HTTP 201) or legacy create path<br>- Sample appears in samples list |
 | **API Permission Denial** | - Direct API call to POST `/lists` returns HTTP 403<br>- Response body: `{"detail": "Permission 'config:edit' required"}`<br>- Backend correctly blocks unauthorized actions even if UI is bypassed |
 | **Backend Processing** | 1. **Token Validation**: JWT verified and decoded<br>2. **Permission Check**: `require_permission("config:edit")` queries user's role permissions<br>3. **Denial**: Permission not found → HTTPException 403 raised |
 

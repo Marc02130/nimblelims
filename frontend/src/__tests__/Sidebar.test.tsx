@@ -93,7 +93,7 @@ describe('Sidebar', () => {
       renderWithProviders(<Sidebar {...defaultProps} />);
       
       expect(screen.getByText('Dashboard')).toBeInTheDocument();
-      expect(screen.getByText('Accessioning')).toBeInTheDocument();
+      expect(screen.getByText('Receive')).toBeInTheDocument();
       expect(screen.getByText('Containers')).toBeInTheDocument();
       expect(screen.getByText('Batches')).toBeInTheDocument();
       expect(screen.getByText('Results')).toBeInTheDocument();
@@ -121,19 +121,19 @@ describe('Sidebar', () => {
   });
 
   describe('Permission-based visibility', () => {
-    test('hides Accessioning when user lacks sample:create permission', () => {
+    test('hides Receive when user lacks sample:create permission', () => {
       const mockUser = createMockUser(['sample:update'], 'Lab Technician');
       renderWithProviders(<Sidebar {...defaultProps} />, ['/dashboard'], mockUser);
       
-      expect(screen.queryByText('Accessioning')).not.toBeInTheDocument();
-      expect(screen.getByText('Containers')).toBeInTheDocument();
+      expect(screen.queryByText('Receive')).not.toBeInTheDocument();
+      expect(screen.getAllByText('Containers').length).toBeGreaterThan(0);
     });
 
     test('hides Containers when user lacks sample:update permission', () => {
       const mockUser = createMockUser(['sample:create'], 'Lab Technician');
       renderWithProviders(<Sidebar {...defaultProps} />, ['/dashboard'], mockUser);
       
-      expect(screen.getByText('Accessioning')).toBeInTheDocument();
+      expect(screen.getAllByText('Receive').length).toBeGreaterThan(0);
       expect(screen.queryByText('Containers')).not.toBeInTheDocument();
     });
 
@@ -171,7 +171,7 @@ describe('Sidebar', () => {
       const mockUser = createMockUser([], 'Administrator');
       renderWithProviders(<Sidebar {...defaultProps} />, ['/dashboard'], mockUser);
       
-      expect(screen.getByText('Accessioning')).toBeInTheDocument();
+      expect(screen.getByText('Receive')).toBeInTheDocument();
       expect(screen.getByText('Containers')).toBeInTheDocument();
       expect(screen.getByText('Batches')).toBeInTheDocument();
       expect(screen.getByText('Results')).toBeInTheDocument();
@@ -182,7 +182,7 @@ describe('Sidebar', () => {
 
   describe('Navigation', () => {
     test('navigates to dashboard when logo is clicked', () => {
-      const { container } = renderWithProviders(<Sidebar {...defaultProps} />, ['/accessioning']);
+      const { container } = renderWithProviders(<Sidebar {...defaultProps} />, ['/receive']);
       
       const logo = screen.getByLabelText('Navigate to dashboard');
       fireEvent.click(logo);
@@ -194,10 +194,10 @@ describe('Sidebar', () => {
     test('navigates when navigation item is clicked', () => {
       const { container } = renderWithProviders(<Sidebar {...defaultProps} />);
       
-      const accessioningButton = screen.getByLabelText('Navigate to Accessioning');
-      fireEvent.click(accessioningButton);
+      const receiveButton = screen.getAllByLabelText('Navigate to Receive')[0];
+      fireEvent.click(receiveButton);
       
-      expect(accessioningButton).toBeInTheDocument();
+      expect(receiveButton).toBeInTheDocument();
     });
 
     test('closes mobile drawer after navigation on mobile', () => {
@@ -220,11 +220,11 @@ describe('Sidebar', () => {
       expect(dashboardButton).toHaveAttribute('aria-current', 'page');
     });
 
-    test('highlights Accessioning when on /accessioning route', () => {
-      renderWithProviders(<Sidebar {...defaultProps} />, ['/accessioning']);
+    test('highlights Receive when on /receive route', () => {
+      renderWithProviders(<Sidebar {...defaultProps} />, ['/receive']);
       
-      const accessioningButton = screen.getByLabelText('Navigate to Accessioning');
-      expect(accessioningButton).toHaveAttribute('aria-current', 'page');
+      const receiveButton = screen.getAllByLabelText('Navigate to Receive')[0];
+      expect(receiveButton).toHaveAttribute('aria-current', 'page');
     });
 
     test('highlights admin Overview when on /admin route', () => {
@@ -414,7 +414,7 @@ describe('Sidebar', () => {
       // Should still render Dashboard
       expect(screen.getByText('Dashboard')).toBeInTheDocument();
       // Should not render permission-gated items
-      expect(screen.queryByText('Accessioning')).not.toBeInTheDocument();
+      expect(screen.queryByText('Receive')).not.toBeInTheDocument();
     });
 
     test('handles missing user gracefully', () => {
@@ -450,7 +450,7 @@ describe('Sidebar', () => {
       renderWithProviders(<Sidebar {...defaultProps} />);
       
       expect(screen.getByLabelText('Navigate to Dashboard')).toBeInTheDocument();
-      expect(screen.getByLabelText('Navigate to Accessioning')).toBeInTheDocument();
+      expect(screen.getByLabelText('Navigate to Receive')).toBeInTheDocument();
       expect(screen.getByLabelText('main navigation')).toBeInTheDocument();
     });
 

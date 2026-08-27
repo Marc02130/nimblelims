@@ -36,16 +36,17 @@
 - Params snapshot at LimsRun start and freeze.
 - Classic type-a-number Result on a Test still lands (WO-4); two writers on same Test = 409.
 - Instantiating from `work_order` uses existing process AuthZ — no client expand.
-- AR P0 still first; processing waits on identity + first vessel.
+- AR P0 still first; processing waits on identity + **1..N vessels** (A-18).
 
 ---
 
 ## Sequencing (unchanged)
 
-1. Atomic receive P0 — identity + first vessel (when Marc green-lights code).  
-2. Work-order + routing map + order params packet.  
-3. Registration / lots packet (compound, gene, protein).  
-4. Intake-profile engine beyond AR OOB when a second real profile is needed.
+1. Atomic receive **CORE** — identity + **1..N vessels** (Leadership provisional open 2026-08-26; results-entry is a follow-on slice).  
+2. Results-entry / persist-lock implement (separate open; not CORE UAT blocker).  
+3. Work-order + routing map + order params packet.  
+4. Registration / lots packet (compound, gene, protein).  
+5. Intake-profile engine beyond AR OOB when a second real profile is needed.
 
 ---
 

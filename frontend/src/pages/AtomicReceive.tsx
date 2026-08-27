@@ -1,0 +1,479 @@
+/**
+ * Atomic receive CORE UI (Phase 4).
+ * Scan loop: sticky type/project/container type, primary + optional additional barcodes,
+ * stay on form after success. No sample-ID, status, tube-type, or aliquot dialog.
+ */
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  Alert,
+  Box,
+  Button,
+  Chip,
+  CircularProgress,
+  FormControl,
+  InputLabel,
+  MenuItem,
+  Paper,
+  Select,
+  Snackbar,
+  Stack,
+  TextField,
+  Typography,
+} from '@mui/material';
+import AddIcon from '@mui/icons-material/Add';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
+import { apiService } from '../services/apiService';
+
+const STICKY_KEY = 'nimble.atomicReceive.sticky';
+
+type LookupItem = { id: string; name: string };
+
+type StickyState = {
+  sample_type: string;
+  project_id: string;
+  container_type_id: string;
+};
+
+type ContainerTypeItem = LookupItem & { rows?: number; columns?: number };
+
+/** Atomic receive only supports single-position vessels (rows=1, columns=1). */
+function isSinglePositionType(ct: { rows?: number; columns?: number }): boolean {
+  return Number(ct.rows) === 1 && Number(ct.columns) === 1;
+}
+
+function loadSticky(): StickyState {
+  try {
+    const raw = sessionStorage.getItem(STICKY_KEY);
+    if (!raw) {
+      return { sample_type: '', project_id: '', container_type_id: '' };
+    }
+    const parsed = JSON.parse(raw);
+    return {
+      sample_type: parsed.sample_type || '',
+      project_id: parsed.project_id || '',
+      container_type_id: parsed.container_type_id || '',
+    };
+  } catch {
+    return { sample_type: '', project_id: '', container_type_id: '' };
+  }
+}
+
+function saveSticky(state: StickyState) {
+  sessionStorage.setItem(STICKY_KEY, JSON.stringify(state));
+}
+
+/** FastAPI/Pydantic `detail` may be a string or a list/object — never render raw objects. */
+function formatApiDetail(detail: unknown, fallback: string): string {
+  if (detail == null) return fallback;
+  if (typeof detail === 'string') return detail;
+  if (Array.isArray(detail)) {
+    return detail
+      .map((item) => {
+        if (typeof item === 'string') return item;
+        if (item && typeof item === 'object' && 'msg' in item) {
+          const loc = Array.isArray((item as any).loc)
+            ? (item as any).loc.filter((x: unknown) => x !== 'body' && x !== 'query').join('.')
+            : '';
+          return loc ? `${loc}: ${(item as any).msg}` : String((item as any).msg);
+        }
+        return JSON.stringify(item);
+      })
+      .join('; ');
+  }
+  if (typeof detail === 'object' && detail !== null && 'msg' in detail) {
+    return String((detail as any).msg);
+  }
+  try {
+    return JSON.stringify(detail);
+  } catch {
+    return fallback;
+  }
+}
+
+const AtomicReceive: React.FC = () => {
+  const primaryRef = useRef<HTMLInputElement>(null);
+
+  const [sampleTypes, setSampleTypes] = useState<LookupItem[]>([]);
+  const [projects, setProjects] = useState<LookupItem[]>([]);
+  const [containerTypes, setContainerTypes] = useState<ContainerTypeItem[]>([]);
+  const [loadingLookups, setLoadingLookups] = useState(true);
+  const [lookupError, setLookupError] = useState<string | null>(null);
+
+  const sticky = loadSticky();
+  const [sampleType, setSampleType] = useState(sticky.sample_type);
+  const [projectId, setProjectId] = useState(sticky.project_id);
+  const [containerTypeId, setContainerTypeId] = useState(sticky.container_type_id);
+  const [primaryBarcode, setPrimaryBarcode] = useState('');
+  const [additionalBarcodes, setAdditionalBarcodes] = useState<string[]>([]);
+  const [extraDraft, setExtraDraft] = useState('');
+  const [temperature, setTemperature] = useState<string>('');
+  const [clientSampleId, setClientSampleId] = useState('');
+
+  const [submitting, setSubmitting] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
+    open: false,
+    message: '',
+    severity: 'success',
+  });
+
+  const loadLookups = useCallback(async () => {
+    setLoadingLookups(true);
+    setLookupError(null);
+    try {
+      // projects.size max is 100 (backend Query le=100) — size=200 caused 422 and blank page
+      const [typesRaw, projectsRaw, containerTypesRaw] = await Promise.all([
+        apiService.getListEntries('sample_types').catch(() =>
+          apiService.getListEntries('Sample Type')
+        ),
+        apiService.getProjects({ page: 1, size: 100 }),
+        apiService.getContainerTypes(),
+      ]);
+
+      const toItems = (raw: any): LookupItem[] => {
+        const arr = Array.isArray(raw) ? raw : raw?.entries || raw?.list_entries || [];
+        return (arr as any[])
+          .filter((x) => x && x.id && x.name)
+          .map((x) => ({ id: String(x.id), name: String(x.name) }));
+      };
+
+      setSampleTypes(toItems(typesRaw));
+      const projList = Array.isArray(projectsRaw)
+        ? projectsRaw
+        : projectsRaw?.projects || [];
+      setProjects(
+        (projList as any[])
+          .filter((p) => p && p.id && p.name)
+          .map((p) => ({ id: String(p.id), name: String(p.name) }))
+      );
+
+      const ctList = Array.isArray(containerTypesRaw)
+        ? containerTypesRaw
+        : containerTypesRaw?.container_types || [];
+      const singlePos = (ctList as any[])
+        .filter((ct) => ct && ct.id && ct.name && isSinglePositionType(ct))
+        .map((ct) => ({
+          id: String(ct.id),
+          name: String(ct.name),
+          rows: Number(ct.rows) || 1,
+          columns: Number(ct.columns) || 1,
+        }));
+      setContainerTypes(singlePos);
+      // Prefer sticky if still valid; else Cryovial / first 1×1
+      setContainerTypeId((prev) => {
+        if (prev && singlePos.some((c) => c.id === prev)) return prev;
+        const cryo = singlePos.find((c) => /cryovial/i.test(c.name));
+        return cryo?.id || singlePos[0]?.id || '';
+      });
+    } catch (err: any) {
+      console.error(err);
+      setLookupError(
+        formatApiDetail(err?.response?.data?.detail, 'Failed to load receive lookups')
+      );
+    } finally {
+      setLoadingLookups(false);
+      // Focus barcode after lookups load
+      setTimeout(() => primaryRef.current?.focus(), 0);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadLookups();
+  }, [loadLookups]);
+
+  useEffect(() => {
+    saveSticky({
+      sample_type: sampleType,
+      project_id: projectId,
+      container_type_id: containerTypeId,
+    });
+  }, [sampleType, projectId, containerTypeId]);
+
+  const addExtraBarcode = () => {
+    const value = extraDraft.trim();
+    if (!value) return;
+    const all = [primaryBarcode.trim(), ...additionalBarcodes];
+    if (all.includes(value)) {
+      setFormError(`Barcode already listed: ${value}`);
+      return;
+    }
+    setAdditionalBarcodes((prev) => [...prev, value]);
+    setExtraDraft('');
+    setFormError(null);
+  };
+
+  const removeExtraBarcode = (barcode: string) => {
+    setAdditionalBarcodes((prev) => prev.filter((b) => b !== barcode));
+  };
+
+  const resetBarcodesAndFocus = () => {
+    setPrimaryBarcode('');
+    setAdditionalBarcodes([]);
+    setExtraDraft('');
+    setClientSampleId('');
+    setTemperature('');
+    // Keep sticky type/project/container type.
+    setTimeout(() => primaryRef.current?.focus(), 0);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setFormError(null);
+
+    const primary = primaryBarcode.trim();
+    if (!primary) {
+      setFormError('Primary barcode is required');
+      primaryRef.current?.focus();
+      return;
+    }
+    if (!sampleType || !projectId || !containerTypeId) {
+      setFormError('Sample type, project, and container type are required (sticky)');
+      return;
+    }
+
+    const extras = additionalBarcodes.map((b) => b.trim()).filter(Boolean);
+    const all = [primary, ...extras];
+    if (new Set(all).size !== all.length) {
+      setFormError('Duplicate barcode in this receive');
+      return;
+    }
+
+    let temp: number | null = null;
+    if (temperature.trim() !== '') {
+      const parsed = Number(temperature);
+      if (Number.isNaN(parsed)) {
+        setFormError('Temperature must be a number');
+        return;
+      }
+      temp = parsed;
+    }
+
+    setSubmitting(true);
+    try {
+      const result = await apiService.receiveSample({
+        container_barcode: primary,
+        additional_container_barcodes: extras,
+        sample_type: sampleType,
+        project_id: projectId,
+        container_type_id: containerTypeId,
+        temperature: temp,
+        client_sample_id: clientSampleId.trim() || null,
+      });
+
+      const vesselCount = result?.containers?.length ?? 1 + extras.length;
+      const sampleName = result?.sample_name || 'sample';
+      setToast({
+        open: true,
+        message: `Received ${sampleName} · ${vesselCount} vessel${vesselCount === 1 ? '' : 's'}`,
+        severity: 'success',
+      });
+      resetBarcodesAndFocus();
+    } catch (err: any) {
+      const message = formatApiDetail(
+        err?.response?.data?.detail ?? err?.message,
+        'Receive failed'
+      );
+      setFormError(message);
+      setToast({ open: true, message, severity: 'error' });
+      // Stay on form; keep barcodes so tech can fix duplicate / retry
+      primaryRef.current?.focus();
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  if (loadingLookups) {
+    return (
+      <Box display="flex" justifyContent="center" alignItems="center" minHeight={240}>
+        <CircularProgress aria-label="Loading receive form" />
+      </Box>
+    );
+  }
+
+  return (
+    <Box maxWidth={720} mx="auto">
+      <Typography variant="h5" gutterBottom>
+        Receive
+      </Typography>
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+        Scan vessels into one sample. Sample ID is assigned by the system. Status becomes Available
+        for Testing. Stay on this screen for the next rack.
+      </Typography>
+
+      {lookupError && (
+        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setLookupError(null)}>
+          {lookupError}
+        </Alert>
+      )}
+      {formError && (
+        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setFormError(null)}>
+          {formError}
+        </Alert>
+      )}
+
+      <Paper component="form" onSubmit={handleSubmit} sx={{ p: 3 }} elevation={1}>
+        <Stack spacing={2.5}>
+          <TextField
+            inputRef={primaryRef}
+            label="Primary barcode"
+            value={primaryBarcode}
+            onChange={(e) => setPrimaryBarcode(e.target.value)}
+            required
+            fullWidth
+            autoComplete="off"
+            inputProps={{ 'data-testid': 'primary-barcode', 'aria-label': 'Primary barcode' }}
+            helperText="Required. Tube barcode as scanned — not the lab sample ID."
+          />
+
+          <Box>
+            <Typography variant="subtitle2" gutterBottom>
+              Additional barcodes (same sample)
+            </Typography>
+            <Stack direction="row" spacing={1} alignItems="flex-start">
+              <TextField
+                label="Additional tube / barcode"
+                value={extraDraft}
+                onChange={(e) => setExtraDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    addExtraBarcode();
+                  }
+                }}
+                fullWidth
+                autoComplete="off"
+                inputProps={{ 'data-testid': 'additional-barcode-draft' }}
+                helperText="Optional extra vessels for this sample — not an aliquot."
+              />
+              <Button
+                variant="outlined"
+                startIcon={<AddIcon />}
+                onClick={addExtraBarcode}
+                sx={{ whiteSpace: 'nowrap', mt: 0.5 }}
+                aria-label="Add additional barcode"
+              >
+                Add
+              </Button>
+            </Stack>
+            {additionalBarcodes.length > 0 && (
+              <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ mt: 1 }}>
+                {additionalBarcodes.map((b) => (
+                  <Chip
+                    key={b}
+                    label={b}
+                    onDelete={() => removeExtraBarcode(b)}
+                    deleteIcon={<DeleteOutlineIcon />}
+                    data-testid={`extra-barcode-${b}`}
+                  />
+                ))}
+              </Stack>
+            )}
+          </Box>
+
+          <FormControl fullWidth required>
+            <InputLabel id="receive-sample-type-label">Sample type</InputLabel>
+            <Select
+              labelId="receive-sample-type-label"
+              label="Sample type"
+              value={sampleType}
+              onChange={(e) => setSampleType(String(e.target.value))}
+              inputProps={{ 'data-testid': 'sample-type' }}
+            >
+              {sampleTypes.map((t) => (
+                <MenuItem key={t.id} value={t.id}>
+                  {t.name}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+
+
+          <FormControl fullWidth required>
+            <InputLabel id="receive-project-label">Project</InputLabel>
+            <Select
+              labelId="receive-project-label"
+              label="Project"
+              value={projectId}
+              onChange={(e) => setProjectId(String(e.target.value))}
+              inputProps={{ 'data-testid': 'project' }}
+            >
+              {projects.map((p) => (
+                <MenuItem key={p.id} value={p.id}>
+                  {p.name}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+
+          <FormControl fullWidth required>
+            <InputLabel id="receive-container-type-label">Container type</InputLabel>
+            <Select
+              labelId="receive-container-type-label"
+              label="Container type"
+              value={containerTypeId}
+              onChange={(e) => setContainerTypeId(String(e.target.value))}
+              inputProps={{ 'data-testid': 'container-type' }}
+            >
+              {containerTypes.map((ct) => (
+                <MenuItem key={ct.id} value={ct.id}>
+                  {ct.name}
+                </MenuItem>
+              ))}
+            </Select>
+            {containerTypes.length === 0 && (
+              <Typography variant="caption" color="error" sx={{ mt: 0.5 }}>
+                No 1×1 container types configured. Plates cannot be used at receive.
+              </Typography>
+            )}
+          </FormControl>
+
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+            <TextField
+              label="Temperature (°C)"
+              value={temperature}
+              onChange={(e) => setTemperature(e.target.value)}
+              fullWidth
+              inputProps={{ 'data-testid': 'temperature', inputMode: 'decimal' }}
+            />
+            <TextField
+              label="Client sample ID"
+              value={clientSampleId}
+              onChange={(e) => setClientSampleId(e.target.value)}
+              fullWidth
+              autoComplete="off"
+              inputProps={{ 'data-testid': 'client-sample-id' }}
+            />
+          </Stack>
+
+          <Box display="flex" gap={2} justifyContent="flex-end">
+            <Button
+              type="submit"
+              variant="contained"
+              disabled={submitting}
+              data-testid="receive-submit"
+            >
+              {submitting ? <CircularProgress size={22} color="inherit" /> : 'Receive'}
+            </Button>
+          </Box>
+        </Stack>
+      </Paper>
+
+      <Snackbar
+        open={toast.open}
+        autoHideDuration={4000}
+        onClose={() => setToast((t) => ({ ...t, open: false }))}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert
+          severity={toast.severity}
+          onClose={() => setToast((t) => ({ ...t, open: false }))}
+          sx={{ width: '100%' }}
+        >
+          {toast.message}
+        </Alert>
+      </Snackbar>
+    </Box>
+  );
+};
+
+export default AtomicReceive;

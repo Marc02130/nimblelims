@@ -643,7 +643,7 @@ During sample accessioning:
 2. Sample is linked to container via contents table
 3. Concentration and amount are recorded
 
-**See**: `.docs/review/manuals/accessioning-workflow.md`
+**See**: `.docs/review/manuals/atomic-receive.md` (CORE) · `.docs/review/manuals/accessioning-workflow.md` (legacy wizard)
 
 ### Aliquot/Derivative Creation
 
