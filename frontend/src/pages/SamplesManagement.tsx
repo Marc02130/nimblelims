@@ -171,12 +171,13 @@ const SamplesManagement: React.FC = () => {
       );
 
       const [samplesResponse, sampleTypesRaw, statusesRaw, matricesRaw, qcTypesRaw, projectsResponse] = await Promise.all([
-        apiService.getSamples(filteredFilters),
+        // API defaults to size=10; request a full page so newly received samples appear
+        apiService.getSamples({ ...filteredFilters, page: '1', size: '100' }),
         apiService.getListEntries('sample_types'),
         apiService.getListEntries('sample_status'),
         apiService.getListEntries('matrix_types'),
         apiService.getListEntries('qc_types'),
-        apiService.getProjects(),
+        apiService.getProjects({ page: 1, size: 100 }),
       ]);
 
       // Handle paginated response - extract samples array
@@ -197,7 +198,9 @@ const SamplesManagement: React.FC = () => {
         ...sample,
         status_name: statuses.find((s: any) => s.id === sample.status)?.name || 'Unknown',
         sample_type_name: sampleTypes.find((t: any) => t.id === sample.sample_type)?.name || 'Unknown',
-        matrix_name: matrices.find((m: any) => m.id === sample.matrix)?.name || 'Unknown',
+        matrix_name: sample.matrix
+          ? (matrices.find((m: any) => m.id === sample.matrix)?.name || 'Unknown')
+          : '—',
         project_name: projects.find((p: any) => p.id === sample.project_id)?.name || 'Unknown',
       }));
 
@@ -403,8 +406,8 @@ const SamplesManagement: React.FC = () => {
               )}
               <Button
                 variant="contained"
-                onClick={() => navigate('/accessioning')}
-                aria-label="Navigate to accessioning form"
+                onClick={() => navigate('/receive')}
+                aria-label="Navigate to receive form"
               >
                 Create Sample
               </Button>
