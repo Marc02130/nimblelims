@@ -25,7 +25,7 @@
 ## Artifact location
 
 ```
-.docs-review/lab-ops-review/{feature-stem}.md
+.docs/review/lab-ops-review/{feature-stem}.md
 ```
 
 Same stem as requirements / tech sketch / other reviews.
@@ -53,5 +53,5 @@ Premature “Accept” from eng/product without lab ops is **invalid for impleme
 
 - Competitive reference: external commercial LIMS docs (not stored in this repository) for entry catalog depth, templates, submit/lock, process stringing  
 
-- Product: `.docs-review/manuals/experiments.md`, `processes.md`, `lims-runs.md`  
-- Requirements: `.docs-review/requirements/experiment-processes-entries.md`
+- Product: `.docs/review/manuals/experiments.md`, `processes.md`, `lims-runs.md`  
+- Requirements: `.docs/review/requirements/experiment-processes-entries.md`

@@ -78,28 +78,28 @@ Tiny/small must **not** skip security or product decisions on sensitive changes 
 
 | Stage | Purpose | Where artifacts live |
 |-------|---------|----------------------|
-| **Ideation** | Problem, one-liner, non-goals, rough success metric | local `.docs-internal/ideas/` (not committed) |
-| **Requirements** | FR/NFR, phases, acceptance criteria, review packet links | [`.docs-review/requirements/`](../requirements/) |
-| **Tech sketch** | Lightweight *how*: APIs, engine, flows (may draft model) | [`.docs-review/tech-sketch/`](../tech-sketch/) |
-| **Schema changes** | **Authoritative DB delta for this cycle** (architecture verifies here) | [`.docs-review/schema-changes/`](../schema-changes/) |
-| **Lab operations review** | **Target-customer lab workflows** (SVP Lab Ops persona); required for ELN/experiments/processes/runs | [`.docs-review/lab-ops-review/`](../lab-ops-review/) · skill `/nimble-lab-ops-review` |
-| **CEO review** | Scope, MVP cut, priority | [`.docs-review/ceo-review/`](../ceo-review/) · skill `/nimble-ceo-review` |
-| **Security review** | Trust boundaries, STRIDE, authZ, AI/data | [`.docs-review/security-review/`](../security-review/) · skill `/nimble-cso-review` |
-| **UI design review** | Personas, flows, empty states | [`.docs-review/ui-review/`](../ui-review/) · skill `/nimble-ui-review` |
-| **Architecture design review** | Schema, APIs, migration | [`.docs-review/architecture-review/`](../architecture-review/) · skill `/nimble-arch-review` |
-| **QA / Testing review** | Testability, UAT readiness, acceptance criteria quality; required when touching sample tracking / results / audit / security | [`.docs-review/qa-review/`](../qa-review/) · skill `/nimble-qa-review` |
+| **Ideation** | Problem, one-liner, non-goals, rough success metric | local `.docs/internal/ideas/` (not committed) |
+| **Requirements** | FR/NFR, phases, acceptance criteria, review packet links | [`.docs/review/requirements/`](../requirements/) |
+| **Tech sketch** | Lightweight *how*: APIs, engine, flows (may draft model) | [`.docs/review/tech-sketch/`](../tech-sketch/) |
+| **Schema changes** | **Authoritative DB delta for this cycle** (architecture verifies here) | [`.docs/review/schema-changes/`](../schema-changes/) |
+| **Lab operations review** | **Target-customer lab workflows** (SVP Lab Ops persona); required for ELN/experiments/processes/runs | [`.docs/review/lab-ops-review/`](../lab-ops-review/) · skill `/nimble-lab-ops-review` |
+| **CEO review** | Scope, MVP cut, priority | [`.docs/review/ceo-review/`](../ceo-review/) · skill `/nimble-ceo-review` |
+| **Security review** | Trust boundaries, STRIDE, authZ, AI/data | [`.docs/review/security-review/`](../security-review/) · skill `/nimble-cso-review` |
+| **UI design review** | Personas, flows, empty states | [`.docs/review/ui-review/`](../ui-review/) · skill `/nimble-ui-review` |
+| **Architecture design review** | Schema, APIs, migration | [`.docs/review/architecture-review/`](../architecture-review/) · skill `/nimble-arch-review` |
+| **QA / Testing review** | Testability, UAT readiness, acceptance criteria quality; required when touching sample tracking / results / audit / security | [`.docs/review/qa-review/`](../qa-review/) · skill `/nimble-qa-review` |
 | **Review skills (how agents run reviews)** | Formal Grok skills + packet rules | [`.grok/skills/nimble-reviews/`](../../.grok/skills/nimble-reviews/) |
-| **Open questions** | Decision log; phase gate | [`.docs-review/open-questions/`](../open-questions/) |
-| **Implementation tracking** | Phase checklists / tasks | [`.docs-review/checklist/`](../checklist/) |
-| **Long-form design** (optional) | Deeper tech design | local `.docs-internal/design/` (not committed) |
-| **Docs sync** | User/operator manuals + API notes for the feature | [`.docs-review/manuals/`](../manuals/), root `README.md` |
-| **Dogfood notes** | Internal exercise log / known issues | [`.docs-review/development-process/dogfood/`](./dogfood/) or checklist |
-| **UAT scripts & results** | Scripted acceptance | [`UAT_Scripts/`](../../UAT_Scripts/) (repo root); optional feature notes under [`.docs-review/development-process/uat/`](./uat/) |
-| **This process** | How we work | [`.docs-review/development-process/`](./) |
+| **Open questions** | Decision log; phase gate | [`.docs/review/open-questions/`](../open-questions/) |
+| **Implementation tracking** | Phase checklists / tasks | [`.docs/review/checklist/`](../checklist/) |
+| **Long-form design** (optional) | Deeper tech design | local `.docs/internal/design/` (not committed) |
+| **Docs sync** | User/operator manuals + API notes for the feature | [`.docs/review/manuals/`](../manuals/), root `README.md` |
+| **Dogfood notes** | Internal exercise log / known issues | [`.docs/review/development-process/dogfood/`](./dogfood/) or checklist |
+| **UAT scripts & results** | Scripted acceptance | [`UAT_Scripts/`](../../UAT_Scripts/) (repo root); optional feature notes under [`.docs/review/development-process/uat/`](./uat/) |
+| **This process** | How we work | [`.docs/review/development-process/`](./) |
 
 **Naming:** same feature stem across docs when possible, e.g. `data-parsers-lims-runs.md`, `uat-data-parsers-lims-runs.md`.
 
-**Do not** leave feature docs at `.docs-review/` root. Do not invent parallel process trees.
+**Do not** leave feature docs at `.docs/review/` root. Do not invent parallel process trees.
 
 ### Lab operations gate (slow down when it matters)
 
@@ -138,7 +138,7 @@ When QA review is required:
 | **Tech sketch** | Early *how*—APIs, engine, flows; may include draft model |
 | **schema-changes/** | **Only** DB/RLS/backfill delta for this cycle — **architecture’s schema checklist** |
 | **Architecture review** | Verdict on sketch + **schema-changes** + requirements |
-| local `.docs-internal/design/schema-evolution.md` (not committed) | Platform product for *dynamic* field management — **not** per-cycle migration lists |
+| local `.docs/internal/design/schema-evolution.md` (not committed) | Platform product for *dynamic* field management — **not** per-cycle migration lists |
 
 **Rule:** If the cycle includes Alembic work, create `schema-changes/<stem>.md` before architecture review. Do not expect reviewers to reconstruct the delta from seven narrative docs.
 
@@ -189,7 +189,7 @@ When QA review is required:
 
 ## 6. Open questions gate
 
-See [`.docs-review/open-questions/`](../open-questions/) and root [`AGENTS.md`](../../AGENTS.md).
+See [`.docs/review/open-questions/`](../open-questions/) and root [`AGENTS.md`](../../AGENTS.md).
 
 1. Blocking questions for **phase N** must not remain **Open**.  
 2. Checklists = tasks; open questions = decisions.  
@@ -253,7 +253,7 @@ Docs may still get a final polish after UAT findings; that is a small loop, not 
 - At least one non-author path exercised when possible  
 - Issues filed; **blockers fixed** or explicitly accepted before UAT  
 
-**Artifacts:** short log under [`.docs-review/development-process/dogfood/`](./dogfood/) or notes on the checklist (date, who, what broke).
+**Artifacts:** short log under [`.docs/review/development-process/dogfood/`](./dogfood/) or notes on the checklist (date, who, what broke).
 
 See [dogfood/README.md](./dogfood/README.md).
 
@@ -266,7 +266,7 @@ See [dogfood/README.md](./dogfood/README.md).
 **Location**
 
 - Primary: [`UAT_Scripts/`](../../UAT_Scripts/) (existing repo convention: `uat-*.md`, runners, results)  
-- Process notes / templates: [`.docs-review/development-process/uat/`](./uat/)
+- Process notes / templates: [`.docs/review/development-process/uat/`](./uat/)
 
 **Exit**
 
@@ -297,7 +297,7 @@ After merge: **monitor** production, then **update requirements** with learnings
 
 | Doc | Role |
 |-----|------|
-| local `.docs-internal/ideas/<stem>.md` (not committed) | Ideation |
+| local `.docs/internal/ideas/<stem>.md` (not committed) | Ideation |
 | `requirements/<stem>.md` | Cycle requirements |
 | `tech-sketch/<stem>.md` | Tech sketch |
 | `schema-changes/<stem>.md` | **DB delta** (if migrations in scope) |
@@ -337,10 +337,10 @@ After merge: **monitor** production, then **update requirements** with learnings
 
 ## Related
 
-- [`.docs-review/README.md`](../README.md)  
+- [`.docs/review/README.md`](../README.md)  
 - [dogfood/README.md](./dogfood/README.md)  
 - [uat/README.md](./uat/README.md)  
-- [`.docs-review/open-questions/README.md`](../open-questions/README.md)  
-- [`.docs-review/tech-sketch/README.md`](../tech-sketch/README.md)  
+- [`.docs/review/open-questions/README.md`](../open-questions/README.md)  
+- [`.docs/review/tech-sketch/README.md`](../tech-sketch/README.md)  
 - [`UAT_Scripts/`](../../UAT_Scripts/)  
 - Root [`AGENTS.md`](../../AGENTS.md)  

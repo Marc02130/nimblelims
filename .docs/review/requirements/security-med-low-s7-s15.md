@@ -3,12 +3,12 @@
 **Date:** 2026-08-21  
 **Status:** **Implemented on branch** (P1–P4) — live UAT / merge pending  
 **Branch:** `security/med-low-s7-s15`  
-**Source audit:** [`.docs-review/security-review/codebase.md`](../security-review/codebase.md)  
-**Idea:** local `.docs-internal/ideas/security-med-low-s7-s15.md` (not committed)  
-**Tech sketch:** [`.docs-review/tech-sketch/security-med-low-s7-s15.md`](../tech-sketch/security-med-low-s7-s15.md)  
-**Schema changes:** [`.docs-review/schema-changes/security-med-low-s7-s15.md`](../schema-changes/security-med-low-s7-s15.md)  
-**Open questions:** [`.docs-review/open-questions/security-med-low-s7-s15.md`](../open-questions/security-med-low-s7-s15.md)  
-**Checklist:** [`.docs-review/checklist/security-med-low-s7-s15.md`](../checklist/security-med-low-s7-s15.md)  
+**Source audit:** [`.docs/review/security-review/codebase.md`](../security-review/codebase.md)  
+**Idea:** local `.docs/internal/ideas/security-med-low-s7-s15.md` (not committed)  
+**Tech sketch:** [`.docs/review/tech-sketch/security-med-low-s7-s15.md`](../tech-sketch/security-med-low-s7-s15.md)  
+**Schema changes:** [`.docs/review/schema-changes/security-med-low-s7-s15.md`](../schema-changes/security-med-low-s7-s15.md)  
+**Open questions:** [`.docs/review/open-questions/security-med-low-s7-s15.md`](../open-questions/security-med-low-s7-s15.md)  
+**Checklist:** [`.docs/review/checklist/security-med-low-s7-s15.md`](../checklist/security-med-low-s7-s15.md)  
 **Prerequisite:** High S1–S6 **Met** ([security-high-s1-s6](security-high-s1-s6.md))
 
 ## Review packet

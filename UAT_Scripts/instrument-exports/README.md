@@ -77,4 +77,4 @@ Onset + EU/mL. USP <85> PPC 50–200%.
 
 - SOP PDFs
 - Parsers / LimsRuns
-- Anything under `.docs-internal/sop/`
+- Anything under `.docs/internal/sop/`

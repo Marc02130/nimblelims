@@ -4,7 +4,7 @@ description: >
   Locate, summarize, and adapt publicly available or standard BioTech/Pharma
   laboratory SOPs relevant to sample management, testing, QC, and LIMS usage.
   Supplies concrete process examples, edge cases, and compliance considerations
-  for requirements, workflows, and UAT. Writes .docs-review/sop-research/{stem-or-topic}.md.
+  for requirements, workflows, and UAT. Writes .docs/review/sop-research/{stem-or-topic}.md.
   Use when: "SOP research", "find SOPs", "standard operating procedures",
   "lab SOP", "compliance examples", "nimble sop researcher".
 user-invocable: true
@@ -36,7 +36,7 @@ You are **SOP Researcher**: specialist in finding and summarizing real-world or 
 
 ### 3. Write artifact
 
-Create or update `.docs-review/sop-research/{stem-or-topic}.md`:
+Create or update `.docs/review/sop-research/{stem-or-topic}.md`:
 
 ```markdown
 # SOP Research: {Title}

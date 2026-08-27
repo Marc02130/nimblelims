@@ -1,8 +1,8 @@
 # Open Questions — Data parsers + LimsRun source/parser lineage
 
 **Status:** Living decision log  
-**Requirements:** [`.docs-review/requirements/data-parsers-lims-runs.md`](../requirements/data-parsers-lims-runs.md)  
-**Idea:** local `.docs-internal/ideas/ai-data-import.md` (not committed)  
+**Requirements:** [`.docs/review/requirements/data-parsers-lims-runs.md`](../requirements/data-parsers-lims-runs.md)  
+**Idea:** local `.docs/internal/ideas/ai-data-import.md` (not committed)  
 **Reviews:** [CEO](../ceo-review/data-parsers-lims-runs.md) · [Security](../security-review/data-parsers-lims-runs.md) · [Architecture](../architecture-review/data-parsers-lims-runs.md) · [UI](../ui-review/data-parsers-lims-runs.md)
 
 ## Gate rule
@@ -29,14 +29,14 @@ Do not implement a phase until questions that **block** that phase are **Decided
 | **12** | AI on every import vs setup-only? | **Decided** | Whole feature / P2 | **Setup only.** Instrument/CRO consistency → one parser, many cheap imports | 2026-07-12 | CEO | Minimize AI cost; deterministic day-to-day import |
 | **13** | MVP phase cut and priority? | **Decided** | Roadmap | **P0+P1 MVP (high priority)**; P2 after P0+P1; result import is expected (manual entry not OK as primary path) | 2026-07-12 | CEO | Modern LIMS table stakes |
 | **14** | Resolve open questions before implementation? | **Decided** | Process | **Yes** — blocking questions resolved before implementation starts | 2026-07-12 | CEO | Aligns with development-process gate |
-| 2 | Instrument catalog grain: instance vs model/vendor? | **Decided** | P0 catalog | **Type** (vendor, model) + **instance** (type FK, serial, name). No location until local `.docs-internal/ideas/lab-locations.md` (not committed). Parsers/runs key **instance**. | 2026-07-19 | Product | Format ~ type; lineage ~ instance |
+| 2 | Instrument catalog grain: instance vs model/vendor? | **Decided** | P0 catalog | **Type** (vendor, model) + **instance** (type FK, serial, name). No location until local `.docs/internal/ideas/lab-locations.md` (not committed). Parsers/runs key **instance**. | 2026-07-19 | Product | Format ~ type; lineage ~ instance |
 | 3 | Permission for parser / instrument / CRO CRUD? | **Decided** | P0–P1 | **`config:edit`** | 2026-07-19 | Product | Acceptable; aligns with other lab config |
 | 4 | Allow override to a parser for a **different** analysis than the run? | **Decided** | P1 UI/API | **Block** — parser must be linked to `run.analysis_id` via `parser_analyses` | 2026-07-19 | Product | Import validity |
 | 5 | Snapshot `parser_config` on import vs versioning? | **Decided** | P1 schema + admin UX | **No JSON snapshot.** Versioned parser rows + `active`; import stores version `parser_id` | 2026-07-19 | Product | See **Decision #5** |
-| 6 | Non-reportable run (no analysis) / method-dev path? | **Decided** | All run paths | **No non-reportable runs.** `analysis_id` **required** on every run (create/start/import/publish). Method-dev deferred to local `.docs-internal/ideas/orders-and-projects.md` (not committed) | 2026-07-19 | Product | See **Decision #6**; aligns [run-results #6](run-results.md) |
+| 6 | Non-reportable run (no analysis) / method-dev path? | **Decided** | All run paths | **No non-reportable runs.** `analysis_id` **required** on every run (create/start/import/publish). Method-dev deferred to local `.docs/internal/ideas/orders-and-projects.md` (not committed) | 2026-07-19 | Product | See **Decision #6**; aligns [run-results #6](run-results.md) |
 | **15** | Keep `experiment_template_id` on parsers? | **Decided** | Schema | **Remove** the column entirely | 2026-07-12 | Product / Architecture | Parsers are analysis×instrument/CRO only |
 | **16** | Run analysis + multi instrument/parser rules? | **Decided** | P1 import/schema | See **Decision #16** | 2026-07-19 | Product | Run tied to analysis; multiple instruments/parsers allowed; each must match analysis + that instrument/CRO |
-| 7 | Instruments/CRO catalogs multi-tenant scope? | **Decided** | P0 | **Lab-global only.** No org segregation. Multi-tenant **out of scope** until real multi-org users — see local `.docs-internal/ideas/multi-tenant.md` (not committed) | 2026-07-18 | Product | Pre-release; single lab deployment |
+| 7 | Instruments/CRO catalogs multi-tenant scope? | **Decided** | P0 | **Lab-global only.** No org segregation. Multi-tenant **out of scope** until real multi-org users — see local `.docs/internal/ideas/multi-tenant.md` (not committed) | 2026-07-18 | Product | Pre-release; single lab deployment |
 | 8 | Multiple parsers per analysis×source: default selection rule? | **Decided (provisional)** | P1 | `parser_analyses.is_default` for that analysis; at most one default per (analysis, instrument\|cro) among linked parsers | 2026-07-19 | Product | |
 | 9 | Table naming: keep `instrument_parsers` vs rename? | **Decided** | P1 migration | **Rename → `data_parsers`** (generic; instrument + CRO). API/UI: “Data parsers” | 2026-07-19 | Product | See **Decision #9** |
 
@@ -448,14 +448,14 @@ Treat each **saved definition** of a parser as an **immutable version row**. Imp
 ## Decision #6 — No non-reportable runs; method-dev deferred to lab projects
 
 **Status:** **Decided** · **Date:** 2026-07-19 · **Owner:** Product  
-**Blocks:** Nothing for P1 special-case import (path removed). Method-dev UX blocked on local `.docs-internal/ideas/orders-and-projects.md` (not committed)
+**Blocks:** Nothing for P1 special-case import (path removed). Method-dev UX blocked on local `.docs/internal/ideas/orders-and-projects.md` (not committed)
 
 ### Decided
 
 1. **No non-reportable runs** anywhere in the LimsRun product path.  
 2. **`run.analysis_id` is required** from create — not optional for start, import, or publish.  
 3. **Do not** keep “continue without analysis”, `acknowledge_no_analysis`, or publish-without-promote.  
-4. **Method development / scratch / work-over-time** is **deferred** until **lab projects** (local `.docs-internal/ideas/orders-and-projects.md` (not committed)). Still uses a real analysis later—not null.  
+4. **Method development / scratch / work-over-time** is **deferred** until **lab projects** (local `.docs/internal/ideas/orders-and-projects.md` (not committed)). Still uses a real analysis later—not null.  
 5. **Promote on publish** always uses the run’s analysis.
 
 ### Rejected
@@ -484,6 +484,6 @@ Treat each **saved definition** of a parser as an **immutable version row**. Imp
 - Promote remains separate (analysis_id on publish).  
 - Permissions: **`config:edit`** for instrument/CRO/parser CRUD.  
 - **Parser versions + active** (Decision #5); import stores version `parser_id` only.  
-- **No non-reportable runs** (Decision #6); method-dev → local `.docs-internal/ideas/orders-and-projects.md` (not committed).  
+- **No non-reportable runs** (Decision #6); method-dev → local `.docs/internal/ideas/orders-and-projects.md` (not committed).  
 - Table/API name **`data_parsers`** (Decision #9).  
 

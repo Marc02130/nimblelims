@@ -3,8 +3,8 @@
 **Date:** 2026-07-11  
 **Branch:** `run-results`  
 **Reviewer:** CSO / Security  
-**Idea:** local `.docs-internal/ideas/run-results.md` (not committed)  
-**Tech:** local `.docs-internal/design/run-results.md` (not committed)
+**Idea:** local `.docs/internal/ideas/run-results.md` (not committed)  
+**Tech:** local `.docs/internal/design/run-results.md` (not committed)
 
 ## Executive Summary
 
@@ -104,4 +104,4 @@ Scientifically wrong values in instrument file still become “official” resul
 
 ---
 
-Related: [ceo](../ceo-review/run-results.md) · [ui-review](../ui-review/run-results.md) · local `.docs-internal/design/run-results.md` (not committed)
+Related: [ceo](../ceo-review/run-results.md) · [ui-review](../ui-review/run-results.md) · local `.docs/internal/design/run-results.md` (not committed)

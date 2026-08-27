@@ -3,7 +3,7 @@
 **Date:** 2026-08-25  
 **Status:** Discussion — Leadership comments captured; not an implement gate  
 **Author framing:** Marc  
-**Inputs:** [`.docs-internal/prd/nimblelims-prd.md`](../prd/nimblelims-prd.md) · [`.docs-internal/prd/sample-accessioning/PRD.md`](../prd/sample-accessioning/PRD.md) · accessioning ISSUES · atomic-receive locks · idea `accessioning-and-workflows-revisit`  
+**Inputs:** [`.docs/internal/prd/nimblelims-prd.md`](../prd/nimblelims-prd.md) · [`.docs/internal/prd/sample-accessioning/PRD.md`](../prd/sample-accessioning/PRD.md) · accessioning ISSUES · atomic-receive locks · idea `accessioning-and-workflows-revisit`  
 **Personas:** CEO · Security CSO · Scientific CSO · VP Lab Ops  
 
 ---
