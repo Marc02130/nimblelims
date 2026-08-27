@@ -53,6 +53,34 @@ function saveSticky(state: StickyState) {
   sessionStorage.setItem(STICKY_KEY, JSON.stringify(state));
 }
 
+/** FastAPI/Pydantic `detail` may be a string or a list/object — never render raw objects. */
+function formatApiDetail(detail: unknown, fallback: string): string {
+  if (detail == null) return fallback;
+  if (typeof detail === 'string') return detail;
+  if (Array.isArray(detail)) {
+    return detail
+      .map((item) => {
+        if (typeof item === 'string') return item;
+        if (item && typeof item === 'object' && 'msg' in item) {
+          const loc = Array.isArray((item as any).loc)
+            ? (item as any).loc.filter((x: unknown) => x !== 'body' && x !== 'query').join('.')
+            : '';
+          return loc ? `${loc}: ${(item as any).msg}` : String((item as any).msg);
+        }
+        return JSON.stringify(item);
+      })
+      .join('; ');
+  }
+  if (typeof detail === 'object' && detail !== null && 'msg' in detail) {
+    return String((detail as any).msg);
+  }
+  try {
+    return JSON.stringify(detail);
+  } catch {
+    return fallback;
+  }
+}
+
 const AtomicReceive: React.FC = () => {
   const primaryRef = useRef<HTMLInputElement>(null);
 
@@ -84,6 +112,7 @@ const AtomicReceive: React.FC = () => {
     setLoadingLookups(true);
     setLookupError(null);
     try {
+      // projects.size max is 100 (backend Query le=100) — size=200 caused 422 and blank page
       const [typesRaw, matricesRaw, projectsRaw] = await Promise.all([
         apiService.getListEntries('sample_types').catch(() =>
           apiService.getListEntries('Sample Type')
@@ -91,7 +120,7 @@ const AtomicReceive: React.FC = () => {
         apiService.getListEntries('matrix_types').catch(() =>
           apiService.getListEntries('Matrix')
         ),
-        apiService.getProjects({ page: 1, size: 200 }),
+        apiService.getProjects({ page: 1, size: 100 }),
       ]);
 
       const toItems = (raw: any): LookupItem[] => {
@@ -113,7 +142,9 @@ const AtomicReceive: React.FC = () => {
       );
     } catch (err: any) {
       console.error(err);
-      setLookupError(err?.response?.data?.detail || 'Failed to load receive lookups');
+      setLookupError(
+        formatApiDetail(err?.response?.data?.detail, 'Failed to load receive lookups')
+      );
     } finally {
       setLoadingLookups(false);
       // Focus barcode after lookups load
@@ -209,11 +240,10 @@ const AtomicReceive: React.FC = () => {
       });
       resetBarcodesAndFocus();
     } catch (err: any) {
-      const detail =
-        err?.response?.data?.detail ||
-        err?.message ||
-        'Receive failed';
-      const message = typeof detail === 'string' ? detail : JSON.stringify(detail);
+      const message = formatApiDetail(
+        err?.response?.data?.detail ?? err?.message,
+        'Receive failed'
+      );
       setFormError(message);
       setToast({ open: true, message, severity: 'error' });
       // Stay on form; keep barcodes so tech can fix duplicate / retry
