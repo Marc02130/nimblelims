@@ -23,7 +23,20 @@
 | **WO-4** | Non-instrument analysis: **LimsRun with analysis required**; manual entry OK; **no parser/instrument required** unless importing. |
 | **WO-5** | Compound/gene/protein **registration deferred**, but **will be required**. Uniqueness validation (e.g. SMILES) is known-hard — separate packet. |
 | **WO-6 / 6b** | Lot model **deferred**. Intent: **one compound = one Sample** so all testing rolls up; lots captured for provenance/troubleshooting. **Prefer lot as child Sample** when designed. |
-| **WO-7** | **Test** row created at **LimsRun start / ensure-on-publish** — not at accession or bare order. |
+| **WO-7** | Test row created or attached at **LimsRun start** — not at accession, not on a bare order, **not at publish**. Publish **refuses** if the Test is missing (no find-or-create / no ensure-on-publish). Hans/Heidi/Günter punch 2026-08-26. |
+
+---
+
+## WO-7 conditions
+
+- `work_order` feeds Process / Experiment / LimsRun — not a second home / AuthZ path.
+- Routing must not order a step on a sample type that does not exist yet (e.g. Qubit on blood).
+- Empty routing map mints nothing.
+- Overlapping TAT refuse (TAT matching algorithm still open).
+- Params snapshot at LimsRun start and freeze.
+- Classic type-a-number Result on a Test still lands (WO-4); two writers on same Test = 409.
+- Instantiating from `work_order` uses existing process AuthZ — no client expand.
+- AR P0 still first.
 
 ---
 
@@ -40,5 +53,5 @@
 
 - Exact intake-profile **schema** columns (only AR OOB for now).  
 - Work_order field list / status model.  
-- How TAT range matching works when multiple map rows overlap.  
+- How TAT range matching works when multiple map rows overlap (overlap **refuses**; algorithm still open).  
 - Registration uniqueness strategies (SMILES, sequences, …).
