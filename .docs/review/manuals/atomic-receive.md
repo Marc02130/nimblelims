@@ -36,7 +36,7 @@ Legacy wizard at `/accessioning` is **not** the happy path (see [accessioning-wo
 5. **Receive** → toast → barcodes clear → sticky fields remain → focus primary.
 6. Stay on the page for the next specimen.
 
-**Container type:** required; **1×1 vessels only** (`dimensions` = `1x1`). Plates / multi-well are hidden in the UI and refused by the API. Same type applies to all vessels on the commit.
+**Container type:** required; **1×1 vessels only** (`rows=1` and `columns=1`). Plates / multi-well are hidden in the UI and refused by the API. Same type applies to all vessels on the commit.
 
 **Not on the form:** sample ID, status, **analysis picker**, aliquot dialog, redirect to sample detail. OOB receive never offers analyses and never sends `analysis_ids`.
 

@@ -54,7 +54,7 @@ def receive_seed(db_session: Session, test_admin_user: User):
         description="Default tube",
         capacity=5,
         material="plastic",
-        dimensions="1x1",
+        rows=1, columns=1,
     )
     db_session.add(tube)
     db_session.flush()
@@ -174,7 +174,7 @@ class TestAtomicReceivePhase2:
             name="Plate-96",
             description="Multi-well — not allowed at atomic receive",
             capacity=96,
-            dimensions="8x12",
+            rows=8, columns=12,
         )
         db_session.add(plate)
         db_session.commit()

@@ -89,7 +89,7 @@ class TestAliquotsAPI:
             description="Test tube container",
             capacity=5.0,
             material="Plastic",
-            dimensions="12x75",
+            rows=1, columns=1,
             created_by=sample_user.id,
             modified_by=sample_user.id
         )
@@ -208,7 +208,7 @@ class TestAliquotsAPI:
             description="DNA tube container",
             capacity=2.0,
             material="Plastic",
-            dimensions="8x32",
+            rows=8, columns=32,
             created_by=sample_user.id,
             modified_by=sample_user.id
         )
@@ -333,7 +333,7 @@ class TestAliquotsAPI:
             description="Tube for pooling samples",
             capacity=10.0,
             material="Plastic",
-            dimensions="15x100",
+            rows=1, columns=1,
             created_by=sample_user.id,
             modified_by=sample_user.id
         )
@@ -465,7 +465,7 @@ class TestAliquotsAPI:
             description="Test tube container",
             capacity=5.0,
             material="Plastic",
-            dimensions="12x75",
+            rows=1, columns=1,
             created_by=sample_user.id,
             modified_by=sample_user.id
         )
@@ -629,7 +629,7 @@ class TestAliquotsAPI:
             description="DNA tube container",
             capacity=2.0,
             material="Plastic",
-            dimensions="8x32",
+            rows=8, columns=32,
             created_by=sample_user.id,
             modified_by=sample_user.id
         )
