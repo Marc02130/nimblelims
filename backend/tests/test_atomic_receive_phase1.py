@@ -45,7 +45,7 @@ def receive_seed(db_session: Session, test_admin_user: User):
         description="Default tube",
         capacity=5,
         material="plastic",
-        dimensions="1x1",
+        rows=1, columns=1,
     )
     db_session.add(tube)
     db_session.flush()

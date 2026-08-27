@@ -35,15 +35,11 @@ type StickyState = {
   container_type_id: string;
 };
 
-type ContainerTypeItem = LookupItem & { dimensions?: string | null };
+type ContainerTypeItem = LookupItem & { rows?: number; columns?: number };
 
-/** Atomic receive only supports 1×1 grid vessels (not plates / multi-well). */
-function isSinglePositionType(ct: { dimensions?: string | null; name?: string }): boolean {
-  const dims = String(ct.dimensions || '')
-    .trim()
-    .toLowerCase()
-    .replace('×', 'x');
-  return /^1\s*x\s*1$/.test(dims);
+/** Atomic receive only supports single-position vessels (rows=1, columns=1). */
+function isSinglePositionType(ct: { rows?: number; columns?: number }): boolean {
+  return Number(ct.rows) === 1 && Number(ct.columns) === 1;
 }
 
 function loadSticky(): StickyState {
@@ -167,7 +163,8 @@ const AtomicReceive: React.FC = () => {
         .map((ct) => ({
           id: String(ct.id),
           name: String(ct.name),
-          dimensions: ct.dimensions ?? null,
+          rows: Number(ct.rows) || 1,
+          columns: Number(ct.columns) || 1,
         }));
       setContainerTypes(singlePos);
       // Prefer sticky if still valid; else Cryovial / first 1×1

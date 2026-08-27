@@ -64,15 +64,8 @@ def resolve_available_for_testing_status(db: Session) -> ListEntry:
 
 
 def is_single_position_container_type(ct: ContainerType) -> bool:
-    """Atomic receive only supports 1×1 vessels (not plates / multi-well).
-
-    Grid dimensions must parse as exactly 1×1 (e.g. ``1x1``). Physical sizes
-    like ``15x100mm`` or plate grids ``8x12`` are not single-position.
-    """
-    import re
-
-    dims = (ct.dimensions or "").strip().lower().replace("×", "x")
-    return bool(re.fullmatch(r"1\s*x\s*1", dims))
+    """Atomic receive only supports single-position vessels (rows=1, columns=1)."""
+    return int(getattr(ct, "rows", 0) or 0) == 1 and int(getattr(ct, "columns", 0) or 0) == 1
 
 
 def resolve_receive_container_type(db: Session, container_type_id: UUID) -> ContainerType:
@@ -94,7 +87,7 @@ def resolve_receive_container_type(db: Session, container_type_id: UUID) -> Cont
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=(
-                f"Container type '{ct.name}' is not a 1×1 vessel. "
+                f"Container type '{ct.name}' is {ct.rows}×{ct.columns}, not 1×1. "
                 "Atomic receive does not support plates or multi-position containers."
             ),
         )

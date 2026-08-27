@@ -81,9 +81,9 @@ describe('AtomicReceive', () => {
       return { projects: [{ id: 'proj-1', name: 'Study A' }] };
     });
     mockGetContainerTypes.mockResolvedValue([
-      { id: 'ct-cryo', name: 'Cryovial (2mL)', dimensions: '1x1' },
-      { id: 'ct-plate', name: '96-Well Plate', dimensions: '8x12' },
-      { id: 'ct-conical', name: '15mL Conical Tube', dimensions: '1x1' },
+      { id: 'ct-cryo', name: 'Cryovial (2mL)', rows: 1, columns: 1 },
+      { id: 'ct-plate', name: '96-Well Plate', rows: 8, columns: 12 },
+      { id: 'ct-conical', name: '15mL Conical Tube', rows: 1, columns: 1 },
     ]);
     mockReceiveSample.mockResolvedValue({
       sample_id: 's1',

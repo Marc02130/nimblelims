@@ -126,7 +126,7 @@ Create a new sample.
 
 **Rules:**
 - No sample name / status / due_date / qc_type / client_id in body (`extra=forbid` → 422)
-- **`container_type_id` required** — active **1×1** type only (`dimensions` = `1x1`); plates / multi-well → **400**
+- **`container_type_id` required** — active **1×1** type only (`rows=1` and `columns=1`); plates / multi-well → **400**
 - `samples.name` from name template; each barcode → `containers.name` (409 on collision, full rollback)
 - Status → **Available for Testing**; `received_date` set
 - Same container type applied to all vessels on the call
