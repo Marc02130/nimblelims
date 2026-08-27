@@ -57,8 +57,7 @@ curl -X POST "$API/samples/receive" \
     "additional_container_barcodes": ["NBIO-AR-SMOKE-1B"],
     "sample_type": "<uuid>",
     "matrix": "<uuid>",
-    "project_id": "<mAb-2301 uuid>",
-    "analysis_ids": []
+    "project_id": "<mAb-2301 uuid>"
   }'
 ```
 

@@ -58,7 +58,8 @@ POST /samples/receive
 }
 ```
 
-**Forbidden body fields (422):** `name`, `status`, `container_type_id`, `due_date`, `qc_type`, `client_id`, …
+**Forbidden body fields (422):** `name`, `status`, `container_type_id`, `due_date`, `qc_type`, `client_id`, …  
+If `analysis_ids` is present and **non-empty** → **422**. Do not ignore. Do not mint Tests. Empty/omitted is the only accepted path; still zero Tests.
 
 **Server (one txn):**
 
@@ -69,7 +70,7 @@ POST /samples/receive
 5. For each barcode → Container + Contents → same sample  
 6. Return `tests: []`; CORE never inserts Test rows
 
-**Errors:** duplicate barcode → **409** (full rollback); missing required → **422**; no project access / client → **403**.
+**Errors:** duplicate barcode → **409** (full rollback); missing required → **422**; non-empty `analysis_ids` → **422**; no project access / client → **403**.
 
 **Response (minimum):** `sample_id`, `sample_name`, `status`, `project_id`, `containers[]`, `tests[]`.
 
@@ -87,7 +88,7 @@ POST /samples/receive
 ## Tests and work plans
 
 - CORE receive creates **zero Tests**.
-- Omit `analysis_ids`; legacy clients may send it, but CORE ignores it.
+- Receive body does **not** take `analysis_ids` as a CORE field. Present and non-empty → **422**. Do not ignore. Do not mint Tests. Do not persist asked-for analyses. Empty/omitted only; still zero Tests. UI never sends `analysis_ids`.
 - A-15 asked-for/work-plan behavior is parked. Add/remove tests later through the separate tests workflow.
 - `DELETE /tests/{id}` → **400** if results exist (A-14).
 
