@@ -407,3 +407,64 @@ class BulkSampleAccessioningRequest(BaseModel):
                 raise ValueError('Either project_id or client_id must be provided')
         
         return data
+
+
+class SampleReceiveRequest(BaseModel):
+    """Atomic receive CORE: one sample + 1..N vessels in one transaction."""
+
+    container_barcode: str = Field(..., min_length=1, max_length=255, description="Primary vessel barcode")
+    additional_container_barcodes: List[str] = Field(
+        default_factory=list,
+        description="Optional extra vessel barcodes for the same sample",
+    )
+    sample_type: UUID = Field(..., description="ID of sample type from list_entries")
+    matrix: UUID = Field(..., description="ID of matrix from list_entries")
+    project_id: UUID = Field(..., description="Required sticky project; never auto-created")
+    analysis_ids: List[UUID] = Field(
+        default_factory=list,
+        description="Optional asked-for analyses only (Assigned/Pending); prefer omit",
+    )
+    temperature: Optional[float] = None
+    client_sample_id: Optional[str] = Field(None, max_length=255)
+
+    @validator("container_barcode")
+    def strip_primary_barcode(cls, v: str) -> str:
+        v = (v or "").strip()
+        if not v:
+            raise ValueError("container_barcode is required")
+        return v
+
+    @validator("additional_container_barcodes", each_item=True)
+    def strip_additional_barcodes(cls, v: str) -> str:
+        v = (v or "").strip()
+        if not v:
+            raise ValueError("additional barcodes must be non-empty strings")
+        return v
+
+    @validator("temperature")
+    def validate_receive_temperature(cls, v):
+        if v is not None and (v < -273.15 or v > 1000):
+            raise ValueError("Temperature must be between -273.15°C and 1000°C")
+        return v
+
+
+class ReceivedContainerInfo(BaseModel):
+    id: UUID
+    barcode: str
+
+    class Config:
+        from_attributes = True
+
+
+class SampleReceiveResponse(BaseModel):
+    """Minimal receive response for toast / stay-on-form UX."""
+
+    sample_id: UUID
+    sample_name: str
+    status: UUID
+    project_id: UUID
+    received_date: Optional[datetime] = None
+    containers: List[ReceivedContainerInfo]
+
+    class Config:
+        from_attributes = True
