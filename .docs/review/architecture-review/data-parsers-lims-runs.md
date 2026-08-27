@@ -3,10 +3,10 @@
 **Date:** 2026-07-12 · **Updated:** 2026-07-19  
 **Verdict date:** 2026-07-19  
 **Status:** **Accepted with conditions**  
-**Requirements:** [`.docs-review/requirements/data-parsers-lims-runs.md`](../requirements/data-parsers-lims-runs.md)  
-**Tech sketch:** [`.docs-review/tech-sketch/data-parsers-lims-runs.md`](../tech-sketch/data-parsers-lims-runs.md)  
-**Schema changes (authoritative DB delta):** [`.docs-review/schema-changes/data-parsers-lims-runs.md`](../schema-changes/data-parsers-lims-runs.md)  
-**Open questions:** [`.docs-review/open-questions/data-parsers-lims-runs.md`](../open-questions/data-parsers-lims-runs.md)
+**Requirements:** [`.docs/review/requirements/data-parsers-lims-runs.md`](../requirements/data-parsers-lims-runs.md)  
+**Tech sketch:** [`.docs/review/tech-sketch/data-parsers-lims-runs.md`](../tech-sketch/data-parsers-lims-runs.md)  
+**Schema changes (authoritative DB delta):** [`.docs/review/schema-changes/data-parsers-lims-runs.md`](../schema-changes/data-parsers-lims-runs.md)  
+**Open questions:** [`.docs/review/open-questions/data-parsers-lims-runs.md`](../open-questions/data-parsers-lims-runs.md)
 
 ## Ask results
 

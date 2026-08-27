@@ -3,8 +3,8 @@
 **Date:** 2026-08-20  
 **Status:** **Accept with conditions**  
 **Reviewer:** Testing / QA Lead (packet)  
-**Requirements:** [`.docs-review/requirements/security-high-s1-s6.md`](../requirements/security-high-s1-s6.md)  
-**Tech sketch:** [`.docs-review/tech-sketch/security-high-s1-s6.md`](../tech-sketch/security-high-s1-s6.md)
+**Requirements:** [`.docs/review/requirements/security-high-s1-s6.md`](../requirements/security-high-s1-s6.md)  
+**Tech sketch:** [`.docs/review/tech-sketch/security-high-s1-s6.md`](../tech-sketch/security-high-s1-s6.md)
 
 ## Testability assessment
 

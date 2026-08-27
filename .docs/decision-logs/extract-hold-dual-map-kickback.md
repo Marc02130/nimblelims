@@ -3,7 +3,7 @@
 **Date:** 2026-08-24  
 **Status:** **Open — kick-back** (implement paused for FD dual-map)  
 **Domain:** Sample processing (aliquot/pool)  
-**Related:** [prd/sample-processing/PRD.md](../prd/sample-processing/PRD.md) · [specs/sample-processing/SPEC.md](../specs/sample-processing/SPEC.md) · `.docs-review/tech-sketch/extract-hold-dest-type.md`
+**Related:** [prd/sample-processing/PRD.md](../prd/sample-processing/PRD.md) · [specs/sample-processing/SPEC.md](../specs/sample-processing/SPEC.md) · `.docs/review/tech-sketch/extract-hold-dest-type.md`
 
 ## Stamps from OQ walk (2026-08-23)
 

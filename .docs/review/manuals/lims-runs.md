@@ -57,7 +57,7 @@ draft → ordered → running → results_received → complete → published
 
 ### Promote-on-publish (structured Tests / Results)
 
-Shipped v1 — see local `.docs-internal/ideas/run-results.md` (not committed).
+Shipped v1 — see local `.docs/internal/ideas/run-results.md` (not committed).
 
 | Rule | Behavior |
 |------|----------|
@@ -149,16 +149,16 @@ You can still enforce strict state-machine rules in the application service laye
 - Decide on status implementation (enum vs lookup table) before adding many more phases.
 - Define what "more flexible" data structures are needed for general ADME / non-dose-response work.
 - Consider whether `LimsRun` should eventually be able to live inside (or be referenced by) an ELN Experiment.
-- Follow-on ideas: local `.docs-internal/ideas/ai-data-import.md` (not committed), local `.docs-internal/ideas/ai-data-analysis.md` (not committed), local `.docs-internal/ideas/ai-analyte-resolution.md` (not committed).
+- Follow-on ideas: local `.docs/internal/ideas/ai-data-import.md` (not committed), local `.docs/internal/ideas/ai-data-analysis.md` (not committed), local `.docs/internal/ideas/ai-analyte-resolution.md` (not committed).
 
 ---
 
 **Related Documents**
-- local `.docs-internal/ideas/run-results.md` (not committed) — promote-on-publish design + shipped phases
+- local `.docs/internal/ideas/run-results.md` (not committed) — promote-on-publish design + shipped phases
 - [open-questions/run-results.md](../open-questions/run-results.md) — decisions
-- `.docs-review/manuals/processes.md`
-- `.docs-internal/design/gap-analysis-process-and-experiment.md`
-- `.docs-review/manuals/experiments.md` (ELN side)
-- `.docs-internal/design/experiment-planning.md`
-- `.docs-review/checklist/experiment-rework-prerequisites.md`
-- `.docs-review/manuals/batches.md` (for contrast)
+- `.docs/review/manuals/processes.md`
+- `.docs/internal/design/gap-analysis-process-and-experiment.md`
+- `.docs/review/manuals/experiments.md` (ELN side)
+- `.docs/internal/design/experiment-planning.md`
+- `.docs/review/checklist/experiment-rework-prerequisites.md`
+- `.docs/review/manuals/batches.md` (for contrast)

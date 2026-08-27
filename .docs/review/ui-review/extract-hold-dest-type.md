@@ -2,8 +2,8 @@
 
 **Date:** 2026-08-23  
 **Status:** **Accept with conditions**  
-**Tech sketch:** [`.docs-review/tech-sketch/extract-hold-dest-type.md`](../tech-sketch/extract-hold-dest-type.md)  
-**Requirements:** [`.docs-review/requirements/extract-hold-dest-type.md`](../requirements/extract-hold-dest-type.md)
+**Tech sketch:** [`.docs/review/tech-sketch/extract-hold-dest-type.md`](../tech-sketch/extract-hold-dest-type.md)  
+**Requirements:** [`.docs/review/requirements/extract-hold-dest-type.md`](../requirements/extract-hold-dest-type.md)
 
 ## Executive summary
 

@@ -1,6 +1,6 @@
 # Open questions
 
-Decision logs for workstreams that must not proceed until product/architecture questions are resolved.
+Cycle/feature **gates** for workstreams that must not proceed until product/architecture questions are **Decided**. This folder is **not** the Leadership stamp tree.
 
 **MVP Release Bar:** The MVP release focuses on three pillars (sample tracking, test ordering, results entry). Open questions that block **those three pillars** must be resolved before release. Open questions for shipped-adjacent features (ELN, LimsRuns/parsers, dose-response, workflow templates) are tracked here but **do not block MVP release**—they block future expansion of those enhancements.
 
@@ -24,6 +24,17 @@ Decision logs for workstreams that must not proceed until product/architecture q
 4. Provisional answers used to ship earlier slices must be labeled **Decided (provisional)** and revisited before expanding scope.
 5. Agents and humans: see root `AGENTS.md` → *Open questions gate*.
 
+## Decision-logs vs open-questions
+
+Two different trees. Do not merge them.
+
+| Tree | Role |
+|------|------|
+| [`.docs/decision-logs/`](../../decision-logs/) | **Leadership stamps** — short decided locks (FW/WO, reorg, framework). Already decided. Committed. |
+| [`.docs/review/open-questions/`](./) | **Cycle/feature gates** — open questions that block a packet/phase until **Decided**. Formal review process. Committed. |
+
+**Rule:** a new Leadership lock (FW/WO/reorg) goes in `decision-logs/`. A packet that cannot start until questions are answered goes in `review/open-questions/`. When an OQ is Decided, leave it there as Decided (do not move it to decision-logs unless it is a cross-cutting Leadership stamp). When saying "fold into docs," name the tree: `review` / `internal` / `decision-logs` / `discussions`.
+
 ## Docs layout
 
-Project documentation is organized under [`.docs-review/README.md`](../README.md). Checklists track *tasks*; this folder owns *decisions*.
+Project documentation is organized under [`.docs/review/README.md`](../README.md) (parent index: [`.docs/README.md`](../../README.md)). Checklists track *tasks*; this folder owns *cycle/feature questions*. Leadership stamps live in [`.docs/decision-logs/`](../../decision-logs/).

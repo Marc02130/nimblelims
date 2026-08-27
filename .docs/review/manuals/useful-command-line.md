@@ -10,7 +10,7 @@ docker compose up -d --build
 
 ## Export container logs
 
-Write outside the repo (or into a local ignored directory), not into `.docs-review/`:
+Write outside the repo (or into a local ignored directory), not into `.docs/review/`:
 
 ```bash
 mkdir -p /tmp/nimblelims-logs

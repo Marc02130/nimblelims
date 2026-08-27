@@ -26,7 +26,7 @@ Container types define the physical characteristics of containers. They are conf
 | Tube, well, vial | **1 × 1** | Liquid-bearing unit of account | **Yes** |
 | Plate, rack, box | e.g. 8×12, 1×10 | Structural parent only | **No** — children hold contents |
 
-**Locked rules:** [`.docs-review/open-questions/containers.md`](../open-questions/containers.md)
+**Locked rules:** [`.docs/review/open-questions/containers.md`](../open-questions/containers.md)
 
 ### Common Container Types
 
@@ -643,7 +643,7 @@ During sample accessioning:
 2. Sample is linked to container via contents table
 3. Concentration and amount are recorded
 
-**See**: `.docs-review/manuals/accessioning-workflow.md`
+**See**: `.docs/review/manuals/accessioning-workflow.md`
 
 ### Aliquot/Derivative Creation
 
