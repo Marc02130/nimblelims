@@ -21,7 +21,7 @@ Packet **design** Accepts still stand (CEO PR 30, Lab Ops L2–L4 / L1 retracted
 
 Heidi / Günter locked receive AuthZ on 2026-08-24. Until that spine lived in the formal sketch, the AuthZ docs gate stayed open. Sketch **§4b** now states the spine; this stamp records it.
 
-`POST /api/samples/receive` is **not** a second permission world. It uses the **same AuthZ as sample create** plus **project RLS** (`has_project_access` / `lims_app`). There is one receive API and one DB transaction for sample + **1..N containers** + contents each. CORE creates zero Tests; A-15 is parked. Orphan multi-call (create sample → create container → link) is refused. The UI must not be the AuthZ gate.
+`POST /api/samples/receive` is **not** a second permission world. It uses the **same AuthZ as sample create** plus **project RLS** (`has_project_access` / `lims_app`). There is one receive API and one DB transaction for sample + **1..N containers** + contents each. CORE creates zero Tests; A-15 is parked. Non-empty `analysis_ids` → **422** (2026-08-26 chat punch; Wilhelmina pick: refuse). Orphan multi-call (create sample → create container → link) is refused. The UI must not be the AuthZ gate.
 
 **Verdict: Accept with conditions.** Conditions **S-AR-1..5** land with **AR CORE** product implement. Not IC50.
 
@@ -31,7 +31,7 @@ Heidi / Günter locked receive AuthZ on 2026-08-24. Until that spine lived in th
 |---------|------|
 | `POST /api/samples/receive` | Elevation if a separate receive permission or client-only path ships |
 | 1..N containers + contents in the same call | Integrity: mid-sequence drop orphans sample without vessel(s) |
-| Optional tests on the same txn | Same AuthZ as the receive commit — not a side door |
+| `analysis_ids` on the body | Non-empty → **422** before the txn (2026-08-26 chat punch). No Test mint. Not an AuthZ side door. |
 | Project sticky / `project_id` required | Disclosure or write if RLS is UI-only |
 
 ## STRIDE (scoped)
