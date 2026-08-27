@@ -483,12 +483,15 @@ async def get_samples(
     
     total = count_query.scalar()
     
+    # Newest first so atomic-receive results appear at the top of the list
+    query = query.order_by(Sample.created_at.desc(), Sample.name.asc())
+
     # Apply pagination
     offset = (page - 1) * size
     samples = query.offset(offset).limit(size).all()
     
     # Calculate pages
-    pages = (total + size - 1) // size
+    pages = (total + size - 1) // size if total else 0
     
     return SampleListResponse(
         samples=[SampleResponse.model_validate(sample) for sample in samples],
