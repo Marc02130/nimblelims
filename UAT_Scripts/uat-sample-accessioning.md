@@ -1,8 +1,12 @@
-# UAT Scripts: Single Sample Accessioning
+# UAT Scripts: Single Sample Accessioning (legacy wizard)
+
+> **Cutover (2026-08-26):** This script is **not** the receive happy path.  
+> **Receive SoT:** [`uat-atomic-receive.md`](uat-atomic-receive.md) · UI `/receive` · `POST /samples/receive`.  
+> Keep this file only for legacy `/accessioning` wizard regression until that path is removed.
 
 ## Overview
 
-This document contains User Acceptance Testing (UAT) scripts for single sample accessioning in NimbleLIMS. These scripts validate the core accessioning workflow as defined in:
+This document contains User Acceptance Testing (UAT) scripts for the **legacy** three-step accessioning wizard. These scripts validate the old workflow as defined in:
 
 - **User Stories**: US-1 (Sample Accessioning), US-5 (Container Management), US-7 (Assign Tests to Samples)
 - **PRD**: Section 3.1 (Sample Tracking)

@@ -3,6 +3,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import MainLayout from './layouts/MainLayout';
 import Dashboard from './pages/Dashboard';
 import AccessioningForm from './pages/AccessioningForm';
+import AtomicReceive from './pages/AtomicReceive';
 import SamplesManagement from './pages/SamplesManagement';
 import TestsManagement from './pages/TestsManagement';
 import ContainerManagement from './pages/ContainerManagement';
@@ -50,6 +51,16 @@ function AppRoutes() {
 
         {/* Core Features Routes */}
         <Route path="/dashboard" element={<Dashboard />} />
+        <Route
+          path="/receive"
+          element={
+            hasPermission('sample:create') ? (
+              <AtomicReceive />
+            ) : (
+              <Navigate to="/dashboard" replace />
+            )
+          }
+        />
         <Route
           path="/accessioning"
           element={

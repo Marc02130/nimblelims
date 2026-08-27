@@ -1,0 +1,288 @@
+"""Atomic receive CORE: Sample + 1..N Containers + Contents in one transaction.
+
+AuthZ = sample create (router) + project RLS / access checks inside this service.
+No project auto-create. No sample-ID field. Status forced to Available for Testing.
+"""
+from __future__ import annotations
+
+import logging
+from datetime import datetime
+from typing import List, Optional, Sequence
+from uuid import UUID
+
+from fastapi import HTTPException, status
+from sqlalchemy import text
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
+
+from app.core.name_generation import generate_name_for_sample
+from app.core.rbac import validate_client_access
+from app.schemas.sample import (
+    ReceivedContainerInfo,
+    SampleReceiveRequest,
+    SampleReceiveResponse,
+)
+from models.container import Container, ContainerType, Contents
+from models.list import List, ListEntry
+from models.project import Project, ProjectUser
+from models.sample import Sample
+from models.user import User
+
+logger = logging.getLogger(__name__)
+
+AVAILABLE_FOR_TESTING = "Available for Testing"
+
+
+def _list_entry_by_names(
+    db: Session, list_names: Sequence[str], entry_name: str
+) -> Optional[ListEntry]:
+    for list_name in list_names:
+        lst = db.query(List).filter(List.name == list_name).first()
+        if not lst:
+            continue
+        entry = (
+            db.query(ListEntry)
+            .filter(ListEntry.list_id == lst.id, ListEntry.name == entry_name)
+            .first()
+        )
+        if entry:
+            return entry
+    # Fallback: entry name alone (create_all tests may use orphan list_entries)
+    return db.query(ListEntry).filter(ListEntry.name == entry_name).first()
+
+
+def resolve_available_for_testing_status(db: Session) -> ListEntry:
+    entry = _list_entry_by_names(
+        db, ("Sample Status", "sample_status"), AVAILABLE_FOR_TESTING
+    )
+    if not entry:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Sample status 'Available for Testing' not found in configuration",
+        )
+    return entry
+
+
+def is_single_position_container_type(ct: ContainerType) -> bool:
+    """Atomic receive only supports single-position vessels (rows=1, columns=1)."""
+    return int(getattr(ct, "rows", 0) or 0) == 1 and int(getattr(ct, "columns", 0) or 0) == 1
+
+
+def resolve_receive_container_type(db: Session, container_type_id: UUID) -> ContainerType:
+    """Require an active 1×1 container type for all vessels on the receive call."""
+    ct = (
+        db.query(ContainerType)
+        .filter(
+            ContainerType.id == container_type_id,
+            ContainerType.active == True,  # noqa: E712
+        )
+        .first()
+    )
+    if not ct:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or inactive container_type_id",
+        )
+    if not is_single_position_container_type(ct):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"Container type '{ct.name}' is {ct.rows}×{ct.columns}, not 1×1. "
+                "Atomic receive does not support plates or multi-position containers."
+            ),
+        )
+    return ct
+
+
+def require_project_for_receive(db: Session, user: User, project_id: UUID) -> Project:
+    """Project required + sticky. Enforce client access and project RLS when available."""
+    project = db.query(Project).filter(Project.id == project_id).first()
+    if not project:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Project not found",
+        )
+
+    validate_client_access(user, project.client_id)
+
+    # Prefer DB has_project_access when present (lims_app / migrated DBs).
+    try:
+        with db.begin_nested():
+            ok = db.execute(
+                text("SELECT has_project_access(CAST(:pid AS uuid))"),
+                {"pid": str(project_id)},
+            ).scalar()
+        if ok is False:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied: insufficient project permissions",
+            )
+        if ok is True:
+            return project
+    except HTTPException:
+        raise
+    except Exception:
+        pass
+
+    # Fallback for create_all / unit tests without has_project_access.
+    if getattr(user.role, "name", None) != "Administrator":
+        access = (
+            db.query(ProjectUser)
+            .filter(
+                ProjectUser.project_id == project_id,
+                ProjectUser.user_id == user.id,
+            )
+            .first()
+        )
+        if not access:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied: insufficient project permissions",
+            )
+    return project
+
+
+def _normalize_barcodes(req: SampleReceiveRequest) -> List[str]:
+    barcodes = [req.container_barcode] + list(req.additional_container_barcodes or [])
+    if len(barcodes) != len(set(barcodes)):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Duplicate container barcode in request",
+        )
+    return barcodes
+
+
+def _assert_barcodes_available(db: Session, barcodes: Sequence[str]) -> None:
+    existing = (
+        db.query(Container)
+        .filter(Container.name.in_(list(barcodes)), Container.active == True)  # noqa: E712
+        .all()
+    )
+    if existing:
+        dups = ", ".join(sorted({c.name for c in existing}))
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Container barcode already exists: {dups}",
+        )
+
+
+def receive_sample(
+    db: Session,
+    req: SampleReceiveRequest,
+    current_user: User,
+) -> SampleReceiveResponse:
+    """
+    One transaction: system sample name + Available for Testing + 1..N vessels.
+    CORE never creates tests. Request validation rejects non-empty analysis_ids.
+    """
+    barcodes = _normalize_barcodes(req)
+    project = require_project_for_receive(db, current_user, req.project_id)
+    available_status = resolve_available_for_testing_status(db)
+    vessel_type = resolve_receive_container_type(db, req.container_type_id)
+    _assert_barcodes_available(db, barcodes)
+
+    # Validate list FKs exist when possible (create_all may use orphan entries)
+    if not db.query(ListEntry).filter(ListEntry.id == req.sample_type).first():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid sample_type",
+        )
+
+    if req.client_sample_id:
+        clash = (
+            db.query(Sample)
+            .filter(
+                Sample.client_sample_id == req.client_sample_id,
+                Sample.active == True,  # noqa: E712
+            )
+            .first()
+        )
+        if clash:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="client_sample_id already exists",
+            )
+
+    received_at = datetime.utcnow()
+    import uuid as _uuid
+
+    # Name generation may CREATE SEQUENCE; lims_app often lacks CREATE privilege.
+    # Use a savepoint so failure does not abort the outer receive transaction.
+    try:
+        with db.begin_nested():
+            sample_name = generate_name_for_sample(
+                db=db,
+                project_id=str(project.id),
+                received_date=received_at,
+            )
+            if not sample_name:
+                raise ValueError("empty generated name")
+    except Exception as e:
+        logger.warning("Name generation failed (%s); falling back to UUID", e)
+        sample_name = str(_uuid.uuid4())
+
+    created_containers: List[Container] = []
+    try:
+        sample = Sample(
+            name=sample_name,
+            sample_type=req.sample_type,
+            matrix=None,  # matrix dropped from intake; sample_type is SoT
+            status=available_status.id,
+            project_id=project.id,
+            received_date=received_at,
+            temperature=req.temperature,
+            client_sample_id=req.client_sample_id,
+            created_by=current_user.id,
+            modified_by=current_user.id,
+        )
+        db.add(sample)
+        db.flush()  # sample.id
+
+        for barcode in barcodes:
+            container = Container(
+                name=barcode,
+                type_id=vessel_type.id,
+                row=1,
+                column=1,
+                created_by=current_user.id,
+                modified_by=current_user.id,
+            )
+            db.add(container)
+            db.flush()
+            db.add(Contents(container_id=container.id, sample_id=sample.id))
+            created_containers.append(container)
+
+        db.commit()
+    except HTTPException:
+        db.rollback()
+        raise
+    except IntegrityError as e:
+        db.rollback()
+        logger.info("Atomic receive integrity conflict: %s", e)
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Duplicate barcode or unique constraint violation",
+        ) from e
+    except Exception as e:
+        db.rollback()
+        logger.exception("Atomic receive failed")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Atomic receive failed: {e}",
+        ) from e
+
+    db.refresh(sample)
+    for c in created_containers:
+        db.refresh(c)
+
+    return SampleReceiveResponse(
+        sample_id=sample.id,
+        sample_name=sample.name,
+        status=sample.status,
+        project_id=sample.project_id,
+        received_date=sample.received_date,
+        containers=[
+            ReceivedContainerInfo(id=c.id, barcode=c.name) for c in created_containers
+        ],
+        tests=[],
+    )

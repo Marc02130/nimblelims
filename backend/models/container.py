@@ -11,11 +11,17 @@ class ContainerType(BaseModel):
     # Container type-specific fields
     capacity = Column(Numeric(10, 3))
     material = Column(String(255))
-    dimensions = Column(String(50))  # e.g., '8x12'
+    # Grid size: 1×1 = single-position vessel; plates are e.g. 8×12 / 16×24
+    rows = Column(Integer, nullable=False, default=1)
+    columns = Column(Integer, nullable=False, default=1)
     preservative = Column(String(255))
     
     # Relationships
     containers = relationship("Container", back_populates="container_type")
+
+    @property
+    def is_single_position(self) -> bool:
+        return int(self.rows or 0) == 1 and int(self.columns or 0) == 1
 
 
 class Container(BaseModel):

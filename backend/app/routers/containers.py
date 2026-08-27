@@ -61,7 +61,8 @@ async def create_container_type(
         description=container_type_data.description,
         capacity=container_type_data.capacity,
         material=container_type_data.material,
-        dimensions=container_type_data.dimensions,
+        rows=container_type_data.rows,
+        columns=container_type_data.columns,
         preservative=container_type_data.preservative,
         created_by=current_user.id,
         modified_by=current_user.id

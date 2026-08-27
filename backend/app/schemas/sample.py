@@ -1,7 +1,7 @@
 """
 Pydantic schemas for samples
 """
-from pydantic import BaseModel, Field, validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, validator, model_validator
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 from uuid import UUID
@@ -17,7 +17,7 @@ class SampleBase(BaseModel):
     date_sampled: Optional[datetime] = Field(None, description="When sample was collected (for expiration calculation)")
     sample_type: UUID = Field(..., description="ID of sample type from list_entries")
     status: UUID = Field(..., description="ID of status from list_entries")
-    matrix: UUID = Field(..., description="ID of matrix from list_entries")
+    matrix: Optional[UUID] = Field(None, description="Legacy matrix; nullable — dropped from intake")
     temperature: Optional[float] = None
     parent_sample_id: Optional[UUID] = None
     client_id: Optional[UUID] = Field(None, description="ID of client (accessed via project relationship)")
@@ -407,3 +407,93 @@ class BulkSampleAccessioningRequest(BaseModel):
                 raise ValueError('Either project_id or client_id must be provided')
         
         return data
+
+
+class SampleReceiveRequest(BaseModel):
+    """Atomic receive CORE: one sample + 1..N vessels in one transaction.
+
+    Field hygiene: forbidden extras include name/sample_name, status, due_date,
+    qc_type, client_id. ``container_type_id`` is required and must be a 1×1
+    vessel type (plates / multi-well refused by the service).
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    container_barcode: str = Field(..., min_length=1, max_length=255, description="Primary vessel barcode")
+    additional_container_barcodes: List[str] = Field(
+        default_factory=list,
+        description="Optional extra vessel barcodes for the same sample",
+    )
+    sample_type: UUID = Field(..., description="ID of sample type from list_entries")
+    project_id: UUID = Field(..., description="Required sticky project; never auto-created")
+    container_type_id: UUID = Field(
+        ...,
+        description="1×1 container type for all vessels on this receive (not plates)",
+    )
+    analysis_ids: List[UUID] = Field(
+        default_factory=list,
+        description="Must be omitted or empty; non-empty values are refused by CORE",
+    )
+    temperature: Optional[float] = None
+    client_sample_id: Optional[str] = Field(None, max_length=255)
+
+    @validator("container_barcode")
+    def strip_primary_barcode(cls, v: str) -> str:
+        v = (v or "").strip()
+        if not v:
+            raise ValueError("container_barcode is required")
+        return v
+
+    @validator("additional_container_barcodes", each_item=True)
+    def strip_additional_barcodes(cls, v: str) -> str:
+        v = (v or "").strip()
+        if not v:
+            raise ValueError("additional barcodes must be non-empty strings")
+        return v
+
+    @validator("temperature")
+    def validate_receive_temperature(cls, v):
+        if v is not None and (v < -273.15 or v > 1000):
+            raise ValueError("Temperature must be between -273.15°C and 1000°C")
+        return v
+
+    @validator("analysis_ids")
+    def reject_nonempty_analysis_ids(cls, v: List[UUID]) -> List[UUID]:
+        if v:
+            raise ValueError("analysis_ids must be empty for Atomic Receive CORE")
+        return []
+
+
+class ReceivedContainerInfo(BaseModel):
+    id: UUID
+    barcode: str
+
+    class Config:
+        from_attributes = True
+
+
+class ReceivedTestInfo(BaseModel):
+    """Legacy response shape; Atomic Receive CORE always returns an empty tests list."""
+
+    id: UUID
+    analysis_id: UUID
+    status: UUID
+    status_name: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
+class SampleReceiveResponse(BaseModel):
+    """Minimal receive response for toast / stay-on-form UX."""
+
+    sample_id: UUID
+    sample_name: str
+    status: UUID
+    project_id: UUID
+    received_date: Optional[datetime] = None
+    containers: List[ReceivedContainerInfo]
+    tests: List[ReceivedTestInfo] = Field(default_factory=list)
+
+    class Config:
+        from_attributes = True

@@ -2,10 +2,15 @@
 
 Stable IDs below are exact. Tobias binds UAT log rows and `payloads.json`
 keys to these strings. High-volume `AR-HV-01`…`AR-HV-04` is **one 24-tube
-wave**; `AR-HV-05` is a separate typed barcode; POST the combined bodies once.
+wave** (no `analysis_ids` on those bodies); `AR-HV-02` is a separate **422** refuse of non-empty `analysis_ids`; `AR-HV-05` is a separate typed barcode.
 
-This pack does **not** implement receive. Product-code gate is **OPEN** (stamp PR 33). Live `POST /api/samples/receive` is still absent on main. Expected
-HTTP codes are the **contract** for the feature PR.
+**WO-7 / CORE contract:** receive does **not** mint Tests. Happy-path bodies omit
+`analysis_ids` (empty `[]` also OK). Non-empty `analysis_ids` → **422**. After
+success: zero Tests, zero Results. Extra barcodes = more tubes of that sample.
+OOB UI has no analysis picker. A-15 asked-for / work-plan is parked.
+
+Live `POST /api/samples/receive` is on `feat/atomic-receive-core` (PR 71 draft).
+Expected HTTP codes below are the **contract**. Hold merge until UAT + dogfood.
 
 Lookups (0058, resolve by name at runtime — list names are slugs after 0007):
 
@@ -17,16 +22,16 @@ Lookups (0058, resolve by name at runtime — list names are slugs after 0007):
 | sample_type (bob) | `PBMC` | `sample_types` |
 | project (alice) | `mAb-2301 PK Study` | `projects` (`proj-mab-pk-001` advertised) |
 | project (bob) | `CAR-T In-Process Testing` | `projects` (`proj-cell-therapy-002`) |
-| analysis ELISA | `ELISA (Human IgG)` | `analyses` (`analysis-elisa-001`) |
-| analysis viability | `Cell Viability (Trypan Blue)` | `analyses` (`analysis-viability-001`) |
+| analysis ELISA | `ELISA (Human IgG)` | `analyses` (`analysis-elisa-001`) — **not** on CORE receive body |
+| analysis viability | `Cell Viability (Trypan Blue)` | `analyses` (`analysis-viability-001`) — **not** on CORE receive body |
 | analyte IgG | `IgG Concentration` | `analytes` (`analyte-igg-conc`, `units_default` = µg/mL) |
 | analyte cell count | `Total Cell Count` | `analytes` (`analyte-cell-count`, `units_default` NULL) |
 | sample status | `Available for Testing` | `sample_status` (`11111111-…`) |
-| test status | `Assigned/Pending` | `test_status` (`22222222-…`, seeded by **0060**) |
+| test status | `Assigned/Pending` | `test_status` (`22222222-…`, seeded by **0060**) — used only after explicit add-test |
 | qualifiers | `<LOD`, `ND` | `Result Qualifiers` (seeded by **0060**) |
 | default tube | `Cryovial (2mL)` | `container_types` (`ctype-001-cryovial`) |
 
-Default tube: Cryovial (2mL). Accessioning UI does not preselect a tube.
+Default tube: Cryovial (2mL). Receive UI does not preselect a tube and does not offer analyses.
 
 ---
 
@@ -39,26 +44,26 @@ Default tube: Cryovial (2mL). Accessioning UI does not preselect a tube.
 | **Actor** | `alice-tech` / `alice123` |
 | **Project** | `mAb-2301 PK Study` only (not CAR-T, not Bob's `project_id`) |
 | **Sticky fields** | `sample_type` = Plasma; `matrix` = Plasma (K2EDTA); `project_id` = mAb-2301 PK Study |
-| **Barcodes** | `NBIO-AR-0001` … `NBIO-AR-0024` (24 unique). Payload refs: `payloads.json` → `scenarios.AR-HV-01.requests` (combined wave including HV-02/03/04 overlays) |
-| **Expected HTTP** | `201` per barcode (feature PR). This pack does not implement receive; live endpoint 404/405 until the feature PR. |
-| **Expected DB** | 24 `containers` rows with `name` = barcode, type Cryovial (2mL); 24 `samples` linked via `contents`; `samples.name` from template `{PROJECT}-{SEQ}` and **≠** barcode; `parent_sample_id` NULL; `status` = Available for Testing; `received_date` NOT NULL. |
-| **Not in P0** | No aliquot UI; no US-31 receipt events; no US-38 qty. Do not insert 0059 samples. |
+| **Barcodes** | `NBIO-AR-0001` … `NBIO-AR-0024` (24 unique). Payload refs: `payloads.json` → `scenarios.AR-HV-01.requests` (combined wave including HV-03/04 overlays). **Omit `analysis_ids`.** |
+| **Expected HTTP** | `201` per barcode |
+| **Expected DB** | 24 `containers` rows with `name` = barcode, type Cryovial (2mL); 24 `samples` linked via `contents`; `samples.name` from template `{PROJECT}-{SEQ}` and **≠** barcode; `parent_sample_id` NULL; `status` = Available for Testing; `received_date` NOT NULL; **zero `tests` rows; zero `results` rows**. |
+| **Not in P0** | No aliquot UI; no US-31 receipt events; no US-38 qty. Do not insert 0059 samples. Do not send non-empty `analysis_ids`. |
 
 ---
 
 ## AR-HV-02
 
-**Title:** Optional tests on the HV wave
+**Title:** Non-empty `analysis_ids` → 422 (WO-7 refuse; do not mint Tests)
 
 | | |
 |--|--|
-| **Actor** | `alice-tech` (same wave as AR-HV-01) |
+| **Actor** | `alice-tech` |
 | **Project** | mAb-2301 PK Study |
 | **Sticky fields** | Same as AR-HV-01 |
-| **Barcodes / payload refs** | First 8: `NBIO-AR-0001`…`NBIO-AR-0008` → `analysis_ids` = `[analysis-elisa-001]` (ELISA Human IgG). Rest `NBIO-AR-0009`…`NBIO-AR-0024` → `analysis_ids` = `[]`. Overlay on the AR-HV-01 bodies; do not POST a second time. |
-| **Expected HTTP** | `201` as part of the HV wave |
-| **Expected DB** | Tubes 0001–0008: one `tests` row each, `analysis_id` = ELISA, status **Assigned** or **Pending** (0060). Tubes 0009–0024: **no** tests. Tests are optional. |
-| **Not in P0** | Do not auto-assign batteries. Do not use 0059 ELISA tests (`test-mab-pk-t0-elisa`, …). |
+| **Barcodes / payload refs** | Dedicated barcode `NBIO-AR-REFUSE-0001`. Body includes `analysis_ids` = `[analysis-elisa-001]` (`payloads.json` → `AR-HV-02`). Do **not** overlay this on the HV-01 wave. Empty/`[]` path is AR-HV-01. UI never sends `analysis_ids`. |
+| **Expected HTTP** | **422**. Do not ignore. Do not mint Tests. |
+| **Expected DB** | Zero sample, container, contents, tests, and results for `NBIO-AR-REFUSE-0001`. |
+| **Not in P0** | A-15 asked-for / work-plan / Assigned-Pending-at-receive is parked. Do not auto-assign batteries. |
 
 ---
 
@@ -73,7 +78,7 @@ Default tube: Cryovial (2mL). Accessioning UI does not preselect a tube.
 | **Sticky fields** | Same as AR-HV-01 |
 | **Barcodes / payload refs** | Odd (`NBIO-AR-0001`, `0003`, … `0023`): `"temperature": 4.0`. Even (`0002`, `0004`, … `0024`): **omit** `temperature` (do not send null unless the schema treats omit/null the same). Overlay on AR-HV-01. |
 | **Expected HTTP** | `201` |
-| **Expected DB** | Odd samples: `samples.temperature` = 4.0. Even: `samples.temperature` IS NULL. |
+| **Expected DB** | Odd samples: `samples.temperature` = 4.0. Even: `samples.temperature` IS NULL. Still zero Tests. |
 | **Not in P0** | No required-temperature gate. No US-38 qty. |
 
 ---
@@ -89,7 +94,7 @@ Default tube: Cryovial (2mL). Accessioning UI does not preselect a tube.
 | **Sticky fields** | Same as AR-HV-01 |
 | **Barcodes / payload refs** | `NBIO-AR-0001`→`EXT-PK-001`, `0002`→`EXT-PK-002`, `0003`→`EXT-PK-003`, `0004`→`EXT-PK-004`. Omit `client_sample_id` on `0005`–`0024`. IDs are **globally unique** (`samples.client_sample_id` UNIQUE). Overlay on AR-HV-01. |
 | **Expected HTTP** | `201`. Replaying an `EXT-PK-*` on another tube → unique-violation / 409 (not a separate AR-* ID). |
-| **Expected DB** | Four rows with those `client_sample_id` values; remaining 20 have NULL. |
+| **Expected DB** | Four rows with those `client_sample_id` values; remaining 20 have NULL. Zero Tests. |
 | **Not in P0** | No per-project uniqueness (constraint is global). |
 
 ---
@@ -104,9 +109,9 @@ Default tube: Cryovial (2mL). Accessioning UI does not preselect a tube.
 | **Actor** | `alice-tech` / `alice123` |
 | **Project** | mAb-2301 PK Study |
 | **Sticky fields** | Same as AR-HV-01 (Plasma / Plasma (K2EDTA) / mAb-2301 PK Study) |
-| **Barcodes / payload refs** | `NBIO-AR-KB-0001` — typed into `container_barcode`. Same POST as a scan. Must not collide with `NBIO-AR-0001`…`0024`. |
+| **Barcodes / payload refs** | `NBIO-AR-KB-0001` — typed into `container_barcode`. Same POST as a scan. Must not collide with `NBIO-AR-0001`…`0024`. Omit `analysis_ids`. |
 | **Expected HTTP** | `201` |
-| **Expected DB** | Same as first HV tube: `containers.name` = typed barcode, `samples.name` from template, Available for Testing, `parent_sample_id` NULL. |
+| **Expected DB** | Same as first HV tube: `containers.name` = typed barcode, `samples.name` from template, Available for Testing, `parent_sample_id` NULL, zero Tests. |
 | **Not in P0** | No separate keyboard API. HID scan vs typing is UI-only; body is identical. |
 
 ---
@@ -136,7 +141,7 @@ Default tube: Cryovial (2mL). Accessioning UI does not preselect a tube.
 |--|--|
 | **Actor** | `alice-tech` |
 | **Project** | mAb-2301 PK Study |
-| **Sticky fields** | Same receive body as `NBIO-AR-0001` in the HV wave (Plasma / Plasma (K2EDTA) / ELISA / temp 4.0 / `EXT-PK-001`) |
+| **Sticky fields** | Same receive body as `NBIO-AR-0001` in the HV wave (Plasma / Plasma (K2EDTA) / temp 4.0 / `EXT-PK-001`). **No `analysis_ids`.** |
 | **Barcodes / payload refs** | Replay `NBIO-AR-0001`. `payloads.json` → `AR-DUP-01`. |
 | **Expected HTTP** | **409**. Collision key is **`containers.name`** (scanned barcode). |
 | **Expected DB** | Still exactly one container `NBIO-AR-0001`. **`samples.name` is not the collision key** — the template ID is a different unique string (`{PROJECT}-{SEQ}`), so a unique violation on `samples.name` would mean the implementation wrote the barcode into `samples.name` (fail). No second sample row. |
@@ -153,7 +158,7 @@ Default tube: Cryovial (2mL). Accessioning UI does not preselect a tube.
 | **Actor** | `alice-tech` |
 | **Project** | mAb-2301 PK Study |
 | **Sticky fields** | Same as HV wave |
-| **Barcodes / payload refs** | Any successful HV tube (use `NBIO-AR-0001`). Body must **not** contain `name`, `sample_name`, or `lab_id`. |
+| **Barcodes / payload refs** | Any successful HV tube (use `NBIO-AR-0001`). Body must **not** contain `name`, `sample_name`, `lab_id`, or non-empty `analysis_ids`. |
 | **Expected HTTP** | `201` on first receive of that barcode |
 | **Expected DB** | `samples.name` is generated from active sample template `{PROJECT}-{SEQ}` (0021, padding 2) using project name `mAb-2301 PK Study` → e.g. `mAb-2301 PK Study-01` (project name is substituted raw, not slugified). **`samples.name` ≠ `containers.name`** ≠ barcode. |
 | **Not in P0** | Client-supplied sample name is rejected/ignored; do not add a name field to the receive body. |
@@ -171,7 +176,7 @@ Default tube: Cryovial (2mL). Accessioning UI does not preselect a tube.
 | **Sticky fields** | Same as HV wave |
 | **Barcodes / payload refs** | Any successful HV tube. `payloads.json` → `AR-ST-01` (DB assertions; no extra POST). |
 | **Expected HTTP** | `201` on receive |
-| **Expected DB** | `samples.status` → list_entry **Available for Testing** (`sample_status`). `received_date` IS NOT NULL. **No Received hop** — do not write status Received then transition. |
+| **Expected DB** | `samples.status` → list_entry **Available for Testing** (`sample_status`). `received_date` IS NOT NULL. **No Received hop** — do not write status Received then transition. Zero Tests. |
 | **Not in P0** | No US-31 receipt event row. Status list still contains `Received` (0004) for legacy accessioning; P0 receive must not use it. |
 
 ---
@@ -184,11 +189,11 @@ Default tube: Cryovial (2mL). Accessioning UI does not preselect a tube.
 |--|--|
 | **Actor** | `alice-tech` |
 | **Project** | mAb-2301 PK Study |
-| **Sticky fields** | Sample already received in HV wave with `analysis_ids: []` |
+| **Sticky fields** | Sample already received in HV wave with omitted/`[]` `analysis_ids` (zero Tests at receive) |
 | **Barcodes / payload refs** | `NBIO-AR-0009`. Resolve `sample_id` via `containers.name`. POST `/tests/` or `/tests/assign` with ELISA (`analysis-elisa-001`). `payloads.json` → `AR-TST-01`. |
 | **Expected HTTP** | `201` |
-| **Expected DB** | One new `tests` row, `analysis` = ELISA (Human IgG), status **Assigned** or **Pending**, `sample_id` = the NBIO-AR-0009 sample. No results. |
-| **Not in P0** | Do not use 0059 samples. Do not set `parent_sample_id`. |
+| **Expected DB** | Immediately after receive: **zero tests**. After this POST: one new `tests` row, `analysis` = ELISA (Human IgG), status **Assigned** or **Pending**, `sample_id` = the NBIO-AR-0009 sample. No results until a later results POST. |
+| **Not in P0** | Do not use 0059 samples. Do not set `parent_sample_id`. Do not mint this test at receive. |
 
 ---
 
@@ -216,11 +221,11 @@ Default tube: Cryovial (2mL). Accessioning UI does not preselect a tube.
 |--|--|
 | **Actor** | `alice-tech` (enter result); DELETE as same tech is enough |
 | **Project** | mAb-2301 PK Study |
-| **Sticky fields** | HV wave already assigned ELISA on `NBIO-AR-0001` |
-| **Barcodes / payload refs** | 1) POST `/results/` on that ELISA test (IgG Concentration). 2) DELETE `/tests/{id}`. `payloads.json` → `AR-TST-03`. |
-| **Expected HTTP** | Result create `201`. DELETE **`400`** (test has results). |
+| **Sticky fields** | After HV receive of `NBIO-AR-0001` (zero Tests), **explicitly add** ELISA, then enter a result |
+| **Barcodes / payload refs** | 1) POST `/tests/` ELISA on `NBIO-AR-0001`. 2) POST `/results/` on that ELISA test (IgG Concentration). 3) DELETE `/tests/{id}`. `payloads.json` → `AR-TST-03`. |
+| **Expected HTTP** | Test create `201`. Result create `201`. DELETE **`400`** (test has results). |
 | **Expected DB** | Test still active; result still present. Current main DELETE soft-deletes even with results — **P0 contract is 400**; treat a 200 delete as a product gap, not a pass. |
-| **Not in P0** | No force-delete flag. |
+| **Not in P0** | No force-delete flag. ELISA was not created at receive. |
 
 ---
 
@@ -232,11 +237,11 @@ Default tube: Cryovial (2mL). Accessioning UI does not preselect a tube.
 |--|--|
 | **Actor** | `alice-tech` (`result:enter`) |
 | **Project** | mAb-2301 PK Study |
-| **Sticky fields** | ELISA test on `NBIO-AR-0001`; analyte `IgG Concentration` (`analyte-igg-conc`) |
+| **Sticky fields** | ELISA test **explicitly added** on `NBIO-AR-0001` after receive; analyte `IgG Concentration` (`analyte-igg-conc`) |
 | **Barcodes / payload refs** | POST `/results/` with `raw_result` plus qualifier `<LOD` (0060 `qualifiers` list). Do **not** send a unit — unit comes from `analytes.units_default` (µg/mL). `payloads.json` → `AR-RES-01`. May share the result row with AR-TST-03; run RES-01 before TST-03 DELETE, or use a distinct replicate. |
 | **Expected HTTP** | `201` |
 | **Expected DB** | `results.raw_result` set; `results.qualifiers` → list_entry `<LOD`; unit applied from `units_default` (µg/mL), not from the payload. `entered_by` = alice. |
-| **Not in P0** | No client-supplied unit override. |
+| **Not in P0** | No client-supplied unit override. Not a CORE receive blocker. |
 
 ---
 
@@ -248,11 +253,11 @@ Default tube: Cryovial (2mL). Accessioning UI does not preselect a tube.
 |--|--|
 | **Actor** | `bob-tech` (CAR-T project) |
 | **Project** | `CAR-T In-Process Testing` |
-| **Sticky fields** | Sample type PBMC; matrix Cell Supernatant. Analysis Cell Viability (Trypan Blue). Analyte **Total Cell Count** (`analyte-cell-count`, `units_default` NULL). Identity-pass and A260/280 also have NULL units — this scenario is specifically Total Cell Count. |
-| **Barcodes / payload refs** | Receive (or use) `CART-AR-0001` with `analysis_ids` including `analysis-viability-001`, then POST `/results/` for Total Cell Count. `payloads.json` → `AR-RES-02`. |
-| **Expected HTTP** | **422**. Result unit is required from `analytes.units_default`; missing → 422. Do not invent a unit in the payload to bypass. |
-| **Expected DB** | No `results` row for that analyte. Test remains Assigned/Pending. |
-| **Not in P0** | No per-result unit picker. Do not use 0059 `CAR-T-Batch-001` / blank QC (those are parent/QC fixtures, not receive). |
+| **Sticky fields** | Sample type PBMC; matrix Cell Supernatant. Analysis Cell Viability (Trypan Blue) is **added after receive**. Analyte **Total Cell Count** (`analyte-cell-count`, `units_default` NULL). Identity-pass and A260/280 also have NULL units — this scenario is specifically Total Cell Count. |
+| **Barcodes / payload refs** | Receive `CART-AR-0001` **without** `analysis_ids` (or `[]`). Then POST `/tests/` with `analysis-viability-001`. Then POST `/results/` for Total Cell Count. `payloads.json` → `AR-RES-02`. |
+| **Expected HTTP** | Receive `201` with zero Tests. Test add `201`. Result **422**. Result unit is required from `analytes.units_default`; missing → 422. Do not invent a unit in the payload to bypass. |
+| **Expected DB** | After receive: zero tests/results. After add-test: one viability test. After result POST: no `results` row for that analyte. Test remains Assigned/Pending. |
+| **Not in P0** | No per-result unit picker. Do not use 0059 `CAR-T-Batch-001` / blank QC (those are parent/QC fixtures, not receive). Not a CORE receive blocker. |
 
 ---
 
@@ -269,7 +274,7 @@ Default tube: Cryovial (2mL). Accessioning UI does not preselect a tube.
 | **Barcodes / payload refs** | `NBIO-AR-CLIENT-0001` in `AR-RBAC-01` |
 | **Expected HTTP** | **403** (401 fail-closed also acceptable). No receive UI for client. |
 | **Expected DB** | No sample or container row. |
-| **Not in P0** | Do not grant client a receive role to make the case pass. |
+| **Not in P0** | Do not grant client a receive role to make the case pass. AuthZ remains PR 68. |
 
 ---
 
@@ -281,11 +286,11 @@ Default tube: Cryovial (2mL). Accessioning UI does not preselect a tube.
 |--|--|
 | **Actor** | `alice-tech` AND `bob-tech` |
 | **Project** | Alice: **mAb-2301 PK Study** only. Bob: **CAR-T In-Process Testing** only. |
-| **Sticky fields** | Alice: Plasma + Plasma (K2EDTA), barcodes `NBIO-AR-*` (HV wave). Bob: **PBMC** + **Cell Supernatant**, barcodes `CART-AR-0001`…`CART-AR-0008`. |
+| **Sticky fields** | Alice: Plasma + Plasma (K2EDTA), barcodes `NBIO-AR-*` (HV wave). Bob: **PBMC** + **Cell Supernatant**, barcodes `CART-AR-0001`…`CART-AR-0008`. Omit `analysis_ids`. |
 | **Barcodes / payload refs** | Alice bodies = AR-HV-01 wave. Bob bodies = `AR-MU-01` CART requests. Negative: Alice POST with Bob's `project_id` / Bob POST with Alice's `project_id`. |
 | **Expected HTTP** | Happy path `201` for each actor on their own project. Cross-project `403` (or 404 under RLS). Each actor **must not** send the other's `project_id`. |
-| **Expected DB** | `project_users`: alice has `proj-mab-pk-001` (+ Alpha alias), **not** `proj-cell-therapy-002`. Bob has CAR-T (+ Beta alias), **not** mAb PK. CART containers named `CART-AR-0001`…`0008`. No cross-project `contents`. |
-| **Not in P0** | No tenant flag beyond `project_users` + RLS. |
+| **Expected DB** | `project_users`: alice has `proj-mab-pk-001` (+ Alpha alias), **not** `proj-cell-therapy-002`. Bob has CAR-T (+ Beta alias), **not** mAb PK. CART containers named `CART-AR-0001`…`0008`. No cross-project `contents`. Zero Tests at receive. |
+| **Not in P0** | No tenant flag beyond `project_users` + RLS. Keep PR 68 AuthZ locks. |
 
 ---
 
@@ -313,6 +318,7 @@ Out of scope for this pack and for the atomic-receive feature PR:
 - **No US-31 receipt events** (no event table write on receive).
 - **No US-38 quantity** (no required amount/concentration on the receive body).
 - No Received status hop.
-- No POST `/api/samples/receive` implementation in this pack.
+- **No asked-for Tests at receive** / no analysis picker / A-15 parked (later work-order packet).
 - **AR-MU-02** (US-10 second-person review) is out of P0 receive must-pass. Q1 parallel. Distinct enterer/reviewer users remain in 0058 seed.
 - No second-person-review tenant flag.
+- IC50 / dose-response / parsers / ELN.

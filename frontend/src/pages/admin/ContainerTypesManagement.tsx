@@ -33,7 +33,8 @@ interface ContainerType {
   description?: string;
   capacity?: number;
   material?: string;
-  dimensions?: string;
+  rows: number;
+  columns: number;
   preservative?: string;
   active: boolean;
   created_at: string;
@@ -82,8 +83,8 @@ const ContainerTypesManagement: React.FC = () => {
         type.name.toLowerCase().includes(term) ||
         type.description?.toLowerCase().includes(term) ||
         type.material?.toLowerCase().includes(term) ||
-        type.dimensions?.toLowerCase().includes(term) ||
         type.preservative?.toLowerCase().includes(term) ||
+        `${type.rows}x${type.columns}`.includes(term) ||
         (type.capacity !== undefined && type.capacity !== null && type.capacity.toString().includes(term))
     );
   }, [containerTypes, searchTerm]);
@@ -93,7 +94,8 @@ const ContainerTypesManagement: React.FC = () => {
     description?: string;
     capacity?: number;
     material?: string;
-    dimensions?: string;
+    rows: number;
+    columns: number;
     preservative?: string;
   }) => {
     await apiService.createContainerType(data);
@@ -105,7 +107,8 @@ const ContainerTypesManagement: React.FC = () => {
     description?: string;
     capacity?: number;
     material?: string;
-    dimensions?: string;
+    rows: number;
+    columns: number;
     preservative?: string;
   }) => {
     if (!selectedContainerType) return;
@@ -158,10 +161,10 @@ const ContainerTypesManagement: React.FC = () => {
       valueGetter: (value) => value ?? 'N/A',
     },
     {
-      field: 'dimensions',
-      headerName: 'Dimensions',
-      width: 150,
-      valueGetter: (value) => value ?? 'N/A',
+      field: 'grid',
+      headerName: 'Grid (R×C)',
+      width: 120,
+      valueGetter: (_value, row) => `${row.rows ?? 1}×${row.columns ?? 1}`,
     },
     {
       field: 'preservative',

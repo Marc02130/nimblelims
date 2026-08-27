@@ -894,7 +894,7 @@ class TestResultsAPI:
             description="Test tube",
             capacity=5.0,
             material="Plastic",
-            dimensions="12x75",
+            rows=1, columns=1,
             created_by=sample_user.id,
             modified_by=sample_user.id
         )
@@ -1142,7 +1142,7 @@ class TestResultsAPI:
         db_session.add(matrix)
         db_session.flush()
         
-        container_type = ContainerType(name="Tube", capacity=5.0, material="Plastic", dimensions="12x75", created_by=sample_user.id, modified_by=sample_user.id)
+        container_type = ContainerType(name="Tube", capacity=5.0, material="Plastic", rows=1, columns=1, created_by=sample_user.id, modified_by=sample_user.id)
         db_session.add(container_type)
         db_session.flush()
         
@@ -1283,7 +1283,7 @@ class TestResultsAPI:
         db_session.add(matrix)
         db_session.flush()
         
-        container_type = ContainerType(name="Tube", capacity=5.0, material="Plastic", dimensions="12x75", created_by=sample_user.id, modified_by=sample_user.id)
+        container_type = ContainerType(name="Tube", capacity=5.0, material="Plastic", rows=1, columns=1, created_by=sample_user.id, modified_by=sample_user.id)
         db_session.add(container_type)
         db_session.flush()
         
@@ -1464,7 +1464,7 @@ class TestResultsAPI:
         db_session.add(matrix)
         db_session.flush()
         
-        container_type = ContainerType(name="Tube", capacity=5.0, material="Plastic", dimensions="12x75", created_by=sample_user.id, modified_by=sample_user.id)
+        container_type = ContainerType(name="Tube", capacity=5.0, material="Plastic", rows=1, columns=1, created_by=sample_user.id, modified_by=sample_user.id)
         db_session.add(container_type)
         db_session.flush()
         

@@ -129,7 +129,7 @@ Tracked for a future containers schema slice:
 | Admin UI / forms | Rows + columns instead of Dimensions |
 | Seeds / UAT / tests | Update tube=1×1, 96-well plate=8×12, well=1×1 |
 
-**Status of implementation:** Decided product rules; **code still has `dimensions`**. Implement slice tracked as local `.docs/internal/ideas/containers-model-update.md` (not committed) (migration + API + admin UI + tests).
+**Status of implementation:** **Partial (2026-08-27):** migration `0069` adds `rows`/`columns`, drops `dimensions`; receive + admin UI use rows/columns. Remaining: Contents-only-on-1×1 DB check, amount/conc semantics, aliquot alignment — see local `.docs/internal/ideas/containers-model-update.md` (not committed).
 
 ---
 

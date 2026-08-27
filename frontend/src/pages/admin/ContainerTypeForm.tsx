@@ -21,7 +21,8 @@ interface ContainerTypeFormProps {
     description?: string;
     capacity?: number;
     material?: string;
-    dimensions?: string;
+    rows?: number;
+    columns?: number;
     preservative?: string;
   } | null;
   existingNames: string[];
@@ -31,7 +32,8 @@ interface ContainerTypeFormProps {
     description?: string;
     capacity?: number;
     material?: string;
-    dimensions?: string;
+    rows: number;
+    columns: number;
     preservative?: string;
   }) => Promise<void>;
 }
@@ -49,9 +51,14 @@ const validationSchema = Yup.object({
   material: Yup.string()
     .required('Material is required')
     .max(255, 'Material must be less than 255 characters'),
-  dimensions: Yup.string()
-    .required('Dimensions are required')
-    .max(50, 'Dimensions must be less than 50 characters'),
+  rows: Yup.number()
+    .required('Rows are required')
+    .integer('Rows must be an integer')
+    .min(1, 'Rows must be at least 1'),
+  columns: Yup.number()
+    .required('Columns are required')
+    .integer('Columns must be an integer')
+    .min(1, 'Columns must be at least 1'),
   preservative: Yup.string().max(255, 'Preservative must be less than 255 characters'),
 });
 
@@ -72,7 +79,8 @@ const ContainerTypeForm: React.FC<ContainerTypeFormProps> = ({
     description: containerType?.description || '',
     capacity: containerType?.capacity ?? null,
     material: containerType?.material || '',
-    dimensions: containerType?.dimensions || '',
+    rows: containerType?.rows ?? 1,
+    columns: containerType?.columns ?? 1,
     preservative: containerType?.preservative || '',
   };
 
@@ -81,14 +89,14 @@ const ContainerTypeForm: React.FC<ContainerTypeFormProps> = ({
     description?: string;
     capacity?: number | null;
     material?: string;
-    dimensions?: string;
+    rows: number;
+    columns: number;
     preservative?: string;
   }) => {
     setLoading(true);
     setError(null);
 
     try {
-      // Check for uniqueness (excluding current container type if editing)
       if (existingNames.includes(values.name) && (!isEdit || values.name !== containerType.name)) {
         setError('A container type with this name already exists');
         setLoading(false);
@@ -100,7 +108,8 @@ const ContainerTypeForm: React.FC<ContainerTypeFormProps> = ({
         description: values.description || undefined,
         capacity: values.capacity !== null && values.capacity !== undefined ? values.capacity : undefined,
         material: values.material || undefined,
-        dimensions: values.dimensions || undefined,
+        rows: values.rows,
+        columns: values.columns,
         preservative: values.preservative || undefined,
       });
       onClose();
@@ -185,16 +194,36 @@ const ContainerTypeForm: React.FC<ContainerTypeFormProps> = ({
                     </Field>
                   </Grid>
 
-                  <Grid size={{ xs: 12, sm: 6 }}>
-                    <Field name="dimensions">
+                  <Grid size={{ xs: 6, sm: 3 }}>
+                    <Field name="rows">
                       {({ field, meta }: any) => (
                         <TextField
                           {...field}
-                          label="Dimensions"
+                          label="Rows"
+                          type="number"
                           fullWidth
                           required
                           margin="normal"
-                          helperText={meta.touched && meta.error ? meta.error : 'Dimensions (e.g., 8x12, 15x100mm)'}
+                          inputProps={{ min: 1, step: 1 }}
+                          helperText={meta.touched && meta.error ? meta.error : '1 for tubes; 8 for 96-well'}
+                          error={meta.touched && !!meta.error}
+                        />
+                      )}
+                    </Field>
+                  </Grid>
+
+                  <Grid size={{ xs: 6, sm: 3 }}>
+                    <Field name="columns">
+                      {({ field, meta }: any) => (
+                        <TextField
+                          {...field}
+                          label="Columns"
+                          type="number"
+                          fullWidth
+                          required
+                          margin="normal"
+                          inputProps={{ min: 1, step: 1 }}
+                          helperText={meta.touched && meta.error ? meta.error : '1 for tubes; 12 for 96-well'}
                           error={meta.touched && !!meta.error}
                         />
                       )}
@@ -251,4 +280,3 @@ const ContainerTypeForm: React.FC<ContainerTypeFormProps> = ({
 };
 
 export default ContainerTypeForm;
-
