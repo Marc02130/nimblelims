@@ -36,7 +36,7 @@
 - Params snapshot at LimsRun start and freeze.
 - Classic type-a-number Result on a Test still lands (WO-4); two writers on same Test = 409.
 - Instantiating from `work_order` uses existing process AuthZ — no client expand.
-- AR P0 still first.
+- AR P0 still first; processing waits on identity + first vessel.
 
 ---
 
