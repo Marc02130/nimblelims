@@ -1,7 +1,7 @@
 # Lab Ops Review (SVP): Atomic receive CORE
 
 **Date:** 2026-08-26  
-**Status:** **Accept with conditions** (L2–L3; L1 retracted; L4 superseded by 2026-08-27 Leadership lock)
+**Status:** **Accept with conditions** (L2–L3; L1 retracted; L4 superseded: non-empty `analysis_ids` → **422**)
 **Reviewer persona:** SVP Lab Ops  
 **Scope of this stamp:** **AR CORE only** — identity + **1..N vessels** + field align + docs/UAT with ship  
 **Packet:**  
@@ -65,7 +65,7 @@ No Lab Ops gap that blocks coding. Watch item only: UI must make “add another 
 
 ### 2.3 Results-entry OUT of CORE — Lab Ops confirm
 
-**Confirmed correct.** Receive ≠ order ≠ execute ≠ results. Techs dogfood receive by scanning vessels and checking sample/container integrity — not by entering analyte values. The 2026-08-27 Leadership lock supersedes L4: CORE creates zero Tests, ignores legacy `analysis_ids`, and hides the analyses picker. A-15 is parked.
+**Confirmed correct.** Receive ≠ order ≠ execute ≠ results. Techs dogfood receive by scanning vessels and checking sample/container integrity — not by entering analyte values. The 2026-08-26 Heidi punch supersedes ignore/silent-drop: CORE creates zero Tests; non-empty `analysis_ids` → **422**; hide the analyses picker. A-15 is parked.
 
 **Do not** pull `POST /tests/{id}/results` into CORE ship/UAT blockers so that “receive can be dogfooded.” That path is unnecessary for accessioning acceptance.
 
@@ -94,7 +94,7 @@ No Lab Ops gap that blocks coding. Watch item only: UI must make “add another 
 | **L1** | **Retracted.** Barcode ≠ sample ID. Two identities. | Sample ID is material; barcode is the tube. | Retracted (2026-08-20); still retracted |
 | **L2** | Project **required** and **session-sticky**. Never auto-create a project per tube / commit. | Auto-create dumps garbage projects and breaks RLS hygiene. | **RQ-AR-7** / SPEC §3 |
 | **L3** | Container type = **lab default tube**, applied to **all** vessels on the call, **off the form** (no type picker on the scan loop). | Asking type on every scan (or per additional barcode) breaks the loop. | **RQ-AR-8** / SPEC §3.2 |
-| **L4** | **Superseded 2026-08-27:** CORE receive creates zero Tests and ignores legacy `analysis_ids`. **DELETE** remains refused if an independently created test has results. | Receive does not imply an order or work plan; A-15 is parked. | Leadership lock / A-14 light-ride |
+| **L4** | **Superseded 2026-08-26 Heidi:** CORE receive creates zero Tests. Non-empty `analysis_ids` → **422** (refuse, do not ignore). **DELETE** remains refused if an independently created test has results. | Receive does not imply an order or work plan; silent drop hides a client that still thinks Tests were created. A-15 is parked. | Heidi lock / A-14 light-ride |
 
 No new L* required for multi-tube: **RQ-AR-2/3** and bounce #2 already encode Lab Ops intent (primary + additional; not single-vessel-only).
 
@@ -107,7 +107,7 @@ No new L* required for multi-tube: **RQ-AR-2/3** and bounce #2 already encode La
 - After success: stay on receive; toast; clear barcode field(s); sticky type/matrix/project; focus **primary** barcode
 - No sample-detail redirect; no aliquot dialog; no sample-ID field; no status picker; no container-type picker
 - Status on commit: **Available for Testing** only; receipt = `received_date`; no `status_history`
-- No analyses picker. Omit `analysis_ids`; legacy values are ignored. A-15/work-plan remains parked.
+- No analyses picker. Never send `analysis_ids`. Non-empty `analysis_ids` → **422**. A-15/work-plan remains parked.
 - AuthZ identical to sample create + project RLS; no second receive API; no client bypass; no orphan multi-call substitute
 - Existing tables only; no `results.unit_id`; no new tables for CORE
 - **OUT of CORE:** results-entry as ship blocker; aliquot/derivative UI; intake-profile engine; work_order / routing / Process·Exp·LimsRun; wizard as forever receive path
@@ -145,5 +145,5 @@ No new L* required for multi-tube: **RQ-AR-2/3** and bounce #2 already encode La
 | Packet SoT | Re-review against **PRD RQ-AR-*** + **SPEC §3**, not plan-doc alone |
 | Vessels | Explicit **1..N** / primary + additional (A-18); retract “first tube only” framing |
 | Results | Explicitly **NR-AR-1** — out of CORE acceptance |
-| L1–L4 | Unchanged: L1 retracted; L2–L4 still required same-phase |
+| L4 | Ignore/silent-drop superseded: non-empty `analysis_ids` → **422** |
 | Implement gate | **OPEN for CORE only** (aligned with Leadership provisional open 2026-08-26) |
