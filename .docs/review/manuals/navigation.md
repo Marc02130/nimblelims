@@ -97,7 +97,7 @@ Core features are organized with Dashboard and Help at the top. These items are 
 The Sample Management section uses a Material-UI Accordion component for collapsible submenu functionality. It is only visible to users with at least one of the following permissions: `sample:create`, `sample:read`, `sample:update`, `test:update`, `batch:manage`, or `result:enter`. This section consolidates all sample-related workflow functions.
 
 **Accordion Behavior:**
-- Auto-expands when user navigates to any `/accessioning`, `/samples`, `/tests`, `/containers`, `/batches`, or `/results` route
+- Auto-expands when user navigates to any `/receive`, `/accessioning`, `/samples`, `/tests`, `/containers`, `/batches`, or `/results` route
 - Can be manually collapsed/expanded by clicking the accordion header
 - Shows active state (primary color icon) when on any sample management route
 - Contains sample management sub-items in a nested list structure
@@ -108,7 +108,7 @@ The Sample Management section uses a Material-UI Accordion component for collaps
 
 | Menu Item | Route | Icon | Permission Required | Description |
 |-----------|-------|------|---------------------|-------------|
-| **Accessioning** | `/accessioning` | Science | `sample:create` | Sample accessioning form for receiving new samples |
+| **Receive** | `/receive` | Science | `sample:create` | Atomic receive (CORE happy path): scan 1..N vessels |
 | **Samples** | `/samples` | Science | `sample:read` | Sample management interface with list and edit functionality |
 | **Tests** | `/tests` | Biotech | `test:update` | Test management interface with list and edit functionality |
 | **Containers** | `/containers` | Inventory | `sample:update` | Container management interface with list, create, and edit functionality |
@@ -245,7 +245,8 @@ The AppBar title is automatically determined from the current route:
 | Route | Title |
 |-------|-------|
 | `/dashboard` | Dashboard |
-| `/accessioning` | Accessioning |
+| `/receive` | Receive |
+| `/accessioning` | Accessioning (legacy) |
 | `/samples` | Samples Management |
 | `/samples/:id` | Edit Sample |
 | `/tests` | Tests Management |
@@ -291,7 +292,8 @@ All authenticated routes use the `MainLayout` component, which provides the unif
 |-------|-----------|--------|
 | `/` | Redirect to `/dashboard` | MainLayout |
 | `/dashboard` | Dashboard | MainLayout |
-| `/accessioning` | AccessioningForm | MainLayout |
+| `/receive` | AtomicReceive | MainLayout |
+| `/accessioning` | AccessioningForm (legacy wizard) | MainLayout |
 | `/samples` | SamplesManagement | MainLayout |
 | `/tests` | TestsManagement | MainLayout |
 | `/containers` | ContainerManagement | MainLayout |
@@ -328,7 +330,7 @@ All authenticated routes use the `MainLayout` component, which provides the unif
 - **Authentication**: All routes require user authentication (redirects to `/login` if not authenticated)
 - **Permission-Based Routes**: Routes check permissions and redirect to `/dashboard` if unauthorized
   - Admin routes require `config:edit` or specific permissions (e.g., `user:manage` for users/roles, `test:configure` for analyses/analytes/batteries)
-  - Core feature routes require respective permissions (e.g., `sample:create` for accessioning, `sample:read` for samples list, `sample:update` for sample/edit/containers)
+  - Core feature routes require respective permissions (e.g., `sample:create` for `/receive`, `sample:read` for samples list, `sample:update` for sample/edit/containers)
   - Experiments routes: `/experiments`, `/experiments/:id`, and `/experiments/templates` all require `experiment:manage`
   - Lab Mgmt routes: `/clients`, `/projects`, `/client-projects` require `project:manage`; `/analyses`, `/analytes` require `analysis:manage`
   - Edit routes (`/samples/:id`, `/tests/:id`, `/containers/:id`) require `sample:update` or `test:update` permissions respectively
@@ -439,7 +441,7 @@ Navigation relies on `UserContext` for:
 ### Accessing Core Features
 
 1. User clicks "Accessioning" in sidebar (requires `sample:create`)
-2. Route changes to `/accessioning`
+2. Route changes to `/receive`
 3. Sidebar highlights "Accessioning" as active
 4. AppBar title updates to "Accessioning"
 5. AccessioningForm component renders in main content area
@@ -535,7 +537,7 @@ Sample Mgmt, Lab Mgmt, and Admin sections use Material-UI's Accordion component 
 
 **Features:**
 - **Auto-Expansion**: Accordions automatically expand when user navigates to related routes
-  - Sample Mgmt: Expands on `/accessioning`, `/samples`, `/tests`, `/containers`, `/batches`, or `/results` routes
+  - Sample Mgmt: Expands on `/receive`, `/accessioning`, `/samples`, `/tests`, `/containers`, `/batches`, or `/results` routes
   - Experiments: Expands on any `/experiments` route (list, detail, templates)
   - Lab Mgmt: Expands on `/clients`, `/projects`, `/client-projects`, `/analyses`, or `/analytes` routes
   - Admin: Expands on any `/admin/*` route

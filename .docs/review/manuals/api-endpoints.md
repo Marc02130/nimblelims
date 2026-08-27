@@ -103,8 +103,38 @@ Create a new sample.
 - Non-System/Admin users can only create samples for projects where `project.client_id = user.client_id`
 - Returns `403 Forbidden` if attempting to create sample for another client's project
 
+### POST /samples/receive
+**CORE / OOB receive happy path.** Create Sample + **1..N Containers** + Contents in **one transaction**.
+
+**Requires:** `sample:create` + project access/RLS  
+**UI:** `/receive`  
+**Manual:** [atomic-receive.md](atomic-receive.md) · **UAT:** `UAT_Scripts/uat-atomic-receive.md`
+
+**Request:**
+```json
+{
+  "container_barcode": "NBIO-AR-0001",
+  "additional_container_barcodes": ["NBIO-AR-0001B"],
+  "sample_type": "uuid",
+  "matrix": "uuid",
+  "project_id": "uuid",
+  "analysis_ids": [],
+  "temperature": 4.0,
+  "client_sample_id": "EXT-001"
+}
+```
+
+**Rules:**
+- No sample name / status / container type / due_date / qc_type / client_id in body (`extra=forbid` → 422)
+- `samples.name` from name template; each barcode → `containers.name` (409 on collision, full rollback)
+- Status → **Available for Testing**; `received_date` set
+- Optional `analysis_ids` → Tests **Assigned/Pending** only (prefer omit)
+- Default tube type off-form for all vessels on the call
+
+**Response:** `{ sample_id, sample_name, status, project_id, received_date, containers[], tests[] }` → **201**
+
 ### POST /samples/accession
-Accession a new sample with test assignment.
+**Legacy** accession wizard path (not CORE receive SoT). Prefer `POST /samples/receive`.
 
 **Requires:** `sample:create` permission
 
@@ -135,7 +165,7 @@ Accession a new sample with test assignment.
 
 **Response:** Sample with created tests
 
-**Note:** This endpoint creates the sample and tests. Containers are created separately via `/containers` and linked via `/contents`.
+**Note:** Legacy path often creates containers via separate frontend calls (orphan risk). Atomic receive avoids that.
 
 ### POST /samples/bulk-accession
 Bulk accession multiple samples with common fields and unique per-sample data (US-24).
