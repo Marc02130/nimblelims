@@ -2,7 +2,7 @@
 
 Stable IDs below are exact. Tobias binds UAT log rows and `payloads.json`
 keys to these strings. High-volume `AR-HV-01`…`AR-HV-04` is **one 24-tube
-wave**; `AR-HV-05` is a separate typed barcode; POST the combined bodies once.
+wave** (no `analysis_ids` on those bodies); `AR-HV-02` is a separate **422** refuse of non-empty `analysis_ids`; `AR-HV-05` is a separate typed barcode.
 
 This pack does **not** implement receive. Product-code gate is **OPEN** (stamp PR 33). Live `POST /api/samples/receive` is still absent on main. Expected
 HTTP codes are the **contract** for the feature PR.
@@ -48,16 +48,16 @@ Default tube: Cryovial (2mL). Accessioning UI does not preselect a tube.
 
 ## AR-HV-02
 
-**Title:** Optional tests on the HV wave
+**Title:** Non-empty `analysis_ids` at receive → 422 (Heidi 2026-08-26)
 
 | | |
 |--|--|
-| **Actor** | `alice-tech` (same wave as AR-HV-01) |
+| **Actor** | `alice-tech` |
 | **Project** | mAb-2301 PK Study |
 | **Sticky fields** | Same as AR-HV-01 |
-| **Barcodes / payload refs** | First 8: `NBIO-AR-0001`…`NBIO-AR-0008` → `analysis_ids` = `[analysis-elisa-001]` (ELISA Human IgG). Rest `NBIO-AR-0009`…`NBIO-AR-0024` → `analysis_ids` = `[]`. Overlay on the AR-HV-01 bodies; do not POST a second time. |
-| **Expected HTTP** | `201` as part of the HV wave |
-| **Expected DB** | Tubes 0001–0008: one `tests` row each, `analysis_id` = ELISA, status **Assigned** or **Pending** (0060). Tubes 0009–0024: **no** tests. Tests are optional. |
+| **Barcodes / payload refs** | Dedicated POST with ELISA in non-empty `analysis_ids` (`payloads.json` → `AR-HV-02`). Do **not** overlay the HV wave. UI never sends `analysis_ids`. |
+| **Expected HTTP** | **422**. Do not ignore. Do not mint Tests. |
+| **Expected DB** | Zero new `samples`, `containers`, `contents`, `tests`. |
 | **Not in P0** | Do not auto-assign batteries. Do not use 0059 ELISA tests (`test-mab-pk-t0-elisa`, …). |
 
 ---
@@ -184,7 +184,7 @@ Default tube: Cryovial (2mL). Accessioning UI does not preselect a tube.
 |--|--|
 | **Actor** | `alice-tech` |
 | **Project** | mAb-2301 PK Study |
-| **Sticky fields** | Sample already received in HV wave with `analysis_ids: []` |
+| **Sticky fields** | Sample already received in HV wave with `analysis_ids` omitted (zero Tests at receive) |
 | **Barcodes / payload refs** | `NBIO-AR-0009`. Resolve `sample_id` via `containers.name`. POST `/tests/` or `/tests/assign` with ELISA (`analysis-elisa-001`). `payloads.json` → `AR-TST-01`. |
 | **Expected HTTP** | `201` |
 | **Expected DB** | One new `tests` row, `analysis` = ELISA (Human IgG), status **Assigned** or **Pending**, `sample_id` = the NBIO-AR-0009 sample. No results. |
@@ -216,7 +216,7 @@ Default tube: Cryovial (2mL). Accessioning UI does not preselect a tube.
 |--|--|
 | **Actor** | `alice-tech` (enter result); DELETE as same tech is enough |
 | **Project** | mAb-2301 PK Study |
-| **Sticky fields** | HV wave already assigned ELISA on `NBIO-AR-0001` |
+| **Sticky fields** | ELISA added **after** receive on `NBIO-AR-0001` (not minted at intake) |
 | **Barcodes / payload refs** | 1) POST `/results/` on that ELISA test (IgG Concentration). 2) DELETE `/tests/{id}`. `payloads.json` → `AR-TST-03`. |
 | **Expected HTTP** | Result create `201`. DELETE **`400`** (test has results). |
 | **Expected DB** | Test still active; result still present. Current main DELETE soft-deletes even with results — **P0 contract is 400**; treat a 200 delete as a product gap, not a pass. |
@@ -249,7 +249,7 @@ Default tube: Cryovial (2mL). Accessioning UI does not preselect a tube.
 | **Actor** | `bob-tech` (CAR-T project) |
 | **Project** | `CAR-T In-Process Testing` |
 | **Sticky fields** | Sample type PBMC; matrix Cell Supernatant. Analysis Cell Viability (Trypan Blue). Analyte **Total Cell Count** (`analyte-cell-count`, `units_default` NULL). Identity-pass and A260/280 also have NULL units — this scenario is specifically Total Cell Count. |
-| **Barcodes / payload refs** | Receive (or use) `CART-AR-0001` with `analysis_ids` including `analysis-viability-001`, then POST `/results/` for Total Cell Count. `payloads.json` → `AR-RES-02`. |
+| **Barcodes / payload refs** | Receive (or use) `CART-AR-0001` **without** `analysis_ids`, assign Cell Viability later via the tests API, then POST `/results/` for Total Cell Count. `payloads.json` → `AR-RES-02`. |
 | **Expected HTTP** | **422**. Result unit is required from `analytes.units_default`; missing → 422. Do not invent a unit in the payload to bypass. |
 | **Expected DB** | No `results` row for that analyte. Test remains Assigned/Pending. |
 | **Not in P0** | No per-result unit picker. Do not use 0059 `CAR-T-Batch-001` / blank QC (those are parent/QC fixtures, not receive). |
