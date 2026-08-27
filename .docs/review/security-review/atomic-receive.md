@@ -13,9 +13,9 @@
 | Gate | State |
 |------|--------|
 | **AuthZ docs gate** | **Satisfied** — Heidi/Günter Accept with conditions on sketch §4b + this stamp (PR 68). |
-| **Product implement** | **Gated on Marc green-light** for the accessioning P0 refactor. Do **not** read PR 30 “Implement gate OPEN” as permission to write product code. |
+| **Product implement** | **Provisional open for AR CORE** (Leadership 2026-08-26) — identity + 1..N vessels. Do **not** read PR 30 as license for results-entry / profile engine / work_order. |
 
-Packet **design** Accepts still stand (CEO PR 30, Lab Ops L2–L4 / L1 retracted, scientific CSO, Architecture, UI). Code stays gated until Marc says go.
+Packet **design** Accepts still stand (CEO PR 30, Lab Ops L2–L4 / L1 retracted, scientific CSO, Architecture, UI). AuthZ conditions **S-AR-1..5** land with CORE code.
 
 ## Executive summary
 
@@ -23,14 +23,14 @@ Heidi / Günter locked receive AuthZ on 2026-08-24. Until that spine lived in th
 
 `POST /api/samples/receive` is **not** a second permission world. It uses the **same AuthZ as sample create** plus **project RLS** (`has_project_access` / `lims_app`). There is one receive API and one DB transaction for sample + **1..N containers** + contents each (+ optional tests). Orphan multi-call (create sample → create container → link) is refused. The UI must not be the AuthZ gate.
 
-**Verdict: Accept with conditions.** Conditions **S-AR-1..5** land with product implement (when Marc green-lights accessioning P0). Not IC50.
+**Verdict: Accept with conditions.** Conditions **S-AR-1..5** land with **AR CORE** product implement. Not IC50.
 
 ## Surface delta
 
 | Surface | Risk |
 |---------|------|
 | `POST /api/samples/receive` | Elevation if a separate receive permission or client-only path ships |
-| First-vessel container + contents in the same call | Integrity: mid-sequence drop orphans sample without tube |
+| 1..N containers + contents in the same call | Integrity: mid-sequence drop orphans sample without vessel(s) |
 | Optional tests on the same txn | Same AuthZ as the receive commit — not a side door |
 | Project sticky / `project_id` required | Disclosure or write if RLS is UI-only |
 
@@ -60,7 +60,7 @@ Heidi / Günter locked receive AuthZ on 2026-08-24. Until that spine lived in th
 - IC50 / dose-response
 - Extract-hold dest type / ELN execute
 - Deep `/cso` infra scan
-- Accessioning P0 product implementation (Marc green-light; not this docs fold)
+- AR CORE product implementation (provisional open; AuthZ conditions land with code — not this docs fold)
 
 ## Verdict
 
@@ -69,7 +69,7 @@ Heidi / Günter locked receive AuthZ on 2026-08-24. Until that spine lived in th
 | **Verdict** | **Accept with conditions** (Heidi/Günter) |
 | **Date** | 2026-08-24 |
 | **AuthZ docs gate** | **Satisfied** — sketch §4b + this stamp (PR 68) |
-| **Product implement** | **Gated on Marc** green-light for accessioning P0 refactor |
+| **Product implement** | **Provisional open for AR CORE** (Leadership 2026-08-26) |
 | **Deep `/cso`** | skipped |
 
 ```

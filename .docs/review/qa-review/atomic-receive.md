@@ -13,11 +13,11 @@
 
 The PR 30 sketch is testable. Receive is a high-volume scan loop: one transaction, two identities, one status (**Available for Testing**), stay on the screen. US-1 is that happy path (no wizard, no sample-ID box, no status picker). US-7 / US-8 start tests at Assigned/Pending. US-30 is two identities. US-31 / US-33 / US-34 are parked for AR-01–AR-15.
 
-Implement gate is **OPEN for this packet only**. CEO accepted when PR 30 merged. Product code may start against the sketch: one sample + first tube. Heidi still bounces new tables, a sample-ID field, a Received hop, or `results.unit_id`.
+**CORE provisional open** (Leadership 2026-08-26): identity + **1..N vessels** + field align + docs/UAT. Heidi still bounces new tables, a sample-ID field, a Received hop, or `results.unit_id`. **AR-RES / results-entry UAT is a follow-on slice** — not a CORE ship blocker.
 
-QA review is Accept with conditions. It is not a substitute for the post-implement UAT pass. Human UAT uses the merged PR 32 catalog on `main`. No third identity.
+QA review is Accept with conditions. It is not a substitute for the post-implement UAT pass. Human UAT uses the merged PR 32 catalog on `main` (receive cases). No third identity.
 
-Architecture lock on result persist: typed number → `results.reported_result` + `qualifiers`. `raw_result` may copy the same value. UAT asserts `reported_result`, not a new column.
+Architecture lock on result persist: typed number → `results.reported_result` + `qualifiers`. `raw_result` may copy the same value. That lock remains design SoT for the **results slice**; CORE UAT does not require AR-RES must-pass.
 
 ## Testability and coverage
 
