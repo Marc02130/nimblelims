@@ -47,7 +47,7 @@ This script is the **receive happy path** sign-off. Do **not** use `uat-sample-a
 |------|------|
 | Actors | `alice-tech` / `alice123` (mAb-2301 PK); `bob-tech` / `bob123` (CAR-T); `david-cro` / `david123` (AR-RBAC-01) |
 | Name template | Assigns `samples.name` with no typed sample ID |
-| Default tube (off form) | Prefer Tube / cryovial / conical — resolved server-side |
+| Container type (sticky, required) | **1×1 only** (e.g. Cryovial 2mL, conical). Plates refused. Same type for all vessels on the commit. |
 | Sample status | Available for Testing |
 | Test status | Assigned/Pending — **only after a later explicit add-test**, never minted at receive |
 | Analysis A (`units_default` set) | ELISA (Human IgG) / IgG Concentration — used after receive, not on the receive body |

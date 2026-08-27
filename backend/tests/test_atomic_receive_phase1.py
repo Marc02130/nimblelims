@@ -87,6 +87,7 @@ def _body(receive_seed, *, barcode="NBIO-P1-0001", additional=None, **overrides)
         "sample_type": str(receive_seed["sample_type"].id),
         "matrix": str(receive_seed["matrix"].id),
         "project_id": str(receive_seed["project"].id),
+        "container_type_id": str(receive_seed["tube"].id),
         "analysis_ids": [],
     }
     payload.update(overrides)

@@ -332,6 +332,7 @@ export class ApiService {
     sample_type: string;
     matrix: string;
     project_id: string;
+    container_type_id: string;
     analysis_ids?: string[];
     temperature?: number | null;
     client_sample_id?: string | null;

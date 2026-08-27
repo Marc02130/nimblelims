@@ -118,17 +118,19 @@ Create a new sample.
   "sample_type": "uuid",
   "matrix": "uuid",
   "project_id": "uuid",
+  "container_type_id": "uuid",
   "temperature": 4.0,
   "client_sample_id": "EXT-001"
 }
 ```
 
 **Rules:**
-- No sample name / status / container type / due_date / qc_type / client_id in body (`extra=forbid` → 422)
+- No sample name / status / due_date / qc_type / client_id in body (`extra=forbid` → 422)
+- **`container_type_id` required** — active **1×1** type only (`dimensions` = `1x1`); plates / multi-well → **400**
 - `samples.name` from name template; each barcode → `containers.name` (409 on collision, full rollback)
 - Status → **Available for Testing**; `received_date` set
+- Same container type applied to all vessels on the call
 - CORE creates **zero Tests** and **zero Results**. Omit `analysis_ids` or send `[]`. Non-empty `analysis_ids` → **422** before the receive transaction (refuse, do not ignore, do not mint). A-15 asked-for / work-plan is parked.
-- Default tube type off-form for all vessels on the call
 
 **Response:** `{ sample_id, sample_name, status, project_id, received_date, containers[], tests[] }` → **201**
 

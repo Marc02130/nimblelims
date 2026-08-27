@@ -63,32 +63,42 @@ def resolve_available_for_testing_status(db: Session) -> ListEntry:
     return entry
 
 
-def resolve_default_tube_type(db: Session) -> ContainerType:
-    """Default tube off-form: prefer name 'Tube', else first active *tube* type."""
-    exact = (
-        db.query(ContainerType)
-        .filter(ContainerType.active == True, ContainerType.name == "Tube")  # noqa: E712
-        .first()
-    )
-    if exact:
-        return exact
+def is_single_position_container_type(ct: ContainerType) -> bool:
+    """Atomic receive only supports 1×1 vessels (not plates / multi-well).
 
-    fuzzy = (
+    Grid dimensions must parse as exactly 1×1 (e.g. ``1x1``). Physical sizes
+    like ``15x100mm`` or plate grids ``8x12`` are not single-position.
+    """
+    import re
+
+    dims = (ct.dimensions or "").strip().lower().replace("×", "x")
+    return bool(re.fullmatch(r"1\s*x\s*1", dims))
+
+
+def resolve_receive_container_type(db: Session, container_type_id: UUID) -> ContainerType:
+    """Require an active 1×1 container type for all vessels on the receive call."""
+    ct = (
         db.query(ContainerType)
         .filter(
+            ContainerType.id == container_type_id,
             ContainerType.active == True,  # noqa: E712
-            ContainerType.name.ilike("%tube%"),
         )
-        .order_by(ContainerType.name)
         .first()
     )
-    if fuzzy:
-        return fuzzy
-
-    raise HTTPException(
-        status_code=status.HTTP_400_BAD_REQUEST,
-        detail="Default tube container type not found in configuration",
-    )
+    if not ct:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or inactive container_type_id",
+        )
+    if not is_single_position_container_type(ct):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"Container type '{ct.name}' is not a 1×1 vessel. "
+                "Atomic receive does not support plates or multi-position containers."
+            ),
+        )
+    return ct
 
 
 def require_project_for_receive(db: Session, user: User, project_id: UUID) -> Project:
@@ -175,7 +185,7 @@ def receive_sample(
     barcodes = _normalize_barcodes(req)
     project = require_project_for_receive(db, current_user, req.project_id)
     available_status = resolve_available_for_testing_status(db)
-    tube_type = resolve_default_tube_type(db)
+    vessel_type = resolve_receive_container_type(db, req.container_type_id)
     _assert_barcodes_available(db, barcodes)
 
     # Validate list FKs exist when possible (create_all may use orphan entries)
@@ -236,7 +246,7 @@ def receive_sample(
         for barcode in barcodes:
             container = Container(
                 name=barcode,
-                type_id=tube_type.id,
+                type_id=vessel_type.id,
                 row=1,
                 column=1,
                 created_by=current_user.id,

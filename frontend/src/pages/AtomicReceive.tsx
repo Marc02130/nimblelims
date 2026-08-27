@@ -32,20 +32,35 @@ type StickyState = {
   sample_type: string;
   matrix: string;
   project_id: string;
+  container_type_id: string;
 };
+
+type ContainerTypeItem = LookupItem & { dimensions?: string | null };
+
+/** Atomic receive only supports 1×1 grid vessels (not plates / multi-well). */
+function isSinglePositionType(ct: { dimensions?: string | null; name?: string }): boolean {
+  const dims = String(ct.dimensions || '')
+    .trim()
+    .toLowerCase()
+    .replace('×', 'x');
+  return /^1\s*x\s*1$/.test(dims);
+}
 
 function loadSticky(): StickyState {
   try {
     const raw = sessionStorage.getItem(STICKY_KEY);
-    if (!raw) return { sample_type: '', matrix: '', project_id: '' };
+    if (!raw) {
+      return { sample_type: '', matrix: '', project_id: '', container_type_id: '' };
+    }
     const parsed = JSON.parse(raw);
     return {
       sample_type: parsed.sample_type || '',
       matrix: parsed.matrix || '',
       project_id: parsed.project_id || '',
+      container_type_id: parsed.container_type_id || '',
     };
   } catch {
-    return { sample_type: '', matrix: '', project_id: '' };
+    return { sample_type: '', matrix: '', project_id: '', container_type_id: '' };
   }
 }
 
@@ -87,6 +102,7 @@ const AtomicReceive: React.FC = () => {
   const [sampleTypes, setSampleTypes] = useState<LookupItem[]>([]);
   const [matrices, setMatrices] = useState<LookupItem[]>([]);
   const [projects, setProjects] = useState<LookupItem[]>([]);
+  const [containerTypes, setContainerTypes] = useState<ContainerTypeItem[]>([]);
   const [loadingLookups, setLoadingLookups] = useState(true);
   const [lookupError, setLookupError] = useState<string | null>(null);
 
@@ -94,6 +110,7 @@ const AtomicReceive: React.FC = () => {
   const [sampleType, setSampleType] = useState(sticky.sample_type);
   const [matrix, setMatrix] = useState(sticky.matrix);
   const [projectId, setProjectId] = useState(sticky.project_id);
+  const [containerTypeId, setContainerTypeId] = useState(sticky.container_type_id);
   const [primaryBarcode, setPrimaryBarcode] = useState('');
   const [additionalBarcodes, setAdditionalBarcodes] = useState<string[]>([]);
   const [extraDraft, setExtraDraft] = useState('');
@@ -113,7 +130,7 @@ const AtomicReceive: React.FC = () => {
     setLookupError(null);
     try {
       // projects.size max is 100 (backend Query le=100) — size=200 caused 422 and blank page
-      const [typesRaw, matricesRaw, projectsRaw] = await Promise.all([
+      const [typesRaw, matricesRaw, projectsRaw, containerTypesRaw] = await Promise.all([
         apiService.getListEntries('sample_types').catch(() =>
           apiService.getListEntries('Sample Type')
         ),
@@ -121,6 +138,7 @@ const AtomicReceive: React.FC = () => {
           apiService.getListEntries('Matrix')
         ),
         apiService.getProjects({ page: 1, size: 100 }),
+        apiService.getContainerTypes(),
       ]);
 
       const toItems = (raw: any): LookupItem[] => {
@@ -140,6 +158,24 @@ const AtomicReceive: React.FC = () => {
           .filter((p) => p && p.id && p.name)
           .map((p) => ({ id: String(p.id), name: String(p.name) }))
       );
+
+      const ctList = Array.isArray(containerTypesRaw)
+        ? containerTypesRaw
+        : containerTypesRaw?.container_types || [];
+      const singlePos = (ctList as any[])
+        .filter((ct) => ct && ct.id && ct.name && isSinglePositionType(ct))
+        .map((ct) => ({
+          id: String(ct.id),
+          name: String(ct.name),
+          dimensions: ct.dimensions ?? null,
+        }));
+      setContainerTypes(singlePos);
+      // Prefer sticky if still valid; else Cryovial / first 1×1
+      setContainerTypeId((prev) => {
+        if (prev && singlePos.some((c) => c.id === prev)) return prev;
+        const cryo = singlePos.find((c) => /cryovial/i.test(c.name));
+        return cryo?.id || singlePos[0]?.id || '';
+      });
     } catch (err: any) {
       console.error(err);
       setLookupError(
@@ -157,8 +193,13 @@ const AtomicReceive: React.FC = () => {
   }, [loadLookups]);
 
   useEffect(() => {
-    saveSticky({ sample_type: sampleType, matrix, project_id: projectId });
-  }, [sampleType, matrix, projectId]);
+    saveSticky({
+      sample_type: sampleType,
+      matrix,
+      project_id: projectId,
+      container_type_id: containerTypeId,
+    });
+  }, [sampleType, matrix, projectId, containerTypeId]);
 
   const addExtraBarcode = () => {
     const value = extraDraft.trim();
@@ -197,8 +238,8 @@ const AtomicReceive: React.FC = () => {
       primaryRef.current?.focus();
       return;
     }
-    if (!sampleType || !matrix || !projectId) {
-      setFormError('Sample type, matrix, and project are required (sticky)');
+    if (!sampleType || !matrix || !projectId || !containerTypeId) {
+      setFormError('Sample type, matrix, project, and container type are required (sticky)');
       return;
     }
 
@@ -227,6 +268,7 @@ const AtomicReceive: React.FC = () => {
         sample_type: sampleType,
         matrix,
         project_id: projectId,
+        container_type_id: containerTypeId,
         temperature: temp,
         client_sample_id: clientSampleId.trim() || null,
       });
@@ -390,6 +432,28 @@ const AtomicReceive: React.FC = () => {
                 </MenuItem>
               ))}
             </Select>
+          </FormControl>
+
+          <FormControl fullWidth required>
+            <InputLabel id="receive-container-type-label">Container type</InputLabel>
+            <Select
+              labelId="receive-container-type-label"
+              label="Container type"
+              value={containerTypeId}
+              onChange={(e) => setContainerTypeId(String(e.target.value))}
+              inputProps={{ 'data-testid': 'container-type' }}
+            >
+              {containerTypes.map((ct) => (
+                <MenuItem key={ct.id} value={ct.id}>
+                  {ct.name}
+                </MenuItem>
+              ))}
+            </Select>
+            {containerTypes.length === 0 && (
+              <Typography variant="caption" color="error" sx={{ mt: 0.5 }}>
+                No 1×1 container types configured. Plates cannot be used at receive.
+              </Typography>
+            )}
           </FormControl>
 
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
