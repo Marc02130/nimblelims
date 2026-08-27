@@ -19,6 +19,7 @@ from app.core.name_generation import generate_name_for_sample
 from app.core.rbac import validate_client_access
 from app.schemas.sample import (
     ReceivedContainerInfo,
+    ReceivedTestInfo,
     SampleReceiveRequest,
     SampleReceiveResponse,
 )
@@ -94,11 +95,20 @@ def resolve_default_tube_type(db: Session) -> ContainerType:
 
 
 def resolve_assigned_pending_status(db: Session) -> ListEntry:
+    """Prefer Assigned/Pending (not In Process) for asked-for receive tests."""
     for list_name in ("Test Status", "test_status"):
         lst = db.query(List).filter(List.name == list_name).first()
         if not lst:
             continue
-        for entry_name in ASSIGNED_PENDING_CANDIDATES:
+        # Prefer combined Assigned/Pending first
+        preferred = (
+            db.query(ListEntry)
+            .filter(ListEntry.list_id == lst.id, ListEntry.name == "Assigned/Pending")
+            .first()
+        )
+        if preferred:
+            return preferred
+        for entry_name in ("Assigned", "Pending"):
             entry = (
                 db.query(ListEntry)
                 .filter(ListEntry.list_id == lst.id, ListEntry.name == entry_name)
@@ -106,7 +116,10 @@ def resolve_assigned_pending_status(db: Session) -> ListEntry:
             )
             if entry:
                 return entry
-    for entry_name in ASSIGNED_PENDING_CANDIDATES:
+    preferred = db.query(ListEntry).filter(ListEntry.name == "Assigned/Pending").first()
+    if preferred:
+        return preferred
+    for entry_name in ("Assigned", "Pending"):
         entry = db.query(ListEntry).filter(ListEntry.name == entry_name).first()
         if entry:
             return entry
@@ -194,12 +207,20 @@ def _create_asked_for_tests(
     sample: Sample,
     analysis_ids: Sequence[UUID],
     current_user: User,
-) -> None:
+) -> List[ReceivedTestInfo]:
+    """Create optional asked-for tests at Assigned/Pending — not In Process / not work plan."""
     if not analysis_ids:
-        return
+        return []
     from models.analysis import Analysis
 
     status_entry = resolve_assigned_pending_status(db)
+    if status_entry.name == "In Process":
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Asked-for receive must not use In Process test status",
+        )
+
+    created: List[ReceivedTestInfo] = []
     for analysis_id in analysis_ids:
         analysis = (
             db.query(Analysis)
@@ -221,6 +242,16 @@ def _create_asked_for_tests(
             modified_by=current_user.id,
         )
         db.add(test)
+        db.flush()
+        created.append(
+            ReceivedTestInfo(
+                id=test.id,
+                analysis_id=analysis_id,
+                status=status_entry.id,
+                status_name=status_entry.name,
+            )
+        )
+    return created
 
 
 def receive_sample(
@@ -290,6 +321,7 @@ def receive_sample(
     db.add(sample)
 
     created_containers: List[Container] = []
+    created_tests: List[ReceivedTestInfo] = []
     try:
         db.flush()  # sample.id
 
@@ -307,7 +339,7 @@ def receive_sample(
             db.add(Contents(container_id=container.id, sample_id=sample.id))
             created_containers.append(container)
 
-        _create_asked_for_tests(
+        created_tests = _create_asked_for_tests(
             db,
             sample=sample,
             analysis_ids=req.analysis_ids or [],
@@ -346,4 +378,5 @@ def receive_sample(
         containers=[
             ReceivedContainerInfo(id=c.id, barcode=c.name) for c in created_containers
         ],
+        tests=created_tests,
     )

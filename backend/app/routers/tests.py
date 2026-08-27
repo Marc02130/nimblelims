@@ -492,11 +492,18 @@ async def delete_test(
 ):
     """
     Soft delete a test (set active=False).
+
+    A-14 / Lab Ops L4: refuse DELETE when any results exist for the test.
     """
-    test = db.query(Test).filter(
-        Test.id == test_id,
-        Test.active == True
-    ).first()
+    from models.result import Result
+    from sqlalchemy.orm import joinedload
+
+    test = (
+        db.query(Test)
+        .options(joinedload(Test.sample).joinedload(Sample.project))
+        .filter(Test.id == test_id, Test.active == True)
+        .first()
+    )
     
     if not test:
         raise HTTPException(
@@ -511,6 +518,18 @@ async def delete_test(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Access denied: insufficient project permissions"
             )
+
+    has_results = (
+        db.query(Result)
+        .filter(Result.test_id == test_id, Result.active == True)
+        .first()
+        is not None
+    )
+    if has_results:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot delete test that has results",
+        )
     
     # Soft delete
     test.active = False
