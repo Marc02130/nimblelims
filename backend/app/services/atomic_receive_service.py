@@ -170,7 +170,7 @@ def receive_sample(
 ) -> SampleReceiveResponse:
     """
     One transaction: system sample name + Available for Testing + 1..N vessels.
-    CORE never creates tests; legacy analysis_ids are accepted and ignored.
+    CORE never creates tests. Request validation rejects non-empty analysis_ids.
     """
     barcodes = _normalize_barcodes(req)
     project = require_project_for_receive(db, current_user, req.project_id)

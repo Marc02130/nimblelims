@@ -40,7 +40,7 @@ Architecture lock on result persist: typed number → `results.reported_result` 
 | QA3 | Duplicate `containers.name` → **409**. Whole txn rolls back. No second sample. | Mix-up prevention. |
 | QA4 | Commit writes Sample.status = **Available for Testing** only. Sets `received_date`. Request has no status field. No Received hop. | System-owned status. |
 | QA5 | After success: stay on receive, toast, clear barcode, sticky type/matrix/project, focus barcode. No sample-detail redirect. No aliquot dialog. | High-volume loop. |
-| QA6 | Receive creates **zero Tests**, even when `analysis_ids` is sent; the UI has no analyses picker. POST add later remains separate. DELETE without results ok. DELETE with results → **400**. | Leadership lock 2026-08-27; A-15 parked. |
+| QA6 | Non-empty `analysis_ids` → **422 before the receive transaction**, with zero Sample/Container/Test rows. Empty/omitted succeeds with zero Tests; the UI has no analyses picker. POST add later remains separate. DELETE without results ok. DELETE with results → **400**. | Heidi Architecture lock; A-15 parked. |
 | QA7 | Typed number persists to `results.reported_result` + `qualifiers`. `raw_result` may copy the same value. Assert `reported_result`, not a new column. Unit from `analytes.units_default`. Missing default → **422**. No unit picker. No `results.unit_id`. | Architecture lock. |
 | QA8 | `sample:create` required. Project list/API scoped by `project_users`. Client cannot receive. Foreign project → **403**, no row. Two techs keep separate sticky projects. | RLS. |
 | QA9 | Seed: Available for Testing; Assigned/Pending (or agreed slug); default tube; sample name template that assigns without a typed name; unique `containers.name`. | Otherwise UAT is blocked on data. |

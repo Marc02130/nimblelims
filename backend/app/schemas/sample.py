@@ -428,7 +428,7 @@ class SampleReceiveRequest(BaseModel):
     project_id: UUID = Field(..., description="Required sticky project; never auto-created")
     analysis_ids: List[UUID] = Field(
         default_factory=list,
-        description="Legacy compatibility field; ignored by Atomic Receive CORE",
+        description="Must be omitted or empty; non-empty values are refused by CORE",
     )
     temperature: Optional[float] = None
     client_sample_id: Optional[str] = Field(None, max_length=255)
@@ -454,16 +454,10 @@ class SampleReceiveRequest(BaseModel):
         return v
 
     @validator("analysis_ids")
-    def dedupe_analysis_ids(cls, v: List[UUID]) -> List[UUID]:
-        if not v:
-            return []
-        seen = set()
-        out: List[UUID] = []
-        for aid in v:
-            if aid not in seen:
-                seen.add(aid)
-                out.append(aid)
-        return out
+    def reject_nonempty_analysis_ids(cls, v: List[UUID]) -> List[UUID]:
+        if v:
+            raise ValueError("analysis_ids must be empty for Atomic Receive CORE")
+        return []
 
 
 class ReceivedContainerInfo(BaseModel):

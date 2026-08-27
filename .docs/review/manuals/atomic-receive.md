@@ -70,7 +70,7 @@ If `analysis_ids` is present and **non-empty** → **422**. Do not ignore. Do no
 5. For each barcode → Container + Contents → same sample  
 6. Return `tests: []`; CORE never inserts Test rows
 
-**Errors:** duplicate barcode → **409** (full rollback); missing required → **422**; non-empty `analysis_ids` → **422**; no project access / client → **403**.
+**Errors:** duplicate barcode → **409** (full rollback); missing required or non-empty `analysis_ids` → **422** before receive writes; no project access / client → **403**.
 
 **Response (minimum):** `sample_id`, `sample_name`, `status`, `project_id`, `containers[]`, `tests[]`.
 
@@ -88,7 +88,8 @@ If `analysis_ids` is present and **non-empty** → **422**. Do not ignore. Do no
 ## Tests and work plans
 
 - CORE receive creates **zero Tests**.
-- Receive body does **not** take `analysis_ids` as a CORE field. Present and non-empty → **422**. Do not ignore. Do not mint Tests. Do not persist asked-for analyses. Empty/omitted only; still zero Tests. UI never sends `analysis_ids`.
+- Receive body does **not** take `analysis_ids` as a CORE field. Omit it or send an empty list; non-empty values are refused with **422 before the receive transaction**. UI never sends it.
+- CORE never ignores, stores, or converts asked-for analyses into Tests.
 - A-15 asked-for/work-plan behavior is parked. Add/remove tests later through the separate tests workflow.
 - `DELETE /tests/{id}` → **400** if results exist (A-14).
 

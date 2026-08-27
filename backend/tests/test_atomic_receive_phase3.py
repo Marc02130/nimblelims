@@ -1,4 +1,4 @@
-"""Phase 3 atomic receive: CORE ignores analysis_ids and retains A-14 DELETE."""
+"""Phase 3 atomic receive: CORE refuses analysis_ids and retains A-14 DELETE."""
 from __future__ import annotations
 
 from datetime import datetime
@@ -9,10 +9,11 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from models.analysis import Analysis, Analyte
-from models.container import ContainerType
+from models.container import Container, ContainerType
 from models.list import List, ListEntry
 from models.project import Project, ProjectUser
 from models.result import Result
+from models.sample import Sample
 from models.test import Test
 from models.user import User
 
@@ -134,6 +135,36 @@ def _create_test(
     return test
 
 
+def _assert_nonempty_analysis_ids_refused(
+    client: TestClient,
+    admin_token: str,
+    receive_seed,
+    db_session: Session,
+    *,
+    barcode: str,
+    analysis_ids: list[str],
+) -> None:
+    before = {
+        "samples": db_session.query(Sample).count(),
+        "containers": db_session.query(Container).count(),
+        "tests": db_session.query(Test).count(),
+    }
+    response = client.post(
+        "/samples/receive",
+        json=_body(
+            receive_seed,
+            barcode=barcode,
+            analysis_ids=analysis_ids,
+        ),
+        headers=_auth_header(admin_token),
+    )
+    assert response.status_code == 422, response.text
+    assert "analysis_ids must be empty" in response.text
+    assert db_session.query(Sample).count() == before["samples"]
+    assert db_session.query(Container).count() == before["containers"]
+    assert db_session.query(Test).count() == before["tests"]
+
+
 class TestAtomicReceivePhase3:
     def test_ac_ar_7_empty_analysis_ids_ok(
         self,
@@ -157,27 +188,22 @@ class TestAtomicReceivePhase3:
             == 0
         )
 
-    def test_core_ignores_supplied_analysis_ids(
+    def test_omitted_analysis_ids_ok(
         self,
         client: TestClient,
         admin_token: str,
         receive_seed,
         db_session: Session,
     ):
-        r = client.post(
+        body = _body(receive_seed, barcode="NBIO-P3-OMITTED")
+        del body["analysis_ids"]
+        response = client.post(
             "/samples/receive",
-            json=_body(
-                receive_seed,
-                barcode="NBIO-P3-ASK",
-                analysis_ids=[
-                    str(receive_seed["analysis_a"].id),
-                    str(receive_seed["analysis_b"].id),
-                ],
-            ),
+            json=body,
             headers=_auth_header(admin_token),
         )
-        assert r.status_code == 201, r.text
-        data = r.json()
+        assert response.status_code == 201, response.text
+        data = response.json()
         assert data["tests"] == []
         assert (
             db_session.query(Test)
@@ -186,33 +212,42 @@ class TestAtomicReceivePhase3:
             == 0
         )
 
-    def test_core_ignores_unknown_analysis_id(
+    def test_core_refuses_supplied_analysis_ids(
         self,
         client: TestClient,
         admin_token: str,
         receive_seed,
         db_session: Session,
     ):
-        r = client.post(
-            "/samples/receive",
-            json=_body(
-                receive_seed,
-                barcode="NBIO-P3-BADAN",
-                analysis_ids=[str(uuid4())],
-            ),
-            headers=_auth_header(admin_token),
-        )
-        assert r.status_code == 201, r.text
-        data = r.json()
-        assert data["tests"] == []
-        assert (
-            db_session.query(Test)
-            .filter(Test.sample_id == data["sample_id"], Test.active == True)
-            .count()
-            == 0
+        _assert_nonempty_analysis_ids_refused(
+            client,
+            admin_token,
+            receive_seed,
+            db_session,
+            barcode="NBIO-P3-ASK",
+            analysis_ids=[
+                str(receive_seed["analysis_a"].id),
+                str(receive_seed["analysis_b"].id),
+            ],
         )
 
-    def test_core_ignores_duplicate_analysis_ids(
+    def test_core_refuses_unknown_analysis_id(
+        self,
+        client: TestClient,
+        admin_token: str,
+        receive_seed,
+        db_session: Session,
+    ):
+        _assert_nonempty_analysis_ids_refused(
+            client,
+            admin_token,
+            receive_seed,
+            db_session,
+            barcode="NBIO-P3-BADAN",
+            analysis_ids=[str(uuid4())],
+        )
+
+    def test_core_refuses_duplicate_analysis_ids(
         self,
         client: TestClient,
         admin_token: str,
@@ -220,22 +255,13 @@ class TestAtomicReceivePhase3:
         db_session: Session,
     ):
         aid = str(receive_seed["analysis_a"].id)
-        r = client.post(
-            "/samples/receive",
-            json=_body(
-                receive_seed,
-                barcode="NBIO-P3-DEDUP",
-                analysis_ids=[aid, aid],
-            ),
-            headers=_auth_header(admin_token),
-        )
-        assert r.status_code == 201, r.text
-        assert r.json()["tests"] == []
-        assert (
-            db_session.query(Test)
-            .filter(Test.sample_id == r.json()["sample_id"], Test.active == True)
-            .count()
-            == 0
+        _assert_nonempty_analysis_ids_refused(
+            client,
+            admin_token,
+            receive_seed,
+            db_session,
+            barcode="NBIO-P3-DEDUP",
+            analysis_ids=[aid, aid],
         )
 
     def test_a14_delete_test_without_results_ok(
@@ -251,7 +277,6 @@ class TestAtomicReceivePhase3:
             json=_body(
                 receive_seed,
                 barcode="NBIO-P3-DEL-OK",
-                analysis_ids=[str(receive_seed["analysis_a"].id)],
             ),
             headers=_auth_header(admin_token),
         )
@@ -285,7 +310,6 @@ class TestAtomicReceivePhase3:
             json=_body(
                 receive_seed,
                 barcode="NBIO-P3-DEL-RES",
-                analysis_ids=[str(receive_seed["analysis_a"].id)],
             ),
             headers=_auth_header(admin_token),
         )
