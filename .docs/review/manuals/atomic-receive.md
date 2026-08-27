@@ -1,11 +1,13 @@
 # Manual: Atomic receive (OOB / CORE)
 
-**Status:** CORE implement (Phases 1–4 on `feat/atomic-receive-core`)  
+**Status:** **CORE shipped + UAT Pass** (2026-08-27) — on `main` (`ebac94e` feature merge; UAT stamp `618fbbf`)  
 **UI:** `/receive` — sidebar **Receive** (`frontend/src/pages/AtomicReceive.tsx`)  
 **API:** `POST /samples/receive` (`backend/app/services/atomic_receive_service.py`)  
-**UAT:** [`UAT_Scripts/uat-atomic-receive.md`](../../UAT_Scripts/uat-atomic-receive.md)  
+**UAT:** [`UAT_Scripts/uat-atomic-receive.md`](../../UAT_Scripts/uat-atomic-receive.md) · run report [`UAT_Scripts/atomic-receive/uat-run-2026-08-27.md`](../../UAT_Scripts/atomic-receive/uat-run-2026-08-27.md)  
 **Requirements:** `.docs/internal/prd/sample-accessioning/PRD.md` (RQ-AR-*) · SPEC §3  
 **Sketch:** `.docs/review/tech-sketch/atomic-receive.md`
+
+**Out of CORE (next packets):** results-entry persist lock (**NR-AR-1** / AR-RES); A-15 asked-for / work-plan; work orders / WO-*.
 
 ---
 

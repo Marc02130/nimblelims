@@ -24,6 +24,7 @@ class SampleBase(BaseModel):
     client_project_id: Optional[UUID] = Field(None, description="ID of client project (optional, for grouping)")
     project_id: Optional[UUID] = Field(None, description="ID of project (optional, auto-created if not provided)")
     qc_type: Optional[UUID] = Field(None, description="ID of QC type from list_entries")
+    client_sample_id: Optional[str] = Field(None, max_length=255, description="Client-provided sample ID")
     custom_attributes: Dict[str, Any] = Field(default_factory=dict, description="Custom attributes as JSON")
 
     @validator('received_date', 'report_date')
