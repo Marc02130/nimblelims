@@ -1,7 +1,7 @@
 # UI / UX Review: Atomic receive CORE
 
 **Date:** 2026-08-26  
-**Status:** **Accept** (condition: no analysis picker; never send `analysis_ids`)  
+**Status:** **Accept** (condition: refuse-or-ignore / no Test mint; no analysis picker; never send `analysis_ids`)  
 **Scope:** AR CORE receive loop — identity + **1..N vessels**  
 **Tech sketch:** [`.docs/review/tech-sketch/atomic-receive.md`](../tech-sketch/atomic-receive.md)  
 **Related reviews:** [Lab Ops](../lab-ops-review/atomic-receive.md) · [CEO](../ceo-review/atomic-receive.md) · [Architecture](../architecture-review/atomic-receive.md)
@@ -12,7 +12,7 @@ Historical packet UI **Accept** still stands: new receive loop, not Accessioning
 
 This stamp is the **CORE fold**. Implement follows PRD **1..N**, not “first vessel.” Scan **primary** barcode + optional **additional** barcodes for the **same sample** (true extra vessels, not daughter Samples, not aliquot). Sticky project / type / matrix. Stay on `/receive`. No sample-ID field, no status picker, no tube picker, no Received hop, no sample-detail redirect.
 
-**No analysis picker.** UI never sends `analysis_ids`. If the API body has them → **422**, not ignore (Heidi 2026-08-26). Extra barcode wells are more 1×1 vessels on the same Sample.
+**Accept holds only with refuse-or-ignore (no Test mint).** Recorded from the **2026-08-26 chat punch**. Locked pick: **refuse**. **No analysis picker.** UI never sends `analysis_ids`. If the API body has them → **422**, not ignore. Extra barcode wells are more 1×1 vessels on the same Sample.
 
 **Verdict: Accept** on CORE. Coding stays Grok Build. PR 71 stays draft until UAT + dogfood. Not IC50.
 
@@ -35,6 +35,7 @@ Label extra barcodes as **additional tubes for this sample** — not aliquot / s
 - Status picker / Received hop
 - Project auto-create
 - Analysis picker / sending `analysis_ids` / analysis as “what’s next” / work plan
+- Test mint at receive / `_create_asked_for_tests` / `analysis_ids` as work plan
 - Sample-detail redirect or aliquot dialog
 - Results-entry UI as CORE ship
 - Extract-hold / `work_order` surfaces on receive
@@ -45,13 +46,14 @@ Label extra barcodes as **additional tubes for this sample** — not aliquot / s
 
 | Field | Value |
 |-------|--------|
-| **Verdict** | **Accept** (no analysis picker; never send `analysis_ids`) |
+| **Verdict** | **Accept** (refuse-or-ignore / no Test mint; no analysis picker; never send `analysis_ids`) |
 | **Date** | 2026-08-26 |
+| **Condition source** | 2026-08-26 chat punch |
 | **Named scope** | AR CORE receive loop — primary + optional additional barcodes |
 | **Product UI code** | Grok Build (this stamp is docs only) |
 
 ```
 UI REVIEW: Accept
 SCOPE: AR CORE (new receive loop, 1..N vessels)
-CONDITION: never offer analysis; never send analysis_ids; API 422 if non-empty
+CONDITION: Accept holds only with refuse-or-ignore (no Test mint). 2026-08-26 chat punch. Never offer analysis; never send analysis_ids; API 422 if non-empty.
 ```
