@@ -31,12 +31,12 @@ Legacy wizard at `/accessioning` is **not** the happy path (see [accessioning-wo
 
 1. Set sticky **sample type**, **matrix**, **project** (session-sticky).  
 2. Scan / type **primary barcode** (required).  
-3. Optionally **Add** additional barcodes for the **same sample** (not aliquot).  
+3. Optionally **Add** additional barcodes for the **same sample** (not aliquot). Extra barcodes = more tubes of **that** sample.  
 4. Optional temperature / client sample ID.
 5. **Receive** → toast → barcodes clear → sticky fields remain → focus primary.
 6. Stay on the page for the next specimen.
 
-**Not on the form:** sample ID, status, container type, analyses/work-plan picker, aliquot dialog, redirect to sample detail.
+**Not on the form:** sample ID, status, container type, **analysis picker**, aliquot dialog, redirect to sample detail. OOB receive never offers analyses and never sends `analysis_ids`.
 
 ---
 
@@ -61,16 +61,18 @@ POST /samples/receive
 **Forbidden body fields (422):** `name`, `status`, `container_type_id`, `due_date`, `qc_type`, `client_id`, …  
 If `analysis_ids` is present and **non-empty** → **422**. Do not ignore. Do not mint Tests. Empty/omitted is the only accepted path; still zero Tests.
 
+**`analysis_ids` (WO-7):** omit the field or send `[]`. Non-empty → **422**. Refuse, do not ignore, do not mint Tests.
+
 **Server (one txn):**
 
-1. AuthZ = sample create + project access/RLS  
+1. AuthZ = sample create + project access/RLS (PR 68)  
 2. Default tube type off-form for all vessels  
 3. System `samples.name` via name template  
 4. Sample status → Available for Testing; set `received_date`  
 5. For each barcode → Container + Contents → same sample  
-6. Return `tests: []`; CORE never inserts Test rows
+6. Return `tests: []`; CORE never inserts Test or Result rows
 
-**Errors:** duplicate barcode → **409** (full rollback); missing required or non-empty `analysis_ids` → **422** before receive writes; no project access / client → **403**.
+**Errors:** duplicate barcode → **409** (full rollback); missing required → **422**; non-empty `analysis_ids` → **422** before receive writes; no project access / client → **403**.
 
 **Response (minimum):** `sample_id`, `sample_name`, `status`, `project_id`, `containers[]`, `tests[]`.
 
@@ -87,10 +89,10 @@ If `analysis_ids` is present and **non-empty** → **422**. Do not ignore. Do no
 
 ## Tests and work plans
 
-- CORE receive creates **zero Tests**.
-- Receive body does **not** take `analysis_ids` as a CORE field. Omit it or send an empty list; non-empty values are refused with **422 before the receive transaction**. UI never sends it.
+- CORE receive creates **zero Tests** and **zero Results**.
+- Happy-path body: **no** `analysis_ids` (or empty only). Non-empty → **422** before the receive transaction. UI never sends it.
 - CORE never ignores, stores, or converts asked-for analyses into Tests.
-- A-15 asked-for/work-plan behavior is parked. Add/remove tests later through the separate tests workflow.
+- A-15 asked-for / Assigned-Pending-at-receive / analysis picker on CORE receive is **parked** (later work-order packet). Add/remove tests later through the separate tests workflow.
 - `DELETE /tests/{id}` → **400** if results exist (A-14).
 
 ---

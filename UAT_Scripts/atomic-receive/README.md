@@ -6,9 +6,11 @@ Catalog + seed notes for atomic receive UAT and pytest.
 **Human UAT SoT:** [`../uat-atomic-receive.md`](../uat-atomic-receive.md)  
 **Manual:** `.docs/review/manuals/atomic-receive.md`
 
+**WO-7 lock:** CORE receive does **not** mint Tests. OOB UI has no analysis picker. Omit `analysis_ids` or send `[]`. Non-empty → **422**. After receive: zero Tests, zero Results. Extra barcodes = more tubes of that sample. A-15 asked-for / work-plan is parked.
+
 Seeded BioTech entities come from migration **0058** (clients, users, projects, lists, analyses, analytes, container types). Migration **0059** seeds lifecycle samples **with aliquots / `parent_sample_id`** — those rows are **not** receive fixtures. CORE receive uses **payloads + live receive API**.
 
-Migration **0060** adds missing **Test Status** (`Assigned/Pending`) and **Result Qualifiers** (`<LOD`, `ND`) when needed.
+Migration **0060** adds missing **Test Status** (`Assigned/Pending`) and **Result Qualifiers** (`<LOD`, `ND`) when needed. Assigned/Pending is for **later explicit add-test**, not for receive.
 
 ---
 
@@ -48,6 +50,7 @@ SELECT le.name
 
 ```bash
 # UI: log in as alice-tech → sidebar Receive → /receive
+# Confirm: no analysis picker. Never send analysis_ids.
 # API (example shape; fill UUIDs from seed):
 curl -X POST "$API/samples/receive" \
   -H "Authorization: Bearer $TOKEN" \
@@ -61,8 +64,10 @@ curl -X POST "$API/samples/receive" \
   }'
 ```
 
-Expect **201**, one sample, two containers, status Available for Testing.
+Expect **201**, one sample, two containers, status Available for Testing, `tests: []`, **zero Test rows**, **zero Result rows**.
 
-Pytest: `backend/tests/test_atomic_receive_phase1.py` … `phase3.py`.
+Non-empty `analysis_ids` must **422** and must not create a sample.
+
+Pytest: `backend/tests/test_atomic_receive_phase1.py` … `phase3.py` (non-empty `analysis_ids` → 422; empty/omitted → 201 with `tests: []`).
 
 See also [scenarios.md](scenarios.md) and [payloads.json](payloads.json).
