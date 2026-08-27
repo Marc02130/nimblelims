@@ -428,7 +428,7 @@ class SampleReceiveRequest(BaseModel):
     project_id: UUID = Field(..., description="Required sticky project; never auto-created")
     analysis_ids: List[UUID] = Field(
         default_factory=list,
-        description="Optional asked-for analyses only (Assigned/Pending); prefer omit",
+        description="Legacy compatibility field; ignored by Atomic Receive CORE",
     )
     temperature: Optional[float] = None
     client_sample_id: Optional[str] = Field(None, max_length=255)
@@ -475,7 +475,7 @@ class ReceivedContainerInfo(BaseModel):
 
 
 class ReceivedTestInfo(BaseModel):
-    """Asked-for test created at receive (Assigned/Pending only)."""
+    """Legacy response shape; Atomic Receive CORE always returns an empty tests list."""
 
     id: UUID
     analysis_id: UUID

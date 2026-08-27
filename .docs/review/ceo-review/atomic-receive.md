@@ -1,6 +1,7 @@
 # CEO / Product Review: Atomic receive (AR CORE)
 
 **Date:** 2026-08-26  
+**Leadership lock:** 2026-08-27 — CORE receive creates zero Tests; A-15 asked-for/work-plan is parked
 **Status:** Accept with conditions  
 **Mode:** HOLD SCOPE  
 **Tech sketch:** [`.docs/review/tech-sketch/atomic-receive.md`](../tech-sketch/atomic-receive.md)  
@@ -17,7 +18,7 @@
 
 Atomic receive CORE is the right product wedge for intake: **identity + 1..N vessels in one transaction**, scan-first, two identities (system sample ID ≠ tube barcode), sticky required project, Available for Testing on commit, AuthZ = sample create + project RLS.
 
-HOLD SCOPE. Do **not** pull results-entry, intake-profile engine, or `work_order` / routing into this slice. Leadership already **APPROVE WITH CHANGES** (2026-08-26) with provisional Marc open for CORE only. This CEO stamp freezes that carve for implement.
+HOLD SCOPE. Do **not** pull test creation, results-entry, intake-profile engine, or `work_order` / routing into this slice. The 2026-08-27 Heidi punch supersedes historical L4/RQ-AR-10 asked-for language: receive creates **zero Tests**, even when a legacy client sends `analysis_ids`.
 
 Lab Ops is not Hold/Revise. Gate clears for CEO Accept-with-conditions on the **requirements + spec CORE packet**. Historical packet design Accept (PR 30) remains; this review is the **CORE vs results** product freeze on the updated RQ-AR / SPEC.
 
@@ -40,7 +41,7 @@ Matches PRD **RQ-AR-*** (In) and **NR-AR-*** (Out). Do not expand.
 | **RQ-AR-7** — `project_id` required + sticky; never auto-create project per tube | **NR-AR-7** — Sidebar multi-config activate shell (FW-1b UX) |
 | **RQ-AR-8** — Default tube type for all vessels, **off the form** | Profile engine beyond OOB narrative |
 | **RQ-AR-9** — Omit `due_date`, `qc_type`, `client_id` from body | Results persist lock as **implement** in this PR |
-| **RQ-AR-10** — Prefer omit analysis; if present = asked-for only (Assigned/Pending) | Compound registration / lots (WO-5 / WO-6) |
+| **RQ-AR-10** — CORE omits/ignores `analysis_ids`; receive creates **zero Tests** | Asked-for analyses / A-15 / work-plan creation; compound registration / lots (WO-5 / WO-6) |
 | **RQ-AR-11** — AuthZ = sample create + project RLS; one API; no orphan multi-call substitute | Second receive permission / client bypass |
 | **RQ-AR-12** — Stay on receive: toast, clear barcodes, sticky, focus primary | Sample-detail redirect; aliquot dialog |
 | **RQ-AR-13** — Docs/UAT with ship: `uat-atomic-receive.md` happy path | Treating wizard UAT as receive SoT |
@@ -73,7 +74,7 @@ Align with Lab Ops **L2–L4**. Product accepts those lab conditions as same-pha
 | **C1** | **Historical identity (retracted).** `samples.name` is **not** the barcode. Two identities: tube = `containers.name` (scan); material = system sample ID from name template. Receive UI has **no sample-ID field**. | Lab Ops **L1 retracted**; sketch C1 gone |
 | **C2** | Project **required** and **session-sticky**. Never auto-create a project per tube (or per vessel). | Lab Ops **L2** / RQ-AR-7 |
 | **C3** | Container type = lab **default tube**, applied to **all** vessels on the call, **off the form** (no type picker on the scan loop). | Lab Ops **L3** / RQ-AR-8 |
-| **C4** | If `analysis_ids` present: Tests **Assigned/Pending** only (not In Process). Prefer empty. **DELETE** of a test with results → **400** (A-14 light ride OK). Analysis is never presented as the lab work plan. | Lab Ops **L4** / RQ-AR-10 |
+| **C4** | CORE receive creates **zero Tests**. Omit `analysis_ids`; legacy payloads may be accepted but are ignored. Hide the analyses picker. A-15/work-plan is parked. **DELETE** of an independently created test with results → **400** (A-14 light ride OK). | Leadership lock 2026-08-27 / RQ-AR-10 superseded |
 | **C5** | **1..N vessels** in one txn (primary + optional additional barcodes). Single-vessel-only API/UI fails CORE (RQ-AR-2, RQ-AR-3, A-18). Any barcode collision → **409** + **full rollback**. | Leadership gate / SPEC AC-AR-2..4 |
 | **C6** | **Results carve.** Results-entry API/UI and AR-RES UAT are **not** CORE acceptance. Persist-lock design may remain in the sketch as follow-on SoT only. | NR-AR-1 / gate memo |
 | **C7** | AuthZ identical to **sample create** + **project RLS**; enforce in receive service; one receive API; refuse orphan multi-call as receive substitute; no client bypass. Conditions from security Accept-with-conditions land with CORE code. | RQ-AR-11 / PR 68 |

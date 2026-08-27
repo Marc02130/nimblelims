@@ -6,7 +6,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Alert,
-  Autocomplete,
   Box,
   Button,
   Chip,
@@ -60,7 +59,6 @@ const AtomicReceive: React.FC = () => {
   const [sampleTypes, setSampleTypes] = useState<LookupItem[]>([]);
   const [matrices, setMatrices] = useState<LookupItem[]>([]);
   const [projects, setProjects] = useState<LookupItem[]>([]);
-  const [analyses, setAnalyses] = useState<LookupItem[]>([]);
   const [loadingLookups, setLoadingLookups] = useState(true);
   const [lookupError, setLookupError] = useState<string | null>(null);
 
@@ -73,7 +71,6 @@ const AtomicReceive: React.FC = () => {
   const [extraDraft, setExtraDraft] = useState('');
   const [temperature, setTemperature] = useState<string>('');
   const [clientSampleId, setClientSampleId] = useState('');
-  const [askedFor, setAskedFor] = useState<LookupItem[]>([]);
 
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -87,7 +84,7 @@ const AtomicReceive: React.FC = () => {
     setLoadingLookups(true);
     setLookupError(null);
     try {
-      const [typesRaw, matricesRaw, projectsRaw, analysesRaw] = await Promise.all([
+      const [typesRaw, matricesRaw, projectsRaw] = await Promise.all([
         apiService.getListEntries('sample_types').catch(() =>
           apiService.getListEntries('Sample Type')
         ),
@@ -95,7 +92,6 @@ const AtomicReceive: React.FC = () => {
           apiService.getListEntries('Matrix')
         ),
         apiService.getProjects({ page: 1, size: 200 }),
-        apiService.getAnalyses({ page: 1, size: 200, active: true }),
       ]);
 
       const toItems = (raw: any): LookupItem[] => {
@@ -114,14 +110,6 @@ const AtomicReceive: React.FC = () => {
         (projList as any[])
           .filter((p) => p && p.id && p.name)
           .map((p) => ({ id: String(p.id), name: String(p.name) }))
-      );
-      const analysisList = Array.isArray(analysesRaw)
-        ? analysesRaw
-        : analysesRaw?.analyses || [];
-      setAnalyses(
-        (analysisList as any[])
-          .filter((a) => a && a.id && a.name)
-          .map((a) => ({ id: String(a.id), name: String(a.name) }))
       );
     } catch (err: any) {
       console.error(err);
@@ -164,8 +152,7 @@ const AtomicReceive: React.FC = () => {
     setExtraDraft('');
     setClientSampleId('');
     setTemperature('');
-    // Keep sticky type/matrix/project and asked-for optional preference cleared for default omit
-    setAskedFor([]);
+    // Keep sticky type/matrix/project.
     setTimeout(() => primaryRef.current?.focus(), 0);
   };
 
@@ -209,7 +196,6 @@ const AtomicReceive: React.FC = () => {
         sample_type: sampleType,
         matrix,
         project_id: projectId,
-        analysis_ids: askedFor.map((a) => a.id),
         temperature: temp,
         client_sample_id: clientSampleId.trim() || null,
       });
@@ -393,23 +379,6 @@ const AtomicReceive: React.FC = () => {
               inputProps={{ 'data-testid': 'client-sample-id' }}
             />
           </Stack>
-
-          <Autocomplete
-            multiple
-            options={analyses}
-            getOptionLabel={(o) => o.name}
-            value={askedFor}
-            onChange={(_, value) => setAskedFor(value)}
-            renderInput={(params) => (
-              <TextField
-                {...params}
-                label="Asked-for analyses (optional)"
-                helperText="Prefer omit. If set, creates Assigned/Pending only — not the work plan."
-                inputProps={{ ...params.inputProps, 'data-testid': 'asked-for-analyses' }}
-              />
-            )}
-            isOptionEqualToValue={(a, b) => a.id === b.id}
-          />
 
           <Box display="flex" gap={2} justifyContent="flex-end">
             <Button

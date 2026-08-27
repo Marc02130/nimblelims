@@ -21,7 +21,7 @@ Packet **design** Accepts still stand (CEO PR 30, Lab Ops L2–L4 / L1 retracted
 
 Heidi / Günter locked receive AuthZ on 2026-08-24. Until that spine lived in the formal sketch, the AuthZ docs gate stayed open. Sketch **§4b** now states the spine; this stamp records it.
 
-`POST /api/samples/receive` is **not** a second permission world. It uses the **same AuthZ as sample create** plus **project RLS** (`has_project_access` / `lims_app`). There is one receive API and one DB transaction for sample + **1..N containers** + contents each (+ optional tests). Orphan multi-call (create sample → create container → link) is refused. The UI must not be the AuthZ gate.
+`POST /api/samples/receive` is **not** a second permission world. It uses the **same AuthZ as sample create** plus **project RLS** (`has_project_access` / `lims_app`). There is one receive API and one DB transaction for sample + **1..N containers** + contents each. CORE creates zero Tests; A-15 is parked. Orphan multi-call (create sample → create container → link) is refused. The UI must not be the AuthZ gate.
 
 **Verdict: Accept with conditions.** Conditions **S-AR-1..5** land with **AR CORE** product implement. Not IC50.
 
@@ -51,7 +51,7 @@ Heidi / Günter locked receive AuthZ on 2026-08-24. Until that spine lived in th
 |----|----------|--------|-----------|
 | **S-AR-1** | High | **Locked (sketch §4b)** | Receive uses the **same AuthZ as sample create**. No new receive permission. |
 | **S-AR-2** | High | **Locked (sketch §4b)** | **Project RLS** on the receive path: `has_project_access` / `lims_app`. Enforce **inside** the receive service before/with the txn. |
-| **S-AR-3** | High | **Locked (sketch §4b)** | **One path, one txn:** one `POST /api/samples/receive`. Sample + **1..N Containers** + Contents each (+ optional tests) in a **single DB transaction**. All intake vessels share that txn (not follow-up calls). Bounce a second receive API. |
+| **S-AR-3** | High | **Locked (sketch §4b)** | **One path, one txn:** one `POST /api/samples/receive`. Sample + **1..N Containers** + Contents each in a **single DB transaction**; zero Tests. All intake vessels share that txn (not follow-up calls). Bounce a second receive API. |
 | **S-AR-4** | High | **Locked (sketch §4b)** | **Refuse orphan multi-call.** Bounce create sample → create container → link as a receive substitute. Clients that drop mid-sequence are refused by design — there is no safe multi-call substitute. |
 | **S-AR-5** | High | **Locked (sketch §4b)** | **No client bypass.** No client-only skip of AuthZ/RLS. Do not rely on the UI to gate project access. |
 

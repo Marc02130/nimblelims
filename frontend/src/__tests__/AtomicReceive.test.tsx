@@ -7,13 +7,11 @@ import AtomicReceive from '../pages/AtomicReceive';
 const mockReceiveSample = jest.fn();
 const mockGetListEntries = jest.fn();
 const mockGetProjects = jest.fn();
-const mockGetAnalyses = jest.fn();
 
 jest.mock('../services/apiService', () => ({
   apiService: {
     getListEntries: (...args: any[]) => mockGetListEntries(...args),
     getProjects: (...args: any[]) => mockGetProjects(...args),
-    getAnalyses: (...args: any[]) => mockGetAnalyses(...args),
     receiveSample: (...args: any[]) => mockReceiveSample(...args),
     getCurrentUser: jest.fn().mockResolvedValue({
       id: '1',
@@ -63,9 +61,6 @@ describe('AtomicReceive', () => {
     mockGetProjects.mockResolvedValue({
       projects: [{ id: 'proj-1', name: 'Study A' }],
     });
-    mockGetAnalyses.mockResolvedValue({
-      analyses: [{ id: 'an-1', name: 'ELISA' }],
-    });
     mockReceiveSample.mockResolvedValue({
       sample_id: 's1',
       sample_name: 'S-100',
@@ -81,6 +76,7 @@ describe('AtomicReceive', () => {
     expect(screen.queryByLabelText(/lab sample id/i)).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/^status$/i)).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/container type/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/asked-for analyses/i)).not.toBeInTheDocument();
   });
 
   test('adds additional barcode chips', async () => {
@@ -114,10 +110,10 @@ describe('AtomicReceive', () => {
           sample_type: 'type-1',
           matrix: 'matrix-1',
           project_id: 'proj-1',
-          analysis_ids: [],
         })
       );
     });
+    expect(mockReceiveSample.mock.calls[0][0]).not.toHaveProperty('analysis_ids');
 
     await waitFor(() => {
       expect((screen.getByTestId('primary-barcode') as HTMLInputElement).value).toBe('');

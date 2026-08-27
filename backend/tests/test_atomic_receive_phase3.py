@@ -1,8 +1,8 @@
-"""Phase 3 atomic receive: optional asked-for analyses (A-13 / AC-AR-7) + A-14 DELETE."""
+"""Phase 3 atomic receive: CORE ignores analysis_ids and retains A-14 DELETE."""
 from __future__ import annotations
 
 from datetime import datetime
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 from fastapi.testclient import TestClient
@@ -13,7 +13,6 @@ from models.container import ContainerType
 from models.list import List, ListEntry
 from models.project import Project, ProjectUser
 from models.result import Result
-from models.sample import Sample
 from models.test import Test
 from models.user import User
 
@@ -43,11 +42,8 @@ def receive_seed(db_session: Session, test_admin_user: User):
         name="Assigned/Pending",
         description="Asked for, not started",
     )
-    in_process = ListEntry(
-        list_id=test_status_list.id, name="In Process", description="Work started"
-    )
     db_session.add_all(
-        [available, sample_type, matrix, project_active, assigned_pending, in_process]
+        [available, sample_type, matrix, project_active, assigned_pending]
     )
 
     tube = ContainerType(
@@ -95,7 +91,6 @@ def receive_seed(db_session: Session, test_admin_user: User):
         "tube": tube,
         "project": project,
         "assigned_pending": assigned_pending,
-        "in_process": in_process,
         "analysis_a": analysis_a,
         "analysis_b": analysis_b,
     }
@@ -116,6 +111,27 @@ def _body(receive_seed, *, barcode="NBIO-P3-0001", analysis_ids=None, **override
     }
     payload.update(overrides)
     return payload
+
+
+def _create_test(
+    db_session: Session,
+    receive_seed,
+    test_admin_user: User,
+    sample_id: str,
+) -> Test:
+    """Create an explicit post-receive test fixture for DELETE coverage."""
+    test = Test(
+        name=f"AR-P3-TEST-{uuid4().hex[:8]}",
+        sample_id=UUID(sample_id),
+        analysis_id=receive_seed["analysis_a"].id,
+        status=receive_seed["assigned_pending"].id,
+        technician_id=test_admin_user.id,
+        created_by=test_admin_user.id,
+        modified_by=test_admin_user.id,
+    )
+    db_session.add(test)
+    db_session.commit()
+    return test
 
 
 class TestAtomicReceivePhase3:
@@ -141,7 +157,7 @@ class TestAtomicReceivePhase3:
             == 0
         )
 
-    def test_ac_ar_7_asked_for_assigned_pending_not_in_process(
+    def test_core_ignores_supplied_analysis_ids(
         self,
         client: TestClient,
         admin_token: str,
@@ -162,30 +178,21 @@ class TestAtomicReceivePhase3:
         )
         assert r.status_code == 201, r.text
         data = r.json()
-        assert len(data["tests"]) == 2
-        for t in data["tests"]:
-            assert t["status"] == str(receive_seed["assigned_pending"].id)
-            assert t["status_name"] == "Assigned/Pending"
-            assert t["status"] != str(receive_seed["in_process"].id)
-
-        db_tests = (
+        assert data["tests"] == []
+        assert (
             db_session.query(Test)
             .filter(Test.sample_id == data["sample_id"], Test.active == True)
-            .all()
+            .count()
+            == 0
         )
-        assert len(db_tests) == 2
-        for t in db_tests:
-            assert t.status == receive_seed["assigned_pending"].id
 
-    def test_unknown_analysis_400_full_rollback(
+    def test_core_ignores_unknown_analysis_id(
         self,
         client: TestClient,
         admin_token: str,
         receive_seed,
         db_session: Session,
     ):
-        before_samples = db_session.query(Sample).count()
-        before_tests = db_session.query(Test).count()
         r = client.post(
             "/samples/receive",
             json=_body(
@@ -195,17 +202,17 @@ class TestAtomicReceivePhase3:
             ),
             headers=_auth_header(admin_token),
         )
-        assert r.status_code == 400, r.text
-        assert db_session.query(Sample).count() == before_samples
-        assert db_session.query(Test).count() == before_tests
+        assert r.status_code == 201, r.text
+        data = r.json()
+        assert data["tests"] == []
         assert (
-            db_session.query(Sample)
-            .filter(Sample.name.ilike("%NBIO-P3-BADAN%"))
+            db_session.query(Test)
+            .filter(Test.sample_id == data["sample_id"], Test.active == True)
             .count()
             == 0
         )
 
-    def test_dedupe_analysis_ids(
+    def test_core_ignores_duplicate_analysis_ids(
         self,
         client: TestClient,
         admin_token: str,
@@ -223,12 +230,12 @@ class TestAtomicReceivePhase3:
             headers=_auth_header(admin_token),
         )
         assert r.status_code == 201, r.text
-        assert len(r.json()["tests"]) == 1
+        assert r.json()["tests"] == []
         assert (
             db_session.query(Test)
             .filter(Test.sample_id == r.json()["sample_id"], Test.active == True)
             .count()
-            == 1
+            == 0
         )
 
     def test_a14_delete_test_without_results_ok(
@@ -237,6 +244,7 @@ class TestAtomicReceivePhase3:
         admin_token: str,
         receive_seed,
         db_session: Session,
+        test_admin_user: User,
     ):
         r = client.post(
             "/samples/receive",
@@ -248,7 +256,13 @@ class TestAtomicReceivePhase3:
             headers=_auth_header(admin_token),
         )
         assert r.status_code == 201, r.text
-        test_id = r.json()["tests"][0]["id"]
+        assert r.json()["tests"] == []
+        test_id = _create_test(
+            db_session,
+            receive_seed,
+            test_admin_user,
+            r.json()["sample_id"],
+        ).id
 
         d = client.delete(
             f"/tests/{test_id}",
@@ -276,7 +290,13 @@ class TestAtomicReceivePhase3:
             headers=_auth_header(admin_token),
         )
         assert r.status_code == 201, r.text
-        test_id = r.json()["tests"][0]["id"]
+        assert r.json()["tests"] == []
+        test_id = _create_test(
+            db_session,
+            receive_seed,
+            test_admin_user,
+            r.json()["sample_id"],
+        ).id
 
         analyte = Analyte(
             name=f"IgG-{uuid4().hex[:6]}",

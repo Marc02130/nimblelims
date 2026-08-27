@@ -1,7 +1,7 @@
 # Tech sketch: Atomic receive
 
 **Date:** 2026-08-20  
-**Updated:** 2026-08-26 (Architecture/UI Accept on CORE + bounce fold) · 2026-08-26 (multi-container receive: 1..N vessels) · 2026-08-24 (AuthZ fold, PR 68)  
+**Updated:** 2026-08-27 (CORE creates zero Tests; A-15 parked) · 2026-08-26 (Architecture/UI Accept + 1..N vessels) · 2026-08-24 (AuthZ fold, PR 68)
 **Stem:** `atomic-receive`  
 **Process:** [`.docs/review/development-process/README.md`](../development-process/README.md)  
 **AuthZ docs gate:** **Satisfied** — Heidi/Günter **Accept with conditions** on §4b + [security-review/atomic-receive.md](../security-review/atomic-receive.md) (PR 68). Receive = sample create + project RLS; one txn; no parallel path.  
@@ -16,13 +16,13 @@ C1 (`samples.name` = barcode = `containers.name`) is **gone**. Two identities.
 
 ## 1. Problem
 
-Receive must create sample + **one or more** containers + contents (+ optional tests) in **one DB transaction**, or a mid-rack failure orphans rows. It is common to receive more than one tube for the same sample. Techs scan; they do not pick status and they do not type a sample ID.
+Receive must create sample + **one or more** containers + contents in **one DB transaction**, or a mid-rack failure orphans rows. It is common to receive more than one tube for the same sample. Techs scan; they do not pick status, type a sample ID, or define a work plan during CORE receive.
 
 ## 2. Goals and non-goals
 
 **Goals (locked — AR CORE)**
 
-- One POST: sample + **1..N containers** + contents for each (+ optional asked-for tests), one transaction.
+- One POST: sample + **1..N containers** + contents for each, one transaction.
 - Extra vessels are **1×1 Containers + Contents all pointing at that Sample** — not daughter Samples, not aliquot.
 - UX: **primary barcode** required + **optional additional barcodes** on the same commit.
 - **Two identities (C1 dropped, Lab Ops L1 retracted):**
@@ -30,11 +30,11 @@ Receive must create sample + **one or more** containers + contents (+ optional t
   - `samples.name` = system-assigned sample ID from the **existing name template/sequence**. Tech does **not** type it.
   - `samples.name` 409 only if that sample ID itself collides.
 - Receive screen: **no sample-ID field**. Lookup is scan the tube. Keyboard still works on the barcode field.
-- Receive body: required primary `container_barcode`, `sample_type`, `matrix`, `project_id`; optional `additional_container_barcodes[]`, `analysis_ids`, `temperature`, `client_sample_id`.
+- Receive body: required primary `container_barcode`, `sample_type`, `matrix`, `project_id`; optional `additional_container_barcodes[]`, `temperature`, `client_sample_id`. Legacy `analysis_ids` is accepted only for compatibility and ignored.
 - Project required and sticky. Never auto-create per tube (L2).
 - Container type = default tube, **off the form** (L3) — applies to all vessels on the call.
 - One status on commit: **Available for Testing**. No Received hop. Receipt is existing `received_date`. No `status_history` table. Techs do not pick status.
-- Tests optional at receive (prefer omit as work plan). If present: assigned/pending, not In Process (L4). **Refuse DELETE** if the test has results (L4 + CSO).
+- CORE receive creates **zero Tests**, including when legacy `analysis_ids` is sent. A-15 asked-for/work-plan is parked. **Refuse DELETE** if an independently created test has results (A-14 + CSO).
 - AuthZ = sample create + project RLS (PR 68).
 - Stay on receive after success: toast, clear barcode field(s), sticky type/matrix/project, focus primary barcode. No sample-detail redirect. No aliquot dialog.
 - Mass/conc stay off Sample.
@@ -81,7 +81,7 @@ samples.project_id        ← required, sticky
 containers.name           ← scanned barcode (unique; 409 on duplicate)
 containers.type_id        ← default tube (off form)
 contents                  ← sample_id + container_id  (1..N rows → same sample)
-tests                     ← optional; status assigned/pending
+tests                     ← no rows created by CORE receive
 ```
 
 **Follow-on (results slice — not CORE):**
@@ -106,13 +106,13 @@ class SampleReceiveRequest(BaseModel):
     sample_type: UUID
     matrix: UUID
     project_id: UUID                # required, sticky; never auto-create
-    analysis_ids: list[UUID] = []   # optional; prefer omit as work plan
+    analysis_ids: list[UUID] = []   # legacy compatibility only; ignored
     temperature: float | None = None
     client_sample_id: str | None = None
     # no status, no sample name, no container_type_id, no client_id
 ```
 
-In one transaction: assign `samples.name` from the existing name template; set status Available for Testing and `received_date`; for **primary + each additional** barcode insert container (`name = barcode`, 409 on any duplicate) + contents → same sample; insert optional tests as assigned/pending. Extra barcodes are extra vessels, not new Samples.
+In one transaction: assign `samples.name` from the existing name template; set status Available for Testing and `received_date`; for **primary + each additional** barcode insert container (`name = barcode`, 409 on any duplicate) + contents → same sample. Do not insert Tests. Extra barcodes are extra vessels, not new Samples.
 
 ### POST /api/samples/{id}/tests  and  DELETE /api/samples/{id}/tests/{test_id}
 
@@ -139,7 +139,7 @@ Service: write `results.reported_result` and `results.qualifiers`. `raw_result` 
 | **Permission** | `POST /api/samples/receive` uses the **same AuthZ as sample create** + **project RLS** (`has_project_access` / `lims_app`). |
 | **No parallel path** | No separate receive permission, no client-only bypass, no second AuthZ spine. |
 | **One API** | One receive endpoint. Bounce a parallel orphan multi-call (create sample → create container → link) and bounce a second receive API. |
-| **One txn** | Sample + **1..N Containers** + Contents each (+ optional tests) in a **single DB transaction**. Clients that drop mid-sequence are refused by design — there is no safe multi-call substitute. |
+| **One txn** | Sample + **1..N Containers** + Contents each in a **single DB transaction**. CORE creates zero Tests. Clients that drop mid-sequence are refused by design — there is no safe multi-call substitute. |
 | **Containers at receive** | All intake vessels for this sample share that same txn (not follow-up calls). Primary + optional additional barcodes. True extra vessels, not daughter Samples. |
 
 Implementers: enforce AuthZ/RLS **inside** the receive service before/with the txn; do not rely on the UI to gate project access.
@@ -149,7 +149,7 @@ Formal CSO stamp: [`.docs/review/security-review/atomic-receive.md`](../security
 ## 5. Receive loop (UI)
 
 1. Scan (or type) **primary** barcode. **No sample-ID field.** Optionally add more barcodes for the same sample.
-2. Sticky sample type, matrix, project. Temperature optional. Prefer no test assignment on default profile.
+2. Sticky sample type, matrix, project. Temperature optional. No analyses picker or test assignment.
 3. Submit.
 4. Stay on the screen. Toast. Clear barcode field(s). Keep sticky fields. Focus primary barcode.
 5. Next sample (or next primary tube).
@@ -160,7 +160,7 @@ Do not redirect to sample detail. Do not open an aliquot dialog. Duplicate barco
 
 | Locked now (CORE) | Later, not CORE |
 |-------------------|-----------------|
-| One sample + **1..N containers** + contents (+ optional asked-for tests), one txn | Aliquot **after** process (new dest vessel) — distinct from multi-tube **receive** |
+| One sample + **1..N containers** + contents, zero Tests, one txn | Asked-for/work-plan (A-15); aliquot **after** process (new dest vessel) |
 | System sample ID + container barcode | Derivative: new sample + `parent_sample_id` |
 | Scan lookup, no sample-ID field on receive | Aliquot UI |
 | AuthZ = sample create + project RLS | `work_order` / extract-hold / intake-profile engine |

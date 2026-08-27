@@ -32,12 +32,11 @@ Legacy wizard at `/accessioning` is **not** the happy path (see [accessioning-wo
 1. Set sticky **sample type**, **matrix**, **project** (session-sticky).  
 2. Scan / type **primary barcode** (required).  
 3. Optionally **Add** additional barcodes for the **same sample** (not aliquot).  
-4. Optionally omit asked-for analyses (preferred) or select analyses (Assigned/Pending only).  
-5. Optional temperature / client sample ID.  
-6. **Receive** → toast → barcodes clear → sticky fields remain → focus primary.  
-7. Stay on the page for the next specimen.
+4. Optional temperature / client sample ID.
+5. **Receive** → toast → barcodes clear → sticky fields remain → focus primary.
+6. Stay on the page for the next specimen.
 
-**Not on the form:** sample ID, status, container type, aliquot dialog, redirect to sample detail.
+**Not on the form:** sample ID, status, container type, analyses/work-plan picker, aliquot dialog, redirect to sample detail.
 
 ---
 
@@ -54,7 +53,6 @@ POST /samples/receive
   "sample_type": "<uuid>",
   "matrix": "<uuid>",
   "project_id": "<uuid>",
-  "analysis_ids": [],
   "temperature": null,
   "client_sample_id": null
 }
@@ -69,7 +67,7 @@ POST /samples/receive
 3. System `samples.name` via name template  
 4. Sample status → Available for Testing; set `received_date`  
 5. For each barcode → Container + Contents → same sample  
-6. Optional tests → Assigned/Pending  
+6. Return `tests: []`; CORE never inserts Test rows
 
 **Errors:** duplicate barcode → **409** (full rollback); missing required → **422**; no project access / client → **403**.
 
@@ -86,11 +84,11 @@ POST /samples/receive
 
 ---
 
-## Tests at receive
+## Tests and work plans
 
-- Prefer **omit** `analysis_ids`.  
-- If present = **asked for** only (Assigned/Pending), not In Process, not the work plan.  
-- Later: add/remove tests from sample.  
+- CORE receive creates **zero Tests**.
+- Omit `analysis_ids`; legacy clients may send it, but CORE ignores it.
+- A-15 asked-for/work-plan behavior is parked. Add/remove tests later through the separate tests workflow.
 - `DELETE /tests/{id}` → **400** if results exist (A-14).
 
 ---
