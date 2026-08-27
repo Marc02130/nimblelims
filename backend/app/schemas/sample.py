@@ -17,7 +17,7 @@ class SampleBase(BaseModel):
     date_sampled: Optional[datetime] = Field(None, description="When sample was collected (for expiration calculation)")
     sample_type: UUID = Field(..., description="ID of sample type from list_entries")
     status: UUID = Field(..., description="ID of status from list_entries")
-    matrix: UUID = Field(..., description="ID of matrix from list_entries")
+    matrix: Optional[UUID] = Field(None, description="Legacy matrix; nullable — dropped from intake")
     temperature: Optional[float] = None
     parent_sample_id: Optional[UUID] = None
     client_id: Optional[UUID] = Field(None, description="ID of client (accessed via project relationship)")
@@ -425,7 +425,6 @@ class SampleReceiveRequest(BaseModel):
         description="Optional extra vessel barcodes for the same sample",
     )
     sample_type: UUID = Field(..., description="ID of sample type from list_entries")
-    matrix: UUID = Field(..., description="ID of matrix from list_entries")
     project_id: UUID = Field(..., description="Required sticky project; never auto-created")
     container_type_id: UUID = Field(
         ...,

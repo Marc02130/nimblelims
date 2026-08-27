@@ -29,7 +29,7 @@ Legacy wizard at `/accessioning` is **not** the happy path (see [accessioning-wo
 
 ## UI loop (`/receive`)
 
-1. Set sticky **sample type**, **matrix**, **project**, **container type** (session-sticky).  
+1. Set sticky **sample type**, **project**, **container type** (session-sticky).  
 2. Scan / type **primary barcode** (required).  
 3. Optionally **Add** additional barcodes for the **same sample** (not aliquot). Extra barcodes = more tubes of **that** sample.  
 4. Optional temperature / client sample ID.
@@ -53,7 +53,6 @@ POST /samples/receive
   "container_barcode": "NBIO-AR-0001",
   "additional_container_barcodes": ["NBIO-AR-0001B"],
   "sample_type": "<uuid>",
-  "matrix": "<uuid>",
   "project_id": "<uuid>",
   "container_type_id": "<1x1 container type uuid>",
   "temperature": null,
@@ -61,8 +60,9 @@ POST /samples/receive
 }
 ```
 
-**Forbidden body fields (422):** `name`, `status`, `due_date`, `qc_type`, `client_id`, …  
-**Required:** `container_type_id` — active **1×1** type only (plates → **400**).  
+**Forbidden body fields (422):** `name`, `status`, `matrix`, `due_date`, `qc_type`, `client_id`, …  
+**Required:** `sample_type`, `project_id`, `container_type_id` (1×1 only; plates → **400**).  
+**Matrix:** dropped from intake (`samples.matrix` nullable; not set on receive).  
 If `analysis_ids` is present and **non-empty** → **422**. Do not ignore. Do not mint Tests. Empty/omitted is the only accepted path; still zero Tests.
 
 **`analysis_ids` (WO-7):** omit the field or send `[]`. Non-empty → **422**. Refuse, do not ignore, do not mint Tests.

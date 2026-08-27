@@ -55,7 +55,7 @@ This script is the **receive happy path** sign-off. Do **not** use `uat-sample-a
 | Alice wave (AR-HV-01) | `NBIO-AR-0001` … `NBIO-AR-0024`. Human sign-off: `0001` then `0002`. Bodies omit `analysis_ids` (empty `[]` also OK). |
 | Multi-vessel (AR-HV-MC) | Primary `NBIO-AR-MC-P` + additional `NBIO-AR-MC-A1`, `NBIO-AR-MC-A2` (same sample, one commit) |
 | Keyboard barcode (AR-HV-05) | `NBIO-AR-KB-0001` |
-| Alice sticky | Plasma / Plasma (K2EDTA) / mAb-2301 PK Study |
+| Alice sticky | Sample type Plasma / project mAb-2301 PK Study / 1×1 container type (e.g. Cryovial) |
 | Bob wave (AR-MU-01) | `CART-AR-0001` … `CART-AR-0008`; sticky PBMC / Cell Supernatant / CAR-T In-Process Testing |
 | Client / no receive (AR-RBAC-01) | `david-cro` → no Receive nav or **403** on POST |
 | Aliquots | None in CORE. Multi-tube receive ≠ aliquot UI. |
