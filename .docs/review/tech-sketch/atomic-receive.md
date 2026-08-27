@@ -1,12 +1,12 @@
 # Tech sketch: Atomic receive
 
 **Date:** 2026-08-20  
-**Updated:** 2026-08-26 (422 if `analysis_ids` non-empty — refuse, do not ignore) · 2026-08-27 (CORE creates zero Tests; A-15 parked) · 2026-08-26 (Architecture/UI Accept + 1..N vessels) · 2026-08-24 (AuthZ fold, PR 68)
+**Updated:** 2026-08-26 (422 if `analysis_ids` non-empty — refuse, do not ignore; 2026-08-26 chat punch) · 2026-08-27 (CORE creates zero Tests; A-15 parked) · 2026-08-26 (Architecture/UI Accept + 1..N vessels) · 2026-08-24 (AuthZ fold, PR 68)
 **Stem:** `atomic-receive`  
 **Process:** [`.docs/review/development-process/README.md`](../development-process/README.md)  
 **AuthZ docs gate:** **Satisfied** — Heidi/Günter **Accept with conditions** on §4b + [security-review/atomic-receive.md](../security-review/atomic-receive.md) (PR 68). Receive = sample create + project RLS; one txn; no parallel path.  
-**Architecture:** **Accept** on CORE — [architecture-review/atomic-receive.md](../architecture-review/atomic-receive.md). Condition: **422 if `analysis_ids` non-empty** (Heidi 2026-08-26).  
-**UI:** **Accept** on CORE — [ui-review/atomic-receive.md](../ui-review/atomic-receive.md). Condition: receive never offers analysis and never sends `analysis_ids` (Mathilda 2026-08-26).  
+**Architecture:** **Accept** on CORE — [architecture-review/atomic-receive.md](../architecture-review/atomic-receive.md). Accept holds only with refuse-or-ignore (no Test mint). Condition from the **2026-08-26 chat punch**: Wilhelmina pick **refuse** — **422 if `analysis_ids` non-empty**.  
+**UI:** **Accept** on CORE — [ui-review/atomic-receive.md](../ui-review/atomic-receive.md). Same **2026-08-26 chat punch** condition: receive never offers analysis and never sends `analysis_ids`; API **422** if non-empty.  
 **Product implement:** **Provisional open for AR CORE only** (Leadership 2026-08-26) — identity + **1..N vessels** + field align + docs/UAT. Coding stays Grok Build. Do **not** treat PR 30 “Implement gate OPEN” as license for results-entry / profile engine / work_order / extract-hold / IC50. PR 71 stays draft until UAT + dogfood.  
 **Packet design (historical, still stands):** CEO Accept (PR 30 merged). Lab Ops L2–L4 + L1 retracted. Scientific CSO Accept.  
 **CORE restamp (2026-08-26):** Architecture **Accept** + UI **Accept** on CORE. Implement follows PRD **1..N**, not “first vessel.” **`analysis_ids` non-empty → 422** (refuse, do not ignore, do not mint). Results persist lock remains **design SoT for a follow-on slice**, not CORE UAT blocker.  
@@ -63,7 +63,7 @@ Normative with Leadership 2026-08-26 / CEO C5–C8. Architecture and UI **Accept
 5. Project auto-create / optional project
 6. Container type / tube picker on the scan loop
 7. Analysis as “what’s next” / work plan
-8. Test mint at receive / `_create_asked_for_tests` / **ignore or silent-drop of `analysis_ids`** (must **422** if non-empty)
+8. Test mint at receive / `_create_asked_for_tests` / `analysis_ids` as work plan / **ignore or silent-drop of `analysis_ids`** (must **422** if non-empty)
 9. `work_order` / routing / Process·Exp·LimsRun / extract-hold / aliquot in the AR PR
 10. Intake-profile engine or second receive API/permission
 11. Results-entry treated as CORE ship blocker
@@ -145,7 +145,7 @@ Service: write `results.reported_result` and `results.qualifiers`. `raw_result` 
 | **One API** | One receive endpoint. Bounce a parallel orphan multi-call (create sample → create container → link) and bounce a second receive API. |
 | **One txn** | Sample + **1..N Containers** + Contents each in a **single DB transaction**. CORE creates zero Tests. Clients that drop mid-sequence are refused by design — there is no safe multi-call substitute. |
 | **Containers at receive** | All intake vessels for this sample share that same txn (not follow-up calls). Primary + optional additional barcodes. True extra vessels, not daughter Samples. |
-| **`analysis_ids`** | Non-empty → **422** (Heidi 2026-08-26). Do not ignore. Do not mint. |
+| **`analysis_ids`** | Non-empty → **422** (2026-08-26 chat punch; Wilhelmina pick: refuse). Do not ignore. Do not mint. |
 
 Implementers: enforce AuthZ/RLS **inside** the receive service before/with the txn; do not rely on the UI to gate project access.
 
@@ -180,6 +180,6 @@ Do not redirect to sample detail. Do not open an aliquot dialog. Duplicate barco
 | Lab Ops | L2–L4 hold. **L1 retracted.** Two IDs correct. Receive must not show a sample-ID field. **1..N vessels** (not first-tube). |
 | CSO | Accept. DELETE-with-results is data integrity. Classic results only. N/A for CORE assay/QC. |
 | Security (Heidi/Günter AuthZ) | **Accept with conditions** (PR 68). AuthZ **docs** gate **satisfied** — sketch §4b + [security-review/atomic-receive.md](../security-review/atomic-receive.md). Receive = sample create + project RLS; one API; one txn; no parallel path. **CORE provisional open** — AuthZ conditions land with CORE code. |
-| Architecture | **Accept on CORE** — [architecture-review/atomic-receive.md](../architecture-review/atomic-receive.md). **Condition (2026-08-26):** non-empty `analysis_ids` → **422**; refuse, do not ignore, do not mint. 1..N vessels; bounce list in §2b. Persist lock is follow-on SoT, not CORE ship. |
-| UI | **Accept on CORE** — [ui-review/atomic-receive.md](../ui-review/atomic-receive.md). New receive loop. Scan primary + optional extra barcodes. No analysis picker; never send `analysis_ids`. Bounce a sample-ID box, wizard, single-vessel-only UI, or analysis-as-work-plan. |
+| Architecture | **Accept on CORE** — [architecture-review/atomic-receive.md](../architecture-review/atomic-receive.md). **Accept holds only with refuse-or-ignore (no Test mint).** Recorded from the **2026-08-26 chat punch**. Locked pick: **refuse** — non-empty `analysis_ids` → **422**. 1..N vessels; bounce list in §2b. Persist lock is follow-on SoT, not CORE ship. |
+| UI | **Accept on CORE** — [ui-review/atomic-receive.md](../ui-review/atomic-receive.md). Same **2026-08-26 chat punch** condition (refuse-or-ignore, no Test mint). New receive loop. Scan primary + optional extra barcodes. No analysis picker; never send `analysis_ids`. Bounce a sample-ID box, wizard, single-vessel-only UI, or analysis-as-work-plan. |
 | CEO | **Accept with conditions** (HOLD SCOPE). One sample + **1..N vessels**. No aliquot UI, no ELN, no IC50. Heidi bounces tables, a sample-ID field, a Received hop, or `results.unit_id`. **CORE provisional open** (Leadership 2026-08-26); results-entry is a follow-on slice. PR 71 stays draft until UAT + dogfood. |
