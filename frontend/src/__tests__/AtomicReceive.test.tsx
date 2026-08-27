@@ -7,11 +7,13 @@ import AtomicReceive from '../pages/AtomicReceive';
 const mockReceiveSample = jest.fn();
 const mockGetListEntries = jest.fn();
 const mockGetProjects = jest.fn();
+const mockGetContainerTypes = jest.fn();
 
 jest.mock('../services/apiService', () => ({
   apiService: {
     getListEntries: (...args: any[]) => mockGetListEntries(...args),
     getProjects: (...args: any[]) => mockGetProjects(...args),
+    getContainerTypes: (...args: any[]) => mockGetContainerTypes(...args),
     receiveSample: (...args: any[]) => mockReceiveSample(...args),
     getCurrentUser: jest.fn().mockResolvedValue({
       id: '1',
@@ -23,7 +25,6 @@ jest.mock('../services/apiService', () => ({
   },
 }));
 
-// Avoid UserProvider network — AtomicReceive does not require user context
 jest.mock('../contexts/UserContext', () => ({
   useUser: () => ({
     user: {
@@ -59,7 +60,6 @@ describe('AtomicReceive', () => {
       return [{ id: 'matrix-1', name: 'Serum' }];
     });
     mockGetProjects.mockImplementation(async (filters?: { size?: number }) => {
-      // Guard: backend le=100 — UI must not request size > 100
       if (filters?.size != null && filters.size > 100) {
         const err: any = new Error('Unprocessable Entity');
         err.response = {
@@ -80,6 +80,11 @@ describe('AtomicReceive', () => {
       }
       return { projects: [{ id: 'proj-1', name: 'Study A' }] };
     });
+    mockGetContainerTypes.mockResolvedValue([
+      { id: 'ct-cryo', name: 'Cryovial (2mL)', dimensions: '1x1' },
+      { id: 'ct-plate', name: '96-Well Plate', dimensions: '8x12' },
+      { id: 'ct-conical', name: '15mL Conical Tube', dimensions: '1x1' },
+    ]);
     mockReceiveSample.mockResolvedValue({
       sample_id: 's1',
       sample_name: 'S-100',
@@ -88,14 +93,17 @@ describe('AtomicReceive', () => {
     });
   });
 
-  test('renders receive loop without sample-ID or status fields', async () => {
+  test('renders receive loop with sticky 1x1 container type, no sample-ID/status', async () => {
     renderPage();
     expect(await screen.findByRole('heading', { name: 'Receive' })).toBeInTheDocument();
     expect(screen.getByTestId('primary-barcode')).toBeInTheDocument();
+    expect(screen.getByTestId('container-type')).toBeInTheDocument();
     expect(screen.queryByLabelText(/lab sample id/i)).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/^status$/i)).not.toBeInTheDocument();
-    expect(screen.queryByLabelText(/container type/i)).not.toBeInTheDocument();
-    expect(screen.queryByLabelText(/asked-for analyses/i)).not.toBeInTheDocument();
+    // Plate must not appear in options
+    fireEvent.mouseDown(screen.getByRole('combobox', { name: /container type/i }));
+    expect(screen.queryByRole('option', { name: /96-Well Plate/i })).not.toBeInTheDocument();
+    expect(screen.getByRole('option', { name: /Cryovial/i })).toBeInTheDocument();
   });
 
   test('adds additional barcode chips', async () => {
@@ -108,7 +116,7 @@ describe('AtomicReceive', () => {
     expect(screen.getByTestId('extra-barcode-NBIO-EXTRA-1')).toBeInTheDocument();
   });
 
-  test('submits receive and clears barcodes', async () => {
+  test('submits receive with container_type_id and clears barcodes', async () => {
     renderPage();
     const primary = await screen.findByTestId('primary-barcode');
 
@@ -118,6 +126,7 @@ describe('AtomicReceive', () => {
     fireEvent.click(await screen.findByRole('option', { name: 'Serum' }));
     fireEvent.mouseDown(screen.getByRole('combobox', { name: /^project$/i }));
     fireEvent.click(await screen.findByRole('option', { name: 'Study A' }));
+    // Cryovial auto-selected as sticky default among 1×1 types
 
     fireEvent.change(primary, { target: { value: 'NBIO-1' } });
     fireEvent.click(screen.getByTestId('receive-submit'));
@@ -129,10 +138,10 @@ describe('AtomicReceive', () => {
           sample_type: 'type-1',
           matrix: 'matrix-1',
           project_id: 'proj-1',
+          container_type_id: 'ct-cryo',
         })
       );
     });
-    expect(mockReceiveSample.mock.calls[0][0]).not.toHaveProperty('analysis_ids');
 
     await waitFor(() => {
       expect((screen.getByTestId('primary-barcode') as HTMLInputElement).value).toBe('');

@@ -23,8 +23,7 @@ BANNED_FIELDS = {
     "sample_name": "HACKED-SAMPLE-ID",
     "lab_id": "HACKED-LAB-ID",
     "status": str(uuid4()),
-    "container_type_id": str(uuid4()),
-    "container_type": str(uuid4()),
+    "container_type": str(uuid4()),  # wrong key — must be container_type_id
     "due_date": datetime.utcnow().isoformat(),
     "qc_type": str(uuid4()),
     "client_id": str(uuid4()),
@@ -94,6 +93,7 @@ def _body(receive_seed, *, barcode="NBIO-P2-0001", **overrides):
         "sample_type": str(receive_seed["sample_type"].id),
         "matrix": str(receive_seed["matrix"].id),
         "project_id": str(receive_seed["project"].id),
+        "container_type_id": str(receive_seed["tube"].id),
         "analysis_ids": [],
     }
     payload.update(overrides)
@@ -141,22 +141,13 @@ class TestAtomicReceivePhase2:
         sample = db_session.query(Sample).filter(Sample.id == data["sample_id"]).one()
         assert sample.name == data["sample_name"]
 
-    def test_a10_default_tube_off_form(
+    def test_container_type_applied_from_body(
         self,
         client: TestClient,
         admin_token: str,
         receive_seed,
         db_session: Session,
     ):
-        other = ContainerType(
-            name="Plate-96",
-            description="Not the default",
-            capacity=96,
-            dimensions="8x12",
-        )
-        db_session.add(other)
-        db_session.commit()
-
         r = client.post(
             "/samples/receive",
             json=_body(receive_seed, barcode="NBIO-P2-TUBE"),
@@ -166,9 +157,39 @@ class TestAtomicReceivePhase2:
         cid = r.json()["containers"][0]["id"]
         container = db_session.query(Container).filter(Container.id == cid).one()
         assert container.type_id == receive_seed["tube"].id
-        assert container.type_id != other.id
 
         contents = (
             db_session.query(Contents).filter(Contents.container_id == container.id).one()
         )
         assert contents.sample_id is not None
+
+    def test_plate_container_type_refused(
+        self,
+        client: TestClient,
+        admin_token: str,
+        receive_seed,
+        db_session: Session,
+    ):
+        plate = ContainerType(
+            name="Plate-96",
+            description="Multi-well — not allowed at atomic receive",
+            capacity=96,
+            dimensions="8x12",
+        )
+        db_session.add(plate)
+        db_session.commit()
+
+        before = db_session.query(Sample).count()
+        r = client.post(
+            "/samples/receive",
+            json=_body(
+                receive_seed,
+                barcode="NBIO-P2-PLATE",
+                container_type_id=str(plate.id),
+            ),
+            headers=_auth_header(admin_token),
+        )
+        assert r.status_code == 400, r.text
+        detail = str(r.json()["detail"]).lower()
+        assert "1×1" in r.json()["detail"] or "1x1" in detail or "plate" in detail or "multi" in detail
+        assert db_session.query(Sample).count() == before

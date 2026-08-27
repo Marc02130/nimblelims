@@ -29,14 +29,16 @@ Legacy wizard at `/accessioning` is **not** the happy path (see [accessioning-wo
 
 ## UI loop (`/receive`)
 
-1. Set sticky **sample type**, **matrix**, **project** (session-sticky).  
+1. Set sticky **sample type**, **matrix**, **project**, **container type** (session-sticky).  
 2. Scan / type **primary barcode** (required).  
 3. Optionally **Add** additional barcodes for the **same sample** (not aliquot). Extra barcodes = more tubes of **that** sample.  
 4. Optional temperature / client sample ID.
 5. **Receive** → toast → barcodes clear → sticky fields remain → focus primary.
 6. Stay on the page for the next specimen.
 
-**Not on the form:** sample ID, status, container type, **analysis picker**, aliquot dialog, redirect to sample detail. OOB receive never offers analyses and never sends `analysis_ids`.
+**Container type:** required; **1×1 vessels only** (`dimensions` = `1x1`). Plates / multi-well are hidden in the UI and refused by the API. Same type applies to all vessels on the commit.
+
+**Not on the form:** sample ID, status, **analysis picker**, aliquot dialog, redirect to sample detail. OOB receive never offers analyses and never sends `analysis_ids`.
 
 ---
 
@@ -53,12 +55,14 @@ POST /samples/receive
   "sample_type": "<uuid>",
   "matrix": "<uuid>",
   "project_id": "<uuid>",
+  "container_type_id": "<1x1 container type uuid>",
   "temperature": null,
   "client_sample_id": null
 }
 ```
 
-**Forbidden body fields (422):** `name`, `status`, `container_type_id`, `due_date`, `qc_type`, `client_id`, …  
+**Forbidden body fields (422):** `name`, `status`, `due_date`, `qc_type`, `client_id`, …  
+**Required:** `container_type_id` — active **1×1** type only (plates → **400**).  
 If `analysis_ids` is present and **non-empty** → **422**. Do not ignore. Do not mint Tests. Empty/omitted is the only accepted path; still zero Tests.
 
 **`analysis_ids` (WO-7):** omit the field or send `[]`. Non-empty → **422**. Refuse, do not ignore, do not mint Tests.
@@ -66,10 +70,10 @@ If `analysis_ids` is present and **non-empty** → **422**. Do not ignore. Do no
 **Server (one txn):**
 
 1. AuthZ = sample create + project access/RLS (PR 68)  
-2. Default tube type off-form for all vessels  
+2. Validate `container_type_id` is active **1×1** (refuse plates / multi-well)  
 3. System `samples.name` via name template  
 4. Sample status → Available for Testing; set `received_date`  
-5. For each barcode → Container + Contents → same sample  
+5. For each barcode → Container (`type_id` = sticky type) + Contents → same sample  
 6. Return `tests: []`; CORE never inserts Test or Result rows
 
 **Errors:** duplicate barcode → **409** (full rollback); missing required → **422**; non-empty `analysis_ids` → **422** before receive writes; no project access / client → **403**.

@@ -412,8 +412,9 @@ class BulkSampleAccessioningRequest(BaseModel):
 class SampleReceiveRequest(BaseModel):
     """Atomic receive CORE: one sample + 1..N vessels in one transaction.
 
-    Phase 2 field hygiene (RQ-AR-5/8/9, A-9–A-11): forbidden extras include
-    name/sample_name, status, container_type(_id), due_date, qc_type, client_id.
+    Field hygiene: forbidden extras include name/sample_name, status, due_date,
+    qc_type, client_id. ``container_type_id`` is required and must be a 1×1
+    vessel type (plates / multi-well refused by the service).
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -426,6 +427,10 @@ class SampleReceiveRequest(BaseModel):
     sample_type: UUID = Field(..., description="ID of sample type from list_entries")
     matrix: UUID = Field(..., description="ID of matrix from list_entries")
     project_id: UUID = Field(..., description="Required sticky project; never auto-created")
+    container_type_id: UUID = Field(
+        ...,
+        description="1×1 container type for all vessels on this receive (not plates)",
+    )
     analysis_ids: List[UUID] = Field(
         default_factory=list,
         description="Must be omitted or empty; non-empty values are refused by CORE",
