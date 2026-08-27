@@ -204,35 +204,38 @@ def receive_sample(
             )
 
     received_at = datetime.utcnow()
+    import uuid as _uuid
 
+    # Name generation may CREATE SEQUENCE; lims_app often lacks CREATE privilege.
+    # Use a savepoint so failure does not abort the outer receive transaction.
     try:
-        sample_name = generate_name_for_sample(
-            db=db,
-            project_id=str(project.id),
-            received_date=received_at,
-        )
+        with db.begin_nested():
+            sample_name = generate_name_for_sample(
+                db=db,
+                project_id=str(project.id),
+                received_date=received_at,
+            )
+            if not sample_name:
+                raise ValueError("empty generated name")
     except Exception as e:
         logger.warning("Name generation failed (%s); falling back to UUID", e)
-        import uuid as _uuid
-
         sample_name = str(_uuid.uuid4())
-
-    sample = Sample(
-        name=sample_name,
-        sample_type=req.sample_type,
-        matrix=None,  # matrix dropped from intake; sample_type is SoT
-        status=available_status.id,
-        project_id=project.id,
-        received_date=received_at,
-        temperature=req.temperature,
-        client_sample_id=req.client_sample_id,
-        created_by=current_user.id,
-        modified_by=current_user.id,
-    )
-    db.add(sample)
 
     created_containers: List[Container] = []
     try:
+        sample = Sample(
+            name=sample_name,
+            sample_type=req.sample_type,
+            matrix=None,  # matrix dropped from intake; sample_type is SoT
+            status=available_status.id,
+            project_id=project.id,
+            received_date=received_at,
+            temperature=req.temperature,
+            client_sample_id=req.client_sample_id,
+            created_by=current_user.id,
+            modified_by=current_user.id,
+        )
+        db.add(sample)
         db.flush()  # sample.id
 
         for barcode in barcodes:
