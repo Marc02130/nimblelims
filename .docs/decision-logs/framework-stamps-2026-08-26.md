@@ -6,6 +6,7 @@
 - [framework-driven-lims-accessioning](../discussions/2026-08-25-framework-driven-lims-accessioning.md)  
 - [work-orders-assay-params-compounds](../discussions/2026-08-25-work-orders-assay-params-compounds.md)  
 - [what-is-a-good-framework](../discussions/2026-08-25-what-is-a-good-framework.md)  
+- [AR CORE leadership](../discussions/2026-08-26-ar-core-plan-leadership.md)  
 
 ---
 
@@ -36,14 +37,15 @@
 - Params snapshot at LimsRun start and freeze.
 - Classic type-a-number Result on a Test still lands (WO-4); two writers on same Test = 409.
 - Instantiating from `work_order` uses existing process AuthZ — no client expand.
-- AR P0 still first; processing waits on identity + first vessel.
+- **AR CORE hole closed:** `_create_asked_for_tests` is a **fail**. Empty `analysis_ids` as happy path is **not** enough. CORE **refuses** `analysis_ids` — **no Test mint at receive**. **Refuse (sketch pick):** if `analysis_ids` is present and non-empty → **422** (do not mint Tests, do not persist asked-for analyses). Empty or omitted is the only accepted path. Do **not** ignore. Do not add `work_order` or a new asked-for store in the AR packet. Classic Test+Result with no LimsRun still exists — do not silently kill it in stories. Test row at LimsRun start is this stamp, a later packet.
+- AR CORE = identity + **1..N** vessels (not first vessel). Processing waits on CORE identity. Hold merge on PR 71 until UAT + dogfood.
 
 ---
 
-## Sequencing (unchanged)
+## Sequencing (unchanged order; CORE vessel count corrected)
 
-1. Atomic receive P0 — identity + first vessel (when Marc green-lights code).  
-2. Work-order + routing map + order params packet.  
+1. Atomic receive CORE — identity + **1..N** vessels; **refuse `analysis_ids`** (when Marc green-lights code; PR 71 stays draft pending UAT + dogfood).  
+2. Work-order + routing map + order params packet. Test at **LimsRun start** (WO-7).  
 3. Registration / lots packet (compound, gene, protein).  
 4. Intake-profile engine beyond AR OOB when a second real profile is needed.
 

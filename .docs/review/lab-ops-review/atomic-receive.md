@@ -1,61 +1,58 @@
-# Lab Ops Review (SVP): Atomic receive
+# Lab Ops Review (SVP): Atomic receive CORE
 
 **Date:** 2026-08-20  
-**Status:** **Accept with conditions** (L1 retracted)  
+**Updated:** 2026-08-26 (CORE re-review — **1..N** vessels; L4 Test-at-receive **superseded**)  
+**Status:** **Accept with conditions** (L2–L3; L1 retracted; L4 Test-at-receive superseded)  
 **Reviewer persona:** SVP Lab Ops  
-**Packet:** [tech-sketch/atomic-receive.md](../tech-sketch/atomic-receive.md)  
-**Related:** Leadership freeze 2026-08-20 (three-pillar MVP)
+**Scope of this stamp:** **AR CORE only** — identity + **1..N vessels**; **refuse `analysis_ids`**; docs/UAT/dogfood  
+**Packet:** [tech-sketch/atomic-receive.md](../tech-sketch/atomic-receive.md) · [requirements/atomic-receive.md](../requirements/atomic-receive.md)  
+**Related:** [Leadership gate](../../discussions/2026-08-26-ar-core-plan-leadership.md) · [WO-7](../../decision-logs/framework-stamps-2026-08-26.md)
 
 ## 1. Executive summary
 
-The packet is the wedge: scan receive, one transaction, type a number on a test. Two identities are correct lab practice. Barcode is the tube. Sample ID is the material.
+CORE is bench-real for high-volume receive: scan a **primary** barcode, optionally add **additional** barcodes for the same material, keep sticky type/matrix/project, commit once, stay on the form. Extra tubes are extra vessels on the **same** Sample — not daughters, not aliquot.
 
-**L1 is retracted.** Sample ID is not the tube barcode.
-
-**Verdict: Accept with conditions** (L2–L4). No aliquot or derivative UI this packet.
-
-## 2. Identities (locked)
+**Two identities remain correct (L1 stays retracted):**
 
 | Identity | Field | Receive |
 |----------|--------|---------|
-| Tube | `containers.name` | Scanned barcode. Duplicate scan → 409 on container only. |
-| Material | `samples.name` | System-assigned from the existing name template. Tech does not type it. 409 only if that sample ID collides. |
+| Tube / vessel | `containers.name` | Scanned barcode. Any duplicate (request or DB) → **409** and full rollback. Stay on the scan well. |
+| Material | `samples.name` | System-assigned from the existing name template. Tech does **not** type it. **No sample-ID field.** |
 
-Receive screen has **no sample-ID field**. Lookup is scan the tube. P0 creates one sample plus its first tube.
+**L4 Test-at-receive is superseded.** CORE creates **zero Tests**. **Refuse:** if `analysis_ids` is present and non-empty → **422**. Empty or omitted only. `_create_asked_for_tests` is a fail. Ignore is not the pick. DELETE-with-results still stands for independently created tests. Classic Test+Result with no LimsRun still exists — not this packet. Test at LimsRun start is WO-7, later.
 
-Aliquot later: same sample, another container + contents row.  
-Derivative later (DNA from blood): new sample with `parent_sample_id`.  
-Not this packet.
+**Language:** Prefer **primary + additional barcodes** / **1..N vessels**. Do **not** use “first tube / first vessel only.”
 
-## 3. Conditions (same phase)
+**Verdict: Accept with conditions** (L2–L3). Merge hold until UAT + dogfood. PR 71 stays draft.
+
+## 2. Conditions (must land with CORE implement)
 
 | ID | Condition | Why |
 |----|-----------|-----|
-| **L1** | **Retracted.** | Two IDs. Barcode is the tube. |
-| **L2** | Project required and session-sticky. Never auto-create a project per tube. | Auto-create dumps garbage projects. |
-| **L3** | Container type is the lab default tube. Not a per-tube field. | Asking type on every scan breaks the loop. |
-| **L4** | Test status at receive is assigned/pending, not In Process. DELETE refused if results exist. | In Process lies that work started. Deleting a resulted test breaks the audit. |
+| **L1** | **Retracted.** Barcode ≠ sample ID. Two identities. | Sample ID is material; barcode is the tube. |
+| **L2** | Project **required** and **session-sticky**. Never auto-create a project per tube. | Auto-create dumps garbage projects. |
+| **L3** | Container type = **lab default tube**, applied to **all** vessels on the call, **off the form**. No tube picker. | Asking type on every scan breaks the loop. |
+| **L4** | **Superseded.** CORE receive creates **zero Tests**. **Refuse** present non-empty `analysis_ids` → **422**. **DELETE** remains refused if an independently created test has results. | Receive does not imply an order or work plan. A-15 parked. WO-7 later. |
 
-## 4. Locked (do not reopen)
+## 3. Locked for CORE (do not reopen)
 
-- One POST, one DB transaction (sample + first container + contents + optional tests)
-- After success: stay on receive, toast, clear barcode, sticky type/matrix/project, focus barcode
-- No sample-detail redirect, no aliquot dialog
-- Tests optional at receive; add/remove from sample with no wizard
-- One status on commit: Available for Testing. Receipt is `received_date`. No status_history. Techs do not pick status.
-- Results: `reported_result` + `qualifiers`. Unit from `analytes.units_default`; missing → 422. No `results.unit_id`.
-- Existing tables only. Temperature optional.
+- One `POST /api/samples/receive`, one DB transaction: sample + **1..N** 1×1 containers + contents each; **zero Tests**
+- Extra barcodes = more 1×1 Contents on the **same** Sample, not daughter Samples
+- UX: **primary barcode required** + **optional additional barcodes** on the same commit
+- After success: stay on receive; toast; clear barcode field(s); sticky type/matrix/project; focus **primary**
+- Collision → **409**, stay on the scan well; no partial commit
+- No sample-detail redirect; no aliquot dialog; no sample-ID field; no status picker; no tube picker; no analyses picker / work-plan
+- Status on commit: **Available for Testing** only; receipt = `received_date`
+- AuthZ identical to sample create + project RLS on the **whole txn**
+- Existing tables only
+- **OUT:** results-entry as ship blocker; aliquot/derivative UI; intake-profile engine; work_order; wizard as forever receive path; IC50
 
-## 5. Few fields
-
-Per-tube: barcode (required), optional `client_sample_id`.  
-Session-sticky: sample type, matrix, project, optional analyses.  
-Off the form: sample ID, status, container type, due_date, qc_type, client_id.
-
-## 6. Verdict
+## 4. Verdict
 
 | Field | Value |
 |-------|--------|
-| **Verdict** | **Accept with conditions** (L2–L4; L1 retracted) |
-| **Date** | 2026-08-20 |
-| **Implement gate** | Packet signed on docs. No new Lab Ops packet. |
+| **Verdict** | **Accept with conditions** (L2–L3; L1 retracted; L4 Test-at-receive superseded) |
+| **CORE scope** | Identity + **1..N vessels** + refuse `analysis_ids` |
+| **Results-entry** | **OUT of CORE** |
+| **Merge** | Hold until UAT + dogfood. PR 71 stays draft. |
+| **Date** | 2026-08-26 |
