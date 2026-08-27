@@ -22,7 +22,7 @@ Receive must create sample + **one or more** containers + contents in **one DB t
 
 **Goals (locked — AR CORE)**
 
-- One POST: sample + **1..N containers** + contents for each, one transaction. **Zero Tests.**
+- One POST: sample + **1..N containers** + contents for each, one transaction. **Zero Tests. Zero Results.**
 - Extra vessels are **1×1 Containers + Contents all pointing at that Sample** — not daughter Samples, not aliquot.
 - UX: **primary barcode** required + **optional additional barcodes** on the same commit.
 - **Two identities (C1 dropped, Lab Ops L1 retracted):**
@@ -116,7 +116,7 @@ class SampleReceiveRequest(BaseModel):
 
 Validate **before** the txn: if `analysis_ids` is present and non-empty → **422**. Do not ignore. Do not call `_create_asked_for_tests`. Do not persist asked-for analyses.
 
-In one transaction: assign `samples.name` from the existing name template; set status Available for Testing and `received_date`; for **primary + each additional** barcode insert container (`name = barcode`, 409 on any duplicate) + contents → same sample. Do not insert Tests. Extra barcodes are extra vessels, not new Samples.
+In one transaction: assign `samples.name` from the existing name template; set status Available for Testing and `received_date`; for **primary + each additional** barcode insert container (`name = barcode`, 409 on any duplicate) + contents → same sample. Do not insert Tests or Results. Extra barcodes are extra vessels of **that** Sample, not new Samples.
 
 ### POST /api/samples/{id}/tests  and  DELETE /api/samples/{id}/tests/{test_id}
 

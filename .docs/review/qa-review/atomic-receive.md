@@ -1,9 +1,9 @@
 # QA Review: Atomic receive
 
 **Date:** 2026-08-20  
-**Status:** Accept with conditions; QA6 amended by 2026-08-27 Leadership lock
+**Status:** Accept with conditions; QA6 restamped 2026-08-27 — non-empty `analysis_ids` → **422** (refuse, do not ignore)
 **Reviewer persona:** Testing / QA Lead (Tobias)  
-**Tech sketch:** [PR 30](https://github.com/Marc02130/nimblelims/pull/30) — `.docs/review/tech-sketch/atomic-receive.md` (C1 dropped; ignore merged #28)  
+**Tech sketch:** [PR 30](https://github.com/Marc02130/nimblelims/pull/30) — `.docs/review/tech-sketch/atomic-receive.md` (C1 dropped; non-empty `analysis_ids` → **422**, not ignore)  
 **Related reviews:** Lab Ops L2–L4 (L1 retracted); CSO Accept; Architecture Accept (PR 30 + persist lock); CEO Accept when PR 30 merged. [PR 33](https://github.com/Marc02130/nimblelims/pull/33) is stamp paperwork only. QA records the gate; it does not open it.  
 **Stories:** [PR 32](https://github.com/Marc02130/nimblelims/pull/32) **merged** — full catalog on `main`. US-1 / US-7 / US-8 / US-30 match the receive loop. Not PR 29.  
 **UAT script:** [`UAT_Scripts/uat-atomic-receive.md`](../../UAT_Scripts/uat-atomic-receive.md)  
@@ -11,7 +11,7 @@
 
 ## Executive summary
 
-The PR 30 sketch is testable. Receive is a high-volume scan loop: one transaction, two identities, one status (**Available for Testing**), stay on the screen. CORE receive creates **zero Tests** and has no analyses picker; A-15 is parked. US-30 is two identities. US-31 / US-33 / US-34 remain parked.
+The PR 30 sketch is testable. Receive is a high-volume scan loop: one transaction, two identities, one status (**Available for Testing**), stay on the screen. CORE receive creates **zero Tests** and **zero Results**. OOB UI has **no analysis picker**. Empty/omitted `analysis_ids` → 201 with `tests: []`. Non-empty `analysis_ids` → **422**. A-15 asked-for / work-plan is parked. US-30 is two identities. US-31 / US-33 / US-34 remain parked.
 
 **CORE provisional open** (Leadership 2026-08-26): identity + **1..N vessels** + field align + docs/UAT. Heidi still bounces new tables, a sample-ID field, a Received hop, or `results.unit_id`. **AR-RES / results-entry UAT is a follow-on slice** — not a CORE ship blocker.
 
@@ -24,8 +24,8 @@ Architecture lock on result persist: typed number → `results.reported_result` 
 | Dimension | Notes |
 |-----------|--------|
 | Testability | Every locked goal maps to a shared AR-* case or a pytest txn-rollback gate. |
-| Sample lifecycle | Receive → Available for Testing with zero Tests. Ordering/results are separate later actions. No Received hop. |
-| Negative paths | Duplicate barcode 409, missing required field 422, missing units_default 422, DELETE-with-results 400, RLS 403. |
+| Sample lifecycle | Receive → Available for Testing with **zero Tests** and **zero Results**. Extra barcodes = more tubes of that sample. Ordering/results are separate later actions. No Received hop. |
+| Negative paths | Duplicate barcode 409, missing required field 422, **non-empty `analysis_ids` 422**, missing units_default 422, DELETE-with-results 400, RLS 403. |
 | UAT readiness | Lab-tech happy path + client/foreign-project denial. Manager override is out of this packet. |
 | Docs and Cursor | Implement prompt must update receive manuals and `uat-atomic-receive.md` (QA10). |
 | Story alignment | US-1 / US-7 / US-8 / US-30 match the sketch on merged PR 32. |
@@ -40,10 +40,10 @@ Architecture lock on result persist: typed number → `results.reported_result` 
 | QA3 | Duplicate `containers.name` → **409**. Whole txn rolls back. No second sample. | Mix-up prevention. |
 | QA4 | Commit writes Sample.status = **Available for Testing** only. Sets `received_date`. Request has no status field. No Received hop. | System-owned status. |
 | QA5 | After success: stay on receive, toast, clear barcode, sticky type/matrix/project, focus barcode. No sample-detail redirect. No aliquot dialog. | High-volume loop. |
-| QA6 | Non-empty `analysis_ids` → **422 before the receive transaction**, with zero Sample/Container/Test rows. Empty/omitted succeeds with zero Tests; the UI has no analyses picker. POST add later remains separate. DELETE without results ok. DELETE with results → **400**. | Heidi Architecture lock; A-15 parked. |
+| QA6 | CORE receive creates **zero Tests** and **zero Results**. UI has no analysis picker and never sends `analysis_ids`. Empty/omitted `analysis_ids` → 201, `tests: []`. Non-empty `analysis_ids` → **422** before the receive transaction (refuse, do not ignore, do not mint). POST add later remains separate. DELETE without results ok. DELETE with results → **400**. A-15 asked-for / work-plan is parked. | WO-7 / Heidi 2026-08-26–27 |
 | QA7 | Typed number persists to `results.reported_result` + `qualifiers`. `raw_result` may copy the same value. Assert `reported_result`, not a new column. Unit from `analytes.units_default`. Missing default → **422**. No unit picker. No `results.unit_id`. | Architecture lock. |
 | QA8 | `sample:create` required. Project list/API scoped by `project_users`. Client cannot receive. Foreign project → **403**, no row. Two techs keep separate sticky projects. | RLS. |
-| QA9 | Seed: Available for Testing; Assigned/Pending (or agreed slug); default tube; sample name template that assigns without a typed name; unique `containers.name`. | Otherwise UAT is blocked on data. |
+| QA9 | Seed: Available for Testing; Assigned/Pending (or agreed slug) for **later explicit add-test**, not at receive; default tube; sample name template that assigns without a typed name; unique `containers.name`. | Otherwise UAT is blocked on data. |
 | QA10 | Cursor implement prompt updates receive/accessioning manuals **and** `UAT_Scripts/uat-atomic-receive.md`. After ship, `uat-sample-accessioning.md` is not the receive happy path. | Docs + UAT gate. |
 
 Automated gate (pytest, not a human case): QA1 rollback after sample insert, before container commit.
@@ -75,7 +75,7 @@ Do **not** fail atomic-receive UAT on:
 | Was (open on PR 31) | Now |
 |---------------------|-----|
 | US-1 old wizard | Atomic-receive happy path. AR-01–AR-15 replaces it. |
-| US-7 In Process at create | Assigned/Pending at receive/add-test. |
+| US-7 In Process at create | No Tests at receive. Assigned/Pending only after a later explicit add-test. A-15 parked. |
 | US-30 lab_id on sample | Two identities. No `lab_id` column. |
 | US-31 / US-33 new tables | Parked. Not in AR-01–AR-15. |
 | Q3 user-entered lab_id | Closed. System sample ID + container barcode. |

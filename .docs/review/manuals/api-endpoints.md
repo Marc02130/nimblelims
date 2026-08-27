@@ -127,7 +127,7 @@ Create a new sample.
 - No sample name / status / container type / due_date / qc_type / client_id in body (`extra=forbid` → 422)
 - `samples.name` from name template; each barcode → `containers.name` (409 on collision, full rollback)
 - Status → **Available for Testing**; `received_date` set
-- CORE creates zero Tests. Omitted or empty `analysis_ids` is accepted; non-empty values return **422 before the receive transaction**. Values are never ignored or persisted.
+- CORE creates **zero Tests** and **zero Results**. Omit `analysis_ids` or send `[]`. Non-empty `analysis_ids` → **422** before the receive transaction (refuse, do not ignore, do not mint). A-15 asked-for / work-plan is parked.
 - Default tube type off-form for all vessels on the call
 
 **Response:** `{ sample_id, sample_name, status, project_id, received_date, containers[], tests[] }` → **201**
