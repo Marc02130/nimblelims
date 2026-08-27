@@ -1,7 +1,7 @@
 """
 Pydantic schemas for samples
 """
-from pydantic import BaseModel, Field, validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, validator, model_validator
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 from uuid import UUID
@@ -410,7 +410,13 @@ class BulkSampleAccessioningRequest(BaseModel):
 
 
 class SampleReceiveRequest(BaseModel):
-    """Atomic receive CORE: one sample + 1..N vessels in one transaction."""
+    """Atomic receive CORE: one sample + 1..N vessels in one transaction.
+
+    Phase 2 field hygiene (RQ-AR-5/8/9, A-9–A-11): forbidden extras include
+    name/sample_name, status, container_type(_id), due_date, qc_type, client_id.
+    """
+
+    model_config = ConfigDict(extra="forbid")
 
     container_barcode: str = Field(..., min_length=1, max_length=255, description="Primary vessel barcode")
     additional_container_barcodes: List[str] = Field(

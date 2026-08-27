@@ -383,18 +383,3 @@ class TestAtomicReceivePhase1:
         )
         assert r.status_code == 403, r.text
 
-    def test_no_sample_name_in_body_ignored_contract(
-        self, client: TestClient, admin_token: str, receive_seed
-    ):
-        """Extra banned fields should not be accepted as body fields (422)."""
-        body = _body(receive_seed, barcode="NBIO-P1-EXTRA")
-        body["name"] = "HACKED-SAMPLE-ID"
-        body["status"] = str(uuid4())
-        r = client.post(
-            "/samples/receive",
-            json=body,
-            headers=_auth_header(admin_token),
-        )
-        # Pydantic v2 by default ignores extra; ensure sample name is still system
-        assert r.status_code == 201, r.text
-        assert r.json()["sample_name"] != "HACKED-SAMPLE-ID"
