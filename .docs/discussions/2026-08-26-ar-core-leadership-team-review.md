@@ -16,6 +16,8 @@
 | **Lab Ops** | **Accept with conditions** (L2–L4; L1 retracted) | **OPEN** for CORE only |
 | **CEO / Product** | **Accept with conditions** (C2–C8; C1 = retracted identity lock) | **HOLD SCOPE** · CORE provisional open |
 | **Security (AuthZ)** | **Accept with conditions** (S-AR-1..5) — docs gate satisfied (PR 68) | Conditions land **with** CORE code |
+| **Architecture** | **Accept** on CORE (1..N vessels; bounce list) | Formal stamp 2026-08-26 |
+| **UI** | **Accept** on CORE (new receive loop; 1..N) | Formal stamp 2026-08-26 |
 | **Scientific CSO** | **N/A for CORE** | No assay/results/QC in this slice; prior packet Accept stands for later results |
 
 **Leadership team:** **APPROVE CORE for implement** against PRD RQ-AR-* / SPEC §3. Results-entry, intake-profile engine, and work_order remain **out**.
@@ -29,6 +31,8 @@
 | Lab Ops | [`.docs/review/lab-ops-review/atomic-receive.md`](../review/lab-ops-review/atomic-receive.md) |
 | CEO | [`.docs/review/ceo-review/atomic-receive.md`](../review/ceo-review/atomic-receive.md) |
 | Security | [`.docs/review/security-review/atomic-receive.md`](../review/security-review/atomic-receive.md) |
+| Architecture | [`.docs/review/architecture-review/atomic-receive.md`](../review/architecture-review/atomic-receive.md) — **Accept** on CORE |
+| UI | [`.docs/review/ui-review/atomic-receive.md`](../review/ui-review/atomic-receive.md) — **Accept** on CORE |
 | Prior gate memo | [2026-08-26-ar-core-plan-leadership.md](2026-08-26-ar-core-plan-leadership.md) |
 
 ---
@@ -60,11 +64,13 @@ MODE: HOLD SCOPE
 LAB OPS: Accept with conditions (L2–L4)
 CEO: Accept with conditions (HOLD SCOPE)
 SECURITY: Accept with conditions (S-AR-1..5 land with code)
-NOT OPEN: results-entry · profile engine · work_order
+ARCHITECTURE: Accept on CORE
+UI: Accept on CORE
+NOT OPEN: results-entry · profile engine · work_order · extract-hold · IC50
 ```
 
 ---
 
 ## Team comment (for ISSUES)
 
-**Leadership team (formal):** Lab Ops + CEO Accept-with-conditions on PRD/SPEC CORE; implement gate **OPEN** for identity + 1..N vessels only; L2–L4 / C2–C8 / S-AR-1..5 same phase; results carve stands; HOLD SCOPE — do not revive wizard or smuggle work_order/results into the AR PR.
+**Leadership team (formal):** Lab Ops + CEO Accept-with-conditions on PRD/SPEC CORE; Architecture + UI **Accept** on CORE (1..N, not first vessel); implement gate **OPEN** for identity + 1..N vessels only; L2–L4 / C2–C8 / S-AR-1..5 same phase; results carve stands; HOLD SCOPE — do not revive wizard or smuggle work_order/results into the AR PR.
