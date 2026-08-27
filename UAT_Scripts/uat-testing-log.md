@@ -12,7 +12,8 @@ The UAT scripts should be run in the following order based on their dependencies
 | 4 | `uat-help-system` | uat-security-rbac | Help system, role-based help content |
 | 5 | `uat-analysis-analyte-management` | uat-security-rbac | Analyses/Analytes CRUD, expandable linked analytes grid, linking/unlinking |
 | 6 | `uat-container-management` | uat-configurations-custom | Container types, hierarchical containers, pooling |
-| 7 | `uat-sample-accessioning` | uat-configurations-custom, uat-container-management | Single sample accessioning with containers and tests |
+| 7 | `uat-atomic-receive` | uat-configurations-custom (lists), 0058/0060 seed | **CORE receive happy path** (`/receive`, 1..N vessels) |
+| 7b | `uat-sample-accessioning` | *(demoted)* | Legacy wizard only — not receive SoT |
 | 8 | `uat-test-ordering` | uat-sample-accessioning, uat-analysis-analyte-management | Test assignment, test batteries, status management |
 | 9 | `uat-sample-status-editing` | uat-sample-accessioning | Sample editing, status transitions |
 | 10 | `uat-batch-management` | uat-sample-accessioning, uat-container-management | Batch creation, cross-project batching, QC generation, **sample prioritization** |
@@ -36,7 +37,8 @@ uat-security-rbac (Foundation)
 │   └── uat-test-ordering (uses analyses for test assignment)
 └── uat-configurations-custom (Lists, Custom Fields)
     ├── uat-container-management
-    │   └── uat-sample-accessioning
+    │   ├── uat-atomic-receive (CORE receive SoT)
+    │   └── uat-sample-accessioning (legacy wizard; demoted)
     │       ├── uat-test-ordering
     │       ├── uat-sample-status-editing
     │       ├── uat-aliquots-qc

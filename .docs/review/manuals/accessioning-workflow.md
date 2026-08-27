@@ -2,7 +2,11 @@
 
 ## Overview
 
-The sample accessioning workflow enables Lab Technicians to receive, inspect, and enter new samples into the LIMS system. This workflow implements **US-1: Sample Accessioning** from the user stories and covers the complete process from sample receipt to test assignment and release.
+> **Cutover (2026-08-26):** OOB / CORE receive happy path is **atomic receive** — UI `/receive`, API `POST /samples/receive`.  
+> See **[atomic-receive.md](atomic-receive.md)** and UAT [`uat-atomic-receive.md`](../../UAT_Scripts/uat-atomic-receive.md).  
+> This document describes the **legacy** three-step wizard at `/accessioning` (not the receive SoT).
+
+The legacy sample accessioning wizard enabled Lab Technicians to enter samples via a multi-step form. **US-1 receive** is now satisfied by atomic receive (identity + 1..N vessels). The wizard path below is retained for historical / secondary use until removed.
 
 ## Workflow Steps
 

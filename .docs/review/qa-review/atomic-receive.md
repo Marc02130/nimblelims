@@ -50,9 +50,10 @@ Automated gate (pytest, not a human case): QA1 rollback after sample insert, bef
 
 ## Suggested UAT scenarios
 
-Must-pass in [`UAT_Scripts/uat-atomic-receive.md`](../../UAT_Scripts/uat-atomic-receive.md): AR-HV-01–05, AR-VAL-01, AR-DUP-01, AR-ID-01, AR-ST-01, AR-TST-01–03, AR-RES-01–02, AR-RBAC-01, AR-MU-01.
+**CORE must-pass** in [`UAT_Scripts/uat-atomic-receive.md`](../../UAT_Scripts/uat-atomic-receive.md): AR-HV-01–05, **AR-HV-MC** (1..N vessels), AR-VAL-01, AR-DUP-01, AR-ID-01, AR-ST-01, AR-TST-01–03, AR-RBAC-01, AR-MU-01.
 
-**Not P0:** AR-MU-02 (US-10 second-person review).
+**Follow-on (not CORE):** AR-RES-01–02 (results-entry).  
+**Not CORE:** AR-MU-02 (US-10 second-person review).
 
 ## Out of this packet
 
