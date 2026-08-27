@@ -45,7 +45,7 @@ ELN Processes are first-class (distinct from LIMS run checklists). Definitions �
 | Step kinds | `eln_experiment` (creates Experiment) · `lims_run` (lazy LimsRun + history; soft advance gates) |
 | UI | `/experiments/processes` — Instances + Definitions tabs; start step; sample assign; journey panel. **Also:** Samples list (`/samples`) → select rows → **Assign to process** |
 | Permission | Manage: `experiment:manage`. Journey: sample visibility (RLS) |
-| Checklist | [`.docs-review/checklist/experiment-checklist.md`](../checklist/experiment-checklist.md) |
+| Checklist | [`.docs/review/checklist/experiment-checklist.md`](../checklist/experiment-checklist.md) |
 
 **Naming:** ELN uses `eln_*` prefixes and `/v1/eln-processes`. LIMS run checklists remain at `/v1/lims-runs/{id}/processes` and `/v1/processes/{id}` (tables `lims_run_checklists` / related).
 
@@ -147,10 +147,10 @@ Current lineage via `experiment_link` details may be superseded or augmented by 
 
 **Related Documents**
 
-- local `.docs-internal/design/process-and-experiment-structural.md` (not committed)
-- local `.docs-internal/design/gap-analysis-process-and-experiment.md` (not committed)
+- local `.docs/internal/design/process-and-experiment-structural.md` (not committed)
+- local `.docs/internal/design/gap-analysis-process-and-experiment.md` (not committed)
 - [experiments.md](experiments.md)
-- [`.docs-review/manuals/lims-runs.md`](lims-runs.md)
-- local `.docs-internal/design/experiment-planning.md` (not committed)
-- [`.docs-review/checklist/experiment-rework-prerequisites.md`](../checklist/experiment-rework-prerequisites.md)
-- [`.docs-review/manuals/workflow-accessioning-to-reporting.md`](workflow-accessioning-to-reporting.md) (for contrast with Workflow Templates)
+- [`.docs/review/manuals/lims-runs.md`](lims-runs.md)
+- local `.docs/internal/design/experiment-planning.md` (not committed)
+- [`.docs/review/checklist/experiment-rework-prerequisites.md`](../checklist/experiment-rework-prerequisites.md)
+- [`.docs/review/manuals/workflow-accessioning-to-reporting.md`](workflow-accessioning-to-reporting.md) (for contrast with Workflow Templates)

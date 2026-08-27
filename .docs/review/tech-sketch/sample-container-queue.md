@@ -15,13 +15,13 @@
 
 | Doc | Role |
 |-----|------|
-| [`.docs-review/open-questions/experiments.md`](../open-questions/experiments.md) **Decision #24** | Cohort is **samples** selected at start (dual-list); gates; cohort **fixed** after start; `ExperimentSampleExecution` links sample ↔ experiment |
-| [`.docs-review/open-questions/containers.md`](../open-questions/containers.md) | Nesting; Contents only on **1×1**; amount Option A; plate/rack = structure |
-| [`.docs-review/tech-sketch/atomic-receive.md`](atomic-receive.md) · [`.docs-review/open-questions/sop-sample-identity-audit.md`](../open-questions/sop-sample-identity-audit.md) **Q3** | **Identity lock:** Sample ID ≠ container barcode |
-| [`.docs-review/tech-sketch/mass-concentration-contents.md`](mass-concentration-contents.md) | Mass/conc on **Contents** + 1×1 Container; **Sample has no mass/conc** |
-| [`.docs-review/tech-sketch/extract-hold-dest-type.md`](extract-hold-dest-type.md) | Aliquot/pool **plan lines think in source samples**; execute mints dest Sample + Contents on a dest 1×1 |
-| [`.docs-review/open-questions/extract-then-qubit-testdata-gap.md`](../open-questions/extract-then-qubit-testdata-gap.md) | Same DNA identity can later enter a Qubit **LIMS Run** (path lock; Hold holes elsewhere) |
-| [`.docs-review/manuals/experiments.md`](../manuals/experiments.md) · [`.docs-review/manuals/lims-runs.md`](../manuals/lims-runs.md) | Experiment cohort vs LIMS Run sample linking |
+| [`.docs/review/open-questions/experiments.md`](../open-questions/experiments.md) **Decision #24** | Cohort is **samples** selected at start (dual-list); gates; cohort **fixed** after start; `ExperimentSampleExecution` links sample ↔ experiment |
+| [`.docs/review/open-questions/containers.md`](../open-questions/containers.md) | Nesting; Contents only on **1×1**; amount Option A; plate/rack = structure |
+| [`.docs/review/tech-sketch/atomic-receive.md`](atomic-receive.md) · [`.docs/review/open-questions/sop-sample-identity-audit.md`](../open-questions/sop-sample-identity-audit.md) **Q3** | **Identity lock:** Sample ID ≠ container barcode |
+| [`.docs/review/tech-sketch/mass-concentration-contents.md`](mass-concentration-contents.md) | Mass/conc on **Contents** + 1×1 Container; **Sample has no mass/conc** |
+| [`.docs/review/tech-sketch/extract-hold-dest-type.md`](extract-hold-dest-type.md) | Aliquot/pool **plan lines think in source samples**; execute mints dest Sample + Contents on a dest 1×1 |
+| [`.docs/review/open-questions/extract-then-qubit-testdata-gap.md`](../open-questions/extract-then-qubit-testdata-gap.md) | Same DNA identity can later enter a Qubit **LIMS Run** (path lock; Hold holes elsewhere) |
+| [`.docs/review/manuals/experiments.md`](../manuals/experiments.md) · [`.docs/review/manuals/lims-runs.md`](../manuals/lims-runs.md) | Experiment cohort vs LIMS Run sample linking |
 
 This document **does not invent** past those locks. It states **why** “what is queued” is now ambiguous, and lays **options** for when the operator must pick a **vessel**.
 

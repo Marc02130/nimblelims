@@ -1770,7 +1770,7 @@ Tables (migrations `0047` + `0051`): `eln_process_definitions`, `eln_process_def
 
 **Coexistence:** Legacy `ExperimentDetail` `experiment_link` lineage remains supported.
 
-**Checklist:** `.docs-review/checklist/experiment-checklist.md`.
+**Checklist:** `.docs/review/checklist/experiment-checklist.md`.
 
 ## SOP parse (AI-assisted template creation)
 
@@ -1782,7 +1782,7 @@ Base path: `/api/v1/sop-parse`. Requires **`experiment:manage`**. Used to upload
 
 **Configuration:** Set environment variable **`ANTHROPIC_API_KEY`** on the backend. If unset, extraction fails with a clear error on the job record.
 
-**RLS:** `sop_parse_jobs` and related experiment-engine tables use client-scoped RLS (see migrations 0041/0042 and `.docs-internal/design/experiment-planning.md`).
+**RLS:** `sop_parse_jobs` and related experiment-engine tables use client-scoped RLS (see migrations 0041/0042 and `.docs/internal/design/experiment-planning.md`).
 
 ## Permissions Reference
 
@@ -1822,7 +1822,7 @@ Endpoints require specific permissions. The system currently has 17 permissions:
 
 **Note**: The code references `test:configure` permission in analyses, analytes, and test batteries endpoints, but this permission is not currently in the database. These endpoints use `require_any_permission(["config:edit", "test:configure"])`, which effectively requires `config:edit` permission.
 
-See local `.docs-internal/prd/nimblelims-prd.md` (not committed) for product requirements; permission list is maintained with seed data and this API reference.
+See local `.docs/internal/prd/nimblelims-prd.md` (not committed) for product requirements; permission list is maintained with seed data and this API reference.
 
 ## Help Endpoints
 
@@ -2182,7 +2182,7 @@ Authorization: Bearer <admin_token>
 
 ## Admin - Name Templates
 
-Name templates define how auto-generated entity names (e.g. sample, project, batch) are built. Placeholders: `{SEQ}` (padded by `seq_padding_digits`; **scoped by “name without SEQ”** so e.g. template `{PROJECT}-{SEQ}` gives per-project sequences—first sample in each project is `…-01`), `{YYYY}`, `{YY}`, `{MM}`, `{DD}`, `{YYYYMMDD}`, `{CLIENT}` / `{CLIABV}` (client abbreviation when set, else client name), `{BATCH}` (batch name), `{PROJECT}` (project name). See `backend/app/core/name_generation.py` and `.docs-review/manuals/ids-and-configuration.md`.
+Name templates define how auto-generated entity names (e.g. sample, project, batch) are built. Placeholders: `{SEQ}` (padded by `seq_padding_digits`; **scoped by “name without SEQ”** so e.g. template `{PROJECT}-{SEQ}` gives per-project sequences—first sample in each project is `…-01`), `{YYYY}`, `{YY}`, `{MM}`, `{DD}`, `{YYYYMMDD}`, `{CLIENT}` / `{CLIABV}` (client abbreviation when set, else client name), `{BATCH}` (batch name), `{PROJECT}` (project name). See `backend/app/core/name_generation.py` and `.docs/review/manuals/ids-and-configuration.md`.
 
 ### GET /admin/name-templates
 List name templates with filtering and pagination.

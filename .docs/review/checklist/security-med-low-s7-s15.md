@@ -2,7 +2,7 @@
 
 **Branch:** `security/med-low-s7-s15`  
 **Last updated:** 2026-08-21  
-**Requirements:** [`.docs-review/requirements/security-med-low-s7-s15.md`](../requirements/security-med-low-s7-s15.md)
+**Requirements:** [`.docs/review/requirements/security-med-low-s7-s15.md`](../requirements/security-med-low-s7-s15.md)
 
 ## Packet gate
 

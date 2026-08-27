@@ -3,8 +3,8 @@
 **Date:** 2026-08-20  
 **Status:** **Accept with conditions**  
 **Reviewer:** CEO / product (packet)  
-**Requirements:** [`.docs-review/requirements/security-high-s1-s6.md`](../requirements/security-high-s1-s6.md)  
-**Source audit:** [`.docs-review/security-review/codebase.md`](../security-review/codebase.md)
+**Requirements:** [`.docs/review/requirements/security-high-s1-s6.md`](../requirements/security-high-s1-s6.md)  
+**Source audit:** [`.docs/review/security-review/codebase.md`](../security-review/codebase.md)
 
 ## Ask
 

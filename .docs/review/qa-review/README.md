@@ -25,7 +25,7 @@
 ## Artifact location
 
 ```
-.docs-review/qa-review/{feature-stem}.md
+.docs/review/qa-review/{feature-stem}.md
 ```
 
 Same stem as requirements / tech sketch / other reviews.
@@ -56,8 +56,8 @@ QA reviews the **packet** for testability before implement. UAT validates the **
 
 ## Reference materials
 
-- Process: `.docs-review/development-process/README.md`  
+- Process: `.docs/review/development-process/README.md`  
 - UAT scripts: `UAT_Scripts/`  
-- UAT process: `.docs-review/development-process/uat/README.md`  
+- UAT process: `.docs/review/development-process/uat/README.md`  
 - Packet rules: `.grok/skills/nimble-reviews/PACKET.md`  
 - QA skill: `.grok/skills/nimble-qa-review/SKILL.md`

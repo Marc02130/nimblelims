@@ -4,7 +4,7 @@ description: >
   Formal NimbleLIMS Business Analyst review of a feature packet.
   Requirements completeness, user stories, acceptance criteria, prioritization
   against MVP, open-questions hygiene, and scope control for BioTech/Pharma
-  startups and CROs. Writes .docs-review/ba-review/{stem}.md.
+  startups and CROs. Writes .docs/review/ba-review/{stem}.md.
   Use when: "BA review", "business analyst", "requirements review",
   "user stories", "acceptance criteria", "nimble ba".
 user-invocable: true
@@ -50,7 +50,7 @@ Conditions: **BA1, BA2, …**
 
 ### 4. Write formal artifact
 
-Create or update `.docs-review/ba-review/{stem}.md`:
+Create or update `.docs/review/ba-review/{stem}.md`:
 
 ```markdown
 # BA Review: {Title}

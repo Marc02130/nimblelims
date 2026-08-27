@@ -54,7 +54,7 @@ This project uses a four-container Docker setup:
    - Username: `admin`
    - Password: `admin123`
    - **⚠️ IMPORTANT**: Change the default password immediately after first login!
-   - See [.docs-review/manuals/admin-setup.md](.docs-review/manuals/admin-setup.md) for detailed security instructions
+   - See [.docs/review/manuals/admin-setup.md](.docs/review/manuals/admin-setup.md) for detailed security instructions
 
 5. **Run migrations (if needed)**
    ```bash
@@ -165,20 +165,10 @@ nimblelims/
 ├── db/                     # Database setup
 │   ├── Dockerfile          # Database container config
 │   └── init.sql            # Database initialization
-├── .docs-review/           # Review stamps, tech sketches, process, manuals
-│   ├── manuals/            # Setup, API, navigation, domain handbooks
-│   ├── requirements/       # Cycle feature requirements (not umbrella PRD)
-│   ├── checklist/          # Implementation checklists
-│   ├── open-questions/     # Decision logs (work gates)
-│   ├── ceo-review/         # CEO / product reviews
-│   ├── lab-ops-review/     # SVP Lab Ops reviews
-│   ├── qa-review/          # QA / Testing reviews
-│   ├── development-process/ # Feature pipeline (ideation → ship)
-│   ├── tech-sketch/        # Lightweight technical how-to sketches
-│   ├── schema-changes/     # Per-cycle DB deltas
-│   ├── ui-review/          # UI / UX reviews
-│   ├── architecture-review/ # Architecture reviews
-│   └── security-review/    # Security reviews
+├── .docs/                  # Documentation root
+│   ├── review/             # Review stamps, tech sketches, process, manuals, OQs
+│   ├── discussions/        # Multi-persona Leadership discussions
+│   └── decision-logs/      # Leadership stamps (FW/WO, reorg)
 ├── services/               # Auxiliary microservices
 │   └── r-calculator/       # Plumber R API for curve fitting
 │       ├── R/              # Curve fitting, categorization, SVG generation
@@ -191,7 +181,7 @@ nimblelims/
 
 ## Features (MVP Scope)
 
-**Note:** This section describes **all implemented features in the codebase**. However, the **MVP release bar** focuses on three core pillars: (1) **track samples** (accessioning, status, lineage), (2) **order tests** (assign analyses), and (3) **enter results** (capture and review). Additional features listed below (ELN experiments, dose-response analysis, LimsRuns/parsers, workflow templates, custom fields) are **shipped/in-tree but not the MVP release bar**—they are enhancements that demonstrate platform capability and remain available for users who need them. See local `.docs-internal/prd/nimblelims-prd.md` (not committed) for the complete MVP definition.
+**Note:** This section describes **all implemented features in the codebase**. However, the **MVP release bar** focuses on three core pillars: (1) **track samples** (accessioning, status, lineage), (2) **order tests** (assign analyses), and (3) **enter results** (capture and review). Additional features listed below (ELN experiments, dose-response analysis, LimsRuns/parsers, workflow templates, custom fields) are **shipped/in-tree but not the MVP release bar**—they are enhancements that demonstrate platform capability and remain available for users who need them. See local `.docs/internal/prd/nimblelims-prd.md` (not committed) for the complete MVP definition.
 
 ### Core Workflows for BioTech/Pharma Startups (**MVP Release Bar** + Shipped Enhancements)
 - **Compound & Sample Tracking** **(MVP)**: Accessioning, status management, lineage (aliquots/derivatives), container hierarchy
@@ -219,12 +209,12 @@ nimblelims/
 - **Promote on publish**: Status → `published` maps columns to analytes (name + **aliases** for CRO/instrument vendor column names), ensures Tests per sample, writes **Results** (`raw_result`, `replicate`, `lims_run_id`).
 - **Conflicts**: Same run updates; other run/manual ownership fails publish with **409** to protect data integrity.
 - **Preview**: Publish confirmation dry-runs create/update/conflict/unresolved columns (`GET /v1/lims-runs/{id}/promotion/preview`).
-- **Docs**: local `.docs-internal/ideas/run-results.md` (not committed), [`.docs-review/manuals/lims-runs.md`](.docs-review/manuals/lims-runs.md).
+- **Docs**: local `.docs/internal/ideas/run-results.md` (not committed), [`.docs/review/manuals/lims-runs.md`](.docs/review/manuals/lims-runs.md).
 
 ### Experiment Management **(Shipped, Not MVP)** (ELN-style Process Tracking)
 - **Experiments**: Full CRUD for experiments; list/detail UI with tabs (Overview, Sample Executions, Details/Steps, Lineage, Linked Processes). Permission: `experiment:manage` (Administrator, Lab Manager, Lab Technician).
 - **Experiment Templates**: `/experiments/templates` — **Basic Info** + **Tables & forms** (`entries[]`: experiment sample metadata, multi-row protocol tables, aliquot/pool steps). **Create field** defines entry columns (`field_definitions` for entity types `experiment_sample_data` / `experiment_data`—not Custom Fields on Sample/Test). Instantiate on experiment create/start. Cohort start: scan/select samples (`StartCohortPanel`); target is accordion-style process → queue dual-list start dialog. Permission: `experiment:manage`.
-- **ELN Processes (Phases 1–3)**: Definitions → instances with typed steps (`eln_experiment` \| `lims_run`). APIs: `/v1/eln-process-definitions`, `/v1/eln-processes`, sample journey `GET /v1/samples/{id}/journey`. UI at `/experiments/processes` (Instances + Definitions). Soft advance gates; lazy LimsRun start; run history. Migrations `0047`–`0051`. Distinct from LIMS run checklists under `/v1/processes`. Checklist: [`.docs-review/checklist/experiment-checklist.md`](.docs-review/checklist/experiment-checklist.md).
+- **ELN Processes (Phases 1–3)**: Definitions → instances with typed steps (`eln_experiment` \| `lims_run`). APIs: `/v1/eln-process-definitions`, `/v1/eln-processes`, sample journey `GET /v1/samples/{id}/journey`. UI at `/experiments/processes` (Instances + Definitions). Soft advance gates; lazy LimsRun start; run history. Migrations `0047`–`0051`. Distinct from LIMS run checklists under `/v1/processes`. Checklist: [`.docs/review/checklist/experiment-checklist.md`](.docs/review/checklist/experiment-checklist.md).
 - **Sidebar**: Dedicated **Experiments** accordion (between Sample Mgmt and Lab Mgmt) with sub-items **All Experiments** and **Experiment Templates** (both require `experiment:manage`).
 - **Sample ↔ experiment linking**: Link samples to experiments (roles, processing conditions, replicate); bidirectional UI: experiment detail links to samples (`/samples?highlight=id`); sample detail shows "Participated in these Experiments" with links.
 - **Lineage**: Experiment lineage view (template + linked experiment IDs); loading and error states.
@@ -326,30 +316,31 @@ NimbleLIMS uses a unified sidebar navigation system that provides consistent acc
 - **State Persistence**: Sidebar collapsed state saved to localStorage
 - **Top AppBar**: Dynamic page titles, sidebar toggle, back button for nested routes (e.g. experiment detail → list, admin analysis analytes → analyses), user info, and logout
 
-See [`.docs-review/manuals/navigation.md`](.docs-review/manuals/navigation.md) for complete navigation documentation (includes Experiments accordion refactor v2.1, experiment templates route, and permission gating).
+See [`.docs/review/manuals/navigation.md`](.docs/review/manuals/navigation.md) for complete navigation documentation (includes Experiments accordion refactor v2.1, experiment templates route, and permission gating).
 
 ## Documentation
 
-In-repo docs live under [`.docs-review/`](.docs-review/) (**review + manuals + process** only). **Start here:** [`.docs-review/README.md`](.docs-review/README.md).
+In-repo docs live under [`.docs/`](.docs/) (**review + discussions + decision-logs**; **review + manuals + process** under [`.docs/review/`](.docs/review/)). **Start here:** [`.docs/README.md`](.docs/README.md).
 
-Umbrella PRD, long-form design, ideas, SOP packs, user stories, and private notes live under local `.docs-internal/` (not committed). Do not add that tree to git.
+Umbrella PRD, long-form design, ideas, SOP packs, user stories, and private notes live under local `.docs/internal/` (not committed). Do not add that tree to git.
 
 | Folder | Contents |
 |--------|----------|
-| [`manuals/`](.docs-review/manuals/) | Setup, API, navigation, domain handbooks (batches, containers, experiments, processes, …) |
-| [`requirements/`](.docs-review/requirements/) | Cycle feature requirements |
-| [`checklist/`](.docs-review/checklist/) | Implementation checklists |
-| [`open-questions/`](.docs-review/open-questions/) | Decision logs (gate new work until blockers are Decided) |
-| [`development-process/`](.docs-review/development-process/) | Feature development process |
-| [`tech-sketch/`](.docs-review/tech-sketch/) | Tech sketches (post-requirements) |
-| [`schema-changes/`](.docs-review/schema-changes/) | Per-cycle DB deltas |
-| [`lab-ops-review/`](.docs-review/lab-ops-review/), [`ceo-review/`](.docs-review/ceo-review/), [`ui-review/`](.docs-review/ui-review/), [`architecture-review/`](.docs-review/architecture-review/), [`security-review/`](.docs-review/security-review/), [`qa-review/`](.docs-review/qa-review/) | Formal reviews |
+| [`manuals/`](.docs/review/manuals/) | Setup, API, navigation, domain handbooks (batches, containers, experiments, processes, …) |
+| [`requirements/`](.docs/review/requirements/) | Cycle feature requirements |
+| [`checklist/`](.docs/review/checklist/) | Implementation checklists |
+| [`open-questions/`](.docs/review/open-questions/) | Cycle/feature gates (block a packet until Decided; not Leadership stamps) |
+| [`decision-logs/`](.docs/decision-logs/) | Leadership stamps (FW/WO, reorg, framework) |
+| [`development-process/`](.docs/review/development-process/) | Feature development process |
+| [`tech-sketch/`](.docs/review/tech-sketch/) | Tech sketches (post-requirements) |
+| [`schema-changes/`](.docs/review/schema-changes/) | Per-cycle DB deltas |
+| [`lab-ops-review/`](.docs/review/lab-ops-review/), [`ceo-review/`](.docs/review/ceo-review/), [`ui-review/`](.docs/review/ui-review/), [`architecture-review/`](.docs/review/architecture-review/), [`security-review/`](.docs/review/security-review/), [`qa-review/`](.docs/review/qa-review/) | Formal reviews |
 
 UAT scripts: `UAT_Scripts/` (e.g. workflow templates, experiment templates).
 
 ## Support
 
-See [`.docs-review/README.md`](.docs-review/README.md) and `.docs-review/manuals/` for implementation details.
+See [`.docs/README.md`](.docs/README.md), [`.docs/review/README.md`](.docs/review/README.md), and `.docs/review/manuals/` for implementation details.
 
 ---
 
@@ -361,6 +352,6 @@ See [`.docs-review/README.md`](.docs-review/README.md) and `.docs-review/manuals
 
 **Key files (backend):** `backend/app/routers/experiments.py`, `backend/app/routers/sop_parse.py`, `backend/app/services/sop_parse_service.py`, `backend/app/services/experiment_service.py`, flexible experiment models/migrations.
 
-**Documentation:** `.docs-review/checklist/experiment-checklist.md`, `.docs-review/manuals/processes.md`, `.docs-review/manuals/experiments.md` (ELN), `.docs-review/manuals/lims-runs.md` (LIMS), local `.docs-internal/design/experiment-planning.md` (not committed), `.docs-review/manuals/navigation.md`, `.docs-review/manuals/api-endpoints.md`, `UAT_Scripts/uat-experiment-templates.md`.
+**Documentation:** `.docs/review/checklist/experiment-checklist.md`, `.docs/review/manuals/processes.md`, `.docs/review/manuals/experiments.md` (ELN), `.docs/review/manuals/lims-runs.md` (LIMS), local `.docs/internal/design/experiment-planning.md` (not committed), `.docs/review/manuals/navigation.md`, `.docs/review/manuals/api-endpoints.md`, `UAT_Scripts/uat-experiment-templates.md`.
 
 **Optional env:** `ANTHROPIC_API_KEY` on the backend for SOP extraction (see `backend/app/core/config.py`).

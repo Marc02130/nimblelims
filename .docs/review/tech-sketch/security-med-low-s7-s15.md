@@ -2,9 +2,9 @@
 
 **Date:** 2026-08-21  
 **Status:** Implemented through P4 (cookie AuthN design locked + shipped on branch)   
-**Requirements:** [`.docs-review/requirements/security-med-low-s7-s15.md`](../requirements/security-med-low-s7-s15.md)  
-**Schema:** [`.docs-review/schema-changes/security-med-low-s7-s15.md`](../schema-changes/security-med-low-s7-s15.md)  
-**Audit:** [`.docs-review/security-review/codebase.md`](../security-review/codebase.md)
+**Requirements:** [`.docs/review/requirements/security-med-low-s7-s15.md`](../requirements/security-med-low-s7-s15.md)  
+**Schema:** [`.docs/review/schema-changes/security-med-low-s7-s15.md`](../schema-changes/security-med-low-s7-s15.md)  
+**Audit:** [`.docs/review/security-review/codebase.md`](../security-review/codebase.md)
 
 ## 1. Context
 

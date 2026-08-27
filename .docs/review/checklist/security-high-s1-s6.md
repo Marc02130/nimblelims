@@ -2,7 +2,7 @@
 
 **Branch:** `security/high-s1-s6`  
 **Last updated:** 2026-08-20  
-**Requirements:** [`.docs-review/requirements/security-high-s1-s6.md`](../requirements/security-high-s1-s6.md)
+**Requirements:** [`.docs/review/requirements/security-high-s1-s6.md`](../requirements/security-high-s1-s6.md)
 
 ## Packet gate
 

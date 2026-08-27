@@ -4,11 +4,11 @@
 **Resubmitted:** 2026-07-19  
 **Verdict date:** 2026-07-19  
 **Status:** **Accepted** (re-confirmed)  
-**Requirements:** [`.docs-review/requirements/data-parsers-lims-runs.md`](../requirements/data-parsers-lims-runs.md)  
-**Tech sketch:** [`.docs-review/tech-sketch/data-parsers-lims-runs.md`](../tech-sketch/data-parsers-lims-runs.md)  
-**Schema changes:** [`.docs-review/schema-changes/data-parsers-lims-runs.md`](../schema-changes/data-parsers-lims-runs.md)  
-**Open questions:** [`.docs-review/open-questions/data-parsers-lims-runs.md`](../open-questions/data-parsers-lims-runs.md)  
-**Idea:** local `.docs-internal/ideas/ai-data-import.md` (not committed)
+**Requirements:** [`.docs/review/requirements/data-parsers-lims-runs.md`](../requirements/data-parsers-lims-runs.md)  
+**Tech sketch:** [`.docs/review/tech-sketch/data-parsers-lims-runs.md`](../tech-sketch/data-parsers-lims-runs.md)  
+**Schema changes:** [`.docs/review/schema-changes/data-parsers-lims-runs.md`](../schema-changes/data-parsers-lims-runs.md)  
+**Open questions:** [`.docs/review/open-questions/data-parsers-lims-runs.md`](../open-questions/data-parsers-lims-runs.md)  
+**Idea:** local `.docs/internal/ideas/ai-data-import.md` (not committed)
 
 ## Verdict
 
@@ -29,7 +29,7 @@
 | Instruments | **Type** + **instance**; parsers key instance |
 | Multi-import | **`lims_run_imports`** + version `parser_id` |
 | Analysis on run | **Required always** — no non-reportable path |
-| Method-dev | Deferred to local `.docs-internal/ideas/orders-and-projects.md` (not committed) |
+| Method-dev | Deferred to local `.docs/internal/ideas/orders-and-projects.md` (not committed) |
 | Permissions | **`config:edit`** |
 | Versioning | Version + active; no import JSON snapshot |
 | Table name | **`data_parsers`** |
