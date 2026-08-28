@@ -1,5 +1,8 @@
 # UAT Scripts: Test Ordering and Status Management
 
+> **2026-08-28:** The `/accessioning` wizard is **removed**. Cases that assign tests **during** the wizard (TC-TEST-ASSIGN-001 and battery-at-accessioning) are **retired**.  
+> Receive does not mint Tests. Assign tests from **Tests** (`/tests`, `TestForm`) on an existing received sample. Work-order / asked-for packet is still future.
+
 ## Overview
 
 This document contains User Acceptance Testing (UAT) scripts for test ordering and status management in NimbleLIMS. These scripts validate the test assignment and status workflows as defined in:

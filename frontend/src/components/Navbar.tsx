@@ -68,12 +68,12 @@ const Navbar: React.FC = () => {
             <Button
               color="inherit"
               startIcon={<Science />}
-              onClick={() => navigate('/accessioning')}
+              onClick={() => navigate('/receive')}
               sx={{ 
-                bgcolor: isActive('/accessioning') ? 'rgba(255,255,255,0.1)' : 'transparent'
+                bgcolor: isActive('/receive') ? 'rgba(255,255,255,0.1)' : 'transparent'
               }}
             >
-              Accessioning
+              Receive
             </Button>
           )}
           

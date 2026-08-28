@@ -14,7 +14,7 @@
 
 **Run notes:** Seed barcodes `NBIO-AR-0001`/`0002`/`MC-*`/`KB-0001` were already consumed from dogfood. Browser happy-path used `NBIO-AR-0010`/`0011`, `NBIO-AR-MC2-*`, `NBIO-AR-KB-0010`. Matrix is no longer on the receive form (sample type is SoT); AR-VAL-01 exercised barcode / sample type / project / container type.
 
-This script is the **receive happy path** sign-off. Do **not** use `uat-sample-accessioning.md` (wizard) as receive SoT.
+This script is the **receive happy path** sign-off. The `/accessioning` wizard is removed (`uat-sample-accessioning.md` retired).
 
 **CORE must-pass:** identity + **1..N vessels**, sticky project, Available for Testing, **zero Tests / zero Results** at receive, AuthZ (PR 68). Non-empty `analysis_ids` → **422**.
 **Follow-on (not CORE blockers):** AR-RES-01/02 results-entry. **A-15 asked-for / work-plan is parked.**
@@ -134,5 +134,5 @@ QA1–QA6, QA8–QA10 in `.docs/review/qa-review/atomic-receive.md` apply to COR
 | Script | Status after CORE docs sync |
 |--------|------------------------------|
 | **`uat-atomic-receive.md`** | **Receive happy-path SoT** |
-| `uat-sample-accessioning.md` | **Demoted** — legacy wizard only; not receive sign-off |
+| `uat-sample-accessioning.md` | **Retired** — wizard removed; `/accessioning` redirects to `/receive` |
 | `uat-sample-status-editing.md` | Do not require Reviewed/Reported on Sample.status for CORE (Q1 parallel) |

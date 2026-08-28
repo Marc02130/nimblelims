@@ -2,7 +2,7 @@
 
 Catalog + seed notes for atomic receive UAT and pytest.
 
-**Product code (Phases 1–4):** `POST /api/samples/receive` + UI `/receive` on branch `feat/atomic-receive-core`.  
+**Product code (Phases 1–4):** `POST /api/samples/receive` + UI `/receive` (wizard at `/accessioning` removed; that route redirects to `/receive`).  
 **Human UAT SoT:** [`../uat-atomic-receive.md`](../uat-atomic-receive.md)  
 **Manual:** `.docs/review/manuals/atomic-receive.md`
 

@@ -34,7 +34,6 @@ const getRouteTitle = (pathname: string): string => {
   const routeMap: Record<string, string> = {
     '/dashboard': 'Dashboard',
     '/receive': 'Receive',
-    '/accessioning': 'Accessioning (legacy)',
     '/samples': 'Samples Management',
     '/tests': 'Tests Management',
     '/containers': 'Containers',
