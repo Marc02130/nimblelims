@@ -23,3 +23,4 @@ Parent index: [`.docs/README.md`](../README.md). Discussions that produced stamp
 | [2026-08-26-docs-reorg-and-teams.md](2026-08-26-docs-reorg-and-teams.md) | Docs reorg (`.docs/review` · `.docs/internal`) + Grok teams |
 | [2026-08-26-ar-multi-container.md](2026-08-26-ar-multi-container.md) | Atomic receive: 1..N containers in one transaction |
 | [extract-hold-dual-map-kickback.md](extract-hold-dual-map-kickback.md) | Extract-hold dual-map kick-back (implement paused; OQ walk stamps) |
+| [2026-08-28-analysis-param-defs.md](2026-08-28-analysis-param-defs.md) | Working note: `analysis_param_defs` catalog + example run-start snapshots (fold into internal PRD/SPEC; **not seed**) |
