@@ -7,17 +7,19 @@
 **UI:** `/receive` (`AtomicReceive.tsx`) — sidebar **Receive**  
 **API:** `POST /api/samples/receive`  
 **Test data:** migration 0058 actors/projects + 0060 lists; catalog [atomic-receive/](atomic-receive/)  
-**Env:** local docker compose (`lims-*` healthy); http://localhost:3000 + :8000  
-**Build / commit:** `ebac94e` (main)  
-**Executor:** Grok browse UAT (`/browse`) + API curl  
-**Date:** 2026-08-27  
+**Env:** local docker compose (`lims-*`); http://localhost:3000 + :8000. UI click 2026-08-28: compose **down** after the run.  
+**Build / commit:** API `ebac94e` (2026-08-27) · UI `33fbcb1` (2026-08-28, main merge of PR 75 wizard removal)  
+**Executor:** Anton (API CORE 21/21, 2026-08-27) · Tobias (UI CORE click `/receive` as `alice-tech`, 2026-08-28)  
+**Date:** 2026-08-27 (API) · 2026-08-28 (UI)  
 
-**Run notes:** Seed barcodes `NBIO-AR-0001`/`0002`/`MC-*`/`KB-0001` were already consumed from dogfood. Browser happy-path used `NBIO-AR-0010`/`0011`, `NBIO-AR-MC2-*`, `NBIO-AR-KB-0010`. Matrix is no longer on the receive form (sample type is SoT); AR-VAL-01 exercised barcode / sample type / project / container type.
+**Run notes:** API stamp used Anton 21/21 on `ebac94e` (seed barcodes as catalog). UI click 2026-08-28 used catalog `NBIO-AR-0001` then `NBIO-AR-0002` as `alice-tech`. Matrix is not on the receive form (sample type is SoT). AR-VAL-01 remains Anton API only (UI required-field validation was not separately clicked).
 
-This script is the **receive happy path** sign-off. The `/accessioning` wizard is removed (`uat-sample-accessioning.md` retired).
+This script is the **receive happy path** sign-off. The `/accessioning` wizard is removed (`uat-sample-accessioning.md` retired). `/accessioning` redirects to `/receive`. No 3-step wizard. Backend `POST /samples/accession` may still exist for pytest — not the UI happy path; do not treat that as a UI fail.
 
 **CORE must-pass:** identity + **1..N vessels**, sticky project, Available for Testing, **zero Tests / zero Results** at receive, AuthZ (PR 68). Non-empty `analysis_ids` → **422**.
 **Follow-on (not CORE blockers):** AR-RES-01/02 results-entry. **A-15 asked-for / work-plan is parked.**
+
+**This stamp:** **API CORE Accept (21/21)** (2026-08-27, `ebac94e`). **UI CORE Pass** (2026-08-28, `33fbcb1`). Do **not** collapse into one undifferentiated Pass.
 
 ---
 
@@ -79,35 +81,36 @@ This script is the **receive happy path** sign-off. The `/accessioning` wizard i
 - App running with CORE receive code (Phases 1–4).
 - Seed: 0058 + 0060.
 - Unique constraint on `containers.name`.
-- Sidebar shows **Receive** → `/receive` for users with `sample:create`.
-- Hold merge until this UAT + dogfood pass. PR 71 stays draft. Not IC50.
+- Sidebar **Sample Mgmt** for `alice-tech`: Receive, Samples, Tests, Containers, Batches, Results. **No Accessioning** item. **Receive** → `/receive` for users with `sample:create`.
+- `/accessioning` redirects to `/receive`. No 3-step wizard.
+- Not IC50. Compose down after the UI click.
 
 ## Cases — CORE must-pass
 
 | ID | Steps | Expected | Pass/Fail | Notes |
 |----|-------|----------|-----------|-------|
-| AR-HV-01 | Log in as `alice-tech`. Open **Receive** (`/receive`). Scan `NBIO-AR-0001`. Sticky Plasma / Plasma (K2EDTA) / mAb-2301. Submit. Immediately scan `NBIO-AR-0002` without navigating away. | Both created. Stay on receive. Toast. Barcode clears and is focused. Type/matrix/project sticky. No sample-detail redirect. **No analysis picker.** No aliquot dialog. After each receive: **zero Tests**, **zero Results**. Extra barcodes would be more tubes of that sample. | **Pass** | Used `NBIO-AR-0010`/`0011` (0001/0002 already taken). Toast `Study-08`/`09`; sticky Plasma / mAb / Cryovial; stay on `/receive`; barcode cleared. |
-| **AR-HV-MC** | Same sticky. Primary `NBIO-AR-MC-P`. Add additional barcodes `NBIO-AR-MC-A1` and `NBIO-AR-MC-A2`. Submit once. | **One** sample; **three** containers + contents → same sample; status Available for Testing; stay on form; **zero Tests**, **zero Results**. | **Pass** | Used `NBIO-AR-MC2-*`. Toast `Study-10 · 3 vessels`. Three containers → one sample id. |
-| AR-HV-02 | Inspect `/receive` (no analysis picker). POST receive for `NBIO-AR-REFUSE-0001` with ELISA (Human IgG) in non-empty `analysis_ids`. Separately, confirm omitted or `[]` `analysis_ids` still succeed (AR-HV-01). | UI has **no analysis picker** and never sends `analysis_ids`. Non-empty `analysis_ids` → **422** before the transaction. No sample, container, contents, Test, or Result rows for `NBIO-AR-REFUSE-0001`. | **Pass** | UI: no analysis picker. API `NBIO-AR-REFUSE-0010` → 422 `analysis_ids must be empty…`; no container row. `[]` → 201 `tests: []`. |
-| AR-HV-03 | Receive with temperature omitted. | Succeeds. Zero Tests. | **Pass** | Covered by AR-HV-01 (temp blank). |
-| AR-HV-04 | Receive once with `client_sample_id`, once omitted. | Both succeed. Zero Tests. | **Pass** | UI `CLIENT-UAT-0010` on `KB-0010` stored in DB; omit also 201. **Note:** GET `/samples/{id}` returns `client_sample_id: null` even when DB has value (response serialization quirk; receive path OK). |
-| AR-HV-05 | Type barcode `NBIO-AR-KB-0001` (no scanner). Submit. | Same success; `containers.name` = typed barcode; zero Tests. | **Pass** | Used `NBIO-AR-KB-0010` (KB-0001 taken). |
-| AR-VAL-01 | Four POSTs/UI submits, each missing one required: barcode, type, matrix, project. | Each → **422** (or UI validation). No sample/container row. | **Pass** | Matrix removed from form. UI empty barcode blocks POST. API: missing barcode/type/project/ctype → 422; plate 8×12 → 400 not 1×1. |
-| AR-DUP-01 | Replay `NBIO-AR-0001` after it exists. | **409**. Toast. Stay on receive. No second sample. | **Pass** | Browser + API: 409 `Container barcode already exists`; toast; stayed on `/receive`. |
-| AR-ID-01 | Inspect `/receive` form and AR-HV-01 response. | **No sample-ID field**. `samples.name` ≠ barcode (unless template coincides). `containers.name` = barcode. No status / tube-type / analysis fields. | **Pass** | Form fields: barcode(s), sample type, project, container type, temp, client sample id only. Name template `mAb-2301 PK Study-NN`. |
-| AR-ST-01 | Inspect sample from `NBIO-AR-0001`. | Status = **Available for Testing**. `received_date` set. No Received hop. Zero Tests. | **Pass** | Samples grid + status UUID → Available for Testing; `received_date` set. |
-| AR-TST-01 | Inspect the sample from `NBIO-AR-0009` immediately after receive, then add ELISA later via the separate tests UI/API. | Zero Tests and zero Results immediately after receive. The later explicit add creates the test with its normal pending status. | **Pass** | Receive `NBIO-AR-0009` → `tests: []`. Later `POST /tests/` ELISA → Assigned/Pending. |
-| AR-TST-02 | DELETE that test (no results). | DELETE succeeds. | **Pass** | DELETE 200; tests total → 0. |
-| AR-TST-03 | After an explicitly added test has results, DELETE it. | **400**. Test and result remain. | **Pass** | DELETE → 400 `Cannot delete test that has results`; test GET still 200. |
-| AR-RBAC-01 | Log in as `david-cro`. Open Receive or POST `/samples/receive`. | No receive UI, or **403**. | **Pass** | No Receive nav; `/receive` redirected to dashboard. API POST → 403 `sample:create` required. |
-| AR-MU-01 | alice receives on mAb; bob on CAR-T; then reverse project_id. | Happy path OK (zero Tests at receive); reverse → **403**. | **Pass*** | Happy paths 201 `tests: []`. Cross-project → **404** `Project not found` (RLS hides project; denied, not 403). |
+| AR-HV-01 | Log in as `alice-tech`. Open **Receive** (`/receive`). Scan `NBIO-AR-0001`. Sticky Plasma / Plasma (K2EDTA) / mAb-2301. Submit. Immediately scan `NBIO-AR-0002` without navigating away. | Both created. Stay on receive. Toast. Barcode clears and is focused. Type/matrix/project sticky. No sample-detail redirect. **No analysis picker.** No aliquot dialog. After each receive: **zero Tests**, **zero Results**. Extra barcodes would be more tubes of that sample. | **Pass** (API Pass / UI Pass) | API: Anton 21/21 (`ebac94e`). UI 2026-08-28 (`33fbcb1`): received `NBIO-AR-0001` then `NBIO-AR-0002`; stayed on `/receive`; toast `Received mAb-2301 PK Study-01/02 · 1 vessel`; barcode cleared; type/project/container sticky. No hop off receive. No aliquot dialog. |
+| **AR-HV-MC** | Same sticky. Primary `NBIO-AR-MC-P`. Add additional barcodes `NBIO-AR-MC-A1` and `NBIO-AR-MC-A2`. Submit once. | **One** sample; **three** containers + contents → same sample; status Available for Testing; stay on form; **zero Tests**, **zero Results**. | **API Pass** | Anton 21/21. Tobias independent verify: 1 sample / 3 vessels. UI 2026-08-28: additional-barcodes field present (helper: not an aliquot). Three-vessel submit **not clicked** this UI run. |
+| AR-HV-02 | Inspect `/receive` (no analysis picker). POST receive for `NBIO-AR-REFUSE-0001` with ELISA (Human IgG) in non-empty `analysis_ids`. Separately, confirm omitted or `[]` `analysis_ids` still succeed (AR-HV-01). | UI has **no analysis picker** and never sends `analysis_ids`. Non-empty `analysis_ids` → **422** before the transaction. No sample, container, contents, Test, or Result rows for `NBIO-AR-REFUSE-0001`. | **Pass** (API Pass / UI Pass) | API: Anton 21/21; non-empty `analysis_ids` → **422**. UI 2026-08-28: no analysis/test picker on `/receive`. |
+| AR-HV-03 | Receive with temperature omitted. | Succeeds. Zero Tests. | **API Pass** | Anton 21/21. UI 2026-08-28: Temperature field present on `/receive`. Omit-temperature submit **not separately clicked**. |
+| AR-HV-04 | Receive once with `client_sample_id`, once omitted. | Both succeed. Zero Tests. | **API Pass** | Anton 21/21. UI 2026-08-28: Client sample ID field present. Dual with/without submit **not separately clicked**. |
+| AR-HV-05 | Type barcode `NBIO-AR-KB-0001` (no scanner). Submit. | Same success; `containers.name` = typed barcode; zero Tests. | **API Pass** | Keyboard. Anton 21/21. UI 2026-08-28: keyboard-only barcode submit **not separately clicked**. |
+| AR-VAL-01 | Four POSTs/UI submits, each missing one required: barcode, type, matrix, project. | Each → **422** (or UI validation). No sample/container row. | **API Pass** | Anton 21/21 only. UI required-field validation **not separately clicked** 2026-08-28. Matrix is not on the form. |
+| AR-DUP-01 | Replay `NBIO-AR-0001` after it exists. | **409**. Toast. Stay on receive. No second sample. | **Pass** (API Pass / UI Pass) | API: Anton 21/21; replay → **409**. UI 2026-08-28: replay `NBIO-AR-0001` → inline error + toast `Container barcode already exists: NBIO-AR-0001`; stayed on `/receive`. |
+| AR-ID-01 | Inspect `/receive` form and AR-HV-01 response. | **No sample-ID field**. `samples.name` ≠ barcode (unless template coincides). `containers.name` = barcode. No status / tube-type / analysis fields. | **Pass** (API Pass / UI Pass) | API: Anton 21/21; names from template. UI 2026-08-28 fields: Primary barcode, additional barcodes (helper: not an aliquot), Sample type, Project, Container type, Temperature, Client sample ID. **No** lab Sample ID field. **No** analysis/test picker. **No** aliquot dialog. Names from template, not barcode. |
+| AR-ST-01 | Inspect sample from `NBIO-AR-0001`. | Status = **Available for Testing**. `received_date` set. No Received hop. Zero Tests. | **API Pass** | QA4. Anton 21/21. Tobias independent verify: Available for Testing; `received_date` set; zero Tests. UI 2026-08-28: zero Tests at receive (WO-7). Observation (not a fail): `/samples/:id` still renders the Samples list (header says Edit Sample) rather than a detail hop from receive. |
+| AR-TST-01 | Inspect the sample from `NBIO-AR-0009` immediately after receive, then add ELISA later via the separate tests UI/API. | Zero Tests and zero Results immediately after receive. The later explicit add creates the test with its normal pending status. | **Pass** (API Pass / UI Pass) | API: Anton 21/21; later `POST /tests/` ELISA. UI 2026-08-28: zero Tests minted at receive (WO-7). Later add-test path **not separately clicked** this UI run. |
+| AR-TST-02 | DELETE that test (no results). | DELETE succeeds. | **API Pass** | QA6 / A-14. Anton 21/21. Not clicked 2026-08-28. |
+| AR-TST-03 | After an explicitly added test has results, DELETE it. | **400**. Test and result remain. | **API Pass** | QA6 / A-14. Anton 21/21. Not clicked 2026-08-28. |
+| AR-RBAC-01 | Log in as `david-cro`. Open Receive or POST `/samples/receive`. | No receive UI, or **403**. | **Pass** (API Pass / UI Pass) | API: Anton 21/21; `david-cro` POST → **403** (`sample:create` required). UI 2026-08-28: `david-cro` has **no Receive nav**. Direct `/receive` URL session-restore was **inconclusive** — noted; do **not** Fail UI CORE on that. |
+| AR-MU-01 | alice receives on mAb; bob on CAR-T; then reverse project_id. | Happy path OK (zero Tests at receive); reverse → **403**. Observed this API run: reverse → **404** Project not found. **403 or 404 both refuse** (no row). | **API Pass** | QA8. Anton 21/21. Tobias independent verify: reverse project → **404** (refuse). Expected column still lists **403**; do not treat 404 as a silent spec rewrite. UI 2026-08-28: reverse-project POST **not clicked**. |
 
 ### Follow-on (not CORE UAT blockers)
 
 | ID | Steps | Expected | Notes |
 |----|-------|----------|-------|
-| AR-RES-01 | After explicit ELISA add on a received sample, typed number on IgG | Persist lock: `reported_result` + qualifiers | Results slice — not minted at receive |
-| AR-RES-02 | After explicit viability add, typed number on analyte missing `units_default` | **422** | Results slice |
+| AR-RES-01 | After explicit ELISA add on a received sample, typed number on IgG | Persist lock: `reported_result` + qualifiers | Results slice — not minted at receive. **Parked / not run** this stamp. |
+| AR-RES-02 | After explicit viability add, typed number on analyte missing `units_default` | **422** | Results slice. **Parked / not run** this stamp. |
 
 ### Automated only (pytest)
 
@@ -117,17 +120,24 @@ This script is the **receive happy path** sign-off. The `/accessioning` wizard i
 
 ## Sign-off
 
-**CORE Pass** — 2026-08-27 — Grok browse + API (`ebac94e`)
+**API CORE Accept (21/21)** — Anton, 2026-08-27, `ebac94e`.  
+**UI CORE Pass** — Tobias, 2026-08-28, `33fbcb1` (clicked `/receive` as `alice-tech`).
+
+Do **not** read this as one undifferentiated Pass. API Accept and UI Pass are separate dated stamps.
 
 **CORE pass** requires CORE must-pass rows above (not AR-RES).  
 QA1–QA6, QA8–QA10 in `.docs/review/qa-review/atomic-receive.md` apply to CORE. QA7 = results follow-on.
 
-### Concerns (non-blockers) — close-out
+Verified holds (Anton API, 2026-08-27): HV-01 `NBIO-AR-0001` / `0002`; HV-MC 1 sample / 3 vessels; zero Tests (WO-7); `samples.name` from template; DUP 409; non-empty `analysis_ids` 422; `david-cro` POST 403; MU reverse **404** refuse. AR-VAL-01 is Anton 21/21 only.
 
-1. **AR-MU-01 status code:** UAT observed **404** under RLS; fixed to **403** (`require_project_for_receive`) on close-out.
-2. **`client_sample_id` on GET:** DB had the value but `SampleBase` omitted the field so responses dropped it; fixed on close-out.
+Verified holds (Tobias UI, 2026-08-28, `33fbcb1`): `/accessioning` → `/receive`; no Accessioning nav; HV-01 stay-on-form + toast + sticky + barcode clear; DUP toast + stay; no sample-ID field; no analysis/test picker; no aliquot dialog; names from template; zero Tests at receive; `david-cro` no Receive nav. Direct `/receive` as `david-cro` inconclusive (not a UI CORE Fail). `/samples/:id` list render is an observation, not a fail. `/samples/accession` for pytest is not a UI fail. Not IC50. Compose down after the run.
+
+### Concerns (non-blockers)
+
+1. **AR-MU-01 status code (API stamp):** cross-client `project_id` returns **404** (project not visible under RLS), not **403**. Access still denied. Keep this API observation; do not treat 404 as a silent spec rewrite.
+2. **`/samples/:id` (UI 2026-08-28):** still renders the Samples list (header says Edit Sample) rather than a detail hop from receive. Observation only — receive itself stayed on `/receive`.
 3. **Create Sample** on Samples page correctly routes to `/receive` (regression check from post-merge fix).
-4. Open PR **#73** (API-only stamp, “UI not run”) is **superseded** by this full browse+API CORE Pass — close without merge.
+4. Closed PR **#73** stamped API-only / “UI not run” on `ebac94e`. That UI-not-run language is **cleared** by this **UI CORE Pass** on `33fbcb1`. Do not revive “UI not Met.”
 
 ## Cutover
 
