@@ -2,15 +2,13 @@
 
 **Date:** 2026-08-28  
 **Stem:** `post-receive-work-spine`  
-**Status:** Draft for review  
+**Status:** Spec **Accept with conditions** on [PR 81](https://github.com/Marc02130/nimblelims/pull/81) P1 (2026-08-28). Architecture/UI Accept with conditions. Hold merge until UAT. P2+ closed.  
 **Requirements:** [`.docs/review/requirements/post-receive-work-spine.md`](../requirements/post-receive-work-spine.md)  
 **Schema:** [`.docs/review/schema-changes/post-receive-work-spine.md`](../schema-changes/post-receive-work-spine.md)  
 **Spec:** [`.docs/internal/specs/post-receive-work-spine/SPEC.md`](../../internal/specs/post-receive-work-spine/SPEC.md)  
 **Process:** [`.docs/review/development-process/README.md`](../development-process/README.md)
 
 Implement **P1 first**. P2–P5 are in this sketch so reviews can lock the spine. Do not code P2–P5 in the P1 PR.
-
-**P1 product lock (this stamp):** asked-for is the **lake**. Copy is **requested analysis**. Asked-for does **not** assign a Test or start work. Receive freeze: non-empty `analysis_ids` on `POST /samples/receive` → **422**; empty/omit → zero Tests. **Route / `work_orders` / WO-7 stay OUT of this stamp.** `analysis_param_defs` freeze onto a Test at **LimsRun start** later — do **not** put them on receive.
 
 **Lab Ops 2026-08-28:** Accept with conditions. P1 implementable if **L1** is in the UI/copy. **P2 coding closed until L2–L4 are in this sketch** (folded below). **L5** binds P4 copy. Artifact: [lab-ops-review/post-receive-work-spine.md](../lab-ops-review/post-receive-work-spine.md).
 
@@ -49,9 +47,9 @@ No new execute runtime. No second AuthZ.
 
 ### 3.1 Tables
 
-`asked_for` — request row (the lake). FK sample, analysis. `tat_days int`. `params jsonb` default `{}`. `status` list or check constraint.
+`analysis_param_defs` — per-analysis parameter catalog (cell line, etc.). Empty in OOB seed is OK. Read: any logged-in user. Mutate = **`config:edit`** in the router (do not let a bypass write the catalog).
 
-P1 operator path fills **analysis + TAT**. Empty `params` `{}` is the P1 path. Do **not** collect `analysis_param_defs` on receive. Catalog + freeze onto a Test is **later (LimsRun start)** — out of this stamp.
+`asked_for` — request row. FK sample, analysis. `tat_days int`. `params jsonb` (**order capture**, not the Test snapshot). `status` list or check constraint.
 
 Partial unique index: `(sample_id, analysis_id) WHERE status <> 'cancelled'`.
 
@@ -59,28 +57,32 @@ Partial unique index: `(sample_id, analysis_id) WHERE status <> 'cancelled'`.
 
 `AskedForService.create`:
 
-1. AuthZ test:assign + load sample under RLS (403 if hidden)
+1. AuthZ test:assign + load sample under RLS **and** `has_project_access` (403 if hidden; 403 not 404)
 2. Sample.status should be Available for Testing (422 otherwise for v1 — do not order on discarded)
 3. Validate analysis active
-4. Do **not** require param defs on create (P1 empty `{}`)
-5. Insert `requested`
+4. Validate params vs defs
+5. Insert `requested` only — **P1 must not write `routed`** (`routed` is P2)
 6. **Do not** call `_create_tests` / `_create_asked_for_tests`
 
-P1 **does not** call routing. **Do not** mint work_orders. **Do not** start a process.
+`AskedForService.list` / `GET /asked-for`: **dual-belt** — same `has_project_access` as create, not RLS-only. `create_all` / non-`lims_app` must not leak.
 
-**L1 (Lab Ops, same-phase P1):** Copy is “asked-for / requested analysis,” never assign/create test, start work, or order process. No Start/Execute CTA on `requested`. Multi-sample: one operator action (same analysis + TAT) writes one row per sample in the set **in one txn** (A3). Hidden sample → **403** (A1). **Client role cannot write** even with leftover `test:assign` (S2). No PATCH in P1 — cancel and recreate (BA4).
+P1 **does not** call routing (table may not exist yet). Type × analysis eligibility is **P2 (L2)**, not this PR.
+
+**L1 (Lab Ops, same-phase P1):** Copy is “asked-for / requested analysis,” never assign/create test, start work, or order process. No Start/Execute CTA on `requested`. Multi-sample: one operator action (same analysis + TAT + params) writes one row per sample in the set **in one txn** (A3). Hidden sample → **403** (A1). **Client role cannot write** even with leftover `test:assign` (S2). No PATCH in P1 — cancel and recreate (BA4).
+
+**Heidi / Mathilda 2026-08-28:** `params` on `asked_for` are **order capture**. Freeze still happens at LimsRun start (WO-7 / P2). Bounce a Start/Execute CTA, silent Order→work, analysis picker on `/receive`, or README that equates asked-for with Test assign. Classic `/tests` type-a-number stays.
 
 ### 3.3 Frontend
 
-`pages/AskedFor.tsx` + sample detail panel. Reuse analysis dropdown from Tests, **not** TestForm (TestForm creates Tests). Multi-select samples for one request (L1).
+`pages/AskedFor.tsx` + sample detail panel. Reuse analysis dropdown from Tests, **not** TestForm (TestForm creates Tests). Multi-select samples for one request (L1). Label params as order capture, not Test snapshot (U2).
 
 Sidebar Sample Mgmt: after Receive, add **Asked-for**.
 
 ### 3.4 Tests
 
-Pytest: create, 409 dup, 403 RLS, receive still 422 on analysis_ids, asked-for leaves tests count 0.
+Pytest: create, 409 dup, 403 RLS, 422 params, receive still 422 on analysis_ids, asked-for leaves tests count 0, list dual-belt (no leak without `has_project_access`).
 
-## 4. P2 design (**OUT of this P1 stamp**)
+## 4. P2 design
 
 `routing_map`: range-gist or exclusion constraint on `(analysis_id, sample_type_id, tat_range)`. Postgres: `int4range` + `EXCLUDE USING gist`.
 
@@ -121,6 +123,7 @@ No new import engine. Frontend: Instruments + Parsers admin (may already exist a
 | Case | Behavior |
 |------|----------|
 | RLS-hidden sample | 403 |
+| List without `has_project_access` | empty / 403 — no leak |
 | Cancelled asked-for re-create | Allowed (unique ignores cancelled) |
 | Route with empty map | 200, no WO |
 | Map overlap | 409 on map save |
@@ -137,4 +140,4 @@ No new import engine. Frontend: Instruments + Parsers admin (may already exist a
 | 4 | P4 SOP Apply → process def |
 | 5 | P5 parser setup UX |
 
-Coding stays Grok Build. One phase per PR. Receive code freeze except bugs.
+Coding stays Grok Build. One phase per PR. Receive code freeze except bugs. Hold merge on PR 81 until UAT. Not IC50.

@@ -1,10 +1,10 @@
 # Requirements: Post-receive work spine
 
 **Date:** 2026-08-28  
-**Status:** Draft for formal review  
+**Status:** Spec **Accept with conditions** on [PR 81](https://github.com/Marc02130/nimblelims/pull/81) P1 (2026-08-28). Architecture/UI Accept with conditions. Hold merge until UAT. P2+ closed.  
 **Stem:** `post-receive-work-spine`  
 **Leadership sequencing (2026-08-28):** order (asked-for) → work_order → results → SOP+AI → process → instrument import config  
-**Do not implement until reviews Accept / Accept-with-conditions and open questions that block the named phase are Decided.**
+**Do not implement P2+ until reviews Accept that phase.**
 
 **Domain PRD:** [`.docs/internal/prd/post-receive-work-spine/PRD.md`](../../internal/prd/post-receive-work-spine/PRD.md)  
 **Spec:** [`.docs/internal/specs/post-receive-work-spine/SPEC.md`](../../internal/specs/post-receive-work-spine/SPEC.md)  
@@ -66,14 +66,16 @@ P1 is the **lake**. P2–P5 are specified here so reviews see the path. Coding a
 |----|-------------|
 | **RQ-AF-1** | After receive, a user with `test:assign` and sample/project access can record **asked-for** rows: `sample_id`, `analysis_id`, `tat_days` (integer ≥ 1), optional `params`. **L1:** one action may target a **set** of samples (same analysis + TAT + params); API still one row per sample. Copy: requested analysis, never “assign test” / “start work.” No Start/Execute on `requested`. |
 | **RQ-AF-2** | Asked-for does **not** create Test, Result, Process, Experiment, or LimsRun rows. |
-| **RQ-AF-3** | UI is **not** `/receive`. Surface: Sample Mgmt item **Asked-for** (`/asked-for`) plus a section on sample detail. Receive never sends `analysis_ids`. |
+| **RQ-AF-3** | UI is **not** `/receive`. Surface: Sample Mgmt item **Asked-for** (`/asked-for`) plus a section on sample detail. Receive never sends `analysis_ids`. Non-empty `analysis_ids` still **422**. |
 | **RQ-AF-4** | Active uniqueness: one open asked-for per `(sample_id, analysis_id)`. Duplicate → **409**. |
-| **RQ-AF-5** | Status: `requested` \| `routed` \| `cancelled`. P1 only writes `requested` / `cancelled`. `routed` is P2. |
-| **RQ-AF-6** | `params` is a JSON object. Keys must match `analysis_param_defs` for that analysis (P1 may ship with zero defs = empty object only). Unknown key or missing required def → **422**. |
-| **RQ-AF-7** | AuthZ = sample access (project RLS) + `test:assign`. Client role cannot create. Mutate routing/config is **not** this permission. |
-| **RQ-AF-8** | RLS via sample → project (same as tests). No new AuthZ path. |
+| **RQ-AF-5** | Status: `requested` \| `routed` \| `cancelled`. P1 only writes `requested` / `cancelled`. **P1 must not write `routed`.** `routed` is P2. |
+| **RQ-AF-6** | `params` is a JSON object (**order capture**, not the Test snapshot). Freeze at LimsRun start is P2 / WO-7. Keys must match `analysis_param_defs` for that analysis (P1 may ship with zero defs = empty object only). Unknown key or missing required def → **422**. |
+| **RQ-AF-7** | Write AuthZ = `test:assign` + project access + Client **403**. Mutate routing/config is **not** this permission. |
+| **RQ-AF-8** | **Dual-belt:** app-level `has_project_access` on create, get, **list**, and cancel — same belt as create. RLS via sample → project is not enough (`create_all` / non-`lims_app` must not leak). Hidden sample → **403** not 404. |
 | **RQ-AF-9** | List views: by sample, by project, by analysis, status `requested`. |
 | **RQ-AF-10** | Cancel is allowed while `requested`. Cancel after `routed` is P2 (must cancel or complete the work_order first). |
+| **RQ-AF-11** | `analysis_param_defs` read: any logged-in user. Mutate = **`config:edit`** in the router. |
+| **RQ-AF-12** | Type × analysis eligibility is **P2 (L2)**, not P1. |
 
 ### 4.2 P2 — Routing map + work_order
 
@@ -86,7 +88,7 @@ P1 is the **lake**. P2–P5 are specified here so reviews see the path. Coding a
 | **RQ-WO-5** | **L2:** Qubit-on-blood (or any LimsRun step whose configured accepted sample type ≠ current sample type) → **422 `route_sample_type` on map save and on route**. Eligibility is **config** on the LimsRun step and/or analysis — **not** `sample_type_transitions`. Until dest-type execute writes DNA, Extract→Qubit on blood **refuses**. No OOB blood→Qubit routes. |
 | **RQ-WO-6** | On asked-for save (or explicit “Route” if map was empty at save): if a map row matches, mint **one** `work_order` embedding the process-definition chain snapshot. Asked-for → `routed`. |
 | **RQ-WO-7** | Instantiating the first process uses **existing process AuthZ** (`experiment:manage`). No client expand. **L4:** completing process N starts N+1 from the **WO snapshot chain** — no second routing hop. |
-| **RQ-WO-11** | **L3:** Asked-for `params` snapshot onto the Test at LimsRun start and freeze. |
+| **RQ-WO-11** | **L3:** Asked-for `params` (order capture) snapshot onto the Test at LimsRun start and freeze. |
 | **RQ-WO-8** | Work_order does **not** create Tests. Tests are created at **LimsRun start** (WO-7). Publish **refuses** if Test is missing (no ensure-on-publish). |
 | **RQ-WO-9** | Non-instrument analysis: LimsRun with `analysis_id` required; manual results OK; parser requires instrument XOR CRO (WO-4). |
 | **RQ-WO-10** | Work_order status: `queued` \| `in_progress` \| `completed` \| `cancelled`. |
@@ -114,7 +116,7 @@ P1 is the **lake**. P2–P5 are specified here so reviews see the path. Coding a
 
 | ID | Requirement |
 |----|-------------|
-| **RQ-IMP-1** | Admin (`config:edit`) can CRUD **instrument types**, **instruments**, **CRO sources**, and **data_parsers** keyed by analysis + (instrument XOR CRO). |
+| **RQ-IMP-1** | Admin (`config:edit`) can CRUD **instrument types**, **instruments**, **CRO sources**, and **data_parsers` keyed by analysis + (instrument XOR CRO). |
 | **RQ-IMP-2** | Parser setup: ≥1 example file, ≥1 expected-output test, dry-run harness, activate only if tests pass. |
 | **RQ-IMP-3** | Optional **AI draft** of `parser_config` at setup only. Day-to-day import = no LLM (G4/G5 already stamped). |
 | **RQ-IMP-4** | Sidebar shows **active** parsers/instruments; activate = `config:edit` (FW-1b). |
@@ -126,6 +128,7 @@ P1 is the **lake**. P2–P5 are specified here so reviews see the path. Coding a
 - Mint Tests at asked-for or work_order save
 - Second workflow engine beside Process / Experiment / LimsRun
 - Rename `projects` → `orders`
+- Equate asked-for with Test assign (README U1)
 - Intake-profile engine, bulk intake UI, wizard revival
 - Compound registration / lots (WO-5/6)
 - Materials module, multi-tenant, IC50 / dose-response
@@ -142,6 +145,9 @@ P1 is the **lake**. P2–P5 are specified here so reviews see the path. Coding a
 7. SOP Apply auto-activates a live process without a human save
 8. Client role writes asked-for / routing / parsers
 9. New `results.unit_id`
+10. `GET /asked-for` list RLS-only (no app-level `has_project_access`)
+11. README / copy that equates asked-for with Test assign
+12. P1 writes `routed`
 
 ## 7. Acceptance (product)
 
@@ -150,6 +156,7 @@ P1 is the **lake**. P2–P5 are specified here so reviews see the path. Coding a
 | AC-P1-1 | Receive a sample → record ELISA asked-for → zero Tests, zero work_orders |
 | AC-P1-2 | Duplicate asked-for same sample+analysis → 409 |
 | AC-P1-3 | User without project access → 403 |
+| AC-P1-4 | `GET /asked-for` without `has_project_access` does not leak other-project rows |
 | AC-P2-1 | Matching route mints work_order with ordered process ids; asked-for = routed |
 | AC-P2-2 | No map row → no work_order; UI says configure routing |
 | AC-P2-3 | Qubit route on blood sample → refuse |
@@ -160,4 +167,4 @@ P1 is the **lake**. P2–P5 are specified here so reviews see the path. Coding a
 
 ## 8. UAT
 
-New script: `UAT_Scripts/uat-post-receive-work-spine.md` (create at implement, not this docs PR). P1 cases first. Do not use retired `uat-sample-accessioning.md`.
+Script: `UAT_Scripts/uat-post-receive-work-spine.md`. P1 cases first. Do not use retired `uat-sample-accessioning.md`. Hold merge until UAT. Not IC50.
