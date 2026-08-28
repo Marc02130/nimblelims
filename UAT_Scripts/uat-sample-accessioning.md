@@ -1,8 +1,8 @@
-# UAT Scripts: Single Sample Accessioning (legacy wizard)
+# UAT Scripts: Single Sample Accessioning — **RETIRED**
 
-> **Cutover (2026-08-26):** This script is **not** the receive happy path.  
+> **2026-08-28:** The `/accessioning` wizard is **removed**. `/accessioning` redirects to `/receive`.  
 > **Receive SoT:** [`uat-atomic-receive.md`](uat-atomic-receive.md) · UI `/receive` · `POST /samples/receive`.  
-> Keep this file only for legacy `/accessioning` wizard regression until that path is removed.
+> Do not run this script. Left as historical record of the old three-step wizard.
 
 ## Overview
 

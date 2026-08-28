@@ -10,15 +10,12 @@ Copyright (c) 2025 Marc Breneiser
 
 ## Features
 
-### Sample Accessioning (US-1, US-24)
-- Multi-step wizard for sample entry
-- **Bulk Mode**: Toggle for bulk accessioning with common fields and unique per-sample data
-- Required fields: due_date, received_date, sample_type, status, matrix, temperature
-- Container specification: Select pre-setup container type, create instance dynamically
-- Optional double-entry validation for key fields
-- Test assignment during accessioning (individual analyses or test batteries)
-- Container assignment with concentration/amount tracking
-- Client project selection for grouping multiple projects
+### Sample receive (US-1)
+- Atomic receive at `/receive`: scan 1..N vessels in one transaction
+- System-assigned sample ID; barcode is the container name
+- Status on commit: Available for Testing
+- No analysis picker, no wizard, no bulk intake UI (wizard removed)
+- Work assignment is after receive (Tests page until order / work-order packets)
 
 ### Container Management (US-5)
 - Create and manage hierarchical containers
@@ -42,10 +39,9 @@ Copyright (c) 2025 Marc Breneiser
 - Enables system customization without code changes
 
 ### Test Assignment (US-7)
-- Assign individual analyses or test batteries to samples during accessioning
-- Test batteries automatically create sequenced tests for all analyses in the battery
-- Test instances with status tracking
-- Integration with sample lifecycle
+- Assign analyses to existing samples from Tests (`/tests`)
+- Not part of receive (CORE receive mints zero Tests)
+- Test batteries still exist in admin; assigning them at intake is not the receive path
 
 ### Batch Management (US-11, US-26, US-27)
 - Create batches with container tracking
@@ -105,18 +101,13 @@ Copyright (c) 2025 Marc Breneiser
 - `Dashboard` - Main overview with sample listing and filtering
 - `ExperimentsManagement` - Experiments list, detail, create (`/experiments`, `/experiments/:id`)
 - `ExperimentTemplatesManagement` - Experiment templates CRUD (entries), SOP upload (`/experiments/templates`)
-- `AccessioningForm` - Multi-step sample accessioning wizard
+- `AtomicReceive` - Scan-loop receive (`/receive`)
 - `ContainerManagement` - Container instance creation and management
 - `BatchManagement` - Batch creation and management
 - `ResultsManagement` - Results entry and review
 - `ClientProjects` - Client project management
 - `Login` - User authentication
 - `AdminOverview` - Admin dashboard with statistics (admin-only)
-
-### Accessioning Components
-- `SampleDetailsStep` - Sample information entry with double-entry validation
-- `TestAssignmentStep` - Analysis selection and assignment
-- `ReviewStep` - Final review before submission
 
 ### Container Components
 - `ContainerForm` - Container instance creation/editing form
@@ -267,16 +258,11 @@ See [`.docs/review/manuals/navigation.md`](../.docs/review/manuals/navigation.md
 
 ## User Workflows
 
-### Sample Accessioning Workflow
-1. Click "Accessioning" in sidebar (requires `sample:create` permission)
-2. Toggle bulk mode if needed (for multiple samples)
-3. Fill sample details (name, type, dates, etc.)
-   - In bulk mode: Fill common fields and unique per-sample data in table
-4. Enable double-entry validation if needed
-5. Select analyses or test battery for testing
-6. Review all information
-7. Submit to create sample(s), container(s), and tests
-   - Bulk mode: Creates all samples atomically in single transaction
+### Sample receive workflow
+1. Click **Receive** in sidebar (requires `sample:create`)
+2. Set sticky sample type, project, and 1×1 container type
+3. Scan primary barcode; optionally add more barcodes for the same sample
+4. Receive; stay on the page for the next tube
 
 ### Container Management Workflow
 1. Click "Containers" in sidebar (requires `sample:update` permission)

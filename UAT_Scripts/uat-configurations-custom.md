@@ -407,14 +407,14 @@ Verify that custom fields are dynamically rendered in forms and validated agains
 | **User Role** | Lab Technician |
 | **Required Permission** | `sample:create` or `sample:update` |
 | **Custom Field Configured** | At least one active custom attribute configuration exists for `entity_type='samples'`:<br>- `attr_name` = "ph_level"<br>- `data_type` = "number"<br>- `validation_rules` = {"min": 0, "max": 14} |
-| **Sample Form** | Sample creation or editing form accessible (e.g., `/accessioning` or `/samples/{id}/edit`) |
+| **Sample Form** | Sample editing form on `/samples` (receive has no custom-field form) |
 
 ### Test Steps
 
 | Step | Action | Expected Result |
 |------|--------|-----------------|
 | 1 | Log in as Lab Technician | User authenticated |
-| 2 | Navigate to sample creation page (e.g., `/accessioning`) | Sample creation form loads |
+| 2 | Navigate to Samples, edit an existing sample | Sample edit form loads |
 | 3 | **Verify Custom Fields Section** | |
 | 3.1 | Locate "Custom Fields" section in form | Section visible below standard fields |
 | 3.2 | Verify custom field rendered | Field for "ph_level" visible:<br>- Label: "pH level" or "ph_level"<br>- Input type: Number input (for number data type) |
