@@ -15,6 +15,8 @@
 
 **Agents / skills:** Prefer these paths. Do not write new artifacts under the old `.docs-review/` or `.docs-internal/` names. Do not put operator how-tos back under `.docs/review/manuals/`.
 
+**Operator start here:** [review/README.md](review/) (receive freeze + asked-for lake) · [review/manuals/asked-for.md](review/manuals/asked-for.md)
+
 **Teams:** See [`.grok/teams/README.md`](../.grok/teams/README.md) (Leadership / BA / Dev / QA / Docs).
 
 **Framework SoT:** [decision-logs/framework-stamps-2026-08-26.md](decision-logs/framework-stamps-2026-08-26.md) · [discussions/2026-08-25-what-is-a-good-framework.md](discussions/2026-08-25-what-is-a-good-framework.md)

@@ -26,6 +26,7 @@ import VisibilityIcon from '@mui/icons-material/Visibility';
 import AccountTreeIcon from '@mui/icons-material/AccountTree';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import SampleForm from '../components/samples/SampleForm';
+import AskedForForm, { AskedForFormValues } from '../components/asked-for/AskedForForm';
 import { apiService, addClientFilterIfNeeded } from '../services/apiService';
 import { useUser } from '../contexts/UserContext';
 import { FillHeightPage, FillHeightTable } from '../components/common/FillHeightPage';
@@ -80,6 +81,11 @@ const SamplesManagement: React.FC = () => {
   const [viewMode, setViewMode] = useState(false);
   const [journey, setJourney] = useState<JourneyItem[]>([]);
   const [journeyLoading, setJourneyLoading] = useState(false);
+  const [askedForRows, setAskedForRows] = useState<
+    { id: string; analysis_name?: string; tat_days: number; status: string }[]
+  >([]);
+  const [askedForLoading, setAskedForLoading] = useState(false);
+  const [showAskedForForm, setShowAskedForForm] = useState(false);
   const [lookupData, setLookupData] = useState<{
     sampleTypes: LookupItem[];
     statuses: LookupItem[];
@@ -108,6 +114,7 @@ const SamplesManagement: React.FC = () => {
   const [assignSuccess, setAssignSuccess] = useState<string | null>(null);
 
   const canUpdate = hasPermission('sample:update');
+  const canAssign = hasPermission('test:assign');
   const canManageProcesses = hasPermission('experiment:manage');
   const selectedIds = Array.from(rowSelection.ids).map(String);
   const selectedCount = selectedIds.length;
@@ -133,6 +140,18 @@ const SamplesManagement: React.FC = () => {
       })
       .finally(() => {
         if (!cancelled) setJourneyLoading(false);
+      });
+    setAskedForLoading(true);
+    apiService
+      .getAskedFor({ sample_id: selectedSample.id })
+      .then((res: any) => {
+        if (!cancelled) setAskedForRows(Array.isArray(res?.items) ? res.items : []);
+      })
+      .catch(() => {
+        if (!cancelled) setAskedForRows([]);
+      })
+      .finally(() => {
+        if (!cancelled) setAskedForLoading(false);
       });
     return () => {
       cancelled = true;
@@ -639,6 +658,55 @@ const SamplesManagement: React.FC = () => {
                 </Box>
               ))}
             </Box>
+          )}
+          <Divider sx={{ my: 2 }} />
+          <Box display="flex" justifyContent="space-between" alignItems="center">
+            <Typography variant="subtitle1">Asked-for</Typography>
+            {canAssign && selectedSample && (
+              <Button size="small" onClick={() => setShowAskedForForm(true)}>
+                Record requested analysis
+              </Button>
+            )}
+          </Box>
+          {askedForLoading ? (
+            <CircularProgress size={20} />
+          ) : askedForRows.length === 0 ? (
+            <Typography variant="body2" color="text.secondary">
+              No requested analyses on this sample.
+            </Typography>
+          ) : (
+            <Box display="flex" flexDirection="column" gap={0.5} mt={1}>
+              {askedForRows.map((row) => (
+                <Typography key={row.id} variant="body2">
+                  {row.analysis_name || row.id} · TAT {row.tat_days}d · {row.status}
+                </Typography>
+              ))}
+            </Box>
+          )}
+        </DialogContent>
+      </Dialog>
+      <Dialog
+        open={showAskedForForm}
+        onClose={() => setShowAskedForForm(false)}
+        maxWidth="sm"
+        fullWidth
+        aria-labelledby="sample-asked-for-title"
+      >
+        <DialogTitle id="sample-asked-for-title">Record requested analysis</DialogTitle>
+        <DialogContent>
+          {selectedSample && (
+            <AskedForForm
+              lockSamples
+              sampleIds={[selectedSample.id]}
+              sampleOptions={[{ id: selectedSample.id, name: selectedSample.name }]}
+              onSubmit={async (values: AskedForFormValues) => {
+                await apiService.createAskedFor(values);
+                setShowAskedForForm(false);
+                const res = await apiService.getAskedFor({ sample_id: selectedSample.id });
+                setAskedForRows(Array.isArray(res?.items) ? res.items : []);
+              }}
+              onCancel={() => setShowAskedForForm(false)}
+            />
           )}
         </DialogContent>
       </Dialog>

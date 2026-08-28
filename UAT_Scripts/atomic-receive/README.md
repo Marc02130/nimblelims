@@ -4,9 +4,9 @@ Catalog + seed notes for atomic receive UAT and pytest.
 
 **Product code (Phases 1–4):** `POST /api/samples/receive` + UI `/receive` (wizard at `/accessioning` removed; that route redirects to `/receive`).  
 **Human UAT SoT:** [`../uat-atomic-receive.md`](../uat-atomic-receive.md)  
-**Manual:** `.docs/review/manuals/atomic-receive.md`
+**Manual:** [manuals/HOWTO.md](../../manuals/HOWTO.md) §2 (receive). Local `.docs/manuals/atomic-receive.md` if present.
 
-**WO-7 lock:** CORE receive does **not** mint Tests. OOB UI has no analysis picker. Omit `analysis_ids` or send `[]`. Non-empty → **422**. After receive: zero Tests, zero Results. Extra barcodes = more tubes of that sample. A-15 asked-for / work-plan is parked.
+**Receive freeze:** CORE receive does **not** mint Tests. OOB UI has no analysis picker. Omit `analysis_ids` or send `[]`. Non-empty → **422**. After receive: zero Tests, zero Results. Extra barcodes = more tubes of that sample. **Asked-for** (requested analysis) is P1 on `/asked-for`, not on receive — see `uat-post-receive-work-spine.md`.
 
 Seeded BioTech entities come from migration **0058** (clients, users, projects, lists, analyses, analytes, container types). Migration **0059** seeds lifecycle samples **with aliquots / `parent_sample_id`** — those rows are **not** receive fixtures. CORE receive uses **payloads + live receive API**.
 

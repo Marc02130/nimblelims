@@ -75,7 +75,14 @@ One action may cover a set of samples (same analysis + TAT). The API still write
 
 Client write → **403**. Hidden / other-project sample → **403** (not 404).
 
-Params: P1 may send `{}`. Assay params freeze at **LimsRun start** when that packet exists — **not** on receive.
+Params: P1 may send `{}`. Assay params freeze at **LimsRun start** when that packet exists — **not** on receive. Setup (`config:edit`) may `GET/PUT /analyses/{id}/param-defs`; empty catalog is the OOB path.
+
+| Case | HTTP |
+|------|------|
+| Duplicate open `(sample, analysis)` | **409** (full rollback) |
+| No project access / client write / hidden sample | **403** |
+| Discarded sample / inactive analysis / TAT &lt; 1 | **422** |
+| Receive with non-empty `analysis_ids` | **422** (receive freeze) |
 
 ---
 

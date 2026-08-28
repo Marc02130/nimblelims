@@ -15,7 +15,7 @@ Copyright (c) 2025 Marc Breneiser
 - System-assigned sample ID; barcode is the container name
 - Status on commit: Available for Testing
 - No analysis picker, no wizard, no bulk intake UI (wizard removed)
-- Work assignment is after receive (Tests page until order / work-order packets)
+- After receive: **Asked-for** (`/asked-for`) records **requested analysis** (zero Tests; does not start work). Classic `/tests` is not the request path.
 
 ### Container Management (US-5)
 - Create and manage hierarchical containers
@@ -38,10 +38,12 @@ Copyright (c) 2025 Marc Breneiser
 - Restricted to users with `config:edit`, `test:configure`, or `user:manage` permissions
 - Enables system customization without code changes
 
-### Test Assignment (US-7)
-- Assign analyses to existing samples from Tests (`/tests`)
-- Not part of receive (CORE receive mints zero Tests)
-- Test batteries still exist in admin; assigning them at intake is not the receive path
+### Requested analysis (asked-for, P1)
+- Record **requested analysis** on **Asked-for** (`/asked-for`) after receive
+- Does **not** assign a Test or start work
+- Not part of receive (CORE receive mints zero Tests; non-empty `analysis_ids` → 422)
+- Classic Tests (`/tests` / TestForm) still mint Tests for typing a number on an existing Test — **not** the request path
+- Test batteries still exist in admin; they are not the receive path
 
 ### Batch Management (US-11, US-26, US-27)
 - Create batches with container tracking
@@ -102,6 +104,7 @@ Copyright (c) 2025 Marc Breneiser
 - `ExperimentsManagement` - Experiments list, detail, create (`/experiments`, `/experiments/:id`)
 - `ExperimentTemplatesManagement` - Experiment templates CRUD (entries), SOP upload (`/experiments/templates`)
 - `AtomicReceive` - Scan-loop receive (`/receive`)
+- `AskedFor` - Requested analyses after receive (`/asked-for`)
 - `ContainerManagement` - Container instance creation and management
 - `BatchManagement` - Batch creation and management
 - `ResultsManagement` - Results entry and review
@@ -254,7 +257,7 @@ NimbleLIMS uses a unified sidebar navigation system:
 - **Top AppBar**: Dynamic page titles, back button for nested routes, user info, logout
 - **Responsive**: Permanent drawer on desktop, temporary drawer on mobile
 
-See [`.docs/review/manuals/navigation.md`](../.docs/review/manuals/navigation.md) for complete navigation documentation.
+See [manuals/HOWTO.md](../manuals/HOWTO.md) for the lab path. Local `.docs/manuals/navigation.md` (not on git) has the full sidebar map.
 
 ## User Workflows
 

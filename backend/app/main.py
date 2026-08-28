@@ -4,7 +4,7 @@ FastAPI application for NimbleLims
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import validate_security_config
-from app.routers import auth, samples, tests, containers, batches, results, aliquots, lists, projects, analyses, analytes, units, users, roles, permissions, clients, test_batteries, client_projects, custom_attributes, help, admin, sequences, workflows, experiments, lims_runs, sop_parse, lims_run_checklists, dose_response, field_definitions, eln_processes, eln_process_definitions, entries, sample_journey, instrument_catalog, data_parsers
+from app.routers import auth, samples, tests, containers, batches, results, aliquots, lists, projects, analyses, analytes, units, users, roles, permissions, clients, test_batteries, client_projects, custom_attributes, help, admin, sequences, workflows, experiments, lims_runs, sop_parse, lims_run_checklists, dose_response, field_definitions, eln_processes, eln_process_definitions, entries, sample_journey, instrument_catalog, data_parsers, asked_for
 import logging
 
 # S3: refuse missing/default JWT secret unless explicit local insecure flags
@@ -97,6 +97,7 @@ app.include_router(lims_runs.router, prefix="/v1")
 app.include_router(sop_parse.router, prefix="/v1")
 app.include_router(lims_run_checklists.router, prefix="/v1")
 app.include_router(eln_processes.router, prefix="/v1")
+app.include_router(asked_for.router, prefix="/v1")
 app.include_router(eln_process_definitions.router, prefix="/v1")
 app.include_router(entries.router, prefix="/v1")
 app.include_router(sample_journey.router, prefix="/v1")
