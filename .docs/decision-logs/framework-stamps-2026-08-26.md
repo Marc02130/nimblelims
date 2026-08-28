@@ -40,19 +40,20 @@
 
 ---
 
-## Sequencing (unchanged)
+## Sequencing (updated 2026-08-28 — Leadership)
 
-1. Atomic receive **CORE** — identity + **1..N vessels** (Leadership provisional open 2026-08-26; results-entry is a follow-on slice).  
-2. Results-entry / persist-lock implement (separate open; not CORE UAT blocker).  
-3. Work-order + routing map + order params packet.  
-4. Registration / lots packet (compound, gene, protein).  
-5. Intake-profile engine beyond AR OOB when a second real profile is needed.
+1. Atomic receive **CORE** — **shipped**. Wizard removed.  
+2. **Asked-for (P1 lake)** → **work_order + routing (P2)** → **results persist (P3)** → **SOP+AI Apply → process (P4)** → **instrument import configuration (P5)**. Packet: `post-receive-work-spine`.  
+3. Registration / lots packet (compound, gene, protein) still after WO.  
+4. Intake-profile engine beyond AR OOB when a second real profile is needed.  
+
+Results persist is **after** asked-for (bench: do not type numbers into nothing). Overlap TAT **refuses** on save (OQ-TAT-1 provisional).
 
 ---
 
 ## Still open (not asked / deferred detail)
 
 - Exact intake-profile **schema** columns (only AR OOB for now).  
-- Work_order field list / status model.  
-- How TAT range matching works when multiple map rows overlap (overlap **refuses**; algorithm still open).  
+- Work_order field list / status model — see `open-questions/post-receive-work-spine.md` (provisional).  
+- TAT overlap: **refuse on save** (OQ-TAT-1, 2026-08-28).  
 - Registration uniqueness strategies (SMILES, sequences, …).
