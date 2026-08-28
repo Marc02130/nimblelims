@@ -19,8 +19,8 @@ RLS: asked_for and work_orders follow sample → project (same pattern as tests)
 
 | Table | Purpose | Key columns |
 |-------|---------|-------------|
-| `analysis_param_defs` | Catalog of order params per analysis | `id`, `analysis_id` FK, `key` text, `data_type` text, `required` bool, `source_list_id` uuid null, `sort_order` int, audit |
-| `asked_for` | Requested analysis on a sample | `id`, `sample_id` FK, `analysis_id` FK, `tat_days` int not null check > 0, `params` jsonb not null default `{}`, `status` text not null, `routed_work_order_id` uuid null, audit |
+| `analysis_param_defs` | Catalog of **method params** per analysis (assay). Example keys: [working note](../../decision-logs/2026-08-28-analysis-param-defs.md) (not seed). | `id`, `analysis_id` FK, `key` text, `data_type` text (`number` \| `int` \| `text` \| `bool`), `unit` text null (display; not `results.unit_id`), `required` bool, `source_list_id` uuid null (list-backed enum), `allowed_values` jsonb null (inline enum sketch when no list), `sort_order` int, audit |
+| `asked_for` | Requested analysis on a sample. `params` = values for that analysis’s defs (order layer). | `id`, `sample_id` FK, `analysis_id` FK, `tat_days` int not null check > 0, `params` jsonb not null default `{}`, `status` text not null, `routed_work_order_id` uuid null, audit |
 | `routing_map` | P2: analysis × sample_type × TAT range → process chain | `id`, `analysis_id` FK, `sample_type_id` uuid (list entry), `tat_range` int4range not null, `process_definition_ids` uuid[] not null, `active` bool, audit |
 | `work_orders` | P2: backlog item | `id`, `asked_for_id` FK unique, `sample_id` FK, `analysis_id` FK, `process_definition_ids` uuid[] not null, `status` text not null, `process_id` uuid null FK eln_processes, audit |
 
@@ -30,15 +30,16 @@ RLS: asked_for and work_orders follow sample → project (same pattern as tests)
 |-------|--------|-------|
 | `sop_parse_jobs` (name as in code) | ADD `process_definition_id` uuid null FK | P4 |
 | `eln_processes` | ADD `work_order_id` uuid null FK | P2; optional reverse of work_orders.process_id — pick **one** FK direction at implement (prefer `work_orders.process_id` only) |
-| `results` | none | P3 uses `reported_result`, `qualifiers`, `raw_result` |
-| `tests` | none | WO-7 timing only |
+| `results` | none | P3 uses `reported_result`, `qualifiers` (UUID FK), `raw_result`. Fitted IC50 etc. live here, **not** in param JSON. |
+| `tests` | **P2:** ADD `asked_for_params jsonb not null default '{}'` | **A5 / L3 / SC5.** Frozen copy of `asked_for.params` at **LimsRun start**. P1 does not write this column. |
 
-Do **not** add `results.unit_id`. Do **not** add asked-for columns on `samples`.
+Do **not** add `results.unit_id`. Do **not** add asked-for columns on `samples`. Param display units are `analysis_param_defs.unit`.
 
 ### 2.3 Constraints & indexes
 
 | Name | Definition | Why |
 |------|------------|-----|
+| `uq_analysis_param_defs_key` | unique `(analysis_id, key)` | A2 |
 | `uq_asked_for_open` | unique `(sample_id, analysis_id)` WHERE status <> 'cancelled' | RQ-AF-4 |
 | `asked_for_status_chk` | status in (`requested`,`routed`,`cancelled`) | |
 | `work_orders_status_chk` | status in (`queued`,`in_progress`,`completed`,`cancelled`) | |
@@ -63,7 +64,7 @@ FORCE ROW LEVEL SECURITY on all four.
 
 ## 3. Seed
 
-P1: no asked-for rows. Param defs optional (ELISA example: `cell_line` list-backed) — **do not** invent Qubit/blood IDs (extract-hold testdata Hold).
+P1: no asked-for rows. **Do not seed** the working-note example catalog (`EX_hERG`, `EX_ELISA`, …). When seed is allowed later: bind `EX_CTG` / `EX_NCI60` only to existing `NBIO-CMPD-001` / A549 (PR 49). Do not invent Qubit/blood IDs.
 
 P2: **no** default routing rows that claim blood→Qubit until dest type lands.
 
