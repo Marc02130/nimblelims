@@ -7,7 +7,7 @@
 **Requirements:** `.docs/internal/prd/sample-accessioning/PRD.md` (RQ-AR-*) · SPEC §3  
 **Sketch:** `.docs/review/tech-sketch/atomic-receive.md`
 
-**Out of CORE (next packets):** post-receive order / asked-for; A-15 / work-plan; work orders / WO-*; results-entry persist lock (**NR-AR-1** / AR-RES).
+**After CORE (P1, not on this screen):** record **requested analysis** on **Asked-for** (`/asked-for`). See [asked-for.md](asked-for.md). Asked-for does **not** mint Tests or start work. Route / work_orders / WO-7 stay **out** of the P1 stamp. Results-entry persist lock remains a later packet (**NR-AR-1** / AR-RES).
 
 The legacy `/accessioning` wizard is **removed**. `/accessioning` redirects to `/receive`.
 
@@ -15,7 +15,7 @@ The legacy `/accessioning` wizard is **removed**. `/accessioning` redirects to `
 
 ## Purpose
 
-High-volume intake: register specimen identity + **1..N vessels** in **one transaction**. Lab sample ID is system-assigned. Tube barcode is the vessel. Status on commit is **Available for Testing**. Work plan / work orders / results entry are **out of receive**.
+High-volume intake: register specimen identity + **1..N vessels** in **one transaction**. Lab sample ID is system-assigned. Tube barcode is the vessel. Status on commit is **Available for Testing**. Requested analysis, work orders, and results entry are **out of receive**. After receive, analysts record requested analysis on **Asked-for** ([asked-for.md](asked-for.md)) — that still creates **zero Tests**.
 
 Legacy wizard at `/accessioning` is **gone** (redirects here). See [accessioning-workflow.md](accessioning-workflow.md).
 
@@ -95,12 +95,12 @@ If `analysis_ids` is present and **non-empty** → **422**. Do not ignore. Do no
 
 ---
 
-## Tests and work plans
+## Tests and requested analysis
 
 - CORE receive creates **zero Tests** and **zero Results**.
 - Happy-path body: **no** `analysis_ids` (or empty only). Non-empty → **422** before the receive transaction. UI never sends it.
-- CORE never ignores, stores, or converts asked-for analyses into Tests.
-- A-15 asked-for / Assigned-Pending-at-receive / analysis picker on CORE receive is **parked** (later work-order packet). Add/remove tests later through the separate tests workflow.
+- CORE never ignores, stores, or converts requested analyses into Tests. `analysis_param_defs` are **not** collected on receive (later: LimsRun start).
+- **A-15 / asked-for** is the P1 lake on `/asked-for` ([asked-for.md](asked-for.md)), **not** on `/receive`. Do not add Tests from receive. Classic `/tests` still exists for typing a number on an existing Test; it is **not** the request path.
 - `DELETE /tests/{id}` → **400** if results exist (A-14).
 
 ---
@@ -110,4 +110,5 @@ If `analysis_ids` is present and **non-empty** → **422**. Do not ignore. Do no
 - API index: [api-endpoints.md](api-endpoints.md)  
 - Containers: [containers.md](containers.md)  
 - Legacy wizard: [accessioning-workflow.md](accessioning-workflow.md)  
+- Asked-for (after receive): [asked-for.md](asked-for.md)  
 - Navigation: [navigation.md](navigation.md)  

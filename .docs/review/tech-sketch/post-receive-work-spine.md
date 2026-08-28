@@ -10,6 +10,8 @@
 
 Implement **P1 first**. P2–P5 are in this sketch so reviews can lock the spine. Do not code P2–P5 in the P1 PR.
 
+**P1 product lock (this stamp):** asked-for is the **lake**. Copy is **requested analysis**. Asked-for does **not** assign a Test or start work. Receive freeze: non-empty `analysis_ids` on `POST /samples/receive` → **422**; empty/omit → zero Tests. **Route / `work_orders` / WO-7 stay OUT of this stamp.** `analysis_param_defs` freeze onto a Test at **LimsRun start** later — do **not** put them on receive.
+
 **Lab Ops 2026-08-28:** Accept with conditions. P1 implementable if **L1** is in the UI/copy. **P2 coding closed until L2–L4 are in this sketch** (folded below). **L5** binds P4 copy. Artifact: [lab-ops-review/post-receive-work-spine.md](../lab-ops-review/post-receive-work-spine.md).
 
 ---
@@ -47,9 +49,9 @@ No new execute runtime. No second AuthZ.
 
 ### 3.1 Tables
 
-`analysis_param_defs` — per-analysis parameter catalog (cell line, etc.). Empty in OOB seed is OK.
+`asked_for` — request row (the lake). FK sample, analysis. `tat_days int`. `params jsonb` default `{}`. `status` list or check constraint.
 
-`asked_for` — request row. FK sample, analysis. `tat_days int`. `params jsonb`. `status` list or check constraint.
+P1 operator path fills **analysis + TAT**. Empty `params` `{}` is the P1 path. Do **not** collect `analysis_param_defs` on receive. Catalog + freeze onto a Test is **later (LimsRun start)** — out of this stamp.
 
 Partial unique index: `(sample_id, analysis_id) WHERE status <> 'cancelled'`.
 
@@ -60,13 +62,13 @@ Partial unique index: `(sample_id, analysis_id) WHERE status <> 'cancelled'`.
 1. AuthZ test:assign + load sample under RLS (403 if hidden)
 2. Sample.status should be Available for Testing (422 otherwise for v1 — do not order on discarded)
 3. Validate analysis active
-4. Validate params vs defs
-5. Insert requested
+4. Do **not** require param defs on create (P1 empty `{}`)
+5. Insert `requested`
 6. **Do not** call `_create_tests` / `_create_asked_for_tests`
 
-P1 **does not** call routing (table may not exist yet).
+P1 **does not** call routing. **Do not** mint work_orders. **Do not** start a process.
 
-**L1 (Lab Ops, same-phase P1):** Copy is “asked-for / requested analysis,” never assign/create test, start work, or order process. No Start/Execute CTA on `requested`. Multi-sample: one operator action (same analysis + TAT + params) writes one row per sample in the set **in one txn** (A3). Hidden sample → **403** (A1). **Client role cannot write** even with leftover `test:assign` (S2). No PATCH in P1 — cancel and recreate (BA4).
+**L1 (Lab Ops, same-phase P1):** Copy is “asked-for / requested analysis,” never assign/create test, start work, or order process. No Start/Execute CTA on `requested`. Multi-sample: one operator action (same analysis + TAT) writes one row per sample in the set **in one txn** (A3). Hidden sample → **403** (A1). **Client role cannot write** even with leftover `test:assign` (S2). No PATCH in P1 — cancel and recreate (BA4).
 
 ### 3.3 Frontend
 
@@ -76,9 +78,9 @@ Sidebar Sample Mgmt: after Receive, add **Asked-for**.
 
 ### 3.4 Tests
 
-Pytest: create, 409 dup, 403 RLS, 422 params, receive still 422 on analysis_ids, asked-for leaves tests count 0.
+Pytest: create, 409 dup, 403 RLS, receive still 422 on analysis_ids, asked-for leaves tests count 0.
 
-## 4. P2 design
+## 4. P2 design (**OUT of this P1 stamp**)
 
 `routing_map`: range-gist or exclusion constraint on `(analysis_id, sample_type_id, tat_range)`. Postgres: `int4range` + `EXCLUDE USING gist`.
 

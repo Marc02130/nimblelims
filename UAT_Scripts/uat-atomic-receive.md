@@ -17,7 +17,7 @@
 This script is the **receive happy path** sign-off. The `/accessioning` wizard is removed (`uat-sample-accessioning.md` retired). `/accessioning` redirects to `/receive`. No 3-step wizard. Backend `POST /samples/accession` may still exist for pytest — not the UI happy path; do not treat that as a UI fail.
 
 **CORE must-pass:** identity + **1..N vessels**, sticky project, Available for Testing, **zero Tests / zero Results** at receive, AuthZ (PR 68). Non-empty `analysis_ids` → **422**.
-**Follow-on (not CORE blockers):** AR-RES-01/02 results-entry. **A-15 asked-for / work-plan is parked.**
+**Follow-on (not CORE blockers):** AR-RES-01/02 results-entry. **A-15 asked-for** is P1 on `/asked-for` (`uat-post-receive-work-spine.md`) — **not** on receive. Receive still mints zero Tests.
 
 **This stamp:** **API CORE Accept (21/21)** (2026-08-27, `ebac94e`). **UI CORE Pass** (2026-08-28, `33fbcb1`). Do **not** collapse into one undifferentiated Pass.
 

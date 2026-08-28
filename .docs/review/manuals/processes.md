@@ -11,6 +11,8 @@ Key characteristics:
 
 Processes sit above individual Experiments and provide structure for multi-step experimental work.
 
+**P1 asked-for does not start a process.** Recording **requested analysis** on `/asked-for` does not assign samples to a process, does not execute, and does not mint a Test. Process start remains this UI (`/experiments/processes`). Route / work_orders are a later stamp.
+
 ### Product rule (Decision #6)
 
 | Entity | How it is defined |

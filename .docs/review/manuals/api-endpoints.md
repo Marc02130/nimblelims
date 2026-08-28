@@ -130,13 +130,17 @@ Create a new sample.
 - `samples.name` from name template; each barcode → `containers.name` (409 on collision, full rollback)
 - Status → **Available for Testing**; `received_date` set
 - Same container type applied to all vessels on the call
-- CORE creates **zero Tests** and **zero Results**. Omit `analysis_ids` or send `[]`. Non-empty `analysis_ids` → **422** before the receive transaction (refuse, do not ignore, do not mint). Record work after receive via **Asked-for** (`POST /v1/asked-for`).
+- CORE creates **zero Tests** and **zero Results**. Omit `analysis_ids` or send `[]`. Non-empty `analysis_ids` → **422** before the receive transaction (refuse, do not ignore, do not mint). Do **not** send `analysis_param_defs` or asked-for on this call. After receive, record **requested analysis** via `POST /v1/asked-for` ([asked-for.md](asked-for.md)) — that still creates zero Tests and does not start work.
 
 **Response:** `{ sample_id, sample_name, status, project_id, received_date, containers[], tests[] }` → **201**
 
-## Asked-for (P1)
+## Asked-for (P1 lake)
 
-UI: `/asked-for`. Write/cancel: `test:assign` and role ≠ Client. List/get: `sample:read`. Hidden/other-project sample → **403** (not 404). Does **not** create Tests or work orders.
+**Manual:** [asked-for.md](asked-for.md) · **UAT:** `UAT_Scripts/uat-post-receive-work-spine.md`
+
+UI: `/asked-for`. Copy: **requested analysis**. Write/cancel: `test:assign` and role ≠ Client. List/get: `sample:read`. Hidden/other-project sample → **403** (not 404).
+
+**Does not** create a Test row, start work, or execute an analysis. Route / work_orders / WO-7 are **not** this stamp. `analysis_param_defs` freeze at **LimsRun start** later — not on receive, not required to record a request.
 
 ### POST /v1/asked-for
 Record requested analyses for a sample set (one row per sample, one transaction).
@@ -150,7 +154,7 @@ Record requested analyses for a sample set (one row per sample, one transaction)
 }
 ```
 
-`sample_id` is accepted as a 1-element alias. Empty `params` is valid when the analysis has no param defs. Duplicate open `(sample, analysis)` → **409** (full rollback). **201** `{ items, count }`.
+`sample_id` is accepted as a 1-element alias. P1 uses empty `params` `{}`. Duplicate open `(sample, analysis)` → **409** (full rollback). **201** `{ items, count }`. **201 has no `tests`.** `COUNT(tests)` unchanged.
 
 ### GET /v1/asked-for
 Query: `sample_id`, `project_id`, `analysis_id`, `status`. **200** `{ items, count }`.
@@ -158,13 +162,10 @@ Query: `sample_id`, `project_id`, `analysis_id`, `status`. **200** `{ items, cou
 ### GET /v1/asked-for/{id}
 
 ### POST /v1/asked-for/{id}/cancel
-Allowed while `requested`. Cancel after `routed` is P2.
+Allowed while `requested`. Cancel after `routed` is **not this stamp** (P2).
 
-### GET /analyses/{id}/param-defs
-Authenticated. **200** `{ items, count }`. Empty catalog is the OOB path.
-
-### PUT /analyses/{id}/param-defs
-`config:edit`. Replaces the catalog. Body `{ items: [{ key, data_type, unit, required, source_list_id, allowed_values, sort_order }] }`. `data_type` is `number` | `int` | `text` | `bool`. Required is boolean only (no required-if).
+### Param defs (later — not receive, not this P1 stamp)
+`GET/PUT /analyses/{id}/param-defs` is catalog setup for freeze at **LimsRun start**. Do not put param defs on `POST /samples/receive`. P1 asked-for does not require filling defs.
 
 ### POST /samples/accession
 **Legacy** accession wizard path (not CORE receive SoT). Prefer `POST /samples/receive`.

@@ -7,7 +7,7 @@ wave** (no `analysis_ids` on those bodies); `AR-HV-02` is a separate **422** ref
 **WO-7 / CORE contract:** receive does **not** mint Tests. Happy-path bodies omit
 `analysis_ids` (empty `[]` also OK). Non-empty `analysis_ids` → **422**. After
 success: zero Tests, zero Results. Extra barcodes = more tubes of that sample.
-OOB UI has no analysis picker. A-15 asked-for / work-plan is parked.
+OOB UI has no analysis picker. Asked-for (requested analysis) is **not** on receive; see `uat-post-receive-work-spine.md`.
 
 Live `POST /api/samples/receive` is on `feat/atomic-receive-core` (PR 71 draft).
 Expected HTTP codes below are the **contract**. Hold merge until UAT + dogfood.
@@ -63,7 +63,7 @@ Default tube: Cryovial (2mL). Receive UI does not preselect a tube and does not 
 | **Barcodes / payload refs** | Dedicated barcode `NBIO-AR-REFUSE-0001`. Body includes `analysis_ids` = `[analysis-elisa-001]` (`payloads.json` → `AR-HV-02`). Do **not** overlay this on the HV-01 wave. Empty/`[]` path is AR-HV-01. UI never sends `analysis_ids`. |
 | **Expected HTTP** | **422**. Do not ignore. Do not mint Tests. |
 | **Expected DB** | Zero sample, container, contents, tests, and results for `NBIO-AR-REFUSE-0001`. |
-| **Not in P0** | A-15 asked-for / work-plan / Assigned-Pending-at-receive is parked. Do not auto-assign batteries. |
+| **Not in P0** | Asked-for is **not** on receive. Do not auto-assign batteries. |
 
 ---
 
@@ -318,7 +318,7 @@ Out of scope for this pack and for the atomic-receive feature PR:
 - **No US-31 receipt events** (no event table write on receive).
 - **No US-38 quantity** (no required amount/concentration on the receive body).
 - No Received status hop.
-- **No asked-for Tests at receive** / no analysis picker / A-15 parked (later work-order packet).
+- **No Tests at receive** / no analysis picker. Requested analysis is `/asked-for` (P1 lake), not receive and not a Test.
 - **AR-MU-02** (US-10 second-person review) is out of P0 receive must-pass. Q1 parallel. Distinct enterer/reviewer users remain in 0058 seed.
 - No second-person-review tenant flag.
 - IC50 / dose-response / parsers / ELN.

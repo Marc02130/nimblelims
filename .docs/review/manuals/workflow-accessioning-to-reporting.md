@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document describes the complete workflow from sample accessioning through results reporting in NimbleLIMS. The workflow covers the lifecycle of a sample from initial receipt to final reporting, including test assignment, results entry, review, and status management.
+This document describes the complete workflow from sample receive through results reporting in NimbleLIMS. The workflow covers the lifecycle of a sample from initial receipt to final reporting, including **requested analysis** (asked-for lake), results entry on existing Tests, review, and status management.
 
 **Experiment templates and experiments** (see [Experiment templates and experiments](#experiment-templates-and-experiments) below) run alongside this path: labs define reusable **experiment templates** (manually or via SOP-assisted extraction), create **experiments** from those definitions, and **link samples** to experiments. That does not replace tests or results entry; it adds a process/lineage layer that workflow templates can automate (e.g. `create_experiment_from_template`, `link_sample_to_experiment`). Navigation: **Experiments** → **All Experiments** (`/experiments`) and **Experiment Templates** (`/experiments/templates`); permission **`experiment:manage`**.
 
@@ -16,7 +16,7 @@ This document describes the complete workflow from sample accessioning through r
 
 **SoT:** [atomic-receive.md](atomic-receive.md) · UI `/receive` · `POST /samples/receive`
 
-The three-step `/accessioning` wizard is **removed**. `/accessioning` redirects to `/receive`. Receive does **not** assign analyses or mint Tests.
+The three-step `/accessioning` wizard is **removed**. `/accessioning` redirects to `/receive`. Receive does **not** assign analyses or mint Tests. Non-empty `analysis_ids` → **422**. Params / `analysis_param_defs` are **not** on receive.
 
 **Steps**:
 
@@ -27,7 +27,7 @@ The three-step `/accessioning` wizard is **removed**. `/accessioning` redirects 
 
 **Status:** Sample is **Available for Testing**. Zero Tests. Zero Results.
 
-**After receive:** Work assignment is a later packet. Until then, tests can be created from **Tests** (`/tests`). Aliquots / derivatives are not part of receive.
+**After receive:** Record **requested analysis** on **Asked-for** (`/asked-for`) — [asked-for.md](asked-for.md). That creates **zero Tests** and does **not** start work. Route / work_orders / WO-7 are **out** of this P1 stamp. Classic `/tests` is not the request path. Aliquots / derivatives are not part of receive.
 
 ### Stage 1.5: Sample/Test/Container Editing (Post-Accessioning)
 

@@ -11,8 +11,9 @@ Copyright (c) 2025 Marc Breneiser
 ## Features
 
 ### Core Functionality
-- **Sample Management**: CRUD operations for samples with status tracking
-- **Test Management**: Assign and track tests with status workflows
+- **Sample Management**: CRUD operations for samples with status tracking. Receive (`POST /samples/receive`) refuses non-empty `analysis_ids` (**422**).
+- **Asked-for (P1)**: `POST /v1/asked-for` records **requested analysis** after receive (no Test row, no execute)
+- **Test Management**: Track existing Tests with status workflows (not the request path)
 - **Results Entry**: Batch-based results entry with validation
 - **Batch Management**: Create and manage batches with container tracking
 - **Container Management**: Container types (admin-managed) and dynamic instance creation
