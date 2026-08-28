@@ -439,6 +439,36 @@ export class ApiService {
     return response.data;
   }
 
+  async getAskedFor(filters?: {
+    sample_id?: string;
+    project_id?: string;
+    analysis_id?: string;
+    status?: string;
+  }) {
+    const response: AxiosResponse = await this.api.get('/v1/asked-for', { params: filters });
+    return response.data;
+  }
+
+  async createAskedFor(data: {
+    sample_ids: string[];
+    analysis_id: string;
+    tat_days: number;
+    params?: Record<string, unknown>;
+  }) {
+    const response: AxiosResponse = await this.api.post('/v1/asked-for', data);
+    return response.data;
+  }
+
+  async cancelAskedFor(id: string) {
+    const response: AxiosResponse = await this.api.post(`/v1/asked-for/${id}/cancel`);
+    return response.data;
+  }
+
+  async getAnalysisParamDefs(analysisId: string) {
+    const response: AxiosResponse = await this.api.get(`/analyses/${analysisId}/param-defs`);
+    return response.data;
+  }
+
   // Analysis endpoints
   async getAnalyses(filters?: { search?: string; active?: boolean; page?: number; size?: number }) {
     const response: AxiosResponse = await this.api.get('/analyses', {

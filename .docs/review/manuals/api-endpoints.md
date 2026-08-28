@@ -130,9 +130,41 @@ Create a new sample.
 - `samples.name` from name template; each barcode → `containers.name` (409 on collision, full rollback)
 - Status → **Available for Testing**; `received_date` set
 - Same container type applied to all vessels on the call
-- CORE creates **zero Tests** and **zero Results**. Omit `analysis_ids` or send `[]`. Non-empty `analysis_ids` → **422** before the receive transaction (refuse, do not ignore, do not mint). A-15 asked-for / work-plan is parked.
+- CORE creates **zero Tests** and **zero Results**. Omit `analysis_ids` or send `[]`. Non-empty `analysis_ids` → **422** before the receive transaction (refuse, do not ignore, do not mint). Record work after receive via **Asked-for** (`POST /v1/asked-for`).
 
 **Response:** `{ sample_id, sample_name, status, project_id, received_date, containers[], tests[] }` → **201**
+
+## Asked-for (P1)
+
+UI: `/asked-for`. Write/cancel: `test:assign` and role ≠ Client. List/get: `sample:read`. Hidden/other-project sample → **403** (not 404). Does **not** create Tests or work orders.
+
+### POST /v1/asked-for
+Record requested analyses for a sample set (one row per sample, one transaction).
+
+```json
+{
+  "sample_ids": ["uuid", "uuid"],
+  "analysis_id": "uuid",
+  "tat_days": 5,
+  "params": {}
+}
+```
+
+`sample_id` is accepted as a 1-element alias. Empty `params` is valid when the analysis has no param defs. Duplicate open `(sample, analysis)` → **409** (full rollback). **201** `{ items, count }`.
+
+### GET /v1/asked-for
+Query: `sample_id`, `project_id`, `analysis_id`, `status`. **200** `{ items, count }`.
+
+### GET /v1/asked-for/{id}
+
+### POST /v1/asked-for/{id}/cancel
+Allowed while `requested`. Cancel after `routed` is P2.
+
+### GET /analyses/{id}/param-defs
+Authenticated. **200** `{ items, count }`. Empty catalog is the OOB path.
+
+### PUT /analyses/{id}/param-defs
+`config:edit`. Replaces the catalog. Body `{ items: [{ key, data_type, unit, required, source_list_id, allowed_values, sort_order }] }`. `data_type` is `number` | `int` | `text` | `bool`. Required is boolean only (no required-if).
 
 ### POST /samples/accession
 **Legacy** accession wizard path (not CORE receive SoT). Prefer `POST /samples/receive`.

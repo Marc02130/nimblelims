@@ -15,7 +15,7 @@ Copyright (c) 2025 Marc Breneiser
 - System-assigned sample ID; barcode is the container name
 - Status on commit: Available for Testing
 - No analysis picker, no wizard, no bulk intake UI (wizard removed)
-- Work assignment is after receive (Tests page until order / work-order packets)
+- Work assignment after receive: **Asked-for** (`/asked-for`) records requested analyses (zero Tests). Classic Tests (`/tests`) still exist.
 
 ### Container Management (US-5)
 - Create and manage hierarchical containers
@@ -39,7 +39,8 @@ Copyright (c) 2025 Marc Breneiser
 - Enables system customization without code changes
 
 ### Test Assignment (US-7)
-- Assign analyses to existing samples from Tests (`/tests`)
+- Record requested analyses on **Asked-for** (`/asked-for`) after receive
+- Classic Tests (`/tests` / TestForm) still mint Tests (WO-4 path)
 - Not part of receive (CORE receive mints zero Tests)
 - Test batteries still exist in admin; assigning them at intake is not the receive path
 
@@ -102,6 +103,7 @@ Copyright (c) 2025 Marc Breneiser
 - `ExperimentsManagement` - Experiments list, detail, create (`/experiments`, `/experiments/:id`)
 - `ExperimentTemplatesManagement` - Experiment templates CRUD (entries), SOP upload (`/experiments/templates`)
 - `AtomicReceive` - Scan-loop receive (`/receive`)
+- `AskedFor` - Requested analyses after receive (`/asked-for`)
 - `ContainerManagement` - Container instance creation and management
 - `BatchManagement` - Batch creation and management
 - `ResultsManagement` - Results entry and review

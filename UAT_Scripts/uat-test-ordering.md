@@ -1,7 +1,7 @@
 # UAT Scripts: Test Ordering and Status Management
 
 > **2026-08-28:** The `/accessioning` wizard is **removed**. Cases that assign tests **during** the wizard (TC-TEST-ASSIGN-001 and battery-at-accessioning) are **retired**.  
-> Receive does not mint Tests. Assign tests from **Tests** (`/tests`, `TestForm`) on an existing received sample. Work-order / asked-for packet is still future.
+> Receive does not mint Tests. **New requests** go to **Asked-for** (`/asked-for`) — see `uat-post-receive-work-spine.md`. Classic Tests (`/tests`, `TestForm`) still mint Tests (WO-4 type-a-number); do not delete those cases.
 
 ## Overview
 
