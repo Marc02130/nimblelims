@@ -92,7 +92,7 @@ Tiny/small must **not** skip security or product decisions on sensitive changes 
 | **Open questions** | Decision log; phase gate | [`.docs/review/open-questions/`](../open-questions/) |
 | **Implementation tracking** | Phase checklists / tasks | [`.docs/review/checklist/`](../checklist/) |
 | **Long-form design** (optional) | Deeper tech design | local `.docs/internal/design/` (not committed) |
-| **Docs sync** | User/operator manuals + API notes for the feature | [`.docs/review/manuals/`](../manuals/), root `README.md` |
+| **Docs sync** | User/operator how-tos + API notes for the feature | [`/manuals/`](../../../manuals/) (git), local `.docs/manuals/` (legacy, not on git), root `README.md` |
 | **Dogfood notes** | Internal exercise log / known issues | [`.docs/review/development-process/dogfood/`](./dogfood/) or checklist |
 | **UAT scripts & results** | Scripted acceptance | [`UAT_Scripts/`](../../UAT_Scripts/) (repo root); optional feature notes under [`.docs/review/development-process/uat/`](./uat/) |
 | **This process** | How we work | [`.docs/review/development-process/`](./) |

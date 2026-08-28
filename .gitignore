@@ -48,12 +48,13 @@ yarn-error.log*
 Thumbs.db
 
 # --- Docs (working / private) ---
-# Project manuals (committed): .docs/review/manuals/
-# Local working PRDs/specs/private: keep out of git
+# Published operator how-tos (committed): /manuals/  (e.g. HOWTO.md)
+# Local working PRDs/specs/private + legacy operator manuals: keep out of git
 .docs/internal/
+.docs/manuals/
 
-# Local third-party PDF dumps at repo root (not .docs/review/manuals/)
-/manuals/
+# Vendor / third-party PDFs must not sit in published /manuals/
+/manuals/**/*.pdf
 
 # --- Tooling ---
 .gstack/
