@@ -7,7 +7,7 @@ Full pipeline (proportional), folders, phased implementation, and review handlin
 → **[`.docs/review/development-process/README.md`](.docs/review/development-process/README.md)**
 
 **Docs trees (reorg 2026-08-26):** Everything under **`.docs/`**.  
-- **`.docs/review/`** — review spine (stamps, sketches, cycle requirements, manuals, process, OQs); prefer committed.  
+- **`.docs/review/`** — review spine (stamps, sketches, cycle requirements, process, OQs); prefer committed. Published how-tos: [`manuals/HOWTO.md`](manuals/HOWTO.md). Local legacy manuals: `.docs/manuals/` (not on git).  
 - **`.docs/internal/`** — working PRDs, specs, design, ideas, user stories, SOP packs, private.  
 - **`.docs/discussions/`**, **`.docs/decision-logs/`** — Leadership discussions and stamps.  
 See [`.docs/README.md`](.docs/README.md). Do not use the old `.docs-review/` / `.docs-internal/` paths.

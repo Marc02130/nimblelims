@@ -311,6 +311,8 @@ Katinka snapshot named **`readout`** and **`wavelength_nm`**. Other **required**
 
 ---
 
-## 5. Fold-in (when `.docs/internal/` is on the host)
+## 5. Fold-in
 
-Add a section **`analysis_param_defs`** to the spine PRD and SPEC with §1–§3 and the bind note. Do not copy this into gitignored paths from this PR. Do not seed these rows in Alembic/OOB except the bind-note rule (`EX_CTG` / `EX_NCI60` → existing `NBIO-CMPD-001` / A549 when seed is allowed).
+**2026-08-28 (packet):** Three-layer bind is now in committed [requirements RQ-AF-6 / RQ-WO-11](../review/requirements/post-receive-work-spine.md), [schema-changes](../review/schema-changes/post-receive-work-spine.md) (`unit`, `allowed_values`, `tests.asked_for_params` at P2), and [tech sketch §3.1](../review/tech-sketch/post-receive-work-spine.md). Internal PRD/SPEC have a short params section (gitignored).
+
+Do **not** seed these example rows in Alembic/OOB except the bind-note rule (`EX_CTG` / `EX_NCI60` → existing `NBIO-CMPD-001` / A549 when seed is allowed).

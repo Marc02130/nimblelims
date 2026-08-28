@@ -18,7 +18,7 @@ Copyright (c) 2025 Marc Breneiser
 - **Batch Management**: Create and manage batches with container tracking
 - **Container Management**: Container types (admin-managed) and dynamic instance creation
 - **Lists Management**: Configurable lists and entries (admin-editable, full CRUD)
-- **Name Templates**: Configurable entity naming; placeholder resolution: {YY} = str(now.year % 100).zfill(2), {SEQ} = str(seq).zfill(template.seq_padding_digits); sequence start via POST /admin/sequences/{entity_type}/start (see `app/core/name_generation.py`, `.docs/review/manuals/ids-and-configuration.md`)
+- **Name Templates**: Configurable entity naming; placeholder resolution: {YY} = str(now.year % 100).zfill(2), {SEQ} = str(seq).zfill(template.seq_padding_digits); sequence start via POST /admin/sequences/{entity_type}/start (see `app/core/name_generation.py`; local `.docs/manuals/ids-and-configuration.md`)
 - **Analyses Management**: CRUD operations for analyses (admin-only)
 - **Analytes Management**: CRUD operations for analytes (admin-only)
 - **Analysis-Analyte Configuration**: Configure validation rules for analytes in analyses (admin-only)
@@ -411,11 +411,8 @@ The `start.sh` script:
 
 ## Related Documentation
 
-- [API Endpoints Reference](../.docs/review/manuals/api-endpoints.md)
+- [How to run the lab path](../manuals/HOWTO.md)
 - local `.docs/internal/design/experiment-planning.md` (not committed)
-- [Authentication Implementation](../.docs/review/manuals/backend-auth.md)
+- local `.docs/manuals/` (legacy operator handbooks, not on git)
 - local `.docs/internal/design/nimblelims-tech.md` (not committed)
-- [Accessioning Workflow](../.docs/review/manuals/accessioning-workflow.md)
-- [Container Management](../.docs/review/manuals/containers.md)
-- [Lists System](../.docs/review/manuals/lists.md)
 
