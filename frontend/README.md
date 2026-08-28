@@ -39,7 +39,7 @@ Copyright (c) 2025 Marc Breneiser
 - Enables system customization without code changes
 
 ### Requested analysis (asked-for, P1)
-- Record **requested analysis** on **Asked-for** (`/asked-for`) after receive
+- Record **requested analysis** on **Asked-for** (`/asked-for`) — a later look-up for already-received samples, not the click after a receive commit
 - Does **not** assign a Test or start work
 - Not part of receive (CORE receive mints zero Tests; non-empty `analysis_ids` → 422)
 - Classic Tests (`/tests` / TestForm) still mint Tests for typing a number on an existing Test — **not** the request path
