@@ -15,7 +15,7 @@ Copyright (c) 2025 Marc Breneiser
 - System-assigned sample ID; barcode is the container name
 - Status on commit: Available for Testing
 - No analysis picker, no wizard, no bulk intake UI (wizard removed)
-- Work assignment after receive: **Asked-for** (`/asked-for`) records requested analyses (zero Tests). Classic Tests (`/tests`) still exist.
+- After receive: **Asked-for** (`/asked-for`) records **requested analysis** (zero Tests; does not start work). Classic `/tests` is not the request path.
 
 ### Container Management (US-5)
 - Create and manage hierarchical containers
@@ -38,11 +38,12 @@ Copyright (c) 2025 Marc Breneiser
 - Restricted to users with `config:edit`, `test:configure`, or `user:manage` permissions
 - Enables system customization without code changes
 
-### Test Assignment (US-7)
-- Record requested analyses on **Asked-for** (`/asked-for`) after receive
-- Classic Tests (`/tests` / TestForm) still mint Tests (WO-4 path)
-- Not part of receive (CORE receive mints zero Tests)
-- Test batteries still exist in admin; assigning them at intake is not the receive path
+### Requested analysis (asked-for, P1)
+- Record **requested analysis** on **Asked-for** (`/asked-for`) after receive
+- Does **not** assign a Test or start work
+- Not part of receive (CORE receive mints zero Tests; non-empty `analysis_ids` → 422)
+- Classic Tests (`/tests` / TestForm) still mint Tests for typing a number on an existing Test — **not** the request path
+- Test batteries still exist in admin; they are not the receive path
 
 ### Batch Management (US-11, US-26, US-27)
 - Create batches with container tracking

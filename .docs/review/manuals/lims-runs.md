@@ -10,6 +10,8 @@ Primary goals:
 - Enable structured data import with validation.
 - Serve as a foundation for analysis (currently dose-response is the most mature example; the intent is to support other analyses).
 
+**Receive / asked-for (P1):** `POST /samples/receive` still refuses non-empty `analysis_ids` (**422**). Recording **requested analysis** on `/asked-for` does **not** start a LimsRun and does **not** mint a Test. Assay params (`analysis_param_defs`) freeze onto the Test at **LimsRun start** in a later stamp — not at receive.
+
 **Important distinction**: An LIMS Run is **not** the same as a Batch.
 - Batches are operational groupings for processing samples through tests and results entry.
 - LIMS Runs represent execution of a protocol/template with focus on data capture, structure, lifecycle, and derived analysis.

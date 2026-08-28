@@ -25,8 +25,8 @@
 - [ ] UI `/asked-for` + sample detail
 - [ ] Sidebar item
 - [ ] Pytest: 409/403/422/zero Tests
-- [ ] UAT script P1
-- [ ] Manuals
+- [x] UAT script P1
+- [x] Manuals
 
 ## P2 work_order
 

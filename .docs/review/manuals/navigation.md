@@ -98,7 +98,7 @@ Core features are organized with Dashboard and Help at the top. These items are 
 The Sample Management section uses a Material-UI Accordion component for collapsible submenu functionality. It is only visible to users with at least one of the following permissions: `sample:create`, `sample:read`, `sample:update`, `test:update`, `batch:manage`, or `result:enter`. This section consolidates all sample-related workflow functions.
 
 **Accordion Behavior:**
-- Auto-expands when user navigates to any `/receive`, `/samples`, `/tests`, `/containers`, `/batches`, or `/results` route
+- Auto-expands when user navigates to any `/receive`, `/asked-for`, `/samples`, `/tests`, `/containers`, `/batches`, or `/results` route
 - Can be manually collapsed/expanded by clicking the accordion header
 - Shows active state (primary color icon) when on any sample management route
 - Contains sample management sub-items in a nested list structure
@@ -109,9 +109,10 @@ The Sample Management section uses a Material-UI Accordion component for collaps
 
 | Menu Item | Route | Icon | Permission Required | Description |
 |-----------|-------|------|---------------------|-------------|
-| **Receive** | `/receive` | Science | `sample:create` | Atomic receive (CORE happy path): scan 1..N vessels |
+| **Receive** | `/receive` | Science | `sample:create` | Atomic receive (CORE happy path): scan 1..N vessels. No analysis picker. |
+| **Asked-for** | `/asked-for` | Assignment | view `sample:read`; create `test:assign` (not Client) | Record **requested analysis** after receive. Does **not** mint a Test or start work. Immediately after Receive. |
 | **Samples** | `/samples` | Science | `sample:read` | Sample management interface with list and edit functionality |
-| **Tests** | `/tests` | Biotech | `test:update` | Test management interface with list and edit functionality |
+| **Tests** | `/tests` | Biotech | `test:update` | Tests on existing Test rows (not the request path) |
 | **Containers** | `/containers` | Inventory | `sample:update` | Container management interface with list, create, and edit functionality |
 | **Batches** | `/batches` | ViewList | `batch:manage` | Batch creation and management |
 | **Results** | `/results` | Assessment | `result:enter` | Results entry interface |
@@ -247,7 +248,8 @@ The AppBar title is automatically determined from the current route:
 |-------|-------|
 | `/dashboard` | Dashboard |
 | `/receive` | Receive |
-| `/accessioning` | Accessioning (legacy) |
+| `/asked-for` | Asked-for |
+| `/accessioning` | Receive (redirect only; wizard removed) |
 | `/samples` | Samples Management |
 | `/samples/:id` | Edit Sample |
 | `/tests` | Tests Management |
@@ -294,7 +296,8 @@ All authenticated routes use the `MainLayout` component, which provides the unif
 | `/` | Redirect to `/dashboard` | MainLayout |
 | `/dashboard` | Dashboard | MainLayout |
 | `/receive` | AtomicReceive | MainLayout |
-| `/accessioning` | AccessioningForm (legacy wizard) | MainLayout |
+| `/asked-for` | AskedFor | MainLayout |
+| `/accessioning` | Redirect to `/receive` (wizard removed) | — |
 | `/samples` | SamplesManagement | MainLayout |
 | `/tests` | TestsManagement | MainLayout |
 | `/containers` | ContainerManagement | MainLayout |
@@ -441,11 +444,11 @@ Navigation relies on `UserContext` for:
 
 ### Accessing Core Features
 
-1. User clicks "Accessioning" in sidebar (requires `sample:create`)
+1. User clicks **Receive** in Sample Mgmt (requires `sample:create`)
 2. Route changes to `/receive`
-3. Sidebar highlights "Accessioning" as active
-4. AppBar title updates to "Accessioning"
-5. AccessioningForm component renders in main content area
+3. Sidebar highlights **Receive** as active
+4. AppBar title updates to **Receive**
+5. `AtomicReceive` renders. No analysis picker. After receive, **Asked-for** records requested analysis (`/asked-for`) — that does not mint a Test.
 
 ### Accessing Experiments Section
 
@@ -538,7 +541,7 @@ Sample Mgmt, Lab Mgmt, and Admin sections use Material-UI's Accordion component 
 
 **Features:**
 - **Auto-Expansion**: Accordions automatically expand when user navigates to related routes
-  - Sample Mgmt: Expands on `/receive`, `/accessioning`, `/samples`, `/tests`, `/containers`, `/batches`, or `/results` routes
+  - Sample Mgmt: Expands on `/receive`, `/asked-for`, `/samples`, `/tests`, `/containers`, `/batches`, or `/results` routes
   - Experiments: Expands on any `/experiments` route (list, detail, templates)
   - Lab Mgmt: Expands on `/clients`, `/projects`, `/client-projects`, `/analyses`, or `/analytes` routes
   - Admin: Expands on any `/admin/*` route
