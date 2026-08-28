@@ -36,6 +36,7 @@ import {
   Straighten as StraightenIcon,
   Folder as FolderIcon,
   AccountTree as AccountTreeIcon,
+  AssignmentOutlined as AssignmentOutlinedIcon,
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useUser } from '../contexts/UserContext';
@@ -80,6 +81,18 @@ const isExperimentsRoute = (pathname: string): boolean => {
   return pathname.startsWith('/experiments') || pathname.startsWith('/runs');
 };
 
+const isSampleMgmtRoute = (pathname: string): boolean => {
+  return (
+    pathname.startsWith('/receive') ||
+    pathname.startsWith('/asked-for') ||
+    pathname.startsWith('/samples') ||
+    pathname.startsWith('/tests') ||
+    pathname.startsWith('/containers') ||
+    pathname.startsWith('/batches') ||
+    pathname.startsWith('/results')
+  );
+};
+
 const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onMobileClose, collapsed = false }) => {
   const { user, hasPermission } = useUser();
   const navigate = useNavigate();
@@ -97,12 +110,7 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onMobileClose, collapsed 
     isExperimentsRoute(location.pathname)
   );
   const [sampleMgmtExpanded, setSampleMgmtExpanded] = useState(
-    location.pathname.startsWith('/receive') ||
-      location.pathname.startsWith('/samples') ||
-      location.pathname.startsWith('/tests') ||
-      location.pathname.startsWith('/containers') ||
-      location.pathname.startsWith('/batches') ||
-      location.pathname.startsWith('/results')
+    isSampleMgmtRoute(location.pathname)
   );
 
   // Collapse accordions when sidebar collapses
@@ -137,6 +145,7 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onMobileClose, collapsed 
     path: string;
     icon: React.ReactNode;
     permission?: string;
+    anyPermissions?: string[];
   }
 
   const SampleMgmtItems: SampleMgmtNavItem[] = [
@@ -145,6 +154,12 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onMobileClose, collapsed 
       path: '/receive',
       icon: <ScienceIcon />,
       permission: 'sample:create',
+    },
+    {
+      text: 'Asked-for',
+      path: '/asked-for',
+      icon: <AssignmentOutlinedIcon />,
+      anyPermissions: ['sample:read', 'test:assign'],
     },
     {
       text: 'Samples',
@@ -259,7 +274,7 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onMobileClose, collapsed 
         setLabMgmtExpanded(true);
       } else if (isExperimentsRoute(path)) {
         setExperimentsExpanded(true);
-      } else if (path.startsWith('/receive') || path.startsWith('/samples') || path.startsWith('/tests') || path.startsWith('/containers') || path.startsWith('/batches') || path.startsWith('/results')) {
+      } else if (isSampleMgmtRoute(path)) {
         setSampleMgmtExpanded(true);
       }
     }
@@ -285,13 +300,14 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onMobileClose, collapsed 
     hasPermission('sample:read') ||
     hasPermission('sample:update') ||
     hasPermission('test:update') ||
+    hasPermission('test:assign') ||
     hasPermission('batch:manage') ||
     hasPermission('result:enter');
 
   /*
    * Permission / role visibility (sidebar sections):
    * - Core Features: all authenticated (Dashboard, Help).
-   * - Sample Mgmt: any of sample:create, sample:read, sample:update, test:update, batch:manage, result:enter.
+   * - Sample Mgmt: any of sample:create, sample:read, sample:update, test:update, test:assign, batch:manage, result:enter.
    * - Experiments: experiment:manage (section + All Experiments + Experiment Templates sub-items).
    * - Lab Mgmt: any of project:manage, analysis:manage.
    * - Admin: config:edit.
@@ -302,14 +318,7 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onMobileClose, collapsed 
     setAdminExpanded(location.pathname.startsWith('/admin'));
     setLabMgmtExpanded(isLabMgmtRoute(location.pathname));
     setExperimentsExpanded(isExperimentsRoute(location.pathname));
-    setSampleMgmtExpanded(
-      location.pathname.startsWith('/receive') ||
-        location.pathname.startsWith('/samples') ||
-        location.pathname.startsWith('/tests') ||
-        location.pathname.startsWith('/containers') ||
-        location.pathname.startsWith('/batches') ||
-        location.pathname.startsWith('/results')
-    );
+    setSampleMgmtExpanded(isSampleMgmtRoute(location.pathname));
   }, [location.pathname]);
 
   const drawerContent = (
@@ -440,30 +449,12 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onMobileClose, collapsed 
                   {collapsed ? (
                     <Tooltip title="Sample Management" placement="right" arrow>
                       <ScienceIcon
-                        color={
-                          location.pathname.startsWith('/receive') ||
-                          location.pathname.startsWith('/samples') ||
-                          location.pathname.startsWith('/tests') ||
-                          location.pathname.startsWith('/containers') ||
-                          location.pathname.startsWith('/batches') ||
-                          location.pathname.startsWith('/results')
-                            ? 'primary'
-                            : 'inherit'
-                        }
+                        color={isSampleMgmtRoute(location.pathname) ? 'primary' : 'inherit'}
                       />
                     </Tooltip>
                   ) : (
                     <ScienceIcon
-                      color={
-                        location.pathname.startsWith('/receive') ||
-                        location.pathname.startsWith('/samples') ||
-                        location.pathname.startsWith('/tests') ||
-                        location.pathname.startsWith('/containers') ||
-                        location.pathname.startsWith('/batches') ||
-                        location.pathname.startsWith('/results')
-                          ? 'primary'
-                          : 'inherit'
-                      }
+                      color={isSampleMgmtRoute(location.pathname) ? 'primary' : 'inherit'}
                     />
                   )}
                 </ListItemIcon>
@@ -477,7 +468,12 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onMobileClose, collapsed 
               </AccordionSummary>
               <AccordionDetails sx={{ p: 0 }}>
                 <List component="nav" aria-label="sample management navigation">
-                  {SampleMgmtItems.filter((item) => !item.permission || hasPermission(item.permission)).map((item) => {
+                  {SampleMgmtItems.filter((item) => {
+                    if (item.anyPermissions?.length) {
+                      return item.anyPermissions.some((p) => hasPermission(p));
+                    }
+                    return !item.permission || hasPermission(item.permission);
+                  }).map((item) => {
                     const active = isActive(item.path);
                     const listItemButton = (
                       <ListItemButton

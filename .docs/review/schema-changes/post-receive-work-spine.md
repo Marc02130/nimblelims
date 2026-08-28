@@ -3,7 +3,7 @@
 **Feature / cycle:** post-receive work spine  
 **Phases covered:** P1 (asked-for) required this cycle; P2 tables specified so architecture can Accept the spine; P3 none; P4 additive FKs; P5 none  
 **Status:** Draft for architecture review  
-**Alembic revisions:** _(fill when implemented)_  
+**Alembic revisions:** `0072_asked_for_p1` (P1: `analysis_param_defs` + `asked_for`)  
 **Requirements:** [`.docs/review/requirements/post-receive-work-spine.md`](../requirements/post-receive-work-spine.md)  
 **Tech sketch:** [`.docs/review/tech-sketch/post-receive-work-spine.md`](../tech-sketch/post-receive-work-spine.md)
 

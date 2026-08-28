@@ -19,8 +19,14 @@ from app.schemas.analysis import (
     AnalyteLinkRequest,
     AnalyteSimple,
 )
+from app.schemas.asked_for import (
+    AnalysisParamDefRead,
+    AnalysisParamDefsPut,
+    AnalysisParamDefsResponse,
+)
+from app.services.asked_for_service import AskedForService
 from app.core.security import get_current_user, get_user_permissions
-from app.core.rbac import require_any_permission
+from app.core.rbac import require_any_permission, require_config_edit
 from uuid import UUID
 import logging
 
@@ -821,3 +827,31 @@ async def delete_analysis_analyte_rule(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to delete analyte rule: {str(e)}"
         )
+
+
+@router.get("/{analysis_id}/param-defs", response_model=AnalysisParamDefsResponse)
+async def get_analysis_param_defs(
+    analysis_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Catalog of method params for an analysis. Empty list is the OOB path."""
+    svc = AskedForService(db, current_user=current_user)
+    rows = svc.list_param_defs(analysis_id)
+    items = [AnalysisParamDefRead.model_validate(r) for r in rows]
+    return AnalysisParamDefsResponse(items=items, count=len(items))
+
+
+@router.put("/{analysis_id}/param-defs", response_model=AnalysisParamDefsResponse)
+async def put_analysis_param_defs(
+    analysis_id: UUID,
+    body: AnalysisParamDefsPut,
+    current_user: User = Depends(require_config_edit),
+    db: Session = Depends(get_db),
+):
+    """Replace the param-def catalog for an analysis. Requires config:edit."""
+    svc = AskedForService(db, current_user=current_user)
+    rows = svc.replace_param_defs(analysis_id, body.items)
+    items = [AnalysisParamDefRead.model_validate(r) for r in rows]
+    return AnalysisParamDefsResponse(items=items, count=len(items))
+
