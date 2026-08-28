@@ -29,6 +29,20 @@
 
 **Not this note:** house SOP, extra assays, seed rows, Field Management UI, OOB catalog contents.
 
+### Bind note
+
+Example snapshots in this file are **not seed**. They must **not** mint new sample or analysis IDs.
+
+When seed is allowed, bind only:
+
+| Example analysis | Bind to existing catalog | Do not |
+|------------------|--------------------------|--------|
+| `EX_CTG` / `EX_NCI60` | `NBIO-CMPD-001` / A549 (PR 49 NCI-60 plate: 5× 10-fold, 1e-8–1e-4 M, GI50) | New compound or plate IDs |
+| `EX_hERG`, `EX_AMES`, `EX_DMPK_MIC` | — | **No 0059 row.** Table-design only |
+| `EX_ELISA` | — | **Not** the HCP ELISA on `CAR-T-Batch-001`. Do not bind or invent that sample |
+
+`EX_ELISA` cell-seeding keys stay example fillers. Not IC50.
+
 ---
 
 ## 2. `analysis_param_defs` catalog — example rows (one per param key)
@@ -299,4 +313,4 @@ Katinka snapshot named **`readout`** and **`wavelength_nm`**. Other **required**
 
 ## 5. Fold-in (when `.docs/internal/` is on the host)
 
-Add a section **`analysis_param_defs`** to the spine PRD and SPEC with §1–§3. Do not copy this into gitignored paths from this PR. Do not seed these rows in Alembic/OOB.
+Add a section **`analysis_param_defs`** to the spine PRD and SPEC with §1–§3 and the bind note. Do not copy this into gitignored paths from this PR. Do not seed these rows in Alembic/OOB except the bind-note rule (`EX_CTG` / `EX_NCI60` → existing `NBIO-CMPD-001` / A549 when seed is allowed).
