@@ -2,7 +2,7 @@
 
 **Stem:** `post-receive-work-spine`  
 **Phase:** P1 asked-for lake (P2–P5 **not** in this stamp)  
-**SoT:** `.docs/review/requirements/post-receive-work-spine.md` RQ-AF-* · [asked-for.md](../.docs/review/manuals/asked-for.md)  
+**SoT:** `.docs/review/requirements/post-receive-work-spine.md` RQ-AF-* · [HOWTO.md](../manuals/HOWTO.md) §3  
 **UI:** `/asked-for` (sidebar **Asked-for**, immediately after Receive) + sample-detail Asked-for section  
 **API:** `POST /api/v1/asked-for` · `GET /api/v1/asked-for` · `POST /api/v1/asked-for/{id}/cancel`  
 **Env:** local docker compose (`lims-*`); http://localhost:3000 + :8000. Compose **down** after the run. Not IC50. P1 lake only.  
