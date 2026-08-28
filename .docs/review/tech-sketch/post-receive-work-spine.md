@@ -45,11 +45,19 @@ No new execute runtime. No second AuthZ.
 
 ## 3. P1 design
 
-### 3.1 Tables
+### 3.1 Tables and param bind
 
-`analysis_param_defs` — per-analysis parameter catalog (cell line, etc.). Empty in OOB seed is OK.
+Three layers (normative with [analysis-param-defs working note](../../decision-logs/2026-08-28-analysis-param-defs.md) — **example data, not seed**):
 
-`asked_for` — request row. FK sample, analysis. `tat_days int`. `params jsonb`. `status` list or check constraint.
+| Layer | Where | When |
+|-------|--------|------|
+| **Catalog** | `analysis_param_defs.analysis_id` | Admin associates keys to an **assay** (`config:edit`). `unit`, `data_type`, `required`, optional `source_list_id` / `allowed_values`. |
+| **Order (P1)** | `asked_for.params` jsonb | User fills values for that analysis on the request. Validate keys vs defs. **No Test.** |
+| **Execute (P2)** | `tests.asked_for_params` jsonb | **LimsRun start:** copy asked-for JSON and freeze. Not receive. Not publish. Not result fields. |
+
+`asked_for` — request row. FK sample, analysis. `tat_days int`. `params jsonb`. `status` check constraint.
+
+Fitted IC50 / Hill / CLint / fu / % remaining are **results**, not catalog keys.
 
 Partial unique index: `(sample_id, analysis_id) WHERE status <> 'cancelled'`.
 
@@ -60,9 +68,9 @@ Partial unique index: `(sample_id, analysis_id) WHERE status <> 'cancelled'`.
 1. AuthZ test:assign + load sample under RLS (403 if hidden)
 2. Sample.status should be Available for Testing (422 otherwise for v1 — do not order on discarded)
 3. Validate analysis active
-4. Validate params vs defs
-5. Insert requested
-6. **Do not** call `_create_tests` / `_create_asked_for_tests`
+4. Validate params vs defs (unknown key / missing `required` → 422). **OQ-AF-6:** `required` is boolean only, set on the analysis. No “required if …” engine.
+5. Insert requested with `params` JSON
+6. **Do not** write `tests.asked_for_params`. **Do not** call `_create_tests` / `_create_asked_for_tests`
 
 P1 **does not** call routing (table may not exist yet).
 
@@ -82,7 +90,7 @@ Pytest: create, 409 dup, 403 RLS, 422 params, receive still 422 on analysis_ids,
 
 `routing_map`: range-gist or exclusion constraint on `(analysis_id, sample_type_id, tat_range)`. Postgres: `int4range` + `EXCLUDE USING gist`.
 
-On `POST .../route` or (once P2 ships) auto-route after asked-for create when a map row matches (Lab Ops stance on OQ-WO-1):
+**OQ-WO-1 Decided:** Tech hits **Route**. No auto-route on asked-for save. `POST /api/v1/asked-for/{id}/route` (batch the same call for a selected set). Then:
 
 - Resolve sample_type
 - Select map row
@@ -92,7 +100,7 @@ On `POST .../route` or (once P2 ships) auto-route after asked-for create when a 
 
 Start: `ELNProcessService.create` from first definition; `work_orders.process_id`. Existing process AuthZ.
 
-**L3:** At LimsRun start, snapshot asked-for `params` onto the Test and freeze.
+**L3 / A5 / SC5:** At LimsRun start, `tests.asked_for_params = asked_for.params` (copy) and freeze. Column ships in the **P2** migration. P1 does not add it. Shape: JSON object matching that analysis’s defs (see working-note §3 snapshots).
 
 WO-7: insert Test if missing at LimsRun start. Publish: refuse if missing. **Remove** ensure-on-publish find-or-create if present.
 
@@ -110,9 +118,9 @@ No `results.unit_id`. Typed token → `reported_result` as-is (no float roundtri
 
 Job row: `process_definition_id` nullable.
 
-## 7. P5 design
+## 7. P5 design (interim)
 
-No new import engine. Frontend: Instruments + Parsers admin (may already exist as `DataParsersManagement` / `InstrumentCatalogManagement`) — close R-8: example + test + dry-run + activate. AI draft = existing setup-only path; gate behind config.
+No new import engine. **Do not build “admin authors parsers” as the product.** Authoring belongs to [ai-sop-north-star](ai-sop-north-star.md) (SOP + example files → MCP → `data_parsers` draft). P5 is dry-run + activate. Day-to-day import: no LLM.
 
 ## 8. Failure modes
 

@@ -16,6 +16,7 @@ Cycle/feature **gates** for workstreams that must not proceed until product/arch
 | [extract-then-qubit-testdata-gap.md](extract-then-qubit-testdata-gap.md) | Extract-then-Qubit Hold — 0058/0059 catalog map (findings only; not an SOP pack) | **No** — Hold; testdata will not invent blood/DNA/Qubit IDs until Hold ships; Compose stays down |
 | [blood-dnatruseq-testdata-gap.md](blood-dnatruseq-testdata-gap.md) | Blood→DNA→TruSeq Nano UAT path — 0058/0059 catalog map (findings only; not an SOP pack; capture parked) | **No** — Hold; testdata will not invent blood/DNA/TruSeq IDs until dest DNA lands; Compose stays down |
 | [post-receive-work-spine.md](post-receive-work-spine.md) | Asked-for · work_order · results persist · SOP Apply · parser setup | **Partially** — P1 asked-for is the MVP test-ordering hole after CORE receive; P2–P5 do not all block release |
+| *(guidance, not a gate)* [ai-sop-north-star](../requirements/ai-sop-north-star.md) | SOP + example files → vectors → MCP drafts process + parser | **No** — north star; implement CLOSED until Leadership restamp |
 
 ## Gate rule
 
