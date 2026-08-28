@@ -2,7 +2,9 @@
 
 ## Overview
 
-This document defines 12 test cases for the Workflow Templates feature: template CRUD, execution with context (accessioning, batch, results entry), conditional behavior, permission denial, and transaction rollback. Run after `uat-security-rbac` (and optionally `uat-configurations-custom` for list data). Assumes admin user has `config:edit` and `workflow:execute`; test roles with reduced permissions where noted.
+This document defines 12 test cases for the Workflow Templates feature: template CRUD, execution with context (batch, results entry; accessioning-page apply is gone), conditional behavior, permission denial, and transaction rollback. Run after `uat-security-rbac` (and optionally `uat-configurations-custom` for list data). Assumes admin user has `config:edit` and `workflow:execute`; test roles with reduced permissions where noted.
+
+> **2026-08-28:** The `/accessioning` wizard (and its Apply Template dropdown) is **removed**. **TC-WF-08** (execute from Accessioning) is **retired** until Apply Template exists on another page. Execute via API still works.
 
 ## Prerequisites
 
@@ -123,7 +125,9 @@ This document defines 12 test cases for the Workflow Templates feature: template
 
 ---
 
-### TC-WF-08: Execute workflow from Accessioning (sample context)
+### TC-WF-08: Execute workflow from Accessioning (sample context) — **RETIRED**
+
+Wizard Apply Template UI removed 2026-08-28. Use API `POST /workflows/execute/{template_id}` if you still need this check.
 
 **Objective**: Verify execution with empty context from Accessioning page and data refresh.
 

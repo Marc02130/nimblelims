@@ -21,3 +21,5 @@ Atomic receive **CORE is closed**: implemented, dogfooded, full browse+API UAT *
 3. **Work orders / WO-*** — processing domain after receive (+ results).  
 
 Do **not** reopen CORE receive scope (no analysis picker, no Test mint at receive, no aliquot UI, no IC50).
+
+**2026-08-28:** Legacy `/accessioning` wizard **removed** from the UI. `/accessioning` redirects to `/receive`.

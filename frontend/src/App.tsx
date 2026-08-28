@@ -2,7 +2,6 @@ import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import MainLayout from './layouts/MainLayout';
 import Dashboard from './pages/Dashboard';
-import AccessioningForm from './pages/AccessioningForm';
 import AtomicReceive from './pages/AtomicReceive';
 import SamplesManagement from './pages/SamplesManagement';
 import TestsManagement from './pages/TestsManagement';
@@ -61,16 +60,7 @@ function AppRoutes() {
             )
           }
         />
-        <Route
-          path="/accessioning"
-          element={
-            hasPermission('sample:create') ? (
-              <AccessioningForm />
-            ) : (
-              <Navigate to="/dashboard" replace />
-            )
-          }
-        />
+        <Route path="/accessioning" element={<Navigate to="/receive" replace />} />
         <Route
           path="/samples"
           element={

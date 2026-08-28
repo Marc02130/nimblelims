@@ -74,9 +74,9 @@ Verify that sidebar navigation correctly gates menu items by permissions, auto-e
 | 4.10 | Verify Admin accordion collapsed | Admin accordion collapsed (not on admin route) |
 | 5 | **Test Sample Mgmt Accordion Auto-Expand** | |
 | 5.1 | Log in as user with sample/test/batch/result permissions | User authenticated |
-| 5.2 | Navigate to `/accessioning` | Accessioning page loads |
+| 5.2 | Navigate to `/receive` | Receive page loads |
 | 5.3 | Verify Sample Mgmt accordion auto-expanded | Sample Mgmt accordion expanded automatically |
-| 5.4 | Verify "Accessioning" item highlighted | "Accessioning" item shows active state (primary color icon) |
+| 5.4 | Verify "Receive" item highlighted | "Receive" item shows active state (primary color icon) |
 | 5.5 | Navigate to `/samples` | Samples page loads |
 | 5.6 | Verify Sample Mgmt accordion still expanded | Sample Mgmt accordion remains expanded |
 | 5.7 | Verify "Samples" item highlighted | "Samples" item shows active state |
@@ -114,7 +114,7 @@ Verify that sidebar navigation correctly gates menu items by permissions, auto-e
 |----------|------------------|
 | **Sidebar Structure** | - Sidebar visible on left (240px width expanded)<br>- Core Features section with items: Dashboard, Help<br>- Sample Mgmt accordion visible (if user has any sample/test/batch/result permission)<br>- Admin accordion visible (if `config:edit` permission)<br>- Lab Mgmt accordion visible (if `project:manage` permission) |
 | **Permission Gating** | - Menu items visible only if user has required permission<br>- Sample Mgmt accordion visible if user has any sample/test/batch/result permission (items filtered by individual permissions)<br>- Admin accordion hidden if no `config:edit` permission<br>- Lab Mgmt accordion hidden if no `project:manage` permission<br>- Core items (Dashboard, Help) always visible |
-| **Auto-Expand Accordion** | - Sample Mgmt accordion auto-expands when navigating to `/accessioning`, `/samples`, `/tests`, `/containers`, `/batches`, or `/results` routes<br>- Admin accordion auto-expands when navigating to `/admin/*` routes<br>- Lab Mgmt accordion auto-expands when navigating to `/projects`, `/clients`, or `/client-projects` routes<br>- Accordions remain expanded while on related routes<br>- Accordions collapse when navigating away |
+| **Auto-Expand Accordion** | - Sample Mgmt accordion auto-expands when navigating to `/receive`, `/samples`, `/tests`, `/containers`, `/batches`, or `/results` routes<br>- Admin accordion auto-expands when navigating to `/admin/*` routes<br>- Lab Mgmt accordion auto-expands when navigating to `/projects`, `/clients`, or `/client-projects` routes<br>- Accordions remain expanded while on related routes<br>- Accordions collapse when navigating away |
 | **Manual Toggle** | - Accordions can be manually collapsed/expanded by clicking header<br>- Toggle state persists during navigation within section |
 | **Active State** | - Current page item highlighted with primary color icon<br>- Selected state applied to active item<br>- Other items show default styling |
 
@@ -198,9 +198,9 @@ Verify that sidebar converts to temporary drawer on mobile devices (<600px), wit
 | 3.7 | Click hamburger icon again | Drawer closes |
 | 4 | **Test Auto-Close on Navigation** | |
 | 4.1 | Open drawer (click hamburger) | Drawer opens |
-| 4.2 | Click "Accessioning" navigation item | Route changes to `/accessioning` |
+| 4.2 | Click "Receive" navigation item | Route changes to `/receive` |
 | 4.3 | Verify drawer auto-closes | Drawer closes automatically after navigation |
-| 4.4 | Verify page content loads | Accessioning page loads correctly |
+| 4.4 | Verify page content loads | Receive page loads correctly |
 | 4.5 | Open drawer again | Drawer opens |
 | 4.6 | Click "Dashboard" navigation item | Route changes to `/dashboard` |
 | 4.7 | Verify drawer auto-closes | Drawer closes automatically |
@@ -351,7 +351,7 @@ Verify that navigation is accessible via keyboard navigation, has proper ARIA la
 |------|--------|-----------------|
 | 9 | **Test Tab Order** | |
 | 9.1 | Press Tab from page start | Focus moves to Logo |
-| 9.2 | Continue pressing Tab | Focus moves through: Logo → Dashboard → Help → Accessioning → Samples → Tests → ... → Batches → Results → Lab Mgmt accordion → (if expanded) Lab Mgmt items → Admin accordion → (if expanded) Admin items → Sidebar toggle → Page content |
+| 9.2 | Continue pressing Tab | Focus moves through: Logo → Dashboard → Help → Receive → Samples → Tests → ... → Batches → Results → Lab Mgmt accordion → (if expanded) Lab Mgmt items → Admin accordion → (if expanded) Admin items → Sidebar toggle → Page content |
 | 9.3 | Verify logical order | Tab order follows visual flow (top to bottom, left to right) |
 
 ### Expected Results - Tab Order
@@ -446,7 +446,7 @@ Verify that navigation is accessible via keyboard navigation, has proper ARIA la
 - **Help**: Always visible (no permission required)
 
 ### Auto-Expand Behavior
-- **Sample Mgmt Accordion**: Auto-expands when navigating to `/accessioning`, `/samples`, `/tests`, `/containers`, `/batches`, or `/results` routes
+- **Sample Mgmt Accordion**: Auto-expands when navigating to `/receive`, `/samples`, `/tests`, `/containers`, `/batches`, or `/results` routes
 - **Admin Accordion**: Auto-expands when navigating to `/admin/*` routes
 - **Lab Mgmt Accordion**: Auto-expands when navigating to `/projects`, `/clients`, or `/client-projects` routes
 - **Lab Mgmt Items Order**: Projects (first), Clients (second), Client Proj (third)

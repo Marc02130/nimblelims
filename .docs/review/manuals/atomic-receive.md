@@ -7,7 +7,9 @@
 **Requirements:** `.docs/internal/prd/sample-accessioning/PRD.md` (RQ-AR-*) · SPEC §3  
 **Sketch:** `.docs/review/tech-sketch/atomic-receive.md`
 
-**Out of CORE (next packets):** results-entry persist lock (**NR-AR-1** / AR-RES); A-15 asked-for / work-plan; work orders / WO-*.
+**Out of CORE (next packets):** post-receive order / asked-for; A-15 / work-plan; work orders / WO-*; results-entry persist lock (**NR-AR-1** / AR-RES).
+
+The legacy `/accessioning` wizard is **removed**. `/accessioning` redirects to `/receive`.
 
 ---
 
@@ -15,7 +17,7 @@
 
 High-volume intake: register specimen identity + **1..N vessels** in **one transaction**. Lab sample ID is system-assigned. Tube barcode is the vessel. Status on commit is **Available for Testing**. Work plan / work orders / results entry are **out of receive**.
 
-Legacy wizard at `/accessioning` is **not** the happy path (see [accessioning-workflow.md](accessioning-workflow.md) for historical wizard docs).
+Legacy wizard at `/accessioning` is **gone** (redirects here). See [accessioning-workflow.md](accessioning-workflow.md).
 
 ---
 
