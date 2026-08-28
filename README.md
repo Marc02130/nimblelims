@@ -1,6 +1,6 @@
 # NimbleLIMS - Laboratory Information Management System
 
-A modern, API-first LIMS built specifically for BioTech and Pharma startups. NimbleLIMS provides the **core foundation for lab operations**: track samples (receive, status, lineage), record **requested analysis** after receive (asked-for lake — not a Test), and enter results (capture and review). Purpose-built for small R&D teams with basic LIMS needs, featuring role-based access, CRO partner isolation, and an extensible platform that supports optional enhancements (dose-response analysis, ELN experiment tracking, instrument data import) when customer requirements emerge. Powered by FastAPI, React, and PostgreSQL.
+A modern, API-first LIMS built specifically for BioTech and Pharma startups. NimbleLIMS provides the **core foundation for lab operations**: track samples (receive, status, lineage), record **requested analysis** in the asked-for lake (a later look-up — not a Test, not the click after receive), and enter results (capture and review). Purpose-built for small R&D teams with basic LIMS needs, featuring role-based access, CRO partner isolation, and an extensible platform that supports optional enhancements (dose-response analysis, ELN experiment tracking, instrument data import) when customer requirements emerge. Powered by FastAPI, React, and PostgreSQL.
 
 ## License
 
@@ -109,7 +109,7 @@ See `backend/tests/test_seed_data_usage_example.py` for example tests.
 ### Data Scenarios
 
 Full catalog with 10+ scenarios covering:
-- Sample lifecycle workflows (receive → requested analysis → results → review)
+- Sample lifecycle workflows: receive loop (stay on `/receive`); separately, requested analysis in the lake; separately, results → review
 - Multi-user RBAC (project isolation, permission enforcement)
 - QC sample handling (blanks, controls)
 - Edge cases (depleted parents, zero results, incomplete tests)
@@ -181,11 +181,11 @@ nimblelims/
 
 ## Features (MVP Scope)
 
-**Note:** This section describes **all implemented features in the codebase**. However, the **MVP release bar** focuses on three core pillars: (1) **track samples** (receive, status, lineage), (2) **requested analysis** (asked-for lake after receive — does **not** assign a Test or start work), and (3) **enter results** (capture and review). Additional features listed below (ELN experiments, dose-response analysis, LimsRuns/parsers, workflow templates, custom fields) are **shipped/in-tree but not the MVP release bar**—they are enhancements that demonstrate platform capability and remain available for users who need them. See local `.docs/internal/prd/nimblelims-prd.md` (not committed) for the complete MVP definition.
+**Note:** This section describes **all implemented features in the codebase**. However, the **MVP release bar** focuses on three core pillars: (1) **track samples** (receive, status, lineage), (2) **requested analysis** (asked-for lake — a later look-up that does **not** assign a Test or start work), and (3) **enter results** (capture and review). Additional features listed below (ELN experiments, dose-response analysis, LimsRuns/parsers, workflow templates, custom fields) are **shipped/in-tree but not the MVP release bar**—they are enhancements that demonstrate platform capability and remain available for users who need them. See local `.docs/internal/prd/nimblelims-prd.md` (not committed) for the complete MVP definition.
 
 ### Core Workflows for BioTech/Pharma Startups (**MVP Release Bar** + Shipped Enhancements)
 - **Compound & Sample Tracking** **(MVP)**: Receive (`/receive`), status management, lineage (aliquots/derivatives), container hierarchy. Non-empty `analysis_ids` on receive → **422**.
-- **Requested analysis** **(MVP, P1)**: After receive, **Asked-for** (`/asked-for`) records requested analysis (zero Tests, no execute). See [asked-for.md](.docs/review/manuals/asked-for.md) and `UAT_Scripts/uat-post-receive-work-spine.md`. Route / work_orders / WO-7 are **not** this stamp. Classic `/tests` is not the request path.
+- **Requested analysis** **(MVP, P1)**: **Asked-for** (`/asked-for`) records requested analysis + TAT for already-received samples (zero Tests, no execute). A later look-up, not the after-receive step — receive ends on `/receive`. See [asked-for.md](.docs/review/manuals/asked-for.md) and `UAT_Scripts/uat-post-receive-work-spine.md`. Route / work_orders / WO-7 are **not** this stamp. Classic `/tests` is not the request path.
 - **Results Entry** **(MVP)**: Manual results entry with real-time validation
 - **Batch Management** **(MVP + Enhancements)**: Create and manage batches (basic is MVP; cross-project support, automatic QC generation, and sample prioritization are shipped enhancements)
 - **Sample Prioritization** **(Shipped, Not MVP)** (US-11): Sort compounds and biological samples by shelf-life expiration and assay deadlines during batch creation
