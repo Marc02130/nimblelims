@@ -8,72 +8,26 @@ This document describes the complete workflow from sample accessioning through r
 
 ## Workflow Stages
 
-### Stage 1: Sample Accessioning
+### Stage 1: Sample receive
 
-**Purpose**: Receive and register new samples into the system with all required metadata and test assignments.
+**Purpose**: Register specimen identity and 1..N vessels in one transaction.
 
-**Actors**: Lab Technician
+**Actors**: Lab Technician (`sample:create`)
 
-**Variation A: Single Sample Accessioning**
+**SoT:** [atomic-receive.md](atomic-receive.md) · UI `/receive` · `POST /samples/receive`
+
+The three-step `/accessioning` wizard is **removed**. `/accessioning` redirects to `/receive`. Receive does **not** assign analyses or mint Tests.
 
 **Steps**:
 
-1. **Sample Details Entry**
-   - Enter sample identification: name (unique), description
-   - Set dates: due_date (when results are due), received_date (when sample was received)
-   - Select sample type from configured list (e.g., Blood, Urine, Tissue)
-   - Select matrix from configured list (e.g., Serum, Plasma, Whole Blood)
-   - Enter storage temperature (validated: -273.15 to 1000°C)
-   - Select project (must have project access)
-   - Optionally select client project (for grouping multiple projects)
-   - Optionally select QC type (Sample, Positive Control, Negative Control, Matrix Spike, Duplicate, Blank)
-   - Document any anomalies observed during inspection
-   - **Custom Fields Section**: Enter custom attributes if configured for 'samples' entity type
-     - Fields dynamically rendered based on active custom attribute configurations
-     - Supports text, number, date, boolean, and select data types
-     - Real-time validation against validation rules (min/max, length, options)
-     - Integrated with form validation; errors displayed inline
+1. Set sticky sample type, project, and 1×1 container type.
+2. Scan / type primary barcode. Optionally add more barcodes for the same sample.
+3. Optional temperature and client sample ID.
+4. Receive → toast, barcodes clear, stay on the page.
 
-2. **Container Assignment**
-   - Select container type from admin-preconfigured types (e.g., tube, plate, well)
-   - Enter container name/barcode (unique identifier)
-   - Set position (row, column) for plate-based containers
-   - Optionally enter concentration and amount with units
-   - Container instance is created dynamically during accessioning
+**Status:** Sample is **Available for Testing**. Zero Tests. Zero Results.
 
-3. **Test Assignment**
-   - Option 1: Assign individual analyses
-     - Select one or more analyses from available list
-     - Each analysis creates a separate test instance
-   - Option 2: Assign test battery
-     - Select a pre-configured test battery
-     - System automatically creates tests for all analyses in battery (ordered by sequence)
-     - Optional analyses in battery can be skipped (future enhancement)
-   - Option 3: Combine both (battery + individual analyses)
-     - System prevents duplicate test creation if analysis already exists from battery
-
-4. **Double Entry Validation** (Optional)
-   - Enable double-entry toggle
-   - Re-enter sample name and sample type for verification
-   - Validation occurs in review step before submission
-
-5. **Review and Submit**
-   - Review all entered information
-   - Validate double-entry fields if enabled
-   - Submit creates (via separate API calls):
-     - Container instance (POST `/containers`)
-     - Sample record (POST `/samples` or POST `/samples/accession`, status: "Received")
-     - Content junction (POST `/contents`, links sample to container)
-     - Test instances (via `/samples/accession` with battery_id/assigned_tests, status: "In Process")
-   - **Note**: Frontend uses separate API calls for granular error handling. The `/samples/accession` endpoint can also create tests, but containers are created separately.
-
-**Status Transitions**:
-- Sample: Created with status "Received"
-- Tests: Created with status "In Process"
-
-**Post-Accessioning**:
-- Optional: Create aliquots/derivatives from parent sample
-- Sample becomes available for testing workflow
+**After receive:** Work assignment is a later packet. Until then, tests can be created from **Tests** (`/tests`). Aliquots / derivatives are not part of receive.
 
 ### Stage 1.5: Sample/Test/Container Editing (Post-Accessioning)
 

@@ -7,7 +7,7 @@ NimbleLIMS uses a **unified sidebar navigation** (left drawer) for all authentic
 | Section | Visibility | Contents |
 |--------|------------|----------|
 | **Core Features** | All users | Dashboard, Help |
-| **Sample Mgmt** | Any of: sample:create, sample:read, sample:update, test:update, batch:manage, result:enter | Accessioning, Samples, Tests, Containers, Batches, Results |
+| **Sample Mgmt** | Any of: sample:create, sample:read, sample:update, test:update, batch:manage, result:enter | Receive, Samples, Tests, Containers, Batches, Results |
 | **Experiments** | experiment:manage | All Experiments (/experiments), Experiment Templates (/experiments/templates; same permission as section) |
 | **Lab Mgmt** | Any of: project:manage, analysis:manage | Projects, Clients, Client Proj, Analyses, Analytes |
 | **Admin** | config:edit | Overview, Name Templates, Custom Attributes, Lists, Container Types, Units, Users, Roles, Analyses, Analytes, Test Batteries, Custom Fields, Custom Names, Workflow Templates, Help Management |
@@ -44,7 +44,7 @@ The sidebar is a persistent left-side drawer (240px expanded, 56px collapsed on 
 ├─────────────┤
 │ ▼ Sample    │ ← Accordion (collapsible, requires sample/test/batch/result permissions)
 │   Mgmt      │
-│   Accessioning│
+│   Receive   │
 │   Samples   │
 │   Tests     │
 │   Containers│
@@ -97,7 +97,7 @@ Core features are organized with Dashboard and Help at the top. These items are 
 The Sample Management section uses a Material-UI Accordion component for collapsible submenu functionality. It is only visible to users with at least one of the following permissions: `sample:create`, `sample:read`, `sample:update`, `test:update`, `batch:manage`, or `result:enter`. This section consolidates all sample-related workflow functions.
 
 **Accordion Behavior:**
-- Auto-expands when user navigates to any `/receive`, `/accessioning`, `/samples`, `/tests`, `/containers`, `/batches`, or `/results` route
+- Auto-expands when user navigates to any `/receive`, `/samples`, `/tests`, `/containers`, `/batches`, or `/results` route
 - Can be manually collapsed/expanded by clicking the accordion header
 - Shows active state (primary color icon) when on any sample management route
 - Contains sample management sub-items in a nested list structure

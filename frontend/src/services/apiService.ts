@@ -317,14 +317,9 @@ export class ApiService {
     return response.data;
   }
 
-  async accessionSample(sampleData: any) {
-    const response: AxiosResponse = await this.api.post('/samples/accession', sampleData);
-    return response.data;
-  }
-
   /**
    * Atomic receive CORE: one txn Sample + 1..N Containers + Contents.
-   * Prefer empty analysis_ids; if set = asked-for only (Assigned/Pending).
+   * Non-empty analysis_ids are refused (422). Work assignment is after receive.
    */
   async receiveSample(receiveData: {
     container_barcode: string;
@@ -337,32 +332,6 @@ export class ApiService {
     client_sample_id?: string | null;
   }) {
     const response: AxiosResponse = await this.api.post('/samples/receive', receiveData);
-    return response.data;
-  }
-
-  async bulkAccessionSamples(bulkData: {
-    due_date: string;
-    received_date: string;
-    sample_type: string;
-    matrix: string;
-    client_id: string;
-    client_project_id?: string;
-    qc_type?: string;
-    assigned_tests: string[];
-    battery_id?: string;
-    container_type_id: string;
-    uniques: Array<{
-      name?: string;
-      client_sample_id?: string;
-      container_name: string;
-      temperature?: number;
-      anomalies?: string;
-      description?: string;
-    }>;
-    auto_name_prefix?: string;
-    auto_name_start?: number;
-  }) {
-    const response: AxiosResponse = await this.api.post('/samples/bulk-accession', bulkData);
     return response.data;
   }
 

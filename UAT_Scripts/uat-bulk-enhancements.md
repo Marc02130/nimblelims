@@ -1,5 +1,9 @@
 # UAT Scripts: Bulk Accessioning and Enhancements
 
+> **2026-08-28:** Bulk intake lived on the `/accessioning` wizard, which is **removed**. `/accessioning` redirects to `/receive`.  
+> **Do not run the bulk-accessioning UI cases** (TC-BULK-001 / auto-naming via the wizard). Batch results cases below are unchanged.  
+> Receive SoT: [`uat-atomic-receive.md`](uat-atomic-receive.md). Bulk intake is not a receive feature.
+
 ## Overview
 
 This document contains User Acceptance Testing (UAT) scripts for bulk accessioning and batch results entry enhancements in NimbleLIMS. These scripts validate bulk workflows as defined in:

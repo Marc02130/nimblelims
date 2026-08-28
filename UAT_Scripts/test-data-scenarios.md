@@ -728,7 +728,7 @@ def mab_pk_t0_sample(db_session):
 2. **Login** as one of the test users (see table above)
 3. **Navigate** to relevant sections based on scenario:
    - Samples: `/samples`
-   - Accessioning: `/accessioning`
+   - Receive: `/receive`
    - Results: `/results`
    - Batches: `/batches`
 4. **Verify** expected data and behaviors per scenario
