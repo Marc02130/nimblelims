@@ -1,6 +1,6 @@
 # NimbleLIMS - Laboratory Information Management System
 
-A modern, API-first LIMS built specifically for BioTech and Pharma startups. NimbleLIMS provides the **core foundation for lab operations**: track samples (accessioning, status, lineage), order tests (assign analyses), and enter results (capture and review). Purpose-built for small R&D teams with basic LIMS needs, featuring role-based access, CRO partner isolation, and an extensible platform that supports optional enhancements (dose-response analysis, ELN experiment tracking, instrument data import) when customer requirements emerge. Powered by FastAPI, React, and PostgreSQL.
+A modern, API-first LIMS built specifically for BioTech and Pharma startups. NimbleLIMS provides the **core foundation for lab operations**: track samples (receive, status, lineage), order tests (asked-for / assign analyses), and enter results (capture and review). Purpose-built for small R&D teams with basic LIMS needs, featuring role-based access, CRO partner isolation, and an extensible platform that supports optional enhancements (dose-response analysis, ELN experiment tracking, instrument data import) when customer requirements emerge. Powered by FastAPI, React, and PostgreSQL.
 
 ## License
 

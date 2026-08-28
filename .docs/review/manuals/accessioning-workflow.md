@@ -9,4 +9,4 @@
 
 Old bookmarks to `/accessioning` redirect to `/receive`.
 
-Do not assign analyses on receive. After receive, samples are **Available for Testing**. Work assignment is a later packet (order / asked-for, then work orders). Until that ships, tests can still be created from **Tests** (`/tests`).
+Do not assign analyses on receive. After receive, samples are **Available for Testing**. Record requested analyses on **Asked-for** (`/asked-for`) or the sample-detail Asked-for section. That does **not** mint a Test. Classic Tests (`/tests` / TestForm) still exist for the WO-4 type-a-number path.

@@ -46,6 +46,14 @@ Copyright (c) 2025 Marc Breneiser
 - `PATCH /samples/{id}` - Update sample
 - `PATCH /samples/{id}/status` - Update sample status
 
+#### Asked-for (P1)
+- `POST /v1/asked-for` - Record requested analyses for a sample set (no Tests)
+- `GET /v1/asked-for` - List asked-for rows
+- `GET /v1/asked-for/{id}` - Get one asked-for row
+- `POST /v1/asked-for/{id}/cancel` - Cancel while `requested`
+- `GET /analyses/{id}/param-defs` - Analysis method-param catalog
+- `PUT /analyses/{id}/param-defs` - Replace catalog (`config:edit`)
+
 #### Tests
 - `GET /tests` - List tests
 - `POST /tests` - Create test assignment
