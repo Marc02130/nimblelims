@@ -66,15 +66,20 @@ Client / no `sample:create` → no Receive nav or **403**.
 
 ## 3. Route / work order
 
-**UI:** `/asked-for` **Route** (not Start). Admin **Routing map** (`/admin/routing-map`). Experiments → **Work Orders** (`/work-orders`).
+**This is a later work-planning action, not the next click after Receive or after saving asked-for.** Receive still ends on `/receive`. Recording requested analysis still ends on `/asked-for` without minting work.
 
-1. Record asked-for first (status `requested`).
-2. Tech hits **Route**. No auto-route on asked-for save.
-3. Match is `analysis` × current sample type × TAT against `routing_map`. Empty map → **200**, `no_route`, stays `requested`.
-4. Every process-definition step in the chain must accept that sample type. Empty or wrong set → **422** `route_sample_type` on map save and on Route. Qubit is a LimsRun step; it does not accept blood. Dest-type Hold is unchanged.
-5. Match mints a `work_order` (`queued`) and sets asked-for `routed`. Still **zero Tests**.
-6. **Start process** on `/work-orders` instantiates the first snapshot definition (`eln_processes.work_order_id`).
-7. Test row at **LimsRun start** (WO-7), not at receive, not on asked-for, not on work_order save.
+**Setup:** an administrator configures **Routing map** at `/admin/routing-map`. Each map row selects an analysis, current sample type, TAT range, and one or more process definitions. Every step in the mapped definition chain must accept that sample type; an empty or incompatible accepted-type set is refused with **422** `route_sample_type`.
+
+**Route when work planning happens:**
+
+1. Open the previously saved `requested` row on `/asked-for`.
+2. Choose its row **Route** action, or select requested rows and choose **Route selected**. This is Route, not Start.
+3. P2 matches analysis × current sample type × TAT against the routing map. No match returns **200** `no_route`; the row stays `requested`, and nothing is minted.
+4. A match creates one queued `work_order`, changes asked-for to `routed`, and still creates **zero Tests**.
+5. Open Experiments → **Work Orders** (`/work-orders`) and choose **Start process**. P2 instantiates the first snapshot process definition, links it through `eln_processes.work_order_id`, and opens that process at `/experiments/processes/{id}`.
+6. Continue through that existing process’s typed Experiment and LimsRun steps. A Test is created or attached and `asked_for_params` freeze only when the LimsRun starts (WO-7), never at receive, asked-for save, Route, or work-order start.
+
+Qubit-on-blood is refused by the process-step type gate; it is not made valid by saving it in the asked-for lake. Dest-type Hold is unchanged.
 
 ---
 
@@ -111,9 +116,9 @@ UAT (classic): [`UAT_Scripts/uat-results-entry-review.md`](../UAT_Scripts/uat-re
 
 *Deliberately outside the numbered path. It is a look-up, not a step in the bench motion.*
 
-**Not the next step after receive.** Asked-for is a **separate motion**, done whenever someone needs to see or record what was asked for — reading a client request, a study plan, a paper form. Nobody is waiting on the bench for it, and it is **not** a Start queue: a `requested` row has no Start / Execute / Route CTA and no work behind it.
+**Not the next step after receive.** Asked-for is a **separate motion**, done whenever someone needs to see or record what was asked for — reading a client request, a study plan, a paper form. Nobody is waiting on the bench for it, and it is **not** a Start queue. Saving a `requested` row creates no work. P2 exposes Route on that row for a distinct, later work-planning action.
 
-**Copy lock:** say **requested analysis**. Do **not** say asked-for assigns a Test, orders work, or starts work.
+**Copy lock:** say **requested analysis**. Do **not** say asked-for save assigns a Test, mints a work order, or starts work. Only the later explicit Route action can mint a work order.
 
 **UI:** Sample Mgmt → **Asked-for** (`/asked-for`). Also a section on sample detail, which is where a tech normally meets it.  
 **API:** `POST /v1/asked-for` · `GET /v1/asked-for` · `POST /v1/asked-for/{id}/cancel`.  
