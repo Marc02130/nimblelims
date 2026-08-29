@@ -257,7 +257,7 @@ NimbleLIMS uses a unified sidebar navigation system:
 - **Top AppBar**: Dynamic page titles, back button for nested routes, user info, logout
 - **Responsive**: Permanent drawer on desktop, temporary drawer on mobile
 
-See [manuals/HOWTO.md](../manuals/HOWTO.md) for the lab path. Local `.docs/manuals/navigation.md` (not on git) has the full sidebar map.
+See [manuals/HOWTO.md](../manuals/HOWTO.md) for the lab path. [manuals/navigation.md](../manuals/navigation.md) has the full sidebar map.
 
 ## User Workflows
 

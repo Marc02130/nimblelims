@@ -9,13 +9,13 @@ This is a how-to, not a PRD. Marc keeps it current as features ship.
 | Step | Status |
 |------|--------|
 | Receive (`/receive`) | Shipped on `main` |
-| Requested analysis (`/asked-for`) | P1 lake on `feat/asked-for-p1` (PR 81) until that merges |
+| Requested analysis (`/asked-for`) | Shipped on `main` (P1 lake) |
 | Route / work order | **Not this slice** |
 | Process / Experiment / LimsRun | Execute substrate shipped; P1 does **not** start it |
 | Results | Classic type-a-number on a Test; persist lock is a later packet |
 
-Local legacy handbooks (not on git): `.docs/manuals/` — `dev-setup.md`, `admin-setup.md`, `atomic-receive.md`, `processes.md`, `experiments.md`, `lims-runs.md`, `api-endpoints.md`, `navigation.md`.  
-UAT: [`UAT_Scripts/uat-atomic-receive.md`](../UAT_Scripts/uat-atomic-receive.md) · P1 [`UAT_Scripts/uat-post-receive-work-spine.md`](../UAT_Scripts/uat-post-receive-work-spine.md) (on the asked-for branch).  
+Handbooks in this folder: [atomic-receive.md](atomic-receive.md), [asked-for.md](asked-for.md), [navigation.md](navigation.md), [api-endpoints.md](api-endpoints.md), [dev-setup.md](dev-setup.md), [admin-setup.md](admin-setup.md), [processes.md](processes.md), [experiments.md](experiments.md), [lims-runs.md](lims-runs.md). Index: [README.md](README.md).  
+UAT: [`UAT_Scripts/uat-atomic-receive.md`](../UAT_Scripts/uat-atomic-receive.md) · P1 [`UAT_Scripts/uat-post-receive-work-spine.md`](../UAT_Scripts/uat-post-receive-work-spine.md).  
 Stamps: [`.docs/decision-logs/framework-stamps-2026-08-26.md`](../.docs/decision-logs/framework-stamps-2026-08-26.md) (WO-7: Test at LimsRun start, not at receive).
 
 ---
@@ -24,8 +24,8 @@ Stamps: [`.docs/decision-logs/framework-stamps-2026-08-26.md`](../.docs/decision
 
 Bring the stack up and log in. Do not duplicate setup here.
 
-- Dev / compose: local `.docs/manuals/dev-setup.md` and root [`README.md`](../README.md) Quick Start.
-- Admin password: local `.docs/manuals/admin-setup.md`.
+- Dev / compose: [dev-setup.md](dev-setup.md) and root [`README.md`](../README.md) Quick Start.
+- Admin password: [admin-setup.md](admin-setup.md).
 - Frontend: http://localhost:3000 · API: http://localhost:8000 · docs: http://localhost:8000/docs.
 - Lab path accounts: `admin` / `admin123` · `lab-tech` / `labtech123` · `alice-tech` / `alice123`. Change the default admin password.
 
@@ -105,7 +105,7 @@ The execute substrate is already in the app. Requested analysis does **not** ope
 | **Experiments** → Processes (`/experiments/processes`) | ELN process **definitions** and **instances**. Assign samples (Samples list → **Assign to process**, or on the process). Start a step (Experiment or lazy LimsRun). |
 | **Experiments** → Runs (`/runs`) | LIMS Runs: create/start/import/review/publish. Every run has an **analysis**. |
 
-Deeper local handbooks: `.docs/manuals/processes.md`, `experiments.md`, `lims-runs.md`.
+Deeper handbooks: [processes.md](processes.md), [experiments.md](experiments.md), [lims-runs.md](lims-runs.md).
 
 P1 does not instantiate a process from requested analysis. Classic `/tests` can still mint a Test for typing a number; that is **not** the request path.
 
