@@ -246,9 +246,9 @@ Do **not** read this as P2–P5 Pass. Do **not** collapse this stamp with Atomic
 
 ## Live AC-P2 stamp — `9c4f9da` (unsigned)
 
-**Branch / build to test:** `feat/work-order-p2` at `9c4f9da` (`9c4f9da61965c7bfd01692622102dc18e332dd39`)  
-**QA signature:** _Unsigned. QA must execute and sign this exact SHA._  
-**Merge gate:** Hold merge of the product branch until QA signs this SHA.  
+**Branch / build to test:** `feat/work-order-p2` at `9c4f9da` (`9c4f9da61965c7bfd01692622102dc18e332dd39`)
+**QA signature:** _Unsigned. QA must execute and sign this exact SHA._
+**Merge gate:** Hold merge of the product branch until QA signs this SHA.
 **History boundary:** Do not copy outcomes or observations from `3b56cfb` into this live stamp. In particular, the prior alice visibility, `sample_type` versus `sample_types`, and unclickable-publish observations describe only that earlier SHA.
 
 **Product context to verify, not re-implement:** process definitions are visible to lab technicians as lab catalog; Routing map uses `sample_types`; Lists accepts the singular alias; Administrator and Lab Manager have seeded `experiment:publish`.
