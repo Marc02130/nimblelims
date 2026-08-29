@@ -464,25 +464,23 @@ Empty `{}` is a freeze, not a hole to refill on a later start. AC-P2-4 records t
 
 **Verified holds on `b005cfe`:** click-save returned **422** `route_sample_type` with “Sample type is not accepted on every step in the chain”; overlapping TAT was refused.
 
-**Live ordered-route expect (not scored on this SHA; not this Result)**
+**Live Hans/Heidi type/map expect (not scored on this SHA; not this Result)**
 
-1. Confirm map create has analysis, TAT, and sortable ordered `process_definition[]`, with no sample-type picker.
-2. Confirm the form displays the first process and its first ordered Experiment/LimsRun allow-list. Change process order or first-step acceptance and verify derived display refreshes.
-3. Save an extract-first route with a later Qubit process/step; confirm map save does not chain-AND later processes or steps.
-4. Route with zero acceptable rows (no analysis + TAT candidate or no candidate whose first process/step accepts current type).
-5. Using a fixture/concurrent state with two candidate map rows that both accept current type, Route again.
-6. Route with exactly one acceptable row and inspect the work-order snapshot order.
-7. Choose Start; inspect created process instances. Complete the first process, then invoke the later start.
-8. Attempt a later process/step start with an empty or incompatible allow-list.
+1. Confirm map create has analysis, intake sample type, TAT, and one process definition.
+2. Confirm the form displays that definition’s first ordered Experiment/LimsRun allowed types as information.
+3. Save a blood-intake map whose one process is extract-first and Qubit-later. Confirm map save succeeds and does not return `route_sample_type` for the later mismatch.
+4. Leave Qubit-on-blood in the asked-for lake, map it to a Qubit-first definition, and choose Route.
+5. Route an intake-compatible extract-first definition and inspect the one-definition work-order snapshot.
+6. Choose Start and advance to a later Qubit step while the sample’s current type remains blood.
+7. Attempt a step start whose accepted set is empty.
 
 **Expect**
-- Map row = analysis + TAT + ordered `process_definition[]`. UI preserves order. Allowed types are derived from the first process / first step, not admin-authored.
-- Zero acceptable rows returns **422** and mints no work order. A first-step type refusal uses `route_sample_type`.
-- Two or more acceptable rows return **409**; no silent `first()`.
-- Exactly one row snapshots the full ordered route.
-- Start instantiates the first process only. Later processes require later starts in route order; Route does not mint a process-of-processes.
-- Map save/Route do not AND later-process or later-step allow-lists.
-- Each later process/step start checks current type; empty or incompatible fails with **422** then.
+- Map row = analysis × intake sample type × TAT → one process definition. Intake type is matching data, not a chain-wide save gate.
+- The UI shows first-step allowed types as information. Typed steps remain ordered.
+- Qubit-first on blood returns **422** `route_sample_type` at Route and mints no work order.
+- Extract-first with later Qubit is legal at map save and Route when the first step accepts blood.
+- Start instantiates the one snapshotted definition. A later Qubit checks the sample’s current type at that step start.
+- Empty or incompatible accepted types fail closed with **422** at that step’s start. The sample is not broken.
 - Dest-type Hold remains out; do not claim an earlier step changed type unless the product did so.
 
 ---
