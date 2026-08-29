@@ -30,7 +30,7 @@
 8. **P2 one process:** `routing_map` / `work_order` hold **one** process definition (typed Exp/LimsRun steps). Bounce process-of-processes, `uuid[]` chain, completing N starts N+1, `start` of `[0]` only.
 9. **WO-7 publish:** refuse the **whole** publish (**422**) if a Test is missing — not swallow into `plan.errors` and mark published.
 10. **Freeze:** first LimsRun start wins. Do not overwrite `asked_for_params` on an existing Test.
-11. **P2-4:** if a tech can instantiate the mapped process, she can **read** that definition and its steps (existing process AuthZ). Mutate stays. Route is not admin-only. “No steps” from hidden RLS is not `route_sample_type`.
+11. **P2-4 / Heidi belt:** Route is `test:assign` and must **read** the mapped def/steps (catalog-visible, same client / logged-in, like `routing_map`). Do not put `experiment:manage` on Route. Do not keep `created_by` on read. Mutate and instantiate stay. “No steps” from hidden RLS is not `route_sample_type`.
 12. **P2-2/3:** routing map and receive share the `sample_types` list. Empty select from `sample_type` vs `sample_types` is a list-key bug.
 
 ---
@@ -103,7 +103,7 @@ P1 is the **lake**. P2–P5 are specified here so reviews see the path. Coding a
 | **RQ-WO-4** | Overlapping TAT ranges for the same `(analysis_id, sample_type_id)` **refuse** on save (**409**). No silent “first match.” |
 | **RQ-WO-5** | **L2 / OQ-WO-4:** Type gate is on **process-definition steps** for **both** `eln_experiment` and `lims_run` (`eln_process_definition_step_accepted_sample_types`). **Not** on the analysis. **Qubit is a LimsRun step.** Current sample type must be in **every** step’s accepted set. Empty set = fail closed. Named **422 `route_sample_type`** on **map save and on Route**. Do **not** read `sample_type_transitions`. Until dest-type execute writes DNA, Extract→Qubit on blood **refuses** (Qubit step does not accept blood). No OOB blood→Qubit routes. |
 | **RQ-WO-6** | **OQ-WO-1:** Tech hits **Route**. Asked-for create/save does **not** mint a work_order. `POST /asked-for/{id}/route` (UI may Route a selected set in one action). If a map row matches, mint **one** `work_order` per asked-for with **one** process-definition snapshot; asked-for → `routed`. No match → stay `requested`, `no_route`. Empty map mints nothing. **P1 never writes `routed`.** |
-| **RQ-WO-7** | Instantiating **that** process definition uses **existing process AuthZ** (`experiment:manage`). No client expand. Bounce completing N starts N+1, `start` of `[0]` on a `uuid[]`, process-of-processes. **P2-4:** Route / type-gate / start **read** the mapped definition and its steps under that same AuthZ — including admin-created or null `created_by`. Mutate stays. Route is not admin-only. Invisible def → “no steps” is not `route_sample_type`. |
+| **RQ-WO-7** | Instantiating **that** process definition uses **existing process AuthZ** (`experiment:manage`). No client expand. Bounce completing N starts N+1, `start` of `[0]` on a `uuid[]`, process-of-processes. **P2-4:** Route is `test:assign` and must **read** the mapped def/steps to run the type gate. SOP def/step **read** is catalog-visible (same client / logged-in, like `routing_map`). Do not require `experiment:manage` on Route. Do not filter read by `created_by`. Mutate stays. Invisible def → “no steps” is not `route_sample_type`. |
 | **RQ-WO-11** | **L3 / SC5 / A5:** Asked-for `params` are **order capture**. At **LimsRun start**, insert Test if missing; copy `asked_for.params` → `tests.asked_for_params` (jsonb) and **freeze**. **First start wins** — do not overwrite `asked_for_params` on an existing Test. Tech does not re-type cell line / method params to run the assay. Empty defs → `{}`. Not receive, not publish, not result columns. P1 does not write the Test snapshot. |
 | **RQ-WO-8** | Work_order does **not** create Tests. Tests are created at **LimsRun start** (WO-7). Publish **422s the whole run** if any Test is missing. Bounce swallow-into-`plan.errors` and mark published. No ensure-on-publish find-or-create. |
 | **RQ-WO-9** | Non-instrument analysis: LimsRun with `analysis_id` required; manual results OK; parser requires instrument XOR CRO (WO-4). |
@@ -113,7 +113,7 @@ P1 is the **lake**. P2–P5 are specified here so reviews see the path. Coding a
 
 | ID | Requirement |
 |----|-------------|
-| **RQ-RES-1** | Typed token lands in `results.reported_result`. `raw_result` **may** copy. **`qualifiers` is the existing UUID FK** to Result Qualifiers (`<LOD`, `ND`); **NULL** for a clean number. Do **not** write JSON into `qualifiers` (SC1). |
+| **RQ-RES-1** | Typed token lands in `results.reported_result`. `raw_result` **may** copy. **`qualifiers` is the existing UUID FK** to Result Qualifiers, (`<LOD`, `ND`); **NULL** for a clean number. Do **not** write JSON into `qualifiers` (SC1). |
 | **RQ-RES-2** | Unit comes from `analytes.units_default`. If missing → **422**. Do **not** add `results.unit_id`. No unit picker. |
 | **RQ-RES-3** | Two writers on the same Test (classic entry vs LimsRun publish) → **409**. |
 | **RQ-RES-4** | P3 does not mint Tests at asked-for or receive. |
@@ -180,7 +180,7 @@ North star authors parsers at SOP via MCP. Until that ships, P5 is **review / dr
 17. Process-of-processes / `uuid[]` chain / completing N starts N+1 / `start` of `[0]` only
 18. Overwrite `asked_for_params` on an existing Test
 19. Publish skip-and-complete when a Test is missing (swallow `ensure_test` 422)
-20. Admin-only Route / RLS that hides a mapped def from a tech who can run it
+20. Admin-only Route / `experiment:manage` on Route / RLS that hides catalog-visible SOP def/steps (`created_by`)
 21. “No steps” / invisible def presented as `route_sample_type`
 22. Routing map `sample_type` vs receive `sample_types` (empty select / list-key)
 
@@ -195,7 +195,7 @@ North star authors parsers at SOP via MCP. Until that ships, P5 is **review / dr
 | AC-P2-1 | Matching route mints work_order with **one** process definition; asked-for = routed |
 | AC-P2-2 | No map row → no work_order; UI says configure routing |
 | AC-P2-3 | Qubit route on blood sample → refuse |
-| AC-P2-4 | alice Routes a mapped def created by admin and can read its steps; not admin-only Route |
+| AC-P2-4 | alice (`test:assign`) Routes a mapped def created by admin and can read its steps; not admin-only; not `experiment:manage` on Route |
 | AC-P2-5 | Publish with a missing Test → 422 the whole run, not published |
 | AC-P2-6 | Routing type select uses `sample_types` (same list as receive); not empty from `sample_type` |
 | AC-P3-1 | Type `12.3` with units_default set → `reported_result` set; `qualifiers` NULL unless a list qualifier is chosen |
