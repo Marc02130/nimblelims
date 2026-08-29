@@ -22,8 +22,8 @@ P1 is the **asked-for lake**. An analyst records **requested analysis + TAT** ag
 | Lake ≠ work | Asked-for create leaves `COUNT(tests)` and `COUNT(work_orders)` unchanged. Save is not scientific assignment or routing: no Test, no work order, no analytes, no legal number entry. |
 | Not a queue | Asked-for is a look-up, not the after-receive click and not a Start queue. Do not document receive → asked-for as one motion. |
 | Wrong pairings | The lake accepts them on purpose (e.g. Qubit on blood). Refusal is **routing** (`route_sample_type` **422**) on map save and Route. |
-| Route | Explicit Route. Empty map → 200 `no_route`. Match mints queued `work_orders` and sets `routed`. The mint is planning, not work started. Still zero Tests. |
-| Params | Freeze onto `tests.asked_for_params` at **LimsRun start** (WO-7). Do **not** collect params on receive. |
+| Route | Explicit Route requires `test:assign` plus project access, not `experiment:manage`. Client writes and hidden/other-project samples return **403**, not 404. Empty map → 200 `no_route`. Match mints queued `work_orders` and sets `routed`. The mint is planning, not work started. Still zero Tests. |
+| Params | Freeze onto `tests.asked_for_params` at the **first LimsRun start** (WO-7). Later starts do not re-freeze. Do **not** collect params on receive. |
 
 ---
 
@@ -31,10 +31,12 @@ P1 is the **asked-for lake**. An analyst records **requested analysis + TAT** ag
 
 | Role | Access |
 |------|--------|
-| Lab tech / manager with `test:assign` and project access | Create and cancel while `status=requested` |
+| Lab tech / manager with `test:assign` and project access | Create and cancel while `status=requested`; Route a requested row |
 | `sample:read` | List / get rows for samples they can see |
-| Client | Cannot write (**403**). No create CTA. |
+| Client | Cannot create, cancel, or Route (**403**, not 404). No create/Route CTA. |
 | Hidden / other-project sample | **403**, not 404 |
+
+Route itself does **not** require `experiment:manage`. **Start process** and LimsRun start do; publish requires `experiment:publish`.
 
 ---
 
@@ -62,7 +64,7 @@ Do not chain this section onto Receive or onto the save steps above. Return to `
 3. No match returns `no_route`; the row stays `requested`, with no `work_order` or Test.
 4. A match creates a queued `work_order`, changes the row to `routed`, and still creates no Test. This queue mint does not mean work has started.
 5. Experiments → **Work Orders** (`/work-orders`) is the work backlog. **Start process** instantiates and opens the existing ELN process; it is not a second execution engine.
-6. A later LimsRun start creates or attaches the Test and freezes `asked_for_params` (WO-7). The lock is that a missing required Test returns **422** and refuses the whole run without creating that Test or publishing partial Results. That refuse is **not** verified as shipped on `9c4f9da`.
+6. The **first** LimsRun start creates or attaches the Test and freezes the then-current `asked_for_params` (WO-7); later starts do not re-freeze. If any cohort sample lacks an active Test at publish, **422** refuses the whole run, writes no Results, invents no Test, and leaves the run `complete`. The guard is implemented on `b005cfe`, but its live AC-P2 stamp is unsigned; the historical `9c4f9da` stamp remains signed not Pass.
 
 The routing type gate fails closed: every mapped process-definition step must accept the current sample type. An empty accepted-type set or incompatible step returns **422** `route_sample_type`. That code means the requested analysis and current sample type are the wrong pairing for a mapped step; it does not mean the sample is broken. Saving an otherwise valid Qubit-on-blood request in the lake does not bypass that gate.
 

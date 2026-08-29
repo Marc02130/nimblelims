@@ -15,7 +15,7 @@ This is a how-to, not a PRD. Marc keeps it current as features ship.
 | Receive (`/receive`) | Shipped on `main` |
 | Route / work order | Shipped on this P2 branch (`/asked-for` Route, `/admin/routing-map`, `/work-orders`) |
 | Process / Experiment / LimsRun | Execute substrate shipped; P1 does **not** start it |
-| Results | Classic type-a-number on a Test; persist lock is a later packet. WO-7 whole-run publish-refuse is the lock, **not** verified on `9c4f9da` |
+| Results | Classic type-a-number on a Test; persist lock is a later packet. WO-7 whole-run publish-refuse is implemented on `b005cfe`, but the live AC-P2 stamp is **unsigned** and makes no outcome claim |
 | Requested analysis (`/asked-for`) — later look-up, off the bench path | Shipped on `main` (P1 lake) |
 
 Handbooks in this folder: [atomic-receive.md](atomic-receive.md), [asked-for.md](asked-for.md), [navigation.md](navigation.md), [api-endpoints.md](api-endpoints.md), [dev-setup.md](dev-setup.md), [admin-setup.md](admin-setup.md), [processes.md](processes.md), [experiments.md](experiments.md), [lims-runs.md](lims-runs.md). Index: [README.md](README.md).  
@@ -33,7 +33,7 @@ Bring the stack up and log in. Do not duplicate setup here.
 - Frontend: http://localhost:3000 · API: http://localhost:8000 · docs: http://localhost:8000/docs.
 - Lab path accounts: `admin` / `admin123` · `lab-tech` / `labtech123` · `alice-tech` / `alice123`. Change the default admin password.
 
-Need `sample:create` for Receive. Need `test:assign` plus project access for requested analysis. Client role cannot receive and cannot write asked-for.
+Need `sample:create` for Receive. Need `test:assign` plus project access for requested analysis and the later Route action. Client role cannot receive, write asked-for, or Route; those writes return **403**, not 404. Route does **not** require `experiment:manage`.
 
 ---
 
@@ -77,7 +77,7 @@ Client / no `sample:create` → no Receive nav or **403**.
 3. P2 matches analysis × current sample type × TAT against the routing map. No match returns **200** `no_route`; the row stays `requested`, and nothing is minted.
 4. A match creates one queued `work_order`, changes asked-for to `routed`, and still creates **zero Tests**. Minting that queue record is planning; **work has not started**.
 5. Open Experiments → **Work Orders** (`/work-orders`) and choose **Start process**. P2 instantiates the first snapshot process definition, links it through `eln_processes.work_order_id`, and opens that process at `/experiments/processes/{id}`.
-6. Continue through that existing process’s typed Experiment and LimsRun steps. A Test is created or attached and `asked_for_params` freeze only when the LimsRun starts (WO-7), never at receive, asked-for save, Route, or work-order start.
+6. Continue through that existing process’s typed Experiment and LimsRun steps. On the **first** LimsRun start, a Test is created or attached and the then-current `asked_for_params` freeze (WO-7). Later starts do not re-freeze them. Nothing freezes at receive, asked-for save, Route, or work-order start.
 
 Qubit-on-blood is refused by the process-step type gate; it is not made valid by saving it in the asked-for lake. A **422** `route_sample_type` means the requested analysis and the sample’s current type are the wrong pairing for a mapped step; it does **not** mean the sample is broken. Dest-type Hold is unchanged.
 
@@ -104,9 +104,9 @@ P1 does not instantiate a process from requested analysis. Classic `/tests` can 
 
 Classic path: **Results** (`/results`) — type a number on an existing Test (batch grid). Unit from `analytes.units_default` when that lock is enforced; missing unit is a later persist-packet **422**, not a receive rule.
 
-Params freeze at **LimsRun start** when the work-order packet exists — **not** on receive.
+Test selection/creation and params freeze on the **first LimsRun start** when the work-order packet exists — **not** on receive or on later starts.
 
-LimsRun **publish** can promote instrument rows onto Tests/Results. Two writers on the same Test → **409**. WO-7 lock: if any required Test is missing, publish must return **422** and refuse the **whole run**, with no partial Results. That refuse is **not** verified as shipped on `9c4f9da` (QA: **200 published** with 0 Tests). Do not treat it as Pass.
+LimsRun **publish** can promote instrument rows onto Tests/Results. Two writers on the same Test → **409**. WO-7 lock: if any cohort sample lacks an active Test, publish returns **422** and refuses the **whole run**, writes no Results, invents no Test, and leaves the run `complete`. This guard is implemented on `b005cfe`; its live AC-P2 stamp remains **unsigned** until QA. The historical `9c4f9da` run returned **200 published** with 0 Tests and stays signed not Pass.
 
 UAT (classic): [`UAT_Scripts/uat-results-entry-review.md`](../UAT_Scripts/uat-results-entry-review.md). Persist lock (P3) is specified on the spine packet, not shipped as that slice.
 
