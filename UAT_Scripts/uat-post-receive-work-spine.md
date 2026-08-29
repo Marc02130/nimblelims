@@ -112,9 +112,40 @@ P1 records **requested analysis + TAT**. It does **not** assign a Test, mint a T
 
 ---
 
-## Out of scope this stamp
+## Out of scope this stamp (P1)
 
-Route, work_orders, LimsRun Test mint (WO-7), param defs on receive, results persist, SOP Apply rewrite, parser dry-run UX, Qubit/blood path.
+Route, work_orders, LimsRun Test mint (WO-7), param defs on receive, results persist, SOP Apply rewrite, parser dry-run UX, Qubit/blood path. P1 remains **Pass**. P2 cases below are a **new** stamp; do not rewrite P1 results.
+
+---
+
+## P2 — Route / work_orders / WO-7 (not signed)
+
+**UI:** `/asked-for` Route · `/admin/routing-map` · `/work-orders` · process definition accepted sample types  
+**API:** `POST /v1/asked-for/{id}/route` · `/v1/routing-map` · `/v1/work-orders/{id}/start`  
+**Do not** seed blood→Qubit. Dest-type Hold unchanged. Receive freeze unchanged.
+
+### AC-P2-1 — Empty map stays requested
+1. Asked-for `requested`. No routing-map row for that analysis × type × TAT.
+2. Route.
+3. **Expect:** 200 `no_route`. Status still `requested`. Zero work_orders. Zero Tests.
+
+### AC-P2-2 — Type gate 422
+1. LimsRun (or experiment) step with empty accepted types, or types that do not include the sample’s current type.
+2. Save routing map **or** Route.
+3. **Expect:** **422** `route_sample_type`. Blood → Extract → Qubit still refuses if the Qubit step does not accept blood.
+
+### AC-P2-3 — TAT overlap 409
+1. Two active map rows, same analysis + sample type, overlapping TAT ranges.
+2. **Expect:** second save **409**.
+
+### AC-P2-4 — Route mints work_order
+1. Map row matches. Every step accepts the sample type.
+2. Route.
+3. **Expect:** asked-for `routed`, `work_orders` queued, still zero Tests. Cancel asked-for → **422**.
+
+### AC-P2-5 — WO-7 Test at LimsRun start
+1. Start a LimsRun with the routed sample in the cohort.
+2. **Expect:** Test minted; `asked_for_params` frozen. Publish without that Test → **422**. Not minted on Route.
 
 ---
 

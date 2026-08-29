@@ -15,6 +15,7 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  Autocomplete,
   FormControl,
   FormControlLabel,
   Checkbox,
@@ -39,7 +40,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import { useNavigate, useParams } from 'react-router-dom';
-import { apiService } from '../services/apiService';
+import { apiService, ApiService } from '../services/apiService';
 import { FillHeightPage, FillHeightTable } from '../components/common/FillHeightPage';
 import StartExperimentDialog from '../components/experiments/StartExperimentDialog';
 
@@ -47,6 +48,9 @@ const apiErrorMsg = (err: any, fallback: string): string => {
   const detail = err?.response?.data?.detail;
   if (typeof detail === 'string') return detail;
   if (Array.isArray(detail) && detail.length > 0) return detail[0]?.msg || fallback;
+  if (detail && typeof detail === 'object' && typeof detail.message === 'string') {
+    return detail.message;
+  }
   return fallback;
 };
 
@@ -107,7 +111,8 @@ interface DefinitionStep {
   process_definition_id: string;
   step_kind: StepKind;
   execution_mode: StepKind;
-  experiment_template_id: string;
+  experiment_template_id?: string;
+  analysis_id?: string;
   name?: string;
   sort_order: number;
 }
@@ -122,8 +127,10 @@ interface DefinitionDetail {
 
 interface DraftStep {
   experiment_template_id: string;
+  analysis_id: string;
   step_kind: StepKind;
   name: string;
+  sample_type_ids: string[];
 }
 
 const kindLabel = (k?: string) =>
@@ -132,14 +139,13 @@ const kindLabel = (k?: string) =>
 const kindColor = (k?: string): 'primary' | 'secondary' | 'default' =>
   k === 'lims_run' ? 'secondary' : 'primary';
 
-/** Both step kinds bind experiment_template_id; label clarifies what gets materialized. */
-const templateFieldLabel = (k?: StepKind) =>
-  k === 'lims_run' ? 'Run template' : 'Experiment template';
-
-const templateFieldHelper = (k?: StepKind) =>
-  k === 'lims_run'
-    ? 'From Experiment Templates (plate layout, lifecycle, worklist). Starting this step creates a LIMS run.'
-    : 'From Experiment Templates. Starting this step creates an ELN experiment.';
+const emptyDraftStep = (): DraftStep => ({
+  experiment_template_id: '',
+  analysis_id: '',
+  step_kind: 'eln_experiment',
+  name: '',
+  sample_type_ids: [],
+});
 
 const ProcessesManagement: React.FC = () => {
   const navigate = useNavigate();
@@ -156,6 +162,8 @@ const ProcessesManagement: React.FC = () => {
   const [info, setInfo] = useState<string | null>(null);
   const [tab, setTab] = useState(0);
   const [templates, setTemplates] = useState<{ id: string; name: string }[]>([]);
+  const [analyses, setAnalyses] = useState<{ id: string; name: string }[]>([]);
+  const [sampleTypes, setSampleTypes] = useState<{ id: string; name: string }[]>([]);
 
   // Create instance (from definition or free-form)
   const [showCreate, setShowCreate] = useState(false);
@@ -169,9 +177,7 @@ const ProcessesManagement: React.FC = () => {
   const [showCreateDef, setShowCreateDef] = useState(false);
   const [defName, setDefName] = useState('');
   const [defDesc, setDefDesc] = useState('');
-  const [defSteps, setDefSteps] = useState<DraftStep[]>([
-    { experiment_template_id: '', step_kind: 'eln_experiment', name: '' },
-  ]);
+  const [defSteps, setDefSteps] = useState<DraftStep[]>([emptyDraftStep()]);
 
   // Add step to instance
   const [showAddStep, setShowAddStep] = useState(false);
@@ -234,6 +240,14 @@ const ProcessesManagement: React.FC = () => {
       .getExperimentTemplates({ page: 1, size: 500, active: true })
       .then((res: any) => setTemplates(res?.templates ?? []))
       .catch(() => {});
+    apiService
+      .getAnalyses({ size: 200, active: true })
+      .then((res: any) => setAnalyses(ApiService.unwrapAnalysesList(res)))
+      .catch(() => {});
+    apiService
+      .getListEntries('sample_type')
+      .then((res: any) => setSampleTypes(Array.isArray(res) ? res : []))
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -287,24 +301,37 @@ const ProcessesManagement: React.FC = () => {
     if (!defName.trim()) return;
     setCreating(true);
     try {
-      const steps = defSteps
-        .filter((s) => s.experiment_template_id)
-        .map((s, i) => ({
-          experiment_template_id: s.experiment_template_id,
-          step_kind: s.step_kind,
-          execution_mode: s.step_kind,
-          sort_order: i,
-          name: s.name || templates.find((t) => t.id === s.experiment_template_id)?.name,
-        }));
-      await apiService.createElnProcessDefinition({
+      const draft = defSteps.filter((s) =>
+        s.step_kind === 'lims_run' ? Boolean(s.analysis_id) : Boolean(s.experiment_template_id)
+      );
+      const steps = draft.map((s, i) => ({
+        experiment_template_id: s.experiment_template_id || undefined,
+        analysis_id: s.analysis_id || undefined,
+        step_kind: s.step_kind,
+        execution_mode: s.step_kind,
+        sort_order: i,
+        name:
+          s.name ||
+          (s.step_kind === 'lims_run'
+            ? analyses.find((a) => a.id === s.analysis_id)?.name
+            : templates.find((t) => t.id === s.experiment_template_id)?.name),
+      }));
+      const created: any = await apiService.createElnProcessDefinition({
         name: defName.trim(),
         description: defDesc || undefined,
         steps: steps.length ? steps : undefined,
       });
+      const createdSteps = created?.steps || [];
+      for (let i = 0; i < createdSteps.length; i += 1) {
+        const types = draft[i]?.sample_type_ids || [];
+        if (types.length) {
+          await apiService.putStepAcceptedSampleTypes(created.id, createdSteps[i].id, types);
+        }
+      }
       setShowCreateDef(false);
       setDefName('');
       setDefDesc('');
-      setDefSteps([{ experiment_template_id: '', step_kind: 'eln_experiment', name: '' }]);
+      setDefSteps([emptyDraftStep()]);
       setListTab(1);
       await loadList();
       setInfo('Process definition created');
@@ -524,8 +551,8 @@ const ProcessesManagement: React.FC = () => {
         Steps
       </Typography>
       <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1 }}>
-        Kind first, then pick an Experiment Template. LIMS Run and ELN Experiment both use that
-        catalog — the kind only changes what is created when the step is started.
+        ELN Experiment steps pick an experiment template. LIMS Run steps pick an analysis
+        (Qubit-style runs need no fake template). Accepted sample types gate Route.
       </Typography>
       {steps.map((s, idx) => (
         <Box key={idx} display="flex" gap={1} alignItems="flex-start" mb={1.5} flexWrap="wrap">
@@ -544,33 +571,65 @@ const ProcessesManagement: React.FC = () => {
               <MenuItem value="lims_run">LIMS Run</MenuItem>
             </Select>
           </FormControl>
-          <FormControl size="small" sx={{ minWidth: 200, flex: 1 }}>
-            <InputLabel>{templateFieldLabel(s.step_kind)}</InputLabel>
-            <Select
-              label={templateFieldLabel(s.step_kind)}
-              value={s.experiment_template_id}
-              onChange={(e) => {
-                const next = [...steps];
-                next[idx] = { ...next[idx], experiment_template_id: e.target.value };
-                setSteps(next);
-              }}
-            >
-              {templates.length === 0 ? (
-                <MenuItem value="" disabled>
-                  No active experiment templates
-                </MenuItem>
-              ) : (
-                templates.map((t) => (
-                  <MenuItem key={t.id} value={t.id}>
-                    {t.name}
+          {s.step_kind === 'lims_run' ? (
+            <FormControl size="small" sx={{ minWidth: 200, flex: 1 }}>
+              <InputLabel>Analysis</InputLabel>
+              <Select
+                label="Analysis"
+                value={s.analysis_id}
+                onChange={(e) => {
+                  const next = [...steps];
+                  next[idx] = { ...next[idx], analysis_id: e.target.value };
+                  setSteps(next);
+                }}
+              >
+                {analyses.map((a) => (
+                  <MenuItem key={a.id} value={a.id}>
+                    {a.name}
                   </MenuItem>
-                ))
-              )}
-            </Select>
-            <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, ml: 0.5 }}>
-              {templateFieldHelper(s.step_kind)}
-            </Typography>
-          </FormControl>
+                ))}
+              </Select>
+            </FormControl>
+          ) : (
+            <FormControl size="small" sx={{ minWidth: 200, flex: 1 }}>
+              <InputLabel>Experiment template</InputLabel>
+              <Select
+                label="Experiment template"
+                value={s.experiment_template_id}
+                onChange={(e) => {
+                  const next = [...steps];
+                  next[idx] = { ...next[idx], experiment_template_id: e.target.value };
+                  setSteps(next);
+                }}
+              >
+                {templates.length === 0 ? (
+                  <MenuItem value="" disabled>
+                    No active experiment templates
+                  </MenuItem>
+                ) : (
+                  templates.map((t) => (
+                    <MenuItem key={t.id} value={t.id}>
+                      {t.name}
+                    </MenuItem>
+                  ))
+                )}
+              </Select>
+            </FormControl>
+          )}
+          <Autocomplete
+            multiple
+            size="small"
+            sx={{ minWidth: 220, flex: 1 }}
+            options={sampleTypes}
+            getOptionLabel={(o) => o.name}
+            value={sampleTypes.filter((t) => s.sample_type_ids.includes(t.id))}
+            onChange={(_e, value) => {
+              const next = [...steps];
+              next[idx] = { ...next[idx], sample_type_ids: value.map((v) => v.id) };
+              setSteps(next);
+            }}
+            renderInput={(params) => <TextField {...params} label="Accepted sample types" />}
+          />
           <TextField
             size="small"
             label="Label"
@@ -596,9 +655,7 @@ const ProcessesManagement: React.FC = () => {
       <Button
         size="small"
         startIcon={<AddIcon />}
-        onClick={() =>
-          setSteps([...steps, { experiment_template_id: '', step_kind: 'eln_experiment', name: '' }])
-        }
+        onClick={() => setSteps([...steps, emptyDraftStep()])}
       >
         Add step row
       </Button>
@@ -896,9 +953,13 @@ const ProcessesManagement: React.FC = () => {
               </Select>
             </FormControl>
             <FormControl fullWidth margin="normal">
-              <InputLabel>{templateFieldLabel(stepKind)}</InputLabel>
+              <InputLabel>
+                {stepKind === 'lims_run' ? 'Run template (optional)' : 'Experiment template'}
+              </InputLabel>
               <Select
-                label={templateFieldLabel(stepKind)}
+                label={
+                  stepKind === 'lims_run' ? 'Run template (optional)' : 'Experiment template'
+                }
                 value={stepTemplateId}
                 onChange={(e) => setStepTemplateId(e.target.value)}
               >
@@ -914,9 +975,6 @@ const ProcessesManagement: React.FC = () => {
                   ))
                 )}
               </Select>
-              <Typography variant="caption" color="text.secondary" sx={{ mt: 0.75, display: 'block' }}>
-                {templateFieldHelper(stepKind)}
-              </Typography>
             </FormControl>
             <TextField
               fullWidth
@@ -1012,9 +1070,7 @@ const ProcessesManagement: React.FC = () => {
                     startIcon={<AddIcon />}
                     onClick={() => {
                       if (!createSteps.length) {
-                        setCreateSteps([
-                          { experiment_template_id: '', step_kind: 'eln_experiment', name: '' },
-                        ]);
+                        setCreateSteps([emptyDraftStep()]);
                       }
                       setShowCreate(true);
                     }}
@@ -1114,7 +1170,7 @@ const ProcessesManagement: React.FC = () => {
               {draftStepEditor(
                 createSteps.length
                   ? createSteps
-                  : [{ experiment_template_id: '', step_kind: 'eln_experiment', name: '' }],
+                  : [emptyDraftStep()],
                 setCreateSteps,
               )}
             </>

@@ -155,8 +155,12 @@ class TestResultPromotion:
         assert r.status_code == 201, r.text
         run_id = r.json()["id"]
 
-        # Start (ack not needed — has analysis)
-        r = client.patch(f"/v1/lims-runs/{run_id}/start", json={}, headers=auth_headers)
+        # Start (ack not needed — has analysis). Cohort required; WO-7 mints Test here.
+        r = client.patch(
+            f"/v1/lims-runs/{run_id}/start",
+            json={"sample_ids": [sample_id]},
+            headers=auth_headers,
+        )
         assert r.status_code == 200, r.text
 
         # Import data
@@ -312,7 +316,11 @@ class TestResultPromotion:
             headers=auth_headers,
         )
         run_id = r.json()["id"]
-        assert client.patch(f"/v1/lims-runs/{run_id}/start", json={}, headers=auth_headers).status_code == 200
+        assert client.patch(
+            f"/v1/lims-runs/{run_id}/start",
+            json={"sample_ids": [sample_id]},
+            headers=auth_headers,
+        ).status_code == 200
         r = client.post(
             f"/v1/lims-runs/{run_id}/import",
             json={

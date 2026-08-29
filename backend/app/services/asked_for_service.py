@@ -62,6 +62,7 @@ class AskedForService:
             "tat_days": row.tat_days,
             "params": row.params or {},
             "status": row.status,
+            "routed_work_order_id": getattr(row, "routed_work_order_id", None),
             "created_at": row.created_at,
             "created_by": row.created_by,
             "modified_at": row.modified_at,
@@ -336,7 +337,7 @@ class AskedForService:
         if row.status == "routed":
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="Cancel after routed is not allowed in P1",
+                detail="Cannot cancel a routed asked-for",
             )
         row.status = "cancelled"
         row.modified_by = self.user.id

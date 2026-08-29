@@ -8,7 +8,8 @@ from models.entry import STEP_KINDS, EXECUTION_MODES
 
 
 class ELNProcessDefinitionStepCreate(BaseModel):
-    experiment_template_id: UUID
+    experiment_template_id: Optional[UUID] = None
+    analysis_id: Optional[UUID] = None
     step_kind: str = Field(default='eln_experiment', description='eln_experiment | lims_run')
     execution_mode: Optional[str] = Field(
         None,
@@ -37,7 +38,8 @@ class ELNProcessDefinitionStepRead(BaseModel):
     process_definition_id: UUID
     step_kind: str
     execution_mode: str
-    experiment_template_id: UUID
+    experiment_template_id: Optional[UUID] = None
+    analysis_id: Optional[UUID] = None
     name: Optional[str] = None
     sort_order: int
     created_at: datetime
@@ -108,3 +110,4 @@ class InstantiateProcessFromDefinitionRequest(BaseModel):
     status_id: Optional[UUID] = None
     sample_ids: Optional[List[UUID]] = None
     set_to_first_step: bool = True
+    work_order_id: Optional[UUID] = None
