@@ -209,8 +209,8 @@ UAT script `UAT_Scripts/uat-post-receive-work-spine.md` at implement (P1 cases f
 
 | ID | This stamp |
 |----|------------|
-| **OQ-WO-3** | **Decided:** `eln_processes.work_order_id` is SoT (A6). |
-| **OQ-WO-1** | Not blocking P1. Agree with Lab Ops: auto-route when a map row matches; else stay `requested`. Resolve before P2 UX. Explicit `POST .../route` remains for rows created while the map was empty. |
+| **OQ-WO-3** | **Decided, superseded:** each process instance links to WO + route position (A6). |
+| **OQ-WO-1** | **Decided:** explicit Route; zero acceptable 422, multiple 409, exactly one snapshot. |
 | **OQ-SOP-2** | Architecture default: yes, inactive parser draft; never bind to production runs. Security still Open — do not code the draft until Security stamps. |
 | **OQ-RES-1** | Already **Decided** (Sci CSO). Architecture agrees (A9). |
 | Watch | Open uniqueness is `(sample_id, analysis_id)` — two ELISA cell lines cannot coexist. Fine for P1 empty params. Revisit when required param defs ship. |

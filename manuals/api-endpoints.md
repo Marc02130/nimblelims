@@ -140,7 +140,7 @@ Create a new sample.
 
 UI: `/asked-for`. Copy: **requested analysis**. Write/cancel/Route: `test:assign`, role ≠ Client, and project access/RLS. Route does **not** require `experiment:manage`. Client and hidden/other-project writes return **403** (not 404). List/get: `sample:read`.
 
-`POST /v1/asked-for` **does not** create a Test or `work_order`, start work, or execute an analysis. Route is a separate, unnumbered later P2 planner. `POST /v1/asked-for/{id}/route` and batch `POST /v1/asked-for/route` mint a `work_order` only when a routing-map row matches. The WO-7 lock creates or attaches Tests and freezes `asked_for_params` at the **first LimsRun start**. That first-start freeze is **open** on `b005cfe`: a later start overwrites the snapshot (see `PATCH /v1/lims-runs/{id}/start`).
+`POST /v1/asked-for` creates no Test or work order. Route later evaluates analysis + TAT candidates and first-process type acceptance: zero → 422, multiple → 409, exactly one → ordered route snapshot. Never silently choose `first()`. WO-7 creates/attaches Tests at LimsRun start; first-start freeze remains OPEN on `b005cfe`.
 
 ### POST /v1/asked-for
 Record requested analyses for a sample set (one row per sample, one transaction).
