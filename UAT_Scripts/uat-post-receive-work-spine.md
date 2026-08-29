@@ -186,9 +186,11 @@ Route, work_orders, LimsRun Test mint (WO-7), param defs on receive, results per
 
 **Verified holds (API):** explicit Route minted a queued `work_order`; work-order start instantiated the existing ELN process (`eln_processes.work_order_id` / returned `process_id`). Routing-map UI on `/admin/routing-map` was blocked (`sample_type` vs `sample_types`); map/setup for this AC used API.
 
+**Lab Ops note:** Admin Route that queues a work order is the **mint bar** only. It is **not** a P2 Pass.
+
 ### AC-P2-4 — WO-7 Test and params freeze at LimsRun start
 
-**Result:** **Fail** (alice, 2026-08-29, `3b56cfb`, Tobias) — process definition / steps RLS blocked the alice path. Do not treat as Pass.
+**Result:** **Fail** (alice, 2026-08-29, `3b56cfb`, Tobias) — **visibility**: alice cannot see the process definition. Not a copy issue. Do not treat as Pass.
 
 1. For a routed asked-for row, set a valid asked-for param (for example a configured text param) before starting the run.
 2. Create or open the typed LimsRun from the linked process, select the routed sample cohort, and `PATCH /v1/lims-runs/{id}/start`.
@@ -201,11 +203,11 @@ Route, work_orders, LimsRun Test mint (WO-7), param defs on receive, results per
 - The saved Test snapshot matches the params present at start; neither asked-for save nor Route copied them into a Test earlier.
 - Publish with the required Test missing returns **422** and does not invent a Test or publish Results.
 
-**Verified holds:** alice could not complete the LimsRun start / freeze path because definition/steps RLS blocked her. Fail stands. Publish 422 is not claimed here.
+**Verified holds:** alice could not complete the LimsRun start / freeze path because she **cannot see the definition** (def/steps RLS). Fail is visibility, not copy. Publish 422 is not claimed here.
 
 ### AC-P2-5 — Type gate fails closed; empty map mints nothing
 
-**Result:** **Pass** for empty-map mint (API, 2026-08-29, `3b56cfb`, Tobias). Publish **422** for a missing Test is **unverified**. AC is therefore **not a full Pass** of the original four-step script.
+**Result:** **not Pass** (2026-08-29, `3b56cfb`, Tobias). Do **not** fold this AC as Pass. Publish was **unclickable**. Do not write “mint Pass / publish 422 unverified” as a Pass.
 
 1. For a `requested` row, ensure no map matches its analysis × current sample type × TAT; choose Route.
 2. Confirm **200** `no_route`, then configure a candidate process step with an empty accepted-type set and try to save the map.
@@ -217,7 +219,7 @@ Route, work_orders, LimsRun Test mint (WO-7), param defs on receive, results per
 - Empty or incompatible accepted-type sets fail map save and Route with **422** `detail.code = route_sample_type`.
 - Every step in every mapped process definition must accept the current sample type. A Qubit step that does not accept blood therefore cannot route a blood sample.
 
-**Verified holds:** empty map Route returned **200** `no_route` and minted neither a work order nor a Test. Publish **422** (missing Test) was not executed in this run.
+**Verified holds:** empty-map mint is **not** recorded as Pass. Publish was **unclickable**, so missing-Test **422** was not exercised. Admin Route queued-WO remains the mint bar, not a Pass for this AC.
 
 ### Supplemental P2 regression — overlapping TAT ranges
 
@@ -234,6 +236,6 @@ Route, work_orders, LimsRun Test mint (WO-7), param defs on receive, results per
 
 Click: `/receive` then `/asked-for` as `alice-tech`. API: AC-P1-3/4. Local compose; down after the run. Not IC50. P1 lake only.
 
-**P2 signed, not Pass** — Tobias, 2026-08-29, `feat/work-order-p2` @ `3b56cfb` — AC-P2-1 Pass; AC-P2-2/3 Pass (API; routing-map UI blocked on `sample_type` vs `sample_types`); AC-P2-4 Fail for alice (def/steps RLS); AC-P2-5 empty-map mint Pass, publish 422 unverified. Not IC50.
+**P2 signed, not Pass** — Tobias, 2026-08-29, `feat/work-order-p2` @ `3b56cfb` — AC-P2-1 Pass; AC-P2-2/3 Pass (API; routing-map UI blocked on `sample_type` vs `sample_types`); AC-P2-4 Fail for alice (**visibility**: cannot see the def); AC-P2-5 **not Pass** (publish unclickable; do not fold mint/unverified-422 as Pass). Admin Route queued WO is the mint bar, not a Pass. Not IC50.
 
 Do **not** read this as P2–P5 Pass. Do **not** collapse this stamp with Atomic Receive **CORE** Pass (`uat-atomic-receive.md`). P1 is on `main` (PR **#81**) and is **not** rewritten. Hold merge.
