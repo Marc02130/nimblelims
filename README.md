@@ -2,6 +2,8 @@
 
 A modern, API-first LIMS built specifically for BioTech and Pharma startups. NimbleLIMS provides the **core foundation for lab operations**: track samples (receive, status, lineage), record **requested analysis** in the asked-for lake (a later look-up — not a Test, not the click after receive), and enter results (capture and review). Purpose-built for small R&D teams with basic LIMS needs, featuring role-based access, CRO partner isolation, and an extensible platform that supports optional enhancements (dose-response analysis, ELN experiment tracking, instrument data import) when customer requirements emerge. Powered by FastAPI, React, and PostgreSQL.
 
+**How to run the lab path:** [manuals/HOWTO.md](manuals/HOWTO.md)
+
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
@@ -54,7 +56,7 @@ This project uses a four-container Docker setup:
    - Username: `admin`
    - Password: `admin123`
    - **⚠️ IMPORTANT**: Change the default password immediately after first login!
-   - See [.docs/review/manuals/admin-setup.md](.docs/review/manuals/admin-setup.md) for detailed security instructions
+   - See [manuals/admin-setup.md](manuals/admin-setup.md) for detailed security instructions
 
 5. **Run migrations (if needed)**
    ```bash
@@ -185,7 +187,7 @@ nimblelims/
 
 ### Core Workflows for BioTech/Pharma Startups (**MVP Release Bar** + Shipped Enhancements)
 - **Compound & Sample Tracking** **(MVP)**: Receive (`/receive`), status management, lineage (aliquots/derivatives), container hierarchy. Non-empty `analysis_ids` on receive → **422**.
-- **Requested analysis** **(MVP, P1)**: **Asked-for** (`/asked-for`) records requested analysis + TAT for already-received samples (zero Tests, no execute). A later look-up, not the after-receive step — receive ends on `/receive`. See [asked-for.md](.docs/review/manuals/asked-for.md) and `UAT_Scripts/uat-post-receive-work-spine.md`. Route / work_orders / WO-7 are **not** this stamp. Classic `/tests` is not the request path.
+- **Requested analysis** **(MVP, P1)**: **Asked-for** (`/asked-for`) records requested analysis + TAT for already-received samples (zero Tests, no execute). A later look-up, not the after-receive step — receive ends on `/receive`. See [manuals/HOWTO.md](manuals/HOWTO.md), [manuals/asked-for.md](manuals/asked-for.md), and `UAT_Scripts/uat-post-receive-work-spine.md`. Route / work_orders / WO-7 are **not** this stamp. Classic `/tests` is not the request path.
 - **Results Entry** **(MVP)**: Manual results entry with real-time validation
 - **Batch Management** **(MVP + Enhancements)**: Create and manage batches (basic is MVP; cross-project support, automatic QC generation, and sample prioritization are shipped enhancements)
 - **Sample Prioritization** **(Shipped, Not MVP)** (US-11): Sort compounds and biological samples by shelf-life expiration and assay deadlines during batch creation
@@ -209,7 +211,7 @@ nimblelims/
 - **Promote on publish**: Status → `published` maps columns to analytes (name + **aliases** for CRO/instrument vendor column names), ensures Tests per sample, writes **Results** (`raw_result`, `replicate`, `lims_run_id`).
 - **Conflicts**: Same run updates; other run/manual ownership fails publish with **409** to protect data integrity.
 - **Preview**: Publish confirmation dry-runs create/update/conflict/unresolved columns (`GET /v1/lims-runs/{id}/promotion/preview`).
-- **Docs**: local `.docs/internal/ideas/run-results.md` (not committed), [`.docs/review/manuals/lims-runs.md`](.docs/review/manuals/lims-runs.md).
+- **Docs**: [manuals/HOWTO.md](manuals/HOWTO.md) · [manuals/lims-runs.md](manuals/lims-runs.md) · local `.docs/internal/ideas/run-results.md` (not committed).
 
 ### Experiment Management **(Shipped, Not MVP)** (ELN-style Process Tracking)
 - **Experiments**: Full CRUD for experiments; list/detail UI with tabs (Overview, Sample Executions, Details/Steps, Lineage, Linked Processes). Permission: `experiment:manage` (Administrator, Lab Manager, Lab Technician).
@@ -316,17 +318,17 @@ NimbleLIMS uses a unified sidebar navigation system that provides consistent acc
 - **State Persistence**: Sidebar collapsed state saved to localStorage
 - **Top AppBar**: Dynamic page titles, sidebar toggle, back button for nested routes (e.g. experiment detail → list, admin analysis analytes → analyses), user info, and logout
 
-See [`.docs/review/manuals/navigation.md`](.docs/review/manuals/navigation.md) for complete navigation documentation (includes Experiments accordion refactor v2.1, experiment templates route, and permission gating).
+See [manuals/HOWTO.md](manuals/HOWTO.md) for the lab path. [manuals/navigation.md](manuals/navigation.md) has the full sidebar map (Experiments accordion, templates route, permission gating).
 
 ## Documentation
 
-In-repo docs live under [`.docs/`](.docs/) (**review + discussions + decision-logs**; **review + manuals + process** under [`.docs/review/`](.docs/review/)). **Start here:** [`.docs/README.md`](.docs/README.md).
+**Published how-tos** are git-tracked under [`manuals/`](manuals/) — start with [HOWTO.md](manuals/HOWTO.md). Review stamps live under [`.docs/review/`](.docs/review/). **Start here:** [`.docs/README.md`](.docs/README.md).
 
-Umbrella PRD, long-form design, ideas, SOP packs, user stories, and private notes live under local `.docs/internal/` (not committed). Do not add that tree to git.
+Umbrella PRD, long-form design, ideas, SOP packs, user stories, and private notes live under local `.docs/internal/` (not committed). Operator handbooks are git-tracked under [`manuals/`](manuals/).
 
 | Folder | Contents |
 |--------|----------|
-| [`manuals/`](.docs/review/manuals/) | Setup, API, navigation, domain handbooks (receive, **asked-for**, batches, containers, experiments, processes, …) |
+| [`manuals/`](manuals/) | Git-tracked operator how-tos (`HOWTO.md` plus receive, asked-for, navigation, API, processes, …) |
 | [`requirements/`](.docs/review/requirements/) | Cycle feature requirements |
 | [`checklist/`](.docs/review/checklist/) | Implementation checklists |
 | [`open-questions/`](.docs/review/open-questions/) | Cycle/feature gates (block a packet until Decided; not Leadership stamps) |
@@ -340,7 +342,7 @@ UAT scripts: `UAT_Scripts/` — receive `uat-atomic-receive.md`; P1 asked-for `u
 
 ## Support
 
-See [`.docs/README.md`](.docs/README.md), [`.docs/review/README.md`](.docs/review/README.md), and `.docs/review/manuals/` for implementation details.
+See [manuals/HOWTO.md](manuals/HOWTO.md), [`.docs/README.md`](.docs/README.md), and [`.docs/review/README.md`](.docs/review/README.md). Operator handbooks: [`manuals/`](manuals/).
 
 ---
 
@@ -352,6 +354,6 @@ See [`.docs/README.md`](.docs/README.md), [`.docs/review/README.md`](.docs/revie
 
 **Key files (backend):** `backend/app/routers/experiments.py`, `backend/app/routers/sop_parse.py`, `backend/app/services/sop_parse_service.py`, `backend/app/services/experiment_service.py`, flexible experiment models/migrations.
 
-**Documentation:** `.docs/review/checklist/experiment-checklist.md`, `.docs/review/manuals/processes.md`, `.docs/review/manuals/experiments.md` (ELN), `.docs/review/manuals/lims-runs.md` (LIMS), local `.docs/internal/design/experiment-planning.md` (not committed), `.docs/review/manuals/navigation.md`, `.docs/review/manuals/api-endpoints.md`, `UAT_Scripts/uat-experiment-templates.md`.
+**Documentation:** [manuals/HOWTO.md](manuals/HOWTO.md), `.docs/review/checklist/experiment-checklist.md`, [processes.md](manuals/processes.md), [experiments.md](manuals/experiments.md), [lims-runs.md](manuals/lims-runs.md), [navigation.md](manuals/navigation.md), [api-endpoints.md](manuals/api-endpoints.md), local `.docs/internal/design/experiment-planning.md` (not committed), `UAT_Scripts/uat-experiment-templates.md`.
 
 **Optional env:** `ANTHROPIC_API_KEY` on the backend for SOP extraction (see `backend/app/core/config.py`).

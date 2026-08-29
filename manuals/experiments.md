@@ -109,7 +109,7 @@ does not accept free-typed source concentration. Execute-minted daughters join
 the current process and populate the read-only **Aliquots / pools** entry after
 execute. Matrix behavior is unchanged.
 
-Destination quantitative cells are not an inventory ledger. Per-row mass/count projects or writes through to `Contents.amount`; total mass and vessel inventory concentration project or write through to the 1×1 Container in the same transaction. Sample never owns mass/concentration, and `Contents.concentration` is not the inventory-concentration SoT. See [mass-concentration-contents.md](../tech-sketch/mass-concentration-contents.md).
+Destination quantitative cells are not an inventory ledger. Per-row mass/count projects or writes through to `Contents.amount`; total mass and vessel inventory concentration project or write through to the 1×1 Container in the same transaction. Sample never owns mass/concentration, and `Contents.concentration` is not the inventory-concentration SoT. See [mass-concentration-contents.md](../.docs/review/tech-sketch/mass-concentration-contents.md).
 
 Normalization offers an eligible prior Result only: same analysis/designated concentration analyte, approved/reviewed first or otherwise latest by entry date. No match or unit mismatch refuses. Publishing the Result writes its value/unit to the bound 1×1 `Container.concentration` in the same transaction.
 
@@ -119,7 +119,7 @@ Storage browse/move remains outside Experiments. An entry may request an explici
 
 ## Starting an experiment (cohort)
 
-**Canonical product rules:** [open-questions/experiments.md Decision #24](../open-questions/experiments.md)
+**Canonical product rules:** [open-questions/experiments.md Decision #24](../.docs/review/open-questions/experiments.md)
 
 ### Eligibility
 
@@ -134,7 +134,7 @@ Scan/resolve of a sample that fails these gates must **not** enter the selected 
 
 ### Product target start UX (product-target dual list)
 
-**Canonical:** [Decision #24](../open-questions/experiments.md). Early labs often **lack barcode scanners**.
+**Canonical:** [Decision #24](../.docs/review/open-questions/experiments.md). Early labs often **lack barcode scanners**.
 
 1. **Process accordion** — click step/experiment to **Start** (not a permanent panel on experiment detail).  
 2. **Ephemeral dialog — dual list (primary):**
@@ -203,4 +203,4 @@ Permission: `experiment:manage` for manage surfaces.
 - Two product kinds with predefined wrappers; no third action kind.
 - product-target **start**: process → choose experiment → select from queue → instance + cohort.
 - Clear separation from **LIMS Runs**.
-- Containers/amount: solute mass only; see [open-questions/containers.md](../open-questions/containers.md).
+- Containers/amount: solute mass only; see [open-questions/containers.md](../.docs/review/open-questions/containers.md).

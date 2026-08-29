@@ -100,6 +100,6 @@ The LIMS system includes the following roles:
 ## Support
 
 For additional help with admin setup, refer to:
-- Backend authentication: `.docs/review/manuals/backend-auth.md`
+- Backend authentication: `backend-auth.md`
 - Useful commands: [useful-command-line.md](useful-command-line.md)
 - API documentation: http://localhost:8000/docs
