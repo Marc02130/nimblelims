@@ -2,13 +2,13 @@
 
 **Date:** 2026-08-28  
 **Stem:** `post-receive-work-spine`  
-**Status:** P1 room-locked 2026-08-28. Architecture / UI **Accept with conditions** already in the room. Spec **Accept** with those conditions. **Hold merge until UAT.** P2+ closed. Not IC50.  
+**Status:** P2 room-locked 2026-08-28. Architecture / UI / Spec **Accept with conditions** on `feat/work-order-p2` @ `3b56cfb`. **Hold merge until UAT.** Punches before merge: publish-refuse-whole-run, first-start-wins, one process definition. Not IC50.  
 **Requirements:** [`.docs/review/requirements/post-receive-work-spine.md`](../requirements/post-receive-work-spine.md)  
 **Schema:** [`.docs/review/schema-changes/post-receive-work-spine.md`](../schema-changes/post-receive-work-spine.md)  
 **Spec:** [`.docs/internal/specs/post-receive-work-spine/SPEC.md`](../../internal/specs/post-receive-work-spine/SPEC.md)  
 **Process:** [`.docs/review/development-process/README.md`](../development-process/README.md)
 
-Implement **P1 first**. P2–P5 are in this sketch so reviews can lock the spine. Do not code P2–P5 in the P1 PR. Coding stays Grok Build.
+P1 is on `main`. P2 is on `feat/work-order-p2` (Accept with conditions). Do not code P3–P5 in the P2 PR. Coding stays Grok Build.
 
 **Lab Ops 2026-08-28:** Accept with conditions. P1 implementable if **L1** is in the UI/copy. **P2 coding closed until L2–L4 are in this sketch** (folded below). **L5** binds P4 copy. Artifact: [lab-ops-review/post-receive-work-spine.md](../lab-ops-review/post-receive-work-spine.md).
 
@@ -18,8 +18,11 @@ Implement **P1 first**. P2–P5 are in this sketch so reviews can lock the spine
 2. **Heidi:** `GET /asked-for` `list()` must **dual-belt `has_project_access`** (same as create), **not RLS-only**. `analysis_param_defs` RLS may be any logged-in user; mutate stays `config:edit` in the router. P1 must **not** write status `routed` (`routed` is P2). Type × analysis eligibility is **P2 (L2)**, not this PR.
 3. **Params** on `asked_for` are **order capture**, not the Test snapshot. Freeze still happens at LimsRun start (WO-7 / P2). Bounce Start/Execute CTA, silent Order→work, analysis picker on `/receive`, README that equates asked-for with Test assign. Classic `/tests` type-a-number stays.
 4. **Mathilda U1 / U2:** asked-for ≠ Test assign. Label params as order capture, not Test snapshot.
-5. Architecture / UI Accept with conditions already in the room. Spec Accept with those conditions. Hold merge until UAT. P2+ closed. Not IC50.
+5. Architecture / UI / Spec **Accept with conditions** on P2 @ `3b56cfb`. Hold merge until UAT. Not IC50.
 6. **Receive freeze:** non-empty `analysis_ids` still **422**.
+7. **P2 one process (Heidi / Mathilda U1):** `routing_map` and `work_order` hold **one** process definition (typed Exp/LimsRun steps). Bounce process-of-processes, `uuid[]` chain, completing N starts N+1, `start` of `[0]` only.
+8. **WO-7 publish:** refuse the **whole** publish (**422**) if a Test is missing. Swallow `ensure_test` 422 into `plan.errors` and mark published is skip-and-complete — bounce.
+9. **Freeze:** first LimsRun start wins. `_mint_tests_at_start` must **not** overwrite `asked_for_params` on an existing Test.
 
 ---
 
@@ -111,13 +114,13 @@ Pytest: create, 409 dup, **403 dual-belt** (create **and** `list()` / `GET /aske
 - Select map row
 - **L2 / OQ-WO-4:** Type eligibility is **config on each process-definition step** (`eln_experiment` **and** `lims_run`) via `eln_process_definition_step_accepted_sample_types`. **Not** on the analysis. **Qubit is a LimsRun step.** Do **not** infer from `sample_type_transitions`. Until extract-hold dest-type execute writes dest type + `parent_sample_id` + `eln_process_samples`, **no earlier step mints DNA**. Chain Extract → Qubit keyed on **blood** is Qubit-on-blood → **422 `route_sample_type` on map save and on Route**. Empty accepted set on any step = fail closed. No OOB rows that claim blood → Qubit. Do not invent Qubit/blood testdata IDs.
 
-`work_orders.process_definition_ids uuid[]` snapshot at mint (**L4**). Completing process *N* starts *N+1* from **that snapshot**. No second routing hop. No first-only + route-next.
+`work_orders.process_definition_id` snapshot at mint (**L4**). **One** existing process definition (typed Exp/LimsRun steps). Bounce `uuid[]` chain, completing N starts N+1, process-of-processes.
 
-Start: `ELNProcessService.create` from first definition; `work_orders.process_id`. Existing process AuthZ.
+Start: `ELNProcessService.instantiate_from_definition` on **that** definition; `work_orders.process_id`. Existing process AuthZ (`experiment:manage`).
 
-**L3 / A5 / SC5:** At LimsRun start, `tests.asked_for_params = asked_for.params` (copy of **order capture**) and freeze. Column ships in the **P2** migration. P1 does **not** write that Test snapshot. Shape: JSON object matching that analysis’s defs (see working-note §3 snapshots).
+**L3 / A5 / SC5:** At LimsRun start, insert Test if missing; copy `asked_for.params` → `tests.asked_for_params` and freeze. **First start wins** — do not overwrite `asked_for_params` on an existing Test. Column ships in the P2 migration. P1 does **not** write that Test snapshot. Shape: JSON object matching that analysis’s defs (see working-note §3 snapshots).
 
-WO-7: insert Test if missing at LimsRun start. Publish: refuse if missing. **Remove** ensure-on-publish find-or-create if present.
+WO-7: insert Test if missing at LimsRun start. Publish: **422 the whole run** if any Test is missing. Do not swallow into `plan.errors` and complete. **Remove** ensure-on-publish find-or-create.
 
 ## 5. P3 design
 
@@ -154,7 +157,7 @@ No new import engine. **Do not build “admin authors parsers” as the product.
 | PR | Scope |
 |----|--------|
 | 1 | P1 tables + API + `/asked-for` UI + pytest + UAT script. **Hold merge until UAT.** |
-| 2 | P2 routing + work_order + route + LimsRun WO-7 tighten (**closed**) |
+| 2 | P2 routing + work_order + route + LimsRun WO-7. Architecture / UI / Spec Accept with conditions. **Hold merge until UAT.** Punches: publish-refuse-whole-run, first-start-wins, one process definition. |
 | 3 | P3 persist lock + results UAT fold (**closed**) |
 | 4 | P4 SOP Apply → process def (**closed**) |
 | 5 | P5 parser setup UX (**closed** this cycle) |
