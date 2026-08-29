@@ -13,10 +13,10 @@ This is a how-to, not a PRD. Marc keeps it current as features ship.
 | Step | Status |
 |------|--------|
 | Receive (`/receive`) | Shipped on `main` |
-| Route / work order | Shipped on this P2 branch (`/asked-for` Route, `/admin/routing-map`, `/work-orders`) |
+| Requested analysis (`/asked-for`) — later look-up, off the bench path | Shipped on `main` (P1 lake) |
+| Later Route / work order (planner, not after receive) | Shipped on this P2 branch (`/asked-for` Route, `/admin/routing-map`, `/work-orders`) |
 | Process / Experiment / LimsRun | Execute substrate shipped; P1 does **not** start it |
 | Results | Classic type-a-number on a Test; persist lock is a later packet. WO-7 whole-run publish-refuse is implemented on `b005cfe`, but the live AC-P2 stamp is **unsigned** and makes no outcome claim |
-| Requested analysis (`/asked-for`) — later look-up, off the bench path | Shipped on `main` (P1 lake) |
 
 Handbooks in this folder: [atomic-receive.md](atomic-receive.md), [asked-for.md](asked-for.md), [navigation.md](navigation.md), [api-endpoints.md](api-endpoints.md), [dev-setup.md](dev-setup.md), [admin-setup.md](admin-setup.md), [processes.md](processes.md), [experiments.md](experiments.md), [lims-runs.md](lims-runs.md). Index: [README.md](README.md).  
 UAT: [`UAT_Scripts/uat-atomic-receive.md`](../UAT_Scripts/uat-atomic-receive.md) · P1 [`UAT_Scripts/uat-post-receive-work-spine.md`](../UAT_Scripts/uat-post-receive-work-spine.md).  
@@ -64,19 +64,54 @@ Client / no `sample:create` → no Receive nav or **403**.
 
 ---
 
+## Later look-up: requested analysis (asked-for lake, P1)
+
+*Deliberately outside the numbered path. It is a look-up, not a step in the bench motion.*
+
+**Not the next step after receive.** Asked-for is a **separate motion**, done whenever someone needs to see or record what was asked for — reading a client request, a study plan, a paper form. Nobody is waiting on the bench for it, and it is **not** a Start queue. Saving a `requested` row creates no work. P2 exposes Route on that row for a distinct, later work-planning action.
+
+**Copy lock:** say **requested analysis**. Do **not** say asked-for save assigns a Test, mints a work order, or starts work. Only the later explicit Route action can mint a work order.
+
+**UI:** Sample Mgmt → **Asked-for** (`/asked-for`). Also a section on sample detail, which is where a tech normally meets it.  
+**API:** `POST /v1/asked-for` · `GET /v1/asked-for` · `POST /v1/asked-for/{id}/cancel`.  
+Handbook: [asked-for.md](asked-for.md).
+
+**What a row is:** **requested analysis + TAT**, against an already-received sample. That is all.
+
+1. The sample must already be received (identity + vessels), Available for Testing, Tests count 0.
+2. Open Asked-for → **Record requested analysis**.
+3. Pick sample(s), pick an active analysis, TAT ≥ 1 (days). Save. Stay on `/asked-for`.
+
+One action may cover a set of samples (same analysis + TAT). The API still writes one row per sample. Status is `requested`. Cancel while `requested` is allowed; then you may record the same analysis again. Duplicate open `(sample, analysis)` → **409**.
+
+**Save is not scientific assignment.** A saved row does **not** assign a Test, does **not** attach analytes, and does **not** make type-a-number legal. It does **not** create a Test, Result, Process, Experiment, LimsRun, or work_order. Receive freeze stays: non-empty `analysis_ids` on receive is still **422**.
+
+**The lake accepts nonsense on purpose.** Qubit-on-blood may sit in it. Scientific eligibility is refused **later**, at routing (`route_sample_type` **422**, P2) — not by the lake.
+
+Params: intent only. P1 sends `{}` OOB — do not type assay params here, and do not enter them in P1 UAT. Params freeze at the **first LimsRun start** (P2 / WO-7), not on receive, not on asked-for, and not on later starts. Setup (`config:edit`) may `GET/PUT /analyses/{id}/param-defs`; empty catalog is the OOB path.
+
+| Case | HTTP |
+|------|------|
+| Duplicate open `(sample, analysis)` | **409** (full rollback) |
+| No project access / client write / hidden sample | **403** (not 404) |
+| Discarded sample / inactive analysis / TAT &lt; 1 | **422** |
+| Receive with non-empty `analysis_ids` | **422** (receive freeze) |
+
+---
+
 ## Later planner: Route / work order
 
-**This is a later work-planning action, not the next click after Receive or after saving asked-for.** Receive still ends on `/receive`. Recording requested analysis still ends on `/asked-for` without minting work.
+**This is a later work-planning action, not the next click after Receive or after saving asked-for.** Receive still ends on `/receive`. Recording requested analysis still ends on `/asked-for` without minting work. Route stays unnumbered: it is not §3 after receive.
 
 **Setup:** an administrator configures **Routing map** at `/admin/routing-map`. Each map row selects an analysis, current sample type, TAT range, and one or more process definitions. Every step in the mapped definition chain must accept that sample type; an empty or incompatible accepted-type set is refused with **422** `route_sample_type`.
 
 **Route when work planning happens:**
 
 1. Open the previously saved `requested` row on `/asked-for`.
-2. Choose its row **Route** action, or select requested rows and choose **Route selected**. This is Route, not Start.
+2. Choose its row **Route** action, or select requested rows and choose **Route selected**. This is Route, not Start. Permission is `test:assign` plus project access, not `experiment:manage`.
 3. P2 matches analysis × current sample type × TAT against the routing map. No match returns **200** `no_route`; the row stays `requested`, and nothing is minted.
 4. A match creates one queued `work_order`, changes asked-for to `routed`, and still creates **zero Tests**. Minting that queue record is planning; **work has not started**.
-5. Open Experiments → **Work Orders** (`/work-orders`) and choose **Start process**. P2 instantiates the first snapshot process definition, links it through `eln_processes.work_order_id`, and opens that process at `/experiments/processes/{id}`.
+5. Open Experiments → **Work Orders** (`/work-orders`) and choose **Start process**. P2 instantiates the first snapshot process definition, links it through `eln_processes.work_order_id`, and opens that process at `/experiments/processes/{id}`. Start process / LimsRun start remain `experiment:manage`; publish is `experiment:publish`.
 6. Continue through that existing process’s typed Experiment and LimsRun steps. On the **first** LimsRun start, a Test is created or attached and the then-current `asked_for_params` freeze (WO-7). Later starts do not re-freeze them. Nothing freezes at receive, asked-for save, Route, or work-order start.
 
 Qubit-on-blood is refused by the process-step type gate; it is not made valid by saving it in the asked-for lake. A **422** `route_sample_type` means the requested analysis and the sample’s current type are the wrong pairing for a mapped step; it does **not** mean the sample is broken. Dest-type Hold is unchanged.
@@ -109,41 +144,6 @@ Test selection/creation and params freeze on the **first LimsRun start** when th
 LimsRun **publish** can promote instrument rows onto Tests/Results. Two writers on the same Test → **409**. WO-7 lock: if any cohort sample lacks an active Test, publish returns **422** and refuses the **whole run**, writes no Results, invents no Test, and leaves the run `complete`. This guard is implemented on `b005cfe`; its live AC-P2 stamp remains **unsigned** until QA. The historical `9c4f9da` run returned **200 published** with 0 Tests and stays signed not Pass.
 
 UAT (classic): [`UAT_Scripts/uat-results-entry-review.md`](../UAT_Scripts/uat-results-entry-review.md). Persist lock (P3) is specified on the spine packet, not shipped as that slice.
-
----
-
-## Later look-up: requested analysis (asked-for lake, P1)
-
-*Deliberately outside the numbered path. It is a look-up, not a step in the bench motion.*
-
-**Not the next step after receive.** Asked-for is a **separate motion**, done whenever someone needs to see or record what was asked for — reading a client request, a study plan, a paper form. Nobody is waiting on the bench for it, and it is **not** a Start queue. Saving a `requested` row creates no work. P2 exposes Route on that row for a distinct, later work-planning action.
-
-**Copy lock:** say **requested analysis**. Do **not** say asked-for save assigns a Test, mints a work order, or starts work. Only the later explicit Route action can mint a work order.
-
-**UI:** Sample Mgmt → **Asked-for** (`/asked-for`). Also a section on sample detail, which is where a tech normally meets it.  
-**API:** `POST /v1/asked-for` · `GET /v1/asked-for` · `POST /v1/asked-for/{id}/cancel`.  
-Handbook: [asked-for.md](asked-for.md).
-
-**What a row is:** **requested analysis + TAT**, against an already-received sample. That is all.
-
-1. The sample must already be received (identity + vessels), Available for Testing, Tests count 0.
-2. Open Asked-for → **Record requested analysis**.
-3. Pick sample(s), pick an active analysis, TAT ≥ 1 (days). Save. Stay on `/asked-for`.
-
-One action may cover a set of samples (same analysis + TAT). The API still writes one row per sample. Status is `requested`. Cancel while `requested` is allowed; then you may record the same analysis again. Duplicate open `(sample, analysis)` → **409**.
-
-**Save is not scientific assignment.** A saved row does **not** assign a Test, does **not** attach analytes, and does **not** make type-a-number legal. It does **not** create a Test, Result, Process, Experiment, LimsRun, or work_order. Receive freeze stays: non-empty `analysis_ids` on receive is still **422**.
-
-**The lake accepts nonsense on purpose.** Qubit-on-blood may sit in it. Scientific eligibility is refused **later**, at routing (`route_sample_type` **422**, P2) — not by the lake.
-
-Params: intent only. P1 sends `{}` OOB — do not type assay params here, and do not enter them in P1 UAT. Params freeze at **LimsRun start** (P2 / WO-7), not on receive and not on asked-for. Setup (`config:edit`) may `GET/PUT /analyses/{id}/param-defs`; empty catalog is the OOB path.
-
-| Case | HTTP |
-|------|------|
-| Duplicate open `(sample, analysis)` | **409** (full rollback) |
-| No project access / client write / hidden sample | **403** (not 404) |
-| Discarded sample / inactive analysis / TAT &lt; 1 | **422** |
-| Receive with non-empty `analysis_ids` | **422** (receive freeze) |
 
 ---
 
