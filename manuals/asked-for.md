@@ -62,7 +62,7 @@ Do not chain this section onto Receive or onto the save steps above. Return to `
 3. No match returns `no_route`; the row stays `requested`, with no `work_order` or Test.
 4. A match creates a queued `work_order`, changes the row to `routed`, and still creates no Test. This queue mint does not mean work has started.
 5. Experiments → **Work Orders** (`/work-orders`) is the work backlog. **Start process** instantiates and opens the existing ELN process; it is not a second execution engine.
-6. A later LimsRun start creates or attaches the Test and freezes `asked_for_params` (WO-7). If a required Test is later missing, publish returns **422** and refuses the whole run without creating that Test or publishing partial Results.
+6. A later LimsRun start creates or attaches the Test and freezes `asked_for_params` (WO-7). The lock is that a missing required Test returns **422** and refuses the whole run without creating that Test or publishing partial Results. That refuse is **not** verified as shipped on `9c4f9da`.
 
 The routing type gate fails closed: every mapped process-definition step must accept the current sample type. An empty accepted-type set or incompatible step returns **422** `route_sample_type`. That code means the requested analysis and current sample type are the wrong pairing for a mapped step; it does not mean the sample is broken. Saving an otherwise valid Qubit-on-blood request in the lake does not bypass that gate.
 
