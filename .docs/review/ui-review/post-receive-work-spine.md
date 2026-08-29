@@ -51,11 +51,11 @@ Sample detail: same add + table. **Not** on `/receive`. **Not** TestForm.
 
 ```
 asked-for requested
-   map match?  yes → work_order queued (auto-route; OQ-WO-1)
-               no  → stay requested; “No work plan” + configure-routing (admin)
+   explicit Route → evaluate analysis + TAT + first-process type
+                  → zero: 422 | multiple: 409 | exactly one: work_order queued
    Work orders surface
-     Start → existing process start (select / scan; cohort locks)
-     complete step N → next ordered step in the same process
+     Start → first process only
+       later Start → next ordered process
    LimsRun start → Test (WO-7); asked-for params frozen on Test
 ```
 
@@ -234,8 +234,8 @@ Must land in the **named phase**. P1 PR is blocked without U1–U8.
 
 | ID | Stance |
 |----|--------|
-| **OQ-WO-1** | **Agree with Lab Ops.** Auto-route on match; else stay `requested` with configure-routing for admin. Does not block P1. Blocks P2 UX (U10). |
-| **OQ-WO-3** | One process link in the UI. Arch picks FK. |
+| **OQ-WO-1** | **Decided:** explicit Route with zero→422, multiple→409, exactly-one snapshot. |
+| **OQ-WO-3** | **Decided:** ordered process instances link through WO route positions. |
 | **OQ-AF-1/2/3** | Already decided: both surfaces, `test:assign`, empty-object params. U3/U8 implement that. |
 
 ---

@@ -193,7 +193,7 @@ North star authors parsers at SOP via MCP. Until that ships, P5 is **review / dr
 | AC-P1-2 | Duplicate asked-for same sample+analysis → 409 |
 | AC-P1-3 | User without project access → **403** on create **and** on `GET /asked-for` `list()` (dual-belt `has_project_access`, not RLS-only) |
 | AC-P1-4 | Receive non-empty `analysis_ids` still **422** |
-| AC-P2-1 | Matching route mints work_order with **one** process definition; asked-for = routed |
+| AC-P2-1 | Exactly one acceptable row mints one work order with ordered `process_definition[]`; asked-for = routed |
 | AC-P2-2 | No acceptable map row → **422**, no work order; UI says configure routing |
 | AC-P2-3 | Ordered `process_definition[]` is preserved. Route: zero acceptable rows → 422; two or more → 409; exactly one snapshots the route. Start instantiates first process only; later processes start later and gate current type then |
 | AC-P2-4 | alice (`test:assign`) Routes a mapped def created by admin and can read its steps; not admin-only; not `experiment:manage` on Route; not `has_experiment_access()` as the SOP-read belt |

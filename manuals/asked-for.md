@@ -63,7 +63,7 @@ Do not chain this section onto Receive or onto the save steps above. Return to `
 2. P2 matches analysis + TAT, then tests current type against each candidate row’s first process / first ordered Experiment/LimsRun allow-list.
 3. Zero acceptable rows returns **422**; two or more returns **409**. The row stays `requested`, with no work order or Test.
 4. Exactly one acceptable row snapshots its ordered `process_definition[]`, creates a queued work order, changes the row to `routed`, and still creates no Test.
-5. Experiments → **Work Orders** (`/work-orders`) is the work backlog. **Start process** instantiates and opens the existing ordered ELN process; Route must make its step order apparent rather than presenting an unordered bag.
+5. Experiments → **Work Orders** is the backlog. **Start process** instantiates only the first process in the snapshotted ordered route. Later starts advance in order; UI shows process and step order.
 6. WO-7 lock: the **first** LimsRun start creates or attaches the Test and freezes the then-current `asked_for_params`. If any cohort sample lacks an active Test at publish, **422** refuses the whole run, writes no Results, invents no Test, and leaves the run `complete`.
 
 The two halves of WO-7 are not at the same maturity on `b005cfe`. The **publish refuse is Tobias-signed Pass**. The **first-start freeze is still open and unscored**: `_mint_tests_at_start` has no already-frozen guard, and `{}` was recorded. Do not read or write that overwrite as closed. Overall P2 Pass remains unsigned; the historical `9c4f9da` stamp remains signed not Pass.

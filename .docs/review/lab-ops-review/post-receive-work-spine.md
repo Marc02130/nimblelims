@@ -52,7 +52,7 @@ P1 as a **lake** is bench-honest: a tech can record “ELISA, 5-day, these plasm
 | **Template → instance** | **7** | Routing snapshots ordered process-definition ids; first starts now, later definitions start later (L4). |
 | **Competitive floor** | **7** | Order line + routing pack + work list is table-stakes vs commercial LIMS. P1 alone is a request log — do not sell it as a worklist. Parser setup (P5) is the ops skill-floor fix (R-8). |
 | **Containers / amount** | **N/A (6 contextual)** | Vessels already exist from AR. Amount/volume/pool execute is extract-hold / entries — out of this packet. |
-| **Cohort / queue** | **6** | P2 start reuses existing process queue (select + scan; fixed set after start). Auto-route vs Route button is still Open (OQ-WO-1). Lab Ops stance below. Chain walk unspecified (L4). |
+| **Cohort / queue** | **6** | Explicit Route snapshots ordered definitions. First process starts first; later starts advance. |
 | **Instrument boundary** | **8** | Assay = LimsRun with analysis; extract = Experiment; parser import = no LLM; Test at LimsRun start (WO-7). Classic type-a-number remains (WO-4) on an existing Test only. |
 
 **Overall lab readiness:** **7.5/10** for the spine with conditions. **P1 is implementable.** P2 is not, until L2–L4 are in the sketch.
@@ -69,7 +69,7 @@ P1 as a **lake** is bench-honest: a tech can record “ELISA, 5-day, these plasm
 | **L4** | **P2** | **Ordered `process_definition[]` is the work plan.** Snapshot at mint. Start instantiates first process only; later starts advance in order under existing AuthZ. UI shows process and step order. | Otherwise sequence and handoff are ambiguous. |
 | **L5** | **P4** | **SOP Apply writes a process definition. It does not close dest-type Hold.** Apply success / manuals / UAT: draft process definition with typed steps; human save; never silent auto-activate. **Do not** say the NCI extract → Qubit path is runnable. **Do not** UAT blood → DNA daughter → Qubit on the daughter in this packet. Dest type remains [extract-hold-dest-type](../requirements/extract-hold-dest-type.md) / [sop-ai-to-process.md](../open-questions/sop-ai-to-process.md). | Selling point is “Apply is not a lie.” Selling point is **not** “daughters exist.” |
 
-Already normative in the packet (restated so implementers do not drop them): empty routing map mints **nothing**; TAT overlap **409** on save; WO does **not** create Tests; publish **422** if Test missing (remove ensure-on-publish find-or-create); results persist only on an existing Test; missing `analytes.units_default` → **422**; no `results.unit_id`; client cannot write asked-for / routing / parsers; P5 AI draft is setup-only.
+Already normative: empty map / zero acceptable routes → **422** and no mint; multiple acceptable routes or TAT overlap → **409**; WO does not create Tests; publish **422** if Test missing; client cannot write routing.
 
 ---
 
@@ -77,8 +77,8 @@ Already normative in the packet (restated so implementers do not drop them): emp
 
 | ID | Stance |
 |----|--------|
-| **OQ-WO-1** (auto-route vs Route button) | **Prefer auto-route when a map row matches; else stay `requested` with an explicit “configure routing” CTA.** Do not add a Route click to every ELISA. Empty map must **not** toast as success/work queued (AC-P2-2). Does not block P1. Resolve before P2 UX coding. |
-| **OQ-WO-3** (FK direction) | Not a lab-ops issue. One FK is enough; do not make the tech see two links. |
+| **OQ-WO-1** | **Superseded:** explicit Route; zero acceptable 422, multiple 409, exactly one mints. |
+| **OQ-WO-3** | **Superseded:** each process instance links to WO + route position; UI shows one ordered route. |
 | **OQ-RES-1** (qualifiers shape) | Sci CSO. Bench bar: the number the tech typed is what review/publish shows. No results column on asked-for. |
 | **OQ-SOP-2** (inactive parser draft) | Accept **inactive, unbound**. Never auto-bind to production runs. |
 

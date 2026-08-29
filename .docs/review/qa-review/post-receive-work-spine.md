@@ -123,7 +123,7 @@ Already normative (restated so implementers do not drop them): empty routing map
 
 ### Out of this packet (do not fail P1 UAT on)
 
-- Work_order / routing map / Route button (OQ-WO-1 Open)
+- Work_order / ordered routing map / explicit Route (OQ-WO-1/3 Decided)
 - Qubit-on-blood, extract-hold dest type, blood → DNA → Qubit E2E, Qubit/blood testdata IDs
 - Results entry / `qualifiers` shape / `results.unit_id`
 - SOP Apply / parser setup / LLM draft
@@ -162,7 +162,7 @@ Classic `lab-tech` / `client` logins are acceptable extras; **0058 actors are th
 |-------|--------|
 | **Verdict** | **Accept with conditions** (QA1–QA12 for P1; QA13–QA15 recorded for later phases) |
 | **Date** | 2026-08-28 |
-| **Implement gate** | **OPEN for P1 only** (matches Lab Ops). P2 closed until OQ-WO-1/3 Decided and L2–L4 stay in the sketch. P3 Hold on OQ-RES-1. P4/P5 not this PR. |
+| **Implement gate** | P2 OQ-WO-1/3 are Decided under the ordered-route lock; product merge remains held because first-start freeze is OPEN and overall P2 Pass unsigned. |
 | **UAT pass** | Still required after implement, before merge to `main`. Source: new `uat-post-receive-work-spine.md` P1 must-pass. Not a substitute: this review. |
 | **Not licensed** | Extract-hold dest type · blood → DNA → Qubit E2E · minting Tests at asked-for · results on asked-for · wizard UAT |
 

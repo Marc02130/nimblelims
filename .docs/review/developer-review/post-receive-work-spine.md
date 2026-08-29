@@ -201,7 +201,7 @@ Treat **D1–D11** as bounce for the P1 PR. Prompt the implementer to:
 | **Date** | 2026-08-28 |
 | **Implement gate** | **OPEN for P1 only** (same as Lab Ops), provided D1–D11 land in the P1 PR |
 | **P1** | Licensed. First PR. |
-| **P2** | **CLOSED** (D12; OQ-WO-1/3 Open; type-eligibility column missing) |
+| **P2** | OQ-WO-1/3 Decided under D12 ordered-route lock; hold product merge while freeze is OPEN / overall P2 unsigned |
 | **P3** | **CLOSED** (D13; `results.qualifiers` type vs OQ-RES-1) |
 | **P4 / P5** | File-mapped; not in P1 PR. P5 may be a later independent PR. |
 | **Not licensed** | Receive reopen · TestForm reuse · mint Tests at asked-for · routing tables in 0072 · Qubit/blood testdata · dest-type E2E |

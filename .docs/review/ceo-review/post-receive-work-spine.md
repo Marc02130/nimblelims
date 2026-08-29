@@ -76,7 +76,7 @@ Matches requirements §§3–5. Do not expand.
 | **P5 Parser setup UX** | **OPEN** (independent of P1). | Engine exists. This is ops skill-floor (R-8). Not a substitute for a work list. |
 | **Extract-hold dest type** | **Not licensed** | Own stem. Blood → DNA daughter → Qubit on the daughter remains Hold. |
 
-**Product default (OQ-WO-1):** auto-route when a map row matches; else stay `requested` with an explicit “configure routing” CTA. Empty map must **not** toast as success / work queued (AC-P2-2). Does not block P1.
+**Product default (OQ-WO-1, superseded):** Tech explicitly chooses Route. Zero acceptable rows returns 422; multiple returns 409; exactly one snapshots the ordered route. No auto-route and no silent first row.
 
 ---
 

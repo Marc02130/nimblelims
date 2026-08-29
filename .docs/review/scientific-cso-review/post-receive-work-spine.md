@@ -93,8 +93,8 @@ Already normative (restated so P3 does not drop them): no `results.unit_id`; mis
 |----|--------|
 | **OQ-RES-1** (qualifiers shape) | **Decided.** See §6. Typed token → `reported_result`; `qualifiers` remains Result Qualifiers list FK; no JSON overlay; no `entered_as` in that column. |
 | **OQ-AF-3** (empty param defs) | Agree provisional. Table ships; OOB may be empty; unknown keys 422. Empty `{}` is not scientific context — it is an honest empty catalog. |
-| **OQ-WO-1** (auto-route) | Not a scientific issue. Lab Ops prefer auto-route when a map matches. |
-| **OQ-WO-3** (FK direction) | Not a scientific issue. |
+| **OQ-WO-1** | Decided: explicit Route with zero→422 / multiple→409. |
+| **OQ-WO-3** | Decided: ordered process instances carry WO route position. |
 | **OQ-SOP-2** (inactive parser draft) | Accept inactive, unbound. Never auto-bind to production runs (would silently remap analytes). |
 
 ---

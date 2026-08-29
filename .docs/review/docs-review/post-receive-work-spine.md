@@ -25,9 +25,9 @@ The spine packet is **documentable**. Core product docs exist (requirements, tec
 
 **P1 docs are ready to attach to a Cursor implement prompt if the DOC list below lands in the same PR.** That prompt is **mandatory docs + UAT + README** — not optional polish.
 
-This stamp does **not** open product implement by itself. QA is **required** (test ordering / sample tracking / RLS). Architecture is **required** (new tables + RLS). Security should speak (AuthZ + RLS + client deny). Those artifacts are missing today. Documentarian does not invent them.
+Required reviews now exist. Current P2 lock is recorded in §4.2; product merge remains held.
 
-**Do not document P2–P5 as shipped in the P1 PR.** Routing, work_order, results persist, SOP Apply, parser setup stay specified-for-review. OQ-WO-1/3, OQ-RES-1, OQ-SOP-2 still **Open** and block those phases.
+**Do not document P2–P5 as shipped in the P1 history.** OQ-WO-1/3 are now Decided under the ordered-route lock. First-start freeze remains OPEN and overall P2 unsigned.
 
 Living manuals are the real gap. After CORE:
 
@@ -48,10 +48,10 @@ Living manuals are the real gap. After CORE:
 
 | Dimension | Notes |
 |-----------|--------|
-| **Completeness** | **Core packet present:** requirements, sketch, schema, PRD, SPEC, OQs, checklist, Lab Ops. **Missing formal reviews** for this stem: CEO, UI, Architecture, Security, Scientific CSO, BA, QA, Developer (this file is the first docs-review). UAT script **correctly deferred** to implement (requirements §8). No operator manual for asked-for yet. Schema omits template sections **Data migration / backfill**, **Rollback**, **Open schema blockers**, **Implementation checklist**. |
-| **Consistency** | Spine naming is coherent: asked-for ≠ Test ≠ work_order ≠ Process. L1 copy is in requirements, sketch, Lab Ops. **Drifts:** SPEC POST is single `sample_id` while RQ-AF-1 / L1 require one operator action on a **set** (API may stay one row per sample — **not written as a contract**). Schema lists **both** `work_orders.process_id` and `eln_processes.work_order_id` while OQ-WO-3 is **Open** (P2). RQ-WO-6 implies auto-route on save; OQ-WO-1 still **Open**. Framework stamps WO-7 bullet still says “TAT matching algorithm still open” while OQ-TAT-1 is **Decided (provisional)** refuse. Requirements **Status: Draft for formal review** after Lab Ops has already accepted P1. Checklist review boxes all empty (Lab Ops is done). Internal US-1 / US-7 / US-23 still mint Tests at accessioning. |
+| **Completeness** | Requirements, sketch, schema, reviews, manuals, and UAT exist. Current ordered-route fold is docs-only; product implementation remains held. |
+| **Consistency** | Current P2 SoT: analysis + TAT + ordered `process_definition[]`; explicit Route; zero acceptable 422; multiple 409; first process starts first. Signed `b005cfe` chain-AND behavior remains history only. |
 | **Cross-references** | Requirements ↔ sketch ↔ schema ↔ PRD ↔ SPEC ↔ OQs ↔ Lab Ops are linked. Open-questions index already lists this stem. `.docs/review/README.md` does not name `docs-review/`. Atomic-receive manuals/UAT still say A-15 is **parked** rather than “opened by `post-receive-work-spine` P1 (not on `/receive`)”. |
-| **Living-doc hygiene** | OQ statuses and phase gate rule are correct: **P1 unblocked**; P2 blocked on OQ-WO-1/3; P3 on OQ-RES-1; P4 on OQ-SOP-2. Dest-type Hold stays on the extract-hold packet — do not fold it here. Checklist is a task list, not an OQ owner — good. Wizard-removed (PR 75) is already stamped on `uat-sample-accessioning.md` (retired) and the accessioning stub; **navigation.md was not fully cut over**. |
+| **Living-doc hygiene** | OQ-WO-1/3 are Decided. P2 remains unmerged because first-start freeze is OPEN and overall Pass unsigned. Dest-type Hold stays separate. |
 | **Review-artifact quality** | Lab Ops follows PACKET header + L* conditions + phase gate. This docs-review follows the Documentarian template. Other reviews: n/a until written. |
 | **Cursor hand-off readiness** | **Yes with conditions, P1 only.** Implement prompt **must** include DOC1–DOC9 (docs + UAT + README). One phase per PR. Do not code P2–P5 in the P1 PR. Product implement still waits on required reviews (QA, Architecture, Security at minimum). |
 | **Discoverability** | Stem is consistent (`post-receive-work-spine`). Findable from OQ index, requirements, Lab Ops. New `docs-review/` folder needs an index line. No `asked-for.md` manual yet — operators will not find the lake. |
