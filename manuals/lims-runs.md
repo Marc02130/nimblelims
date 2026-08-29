@@ -10,7 +10,7 @@ Primary goals:
 - Enable structured data import with validation.
 - Serve as a foundation for analysis (currently dose-response is the most mature example; the intent is to support other analyses).
 
-**Receive / asked-for (P1):** `POST /samples/receive` still refuses non-empty `analysis_ids` (**422**). Recording **requested analysis** on `/asked-for` does **not** start a LimsRun and does **not** mint a Test. Assay params (`analysis_param_defs`) freeze onto the Test at **LimsRun start** in a later stamp — not at receive.
+**Receive / asked-for / Route:** `POST /samples/receive` still refuses non-empty `analysis_ids` (**422**). Recording **requested analysis** on `/asked-for` does **not** create a `work_order`, start a LimsRun, or mint a Test. A separate, later Route action may mint a queued work order. Assay params freeze onto the Test at **LimsRun start** (WO-7) — not at receive, asked-for save, Route, or work-order start.
 
 **Important distinction**: An LIMS Run is **not** the same as a Batch.
 - Batches are operational groupings for processing samples through tests and results entry.
@@ -66,11 +66,11 @@ Shipped v1 — see local `.docs/internal/ideas/run-results.md` (not committed).
 | **When** | Status → `published` (run always has **`analysis_id`**) |
 | **No analysis** | **Not allowed** — set analysis on create/edit; no non-reportable / continue-without path |
 | **Mapping** | JSONB column → analyte via **name** or **analyte alias** (casefold); known non-analyte keys (`units`, etc.) skipped |
-| **Tests** | Find-or-create Test per `(sample_id, analysis_id)` |
+| **Tests** | Use the active Test created or attached at LimsRun start for `(sample_id, analysis_id)`; publish refuses a missing Test instead of creating one |
 | **Results** | Write `raw_result`, `replicate` (from JSONB or row order), `lims_run_id` lineage |
 | **Conflicts** | Same run → update; other run / manual result owns triple → **409**, publish blocked |
 | **Preview** | `GET /v1/lims-runs/{id}/promotion/preview` — dry-run; UI shows counts on Publish confirm |
-| **Permissions** | **Publish alone** may create/update tests/results on this path |
+| **Permissions** | **Publish** may create/update Results on this path, but may not create the WO-7 Test |
 | **Batch size** | Env `LIMS_PROMOTE_BATCH_SIZE` (default **200**) |
 
 Instrument JSONB remains SoT for raw import; Results are the published structured projection.
@@ -89,7 +89,7 @@ Instrument JSONB remains SoT for raw import; Results are the published structure
 - **Samples**: Linked via imported data rows. Less rich than `ExperimentSampleExecution` (no built-in role/replicate/conditions on the junction itself).
 - **Batches**: Different concept. See warning above. Do not model a Run as "the batch of samples tested".
 - **ELN Experiments**: Separate. Runs are the structured LIMS execution path. Future linking may be added.
-- **Analyses / Analytes**: Catalog assays. Aliases on analytes support multi-CRO column names. Every run **must** have an analysis; publish promotes into that analysis’s Tests/Results.
+- **Analyses / Analytes**: Catalog assays. Aliases on analytes support multi-CRO column names. Every run **must** have an analysis; start creates or attaches the Test and freezes asked-for params, then publish promotes into that Test’s Results.
 - **Dose Response**: Specialized analysis on top of Runs (curve fitting, exclusions, review)—orthogonal to classic promote-to-results.
 
 ## In-House vs CRO
@@ -142,7 +142,7 @@ You can still enforce strict state-machine rules in the application service laye
 
 - Routes: `/runs`, `/runs/:id`, `/runs/:id/dose-response`
 - Main pages: RunsManagement, LimsRunDetail (Overview / Data / Dose Response tabs)
-  - Overview: **Analysis** required; **Publish** opens promotion preview
+  - Overview: **Analysis** and cohort required to start; start locks the cohort and enforces WO-7. **Publish** opens promotion preview and refuses if a required Test is missing.
 - API under `/v1/lims-runs` (including `GET …/promotion/preview`, publish = `PATCH …/complete`)
 
 ## Next Steps / Open Questions

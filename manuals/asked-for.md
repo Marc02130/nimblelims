@@ -7,7 +7,7 @@
 **Requirements:** [`.docs/review/requirements/post-receive-work-spine.md`](../.docs/review/requirements/post-receive-work-spine.md) **RQ-AF-***  
 **Sketch:** [`.docs/review/tech-sketch/post-receive-work-spine.md`](../.docs/review/tech-sketch/post-receive-work-spine.md) §3
 
-P1 is the **asked-for lake**. An analyst records **requested analysis + TAT** against an already-received sample. That is all a row is: it does **not** assign a Test, mint a Test row, attach analytes, make type-a-number legal, or start work.
+P1 is the **asked-for lake**. An analyst records **requested analysis + TAT** against an already-received sample. That is all a saved row is: it does **not** assign a Test, mint a Test row or `work_order`, attach analytes, make type-a-number legal, or start work. **Route is a separate, later P2 action.**
 
 **Receive ≠ order ≠ work.** This is a **later look-up**, not a step in the receive motion and not the click after a commit. Receive’s own happy path is to stay on `/receive` and scan the next tube ([atomic-receive.md](atomic-receive.md)); nothing at the bench waits on a request being typed.
 
@@ -19,7 +19,7 @@ P1 is the **asked-for lake**. An analyst records **requested analysis + TAT** ag
 |------|--------|
 | Copy | **Asked-for** / **requested analysis** / **Record request**. Never “assign test,” “create test,” or “order process.” **Route** is allowed on `requested`. No Start / Execute on the asked-for page. |
 | Receive freeze | Non-empty `analysis_ids` on `POST /samples/receive` → **422**. Empty or omit → zero Tests. No analysis picker on `/receive`. |
-| Lake ≠ Test | Asked-for create leaves `COUNT(tests)` unchanged. Save is not scientific assignment: no Test, no analytes, no legal number entry. |
+| Lake ≠ work | Asked-for create leaves `COUNT(tests)` and `COUNT(work_orders)` unchanged. Save is not scientific assignment or routing: no Test, no work order, no analytes, no legal number entry. |
 | Not a queue | Asked-for is a look-up, not the after-receive click and not a Start queue. Do not document receive → asked-for as one motion. |
 | Wrong pairings | The lake accepts them on purpose (e.g. Qubit on blood). Refusal is **routing** (`route_sample_type` **422**) on map save and Route. |
 | Route | Explicit Route. Empty map → 200 `no_route`. Match mints `work_orders` and sets `routed`. Still zero Tests. |
@@ -45,11 +45,26 @@ P1 is the **asked-for lake**. An analyst records **requested analysis + TAT** ag
 1. Open **Asked-for** (`/asked-for`) or the sample-detail Asked-for section as its own task.  
 2. **Record requested analysis**: pick sample(s), pick an active analysis, TAT ≥ 1. Leave params empty — `{}` is the P1 path.  
 3. Save. Stay on `/asked-for`. Toast: requested analysis recorded. No navigation to Tests.  
-4. `COUNT(tests)` for those samples is still 0. Sample stays **Available for Testing**.
+4. `COUNT(tests)` and `COUNT(work_orders)` for those requests are still 0. Sample stays **Available for Testing**.
 
 One operator action may target a **set** of samples (same analysis + TAT). API still writes one row per sample.
 
 **Not on this surface:** TestForm, Create test, Start, Execute, results entry, analysis picker on receive. **Route** is on this page; it does not start a process or mint a Test.
+
+---
+
+## Routing later (P2)
+
+Do not chain this section onto Receive or onto the save steps above. Return to `/asked-for` later when work planning happens.
+
+1. For one `requested` row, choose **Route**. For several requested rows, select them and choose **Route selected**.
+2. P2 matches each row’s analysis, current sample type, and TAT against the configured map at `/admin/routing-map`.
+3. No match returns `no_route`; the row stays `requested`, with no `work_order` or Test.
+4. A match creates a queued `work_order`, changes the row to `routed`, and still creates no Test.
+5. Experiments → **Work Orders** (`/work-orders`) is the work backlog. **Start process** instantiates and opens the existing ELN process; it is not a second execution engine.
+6. A later LimsRun start creates or attaches the Test and freezes `asked_for_params` (WO-7). Publish refuses to invent a missing Test.
+
+The routing type gate fails closed: every mapped process-definition step must accept the current sample type. An empty accepted-type set or incompatible step returns **422** `route_sample_type`. Saving an otherwise valid Qubit-on-blood request in the lake does not bypass that gate.
 
 ---
 
@@ -83,4 +98,4 @@ One operator action may target a **set** of samples (same analysis + TAT). API s
 - Intake stub: [accessioning-workflow.md](accessioning-workflow.md)  
 - API: [api-endpoints.md](api-endpoints.md)  
 - Nav: [navigation.md](navigation.md)  
-- Spine (P2–P5 specified, not shipped): [requirements/post-receive-work-spine.md](../.docs/review/requirements/post-receive-work-spine.md)
+- Spine requirements and phased status: [requirements/post-receive-work-spine.md](../.docs/review/requirements/post-receive-work-spine.md)
