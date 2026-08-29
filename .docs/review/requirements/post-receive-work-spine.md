@@ -1,7 +1,7 @@
 # Requirements: Post-receive work spine
 
 **Date:** 2026-08-28  
-**Status:** Spec **Accept** with Architecture / UI conditions (2026-08-28 room). **Hold merge until UAT.** P2+ closed. Not IC50.  
+**Status:** Spec **Accept** with Architecture / UI conditions (2026-08-28 room). **P1 shipped** on `main` (PR 81; UAT Pass). P2+ closed until type-eligibility schema (A4). Not IC50.  
 **Stem:** `post-receive-work-spine`  
 **Leadership sequencing (2026-08-28):** order (asked-for) → work_order → results → SOP+AI → process → instrument import config  
 **Do not implement P2+ until those phase reviews Accept / Accept-with-conditions and open questions that block the named phase are Decided.**
@@ -24,7 +24,7 @@
 2. **Heidi:** `GET /asked-for` `list()` must **dual-belt `has_project_access`** (same as create), **not RLS-only**. `analysis_param_defs` RLS may be any logged-in user; mutate stays `config:edit` in the router. P1 must **not** write status `routed` (`routed` is P2). Type × analysis eligibility is **P2 (L2)**, not this PR.
 3. **Params** on `asked_for` are **order capture**, not the Test snapshot. Freeze still happens at LimsRun start (WO-7 / P2). Bounce Start/Execute CTA, silent Order→work, analysis picker on `/receive`, README that equates asked-for with Test assign. Classic `/tests` type-a-number stays.
 4. **Mathilda U1 / U2:** asked-for ≠ Test assign. Label params as order capture, not Test snapshot.
-5. Architecture / UI Accept with conditions already in the room. Spec Accept with those conditions. Hold merge until UAT. P2+ closed. Not IC50.
+5. Architecture / UI Accept with conditions already in the room. Spec Accept with those conditions. P1 UAT Pass; PR 81 merged. P2+ closed until A4 type-eligibility is in schema-changes. Not IC50.
 6. **Receive freeze:** non-empty `analysis_ids` still **422**.
 7. Operator how-tos live in git-tracked [`/manuals/HOWTO.md`](../../../manuals/HOWTO.md). Do not put operator manuals back under `.docs/review/manuals/`.
 
@@ -46,7 +46,7 @@ Receive registers identity + vessels. The bench question after that is **what wa
 
 ```text
 RECEIVE          identity + 1..N vessels          SHIPPED
-ASKED-FOR (P1)   analysis + TAT + params          THIS PACKET (lake)
+ASKED-FOR (P1)   analysis + TAT + params          SHIPPED (PR 81)
 ROUTING (P2)     analysis × sample_type × TAT     THIS PACKET
 WORK_ORDER (P2)  ordered process_definition chain THIS PACKET
 EXECUTE          Process → Exp and/or LimsRun     SHIPPED (route into it)
@@ -62,7 +62,7 @@ PARSER SETUP (P5) instruments / CRO / parsers     THIS PACKET (config UX)
 
 | Phase | Name | MVP pillar | Implement when |
 |-------|------|------------|----------------|
-| **P1** | Asked-for (lake) | Test ordering | Reviews Accept P1; **hold merge until UAT** |
+| **P1** | Asked-for (lake) | Test ordering | **Shipped** (PR 81; UAT Pass 2026-08-28) |
 | **P2** | Routing + work_order | Test ordering / processing | **CLOSED.** P1 shipped; OQ-TAT overlap Decided; L2 type × analysis eligibility |
 | **P3** | Results persist | Results entry | **CLOSED.** After P1 (may parallel P2 if Test exists via LimsRun or classic) |
 | **P4** | SOP+AI → process definition | Processing (not MVP bar) | **CLOSED.** P2 process chain is the Apply target; extract-hold dest type still Hold for blood→DNA→Qubit E2E |
@@ -191,4 +191,4 @@ North star authors parsers at SOP via MCP. Until that ships, P5 is **review / dr
 
 ## 8. UAT
 
-Script: `UAT_Scripts/uat-post-receive-work-spine.md` (P1 cases). **Hold merge until UAT.** Do not use retired `uat-sample-accessioning.md`.
+Script: `UAT_Scripts/uat-post-receive-work-spine.md` (P1 cases). **P1 Pass**; merged PR 81. Do not use retired `uat-sample-accessioning.md`.

@@ -338,7 +338,7 @@ Umbrella PRD, long-form design, ideas, SOP packs, user stories, and private note
 | [`schema-changes/`](.docs/review/schema-changes/) | Per-cycle DB deltas |
 | [`lab-ops-review/`](.docs/review/lab-ops-review/), [`ceo-review/`](.docs/review/ceo-review/), [`ui-review/`](.docs/review/ui-review/), [`architecture-review/`](.docs/review/architecture-review/), [`security-review/`](.docs/review/security-review/), [`qa-review/`](.docs/review/qa-review/) | Formal reviews |
 
-UAT scripts: `UAT_Scripts/` — receive `uat-atomic-receive.md`; P1 asked-for `uat-post-receive-work-spine.md` (hold merge until UAT pass).
+UAT scripts: `UAT_Scripts/` — receive `uat-atomic-receive.md`; P1 asked-for `uat-post-receive-work-spine.md` (**P1 Pass**, merged PR 81).
 
 ## Support
 
