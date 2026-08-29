@@ -66,7 +66,7 @@ Shipped v1 — see local `.docs/internal/ideas/run-results.md` (not committed).
 | **When** | Status → `published` (run always has **`analysis_id`**) |
 | **No analysis** | **Not allowed** — set analysis on create/edit; no non-reportable / continue-without path |
 | **Mapping** | JSONB column → analyte via **name** or **analyte alias** (casefold); known non-analyte keys (`units`, etc.) skipped |
-| **Tests** | Use the active Test created or attached at LimsRun start for `(sample_id, analysis_id)`; if any required Test is missing, publish returns **422** and refuses the whole run instead of creating one or writing partial Results |
+| **Tests** | Use the active Test created or attached at LimsRun start for `(sample_id, analysis_id)`. WO-7 lock: missing required Test → **422** and refuse the whole run, no invented Test, no partial Results. That refuse is **not** verified as shipped on `9c4f9da` |
 | **Results** | Write `raw_result`, `replicate` (from JSONB or row order), `lims_run_id` lineage |
 | **Conflicts** | Same run → update; other run / manual result owns triple → **409**, publish blocked |
 | **Preview** | `GET /v1/lims-runs/{id}/promotion/preview` — dry-run; UI shows counts on Publish confirm |
@@ -142,7 +142,7 @@ You can still enforce strict state-machine rules in the application service laye
 
 - Routes: `/runs`, `/runs/:id`, `/runs/:id/dose-response`
 - Main pages: RunsManagement, LimsRunDetail (Overview / Data / Dose Response tabs)
-  - Overview: **Analysis** and cohort required to start; start locks the cohort, creates or attaches each Test, freezes asked-for params, and enforces WO-7. **Publish** opens promotion preview and, if a required Test is missing, refuses the whole run with no partial Results.
+  - Overview: **Analysis** and cohort required to start; start locks the cohort, creates or attaches each Test, freezes asked-for params, and enforces WO-7. **Publish** opens promotion preview. Whole-run refuse when a required Test is missing is the WO-7 lock, **not** verified as shipped on `9c4f9da`.
 - API under `/v1/lims-runs` (including `GET …/promotion/preview`, publish = `PATCH …/complete`)
 
 ## Next Steps / Open Questions

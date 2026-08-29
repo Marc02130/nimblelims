@@ -2337,7 +2337,7 @@ Dry-run of what publish would write to existing Tests/Results when `analysis_id`
 ### PATCH /v1/lims-runs/{id}/complete
 Transition `complete → published` (requires `experiment:publish`).
 
-Promotes instrument JSONB → Tests/Results in one transaction (**run always has `analysis_id`**). Each Test must already exist from LimsRun start (WO-7). If any required Test is missing, publish returns **422** and refuses the whole run instead of inventing a Test or writing partial Results. **409** with `code: promotion_conflict` if another run/manual result owns the same test/analyte/replicate.
+Promotes instrument JSONB → Tests/Results in one transaction (**run always has `analysis_id`**). Each Test must already exist from LimsRun start (WO-7). The lock is: if any required Test is missing, publish returns **422** and refuses the whole run instead of inventing a Test or writing partial Results. That refuse is **not** verified as shipped on `9c4f9da`. **409** with `code: promotion_conflict` if another run/manual result owns the same test/analyte/replicate.
 
 ### PATCH /v1/lims-runs/{id}/start
 Start run. **Requires `analysis_id`** on the run and at least one cohort sample — **400** if either is missing. With `sample_ids` in the body, start locks the cohort, creates or attaches one active Test per `(sample, analysis)`, and freezes the routed asked-for `params` into `tests.asked_for_params`. No non-reportable / `acknowledge_no_analysis` path (product lock 2026-07-19; remove legacy ack if still in code).

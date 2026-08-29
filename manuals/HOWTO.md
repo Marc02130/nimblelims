@@ -15,7 +15,7 @@ This is a how-to, not a PRD. Marc keeps it current as features ship.
 | Receive (`/receive`) | Shipped on `main` |
 | Route / work order | Shipped on this P2 branch (`/asked-for` Route, `/admin/routing-map`, `/work-orders`) |
 | Process / Experiment / LimsRun | Execute substrate shipped; P1 does **not** start it |
-| Results | Classic type-a-number on a Test; persist lock is a later packet |
+| Results | Classic type-a-number on a Test; persist lock is a later packet. WO-7 whole-run publish-refuse is the lock, **not** verified on `9c4f9da` |
 | Requested analysis (`/asked-for`) — later look-up, off the bench path | Shipped on `main` (P1 lake) |
 
 Handbooks in this folder: [atomic-receive.md](atomic-receive.md), [asked-for.md](asked-for.md), [navigation.md](navigation.md), [api-endpoints.md](api-endpoints.md), [dev-setup.md](dev-setup.md), [admin-setup.md](admin-setup.md), [processes.md](processes.md), [experiments.md](experiments.md), [lims-runs.md](lims-runs.md). Index: [README.md](README.md).  
@@ -106,7 +106,7 @@ Classic path: **Results** (`/results`) — type a number on an existing Test (ba
 
 Params freeze at **LimsRun start** when the work-order packet exists — **not** on receive.
 
-LimsRun **publish** can promote instrument rows onto Tests/Results. Two writers on the same Test → **409**. Publish must not invent a Test if WO-7 is in force: if any required Test is missing, publish returns **422** and refuses the **whole run**, with no partial Results.
+LimsRun **publish** can promote instrument rows onto Tests/Results. Two writers on the same Test → **409**. WO-7 lock: if any required Test is missing, publish must return **422** and refuse the **whole run**, with no partial Results. That refuse is **not** verified as shipped on `9c4f9da` (QA: **200 published** with 0 Tests). Do not treat it as Pass.
 
 UAT (classic): [`UAT_Scripts/uat-results-entry-review.md`](../UAT_Scripts/uat-results-entry-review.md). Persist lock (P3) is specified on the spine packet, not shipped as that slice.
 
