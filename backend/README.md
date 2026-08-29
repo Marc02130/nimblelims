@@ -11,13 +11,14 @@ Copyright (c) 2025 Marc Breneiser
 ## Features
 
 ### Core Functionality
-- **Sample Management**: CRUD operations for samples with status tracking
-- **Test Management**: Assign and track tests with status workflows
+- **Sample Management**: CRUD operations for samples with status tracking. Receive (`POST /samples/receive`) refuses non-empty `analysis_ids` (**422**).
+- **Asked-for (P1)**: `POST /v1/asked-for` records **requested analysis** after receive (no Test row, no execute)
+- **Test Management**: Track existing Tests with status workflows (not the request path)
 - **Results Entry**: Batch-based results entry with validation
 - **Batch Management**: Create and manage batches with container tracking
 - **Container Management**: Container types (admin-managed) and dynamic instance creation
 - **Lists Management**: Configurable lists and entries (admin-editable, full CRUD)
-- **Name Templates**: Configurable entity naming; placeholder resolution: {YY} = str(now.year % 100).zfill(2), {SEQ} = str(seq).zfill(template.seq_padding_digits); sequence start via POST /admin/sequences/{entity_type}/start (see `app/core/name_generation.py`, `.docs/review/manuals/ids-and-configuration.md`)
+- **Name Templates**: Configurable entity naming; placeholder resolution: {YY} = str(now.year % 100).zfill(2), {SEQ} = str(seq).zfill(template.seq_padding_digits); sequence start via POST /admin/sequences/{entity_type}/start (see `app/core/name_generation.py`, [`manuals/ids-and-configuration.md`](../manuals/ids-and-configuration.md))
 - **Analyses Management**: CRUD operations for analyses (admin-only)
 - **Analytes Management**: CRUD operations for analytes (admin-only)
 - **Analysis-Analyte Configuration**: Configure validation rules for analytes in analyses (admin-only)
@@ -45,6 +46,14 @@ Copyright (c) 2025 Marc Breneiser
 - `GET /samples/{id}` - Get sample details
 - `PATCH /samples/{id}` - Update sample
 - `PATCH /samples/{id}/status` - Update sample status
+
+#### Asked-for (P1)
+- `POST /v1/asked-for` - Record requested analyses for a sample set (no Tests)
+- `GET /v1/asked-for` - List asked-for rows
+- `GET /v1/asked-for/{id}` - Get one asked-for row
+- `POST /v1/asked-for/{id}/cancel` - Cancel while `requested`
+- `GET /analyses/{id}/param-defs` - Analysis method-param catalog
+- `PUT /analyses/{id}/param-defs` - Replace catalog (`config:edit`)
 
 #### Tests
 - `GET /tests` - List tests
@@ -402,11 +411,8 @@ The `start.sh` script:
 
 ## Related Documentation
 
-- [API Endpoints Reference](../.docs/review/manuals/api-endpoints.md)
+- [How to run the lab path](../manuals/HOWTO.md)
 - local `.docs/internal/design/experiment-planning.md` (not committed)
-- [Authentication Implementation](../.docs/review/manuals/backend-auth.md)
+- [Operator manuals](../manuals/) (HOWTO, API, navigation, domain handbooks)
 - local `.docs/internal/design/nimblelims-tech.md` (not committed)
-- [Accessioning Workflow](../.docs/review/manuals/accessioning-workflow.md)
-- [Container Management](../.docs/review/manuals/containers.md)
-- [Lists System](../.docs/review/manuals/lists.md)
 

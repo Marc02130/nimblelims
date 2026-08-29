@@ -1,1 +1,1 @@
-Operator manuals moved to local `.docs/manuals/` (not on git); published how-tos are [`/manuals/`](../../../manuals/).
+Operator manuals live in git-tracked [`/manuals/`](../../../manuals/). Start with [`HOWTO.md`](../../../manuals/HOWTO.md). Do not put operator how-tos back here.
