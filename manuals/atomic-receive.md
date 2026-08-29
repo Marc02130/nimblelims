@@ -7,7 +7,7 @@
 **Requirements:** `.docs/internal/prd/sample-accessioning/PRD.md` (RQ-AR-*) · SPEC §3  
 **Sketch:** `.docs/review/tech-sketch/atomic-receive.md`
 
-**After CORE (P1, not on this screen):** record **requested analysis** on **Asked-for** (`/asked-for`). See [asked-for.md](asked-for.md). Asked-for does **not** mint Tests or start work. Route / work_orders / WO-7 stay **out** of the P1 stamp. Results-entry persist lock remains a later packet (**NR-AR-1** / AR-RES).
+**Separate motion (P1, not on this screen, not the click after a commit):** **Asked-for** (`/asked-for`) records **requested analysis + TAT** as a later look-up. See [asked-for.md](asked-for.md). Asked-for does **not** mint Tests or start work; receive’s happy path is staying on `/receive` for the next tube. Route / work_orders / WO-7 stay **out** of the P1 stamp. Results-entry persist lock remains a later packet (**NR-AR-1** / AR-RES).
 
 The legacy `/accessioning` wizard is **removed**. `/accessioning` redirects to `/receive`.
 
@@ -15,7 +15,7 @@ The legacy `/accessioning` wizard is **removed**. `/accessioning` redirects to `
 
 ## Purpose
 
-High-volume intake: register specimen identity + **1..N vessels** in **one transaction**. Lab sample ID is system-assigned. Tube barcode is the vessel. Status on commit is **Available for Testing**. Requested analysis, work orders, and results entry are **out of receive**. After receive, analysts record requested analysis on **Asked-for** ([asked-for.md](asked-for.md)) — that still creates **zero Tests**.
+High-volume intake: register specimen identity + **1..N vessels** in **one transaction**. Lab sample ID is system-assigned. Tube barcode is the vessel. Status on commit is **Available for Testing**. Requested analysis, work orders, and results entry are **out of receive**. Requested analysis is recorded later on **Asked-for** ([asked-for.md](asked-for.md)) as its own look-up — that still creates **zero Tests**.
 
 Legacy wizard at `/accessioning` is **gone** (redirects here). See [accessioning-workflow.md](accessioning-workflow.md).
 
@@ -40,7 +40,7 @@ Legacy wizard at `/accessioning` is **gone** (redirects here). See [accessioning
 5. **Receive** → toast → barcodes clear → sticky fields remain → focus primary.
 6. Stay on the page for the next specimen.
 
-**Container type:** required; **1×1 vessels only** (`rows=1` and `columns=1`). Plates / multi-well are hidden in the UI and refused by the API. Same type applies to all vessels on the commit.
+**Container type — CORE drift.** The lock is RQ-AR-8 / Lab Ops **L3**: lab **default tube**, applied to all vessels on the call, **off the form** (no type picker in the scan loop). The shipped screen still asks for it and the API still requires `container_type_id`: **1×1 vessels only** (`rows=1` and `columns=1`); plates / multi-well are hidden in the UI and refused by the API; same type applies to all vessels on the commit. Document it as drift, do not teach it as the target path.
 
 **Not on the form:** sample ID, status, **analysis picker**, aliquot dialog, redirect to sample detail. OOB receive never offers analyses and never sends `analysis_ids`.
 
@@ -110,5 +110,5 @@ If `analysis_ids` is present and **non-empty** → **422**. Do not ignore. Do no
 - API index: [api-endpoints.md](api-endpoints.md)  
 - Containers: [containers.md](containers.md)  
 - Legacy wizard: [accessioning-workflow.md](accessioning-workflow.md)  
-- Asked-for (after receive): [asked-for.md](asked-for.md)  
+- Asked-for (separate later look-up): [asked-for.md](asked-for.md)  
 - Navigation: [navigation.md](navigation.md)  

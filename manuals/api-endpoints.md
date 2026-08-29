@@ -130,7 +130,7 @@ Create a new sample.
 - `samples.name` from name template; each barcode → `containers.name` (409 on collision, full rollback)
 - Status → **Available for Testing**; `received_date` set
 - Same container type applied to all vessels on the call
-- CORE creates **zero Tests** and **zero Results**. Omit `analysis_ids` or send `[]`. Non-empty `analysis_ids` → **422** before the receive transaction (refuse, do not ignore, do not mint). Do **not** send `analysis_param_defs` or asked-for on this call. After receive, record **requested analysis** via `POST /v1/asked-for` ([asked-for.md](asked-for.md)) — that still creates zero Tests and does not start work.
+- CORE creates **zero Tests** and **zero Results**. Omit `analysis_ids` or send `[]`. Non-empty `analysis_ids` → **422** before the receive transaction (refuse, do not ignore, do not mint). Do **not** send `analysis_param_defs` or asked-for on this call. **Requested analysis** is a separate, later call — `POST /v1/asked-for` ([asked-for.md](asked-for.md)) — not a follow-up the receive client is expected to chain; it still creates zero Tests and does not start work.
 
 **Response:** `{ sample_id, sample_name, status, project_id, received_date, containers[], tests[] }` → **201**
 
