@@ -23,7 +23,7 @@ P1 is the **asked-for lake**. An analyst records **requested analysis + TAT** ag
 | Not a queue | Asked-for is a look-up, not the after-receive click and not a Start queue. Do not document receive → asked-for as one motion. |
 | Wrong pairings | The lake accepts them on purpose (e.g. Qubit on blood). Refusal is **routing** (`route_sample_type` **422**) on map save and Route. |
 | Route | Explicit Route requires `test:assign` plus project access, not `experiment:manage`. Client writes and hidden/other-project samples return **403**, not 404. Empty map → 200 `no_route`. Match mints queued `work_orders` and sets `routed`. The mint is planning, not work started. Still zero Tests. |
-| Params | Freeze onto `tests.asked_for_params` at the **first LimsRun start** (WO-7). Later starts do not re-freeze. Do **not** collect params on receive. |
+| Params | Lock: freeze onto `tests.asked_for_params` at the **first LimsRun start** (WO-7). That first-start freeze is **still open** on `b005cfe` — a later start rewrites the snapshot, with empty `{}` when no `routed` row matches. Empty `{}` is a freeze, not a hole to refill. Do **not** collect params on receive. |
 
 ---
 
@@ -64,7 +64,9 @@ Do not chain this section onto Receive or onto the save steps above. Return to `
 3. No match returns `no_route`; the row stays `requested`, with no `work_order` or Test.
 4. A match creates a queued `work_order`, changes the row to `routed`, and still creates no Test. This queue mint does not mean work has started.
 5. Experiments → **Work Orders** (`/work-orders`) is the work backlog. **Start process** instantiates and opens the existing ELN process; it is not a second execution engine.
-6. The **first** LimsRun start creates or attaches the Test and freezes the then-current `asked_for_params` (WO-7); later starts do not re-freeze. If any cohort sample lacks an active Test at publish, **422** refuses the whole run, writes no Results, invents no Test, and leaves the run `complete`. The guard is implemented on `b005cfe`, but its live AC-P2 stamp is unsigned; the historical `9c4f9da` stamp remains signed not Pass.
+6. WO-7 lock: the **first** LimsRun start creates or attaches the Test and freezes the then-current `asked_for_params`. If any cohort sample lacks an active Test at publish, **422** refuses the whole run, writes no Results, invents no Test, and leaves the run `complete`.
+
+The two halves of WO-7 are not at the same maturity on `b005cfe`. The **publish refuse is in code** (live AC-P2 unsigned until QA). The **first-start freeze is still open**: `_mint_tests_at_start` has no already-frozen guard, so a later start that finds the existing active Test rewrites `tests.asked_for_params` — including overwriting with empty `{}` when no `routed` asked-for row matches. Do not read or write that overwrite as closed. The historical `9c4f9da` stamp remains signed not Pass.
 
 The routing type gate fails closed: every mapped process-definition step must accept the current sample type. An empty accepted-type set or incompatible step returns **422** `route_sample_type`. That code means the requested analysis and current sample type are the wrong pairing for a mapped step; it does not mean the sample is broken. Saving an otherwise valid Qubit-on-blood request in the lake does not bypass that gate.
 
