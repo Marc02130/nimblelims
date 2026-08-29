@@ -109,7 +109,7 @@ Pytest: create, 409 dup, **403 dual-belt** (create **and** `list()` / `GET /aske
 
 - Resolve sample_type
 - Select map row
-- **L2:** Type eligibility is **config** on the process-definition LimsRun step and/or the analysis — **not** inferred from `sample_type_transitions` (that table is allowed dests, not proof execute minted them). Until extract-hold dest-type execute writes dest type + `parent_sample_id` + `eln_process_samples`, **no earlier step mints DNA**. Chain Extract → Qubit keyed on **blood** is Qubit-on-blood → **422 `route_sample_type` on map save and on route**. No OOB rows that claim blood → Qubit. Do not invent Qubit/blood testdata IDs. **Not this PR.**
+- **L2 / OQ-WO-4:** Type eligibility is **config on each process-definition step** (`eln_experiment` **and** `lims_run`) via `eln_process_definition_step_accepted_sample_types`. **Not** on the analysis. **Qubit is a LimsRun step.** Do **not** infer from `sample_type_transitions`. Until extract-hold dest-type execute writes dest type + `parent_sample_id` + `eln_process_samples`, **no earlier step mints DNA**. Chain Extract → Qubit keyed on **blood** is Qubit-on-blood → **422 `route_sample_type` on map save and on Route**. Empty accepted set on any step = fail closed. No OOB rows that claim blood → Qubit. Do not invent Qubit/blood testdata IDs.
 
 `work_orders.process_definition_ids uuid[]` snapshot at mint (**L4**). Completing process *N* starts *N+1* from **that snapshot**. No second routing hop. No first-only + route-next.
 

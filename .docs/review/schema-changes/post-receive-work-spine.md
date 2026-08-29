@@ -22,14 +22,16 @@ RLS: asked_for and work_orders follow sample → project (same pattern as tests)
 | `analysis_param_defs` | Catalog of **method params** per analysis (assay). Example keys: [working note](../../decision-logs/2026-08-28-analysis-param-defs.md) (not seed). | `id`, `analysis_id` FK, `key` text, `data_type` text (`number` \| `int` \| `text` \| `bool`), `unit` text null (display; not `results.unit_id`), `required` bool, `source_list_id` uuid null (list-backed enum), `allowed_values` jsonb null (inline enum sketch when no list), `sort_order` int, audit |
 | `asked_for` | Requested analysis on a sample. `params` = values for that analysis’s defs (order layer). | `id`, `sample_id` FK, `analysis_id` FK, `tat_days` int not null check > 0, `params` jsonb not null default `{}`, `status` text not null, `routed_work_order_id` uuid null, audit |
 | `routing_map` | P2: analysis × sample_type × TAT range → process chain | `id`, `analysis_id` FK, `sample_type_id` uuid (list entry), `tat_range` int4range not null, `process_definition_ids` uuid[] not null, `active` bool, audit |
-| `work_orders` | P2: backlog item | `id`, `asked_for_id` FK unique, `sample_id` FK, `analysis_id` FK, `process_definition_ids` uuid[] not null, `status` text not null, `process_id` uuid null FK eln_processes, audit |
+| `work_orders` | P2: backlog item | `id`, `asked_for_id` FK unique, `sample_id` FK, `analysis_id` FK, `process_definition_ids` uuid[] not null, `status` text not null, `process_id` uuid null (denorm of current process only) |
+| `eln_process_definition_step_accepted_sample_types` | P2 L2 / **OQ-WO-4:** accepted sample types per **step** (experiment **and** LimsRun). Not on analysis. Qubit = a LimsRun step. | `step_id` FK `eln_process_definition_steps` ON DELETE CASCADE, `sample_type_id` FK `list_entries`, unique `(step_id, sample_type_id)` |
 
 ### 2.2 Altered tables
 
 | Table | Change | Notes |
 |-------|--------|-------|
 | `sop_parse_jobs` (name as in code) | ADD `process_definition_id` uuid null FK | P4 |
-| `eln_processes` | ADD `work_order_id` uuid null FK | P2; optional reverse of work_orders.process_id — pick **one** FK direction at implement (prefer `work_orders.process_id` only) |
+| `eln_processes` | ADD `work_order_id` uuid null FK | P2 SoT (OQ-WO-3 / A6). Every process instance in the chain points at the WO. `work_orders.process_id` if kept is denorm of **current** only. |
+| `eln_process_definition_steps` | P2: `experiment_template_id` **nullable**; ADD `analysis_id` uuid null FK `analyses` | Pulled from A8 so a **Qubit LimsRun** step does not need a fake ExperimentTemplate. CHECK: `eln_experiment` ⇒ template NOT NULL; `lims_run` ⇒ `analysis_id` NOT NULL. |
 | `results` | none | P3 uses `reported_result`, `qualifiers` (UUID FK), `raw_result`. Fitted IC50 etc. live here, **not** in param JSON. |
 | `tests` | **P2:** ADD `asked_for_params jsonb not null default '{}'` | **A5 / L3 / SC5.** Frozen copy of `asked_for.params` at **LimsRun start**. P1 does not write this column. |
 
@@ -45,7 +47,10 @@ Do **not** add `results.unit_id`. Do **not** add asked-for columns on `samples`.
 | `work_orders_status_chk` | status in (`queued`,`in_progress`,`completed`,`cancelled`) | |
 | `routing_map_tat_excl` | EXCLUDE gist (`analysis_id` WITH `=`, `sample_type_id` WITH `=`, `tat_range` WITH `&&`) WHERE active | RQ-WO-4 |
 | `routing_map_chain_chk` | `array_length(process_definition_ids, 1) >= 1` | empty chain forbidden |
+| `uq_step_accepted_sample_type` | unique `(step_id, sample_type_id)` | OQ-WO-4 |
+| `eln_process_definition_steps` kind check | `eln_experiment` ⇒ `experiment_template_id` NOT NULL; `lims_run` ⇒ `analysis_id` NOT NULL | Qubit as LimsRun |
 | indexes | `asked_for(sample_id)`, `asked_for(status)`, `work_orders(status)`, `work_orders(sample_id)` | lists |
+| extension | P2: `CREATE EXTENSION IF NOT EXISTS btree_gist` | TAT exclude |
 
 ### 2.4 Enums / types
 
@@ -59,8 +64,11 @@ No Postgres ENUM. Text + check. Status lists may also seed `list_entries` if the
 | `work_orders` | same |
 | `analysis_param_defs` | read: authenticated; write: config:edit / admin |
 | `routing_map` | read: authenticated lab roles; write: config:edit / admin |
+| `eln_process_definition_step_accepted_sample_types` | same as process definitions (config write; lab read) |
 
-FORCE ROW LEVEL SECURITY on all four.
+FORCE ROW LEVEL SECURITY on asked_for, work_orders, analysis_param_defs, routing_map, and the step-accepted-types table.
+
+**P2 type gate (OQ-WO-4):** do **not** add `analysis_accepted_sample_types`. Check **current** sample type against **every** definition step in the mapped chain (experiment steps and LimsRun steps). Empty accepted set on a step → fail closed (`422 route_sample_type`) on map save and on Route. Qubit is a `lims_run` step; it does not accept blood. Do not read `sample_type_transitions`.
 
 ## 3. Seed
 
