@@ -1,7 +1,7 @@
 # Requirements: Post-receive work spine
 
 **Date:** 2026-08-28  
-**Status:** Spec **Accept with conditions** on P2 (`feat/work-order-p2` @ `3b56cfb`, 2026-08-28 room). **P1 shipped** on `main` (PR 81; UAT Pass). **Hold merge until UAT.** Punches: publish-refuse-whole-run, first-start-wins, one process definition, P2-4 read visibility (`0074` `has_experiment_access` is not catalog-visible), list-key. Not IC50.  
+**Status:** Spec **Accept with conditions** on P2 (`feat/work-order-p2` @ `3b56cfb`, 2026-08-28 room). **P1 shipped** on `main` (PR 81; UAT Pass). **Hold merge until UAT.** Punches: publish-refuse-whole-run (including empty plan), first-start-wins, one process definition, P2-4 read visibility (`0074` `has_experiment_access` is not catalog-visible), list-key. Not IC50.  
 **Stem:** `post-receive-work-spine`  
 **Leadership sequencing (2026-08-28):** order (asked-for) → work_order → results → SOP+AI → process → instrument import config  
 **Do not implement P2+ until those phase reviews Accept / Accept-with-conditions and open questions that block the named phase are Decided.**
@@ -28,7 +28,7 @@
 6. **Receive freeze:** non-empty `analysis_ids` still **422**.
 7. Operator how-tos live in git-tracked [`/manuals/HOWTO.md`](../../../manuals/HOWTO.md). Do not put operator manuals back under `.docs/review/manuals/`.
 8. **P2 one process:** `routing_map` / `work_order` hold **one** process definition (typed Exp/LimsRun steps). Bounce process-of-processes, `uuid[]` chain, completing N starts N+1, `start` of `[0]` only.
-9. **WO-7 publish:** refuse the **whole** publish (**422**) if a Test is missing — not swallow into `plan.errors` and mark published.
+9. **WO-7 publish (QA Fail @ `9c4f9da`):** refuse the **whole** publish (**422**) if a Test is missing — stay unpublished, zero Results. Same lock covers swallow-into-`plan.errors` **and** empty plan (0 data rows, never calls `ensure_test`) that still `PATCH complete` → 200 published. Do not fold start-mint as WO-7 Pass.
 10. **Freeze:** first LimsRun start wins. Do not overwrite `asked_for_params` on an existing Test.
 11. **P2-4 / Heidi belt:** Route is `test:assign` and must **read** the mapped def/steps (catalog-visible, same client / logged-in, like `routing_map`). Do not put `experiment:manage` on Route. Do not keep `created_by` on read. **`0074`:** `is_admin() OR has_experiment_access()` is not catalog-visible. Mutate stays `config:edit`. Instantiate stays. “No steps” from hidden RLS is not `route_sample_type`.
 12. **P2-2/3:** routing map and receive share the `sample_types` list. Empty select from `sample_type` vs `sample_types` is a list-key bug.
@@ -68,7 +68,7 @@ PARSER SETUP (P5) instruments / CRO / parsers     THIS PACKET (config UX)
 | Phase | Name | MVP pillar | Implement when |
 |-------|------|------------|----------------|
 | **P1** | Asked-for (lake) | Test ordering | **Shipped** (PR 81; UAT Pass 2026-08-28) |
-| **P2** | Routing + work_order | Test ordering / processing | Architecture / UI / Spec Accept with conditions @ `3b56cfb`. **Hold merge until UAT.** Punches: publish-refuse-whole-run, first-start-wins, one process definition, P2-4 catalog-visible read, list-key. |
+| **P2** | Routing + work_order | Test ordering / processing | Architecture / UI / Spec Accept with conditions @ `3b56cfb`. **Hold merge until UAT.** Punches: publish-refuse-whole-run (including empty plan), first-start-wins, one process definition, P2-4 catalog-visible read, list-key. |
 | **P3** | Results persist | Results entry | **CLOSED.** After P1 (may parallel P2 if Test exists via LimsRun or classic) |
 | **P4** | SOP+AI → process definition | Processing (not MVP bar) | **CLOSED.** P2 process definition is the Apply target; extract-hold dest type still Hold for blood→DNA→Qubit E2E |
 | **P5** | Instrument import configuration | Processing (parsers shipped) | **CLOSED this cycle.** Independent of P1 |
@@ -105,7 +105,7 @@ P1 is the **lake**. P2–P5 are specified here so reviews see the path. Coding a
 | **RQ-WO-6** | **OQ-WO-1:** Tech hits **Route**. Asked-for create/save does **not** mint a work_order. `POST /asked-for/{id}/route` (UI may Route a selected set in one action). If a map row matches, mint **one** `work_order` per asked-for with **one** process-definition snapshot; asked-for → `routed`. No match → stay `requested`, `no_route`. Empty map mints nothing. **P1 never writes `routed`.** |
 | **RQ-WO-7** | Instantiating **that** process definition uses **existing process AuthZ** (`experiment:manage`). No client expand. Bounce completing N starts N+1, `start` of `[0]` on a `uuid[]`, process-of-processes. **P2-4:** Route is `test:assign` and must **read** the mapped def/steps to run the type gate. SOP def/step **read** is catalog-visible (same client / logged-in, like `routing_map`). Do not require `experiment:manage` on Route. Do not filter read by `created_by` or `has_experiment_access()`. **`0074` is not catalog-visible.** Mutate stays `config:edit`. Invisible def → “no steps” is not `route_sample_type`. |
 | **RQ-WO-11** | **L3 / SC5 / A5:** Asked-for `params` are **order capture**. At **LimsRun start**, insert Test if missing; copy `asked_for.params` → `tests.asked_for_params` (jsonb) and **freeze**. **First start wins** — do not overwrite `asked_for_params` on an existing Test. Tech does not re-type cell line / method params to run the assay. Empty defs → `{}`. Not receive, not publish, not result columns. P1 does not write the Test snapshot. |
-| **RQ-WO-8** | Work_order does **not** create Tests. Tests are created at **LimsRun start** (WO-7). Publish **422s the whole run** if any Test is missing. Bounce swallow-into-`plan.errors` and mark published. No ensure-on-publish find-or-create. |
+| **RQ-WO-8** | Work_order does **not** create Tests. Tests are created at **LimsRun start** (WO-7). Publish / `PATCH complete` **422s the whole run** if any Test is missing — including **empty plan** (0 data rows, never calls `ensure_test`). Stay unpublished. Zero Results. Bounce swallow-into-`plan.errors` and mark published. No ensure-on-publish find-or-create. Start-mint is not WO-7 Pass. |
 | **RQ-WO-9** | Non-instrument analysis: LimsRun with `analysis_id` required; manual results OK; parser requires instrument XOR CRO (WO-4). |
 | **RQ-WO-10** | Work_order status: `queued` \| `in_progress` \| `completed` \| `cancelled`. |
 
@@ -179,7 +179,7 @@ North star authors parsers at SOP via MCP. Until that ships, P5 is **review / dr
 16. P1 `params` labeled or stored as the Test snapshot
 17. Process-of-processes / `uuid[]` chain / completing N starts N+1 / `start` of `[0]` only
 18. Overwrite `asked_for_params` on an existing Test
-19. Publish skip-and-complete when a Test is missing (swallow `ensure_test` 422)
+19. Publish skip-and-complete when a Test is missing (swallow `ensure_test` 422 **or** empty plan / 0 data rows that never calls `ensure_test`)
 20. Admin-only Route / `experiment:manage` on Route / RLS that hides catalog-visible SOP def/steps (`created_by` or `has_experiment_access()`)
 21. “No steps” / invisible def presented as `route_sample_type`
 22. Routing map `sample_type` vs receive `sample_types` (empty select / list-key)
@@ -196,7 +196,7 @@ North star authors parsers at SOP via MCP. Until that ships, P5 is **review / dr
 | AC-P2-2 | No map row → no work_order; UI says configure routing |
 | AC-P2-3 | Qubit route on blood sample → refuse |
 | AC-P2-4 | alice (`test:assign`) Routes a mapped def created by admin and can read its steps; not admin-only; not `experiment:manage` on Route; not `has_experiment_access()` as the SOP-read belt |
-| AC-P2-5 | Publish with a missing Test → 422 the whole run, not published |
+| AC-P2-5 | Publish / `PATCH complete` with a missing Test (including empty plan / 0 data rows after Test delete) → 422 the whole run, stay unpublished, zero Results |
 | AC-P2-6 | Routing type select uses `sample_types` (same list as receive); not empty from `sample_type` |
 | AC-P3-1 | Type `12.3` with units_default set → `reported_result` set; `qualifiers` NULL unless a list qualifier is chosen |
 | AC-P3-2 | Missing units_default → 422, no row |
