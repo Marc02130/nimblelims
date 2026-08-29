@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-28  
 **Stem:** `post-receive-work-spine`  
-**Status:** P2 room-locked 2026-08-28. Architecture / UI / Spec **Accept with conditions** on `feat/work-order-p2` @ `3b56cfb`. **Hold merge until UAT.** Punches before merge: publish-refuse-whole-run (including empty plan), first-start-wins, one process definition, P2-4 read visibility (`0074` `has_experiment_access` is not catalog-visible), list-key. Not IC50.  
+**Status:** P2 room-locked 2026-08-28. Architecture / UI / Spec **Accept with conditions** on `feat/work-order-p2` @ `b005cfe`. **Hold merge until UAT.** Punch (1) publish-refuse **code-closed** @ `b005cfe` (hold QA click). Open: first-start-wins, one process definition, P2-4 read visibility (`0074` `has_experiment_access` is not catalog-visible). Not IC50.  
 **Requirements:** [`.docs/review/requirements/post-receive-work-spine.md`](../requirements/post-receive-work-spine.md)  
 **Schema:** [`.docs/review/schema-changes/post-receive-work-spine.md`](../schema-changes/post-receive-work-spine.md)  
 **Spec:** [`.docs/internal/specs/post-receive-work-spine/SPEC.md`](../../internal/specs/post-receive-work-spine/SPEC.md)  
@@ -18,12 +18,12 @@ P1 is on `main`. P2 is on `feat/work-order-p2` (Accept with conditions). Do not 
 2. **Heidi:** `GET /asked-for` `list()` must **dual-belt `has_project_access`** (same as create), **not RLS-only**. `analysis_param_defs` RLS may be any logged-in user; mutate stays `config:edit` in the router. P1 must **not** write status `routed` (`routed` is P2). Type × analysis eligibility is **P2 (L2)**, not this PR.
 3. **Params** on `asked_for` are **order capture**, not the Test snapshot. Freeze still happens at LimsRun start (WO-7 / P2). Bounce Start/Execute CTA, silent Order→work, analysis picker on `/receive`, README that equates asked-for with Test assign. Classic `/tests` type-a-number stays.
 4. **Mathilda U1 / U2:** asked-for ≠ Test assign. Label params as order capture, not Test snapshot.
-5. Architecture / UI / Spec **Accept with conditions** on P2 @ `3b56cfb`. Hold merge until UAT. Not IC50.
+5. Architecture / UI / Spec **Accept with conditions** on P2. Hold merge until UAT. Not IC50.
 6. **Receive freeze:** non-empty `analysis_ids` still **422**.
-7. **P2 one process (Heidi / Mathilda U1):** `routing_map` and `work_order` hold **one** process definition (typed Exp/LimsRun steps). Bounce process-of-processes, `uuid[]` chain, completing N starts N+1, `start` of `[0]` only.
-8. **WO-7 publish (QA Fail @ `9c4f9da`):** refuse the **whole** publish (**422**) if a Test is missing — status stays unpublished, zero Results. Two holes, same lock: (1) swallow `ensure_test` 422 into `plan.errors` and mark published; (2) **empty plan** (0 data rows) that never calls `ensure_test` and still `PATCH complete` → 200 published. Do **not** fold start-mint as WO-7 Pass.
-9. **Freeze:** first LimsRun start wins. `_mint_tests_at_start` must **not** overwrite `asked_for_params` on an existing Test.
-10. **P2-4 visibility (QA Fail / Heidi belt):** Route is `test:assign` and must **read** the mapped def/steps to run the type gate. SOP def/step **read** is catalog-visible (same client / logged-in, like `routing_map`). Do **not** require `experiment:manage` on Route. Do **not** filter read by `created_by`. **`0074`:** dropping `created_by` is good; `is_admin() OR has_experiment_access()` is **not** catalog-visible — a tech with `test:assign` and no experiment access still cannot see the mapped SOP. Mutate stays `config:edit` (do not widen write to `has_experiment_access()`). Instantiate stays. Invisible def → “no steps” is **not** `route_sample_type`. Route is **not** admin-only.
+7. **P2 one process (Heidi / Mathilda U1):** `routing_map` and `work_order` hold **one** process definition (typed Exp/LimsRun steps). Bounce process-of-processes, `uuid[]` chain, completing N starts N+1, `start` of `[0]` only. **Still open** on `b005cfe`.
+8. **WO-7 publish (code-closed @ `b005cfe`, hold QA):** `_require_wo7_tests` 422s before promote if any cohort sample lacks an active Test (empty cohort / empty plan / Test delete). `plan.errors` also 422s. Status stays unpublished (complete). Do **not** fold start-mint as WO-7 Pass.
+9. **Freeze:** first LimsRun start wins. `_mint_tests_at_start` must **not** overwrite `asked_for_params` on an existing Test. **Still open** on `b005cfe`.
+10. **P2-4 visibility (QA Fail / Heidi belt):** Route is `test:assign` and must **read** the mapped def/steps to run the type gate. SOP def/step **read** is catalog-visible (same client / logged-in, like `routing_map`). Do **not** require `experiment:manage` on Route. Do **not** filter read by `created_by`. **`0074`:** dropping `created_by` is good; `is_admin() OR has_experiment_access()` is **not** catalog-visible — a tech with `test:assign` and no experiment access still cannot see the mapped SOP. Mutate stays `config:edit` (do not widen write to `has_experiment_access()`). Instantiate stays. Invisible def → “no steps” is **not** `route_sample_type`. Route is **not** admin-only. **Still open** on `b005cfe`.
 11. **P2-2/3 list-key:** routing map and receive use the **same** sample-type list (`sample_types`). `sample_type` vs `sample_types` empty select is a list-key bug, not a type gate.
 
 ---
@@ -122,7 +122,7 @@ Start: `ELNProcessService.instantiate_from_definition` on **that** definition; `
 
 **L3 / A5 / SC5:** At LimsRun start, insert Test if missing; copy `asked_for.params` → `tests.asked_for_params` and freeze. **First start wins** — do not overwrite `asked_for_params` on an existing Test. Column ships in the P2 migration. P1 does **not** write that Test snapshot. Shape: JSON object matching that analysis’s defs (see working-note §3 snapshots).
 
-WO-7: insert Test if missing at LimsRun start. Publish (`PATCH complete`): **422 the whole run** if any Test is missing — including **empty plan** (0 data rows, never calls `ensure_test`). Do not swallow into `plan.errors` and complete. Status stays unpublished. Zero Results. **Remove** ensure-on-publish find-or-create. Start-mint is not WO-7 Pass.
+WO-7 publish @ `b005cfe` (code-closed, hold QA): `_require_wo7_tests` 422s before promote if any cohort sample lacks an active Test (empty cohort / empty plan / Test delete). `plan.errors` also 422s. Status stays complete / unpublished. Zero Results. Start-mint is not WO-7 Pass.
 
 ## 5. P3 design
 
@@ -150,7 +150,7 @@ No new import engine. **Do not build “admin authors parsers” as the product.
 | Cancelled asked-for re-create | Allowed (unique ignores cancelled) |
 | Route with empty map | 200, no WO |
 | Map overlap | 409 on map save |
-| Publish without Test (deleted Test or empty plan / 0 data rows) | **422** the whole run. Stay unpublished. Zero Results. |
+| Publish without Test (deleted Test or empty plan / 0 data rows) | **422** the whole run (`_require_wo7_tests` / `plan.errors` @ `b005cfe`). Stay unpublished. Zero Results. Hold QA. |
 | Invisible process def (alice vs `created_by` / `has_experiment_access`) | Catalog-visible **read** (same client / logged-in). `0074` is not enough. Route stays `test:assign`. Not `experiment:manage` on Route. Not `route_sample_type`. |
 | Routing select empty (`sample_type` vs `sample_types`) | List-key bug — fix the list, not a type refuse |
 | Parser AI on import | Impossible (no call site) |
@@ -161,7 +161,7 @@ No new import engine. **Do not build “admin authors parsers” as the product.
 | PR | Scope |
 |----|--------|
 | 1 | P1 tables + API + `/asked-for` UI + pytest + UAT script. **Hold merge until UAT.** |
-| 2 | P2 routing + work_order + route + LimsRun WO-7. Architecture / UI / Spec Accept with conditions. **Hold merge until UAT.** Punches: publish-refuse-whole-run (including empty plan), first-start-wins, one process definition, P2-4 catalog-visible read, list-key. |
+| 2 | P2 routing + work_order + route + LimsRun WO-7. Architecture / UI / Spec Accept with conditions. **Hold merge until UAT.** Punch (1) code-closed @ `b005cfe`. Open: first-start-wins, one process definition, P2-4 catalog-visible read. |
 | 3 | P3 persist lock + results UAT fold (**closed**) |
 | 4 | P4 SOP Apply → process def (**closed**) |
 | 5 | P5 parser setup UX (**closed** this cycle) |
