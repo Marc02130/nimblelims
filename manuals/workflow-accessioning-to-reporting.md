@@ -27,7 +27,7 @@ The three-step `/accessioning` wizard is **removed**. `/accessioning` redirects 
 
 **Status:** Sample is **Available for Testing**. Zero Tests. Zero Results.
 
-**Separate later look-up:** **Asked-for** (`/asked-for`) records **requested analysis + TAT** — [asked-for.md](asked-for.md). Not the click after a receive commit; receive ends on its own form. That save creates **zero Tests and zero work orders** and does **not** start work. P2 Route is another later action: an explicit match mints a queued work order, Work Orders starts the existing ELN process, and WO-7 creates or attaches the Test only at LimsRun start. None of that is part of Receive or the asked-for save. Classic `/tests` is not the request path. Aliquots / derivatives are not part of receive.
+**Separate later look-up:** **Asked-for** records requested analysis + TAT and creates zero Tests/work orders. Later Route evaluates analysis + TAT candidates against current type: zero acceptable → 422; two saved rows that both accept current type → 409; exactly one snapshots ordered `process_definition[]`. Work Orders starts the first process only; later starts advance in order. None of this is part of Receive.
 
 ### Stage 1.5: Sample/Test/Container Editing (Post-Accessioning)
 

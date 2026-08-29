@@ -33,7 +33,7 @@ Atomic receive CORE is shipped. Tubes land as **Available for Testing** with **z
 
 P1 as a **lake** is bench-honest: a tech can record “ELISA, 5-day, these plasmas” without lying that work has started. That is how a CRO request actually arrives. **Asked-for must not be the work plan.** Extract-then-assay is the work. If `/asked-for` looks like today’s Tests page, techs will treat it as Tests and we have re-opened WO-7 under a new name.
 
-**Qubit-on-blood must refuse.** If Qubit is first, Route compares the blood sample’s current type with the derived first-step DNA allow-list and refuses before mint. If Qubit is later, its step start refuses while current type is still blood. Named error, not a broken sample. Map authoring has no sample-type picker and must not read `sample_type_transitions` as proof that an earlier step minted DNA.
+**Qubit-on-blood must refuse.** If Qubit is first, Route compares the blood sample’s current type with the derived first-step DNA allow-list and refuses before mint. If Qubit is later, its step start refuses while current type is still blood. Named error, not a broken sample. Map authoring has no sample-type picker. Extract-first and Qubit-first for the same TAT may both exist.
 
 **SOP Apply must not claim dest-type Hold is fixed.** P4 closing the template-only lie is necessary and welcome. It does not mint a DNA daughter. NCI 23113 → 22975 remains Hold. Do not seed routing or UAT that pretends otherwise.
 
@@ -48,11 +48,11 @@ P1 as a **lake** is bench-honest: a tech can record “ELISA, 5-day, these plasm
 | **Bench reality** | **8** | Request ≠ work is how SOP labs operate. P1 lake without a work list is honest **if** copy does not imply work started. P2 is the “what’s next?” queue (L-OPS-5). Multi-sample asked-for is how a rack is ordered (L1). |
 | **Material & sample integrity** | **8** | Does not reopen receive. Does not mint Tests on the parent at order time. Qubit-on-blood refuse (L2) is the integrity gate. Dest type stays out — correctly. |
 | **Chemistry / sequencing** | **6** | ELISA params catalog may be empty OOB (acceptable for P1). Qubit path is named but dest-type Hold still blocks dsDNA HS on a daughter. No indexing/pooling in this packet. |
-| **Gating & compliance habits** | **8** | Zero acceptable route 422; ambiguous route 409; TAT overlap 409; publish refuses missing Test. |
+| **Gating & compliance habits** | **8** | Zero acceptable route 422; two saved rows that both accept current type 409; map-save 409 only on TAT **and** first-step allow-list overlap; publish refuses missing Test. |
 | **Template → instance** | **7** | Routing snapshots ordered process-definition ids; first starts now, later definitions start later (L4). |
 | **Competitive floor** | **7** | Order line + routing pack + work list is table-stakes vs commercial LIMS. P1 alone is a request log — do not sell it as a worklist. Parser setup (P5) is the ops skill-floor fix (R-8). |
 | **Containers / amount** | **N/A (6 contextual)** | Vessels already exist from AR. Amount/volume/pool execute is extract-hold / entries — out of this packet. |
-| **Cohort / queue** | **6** | P2 start reuses existing process queue (select + scan; fixed set after start). Auto-route vs Route button is still Open (OQ-WO-1). Lab Ops stance below. Chain walk unspecified (L4). |
+| **Cohort / queue** | **6** | Explicit Route snapshots ordered definitions. First process starts first; later starts advance. |
 | **Instrument boundary** | **8** | Assay = LimsRun with analysis; extract = Experiment; parser import = no LLM; Test at LimsRun start (WO-7). Classic type-a-number remains (WO-4) on an existing Test only. |
 
 **Overall lab readiness:** **7.5/10** for the spine with conditions. **P1 is implementable.** P2 is not, until L2–L4 are in the sketch.
@@ -64,12 +64,12 @@ P1 as a **lake** is bench-honest: a tech can record “ELISA, 5-day, these plasm
 | ID | Phase | Condition | Why |
 |----|-------|-----------|-----|
 | **L1** | **P1** | **Asked-for is a request lake, not the work plan.** Copy: “Asked-for” / “requested analysis,” never “assign test,” “create test,” “start work,” or “order process.” Saving asked-for creates **zero** Tests, Results, Processes, Experiments, LimsRuns, work_orders. **No Start / Execute CTA** on a `requested` row. UI is **not** `/receive`; receive still **422** on non-empty `analysis_ids`; do not call `_create_tests` / `_create_asked_for_tests`. **Multi-sample:** one operator action (same analysis + TAT + params) can write asked-for for a **set** of received samples (rack of plasma ELISA). API may remain one row per sample. | If this page is Tests with a new name, WO-7 is dead on arrival. One-by-one click per tube fails a real rack. |
-| **L2** | **P2** | No map type picker. Match analysis + TAT, then current type against each row’s first process / first Experiment-LimsRun list. Zero acceptable → 422; multiple → 409. Map save/Route do not inspect later processes/steps. Later starts gate current type; empty fails closed. Dest-type Hold remains. | Refuses invalid first assignment without blocking extract-first + later Qubit routes. |
+| **L2** | **P2** | No map type picker. Match analysis + TAT, then current type against each row’s first process / first Experiment-LimsRun list. Zero acceptable → 422; two saved rows that both accept current type → 409. Map save **409**s only when TAT **and** first-step allow-lists overlap. Extract-first vs Qubit-first for the same TAT is legal. Map save/Route do not inspect later processes/steps. Later starts gate current type; empty fails closed. Dest-type Hold remains. | Refuses invalid first assignment without blocking extract-first + later Qubit routes. |
 | **L3** | **P2** | **Params travel.** Asked-for `params` snapshot onto the Test at **LimsRun start** (WO-7) and freeze. Tech does not re-type cell line / assay params to run the assay. Empty defs remain empty-object-only (OQ-AF-3). | Framework stamp: params travel. Cell line on the order that dies at the bench is a side process. |
 | **L4** | **P2** | **Ordered `process_definition[]` is the work plan.** Snapshot at mint. Start instantiates first process only; later starts advance in order under existing AuthZ. UI shows process and step order. | Otherwise sequence and handoff are ambiguous. |
 | **L5** | **P4** | **SOP Apply writes a process definition. It does not close dest-type Hold.** Apply success / manuals / UAT: draft process definition with typed steps; human save; never silent auto-activate. **Do not** say the NCI extract → Qubit path is runnable. **Do not** UAT blood → DNA daughter → Qubit on the daughter in this packet. Dest type remains [extract-hold-dest-type](../requirements/extract-hold-dest-type.md) / [sop-ai-to-process.md](../open-questions/sop-ai-to-process.md). | Selling point is “Apply is not a lie.” Selling point is **not** “daughters exist.” |
 
-Already normative in the packet (restated so implementers do not drop them): empty routing map mints **nothing**; TAT overlap **409** on save; WO does **not** create Tests; publish **422** if Test missing (remove ensure-on-publish find-or-create); results persist only on an existing Test; missing `analytes.units_default` → **422**; no `results.unit_id`; client cannot write asked-for / routing / parsers; P5 AI draft is setup-only.
+Already normative: empty map / zero acceptable routes → **422** and no mint; two saved rows that both accept current type or overlapping TAT **and** first-step allow-lists → **409**; WO does not create Tests; publish **422** if Test missing; client cannot write routing.
 
 ---
 
@@ -77,8 +77,8 @@ Already normative in the packet (restated so implementers do not drop them): emp
 
 | ID | Stance |
 |----|--------|
-| **OQ-WO-1** (auto-route vs Route button) | **Prefer auto-route when a map row matches; else stay `requested` with an explicit “configure routing” CTA.** Do not add a Route click to every ELISA. Empty map must **not** toast as success/work queued (AC-P2-2). Does not block P1. Resolve before P2 UX coding. |
-| **OQ-WO-3** (FK direction) | Not a lab-ops issue. One FK is enough; do not make the tech see two links. |
+| **OQ-WO-1** | **Superseded:** explicit Route; zero acceptable 422, two saved rows that both accept current type 409, exactly one mints. |
+| **OQ-WO-3** | **Superseded:** each process instance links to WO + route position; UI shows one ordered route. |
 | **OQ-RES-1** (qualifiers shape) | Sci CSO. Bench bar: the number the tech typed is what review/publish shows. No results column on asked-for. |
 | **OQ-SOP-2** (inactive parser draft) | Accept **inactive, unbound**. Never auto-bind to production runs. |
 
@@ -101,7 +101,7 @@ Already normative in the packet (restated so implementers do not drop them): emp
 - Receive stays dumb. No analysis picker. Non-empty `analysis_ids` → **422**.
 - Asked-for ≠ Test ≠ work_order ≠ Process.
 - Test row at **LimsRun start** only (WO-7). Publish refuses if missing.
-- Empty routing map mints nothing. Overlapping TAT refuses on save.
+- Empty map / zero acceptable routes returns 422 and mints nothing. Map save 409s only when overlapping TAT **and** overlapping first-step allow-lists. Extract-first vs Qubit-first for the same TAT saves.
 - Qubit-on-blood refuses. Dest-type Hold is a **different** packet.
 - One execute substrate: Process / Experiment / LimsRun. No third engine.
 - SOP Apply: human save of a process definition; never silent auto-activate; no SOP PDF bodies in git; not IC50.
@@ -118,7 +118,7 @@ Already normative in the packet (restated so implementers do not drop them): emp
 | **Date** | 2026-08-28 |
 | **Implement gate** | **OPEN for P1 only** |
 | **P1** | **OPEN** — L1 is already the PRD principle + RQ-AF-2/3 bounce; copy, zero Tests, receive freeze, and multi-sample action land with the P1 PR |
-| **P2** | Marc/Rolf supersede singular-definition L4: ordered `process_definition[]`; first process starts first; later processes start later. L2 has zero→422 / multiple→409. |
+| **P2** | Heidi/Leadership: ordered `process_definition[]`; map-save 409 only on TAT **and** first-step allow-list overlap; Route 409 when two saved rows both accept current type. |
 | **P3** | Persist lock OK for Lab Ops; wait OQ-RES-1 (Sci CSO). Not licensed as “type results on asked-for.” |
 | **P4** | Apply → process definition **may** proceed with **L5**. Dest-type Hold **unchanged**. |
 | **P5** | **OPEN** (independent; admin UX). |

@@ -21,8 +21,8 @@ P1 is the **asked-for lake**. An analyst records **requested analysis + TAT** ag
 | Receive freeze | Non-empty `analysis_ids` on `POST /samples/receive` → **422**. Empty or omit → zero Tests. No analysis picker on `/receive`. |
 | Lake ≠ work | Asked-for create leaves `COUNT(tests)` and `COUNT(work_orders)` unchanged. Save is not scientific assignment or routing: no Test, no work order, no analytes, no legal number entry. |
 | Not a queue | Asked-for is a look-up, not the after-receive click and not a Start queue. Do not document receive → asked-for as one motion. |
-| Wrong pairings | Map create has no sample-type picker. A row holds analysis + TAT + ordered `process_definition[]`. Route gates current type against the first process’s first ordered step only; later processes/steps gate at their starts. |
-| Route | Explicit Route requires `test:assign` plus project access. Zero acceptable rows → **422**; two or more → **409**; no silent `first()`. Exactly one mints a queued work order and sets `routed`. The mint is planning, not work started. Still zero Tests. |
+| Wrong pairings | Map create has no sample-type picker. A row holds analysis + TAT + ordered `process_definition[]`. Map save 409s only when analysis, TAT, **and** first-step allow-lists overlap. Extract-first and Qubit-first for the same TAT are legal. Route gates current type against the first process’s first ordered step only. |
+| Route | Explicit Route requires `test:assign` plus project access. Zero acceptable rows → **422**; two saved rows that both accept current type → **409**; no silent `first()`. Exactly one mints a queued work order and sets `routed`. |
 | Params | Lock: freeze onto `tests.asked_for_params` at the **first LimsRun start** (WO-7). That first-start freeze is **still open** on `b005cfe` — a later start rewrites the snapshot, with empty `{}` when no `routed` row matches. Empty `{}` is a freeze, not a hole to refill. Do **not** collect params on receive. |
 
 ---
@@ -61,14 +61,14 @@ Do not chain this section onto Receive or onto the save steps above. Return to `
 
 1. For one `requested` row, choose **Route**. For several requested rows, select them and choose **Route selected**.
 2. P2 matches analysis + TAT, then tests current type against each candidate row’s first process / first ordered Experiment/LimsRun allow-list.
-3. Zero acceptable rows returns **422**; two or more returns **409**. The row stays `requested`, with no work order or Test.
+3. Zero acceptable rows returns **422**; two saved rows that both accept current type return **409**. The row stays `requested`, with no work order or Test.
 4. Exactly one acceptable row snapshots its ordered `process_definition[]`, creates a queued work order, changes the row to `routed`, and still creates no Test.
-5. Experiments → **Work Orders** (`/work-orders`) is the work backlog. **Start process** instantiates and opens the existing ordered ELN process; Route must make its step order apparent rather than presenting an unordered bag.
+5. Experiments → **Work Orders** is the backlog. **Start process** instantiates only the first process in the snapshotted ordered route. Later starts advance in order; UI shows process and step order.
 6. WO-7 lock: the **first** LimsRun start creates or attaches the Test and freezes the then-current `asked_for_params`. If any cohort sample lacks an active Test at publish, **422** refuses the whole run, writes no Results, invents no Test, and leaves the run `complete`.
 
 The two halves of WO-7 are not at the same maturity on `b005cfe`. The **publish refuse is Tobias-signed Pass**. The **first-start freeze is still open and unscored**: `_mint_tests_at_start` has no already-frozen guard, and `{}` was recorded. Do not read or write that overwrite as closed. Overall P2 Pass remains unsigned; the historical `9c4f9da` stamp remains signed not Pass.
 
-After analysis + TAT match, Route compares current type with the first process’s first ordered Experiment/LimsRun allow-list for each candidate row. No acceptable row returns **422**; type refusal uses `route_sample_type`. Multiple acceptable rows return **409**, the same ambiguity class as TAT overlap. Exactly one row wins; never silently use `first()`. Map save and Route do not AND one type across later processes or steps. The UI derives the first process and first-step types on read when possible; any stored display copy must refresh on process/first-step change. Start instantiates only the first process. Later processes and steps gate current type when each is started. Dest-type Hold remains unchanged.
+After analysis + TAT match, Route compares current type with the first process’s first ordered Experiment/LimsRun allow-list for each candidate row. No acceptable row returns **422**; type refusal uses `route_sample_type`. Two saved rows that both accept this current type return **409**. Never silently use `first()`. Map save 409s only when the same analysis, overlapping TAT, **and** overlapping first-step allow-lists all hold; extract-first and Qubit-first for the same TAT must save. Map save and Route do not AND one type across later processes or steps. Start instantiates only the first process. Later processes and steps gate current type when each is started. Dest-type Hold remains unchanged.
 
 ---
 
@@ -91,7 +91,9 @@ After analysis + TAT match, Route compares current type with the first process�
 | Discarded sample / inactive analysis / TAT &lt; 1 | **422** |
 | Receive with non-empty `analysis_ids` | **422** (receive freeze; not an asked-for call) |
 | Route, zero acceptable rows | **422**, status stays `requested`; first-step type refusal uses `route_sample_type` |
-| Route, two or more acceptable rows | **409** ambiguity; no silent `first()` |
+| Route, two saved rows both accept current type | **409**; no silent `first()` |
+| Map save, same analysis + overlapping TAT + overlapping first-step allow-lists | **409** |
+| Map save, same analysis + overlapping TAT, disjoint first-step allow-lists | **201** (extract-first vs Qubit-first is legal) |
 | Later step start, current sample type not accepted or allow-list empty | **422** `route_sample_type` |
 | Cancel after `routed` | **422** |
 

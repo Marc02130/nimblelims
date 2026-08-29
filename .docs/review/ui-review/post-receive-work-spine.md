@@ -20,7 +20,7 @@ Atomic receive CORE is shipped. Tubes land **Available for Testing** with **zero
 
 Sketch UI completeness is **4/10**: it names `pages/AskedFor.tsx`, a sample-detail panel, sidebar after Receive, multi-select, and “reuse analysis dropdown not TestForm.” It does not specify hierarchy, empty states, 409/422 copy, scan-into-set, TAT due date, status chips, partial multi-sample failure, or the P2 split from the lake. Conditions below close that for implementers. **Do not revise the packet to invent a third engine or put analysis on `/receive`.**
 
-**P1 may implement** if **U1–U8** land in the same PR. **P2 UX stays closed** until **U9–U11** plus Lab Ops **L2–L4** and **OQ-WO-1**. P3/P4/P5 bind later PRs (**U12–U14**).
+**P1 may implement** if **U1–U8** land. P2 U9–U11 are now bound by the Decided ordered-route lock; product merge remains held on the OPEN freeze / unsigned overall Pass.
 
 **Verdict: Accept with conditions.**
 
@@ -51,11 +51,11 @@ Sample detail: same add + table. **Not** on `/receive`. **Not** TestForm.
 
 ```
 asked-for requested
-   map match?  yes → work_order queued (auto-route; OQ-WO-1)
-               no  → stay requested; “No work plan” + configure-routing (admin)
+   explicit Route → evaluate analysis + TAT + first-process type
+                  → zero: 422 | two accept current type: 409 | exactly one: work_order queued
    Work orders surface
-     Start → existing process start (select / scan; cohort locks)
-     complete step N → next ordered step in the same process
+     Start → first process only
+       later Start → next ordered process
    LimsRun start → Test (WO-7); asked-for params frozen on Test
 ```
 
@@ -152,7 +152,7 @@ Classifier: **APP UI**. Calm hierarchy, utility copy, DataGrid is the workspace 
 | 4 AI slop | 8/10 | No hero, no card grid. Risk is Tests-clone chrome + “Assign test” muscle memory, not marketing slop. |
 | 5 Design system | 7/10 | Reuse FillHeightPage, DataGrid, ListFilterChips, CustomAttributeField, receive barcode field. No DESIGN.md — do not invent a new visual language. |
 | 6 Responsive / a11y | 3/10 | Keyboard + chip contrast unspecified; laptop-only is acceptable if stated. |
-| 7 Unresolved | — | OQ-WO-1 blocks **P2 UX**, not P1. TAT due-date display (Lab Ops watch) is U7. |
+| 7 Unresolved | — | OQ-WO-1 is Decided. First-start freeze remains OPEN; overall P2 Pass unsigned. |
 
 Sketch overall **4/10**. P1 is implementable only with **U1–U8** as the missing UI spec.
 
@@ -191,8 +191,8 @@ Must land in the **named phase**. P1 PR is blocked without U1–U8.
 | **U7** | **P1** | TAT + chips | TAT field label **TAT (days)** integer ≥ 1. Show a **computed due date** next to it (techs do not think in integer ranges). Status chips: `requested` = info, `cancelled` = default; contrast ≥ 4.5:1; no `routed` chip until P2. Cancel while `requested` with confirm: “Cancel this request? You can record it again later.” |
 | **U8** | **P1** | Filters, a11y, client, params | List filters: project, analysis, status (default **requested**) — RQ-AF-9. Keyboard: Tab through dialog; Enter on barcode Add and Save request; Cancel is a real button. Laptop-first; no mobile redesign. **Client:** read-only list if they can read the sample; no Record / Cancel. Params when defs exist: `CustomAttributeField` / list-backed selects, not free JSON. Picker shows sample **name, type, status** so discarded/wrong type is obvious. Do not block a second analysis on a sample already in a process. |
 | **U9** | **P2** | Work list ≠ lake | **Work orders** is a different surface. Start lives there. The route view shows ordered process definitions and their instance/status links; it does not flatten them into one process or a bag. |
-| **U10** | **P2** | Explicit Route | Route evaluates candidates. Zero acceptable → 422 “No acceptable route for this request.” Multiple → 409 “More than one route accepts this request; fix routing configuration.” Never silently select the first row. |
-| **U11** | **P2** | Binds L2–L4 UX | Map authoring has analysis, TAT, and sortable ordered `process_definition[]` — no sample-type picker. Display the first process and its first Experiment/LimsRun allow-list, derived on read; refresh any stored display copy. Start instantiates first process only. Later start advances in order. Show current-type refusal at the relevant start. First-start freeze remains OPEN on `b005cfe`. |
+| **U10** | **P2** | Explicit Route | Route evaluates candidates. Zero acceptable → 422. Two saved rows that both accept current type → 409. Never silently select the first row. |
+| **U11** | **P2** | Binds L2–L4 UX | Map authoring has analysis, TAT, and sortable ordered `process_definition[]` — no sample-type picker. Display the first process and its first Experiment/LimsRun allow-list, derived on read. Map save 409s only when overlapping TAT **and** overlapping first-step allow-lists. Extract-first vs Qubit-first for the same TAT is legal. Start instantiates first process only. Later start advances in order. Show current-type refusal at the relevant start. First-start freeze remains OPEN on `b005cfe`. |
 | **U12** | **P3** | Persist lock only | No results-entry UI on asked-for. P3 types numbers on an **existing Test**. Missing `units_default` → 422 with “This analyte has no default unit.” No unit picker. |
 | **U13** | **P4** | Binds **L5** | SOP Apply success: “Draft process definition created. Review and save. Not activated.” Human save; never silent auto-activate. **Do not** say the NCI extract → Qubit path is runnable or that daughters exist. Navigate to the draft process definition, not only an ExperimentTemplate. |
 | **U14** | **P5** | Parser setup | Admin: example file → expected-output test → **dry-run** → activate only if tests pass. Empty: “No active parser for this analysis + instrument — create one.” AI draft labeled **setup only**; Import on a run never says AI. Prior parser UI stamp (data-parsers U1–U4) still binds. Client: no parser mutate. |
@@ -234,8 +234,8 @@ Must land in the **named phase**. P1 PR is blocked without U1–U8.
 
 | ID | Stance |
 |----|--------|
-| **OQ-WO-1** | **Agree with Lab Ops.** Auto-route on match; else stay `requested` with configure-routing for admin. Does not block P1. Blocks P2 UX (U10). |
-| **OQ-WO-3** | One process link in the UI. Arch picks FK. |
+| **OQ-WO-1** | **Decided:** explicit Route with zero→422, two saved rows that both accept current type→409, exactly-one snapshot. |
+| **OQ-WO-3** | **Decided:** ordered process instances link through WO route positions. |
 | **OQ-AF-1/2/3** | Already decided: both surfaces, `test:assign`, empty-object params. U3/U8 implement that. |
 
 ---

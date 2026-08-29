@@ -45,13 +45,13 @@ Do **not** add `results.unit_id`. Do **not** add asked-for columns on `samples`.
 | `uq_asked_for_open` | unique `(sample_id, analysis_id)` WHERE status <> 'cancelled' | RQ-AF-4 |
 | `asked_for_status_chk` | status in (`requested`,`routed`,`cancelled`) | |
 | `work_orders_status_chk` | status in (`queued`,`in_progress`,`completed`,`cancelled`) | |
-| `routing_map_tat_excl` | EXCLUDE gist (`analysis_id` WITH `=`, `tat_range` WITH `&&`) WHERE active | RQ-WO-4 |
+| `routing_map_overlap_chk` | Service-side: refuse save (**409**) only when same `analysis_id`, `tat_range &&`, **and** first-step allow-lists intersect | Extract-first vs Qubit-first for the same TAT is legal; gist-on-TAT-alone is too coarse |
 | `routing_map_defs_chk` | non-empty ordered `process_definition_ids`; every UUID resolves; reject duplicate positions | ordered route, not one definition or an unordered bag |
 | `work_order_route_instance_uq` | unique (`work_order_id`, `work_order_route_position`) where work_order_id not null | one instance per route position |
 | `uq_step_accepted_sample_type` | unique `(step_id, sample_type_id)` | OQ-WO-4 |
 | `eln_process_definition_steps` kind check | `eln_experiment` ⇒ `experiment_template_id` NOT NULL; `lims_run` ⇒ `analysis_id` NOT NULL | Qubit as LimsRun |
 | indexes | `asked_for(sample_id)`, `asked_for(status)`, `work_orders(status)`, `work_orders(sample_id)` | lists |
-| extension | P2: `CREATE EXTENSION IF NOT EXISTS btree_gist` | TAT exclude |
+| extension | P2: `CREATE EXTENSION IF NOT EXISTS btree_gist` optional for TAT candidate lookup | Do **not** gist-exclude on analysis+TAT alone |
 
 ### 2.4 Enums / types
 
@@ -69,7 +69,7 @@ No Postgres ENUM. Text + check. Status lists may also seed `list_entries` if the
 
 FORCE ROW LEVEL SECURITY on asked_for, work_orders, analysis_param_defs, routing_map, and the step-accepted-types table.
 
-**P2 route/type lock:** map create has no sample-type picker. Match analysis + TAT, then current type against each candidate row’s first process / first ordered Experiment-LimsRun allow-list. Zero acceptable rows → 422; two or more → 409; exactly one snapshots ordered `process_definition_ids`. Map save/Route do not AND later processes or steps. Start instantiates array position 1 only; each later start advances one position and gates current type then. Empty allow-list fails closed. Dest-type Hold remains unchanged.
+**P2 route/type lock:** map create has no sample-type picker. Match analysis + TAT, then current type against each candidate row’s first process / first ordered Experiment-LimsRun allow-list. Zero acceptable rows → 422; two saved rows that both accept this current type → 409; exactly one snapshots ordered `process_definition_ids`. Never silently use `first()`. Map save **409**s only when the same analysis, overlapping TAT, **and** overlapping first-step allow-lists all hold. Extract-first and Qubit-first for the same TAT are legal. Map save/Route do not AND later processes or steps. Start instantiates array position 1 only; each later start advances one position and gates current type then. Empty allow-list fails closed. Dest-type Hold remains unchanged.
 
 ## 3. Seed
 

@@ -103,13 +103,15 @@ Params: intent only. P1 sends `{}` OOB — do not type assay params here, and do
 
 **This is a later work-planning action, not the next click after Receive or after saving asked-for.** Receive still ends on `/receive`. Recording requested analysis still ends on `/asked-for` without minting work. Route stays unnumbered: it is not §3 after receive.
 
-**Setup:** an administrator configures **Routing map** at `/admin/routing-map`. Each map row selects an analysis, TAT range, and an ordered `process_definition[]`. This is a route sequence, not one definition and not an unordered bag. There is **no admin-picked sample type**. The UI derives and displays the first process and that process’s first ordered Experiment/LimsRun allow-list. Prefer deriving it on read; any stored copy is display-only and must refresh when the process sequence or first step changes. Map save does not AND one type across later processes or steps. Extract-first followed by a later Qubit process/step is a legal ordered route.
+**Setup:** an administrator configures **Routing map** at `/admin/routing-map`. Each row selects analysis, TAT range, and an ordered `process_definition[]`. This is a route sequence, not one definition and not an unordered bag. There is **no admin-picked sample type**. The UI derives and displays the first process and that process’s first ordered Experiment/LimsRun allow-list. Map save does **not** AND one type across later processes or steps. Extract-first followed by later Qubit in **one** ordered route is legal.
+
+Map save returns **409** only when another active row has the **same analysis**, an **overlapping TAT range**, **and** an **overlapping first-step allow-list**. Extract-first and Qubit-first for the same analysis and TAT are legal at save because their first-step lists differ. Overlapping TAT alone is not a 409.
 
 **Route when work planning happens:**
 
 1. Open the previously saved `requested` row on `/asked-for`.
 2. Choose its row **Route** action, or select requested rows and choose **Route selected**. This is Route, not Start. Permission is `test:assign` plus project access, not `experiment:manage`.
-3. P2 finds rows whose analysis + TAT match, then keeps only rows whose **first process’s first ordered Experiment/LimsRun** accepts the sample’s current type. **Zero acceptable rows returns 422** and mints nothing; a type refusal uses `route_sample_type`. **Two or more acceptable rows return 409**. Never silently call `first()`.
+3. P2 finds rows whose analysis + TAT match, then keeps only rows whose **first process’s first ordered Experiment/LimsRun** accepts the sample’s current type. **Zero acceptable rows returns 422** and mints nothing; a type refusal uses `route_sample_type`. **Two or more saved rows that both accept this current type return 409**. Never silently call `first()`.
 4. Exactly one acceptable row creates one queued `work_order`, snapshots the ordered `process_definition[]`, changes asked-for to `routed`, and still creates **zero Tests**. Minting that queue record is planning; **work has not started**.
 5. Open Experiments → **Work Orders** (`/work-orders`) and choose **Start process**. Start instantiates **only the first process definition** in the snapshot, links it through `eln_processes.work_order_id`, and opens it at `/experiments/processes/{id}`. It does not mint a process-of-processes. Start process / LimsRun start remain `experiment:manage`; publish is `experiment:publish`.
 6. Complete that process, then use the later start for the next process in route order. Each later process/step start compares the sample’s **current** type with the allow-list at that start; empty or incompatible returns **422** `route_sample_type`. The sample is not broken. The WO-7 first-start freeze remains OPEN on `b005cfe`.
@@ -159,10 +161,11 @@ UAT (classic): [`UAT_Scripts/uat-results-entry-review.md`](../UAT_Scripts/uat-re
 - Do **not** pick container type in the scan loop. Default tube, off the form (RQ-AR-8).
 - Do **not** invent a second workflow engine. Work_order (later) feeds the Process / Experiment / LimsRun that already exist.
 - Do **not** put analysis param defs on receive, and do **not** type params on asked-for.
-- Do **not** put a sample-type picker on routing-map create. Map match is analysis + TAT; the first process and its first-step allow-list are derived display.
+- Do **not** put a sample-type picker on routing-map create. Display the first process and its first-step allow-list as derived information.
+- Do **not** 409 map save on overlapping TAT alone. 409 requires the same analysis, overlapping TAT, **and** overlapping first-step allow-lists. Extract-first and Qubit-first for the same TAT must save.
 - Do **not** teach routing-map save or Route as ANDing one type across later processes or steps. Route gates only the first process’s first ordered Experiment/LimsRun; later starts gate current type then.
 - Do **not** collapse ordered `process_definition[]` into one definition or an unordered bag. Start instantiates the first process only; the UI must preserve route order.
-- Do **not** treat zero or multiple acceptable routes as `first()`: zero → 422; two or more → 409.
+- Do **not** treat zero or multiple acceptable routes as `first()`: zero → 422; two saved rows that both accept current type → 409.
 - Do **not** write “later starts do not re-freeze params” as current behavior. That freeze is the WO-7 lock and is **open** on `b005cfe`.
 - Do **not** treat empty `{}` as a hole to refill on a later start. `{}` is a freeze.
 - Not IC50. Not a fake Route how-to.
