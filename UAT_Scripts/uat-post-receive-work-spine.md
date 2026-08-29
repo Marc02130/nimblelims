@@ -571,8 +571,9 @@ The preceding `b005cfe` section is retained verbatim as signed history, includin
 
 **Expect**
 - Receive, asked-for save, Route, and work-order start create no Test.
-- First LimsRun start creates or attaches one active Test per cohort sample and freezes the then-current params into `tests.asked_for_params`. Empty `{}` is a freeze, not a hole to refill.
-- A later start neither replaces the Test nor rewrites the first-start snapshot, including never overwriting a snapshot with `{}`.
+- First LimsRun start of the **asked-for** analysis creates or attaches one active Test per cohort sample and **writes** `asked_for_params` unless a snapshot already exists.
+- Skip later overwrite only when a snapshot **already exists** (including frozen `{}`). A classic `/tests` row with NULL or default `{}` is **not** a freeze — that first start must **write**.
+- Extract LimsRun must **not** share the asked-for `analysis_id`.
 - With any cohort Test missing, publish returns **422**, not **200 published**.
 - The whole run is refused: it stays `complete`, no Test is invented, and no Results are written, including for cohort samples whose Tests still exist.
 

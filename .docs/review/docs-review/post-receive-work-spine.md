@@ -37,6 +37,7 @@ Product commit `8cfa2a9` closed WO-7 first-start freeze, Route 422/409, later-st
 | **DOC-H3** | HOWTO opener “Work (route → Process / Experiment / LimsRun)” and “next pending” Start copy could teach the whole chain starting at Route/Start. | Punch: Route is a planner; Start instantiates the first process only; later processes = later starts; not a process-of-processes at Route. Route stays an unnumbered planner. |
 | **DOC-H4** | Ordered-route locks (ordered `process_definition[]`, no create type picker, derive first-step types) must stay. Dest-type Hold out. No invented seed IDs. | Keep. |
 | **DOC-H5** | `b005cfe` signed Results and P1 `c649245` Pass must not be rewritten. | Live block only after the `b005cfe` retention line. P1 AC results untouched. |
+| **DOC-H6** | HOWTO/`_mint_tests_at_start` skip-on-existing-Test is a lie. Classic `/tests` NULL or default `{}` is not a freeze. Extract LimsRun must not share the asked-for `analysis_id`. | Strike skip-on-existing-Test. Skip only when a snapshot **already exists** (including frozen `{}`). First asked-for LimsRun start must **write** onto a classic Test. Live AC-P2 stays unsigned. |
 
 Operator how-tos stay in git-tracked [`manuals/`](../../../manuals/). Formal stamps stay under `.docs/review/`. Do not commit `.docs/internal/` or `.docs/manuals/`.
 
@@ -44,13 +45,13 @@ Operator how-tos stay in git-tracked [`manuals/`](../../../manuals/). Formal sta
 
 | Field | Value |
 |-------|--------|
-| **Verdict** | **Accept with conditions** (DOC-H1–H5 land in this docs-only PR) |
+| **Verdict** | **Accept with conditions** (DOC-H1–H6 land in this docs-only PR) |
 | **Docs ready for Cursor** | Yes for this honesty fold — **no product implement** |
 | **Merge** | **Hold** product merge of `feat/work-order-p2` to `main` until QA restamps live AC-P2 |
 | **Not licensed** | Teaching freeze/422/409 as QA Pass · rewriting `b005cfe` / P1 Results · dest-type E2E · IC50 |
 
 ```
-DOCUMENTARIAN REVIEW: Accept with conditions (DOC-H1–H5 honesty fold)
+DOCUMENTARIAN REVIEW: Accept with conditions (DOC-H1–H6 honesty fold)
 DOCS READY FOR CURSOR: Yes with conditions (docs-only; hold product merge)
 ```
 

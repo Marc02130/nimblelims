@@ -120,7 +120,7 @@ Map save returns **409** only when another active row has the **same analysis**,
 5. Open Experiments → **Work Orders** (`/work-orders`) and choose **Start process**. **Start instantiates only the first process definition** in the snapshot, links it through `eln_processes.work_order_id`, and opens it at `/experiments/processes/{id}`. It does not mint a process-of-processes and does not instantiate later processes. Start process / LimsRun start remain `experiment:manage`; publish is `experiment:publish`.
 6. Complete that process, then use a **later start** for the next process in route order. Each later process/step start compares the sample’s **current** type with the allow-list at that start; empty or incompatible returns **422** `route_sample_type` **in code on `8cfa2a9`**, unsigned until QA. The sample is not broken.
 
-**WO-7 first-start freeze is in code on `8cfa2a9`; unsigned until QA.** `_mint_tests_at_start` skips `asked_for_params` on an existing Test, so a later start that finds the active Test for the same sample + analysis is intended to keep the first-start snapshot. Empty `{}` is itself a freeze, not a hole to refill later. Do not claim this half as UAT Pass. Do not claim overall P2 Pass.
+**WO-7 first-start freeze is a lock on `8cfa2a9`, unsigned until QA. Do not teach skip-on-existing-Test as shipped.** Skip `asked_for_params` only when a snapshot **already exists** (including a frozen `{}`). A classic `/tests` row with NULL or default `{}` is **not** a freeze — the first LimsRun start for that asked-for analysis must **write** the snapshot onto that Test. Extract LimsRun must **not** share the asked-for `analysis_id`. Do not claim this half as UAT Pass. Do not claim overall P2 Pass.
 
 Qubit-first on blood is refused by Route before a work order is minted. If Qubit is later, its step start refuses while the sample’s current type is still blood. A **422** `route_sample_type` means current type is wrong for the assigned first step or the later step being started; it does **not** mean the sample is broken. Dest-type Hold is unchanged, so do not claim this branch already creates a transformed daughter.
 
@@ -147,7 +147,7 @@ P1 does not instantiate a process from requested analysis. Classic `/tests` can 
 
 Classic path: **Results** (`/results`) — type a number on an existing Test (batch grid). Unit from `analytes.units_default` when that lock is enforced; missing unit is a later persist-packet **422**, not a receive rule.
 
-The WO-7 lock puts Test selection/creation and the params freeze on the **first LimsRun start** when the work-order packet exists — **not** on receive, Route, or work-order Start. The freeze guard is **in code on `8cfa2a9`**, **unsigned until QA**.
+The WO-7 lock puts Test selection/creation and the params freeze on the **first LimsRun start** for the asked-for analysis — **not** on receive, Route, or work-order Start. Skip only when a snapshot **already exists** (including frozen `{}`). Classic `/tests` NULL or default `{}` is not a freeze. Extract LimsRun must not share the asked-for `analysis_id`. This lock is **unsigned until QA**.
 
 LimsRun **publish** can promote instrument rows onto Tests/Results. Two writers on the same Test → **409**. The other half of WO-7 — if any cohort sample lacks an active Test, publish returns **422** and refuses the **whole run**, writes no Results, invents no Test, and leaves the run `complete` — is **Tobias-signed Pass** on `b005cfe` (keep that Result). Live freeze / Route 422/409 on `8cfa2a9` are not that Pass. Overall P2 Pass is unsigned. Historical `9c4f9da` / `b005cfe` stamps stay signed history.
 
@@ -171,6 +171,9 @@ UAT (classic): [`UAT_Scripts/uat-results-entry-review.md`](../UAT_Scripts/uat-re
 - Do **not** collapse ordered `process_definition[]` into one definition or an unordered bag. Start instantiates the first process only; later processes need later starts; the UI must preserve route order.
 - Do **not** teach Route or Start as starting the whole chain.
 - Do **not** treat zero or multiple acceptable routes as `first()`: lock is zero → 422; two saved rows that both accept current type → 409 — **in code on `8cfa2a9`, unsigned until QA**.
-- Do **not** treat first-start freeze or Route 422/409 as UAT Pass until QA clicks `8cfa2a9`. The guards are in code, not verified.
-- Do **not** treat empty `{}` as a hole to refill on a later start. `{}` is a freeze.
+- Do **not** treat first-start freeze or Route 422/409 as UAT Pass until QA clicks `8cfa2a9`.
+- Do **not** teach `_mint_tests_at_start` as skip-on-existing-Test. Skip only when a snapshot **already exists** (including frozen `{}`).
+- Do **not** treat a classic `/tests` row with NULL or default `{}` as a freeze. First LimsRun start must **write** the snapshot onto that Test.
+- Do **not** give an extract LimsRun the asked-for `analysis_id`.
+- Do **not** treat a later start as a hole to refill a **frozen** `{}`. Frozen `{}` is a snapshot. Classic default `{}` is not.
 - Not IC50. Not a fake Route how-to.

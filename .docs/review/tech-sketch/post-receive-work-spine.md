@@ -22,7 +22,7 @@ P1 is on `main`. P2 is on `feat/work-order-p2` (Accept with conditions). Do not 
 6. **Receive freeze:** non-empty `analysis_ids` still **422**.
 7. **P2 one process (Heidi / Mathilda):** `routing_map` and `work_order` hold **one** process definition (typed Exp/LimsRun steps). Bounce process-of-processes, `uuid[]` chain, completing N starts N+1, `start` of `[0]` only, `work_order_route_position` next pending, Start next, N of M. **Still open** on `8cfa2a9`. The ordered-`process_definition[]` rewrite is not the lock.
 8. **WO-7 publish (Tobias-signed Pass @ `b005cfe`):** `_require_wo7_tests` 422s before promote if any cohort sample lacks an active Test. `plan.errors` also 422s. Status stays unpublished (complete). Do **not** fold first-start freeze into this Pass.
-9. **Freeze (in code on `8cfa2a9`, unsigned until QA):** first LimsRun start wins. `_mint_tests_at_start` must **not** overwrite `asked_for_params` on an existing Test (including `{}`). Not shipped Pass.
+9. **Freeze (lock on `8cfa2a9`, unsigned until QA):** skip `asked_for_params` only when a snapshot **already exists** (including frozen `{}`). Classic `/tests` NULL or default `{}` is **not** a freeze — first start must **write**. Extract LimsRun must not share the asked-for `analysis_id`. Do not teach skip-on-existing-Test as shipped.
 10. **P2-4 visibility:** Route is `test:assign` and must **read** the mapped def/steps (catalog-visible, same client / logged-in, like `routing_map`). Do **not** put `experiment:manage` on Route. **`0074`:** `is_admin() OR has_experiment_access()` is **not** catalog-visible. Mutate stays `config:edit`. Instantiate stays. **Still open** on `8cfa2a9`.
 11. **No sample-type picker (in code on `8cfa2a9`, unsigned until QA):** derive first Exp/LimsRun allow-list. `assert_chain_accepts_sample_type` is gone. Route: 0 hits **422**, two that accept **409**, live check vs first step of process[0]. Never `first()`. Map-save 409 when TAT **and** first-step allow-lists overlap. Denorm `sample_type_id` is display/sync only. Empty first-step allow-list fails closed at **start**, not map-save. Not shipped Pass.
 
@@ -122,7 +122,7 @@ Pytest: create, 409 dup, **403 dual-belt** (create **and** `list()` / `GET /aske
 
 Start: `ELNProcessService.instantiate_from_definition` on **that** definition; `work_orders.process_id`. Instantiate stays `experiment:manage`. Route stays `test:assign`. Later **step** starts type-gate current type vs **that** step only. Do not instantiate the next process definition.
 
-**L3 / A5 / SC5:** At LimsRun start, insert Test if missing; copy `asked_for.params` → `tests.asked_for_params` and freeze. **First start wins** — do not overwrite `asked_for_params` on an existing Test (including `{}`). P1 does **not** write that Test snapshot.
+**L3 / A5 / SC5:** At LimsRun start for the asked-for analysis, insert Test if missing; copy `asked_for.params` → `tests.asked_for_params` and freeze. Skip later overwrite only when a snapshot **already exists** (including frozen `{}`). Classic `/tests` NULL or default `{}` is **not** a freeze — first start must **write**. Extract LimsRun must not share the asked-for `analysis_id`. P1 does **not** write that Test snapshot. Do not teach skip-on-existing-Test as shipped.
 
 WO-7 publish @ `b005cfe` is Tobias-signed Pass: `_require_wo7_tests` + `plan.errors` 422 the whole run. Status stays complete / unpublished. Zero Results. First-start freeze is **in code on `8cfa2a9`**, **unsigned until QA**. Overall P2 Pass is unsigned.
 

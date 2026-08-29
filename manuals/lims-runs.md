@@ -67,7 +67,7 @@ Shipped v1 — see local `.docs/internal/ideas/run-results.md` (not committed).
 | **No analysis** | **Not allowed** — set analysis on create/edit; no non-reportable / continue-without path |
 | **Mapping** | JSONB column → analyte via **name** or **analyte alias** (casefold); known non-analyte keys (`units`, etc.) skipped |
 | **Tests** | Use the active Test created or attached at the first LimsRun start for `(sample_id, analysis_id)`. If any cohort sample lacks one, WO-7 returns **422**, refuses the whole run, writes no Results, invents no Test, and leaves the run `complete`. Publish-refuse is **Tobias-signed Pass** on `b005cfe`; overall P2 Pass remains unsigned. Historical `9c4f9da` stays signed not Pass |
-| **First-start freeze** | **In code on `8cfa2a9`, unsigned until QA.** `_mint_tests_at_start` skips `asked_for_params` on an existing Test. Empty `{}` is a freeze, not a hole to refill. Do not teach as UAT Pass |
+| **First-start freeze** | **Lock on `8cfa2a9`, unsigned until QA.** Skip `asked_for_params` only when a snapshot **already exists** (including frozen `{}`). Classic `/tests` NULL or default `{}` is **not** a freeze — first start must **write**. Extract LimsRun must not share the asked-for `analysis_id`. Do not teach skip-on-existing-Test as shipped |
 | **Results** | Write `raw_result`, `replicate` (from JSONB or row order), `lims_run_id` lineage |
 | **Conflicts** | Same run → update; other run / manual result owns triple → **409**, publish blocked |
 | **Preview** | `GET /v1/lims-runs/{id}/promotion/preview` — dry-run; UI shows counts on Publish confirm |
@@ -90,7 +90,7 @@ Instrument JSONB remains SoT for raw import; Results are the published structure
 - **Samples**: Linked via imported data rows. Less rich than `ExperimentSampleExecution` (no built-in role/replicate/conditions on the junction itself).
 - **Batches**: Different concept. See warning above. Do not model a Run as "the batch of samples tested".
 - **ELN Experiments**: Separate. Runs are the structured LIMS execution path. Future linking may be added.
-- **Analyses / Analytes**: Catalog assays. Aliases on analytes support multi-CRO column names. Every run **must** have an analysis; the lock is that first start creates or attaches the Test and freezes asked-for params, then publish promotes into that Test’s Results. Freeze is **in code on `8cfa2a9`**, **unsigned until QA**.
+- **Analyses / Analytes**: Catalog assays. Aliases on analytes support multi-CRO column names. Every run **must** have an analysis. The WO-7 lock is that the first start of the **asked-for** analysis creates or attaches the Test and writes `asked_for_params` unless a snapshot already exists (including frozen `{}`). Classic `/tests` NULL or default `{}` is not a freeze. Extract LimsRun must not share that `analysis_id`. Freeze is **unsigned until QA**.
 - **Dose Response**: Specialized analysis on top of Runs (curve fitting, exclusions, review)—orthogonal to classic promote-to-results.
 
 ## In-House vs CRO
