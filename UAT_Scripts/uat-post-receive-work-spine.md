@@ -387,7 +387,7 @@ Empty `{}` is a freeze, not a hole to refill on a later start. AC-P2-4 records t
 
 ### AC-P2-1 — Route remains a separate later planner
 
-**Result:** **Pass — execution path only** (alice click, Tobias signed, 2026-08-29, `b005cfe`). The superseding map/type lock is specified under AC-P2-5 and was not verified on this SHA.
+**Result:** **Pass** (alice click, Tobias signed, 2026-08-29, `b005cfe`)
 
 1. As a lab user with `sample:create`, receive a sample on `/receive`.
 2. Confirm the successful receive stays on `/receive`, clears the barcode, and is ready for the next tube.
@@ -458,13 +458,13 @@ Empty `{}` is a freeze, not a hole to refill on a later start. AC-P2-4 records t
 
 **Recorded but not scored (first-start freeze):** `asked_for_params` was `{}`. This is the known OPEN overwrite gap, not a Pass and not evidence that first-start freeze is closed.
 
-### AC-P2-5 — signed `b005cfe` behavior; superseded map-authoring expect
+### AC-P2-5 — chain-AND map-save history on `b005cfe`
 
-**Result on `b005cfe`:** **Pass** (Tobias signed, 2026-08-29). This result is history of what that SHA did and is **not re-scored** under the later Marc/Rolf lock.
+**Result:** **Pass** (Tobias signed, 2026-08-29, `b005cfe`). This Pass is **history of the chain-AND** (map save 422’d because the type was not accepted on every step). Do **not** re-score it. Do **not** teach that map-save 422 as the live authoring rule.
 
-**Verified holds on `b005cfe`:** click-save returned **422** `route_sample_type` with “Sample type is not accepted on every step in the chain”; overlapping TAT was refused. The chain-AND map-save behavior is a signed observation, not the ongoing authoring rule.
+**Verified holds on `b005cfe`:** click-save returned **422** `route_sample_type` with “Sample type is not accepted on every step in the chain”; overlapping TAT was refused.
 
-**Superseding ordered-route expect for the next product SHA (not a result of this run)**
+**Live ordered-route expect (not scored on this SHA; not this Result)**
 
 1. Confirm map create has analysis, TAT, and sortable ordered `process_definition[]`, with no sample-type picker.
 2. Confirm the form displays the first process and its first ordered Experiment/LimsRun allow-list. Change process order or first-step acceptance and verify derived display refreshes.
@@ -491,6 +491,6 @@ Empty `{}` is a freeze, not a hole to refill on a later start. AC-P2-4 records t
 
 **Signed by Tobias, 2026-08-29; local docker compose, compose down.**
 
-AC-P2-1 **Pass** · AC-P2-2 **Pass** · AC-P2-3 **Pass (execution path only)** · AC-P2-4 **publish-refuse Pass only** · AC-P2-5 **Pass as `b005cfe` history**.
+AC-P2-1 **Pass** · AC-P2-2 **Pass** · AC-P2-3 **Pass** · AC-P2-4 **publish-refuse Pass**; first-start freeze **OPEN, not scored** · AC-P2-5 **Pass as chain-AND history**.
 
-**Overall P2 Pass remains unsigned and is not claimed.** WO-7 first-start freeze remains **OPEN** and was not scored. Hold product merge. Not IC50.
+**Overall P2 remains unsigned.** Do not write overall P2 Pass, signed Pass, or merge-ready. Hold product merge. Not IC50.
