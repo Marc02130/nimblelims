@@ -1,4 +1,4 @@
-"""P2 routing map, type gate, and Route → work_order."""
+"""P2 routing map and Route → work_order."""
 from __future__ import annotations
 
 import logging
@@ -19,7 +19,6 @@ from models.work_order import RoutingMap, StepAcceptedSampleType, WorkOrder
 logger = logging.getLogger(__name__)
 
 ROUTE_SAMPLE_TYPE = "route_sample_type"
-NO_ROUTE = "no_route"
 
 
 def _range(tat_min: int, tat_max: int) -> NumericRange:
@@ -59,26 +58,30 @@ class RoutingService:
     def create_map(
         self,
         analysis_id: UUID,
-        sample_type_id: UUID,
         tat_min: int,
         tat_max: int,
         process_definition_ids: Sequence[UUID],
         active: bool = True,
-    ) -> RoutingMap:
+    ) -> List[RoutingMap]:
+        """Sample types come from the first process's first experiment/LIMS Run."""
         chain = list(process_definition_ids)
         self._require_definitions(chain)
-        self.assert_chain_accepts_sample_type(chain, sample_type_id)
-        self._refuse_overlap(analysis_id, sample_type_id, tat_min, tat_max)
-        row = RoutingMap(
-            analysis_id=analysis_id,
-            sample_type_id=sample_type_id,
-            tat_range=_range(tat_min, tat_max),
-            process_definition_ids=chain,
-            active=active,
-            created_by=self.user.id,
-            modified_by=self.user.id,
-        )
-        self.db.add(row)
+        types = self._require_first_step_types(chain)
+        for sid in types:
+            self._refuse_overlap(analysis_id, sid, tat_min, tat_max)
+        created: List[RoutingMap] = []
+        for sid in types:
+            row = RoutingMap(
+                analysis_id=analysis_id,
+                sample_type_id=sid,
+                tat_range=_range(tat_min, tat_max),
+                process_definition_ids=chain,
+                active=active,
+                created_by=self.user.id,
+                modified_by=self.user.id,
+            )
+            self.db.add(row)
+            created.append(row)
         try:
             self.db.commit()
         except IntegrityError as e:
@@ -88,8 +91,9 @@ class RoutingService:
                 status_code=status.HTTP_409_CONFLICT,
                 detail="Overlapping TAT range for this analysis and sample type",
             ) from e
-        self.db.refresh(row)
-        return row
+        for row in created:
+            self.db.refresh(row)
+        return created
 
     def update_map(
         self,
@@ -118,7 +122,6 @@ class RoutingService:
         )
         if process_definition_ids is not None:
             self._require_definitions(chain)
-        self.assert_chain_accepts_sample_type(chain, row.sample_type_id)
         self._refuse_overlap(
             row.analysis_id, row.sample_type_id, lo, hi, exclude_id=row.id
         )
@@ -128,6 +131,9 @@ class RoutingService:
             row.active = active
         row.modified_by = self.user.id
         try:
+            self.db.flush()
+            if chain:
+                self._sync_maps_for_first_process(chain[0])
             self.db.commit()
         except IntegrityError as e:
             self.db.rollback()
@@ -135,8 +141,8 @@ class RoutingService:
                 status_code=status.HTTP_409_CONFLICT,
                 detail="Overlapping TAT range for this analysis and sample type",
             ) from e
-        self.db.refresh(row)
-        return row
+        refreshed = self.db.query(RoutingMap).filter(RoutingMap.id == map_id).first()
+        return refreshed or row
 
     def delete_map(self, map_id: UUID) -> None:
         row = self.db.query(RoutingMap).filter(RoutingMap.id == map_id).first()
@@ -184,40 +190,136 @@ class RoutingService:
             self.db.add(
                 StepAcceptedSampleType(step_id=step_id, sample_type_id=sid)
             )
-        self.db.commit()
+        self.db.flush()
+        try:
+            if self._is_first_typed_step(step):
+                self._sync_maps_for_first_process(step.process_definition_id)
+            self.db.commit()
+        except HTTPException:
+            self.db.rollback()
+            raise
+        except IntegrityError as e:
+            self.db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Overlapping TAT range for this analysis and sample type",
+            ) from e
         return list(seen)
 
-    def assert_chain_accepts_sample_type(
-        self, process_definition_ids: Sequence[UUID], sample_type_id: UUID
-    ) -> None:
-        """Fail closed if any step has empty accepted set or does not include sample_type."""
-        for def_id in process_definition_ids:
-            steps = (
-                self.db.query(ELNProcessDefinitionStep)
-                .filter(ELNProcessDefinitionStep.process_definition_id == def_id)
-                .order_by(ELNProcessDefinitionStep.sort_order)
-                .all()
+    def _first_typed_step(
+        self, process_definition_id: UUID
+    ) -> Optional[ELNProcessDefinitionStep]:
+        steps = (
+            self.db.query(ELNProcessDefinitionStep)
+            .filter(ELNProcessDefinitionStep.process_definition_id == process_definition_id)
+            .order_by(ELNProcessDefinitionStep.sort_order.asc())
+            .all()
+        )
+        if not steps:
+            return None
+        for step in steps:
+            if (step.step_kind or "") in ("eln_experiment", "lims_run"):
+                return step
+        return steps[0]
+
+    def _is_first_typed_step(self, step: ELNProcessDefinitionStep) -> bool:
+        first = self._first_typed_step(step.process_definition_id)
+        return first is not None and first.id == step.id
+
+    def _require_first_step_types(self, chain: Sequence[UUID]) -> List[UUID]:
+        if not chain:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail={
+                    "code": ROUTE_SAMPLE_TYPE,
+                    "message": "Process definition has no experiment or LIMS Run step",
+                },
             )
-            if not steps:
-                raise HTTPException(
-                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                    detail={
-                        "code": ROUTE_SAMPLE_TYPE,
-                        "message": "Process definition has no steps",
-                    },
-                )
-            for step in steps:
-                accepted = self.list_step_accepted_types(step.id)
-                if not accepted or sample_type_id not in accepted:
-                    raise HTTPException(
-                        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                        detail={
-                            "code": ROUTE_SAMPLE_TYPE,
-                            "message": (
-                                "Sample type is not accepted on every step in the chain"
-                            ),
-                        },
+        step = self._first_typed_step(chain[0])
+        if step is None:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail={
+                    "code": ROUTE_SAMPLE_TYPE,
+                    "message": "Process definition has no experiment or LIMS Run step",
+                },
+            )
+        types = self.list_step_accepted_types(step.id)
+        if not types:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail={
+                    "code": ROUTE_SAMPLE_TYPE,
+                    "message": (
+                        "First experiment/LIMS Run has no accepted sample types"
+                    ),
+                },
+            )
+        return types
+
+    def _assert_sample_matches_first_step(
+        self, chain: Sequence[UUID], sample_type_id: UUID
+    ) -> None:
+        types = self._require_first_step_types(chain)
+        if sample_type_id not in types:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail={
+                    "code": ROUTE_SAMPLE_TYPE,
+                    "message": (
+                        "Sample type is not accepted on the first experiment/"
+                        "LIMS Run of the first process"
+                    ),
+                },
+            )
+
+    def _sync_maps_for_first_process(self, process_definition_id: UUID) -> None:
+        """Keep routing_map.sample_type_id in line with the first typed step."""
+        step = self._first_typed_step(process_definition_id)
+        desired = (
+            list(dict.fromkeys(self.list_step_accepted_types(step.id)))
+            if step
+            else []
+        )
+        maps = [
+            m
+            for m in self.db.query(RoutingMap).all()
+            if (m.process_definition_ids or [None])[0] == process_definition_id
+        ]
+        groups: dict[tuple, list] = {}
+        for row in maps:
+            lo, hi = _range_bounds(row.tat_range)
+            key = (
+                row.analysis_id,
+                lo,
+                hi,
+                tuple(row.process_definition_ids or []),
+                row.active,
+            )
+            groups.setdefault(key, []).append(row)
+        for (analysis_id, lo, hi, chain, active), group in groups.items():
+            existing = {m.sample_type_id: m for m in group}
+            for sid, row in existing.items():
+                if sid not in desired:
+                    self.db.delete(row)
+            self.db.flush()
+            owner = group[0]
+            for sid in desired:
+                if sid in existing:
+                    continue
+                self._refuse_overlap(analysis_id, sid, lo, hi)
+                self.db.add(
+                    RoutingMap(
+                        analysis_id=analysis_id,
+                        sample_type_id=sid,
+                        tat_range=_range(lo, hi),
+                        process_definition_ids=list(chain),
+                        active=active,
+                        created_by=owner.created_by,
+                        modified_by=self.user.id,
                     )
+                )
+        self.db.flush()
 
     def find_map(
         self, analysis_id: UUID, sample_type_id: UUID, tat_days: int
@@ -284,7 +386,7 @@ class RoutingService:
             return {"asked_for_id": row.id, "work_order": None, "no_route": True}
 
         chain = list(match.process_definition_ids or [])
-        self.assert_chain_accepts_sample_type(chain, sample.sample_type)
+        self._assert_sample_matches_first_step(chain, sample.sample_type)
 
         wo = WorkOrder(
             asked_for_id=row.id,
@@ -327,7 +429,7 @@ class RoutingService:
         return q.order_by(WorkOrder.created_at.desc()).all()
 
     def start_work_order(self, work_order_id: UUID):
-        """Instantiate the first snapshot definition and link eln_processes.work_order_id."""
+        """Instantiate the first process in the ordered snapshot and link eln_processes.work_order_id."""
         deny_client_write(self.user)
         wo = (
             self.db.query(WorkOrder)
@@ -381,6 +483,11 @@ class RoutingService:
             raise HTTPException(
                 status.HTTP_422_UNPROCESSABLE_ENTITY,
                 "process_definition_ids must not be empty",
+            )
+        if len(ids) != len(set(ids)):
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_ENTITY,
+                "process_definition_ids must be unique in listed order",
             )
         found = (
             self.db.query(ELNProcessDefinition.id)

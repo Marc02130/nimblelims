@@ -16,6 +16,8 @@ jest.mock('../services/apiService', () => ({
     getAnalyses: jest.fn().mockResolvedValue({ analyses: [] }),
     getListEntries: jest.fn().mockResolvedValue([]),
     getElnProcessDefinitions: jest.fn().mockResolvedValue({ definitions: [] }),
+    getElnProcessDefinition: jest.fn().mockResolvedValue({ id: 'd1', name: 'SOP', steps: [] }),
+    getStepAcceptedSampleTypes: jest.fn().mockResolvedValue({ sample_type_ids: [] }),
     createRoutingMap: jest.fn(),
     deleteRoutingMap: jest.fn(),
   },

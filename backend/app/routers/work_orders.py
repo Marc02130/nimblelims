@@ -51,21 +51,24 @@ def list_routing_map(
     return [RoutingMapRead(**map_to_read(r)) for r in rows]
 
 
-@routing_map_router.post("", response_model=RoutingMapRead, status_code=status.HTTP_201_CREATED)
+@routing_map_router.post(
+    "",
+    response_model=List[RoutingMapRead],
+    status_code=status.HTTP_201_CREATED,
+)
 def create_routing_map(
     body: RoutingMapCreate,
     user: User = Depends(require_config_edit),
     db: Session = Depends(get_db),
 ):
-    row = _svc(db, user).create_map(
+    rows = _svc(db, user).create_map(
         analysis_id=body.analysis_id,
-        sample_type_id=body.sample_type_id,
         tat_min=body.tat_min,
         tat_max=body.tat_max,
         process_definition_ids=body.process_definition_ids,
         active=body.active,
     )
-    return RoutingMapRead(**map_to_read(row))
+    return [RoutingMapRead(**map_to_read(r)) for r in rows]
 
 
 @routing_map_router.patch("/{map_id}", response_model=RoutingMapRead)

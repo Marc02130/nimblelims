@@ -1,4 +1,4 @@
-"""P2 routing map, Route → work_order, type gate, WO-7 Test at LimsRun start."""
+"""P2 routing map, Route → work_order, WO-7 Test at LimsRun start."""
 from __future__ import annotations
 
 from datetime import datetime
@@ -14,7 +14,7 @@ from models.list import List, ListEntry
 from models.project import Project, ProjectUser
 from models.test import Test
 from models.user import User
-from models.work_order import WorkOrder
+from models.work_order import StepAcceptedSampleType, WorkOrder
 
 
 def _auth(token: str) -> dict:
@@ -167,22 +167,22 @@ def _create_map(
     token,
     *,
     analysis_id,
-    sample_type_id,
-    definition_id,
+    definition_id=None,
+    definition_ids=None,
     tat_min=1,
     tat_max=10,
+    sample_type_id=None,
 ):
-    return client.post(
-        "/v1/routing-map",
-        json={
-            "analysis_id": str(analysis_id),
-            "sample_type_id": str(sample_type_id),
-            "tat_min": tat_min,
-            "tat_max": tat_max,
-            "process_definition_ids": [str(definition_id)],
-        },
-        headers=_auth(token),
-    )
+    ids = definition_ids if definition_ids is not None else [definition_id]
+    body = {
+        "analysis_id": str(analysis_id),
+        "tat_min": tat_min,
+        "tat_max": tat_max,
+        "process_definition_ids": [str(i) for i in ids],
+    }
+    if sample_type_id is not None:
+        body["sample_type_id"] = str(sample_type_id)
+    return client.post("/v1/routing-map", json=body, headers=_auth(token))
 
 
 class TestWorkOrderP2:
@@ -212,7 +212,7 @@ class TestWorkOrderP2:
         assert got.json()["status"] == "requested"
         assert db_session.query(WorkOrder).count() == before
 
-    def test_map_save_empty_accepted_types_422(
+    def test_map_save_without_first_step_types_422(
         self,
         client: TestClient,
         admin_token: str,
@@ -225,29 +225,6 @@ class TestWorkOrderP2:
             client,
             admin_token,
             analysis_id=p2_seed["analysis_a"].id,
-            sample_type_id=p2_seed["sample_type"].id,
-            definition_id=definition["id"],
-        )
-        assert r.status_code == 422, r.text
-        detail = r.json()["detail"]
-        code = detail.get("code") if isinstance(detail, dict) else None
-        assert code == "route_sample_type"
-
-    def test_wrong_step_type_422_on_map_and_route(
-        self,
-        client: TestClient,
-        admin_token: str,
-        p2_seed,
-    ):
-        definition = _create_lims_run_definition(
-            client, admin_token, p2_seed["analysis_a"].id
-        )
-        _put_step_types(client, admin_token, definition, p2_seed["dna_type"].id)
-        r = _create_map(
-            client,
-            admin_token,
-            analysis_id=p2_seed["analysis_a"].id,
-            sample_type_id=p2_seed["sample_type"].id,
             definition_id=definition["id"],
         )
         assert r.status_code == 422, r.text
@@ -255,18 +232,186 @@ class TestWorkOrderP2:
         assert isinstance(detail, dict)
         assert detail["code"] == "route_sample_type"
 
+    def test_later_step_different_type_still_routes(
+        self,
+        client: TestClient,
+        admin_token: str,
+        p2_seed,
+        db_session: Session,
+    ):
+        """Routing does not require every step to accept the inbound sample type."""
+        created_def = client.post(
+            "/v1/eln-process-definitions",
+            json={
+                "name": f"SOP extract-then-qc {uuid4().hex[:8]}",
+                "steps": [
+                    {
+                        "analysis_id": str(p2_seed["analysis_a"].id),
+                        "step_kind": "lims_run",
+                        "execution_mode": "lims_run",
+                        "name": "Extract",
+                        "sort_order": 0,
+                    },
+                    {
+                        "analysis_id": str(p2_seed["analysis_a"].id),
+                        "step_kind": "lims_run",
+                        "execution_mode": "lims_run",
+                        "name": "Plate QC",
+                        "sort_order": 1,
+                    },
+                ],
+            },
+            headers=_auth(admin_token),
+        )
+        assert created_def.status_code == 201, created_def.text
+        definition = created_def.json()
+        steps = sorted(definition["steps"], key=lambda s: s["sort_order"])
+        first_id = steps[0]["id"]
+        second_id = steps[1]["id"]
+        r1 = client.put(
+            f"/v1/eln-process-definitions/{definition['id']}/steps/{first_id}/accepted-sample-types",
+            json={"sample_type_ids": [str(p2_seed["sample_type"].id)]},
+            headers=_auth(admin_token),
+        )
+        assert r1.status_code == 200, r1.text
+        r2 = client.put(
+            f"/v1/eln-process-definitions/{definition['id']}/steps/{second_id}/accepted-sample-types",
+            json={"sample_type_ids": [str(p2_seed["dna_type"].id)]},
+            headers=_auth(admin_token),
+        )
+        assert r2.status_code == 200, r2.text
+
+        mapped = _create_map(
+            client,
+            admin_token,
+            analysis_id=p2_seed["analysis_a"].id,
+            definition_id=definition["id"],
+        )
+        assert mapped.status_code == 201, mapped.text
+        items = mapped.json()
+        assert isinstance(items, list)
+        assert {row["sample_type_id"] for row in items} == {
+            str(p2_seed["sample_type"].id)
+        }
+
+        sample_id = _receive_sample(client, admin_token, p2_seed, "NBIO-P2-DEST")
+        created = client.post(
+            "/v1/asked-for",
+            json=_asked_for_body([sample_id], p2_seed["analysis_a"].id),
+            headers=_auth(admin_token),
+        )
+        af_id = created.json()["items"][0]["id"]
+        before = db_session.query(WorkOrder).count()
+        routed = client.post(f"/v1/asked-for/{af_id}/route", headers=_auth(admin_token))
+        assert routed.status_code == 200, routed.text
+        item = routed.json()["items"][0]
+        assert item["no_route"] is False
+        assert item["work_order"] is not None
+        assert db_session.query(WorkOrder).count() == before + 1
+
+        dna_id = _receive_sample(
+            client,
+            admin_token,
+            p2_seed,
+            "NBIO-P2-DEST-DNA",
+            sample_type_id=p2_seed["dna_type"].id,
+        )
+        dna_af = client.post(
+            "/v1/asked-for",
+            json=_asked_for_body([dna_id], p2_seed["analysis_a"].id),
+            headers=_auth(admin_token),
+        )
+        dna_routed = client.post(
+            f"/v1/asked-for/{dna_af.json()['items'][0]['id']}/route",
+            headers=_auth(admin_token),
+        )
+        assert dna_routed.status_code == 200, dna_routed.text
+        assert dna_routed.json()["items"][0]["no_route"] is True
+
+    def test_ordered_process_chain_on_map_and_work_order(
+        self,
+        client: TestClient,
+        admin_token: str,
+        p2_seed,
+    ):
+        extract = _create_lims_run_definition(
+            client, admin_token, p2_seed["analysis_a"].id
+        )
+        analysis = _create_lims_run_definition(
+            client, admin_token, p2_seed["analysis_a"].id
+        )
+        reporting = _create_lims_run_definition(
+            client, admin_token, p2_seed["analysis_a"].id
+        )
+        _put_step_types(client, admin_token, extract, p2_seed["sample_type"].id)
+        _put_step_types(client, admin_token, analysis, p2_seed["dna_type"].id)
+        mapped = _create_map(
+            client,
+            admin_token,
+            analysis_id=p2_seed["analysis_a"].id,
+            definition_ids=[extract["id"], analysis["id"], reporting["id"]],
+        )
+        assert mapped.status_code == 201, mapped.text
+        items = mapped.json()
+        assert {row["sample_type_id"] for row in items} == {
+            str(p2_seed["sample_type"].id)
+        }
+        chain = items[0]["process_definition_ids"]
+        assert chain == [
+            str(extract["id"]),
+            str(analysis["id"]),
+            str(reporting["id"]),
+        ]
+        dup = _create_map(
+            client,
+            admin_token,
+            analysis_id=p2_seed["analysis_a"].id,
+            definition_ids=[extract["id"], extract["id"]],
+            tat_min=11,
+            tat_max=20,
+        )
+        assert dup.status_code == 422, dup.text
+        sample_id = _receive_sample(client, admin_token, p2_seed, "NBIO-P2-CHAIN")
+        created = client.post(
+            "/v1/asked-for",
+            json=_asked_for_body([sample_id], p2_seed["analysis_a"].id),
+            headers=_auth(admin_token),
+        )
+        af_id = created.json()["items"][0]["id"]
+        routed = client.post(f"/v1/asked-for/{af_id}/route", headers=_auth(admin_token))
+        assert routed.status_code == 200, routed.text
+        wo = routed.json()["items"][0]["work_order"]
+        assert wo["process_definition_ids"] == chain
+
+    def test_route_422_when_first_step_types_go_stale(
+        self,
+        client: TestClient,
+        admin_token: str,
+        p2_seed,
+        db_session: Session,
+    ):
+        definition = _create_lims_run_definition(
+            client, admin_token, p2_seed["analysis_a"].id
+        )
         _put_step_types(client, admin_token, definition, p2_seed["sample_type"].id)
         mapped = _create_map(
             client,
             admin_token,
             analysis_id=p2_seed["analysis_a"].id,
-            sample_type_id=p2_seed["sample_type"].id,
             definition_id=definition["id"],
         )
         assert mapped.status_code == 201, mapped.text
-
-        _put_step_types(client, admin_token, definition, p2_seed["dna_type"].id)
-        sample_id = _receive_sample(client, admin_token, p2_seed, "NBIO-P2-GATE")
+        step_id = definition["steps"][0]["id"]
+        db_session.query(StepAcceptedSampleType).filter(
+            StepAcceptedSampleType.step_id == step_id
+        ).delete()
+        db_session.add(
+            StepAcceptedSampleType(
+                step_id=step_id, sample_type_id=p2_seed["dna_type"].id
+            )
+        )
+        db_session.commit()
+        sample_id = _receive_sample(client, admin_token, p2_seed, "NBIO-P2-STALE")
         created = client.post(
             "/v1/asked-for",
             json=_asked_for_body([sample_id], p2_seed["analysis_a"].id),
@@ -278,6 +423,36 @@ class TestWorkOrderP2:
         detail = routed.json()["detail"]
         assert isinstance(detail, dict)
         assert detail["code"] == "route_sample_type"
+
+    def test_first_step_type_change_updates_map(
+        self,
+        client: TestClient,
+        admin_token: str,
+        p2_seed,
+    ):
+        definition = _create_lims_run_definition(
+            client, admin_token, p2_seed["analysis_a"].id
+        )
+        _put_step_types(client, admin_token, definition, p2_seed["sample_type"].id)
+        mapped = _create_map(
+            client,
+            admin_token,
+            analysis_id=p2_seed["analysis_a"].id,
+            definition_id=definition["id"],
+        )
+        assert mapped.status_code == 201, mapped.text
+        _put_step_types(client, admin_token, definition, p2_seed["dna_type"].id)
+        rows = client.get(
+            "/v1/routing-map?active_only=false",
+            headers=_auth(admin_token),
+        )
+        assert rows.status_code == 200, rows.text
+        types = {
+            row["sample_type_id"]
+            for row in rows.json()
+            if row["analysis_id"] == str(p2_seed["analysis_a"].id)
+        }
+        assert types == {str(p2_seed["dna_type"].id)}
 
     def test_tat_overlap_409(
         self,
@@ -293,7 +468,6 @@ class TestWorkOrderP2:
             client,
             admin_token,
             analysis_id=p2_seed["analysis_a"].id,
-            sample_type_id=p2_seed["sample_type"].id,
             definition_id=definition["id"],
             tat_min=1,
             tat_max=7,
@@ -303,7 +477,6 @@ class TestWorkOrderP2:
             client,
             admin_token,
             analysis_id=p2_seed["analysis_a"].id,
-            sample_type_id=p2_seed["sample_type"].id,
             definition_id=definition["id"],
             tat_min=5,
             tat_max=10,
@@ -325,7 +498,6 @@ class TestWorkOrderP2:
             client,
             admin_token,
             analysis_id=p2_seed["analysis_a"].id,
-            sample_type_id=p2_seed["sample_type"].id,
             definition_id=definition["id"],
         )
         assert mapped.status_code == 201, mapped.text
@@ -381,7 +553,6 @@ class TestWorkOrderP2:
                 client,
                 admin_token,
                 analysis_id=p2_seed["analysis_a"].id,
-                sample_type_id=p2_seed["sample_type"].id,
                 definition_id=definition["id"],
             ).status_code
             == 201
