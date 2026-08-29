@@ -134,13 +134,13 @@ Create a new sample.
 
 **Response:** `{ sample_id, sample_name, status, project_id, received_date, containers[], tests[] }` → **201**
 
-## Asked-for (P1 lake)
+## Asked-for and routing (P1 lake + P2)
 
 **Manual:** [asked-for.md](asked-for.md) · **UAT:** `UAT_Scripts/uat-post-receive-work-spine.md`
 
 UI: `/asked-for`. Copy: **requested analysis**. Write/cancel: `test:assign` and role ≠ Client. List/get: `sample:read`. Hidden/other-project sample → **403** (not 404).
 
-**Does not** create a Test row, start work, or execute an analysis. P2 **Route** (`POST /v1/asked-for/{id}/route` and `POST /v1/asked-for/route`) may mint a `work_order`. Tests freeze `asked_for_params` at **LimsRun start** (WO-7).
+`POST /v1/asked-for` **does not** create a Test or `work_order`, start work, or execute an analysis. Route is a separate, later P2 call. `POST /v1/asked-for/{id}/route` and batch `POST /v1/asked-for/route` mint a `work_order` only when a routing-map row matches. Tests create or attach and freeze `asked_for_params` at **LimsRun start** (WO-7).
 
 ### POST /v1/asked-for
 Record requested analyses for a sample set (one row per sample, one transaction).
@@ -154,7 +154,7 @@ Record requested analyses for a sample set (one row per sample, one transaction)
 }
 ```
 
-`sample_id` is accepted as a 1-element alias. P1 uses empty `params` `{}`. Duplicate open `(sample, analysis)` → **409** (full rollback). **201** `{ items, count }`. **201 has no `tests`.** `COUNT(tests)` unchanged.
+`sample_id` is accepted as a 1-element alias. P1 uses empty `params` `{}`. Duplicate open `(sample, analysis)` → **409** (full rollback). **201** `{ items, count }`. **201 has no `tests` or `work_orders`.** `COUNT(tests)` and `COUNT(work_orders)` are unchanged.
 
 ### GET /v1/asked-for
 Query: `sample_id`, `project_id`, `analysis_id`, `status`. **200** `{ items, count }`.
@@ -166,12 +166,13 @@ Allowed while `requested`. Cancel after `routed` → **422**.
 
 ### POST /v1/asked-for/{id}/route
 ### POST /v1/asked-for/route
-Body for batch: `{ "asked_for_ids": ["uuid"] }`. **200** `{ items: [{ asked_for_id, work_order, no_route }], count }`. Empty map → `no_route: true`. Type gate fail → **422** `{ "code": "route_sample_type" }`. Write: `test:assign`, not Client.
+These are explicit later actions, not calls that Receive or asked-for create should chain automatically. Body for batch: `{ "asked_for_ids": ["uuid"] }`. **200** `{ items: [{ asked_for_id, work_order, no_route }], count }`. Empty map → `no_route: true`, status remains `requested`, and nothing is minted. A match creates a queued `work_order`, changes asked-for to `routed`, and creates no Test. Type gate fail → **422** with `detail.code = "route_sample_type"`. Write: `test:assign`, not Client.
 
 ### Routing map / work orders
-- `GET/POST /v1/routing-map` · `PATCH/DELETE /v1/routing-map/{id}` (write: `config:edit`). TAT overlap → **409**.
-- `PUT /v1/eln-process-definitions/{id}/steps/{step_id}/accepted-sample-types`
-- `GET /v1/work-orders` · `POST /v1/work-orders/{id}/start` (start: `experiment:manage`)
+- `GET/POST /v1/routing-map` · `PATCH/DELETE /v1/routing-map/{id}` (write: `config:edit`). Rows match analysis × sample type × inclusive TAT range; TAT overlap → **409**.
+- `GET/PUT /v1/eln-process-definitions/{id}/steps/{step_id}/accepted-sample-types`. Every step in every mapped definition must include the map’s sample type; empty or incompatible sets fail map save and Route with **422** `route_sample_type`.
+- `GET /v1/work-orders` (requires `sample:read`; filters: `status`, `sample_id`) returns `{ items, count }`.
+- `POST /v1/work-orders/{id}/start` (requires `experiment:manage`) instantiates the first snapshot process definition, assigns the work-order sample, sets the work order `in_progress`, and returns its `process_id`. The linked ELN process owns Experiment/LimsRun step execution; P2 does not create a second workflow home.
 
 ### Param defs (later — not receive, not this P1 stamp)
 `GET/PUT /analyses/{id}/param-defs` is catalog setup for freeze at **LimsRun start**. Do not put param defs on `POST /samples/receive`. P1 asked-for does not require filling defs.
@@ -2329,17 +2330,17 @@ Set the next value for the global sequence `name_template_seq_{entity_type}`.
 Full run lifecycle is under `/v1/lims-runs`. See [lims-runs.md](lims-runs.md) for product rules.
 
 ### GET /v1/lims-runs/{id}/promotion/preview
-Dry-run of what publish would write to Tests/Results when `analysis_id` is set. **No DB writes.**
+Dry-run of what publish would write to existing Tests/Results when `analysis_id` is set. **No DB writes and no Test creation.**
 
 **Response (shape):** `will_promote`, `create_count`, `update_count`, `conflict_count`, `skip_count`, `unresolved_columns[]`, `errors[]`, `items[]` (capped).
 
 ### PATCH /v1/lims-runs/{id}/complete
 Transition `complete → published` (requires `experiment:publish`).
 
-Promotes instrument JSONB → Tests/Results in the same transaction (**run always has `analysis_id`**). **409** with `code: promotion_conflict` if another run/manual result owns the same test/analyte/replicate.
+Promotes instrument JSONB → Tests/Results in the same transaction (**run always has `analysis_id`**). The Test must already exist from LimsRun start (WO-7); publish refuses a missing Test with **422** instead of inventing one. **409** with `code: promotion_conflict` if another run/manual result owns the same test/analyte/replicate.
 
 ### PATCH /v1/lims-runs/{id}/start
-Start run. **Requires `analysis_id`** on the run — **400** if missing. No non-reportable / `acknowledge_no_analysis` path (product lock 2026-07-19; remove legacy ack if still in code).
+Start run. **Requires `analysis_id`** on the run and at least one cohort sample — **400** if either is missing. With `sample_ids` in the body, start locks the cohort, creates or attaches one active Test per `(sample, analysis)`, and freezes the routed asked-for `params` into `tests.asked_for_params`. No non-reportable / `acknowledge_no_analysis` path (product lock 2026-07-19; remove legacy ack if still in code).
 
 ### Analyte aliases
 - List/create/delete under `/analytes/{id}/aliases` (admin analyte form also manages aliases).
