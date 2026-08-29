@@ -11,7 +11,7 @@ Key characteristics:
 
 Processes sit above individual Experiments and provide structure for multi-step experimental work.
 
-**Asked-for does not start a process.** Recording **requested analysis** does not execute or mint a Test. A routing-map row authors analysis + TAT + ordered `process_definition[]`, with no sample-type picker. The UI preserves route order and derives the first process / first ordered Experiment-LimsRun allow-list. Route compares current type with that list across candidate rows: zero acceptable → **422**, two or more → **409**, exactly one → queued work order. **Start process** requires `experiment:manage` and instantiates only the first process. A later start advances to the next definition in snapshot order; Route does not mint a process-of-processes. Later process/step starts gate current type then; empty or incompatible returns **422** `route_sample_type`.
+**Asked-for does not start a process.** A routing-map row matches analysis × intake sample type × TAT to one process definition. Map save does not require every ordered step to accept the intake type. Route checks only the first ordered Experiment/LimsRun step; Start instantiates that definition. Each later step checks current sample type when started; empty or incompatible returns **422** `route_sample_type`.
 
 ### Product rule (Decision #6)
 

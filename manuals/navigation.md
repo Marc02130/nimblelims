@@ -135,7 +135,7 @@ The **Experiments** section is its own top-level accordion, placed immediately a
 | Menu Item | Route | Icon | Tooltip | Permission | Description |
 |-----------|-------|------|---------|------------|-------------|
 | **All Experiments** | `/experiments` | Biotech | Experiments & Processes | (section) `experiment:manage` | List and detail of experiments; sample executions, lineage, linked processes |
-| **Work Orders** | `/work-orders` | AssignmentTurnedIn | Routed work orders | view `sample:read`; Start `experiment:manage` | Planning backlog with ordered process routes. Start instantiates only the first pending process; later starts advance in snapshot order. A queued work order is not started work |
+| **Work Orders** | `/work-orders` | AssignmentTurnedIn | Routed work orders | view `sample:read`; Start `experiment:manage` | Planning backlog. Each work order snapshots one process definition; Start opens its ordered typed steps |
 | **Processes** | `/experiments/processes` | AccountTree | ELN multi-step processes | `experiment:manage` | Existing process definitions and instances with typed Experiment/LimsRun steps |
 | **Experiment Templates** | `/experiments/templates` | ViewList | Experiment template definitions | `experiment:manage` (same as section) | Template CRUD, SOP/AI-assisted creation, sign-off, activation (`ExperimentTemplatesManagement`) |
 | **Runs** | `/runs` | PlayCircleOutline | Experiment Runs | `experiment:manage` | LimsRun list; the WO-7 lock puts Test create/attach and the asked-for parameter freeze at first start. The freeze is open on `b005cfe`: later starts still overwrite `tests.asked_for_params` |
@@ -194,7 +194,7 @@ The Admin section uses a Material-UI Accordion component for collapsible submenu
 | **Users Management** | `/admin/users` | People | User CRUD operations |
 | **Roles & Permissions** | `/admin/roles` | Security | Role and permission management |
 | **Analyses Management** | `/admin/analyses` | Science | Test analysis configuration |
-| **Routing map** | `/admin/routing-map` | AltRoute | Configure analysis + TAT + ordered `process_definition[]`. No sample-type picker. Show route order and derive the first process / first Experiment-LimsRun allow-list. Route gates that list; later starts gate current type |
+| **Routing map** | `/admin/routing-map` | AltRoute | Configure analysis × intake sample type × TAT → one process definition. Display first-step allowed types as information; no chain-wide save gate |
 | **Analytes Management** | `/admin/analytes` | Biotech | Analyte definitions |
 | **Test Batteries** | `/admin/test-batteries` | BatteryChargingFull | Test battery configuration |
 | **Custom Fields** | `/admin/custom-fields` | Tune | Manage custom attribute configurations (EAV) |

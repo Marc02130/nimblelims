@@ -28,7 +28,7 @@ This is the right product. Do not collapse it. Do not expand it.
 | Layer | Is | Is not |
 |-------|----|--------|
 | Asked-for (P1) | Request: analysis + TAT + params | Work plan, Test, Process, LimsRun |
-| Routing + `work_order` (P2) | Ordered `process_definition[]` work plan | A Test row or unordered process bag |
+| Routing + `work_order` (P2) | One process definition with ordered typed steps | A Test row or unordered process bag |
 | Execute (shipped) | Process → Exp and/or LimsRun | A third engine |
 | Test (WO-7) | Minted at **LimsRun start** | Minted at receive / asked-for / WO save / publish |
 | SOP Apply (P4) | Writes a **process definition** | Blood → DNA daughter → Qubit E2E |
@@ -51,9 +51,9 @@ Matches requirements §§3–5. Do not expand.
 | **P1** zero Tests, Results, Processes, Experiments, LimsRuns, work_orders on save | Mint Tests at asked-for or work_order save |
 | **P1** copy: asked-for / requested analysis; no Start/Execute on `requested` | Treat asked-for as the worklist or Tests page with a new name |
 | **P1** multi-sample one operator action (same analysis + TAT + params) | One-by-one click per tube as the only path |
-| **P2** map row = analysis + TAT + ordered `process_definition[]` | One definition; unordered bag; admin-authored sample type |
-| **P2** Route derives first-process / first-step types; zero → 422, multiple → 409 | Silent `first()` or chain-wide type AND |
-| **P2** Start instantiates first process only; later processes start later | Mint a process-of-processes at Route |
+| **P2** map row = analysis × intake type × TAT → one process definition | Multiple definitions documented as shipped or unordered steps |
+| **P2** Route checks only the first step; later steps check current type at start | Chain-wide map-save type gate |
+| **P2** displays first-step allowed types as information | Treating them as a save gate |
 | **WO-7** Test at LimsRun start; publish **refuses** if missing | Ensure-on-publish find-or-create |
 | **P3** typed number → `reported_result` + `qualifiers`; unit from `analytes.units_default` | `results.unit_id`; type numbers into asked-for |
 | **P4** Apply → process definition; human save; never silent auto-activate | Claim dest-type Hold is closed; SOP PDFs in git; IC50 |
@@ -70,13 +70,13 @@ Matches requirements §§3–5. Do not expand.
 | Slice | CEO | Meaning |
 |-------|-----|---------|
 | **P1 Asked-for** | **Implement OPEN** | Code against RQ-AF-* / SPEC P1 with **C1** in the same PR. OQ-AF-* already Decided (provisional). |
-| **P2 Routing + work_order** | Ordered-route design locked; OQ-WO-1/3 Decided. | Product merge held on OPEN freeze / unsigned overall Pass. |
+| **P2 Routing + work_order** | Hans/Heidi map/type design locked; OQ-WO-1/3 Decided. | Product merge held on OPEN freeze / unsigned overall Pass. |
 | **P3 Results persist** | **Design accepted.** **Coding closed** until OQ-RES-1 (Sci CSO). | Persist lock only. Not a results product. Not P1 UAT. |
 | **P4 SOP+AI Apply** | **May proceed with C5 / L5.** | Closes the template-only lie. Dest-type Hold unchanged. OQ-SOP-2 before optional parser draft. |
 | **P5 Parser setup UX** | **OPEN** (independent of P1). | Engine exists. This is ops skill-floor (R-8). Not a substitute for a work list. |
 | **Extract-hold dest type** | **Not licensed** | Own stem. Blood → DNA daughter → Qubit on the daughter remains Hold. |
 
-**Product default (OQ-WO-1, superseded):** Tech explicitly chooses Route. Zero acceptable rows returns 422; multiple returns 409; exactly one snapshots the ordered route. No auto-route and no silent first row.
+**Product default (OQ-WO-1, superseded):** Tech explicitly chooses Route. No analysis × intake type × TAT match returns `no_route`; a first-step mismatch returns 422. No auto-route.
 
 ---
 
@@ -87,9 +87,9 @@ Product accepts Lab Ops **L1–L5** as same-phase. C1–C5 **are** L1–L5. Addi
 | ID | Condition | Aligns |
 |----|-----------|--------|
 | **C1** | **Asked-for is a request lake, not the work plan.** Copy: “Asked-for” / “requested analysis,” never “assign test,” “create test,” “start work,” or “order process.” Saving asked-for creates **zero** Tests, Results, Processes, Experiments, LimsRuns, work_orders. **No Start / Execute CTA** on a `requested` row. UI is **not** `/receive`; receive still **422** on non-empty `analysis_ids`; do not call `_create_tests` / `_create_asked_for_tests` / `_create_tests_for_sample`. **Multi-sample:** one operator action (same analysis + TAT + params) can write asked-for for a **set** of received samples. API may remain one row per sample; the action is all-or-nothing **or** every per-sample failure is visible — never silent partial success. Show a computed due date from `tat_days`; keep `tat_days ≥ 1` (do not add STAT 0 this phase). Sidebar Sample Mgmt: **Asked-for immediately after Receive.** Do not reuse `TestForm`. | Lab Ops **L1** |
-| **C2** | **Marc/Rolf route lock:** no map type picker. Each row has ordered `process_definition[]`. Match analysis + TAT, then current type against each candidate’s first process / first Experiment-LimsRun list. Zero acceptable → 422; multiple → 409; exactly one wins. No later-process/step AND. | Lab Ops **L2** |
+| **C2** | **Hans/Heidi route lock:** map sample type is intake matching only. Route checks the first ordered step. Map save does not check later steps; those check current type at start. | Lab Ops **L2** |
 | **C3** | **Params travel.** Asked-for `params` snapshot onto the Test at **LimsRun start** (WO-7) and freeze. Tech does not re-type cell line / assay params to run the assay. Empty defs remain empty-object-only (OQ-AF-3). Uniqueness stays `(sample_id, analysis_id)` while open for P1. Do **not** expand uniqueness to param identity this phase. | Lab Ops **L3** |
-| **C4** | **Ordered process definitions are the work plan.** Snapshot the route at mint. Start instantiates the first process only; a later start advances in order under existing AuthZ. UI shows process and step order. | Lab Ops **L4** |
+| **C4** | **One process definition is the P2 work plan.** Its typed steps stay ordered. Multi-definition data must never appear as an unordered bag and is not the shipped contract. | Lab Ops **L4** |
 | **C5** | **SOP Apply writes a process definition. It does not close dest-type Hold.** Apply success / manuals / UAT: draft process definition with typed steps; human save; never silent auto-activate. **Do not** say the NCI extract → Qubit path is runnable. **Do not** UAT blood → DNA daughter → Qubit on the daughter in this packet. Dest type remains [extract-hold-dest-type](../requirements/extract-hold-dest-type.md) / [sop-ai-to-process.md](../open-questions/sop-ai-to-process.md). No SOP PDF bodies in git. Not IC50. | Lab Ops **L5** |
 | **C6** | **Do not sell P1 as a worklist.** P1 is a request log. The work list is P2 `work_order`. Classic `/tests` + `TestForm` still mints Tests (WO-4 type-a-number stays). Do not delete it in P1. P1 UAT and manuals: record requests on **Asked-for**, not TestForm. Revisit hiding Test-create only after dogfood. Domain processing PRD still says “ensure-on-publish”; this packet **supersedes** that — publish **422** if Test missing. | Product freeze / WO-7 |
 | **C7** | **One phase per PR.** P1 tables + API + `/asked-for` + pytest + UAT script in PR 1. Do not land P2–P5 schema/UI in the P1 PR. Receive code freeze except bugs. | Completeness of spine, small diffs |
@@ -195,7 +195,7 @@ This plan moves **toward** that by locking the spine and shipping the lake. Expa
 Current Lab Ops artifact is **Accept with conditions (L1–L5)**. **Not Hold. Not Revise.**
 
 - **P1 OPEN** — L1 is already RQ-AF-2/3 + bounce; copy, zero Tests, receive freeze, multi-sample land with the P1 PR (**C1**).  
-- **P2 sketch gate:** map rows hold ordered `process_definition[]`; no type picker. Route gates each candidate by first process / first step, with zero → 422 and multiple → 409. Start instantiates first process only; later starts advance. Params snapshot remains at LimsRun start.
+- **P2 sketch gate:** map rows hold analysis × intake type × TAT → one definition. Route gates its first step; later steps gate at start. Map save has no chain-wide type check. Params snapshot remains at LimsRun start.
 - **P4** may write process definitions with **L5 / C5**. Dest-type Hold unchanged.  
 - **P5** independent.
 
@@ -217,7 +217,7 @@ Lab Ops watch items we freeze as product (non-blocking for P1, not expansions):
 |----------|---------|
 | **A. Classic Tests as the order** | Rejected. Violates WO-7. Status quo hurt. |
 | **B. Asked-for lake, then routing/`work_order` into existing execute (this packet)** | **Accepted.** Completeness of the spine in the packet; P1 is the implement lake. |
-| **C. Skip P1, mint work_order from analysis at save** | Rejected. Empty map means zero acceptable routes → 422 and no mint; request ≠ work. |
+| **C. Skip P1, mint work_order from analysis at save** | Rejected. Empty map returns `no_route`; request ≠ work. |
 
 HOLD SCOPE does not cherry-pick expansions. Approach B stands.
 
@@ -232,7 +232,7 @@ HOLD SCOPE does not cherry-pick expansions. Approach B stands.
 | **Date** | 2026-08-28 |
 | **Lab Ops** | Accept with conditions (L1–L5); P1 OPEN; P2 sketch gate cleared by L2–L4 fold |
 | **P1 implement** | **OPEN** — asked-for lake with C1 / L1 in the same PR |
-| **P2** | Ordered-route lock Decided; hold product merge while freeze is OPEN / overall Pass unsigned |
+| **P2** | Hans/Heidi lock Decided; hold product merge while freeze is OPEN / overall Pass unsigned |
 | **P3** | Design accepted; coding waits OQ-RES-1 (Sci CSO) |
 | **P4** | May proceed with C5 / L5; dest-type Hold unchanged |
 | **P5** | **OPEN** (independent; admin UX) |

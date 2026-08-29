@@ -27,7 +27,7 @@ The spine packet is **documentable**. Core product docs exist (requirements, tec
 
 Required reviews now exist. Current P2 lock is recorded in §4.2; product merge remains held.
 
-**Do not document P2–P5 as shipped in the P1 history.** OQ-WO-1/3 are now Decided under the ordered-route lock. First-start freeze remains OPEN and overall P2 unsigned.
+**Do not document P2–P5 as shipped in the P1 history.** OQ-WO-1/3 are now Decided under the Hans/Heidi lock. First-start freeze remains OPEN and overall P2 unsigned.
 
 Living manuals are the real gap. After CORE:
 
@@ -48,8 +48,8 @@ Living manuals are the real gap. After CORE:
 
 | Dimension | Notes |
 |-----------|--------|
-| **Completeness** | Requirements, sketch, schema, reviews, manuals, and UAT exist. Current ordered-route fold is docs-only; product implementation remains held. |
-| **Consistency** | Current P2 SoT: analysis + TAT + ordered `process_definition[]`; explicit Route; zero acceptable 422; multiple 409; first process starts first. Signed `b005cfe` chain-AND behavior remains history only. |
+| **Completeness** | Requirements, sketch, schema, reviews, manuals, and UAT exist. Current type/map fold is docs-only; product implementation remains held. |
+| **Consistency** | Current P2 SoT: analysis × intake type × TAT → one process definition; first-step Route gate; later step-start gates; no chain-wide map-save gate. Signed `b005cfe` chain-AND behavior remains history only. |
 | **Cross-references** | Requirements ↔ sketch ↔ schema ↔ PRD ↔ SPEC ↔ OQs ↔ Lab Ops are linked. Open-questions index already lists this stem. `.docs/review/README.md` does not name `docs-review/`. Atomic-receive manuals/UAT still say A-15 is **parked** rather than “opened by `post-receive-work-spine` P1 (not on `/receive`)”. |
 | **Living-doc hygiene** | OQ-WO-1/3 are Decided. P2 remains unmerged because first-start freeze is OPEN and overall Pass unsigned. Dest-type Hold stays separate. |
 | **Review-artifact quality** | Lab Ops follows PACKET header + L* conditions + phase gate. This docs-review follows the Documentarian template. Other reviews: n/a until written. |
@@ -78,7 +78,7 @@ Living manuals are the real gap. After CORE:
 | **DOC4** | **P1** | **Pointer hygiene on existing UAT.** [`uat-atomic-receive.md`](../../../UAT_Scripts/uat-atomic-receive.md) + [`atomic-receive/README.md`](../../../UAT_Scripts/atomic-receive/README.md) + [`scenarios.md`](../../../UAT_Scripts/atomic-receive/scenarios.md): A-15 is **this packet (P1 asked-for)**, still **not on receive**; CORE remains zero Tests. [`uat-test-ordering.md`](../../../UAT_Scripts/uat-test-ordering.md): banner that the **order path is** `uat-post-receive-work-spine.md` / `/asked-for`; TestForm is **not** asked-for; do **not** un-retire wizard cases. [`uat-testing-log.md`](../../../UAT_Scripts/uat-testing-log.md): insert `uat-post-receive-work-spine` after `uat-atomic-receive` (depends on receive + analyses). [`uat-navigation-ui.md`](../../../UAT_Scripts/uat-navigation-ui.md): Asked-for after Receive; `/accessioning` is not a sidebar item. | Otherwise three scripts still teach “assign tests from TestForm / A-15 parked.” |
 | **DOC5** | **P1** | **L1 terminology lock in every user-facing string this PR touches** (manuals, UAT, README, help if a help row is added, UI copy). Allowed: Asked-for, requested analysis, record request, cancel request. **Forbidden:** assign test, create test, start work, order process, Start/Execute on `requested`. Sidebar label **Asked-for** (not Tests, not Orders, not Projects). | If docs say Tests, WO-7 dies on arrival (Lab Ops L1). |
 | **DOC6** | **P1** | **SPEC + schema close-out in the P1 PR.** SPEC: document multi-sample as **UI one action → N `POST /asked-for` rows** (or a `sample_ids[]` body if the API changes — pick one, write it, match pytest). P1 does **not** write work_orders. Schema-changes: fill **Alembic revision id(s)**; add **Backfill: none**; **Rollback** (drop P1 tables / forward-only reason); note OQ-WO-3 does **not** block P1 (P2 tables may be specified but not migrated in PR 1 unless Arch says otherwise — **P1 migration = `asked_for` + `analysis_param_defs` only**). | SPEC vs L1 is an implement trap. Schema template gaps block Arch and Alembic matching. |
-| **DOC7** | **P1 history** | Phase-scoped docs did not publish P2 as shipped. Current OQ-WO-1/3 are Decided under the ordered-route lock; dest-type Hold remains separate. | Historical P1 condition; superseded P2 gate. |
+| **DOC7** | **P1 history** | Phase-scoped docs did not publish P2 as shipped. Current OQ-WO-1/3 are Decided under the Hans/Heidi lock; dest-type Hold remains separate. | Historical P1 condition; superseded P2 gate. |
 | **DOC8** | **P1** | **Wizard stays removed (PR 75).** No new `/accessioning` wizard docs, no un-retiring `uat-sample-accessioning.md`, no Test Assignment step, no analysis picker on receive. Redirect mention only. | User lock + CORE bounce list. |
 | **DOC9** | **P1** | **Living hygiene in the same PR:** checklist — tick Lab Ops + Documentarian; leave other reviews until those artifacts exist. Requirements **Status** no longer “Draft for formal review” once P1 implement starts (e.g. “P1 implementing / P2–P5 specified”). Index `docs-review/` in [`.docs/review/README.md`](../README.md). Optional: one-line in [framework-stamps](../../decision-logs/framework-stamps-2026-08-26.md) WO-7 bullets that TAT overlap is **refuse** (OQ-TAT-1). Internal US-1/US-7/US-23 “tests at accessioning” — rewrite or stamp superseded by asked-for (working notes, not merge-blocking). | Orphan checkboxes and “draft” status after Lab Ops Accept confuse the next agent. |
 
@@ -123,7 +123,7 @@ Already normative (restated so implementers do not drop them): empty routing map
 
 | Phase | When | Docs |
 |-------|------|------|
-| **P2** | Marc/Rolf ordered-route lock | Docs must teach analysis + TAT + ordered `process_definition[]`, no type picker, derived first-process / first-step display, zero acceptable 422, multiple acceptable 409, first-process-only Start, later starts/gates, and no chain-AND. Preserve `b005cfe` signed history; freeze OPEN. |
+| **P2** | Hans/Heidi type/map lock | Docs teach intake-type matching, one process definition with ordered steps, informational first-step types, first-step Route refusal, later step-start refusal, and no chain-wide map-save gate. Preserve `b005cfe` history; freeze OPEN. |
 | **P3** | After OQ-RES-1 | Fold AR-RES into this stem UAT (or `uat-results-entry-review.md` with a pointer). Manual: typed number → `reported_result` + `qualifiers`; missing `units_default` → 422; no `results.unit_id`; two writers 409. **Not** results on asked-for. |
 | **P4** | After OQ-SOP-2 for parser draft | `experiments.md` SOP Apply success path = **process definition** (template only if a step needs it). `processes.md` Apply. **L5 copy:** do not say NCI extract → Qubit is runnable. No SOP PDF bodies in git. |
 | **P5** | Independent | Parser/instrument admin manuals: example + test + dry-run + activate; AI draft setup-only; production import no LLM. |
