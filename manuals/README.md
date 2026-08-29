@@ -8,11 +8,11 @@ Review stamps stay under [`.docs/review/`](../.docs/review/). Local scratch copi
 
 | Path | Role |
 |------|------|
-| [HOWTO.md](HOWTO.md) | Lab path: receive → requested analysis → route (later) → execute → results |
+| [HOWTO.md](HOWTO.md) | Lab path: receive ≠ order ≠ work. Receive loop (stay on `/receive`); requested analysis is a later look-up; route / execute / results are later packets |
 | [atomic-receive.md](atomic-receive.md) | CORE receive (`/receive`). Non-empty `analysis_ids` → **422**. Zero Tests. |
-| [asked-for.md](asked-for.md) | P1 lake: after receive, record **requested analysis**. Does **not** assign a Test or start work. |
+| [asked-for.md](asked-for.md) | P1 lake: a **later look-up** that records **requested analysis + TAT** for already-received samples. Does **not** assign a Test or start work. |
 | [accessioning-workflow.md](accessioning-workflow.md) | Wizard removed; `/accessioning` redirects to `/receive`. |
-| [navigation.md](navigation.md) | Sidebar: Receive → **Asked-for** → Samples → Tests … |
+| [navigation.md](navigation.md) | Sidebar order: Receive, **Asked-for**, Samples, Tests … (nav order only — not a work queue) |
 | [api-endpoints.md](api-endpoints.md) | `POST /samples/receive` freeze + `POST /v1/asked-for` |
 
 ## Domain handbooks
