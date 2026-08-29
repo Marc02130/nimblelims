@@ -72,7 +72,8 @@ interface ProcessStep {
   process_id: string;
   step_kind?: StepKind;
   execution_mode?: StepKind;
-  experiment_template_id: string;
+  experiment_template_id?: string;
+  analysis_id?: string;
   experiment_id?: string;
   current_lims_run_id?: string;
   name?: string;
@@ -255,8 +256,10 @@ const ProcessesManagement: React.FC = () => {
     else loadList();
   }, [routeId, loadList, loadDetail]);
 
-  const templateName = (tid: string) =>
-    templates.find((t) => t.id === tid)?.name || tid.slice(0, 8);
+  const templateName = (tid?: string | null) => {
+    if (!tid) return '—';
+    return templates.find((t) => t.id === tid)?.name || tid.slice(0, 8);
+  };
 
   const handleCreate = async () => {
     if (!createName.trim()) return;
