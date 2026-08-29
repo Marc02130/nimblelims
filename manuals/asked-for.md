@@ -21,7 +21,7 @@ P1 is the **asked-for lake**. An analyst records **requested analysis + TAT** ag
 | Receive freeze | Non-empty `analysis_ids` on `POST /samples/receive` → **422**. Empty or omit → zero Tests. No analysis picker on `/receive`. |
 | Lake ≠ work | Asked-for create leaves `COUNT(tests)` and `COUNT(work_orders)` unchanged. Save is not scientific assignment or routing: no Test, no work order, no analytes, no legal number entry. |
 | Not a queue | Asked-for is a look-up, not the after-receive click and not a Start queue. Do not document receive → asked-for as one motion. |
-| Wrong pairings | The lake and routing-map authoring accept them on purpose. The map’s intake/current type selects a route; it is not ANDed across every later step. At step start, a current-type mismatch returns `route_sample_type` **422**. |
+| Wrong pairings | The lake and routing-map save accept them on purpose. Map create has no sample-type picker. Route matches analysis + TAT, then compares current type with the first ordered step’s derived allow-list; mismatch → `route_sample_type` **422**. Later steps gate current type at start. |
 | Route | Explicit Route requires `test:assign` plus project access, not `experiment:manage`. Client writes and hidden/other-project samples return **403**, not 404. Empty map → 200 `no_route`. Match mints queued `work_orders` and sets `routed`. The mint is planning, not work started. Still zero Tests. |
 | Params | Lock: freeze onto `tests.asked_for_params` at the **first LimsRun start** (WO-7). That first-start freeze is **still open** on `b005cfe` — a later start rewrites the snapshot, with empty `{}` when no `routed` row matches. Empty `{}` is a freeze, not a hole to refill. Do **not** collect params on receive. |
 
@@ -60,15 +60,15 @@ One operator action may target a **set** of samples (same analysis + TAT). API s
 Do not chain this section onto Receive or onto the save steps above. Return to `/asked-for` later when work planning happens.
 
 1. For one `requested` row, choose **Route**. For several requested rows, select them and choose **Route selected**.
-2. P2 matches each row’s analysis, current sample type, and TAT against the configured map at `/admin/routing-map`. Map save does not require every later step to accept that intake type.
+2. P2 matches each row’s analysis and TAT against the configured map at `/admin/routing-map`. The admin does not select a sample type on map create.
 3. No match returns `no_route`; the row stays `requested`, with no `work_order` or Test.
 4. A match creates a queued `work_order`, changes the row to `routed`, and still creates no Test. This queue mint does not mean work has started.
 5. Experiments → **Work Orders** (`/work-orders`) is the work backlog. **Start process** instantiates and opens the existing ordered ELN process; Route must make its step order apparent rather than presenting an unordered bag.
 6. WO-7 lock: the **first** LimsRun start creates or attaches the Test and freezes the then-current `asked_for_params`. If any cohort sample lacks an active Test at publish, **422** refuses the whole run, writes no Results, invents no Test, and leaves the run `complete`.
 
-The two halves of WO-7 are not at the same maturity on `b005cfe`. The **publish refuse is in code** (live AC-P2 unsigned until QA). The **first-start freeze is still open**: `_mint_tests_at_start` has no already-frozen guard, so a later start that finds the existing active Test rewrites `tests.asked_for_params` — including overwriting with empty `{}` when no `routed` asked-for row matches. Do not read or write that overwrite as closed. The historical `9c4f9da` stamp remains signed not Pass.
+The two halves of WO-7 are not at the same maturity on `b005cfe`. The **publish refuse is Tobias-signed Pass**. The **first-start freeze is still open and unscored**: `_mint_tests_at_start` has no already-frozen guard, and `{}` was recorded. Do not read or write that overwrite as closed. Overall P2 Pass remains unsigned; the historical `9c4f9da` stamp remains signed not Pass.
 
-The type gate is evaluated when a step starts: the sample’s current type must be in that step’s accepted set. An empty or incompatible set returns **422** `route_sample_type`. That code means the sample’s current type is wrong for the step being started; it does not mean the sample is broken. A map may name the intake/current type for analysis × type × TAT matching without requiring every later step to accept it. The routing-map UI shows the first ordered Experiment or LimsRun step’s allowed types as information only, not as a save gate. Dest-type Hold remains unchanged.
+After analysis + TAT match, Route compares the sample’s current type with the first ordered Experiment/LimsRun step’s derived allow-list. Empty or incompatible first-step acceptance returns **422** `route_sample_type` and mints nothing. That code means wrong type for the assigned first step, not a broken sample. Later steps apply the same current-type check only when each step starts; map save and Route do not AND one type across later steps. The routing-map UI displays derived allowed types for the selected first/only process and its first ordered step as information, not an admin field. Dest-type Hold remains unchanged.
 
 ---
 
@@ -91,7 +91,8 @@ The type gate is evaluated when a step starts: the sample’s current type must 
 | Discarded sample / inactive analysis / TAT &lt; 1 | **422** |
 | Receive with non-empty `analysis_ids` | **422** (receive freeze; not an asked-for call) |
 | Route, no map match | **200** `no_route`, status stays `requested` |
-| Step start, current sample type not accepted by that step | **422** `route_sample_type` (wrong type for this step; sample is not broken) |
+| Route, current sample type not accepted by first ordered step | **422** `route_sample_type` (wrong type for assignment; sample is not broken) |
+| Later step start, current sample type not accepted or allow-list empty | **422** `route_sample_type` |
 | Cancel after `routed` | **422** |
 
 ---

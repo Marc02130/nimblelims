@@ -21,7 +21,7 @@ RLS: asked_for and work_orders follow sample → project (same pattern as tests)
 |-------|---------|-------------|
 | `analysis_param_defs` | Catalog of **method params** per analysis (assay). Example keys: [working note](../../decision-logs/2026-08-28-analysis-param-defs.md) (not seed). | `id`, `analysis_id` FK, `key` text, `data_type` text (`number` \| `int` \| `text` \| `bool`), `unit` text null (display; not `results.unit_id`), `required` bool, `source_list_id` uuid null (list-backed enum), `allowed_values` jsonb null (inline enum sketch when no list), `sort_order` int, audit |
 | `asked_for` | Requested analysis on a sample. `params` = values for that analysis’s defs (order layer). | `id`, `sample_id` FK, `analysis_id` FK, `tat_days` int not null check > 0, `params` jsonb not null default `{}`, `status` text not null, `routed_work_order_id` uuid null, audit |
-| `routing_map` | P2: analysis × sample_type × TAT range → **one** process definition | `id`, `analysis_id` FK, `sample_type_id` uuid (list entry), `tat_range` int4range not null, `process_definition_id` uuid FK not null, `active` bool, audit |
+| `routing_map` | P2: analysis × TAT range → **one** process definition | `id`, `analysis_id` FK, `tat_range` int4range not null, `process_definition_id` uuid FK not null, `active` bool, audit. **No admin-authored `sample_type_id`.** An optional stored type summary must be derived from the selected first/only process and first ordered step and refreshed when that selection changes |
 | `work_orders` | P2: backlog item | `id`, `asked_for_id` FK unique, `sample_id` FK, `analysis_id` FK, `process_definition_id` uuid FK not null, `status` text not null, `process_id` uuid null (denorm of the instantiated process) |
 | `eln_process_definition_step_accepted_sample_types` | P2 L2 / **OQ-WO-4:** accepted sample types per **step** (experiment **and** LimsRun). Not on analysis. Qubit = a LimsRun step. | `step_id` FK `eln_process_definition_steps` ON DELETE CASCADE, `sample_type_id` FK `list_entries`, unique `(step_id, sample_type_id)` |
 
@@ -45,7 +45,7 @@ Do **not** add `results.unit_id`. Do **not** add asked-for columns on `samples`.
 | `uq_asked_for_open` | unique `(sample_id, analysis_id)` WHERE status <> 'cancelled' | RQ-AF-4 |
 | `asked_for_status_chk` | status in (`requested`,`routed`,`cancelled`) | |
 | `work_orders_status_chk` | status in (`queued`,`in_progress`,`completed`,`cancelled`) | |
-| `routing_map_tat_excl` | EXCLUDE gist (`analysis_id` WITH `=`, `sample_type_id` WITH `=`, `tat_range` WITH `&&`) WHERE active | RQ-WO-4 |
+| `routing_map_tat_excl` | EXCLUDE gist (`analysis_id` WITH `=`, `tat_range` WITH `&&`) WHERE active | RQ-WO-4 |
 | `routing_map_def_chk` | `process_definition_id` NOT NULL FK `eln_process_definitions` | one process definition; bounce `uuid[]` chain |
 | `uq_step_accepted_sample_type` | unique `(step_id, sample_type_id)` | OQ-WO-4 |
 | `eln_process_definition_steps` kind check | `eln_experiment` ⇒ `experiment_template_id` NOT NULL; `lims_run` ⇒ `analysis_id` NOT NULL | Qubit as LimsRun |
@@ -68,13 +68,13 @@ No Postgres ENUM. Text + check. Status lists may also seed `list_entries` if the
 
 FORCE ROW LEVEL SECURITY on asked_for, work_orders, analysis_param_defs, routing_map, and the step-accepted-types table.
 
-**P2 type gate (OQ-WO-4, Marc/Rolf authoring lock):** do **not** add `analysis_accepted_sample_types`. `routing_map.sample_type_id` remains the intake/current type used for analysis × type × TAT matching. Map save and Route do **not** check that type against every step. At step start, compare the sample’s **current** type with that step’s accepted types; an empty or incompatible set returns `422 route_sample_type`. This permits later ordered steps to expect a transformed type without turning map authoring into a chain-wide AND. The planner shows the first ordered Experiment or LimsRun step’s allowed types for information only. Do not read `sample_type_transitions`; dest-type Hold remains unchanged. Bounce `uuid[]` / process-of-processes and unordered-step UI.
+**P2 type gate (OQ-WO-4, superseding Marc/Rolf lock):** routing-map create has no sample-type picker and matching uses analysis + TAT. Derive allowed types from the mapped first/only process and its first ordered Experiment/LimsRun step. Route compares the sample’s current type with that first-step set; empty or incompatible returns `422 route_sample_type` and mints nothing. Do not AND later steps at Route. Each later step compares current type only when it starts; empty fails closed there. Do not read `sample_type_transitions`; dest-type Hold remains unchanged. Bounce `uuid[]` / process-of-processes and unordered-step UI.
 
 ## 3. Seed
 
 P1: no asked-for rows. **Do not seed** the working-note example catalog (`EX_hERG`, `EX_ELISA`, …). When seed is allowed later: bind `EX_CTG` / `EX_NCI60` only to existing `NBIO-CMPD-001` / A549 (PR 49). Do not invent Qubit/blood IDs.
 
-P2: **no** default routing rows that claim blood→Qubit until dest type lands.
+P2: **no** invented sample-type IDs. A Qubit-first process derives a DNA allow-list and refuses blood at Route; a later Qubit step is gated only when started. Dest type remains out.
 
 ## 4. Out of schema this cycle
 

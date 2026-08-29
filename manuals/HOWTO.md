@@ -16,7 +16,7 @@ This is a how-to, not a PRD. Marc keeps it current as features ship.
 | Requested analysis (`/asked-for`) — later look-up, off the bench path | Shipped on `main` (P1 lake) |
 | Later Route / work order (planner, not after receive) | Shipped on this P2 branch (`/asked-for` Route, `/admin/routing-map`, `/work-orders`) |
 | Process / Experiment / LimsRun | Execute substrate shipped; P1 does **not** start it. WO-7 **first-start freeze is the lock and still OPEN** on `b005cfe` — a later start overwrites `tests.asked_for_params` |
-| Results | Classic type-a-number on a Test; persist lock is a later packet. WO-7 whole-run publish-refuse **is in code** on `b005cfe`; the live AC-P2 stamp is **unsigned** and makes no outcome claim |
+| Results | Classic type-a-number on a Test; persist lock is a later packet. WO-7 whole-run publish-refuse is **Tobias-signed Pass** on `b005cfe`; first-start freeze stays OPEN, so overall P2 Pass remains unsigned |
 
 Handbooks in this folder: [atomic-receive.md](atomic-receive.md), [asked-for.md](asked-for.md), [navigation.md](navigation.md), [api-endpoints.md](api-endpoints.md), [dev-setup.md](dev-setup.md), [admin-setup.md](admin-setup.md), [processes.md](processes.md), [experiments.md](experiments.md), [lims-runs.md](lims-runs.md). Index: [README.md](README.md).  
 UAT: [`UAT_Scripts/uat-atomic-receive.md`](../UAT_Scripts/uat-atomic-receive.md) · P1 [`UAT_Scripts/uat-post-receive-work-spine.md`](../UAT_Scripts/uat-post-receive-work-spine.md).  
@@ -86,7 +86,7 @@ One action may cover a set of samples (same analysis + TAT). The API still write
 
 **Save is not scientific assignment.** A saved row does **not** assign a Test, does **not** attach analytes, and does **not** make type-a-number legal. It does **not** create a Test, Result, Process, Experiment, LimsRun, or work_order. Receive freeze stays: non-empty `analysis_ids` on receive is still **422**.
 
-**The lake accepts nonsense on purpose.** Qubit-on-blood may sit in it. Scientific eligibility is refused when a step starts with an incompatible current sample type (`route_sample_type` **422**, P2) — not by the lake or routing-map save.
+**The lake accepts nonsense on purpose.** Qubit-on-blood may sit in it. Route compares the sample’s current type with the mapped process’s first ordered Experiment/LimsRun allow-list; a mismatch returns `route_sample_type` **422**. Later steps repeat that current-type check when they start. The lake and routing-map save do not run a chain-wide check.
 
 Params: intent only. P1 sends `{}` OOB — do not type assay params here, and do not enter them in P1 UAT. The WO-7 lock is that params freeze at the **first LimsRun start** (P2), never on receive or asked-for. That first-start freeze is **still open** on `b005cfe`: see [Later planner](#later-planner-route--work-order). Setup (`config:edit`) may `GET/PUT /analyses/{id}/param-defs`; empty catalog is the OOB path.
 
@@ -103,20 +103,20 @@ Params: intent only. P1 sends `{}` OOB — do not type assay params here, and do
 
 **This is a later work-planning action, not the next click after Receive or after saving asked-for.** Receive still ends on `/receive`. Recording requested analysis still ends on `/asked-for` without minting work. Route stays unnumbered: it is not §3 after receive.
 
-**Setup:** an administrator configures **Routing map** at `/admin/routing-map`. Each map row selects an analysis, intake/current sample type, TAT range, and one process definition. Saving a map does **not** compare that type with every step’s accepted types: later ordered steps may correctly expect a transformed type (for example, extract blood → Qubit DNA). The planner shows the first ordered Experiment or LimsRun step’s allowed types for information only. The Route UI must show the process’s step order; a process definition is an ordered workflow, not an unordered bag of steps.
+**Setup:** an administrator configures **Routing map** at `/admin/routing-map`. Each map row selects an analysis, TAT range, and one process definition. There is **no admin-picked sample type** on map create. The UI derives and displays allowed types for the selected first/only process and its first ordered Experiment or LimsRun step; that display may be stored or refreshed when the process or step changes, but it is informational, not an authored field or map-save gate. Later ordered steps may correctly expect a transformed type (for example, extract blood → Qubit DNA). The Route UI must show the process’s step order; a process definition is an ordered workflow, not an unordered bag of steps.
 
 **Route when work planning happens:**
 
 1. Open the previously saved `requested` row on `/asked-for`.
 2. Choose its row **Route** action, or select requested rows and choose **Route selected**. This is Route, not Start. Permission is `test:assign` plus project access, not `experiment:manage`.
-3. P2 matches analysis × current sample type × TAT against the routing map. No match returns **200** `no_route`; the row stays `requested`, and nothing is minted.
+3. P2 matches analysis × TAT against the routing map. It then compares the sample’s current type with the first ordered Experiment/LimsRun step’s derived allow-list. No map match returns **200** `no_route`; a first-step mismatch returns **422** `route_sample_type`. In either case nothing is minted.
 4. A match creates one queued `work_order`, changes asked-for to `routed`, and still creates **zero Tests**. Minting that queue record is planning; **work has not started**.
 5. Open Experiments → **Work Orders** (`/work-orders`) and choose **Start process**. P2 instantiates the first snapshot process definition, links it through `eln_processes.work_order_id`, and opens that process at `/experiments/processes/{id}`. Start process / LimsRun start remain `experiment:manage`; publish is `experiment:publish`.
-6. Continue in order through that existing process’s typed Experiment and LimsRun steps. At each step start, the sample’s **current** type must be accepted by that step. A mismatch returns **422** `route_sample_type`; the sample is not broken. The WO-7 lock is that the **first** LimsRun start creates or attaches the Test and freezes the then-current `asked_for_params`; nothing freezes at receive, asked-for save, Route, or work-order start.
+6. Continue in order through that existing process’s typed Experiment and LimsRun steps. Route already gated the first step. At each later step start, the sample’s **current** type must be accepted by that step; an empty or incompatible allow-list returns **422** `route_sample_type`. The sample is not broken. The WO-7 lock is that the **first** LimsRun start creates or attaches the Test and freezes the then-current `asked_for_params`; nothing freezes at receive, asked-for save, Route, or work-order start.
 
 **WO-7 first-start freeze is OPEN on `b005cfe`. Do not teach it as shipped.** `_mint_tests_at_start` has no already-frozen guard: every start that reaches it assigns `tests.asked_for_params`, so a later start that finds the existing active Test for the same sample + analysis overwrites the first-start snapshot. When no `routed` asked-for row matches, that write is the empty `{}` over a real snapshot. **Empty `{}` is itself a freeze, not a hole to refill later** — that is the intended lock, not verified-closed behavior. Until the guard lands, treat params on a Test touched by a second start as unreliable.
 
-Qubit-on-blood is refused when the Qubit step starts while the sample’s current type is still blood; it is not made valid by saving a request or routing map. A **422** `route_sample_type` means the sample’s current type is wrong for the step being started; it does **not** mean the sample is broken. A legitimate earlier transformation may make a later step eligible. Dest-type Hold is unchanged, so do not claim this branch already creates that transformed daughter.
+Qubit-first on blood is refused by Route before a work order is minted. If Qubit is later, its step start refuses while the sample’s current type is still blood. A **422** `route_sample_type` means current type is wrong for the assigned first step or the later step being started; it does **not** mean the sample is broken. Dest-type Hold is unchanged, so do not claim this branch already creates a transformed daughter.
 
 ---
 
@@ -143,7 +143,7 @@ Classic path: **Results** (`/results`) — type a number on an existing Test (ba
 
 The WO-7 lock puts Test selection/creation and the params freeze on the **first LimsRun start** when the work-order packet exists — **not** on receive. That freeze half of the lock is **still open**: later starts overwrite `tests.asked_for_params` (see [Later planner](#later-planner-route--work-order)).
 
-LimsRun **publish** can promote instrument rows onto Tests/Results. Two writers on the same Test → **409**. The other half of WO-7 — if any cohort sample lacks an active Test, publish returns **422** and refuses the **whole run**, writes no Results, invents no Test, and leaves the run `complete` — **is in code** on `b005cfe`, unsigned until QA. Keep the two halves apart: **the publish refuse is implemented; the first-start freeze is not.** The historical `9c4f9da` run returned **200 published** with 0 Tests and stays signed not Pass.
+LimsRun **publish** can promote instrument rows onto Tests/Results. Two writers on the same Test → **409**. The other half of WO-7 — if any cohort sample lacks an active Test, publish returns **422** and refuses the **whole run**, writes no Results, invents no Test, and leaves the run `complete` — is **Tobias-signed Pass** on `b005cfe`. Keep the two halves apart: **publish refuse passed; first-start freeze remains OPEN and unscored.** Overall P2 Pass is unsigned. The historical `9c4f9da` run stays signed not Pass.
 
 UAT (classic): [`UAT_Scripts/uat-results-entry-review.md`](../UAT_Scripts/uat-results-entry-review.md). Persist lock (P3) is specified on the spine packet, not shipped as that slice.
 
@@ -159,7 +159,8 @@ UAT (classic): [`UAT_Scripts/uat-results-entry-review.md`](../UAT_Scripts/uat-re
 - Do **not** pick container type in the scan loop. Default tube, off the form (RQ-AR-8).
 - Do **not** invent a second workflow engine. Work_order (later) feeds the Process / Experiment / LimsRun that already exist.
 - Do **not** put analysis param defs on receive, and do **not** type params on asked-for.
-- Do **not** teach routing-map save as ANDing the intake type across every step’s allow-list. Display the first ordered step’s allowed types as information only; enforce current type when each step starts.
+- Do **not** put a sample-type picker on routing-map create. Map match is analysis + TAT; first-process and first-step allowed types are derived display.
+- Do **not** teach routing-map save or Route as ANDing one type across every step’s allow-list. Route gates only the first ordered Experiment/LimsRun against current type; later steps gate current type when they start.
 - Do **not** present a process definition as an unordered bag. Route must make the process and step order apparent.
 - Do **not** write “later starts do not re-freeze params” as current behavior. That freeze is the WO-7 lock and is **open** on `b005cfe`.
 - Do **not** treat empty `{}` as a hole to refill on a later start. `{}` is a freeze.

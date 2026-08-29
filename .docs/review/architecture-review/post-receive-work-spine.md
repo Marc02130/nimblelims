@@ -30,8 +30,8 @@ Schema-changes exists and lists the four new tables. That is enough to Accept th
  /asked-for  ──► asked_for (requested)
                       │
                       │  P2: routing_map
-                      │  key = analysis × sample_type × TAT range
-                      │  first-step accepted types = informational; no map-save chain AND
+                      │  key = analysis × TAT range
+                      │  Route gate = current type ∈ derived first-step types
                       ▼
                  work_orders  (one process_definition_id snapshot; ordered steps)
                       │
@@ -62,7 +62,7 @@ SOP Apply (P4) writes **process definitions** that `routing_map` points at. Dest
 | Partial unique open `(sample_id, analysis_id)` | Yes | `uq_asked_for_open` | **Match.** |
 | P1 does not mint Tests / WO | Yes | No asked-for cols on `samples` | **Match.** |
 | `routing_map` gist exclude | P2 | `int4range` + `EXCLUDE gist` | **Match.** Must `CREATE EXTENSION btree_gist` (A10). |
-| Type eligibility | Current type gate at each step start; no chain-wide map-save gate; **not** `sample_type_transitions` | **Missing** | **Drift.** A4. |
+| Type eligibility | No map type field; Route gates derived first-step types; later steps gate at start; **not** `sample_type_transitions` | **Missing** | **Drift.** A4. |
 | L3 params snapshot on Test at LimsRun start | Yes | `tests: none` / WO-7 timing only | **Drift.** A5. Sci CSO SC5. |
 | L4 ordered work plan | Yes | One process definition with ordered typed steps | **Under-specified.** A6 closes OQ-WO-3. |
 | WO-7 mint at start; publish refuse | Yes | `tests: none` | Timing is app; **ensure-on-publish still in code** (A7). |
@@ -115,7 +115,7 @@ SOP Apply (P4) writes **process definitions** that `routing_map` points at. Dest
 | **A1** | **P1** | Same-phase | **RLS-hidden sample/project → 403, never 404.** Mirror `atomic_receive_service.require_project_for_receive`. Do not reuse `sample_access.require_accessible_sample` (that helper 404s). Unknown UUID that does not exist **and** is not hidden may 404; cross-project miss is 403. Pytest: no project access → 403 (AC-P1-3). Client POST asked-for → 403. |
 | **A2** | **P1** | Same-phase | **P1 migration is only `asked_for` + `analysis_param_defs`.** Unique `(analysis_id, key)` on param defs. `tat_days` check `> 0`. Partial unique `uq_asked_for_open`. Status check. FORCE RLS. Policy: USING/WITH CHECK via sample.project (mirror `tests_access`). Param-defs write: `config:edit` / admin. Rollback: DROP both tables. Do not create `routing_map` / `work_orders` in the P1 PR. |
 | **A3** | **P1** | Same-phase | **Zero Tests, zero work_orders, zero processes on asked-for save.** Never call `_create_tests_for_sample` or any `_create_asked_for_tests`. Receive stays 422 on non-empty `analysis_ids`. Copy = L1. Multi-sample: one operator action; **one transaction** (`sample_ids[]` on POST or equivalent); unique 409 rolls back the batch — no partial rack. API may still persist one row per sample. |
-| **A4** | **P2** | Blocks P2 | **Superseded by Marc/Rolf authoring lock:** type eligibility is **not** `analysis_accepted_sample_types`. SoT remains `eln_process_definition_step_accepted_sample_types (step_id, sample_type_id)` on both step kinds. `routing_map.sample_type_id` is the intake/current type for analysis × type × TAT matching; map save and Route do **not** compare it with every step. The planner displays the first ordered Experiment or LimsRun step’s allowed types for information only. At step start, current type outside that step’s set (including empty) returns `route_sample_type` **422** and does not mark the sample broken. Later steps may expect transformed types. Do not read `sample_type_transitions`; dest-type Hold remains. Do not invent Qubit/blood testdata IDs. |
+| **A4** | **P2** | Blocks P2 | **Superseded again by Marc/Rolf map-create lock:** `routing_map` has no admin-authored `sample_type_id`; matching is analysis + TAT. SoT for eligibility remains `eln_process_definition_step_accepted_sample_types (step_id, sample_type_id)`. Derive and display allowed types for the selected first/only process and its first ordered step. Route compares sample current type with that first-step set only; empty or incompatible returns `route_sample_type` **422** and no WO. Later steps check current type only at start. Do not read `sample_type_transitions`; dest-type Hold remains. |
 | **A5** | **P2** | Blocks P2 | **L3 params snapshot column.** Schema-changes `tests: none` is wrong. ADD `tests.asked_for_params jsonb not null default '{}'` (Sci CSO SC5). At **LimsRun start**, copy matching asked-for `params` (sample + run.analysis_id, status `routed`) and freeze. Do not merge into `tests.custom_attributes`. Later asked-for edits do not mutate a started Test. Empty defs → `{}` only. |
 | **A6** | **P2** | Blocks P2 | **L4 ordered process is the work plan. OQ-WO-3 decided here.** SoT: ADD `eln_processes.work_order_id` uuid NULL FK (index). One instantiated process points at the WO; `work_orders.process_definition_id` snapshots one definition. `work_orders.asked_for_id` UNIQUE is the asked-for link; `asked_for.routed_work_order_id` is optional denorm set in the same txn. Start that definition via existing instantiate + process AuthZ. Route and process UI must expose definition-step order; no unordered step bag, second routing hop, or `process_definition_ids[]` chain. |
 | **A7** | **P2** | Blocks P2 | **WO-7: mint Test at LimsRun start; no ensure-on-publish.** `start_run` inserts Test if no active `(sample_id, analysis_id)` (reuse classic Test if present). Publish: Test missing → **422**. **Delete** the ensure path: `ResultPromotionService.ensure_test` must not run from `plan_promotion` when `dry_run=False`. Promote may only attach results to an existing Test. Classic `POST /tests` remains (WO-4). |
@@ -136,9 +136,10 @@ SOP Apply (P4) writes **process definitions** that `routing_map` points at. Dest
 | Multi-sample partial unique | Half rack | One txn; all-or-nothing 409 | pytest |
 | Empty routing map | Fake work | 200, `work_order: null`, stay `requested` | pytest AC-P2-2 |
 | TAT overlap on map save | Ambiguous route | **409** gist exclude | pytest |
-| Map with later transformed-type step | False authoring rejection | Save succeeds; first-step allowed types informational | pytest AC-P2-3 |
-| Step start with incompatible current type | Assay on wrong material | **422 `route_sample_type`** | pytest; assert no `sample_type_transitions` query |
-| Empty accepted-types set at step start | Unconfigured step | **422** fail closed | pytest |
+| Map create offers sample type | Admin authors derived eligibility | Remove picker; derive first-process / first-step display | UI/API AC-P2-6 |
+| Route with incompatible first-step current type | Invalid assignment | **422 `route_sample_type`**, no WO | pytest AC-P2-3 |
+| Later step start with incompatible current type | Assay on wrong material | **422 `route_sample_type`** | pytest; assert no `sample_type_transitions` inference |
+| Empty accepted-types set | Unconfigured step | **422** at Route for first step or at later step start | pytest |
 | Publish without Test | WO-7 violation | **422**; no `ensure_test` | pytest; grep-guard optional |
 | Two writers on Test | Classic vs promote | **409** | existing + P3 |
 | Missing numeric `units_default` | Ununited number | **422**, no row | P3 |
@@ -169,11 +170,12 @@ Packet spine names (pytest, testcontainers, same style as `test_atomic_receive_p
 
 **P2 — `backend/tests/test_work_orders.py`** (when P2 opens)
 
-- Map match mints WO with one process definition and ordered steps; asked-for → `routed`
+- Analysis + TAT map match plus first-step type pass mints WO with one process definition and ordered steps; asked-for → `routed`
 - Empty map: no WO
 - Overlap save → 409
-- Map save allows a later transformed-type step; first-step types are informational
-- Step start with unaccepted current type → 422 `route_sample_type`; **no** `sample_type_transitions` inference
+- Map create has no sample-type field; display first-process / first-step types as derived information
+- Route with unaccepted first-step current type → 422 `route_sample_type`; no WO
+- Later step start with unaccepted current type → 422; **no** `sample_type_transitions` inference
 - LimsRun start inserts Test + freezes `asked_for_params`
 - Publish with no Test → 422; `ensure_test` not invoked
 - Route/process UI exposes ordered steps; no unordered bag or second route
