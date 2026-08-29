@@ -10,7 +10,7 @@ Primary goals:
 - Enable structured data import with validation.
 - Serve as a foundation for analysis (currently dose-response is the most mature example; the intent is to support other analyses).
 
-**Receive / asked-for / Route:** `POST /samples/receive` still refuses non-empty `analysis_ids` (**422**). Recording **requested analysis** on `/asked-for` does **not** create a `work_order`, start a LimsRun, or mint a Test. A separate, later Route action may mint a queued work order. Assay params freeze onto the Test at **LimsRun start** (WO-7) — not at receive, asked-for save, Route, or work-order start.
+**Receive / asked-for / Route:** `POST /samples/receive` still refuses non-empty `analysis_ids` (**422**). Recording **requested analysis** on `/asked-for` does **not** create a `work_order`, start a LimsRun, or mint a Test. A separate, later Route action may mint a queued work order for planning; the mint is not work started. Assay params and the Test freeze at **LimsRun start** (WO-7) — not at receive, asked-for save, Route, or work-order start.
 
 **Important distinction**: An LIMS Run is **not** the same as a Batch.
 - Batches are operational groupings for processing samples through tests and results entry.
@@ -66,7 +66,7 @@ Shipped v1 — see local `.docs/internal/ideas/run-results.md` (not committed).
 | **When** | Status → `published` (run always has **`analysis_id`**) |
 | **No analysis** | **Not allowed** — set analysis on create/edit; no non-reportable / continue-without path |
 | **Mapping** | JSONB column → analyte via **name** or **analyte alias** (casefold); known non-analyte keys (`units`, etc.) skipped |
-| **Tests** | Use the active Test created or attached at LimsRun start for `(sample_id, analysis_id)`; publish refuses a missing Test instead of creating one |
+| **Tests** | Use the active Test created or attached at LimsRun start for `(sample_id, analysis_id)`; if any required Test is missing, publish returns **422** and refuses the whole run instead of creating one or writing partial Results |
 | **Results** | Write `raw_result`, `replicate` (from JSONB or row order), `lims_run_id` lineage |
 | **Conflicts** | Same run → update; other run / manual result owns triple → **409**, publish blocked |
 | **Preview** | `GET /v1/lims-runs/{id}/promotion/preview` — dry-run; UI shows counts on Publish confirm |
@@ -142,7 +142,7 @@ You can still enforce strict state-machine rules in the application service laye
 
 - Routes: `/runs`, `/runs/:id`, `/runs/:id/dose-response`
 - Main pages: RunsManagement, LimsRunDetail (Overview / Data / Dose Response tabs)
-  - Overview: **Analysis** and cohort required to start; start locks the cohort and enforces WO-7. **Publish** opens promotion preview and refuses if a required Test is missing.
+  - Overview: **Analysis** and cohort required to start; start locks the cohort, creates or attaches each Test, freezes asked-for params, and enforces WO-7. **Publish** opens promotion preview and, if a required Test is missing, refuses the whole run with no partial Results.
 - API under `/v1/lims-runs` (including `GET …/promotion/preview`, publish = `PATCH …/complete`)
 
 ## Next Steps / Open Questions

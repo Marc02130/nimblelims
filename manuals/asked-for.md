@@ -22,7 +22,7 @@ P1 is the **asked-for lake**. An analyst records **requested analysis + TAT** ag
 | Lake ≠ work | Asked-for create leaves `COUNT(tests)` and `COUNT(work_orders)` unchanged. Save is not scientific assignment or routing: no Test, no work order, no analytes, no legal number entry. |
 | Not a queue | Asked-for is a look-up, not the after-receive click and not a Start queue. Do not document receive → asked-for as one motion. |
 | Wrong pairings | The lake accepts them on purpose (e.g. Qubit on blood). Refusal is **routing** (`route_sample_type` **422**) on map save and Route. |
-| Route | Explicit Route. Empty map → 200 `no_route`. Match mints `work_orders` and sets `routed`. Still zero Tests. |
+| Route | Explicit Route. Empty map → 200 `no_route`. Match mints queued `work_orders` and sets `routed`. The mint is planning, not work started. Still zero Tests. |
 | Params | Freeze onto `tests.asked_for_params` at **LimsRun start** (WO-7). Do **not** collect params on receive. |
 
 ---
@@ -60,11 +60,11 @@ Do not chain this section onto Receive or onto the save steps above. Return to `
 1. For one `requested` row, choose **Route**. For several requested rows, select them and choose **Route selected**.
 2. P2 matches each row’s analysis, current sample type, and TAT against the configured map at `/admin/routing-map`.
 3. No match returns `no_route`; the row stays `requested`, with no `work_order` or Test.
-4. A match creates a queued `work_order`, changes the row to `routed`, and still creates no Test.
+4. A match creates a queued `work_order`, changes the row to `routed`, and still creates no Test. This queue mint does not mean work has started.
 5. Experiments → **Work Orders** (`/work-orders`) is the work backlog. **Start process** instantiates and opens the existing ELN process; it is not a second execution engine.
-6. A later LimsRun start creates or attaches the Test and freezes `asked_for_params` (WO-7). Publish refuses to invent a missing Test.
+6. A later LimsRun start creates or attaches the Test and freezes `asked_for_params` (WO-7). If a required Test is later missing, publish returns **422** and refuses the whole run without creating that Test or publishing partial Results.
 
-The routing type gate fails closed: every mapped process-definition step must accept the current sample type. An empty accepted-type set or incompatible step returns **422** `route_sample_type`. Saving an otherwise valid Qubit-on-blood request in the lake does not bypass that gate.
+The routing type gate fails closed: every mapped process-definition step must accept the current sample type. An empty accepted-type set or incompatible step returns **422** `route_sample_type`. That code means the requested analysis and current sample type are the wrong pairing for a mapped step; it does not mean the sample is broken. Saving an otherwise valid Qubit-on-blood request in the lake does not bypass that gate.
 
 ---
 
@@ -87,7 +87,7 @@ The routing type gate fails closed: every mapped process-definition step must ac
 | Discarded sample / inactive analysis / TAT &lt; 1 | **422** |
 | Receive with non-empty `analysis_ids` | **422** (receive freeze; not an asked-for call) |
 | Route, no map match | **200** `no_route`, status stays `requested` |
-| Route / map save, sample type not accepted on a step | **422** `route_sample_type` |
+| Route / map save, sample type not accepted on a step | **422** `route_sample_type` (wrong type pairing; sample is not broken) |
 | Cancel after `routed` | **422** |
 
 ---
