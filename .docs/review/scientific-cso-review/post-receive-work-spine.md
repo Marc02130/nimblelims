@@ -27,14 +27,14 @@ The spine is scientifically right and must not collapse:
 | Layer | Scientific object | Must not become |
 |-------|-------------------|-----------------|
 | Asked-for (P1) | Request: analysis + TAT + assay params | A Test, a result, or a work plan |
-| Routing + `work_order` (P2) | Ordered process-definition chain for this matrix × TAT | A Test row or a second execute engine |
+| Routing + `work_order` (P2) | One process definition with ordered steps for intake/current type × TAT matching | A Test row, a second execute engine, or a chain-wide type gate |
 | Test (WO-7) | Assay **instance** at LimsRun start, with frozen params | Minted at receive / asked-for / WO save / publish |
 | Result (P3) | Reportable analyte value + unit + optional qualifier + replicate | A unit picker, a JSON blob in `qualifiers`, or a number typed into asked-for |
 | SOP Apply (P4) | Process definition with typed experiment / LimsRun steps | Blood → DNA → Qubit E2E (still Hold) |
 
 **OQ-RES-1 is Decided here.** The proposal to store `qualifiers` as JSON `{"entered_as": "<string>"}` is scientifically wrong and would break the live column. `results.qualifiers` is already a UUID FK to **Result Qualifiers** (`<LOD`, `ND`). That list is the controlled vocabulary for censored / special results. The typed token belongs in `reported_result`. See §3 SC1 and §6.
 
-**Qubit-on-blood must refuse.** Qubit dsDNA HS (NCI 22975) quantifies **extracted DNA**, not whole blood. A chain Extract → Qubit keyed on blood is still Qubit-on-blood until dest-type execute actually mints a DNA daughter. Aligns with Lab Ops **L2**. Do not seed that route. Do not invent Qubit/blood testdata IDs.
+**Qubit-on-blood must refuse at Qubit step start while the sample’s current type is blood.** Qubit dsDNA HS (NCI 22975) quantifies **extracted DNA**, not whole blood. The routing map may still name blood as intake and include a later Qubit DNA step; map save does not AND blood across the ordered chain. Dest-type execute must actually mint or select the DNA daughter before that later step can start. Aligns with the superseding Marc/Rolf authoring lock and Lab Ops **L2**. Do not invent Qubit/blood testdata IDs.
 
 **Params must travel and freeze (L3).** Cell line / dilution / assay params that die at the bench are a side process. Snapshot onto the Test at LimsRun start. Schema currently says `tests: none` — that is not enough (SC5).
 
@@ -54,7 +54,7 @@ The spine is scientifically right and must not collapse:
 | **Metadata sufficiency** | **6** | Params catalog + snapshot is the reproducibility joint (FW-0 “params travel”). Without a frozen Test payload, “IgG 12.3 µg/mL” has no cell line / dilution. Replicate column exists (Decision #14). `entered_by` / `entry_date` exist. Instrument SoT remains `lims_run_data` for promote. |
 | **Data-integrity habits** | **7** | Two writers → 409; publish refuses missing Test (WO-7); cancel-before-reroute; TAT overlap 409; human SOP Apply. Persist must not float-roundtrip the typed token (sig figs). Review-lock of final results is **not** this slice. |
 | **Practicality for startups/CROs** | **8** | No enterprise result-amendment workflow. Classic type-a-number stays (WO-4). Empty param defs OOB. One persist function. No unit picker. Do not invent a second qualifier JSON overlay. |
-| **Alignment with Lab Ops** | **8** | L1 (asked-for ≠ work) is scientifically required so WO-7 is not reopened. L2 Qubit-on-blood refuse is assay-valid. L3 params travel is the CSO bar. L4 snapshot chain is the work plan. L5 dest-type Hold unchanged. Bench bar on OQ-RES-1 (“the number typed is what review shows”) is adopted — via `reported_result`, not via JSON in `qualifiers`. |
+| **Alignment with Lab Ops** | **8** | L1 (asked-for ≠ work) is scientifically required so WO-7 is not reopened. L2 current-type refusal at step start is assay-valid without blocking map authoring. L3 params travel is the CSO bar. L4 ordered process steps are the work plan. L5 dest-type Hold unchanged. Bench bar on OQ-RES-1 (“the number typed is what review shows”) is adopted — via `reported_result`, not via JSON in `qualifiers`. |
 
 **Overall scientific readiness:** **7/10** for the spine with conditions. **P1 is implementable.** **P3 is not**, until OQ-RES-1 / RQ-RES-1 / AC-P3-1 match the live result columns.
 
@@ -70,7 +70,7 @@ The spine is scientifically right and must not collapse:
 | **SC4** | **P3** | **The reportable ledger is `reported_result`.** Manual persist writes it (SC1). Promote-on-publish must also leave `reported_result` populated: copy `raw_result` → `reported_result` unless a later censoring rule applies. Instrument SoT remains `lims_run_data` (Decision #5). Two writers on the same Test (classic vs LimsRun publish) → **409**. Promote still must **not** ensure-on-publish a missing Test (WO-7). | Decision #2 filled `raw_result` only; published ELISA/Qubit rows then show an empty reported value. Lab Ops bench bar: the number typed or promoted is what review/publish shows. |
 | **SC5** | **P2** | **Frozen params on the Test.** At LimsRun start, snapshot asked-for `params` onto the Test and **freeze**. Storage is a dedicated payload (preferred: `tests.asked_for_params` JSONB, nullable), **not** merged into editable Field Management `tests.custom_attributes`. Later asked-for edits do not mutate a started Test. Empty defs remain `{}` only (OQ-AF-3). Schema “`tests: none`” is insufficient — P2 schema delta must name this column. Aligns Lab Ops **L3**. | Assay params are scientific context for the result. Cell line on the order that never reaches the Test cannot be reconstructed at review. |
 
-Already normative (restated so P3 does not drop them): no `results.unit_id`; missing numeric `units_default` → 422; results persist only on an existing Test; P3 does not mint Tests at asked-for or receive; client cannot write results they cannot see; P4 does not close dest-type Hold (**L5**); Qubit-on-blood refuses (**L2**) — Qubit dsDNA HS is not a whole-blood assay.
+Already normative (restated so P3 does not drop them): no `results.unit_id`; missing numeric `units_default` → 422; results persist only on an existing Test; P3 does not mint Tests at asked-for or receive; client cannot write results they cannot see; P4 does not close dest-type Hold (**L5**); Qubit started while current type is blood refuses (**L2**) — Qubit dsDNA HS is not a whole-blood assay.
 
 ---
 
@@ -142,7 +142,7 @@ Already normative (restated so P3 does not drop them): no `results.unit_id`; mis
 - Asked-for ≠ Test ≠ work_order ≠ Result. No numbers on asked-for.  
 - Test at **LimsRun start** only (WO-7). Publish refuses if missing.  
 - Params snapshot at LimsRun start and freeze (L3 / SC5).  
-- Qubit-on-blood refuses (L2). Dest-type Hold is a **different** packet.  
+- Qubit started on a still-blood sample refuses at step start (L2). Map authoring itself is not the type gate. Dest-type Hold is a **different** packet.
 - No `results.unit_id`. Unit from analyte default.  
 - `qualifiers` remain list-backed. No JSON overlay.  
 - Two writers on the same Test → 409.  

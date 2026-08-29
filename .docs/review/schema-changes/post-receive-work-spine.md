@@ -68,7 +68,7 @@ No Postgres ENUM. Text + check. Status lists may also seed `list_entries` if the
 
 FORCE ROW LEVEL SECURITY on asked_for, work_orders, analysis_param_defs, routing_map, and the step-accepted-types table.
 
-**P2 type gate (OQ-WO-4):** do **not** add `analysis_accepted_sample_types`. Check **current** sample type against **every** step in **that one** process definition (experiment steps and LimsRun steps). Empty accepted set on a step → fail closed (`422 route_sample_type`) on map save and on Route. Qubit is a `lims_run` step; it does not accept blood. Do not read `sample_type_transitions`. Bounce `uuid[]` / process-of-processes.
+**P2 type gate (OQ-WO-4, Marc/Rolf authoring lock):** do **not** add `analysis_accepted_sample_types`. `routing_map.sample_type_id` remains the intake/current type used for analysis × type × TAT matching. Map save and Route do **not** check that type against every step. At step start, compare the sample’s **current** type with that step’s accepted types; an empty or incompatible set returns `422 route_sample_type`. This permits later ordered steps to expect a transformed type without turning map authoring into a chain-wide AND. The planner shows the first ordered Experiment or LimsRun step’s allowed types for information only. Do not read `sample_type_transitions`; dest-type Hold remains unchanged. Bounce `uuid[]` / process-of-processes and unordered-step UI.
 
 ## 3. Seed
 

@@ -411,7 +411,7 @@ Empty `{}` is a freeze, not a hole to refill on a later start. AC-P2-4 records t
 
 ### AC-P2-3 — queued work order feeds the existing execution engine
 
-1. Use an existing process definition whose typed steps accept the sample’s current type.
+1. Use an existing process definition with at least two ordered typed steps whose accepted types differ (for example, an intake-type Experiment step followed by a LimsRun step that expects a transformed type). Do not invent seed IDs.
 2. Configure a matching analysis × sample type × TAT map and explicitly Route the requested row.
 3. Inspect `/work-orders` before choosing **Start process**.
 4. Start the work order, follow the linked process, and open its typed Experiment/LimsRun step.
@@ -419,6 +419,8 @@ Empty `{}` is a freeze, not a hole to refill on a later start. AC-P2-4 records t
 **Expect**
 - Route creates one queued `work_order`, changes asked-for to `routed`, and creates zero Tests.
 - The queued record is planning only; **Start process** begins execution and requires `experiment:manage`.
+- Routing-map authoring shows the first ordered Experiment or LimsRun step’s allowed types for information only. It does not reject the map because a later step accepts a different type.
+- Route and process views make process/step order apparent; steps are not presented as an unordered bag.
 - Process detail renders even when a step has a null template id; no `tid.slice` blank page.
 
 ### AC-P2-4 — WO-7 first-start freeze and whole-run refusal
@@ -441,13 +443,20 @@ Empty `{}` is a freeze, not a hole to refill on a later start. AC-P2-4 records t
 - Intended: a later start neither replaces the Test nor rewrites the first-start `asked_for_params` snapshot, and never overwrites a snapshot with `{}`.
 - Actual on `b005cfe`: steps 4–5 are expected to show the later start rewriting `asked_for_params`, because `_mint_tests_at_start` carries no already-frozen guard. Record the observed values; that gap is the open lock, not a product-code change for this docs fold.
 
-### AC-P2-5 — routing type gate remains fail-closed
+### AC-P2-5 — map authoring permits type transitions; step start gates current type
 
 1. Confirm an empty routing map returns **200** `no_route` and mints nothing.
-2. Try map save and Route with an empty or incompatible accepted-sample-type set.
-3. Create overlapping inclusive TAT ranges for the same analysis and sample type.
+2. Create a map that names the intake/current sample type and points to an ordered process whose later step accepts a different type.
+3. Confirm map save is not required to return **422** `route_sample_type` for that later-step difference, then Route a matching request.
+4. Start the first step with a sample whose current type is accepted.
+5. Without claiming dest-type Hold is closed, attempt to start a step whose accepted types do not include the sample’s current type.
+6. Create overlapping inclusive TAT ranges for the same analysis and sample type.
 
 **Expect**
 - Empty map leaves the row `requested` with zero new work orders and Tests.
-- Empty or incompatible step acceptance returns **422** `route_sample_type`.
+- Map save does **not** AND the intake type across every step’s accepted-type set. A later step may expect a transformed type.
+- The map may still use intake/current sample type for analysis × type × TAT Route matching.
+- Starting a step with an incompatible **current** sample type returns **422** `route_sample_type`; this means wrong type for that step, not a broken sample. Empty accepted types also fail at step start.
+- The Route UI shows the process and ordered steps, plus the first ordered Experiment or LimsRun step’s allowed types as informational copy only.
+- Dest-type Hold remains out of scope; do not claim an earlier step changed the sample type unless the product actually did so.
 - Overlapping TAT ranges return **409**.
