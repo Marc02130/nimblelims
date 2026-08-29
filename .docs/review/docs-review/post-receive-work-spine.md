@@ -19,6 +19,43 @@
 
 ---
 
+## 2026-08-29 honesty fold (`8cfa2a9`)
+
+**Date:** 2026-08-29  
+**Status:** Accept with conditions — **this fold is the conditions**  
+**Product SHA:** `8cfa2a9` (`8cfa2a9be646630f5d4edba0ac64e47069312bfa`) on `feat/work-order-p2`  
+**Scope:** docs only. No product code. Hold product merge. Not IC50.
+
+Product commit `8cfa2a9` closed WO-7 first-start freeze, Route 422/409, later-start type gate, and next-pending instantiate **in code**, and the same commit already rewrote HOWTO/UAT/review toward “in code.” That is not a QA click. Leadership lock (Rolf): live AC-P2 is **unsigned** on this SHA; do not teach freeze or Route 422/409 as shipped/verified until QA clicks; keep ordered-route locks on the page; punch whole-chain-at-Route/Start; `b005cfe` Results stay signed history (publish-refuse Pass, freeze OPEN then, AC-P2-5 chain-AND); P1 `c649245` byte-for-byte.
+
+### Findings on `8cfa2a9` before this fold
+
+| ID | Finding | Fold |
+|----|---------|------|
+| **DOC-H1** | Live AC-P2 block said “fill SHA at restamp” and “Start instantiates the next pending process only,” so the live stamp was not pinned to `8cfa2a9` and could be read as Start running the chain. | Pin live unsigned stamp to `8cfa2a9`. No Pass/Fail. Start = first process only. |
+| **DOC-H2** | HOWTO/README/manuals taught freeze and Route 0→422 / two-accept→409 as current operator truth (“in code” / “shipped on this P2 branch”) without “unsigned until QA.” | Keep the lock on the page. Maturity = **in code on `8cfa2a9`, unsigned until QA**. Not UAT Pass. |
+| **DOC-H3** | HOWTO opener “Work (route → Process / Experiment / LimsRun)” and “next pending” Start copy could teach the whole chain starting at Route/Start. | Punch: Route is a planner; Start instantiates the first process only; later processes = later starts; not a process-of-processes at Route. Route stays an unnumbered planner. |
+| **DOC-H4** | Ordered-route locks (ordered `process_definition[]`, no create type picker, derive first-step types) must stay. Dest-type Hold out. No invented seed IDs. | Keep. |
+| **DOC-H5** | `b005cfe` signed Results and P1 `c649245` Pass must not be rewritten. | Live block only after the `b005cfe` retention line. P1 AC results untouched. |
+
+Operator how-tos stay in git-tracked [`manuals/`](../../../manuals/). Formal stamps stay under `.docs/review/`. Do not commit `.docs/internal/` or `.docs/manuals/`.
+
+### Verdict (this fold)
+
+| Field | Value |
+|-------|--------|
+| **Verdict** | **Accept with conditions** (DOC-H1–H5 land in this docs-only PR) |
+| **Docs ready for Cursor** | Yes for this honesty fold — **no product implement** |
+| **Merge** | **Hold** product merge of `feat/work-order-p2` to `main` until QA restamps live AC-P2 |
+| **Not licensed** | Teaching freeze/422/409 as QA Pass · rewriting `b005cfe` / P1 Results · dest-type E2E · IC50 |
+
+```
+DOCUMENTARIAN REVIEW: Accept with conditions (DOC-H1–H5 honesty fold)
+DOCS READY FOR CURSOR: Yes with conditions (docs-only; hold product merge)
+```
+
+---
+
 ## 1. Executive summary
 
 The spine packet is **documentable**. Core product docs exist (requirements, tech sketch, schema, PRD, SPEC, living OQ log). Lab Ops has spoken. P1 asked-for is the lake: record analysis + TAT + params after receive, **zero Tests**, UI **not** `/receive`. Wizard stays gone.

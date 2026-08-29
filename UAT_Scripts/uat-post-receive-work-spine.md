@@ -502,19 +502,19 @@ AC-P2-1 **Pass** · AC-P2-2 **Pass** · AC-P2-3 **Pass** · AC-P2-4 **publish-re
 
 The preceding `b005cfe` section is retained verbatim as signed history, including its original “Live” heading and Results. It is not the current stamp. Do not rewrite or transfer those observations to another SHA. AC-P2-5 Pass on `b005cfe` is **chain-AND history only**.
 
-## Live AC-P2 stamp — ordered route + first-start freeze (unsigned)
+## Live AC-P2 stamp — `8cfa2a9` (unsigned)
 
-**Result:** **unsigned / not Pass.** Do **not** report P2 Pass. Hold merge.
+**Result:** **unsigned.** No Pass. No Fail. Do **not** report P2 Pass. Hold product merge.
 
-**Branch / build under test:** `feat/work-order-p2` — fill SHA at restamp. Code under this stamp: Route 422/409 (no silent `first()`), first-process first-step types, ordered later starts, WO-7 first-start freeze guard.
+**Branch / build under test:** `feat/work-order-p2` at `8cfa2a9` (`8cfa2a9be646630f5d4edba0ac64e47069312bfa`)
 
-**Executor / environment / date:** fill at restamp · local docker compose (`lims-*`) · compose **down** after the run. Not IC50.
+**Executor / environment / date:** **unsigned** — Tobias has not clicked this SHA. Local docker compose (`lims-*`) when restamped; compose **down** after that run. Not IC50.
 
-**History boundary:** Do not copy outcomes from `b005cfe`, `9c4f9da`, `3b56cfb`, or P1 into this live stamp.
+**Maturity on this SHA (do not teach as QA-verified):** first-start freeze, Route zero→**422** / two-accept→**409**, later-start type gate, and next-pending process instantiate are **in code on `8cfa2a9`**. They are **unsigned until QA**. Do not copy Pass/Fail from `b005cfe` / `9c4f9da` / `3b56cfb` / P1 into this block.
 
 **Copy and permission locks:** Receive ends on `/receive`. Asked-for is a separate later look-up. Route is an unnumbered later planner requiring `test:assign` plus project access; it does not require `experiment:manage`. Client and inaccessible-project Route writes return **403**, not 404. **Start process** and LimsRun start require `experiment:manage`; publish requires `experiment:publish`.
 
-**Routing lock (live):** map create has analysis, TAT, and sortable ordered `process_definition[]`, **no sample-type picker**. Allowed types are derived from the first process’s first ordered Experiment/LimsRun. Map save **409**s only when the same analysis, overlapping TAT, **and** overlapping first-step allow-lists all hold. Extract-first vs Qubit-first for the same TAT is legal. Route: analysis + TAT candidates filtered by live first-step current-type acceptance. Zero acceptable → **422** (`route_sample_type` on type refusal); two saved rows that both accept current type → **409**; exactly one snapshots the ordered route. Never silent `first()`. Start instantiates the next pending process only. Each later process/step start gates current type; empty or incompatible → **422** `route_sample_type`. Dest-type Hold remains out.
+**Routing lock (live, unsigned):** map create has analysis, TAT, and sortable ordered `process_definition[]`, **no sample-type picker**. Allowed types are derived from the first process’s first ordered Experiment/LimsRun. Map save **409**s only when the same analysis, overlapping TAT, **and** overlapping first-step allow-lists all hold. Extract-first vs Qubit-first for the same TAT is legal. Route: analysis + TAT candidates filtered by live first-step current-type acceptance. Zero acceptable → **422** (`route_sample_type` on type refusal); two saved rows that both accept current type → **409**; exactly one snapshots the ordered route. Never silent `first()`. **Start instantiates the first process only.** Later processes = later starts in route order, not a process-of-processes at Route. Each later process/step start gates current type; empty or incompatible → **422** `route_sample_type`. Dest-type Hold remains out.
 
 ### AC-P2-1 — Route remains a separate later planner
 
@@ -554,7 +554,7 @@ The preceding `b005cfe` section is retained verbatim as signed history, includin
 **Expect**
 - Route creates one queued `work_order`, snapshots the full ordered chain, changes asked-for to `routed`, and creates zero Tests.
 - The queued record is planning only; **Start process** begins execution and requires `experiment:manage`.
-- Start instantiates **process 1 only**. Route/process views make order apparent (`1. … → 2. …`).
+- **Start instantiates process 1 only.** It does not start the rest of the chain. Later processes need later starts. Route/process views make order apparent (`1. … → 2. …`).
 - Process detail renders even when a step has a null template id; no `tid.slice` blank page.
 
 ### AC-P2-4 — WO-7 first-start freeze and whole-run refusal
@@ -604,6 +604,6 @@ The preceding `b005cfe` section is retained verbatim as signed history, includin
 
 ---
 
-## Live ordered-route restamp — unsigned
+## Live `8cfa2a9` restamp — unsigned
 
-**Do not sign overall P2 Pass on this block until QA restamps it.** Fill SHA, executor, and per-AC Results at restamp. Hold product merge. Not IC50.
+**No Pass / Fail on this block.** SHA is `8cfa2a9`. Freeze, Route 422/409, later-start type gate, and first-process-only Start are **in code**, not QA-clicked. Do not sign overall P2 Pass until QA restamps. Hold product merge. Not IC50.
