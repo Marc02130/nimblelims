@@ -15,7 +15,7 @@ This is a how-to, not a PRD. Marc keeps it current as features ship.
 | Receive (`/receive`) | Shipped on `main` |
 | Route / work order | Shipped on this P2 branch (`/asked-for` Route, `/admin/routing-map`, `/work-orders`) |
 | Process / Experiment / LimsRun | Execute substrate shipped; P1 does **not** start it |
-| Results | Classic type-a-number on a Test; persist lock is a later packet |
+| Results | Classic type-a-number on a Test; persist lock is a later packet. WO-7 whole-run publish-refuse is the lock, **not** verified on `9c4f9da` |
 | Requested analysis (`/asked-for`) — later look-up, off the bench path | Shipped on `main` (P1 lake) |
 
 Handbooks in this folder: [atomic-receive.md](atomic-receive.md), [asked-for.md](asked-for.md), [navigation.md](navigation.md), [api-endpoints.md](api-endpoints.md), [dev-setup.md](dev-setup.md), [admin-setup.md](admin-setup.md), [processes.md](processes.md), [experiments.md](experiments.md), [lims-runs.md](lims-runs.md). Index: [README.md](README.md).  
@@ -64,7 +64,7 @@ Client / no `sample:create` → no Receive nav or **403**.
 
 ---
 
-## 3. Route / work order
+## Later planner: Route / work order
 
 **This is a later work-planning action, not the next click after Receive or after saving asked-for.** Receive still ends on `/receive`. Recording requested analysis still ends on `/asked-for` without minting work.
 
@@ -75,15 +75,15 @@ Client / no `sample:create` → no Receive nav or **403**.
 1. Open the previously saved `requested` row on `/asked-for`.
 2. Choose its row **Route** action, or select requested rows and choose **Route selected**. This is Route, not Start.
 3. P2 matches analysis × current sample type × TAT against the routing map. No match returns **200** `no_route`; the row stays `requested`, and nothing is minted.
-4. A match creates one queued `work_order`, changes asked-for to `routed`, and still creates **zero Tests**.
+4. A match creates one queued `work_order`, changes asked-for to `routed`, and still creates **zero Tests**. Minting that queue record is planning; **work has not started**.
 5. Open Experiments → **Work Orders** (`/work-orders`) and choose **Start process**. P2 instantiates the first snapshot process definition, links it through `eln_processes.work_order_id`, and opens that process at `/experiments/processes/{id}`.
 6. Continue through that existing process’s typed Experiment and LimsRun steps. A Test is created or attached and `asked_for_params` freeze only when the LimsRun starts (WO-7), never at receive, asked-for save, Route, or work-order start.
 
-Qubit-on-blood is refused by the process-step type gate; it is not made valid by saving it in the asked-for lake. Dest-type Hold is unchanged.
+Qubit-on-blood is refused by the process-step type gate; it is not made valid by saving it in the asked-for lake. A **422** `route_sample_type` means the requested analysis and the sample’s current type are the wrong pairing for a mapped step; it does **not** mean the sample is broken. Dest-type Hold is unchanged.
 
 ---
 
-## 4. Process / Experiment / LimsRun
+## Later execution: Process / Experiment / LimsRun
 
 The execute substrate is already in the app. Requested analysis does **not** open it.
 
@@ -100,13 +100,13 @@ P1 does not instantiate a process from requested analysis. Classic `/tests` can 
 
 ---
 
-## 5. Results
+## Later results
 
 Classic path: **Results** (`/results`) — type a number on an existing Test (batch grid). Unit from `analytes.units_default` when that lock is enforced; missing unit is a later persist-packet **422**, not a receive rule.
 
 Params freeze at **LimsRun start** when the work-order packet exists — **not** on receive.
 
-LimsRun **publish** can promote instrument rows onto Tests/Results. Two writers on the same Test → **409**. Publish must not invent a Test if WO-7 is in force.
+LimsRun **publish** can promote instrument rows onto Tests/Results. Two writers on the same Test → **409**. WO-7 lock: if any required Test is missing, publish must return **422** and refuse the **whole run**, with no partial Results. That refuse is **not** verified as shipped on `9c4f9da` (QA: **200 published** with 0 Tests). Do not treat it as Pass.
 
 UAT (classic): [`UAT_Scripts/uat-results-entry-review.md`](../UAT_Scripts/uat-results-entry-review.md). Persist lock (P3) is specified on the spine packet, not shipped as that slice.
 
@@ -147,7 +147,7 @@ Params: intent only. P1 sends `{}` OOB — do not type assay params here, and do
 
 ---
 
-## 6. What not to do
+## What not to do
 
 - Do **not** teach receive → asked-for as one motion. Receive ends on `/receive`.
 - Do **not** hop off `/receive` after a successful scan — stay on the form for the next tube.
