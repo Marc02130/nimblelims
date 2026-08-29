@@ -376,6 +376,15 @@ This block records acceptance steps only. It contains no copied outcomes or obse
 
 **Copy and permission locks:** Receive ends on `/receive`. Asked-for is a separate later look-up. Route is an unnumbered later planner requiring `test:assign` plus project access; it does not require `experiment:manage`. Client and inaccessible-project Route writes return **403**, not 404. **Start process** and LimsRun start require `experiment:manage`; publish requires `experiment:publish`.
 
+**WO-7 maturity, stated so QA does not read a lock as shipped behavior:** the two halves differ on this SHA.
+
+| WO-7 half | State on `b005cfe` |
+|-----------|--------------------|
+| Whole-run publish refuse when a cohort Test is missing | **In code**, unsigned until QA executes AC-P2-4 |
+| First-start freeze of `tests.asked_for_params` | **Lock, still OPEN.** `_mint_tests_at_start` has no already-frozen guard, so a later start that finds the existing active Test rewrites the first-start snapshot — with empty `{}` when no `routed` row matches |
+
+Empty `{}` is a freeze, not a hole to refill on a later start. AC-P2-4 records the freeze as the target lock; an overwrite observed on this SHA is the expected open gap, not a surprise.
+
 ### AC-P2-1 — Route remains a separate later planner
 
 1. As a lab user with `sample:create`, receive a sample on `/receive`.
@@ -417,17 +426,20 @@ This block records acceptance steps only. It contains no copied outcomes or obse
 1. For a routed row, save a valid asked-for param before starting its typed LimsRun.
 2. Select the routed cohort and call `PATCH /v1/lims-runs/{id}/start` for the first start.
 3. Inspect the active Test for each `(sample_id, analysis_id)` and its `asked_for_params`.
-4. Change the source asked-for params after first start. Exercise any supported later/repeated start path without replacing the run.
-5. Confirm the original Test selection and params snapshot remain frozen.
+4. Change the source asked-for params after first start, and clear the `routed` asked-for row for one cohort sample. Then reach `_mint_tests_at_start` a second time for the same `(sample, analysis)`: exercise any supported repeated-start path on the run, and also start a second run over the same cohort and analysis (the path that commits against the existing active Test).
+5. Re-read `tests.asked_for_params` and record what that later start did to the first-start snapshot, including whether the cleared row left `{}` behind.
 6. Add publishable run data, remove or deactivate one cohort Test in the QA fixture, and move the run to `complete`.
 7. Call publish with `PATCH /v1/lims-runs/{id}/complete`, then inspect run status, Tests, and every candidate Result.
 
-**Expect**
+**Expect (publish refuse — in code on this SHA)**
 - Receive, asked-for save, Route, and work-order start create no Test.
 - First LimsRun start creates or attaches one active Test per cohort sample and freezes the then-current params into `tests.asked_for_params`.
-- Later starts do not create a replacement Test or re-freeze changed params.
 - With any cohort Test missing, publish returns **422**, not **200 published**.
 - The whole run is refused: it stays `complete`, no Test is invented, and no Results are written, including for cohort samples whose Tests still exist.
+
+**Target lock (first-start freeze — OPEN on this SHA, do not score as a regression)**
+- Intended: a later start neither replaces the Test nor rewrites the first-start `asked_for_params` snapshot, and never overwrites a snapshot with `{}`.
+- Actual on `b005cfe`: steps 4–5 are expected to show the later start rewriting `asked_for_params`, because `_mint_tests_at_start` carries no already-frozen guard. Record the observed values; that gap is the open lock, not a product-code change for this docs fold.
 
 ### AC-P2-5 — routing type gate remains fail-closed
 
