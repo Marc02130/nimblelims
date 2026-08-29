@@ -7,7 +7,7 @@
 **Requirements:** `.docs/internal/prd/sample-accessioning/PRD.md` (RQ-AR-*) · SPEC §3  
 **Sketch:** `.docs/review/tech-sketch/atomic-receive.md`
 
-**Separate motion (P1, not on this screen, not the click after a commit):** **Asked-for** (`/asked-for`) records **requested analysis + TAT** as a later look-up. See [asked-for.md](asked-for.md). Asked-for does **not** mint Tests or start work; receive’s happy path is staying on `/receive` for the next tube. Route / work_orders / WO-7 stay **out** of the P1 stamp. Results-entry persist lock remains a later packet (**NR-AR-1** / AR-RES).
+**Separate motion (not on this screen, not the click after a commit):** **Asked-for** (`/asked-for`) records **requested analysis + TAT** as a later look-up. See [asked-for.md](asked-for.md). Asked-for save does **not** mint a Test or work order and does not start work; receive’s happy path is staying on `/receive` for the next tube. P2 Route, Work Orders, and WO-7 now exist as later actions, but remain **out of Receive**: only explicit Route can mint the work order, and only LimsRun start creates or attaches the Test. Results-entry persist lock remains a later packet (**NR-AR-1** / AR-RES).
 
 The legacy `/accessioning` wizard is **removed**. `/accessioning` redirects to `/receive`.
 
