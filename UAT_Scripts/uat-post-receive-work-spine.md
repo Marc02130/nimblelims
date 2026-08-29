@@ -380,14 +380,14 @@ This block records Tobias’s `b005cfe` results. It does not rewrite or transfer
 
 | WO-7 half | State on `b005cfe` |
 |-----------|--------------------|
-| Whole-run publish refuse when a cohort Test is missing | **Pass signed by Tobias** in AC-P2-4 |
+| Whole-run publish refuse when a cohort Test is missing | **Publish-refuse Pass signed by Tobias** in AC-P2-4; first-start freeze not scored |
 | First-start freeze of `tests.asked_for_params` | **Lock, still OPEN and not scored.** `{}` was recorded; `_mint_tests_at_start` still has no already-frozen guard |
 
 Empty `{}` is a freeze, not a hole to refill on a later start. AC-P2-4 records the freeze as the target lock; an overwrite observed on this SHA is the expected open gap, not a surprise.
 
 ### AC-P2-1 — Route remains a separate later planner
 
-**Result:** **Pass** (alice click, Tobias signed, 2026-08-29, `b005cfe`)
+**Result:** **Pass — execution path only** (alice click, Tobias signed, 2026-08-29, `b005cfe`). The superseding map/type lock is specified under AC-P2-5 and was not verified on this SHA.
 
 1. As a lab user with `sample:create`, receive a sample on `/receive`.
 2. Confirm the successful receive stays on `/receive`, clears the barcode, and is ready for the next tube.
@@ -420,15 +420,13 @@ Empty `{}` is a freeze, not a hole to refill on a later start. AC-P2-4 records t
 **Result:** **Pass** (alice click, Tobias signed, 2026-08-29, `b005cfe`)
 
 1. Use an existing process definition with ordered typed steps. Do not invent seed IDs.
-2. Configure a matching analysis × TAT map with that one process definition and explicitly Route the requested row. Do not select a sample type on map create.
+2. Use the admin-created matching routing map for that one process definition and explicitly Route the requested row.
 3. Inspect `/work-orders` before choosing **Start process**.
 4. Start the work order, follow the linked process, and open its typed Experiment/LimsRun step.
 
 **Expect**
 - Route creates one queued `work_order`, changes asked-for to `routed`, and creates zero Tests.
 - The queued record is planning only; **Start process** begins execution and requires `experiment:manage`.
-- Routing-map authoring displays allowed types derived from the selected first/only process and its first ordered Experiment or LimsRun step. It has no sample-type picker.
-- Route compares the sample’s current type with that first-step allow-list only; it does not inspect later steps.
 - Route and process views make process/step order apparent; steps are not presented as an unordered bag.
 - Process detail renders even when a step has a null template id; no `tid.slice` blank page.
 
@@ -491,6 +489,6 @@ Empty `{}` is a freeze, not a hole to refill on a later start. AC-P2-4 records t
 
 **Signed by Tobias, 2026-08-29; local docker compose, compose down.**
 
-AC-P2-1 **Pass** · AC-P2-2 **Pass** · AC-P2-3 **Pass** · AC-P2-4 **publish-refuse Pass only** · AC-P2-5 **Pass as `b005cfe` history**.
+AC-P2-1 **Pass** · AC-P2-2 **Pass** · AC-P2-3 **Pass (execution path only)** · AC-P2-4 **publish-refuse Pass only** · AC-P2-5 **Pass as `b005cfe` history**.
 
 **Overall P2 Pass remains unsigned and is not claimed.** WO-7 first-start freeze remains **OPEN** and was not scored. Hold product merge. Not IC50.
