@@ -166,7 +166,7 @@ Allowed while `requested`. Cancel after `routed` → **422**.
 
 ### POST /v1/asked-for/{id}/route
 ### POST /v1/asked-for/route
-These are explicit later actions, not calls that Receive or asked-for create should chain automatically. Body for batch: `{ "asked_for_ids": ["uuid"] }`. **200** `{ items: [{ asked_for_id, work_order, no_route }], count }`. Empty map → `no_route: true`, status remains `requested`, and nothing is minted. A match creates a queued `work_order`, changes asked-for to `routed`, and creates no Test. Type gate fail → **422** with `detail.code = "route_sample_type"`. Write: `test:assign`, not Client.
+These are explicit later planning actions, not calls that Receive or asked-for create should chain automatically. Body for batch: `{ "asked_for_ids": ["uuid"] }`. **200** `{ items: [{ asked_for_id, work_order, no_route }], count }`. Empty map → `no_route: true`, status remains `requested`, and nothing is minted. A match creates a queued `work_order`, changes asked-for to `routed`, and creates no Test; minting that queue record does not mean work has started. Type gate fail → **422** with `detail.code = "route_sample_type"`: the analysis/sample-type pairing is wrong for a mapped step, not a broken sample. Write: `test:assign`, not Client.
 
 ### Routing map / work orders
 - `GET/POST /v1/routing-map` · `PATCH/DELETE /v1/routing-map/{id}` (write: `config:edit`). Rows match analysis × sample type × inclusive TAT range; TAT overlap → **409**.
@@ -2337,7 +2337,7 @@ Dry-run of what publish would write to existing Tests/Results when `analysis_id`
 ### PATCH /v1/lims-runs/{id}/complete
 Transition `complete → published` (requires `experiment:publish`).
 
-Promotes instrument JSONB → Tests/Results in the same transaction (**run always has `analysis_id`**). The Test must already exist from LimsRun start (WO-7); publish refuses a missing Test with **422** instead of inventing one. **409** with `code: promotion_conflict` if another run/manual result owns the same test/analyte/replicate.
+Promotes instrument JSONB → Tests/Results in one transaction (**run always has `analysis_id`**). Each Test must already exist from LimsRun start (WO-7). If any required Test is missing, publish returns **422** and refuses the whole run instead of inventing a Test or writing partial Results. **409** with `code: promotion_conflict` if another run/manual result owns the same test/analyte/replicate.
 
 ### PATCH /v1/lims-runs/{id}/start
 Start run. **Requires `analysis_id`** on the run and at least one cohort sample — **400** if either is missing. With `sample_ids` in the body, start locks the cohort, creates or attaches one active Test per `(sample, analysis)`, and freezes the routed asked-for `params` into `tests.asked_for_params`. No non-reportable / `acknowledge_no_analysis` path (product lock 2026-07-19; remove legacy ack if still in code).
