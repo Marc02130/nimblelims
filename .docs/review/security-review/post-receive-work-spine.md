@@ -66,7 +66,7 @@ UI `hasPermission` is UX only. Server RBAC + Postgres RLS are AuthZ.
 | Multi-sample asked-for (L1) | Mixed-project set writes unauthorized `sample_id`s if AuthZ is first-row-only |
 | `PUT /api/v1/analyses/{id}/param-defs` | Config elevation; `params` JSONB dumping identity fields |
 | `GET/POST/PATCH/DELETE /api/v1/routing-map` | Elevation if writable without `config:edit` |
-| `POST /api/v1/asked-for/{id}/route` | Mint WO for another client’s sample; empty map inventing work |
+| `POST /api/v1/asked-for/{id}/route` | Mint WO for another client; zero-hit mint; ambiguous silent first-row choice |
 | `GET /api/v1/work-orders`, `POST …/start` | Hijack another client’s WO; client expand into Process |
 | LimsRun start → Test (WO-7) | Silent Test create at asked-for / WO save / **publish ensure** |
 | `persist_typed_result` (P3) | Two-writer overwrite; Client enter; persist without a Test |
@@ -82,7 +82,7 @@ No new execute runtime. Receive stays 422 on `analysis_ids` (existing bounce, no
 | Threat | Control |
 |--------|---------|
 | **Spoofing** | Existing JWT / cookie session. Same AuthN as tests / processes. No new token world. |
-| **Tampering** | Params allowlist (S4). Routing overlap 409; empty map mints nothing (S5). One process-definition snapshot at mint, with ordered steps (S8). Results two-writer 409 (S9). SOP Apply does not eval model output (S10). |
+| **Tampering** | Params allowlist. Routing zero-hit 422 / ambiguity 409. Ordered process-definition snapshot at mint. Results two-writer 409. |
 | **Repudiation** | Audit create/cancel asked-for, map save, route/mint, WO start, LimsRun Test mint, SOP Apply, parser activate (S4, S8, S10, S12). |
 | **Info disclosure** | Sample → project RLS + FORCE on new tables; hidden → **403** not 404 (S1, S3, S6). Client does not need lab-wide routing packs (S8). |
 | **DoS** | Out of scope (no new public flood surface; parser upload caps already S3 on the parsers packet). |
@@ -98,10 +98,10 @@ No new execute runtime. Receive stays 422 on `analysis_ids` (existing bounce, no
 | **S2** | High | **P1** | **Client role cannot write asked-for** (create / cancel). GET/list only if `sample:read` + RLS on that sample. **Do not treat leftover Client `test:assign` as write license.** `0013_seed_client_role` falls back to `test:assign` because `test:read` does not exist — permission-name-only checks fail this. Pytest: Client POST/cancel → 403; lab tech without project access → 403; other-client sample → 403. |
 | **S3** | High | **P1** | **FORCE ROW LEVEL SECURITY** on `asked_for` and `analysis_param_defs`. `asked_for` USING **and WITH CHECK** via sample → project (mirror `tests`). Param-defs: authenticated read; **write `config:edit` / admin**. Multi-sample (L1): **each** `sample_id` independently RLS-checked; fail closed — no write of unauthorized ids (no first-row-only bulk). |
 | **S4** | Med | **P1** | `params` keys must match `analysis_param_defs` for that analysis; unknown or missing required → **422**. Empty defs = `{}` only. Do **not** persist `params` onto Sample identity (`client_sample_id`, subject, container metrics). Audit asked-for create/cancel (actor, sample_id, analysis_id, status). |
-| **S5** | High | **P2** | `routing_map` mutate (POST/PATCH/DELETE) = **`config:edit` only**. Not `test:assign`, not `experiment:manage` alone, not Client. FORCE RLS; write policy admin / `config:edit`. Map create has no sample-type field. Empty map mints **nothing**. TAT overlap by analysis → **409**. Explicit Route may mint a WO from an analysis + TAT match only after the derived first-step current-type gate; it must **not** mutate the map. |
-| **S6** | High | **P2** | `work_orders` FORCE RLS + USING/WITH CHECK via sample → project. `POST …/route` and `POST …/start` load asked-for / WO under RLS; hidden → **403**. Start instantiates that one definition via **existing process AuthZ** (`experiment:manage` / `ELNProcessService.create`). **No new start permission. No client expand.** Completing step *N* surfaces the next ordered step in the same definition — no second routing hop or process-of-processes chain. |
+| **S5** | High | **P2** | Map mutate = `config:edit`; no type field. Route evaluates analysis + TAT candidates and first-process type acceptance under RLS. Zero acceptable → 422; multiple → 409. Never use `first()` or mutate the map. |
+| **S6** | High | **P2** | Work orders snapshot ordered `process_definition[]`. Start under `experiment:manage` instantiates first pending definition only and records route position. Later start advances one. No client expansion; no process-of-processes minted at Route. |
 | **S7** | High | **P2** | **WO-7:** Test minted **only** at LimsRun start under process AuthZ. Asked-for create, WO save, and route mint **zero** Tests. Publish **422** if Test missing. **Remove** find-or-create / `ensure_test` on publish (`ResultPromotionService.ensure_test` is called today from `publish_run` — “may create tests via ensure”). Asked-for `params` snapshot onto the Test at LimsRun start and **freeze**; no write-back to Sample identity. |
-| **S8** | Med | **P2** | Snapshot one `process_definition_id` at mint so later map edits cannot retarget in-flight WOs. Preserve and expose the definition’s step order; do not treat steps as an unordered bag. Client: read WO rows only for own-project samples; **no start**. Audit: map save, first-step Route refusal, route/mint, WO start, later step-start type refusal, LimsRun Test mint (actor + ids). |
+| **S8** | Med | **P2** | Snapshot ordered definition IDs at mint so map edits cannot retarget work. Preserve process/step order. Audit candidate count, Route refusal/ambiguity, chosen map, each route-position start, and later type refusal. |
 | **S9** | High | **P3** | Persist typed results on an **existing** Test only. AuthZ = existing `result:enter` (classic) or existing publish path (lab-only). RLS via test → sample → project. Two writers on the same Test → **409**. Client cannot enter. No `results.unit_id`. Do not persist from asked-for. P3 does not mint Tests. |
 | **S10** | High | **P4** | SOP Apply is a **human** POST (`experiment:manage`; Client **403**). Creates/updates a **draft** process definition (`active=false`) until explicit activate (`config:edit` / existing process-def activation). **Never silent auto-activate.** Treat model output as untrusted: typed steps only; no eval/exec. Apply does **not** call LLM. No SOP PDF bodies in git. |
 | **S11** | High | **P4** | Optional parser draft from Apply: **inactive and unbound**. Never auto-bind to production runs or day-to-day import. **OQ-SOP-2 locked this way for security.** Production import stays the deterministic engine. |
@@ -116,8 +116,8 @@ Already normative in the packet (restated so they are not dropped): uniqueness 4
 | ID | Stance |
 |----|--------|
 | **OQ-AF-2** | **Locked.** Reuse `test:assign`. Do not add `order:create`. Client write still denied by **role** (S2). |
-| **OQ-WO-1** | Auto-route vs Route button is UX. Either way: mint is a lab write under RLS; empty map mints nothing; Client cannot route. Does not block P1. |
-| **OQ-WO-3** | One FK (`work_orders.process_id` preferred). RLS must follow the sample, not the FK direction. |
+| **OQ-WO-1** | Explicit Route is a lab write under RLS; zero acceptable returns 422; Client cannot route. |
+| **OQ-WO-3** | Each process instance links to WO + route position. RLS follows the sample. |
 | **OQ-SOP-2** | **Locked for security:** inactive, **unbound**. Never auto-bind (S11). |
 
 ---

@@ -419,8 +419,8 @@ Empty `{}` is a freeze, not a hole to refill on a later start. AC-P2-4 records t
 
 **Result:** **Pass** (alice click, Tobias signed, 2026-08-29, `b005cfe`)
 
-1. Use an existing process definition with ordered typed steps. Do not invent seed IDs.
-2. Use the admin-created matching routing map for that one process definition and explicitly Route the requested row.
+1. Use the admin-created ELISA LimsRun definition from the signed run. Do not invent seed IDs.
+2. Use the admin-created matching routing map from that run and explicitly Route the requested row.
 3. Inspect `/work-orders` before choosing **Start process**.
 4. Start the work order, follow the linked process, and open its typed Experiment/LimsRun step.
 
@@ -464,24 +464,26 @@ Empty `{}` is a freeze, not a hole to refill on a later start. AC-P2-4 records t
 
 **Verified holds on `b005cfe`:** click-save returned **422** `route_sample_type` with “Sample type is not accepted on every step in the chain”; overlapping TAT was refused. The chain-AND map-save behavior is a signed observation, not the ongoing authoring rule.
 
-**Superseding expect for the next product SHA (not a result of this run)**
+**Superseding ordered-route expect for the next product SHA (not a result of this run)**
 
-1. Confirm routing-map create has analysis, TAT, and one ordered process definition, with **no sample-type picker**.
-2. Confirm the form displays allowed types derived from the selected first/only process and its first ordered Experiment/LimsRun step; change the process/step and verify the display refreshes.
-3. Save the map without comparing one type across later steps.
-4. Route a request whose sample current type is not accepted by the first ordered step.
-5. Route a request accepted by the first step while a later step expects a different type.
-6. Reach the later step without a valid type transformation and attempt to start it.
-7. Create overlapping inclusive TAT ranges for the same analysis.
+1. Confirm map create has analysis, TAT, and sortable ordered `process_definition[]`, with no sample-type picker.
+2. Confirm the form displays the first process and its first ordered Experiment/LimsRun allow-list. Change process order or first-step acceptance and verify derived display refreshes.
+3. Save an extract-first route with a later Qubit process/step; confirm map save does not chain-AND later processes or steps.
+4. Route with zero acceptable rows (no analysis + TAT candidate or no candidate whose first process/step accepts current type).
+5. Using a fixture/concurrent state with two candidate map rows that both accept current type, Route again.
+6. Route with exactly one acceptable row and inspect the work-order snapshot order.
+7. Choose Start; inspect created process instances. Complete the first process, then invoke the later start.
+8. Attempt a later process/step start with an empty or incompatible allow-list.
 
 **Expect**
-- Map match uses analysis + TAT. Allowed types are derived display, not an admin-authored map field.
-- First-step current-type mismatch returns **422** `route_sample_type` at Route and mints no work order. This means wrong type for assignment, not a broken sample.
-- Route does **not** AND later-step allow-lists. A later step may expect a transformed type.
-- Each later step checks current type only when started; empty or incompatible allow-list fail-closes with **422** then.
-- Route and process views show one process definition and its ordered steps, not a bag of definitions or steps.
+- Map row = analysis + TAT + ordered `process_definition[]`. UI preserves order. Allowed types are derived from the first process / first step, not admin-authored.
+- Zero acceptable rows returns **422** and mints no work order. A first-step type refusal uses `route_sample_type`.
+- Two or more acceptable rows return **409**; no silent `first()`.
+- Exactly one row snapshots the full ordered route.
+- Start instantiates the first process only. Later processes require later starts in route order; Route does not mint a process-of-processes.
+- Map save/Route do not AND later-process or later-step allow-lists.
+- Each later process/step start checks current type; empty or incompatible fails with **422** then.
 - Dest-type Hold remains out; do not claim an earlier step changed type unless the product did so.
-- Overlapping TAT ranges for the same analysis return **409**.
 
 ---
 

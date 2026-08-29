@@ -85,7 +85,7 @@ US-7 as written covers: surface (`/asked-for` + sample detail), analysis + TAT +
 
 | Phase | Stories | Product AC hole | OQ gate |
 |-------|---------|-----------------|--------|
-| **P2** | None | Missing: map create has no sample-type picker; analysis + TAT match; derived first-process / first-step types; Route gates first step only; later steps gate at start; TAT overlap 409; empty map mints nothing; ordered UI; L3 params snapshot; Test **not** at WO save; publish 422 if Test missing | OQ-WO-4 is superseded again by the Marc/Rolf map-create lock. |
+| **P2** | None | Missing: ordered `process_definition[]`; no type picker; zero acceptable 422; multiple acceptable 409; first process starts first; later starts advance/gate; ordered UI; publish 422 if Test missing | Marc/Rolf ordered-route lock supersedes singular definition. |
 | **P3** | US-9 is the old results product, not persist lock | Missing two-writers **409** (RQ-RES-3). `AC-P3-1/2` OK as persist happy/fail | **OQ-RES-1 Open** — blocks P3 |
 | **P4** | None | Missing human save / never silent activate; L5 dest-type copy | OQ-SOP-2 Open for parser draft only. Dest-type Hold is a **different** packet. |
 | **P5** | None | Missing `config:edit`, instrument XOR CRO, example+test+dry-run | OQ-IMP-1 Decided — may parallel P1 **after staffing**, not inside the P1 PR |
@@ -112,7 +112,7 @@ Already normative (restated so they are not dropped): L1 copy / zero-mint / not-
 
 **Not P1 — do not code in the P1 PR:**
 
-- Routing map without a sample-type picker, `work_order`, explicit Route, L2 first-step Route gate + later step-start gates, derived first-process / first-step types, L3 params snapshot, L4 ordered process steps, WO-7 publish refusal.
+- Routing map with ordered `process_definition[]`, no type picker, explicit Route 0/2 ambiguity handling, first-process-only Start, later start gates, L3 params snapshot, WO-7 publish refusal.
 - P3 persist lock (OQ-RES-1). Do not type numbers on asked-for. Do not fold AR-RES into P1 UAT.
 - P4 SOP Apply → process definition (L5). Dest-type Hold unchanged. No blood → DNA → Qubit UAT. No SOP PDF bodies. Not IC50.
 - P5 parser setup UX (may staff-parallel **after** P1, not inside it).

@@ -27,14 +27,14 @@ The spine is scientifically right and must not collapse:
 | Layer | Scientific object | Must not become |
 |-------|-------------------|-----------------|
 | Asked-for (P1) | Request: analysis + TAT + assay params | A Test, a result, or a work plan |
-| Routing + `work_order` (P2) | Analysis + TAT match to one process; derived first-step type gate | A Test row, a second execute engine, an admin-authored type, or a chain-wide gate |
+| Routing + `work_order` (P2) | Analysis + TAT → ordered `process_definition[]`; first-process type gate | A Test row, an unordered bag, an admin-authored type, or a chain-wide gate |
 | Test (WO-7) | Assay **instance** at LimsRun start, with frozen params | Minted at receive / asked-for / WO save / publish |
 | Result (P3) | Reportable analyte value + unit + optional qualifier + replicate | A unit picker, a JSON blob in `qualifiers`, or a number typed into asked-for |
 | SOP Apply (P4) | Process definition with typed experiment / LimsRun steps | Blood → DNA → Qubit E2E (still Hold) |
 
 **OQ-RES-1 is Decided here.** The proposal to store `qualifiers` as JSON `{"entered_as": "<string>"}` is scientifically wrong and would break the live column. `results.qualifiers` is already a UUID FK to **Result Qualifiers** (`<LOD`, `ND`). That list is the controlled vocabulary for censored / special results. The typed token belongs in `reported_result`. See §3 SC1 and §6.
 
-**Qubit-on-blood must refuse.** If Qubit is the first step, Route compares blood with the derived DNA allow-list and refuses before mint. If Qubit is later, its start refuses until dest-type execute actually minted or selected a DNA daughter. The routing map has no admin-authored sample type. Aligns with the superseding Marc/Rolf lock and Lab Ops **L2**. Do not invent Qubit/blood testdata IDs.
+**Qubit-on-blood must refuse.** If Qubit is the first Experiment/LimsRun in the first process, Route refuses blood before mint. If Qubit is in a later process/step, that later start refuses until dest-type execute actually minted or selected DNA. Map save does not chain-AND the ordered route. Do not invent testdata IDs.
 
 **Params must travel and freeze (L3).** Cell line / dilution / assay params that die at the bench are a side process. Snapshot onto the Test at LimsRun start. Schema currently says `tests: none` — that is not enough (SC5).
 
