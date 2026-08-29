@@ -358,3 +358,84 @@ Do **not** read this as P2–P5 Pass. Do **not** collapse this stamp with Atomic
 **P2 signed, not Pass** — Tobias, 2026-08-29, `feat/work-order-p2` @ `9c4f9da` — AC-P2-1 Pass; AC-P2-2 Pass; AC-P2-3 Pass (blank process page `tid.slice` is observation only, not a Fail); AC-P2-4 **Fail** (publish **200 published** with 0 Tests after Test delete; do not fold mint as Pass; whole-run refuse **not** verified); AC-P2-5 Pass (`route_sample_type` 422; TAT overlap 409). Local compose; down after the run. Not IC50.
 
 P1 remains the historical **Pass** on `c649245`; this live P2 section does not alter it. The `3b56cfb` block remains history only. Hold merge of `feat/work-order-p2`.
+
+---
+
+The preceding `9c4f9da` section is retained verbatim as signed history, including its original “Live” heading and Results. It is not the current stamp. Do not rewrite or transfer those observations to another SHA.
+
+## Live AC-P2 stamp — `b005cfe` (unsigned)
+
+**Branch / build awaiting QA:** `feat/work-order-p2` at `b005cfe` (`b005cfe4596ca64baf5c674d372536e27560cf69`)
+
+**QA signature:** unsigned
+
+**Executor / environment / date:** to be recorded by QA
+**Merge:** hold `feat/work-order-p2` until QA executes and signs this block. Not IC50.
+
+This block records acceptance steps only. It contains no copied outcomes or observations from `9c4f9da` or `3b56cfb`.
+
+**Copy and permission locks:** Receive ends on `/receive`. Asked-for is a separate later look-up. Route is an unnumbered later planner requiring `test:assign` plus project access; it does not require `experiment:manage`. Client and inaccessible-project Route writes return **403**, not 404. **Start process** and LimsRun start require `experiment:manage`; publish requires `experiment:publish`.
+
+### AC-P2-1 — Route remains a separate later planner
+
+1. As a lab user with `sample:create`, receive a sample on `/receive`.
+2. Confirm the successful receive stays on `/receive`, clears the barcode, and is ready for the next tube.
+3. In a separate later task, record requested analysis + TAT on `/asked-for`; confirm save stays on `/asked-for` and does not auto-route.
+4. Later, choose **Route** or **Route selected** on a `requested` row.
+
+**Expect**
+- Receive has no analysis or Route action.
+- Asked-for is not a numbered post-receive step or Start queue.
+- Only the explicit later Route action evaluates the routing map.
+
+### AC-P2-2 — Route authorization is `test:assign` plus project RLS
+
+1. Route an accessible `requested` row as a non-Client lab user with `test:assign`.
+2. Repeat without `test:assign`.
+3. Attempt Route against a hidden or other-project sample.
+4. Attempt Route as a Client, including a Client that otherwise has `test:assign`.
+
+**Expect**
+- The accessible lab action reaches routing without requiring `experiment:manage`.
+- Missing `test:assign`, hidden/other-project access, and Client writes return **403**, not 404.
+- Route itself does not grant permission to **Start process**; that later action still requires `experiment:manage`.
+
+### AC-P2-3 — queued work order feeds the existing execution engine
+
+1. Use an existing process definition whose typed steps accept the sample’s current type.
+2. Configure a matching analysis × sample type × TAT map and explicitly Route the requested row.
+3. Inspect `/work-orders` before choosing **Start process**.
+4. Start the work order, follow the linked process, and open its typed Experiment/LimsRun step.
+
+**Expect**
+- Route creates one queued `work_order`, changes asked-for to `routed`, and creates zero Tests.
+- The queued record is planning only; **Start process** begins execution and requires `experiment:manage`.
+- Process detail renders even when a step has a null template id; no `tid.slice` blank page.
+
+### AC-P2-4 — WO-7 first-start freeze and whole-run refusal
+
+1. For a routed row, save a valid asked-for param before starting its typed LimsRun.
+2. Select the routed cohort and call `PATCH /v1/lims-runs/{id}/start` for the first start.
+3. Inspect the active Test for each `(sample_id, analysis_id)` and its `asked_for_params`.
+4. Change the source asked-for params after first start. Exercise any supported later/repeated start path without replacing the run.
+5. Confirm the original Test selection and params snapshot remain frozen.
+6. Add publishable run data, remove or deactivate one cohort Test in the QA fixture, and move the run to `complete`.
+7. Call publish with `PATCH /v1/lims-runs/{id}/complete`, then inspect run status, Tests, and every candidate Result.
+
+**Expect**
+- Receive, asked-for save, Route, and work-order start create no Test.
+- First LimsRun start creates or attaches one active Test per cohort sample and freezes the then-current params into `tests.asked_for_params`.
+- Later starts do not create a replacement Test or re-freeze changed params.
+- With any cohort Test missing, publish returns **422**, not **200 published**.
+- The whole run is refused: it stays `complete`, no Test is invented, and no Results are written, including for cohort samples whose Tests still exist.
+
+### AC-P2-5 — routing type gate remains fail-closed
+
+1. Confirm an empty routing map returns **200** `no_route` and mints nothing.
+2. Try map save and Route with an empty or incompatible accepted-sample-type set.
+3. Create overlapping inclusive TAT ranges for the same analysis and sample type.
+
+**Expect**
+- Empty map leaves the row `requested` with zero new work orders and Tests.
+- Empty or incompatible step acceptance returns **422** `route_sample_type`.
+- Overlapping TAT ranges return **409**.

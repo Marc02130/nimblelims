@@ -188,7 +188,7 @@ nimblelims/
 ### Core Workflows for BioTech/Pharma Startups (**MVP Release Bar** + Shipped Enhancements)
 - **Compound & Sample Tracking** **(MVP)**: Receive (`/receive`), status management, lineage (aliquots/derivatives), container hierarchy. Non-empty `analysis_ids` on receive → **422**.
 - **Requested analysis** **(MVP, P1)**: **Asked-for** (`/asked-for`) records requested analysis + TAT for already-received samples (zero Tests, no execute). A later look-up, not the after-receive step — receive ends on `/receive`. See [manuals/HOWTO.md](manuals/HOWTO.md), [manuals/asked-for.md](manuals/asked-for.md), and `UAT_Scripts/uat-post-receive-work-spine.md`. Classic `/tests` is not the request path.
-- **Route / work orders (P2):** Explicit **Route** on `/asked-for` matches `routing_map` (analysis × sample type × TAT) and mints a `work_order`. Empty map stays `requested`. Step accepted sample types gate Route (`422 route_sample_type`). Tests mint at **LimsRun start** (WO-7), not on Route. Admin: `/admin/routing-map`. Backlog: `/work-orders`.
+- **Route / work orders (P2):** Explicit, unnumbered later **Route** on `/asked-for` requires `test:assign` plus project access, not `experiment:manage`, then matches `routing_map` (analysis × sample type × TAT) and mints a `work_order`. Empty map stays `requested`. Step accepted sample types gate Route (`422 route_sample_type`). Tests and params freeze at the **first LimsRun start** (WO-7), not on Route or later starts. Admin: `/admin/routing-map`. Backlog: `/work-orders`.
 - **Results Entry** **(MVP)**: Manual results entry with real-time validation
 - **Batch Management** **(MVP + Enhancements)**: Create and manage batches (basic is MVP; cross-project support, automatic QC generation, and sample prioritization are shipped enhancements)
 - **Sample Prioritization** **(Shipped, Not MVP)** (US-11): Sort compounds and biological samples by shelf-life expiration and assay deadlines during batch creation
@@ -209,7 +209,7 @@ nimblelims/
 ### LIMS Runs → Structured Results **(Shipped, Not MVP)** (promote-on-publish)
 - **Analysis required**: Every LimsRun (e.g., plate reader output, screening campaign) has an **Analysis** from create (no non-reportable path).
 - **Import remains flexible JSONB** (`lims_run_data`); parsers/import are analysis-scoped for different instrument vendors.
-- **Promote on publish**: Status → `published` maps columns to analytes (name + **aliases** for CRO/instrument vendor column names), ensures Tests per sample, writes **Results** (`raw_result`, `replicate`, `lims_run_id`).
+- **Promote on publish**: Status → `published` maps columns to analytes (name + **aliases** for CRO/instrument vendor column names) and writes **Results** (`raw_result`, `replicate`, `lims_run_id`) only into active Tests frozen at first start. If any cohort Test is missing, WO-7 refuses the whole publish with **422**, writes no Results, invents no Test, and leaves the run `complete`. The `b005cfe` live AC-P2 stamp is unsigned.
 - **Conflicts**: Same run updates; other run/manual ownership fails publish with **409** to protect data integrity.
 - **Preview**: Publish confirmation dry-runs create/update/conflict/unresolved columns (`GET /v1/lims-runs/{id}/promotion/preview`).
 - **Docs**: [manuals/HOWTO.md](manuals/HOWTO.md) · [manuals/lims-runs.md](manuals/lims-runs.md) · local `.docs/internal/ideas/run-results.md` (not committed).
