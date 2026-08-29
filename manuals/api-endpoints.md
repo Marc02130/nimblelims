@@ -2342,7 +2342,7 @@ Promotes instrument JSONB → Tests/Results in one transaction (**run always has
 ### PATCH /v1/lims-runs/{id}/start
 **Requires `analysis_id`** on the run and at least one cohort sample — **400** if either is missing. With `sample_ids` in the body, first start of the **asked-for** analysis locks the cohort, creates or attaches one active Test per `(sample, analysis)`, and **writes** `asked_for_params` unless a snapshot already exists. Classic `/tests` NULL or default `{}` is not a freeze. Extract LimsRun must not share this `analysis_id`.
 
-**WO-7 first-start freeze is a lock on `8cfa2a9`, unsigned until QA.** Skip `asked_for_params` only when a snapshot **already exists** (including frozen `{}`). A classic `/tests` row with NULL or default `{}` is **not** a freeze — first LimsRun start must **write** the snapshot onto that Test. Extract LimsRun must not share the asked-for `analysis_id`. Do not teach skip-on-existing-Test as shipped.
+**WO-7 first-start freeze is unsigned on `8cfa2a9` — not closed, not verified.** `if test: continue` is **not** a freeze. Skip `asked_for_params` only when a snapshot **already exists** (including frozen `{}`). A classic `/tests` row with NULL or default `{}` is **not** frozen — first LimsRun start must **write**. Extract LimsRun must not share the asked-for `analysis_id` or it attaches/freezes the panel Test at extract start.
 
 No non-reportable / `acknowledge_no_analysis` path (product lock 2026-07-19; remove legacy ack if still in code).
 

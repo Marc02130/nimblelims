@@ -38,6 +38,7 @@ Product commit `8cfa2a9` closed WO-7 first-start freeze, Route 422/409, later-st
 | **DOC-H4** | Ordered-route locks (ordered `process_definition[]`, no create type picker, derive first-step types) must stay. Dest-type Hold out. No invented seed IDs. | Keep. |
 | **DOC-H5** | `b005cfe` signed Results and P1 `c649245` Pass must not be rewritten. | Live block only after the `b005cfe` retention line. P1 AC results untouched. |
 | **DOC-H6** | HOWTO/`_mint_tests_at_start` skip-on-existing-Test is a lie. Classic `/tests` NULL or default `{}` is not a freeze. Extract LimsRun must not share the asked-for `analysis_id`. | Strike skip-on-existing-Test. Skip only when a snapshot **already exists** (including frozen `{}`). First asked-for LimsRun start must **write** onto a classic Test. Live AC-P2 stays unsigned. |
+| **DOC-H7** | Hans/Heidi/Günter: `if test: continue` is not a freeze; extract sharing `analysis_id` freezes the panel Test at extract start; first Start minting later processes/Tests is a punch; Route is ordered snapshot + zero Tests. | Fold those four locks into HOWTO, live UAT expect, and `.docs/review/`. Do not claim freeze closed on `8cfa2a9`. Dest-type Hold out. |
 
 Operator how-tos stay in git-tracked [`manuals/`](../../../manuals/). Formal stamps stay under `.docs/review/`. Do not commit `.docs/internal/` or `.docs/manuals/`.
 
@@ -45,13 +46,13 @@ Operator how-tos stay in git-tracked [`manuals/`](../../../manuals/). Formal sta
 
 | Field | Value |
 |-------|--------|
-| **Verdict** | **Accept with conditions** (DOC-H1–H6 land in this docs-only PR) |
+| **Verdict** | **Accept with conditions** (DOC-H1–H7 land in this docs-only PR) |
 | **Docs ready for Cursor** | Yes for this honesty fold — **no product implement** |
 | **Merge** | **Hold** product merge of `feat/work-order-p2` to `main` until QA restamps live AC-P2 |
 | **Not licensed** | Teaching freeze/422/409 as QA Pass · rewriting `b005cfe` / P1 Results · dest-type E2E · IC50 |
 
 ```
-DOCUMENTARIAN REVIEW: Accept with conditions (DOC-H1–H6 honesty fold)
+DOCUMENTARIAN REVIEW: Accept with conditions (DOC-H1–H7 honesty fold)
 DOCS READY FOR CURSOR: Yes with conditions (docs-only; hold product merge)
 ```
 

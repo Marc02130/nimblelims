@@ -67,7 +67,7 @@ Shipped v1 — see local `.docs/internal/ideas/run-results.md` (not committed).
 | **No analysis** | **Not allowed** — set analysis on create/edit; no non-reportable / continue-without path |
 | **Mapping** | JSONB column → analyte via **name** or **analyte alias** (casefold); known non-analyte keys (`units`, etc.) skipped |
 | **Tests** | Use the active Test created or attached at the first LimsRun start for `(sample_id, analysis_id)`. If any cohort sample lacks one, WO-7 returns **422**, refuses the whole run, writes no Results, invents no Test, and leaves the run `complete`. Publish-refuse is **Tobias-signed Pass** on `b005cfe`; overall P2 Pass remains unsigned. Historical `9c4f9da` stays signed not Pass |
-| **First-start freeze** | **Lock on `8cfa2a9`, unsigned until QA.** Skip `asked_for_params` only when a snapshot **already exists** (including frozen `{}`). Classic `/tests` NULL or default `{}` is **not** a freeze — first start must **write**. Extract LimsRun must not share the asked-for `analysis_id`. Do not teach skip-on-existing-Test as shipped |
+| **First-start freeze** | **Unsigned on `8cfa2a9` — not closed, not verified.** `if test: continue` is **not** a freeze. Skip only when a snapshot **already exists** (including frozen `{}`). Classic `/tests` NULL or default `{}` is **not** frozen — first start must **write**. Extract LimsRun must not share the asked-for `analysis_id` or it attaches/freezes the panel Test at extract start |
 | **Results** | Write `raw_result`, `replicate` (from JSONB or row order), `lims_run_id` lineage |
 | **Conflicts** | Same run → update; other run / manual result owns triple → **409**, publish blocked |
 | **Preview** | `GET /v1/lims-runs/{id}/promotion/preview` — dry-run; UI shows counts on Publish confirm |
