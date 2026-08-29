@@ -111,3 +111,4 @@ class InstantiateProcessFromDefinitionRequest(BaseModel):
     sample_ids: Optional[List[UUID]] = None
     set_to_first_step: bool = True
     work_order_id: Optional[UUID] = None
+    work_order_route_position: Optional[int] = None

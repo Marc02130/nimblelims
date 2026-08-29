@@ -9,7 +9,9 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from models.analysis import Analysis
+from models.asked_for import AskedFor
 from models.container import ContainerType
+from models.entry import ELNProcess
 from models.list import List, ListEntry
 from models.project import Project, ProjectUser
 from models.test import Test
@@ -186,7 +188,7 @@ def _create_map(
 
 
 class TestWorkOrderP2:
-    def test_empty_map_no_route(
+    def test_empty_map_route_422(
         self,
         client: TestClient,
         admin_token: str,
@@ -203,11 +205,10 @@ class TestWorkOrderP2:
         af_id = created.json()["items"][0]["id"]
         before = db_session.query(WorkOrder).count()
         r = client.post(f"/v1/asked-for/{af_id}/route", headers=_auth(admin_token))
-        assert r.status_code == 200, r.text
-        body = r.json()
-        assert body["count"] == 1
-        assert body["items"][0]["no_route"] is True
-        assert body["items"][0]["work_order"] is None
+        assert r.status_code == 422, r.text
+        detail = r.json()["detail"]
+        assert isinstance(detail, dict)
+        assert detail["code"] == "route_sample_type"
         got = client.get(f"/v1/asked-for/{af_id}", headers=_auth(admin_token))
         assert got.json()["status"] == "requested"
         assert db_session.query(WorkOrder).count() == before
@@ -325,8 +326,10 @@ class TestWorkOrderP2:
             f"/v1/asked-for/{dna_af.json()['items'][0]['id']}/route",
             headers=_auth(admin_token),
         )
-        assert dna_routed.status_code == 200, dna_routed.text
-        assert dna_routed.json()["items"][0]["no_route"] is True
+        assert dna_routed.status_code == 422, dna_routed.text
+        detail = dna_routed.json()["detail"]
+        assert isinstance(detail, dict)
+        assert detail["code"] == "route_sample_type"
 
     def test_ordered_process_chain_on_map_and_work_order(
         self,
@@ -536,6 +539,7 @@ class TestWorkOrderP2:
         assert started.status_code == 200, started.text
         assert started.json()["status"] == "in_progress"
         assert started.json()["process_id"] is not None
+        assert started.json()["started_count"] == 1
 
     def test_wo7_mints_test_at_lims_run_start(
         self,
@@ -632,6 +636,424 @@ class TestWorkOrderP2:
         still = client.get(f"/v1/lims-runs/{run_id}", headers=_auth(admin_token))
         assert still.status_code == 200, still.text
         assert still.json()["status"] == "complete"
+
+    def test_wo7_first_start_freeze(
+        self,
+        client: TestClient,
+        admin_token: str,
+        p2_seed,
+        db_session: Session,
+    ):
+        definition = _create_lims_run_definition(
+            client, admin_token, p2_seed["analysis_a"].id
+        )
+        _put_step_types(client, admin_token, definition, p2_seed["sample_type"].id)
+        assert (
+            _create_map(
+                client,
+                admin_token,
+                analysis_id=p2_seed["analysis_a"].id,
+                definition_id=definition["id"],
+            ).status_code
+            == 201
+        )
+        sample_id = _receive_sample(client, admin_token, p2_seed, "NBIO-P2-FREEZE")
+        defs = client.put(
+            f"/analyses/{p2_seed['analysis_a'].id}/param-defs",
+            json={
+                "items": [
+                    {
+                        "key": "cell_line",
+                        "data_type": "text",
+                        "required": False,
+                        "sort_order": 0,
+                    }
+                ]
+            },
+            headers=_auth(admin_token),
+        )
+        assert defs.status_code == 200, defs.text
+        created = client.post(
+            "/v1/asked-for",
+            json=_asked_for_body(
+                [sample_id],
+                p2_seed["analysis_a"].id,
+                params={"cell_line": "A549"},
+            ),
+            headers=_auth(admin_token),
+        )
+        af_id = created.json()["items"][0]["id"]
+        routed = client.post(f"/v1/asked-for/{af_id}/route", headers=_auth(admin_token))
+        assert routed.status_code == 200, routed.text
+
+        run = client.post(
+            "/v1/lims-runs",
+            json={
+                "name": f"Run {uuid4().hex[:8]}",
+                "analysis_id": str(p2_seed["analysis_a"].id),
+            },
+            headers=_auth(admin_token),
+        )
+        run_id = run.json()["id"]
+        started = client.patch(
+            f"/v1/lims-runs/{run_id}/start",
+            json={"sample_ids": [sample_id]},
+            headers=_auth(admin_token),
+        )
+        assert started.status_code == 200, started.text
+        db_session.expire_all()
+        test = (
+            db_session.query(Test)
+            .filter(
+                Test.sample_id == sample_id,
+                Test.analysis_id == p2_seed["analysis_a"].id,
+            )
+            .one()
+        )
+        assert test.asked_for_params == {"cell_line": "A549"}
+
+        asked = db_session.query(AskedFor).filter(AskedFor.id == af_id).one()
+        asked.params = {"cell_line": "HeLa"}
+        db_session.commit()
+
+        run2 = client.post(
+            "/v1/lims-runs",
+            json={
+                "name": f"Run {uuid4().hex[:8]}",
+                "analysis_id": str(p2_seed["analysis_a"].id),
+            },
+            headers=_auth(admin_token),
+        )
+        started2 = client.patch(
+            f"/v1/lims-runs/{run2.json()['id']}/start",
+            json={"sample_ids": [sample_id]},
+            headers=_auth(admin_token),
+        )
+        assert started2.status_code == 200, started2.text
+        db_session.expire_all()
+        test = (
+            db_session.query(Test)
+            .filter(
+                Test.sample_id == sample_id,
+                Test.analysis_id == p2_seed["analysis_a"].id,
+            )
+            .one()
+        )
+        assert test.asked_for_params == {"cell_line": "A549"}
+
+        asked = db_session.query(AskedFor).filter(AskedFor.id == af_id).one()
+        asked.status = "cancelled"
+        db_session.commit()
+        run3 = client.post(
+            "/v1/lims-runs",
+            json={
+                "name": f"Run {uuid4().hex[:8]}",
+                "analysis_id": str(p2_seed["analysis_a"].id),
+            },
+            headers=_auth(admin_token),
+        )
+        started3 = client.patch(
+            f"/v1/lims-runs/{run3.json()['id']}/start",
+            json={"sample_ids": [sample_id]},
+            headers=_auth(admin_token),
+        )
+        assert started3.status_code == 200, started3.text
+        db_session.expire_all()
+        test = (
+            db_session.query(Test)
+            .filter(
+                Test.sample_id == sample_id,
+                Test.analysis_id == p2_seed["analysis_a"].id,
+            )
+            .one()
+        )
+        assert test.asked_for_params == {"cell_line": "A549"}
+
+    def test_extract_vs_qubit_same_tat_saves(
+        self,
+        client: TestClient,
+        admin_token: str,
+        p2_seed,
+    ):
+        extract = _create_lims_run_definition(
+            client, admin_token, p2_seed["analysis_a"].id
+        )
+        qubit = _create_lims_run_definition(
+            client, admin_token, p2_seed["analysis_a"].id
+        )
+        _put_step_types(client, admin_token, extract, p2_seed["sample_type"].id)
+        _put_step_types(client, admin_token, qubit, p2_seed["dna_type"].id)
+        first = _create_map(
+            client,
+            admin_token,
+            analysis_id=p2_seed["analysis_a"].id,
+            definition_id=extract["id"],
+            tat_min=1,
+            tat_max=10,
+        )
+        assert first.status_code == 201, first.text
+        second = _create_map(
+            client,
+            admin_token,
+            analysis_id=p2_seed["analysis_a"].id,
+            definition_id=qubit["id"],
+            tat_min=1,
+            tat_max=10,
+        )
+        assert second.status_code == 201, second.text
+
+    def test_route_409_when_two_maps_accept_type(
+        self,
+        client: TestClient,
+        admin_token: str,
+        p2_seed,
+        db_session: Session,
+    ):
+        extract = _create_lims_run_definition(
+            client, admin_token, p2_seed["analysis_a"].id
+        )
+        qubit = _create_lims_run_definition(
+            client, admin_token, p2_seed["analysis_a"].id
+        )
+        _put_step_types(client, admin_token, extract, p2_seed["sample_type"].id)
+        _put_step_types(client, admin_token, qubit, p2_seed["dna_type"].id)
+        assert (
+            _create_map(
+                client,
+                admin_token,
+                analysis_id=p2_seed["analysis_a"].id,
+                definition_id=extract["id"],
+            ).status_code
+            == 201
+        )
+        assert (
+            _create_map(
+                client,
+                admin_token,
+                analysis_id=p2_seed["analysis_a"].id,
+                definition_id=qubit["id"],
+            ).status_code
+            == 201
+        )
+        both = client.put(
+            f"/v1/eln-process-definitions/{qubit['id']}/steps/{qubit['steps'][0]['id']}/accepted-sample-types",
+            json={
+                "sample_type_ids": [
+                    str(p2_seed["sample_type"].id),
+                    str(p2_seed["dna_type"].id),
+                ]
+            },
+            headers=_auth(admin_token),
+        )
+        assert both.status_code == 200, both.text
+        sample_id = _receive_sample(client, admin_token, p2_seed, "NBIO-P2-AMBIG")
+        created = client.post(
+            "/v1/asked-for",
+            json=_asked_for_body([sample_id], p2_seed["analysis_a"].id),
+            headers=_auth(admin_token),
+        )
+        af_id = created.json()["items"][0]["id"]
+        before = db_session.query(WorkOrder).count()
+        routed = client.post(f"/v1/asked-for/{af_id}/route", headers=_auth(admin_token))
+        assert routed.status_code == 409, routed.text
+        assert db_session.query(WorkOrder).count() == before
+
+    def test_later_start_advances_and_gates_type(
+        self,
+        client: TestClient,
+        admin_token: str,
+        p2_seed,
+        db_session: Session,
+    ):
+        extract = _create_lims_run_definition(
+            client, admin_token, p2_seed["analysis_a"].id
+        )
+        analysis = _create_lims_run_definition(
+            client, admin_token, p2_seed["analysis_a"].id
+        )
+        reporting = _create_lims_run_definition(
+            client, admin_token, p2_seed["analysis_a"].id
+        )
+        _put_step_types(client, admin_token, extract, p2_seed["sample_type"].id)
+        _put_step_types(client, admin_token, analysis, p2_seed["sample_type"].id)
+        _put_step_types(client, admin_token, reporting, p2_seed["sample_type"].id)
+        mapped = _create_map(
+            client,
+            admin_token,
+            analysis_id=p2_seed["analysis_a"].id,
+            definition_ids=[extract["id"], analysis["id"], reporting["id"]],
+        )
+        assert mapped.status_code == 201, mapped.text
+        sample_id = _receive_sample(client, admin_token, p2_seed, "NBIO-P2-LATER")
+        created = client.post(
+            "/v1/asked-for",
+            json=_asked_for_body([sample_id], p2_seed["analysis_a"].id),
+            headers=_auth(admin_token),
+        )
+        af_id = created.json()["items"][0]["id"]
+        routed = client.post(f"/v1/asked-for/{af_id}/route", headers=_auth(admin_token))
+        wo_id = routed.json()["items"][0]["work_order"]["id"]
+
+        first = client.post(
+            f"/v1/work-orders/{wo_id}/start", headers=_auth(admin_token)
+        )
+        assert first.status_code == 200, first.text
+        assert first.json()["started_count"] == 1
+        first_process = first.json()["process_id"]
+
+        second = client.post(
+            f"/v1/work-orders/{wo_id}/start", headers=_auth(admin_token)
+        )
+        assert second.status_code == 200, second.text
+        assert second.json()["started_count"] == 2
+        assert second.json()["process_id"] == first_process
+        assert second.json()["latest_process_id"] != first_process
+
+        third = client.post(
+            f"/v1/work-orders/{wo_id}/start", headers=_auth(admin_token)
+        )
+        assert third.status_code == 200, third.text
+        assert third.json()["started_count"] == 3
+        done = client.post(
+            f"/v1/work-orders/{wo_id}/start", headers=_auth(admin_token)
+        )
+        assert done.status_code == 422, done.text
+        db_session.expire_all()
+        positions = [
+            p.work_order_route_position
+            for p in db_session.query(ELNProcess).filter(
+                ELNProcess.work_order_id == wo_id
+            )
+        ]
+        assert sorted(positions) == [1, 2, 3]
+
+    def test_later_process_start_incompatible_type_422(
+        self,
+        client: TestClient,
+        admin_token: str,
+        p2_seed,
+    ):
+        extract = _create_lims_run_definition(
+            client, admin_token, p2_seed["analysis_a"].id
+        )
+        qubit = _create_lims_run_definition(
+            client, admin_token, p2_seed["analysis_a"].id
+        )
+        _put_step_types(client, admin_token, extract, p2_seed["sample_type"].id)
+        _put_step_types(client, admin_token, qubit, p2_seed["dna_type"].id)
+        mapped = _create_map(
+            client,
+            admin_token,
+            analysis_id=p2_seed["analysis_a"].id,
+            definition_ids=[extract["id"], qubit["id"]],
+        )
+        assert mapped.status_code == 201, mapped.text
+        sample_id = _receive_sample(client, admin_token, p2_seed, "NBIO-P2-HOLD")
+        created = client.post(
+            "/v1/asked-for",
+            json=_asked_for_body([sample_id], p2_seed["analysis_a"].id),
+            headers=_auth(admin_token),
+        )
+        routed = client.post(
+            f"/v1/asked-for/{created.json()['items'][0]['id']}/route",
+            headers=_auth(admin_token),
+        )
+        wo_id = routed.json()["items"][0]["work_order"]["id"]
+        first = client.post(
+            f"/v1/work-orders/{wo_id}/start", headers=_auth(admin_token)
+        )
+        assert first.status_code == 200, first.text
+        later = client.post(
+            f"/v1/work-orders/{wo_id}/start", headers=_auth(admin_token)
+        )
+        assert later.status_code == 422, later.text
+        detail = later.json()["detail"]
+        assert isinstance(detail, dict)
+        assert detail["code"] == "route_sample_type"
+
+    def test_later_step_start_incompatible_type_422(
+        self,
+        client: TestClient,
+        admin_token: str,
+        p2_seed,
+    ):
+        created_def = client.post(
+            "/v1/eln-process-definitions",
+            json={
+                "name": f"SOP extract-qc {uuid4().hex[:8]}",
+                "steps": [
+                    {
+                        "analysis_id": str(p2_seed["analysis_a"].id),
+                        "step_kind": "lims_run",
+                        "execution_mode": "lims_run",
+                        "name": "Extract",
+                        "sort_order": 0,
+                    },
+                    {
+                        "analysis_id": str(p2_seed["analysis_a"].id),
+                        "step_kind": "lims_run",
+                        "execution_mode": "lims_run",
+                        "name": "QC",
+                        "sort_order": 1,
+                    },
+                ],
+            },
+            headers=_auth(admin_token),
+        )
+        definition = created_def.json()
+        steps = sorted(definition["steps"], key=lambda s: s["sort_order"])
+        client.put(
+            f"/v1/eln-process-definitions/{definition['id']}/steps/{steps[0]['id']}/accepted-sample-types",
+            json={"sample_type_ids": [str(p2_seed["sample_type"].id)]},
+            headers=_auth(admin_token),
+        )
+        client.put(
+            f"/v1/eln-process-definitions/{definition['id']}/steps/{steps[1]['id']}/accepted-sample-types",
+            json={"sample_type_ids": [str(p2_seed["dna_type"].id)]},
+            headers=_auth(admin_token),
+        )
+        mapped = _create_map(
+            client,
+            admin_token,
+            analysis_id=p2_seed["analysis_a"].id,
+            definition_id=definition["id"],
+        )
+        assert mapped.status_code == 201, mapped.text
+        sample_id = _receive_sample(client, admin_token, p2_seed, "NBIO-P2-STEP")
+        created = client.post(
+            "/v1/asked-for",
+            json=_asked_for_body([sample_id], p2_seed["analysis_a"].id),
+            headers=_auth(admin_token),
+        )
+        routed = client.post(
+            f"/v1/asked-for/{created.json()['items'][0]['id']}/route",
+            headers=_auth(admin_token),
+        )
+        wo_id = routed.json()["items"][0]["work_order"]["id"]
+        started = client.post(
+            f"/v1/work-orders/{wo_id}/start", headers=_auth(admin_token)
+        )
+        process_id = started.json()["process_id"]
+        proc = client.get(
+            f"/v1/eln-processes/{process_id}", headers=_auth(admin_token)
+        )
+        assert proc.status_code == 200, proc.text
+        inst_steps = sorted(proc.json()["steps"], key=lambda s: s["sort_order"])
+        first_step = client.post(
+            f"/v1/eln-processes/{process_id}/steps/{inst_steps[0]['id']}/start",
+            json={},
+            headers=_auth(admin_token),
+        )
+        assert first_step.status_code == 201, first_step.text
+        second_step = client.post(
+            f"/v1/eln-processes/{process_id}/steps/{inst_steps[1]['id']}/start",
+            json={},
+            headers=_auth(admin_token),
+        )
+        assert second_step.status_code == 422, second_step.text
+        detail = second_step.json()["detail"]
+        assert isinstance(detail, dict)
+        assert detail["code"] == "route_sample_type"
 
 
 class TestListNameAlias:

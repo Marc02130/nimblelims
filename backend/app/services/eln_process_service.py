@@ -248,6 +248,7 @@ class ELNProcessService:
             status_id=data.status_id,
             process_definition_id=definition_id,
             work_order_id=data.work_order_id,
+            work_order_route_position=data.work_order_route_position,
             created_by=self._user_id(),
             modified_by=self._user_id(),
         )
@@ -513,14 +514,31 @@ class ELNProcessService:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Process step not found",
             )
+        extra_sample_ids = list(data.sample_ids) if data and data.sample_ids else []
         kind = getattr(step, 'step_kind', None) or 'eln_experiment'
+        force_new = bool(data and data.force_new)
+        already_started = (
+            (kind == "lims_run" and step.current_lims_run_id and not force_new)
+            or (
+                kind != "lims_run"
+                and step.experiment_id is not None
+                and not force_new
+                and not extra_sample_ids
+            )
+        )
+        if not already_started:
+            from app.services.routing_service import (
+                assert_instance_step_accepts_current_type,
+            )
+
+            assert_instance_step_accepts_current_type(
+                self.db, process, step, extra_sample_ids=extra_sample_ids
+            )
         if kind != 'lims_run' and not self.repo.template_exists(step.experiment_template_id):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Experiment template not found",
             )
-
-        force_new = bool(data and data.force_new)
         step_label = step.name or f"Step {step.sort_order}"
         default_name = (
             (data.name if data and data.name else None)

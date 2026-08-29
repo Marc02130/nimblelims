@@ -10,7 +10,7 @@ from app.database import get_db
 from app.schemas.asked_for import AskedForCreate, AskedForListResponse, AskedForRead
 from app.schemas.work_order import RouteItem, RouteRequest, RouteResponse, WorkOrderRead
 from app.services.asked_for_service import AskedForService
-from app.services.routing_service import RoutingService, work_order_to_read
+from app.services.routing_service import RoutingService
 from models.user import User
 
 router = APIRouter(prefix="/asked-for", tags=["asked-for"])
@@ -83,14 +83,15 @@ def route_asked_for_batch(
     user: User = Depends(require_test_assign),
     db: Session = Depends(get_db),
 ):
-    results = RoutingService(db, user).route_many(body.asked_for_ids)
+    svc = RoutingService(db, user)
+    results = svc.route_many(body.asked_for_ids)
     items = []
     for result in results:
         wo = result["work_order"]
         items.append(
             RouteItem(
                 asked_for_id=result["asked_for_id"],
-                work_order=WorkOrderRead(**work_order_to_read(wo)) if wo else None,
+                work_order=WorkOrderRead(**svc.read_work_order(wo)) if wo else None,
                 no_route=result["no_route"],
             )
         )
@@ -103,11 +104,12 @@ def route_asked_for(
     user: User = Depends(require_test_assign),
     db: Session = Depends(get_db),
 ):
-    result = RoutingService(db, user).route_one(asked_for_id)
+    svc = RoutingService(db, user)
+    result = svc.route_one(asked_for_id)
     wo = result["work_order"]
     item = RouteItem(
         asked_for_id=result["asked_for_id"],
-        work_order=WorkOrderRead(**work_order_to_read(wo)) if wo else None,
+        work_order=WorkOrderRead(**svc.read_work_order(wo)) if wo else None,
         no_route=result["no_route"],
     )
     return RouteResponse(items=[item], count=1)

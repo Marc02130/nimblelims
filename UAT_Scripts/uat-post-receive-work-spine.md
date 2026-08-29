@@ -497,3 +497,113 @@ Empty `{}` is a freeze, not a hole to refill on a later start. AC-P2-4 records t
 AC-P2-1 **Pass** · AC-P2-2 **Pass** · AC-P2-3 **Pass** · AC-P2-4 **publish-refuse Pass**; first-start freeze **OPEN, not scored** · AC-P2-5 **Pass as chain-AND history**.
 
 **Overall P2 remains unsigned.** Do not write overall P2 Pass, signed Pass, or merge-ready. Hold product merge. Not IC50.
+
+---
+
+The preceding `b005cfe` section is retained verbatim as signed history, including its original “Live” heading and Results. It is not the current stamp. Do not rewrite or transfer those observations to another SHA. AC-P2-5 Pass on `b005cfe` is **chain-AND history only**.
+
+## Live AC-P2 stamp — ordered route + first-start freeze (unsigned)
+
+**Result:** **unsigned / not Pass.** Do **not** report P2 Pass. Hold merge.
+
+**Branch / build under test:** `feat/work-order-p2` — fill SHA at restamp. Code under this stamp: Route 422/409 (no silent `first()`), first-process first-step types, ordered later starts, WO-7 first-start freeze guard.
+
+**Executor / environment / date:** fill at restamp · local docker compose (`lims-*`) · compose **down** after the run. Not IC50.
+
+**History boundary:** Do not copy outcomes from `b005cfe`, `9c4f9da`, `3b56cfb`, or P1 into this live stamp.
+
+**Copy and permission locks:** Receive ends on `/receive`. Asked-for is a separate later look-up. Route is an unnumbered later planner requiring `test:assign` plus project access; it does not require `experiment:manage`. Client and inaccessible-project Route writes return **403**, not 404. **Start process** and LimsRun start require `experiment:manage`; publish requires `experiment:publish`.
+
+**Routing lock (live):** map create has analysis, TAT, and sortable ordered `process_definition[]`, **no sample-type picker**. Allowed types are derived from the first process’s first ordered Experiment/LimsRun. Map save **409**s only when the same analysis, overlapping TAT, **and** overlapping first-step allow-lists all hold. Extract-first vs Qubit-first for the same TAT is legal. Route: analysis + TAT candidates filtered by live first-step current-type acceptance. Zero acceptable → **422** (`route_sample_type` on type refusal); two saved rows that both accept current type → **409**; exactly one snapshots the ordered route. Never silent `first()`. Start instantiates the next pending process only. Each later process/step start gates current type; empty or incompatible → **422** `route_sample_type`. Dest-type Hold remains out.
+
+### AC-P2-1 — Route remains a separate later planner
+
+**Result:** unsigned
+
+1. As a lab user with `sample:create`, receive a sample on `/receive`.
+2. Confirm the successful receive stays on `/receive`, clears the barcode, and is ready for the next tube.
+3. In a separate later task, record requested analysis + TAT on `/asked-for`; confirm save stays on `/asked-for` and does not auto-route.
+4. Later, choose **Route** or **Route selected** on a `requested` row.
+
+**Expect**
+- Receive has no analysis or Route action.
+- Asked-for is not a numbered post-receive step or Start queue.
+- Only the explicit later Route action evaluates the routing map.
+
+### AC-P2-2 — Asked-for save mints no work order or Test
+
+**Result:** unsigned
+
+1. Record work-order and Test counts for the project.
+2. Save requested analysis + TAT on `/asked-for`.
+3. Recount before Route.
+
+**Expect**
+- The row stays `requested`.
+- Work-order and Test counts remain zero.
+
+### AC-P2-3 — queued work order feeds the existing execution engine
+
+**Result:** unsigned
+
+1. Admin-create an extract-then-later-process definition/map (ordered chain). Do not invent seed IDs.
+2. Explicitly Route a requested row that the first process’s first Experiment/LimsRun accepts.
+3. Inspect `/work-orders` before choosing **Start process**.
+4. Start the work order, follow the linked process, and open its typed Experiment/LimsRun step.
+
+**Expect**
+- Route creates one queued `work_order`, snapshots the full ordered chain, changes asked-for to `routed`, and creates zero Tests.
+- The queued record is planning only; **Start process** begins execution and requires `experiment:manage`.
+- Start instantiates **process 1 only**. Route/process views make order apparent (`1. … → 2. …`).
+- Process detail renders even when a step has a null template id; no `tid.slice` blank page.
+
+### AC-P2-4 — WO-7 first-start freeze and whole-run refusal
+
+**Result:** unsigned
+
+1. For a routed row, save a valid asked-for param before starting its typed LimsRun.
+2. Select the routed cohort and call `PATCH /v1/lims-runs/{id}/start` for the first start.
+3. Inspect the active Test for each `(sample_id, analysis_id)` and its `asked_for_params`.
+4. Change the source asked-for params after first start, and clear the `routed` asked-for row for one cohort sample (QA fixture; cancel-while-routed remains 422). Then reach `_mint_tests_at_start` a second time for the same `(sample, analysis)`: start a second run over the same cohort and analysis (the path that finds the existing active Test).
+5. Re-read `tests.asked_for_params`.
+6. Add publishable run data, remove or deactivate one cohort Test in the QA fixture, and move the run to `complete`.
+7. Call publish with `PATCH /v1/lims-runs/{id}/complete`, then inspect run status, Tests, and every candidate Result.
+
+**Expect**
+- Receive, asked-for save, Route, and work-order start create no Test.
+- First LimsRun start creates or attaches one active Test per cohort sample and freezes the then-current params into `tests.asked_for_params`. Empty `{}` is a freeze, not a hole to refill.
+- A later start neither replaces the Test nor rewrites the first-start snapshot, including never overwriting a snapshot with `{}`.
+- With any cohort Test missing, publish returns **422**, not **200 published**.
+- The whole run is refused: it stays `complete`, no Test is invented, and no Results are written, including for cohort samples whose Tests still exist.
+
+### AC-P2-5 — ordered route; first-process first-step types
+
+**Result:** unsigned. Do **not** score chain-AND map-save 422. That Pass lives only on `b005cfe` history.
+
+1. Confirm map create has analysis, TAT, and sortable ordered `process_definition[]`, with no sample-type picker.
+2. Confirm the form displays the first process and its first ordered Experiment/LimsRun allow-list. Change process order or first-step acceptance and verify derived display refreshes.
+3. Save an extract-first route with a later Qubit process/step; confirm map save does not chain-AND later processes or steps.
+4. Save extract-first and Qubit-first rows for the **same analysis and overlapping TAT**. Confirm map save succeeds because first-step allow-lists do not overlap.
+5. Save a second extract-first row whose first-step allow-list overlaps the first extract-first row and whose TAT overlaps. Confirm **409**.
+6. Route with zero acceptable rows (no analysis + TAT candidate, or no candidate whose first process/step accepts current type). Confirm **422** and no work order. Type refusal uses `route_sample_type`.
+7. Using a fixture with two saved rows that both accept current type (e.g. change a Qubit-first first-step list so it also accepts the extract-first type), Route again. Confirm **409**; no silent `first()`.
+8. Route with exactly one acceptable row and inspect the work-order snapshot order.
+9. Choose Start; inspect created process instances. Complete or leave the first process, then invoke the later start. Confirm the second process instance and `work_order_route_position`.
+10. Attempt a later process/step start with an empty or incompatible allow-list (sample still the inbound type; dest-type Hold is unchanged). Confirm **422** `route_sample_type`.
+
+**Expect**
+- Map row = analysis + TAT + ordered `process_definition[]`. UI preserves order. Allowed types are derived from the first process / first step, not admin-authored.
+- Map save **409**s only when the same analysis, overlapping TAT, **and** overlapping first-step allow-lists all hold. Extract-first vs Qubit-first for the same TAT is legal.
+- Zero acceptable rows returns **422** and mints no work order. A first-step type refusal uses `route_sample_type`.
+- Two saved rows that both accept this sample’s current type return **409**; no silent `first()`.
+- Exactly one row snapshots the full ordered route.
+- Start instantiates the first process only. Later processes require later starts in route order; Route does not mint a process-of-processes.
+- Map save/Route do not AND later-process or later-step allow-lists.
+- Each later process/step start checks current type; empty or incompatible fails with **422** then.
+- Dest-type Hold remains out; do not claim an earlier step changed type unless the product did so.
+
+---
+
+## Live ordered-route restamp — unsigned
+
+**Do not sign overall P2 Pass on this block until QA restamps it.** Fill SHA, executor, and per-AC Results at restamp. Hold product merge. Not IC50.

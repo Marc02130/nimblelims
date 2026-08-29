@@ -157,6 +157,7 @@ class ELNProcessRead(BaseModel):
     status_id: Optional[UUID] = None
     process_definition_id: Optional[UUID] = None
     work_order_id: Optional[UUID] = None
+    work_order_route_position: Optional[int] = None
     created_at: datetime
     created_by: Optional[UUID] = None
     modified_at: datetime

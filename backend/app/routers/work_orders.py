@@ -23,7 +23,6 @@ from app.schemas.work_order import (
 from app.services.routing_service import (
     RoutingService,
     map_to_read,
-    work_order_to_read,
 )
 from models.user import User
 
@@ -103,8 +102,9 @@ def start_work_order(
     user: User = Depends(require_experiment_manage),
     db: Session = Depends(get_db),
 ):
-    row = _svc(db, user).start_work_order(work_order_id)
-    return WorkOrderRead(**work_order_to_read(row))
+    svc = _svc(db, user)
+    row = svc.start_work_order(work_order_id)
+    return WorkOrderRead(**svc.read_work_order(row))
 
 
 @work_orders_router.get("", response_model=WorkOrderListResponse)
@@ -114,10 +114,11 @@ def list_work_orders(
     user: User = Depends(require_sample_read),
     db: Session = Depends(get_db),
 ):
-    rows = _svc(db, user).list_work_orders(
+    svc = _svc(db, user)
+    rows = svc.list_work_orders(
         status_filter=status_filter, sample_id=sample_id
     )
-    items = [WorkOrderRead(**work_order_to_read(r)) for r in rows]
+    items = [WorkOrderRead(**payload) for payload in svc.read_work_orders(rows)]
     return WorkOrderListResponse(items=items, count=len(items))
 
 

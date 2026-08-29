@@ -15,8 +15,8 @@ This is a how-to, not a PRD. Marc keeps it current as features ship.
 | Receive (`/receive`) | Shipped on `main` |
 | Requested analysis (`/asked-for`) — later look-up, off the bench path | Shipped on `main` (P1 lake) |
 | Later Route / work order (planner, not after receive) | Shipped on this P2 branch (`/asked-for` Route, `/admin/routing-map`, `/work-orders`) |
-| Process / Experiment / LimsRun | Execute substrate shipped; P1 does **not** start it. WO-7 **first-start freeze is the lock and still OPEN** on `b005cfe` — a later start overwrites `tests.asked_for_params` |
-| Results | Classic type-a-number on a Test; persist lock is a later packet. WO-7 whole-run publish-refuse is **Tobias-signed Pass** on `b005cfe`; first-start freeze stays OPEN, so overall P2 Pass remains unsigned |
+| Process / Experiment / LimsRun | Execute substrate shipped; P1 does **not** start it. WO-7 first-start freeze is **in code** (later starts do not overwrite `tests.asked_for_params`); UAT restamp unsigned |
+| Results | Classic type-a-number on a Test; persist lock is a later packet. WO-7 whole-run publish-refuse is **Tobias-signed Pass** on `b005cfe`; first-start freeze is in code awaiting restamp, so overall P2 Pass remains unsigned |
 
 Handbooks in this folder: [atomic-receive.md](atomic-receive.md), [asked-for.md](asked-for.md), [navigation.md](navigation.md), [api-endpoints.md](api-endpoints.md), [dev-setup.md](dev-setup.md), [admin-setup.md](admin-setup.md), [processes.md](processes.md), [experiments.md](experiments.md), [lims-runs.md](lims-runs.md). Index: [README.md](README.md).  
 UAT: [`UAT_Scripts/uat-atomic-receive.md`](../UAT_Scripts/uat-atomic-receive.md) · P1 [`UAT_Scripts/uat-post-receive-work-spine.md`](../UAT_Scripts/uat-post-receive-work-spine.md).  
@@ -88,7 +88,7 @@ One action may cover a set of samples (same analysis + TAT). The API still write
 
 **The lake accepts nonsense on purpose.** Qubit-on-blood may sit in it. Route compares the sample’s current type with the mapped process’s first ordered Experiment/LimsRun allow-list; a mismatch returns `route_sample_type` **422**. Later steps repeat that current-type check when they start. The lake and routing-map save do not run a chain-wide check.
 
-Params: intent only. P1 sends `{}` OOB — do not type assay params here, and do not enter them in P1 UAT. The WO-7 lock is that params freeze at the **first LimsRun start** (P2), never on receive or asked-for. That first-start freeze is **still open** on `b005cfe`: see [Later planner](#later-planner-route--work-order). Setup (`config:edit`) may `GET/PUT /analyses/{id}/param-defs`; empty catalog is the OOB path.
+Params: intent only. P1 sends `{}` OOB — do not type assay params here, and do not enter them in P1 UAT. The WO-7 lock is that params freeze at the **first LimsRun start** (P2), never on receive or asked-for. That freeze is **in code**; UAT restamp is unsigned. Setup (`config:edit`) may `GET/PUT /analyses/{id}/param-defs`; empty catalog is the OOB path.
 
 | Case | HTTP |
 |------|------|
@@ -114,9 +114,9 @@ Map save returns **409** only when another active row has the **same analysis**,
 3. P2 finds rows whose analysis + TAT match, then keeps only rows whose **first process’s first ordered Experiment/LimsRun** accepts the sample’s current type. **Zero acceptable rows returns 422** and mints nothing; a type refusal uses `route_sample_type`. **Two or more saved rows that both accept this current type return 409**. Never silently call `first()`.
 4. Exactly one acceptable row creates one queued `work_order`, snapshots the ordered `process_definition[]`, changes asked-for to `routed`, and still creates **zero Tests**. Minting that queue record is planning; **work has not started**.
 5. Open Experiments → **Work Orders** (`/work-orders`) and choose **Start process**. Start instantiates **only the first process definition** in the snapshot, links it through `eln_processes.work_order_id`, and opens it at `/experiments/processes/{id}`. It does not mint a process-of-processes. Start process / LimsRun start remain `experiment:manage`; publish is `experiment:publish`.
-6. Complete that process, then use the later start for the next process in route order. Each later process/step start compares the sample’s **current** type with the allow-list at that start; empty or incompatible returns **422** `route_sample_type`. The sample is not broken. The WO-7 first-start freeze remains OPEN on `b005cfe`.
+6. Complete that process, then use the later start for the next process in route order. Each later process/step start compares the sample’s **current** type with the allow-list at that start; empty or incompatible returns **422** `route_sample_type`. The sample is not broken.
 
-**WO-7 first-start freeze is OPEN on `b005cfe`. Do not teach it as shipped.** `_mint_tests_at_start` has no already-frozen guard: every start that reaches it assigns `tests.asked_for_params`, so a later start that finds the existing active Test for the same sample + analysis overwrites the first-start snapshot. When no `routed` asked-for row matches, that write is the empty `{}` over a real snapshot. **Empty `{}` is itself a freeze, not a hole to refill later** — that is the intended lock, not verified-closed behavior. Until the guard lands, treat params on a Test touched by a second start as unreliable.
+**WO-7 first-start freeze is in code; UAT restamp is unsigned.** `_mint_tests_at_start` skips `asked_for_params` on an existing Test, so a later start that finds the active Test for the same sample + analysis keeps the first-start snapshot. Empty `{}` is itself a freeze, not a hole to refill later. Do not claim overall P2 Pass until QA restamps it.
 
 Qubit-first on blood is refused by Route before a work order is minted. If Qubit is later, its step start refuses while the sample’s current type is still blood. A **422** `route_sample_type` means current type is wrong for the assigned first step or the later step being started; it does **not** mean the sample is broken. Dest-type Hold is unchanged, so do not claim this branch already creates a transformed daughter.
 
@@ -143,9 +143,9 @@ P1 does not instantiate a process from requested analysis. Classic `/tests` can 
 
 Classic path: **Results** (`/results`) — type a number on an existing Test (batch grid). Unit from `analytes.units_default` when that lock is enforced; missing unit is a later persist-packet **422**, not a receive rule.
 
-The WO-7 lock puts Test selection/creation and the params freeze on the **first LimsRun start** when the work-order packet exists — **not** on receive. That freeze half of the lock is **still open**: later starts overwrite `tests.asked_for_params` (see [Later planner](#later-planner-route--work-order)).
+The WO-7 lock puts Test selection/creation and the params freeze on the **first LimsRun start** when the work-order packet exists — **not** on receive. Later starts do not overwrite `tests.asked_for_params`.
 
-LimsRun **publish** can promote instrument rows onto Tests/Results. Two writers on the same Test → **409**. The other half of WO-7 — if any cohort sample lacks an active Test, publish returns **422** and refuses the **whole run**, writes no Results, invents no Test, and leaves the run `complete` — is **Tobias-signed Pass** on `b005cfe`. Keep the two halves apart: **publish refuse passed; first-start freeze remains OPEN and unscored.** Overall P2 Pass is unsigned. The historical `9c4f9da` run stays signed not Pass.
+LimsRun **publish** can promote instrument rows onto Tests/Results. Two writers on the same Test → **409**. The other half of WO-7 — if any cohort sample lacks an active Test, publish returns **422** and refuses the **whole run**, writes no Results, invents no Test, and leaves the run `complete` — is **Tobias-signed Pass** on `b005cfe`. First-start freeze is in code awaiting restamp. Overall P2 Pass is unsigned. Historical `9c4f9da` / `b005cfe` stamps stay signed history.
 
 UAT (classic): [`UAT_Scripts/uat-results-entry-review.md`](../UAT_Scripts/uat-results-entry-review.md). Persist lock (P3) is specified on the spine packet, not shipped as that slice.
 
@@ -166,6 +166,6 @@ UAT (classic): [`UAT_Scripts/uat-results-entry-review.md`](../UAT_Scripts/uat-re
 - Do **not** teach routing-map save or Route as ANDing one type across later processes or steps. Route gates only the first process’s first ordered Experiment/LimsRun; later starts gate current type then.
 - Do **not** collapse ordered `process_definition[]` into one definition or an unordered bag. Start instantiates the first process only; the UI must preserve route order.
 - Do **not** treat zero or multiple acceptable routes as `first()`: zero → 422; two saved rows that both accept current type → 409.
-- Do **not** write “later starts do not re-freeze params” as current behavior. That freeze is the WO-7 lock and is **open** on `b005cfe`.
+- Do **not** treat first-start freeze as UAT Pass until QA restamps it. The guard is in code: later starts do not overwrite `tests.asked_for_params`.
 - Do **not** treat empty `{}` as a hole to refill on a later start. `{}` is a freeze.
 - Not IC50. Not a fake Route how-to.

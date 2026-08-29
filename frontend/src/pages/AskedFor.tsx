@@ -100,13 +100,9 @@ const AskedFor: React.FC = () => {
     }
   };
 
-  const summarizeRoute = (items: Array<{ no_route?: boolean; work_order?: unknown }>) => {
+  const summarizeRoute = (items: Array<{ work_order?: unknown }>) => {
     const routed = items.filter((i) => i.work_order).length;
-    const unmatched = items.filter((i) => i.no_route).length;
-    const parts: string[] = [];
-    if (routed) parts.push(`${routed} routed`);
-    if (unmatched) parts.push(`${unmatched} with no routing-map match (stayed requested)`);
-    return parts.join('; ') || 'Route complete';
+    return routed ? `${routed} routed` : 'Route complete';
   };
 
   const handleRouteOne = async (id: string) => {

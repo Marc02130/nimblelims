@@ -140,7 +140,7 @@ Create a new sample.
 
 UI: `/asked-for`. Copy: **requested analysis**. Write/cancel/Route: `test:assign`, role ≠ Client, and project access/RLS. Route does **not** require `experiment:manage`. Client and hidden/other-project writes return **403** (not 404). List/get: `sample:read`.
 
-`POST /v1/asked-for` creates no Test or work order. Route later evaluates analysis + TAT candidates and first-process type acceptance: zero → 422, two saved rows that both accept current type → 409, exactly one → ordered route snapshot. Never silently choose `first()`. WO-7 creates/attaches Tests at LimsRun start; first-start freeze remains OPEN on `b005cfe`.
+`POST /v1/asked-for` creates no Test or work order. Route later evaluates analysis + TAT candidates and first-process type acceptance: zero → 422, two saved rows that both accept current type → 409, exactly one → ordered route snapshot. Never silently choose `first()`. WO-7 creates/attaches Tests at LimsRun start and freezes `asked_for_params` on first start.
 
 ### POST /v1/asked-for
 Record requested analyses for a sample set (one row per sample, one transaction).
@@ -2337,12 +2337,12 @@ Dry-run of what publish would write to existing Tests/Results when `analysis_id`
 ### PATCH /v1/lims-runs/{id}/complete
 Transition `complete → published` (requires `experiment:publish`).
 
-Promotes instrument JSONB → Tests/Results in one transaction (**run always has `analysis_id`**). Each active Test must already exist from the first LimsRun start (WO-7). If any cohort sample lacks one, publish returns **422**, refuses the whole run, writes no Results, invents no Test, and leaves the run `complete`. This refuse is **Tobias-signed Pass** on `b005cfe`. Overall P2 Pass remains unsigned because the separate first-start params freeze is **OPEN and unscored** — see `PATCH /v1/lims-runs/{id}/start`. The historical `9c4f9da` behavior remains signed not Pass. **409** with `code: promotion_conflict` if another run/manual result owns the same test/analyte/replicate.
+Promotes instrument JSONB → Tests/Results in one transaction (**run always has `analysis_id`**). Each active Test must already exist from the first LimsRun start (WO-7). If any cohort sample lacks one, publish returns **422**, refuses the whole run, writes no Results, invents no Test, and leaves the run `complete`. This refuse is **Tobias-signed Pass** on `b005cfe`. First-start freeze is in code; overall P2 Pass remains unsigned pending UAT restamp. Historical `9c4f9da` remains signed not Pass. **409** with `code: promotion_conflict` if another run/manual result owns the same test/analyte/replicate.
 
 ### PATCH /v1/lims-runs/{id}/start
 **Requires `analysis_id`** on the run and at least one cohort sample — **400** if either is missing. With `sample_ids` in the body, first start locks the cohort, creates or attaches one active Test per `(sample, analysis)`, and freezes the then-current routed asked-for `params` into `tests.asked_for_params`.
 
-**WO-7 first-start freeze is the lock and is OPEN on `b005cfe`.** `_mint_tests_at_start` has no already-frozen guard: every start that reaches it assigns `tests.asked_for_params`, so a later start that finds the existing active Test for the same `(sample, analysis)` overwrites the first-start snapshot, and writes the empty `{}` when no `routed` asked-for row matches. Empty `{}` is a freeze, not a hole to refill on a later start. Do not document the overwrite as prevented.
+**WO-7 first-start freeze is in code.** `_mint_tests_at_start` skips `asked_for_params` on an existing Test, so a later start that finds the active Test for the same `(sample, analysis)` keeps the first-start snapshot. Empty `{}` is a freeze, not a hole to refill on a later start. UAT restamp unsigned.
 
 No non-reportable / `acknowledge_no_analysis` path (product lock 2026-07-19; remove legacy ack if still in code).
 

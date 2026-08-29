@@ -66,6 +66,8 @@ class WorkOrderRead(BaseModel):
     process_definition_ids: List[UUID]
     status: str
     process_id: Optional[UUID] = None
+    latest_process_id: Optional[UUID] = None
+    started_count: int = 0
     created_at: datetime
 
     class Config:

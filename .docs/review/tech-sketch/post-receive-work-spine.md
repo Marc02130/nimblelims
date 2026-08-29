@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-28  
 **Stem:** `post-receive-work-spine`  
-**Status:** P2 `b005cfe` per-AC history signed; publish-refuse Pass; first-start freeze OPEN; overall P2 unsigned/not Pass. Hold product merge. Current lock: ordered `process_definition[]`; map-save 409 only when TAT **and** first-step allow-lists overlap; Route 409 when two saved rows both accept current type. Not IC50.
+**Status:** P2 `b005cfe` per-AC history signed; publish-refuse Pass. First-start freeze and ordered-route lock are in code; overall P2 unsigned/not Pass pending UAT restamp. Hold product merge. Current lock: ordered `process_definition[]`; map-save 409 only when TAT **and** first-step allow-lists overlap; Route 409 when two saved rows both accept current type. Not IC50.
 **Requirements:** [`.docs/review/requirements/post-receive-work-spine.md`](../requirements/post-receive-work-spine.md)  
 **Schema:** [`.docs/review/schema-changes/post-receive-work-spine.md`](../schema-changes/post-receive-work-spine.md)  
 **Spec:** [`.docs/internal/specs/post-receive-work-spine/SPEC.md`](../../internal/specs/post-receive-work-spine/SPEC.md)  
@@ -22,7 +22,7 @@ P1 is on `main`. P2 is on `feat/work-order-p2` (Accept with conditions). Do not 
 6. **Receive freeze:** non-empty `analysis_ids` still **422**.
 7. **P2 ordered route:** `routing_map` and work order hold ordered `process_definition[]`. Not one definition, not a bag. Start instantiates position 1 only; later starts advance one position.
 8. **WO-7 publish (Tobias-signed Pass @ `b005cfe`):** `_require_wo7_tests` 422s before promote if any cohort sample lacks an active Test. Status stays unpublished (complete). Do **not** fold first-start freeze into this Pass; that half remains OPEN.
-9. **Freeze:** first LimsRun start wins. `_mint_tests_at_start` must **not** overwrite `asked_for_params` on an existing Test. **Still open** on `b005cfe`.
+9. **Freeze:** first LimsRun start wins. `_mint_tests_at_start` must **not** overwrite `asked_for_params` on an existing Test. Guard is in code; UAT restamp unsigned.
 10. **P2-4 visibility:** Route is `test:assign` and reads ordered process/step metadata. UI shows the full route order and derives first process / first Experiment-LimsRun types. Process starts remain `experiment:manage`; mutate remains `config:edit`.
 11. **Heidi/Leadership overlap lock:** no sample-type picker. Map save **409**s only when the same analysis, overlapping TAT, **and** overlapping first-step allow-lists all hold. Extract-first vs Qubit-first for the same TAT is legal. Route: analysis + TAT candidates filtered by first-step current-type acceptance. Zero → 422; two saved rows that both accept current type → 409; never `first()`.
 
@@ -124,7 +124,7 @@ Start: `ELNProcessService.instantiate_from_definition` on the first pending orde
 
 **L3 / A5 / SC5:** At LimsRun start, insert Test if missing; copy `asked_for.params` → `tests.asked_for_params` and freeze. **First start wins** — do not overwrite `asked_for_params` on an existing Test. Column ships in the P2 migration. P1 does **not** write that Test snapshot. Shape: JSON object matching that analysis’s defs (see working-note §3 snapshots).
 
-WO-7 publish @ `b005cfe` is Tobias-signed Pass: missing cohort Test returns 422, status stays complete / unpublished, and no Test is reminted. First-start params freeze remains OPEN and unscored; overall P2 Pass is unsigned.
+WO-7 publish @ `b005cfe` is Tobias-signed Pass: missing cohort Test returns 422, status stays complete / unpublished, and no Test is reminted. First-start params freeze is in code; overall P2 Pass is unsigned pending UAT restamp.
 
 ## 5. P3 design
 
@@ -157,7 +157,7 @@ No new import engine. **Do not build “admin authors parsers” as the product.
 | Map save rejects a later-step mismatch | Remove chain-wide validation; save succeeds |
 | Route with current type outside every candidate’s first-process / first-step types | **422 `route_sample_type`**; no WO |
 | Later step start with current type outside that step’s accepted types | **422 `route_sample_type`**; sample is not broken |
-| Publish without Test (deleted Test or empty plan / 0 data rows) | **422** the whole run (`_require_wo7_tests` / `plan.errors` @ `b005cfe`). Stay unpublished. Zero Results. Publish-refuse Pass; first-start freeze remains OPEN. |
+| Publish without Test (deleted Test or empty plan / 0 data rows) | **422** the whole run (`_require_wo7_tests` / `plan.errors` @ `b005cfe`). Stay unpublished. Zero Results. Publish-refuse Pass; first-start freeze in code, UAT unsigned. |
 | Invisible process def (alice vs `created_by` / `has_experiment_access`) | Catalog-visible **read** (same client / logged-in). `0074` is not enough. Route stays `test:assign`. Not `experiment:manage` on Route. Not `route_sample_type`. |
 | Empty accepted set at step start | **422 `route_sample_type`** |
 | Parser AI on import | Impossible (no call site) |
