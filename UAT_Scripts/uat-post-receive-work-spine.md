@@ -156,7 +156,7 @@ Admin is not a tube-tech actor for these motions. Admin is setup only (routing-m
 
 ### AC-P2-2 — Type gate 422
 
-**Result:** **Pass** (API, 2026-08-28 ET, `3b56cfb`). UI map save blocked — **observation**, not a tube-tech fail.
+**Result:** **Pass** (API, 2026-08-28 ET, `3b56cfb`). UI map save blocked — leftover config **observation**, not extract-hold, not a tube-tech fail.
 
 **Steps**
 1. LimsRun (or experiment) step with empty accepted types, or types that do not include the sample’s current type.
@@ -168,7 +168,7 @@ Admin is not a tube-tech actor for these motions. Admin is setup only (routing-m
 - `POST /v1/routing-map` ELISA × Plasma TAT 1–7 → **422** `{code: route_sample_type, message: "Sample type is not accepted on every step in the chain"}`.
 - Reads as **wrong type**, not a dead sample.
 
-**Observation (not a tube-tech fail):** `/admin/routing-map` errors `List 'sample_type' not found` (page asks `sample_type`; receive uses `sample_types`). Dropdowns empty. Map save was not exercised as a lab-tech click; type gate is API Pass.
+**Observation (leftover config, not extract-hold):** `/admin/routing-map` errors `List 'sample_type' not found` (page asks `sample_type`; receive uses `sample_types`). Dropdowns empty. Map save was not exercised as a lab-tech click; type gate is API Pass.
 
 ### AC-P2-3 — TAT overlap 409
 
@@ -193,31 +193,30 @@ Admin is not a tube-tech actor for these motions. Admin is setup only (routing-m
 
 **Fail bar:** `alice-tech` Route on matching asked-for → **422** `route_sample_type` / `Process definition has no steps`. `alice-tech` GET definition → **404**. Admin GET sees **1** `lims_run` step.
 
-**Root:** definition / steps RLS (`is_admin()` or same-client `created_by`); admin `client_id` `00000000-...-0001`; alice samples are another client. The bench actor cannot see the steps the map points at, so Route looks like “no steps” / type gate.
+**Root:** **visibility**. Alice cannot see the admin-created definition/steps (definition / steps RLS: `is_admin()` or same-client `created_by`; admin `client_id` `00000000-...-0001`; alice samples are another client). The bench actor cannot see the steps the map points at. Do **not** treat the 422 wording as the bug, and do **not** recommend changing the 422 text as the fix.
 
-**Admin API after alice failed (does not make this AC Pass):**
-- Admin Route → **200**, asked-for `routed`, WO `7a23e690-…` queued, Tests still **0**.
+**Admin Route after alice failed — mint bar only, not a Pass:**
+- Admin Route → **200**, asked-for `routed`, WO `7a23e690-…` queued, Tests still **0**. That is the **mint** bar (Route mints WO, still zero Tests). It does **not** make AC-P2-4 Pass. The AC is lab-tech Route.
 - Cancel routed → **422** `Cannot cancel a routed asked-for`.
-- Route did **not** mint a Test.
-- `/work-orders` copy: “Tests are still minted later, at LimsRun start.”
+- If `/work-orders` looks Start-able, that is still a **fail note**, not a Pass. Copy observed: “Tests are still minted later, at LimsRun start.”
 
-The WO-mint path exists for admin. The AC is a **lab-tech Route**. Fail stands.
+Fail stands.
 
 ### AC-P2-5 — WO-7 Test at LimsRun start
 
-**Result:** **Pass (mint)** (2026-08-28 ET, `3b56cfb`). Publish **422** unverified.
+**Result:** **not Pass** (2026-08-28 ET, `3b56cfb`). Unsigned / unverified. Do **not** write “Pass (mint)”.
 
 **Steps**
 1. Start a LimsRun with the routed sample in the cohort.
 2. **Expect:** Test minted; `asked_for_params` frozen. Publish without that Test → **422**. Not minted on Route.
 
-**Verified holds (mint):**
+**Observed (not a Pass):**
 - After Route: **0** Tests.
 - `alice-tech` `POST /v1/lims-runs` + PATCH start with sample in cohort → Test minted `mAb-2301 PK Study-05_ELISA (Human IgG)`.
 - `asked_for_params` `{}`.
 - Tests page 3 → **4**. Not present after Route.
 
-**Publish residual (not a mint fail):** PATCH `…/complete` → **403** `Permission 'experiment:publish' required`. Seed catalog has `experiment:manage` only. Exact **422** `Test missing; Tests are created at LimsRun start (WO-7)` was **not** HTTP-hit.
+**Why this AC is not Pass:** Publish was **unclickable**. PATCH `…/complete` → **403** `Permission 'experiment:publish' required`. Seed catalog has `experiment:manage` only. Exact **422** `Test missing; Tests are created at LimsRun start (WO-7)` was **not** HTTP-hit. Unsigned / unverified until a tech can publish and that WO-7 **422** is hit.
 
 ---
 
@@ -229,8 +228,8 @@ Click: `/receive` then `/asked-for` as `alice-tech`. API: AC-P1-3/4. Local compo
 
 Do **not** read this as P2–P5 Pass. Do **not** collapse this stamp with Atomic Receive **CORE** Pass (`uat-atomic-receive.md`). P1 is on `main` (PR **#81**).
 
-**P2 not Pass** — Tobias, 2026-08-28 ET, `3b56cfb` — AC-P2-1 Pass, AC-P2-2 Pass (API), AC-P2-3 Pass (API), AC-P2-4 **Fail** (alice), AC-P2-5 mint Pass / publish unverified.
+**P2 not Pass** — Tobias, 2026-08-28 ET, `3b56cfb` — AC-P2-1 Pass, AC-P2-2 Pass (API), AC-P2-3 Pass (API), AC-P2-4 **Fail** (alice), AC-P2-5 **not Pass** (publish unclickable).
 
 Click: `alice-tech` three motions (receive stay-on-form, asked-for later look-up, Route). Admin used only for routing-map / process-definition setup. Local compose; down after the run. Not IC50.
 
-Hold merge. Do **not** collapse with P1 or receive CORE. Not IC50. Leftover: `/admin/routing-map` list name `sample_type` vs receive `sample_types`.
+Hold merge. Do **not** collapse with P1 or receive CORE. Not IC50. Leftover config (observation, not extract-hold): `/admin/routing-map` list name `sample_type` vs receive `sample_types`.
