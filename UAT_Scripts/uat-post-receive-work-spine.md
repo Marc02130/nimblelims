@@ -118,34 +118,106 @@ Route, work_orders, LimsRun Test mint (WO-7), param defs on receive, results per
 
 ---
 
-## P2 — Route / work_orders / WO-7 (not signed)
+## P2 — Route / work_orders / WO-7 (stamp on `3b56cfb`)
 
+**Result of this stamp:** **P2 not Pass**. Hold merge. Do **not** collapse with P1 (`c649245` / PR **#81**) or receive CORE (`uat-atomic-receive.md`). Not IC50. Do **not** seed blood→Qubit.
+
+**Phase:** P2 Route / work_orders / WO-7 Test-at-LimsRun-start  
 **UI:** `/asked-for` Route · `/admin/routing-map` · `/work-orders` · process definition accepted sample types  
-**API:** `POST /v1/asked-for/{id}/route` · `/v1/routing-map` · `/v1/work-orders/{id}/start`  
-**Do not** seed blood→Qubit. Dest-type Hold unchanged. Receive freeze unchanged.
+**API:** `POST /v1/asked-for/{id}/route` · `/v1/routing-map` · `POST /v1/lims-runs` · LimsRun start  
+**Env:** local docker compose (`lims-*`); http://localhost:3000 + :8000. Compose **down** after the run. Not IC50.  
+**Build / commit:** `3b56cfb` (`3b56cfb8f2a111b278c3d8b4c546bf6e5bf9116c`, `feat/work-order-p2`, 2026-08-28 ET / 2026-08-29 UTC)  
+**Executor:** Tobias. Click: `alice-tech` three motions (receive stay-on-form, asked-for later look-up, Route). Admin used only for routing-map / process-definition setup.  
+**Date:** 2026-08-28 ET  
+**Dest-type Hold** unchanged. Receive freeze unchanged.
+
+**Motions (not ACs)** — three separate motions; do not run as one chain from receive.
+
+1. **Receive (precondition).** `alice-tech` `/receive` barcode `NBIO-P2-0001` → sample name `mAb-2301 PK Study-05` (`e382ebb5-3b7e-443c-a01f-6ef1e6abd095`). Sticky Plasma / mAb-2301 PK Study / Cryovial. Stayed on `/receive`. Zero Tests. Then left to Dashboard, **not** asked-for. Receive freeze: `POST /samples/receive` with `analysis_ids` → **422**.
+2. **Asked-for later look-up.** ELISA TAT **2** on Study-05. Status `requested`. 0 Tests, 0 `work_orders`. Copy: requested analysis, no Start / Execute. Route CTA present (per-row + **ROUTE SELECTED**). Save did **not** mint a work_order.
+
+Admin is not a tube-tech actor for these motions. Admin is setup only (routing-map / process definition).
 
 ### AC-P2-1 — Empty map stays requested
+
+**Result:** **Pass** (click, `alice-tech`, 2026-08-28 ET, `3b56cfb`)
+
+**Steps**
 1. Asked-for `requested`. No routing-map row for that analysis × type × TAT.
 2. Route.
-3. **Expect:** 200 `no_route`. Status still `requested`. Zero work_orders. Zero Tests.
+
+**Expect**
+- 200 `no_route`. Status still `requested`. Zero work_orders. Zero Tests.
+
+**Verified holds:**
+- `POST /v1/asked-for/{id}/route` → **200** `{no_route: true, work_order: null}`.
+- UI banner: “1 with no routing-map match (stayed requested)”.
+- Status still `requested`. WOs **0**. Tests **0**.
 
 ### AC-P2-2 — Type gate 422
+
+**Result:** **Pass** (API, 2026-08-28 ET, `3b56cfb`). UI map save blocked — **observation**, not a tube-tech fail.
+
+**Steps**
 1. LimsRun (or experiment) step with empty accepted types, or types that do not include the sample’s current type.
 2. Save routing map **or** Route.
-3. **Expect:** **422** `route_sample_type`. Blood → Extract → Qubit still refuses if the Qubit step does not accept blood.
+3. **Expect:** **422** `route_sample_type`. Blood → Extract → Qubit still refuses if the Qubit step does not accept blood. This run did **not** seed blood→Qubit; type gate used DNA vs Plasma on an ELISA LimsRun.
+
+**Verified holds (API):**
+- Admin LimsRun definition `ELISA LimsRun P2 type-gate` with accepted type **DNA** (not Plasma).
+- `POST /v1/routing-map` ELISA × Plasma TAT 1–7 → **422** `{code: route_sample_type, message: "Sample type is not accepted on every step in the chain"}`.
+- Reads as **wrong type**, not a dead sample.
+
+**Observation (not a tube-tech fail):** `/admin/routing-map` errors `List 'sample_type' not found` (page asks `sample_type`; receive uses `sample_types`). Dropdowns empty. Map save was not exercised as a lab-tech click; type gate is API Pass.
 
 ### AC-P2-3 — TAT overlap 409
+
+**Result:** **Pass** (API, 2026-08-28 ET, `3b56cfb`)
+
+**Steps**
 1. Two active map rows, same analysis + sample type, overlapping TAT ranges.
 2. **Expect:** second save **409**.
 
+**Verified holds:**
+- Accepted types set to Plasma. Map TAT 1–7 → **201**.
+- Overlap TAT 5–10 same analysis + type → **409** `Overlapping TAT range for this analysis and sample type`.
+
 ### AC-P2-4 — Route mints work_order
+
+**Result:** **Fail** (`alice-tech` bench, 2026-08-28 ET, `3b56cfb`). Do **not** mark Pass. Lab tech cannot complete Route. Hold merge.
+
+**Steps**
 1. Map row matches. Every step accepts the sample type.
 2. Route.
 3. **Expect:** asked-for `routed`, `work_orders` queued, still zero Tests. Cancel asked-for → **422**.
 
+**Fail bar:** `alice-tech` Route on matching asked-for → **422** `route_sample_type` / `Process definition has no steps`. `alice-tech` GET definition → **404**. Admin GET sees **1** `lims_run` step.
+
+**Root:** definition / steps RLS (`is_admin()` or same-client `created_by`); admin `client_id` `00000000-...-0001`; alice samples are another client. The bench actor cannot see the steps the map points at, so Route looks like “no steps” / type gate.
+
+**Admin API after alice failed (does not make this AC Pass):**
+- Admin Route → **200**, asked-for `routed`, WO `7a23e690-…` queued, Tests still **0**.
+- Cancel routed → **422** `Cannot cancel a routed asked-for`.
+- Route did **not** mint a Test.
+- `/work-orders` copy: “Tests are still minted later, at LimsRun start.”
+
+The WO-mint path exists for admin. The AC is a **lab-tech Route**. Fail stands.
+
 ### AC-P2-5 — WO-7 Test at LimsRun start
+
+**Result:** **Pass (mint)** (2026-08-28 ET, `3b56cfb`). Publish **422** unverified.
+
+**Steps**
 1. Start a LimsRun with the routed sample in the cohort.
 2. **Expect:** Test minted; `asked_for_params` frozen. Publish without that Test → **422**. Not minted on Route.
+
+**Verified holds (mint):**
+- After Route: **0** Tests.
+- `alice-tech` `POST /v1/lims-runs` + PATCH start with sample in cohort → Test minted `mAb-2301 PK Study-05_ELISA (Human IgG)`.
+- `asked_for_params` `{}`.
+- Tests page 3 → **4**. Not present after Route.
+
+**Publish residual (not a mint fail):** PATCH `…/complete` → **403** `Permission 'experiment:publish' required`. Seed catalog has `experiment:manage` only. Exact **422** `Test missing; Tests are created at LimsRun start (WO-7)` was **not** HTTP-hit.
 
 ---
 
@@ -156,3 +228,9 @@ Route, work_orders, LimsRun Test mint (WO-7), param defs on receive, results per
 Click: `/receive` then `/asked-for` as `alice-tech`. API: AC-P1-3/4. Local compose; down after the run. Not IC50. P1 lake only.
 
 Do **not** read this as P2–P5 Pass. Do **not** collapse this stamp with Atomic Receive **CORE** Pass (`uat-atomic-receive.md`). P1 is on `main` (PR **#81**).
+
+**P2 not Pass** — Tobias, 2026-08-28 ET, `3b56cfb` — AC-P2-1 Pass, AC-P2-2 Pass (API), AC-P2-3 Pass (API), AC-P2-4 **Fail** (alice), AC-P2-5 mint Pass / publish unverified.
+
+Click: `alice-tech` three motions (receive stay-on-form, asked-for later look-up, Route). Admin used only for routing-map / process-definition setup. Local compose; down after the run. Not IC50.
+
+Hold merge. Do **not** collapse with P1 or receive CORE. Not IC50. Leftover: `/admin/routing-map` list name `sample_type` vs receive `sample_types`.
