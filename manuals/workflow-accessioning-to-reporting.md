@@ -27,7 +27,7 @@ The three-step `/accessioning` wizard is **removed**. `/accessioning` redirects 
 
 **Status:** Sample is **Available for Testing**. Zero Tests. Zero Results.
 
-**After receive:** Record **requested analysis** on **Asked-for** (`/asked-for`) — [asked-for.md](asked-for.md). That creates **zero Tests** and does **not** start work. Route / work_orders / WO-7 are **out** of this P1 stamp. Classic `/tests` is not the request path. Aliquots / derivatives are not part of receive.
+**Separate later look-up:** **Asked-for** (`/asked-for`) records **requested analysis + TAT** — [asked-for.md](asked-for.md). Not the click after a receive commit; receive ends on its own form. That save creates **zero Tests** and does **not** start work. Route / work_orders / WO-7 are **out** of this P1 stamp. Classic `/tests` is not the request path. Aliquots / derivatives are not part of receive.
 
 ### Stage 1.5: Sample/Test/Container Editing (Post-Accessioning)
 

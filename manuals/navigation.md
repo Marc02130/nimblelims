@@ -110,7 +110,7 @@ The Sample Management section uses a Material-UI Accordion component for collaps
 | Menu Item | Route | Icon | Permission Required | Description |
 |-----------|-------|------|---------------------|-------------|
 | **Receive** | `/receive` | Science | `sample:create` | Atomic receive (CORE happy path): scan 1..N vessels. No analysis picker. |
-| **Asked-for** | `/asked-for` | Assignment | view `sample:read`; create `test:assign` (not Client) | Record **requested analysis** after receive. Does **not** mint a Test or start work. Immediately after Receive. |
+| **Asked-for** | `/asked-for` | Assignment | view `sample:read`; create `test:assign` (not Client) | Record **requested analysis + TAT** for already-received samples — a later look-up, not the click after a receive commit. Does **not** mint a Test or start work. Listed after Receive in the sidebar; that is nav order, not a work queue. |
 | **Samples** | `/samples` | Science | `sample:read` | Sample management interface with list and edit functionality |
 | **Tests** | `/tests` | Biotech | `test:update` | Tests on existing Test rows (not the request path) |
 | **Containers** | `/containers` | Inventory | `sample:update` | Container management interface with list, create, and edit functionality |
@@ -448,7 +448,7 @@ Navigation relies on `UserContext` for:
 2. Route changes to `/receive`
 3. Sidebar highlights **Receive** as active
 4. AppBar title updates to **Receive**
-5. `AtomicReceive` renders. No analysis picker. After receive, **Asked-for** records requested analysis (`/asked-for`) — that does not mint a Test.
+5. `AtomicReceive` renders. No analysis picker. Commit and stay on the form for the next tube — the receive flow ends here. **Asked-for** (`/asked-for`) records requested analysis in a separate, later visit; it does not mint a Test.
 
 ### Accessing Experiments Section
 
