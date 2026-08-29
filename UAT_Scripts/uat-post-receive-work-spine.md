@@ -2,20 +2,26 @@
 
 **Stem:** `post-receive-work-spine`  
 **Phase:** P1 asked-for lake (P2–P5 **not** in this stamp)  
-**SoT:** `.docs/review/requirements/post-receive-work-spine.md` RQ-AF-* · [HOWTO.md](../manuals/HOWTO.md) §3  
-**UI:** `/asked-for` (sidebar **Asked-for**, immediately after Receive) + sample-detail Asked-for section  
+**SoT:** `.docs/review/requirements/post-receive-work-spine.md` RQ-AF-* · [asked-for.md](../manuals/asked-for.md) · [HOWTO.md](../manuals/HOWTO.md)  
+**UI:** `/asked-for` (Sample Mgmt → **Asked-for**) + sample-detail Asked-for section. A **later look-up**, not the after-receive click and not a Start queue  
 **API:** `POST /api/v1/asked-for` · `GET /api/v1/asked-for` · `POST /api/v1/asked-for/{id}/cancel`  
 **Env:** local docker compose (`lims-*`); http://localhost:3000 + :8000. Compose **down** after the run. Not IC50. P1 lake only.  
 **Build / commit:** `c649245` (`c6492455200fa69c2093865615f82ada23b8d2b1`, 2026-08-28)  
-**Executor:** Tobias (clicked `/receive` then `/asked-for` as `alice-tech`) + API AC-P1-3/4  
+**Executor:** Tobias (`alice-tech`: `/receive` as the precondition — stayed on the form — then `/asked-for` as a separate motion) + API AC-P1-3/4  
 **Date:** 2026-08-28  
 **Do not use** retired `uat-sample-accessioning.md`. Receive freeze: non-empty `analysis_ids` still **422**.
 
-P1 records **requested analysis**. It does **not** assign a Test, mint a Test row, or start work. Copy: “Asked-for” / “requested analysis”. No Start / Execute.
+P1 records **requested analysis + TAT**. It does **not** assign a Test, mint a Test row, attach analytes, or start work; the save is not scientific assignment. Copy: “Asked-for” / “requested analysis”. No Start / Execute.
+
+**Receive ≠ order ≠ work.** Receive’s happy path is **stay on `/receive`** for the next tube (CORE stamp: `uat-atomic-receive.md`). The lake is a later look-up. Do not run these ACs as one motion from receive.
+
+**The lake accepts scientifically wrong pairings on purpose** — a Qubit-on-blood request may sit in it. Refusal belongs to **routing** (P2 `route_sample_type` **422**), not to P1. Do not exercise that here and do not invent Qubit/blood testdata.
 
 **Out of this stamp:** Route, work_orders, WO-7 Test-at-LimsRun-start, `analysis_param_defs` on receive, results persist, SOP Apply, parser dry-run UX, Qubit/blood path.
 
 **This stamp:** **P1 Pass** on `c649245` — AC-P1-1..4. Merged to `main` (PR **#81**, `af5b388`). Do **not** write P2–P5 Pass. Do **not** collapse with receive CORE stamps (`uat-atomic-receive.md`).
+
+**Merge note (2026-08-28):** PR **#81** was merged to `main` (`af5b388`) after this stamp was signed. The hold sentences in this file record the stamp’s condition as written; they are history, not a live instruction.
 
 ---
 
@@ -32,30 +38,38 @@ P1 records **requested analysis**. It does **not** assign a Test, mint a Test ro
 
 ---
 
-## AC-P1-1 — Receive → ELISA requested analysis → zero Tests
+## AC-P1-1 — Asked-for save mints zero Tests (lake AC)
 
 **Result:** **Pass** (click, 2026-08-28, `c649245`)
 
-**Steps**
-1. Log in as lab-tech. Sidebar Sample Mgmt: **Asked-for** is immediately after **Receive**.
-2. Receive a sample on `/receive` (empty analyses; UI never sends `analysis_ids`). Status **Available for Testing**. Tests grid count for that sample is 0.
-3. Open `/asked-for` → **Record requested analysis**. Multi-select the received sample. Pick ELISA. TAT ≥ 1 (default from analysis TAT is fine). Do **not** enter assay params (params freeze at LimsRun start later; not on receive).
-4. Save.
+**What is measured:** zero Tests **after the asked-for save**. This is a **lake** AC, not a receive CORE AC, and **not one hop from receive**. Receive is a **precondition**, executed and stamped separately in `uat-atomic-receive.md`; its own happy path is **stay on `/receive`** for the next tube. Asked-for is a **later look-up** — a separate motion, not the after-receive click and not a Start queue.
 
-**Expect**
-- Row `status=requested`. Copy is “requested analysis”, never “assign test” / “start work”.
-- No Start / Execute / Route CTA.
-- `COUNT(tests)` for that sample unchanged (0). Asked-for does not start work.
+**Precondition (already true before this AC starts)**
+- A sample exists from an earlier `/receive` commit (empty analyses; UI never sends `analysis_ids`). Status **Available for Testing**. Tests count for that sample is 0. The tech has left the receive loop; nothing on the bench is waiting on asked-for.
+
+**Steps (asked-for only)**
+1. Log in as lab-tech. Open `/asked-for` (Sample Mgmt → **Asked-for**) as its own task, not as a continuation of receive.
+2. **Record requested analysis** → multi-select the already-received sample. Pick ELISA. TAT ≥ 1 (default from analysis TAT is fine).
+3. Do **not** enter assay params. P1 sends `{}`; params freeze at **LimsRun start** (P2 / WO-7), not here and not on receive.
+4. Save. Stay on `/asked-for`.
+
+**Expect (after the save)**
+- Row `status=requested`, carrying **requested analysis + TAT** only. Copy is “requested analysis”, never “assign test” / “start work”.
+- `COUNT(tests)` for that sample is still **0** — **this is the pass**. Save assigns no Test, attaches no analytes, and does not make type-a-number legal. Zero Results, Processes, Experiments, LimsRuns, work_orders.
+- No Start / Execute / Route CTA. Sample stays **Available for Testing**.
 - Sample detail shows the asked-for row under **Asked-for**.
+- No redirect back into receive, and no prompt to leave `/receive` for this screen.
 
 **Verified holds (Tobias click, `alice-tech`):**
-- Sidebar Sample Mgmt: **Receive**, then **Asked-for** immediately after.
+- Sidebar Sample Mgmt lists **Receive** then **Asked-for** (observed nav order only — not an instruction to go there after a commit, and not a work queue).
 - `/receive`: no analysis/asked-for picker, no lab Sample ID, no aliquot dialog. Received `NBIO-AF-P1-0001`; stayed on `/receive`; barcode cleared; sticky Plasma / mAb-2301 PK Study / Cryovial.
 - `/asked-for` copy: “After receive, record what was asked for. This does not assign a test or start work.” CTA **RECORD REQUESTED ANALYSIS**. Modal: “Record a requested analysis. This does not assign a test or start work.” No Start / Execute anywhere.
 - Recorded ELISA (Human IgG) on `mAb-2301 PK Study-04` (the receive of `NBIO-AF-P1-0001`). Grid shows requested row; after cancel+resave: one requested + one cancelled (1–2 of 2).
 - Tests Management still 3 seed tests only (not minted for the new receive). No `work_orders` table.
 
-**Observation (not a fail):** sample picker by raw barcode `NBIO-AF-P1-0001` showed “No options”; recording used the sample name.
+**Observations (not fails):**
+- Sample picker by raw barcode `NBIO-AF-P1-0001` showed “No options”; recording used the sample name.
+- Page copy leads with “After receive, record what was asked for.” It is correct that no Test is assigned, but the lead-in reads as the next motion after a commit. Copy owner’s call, not a P1 result: the lake is a later look-up, and receive ends on `/receive`.
 
 ## AC-P1-2 — Duplicate 409
 
