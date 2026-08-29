@@ -510,11 +510,18 @@ The preceding `b005cfe` section is retained verbatim as signed history, includin
 
 **Executor / environment / date:** **unsigned** — Tobias has not clicked this SHA. Local docker compose (`lims-*`) when restamped; compose **down** after that run. Not IC50.
 
-**Maturity on this SHA (do not teach as QA-verified):** first-start freeze, Route zero→**422** / two-accept→**409**, later-start type gate, and next-pending process instantiate are **in code on `8cfa2a9`**. They are **unsigned until QA**. Do not copy Pass/Fail from `b005cfe` / `9c4f9da` / `3b56cfb` / P1 into this block.
+**Maturity on this SHA (do not teach as QA-verified):** freeze, Route 422/409, later-start type gate, and next-pending instantiate are **unsigned on `8cfa2a9`**. Do **not** claim freeze closed or verified. Do not copy Pass/Fail from `b005cfe` / `9c4f9da` / `3b56cfb` / P1 into this block.
 
 **Copy and permission locks:** Receive ends on `/receive`. Asked-for is a separate later look-up. Route is an unnumbered later planner requiring `test:assign` plus project access; it does not require `experiment:manage`. Client and inaccessible-project Route writes return **403**, not 404. **Start process** and LimsRun start require `experiment:manage`; publish requires `experiment:publish`.
 
-**Routing lock (live, unsigned):** map create has analysis, TAT, and sortable ordered `process_definition[]`, **no sample-type picker**. Allowed types are derived from the first process’s first ordered Experiment/LimsRun. Map save **409**s only when the same analysis, overlapping TAT, **and** overlapping first-step allow-lists all hold. Extract-first vs Qubit-first for the same TAT is legal. Route: analysis + TAT candidates filtered by live first-step current-type acceptance. Zero acceptable → **422** (`route_sample_type` on type refusal); two saved rows that both accept current type → **409**; exactly one snapshots the ordered route. Never silent `first()`. **Start instantiates the first process only.** Later processes = later starts in route order, not a process-of-processes at Route. Each later process/step start gates current type; empty or incompatible → **422** `route_sample_type`. Dest-type Hold remains out.
+**Leadership honesty locks (Hans / Heidi / Günter) — unsigned. Dest-type Hold out. Not IC50.**
+
+1. **Freeze skip:** `if test: continue` is **not** a freeze. A classic `/tests` row with `asked_for_params` NULL or default `{}` is **not** frozen. First LimsRun start must **write** the snapshot onto that Test. Skip only when a snapshot **already exists**, including a frozen `{}`.
+2. **Extract `analysis_id`:** Extract LimsRun must **not** share the asked-for `analysis_id` or it attaches/freezes the panel Test at extract start.
+3. **Start:** First Start instantiates `chain[0]` only. If first Start also mints later processes (Qubit/reporting) or their Tests, that is a punch — do not teach it as shipped. Later Start = next pending process, on the sample that exists then.
+4. **Route:** snapshots the ordered list, **zero Tests**.
+
+**Routing lock (live, unsigned):** map create has analysis, TAT, and sortable ordered `process_definition[]`, **no sample-type picker**. Allowed types are derived from the first process’s first ordered Experiment/LimsRun. Map save **409**s only when the same analysis, overlapping TAT, **and** overlapping first-step allow-lists all hold. Extract-first vs Qubit-first for the same TAT is legal. Route: analysis + TAT candidates filtered by live first-step current-type acceptance. Zero acceptable → **422** (`route_sample_type` on type refusal); two saved rows that both accept current type → **409**; exactly one snapshots the ordered list and mints **zero Tests**. Never silent `first()`. First Start instantiates `chain[0]` only. Later Start = next pending process, on the sample that exists then. Each later process/step start gates current type; empty or incompatible → **422** `route_sample_type`. Dest-type Hold remains out.
 
 ### AC-P2-1 — Route remains a separate later planner
 
@@ -552,9 +559,10 @@ The preceding `b005cfe` section is retained verbatim as signed history, includin
 4. Start the work order, follow the linked process, and open its typed Experiment/LimsRun step.
 
 **Expect**
-- Route creates one queued `work_order`, snapshots the full ordered chain, changes asked-for to `routed`, and creates zero Tests.
+- Route creates one queued `work_order`, **snapshots the ordered list**, changes asked-for to `routed`, and creates **zero Tests**.
 - The queued record is planning only; **Start process** begins execution and requires `experiment:manage`.
-- **Start instantiates process 1 only.** It does not start the rest of the chain. Later processes need later starts. Route/process views make order apparent (`1. … → 2. …`).
+- **First Start instantiates `chain[0]` only.** If first Start also mints later processes (Qubit/reporting) or their Tests, that is a punch — record it; do not teach as shipped.
+- **Later Start** = next pending process, on the sample that exists then. Dest-type Hold is out.
 - Process detail renders even when a step has a null template id; no `tid.slice` blank page.
 
 ### AC-P2-4 — WO-7 first-start freeze and whole-run refusal
@@ -570,10 +578,11 @@ The preceding `b005cfe` section is retained verbatim as signed history, includin
 7. Call publish with `PATCH /v1/lims-runs/{id}/complete`, then inspect run status, Tests, and every candidate Result.
 
 **Expect**
-- Receive, asked-for save, Route, and work-order start create no Test.
-- First LimsRun start of the **asked-for** analysis creates or attaches one active Test per cohort sample and **writes** `asked_for_params` unless a snapshot already exists.
-- Skip later overwrite only when a snapshot **already exists** (including frozen `{}`). A classic `/tests` row with NULL or default `{}` is **not** a freeze — that first start must **write**.
-- Extract LimsRun must **not** share the asked-for `analysis_id`.
+- Receive, asked-for save, Route, and work-order start create no Test. Route snapshots the ordered list, **zero Tests**.
+- `if test: continue` is **not** a freeze. First LimsRun start of the **asked-for** analysis **writes** `asked_for_params` unless a snapshot already exists.
+- Skip later overwrite only when a snapshot **already exists** (including frozen `{}`). A classic `/tests` row with `asked_for_params` NULL or default `{}` is **not** frozen — that first start must **write**.
+- Extract LimsRun must **not** share the asked-for `analysis_id` or it attaches/freezes the panel Test at extract start.
+- Do **not** claim freeze closed/verified on `8cfa2a9`.
 - With any cohort Test missing, publish returns **422**, not **200 published**.
 - The whole run is refused: it stays `complete`, no Test is invented, and no Results are written, including for cohort samples whose Tests still exist.
 
@@ -597,8 +606,9 @@ The preceding `b005cfe` section is retained verbatim as signed history, includin
 - Map save **409**s only when the same analysis, overlapping TAT, **and** overlapping first-step allow-lists all hold. Extract-first vs Qubit-first for the same TAT is legal.
 - Zero acceptable rows returns **422** and mints no work order. A first-step type refusal uses `route_sample_type`.
 - Two saved rows that both accept this sample’s current type return **409**; no silent `first()`.
-- Exactly one row snapshots the full ordered route.
-- Start instantiates the first process only. Later processes require later starts in route order; Route does not mint a process-of-processes.
+- Exactly one row **snapshots the ordered list** and mints **zero Tests**.
+- **First Start instantiates `chain[0]` only.** If first Start also mints later processes (Qubit/reporting) or their Tests, that is a punch — do not teach as shipped.
+- **Later Start** = next pending process, on the sample that exists then. Route does not mint a process-of-processes.
 - Map save/Route do not AND later-process or later-step allow-lists.
 - Each later process/step start checks current type; empty or incompatible fails with **422** then.
 - Dest-type Hold remains out; do not claim an earlier step changed type unless the product did so.
@@ -607,4 +617,4 @@ The preceding `b005cfe` section is retained verbatim as signed history, includin
 
 ## Live `8cfa2a9` restamp — unsigned
 
-**No Pass / Fail on this block.** SHA is `8cfa2a9`. Freeze, Route 422/409, later-start type gate, and first-process-only Start are **in code**, not QA-clicked. Do not sign overall P2 Pass until QA restamps. Hold product merge. Not IC50.
+**No Pass / Fail on this block.** SHA is `8cfa2a9`. Do **not** claim freeze closed/verified. `if test: continue` is not a freeze. First Start = `chain[0]` only. Route = ordered snapshot, zero Tests. Hold product merge. Not IC50.
