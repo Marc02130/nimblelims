@@ -10,7 +10,7 @@
 - PRD: [`.docs/internal/prd/post-receive-work-spine/PRD.md`](../../internal/prd/post-receive-work-spine/PRD.md)  
 - Spec: [`.docs/internal/specs/post-receive-work-spine/SPEC.md`](../../internal/specs/post-receive-work-spine/SPEC.md)  
 - Open questions: [`.docs/review/open-questions/post-receive-work-spine.md`](../open-questions/post-receive-work-spine.md)  
-**Related Lab Ops:** [lab-ops-review/post-receive-work-spine.md](../lab-ops-review/post-receive-work-spine.md) — ordered-route L2/L4 locked; product merge held on OPEN freeze / unsigned P2  
+**Related Lab Ops:** [lab-ops-review/post-receive-work-spine.md](../lab-ops-review/post-receive-work-spine.md) — ordered-route L2/L4 locked; product merge held on OPEN freeze / unsigned P2
 **Related:**  
 - Framework stamps WO-1…WO-7, FW-0/FW-2: [`.docs/decision-logs/framework-stamps-2026-08-26.md`](../../decision-logs/framework-stamps-2026-08-26.md)  
 - Promote-on-publish: [open-questions/run-results.md](../open-questions/run-results.md) (Decision #2 `raw_result`; Decision #7 ensure-on-publish **superseded by WO-7**)  
