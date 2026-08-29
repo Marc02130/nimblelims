@@ -39,6 +39,8 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
+import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 import { useNavigate, useParams } from 'react-router-dom';
 import { apiService, ApiService } from '../services/apiService';
 import { FillHeightPage, FillHeightTable } from '../components/common/FillHeightPage';
@@ -554,11 +556,13 @@ const ProcessesManagement: React.FC = () => {
         Steps
       </Typography>
       <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1 }}>
-        ELN Experiment steps pick an experiment template. LIMS Run steps pick an analysis
-        (Qubit-style runs need no fake template). Accepted sample types gate Route.
+        Steps run in this order (1, 2, 3…). ELN Experiment steps pick a template; LIMS Run
+        steps pick an analysis. A later step may accept a different sample type after dest-type
+        change. Route assignment uses accepted types of the first experiment/LIMS Run only.
       </Typography>
       {steps.map((s, idx) => (
         <Box key={idx} display="flex" gap={1} alignItems="flex-start" mb={1.5} flexWrap="wrap">
+          <Chip size="small" label={`Step ${idx + 1}`} sx={{ mt: 1 }} />
           <FormControl size="small" sx={{ minWidth: 150 }}>
             <InputLabel>Kind</InputLabel>
             <Select
@@ -646,7 +650,35 @@ const ProcessesManagement: React.FC = () => {
           />
           <IconButton
             size="small"
-            aria-label="remove draft step"
+            aria-label={`move step ${idx + 1} up`}
+            onClick={() => {
+              if (idx === 0) return;
+              const next = [...steps];
+              [next[idx - 1], next[idx]] = [next[idx], next[idx - 1]];
+              setSteps(next);
+            }}
+            disabled={idx === 0}
+            sx={{ mt: 0.5 }}
+          >
+            <ArrowUpwardIcon fontSize="small" />
+          </IconButton>
+          <IconButton
+            size="small"
+            aria-label={`move step ${idx + 1} down`}
+            onClick={() => {
+              if (idx >= steps.length - 1) return;
+              const next = [...steps];
+              [next[idx], next[idx + 1]] = [next[idx + 1], next[idx]];
+              setSteps(next);
+            }}
+            disabled={idx >= steps.length - 1}
+            sx={{ mt: 0.5 }}
+          >
+            <ArrowDownwardIcon fontSize="small" />
+          </IconButton>
+          <IconButton
+            size="small"
+            aria-label={`remove step ${idx + 1}`}
             onClick={() => setSteps(steps.filter((_, i) => i !== idx))}
             disabled={steps.length <= 1}
             sx={{ mt: 0.5 }}
@@ -743,7 +775,7 @@ const ProcessesManagement: React.FC = () => {
               <Table size="small">
                 <TableHead>
                   <TableRow>
-                    <TableCell width={50}>#</TableCell>
+                    <TableCell width={70}>Order</TableCell>
                     <TableCell>Name</TableCell>
                     <TableCell>Kind</TableCell>
                     <TableCell>Template</TableCell>
@@ -755,13 +787,13 @@ const ProcessesManagement: React.FC = () => {
                   {(detail.steps || [])
                     .slice()
                     .sort((a, b) => a.sort_order - b.sort_order)
-                    .map((s) => {
+                    .map((s, idx) => {
                       const kind = s.step_kind || 'eln_experiment';
                       const hasWork =
                         kind === 'lims_run' ? Boolean(s.current_lims_run_id) : Boolean(s.experiment_id);
                       return (
                         <TableRow key={s.id}>
-                          <TableCell>{s.sort_order}</TableCell>
+                          <TableCell>{idx + 1}</TableCell>
                           <TableCell>{s.name || '—'}</TableCell>
                           <TableCell>
                             <Chip size="small" color={kindColor(kind)} label={kindLabel(kind)} />
@@ -900,7 +932,14 @@ const ProcessesManagement: React.FC = () => {
                           {step ? (
                             <Box display="flex" alignItems="center" gap={0.5}>
                               <span>
-                                {step.sort_order}: {step.name || templateName(step.experiment_template_id)}
+                                {(() => {
+                                  const ordered = [...(detail.steps || [])].sort(
+                                    (a, b) => a.sort_order - b.sort_order
+                                  );
+                                  const n = ordered.findIndex((x) => x.id === step.id);
+                                  return n >= 0 ? n + 1 : step.sort_order + 1;
+                                })()}
+                                : {step.name || templateName(step.experiment_template_id)}
                               </span>
                               <Chip
                                 size="small"
@@ -1034,7 +1073,12 @@ const ProcessesManagement: React.FC = () => {
             startDialogStep
               ? startDialogStep.name ||
                 templateName(startDialogStep.experiment_template_id) ||
-                `Step ${startDialogStep.sort_order}`
+                `Step ${
+                  [...(detail.steps || [])]
+                    .sort((a, b) => a.sort_order - b.sort_order)
+                    .findIndex((x) => x.id === startDialogStep.id) + 1 ||
+                  startDialogStep.sort_order + 1
+                }`
               : undefined
           }
           onStarted={handleStartDialogDone}

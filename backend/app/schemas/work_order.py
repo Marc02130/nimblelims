@@ -18,7 +18,10 @@ class StepAcceptedSampleTypesResponse(BaseModel):
 
 class RoutingMapCreate(BaseModel):
     analysis_id: UUID
-    sample_type_id: UUID
+    sample_type_id: Optional[UUID] = Field(
+        None,
+        description="Ignored. Sample types are taken from the first process's first experiment/LIMS Run.",
+    )
     tat_min: int = Field(..., ge=1)
     tat_max: int = Field(..., ge=1)
     process_definition_ids: List[UUID] = Field(..., min_length=1)

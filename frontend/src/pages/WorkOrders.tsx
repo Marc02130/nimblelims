@@ -25,14 +25,19 @@ const WorkOrders: React.FC = () => {
   const { hasPermission } = useUser();
   const canStart = hasPermission('experiment:manage');
   const [rows, setRows] = useState<WorkOrderRow[]>([]);
+  const [definitions, setDefinitions] = useState<{ id: string; name: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const load = async () => {
     try {
       setLoading(true);
-      const res = await apiService.getWorkOrders();
+      const [res, defsRaw] = await Promise.all([
+        apiService.getWorkOrders(),
+        apiService.getElnProcessDefinitions({ page: 1, size: 200, active: true }),
+      ]);
       setRows(Array.isArray(res?.items) ? res.items : []);
+      setDefinitions(Array.isArray(defsRaw?.definitions) ? defsRaw.definitions : []);
       setError(null);
     } catch (err) {
       setError(ApiService.formatError(err, 'Failed to load work orders'));
@@ -60,12 +65,25 @@ const WorkOrders: React.FC = () => {
   const columns: GridColDef[] = [
     { field: 'sample_name', headerName: 'Sample', flex: 1, minWidth: 140 },
     { field: 'analysis_name', headerName: 'Analysis', flex: 1, minWidth: 160 },
+    {
+      field: 'process_definition_ids',
+      headerName: 'Process chain',
+      flex: 1.6,
+      minWidth: 220,
+      valueGetter: (_v, row) =>
+        (row.process_definition_ids || [])
+          .map((id: string, i: number) => {
+            const name = definitions.find((d) => d.id === id)?.name || id.slice(0, 8);
+            return `${i + 1}. ${name}`;
+          })
+          .join(' → ') || '—',
+    },
     { field: 'status', headerName: 'Status', width: 130 },
     {
       field: 'process_id',
-      headerName: 'Process',
-      width: 140,
-      valueGetter: (_v, row) => (row.process_id ? 'Open' : '—'),
+      headerName: 'Started',
+      width: 110,
+      valueGetter: (_v, row) => (row.process_id ? 'Open first' : '—'),
     },
     {
       field: 'actions',
@@ -94,8 +112,9 @@ const WorkOrders: React.FC = () => {
             <Button onClick={() => void load()}>Refresh</Button>
           </Box>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Backlog minted by Route. Start instantiates the first process in the snapshot
-            chain. Tests are still minted later, at LimsRun start.
+            Backlog minted by Route. The process chain is ordered: first is sample-type
+            dependent; later processes are not. Start instantiates the first process in
+            that chain. Tests are still minted later, at LimsRun start.
           </Typography>
           {error && (
             <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
