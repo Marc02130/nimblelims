@@ -21,6 +21,8 @@ P1 records **requested analysis + TAT**. It does **not** assign a Test, mint a T
 
 **This stamp:** **P1 Pass** on `c649245` — AC-P1-1..4. Do **not** write P2–P5 Pass. Do **not** collapse with receive CORE stamps (`uat-atomic-receive.md`). Hold merge of PR **#81** to `main`.
 
+**Merge note (2026-08-28):** PR **#81** was merged to `main` (`af5b388`) after this stamp was signed. The hold sentences in this file record the stamp’s condition as written; they are history, not a live instruction.
+
 ---
 
 ## Fixtures
