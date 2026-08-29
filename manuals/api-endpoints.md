@@ -140,7 +140,7 @@ Create a new sample.
 
 UI: `/asked-for`. Copy: **requested analysis**. Write/cancel/Route: `test:assign`, role ≠ Client, and project access/RLS. Route does **not** require `experiment:manage`. Client and hidden/other-project writes return **403** (not 404). List/get: `sample:read`.
 
-`POST /v1/asked-for` **does not** create a Test or `work_order`, start work, or execute an analysis. Route is a separate, unnumbered later P2 planner. `POST /v1/asked-for/{id}/route` and batch `POST /v1/asked-for/route` mint a `work_order` only when a routing-map row matches. Tests create or attach and freeze `asked_for_params` at the **first LimsRun start** (WO-7); later starts do not re-freeze.
+`POST /v1/asked-for` **does not** create a Test or `work_order`, start work, or execute an analysis. Route is a separate, unnumbered later P2 planner. `POST /v1/asked-for/{id}/route` and batch `POST /v1/asked-for/route` mint a `work_order` only when a routing-map row matches. The WO-7 lock creates or attaches Tests and freezes `asked_for_params` at the **first LimsRun start**. That first-start freeze is **open** on `b005cfe`: a later start overwrites the snapshot (see `PATCH /v1/lims-runs/{id}/start`).
 
 ### POST /v1/asked-for
 Record requested analyses for a sample set (one row per sample, one transaction).
@@ -2337,10 +2337,14 @@ Dry-run of what publish would write to existing Tests/Results when `analysis_id`
 ### PATCH /v1/lims-runs/{id}/complete
 Transition `complete → published` (requires `experiment:publish`).
 
-Promotes instrument JSONB → Tests/Results in one transaction (**run always has `analysis_id`**). Each active Test must already exist from the first LimsRun start (WO-7). If any cohort sample lacks one, publish returns **422**, refuses the whole run, writes no Results, invents no Test, and leaves the run `complete`. The guard is implemented on `b005cfe`; the live AC-P2 stamp remains unsigned. The historical `9c4f9da` behavior remains signed not Pass. **409** with `code: promotion_conflict` if another run/manual result owns the same test/analyte/replicate.
+Promotes instrument JSONB → Tests/Results in one transaction (**run always has `analysis_id`**). Each active Test must already exist from the first LimsRun start (WO-7). If any cohort sample lacks one, publish returns **422**, refuses the whole run, writes no Results, invents no Test, and leaves the run `complete`. This refuse **is in code** on `b005cfe`; the live AC-P2 stamp remains unsigned. The historical `9c4f9da` behavior remains signed not Pass. The separate first-start params freeze is **not** closed — see `PATCH /v1/lims-runs/{id}/start`. **409** with `code: promotion_conflict` if another run/manual result owns the same test/analyte/replicate.
 
 ### PATCH /v1/lims-runs/{id}/start
-First start. **Requires `analysis_id`** on the run and at least one cohort sample — **400** if either is missing. With `sample_ids` in the body, first start locks the cohort, creates or attaches one active Test per `(sample, analysis)`, and freezes the then-current routed asked-for `params` into `tests.asked_for_params`. Later starts do not create/attach again or re-freeze params. No non-reportable / `acknowledge_no_analysis` path (product lock 2026-07-19; remove legacy ack if still in code).
+**Requires `analysis_id`** on the run and at least one cohort sample — **400** if either is missing. With `sample_ids` in the body, first start locks the cohort, creates or attaches one active Test per `(sample, analysis)`, and freezes the then-current routed asked-for `params` into `tests.asked_for_params`.
+
+**WO-7 first-start freeze is the lock and is OPEN on `b005cfe`.** `_mint_tests_at_start` has no already-frozen guard: every start that reaches it assigns `tests.asked_for_params`, so a later start that finds the existing active Test for the same `(sample, analysis)` overwrites the first-start snapshot, and writes the empty `{}` when no `routed` asked-for row matches. Empty `{}` is a freeze, not a hole to refill on a later start. Do not document the overwrite as prevented.
+
+No non-reportable / `acknowledge_no_analysis` path (product lock 2026-07-19; remove legacy ack if still in code).
 
 ### Analyte aliases
 - List/create/delete under `/analytes/{id}/aliases` (admin analyte form also manages aliases).
