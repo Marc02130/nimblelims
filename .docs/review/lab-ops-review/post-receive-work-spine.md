@@ -101,7 +101,7 @@ Already normative: empty map / zero acceptable routes → **422** and no mint; m
 - Receive stays dumb. No analysis picker. Non-empty `analysis_ids` → **422**.
 - Asked-for ≠ Test ≠ work_order ≠ Process.
 - Test row at **LimsRun start** only (WO-7). Publish refuses if missing.
-- Empty routing map mints nothing. Overlapping TAT refuses on save.
+- Empty map / zero acceptable routes returns 422 and mints nothing. Overlapping TAT refuses on save with 409.
 - Qubit-on-blood refuses. Dest-type Hold is a **different** packet.
 - One execute substrate: Process / Experiment / LimsRun. No third engine.
 - SOP Apply: human save of a process definition; never silent auto-activate; no SOP PDF bodies in git; not IC50.

@@ -20,7 +20,7 @@ Atomic receive CORE is shipped. Tubes land **Available for Testing** with **zero
 
 Sketch UI completeness is **4/10**: it names `pages/AskedFor.tsx`, a sample-detail panel, sidebar after Receive, multi-select, and “reuse analysis dropdown not TestForm.” It does not specify hierarchy, empty states, 409/422 copy, scan-into-set, TAT due date, status chips, partial multi-sample failure, or the P2 split from the lake. Conditions below close that for implementers. **Do not revise the packet to invent a third engine or put analysis on `/receive`.**
 
-**P1 may implement** if **U1–U8** land in the same PR. **P2 UX stays closed** until **U9–U11** plus Lab Ops **L2–L4** and **OQ-WO-1**. P3/P4/P5 bind later PRs (**U12–U14**).
+**P1 may implement** if **U1–U8** land. P2 U9–U11 are now bound by the Decided ordered-route lock; product merge remains held on the OPEN freeze / unsigned overall Pass.
 
 **Verdict: Accept with conditions.**
 
@@ -152,7 +152,7 @@ Classifier: **APP UI**. Calm hierarchy, utility copy, DataGrid is the workspace 
 | 4 AI slop | 8/10 | No hero, no card grid. Risk is Tests-clone chrome + “Assign test” muscle memory, not marketing slop. |
 | 5 Design system | 7/10 | Reuse FillHeightPage, DataGrid, ListFilterChips, CustomAttributeField, receive barcode field. No DESIGN.md — do not invent a new visual language. |
 | 6 Responsive / a11y | 3/10 | Keyboard + chip contrast unspecified; laptop-only is acceptable if stated. |
-| 7 Unresolved | — | OQ-WO-1 blocks **P2 UX**, not P1. TAT due-date display (Lab Ops watch) is U7. |
+| 7 Unresolved | — | OQ-WO-1 is Decided. First-start freeze remains OPEN; overall P2 Pass unsigned. |
 
 Sketch overall **4/10**. P1 is implementable only with **U1–U8** as the missing UI spec.
 
