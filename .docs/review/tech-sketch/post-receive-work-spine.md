@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-28  
 **Stem:** `post-receive-work-spine`  
-**Status:** Architecture / UI / Spec **Accept with conditions** on `feat/work-order-p2` @ `8cfa2a9`. **Hold merge until UAT.** Punch (3) **open**: one process definition, not next-pending / Start next / N of M. P2-4 still `0074` `has_experiment_access`. Closed pending QA: (1) first-start freeze, (2) no sample-type picker, (4) Route 0=422 / two=409, (6) publish-refuse, (7) Route `test:assign`. Not IC50.  
+**Status:** Architecture / UI / Spec **Accept with conditions** on `feat/work-order-p2` @ `8cfa2a9`. **Hold merge until UAT.** Punch (3) **open**: first Start must not mint later processes or their Tests. Route snapshots ordered `process_definition[]`, zero Tests. First Start = process[0] only; later Start = next process, on the sample that exists then. One-definition restore (`82228ab` / `56cbc76`) is behind Leadership. Still open: Hans freeze (classic `/tests` `{}` is not a freeze), extract must not share asked-for `analysis_id`, P2-4 `0074`. Closed pending QA: no sample-type picker, Route 0=422 / two=409, publish-refuse, Route `test:assign`. Not IC50.  
 **Requirements:** [`.docs/review/requirements/post-receive-work-spine.md`](../requirements/post-receive-work-spine.md)  
 **Schema:** [`.docs/review/schema-changes/post-receive-work-spine.md`](../schema-changes/post-receive-work-spine.md)  
 **Spec:** [`.docs/internal/specs/post-receive-work-spine/SPEC.md`](../../internal/specs/post-receive-work-spine/SPEC.md)  
@@ -20,11 +20,12 @@ P1 is on `main`. P2 is on `feat/work-order-p2` (Accept with conditions). Do not 
 4. **Mathilda U1 / U2:** asked-for ≠ Test assign. Label params as order capture, not Test snapshot.
 5. Architecture / UI / Spec **Accept with conditions** on P2 @ `8cfa2a9`. Hold merge until UAT. Not IC50.
 6. **Receive freeze:** non-empty `analysis_ids` still **422**.
-7. **P2 one process (Heidi / Mathilda):** `routing_map` and `work_order` hold **one** process definition (typed Exp/LimsRun steps). Bounce process-of-processes, `uuid[]` chain, completing N starts N+1, `start` of `[0]` only, `work_order_route_position` next pending, Start next, N of M. **Still open** on `8cfa2a9`. The ordered-`process_definition[]` rewrite is not the lock.
+7. **P2 ordered route (Leadership / Heidi):** a route is analysis + TAT + **ordered** `process_definition[]`. Route snapshots the list, **zero Tests**. First Start = process[0] only. Later Start = next process, on the sample that exists then. Punch (3) is **first Start minting later processes or their Tests**, not the list itself. One-definition restore (`82228ab` / `56cbc76`) is behind this lock.
 8. **WO-7 publish (code-closed @ `b005cfe`, hold QA):** `_require_wo7_tests` 422s before promote if any cohort sample lacks an active Test. `plan.errors` also 422s. Status stays unpublished (complete).
-9. **Freeze (code-closed @ `8cfa2a9`, hold QA):** first LimsRun start wins. `_mint_tests_at_start` must **not** overwrite `asked_for_params` on an existing Test (including `{}`).
+9. **Hans freeze (still open):** skip overwrite only when a **LimsRun-start snapshot** already exists. Classic `/tests` default `{}` is **not** a freeze. Do not treat empty `{}` as already frozen.
 10. **P2-4 visibility:** Route is `test:assign` and must **read** the mapped def/steps (catalog-visible, same client / logged-in, like `routing_map`). Do **not** put `experiment:manage` on Route. **`0074`:** `is_admin() OR has_experiment_access()` is **not** catalog-visible. Mutate stays `config:edit`. Instantiate stays. **Still open** on `8cfa2a9`.
 11. **No sample-type picker (code-closed @ `8cfa2a9`, hold QA):** derive first Exp/LimsRun allow-list. `assert_chain_accepts_sample_type` is gone. Route: 0 hits **422**, two that accept **409**, live check vs first step of process[0]. Never `first()`. Map-save 409 when TAT **and** first-step allow-lists overlap. Denorm `sample_type_id` is display/sync only. Empty first-step allow-list fails closed at **start**, not map-save.
+12. **Extract `analysis_id` (still open):** Extract must **not** share the asked-for `analysis_id`.
 
 ---
 
@@ -38,16 +39,16 @@ Receive writes Sample + Containers + Contents. Nothing records the request. Clas
 UI /asked-for ──▶ asked_for (P1)
                       │
                       ▼  explicit Route (P2)
-          analysis + TAT candidates
+          analysis + TAT + ordered process_definition[]
              │ 0: 422 │ 2 accept current type: 409
              ▼ exactly 1
-            work_order (one process_definition_id)
+            work_order (snapshot the list, zero Tests)
                  │
-                 ▼ Start that process only
+                 ▼ First Start = process[0] only
          existing /v1/eln-processes
                  │
-                 ▼
-         LimsRun start → Test (WO-7)
+                 ▼ Later Start = next process, on the sample that exists then
+         LimsRun start → Test (WO-7) for that process only
                  │
                  ▼
          results persist (P3)  or  parser import (P5) → publish
@@ -55,7 +56,7 @@ UI /asked-for ──▶ asked_for (P1)
 
 SOP Apply (P4) writes **process definitions** that routing_map points at.
 
-No new execute runtime. No second AuthZ. No second workflow engine. No process-of-processes.
+No new execute runtime. No second AuthZ. No second workflow engine. First Start must not mint later processes or their Tests.
 
 ## 3. P1 design
 
@@ -108,21 +109,21 @@ Pytest: create, 409 dup, **403 dual-belt** (create **and** `list()` / `GET /aske
 
 ## 4. P2 design
 
-`routing_map`: analysis + TAT + **one** `process_definition_id`. No sample-type picker; derive first Exp/LimsRun allow-list. Save **409**s when the same analysis, overlapping TAT, **and** overlapping first-step allow-lists all hold.
+`routing_map`: analysis + TAT + **ordered** `process_definition[]`. No sample-type picker; derive first Exp/LimsRun allow-list of process[0]. Save **409**s when the same analysis, overlapping TAT, **and** overlapping first-step allow-lists all hold.
 
 **OQ-WO-1 Decided:** Tech hits **Route**. No auto-route on asked-for save. `POST /api/v1/asked-for/{id}/route` (batch the same call for a selected set). Then:
 
-- Select analysis + TAT candidates; filter by current type against the mapped process’s first Exp/LimsRun step allow-list
-- Zero acceptable rows → 422; two saved rows that both accept this current type → 409; exactly one snapshots **one** `process_definition_id`
+- Select analysis + TAT candidates; filter by current type against process[0]’s first Exp/LimsRun step allow-list
+- Zero acceptable rows → 422; two saved rows that both accept this current type → 409; exactly one **snapshots the ordered list, zero Tests**
 - Never silently use `first()`
 - Denorm `sample_type_id` is display/sync only — Route uses the live first-step list
 - Empty first-step allow-list fails closed at **start**, not map-save
 
-`work_orders.process_definition_id` snapshot at mint (**L4**). **One** existing process definition (typed Exp/LimsRun steps). Bounce `uuid[]` chain, `work_order_route_position` next pending, Start next, N of M, process-of-processes.
+`work_orders.process_definition_ids` snapshot at mint (**L4**). Ordered list is the lock. Punch (3): **first Start must not mint later processes or their Tests**.
 
-Start: `ELNProcessService.instantiate_from_definition` on **that** definition; `work_orders.process_id`. Instantiate stays `experiment:manage`. Route stays `test:assign`. Later **step** starts type-gate current type vs **that** step only. Do not instantiate the next process definition.
+Start: `ELNProcessService.instantiate_from_definition` on **process[0] only**. Later Start = next process, on the sample that exists then. Instantiate stays `experiment:manage`. Route stays `test:assign`. Later process/step starts type-gate current type vs **that** step only.
 
-**L3 / A5 / SC5:** At LimsRun start, insert Test if missing; copy `asked_for.params` → `tests.asked_for_params` and freeze. **First start wins** — do not overwrite `asked_for_params` on an existing Test (including `{}`). P1 does **not** write that Test snapshot.
+**L3 / A5 / SC5 / Hans:** At LimsRun start, insert Test if missing; copy `asked_for.params` → `tests.asked_for_params` and freeze. Skip overwrite **only** when a LimsRun-start snapshot already exists. Classic `/tests` default `{}` is **not** a freeze. Extract must **not** share the asked-for `analysis_id`. P1 does **not** write that Test snapshot.
 
 WO-7 publish @ `b005cfe`: `_require_wo7_tests` + `plan.errors` 422 the whole run. Status stays complete / unpublished. Zero Results.
 
@@ -154,11 +155,14 @@ No new import engine. **Do not build “admin authors parsers” as the product.
 | Route with two saved rows that both accept current type | **409**, no silent `first()` |
 | Map save, same analysis + overlapping TAT + overlapping first-step allow-lists | **409** |
 | Map save, same analysis + overlapping TAT, disjoint first-step allow-lists | Save succeeds (extract-first vs Qubit-first) |
-| Next pending / Start next / N of M | Bounce — one process definition |
+| First Start mints later processes or their Tests | Bounce — punch (3). Snapshot is the list only |
+| Later Start | Next process, on the sample that exists then |
 | Later step start with current type outside that step’s accepted types | **422 `route_sample_type`** |
 | Publish without Test | **422** the whole run. Stay unpublished. Zero Results. |
 | Invisible process def (`0074` `has_experiment_access`) | Catalog-visible **read**. Route stays `test:assign`. Not `experiment:manage` on Route. |
 | Empty accepted set at step start | **422 `route_sample_type`** |
+| Classic `/tests` default `{}` | Not a freeze — LimsRun start must still snapshot |
+| Extract LimsRun shares asked-for `analysis_id` | Bounce |
 | Parser AI on import | Impossible (no call site) |
 | Receive non-empty `analysis_ids` | **422** (freeze) |
 
@@ -167,7 +171,7 @@ No new import engine. **Do not build “admin authors parsers” as the product.
 | PR | Scope |
 |----|--------|
 | 1 | P1 tables + API + `/asked-for` UI + pytest + UAT script. **Hold merge until UAT.** |
-| 2 | P2 routing + work_order + one process definition + LimsRun WO-7. Architecture / UI / Spec Accept with conditions @ `8cfa2a9`. **Hold merge until UAT.** Punch (3) open: drop chain / Start next. P2-4 still `0074`. |
+| 2 | P2 routing + work_order + ordered `process_definition[]` + LimsRun WO-7. Architecture / UI / Spec Accept with conditions @ `8cfa2a9`. **Hold merge until UAT.** Punch (3) open: first Start must not mint later processes or Tests. Still open: Hans freeze, extract `analysis_id`, P2-4 `0074`. |
 | 3 | P3 persist lock + results UAT fold (**closed**) |
 | 4 | P4 SOP Apply → process def (**closed**) |
 | 5 | P5 parser setup UX (**closed** this cycle) |
