@@ -98,8 +98,8 @@ No new execute runtime. Receive stays 422 on `analysis_ids` (existing bounce, no
 | **S2** | High | **P1** | **Client role cannot write asked-for** (create / cancel). GET/list only if `sample:read` + RLS on that sample. **Do not treat leftover Client `test:assign` as write license.** `0013_seed_client_role` falls back to `test:assign` because `test:read` does not exist — permission-name-only checks fail this. Pytest: Client POST/cancel → 403; lab tech without project access → 403; other-client sample → 403. |
 | **S3** | High | **P1** | **FORCE ROW LEVEL SECURITY** on `asked_for` and `analysis_param_defs`. `asked_for` USING **and WITH CHECK** via sample → project (mirror `tests`). Param-defs: authenticated read; **write `config:edit` / admin**. Multi-sample (L1): **each** `sample_id` independently RLS-checked; fail closed — no write of unauthorized ids (no first-row-only bulk). |
 | **S4** | Med | **P1** | `params` keys must match `analysis_param_defs` for that analysis; unknown or missing required → **422**. Empty defs = `{}` only. Do **not** persist `params` onto Sample identity (`client_sample_id`, subject, container metrics). Audit asked-for create/cancel (actor, sample_id, analysis_id, status). |
-| **S5** | High | **P2** | Map mutate = `config:edit`; intake type is match data only. Route matches analysis × type × TAT and checks only the first step. Map save does no chain-wide type validation. |
-| **S6** | High | **P2** | Work orders snapshot one `process_definition_id`. Start under `experiment:manage` instantiates it once; typed steps retain order. |
+| **S5** | High | **P2** | Map mutate = `config:edit`; no type field. Route evaluates analysis + TAT candidates and first-process type acceptance under RLS. Zero acceptable → 422; two saved rows that both accept current type → 409. Never use `first()` or mutate the map. Map save 409s only on overlapping TAT **and** overlapping first-step allow-lists. |
+| **S6** | High | **P2** | Work orders snapshot ordered `process_definition[]`. Start under `experiment:manage` instantiates first pending definition only and records route position. Later start advances one. No client expansion; no process-of-processes minted at Route. |
 | **S7** | High | **P2** | **WO-7:** Test minted **only** at LimsRun start under process AuthZ. Asked-for create, WO save, and route mint **zero** Tests. Publish **422** if Test missing. **Remove** find-or-create / `ensure_test` on publish (`ResultPromotionService.ensure_test` is called today from `publish_run` — “may create tests via ensure”). Asked-for `params` snapshot onto the Test at LimsRun start and **freeze**; no write-back to Sample identity. |
 | **S8** | Med | **P2** | Snapshot ordered definition IDs at mint so map edits cannot retarget work. Preserve process/step order. Audit candidate count, Route refusal/ambiguity, chosen map, each route-position start, and later type refusal. |
 | **S9** | High | **P3** | Persist typed results on an **existing** Test only. AuthZ = existing `result:enter` (classic) or existing publish path (lab-only). RLS via test → sample → project. Two writers on the same Test → **409**. Client cannot enter. No `results.unit_id`. Do not persist from asked-for. P3 does not mint Tests. |
@@ -116,8 +116,8 @@ Already normative in the packet (restated so they are not dropped): uniqueness 4
 | ID | Stance |
 |----|--------|
 | **OQ-AF-2** | **Locked.** Reuse `test:assign`. Do not add `order:create`. Client write still denied by **role** (S2). |
-| **OQ-WO-1** | Explicit Route is a lab write under RLS; no map returns `no_route`; Client cannot route. |
-| **OQ-WO-3** | One process instance links to the work order. RLS follows the sample. |
+| **OQ-WO-1** | Explicit Route is a lab write under RLS; zero acceptable returns 422; Client cannot route. |
+| **OQ-WO-3** | Each process instance links to WO + route position. RLS follows the sample. |
 | **OQ-SOP-2** | **Locked for security:** inactive, **unbound**. Never auto-bind (S11). |
 
 ---

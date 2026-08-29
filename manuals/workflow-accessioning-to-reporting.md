@@ -27,7 +27,7 @@ The three-step `/accessioning` wizard is **removed**. `/accessioning` redirects 
 
 **Status:** Sample is **Available for Testing**. Zero Tests. Zero Results.
 
-**Separate later look-up:** **Asked-for** records requested analysis + TAT and creates zero Tests/work orders. Later Route matches analysis × intake type × TAT, checks the mapped process’s first step, and queues one process definition. Later steps gate current type when started. None of this is part of Receive.
+**Separate later look-up:** **Asked-for** records requested analysis + TAT and creates zero Tests/work orders. Later Route evaluates analysis + TAT candidates against current type: zero acceptable → 422; two saved rows that both accept current type → 409; exactly one snapshots ordered `process_definition[]`. Work Orders starts the first process only; later starts advance in order. None of this is part of Receive.
 
 ### Stage 1.5: Sample/Test/Container Editing (Post-Accessioning)
 

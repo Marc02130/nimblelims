@@ -140,7 +140,7 @@ Create a new sample.
 
 UI: `/asked-for`. Copy: **requested analysis**. Write/cancel/Route: `test:assign`, role ≠ Client, and project access/RLS. Route does **not** require `experiment:manage`. Client and hidden/other-project writes return **403** (not 404). List/get: `sample:read`.
 
-`POST /v1/asked-for` creates no Test or work order. Route later matches analysis × intake type × TAT, then checks the first ordered step only. Map save never chain-ANDs the intake type across later steps. WO-7 creates/attaches Tests at LimsRun start; first-start freeze remains OPEN on `b005cfe`.
+`POST /v1/asked-for` creates no Test or work order. Route later evaluates analysis + TAT candidates and first-process type acceptance: zero → 422, two saved rows that both accept current type → 409, exactly one → ordered route snapshot. Never silently choose `first()`. WO-7 creates/attaches Tests at LimsRun start; first-start freeze remains OPEN on `b005cfe`.
 
 ### POST /v1/asked-for
 Record requested analyses for a sample set (one row per sample, one transaction).
@@ -166,13 +166,13 @@ Allowed while `requested`. Cancel after `routed` → **422**.
 
 ### POST /v1/asked-for/{id}/route
 ### POST /v1/asked-for/route
-These are explicit later planning actions. Body for batch: `{ "asked_for_ids": ["uuid"] }`. Route matches analysis × intake/current sample type × TAT. No match returns **200** `no_route`. A mapped process whose first ordered Experiment/LimsRun step rejects the intake type returns **422** `route_sample_type`. A valid match snapshots one process definition, creates a queued work order, changes asked-for to `routed`, and creates no Test.
+These are explicit later planning actions, not calls that Receive or asked-for create should chain automatically. Body for batch: `{ "asked_for_ids": ["uuid"] }`. Route finds analysis + TAT candidate rows, then compares current type with each row’s first process / first ordered Experiment/LimsRun allow-list. Zero acceptable rows → **422** and no mint; type refusal uses `detail.code = "route_sample_type"`. Two saved rows that both accept this current type → **409**. Exactly one acceptable row snapshots its ordered `process_definition[]`, creates a queued work order, changes asked-for to `routed`, and creates no Test. Never silently use `first()`. Write requires `test:assign` plus project access, not `experiment:manage`; Client and inaccessible-project writes return **403**, not 404.
 
 ### Routing map / work orders
-- `GET/POST /v1/routing-map` · `PATCH/DELETE /v1/routing-map/{id}` (write: `config:edit`). Row = analysis × intake sample type × inclusive TAT range → one process definition. TAT overlap for the same analysis/type → **409**.
-- `GET/PUT /v1/eln-process-definitions/{id}/steps/{step_id}/accepted-sample-types`. Display the first ordered Experiment/LimsRun step’s allowed types as information. Map save performs no chain-wide accepted-type check.
+- `GET/POST /v1/routing-map` · `PATCH/DELETE /v1/routing-map/{id}` (write: `config:edit`). Rows author analysis × inclusive TAT range × ordered `process_definition[]`; the UI must preserve order. **409** on save only when the same analysis, overlapping TAT, **and** overlapping first-step allow-lists all hold. Extract-first and Qubit-first for the same TAT are legal. No sample-type create field. Map save performs no chain-wide check across later processes or steps.
+- `GET/PUT /v1/eln-process-definitions/{id}/steps/{step_id}/accepted-sample-types`. Derive the first process and its first ordered Experiment/LimsRun allowed types on read. Any stored display copy must refresh when process order or first-step acceptance changes.
 - `GET /v1/work-orders` (requires `sample:read`; filters: `status`, `sample_id`) returns `{ items, count }`.
-- `POST /v1/work-orders/{id}/start` (requires `experiment:manage`) instantiates the snapshotted process definition and returns its `process_id`. Typed steps stay ordered. Each step start compares current sample type with that step’s allow-list; empty or incompatible returns **422** `route_sample_type`.
+- `POST /v1/work-orders/{id}/start` (requires `experiment:manage`) instantiates **only the first not-yet-started process definition** in snapshot order and returns its `process_id`. Route has already gated the first process’s first step. A later start advances to the next process; it does not mint a process-of-processes at Route. Each later process/step start compares current type with the allow-list at that start; empty or incompatible returns **422** `detail.code = "route_sample_type"`.
 
 ### Param defs (later — not receive, not this P1 stamp)
 `GET/PUT /analyses/{id}/param-defs` is catalog setup for freeze at **LimsRun start**. Do not put param defs on `POST /samples/receive`. P1 asked-for does not require filling defs.

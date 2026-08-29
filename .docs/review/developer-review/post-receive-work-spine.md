@@ -25,13 +25,13 @@ The packet is **not** ready as a single mega-PR. Existing code already has the w
 |----------|---------------------|------|
 | `atomic_receive_service` + `POST /samples/receive` | **Freeze.** Keep `analysis_ids` 422. | Do not reopen CORE. |
 | `TestsManagement` / `POST /tests` / `TestForm` | Classic Test grid (WO-4 type-a-number still lives here). | **Do not reuse `TestForm`.** It is Test CRUD copy and `test:update`. |
-| `ELNProcessService.instantiate_from_definition` | P2 start of snapshotted definition. | Do not call from asked-for create. |
+| `ELNProcessService.instantiate_from_definition` | P2 start of first process. | Do not call from asked-for create. |
 | `LimsRunService.start_run` + `ResultPromotionService.ensure_test` | P2 WO-7: mint Test at **start**; **stop** ensure-on-publish. | Today `ensure_test` still runs on publish (`plan_promotion` `dry_run=False`). |
 | `DataParsersManagement` + `/v1/data-parsers` | P5 setup UX (engine shipped). | No new import engine. |
 
 P1 is a **new domain** (`asked_for`), mounted like other post-wizard APIs (`/v1/...`), modeled like `Result`/`DataParser` (**not** `BaseModel` — unique `name` would explode). Multi-sample L1 is one transactional write, not N independent POSTs. Hidden samples return **403** like receive, not `require_accessible_sample` 404.
 
-**OQ-WO-1 / OQ-WO-3 are Decided** under the Hans/Heidi lock. P2 product merge remains held because first-start freeze is OPEN and overall Pass unsigned.
+**OQ-WO-1 / OQ-WO-3 are Decided** under the ordered-route lock. P2 product merge remains held because first-start freeze is OPEN and overall Pass unsigned.
 
 **Verdict: Accept with conditions** for P1. Later phases are file-mapped, not licensed.
 
@@ -81,10 +81,10 @@ P1 is a **new domain** (`asked_for`), mounted like other post-wizard APIs (`/v1/
 
 | Area | File | Work |
 |------|------|------|
-| Migration | new `007x_routing_work_orders.py` | Map intake `sample_type_id`; one `process_definition_id` snapshot on work order. |
-| Type gate | step accepted types | Map save does no chain-wide check. Route gates first step; later steps gate current type at start. |
-| Route | routing/work-order services | Analysis × intake type × TAT; `no_route` if none; first-step mismatch 422. |
-| Start | `ELNProcessService.instantiate_from_definition` | Instantiate the one snapshotted definition. |
+| Migration | new `007x_routing_work_orders.py` | Ordered `process_definition_ids` on map + WO; route position on process instances; no map `sample_type_id`. |
+| Type gate | step accepted types | Route gates each candidate’s first process / first step. Later starts gate current type. Empty fails closed. |
+| Route | routing/work-order services | Analysis + TAT candidates; zero acceptable 422; two saved rows that both accept current type 409; exactly one snapshots ordered route. Never `first()`. Map save 409s only on overlapping TAT **and** overlapping first-step allow-lists. |
+| Start | `ELNProcessService.instantiate_from_definition` | Instantiate first pending definition only; link route position; later calls advance. |
 | WO-7 | `backend/app/services/lims_run_service.py` `start_run` (~L191) | Insert Test if missing; snapshot asked-for `params` onto Test (L3) and freeze. |
 | Publish refuse | `backend/app/services/result_promotion_service.py` `ensure_test` (~L164) called from `plan_promotion` when `dry_run=False` (~L313) | Remove find-or-create on publish; 422 if Test missing. |
 | UI | new Work Orders page **or** extend Processes; routing-map admin (`config:edit`) | Not `/asked-for` Start CTA. |
@@ -130,7 +130,7 @@ P1 is a **new domain** (`asked_for`), mounted like other post-wizard APIs (`/v1/
 | **D9** | **P1** | **RLS + unique handling.** FORCE RLS on both tables. `asked_for`: USING **and** WITH CHECK via `samples.project_id` + `has_project_access` (mirror `tests_access`, add WITH CHECK like `0068`). `analysis_param_defs`: read authenticated lab roles; write `config:edit` / admin (API-enforced write is acceptable if policy is admin-or-authenticated-read like instrument catalogs — still FORCE RLS). GRANT `lims_app`. Catch unique `uq_asked_for_open` → 409. Cancelled row may be re-created (partial unique ignores cancelled). | Schema-changes §2.5. USING-only policies fail inserts under FORCE RLS. |
 | **D10** | **P1** | **Docs + UAT in the same PR.** Create `UAT_Scripts/uat-post-receive-work-spine.md` with AC-P1-1..3 (receive → ELISA asked-for → zero Tests/WOs; dup 409; cross-project 403). Do **not** use retired `uat-sample-accessioning.md`. Update `.docs/review/manuals/navigation.md`, `api-endpoints.md`, `accessioning-workflow.md` (after receive → Asked-for, not TestForm), and `README.md` / `frontend/README.md` route list. Fill Alembic id in schema-changes. No Qubit/blood testdata. | Full-pipeline implement requirements. |
 | **D11** | **P1** | **Pytest/Jest minimums** (see §6). Include: Client 403 on POST; lab-tech 201; IntegrityError 409; unknown param key 422; empty defs + `{}` 201; receive still 422 on `analysis_ids`; asked-for create leaves tests count 0; RLS-hidden sample 403. | Sketch §3.4 + QA will need these even before a QA review stamp. |
-| **D12** | **P2 (not P1)** | Map row = analysis × intake type × TAT → one definition. Display first-step types. No chain-wide map-save gate; Route checks first step; later steps gate at start. | Hans/Heidi lock. |
+| **D12** | **P2 (not P1)** | Map row / WO snapshot ordered `process_definition[]`; no type picker. Derive first-process / first-step list. Route zero→422, two-accept→409. Map save 409 only on TAT **and** first-step overlap. Start first process only; later starts advance/gate. No chain-AND. | Heidi/Leadership ordered-route lock. |
 | **D13** | **P3 (not P1)** | Do **not** implement persist lock until OQ-RES-1 decides how typed `qualifiers` relate to the existing UUID FK. Do not add `results.unit_id`. | Schema-changes “P3 none” contradicts JSON qualifiers. |
 
 ---
@@ -201,7 +201,7 @@ Treat **D1–D11** as bounce for the P1 PR. Prompt the implementer to:
 | **Date** | 2026-08-28 |
 | **Implement gate** | **OPEN for P1 only** (same as Lab Ops), provided D1–D11 land in the P1 PR |
 | **P1** | Licensed. First PR. |
-| **P2** | OQ-WO-1/3 Decided under D12 Hans/Heidi lock; hold product merge while freeze is OPEN / overall P2 unsigned |
+| **P2** | OQ-WO-1/3 Decided under D12 ordered-route lock; hold product merge while freeze is OPEN / overall P2 unsigned |
 | **P3** | **CLOSED** (D13; `results.qualifiers` type vs OQ-RES-1) |
 | **P4 / P5** | File-mapped; not in P1 PR. P5 may be a later independent PR. |
 | **Not licensed** | Receive reopen · TestForm reuse · mint Tests at asked-for · routing tables in 0072 · Qubit/blood testdata · dest-type E2E |
