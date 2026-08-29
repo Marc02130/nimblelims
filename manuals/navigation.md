@@ -113,7 +113,7 @@ The Sample Management section uses a Material-UI Accordion component for collaps
 | Menu Item | Route | Icon | Permission Required | Description |
 |-----------|-------|------|---------------------|-------------|
 | **Receive** | `/receive` | Science | `sample:create` | Atomic receive (CORE happy path): scan 1..N vessels. No analysis picker. |
-| **Asked-for** | `/asked-for` | Assignment | view `sample:read`; create `test:assign` (not Client) | Record **requested analysis + TAT** for already-received samples — a later look-up, not the click after a receive commit. Does **not** mint a Test or start work. Listed after Receive in the sidebar; that is nav order, not a work queue. |
+| **Asked-for** | `/asked-for` | Assignment | view `sample:read`; create/cancel/Route `test:assign` + project access (not Client) | Record **requested analysis + TAT** for already-received samples — a later look-up, not the click after a receive commit. Route is an unnumbered later planner and does **not** require `experiment:manage`. Unauthorized Client or project-scoped writes return **403**, not 404. Listed after Receive in the sidebar; that is nav order, not a work queue. |
 | **Samples** | `/samples` | Science | `sample:read` | Sample management interface with list and edit functionality |
 | **Tests** | `/tests` | Biotech | `test:update` | Tests on existing Test rows (not the request path) |
 | **Containers** | `/containers` | Inventory | `sample:update` | Container management interface with list, create, and edit functionality |
@@ -135,10 +135,10 @@ The **Experiments** section is its own top-level accordion, placed immediately a
 | Menu Item | Route | Icon | Tooltip | Permission | Description |
 |-----------|-------|------|---------|------------|-------------|
 | **All Experiments** | `/experiments` | Biotech | Experiments & Processes | (section) `experiment:manage` | List and detail of experiments; sample executions, lineage, linked processes |
-| **Work Orders** | `/work-orders` | AssignmentTurnedIn | Routed work orders | view `sample:read`; Start `experiment:manage` | Planning backlog minted only by the later explicit Route action. A queued work order does not mean work has started. **Start process** instantiates and opens the existing ELN process; Tests wait for LimsRun start. |
+| **Work Orders** | `/work-orders` | AssignmentTurnedIn | Routed work orders | view `sample:read`; Start `experiment:manage` | Planning backlog minted only by the later explicit Route action. A queued work order does not mean work has started. **Start process** instantiates and opens the existing ELN process; Tests and params freeze at the first LimsRun start, not later starts. |
 | **Processes** | `/experiments/processes` | AccountTree | ELN multi-step processes | `experiment:manage` | Existing process definitions and instances with typed Experiment/LimsRun steps |
 | **Experiment Templates** | `/experiments/templates` | ViewList | Experiment template definitions | `experiment:manage` (same as section) | Template CRUD, SOP/AI-assisted creation, sign-off, activation (`ExperimentTemplatesManagement`) |
-| **Runs** | `/runs` | PlayCircleOutline | Experiment Runs | `experiment:manage` | LimsRun list; Test create/attach and asked-for parameter freeze occur at run start |
+| **Runs** | `/runs` | PlayCircleOutline | Experiment Runs | `experiment:manage` | LimsRun list; Test create/attach and asked-for parameter freeze occur at first start and are not repeated on later starts |
 
 **Templates visibility:** The "Experiment Templates" sub-item is shown whenever the user has `experiment:manage` (Administrator, Lab Manager, Lab Technician in default seed roles). It is not restricted to `config:edit`.
 
@@ -354,6 +354,7 @@ All authenticated routes use the `MainLayout` component, which provides the unif
 - **Permission-Based Routes**: Routes check permissions and redirect to `/dashboard` if unauthorized
   - Admin routes require `config:edit` or specific permissions; `/admin/routing-map` requires `config:edit`
   - Core feature routes require respective permissions (e.g., `sample:create` for `/receive`, `sample:read` for samples list, `sample:update` for sample/edit/containers)
+  - Asked-for Route actions require `test:assign` plus project access; Client and inaccessible-project writes return **403**, not 404. Route does not require `experiment:manage`
   - Experiments routes: `/experiments`, `/experiments/:id`, `/experiments/processes`, `/experiments/templates`, and `/runs` require `experiment:manage`; `/work-orders` route is visible with `sample:read` or `experiment:manage`, while its list API requires `sample:read` and Start requires `experiment:manage`
   - Lab Mgmt routes: `/clients`, `/projects`, `/client-projects` require `project:manage`; `/analyses`, `/analytes` require `analysis:manage`
   - Edit routes (`/samples/:id`, `/tests/:id`, `/containers/:id`) require `sample:update` or `test:update` permissions respectively
