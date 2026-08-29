@@ -19,7 +19,7 @@ This is a how-to, not a PRD. Marc keeps it current as features ship.
 | Requested analysis (`/asked-for`) — later look-up, off the bench path | P1 lake on `feat/asked-for-p1` (PR 81) until that merges |
 
 Local legacy handbooks (not on git): `.docs/manuals/` — `dev-setup.md`, `admin-setup.md`, `atomic-receive.md`, `processes.md`, `experiments.md`, `lims-runs.md`, `api-endpoints.md`, `navigation.md`.  
-UAT: [`UAT_Scripts/uat-atomic-receive.md`](../UAT_Scripts/uat-atomic-receive.md) · P1 [`UAT_Scripts/uat-post-receive-work-spine.md`](../UAT_Scripts/uat-post-receive-work-spine.md) (on the asked-for branch).  
+UAT: [`UAT_Scripts/uat-atomic-receive.md`](../UAT_Scripts/uat-atomic-receive.md) · P1 `UAT_Scripts/uat-post-receive-work-spine.md` (lives on `feat/asked-for-p1`; not on `main` while PR 81 is held, so it is not linked here).  
 Stamps: [`.docs/decision-logs/framework-stamps-2026-08-26.md`](../.docs/decision-logs/framework-stamps-2026-08-26.md) (WO-7: Test at LimsRun start, not at receive).
 
 ---
