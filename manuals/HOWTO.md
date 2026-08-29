@@ -72,8 +72,8 @@ Client / no `sample:create` → no Receive nav or **403**.
 
 **Copy lock:** say **requested analysis**. Do **not** say asked-for save assigns a Test, mints a work order, or starts work. Only the later explicit Route action can mint a work order.
 
-**UI:** Sample Mgmt → **Asked-for** (`/asked-for`). Also a section on sample detail, which is where a tech normally meets it.  
-**API:** `POST /v1/asked-for` · `GET /v1/asked-for` · `POST /v1/asked-for/{id}/cancel`.  
+**UI:** Sample Mgmt → **Asked-for** (`/asked-for`). Also a section on sample detail, which is where a tech normally meets it.
+**API:** `POST /v1/asked-for` · `GET /v1/asked-for` · `POST /v1/asked-for/{id}/cancel`.
 Handbook: [asked-for.md](asked-for.md).
 
 **What a row is:** **requested analysis + TAT**, against an already-received sample. That is all.
