@@ -15,7 +15,7 @@ P1 records **requested analysis**. It does **not** assign a Test, mint a Test ro
 
 **Out of this stamp:** Route, work_orders, WO-7 Test-at-LimsRun-start, `analysis_param_defs` on receive, results persist, SOP Apply, parser dry-run UX, Qubit/blood path.
 
-**This stamp:** **P1 Pass** on `c649245` — AC-P1-1..4. Do **not** write P2–P5 Pass. Do **not** collapse with receive CORE stamps (`uat-atomic-receive.md`). Hold merge of PR **#81** to `main`.
+**This stamp:** **P1 Pass** on `c649245` — AC-P1-1..4. Merged to `main` (PR **#81**, `af5b388`). Do **not** write P2–P5 Pass. Do **not** collapse with receive CORE stamps (`uat-atomic-receive.md`).
 
 ---
 
@@ -110,4 +110,4 @@ Route, work_orders, LimsRun Test mint (WO-7), param defs on receive, results per
 
 Click: `/receive` then `/asked-for` as `alice-tech`. API: AC-P1-3/4. Local compose; down after the run. Not IC50. P1 lake only.
 
-Do **not** read this as P2–P5 Pass. Do **not** collapse this stamp with Atomic Receive **CORE** Pass (`uat-atomic-receive.md`). Hold merge of PR **#81** to `main`.
+Do **not** read this as P2–P5 Pass. Do **not** collapse this stamp with Atomic Receive **CORE** Pass (`uat-atomic-receive.md`). P1 is on `main` (PR **#81**).
