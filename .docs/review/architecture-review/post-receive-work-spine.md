@@ -6,7 +6,7 @@
 **Schema changes:** [`.docs/review/schema-changes/post-receive-work-spine.md`](../schema-changes/post-receive-work-spine.md) — **present**; P1 tables OK; P2/P4 deltas incomplete vs L2/L3/L4 (A4–A6, A8, A10)  
 **Requirements:** [`.docs/review/requirements/post-receive-work-spine.md`](../requirements/post-receive-work-spine.md)  
 **Spec:** [`.docs/internal/specs/post-receive-work-spine/SPEC.md`](../../internal/specs/post-receive-work-spine/SPEC.md)  
-**Related reviews:** [Lab Ops](../lab-ops-review/post-receive-work-spine.md) (L1–L5; P1 OPEN; P2 CLOSED until L2–L4) · [Scientific CSO](../scientific-cso-review/post-receive-work-spine.md) (SC1–SC5)  
+**Related reviews:** [Lab Ops](../lab-ops-review/post-receive-work-spine.md) (ordered-route L2/L4 locked) · [Scientific CSO](../scientific-cso-review/post-receive-work-spine.md) (SC1–SC5)  
 **Open questions:** [`.docs/review/open-questions/post-receive-work-spine.md`](../open-questions/post-receive-work-spine.md)  
 **Prior architecture review:** none for this stem
 
@@ -16,11 +16,11 @@
 
 The spine is the right system shape. Do not collapse layers. Do not add a third execute engine. P1 is implementable as a request lake on existing sample/project RLS + `test:assign`.
 
-Schema-changes exists and lists the four new tables. That is enough to Accept the spine **only with the locks below**. Lab Ops L2–L4 are prose in the sketch; they are **not** columns yet. `tests: none` contradicts L3 / SC5. Type eligibility has no config object. Chain walk cannot be `work_orders.process_id` only. Publish still **ensure-creates Tests**.
+Current schema sketch carries ordered process-definition IDs on map/work order and route position on each process instance. Type eligibility stays on definition steps. Publish refusal is signed Pass; first-start freeze remains the OPEN code gap.
 
-**P1 OPEN** if A1–A3 land in the same PR. **P2 CLOSED** until schema-changes names A4–A7 (and A10). **P3** persist lock is column-use only after SC1–SC4 fold; no `results.unit_id`. **P4** needs step `analysis_id` (A8) before Apply can write a real LimsRun step. **P5** is admin UX on shipped parser tables.
+**P2 ordered-route schema is now named in A4/A6.** Product merge remains held because first-start freeze is OPEN and overall P2 Pass unsigned.
 
-**This stamp decides OQ-WO-3:** SoT is `eln_processes.work_order_id`. See A6.
+**OQ-WO-3 is superseded by A6:** each process instance links to the work order with its route position.
 
 ---
 

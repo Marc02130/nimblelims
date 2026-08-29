@@ -37,13 +37,13 @@ Receive writes Sample + Containers + Contents. Nothing records the request. Clas
 ```
 UI /asked-for ──▶ asked_for (P1)
                       │
-                      ▼  (P2)
-              routing_map match?
-                 │ yes          │ no
-                 ▼              ▼
-            work_orders      stop (configure)
+                      ▼  explicit Route (P2)
+          analysis + TAT candidates
+             │ 0: 422 │ 2+: 409
+             ▼ exactly 1
+            work_order (ordered process_definition[])
                  │
-                 ▼
+                 ▼ Start first process only
          existing /v1/eln-processes
                  │
                  ▼

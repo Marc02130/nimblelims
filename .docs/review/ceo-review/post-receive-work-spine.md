@@ -70,7 +70,7 @@ Matches requirements §§3–5. Do not expand.
 | Slice | CEO | Meaning |
 |-------|-----|---------|
 | **P1 Asked-for** | **Implement OPEN** | Code against RQ-AF-* / SPEC P1 with **C1** in the same PR. OQ-AF-* already Decided (provisional). |
-| **P2 Routing + work_order** | **Design accepted.** **Coding closed** until Arch names type-eligibility config (C2) and OQ-WO-1 / OQ-WO-3 are Decided. | L2–L4 are in the sketch (Lab Ops sketch gate cleared). Product default for OQ-WO-1 below. FK direction is Arch, not product. |
+| **P2 Routing + work_order** | Ordered-route design locked; OQ-WO-1/3 Decided. | Product merge held on OPEN freeze / unsigned overall Pass. |
 | **P3 Results persist** | **Design accepted.** **Coding closed** until OQ-RES-1 (Sci CSO). | Persist lock only. Not a results product. Not P1 UAT. |
 | **P4 SOP+AI Apply** | **May proceed with C5 / L5.** | Closes the template-only lie. Dest-type Hold unchanged. OQ-SOP-2 before optional parser draft. |
 | **P5 Parser setup UX** | **OPEN** (independent of P1). | Engine exists. This is ops skill-floor (R-8). Not a substitute for a work list. |
@@ -217,7 +217,7 @@ Lab Ops watch items we freeze as product (non-blocking for P1, not expansions):
 |----------|---------|
 | **A. Classic Tests as the order** | Rejected. Violates WO-7. Status quo hurt. |
 | **B. Asked-for lake, then routing/`work_order` into existing execute (this packet)** | **Accepted.** Completeness of the spine in the packet; P1 is the implement lake. |
-| **C. Skip P1, mint work_order from analysis at save** | Rejected. Empty map mints nothing, so there is no honest path; also collapses request ≠ work. |
+| **C. Skip P1, mint work_order from analysis at save** | Rejected. Empty map means zero acceptable routes → 422 and no mint; request ≠ work. |
 
 HOLD SCOPE does not cherry-pick expansions. Approach B stands.
 
@@ -232,7 +232,7 @@ HOLD SCOPE does not cherry-pick expansions. Approach B stands.
 | **Date** | 2026-08-28 |
 | **Lab Ops** | Accept with conditions (L1–L5); P1 OPEN; P2 sketch gate cleared by L2–L4 fold |
 | **P1 implement** | **OPEN** — asked-for lake with C1 / L1 in the same PR |
-| **P2** | **Design accepted.** **Coding closed** until named type-eligibility source (C2) + OQ-WO-1 / OQ-WO-3 Decided |
+| **P2** | Ordered-route lock Decided; hold product merge while freeze is OPEN / overall Pass unsigned |
 | **P3** | Design accepted; coding waits OQ-RES-1 (Sci CSO) |
 | **P4** | May proceed with C5 / L5; dest-type Hold unchanged |
 | **P5** | **OPEN** (independent; admin UX) |

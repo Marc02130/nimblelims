@@ -31,7 +31,7 @@ The packet is **not** ready as a single mega-PR. Existing code already has the w
 
 P1 is a **new domain** (`asked_for`), mounted like other post-wizard APIs (`/v1/...`), modeled like `Result`/`DataParser` (**not** `BaseModel` — unique `name` would explode). Multi-sample L1 is one transactional write, not N independent POSTs. Hidden samples return **403** like receive, not `require_accessible_sample` 404.
 
-**P2 coding remains closed** until OQ-WO-1 / OQ-WO-3 are Decided and L2 names a real column for type eligibility (`eln_process_definition_steps.experiment_template_id` is still NOT NULL; no `analysis_id`; no accepted-type config). **P3 is closed** until OQ-RES-1: `results.qualifiers` is a UUID FK to `list_entries`, not JSON.
+**OQ-WO-1 / OQ-WO-3 are Decided** under the ordered-route lock. P2 product merge remains held because first-start freeze is OPEN and overall Pass unsigned.
 
 **Verdict: Accept with conditions** for P1. Later phases are file-mapped, not licensed.
 
