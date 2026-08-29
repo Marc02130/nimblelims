@@ -135,7 +135,7 @@ The **Experiments** section is its own top-level accordion, placed immediately a
 | Menu Item | Route | Icon | Tooltip | Permission | Description |
 |-----------|-------|------|---------|------------|-------------|
 | **All Experiments** | `/experiments` | Biotech | Experiments & Processes | (section) `experiment:manage` | List and detail of experiments; sample executions, lineage, linked processes |
-| **Work Orders** | `/work-orders` | AssignmentTurnedIn | Routed work orders | view `sample:read`; Start `experiment:manage` | Backlog minted only by the later explicit Route action. **Start process** instantiates and opens the existing ELN process; Tests wait for LimsRun start. |
+| **Work Orders** | `/work-orders` | AssignmentTurnedIn | Routed work orders | view `sample:read`; Start `experiment:manage` | Planning backlog minted only by the later explicit Route action. A queued work order does not mean work has started. **Start process** instantiates and opens the existing ELN process; Tests wait for LimsRun start. |
 | **Processes** | `/experiments/processes` | AccountTree | ELN multi-step processes | `experiment:manage` | Existing process definitions and instances with typed Experiment/LimsRun steps |
 | **Experiment Templates** | `/experiments/templates` | ViewList | Experiment template definitions | `experiment:manage` (same as section) | Template CRUD, SOP/AI-assisted creation, sign-off, activation (`ExperimentTemplatesManagement`) |
 | **Runs** | `/runs` | PlayCircleOutline | Experiment Runs | `experiment:manage` | LimsRun list; Test create/attach and asked-for parameter freeze occur at run start |

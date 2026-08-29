@@ -123,7 +123,9 @@ Route, work_orders, LimsRun Test mint (WO-7), param defs on receive, results per
 
 ---
 
-## P2 — Route / work_orders / WO-7 (QA signed, not Pass)
+## Historical P2 record — `3b56cfb` (QA signed, not Pass)
+
+This entire `3b56cfb` block is retained as history of that SHA, like the P1 merge note above. Its outcomes and observations are not the live AC-P2 stamp for the current product branch.
 
 **Result:** **not Pass** (QA signed, Tobias, 2026-08-29, `feat/work-order-p2` @ `3b56cfb`). Do **not** report P2 Pass. Hold merge.
 
@@ -230,7 +232,7 @@ Route, work_orders, LimsRun Test mint (WO-7), param defs on receive, results per
 
 ---
 
-## Sign-off
+## Historical sign-off — through `3b56cfb`
 
 **P1 Pass** — Tobias, 2026-08-28, `c649245` — AC-P1-1..4.
 
@@ -238,4 +240,121 @@ Click: `/receive` then `/asked-for` as `alice-tech`. API: AC-P1-3/4. Local compo
 
 **P2 signed, not Pass** — Tobias, 2026-08-29, `feat/work-order-p2` @ `3b56cfb` — AC-P2-1 Pass; AC-P2-2/3 Pass (API; routing-map UI blocked on `sample_type` vs `sample_types`); AC-P2-4 Fail for alice (**visibility**: cannot see the def); AC-P2-5 **not Pass** (publish unclickable; do not fold mint/unverified-422 as Pass). Admin Route queued WO is the mint bar, not a Pass. Not IC50.
 
-Do **not** read this as P2–P5 Pass. Do **not** collapse this stamp with Atomic Receive **CORE** Pass (`uat-atomic-receive.md`). P1 is on `main` (PR **#81**) and is **not** rewritten. Hold merge.
+Do **not** read this as P2–P5 Pass. Do **not** collapse this stamp with Atomic Receive **CORE** Pass (`uat-atomic-receive.md`). P1 is on `main` (PR **#81**) and is **not** rewritten. The P2 statements in this historical block apply only to `3b56cfb`.
+
+---
+
+## Live AC-P2 stamp — `9c4f9da` (QA signed, not Pass)
+
+**Result:** **not Pass** (QA signed, Tobias, 2026-08-29, `feat/work-order-p2` @ `9c4f9da`). Do **not** report P2 Pass. Hold merge.
+
+**Branch / build under test:** `feat/work-order-p2` at `9c4f9da` (`9c4f9da61965c7bfd01692622102dc18e332dd39`)
+**Executor:** Tobias
+**Env:** local docker compose (`lims-*`); compose **down** after the run. Not IC50.
+
+**History boundary:** Do not copy outcomes or observations from `3b56cfb` into this live stamp. That block remains history of that earlier SHA only.
+
+**Copy locks:** Receive ≠ order ≠ work. Receive stays on `/receive`. Asked-for is an unnumbered later look-up. Route is a later planner. Minting a queued `work_order` is not work begun; **Start process** is the later action. A **422** `route_sample_type` means the analysis/sample-type pairing is wrong for a mapped step, not that the sample is broken. Test creation/attachment and params freeze at LimsRun start. The WO-7 lock is that publish refuses the whole run if any required Test is missing; that refuse is **not** verified as shipped on this SHA. Not IC50.
+
+### AC-P2-1 — Route is a later planner, never after-receive
+
+**Result:** **Pass** (click, 2026-08-29, `9c4f9da`, Tobias)
+
+1. As lab-tech, receive a sample on `/receive`.
+2. Confirm the successful receive stays on `/receive`, clears the barcode, and is ready for the next tube.
+3. In a separate later task, open `/asked-for`, save requested analysis + TAT, and confirm that task ends on `/asked-for`.
+4. Later still, return to the `requested` row and choose **Route** or **Route selected**.
+
+**Expect**
+- Receive offers no analysis or Route action and does not navigate to `/asked-for`.
+- Asked-for is a later look-up, not the next numbered receive step and not a Start queue.
+- Save does not auto-route. Only the later explicit Route action evaluates the routing map.
+
+**Verified holds (alice):** receive stay-on-form; asked-for later; Route later. Empty-map Route banner “1 with no routing-map match (stayed requested)”; **200** `no_route`.
+
+### AC-P2-2 — Asked-for save mints no work_order
+
+**Result:** **Pass** (2026-08-29, `9c4f9da`, Tobias)
+
+1. Record `COUNT(work_orders)` and `COUNT(tests)` for an already-received sample.
+2. `POST /v1/asked-for` with an active analysis, TAT ≥ 1, and valid `params` (`{}` is acceptable).
+3. Recount before invoking either Route endpoint.
+
+**Expect**
+- The new row is `requested`.
+- `COUNT(work_orders)` and `COUNT(tests)` are unchanged. No Process, Experiment, or LimsRun is created.
+- Params remain intent only; they are not frozen.
+
+**Verified holds:** Study-06 asked-for save stayed `requested`; work orders **1 leftover only**; **0** tests on `bd68189f`.
+
+### AC-P2-3 — queued mint is planning; Start process begins the process
+
+**Result:** **Pass** (2026-08-29, `9c4f9da`, Tobias)
+
+1. Use an existing process definition whose typed steps all accept the sample’s current type.
+2. At `/admin/routing-map`, create a matching analysis × sample type × TAT row.
+3. Explicitly Route the requested row.
+4. Inspect `/work-orders` before choosing **Start process**.
+5. Choose **Start process**, then follow the linked process at `/experiments/processes/{process_id}`.
+
+**Expect**
+- Route creates one queued `work_order`, changes asked-for to `routed`, and creates zero Tests.
+- The queued mint is a planning record; work has not started and no process instance exists yet.
+- **Start process** sets the work order `in_progress`, creates one linked ELN process from the first snapshot definition, and returns/stores its `process_id`.
+- Experiment and LimsRun steps continue in the existing Process / Experiment / LimsRun surfaces.
+
+**Verified holds (alice):** Route minted queued work order `ad87f804` with **0** Tests. **Start process** opened process `714014b2`.
+
+**Observation only (not a Fail):** `/experiments/processes/{id}` is a blank page (`tid.slice`). Do not treat that observation as a Fail.
+
+### AC-P2-4 — WO-7 freezes Test + params at LimsRun start; publish is all-or-nothing
+
+**Result:** **Fail** (2026-08-29, `9c4f9da`, Tobias). The fail is publish succeeding without a Test. **Do not fold the mint as a Pass.** Do not claim whole-run publish-refuse as verified on this SHA.
+
+1. For a routed row, save a valid asked-for param before starting the run.
+2. From the linked process, create or open the typed LimsRun, select the routed sample cohort, and `PATCH /v1/lims-runs/{id}/start`.
+3. Verify the active Test for `(sample_id, analysis_id)` and its `asked_for_params`.
+4. With publishable run data present, remove or deactivate one required Test in the QA fixture, move the run to `complete`, and call `PATCH /v1/lims-runs/{id}/complete`.
+5. Verify the run and every candidate Result after the response.
+
+**Expect**
+- Route and work-order start create no Test.
+- LimsRun start creates the missing active Test or attaches the existing one and freezes the then-current asked-for params into `tests.asked_for_params`.
+- The Test and params snapshot are fixed at run start, not receive, asked-for save, Route, or work-order start.
+- Missing any required Test returns **422**. Publish creates no Test, refuses the whole run, leaves the run unpublished, and writes no partial Results.
+
+**Verified holds:** LimsRun start did mint Test `6a8a1626`. After that Test was deleted, carol `PATCH /v1/lims-runs/ee5277b4/complete` returned **200 published** at 22:32 ET, **not 422**. The run published with **0** Tests and **0** data rows. Do **not** fold the mint as a Pass. The fail is publish succeeding without a Test.
+
+### AC-P2-5 — type gate means wrong pairing, not broken sample
+
+**Result:** **Pass** (2026-08-29, `9c4f9da`, Tobias)
+
+1. For a `requested` row, confirm an empty routing map returns **200** `no_route` and mints nothing.
+2. Using existing configured sample types, try to save a map whose candidate definition has an empty accepted-type set.
+3. Configure a candidate step to accept only a different sample type and retry map save.
+4. After creating a valid map, remove the current sample type from a mapped step and Route another matching requested row.
+
+**Expect**
+- Empty map leaves the row `requested` and creates zero work orders and zero Tests.
+- Empty or incompatible accepted-type sets fail map save and Route with **422** `detail.code = route_sample_type`.
+- The error identifies a wrong analysis/sample-type pairing for a mapped step. It does not mark or imply that the sample is broken.
+- Every step in every mapped process definition must accept the current sample type.
+
+**Verified holds:** **422** `route_sample_type` “Sample type is not accepted on every step in the chain”; UI “…accept that sample type.” TAT overlap **409**.
+
+### Supplemental P2 regression — overlapping TAT ranges
+
+**Result:** **Pass** (2026-08-29, `9c4f9da`, Tobias; covered with AC-P2-5)
+
+1. Create two active routing-map rows for the same analysis and sample type with overlapping inclusive TAT ranges.
+2. Expect the second save to return **409** and create no overlapping row.
+
+**Verified holds:** TAT overlap **409**.
+
+---
+
+## Live sign-off
+
+**P2 signed, not Pass** — Tobias, 2026-08-29, `feat/work-order-p2` @ `9c4f9da` — AC-P2-1 Pass; AC-P2-2 Pass; AC-P2-3 Pass (blank process page `tid.slice` is observation only, not a Fail); AC-P2-4 **Fail** (publish **200 published** with 0 Tests after Test delete; do not fold mint as Pass; whole-run refuse **not** verified); AC-P2-5 Pass (`route_sample_type` 422; TAT overlap 409). Local compose; down after the run. Not IC50.
+
+P1 remains the historical **Pass** on `c649245`; this live P2 section does not alter it. The `3b56cfb` block remains history only. Hold merge of `feat/work-order-p2`.
