@@ -77,6 +77,9 @@ Verify that sidebar navigation correctly gates menu items by permissions, auto-e
 | 5.2 | Navigate to `/receive` | Receive page loads |
 | 5.3 | Verify Sample Mgmt accordion auto-expanded | Sample Mgmt accordion expanded automatically |
 | 5.4 | Verify "Receive" item highlighted | "Receive" item shows active state (primary color icon) |
+| 5.4a | Verify **Asked-for** is the next Sample Mgmt item | **Asked-for** sits immediately after Receive |
+| 5.4b | Navigate to `/asked-for` | Asked-for page loads; AppBar title **Asked-for**; accordion stays expanded |
+| 5.4c | Verify copy | Page is requested analysis; no “assign test” / Start / Execute |
 | 5.5 | Navigate to `/samples` | Samples page loads |
 | 5.6 | Verify Sample Mgmt accordion still expanded | Sample Mgmt accordion remains expanded |
 | 5.7 | Verify "Samples" item highlighted | "Samples" item shows active state |
@@ -351,7 +354,7 @@ Verify that navigation is accessible via keyboard navigation, has proper ARIA la
 |------|--------|-----------------|
 | 9 | **Test Tab Order** | |
 | 9.1 | Press Tab from page start | Focus moves to Logo |
-| 9.2 | Continue pressing Tab | Focus moves through: Logo → Dashboard → Help → Receive → Samples → Tests → ... → Batches → Results → Lab Mgmt accordion → (if expanded) Lab Mgmt items → Admin accordion → (if expanded) Admin items → Sidebar toggle → Page content |
+| 9.2 | Continue pressing Tab | Focus moves through: Logo → Dashboard → Help → Receive → Asked-for → Samples → Tests → ... → Batches → Results → Lab Mgmt accordion → (if expanded) Lab Mgmt items → Admin accordion → (if expanded) Admin items → Sidebar toggle → Page content |
 | 9.3 | Verify logical order | Tab order follows visual flow (top to bottom, left to right) |
 
 ### Expected Results - Tab Order

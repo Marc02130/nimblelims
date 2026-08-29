@@ -349,11 +349,11 @@ Logout then resent Bearer must **401** (denylist).
 
 | Step | Action | Expected |
 |------|--------|----------|
-| 1 | Read [`.docs/review/manuals/backend-auth.md`](../.docs/review/manuals/backend-auth.md) | States frontend `hasPermission` is UX only; server RBAC/RLS is AuthZ |
+| 1 | Read [`manuals/backend-auth.md`](../manuals/backend-auth.md) | States frontend `hasPermission` is UX only; server RBAC/RLS is AuthZ |
 
 | Result | Pass / Fail | Tester | Date | Notes |
 |--------|-------------|--------|------|-------|
-| Pass | Pass | Tobias | 2026-08-21 | `.docs/review/manuals/backend-auth.md` hasPermission UX only |
+| Pass | Pass | Tobias | 2026-08-21 | `manuals/backend-auth.md` hasPermission UX only |
 
 ---
 

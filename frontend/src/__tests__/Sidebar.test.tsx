@@ -51,7 +51,7 @@ jest.mock('../contexts/UserContext', () => {
 const renderWithProviders = (
   component: React.ReactElement,
   initialEntries: string[] = ['/dashboard'],
-  mockUser = createMockUser(['sample:create', 'sample:update', 'batch:manage', 'result:enter', 'project:manage', 'config:edit'])
+  mockUser = createMockUser(['sample:create', 'sample:read', 'sample:update', 'batch:manage', 'result:enter', 'project:manage', 'config:edit'])
 ) => {
   const { useUser } = require('../contexts/UserContext');
   useUser.mockReturnValue(mockUser);
@@ -94,6 +94,7 @@ describe('Sidebar', () => {
       
       expect(screen.getByText('Dashboard')).toBeInTheDocument();
       expect(screen.getByText('Receive')).toBeInTheDocument();
+      expect(screen.getAllByText('Asked-for').length).toBeGreaterThan(0);
       expect(screen.getByText('Containers')).toBeInTheDocument();
       expect(screen.getByText('Batches')).toBeInTheDocument();
       expect(screen.getByText('Results')).toBeInTheDocument();
@@ -127,6 +128,21 @@ describe('Sidebar', () => {
       
       expect(screen.queryByText('Receive')).not.toBeInTheDocument();
       expect(screen.getAllByText('Containers').length).toBeGreaterThan(0);
+    });
+
+    test('places Asked-for immediately after Receive', () => {
+      renderWithProviders(<Sidebar {...defaultProps} />);
+      const receive = screen.getAllByText('Receive')[0];
+      const askedFor = screen.getAllByText('Asked-for')[0];
+      expect(
+        receive.compareDocumentPosition(askedFor) & Node.DOCUMENT_POSITION_FOLLOWING
+      ).toBeTruthy();
+    });
+
+    test('hides Asked-for without sample:read or test:assign', () => {
+      const mockUser = createMockUser(['sample:create'], 'Lab Technician');
+      renderWithProviders(<Sidebar {...defaultProps} />, ['/dashboard'], mockUser);
+      expect(screen.queryByText('Asked-for')).not.toBeInTheDocument();
     });
 
     test('hides Containers when user lacks sample:update permission', () => {

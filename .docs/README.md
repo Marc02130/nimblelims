@@ -9,11 +9,13 @@
 | [`.docs/discussions/`](discussions/) | (from internal) | Multi-persona Leadership discussions |
 | [`.docs/decision-logs/`](decision-logs/) | (from internal) | Short stamps (e.g. framework FW/WO) |
 
-**Published how-tos (git):** [`/manuals/`](../manuals/) — start with [`HOWTO.md`](../manuals/HOWTO.md).  
-**Local legacy operator manuals (not on git):** `.docs/manuals/`.  
-**Working PRDs / private (not on git):** `.docs/internal/`.
+**Published how-tos (git):** [`/manuals/`](../manuals/) — start with [`HOWTO.md`](../manuals/HOWTO.md). Operator handbooks that used to live under `.docs/review/manuals/` are in that folder.  
+**Working PRDs / private (not on git):** `.docs/internal/`.  
+**Local vendor dumps (not on git):** `.docs/manuals/` (PDFs; not Nimble operator how-tos).
 
 **Agents / skills:** Prefer these paths. Do not write new artifacts under the old `.docs-review/` or `.docs-internal/` names. Do not put operator how-tos back under `.docs/review/manuals/`.
+
+**Operator start here:** [`/manuals/HOWTO.md`](../manuals/HOWTO.md) · [`/manuals/asked-for.md`](../manuals/asked-for.md)
 
 **Teams:** See [`.grok/teams/README.md`](../.grok/teams/README.md) (Leadership / BA / Dev / QA / Docs).
 

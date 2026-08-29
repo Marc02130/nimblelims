@@ -16,10 +16,10 @@ This is a how-to, not a PRD. Marc keeps it current as features ship.
 | Route / work order | **Not this slice** |
 | Process / Experiment / LimsRun | Execute substrate shipped; P1 does **not** start it |
 | Results | Classic type-a-number on a Test; persist lock is a later packet |
-| Requested analysis (`/asked-for`) — later look-up, off the bench path | P1 lake on `feat/asked-for-p1` (PR 81) until that merges |
+| Requested analysis (`/asked-for`) — later look-up, off the bench path | Shipped on `main` (P1 lake) |
 
-Local legacy handbooks (not on git): `.docs/manuals/` — `dev-setup.md`, `admin-setup.md`, `atomic-receive.md`, `processes.md`, `experiments.md`, `lims-runs.md`, `api-endpoints.md`, `navigation.md`.  
-UAT: [`UAT_Scripts/uat-atomic-receive.md`](../UAT_Scripts/uat-atomic-receive.md) · P1 `UAT_Scripts/uat-post-receive-work-spine.md` (lives on `feat/asked-for-p1`; not on `main` while PR 81 is held, so it is not linked here).  
+Handbooks in this folder: [atomic-receive.md](atomic-receive.md), [asked-for.md](asked-for.md), [navigation.md](navigation.md), [api-endpoints.md](api-endpoints.md), [dev-setup.md](dev-setup.md), [admin-setup.md](admin-setup.md), [processes.md](processes.md), [experiments.md](experiments.md), [lims-runs.md](lims-runs.md). Index: [README.md](README.md).  
+UAT: [`UAT_Scripts/uat-atomic-receive.md`](../UAT_Scripts/uat-atomic-receive.md) · P1 [`UAT_Scripts/uat-post-receive-work-spine.md`](../UAT_Scripts/uat-post-receive-work-spine.md).  
 Stamps: [`.docs/decision-logs/framework-stamps-2026-08-26.md`](../.docs/decision-logs/framework-stamps-2026-08-26.md) (WO-7: Test at LimsRun start, not at receive).
 
 ---
@@ -28,8 +28,8 @@ Stamps: [`.docs/decision-logs/framework-stamps-2026-08-26.md`](../.docs/decision
 
 Bring the stack up and log in. Do not duplicate setup here.
 
-- Dev / compose: local `.docs/manuals/dev-setup.md` and root [`README.md`](../README.md) Quick Start.
-- Admin password: local `.docs/manuals/admin-setup.md`.
+- Dev / compose: [dev-setup.md](dev-setup.md) and root [`README.md`](../README.md) Quick Start.
+- Admin password: [admin-setup.md](admin-setup.md).
 - Frontend: http://localhost:3000 · API: http://localhost:8000 · docs: http://localhost:8000/docs.
 - Lab path accounts: `admin` / `admin123` · `lab-tech` / `labtech123` · `alice-tech` / `alice123`. Change the default admin password.
 
@@ -83,7 +83,7 @@ The execute substrate is already in the app. Requested analysis does **not** ope
 | **Experiments** → Processes (`/experiments/processes`) | ELN process **definitions** and **instances**. Assign samples (Samples list → **Assign to process**, or on the process). Start a step (Experiment or lazy LimsRun). |
 | **Experiments** → Runs (`/runs`) | LIMS Runs: create/start/import/review/publish. Every run has an **analysis**. |
 
-Deeper local handbooks: `.docs/manuals/processes.md`, `experiments.md`, `lims-runs.md`.
+Deeper handbooks: [processes.md](processes.md), [experiments.md](experiments.md), [lims-runs.md](lims-runs.md).
 
 P1 does not instantiate a process from requested analysis. Classic `/tests` can still mint a Test for typing a number; that is **not** the request path.
 
@@ -109,8 +109,9 @@ UAT (classic): [`UAT_Scripts/uat-results-entry-review.md`](../UAT_Scripts/uat-re
 
 **Copy lock:** say **requested analysis**. Do **not** say asked-for assigns a Test, orders work, or starts work.
 
-**UI (when P1 is on the build):** Sample Mgmt → **Asked-for** (`/asked-for`). Also a section on sample detail, which is where a tech normally meets it.  
-**API:** `POST /v1/asked-for` · `GET /v1/asked-for` · `POST /v1/asked-for/{id}/cancel`.
+**UI:** Sample Mgmt → **Asked-for** (`/asked-for`). Also a section on sample detail, which is where a tech normally meets it.  
+**API:** `POST /v1/asked-for` · `GET /v1/asked-for` · `POST /v1/asked-for/{id}/cancel`.  
+Handbook: [asked-for.md](asked-for.md).
 
 **What a row is:** **requested analysis + TAT**, against an already-received sample. That is all.
 
@@ -124,9 +125,14 @@ One action may cover a set of samples (same analysis + TAT). The API still write
 
 **The lake accepts nonsense on purpose.** Qubit-on-blood may sit in it. Scientific eligibility is refused **later**, at routing (`route_sample_type` **422**, P2) — not by the lake.
 
-Client write → **403**. Hidden / other-project sample → **403** (not 404).
+Params: intent only. P1 sends `{}` OOB — do not type assay params here, and do not enter them in P1 UAT. Params freeze at **LimsRun start** (P2 / WO-7), not on receive and not on asked-for. Setup (`config:edit`) may `GET/PUT /analyses/{id}/param-defs`; empty catalog is the OOB path.
 
-Params: intent only. P1 sends `{}` OOB — do not type assay params here, and do not enter them in P1 UAT. Params freeze at **LimsRun start** (P2 / WO-7), not on receive and not on asked-for.
+| Case | HTTP |
+|------|------|
+| Duplicate open `(sample, analysis)` | **409** (full rollback) |
+| No project access / client write / hidden sample | **403** (not 404) |
+| Discarded sample / inactive analysis / TAT &lt; 1 | **422** |
+| Receive with non-empty `analysis_ids` | **422** (receive freeze) |
 
 ---
 

@@ -20,6 +20,7 @@ from .analysis import Analysis, Analyte, AnalysisAnalyte, AnalyteAlias
 from .test import Test
 from .test_battery import TestBattery, BatteryAnalysis
 from .result import Result
+from .asked_for import AskedFor, AnalysisParamDef
 from .batch import Batch, BatchContainer
 from .list import List, ListEntry
 from .unit import Unit
