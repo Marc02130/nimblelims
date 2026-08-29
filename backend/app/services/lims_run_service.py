@@ -332,8 +332,8 @@ class LimsRunService:
                 .first()
             )
             if test:
-                test.asked_for_params = params
-                test.modified_by = self._user_id()
+                # WO-7 first-start freeze: an existing Test already holds
+                # asked_for_params, including empty {}. Do not overwrite.
                 continue
             sample = self.db.query(Sample).filter(Sample.id == sid).first()
             if not sample or not analysis:

@@ -21,6 +21,75 @@ logger = logging.getLogger(__name__)
 ROUTE_SAMPLE_TYPE = "route_sample_type"
 
 
+def _type_error(message: str) -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        detail={"code": ROUTE_SAMPLE_TYPE, "message": message},
+    )
+
+
+def assert_instance_step_accepts_current_type(
+    db: Session,
+    process,
+    instance_step,
+    extra_sample_ids: Optional[Sequence[UUID]] = None,
+) -> None:
+    """Gate a process-step start against that step's accepted types.
+
+    Work-order instances fail closed on an empty allow-list. Free-form
+    processes without accepted types stay ungated.
+    """
+    from models.entry import ELNProcessSample
+
+    def_id = getattr(process, "process_definition_id", None)
+    wo_linked = getattr(process, "work_order_id", None)
+    if not def_id:
+        if wo_linked:
+            raise _type_error("Process instance has no definition to type-gate")
+        return
+    def_step = (
+        db.query(ELNProcessDefinitionStep)
+        .filter(
+            ELNProcessDefinitionStep.process_definition_id == def_id,
+            ELNProcessDefinitionStep.sort_order == instance_step.sort_order,
+        )
+        .first()
+    )
+    if not def_step:
+        if wo_linked:
+            raise _type_error("Process step has no matching definition step")
+        return
+    types = [
+        r.sample_type_id
+        for r in db.query(StepAcceptedSampleType).filter(
+            StepAcceptedSampleType.step_id == def_step.id
+        )
+    ]
+    if not types:
+        if wo_linked:
+            raise _type_error(
+                "Step has no accepted sample types; empty allow-list fails closed"
+            )
+        return
+    sample_ids = set()
+    for assignment in (
+        db.query(ELNProcessSample)
+        .filter(ELNProcessSample.process_id == process.id)
+        .all()
+    ):
+        sample_ids.add(assignment.sample_id)
+    for sid in extra_sample_ids or []:
+        sample_ids.add(sid)
+    for sid in sample_ids:
+        sample = db.query(Sample).filter(Sample.id == sid).first()
+        if sample is None:
+            continue
+        if sample.sample_type not in types:
+            raise _type_error(
+                "Sample type is not accepted on this process step"
+            )
+
+
 def _range(tat_min: int, tat_max: int) -> NumericRange:
     return NumericRange(tat_min, tat_max, "[]")
 
@@ -307,7 +376,10 @@ class RoutingService:
             for sid in desired:
                 if sid in existing:
                     continue
-                self._refuse_overlap(analysis_id, sid, lo, hi)
+                if self._has_overlap(analysis_id, sid, lo, hi):
+                    # Live first-step list is SoT. Skip a denorm row that
+                    # would collide; Route 409s when two maps accept the type.
+                    continue
                 self.db.add(
                     RoutingMap(
                         analysis_id=analysis_id,
@@ -324,16 +396,69 @@ class RoutingService:
     def find_map(
         self, analysis_id: UUID, sample_type_id: UUID, tat_days: int
     ) -> Optional[RoutingMap]:
+        acceptable = self._acceptable_maps(analysis_id, sample_type_id, tat_days)
+        return acceptable[0] if len(acceptable) == 1 else None
+
+    def _analysis_tat_candidates(
+        self, analysis_id: UUID, tat_days: int
+    ) -> List[RoutingMap]:
         return (
             self.db.query(RoutingMap)
             .filter(
                 RoutingMap.active == True,  # noqa: E712
                 RoutingMap.analysis_id == analysis_id,
-                RoutingMap.sample_type_id == sample_type_id,
                 RoutingMap.tat_range.op("@>")(tat_days),
             )
-            .first()
+            .all()
         )
+
+    def _unique_logical_maps(self, rows: Sequence[RoutingMap]) -> List[RoutingMap]:
+        seen: dict[tuple, RoutingMap] = {}
+        for row in rows:
+            lo, hi = _range_bounds(row.tat_range)
+            key = (
+                row.analysis_id,
+                lo,
+                hi,
+                tuple(row.process_definition_ids or []),
+            )
+            seen.setdefault(key, row)
+        return list(seen.values())
+
+    def _acceptable_maps(
+        self, analysis_id: UUID, sample_type_id: UUID, tat_days: int
+    ) -> List[RoutingMap]:
+        unique = self._unique_logical_maps(
+            self._analysis_tat_candidates(analysis_id, tat_days)
+        )
+        acceptable: List[RoutingMap] = []
+        for row in unique:
+            chain = list(row.process_definition_ids or [])
+            try:
+                types = self._require_first_step_types(chain)
+            except HTTPException:
+                continue
+            if sample_type_id in types:
+                acceptable.append(row)
+        return acceptable
+
+    def _has_overlap(
+        self,
+        analysis_id: UUID,
+        sample_type_id: UUID,
+        tat_min: int,
+        tat_max: int,
+        exclude_id: Optional[UUID] = None,
+    ) -> bool:
+        q = self.db.query(RoutingMap).filter(
+            RoutingMap.active == True,  # noqa: E712
+            RoutingMap.analysis_id == analysis_id,
+            RoutingMap.sample_type_id == sample_type_id,
+            RoutingMap.tat_range.op("&&")(_range(tat_min, tat_max)),
+        )
+        if exclude_id is not None:
+            q = q.filter(RoutingMap.id != exclude_id)
+        return q.first() is not None
 
     def _refuse_overlap(
         self,
@@ -343,15 +468,9 @@ class RoutingService:
         tat_max: int,
         exclude_id: Optional[UUID] = None,
     ) -> None:
-        q = self.db.query(RoutingMap).filter(
-            RoutingMap.active == True,  # noqa: E712
-            RoutingMap.analysis_id == analysis_id,
-            RoutingMap.sample_type_id == sample_type_id,
-            RoutingMap.tat_range.op("&&")(_range(tat_min, tat_max)),
-        )
-        if exclude_id is not None:
-            q = q.filter(RoutingMap.id != exclude_id)
-        if q.first():
+        if self._has_overlap(
+            analysis_id, sample_type_id, tat_min, tat_max, exclude_id=exclude_id
+        ):
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="Overlapping TAT range for this analysis and sample type",
@@ -381,10 +500,19 @@ class RoutingService:
                 status.HTTP_403_FORBIDDEN,
                 "Access denied: insufficient project permissions",
             )
-        match = self.find_map(row.analysis_id, sample.sample_type, row.tat_days)
-        if not match:
-            return {"asked_for_id": row.id, "work_order": None, "no_route": True}
-
+        acceptable = self._acceptable_maps(
+            row.analysis_id, sample.sample_type, row.tat_days
+        )
+        if not acceptable:
+            raise _type_error(
+                "No routing-map row accepts this analysis, TAT, and sample type"
+            )
+        if len(acceptable) > 1:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Two routing-map rows accept this sample type",
+            )
+        match = acceptable[0]
         chain = list(match.process_definition_ids or [])
         self._assert_sample_matches_first_step(chain, sample.sample_type)
 
@@ -428,8 +556,30 @@ class RoutingService:
             q = q.filter(WorkOrder.sample_id == sample_id)
         return q.order_by(WorkOrder.created_at.desc()).all()
 
+    def _started_processes(self, work_order_ids: Sequence[UUID]):
+        from models.entry import ELNProcess
+
+        if not work_order_ids:
+            return {}
+        rows = (
+            self.db.query(ELNProcess)
+            .filter(ELNProcess.work_order_id.in_(list(work_order_ids)))
+            .all()
+        )
+        grouped: dict = {}
+        for process in rows:
+            grouped.setdefault(process.work_order_id, []).append(process)
+        for items in grouped.values():
+            items.sort(
+                key=lambda p: (
+                    p.work_order_route_position is None,
+                    p.work_order_route_position or 0,
+                )
+            )
+        return grouped
+
     def start_work_order(self, work_order_id: UUID):
-        """Instantiate the first process in the ordered snapshot and link eln_processes.work_order_id."""
+        """Instantiate the next pending process in snapshot order."""
         deny_client_write(self.user)
         wo = (
             self.db.query(WorkOrder)
@@ -445,28 +595,49 @@ class RoutingService:
                 status.HTTP_422_UNPROCESSABLE_ENTITY,
                 "Only queued or in-progress work orders can be started",
             )
-        if wo.process_id:
-            return wo
         chain = list(wo.process_definition_ids or [])
         if not chain:
             raise HTTPException(
                 status.HTTP_422_UNPROCESSABLE_ENTITY,
                 "Work order has an empty process chain",
             )
+        started = self._started_processes([wo.id]).get(wo.id, [])
+        started_defs = {
+            p.process_definition_id for p in started if p.process_definition_id
+        }
+        next_idx = next(
+            (i for i, def_id in enumerate(chain) if def_id not in started_defs),
+            None,
+        )
+        if next_idx is None:
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_ENTITY,
+                "All processes in the route have been started",
+            )
+        sample_type_id = getattr(wo.sample, "sample_type", None)
+        if sample_type_id is None:
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_ENTITY,
+                "Work order sample has no sample type",
+            )
+        self._assert_sample_matches_first_step([chain[next_idx]], sample_type_id)
         from app.schemas.eln_process_definition import InstantiateProcessFromDefinitionRequest
         from app.services.eln_process_service import ELNProcessService
 
         sample_name = getattr(wo.sample, "name", None) or "sample"
         analysis_name = getattr(wo.analysis, "name", None) or "analysis"
+        position = next_idx + 1
         inst = ELNProcessService(self.db, current_user=self.user).instantiate_from_definition(
-            chain[0],
+            chain[next_idx],
             InstantiateProcessFromDefinitionRequest(
-                name=f"WO {sample_name} {analysis_name} {uuid4().hex[:6]}"[:240],
+                name=f"WO {sample_name} {analysis_name} p{position} {uuid4().hex[:6]}"[:240],
                 sample_ids=[wo.sample_id],
                 work_order_id=wo.id,
+                work_order_route_position=position,
             ),
         )
-        wo.process_id = inst.id
+        if wo.process_id is None:
+            wo.process_id = inst.id
         wo.status = "in_progress"
         wo.modified_by = self.user.id
         self.db.commit()
@@ -477,6 +648,14 @@ class RoutingService:
             .filter(WorkOrder.id == wo.id)
             .first()
         )
+
+    def read_work_order(self, row: WorkOrder) -> dict:
+        started = self._started_processes([row.id]).get(row.id, [])
+        return work_order_to_read(row, started)
+
+    def read_work_orders(self, rows: Sequence[WorkOrder]) -> List[dict]:
+        grouped = self._started_processes([r.id for r in rows])
+        return [work_order_to_read(r, grouped.get(r.id, [])) for r in rows]
 
     def _require_definitions(self, ids: Sequence[UUID]) -> None:
         if not ids:
@@ -516,9 +695,11 @@ def map_to_read(row: RoutingMap) -> dict:
     }
 
 
-def work_order_to_read(row: WorkOrder) -> dict:
+def work_order_to_read(row: WorkOrder, started: Optional[Sequence] = None) -> dict:
     sample = getattr(row, "sample", None)
     analysis = getattr(row, "analysis", None)
+    started = list(started or [])
+    latest = started[-1] if started else None
     return {
         "id": row.id,
         "asked_for_id": row.asked_for_id,
@@ -529,5 +710,7 @@ def work_order_to_read(row: WorkOrder) -> dict:
         "process_definition_ids": list(row.process_definition_ids or []),
         "status": row.status,
         "process_id": row.process_id,
+        "latest_process_id": latest.id if latest else row.process_id,
+        "started_count": len(started),
         "created_at": row.created_at,
     }

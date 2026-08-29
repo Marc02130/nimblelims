@@ -193,6 +193,7 @@ class ELNProcessRepository:
         status_id: Optional[UUID] = None,
         process_definition_id: Optional[UUID] = None,
         work_order_id: Optional[UUID] = None,
+        work_order_route_position: Optional[int] = None,
         created_by: Optional[UUID] = None,
         modified_by: Optional[UUID] = None,
     ) -> ELNProcess:
@@ -203,6 +204,7 @@ class ELNProcessRepository:
             status_id=status_id,
             process_definition_id=process_definition_id,
             work_order_id=work_order_id,
+            work_order_route_position=work_order_route_position,
             created_by=created_by,
             modified_by=modified_by,
         )

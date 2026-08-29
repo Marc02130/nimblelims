@@ -17,6 +17,8 @@ interface WorkOrderRow {
   process_definition_ids: string[];
   status: string;
   process_id?: string | null;
+  latest_process_id?: string | null;
+  started_count?: number;
   created_at: string;
 }
 
@@ -54,8 +56,9 @@ const WorkOrders: React.FC = () => {
     try {
       const wo = await apiService.startWorkOrder(id);
       await load();
-      if (wo?.process_id) {
-        navigate(`/experiments/processes/${wo.process_id}`);
+      const openId = wo?.latest_process_id || wo?.process_id;
+      if (openId) {
+        navigate(`/experiments/processes/${openId}`);
       }
     } catch (err) {
       setError(ApiService.formatError(err, 'Could not start work order'));
@@ -82,20 +85,30 @@ const WorkOrders: React.FC = () => {
     {
       field: 'process_id',
       headerName: 'Started',
-      width: 110,
-      valueGetter: (_v, row) => (row.process_id ? 'Open first' : '—'),
+      width: 130,
+      valueGetter: (_v, row) => {
+        const chain = (row.process_definition_ids || []).length;
+        const started = row.started_count || (row.process_id ? 1 : 0);
+        if (!started) return '—';
+        return `${started} of ${chain || started}`;
+      },
     },
     {
       field: 'actions',
       type: 'actions',
       width: 90,
       getActions: (params) => {
-        if (!canStart || params.row.status !== 'queued') return [];
+        const chain = (params.row.process_definition_ids || []).length;
+        const started = params.row.started_count || (params.row.process_id ? 1 : 0);
+        const pending =
+          params.row.status === 'queued' ||
+          (params.row.status === 'in_progress' && started < chain);
+        if (!canStart || !pending) return [];
         return [
           <GridActionsCellItem
             key="start"
             icon={<PlayArrowIcon />}
-            label="Start process"
+            label={started ? 'Start next process' : 'Start process'}
             onClick={() => void handleStart(params.id as string)}
           />,
         ];
@@ -112,9 +125,9 @@ const WorkOrders: React.FC = () => {
             <Button onClick={() => void load()}>Refresh</Button>
           </Box>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Backlog minted by Route. The process chain is ordered: first is sample-type
-            dependent; later processes are not. Start instantiates the first process in
-            that chain. Tests are still minted later, at LimsRun start.
+            Backlog minted by Route. The process chain is ordered. Start instantiates
+            the next pending process only (first start = process 1). Later starts
+            gate the sample’s current type. Tests are minted later, at LimsRun start.
           </Typography>
           {error && (
             <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>

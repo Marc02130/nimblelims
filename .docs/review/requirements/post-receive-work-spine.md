@@ -1,7 +1,7 @@
 # Requirements: Post-receive work spine
 
 **Date:** 2026-08-28  
-**Status:** P1 shipped. P2 `b005cfe` has signed per-AC history; publish-refuse Pass; first-start freeze OPEN; overall P2 unsigned/not Pass. Hold product merge. Current lock: analysis + TAT + ordered `process_definition[]`; map-save 409 only when TAT **and** first-step allow-lists overlap; Route 409 when two saved rows both accept current type. Not IC50.
+**Status:** P1 shipped. P2 `b005cfe` has signed per-AC history; publish-refuse Pass. First-start freeze is in code; ordered-route lock in code. Overall P2 unsigned/not Pass pending UAT restamp. Hold product merge. Current lock: analysis + TAT + ordered `process_definition[]`; map-save 409 only when TAT **and** first-step allow-lists overlap; Route 409 when two saved rows both accept current type. Not IC50.
 **Stem:** `post-receive-work-spine`  
 **Leadership sequencing (2026-08-28):** order (asked-for) → work_order → results → SOP+AI → process → instrument import config  
 **Do not implement P2+ until those phase reviews Accept / Accept-with-conditions and open questions that block the named phase are Decided.**
@@ -28,8 +28,8 @@
 6. **Receive freeze:** non-empty `analysis_ids` still **422**.
 7. Operator how-tos live in git-tracked [`/manuals/HOWTO.md`](../../../manuals/HOWTO.md). Do not put operator manuals back under `.docs/review/manuals/`.
 8. **P2 ordered route:** each `routing_map` row and work-order snapshot hold an ordered `process_definition[]`. This is not one definition and not an unordered bag. Start instantiates the first process only; later processes start later in route order.
-9. **WO-7 publish (Tobias-signed Pass @ `b005cfe`):** refuse the **whole** publish (**422**) if a Test is missing — stay unpublished, zero Results, no Test remint. Do **not** fold first-start freeze into this Pass; that half remains OPEN.
-10. **Freeze:** first LimsRun start wins. Do not overwrite `asked_for_params` on an existing Test. This first-start freeze remains **OPEN on `b005cfe`**; do not state the target as shipped.
+9. **WO-7 publish (Tobias-signed Pass @ `b005cfe`):** refuse the **whole** publish (**422**) if a Test is missing — stay unpublished, zero Results, no Test remint. Do **not** fold first-start freeze into that historical Pass.
+10. **Freeze:** first LimsRun start wins. Do not overwrite `asked_for_params` on an existing Test. Guard is in code; UAT restamp unsigned.
 11. **P2-4 / Heidi belt:** Route is `test:assign`; do not put `experiment:manage` on Route. Process metadata is catalog-visible so the UI can show ordered `process_definition[]` and derive the first process / first Experiment-LimsRun allow-list. Mutate stays `config:edit`; each process start stays `experiment:manage`.
 12. **Heidi/Leadership overlap lock:** no map sample-type picker. Map save **409**s only when the same analysis, overlapping TAT, **and** overlapping first-step allow-lists all hold. Extract-first and Qubit-first for the same TAT are legal. Route: match analysis + TAT, then current type against each candidate’s first process / first step. Zero acceptable → 422; two saved rows that both accept current type → 409; no silent `first()`. Map save does not chain-AND later processes/steps.
 

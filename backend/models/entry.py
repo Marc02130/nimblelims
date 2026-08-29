@@ -27,6 +27,8 @@ from sqlalchemy import (
     Text,
     Numeric,
     UniqueConstraint,
+    Index,
+    text,
 )
 from sqlalchemy.dialects.postgresql import UUID as PostgresUUID, JSONB
 from sqlalchemy.orm import relationship
@@ -477,6 +479,15 @@ class ELNProcess(BaseModel):
     """
 
     __tablename__ = "eln_processes"
+    __table_args__ = (
+        Index(
+            "uq_eln_process_wo_route",
+            "work_order_id",
+            "work_order_route_position",
+            unique=True,
+            postgresql_where=text("work_order_id IS NOT NULL"),
+        ),
+    )
 
     work_order_id = Column(
         PostgresUUID(as_uuid=True),
@@ -484,6 +495,7 @@ class ELNProcess(BaseModel):
         nullable=True,
         index=True,
     )
+    work_order_route_position = Column(Integer, nullable=True)
     status_id = Column(
         PostgresUUID(as_uuid=True),
         ForeignKey("list_entries.id"),
