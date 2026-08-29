@@ -79,4 +79,4 @@ docker compose ps
 
 - [Admin setup](admin-setup.md)
 - [Dev setup](dev-setup.md)
-- [Docs index](../README.md)
+- [Docs index](../.docs/review/README.md)

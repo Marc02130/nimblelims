@@ -157,10 +157,10 @@ You can still enforce strict state-machine rules in the application service laye
 
 **Related Documents**
 - local `.docs/internal/ideas/run-results.md` (not committed) — promote-on-publish design + shipped phases
-- [open-questions/run-results.md](../open-questions/run-results.md) — decisions
-- `.docs/review/manuals/processes.md`
+- [open-questions/run-results.md](../.docs/review/open-questions/run-results.md) — decisions
+- `processes.md`
 - `.docs/internal/design/gap-analysis-process-and-experiment.md`
-- `.docs/review/manuals/experiments.md` (ELN side)
+- `experiments.md` (ELN side)
 - `.docs/internal/design/experiment-planning.md`
 - `.docs/review/checklist/experiment-rework-prerequisites.md`
-- `.docs/review/manuals/batches.md` (for contrast)
+- `batches.md` (for contrast)

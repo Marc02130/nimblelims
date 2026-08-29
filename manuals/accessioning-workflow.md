@@ -5,7 +5,7 @@
 **Receive SoT:** [atomic-receive.md](atomic-receive.md)  
 **UI:** `/receive` (sidebar **Receive**)  
 **API:** `POST /samples/receive`  
-**UAT:** [`uat-atomic-receive.md`](../../UAT_Scripts/uat-atomic-receive.md)
+**UAT:** [`uat-atomic-receive.md`](../UAT_Scripts/uat-atomic-receive.md)
 
 Old bookmarks to `/accessioning` redirect to `/receive`.
 

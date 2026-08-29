@@ -3,9 +3,9 @@
 **Status:** P1 lake (this stamp). Route / work_orders / WO-7 / param freeze at LimsRun start are **not** this stamp.  
 **UI:** `/asked-for` — sidebar **Asked-for**, immediately after **Receive** · sample-detail **Asked-for** section  
 **API:** `POST /v1/asked-for` · `GET /v1/asked-for` · `POST /v1/asked-for/{id}/cancel`  
-**UAT:** [`UAT_Scripts/uat-post-receive-work-spine.md`](../../UAT_Scripts/uat-post-receive-work-spine.md)  
-**Requirements:** [`.docs/review/requirements/post-receive-work-spine.md`](../requirements/post-receive-work-spine.md) **RQ-AF-***  
-**Sketch:** [`.docs/review/tech-sketch/post-receive-work-spine.md`](../tech-sketch/post-receive-work-spine.md) §3
+**UAT:** [`UAT_Scripts/uat-post-receive-work-spine.md`](../UAT_Scripts/uat-post-receive-work-spine.md)  
+**Requirements:** [`.docs/review/requirements/post-receive-work-spine.md`](../.docs/review/requirements/post-receive-work-spine.md) **RQ-AF-***  
+**Sketch:** [`.docs/review/tech-sketch/post-receive-work-spine.md`](../.docs/review/tech-sketch/post-receive-work-spine.md) §3
 
 P1 is the **asked-for lake**. After receive, an analyst records **requested analysis**. That does **not** assign a Test, mint a Test row, or start work.
 
@@ -74,4 +74,4 @@ One operator action may target a **set** of samples (same analysis + TAT). API s
 - Intake stub: [accessioning-workflow.md](accessioning-workflow.md)  
 - API: [api-endpoints.md](api-endpoints.md)  
 - Nav: [navigation.md](navigation.md)  
-- Spine (P2–P5 specified, not shipped): [requirements/post-receive-work-spine.md](../requirements/post-receive-work-spine.md)
+- Spine (P2–P5 specified, not shipped): [requirements/post-receive-work-spine.md](../.docs/review/requirements/post-receive-work-spine.md)

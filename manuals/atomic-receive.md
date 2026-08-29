@@ -3,7 +3,7 @@
 **Status:** **CORE shipped + UAT Pass** (2026-08-27) — on `main` (`ebac94e` feature merge; UAT stamp `618fbbf`)  
 **UI:** `/receive` — sidebar **Receive** (`frontend/src/pages/AtomicReceive.tsx`)  
 **API:** `POST /samples/receive` (`backend/app/services/atomic_receive_service.py`)  
-**UAT:** [`UAT_Scripts/uat-atomic-receive.md`](../../UAT_Scripts/uat-atomic-receive.md) · run report [`UAT_Scripts/atomic-receive/uat-run-2026-08-27.md`](../../UAT_Scripts/atomic-receive/uat-run-2026-08-27.md)  
+**UAT:** [`UAT_Scripts/uat-atomic-receive.md`](../UAT_Scripts/uat-atomic-receive.md) · run report [`UAT_Scripts/atomic-receive/uat-run-2026-08-27.md`](../UAT_Scripts/atomic-receive/uat-run-2026-08-27.md)  
 **Requirements:** `.docs/internal/prd/sample-accessioning/PRD.md` (RQ-AR-*) · SPEC §3  
 **Sketch:** `.docs/review/tech-sketch/atomic-receive.md`
 

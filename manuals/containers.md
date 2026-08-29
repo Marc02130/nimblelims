@@ -26,7 +26,7 @@ Container types define the physical characteristics of containers. They are conf
 | Tube, well, vial | **1 × 1** | Liquid-bearing unit of account | **Yes** |
 | Plate, rack, box | e.g. 8×12, 1×10 | Structural parent only | **No** — children hold contents |
 
-**Locked rules:** [`.docs/review/open-questions/containers.md`](../open-questions/containers.md)
+**Locked rules:** [`.docs/review/open-questions/containers.md`](../.docs/review/open-questions/containers.md)
 
 ### Common Container Types
 
@@ -63,7 +63,7 @@ All containers inherit standard base model fields:
 
 Containers support self-referential parent-child relationships to model physical containment.
 
-**Locked inventory model:** multi-element parent → single-element children → contents only on single-element vessels. See [open-questions/containers.md](../open-questions/containers.md).
+**Locked inventory model:** multi-element parent → single-element children → contents only on single-element vessels. See [open-questions/containers.md](../.docs/review/open-questions/containers.md).
 
 ### Examples
 
@@ -126,7 +126,7 @@ Pooling = multiple content rows on one **tube/well (1×1)**:
 
 ## Amount, concentration, and volume (locked)
 
-**Option A (solute mass)** — full rules in [open-questions/containers.md](../open-questions/containers.md):
+**Option A (solute mass)** — full rules in [open-questions/containers.md](../.docs/review/open-questions/containers.md):
 
 | Store | Where |
 |-------|--------|
@@ -138,7 +138,7 @@ Pooling = multiple content rows on one **tube/well (1×1)**:
 - **Liquid / diluent is not mass.** Dilution updates concentration (and derived volume), not solute amount.
 - Inbound volume + concentration → compute mass; store amount + conc.
 
-**Result/normalization lock:** publishing the selected concentration Result writes value/unit to the bound 1×1 `Container.concentration` in the same transaction. Normalization offers eligible Results only (same analysis/designated analyte; approved/reviewed first, otherwise latest by entry date), refuses no match, and refuses unit mismatch without silent conversion. See [mass-concentration-contents.md §10](../tech-sketch/mass-concentration-contents.md).
+**Result/normalization lock:** publishing the selected concentration Result writes value/unit to the bound 1×1 `Container.concentration` in the same transaction. Normalization offers eligible Results only (same analysis/designated analyte; approved/reviewed first, otherwise latest by entry date), refuses no match, and refuses unit mismatch without silent conversion. See [mass-concentration-contents.md §10](../.docs/review/tech-sketch/mass-concentration-contents.md).
 
 ### Unit Types
 
@@ -643,7 +643,7 @@ During sample accessioning:
 2. Sample is linked to container via contents table
 3. Concentration and amount are recorded
 
-**See**: `.docs/review/manuals/atomic-receive.md` (CORE) · `.docs/review/manuals/accessioning-workflow.md` (legacy wizard)
+**See**: `atomic-receive.md` (CORE) · `accessioning-workflow.md` (legacy wizard)
 
 ### Aliquot/Derivative Creation
 
