@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-28  
 **Stem:** `post-receive-work-spine`  
-**Status:** P2 `b005cfe` per-AC history signed; publish-refuse Pass; first-start freeze OPEN; overall P2 unsigned/not Pass. Hold product merge. Current lock: intake-type match → one process definition; no chain-wide map-save type check. Not IC50.
+**Status:** P2 `b005cfe` per-AC history signed; publish-refuse Pass; first-start freeze OPEN; overall P2 unsigned/not Pass. Hold product merge. Current lock: ordered `process_definition[]`; map-save 409 only when TAT **and** first-step allow-lists overlap; Route 409 when two saved rows both accept current type. Not IC50.
 **Requirements:** [`.docs/review/requirements/post-receive-work-spine.md`](../requirements/post-receive-work-spine.md)  
 **Schema:** [`.docs/review/schema-changes/post-receive-work-spine.md`](../schema-changes/post-receive-work-spine.md)  
 **Spec:** [`.docs/internal/specs/post-receive-work-spine/SPEC.md`](../../internal/specs/post-receive-work-spine/SPEC.md)  
@@ -20,11 +20,11 @@ P1 is on `main`. P2 is on `feat/work-order-p2` (Accept with conditions). Do not 
 4. **Mathilda U1 / U2:** asked-for ≠ Test assign. Label params as order capture, not Test snapshot.
 5. Architecture / UI / Spec **Accept with conditions** on P2. Hold product merge. Not IC50.
 6. **Receive freeze:** non-empty `analysis_ids` still **422**.
-7. **P2 one definition:** `routing_map` and work order hold one `process_definition_id`; typed steps stay ordered.
+7. **P2 ordered route:** `routing_map` and work order hold ordered `process_definition[]`. Not one definition, not a bag. Start instantiates position 1 only; later starts advance one position.
 8. **WO-7 publish (Tobias-signed Pass @ `b005cfe`):** `_require_wo7_tests` 422s before promote if any cohort sample lacks an active Test. Status stays unpublished (complete). Do **not** fold first-start freeze into this Pass; that half remains OPEN.
 9. **Freeze:** first LimsRun start wins. `_mint_tests_at_start` must **not** overwrite `asked_for_params` on an existing Test. **Still open** on `b005cfe`.
-10. **P2-4 visibility:** Route is `test:assign`. UI shows ordered steps and first-step allowed types as information. Start remains `experiment:manage`; map mutate remains `config:edit`.
-11. **Hans/Heidi route lock:** analysis × intake type × TAT identifies the map. Route checks its first step only. Map save does not inspect later-step acceptance.
+10. **P2-4 visibility:** Route is `test:assign` and reads ordered process/step metadata. UI shows the full route order and derives first process / first Experiment-LimsRun types. Process starts remain `experiment:manage`; mutate remains `config:edit`.
+11. **Heidi/Leadership overlap lock:** no sample-type picker. Map save **409**s only when the same analysis, overlapping TAT, **and** overlapping first-step allow-lists all hold. Extract-first vs Qubit-first for the same TAT is legal. Route: analysis + TAT candidates filtered by first-step current-type acceptance. Zero → 422; two saved rows that both accept current type → 409; never `first()`.
 
 ---
 
@@ -38,12 +38,12 @@ Receive writes Sample + Containers + Contents. Nothing records the request. Clas
 UI /asked-for ──▶ asked_for (P1)
                       │
                       ▼  explicit Route (P2)
-          analysis × intake type × TAT
-             │ first-step type gate
-             ▼
-            work_order (one process_definition_id)
+          analysis + TAT candidates
+             │ 0: 422 │ 2 accept current type: 409
+             ▼ exactly 1
+            work_order (ordered process_definition[])
                  │
-                 ▼ Start ordered process
+                 ▼ Start first process only
          existing /v1/eln-processes
                  │
                  ▼
@@ -108,18 +108,19 @@ Pytest: create, 409 dup, **403 dual-belt** (create **and** `list()` / `GET /aske
 
 ## 4. P2 design
 
-`routing_map`: range-gist or exclusion constraint on `(analysis_id, sample_type_id, tat_range)`. `sample_type_id` is intake matching only.
+`routing_map`: analysis + TAT + ordered `process_definition_ids`. Do **not** gist-exclude on analysis+TAT alone. Save **409**s only when the same analysis, overlapping TAT, **and** overlapping first-step allow-lists all hold.
 
 **OQ-WO-1 Decided:** Tech hits **Route**. No auto-route on asked-for save. `POST /api/v1/asked-for/{id}/route` (batch the same call for a selected set). Then:
 
-- Match analysis × sample current/intake type × TAT
-- No match → 200 `no_route`; mapped first ordered step rejects intake → 422 `route_sample_type`
-- Display first-step allowed types as information
-- Map save does not inspect step acceptance. Extract-first + later Qubit in one process is legal. Dest-type Hold remains out.
+- Select analysis + TAT candidates; filter by current type against each candidate’s first process / first ordered Experiment-LimsRun list
+- Zero acceptable rows → 422; two saved rows that both accept this current type → 409; exactly one snapshots its ordered `process_definition[]`
+- Never silently use `first()`
+- Prefer deriving first-process display on read. Any stored display copy refreshes on sequence/first-step change.
+- Map save/Route do not inspect later processes or steps. Extract-first + later Qubit in one ordered route is legal. Extract-first vs Qubit-first for the same TAT is legal at save. Dest-type Hold remains out.
 
-`work_orders.process_definition_id` snapshots one definition at mint. Its typed steps retain definition order.
+`work_orders.process_definition_ids` snapshots route order at mint. Start instantiates position 1 only. A later start instantiates the next pending definition and records its route position; Route never mints a process-of-processes.
 
-Start: `ELNProcessService.instantiate_from_definition` on the snapshotted definition under `experiment:manage`. Route remains `test:assign`. Each step start checks current type; empty fails closed.
+Start: `ELNProcessService.instantiate_from_definition` on the first pending ordered definition under existing process AuthZ (`experiment:manage`). Link each instance to the work order with route position. Route remains `test:assign`. Each later process/step start checks current type; empty fails closed.
 
 **L3 / A5 / SC5:** At LimsRun start, insert Test if missing; copy `asked_for.params` → `tests.asked_for_params` and freeze. **First start wins** — do not overwrite `asked_for_params` on an existing Test. Column ships in the P2 migration. P1 does **not** write that Test snapshot. Shape: JSON object matching that analysis’s defs (see working-note §3 snapshots).
 
@@ -149,10 +150,12 @@ No new import engine. **Do not build “admin authors parsers” as the product.
 |------|----------|
 | Hidden sample (create or list) | **403** via dual-belt `has_project_access` (not RLS-only) |
 | Cancelled asked-for re-create | Allowed (unique ignores cancelled) |
-| Route with no analysis × intake type × TAT match | **200** `no_route`, no WO |
-| Map overlap | 409 on map save |
+| Route with zero acceptable rows | **422**, no WO |
+| Route with two saved rows that both accept current type | **409**, no silent `first()` |
+| Map save, same analysis + overlapping TAT + overlapping first-step allow-lists | **409** |
+| Map save, same analysis + overlapping TAT, disjoint first-step allow-lists | Save succeeds (extract-first vs Qubit-first) |
 | Map save rejects a later-step mismatch | Remove chain-wide validation; save succeeds |
-| Route intake type outside first-step accepted types | **422 `route_sample_type`**; no WO |
+| Route with current type outside every candidate’s first-process / first-step types | **422 `route_sample_type`**; no WO |
 | Later step start with current type outside that step’s accepted types | **422 `route_sample_type`**; sample is not broken |
 | Publish without Test (deleted Test or empty plan / 0 data rows) | **422** the whole run (`_require_wo7_tests` / `plan.errors` @ `b005cfe`). Stay unpublished. Zero Results. Publish-refuse Pass; first-start freeze remains OPEN. |
 | Invisible process def (alice vs `created_by` / `has_experiment_access`) | Catalog-visible **read** (same client / logged-in). `0074` is not enough. Route stays `test:assign`. Not `experiment:manage` on Route. Not `route_sample_type`. |
@@ -165,7 +168,7 @@ No new import engine. **Do not build “admin authors parsers” as the product.
 | PR | Scope |
 |----|--------|
 | 1 | P1 tables + API + `/asked-for` UI + pytest + UAT script. **Hold merge until UAT.** |
-| 2 | P2 routing + work orders. **Hold product merge.** `b005cfe` remains signed history; publish-refuse Pass; overall unsigned/not Pass. Current lock: intake matching, one process definition, first-step Route gate, later step-start gates. |
+| 2 | P2 ordered routes + work orders. **Hold product merge.** `b005cfe` remains signed history; publish-refuse Pass; overall unsigned/not Pass. Current lock: ordered process definitions; map-save 409 only on TAT **and** first-step overlap; Route 409 when two saved rows both accept current type. |
 | 3 | P3 persist lock + results UAT fold (**closed**) |
 | 4 | P4 SOP Apply → process def (**closed**) |
 | 5 | P5 parser setup UX (**closed** this cycle) |
