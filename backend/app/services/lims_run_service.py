@@ -432,12 +432,12 @@ class LimsRunService:
         from app.services.result_promotion_service import ResultPromotionService
 
         promo = ResultPromotionService(self.db, current_user=self.current_user)
-        # Plan first (may create tests via ensure); apply if analysis set
         if not run.analysis_id:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="analysis_id is required to publish",
             )
+        self._require_wo7_tests(run)
         plan = promo.plan_promotion(run)
         if plan.conflict_count:
             raise HTTPException(
@@ -453,11 +453,73 @@ class LimsRunService:
                     "preview": plan.to_dict(),
                 },
             )
+        if plan.errors:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail={
+                    "code": "test_missing",
+                    "message": (
+                        "Test missing; Tests are created at LimsRun start (WO-7). "
+                        "Publish refuses the whole run."
+                    ),
+                    "errors": plan.errors[:20],
+                },
+            )
         promo.apply_plan(run, plan)
 
         self.run_repo.update_status(run, LimsRunStatus.published, self._user_id())
         self._commit_refresh(run)
         return run
+
+    def _require_wo7_tests(self, run: LimsRun) -> None:
+        """WO-7: refuse publish if any cohort sample lacks an active Test.
+
+        Empty instrument data is the same Fail as a missing Test: do not
+        publish a run that never minted Tests at start.
+        """
+        from models.test import Test
+
+        cohort = dict(run.cohort or {})
+        raw_ids = cohort.get("sample_ids") or []
+        sample_ids = []
+        for sid in raw_ids:
+            sample_ids.append(sid if isinstance(sid, uuid.UUID) else uuid.UUID(str(sid)))
+        if not sample_ids:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail={
+                    "code": "test_missing",
+                    "message": (
+                        "Test missing; Tests are created at LimsRun start (WO-7). "
+                        "Publish refuses the whole run."
+                    ),
+                },
+            )
+        missing = []
+        for sid in sample_ids:
+            test = (
+                self.db.query(Test)
+                .filter(
+                    Test.sample_id == sid,
+                    Test.analysis_id == run.analysis_id,
+                    Test.active == True,  # noqa: E712
+                )
+                .first()
+            )
+            if not test:
+                missing.append(str(sid))
+        if missing:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail={
+                    "code": "test_missing",
+                    "message": (
+                        "Test missing; Tests are created at LimsRun start (WO-7). "
+                        "Publish refuses the whole run."
+                    ),
+                    "sample_ids": missing,
+                },
+            )
 
     def promotion_preview(self, run_id: uuid.UUID) -> dict:
         """Dry-run of promote-on-publish (no DB writes)."""

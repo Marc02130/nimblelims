@@ -446,18 +446,21 @@ class TestWorkOrderP2:
 
         db_session.delete(test)
         db_session.commit()
-        from fastapi import HTTPException
-        from uuid import UUID
-        from app.services.result_promotion_service import ResultPromotionService
-
-        with pytest.raises(HTTPException) as exc:
-            ResultPromotionService(db_session).ensure_test(
-                UUID(sample_id),
-                p2_seed["analysis_a"].id,
-                cache={},
-            )
-        assert exc.value.status_code == 422
-        assert "WO-7" in str(exc.value.detail) or "Test missing" in str(exc.value.detail)
+        review = client.patch(
+            f"/v1/lims-runs/{run_id}/review", headers=_auth(admin_token)
+        )
+        assert review.status_code == 200, review.text
+        published = client.patch(
+            f"/v1/lims-runs/{run_id}/complete", headers=_auth(admin_token)
+        )
+        assert published.status_code == 422, published.text
+        body = published.json()
+        detail = body.get("detail") if isinstance(body, dict) else body
+        text = detail if isinstance(detail, str) else str(detail)
+        assert "WO-7" in text or "Test missing" in text or "test_missing" in text
+        still = client.get(f"/v1/lims-runs/{run_id}", headers=_auth(admin_token))
+        assert still.status_code == 200, still.text
+        assert still.json()["status"] == "complete"
 
 
 class TestListNameAlias:
