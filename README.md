@@ -188,7 +188,7 @@ nimblelims/
 ### Core Workflows for BioTech/Pharma Startups (**MVP Release Bar** + Shipped Enhancements)
 - **Compound & Sample Tracking** **(MVP)**: Receive (`/receive`), status management, lineage (aliquots/derivatives), container hierarchy. Non-empty `analysis_ids` on receive → **422**.
 - **Requested analysis** **(MVP, P1)**: **Asked-for** (`/asked-for`) records requested analysis + TAT for already-received samples (zero Tests, no execute). A later look-up, not the after-receive step — receive ends on `/receive`. See [manuals/HOWTO.md](manuals/HOWTO.md), [manuals/asked-for.md](manuals/asked-for.md), and `UAT_Scripts/uat-post-receive-work-spine.md`. Classic `/tests` is not the request path.
-- **Route / work orders (P2):** Explicit Route matches analysis + TAT rows containing ordered `process_definition[]`; no type picker. Map save **409**s only when the same analysis, overlapping TAT, **and** overlapping first-step allow-lists all hold (extract-first vs Qubit-first for the same TAT is legal). Route: zero acceptable → 422; two saved rows that both accept current type → 409; exactly one snapshots the route. Never silently `first()`. Start instantiates first process only; later starts advance/gate current type. No chain-AND; dest-type Hold stays out. WO-7 first-start freeze is in code; overall P2 Pass unsigned pending UAT restamp.
+- **Route / work orders (P2):** Explicit Route matches analysis + TAT rows containing ordered `process_definition[]`; no type picker. Map save **409**s only when the same analysis, overlapping TAT, **and** overlapping first-step allow-lists all hold (extract-first vs Qubit-first for the same TAT is legal). **In code on `8cfa2a9`, unsigned until QA:** Route zero acceptable → 422; two saved rows that both accept current type → 409; exactly one snapshots the route. Never silently `first()`. **Start instantiates the first process only**; later processes = later starts, not a process-of-processes at Route. No chain-AND; dest-type Hold stays out. WO-7 first-start freeze is in code on `8cfa2a9`, not QA-verified. Overall P2 Pass unsigned. Hold product merge.
 - **Results Entry** **(MVP)**: Manual results entry with real-time validation
 - **Batch Management** **(MVP + Enhancements)**: Create and manage batches (basic is MVP; cross-project support, automatic QC generation, and sample prioritization are shipped enhancements)
 - **Sample Prioritization** **(Shipped, Not MVP)** (US-11): Sort compounds and biological samples by shelf-life expiration and assay deadlines during batch creation
@@ -209,7 +209,7 @@ nimblelims/
 ### LIMS Runs → Structured Results **(Shipped, Not MVP)** (promote-on-publish)
 - **Analysis required**: Every LimsRun (e.g., plate reader output, screening campaign) has an **Analysis** from create (no non-reportable path).
 - **Import remains flexible JSONB** (`lims_run_data`); parsers/import are analysis-scoped for different instrument vendors.
-- **Promote on publish**: Status → `published` maps columns to analytes (name + **aliases** for CRO/instrument vendor column names) and writes **Results** (`raw_result`, `replicate`, `lims_run_id`) only into active Tests from first start. If any cohort Test is missing, WO-7 refuses the whole publish with **422**, writes no Results, invents no Test, and leaves the run `complete`. Publish-refuse is Tobias-signed Pass on `b005cfe`. First-start params freeze is in code; overall P2 Pass remains unsigned pending UAT restamp.
+- **Promote on publish**: Status → `published` maps columns to analytes (name + **aliases** for CRO/instrument vendor column names) and writes **Results** (`raw_result`, `replicate`, `lims_run_id`) only into active Tests from first start. If any cohort Test is missing, WO-7 refuses the whole publish with **422**, writes no Results, invents no Test, and leaves the run `complete`. Publish-refuse is Tobias-signed Pass on `b005cfe` (history). First-start params freeze is in code on `8cfa2a9`, **unsigned until QA**. Overall P2 Pass remains unsigned.
 - **Conflicts**: Same run updates; other run/manual ownership fails publish with **409** to protect data integrity.
 - **Preview**: Publish confirmation dry-runs create/update/conflict/unresolved columns (`GET /v1/lims-runs/{id}/promotion/preview`).
 - **Docs**: [manuals/HOWTO.md](manuals/HOWTO.md) · [manuals/lims-runs.md](manuals/lims-runs.md) · local `.docs/internal/ideas/run-results.md` (not committed).
@@ -339,7 +339,7 @@ Umbrella PRD, long-form design, ideas, SOP packs, user stories, and private note
 | [`schema-changes/`](.docs/review/schema-changes/) | Per-cycle DB deltas |
 | [`lab-ops-review/`](.docs/review/lab-ops-review/), [`ceo-review/`](.docs/review/ceo-review/), [`ui-review/`](.docs/review/ui-review/), [`architecture-review/`](.docs/review/architecture-review/), [`security-review/`](.docs/review/security-review/), [`qa-review/`](.docs/review/qa-review/) | Formal reviews |
 
-UAT scripts: `UAT_Scripts/` — receive `uat-atomic-receive.md`; P1 asked-for `uat-post-receive-work-spine.md` (**P1 Pass**, merged PR 81).
+UAT scripts: `UAT_Scripts/` — receive `uat-atomic-receive.md`; P1 asked-for `uat-post-receive-work-spine.md` (**P1 Pass** on `c649245`, merged PR 81). Live AC-P2 on `8cfa2a9` is **unsigned**; hold product merge.
 
 ## Support
 

@@ -1,6 +1,6 @@
 # Manual: Asked-for (requested analysis)
 
-**Status:** P1 lake shipped. **P2 Route / work_orders / WO-7** are on this slice.  
+**Status:** P1 lake shipped. P2 Route / work_orders / WO-7 surfaces are on `feat/work-order-p2` @ `8cfa2a9`. Freeze / Route 422/409 are **in code, unsigned until QA**. Hold product merge.  
 **UI:** `/asked-for` — sidebar **Asked-for** (listed after **Receive**; nav order only, not a work queue) · sample-detail **Asked-for** section · **Route** CTA on `requested`  
 **API:** `POST /v1/asked-for` · `GET /v1/asked-for` · `POST /v1/asked-for/{id}/cancel` · `POST /v1/asked-for/{id}/route` · `POST /v1/asked-for/route`  
 **UAT:** [`UAT_Scripts/uat-post-receive-work-spine.md`](../UAT_Scripts/uat-post-receive-work-spine.md)  
@@ -22,8 +22,8 @@ P1 is the **asked-for lake**. An analyst records **requested analysis + TAT** ag
 | Lake ≠ work | Asked-for create leaves `COUNT(tests)` and `COUNT(work_orders)` unchanged. Save is not scientific assignment or routing: no Test, no work order, no analytes, no legal number entry. |
 | Not a queue | Asked-for is a look-up, not the after-receive click and not a Start queue. Do not document receive → asked-for as one motion. |
 | Wrong pairings | Map create has no sample-type picker. A row holds analysis + TAT + ordered `process_definition[]`. Map save 409s only when analysis, TAT, **and** first-step allow-lists overlap. Extract-first and Qubit-first for the same TAT are legal. Route gates current type against the first process’s first ordered step only. |
-| Route | Explicit Route requires `test:assign` plus project access. Zero acceptable rows → **422**; two saved rows that both accept current type → **409**; no silent `first()`. Exactly one mints a queued work order and sets `routed`. |
-| Params | Lock: freeze onto `tests.asked_for_params` at the **first LimsRun start** (WO-7). Later starts do not overwrite that snapshot. Empty `{}` is a freeze, not a hole to refill. Do **not** collect params on receive. UAT restamp unsigned. |
+| Route | Explicit Route requires `test:assign` plus project access. **Lock (in code on `8cfa2a9`, unsigned until QA):** zero acceptable rows → **422**; two saved rows that both accept current type → **409**; no silent `first()`. Exactly one mints a queued work order and sets `routed`. Route does not start processes. |
+| Params | Lock: freeze onto `tests.asked_for_params` at the **first LimsRun start** (WO-7). Intended: later starts do not overwrite that snapshot. Empty `{}` is a freeze, not a hole to refill. Do **not** collect params on receive. **In code on `8cfa2a9`, unsigned until QA.** |
 
 ---
 
@@ -63,10 +63,10 @@ Do not chain this section onto Receive or onto the save steps above. Return to `
 2. P2 matches analysis + TAT, then tests current type against each candidate row’s first process / first ordered Experiment/LimsRun allow-list.
 3. Zero acceptable rows returns **422**; two saved rows that both accept current type return **409**. The row stays `requested`, with no work order or Test.
 4. Exactly one acceptable row snapshots its ordered `process_definition[]`, creates a queued work order, changes the row to `routed`, and still creates no Test.
-5. Experiments → **Work Orders** is the backlog. **Start process** instantiates only the first process in the snapshotted ordered route. Later starts advance in order; UI shows process and step order.
+5. Experiments → **Work Orders** is the backlog. **Start process** instantiates **only the first process** in the snapshotted ordered route — not the rest of the chain. Later starts advance in order; UI shows process and step order. Route is not a process-of-processes.
 6. WO-7 lock: the **first** LimsRun start creates or attaches the Test and freezes the then-current `asked_for_params`. If any cohort sample lacks an active Test at publish, **422** refuses the whole run, writes no Results, invents no Test, and leaves the run `complete`.
 
-Publish refuse is **Tobias-signed Pass** on `b005cfe`. First-start freeze is **in code** (later starts skip `asked_for_params` on an existing Test). Overall P2 Pass remains unsigned pending UAT restamp; historical `9c4f9da` / `b005cfe` stamps remain signed history.
+Publish refuse is **Tobias-signed Pass** on `b005cfe` (keep that Result). First-start freeze and live Route 422/409 are **in code on `8cfa2a9`**, **unsigned until QA**. Overall P2 Pass remains unsigned; historical `9c4f9da` / `b005cfe` stamps remain signed history.
 
 After analysis + TAT match, Route compares current type with the first process’s first ordered Experiment/LimsRun allow-list for each candidate row. No acceptable row returns **422**; type refusal uses `route_sample_type`. Two saved rows that both accept this current type return **409**. Never silently use `first()`. Map save 409s only when the same analysis, overlapping TAT, **and** overlapping first-step allow-lists all hold; extract-first and Qubit-first for the same TAT must save. Map save and Route do not AND one type across later processes or steps. Start instantiates only the first process. Later processes and steps gate current type when each is started. Dest-type Hold remains unchanged.
 
