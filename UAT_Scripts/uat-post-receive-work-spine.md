@@ -363,16 +363,16 @@ P1 remains the historical **Pass** on `c649245`; this live P2 section does not a
 
 The preceding `9c4f9da` section is retained verbatim as signed history, including its original “Live” heading and Results. It is not the current stamp. Do not rewrite or transfer those observations to another SHA.
 
-## Live AC-P2 stamp — `b005cfe` (unsigned)
+## Live AC-P2 stamp — `b005cfe` (per-AC signed; overall P2 unsigned / not Pass)
 
-**Branch / build awaiting QA:** `feat/work-order-p2` at `b005cfe` (`b005cfe4596ca64baf5c674d372536e27560cf69`)
+**Branch / build tested:** `feat/work-order-p2` at `b005cfe` (`b005cfe4596ca64baf5c674d372536e27560cf69`)
 
-**QA signature:** unsigned
+**QA signature:** Tobias — signed per-AC results below. **Overall P2 Pass remains unsigned and is not claimed.**
 
-**Executor / environment / date:** to be recorded by QA
-**Merge:** hold `feat/work-order-p2` until QA executes and signs this block. Not IC50.
+**Executor / environment / date:** Tobias · local docker compose (`lims-*`) · 2026-08-29 · compose down after run
+**Merge:** hold product merge of `feat/work-order-p2`. Not IC50.
 
-This block records acceptance steps only. It contains no copied outcomes or observations from `9c4f9da` or `3b56cfb`.
+This block records Tobias’s `b005cfe` results. It does not rewrite or transfer outcomes from `9c4f9da`, `3b56cfb`, or P1.
 
 **Copy and permission locks:** Receive ends on `/receive`. Asked-for is a separate later look-up. Route is an unnumbered later planner requiring `test:assign` plus project access; it does not require `experiment:manage`. Client and inaccessible-project Route writes return **403**, not 404. **Start process** and LimsRun start require `experiment:manage`; publish requires `experiment:publish`.
 
@@ -380,12 +380,14 @@ This block records acceptance steps only. It contains no copied outcomes or obse
 
 | WO-7 half | State on `b005cfe` |
 |-----------|--------------------|
-| Whole-run publish refuse when a cohort Test is missing | **In code**, unsigned until QA executes AC-P2-4 |
-| First-start freeze of `tests.asked_for_params` | **Lock, still OPEN.** `_mint_tests_at_start` has no already-frozen guard, so a later start that finds the existing active Test rewrites the first-start snapshot — with empty `{}` when no `routed` row matches |
+| Whole-run publish refuse when a cohort Test is missing | **Pass signed by Tobias** in AC-P2-4 |
+| First-start freeze of `tests.asked_for_params` | **Lock, still OPEN and not scored.** `{}` was recorded; `_mint_tests_at_start` still has no already-frozen guard |
 
 Empty `{}` is a freeze, not a hole to refill on a later start. AC-P2-4 records the freeze as the target lock; an overwrite observed on this SHA is the expected open gap, not a surprise.
 
 ### AC-P2-1 — Route remains a separate later planner
+
+**Result:** **Pass** (alice click, Tobias signed, 2026-08-29, `b005cfe`)
 
 1. As a lab user with `sample:create`, receive a sample on `/receive`.
 2. Confirm the successful receive stays on `/receive`, clears the barcode, and is ready for the next tube.
@@ -397,33 +399,44 @@ Empty `{}` is a freeze, not a hole to refill on a later start. AC-P2-4 records t
 - Asked-for is not a numbered post-receive step or Start queue.
 - Only the explicit later Route action evaluates the routing map.
 
-### AC-P2-2 — Route authorization is `test:assign` plus project RLS
+**Verified holds:** alice received and stayed on `/receive`; asked-for was a separate later motion; Route was later again.
 
-1. Route an accessible `requested` row as a non-Client lab user with `test:assign`.
-2. Repeat without `test:assign`.
-3. Attempt Route against a hidden or other-project sample.
-4. Attempt Route as a Client, including a Client that otherwise has `test:assign`.
+### AC-P2-2 — Asked-for save mints no work order or Test
+
+**Result:** **Pass** (Tobias signed, 2026-08-29, `b005cfe`)
+
+1. Record work-order and Test counts for Study-01.
+2. Save requested analysis + TAT on `/asked-for`.
+3. Recount before Route.
 
 **Expect**
-- The accessible lab action reaches routing without requiring `experiment:manage`.
-- Missing `test:assign`, hidden/other-project access, and Client writes return **403**, not 404.
-- Route itself does not grant permission to **Start process**; that later action still requires `experiment:manage`.
+- The row stays `requested`.
+- Work-order and Test counts remain zero.
+
+**Verified holds:** Study-01 asked-for save left the row `requested` with **0 work orders** and **0 Tests**.
 
 ### AC-P2-3 — queued work order feeds the existing execution engine
 
-1. Use an existing process definition with at least two ordered typed steps whose accepted types differ (for example, an intake-type Experiment step followed by a LimsRun step that expects a transformed type). Do not invent seed IDs.
-2. Configure a matching analysis × sample type × TAT map and explicitly Route the requested row.
+**Result:** **Pass** (alice click, Tobias signed, 2026-08-29, `b005cfe`)
+
+1. Use an existing process definition with ordered typed steps. Do not invent seed IDs.
+2. Configure a matching analysis × TAT map with that one process definition and explicitly Route the requested row. Do not select a sample type on map create.
 3. Inspect `/work-orders` before choosing **Start process**.
 4. Start the work order, follow the linked process, and open its typed Experiment/LimsRun step.
 
 **Expect**
 - Route creates one queued `work_order`, changes asked-for to `routed`, and creates zero Tests.
 - The queued record is planning only; **Start process** begins execution and requires `experiment:manage`.
-- Routing-map authoring shows the first ordered Experiment or LimsRun step’s allowed types for information only. It does not reject the map because a later step accepts a different type.
+- Routing-map authoring displays allowed types derived from the selected first/only process and its first ordered Experiment or LimsRun step. It has no sample-type picker.
+- Route compares the sample’s current type with that first-step allow-list only; it does not inspect later steps.
 - Route and process views make process/step order apparent; steps are not presented as an unordered bag.
 - Process detail renders even when a step has a null template id; no `tid.slice` blank page.
 
+**Verified holds:** alice used Route + Start on the admin-created ELISA LimsRun P2 type-gate definition. Route minted one queued work order and **0 Tests**; Start opened process `b47db5ee`; process detail rendered without a `tid.slice` crash.
+
 ### AC-P2-4 — WO-7 first-start freeze and whole-run refusal
+
+**Result:** **Publish-refuse Pass** (carol API + UI, Tobias signed, 2026-08-29, `b005cfe`). **First-start freeze remains OPEN and was not scored. Do not fold this into overall P2 Pass.**
 
 1. For a routed row, save a valid asked-for param before starting its typed LimsRun.
 2. Select the routed cohort and call `PATCH /v1/lims-runs/{id}/start` for the first start.
@@ -443,20 +456,41 @@ Empty `{}` is a freeze, not a hole to refill on a later start. AC-P2-4 records t
 - Intended: a later start neither replaces the Test nor rewrites the first-start `asked_for_params` snapshot, and never overwrites a snapshot with `{}`.
 - Actual on `b005cfe`: steps 4–5 are expected to show the later start rewriting `asked_for_params`, because `_mint_tests_at_start` carries no already-frozen guard. Record the observed values; that gap is the open lock, not a product-code change for this docs fold.
 
-### AC-P2-5 — map authoring permits type transitions; step start gates current type
+**Verified holds (publish-refuse half):** after Test `40ac357f` was deleted, carol `PATCH /complete` returned **422** `test_missing`: “Test missing; Tests are created at LimsRun start (WO-7). Publish refuses the whole run.” The UI showed the same banner. Status stayed **Complete**, Published stayed **—**, and no Test was reminted.
 
-1. Confirm an empty routing map returns **200** `no_route` and mints nothing.
-2. Create a map that names the intake/current sample type and points to an ordered process whose later step accepts a different type.
-3. Confirm map save is not required to return **422** `route_sample_type` for that later-step difference, then Route a matching request.
-4. Start the first step with a sample whose current type is accepted.
-5. Without claiming dest-type Hold is closed, attempt to start a step whose accepted types do not include the sample’s current type.
-6. Create overlapping inclusive TAT ranges for the same analysis and sample type.
+**Recorded but not scored (first-start freeze):** `asked_for_params` was `{}`. This is the known OPEN overwrite gap, not a Pass and not evidence that first-start freeze is closed.
+
+### AC-P2-5 — signed `b005cfe` behavior; superseded map-authoring expect
+
+**Result on `b005cfe`:** **Pass** (Tobias signed, 2026-08-29). This result is history of what that SHA did and is **not re-scored** under the later Marc/Rolf lock.
+
+**Verified holds on `b005cfe`:** click-save returned **422** `route_sample_type` with “Sample type is not accepted on every step in the chain”; overlapping TAT was refused. The chain-AND map-save behavior is a signed observation, not the ongoing authoring rule.
+
+**Superseding expect for the next product SHA (not a result of this run)**
+
+1. Confirm routing-map create has analysis, TAT, and one ordered process definition, with **no sample-type picker**.
+2. Confirm the form displays allowed types derived from the selected first/only process and its first ordered Experiment/LimsRun step; change the process/step and verify the display refreshes.
+3. Save the map without comparing one type across later steps.
+4. Route a request whose sample current type is not accepted by the first ordered step.
+5. Route a request accepted by the first step while a later step expects a different type.
+6. Reach the later step without a valid type transformation and attempt to start it.
+7. Create overlapping inclusive TAT ranges for the same analysis.
 
 **Expect**
-- Empty map leaves the row `requested` with zero new work orders and Tests.
-- Map save does **not** AND the intake type across every step’s accepted-type set. A later step may expect a transformed type.
-- The map may still use intake/current sample type for analysis × type × TAT Route matching.
-- Starting a step with an incompatible **current** sample type returns **422** `route_sample_type`; this means wrong type for that step, not a broken sample. Empty accepted types also fail at step start.
-- The Route UI shows the process and ordered steps, plus the first ordered Experiment or LimsRun step’s allowed types as informational copy only.
-- Dest-type Hold remains out of scope; do not claim an earlier step changed the sample type unless the product actually did so.
-- Overlapping TAT ranges return **409**.
+- Map match uses analysis + TAT. Allowed types are derived display, not an admin-authored map field.
+- First-step current-type mismatch returns **422** `route_sample_type` at Route and mints no work order. This means wrong type for assignment, not a broken sample.
+- Route does **not** AND later-step allow-lists. A later step may expect a transformed type.
+- Each later step checks current type only when started; empty or incompatible allow-list fail-closes with **422** then.
+- Route and process views show one process definition and its ordered steps, not a bag of definitions or steps.
+- Dest-type Hold remains out; do not claim an earlier step changed type unless the product did so.
+- Overlapping TAT ranges for the same analysis return **409**.
+
+---
+
+## Live `b005cfe` per-AC sign-off
+
+**Signed by Tobias, 2026-08-29; local docker compose, compose down.**
+
+AC-P2-1 **Pass** · AC-P2-2 **Pass** · AC-P2-3 **Pass** · AC-P2-4 **publish-refuse Pass only** · AC-P2-5 **Pass as `b005cfe` history**.
+
+**Overall P2 Pass remains unsigned and is not claimed.** WO-7 first-start freeze remains **OPEN** and was not scored. Hold product merge. Not IC50.

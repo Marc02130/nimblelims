@@ -66,7 +66,7 @@ Shipped v1 — see local `.docs/internal/ideas/run-results.md` (not committed).
 | **When** | Status → `published` (run always has **`analysis_id`**) |
 | **No analysis** | **Not allowed** — set analysis on create/edit; no non-reportable / continue-without path |
 | **Mapping** | JSONB column → analyte via **name** or **analyte alias** (casefold); known non-analyte keys (`units`, etc.) skipped |
-| **Tests** | Use the active Test created or attached at the first LimsRun start for `(sample_id, analysis_id)`. If any cohort sample lacks one, WO-7 returns **422**, refuses the whole run, writes no Results, invents no Test, and leaves the run `complete`. This refuse **is in code** on `b005cfe`; live AC-P2 is unsigned. Historical `9c4f9da` stays signed not Pass |
+| **Tests** | Use the active Test created or attached at the first LimsRun start for `(sample_id, analysis_id)`. If any cohort sample lacks one, WO-7 returns **422**, refuses the whole run, writes no Results, invents no Test, and leaves the run `complete`. Publish-refuse is **Tobias-signed Pass** on `b005cfe`; overall P2 Pass remains unsigned. Historical `9c4f9da` stays signed not Pass |
 | **First-start freeze** | **Lock, still OPEN on `b005cfe`.** `_mint_tests_at_start` has no already-frozen guard, so a later start that finds the existing active Test rewrites `tests.asked_for_params` — with empty `{}` when no `routed` asked-for row matches. Empty `{}` is a freeze, not a hole to refill. Do not document this as closed |
 | **Results** | Write `raw_result`, `replicate` (from JSONB or row order), `lims_run_id` lineage |
 | **Conflicts** | Same run → update; other run / manual result owns triple → **409**, publish blocked |
@@ -143,7 +143,7 @@ You can still enforce strict state-machine rules in the application service laye
 
 - Routes: `/runs`, `/runs/:id`, `/runs/:id/dose-response`
 - Main pages: RunsManagement, LimsRunDetail (Overview / Data / Dose Response tabs)
-  - Overview: **Analysis** and cohort required to start; first start locks the cohort, creates or attaches each Test, and freezes asked-for params. The freeze half of WO-7 is **open** — a later start overwrites `tests.asked_for_params`. **Publish** opens promotion preview. If any cohort Test is missing, WO-7 refuses the whole publish with **422**, writes no Results, creates no Test, and leaves the run `complete`. That refuse **is in code** on `b005cfe` but the live AC-P2 stamp is unsigned; `9c4f9da` remains signed not Pass history.
+  - Overview: **Analysis** and cohort required to start; first start locks the cohort, creates or attaches each Test, and targets a params freeze. The freeze half of WO-7 is **OPEN and unscored** — `{}` was recorded and later starts may overwrite. **Publish** opens promotion preview. If any cohort Test is missing, WO-7 refuses the whole publish with **422**, writes no Results, creates no Test, and leaves the run `complete`. Publish-refuse is **Tobias-signed Pass** on `b005cfe`; overall P2 Pass remains unsigned. `9c4f9da` remains signed not Pass history.
 - API under `/v1/lims-runs` (including `GET …/promotion/preview`, publish = `PATCH …/complete`)
 
 ## Next Steps / Open Questions
