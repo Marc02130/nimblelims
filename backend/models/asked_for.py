@@ -99,6 +99,11 @@ class AskedFor(Base):
     tat_days = Column(Integer, nullable=False)
     params = Column(JSONB, nullable=False, server_default="{}", default=dict)
     status = Column(Text, nullable=False)
+    routed_work_order_id = Column(
+        PostgresUUID(as_uuid=True),
+        ForeignKey("work_orders.id", use_alter=True, name="fk_asked_for_routed_work_order_id"),
+        nullable=True,
+    )
     active = Column(Boolean, nullable=False, server_default="true", default=True)
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
     created_by = Column(PostgresUUID(as_uuid=True), ForeignKey("users.id"), nullable=True)

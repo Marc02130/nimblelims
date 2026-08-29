@@ -140,7 +140,7 @@ Create a new sample.
 
 UI: `/asked-for`. Copy: **requested analysis**. Write/cancel: `test:assign` and role ≠ Client. List/get: `sample:read`. Hidden/other-project sample → **403** (not 404).
 
-**Does not** create a Test row, start work, or execute an analysis. Route / work_orders / WO-7 are **not** this stamp. `analysis_param_defs` freeze at **LimsRun start** later — not on receive, not required to record a request.
+**Does not** create a Test row, start work, or execute an analysis. P2 **Route** (`POST /v1/asked-for/{id}/route` and `POST /v1/asked-for/route`) may mint a `work_order`. Tests freeze `asked_for_params` at **LimsRun start** (WO-7).
 
 ### POST /v1/asked-for
 Record requested analyses for a sample set (one row per sample, one transaction).
@@ -162,7 +162,16 @@ Query: `sample_id`, `project_id`, `analysis_id`, `status`. **200** `{ items, cou
 ### GET /v1/asked-for/{id}
 
 ### POST /v1/asked-for/{id}/cancel
-Allowed while `requested`. Cancel after `routed` is **not this stamp** (P2).
+Allowed while `requested`. Cancel after `routed` → **422**.
+
+### POST /v1/asked-for/{id}/route
+### POST /v1/asked-for/route
+Body for batch: `{ "asked_for_ids": ["uuid"] }`. **200** `{ items: [{ asked_for_id, work_order, no_route }], count }`. Empty map → `no_route: true`. Type gate fail → **422** `{ "code": "route_sample_type" }`. Write: `test:assign`, not Client.
+
+### Routing map / work orders
+- `GET/POST /v1/routing-map` · `PATCH/DELETE /v1/routing-map/{id}` (write: `config:edit`). TAT overlap → **409**.
+- `PUT /v1/eln-process-definitions/{id}/steps/{step_id}/accepted-sample-types`
+- `GET /v1/work-orders` · `POST /v1/work-orders/{id}/start` (start: `experiment:manage`)
 
 ### Param defs (later — not receive, not this P1 stamp)
 `GET/PUT /analyses/{id}/param-defs` is catalog setup for freeze at **LimsRun start**. Do not put param defs on `POST /samples/receive`. P1 asked-for does not require filling defs.

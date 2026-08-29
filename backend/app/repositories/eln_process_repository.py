@@ -95,17 +95,19 @@ class ELNProcessRepository:
     def create_definition_step(
         self,
         process_definition_id: UUID,
-        experiment_template_id: UUID,
+        experiment_template_id: Optional[UUID],
         sort_order: int,
         step_kind: str = 'eln_experiment',
         execution_mode: str = 'eln_experiment',
         name: Optional[str] = None,
+        analysis_id: Optional[UUID] = None,
         created_by: Optional[UUID] = None,
         modified_by: Optional[UUID] = None,
     ) -> ELNProcessDefinitionStep:
         s = ELNProcessDefinitionStep(
             process_definition_id=process_definition_id,
             experiment_template_id=experiment_template_id,
+            analysis_id=analysis_id,
             step_kind=step_kind,
             execution_mode=execution_mode,
             name=name,
@@ -190,6 +192,7 @@ class ELNProcessRepository:
         active: bool = True,
         status_id: Optional[UUID] = None,
         process_definition_id: Optional[UUID] = None,
+        work_order_id: Optional[UUID] = None,
         created_by: Optional[UUID] = None,
         modified_by: Optional[UUID] = None,
     ) -> ELNProcess:
@@ -199,6 +202,7 @@ class ELNProcessRepository:
             active=active,
             status_id=status_id,
             process_definition_id=process_definition_id,
+            work_order_id=work_order_id,
             created_by=created_by,
             modified_by=modified_by,
         )
@@ -243,10 +247,11 @@ class ELNProcessRepository:
     def create_step(
         self,
         process_id: UUID,
-        experiment_template_id: UUID,
+        experiment_template_id: Optional[UUID],
         sort_order: int,
         name: Optional[str] = None,
         experiment_id: Optional[UUID] = None,
+        analysis_id: Optional[UUID] = None,
         step_kind: str = 'eln_experiment',
         execution_mode: str = 'eln_experiment',
         current_lims_run_id: Optional[UUID] = None,
@@ -256,6 +261,7 @@ class ELNProcessRepository:
         step = ELNProcessStep(
             process_id=process_id,
             experiment_template_id=experiment_template_id,
+            analysis_id=analysis_id,
             experiment_id=experiment_id,
             step_kind=step_kind,
             execution_mode=execution_mode,

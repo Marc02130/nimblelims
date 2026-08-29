@@ -13,7 +13,7 @@ This is a how-to, not a PRD. Marc keeps it current as features ship.
 | Step | Status |
 |------|--------|
 | Receive (`/receive`) | Shipped on `main` |
-| Route / work order | **Not this slice** |
+| Route / work order | Shipped on this P2 branch (`/asked-for` Route, `/admin/routing-map`, `/work-orders`) |
 | Process / Experiment / LimsRun | Execute substrate shipped; P1 does **not** start it |
 | Results | Classic type-a-number on a Test; persist lock is a later packet |
 | Requested analysis (`/asked-for`) — later look-up, off the bench path | Shipped on `main` (P1 lake) |
@@ -66,9 +66,15 @@ Client / no `sample:create` → no Receive nav or **403**.
 
 ## 3. Route / work order
 
-**Not this slice.** Not shipped. Do not look for a Route CTA.
+**UI:** `/asked-for` **Route** (not Start). Admin **Routing map** (`/admin/routing-map`). Experiments → **Work Orders** (`/work-orders`).
 
-Later packet: tech hits Route; a routing map (`analysis` × `sample_type` × TAT) may mint a `work_order`. That is also where the wrong pairing (e.g. Qubit on blood) is refused. That work_order feeds Process / Experiment / LimsRun. Test row at **LimsRun start** (WO-7), not at receive, not on asked-for, not on work_order save.
+1. Record asked-for first (status `requested`).
+2. Tech hits **Route**. No auto-route on asked-for save.
+3. Match is `analysis` × current sample type × TAT against `routing_map`. Empty map → **200**, `no_route`, stays `requested`.
+4. Every process-definition step in the chain must accept that sample type. Empty or wrong set → **422** `route_sample_type` on map save and on Route. Qubit is a LimsRun step; it does not accept blood. Dest-type Hold is unchanged.
+5. Match mints a `work_order` (`queued`) and sets asked-for `routed`. Still **zero Tests**.
+6. **Start process** on `/work-orders` instantiates the first snapshot definition (`eln_processes.work_order_id`).
+7. Test row at **LimsRun start** (WO-7), not at receive, not on asked-for, not on work_order save.
 
 ---
 

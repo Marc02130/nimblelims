@@ -78,7 +78,7 @@ class TemplateDefinition(BaseModel):
 class LimsRunCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=255)
     description: Optional[str] = None
-    experiment_template_id: uuid.UUID
+    experiment_template_id: Optional[uuid.UUID] = None
     analysis_id: uuid.UUID = Field(
         ...,
         description="Required analysis for the run (import + promote).",
@@ -109,7 +109,7 @@ class LimsRunRead(BaseModel):
     id: uuid.UUID
     name: str
     description: Optional[str]
-    experiment_template_id: uuid.UUID
+    experiment_template_id: Optional[uuid.UUID] = None
     analysis_id: Optional[uuid.UUID] = None
     status: LimsRunStatus
     cohort: Optional[Dict[str, Any]] = None

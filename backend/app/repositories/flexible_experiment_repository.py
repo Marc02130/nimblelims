@@ -57,7 +57,7 @@ class LimsRunRepository:
     def create(
         self,
         name: str,
-        experiment_template_id: uuid.UUID,
+        experiment_template_id: Optional[uuid.UUID],
         description: Optional[str],
         created_by: Optional[uuid.UUID],
         analysis_id: Optional[uuid.UUID] = None,

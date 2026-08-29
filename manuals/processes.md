@@ -11,7 +11,7 @@ Key characteristics:
 
 Processes sit above individual Experiments and provide structure for multi-step experimental work.
 
-**P1 asked-for does not start a process.** Recording **requested analysis** on `/asked-for` does not assign samples to a process, does not execute, and does not mint a Test. Process start remains this UI (`/experiments/processes`). Route / work_orders are a later stamp.
+**Asked-for does not start a process.** Recording **requested analysis** on `/asked-for` does not assign samples to a process, does not execute, and does not mint a Test. **Route** mints a work order. **Start process** on `/work-orders` instantiates the first snapshot definition and sets `eln_processes.work_order_id`. LimsRun steps pick an **analysis** (no fake ExperimentTemplate required). Accepted sample types on each definition step gate Route.
 
 ### Product rule (Decision #6)
 

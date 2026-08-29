@@ -267,7 +267,97 @@ class LimsRunService:
             run.modified_by = self._user_id()
             self.db.flush()
 
+        self._mint_tests_at_start(run)
         return self._transition(run, LimsRunStatus.running)
+
+    def _mint_tests_at_start(self, run: LimsRun) -> None:
+        """WO-7: insert Test if missing; snapshot asked-for params and freeze."""
+        from datetime import datetime
+        from models.analysis import Analysis
+        from models.asked_for import AskedFor
+        from models.list import List, ListEntry
+        from models.sample import Sample
+        from models.test import Test
+
+        cohort = dict(run.cohort or {})
+        raw_ids = cohort.get("sample_ids") or []
+        sample_ids = []
+        for sid in raw_ids:
+            sample_ids.append(sid if isinstance(sid, uuid.UUID) else uuid.UUID(str(sid)))
+        if not sample_ids or run.analysis_id is None:
+            return
+
+        status_row = (
+            self.db.query(ListEntry)
+            .join(List, ListEntry.list_id == List.id)
+            .filter(
+                List.name.in_(("Test Status", "test_status")),
+                ListEntry.name.in_(("Assigned/Pending", "In Process", "Pending")),
+            )
+            .first()
+        )
+        if not status_row:
+            status_row = (
+                self.db.query(ListEntry)
+                .filter(
+                    ListEntry.name.in_(("Assigned/Pending", "In Process", "Pending"))
+                )
+                .first()
+            )
+        if not status_row:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Test status 'Assigned/Pending' not found",
+            )
+
+        analysis = self.db.query(Analysis).filter(Analysis.id == run.analysis_id).first()
+        for sid in sample_ids:
+            asked = (
+                self.db.query(AskedFor)
+                .filter(
+                    AskedFor.sample_id == sid,
+                    AskedFor.analysis_id == run.analysis_id,
+                    AskedFor.status == "routed",
+                )
+                .first()
+            )
+            params = dict(asked.params or {}) if asked else {}
+            test = (
+                self.db.query(Test)
+                .filter(
+                    Test.sample_id == sid,
+                    Test.analysis_id == run.analysis_id,
+                    Test.active == True,  # noqa: E712
+                )
+                .first()
+            )
+            if test:
+                test.asked_for_params = params
+                test.modified_by = self._user_id()
+                continue
+            sample = self.db.query(Sample).filter(Sample.id == sid).first()
+            if not sample or not analysis:
+                continue
+            base_name = f"{sample.name}_{analysis.name}"
+            name = base_name[:240]
+            n = 0
+            while self.db.query(Test.id).filter(Test.name == name).first():
+                n += 1
+                name = f"{base_name[:220]}_{n}"
+            self.db.add(
+                Test(
+                    name=name,
+                    sample_id=sid,
+                    analysis_id=run.analysis_id,
+                    status=status_row.id,
+                    asked_for_params=params,
+                    test_date=datetime.utcnow(),
+                    technician_id=self._user_id(),
+                    created_by=self._user_id(),
+                    modified_by=self._user_id(),
+                )
+            )
+        self.db.flush()
 
     def set_cohort(
         self,

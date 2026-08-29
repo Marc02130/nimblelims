@@ -1,8 +1,8 @@
 # Manual: Asked-for (requested analysis)
 
-**Status:** P1 lake (this stamp). Route / work_orders / WO-7 / param freeze at LimsRun start are **not** this stamp.  
-**UI:** `/asked-for` — sidebar **Asked-for** (listed after **Receive**; nav order only, not a work queue) · sample-detail **Asked-for** section  
-**API:** `POST /v1/asked-for` · `GET /v1/asked-for` · `POST /v1/asked-for/{id}/cancel`  
+**Status:** P1 lake shipped. **P2 Route / work_orders / WO-7** are on this slice.  
+**UI:** `/asked-for` — sidebar **Asked-for** (listed after **Receive**; nav order only, not a work queue) · sample-detail **Asked-for** section · **Route** CTA on `requested`  
+**API:** `POST /v1/asked-for` · `GET /v1/asked-for` · `POST /v1/asked-for/{id}/cancel` · `POST /v1/asked-for/{id}/route` · `POST /v1/asked-for/route`  
 **UAT:** [`UAT_Scripts/uat-post-receive-work-spine.md`](../UAT_Scripts/uat-post-receive-work-spine.md)  
 **Requirements:** [`.docs/review/requirements/post-receive-work-spine.md`](../.docs/review/requirements/post-receive-work-spine.md) **RQ-AF-***  
 **Sketch:** [`.docs/review/tech-sketch/post-receive-work-spine.md`](../.docs/review/tech-sketch/post-receive-work-spine.md) §3
@@ -17,13 +17,13 @@ P1 is the **asked-for lake**. An analyst records **requested analysis + TAT** ag
 
 | Lock | Rule |
 |------|--------|
-| Copy | **Asked-for** / **requested analysis** / **Record request**. Never “assign test,” “create test,” “start work,” or “order process.” No Start / Execute on `requested`. |
+| Copy | **Asked-for** / **requested analysis** / **Record request**. Never “assign test,” “create test,” or “order process.” **Route** is allowed on `requested`. No Start / Execute on the asked-for page. |
 | Receive freeze | Non-empty `analysis_ids` on `POST /samples/receive` → **422**. Empty or omit → zero Tests. No analysis picker on `/receive`. |
 | Lake ≠ Test | Asked-for create leaves `COUNT(tests)` unchanged. Save is not scientific assignment: no Test, no analytes, no legal number entry. |
 | Not a queue | Asked-for is a look-up, not the after-receive click and not a Start queue. Do not document receive → asked-for as one motion. |
-| Wrong pairings | The lake accepts them on purpose (e.g. Qubit on blood). Refusal is **routing** (P2 `route_sample_type` **422**), not P1. |
-| Not this stamp | Route, `work_orders`, WO-7 Test-at-LimsRun-start, results persist, SOP Apply. |
-| Params | `analysis_param_defs` and freeze onto a Test happen later (**LimsRun start**). Do **not** collect or assign params on receive. P1 records analysis + TAT; empty `params` `{}` is the P1 path. |
+| Wrong pairings | The lake accepts them on purpose (e.g. Qubit on blood). Refusal is **routing** (`route_sample_type` **422**) on map save and Route. |
+| Route | Explicit Route. Empty map → 200 `no_route`. Match mints `work_orders` and sets `routed`. Still zero Tests. |
+| Params | Freeze onto `tests.asked_for_params` at **LimsRun start** (WO-7). Do **not** collect params on receive. |
 
 ---
 
@@ -49,7 +49,7 @@ P1 is the **asked-for lake**. An analyst records **requested analysis + TAT** ag
 
 One operator action may target a **set** of samples (same analysis + TAT). API still writes one row per sample.
 
-**Not on this surface:** TestForm, Create test, Start, Execute, Route, work order, results entry, analysis picker on receive.
+**Not on this surface:** TestForm, Create test, Start, Execute, results entry, analysis picker on receive. **Route** is on this page; it does not start a process or mint a Test.
 
 ---
 
@@ -59,7 +59,7 @@ One operator action may target a **set** of samples (same analysis + TAT). API s
 |--------|---------|
 | `requested` | Open requested analysis. P1 writes this. |
 | `cancelled` | Cancelled while `requested`. Unique index ignores cancelled; re-create is allowed. |
-| `routed` | **Not this stamp** (P2). P1 does not write it. |
+| `routed` | P2 Route matched a map and minted a work order. Cancel after routed is **422**. |
 
 ---
 
@@ -71,6 +71,9 @@ One operator action may target a **set** of samples (same analysis + TAT). API s
 | No project access / client write / hidden sample | **403** (not 404) |
 | Discarded sample / inactive analysis / TAT &lt; 1 | **422** |
 | Receive with non-empty `analysis_ids` | **422** (receive freeze; not an asked-for call) |
+| Route, no map match | **200** `no_route`, status stays `requested` |
+| Route / map save, sample type not accepted on a step | **422** `route_sample_type` |
+| Cancel after `routed` | **422** |
 
 ---
 

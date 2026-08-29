@@ -8,7 +8,7 @@ NimbleLIMS uses a **unified sidebar navigation** (left drawer) for all authentic
 |--------|------------|----------|
 | **Core Features** | All users | Dashboard, Help |
 | **Sample Mgmt** | Any of: sample:create, sample:read, sample:update, test:update, test:assign, batch:manage, result:enter | Receive, Asked-for, Samples, Tests, Containers, Batches, Results |
-| **Experiments** | experiment:manage | All Experiments (/experiments), Experiment Templates (/experiments/templates; same permission as section) |
+| **Experiments** | experiment:manage | All Experiments, Work Orders (`/work-orders`), Processes, Experiment Templates, Runs |
 | **Lab Mgmt** | Any of: project:manage, analysis:manage | Projects, Clients, Client Proj, Analyses, Analytes |
 | **Admin** | config:edit | Overview, Name Templates, Custom Attributes, Lists, Container Types, Units, Users, Roles, Analyses, Analytes, Test Batteries, Custom Fields, Custom Names, Workflow Templates, Help Management |
 
@@ -55,8 +55,11 @@ The sidebar is a persistent left-side drawer (240px expanded, 56px collapsed on 
 │ ▼ Experiments│ ← Accordion (experiment:manage; both sub-items require experiment:manage)
 │   All       │
 │   Experiments│
+│   Work Orders│
+│   Processes  │
 │   Experiment │
 │   Templates  │
+│   Runs       │
 ├─────────────┤
 │ ▼ Lab Mgmt  │ ← Accordion (collapsible, requires project:manage | analysis:manage)
 │   Projects  │

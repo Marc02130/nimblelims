@@ -187,7 +187,8 @@ nimblelims/
 
 ### Core Workflows for BioTech/Pharma Startups (**MVP Release Bar** + Shipped Enhancements)
 - **Compound & Sample Tracking** **(MVP)**: Receive (`/receive`), status management, lineage (aliquots/derivatives), container hierarchy. Non-empty `analysis_ids` on receive → **422**.
-- **Requested analysis** **(MVP, P1)**: **Asked-for** (`/asked-for`) records requested analysis + TAT for already-received samples (zero Tests, no execute). A later look-up, not the after-receive step — receive ends on `/receive`. See [manuals/HOWTO.md](manuals/HOWTO.md), [manuals/asked-for.md](manuals/asked-for.md), and `UAT_Scripts/uat-post-receive-work-spine.md`. Route / work_orders / WO-7 are **not** this stamp. Classic `/tests` is not the request path.
+- **Requested analysis** **(MVP, P1)**: **Asked-for** (`/asked-for`) records requested analysis + TAT for already-received samples (zero Tests, no execute). A later look-up, not the after-receive step — receive ends on `/receive`. See [manuals/HOWTO.md](manuals/HOWTO.md), [manuals/asked-for.md](manuals/asked-for.md), and `UAT_Scripts/uat-post-receive-work-spine.md`. Classic `/tests` is not the request path.
+- **Route / work orders (P2):** Explicit **Route** on `/asked-for` matches `routing_map` (analysis × sample type × TAT) and mints a `work_order`. Empty map stays `requested`. Step accepted sample types gate Route (`422 route_sample_type`). Tests mint at **LimsRun start** (WO-7), not on Route. Admin: `/admin/routing-map`. Backlog: `/work-orders`.
 - **Results Entry** **(MVP)**: Manual results entry with real-time validation
 - **Batch Management** **(MVP + Enhancements)**: Create and manage batches (basic is MVP; cross-project support, automatic QC generation, and sample prioritization are shipped enhancements)
 - **Sample Prioritization** **(Shipped, Not MVP)** (US-11): Sort compounds and biological samples by shelf-life expiration and assay deadlines during batch creation

@@ -20,6 +20,17 @@ def auth_headers(client: TestClient, test_admin_user):
 
 
 @pytest.fixture
+def analysis_id(client: TestClient, auth_headers):
+    r = client.post(
+        "/analyses",
+        json={"name": f"RunQC {uuid4().hex[:8]}", "method": "qc"},
+        headers=auth_headers,
+    )
+    assert r.status_code == 201, r.text
+    return r.json()["id"]
+
+
+@pytest.fixture
 def template_id(client: TestClient, auth_headers):
     r = client.post(
         "/v1/experiment-templates",
@@ -35,7 +46,7 @@ def template_id(client: TestClient, auth_headers):
 
 class TestProcessDefinitions:
     def test_create_definition_and_instantiate(
-        self, client: TestClient, auth_headers, template_id
+        self, client: TestClient, auth_headers, template_id, analysis_id
     ):
         r = client.post(
             "/v1/eln-process-definitions",
@@ -51,7 +62,7 @@ class TestProcessDefinitions:
                         "sort_order": 0,
                     },
                     {
-                        "experiment_template_id": template_id,
+                        "analysis_id": analysis_id,
                         "step_kind": "lims_run",
                         "execution_mode": "lims_run",
                         "name": "Plate QC",
@@ -80,7 +91,7 @@ class TestProcessDefinitions:
         assert inst["steps"][1]["step_kind"] == "lims_run"
 
     def test_start_eln_and_lims_run_steps(
-        self, client: TestClient, auth_headers, template_id
+        self, client: TestClient, auth_headers, template_id, analysis_id
     ):
         r = client.post(
             "/v1/eln-process-definitions",
@@ -94,7 +105,7 @@ class TestProcessDefinitions:
                         "sort_order": 0,
                     },
                     {
-                        "experiment_template_id": template_id,
+                        "analysis_id": analysis_id,
                         "step_kind": "lims_run",
                         "execution_mode": "lims_run",
                         "name": "QC",

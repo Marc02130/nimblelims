@@ -150,11 +150,6 @@ class ELNProcessService:
         s: ELNProcessDefinitionStepCreate,
         sort_order: int,
     ) -> None:
-        if not self.repo.template_exists(s.experiment_template_id):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Experiment template {s.experiment_template_id} not found",
-            )
         kind = s.step_kind
         mode = s.execution_mode or kind
         if mode != kind:
@@ -162,9 +157,27 @@ class ELNProcessService:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="execution_mode must match step_kind",
             )
+        if kind == "eln_experiment":
+            if not s.experiment_template_id:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="experiment_template_id is required for eln_experiment steps",
+                )
+            if not self.repo.template_exists(s.experiment_template_id):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Experiment template {s.experiment_template_id} not found",
+                )
+        elif kind == "lims_run":
+            if not s.analysis_id:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="analysis_id is required for lims_run steps",
+                )
         self.repo.create_definition_step(
             process_definition_id=definition_id,
             experiment_template_id=s.experiment_template_id,
+            analysis_id=getattr(s, "analysis_id", None),
             sort_order=sort_order,
             step_kind=kind,
             execution_mode=mode,
@@ -234,6 +247,7 @@ class ELNProcessService:
             description=data.description or definition.description,
             status_id=data.status_id,
             process_definition_id=definition_id,
+            work_order_id=data.work_order_id,
             created_by=self._user_id(),
             modified_by=self._user_id(),
         )
@@ -241,6 +255,7 @@ class ELNProcessService:
             self.repo.create_step(
                 process_id=p.id,
                 experiment_template_id=s.experiment_template_id,
+                analysis_id=getattr(s, "analysis_id", None),
                 sort_order=s.sort_order,
                 name=s.name,
                 step_kind=s.step_kind,
@@ -366,10 +381,20 @@ class ELNProcessService:
         data: ELNProcessStepCreate,
         explicit_order: Optional[int] = None,
     ) -> ELNProcessStep:
-        if not self.repo.template_exists(data.experiment_template_id):
+        kind = data.step_kind or 'eln_experiment'
+        mode = data.execution_mode or kind
+        if kind == 'eln_experiment':
+            if not data.experiment_template_id or not self.repo.template_exists(
+                data.experiment_template_id
+            ):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="experiment_template_id is required for eln_experiment steps",
+                )
+        elif kind == 'lims_run' and not data.analysis_id:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Experiment template {data.experiment_template_id} not found",
+                detail="analysis_id is required for lims_run steps",
             )
         if explicit_order is not None:
             sort_order = explicit_order
@@ -380,11 +405,10 @@ class ELNProcessService:
                     self.repo.update_step(s, sort_order=s.sort_order + 1)
         else:
             sort_order = self.repo.next_sort_order(process_id)
-        kind = data.step_kind or 'eln_experiment'
-        mode = data.execution_mode or kind
         return self.repo.create_step(
             process_id=process_id,
             experiment_template_id=data.experiment_template_id,
+            analysis_id=getattr(data, 'analysis_id', None),
             sort_order=sort_order,
             name=data.name,
             step_kind=kind,
@@ -489,13 +513,13 @@ class ELNProcessService:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Process step not found",
             )
-        if not self.repo.template_exists(step.experiment_template_id):
+        kind = getattr(step, 'step_kind', None) or 'eln_experiment'
+        if kind != 'lims_run' and not self.repo.template_exists(step.experiment_template_id):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Experiment template not found",
             )
 
-        kind = getattr(step, 'step_kind', None) or 'eln_experiment'
         force_new = bool(data and data.force_new)
         step_label = step.name or f"Step {step.sort_order}"
         default_name = (
@@ -504,6 +528,12 @@ class ELNProcessService:
         )
 
         if kind == 'lims_run':
+            analysis_id = getattr(step, 'analysis_id', None)
+            if not analysis_id:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="analysis_id is required to start a lims_run step",
+                )
             if step.current_lims_run_id and not force_new:
                 return ELNProcessStepStartResponse(
                     step=ELNProcessStepRead.model_validate(step),
@@ -519,6 +549,7 @@ class ELNProcessService:
                     name=default_name,
                     description=f"From process '{process.name}' step '{step_label}'",
                     experiment_template_id=step.experiment_template_id,
+                    analysis_id=analysis_id,
                 )
             )
             self.repo.update_step(

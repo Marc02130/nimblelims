@@ -15,7 +15,8 @@ from models.entry import STEP_KINDS, EXECUTION_MODES
 
 
 class ELNProcessStepCreate(BaseModel):
-    experiment_template_id: UUID
+    experiment_template_id: Optional[UUID] = None
+    analysis_id: Optional[UUID] = None
     step_kind: str = Field(default='eln_experiment')
     execution_mode: Optional[str] = None
     name: Optional[str] = Field(None, max_length=255)
@@ -44,7 +45,8 @@ class ELNProcessStepRead(BaseModel):
     process_id: UUID
     step_kind: str = 'eln_experiment'
     execution_mode: str = 'eln_experiment'
-    experiment_template_id: UUID
+    experiment_template_id: Optional[UUID] = None
+    analysis_id: Optional[UUID] = None
     experiment_id: Optional[UUID] = None
     current_lims_run_id: Optional[UUID] = None
     name: Optional[str] = None
@@ -154,6 +156,7 @@ class ELNProcessRead(BaseModel):
     active: bool
     status_id: Optional[UUID] = None
     process_definition_id: Optional[UUID] = None
+    work_order_id: Optional[UUID] = None
     created_at: datetime
     created_by: Optional[UUID] = None
     modified_at: datetime

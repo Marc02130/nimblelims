@@ -445,7 +445,13 @@ class ELNProcessDefinitionStep(Base):
     experiment_template_id = Column(
         PostgresUUID(as_uuid=True),
         ForeignKey("experiment_templates.id"),
-        nullable=False,
+        nullable=True,
+        index=True,
+    )
+    analysis_id = Column(
+        PostgresUUID(as_uuid=True),
+        ForeignKey("analyses.id"),
+        nullable=True,
         index=True,
     )
     name = Column(String(255), nullable=True)
@@ -472,6 +478,12 @@ class ELNProcess(BaseModel):
 
     __tablename__ = "eln_processes"
 
+    work_order_id = Column(
+        PostgresUUID(as_uuid=True),
+        ForeignKey("work_orders.id", use_alter=True, name="fk_eln_processes_work_order_id"),
+        nullable=True,
+        index=True,
+    )
     status_id = Column(
         PostgresUUID(as_uuid=True),
         ForeignKey("list_entries.id"),
@@ -534,7 +546,13 @@ class ELNProcessStep(Base):
     experiment_template_id = Column(
         PostgresUUID(as_uuid=True),
         ForeignKey("experiment_templates.id"),
-        nullable=False,
+        nullable=True,
+        index=True,
+    )
+    analysis_id = Column(
+        PostgresUUID(as_uuid=True),
+        ForeignKey("analyses.id"),
+        nullable=True,
         index=True,
     )
     experiment_id = Column(
