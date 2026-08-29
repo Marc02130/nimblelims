@@ -123,7 +123,7 @@ Already normative (restated so implementers do not drop them): empty routing map
 
 | Phase | When | Docs |
 |-------|------|------|
-| **P2** | After OQ-WO-1/3 Decided and L2–L4 in sketch (already folded) + reviews | Work-order docs: routing map authors analysis + TAT + one process, **no sample-type picker**; TAT overlap 409; empty map mints nothing; first-process / first-step allowed types are derived display; Route gates current type against first step only; later steps gate at start; ordered process/step display; **no Tests at WO save**. Update asked-for, processes, and LimsRun publish refusal. Keep first-start freeze OPEN on `b005cfe`. Preserve signed `b005cfe` behavior as history without teaching its chain-AND map-save result as the current rule. |
+| **P2** | Marc/Rolf ordered-route lock | Docs must teach analysis + TAT + ordered `process_definition[]`, no type picker, derived first-process / first-step display, zero acceptable 422, multiple acceptable 409, first-process-only Start, later starts/gates, and no chain-AND. Preserve `b005cfe` signed history; freeze OPEN. |
 | **P3** | After OQ-RES-1 | Fold AR-RES into this stem UAT (or `uat-results-entry-review.md` with a pointer). Manual: typed number → `reported_result` + `qualifiers`; missing `units_default` → 422; no `results.unit_id`; two writers 409. **Not** results on asked-for. |
 | **P4** | After OQ-SOP-2 for parser draft | `experiments.md` SOP Apply success path = **process definition** (template only if a step needs it). `processes.md` Apply. **L5 copy:** do not say NCI extract → Qubit is runnable. No SOP PDF bodies in git. |
 | **P5** | Independent | Parser/instrument admin manuals: example + test + dry-run + activate; AI draft setup-only; production import no LLM. |
