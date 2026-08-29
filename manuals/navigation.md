@@ -194,7 +194,7 @@ The Admin section uses a Material-UI Accordion component for collapsible submenu
 | **Users Management** | `/admin/users` | People | User CRUD operations |
 | **Roles & Permissions** | `/admin/roles` | Security | Role and permission management |
 | **Analyses Management** | `/admin/analyses` | Science | Test analysis configuration |
-| **Routing map** | `/admin/routing-map` | AltRoute | Configure analysis × sample type × TAT routing to process definitions; every mapped step must accept the sample type |
+| **Routing map** | `/admin/routing-map` | AltRoute | Configure analysis + TAT + ordered `process_definition[]`. No sample-type picker. Show route order and derive the first process / first Experiment-LimsRun allow-list. Route gates that list; later starts gate current type |
 | **Analytes Management** | `/admin/analytes` | Biotech | Analyte definitions |
 | **Test Batteries** | `/admin/test-batteries` | BatteryChargingFull | Test battery configuration |
 | **Custom Fields** | `/admin/custom-fields` | Tune | Manage custom attribute configurations (EAV) |

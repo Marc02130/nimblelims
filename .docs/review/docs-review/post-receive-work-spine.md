@@ -123,7 +123,7 @@ Already normative (restated so implementers do not drop them): empty routing map
 
 | Phase | When | Docs |
 |-------|------|------|
-| **P2** | After OQ-WO-1/3 Decided and L2–L4 in sketch (already folded) + reviews | New `work-orders.md` (or section): routing map (`config:edit`), TAT overlap 409, empty map mints nothing, `route_sample_type` 422, WO snapshot chain, start via existing process AuthZ, **no Tests at WO save**. Update asked-for (`routed`, cancel-after-routed). Update `processes.md` (start N+1 from snapshot). Update `lims-runs.md`: Test at **LimsRun start**, publish **422** if missing (today’s “promoted on publish” language is WO-7-wrong). UAT P2 cases in the same stem script (new section, not a second file unless QA says so). No OOB blood→Qubit rows. |
+| **P2** | Marc/Rolf ordered-route lock | Docs must teach analysis + TAT + ordered `process_definition[]`, no type picker, derived first-process / first-step display, zero acceptable 422, multiple acceptable 409, first-process-only Start, later starts/gates, and no chain-AND. Preserve `b005cfe` signed history; freeze OPEN. |
 | **P3** | After OQ-RES-1 | Fold AR-RES into this stem UAT (or `uat-results-entry-review.md` with a pointer). Manual: typed number → `reported_result` + `qualifiers`; missing `units_default` → 422; no `results.unit_id`; two writers 409. **Not** results on asked-for. |
 | **P4** | After OQ-SOP-2 for parser draft | `experiments.md` SOP Apply success path = **process definition** (template only if a step needs it). `processes.md` Apply. **L5 copy:** do not say NCI extract → Qubit is runnable. No SOP PDF bodies in git. |
 | **P5** | Independent | Parser/instrument admin manuals: example + test + dry-run + activate; AI draft setup-only; production import no LLM. |

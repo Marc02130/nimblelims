@@ -28,7 +28,7 @@ This is the right product. Do not collapse it. Do not expand it.
 | Layer | Is | Is not |
 |-------|----|--------|
 | Asked-for (P1) | Request: analysis + TAT + params | Work plan, Test, Process, LimsRun |
-| Routing + `work_order` (P2) | What the lab must run (ordered process-definition chain) | A Test row |
+| Routing + `work_order` (P2) | Ordered `process_definition[]` work plan | A Test row or unordered process bag |
 | Execute (shipped) | Process → Exp and/or LimsRun | A third engine |
 | Test (WO-7) | Minted at **LimsRun start** | Minted at receive / asked-for / WO save / publish |
 | SOP Apply (P4) | Writes a **process definition** | Blood → DNA daughter → Qubit E2E |
@@ -51,9 +51,9 @@ Matches requirements §§3–5. Do not expand.
 | **P1** zero Tests, Results, Processes, Experiments, LimsRuns, work_orders on save | Mint Tests at asked-for or work_order save |
 | **P1** copy: asked-for / requested analysis; no Start/Execute on `requested` | Treat asked-for as the worklist or Tests page with a new name |
 | **P1** multi-sample one operator action (same analysis + TAT + params) | One-by-one click per tube as the only path |
-| **P2** `routing_map` analysis × sample_type × TAT range → ordered process-definition ids | Empty map mints work_orders; overlapping TAT first-match |
-| **P2** `work_order` snapshot chain; complete N starts N+1 from snapshot | First-only + route-next; second routing hop |
-| **P2** Qubit-on-blood **422 `route_sample_type`** on map save and on route | Infer dest mint from `sample_type_transitions`; OOB blood→Qubit routes |
+| **P2** map row = analysis + TAT + ordered `process_definition[]` | One definition; unordered bag; admin-authored sample type |
+| **P2** Route derives first-process / first-step types; zero → 422, multiple → 409 | Silent `first()` or chain-wide type AND |
+| **P2** Start instantiates first process only; later processes start later | Mint a process-of-processes at Route |
 | **WO-7** Test at LimsRun start; publish **refuses** if missing | Ensure-on-publish find-or-create |
 | **P3** typed number → `reported_result` + `qualifiers`; unit from `analytes.units_default` | `results.unit_id`; type numbers into asked-for |
 | **P4** Apply → process definition; human save; never silent auto-activate | Claim dest-type Hold is closed; SOP PDFs in git; IC50 |
@@ -87,9 +87,9 @@ Product accepts Lab Ops **L1–L5** as same-phase. C1–C5 **are** L1–L5. Addi
 | ID | Condition | Aligns |
 |----|-----------|--------|
 | **C1** | **Asked-for is a request lake, not the work plan.** Copy: “Asked-for” / “requested analysis,” never “assign test,” “create test,” “start work,” or “order process.” Saving asked-for creates **zero** Tests, Results, Processes, Experiments, LimsRuns, work_orders. **No Start / Execute CTA** on a `requested` row. UI is **not** `/receive`; receive still **422** on non-empty `analysis_ids`; do not call `_create_tests` / `_create_asked_for_tests` / `_create_tests_for_sample`. **Multi-sample:** one operator action (same analysis + TAT + params) can write asked-for for a **set** of received samples. API may remain one row per sample; the action is all-or-nothing **or** every per-sample failure is visible — never silent partial success. Show a computed due date from `tat_days`; keep `tat_days ≥ 1` (do not add STAT 0 this phase). Sidebar Sample Mgmt: **Asked-for immediately after Receive.** Do not reuse `TestForm`. | Lab Ops **L1** |
-| **C2** | **Qubit-on-blood refuses.** Named error `route_sample_type` (422) on **map save and on route**. Type eligibility is **config** on the process-definition LimsRun step and/or the analysis — **not** inferred from `sample_type_transitions`. Until extract-hold dest-type execute writes dest type + `parent_sample_id` + `eln_process_samples`, **no earlier step mints DNA**. Chain Extract → Qubit keyed on blood is still Qubit-on-blood: **refuse**. No OOB routing rows that claim blood → Qubit. Do not invent Qubit/blood testdata IDs. **P2 coding remains closed until Architecture names the actual column/table for that eligibility** (`analyses` has none today; `eln_process_definition_steps` has none today). Product will not invent it in this review. | Lab Ops **L2** |
+| **C2** | **Marc/Rolf route lock:** no map type picker. Each row has ordered `process_definition[]`. Match analysis + TAT, then current type against each candidate’s first process / first Experiment-LimsRun list. Zero acceptable → 422; multiple → 409; exactly one wins. No later-process/step AND. | Lab Ops **L2** |
 | **C3** | **Params travel.** Asked-for `params` snapshot onto the Test at **LimsRun start** (WO-7) and freeze. Tech does not re-type cell line / assay params to run the assay. Empty defs remain empty-object-only (OQ-AF-3). Uniqueness stays `(sample_id, analysis_id)` while open for P1. Do **not** expand uniqueness to param identity this phase. | Lab Ops **L3** |
-| **C4** | **The WO snapshot chain is the work plan.** `work_orders.process_definition_ids` is ordered and frozen at mint (WO-3). Start instantiates the first definition via **existing** process AuthZ (`experiment:manage`). Completing process *N* surfaces start of *N+1* from **that snapshot** — no second routing hop, no “go find a definition,” no first-only + route-next. One FK is enough in the UI (OQ-WO-3 is Arch). | Lab Ops **L4** |
+| **C4** | **Ordered process definitions are the work plan.** Snapshot the route at mint. Start instantiates the first process only; a later start advances in order under existing AuthZ. UI shows process and step order. | Lab Ops **L4** |
 | **C5** | **SOP Apply writes a process definition. It does not close dest-type Hold.** Apply success / manuals / UAT: draft process definition with typed steps; human save; never silent auto-activate. **Do not** say the NCI extract → Qubit path is runnable. **Do not** UAT blood → DNA daughter → Qubit on the daughter in this packet. Dest type remains [extract-hold-dest-type](../requirements/extract-hold-dest-type.md) / [sop-ai-to-process.md](../open-questions/sop-ai-to-process.md). No SOP PDF bodies in git. Not IC50. | Lab Ops **L5** |
 | **C6** | **Do not sell P1 as a worklist.** P1 is a request log. The work list is P2 `work_order`. Classic `/tests` + `TestForm` still mints Tests (WO-4 type-a-number stays). Do not delete it in P1. P1 UAT and manuals: record requests on **Asked-for**, not TestForm. Revisit hiding Test-create only after dogfood. Domain processing PRD still says “ensure-on-publish”; this packet **supersedes** that — publish **422** if Test missing. | Product freeze / WO-7 |
 | **C7** | **One phase per PR.** P1 tables + API + `/asked-for` + pytest + UAT script in PR 1. Do not land P2–P5 schema/UI in the P1 PR. Receive code freeze except bugs. | Completeness of spine, small diffs |
@@ -141,7 +141,7 @@ Routing / work_order coding; dest-type execute; STAT `tat_days = 0`; uniqueness 
 | Multi-sample: one tube 409 | No silent success on the rest |
 | Empty routing map (P2) | Stay `requested`; configure-routing CTA; not “queued” |
 | Map overlap (P2) | 409 on save |
-| Qubit-on-blood (P2) | 422 `route_sample_type` |
+| Step start while current type is incompatible (P2) | 422 `route_sample_type` |
 | Publish without Test (P2+) | 422 |
 | Two writers on same Test (P3) | 409 |
 | Missing `units_default` (P3) | 422, no row |
@@ -195,7 +195,7 @@ This plan moves **toward** that by locking the spine and shipping the lake. Expa
 Current Lab Ops artifact is **Accept with conditions (L1–L5)**. **Not Hold. Not Revise.**
 
 - **P1 OPEN** — L1 is already RQ-AF-2/3 + bounce; copy, zero Tests, receive freeze, multi-sample land with the P1 PR (**C1**).  
-- **P2 sketch gate:** Lab Ops closed P2 coding until L2–L4 were in the tech sketch. Those paragraphs are now in sketch §4 (type eligibility ≠ `sample_type_transitions`; params snapshot at LimsRun start; chain walk from WO snapshot). CEO treats that fold as **done**. Remaining P2 coding blockers are **C2** (name the eligibility column) and OQ-WO-1 / OQ-WO-3.  
+- **P2 sketch gate:** map rows hold ordered `process_definition[]`; no type picker. Route gates each candidate by first process / first step, with zero → 422 and multiple → 409. Start instantiates first process only; later starts advance. Params snapshot remains at LimsRun start.
 - **P4** may write process definitions with **L5 / C5**. Dest-type Hold unchanged.  
 - **P5** independent.
 
