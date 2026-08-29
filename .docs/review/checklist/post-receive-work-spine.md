@@ -30,7 +30,7 @@
 
 ## P2 work_order
 
-- [ ] routing_map + gist exclude
+- [ ] routing_map + overlap 409 (same analysis + overlapping TAT **and** overlapping first-step allow-lists; extract-first vs Qubit-first same TAT is legal)
 - [ ] work_orders
 - [ ] route + start
 - [ ] WO-7 LimsRun start / publish refuse
