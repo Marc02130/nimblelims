@@ -458,3 +458,20 @@ class TestWorkOrderP2:
             )
         assert exc.value.status_code == 422
         assert "WO-7" in str(exc.value.detail) or "Test missing" in str(exc.value.detail)
+
+
+class TestListNameAlias:
+    def test_sample_type_alias_resolves_sample_types(
+        self,
+        client: TestClient,
+        admin_token: str,
+        db_session: Session,
+    ):
+        lst = List(name="sample_types", description="Sample types slug")
+        db_session.add(lst)
+        db_session.flush()
+        db_session.add(ListEntry(list_id=lst.id, name="Plasma"))
+        db_session.commit()
+        r = client.get("/lists/sample_type/entries", headers=_auth(admin_token))
+        assert r.status_code == 200, r.text
+        assert any(e.get("name") == "Plasma" for e in r.json())

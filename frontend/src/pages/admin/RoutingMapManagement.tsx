@@ -56,7 +56,7 @@ const RoutingMapManagement: React.FC = () => {
       const [maps, analysesRaw, typesRaw, defsRaw] = await Promise.all([
         apiService.getRoutingMap({ active_only: false }),
         apiService.getAnalyses({ size: 200, active: true }),
-        apiService.getListEntries('sample_type'),
+        apiService.getListEntries('sample_types'),
         apiService.getElnProcessDefinitions({ page: 1, size: 200, active: true }),
       ]);
       setRows(Array.isArray(maps) ? maps : []);

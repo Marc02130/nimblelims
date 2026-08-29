@@ -245,7 +245,7 @@ const ProcessesManagement: React.FC = () => {
       .then((res: any) => setAnalyses(ApiService.unwrapAnalysesList(res)))
       .catch(() => {});
     apiService
-      .getListEntries('sample_type')
+      .getListEntries('sample_types')
       .then((res: any) => setSampleTypes(Array.isArray(res) ? res : []))
       .catch(() => {});
   }, []);
