@@ -6,7 +6,7 @@
 **Schema changes:** [`.docs/review/schema-changes/post-receive-work-spine.md`](../schema-changes/post-receive-work-spine.md) — **present**; P1 tables OK; P2/P4 deltas incomplete vs L2/L3/L4 (A4–A6, A8, A10)  
 **Requirements:** [`.docs/review/requirements/post-receive-work-spine.md`](../requirements/post-receive-work-spine.md)  
 **Spec:** [`.docs/internal/specs/post-receive-work-spine/SPEC.md`](../../internal/specs/post-receive-work-spine/SPEC.md)  
-**Related reviews:** [Lab Ops](../lab-ops-review/post-receive-work-spine.md) (ordered-route L2/L4 locked) · [Scientific CSO](../scientific-cso-review/post-receive-work-spine.md) (SC1–SC5)  
+**Related reviews:** [Lab Ops](../lab-ops-review/post-receive-work-spine.md) (ordered-route L2/L4 locked) · [Scientific CSO](../scientific-cso-review/post-receive-work-spine.md) (SC1–SC5)
 **Open questions:** [`.docs/review/open-questions/post-receive-work-spine.md`](../open-questions/post-receive-work-spine.md)  
 **Prior architecture review:** none for this stem
 
