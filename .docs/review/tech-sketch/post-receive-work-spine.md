@@ -25,3 +25,145 @@ P1 is on `main`. P2 is on `feat/work-order-p2` (Accept with conditions). Do not 
 9. **Freeze:** first LimsRun start wins. `_mint_tests_at_start` must **not** overwrite `asked_for_params` on an existing Test.
 10. **P2-4 visibility (QA Fail):** if a tech can instantiate the mapped process (`experiment:manage` / existing process AuthZ), she can **read** that definition and its steps — including admin-created or null `created_by`. Mutate stays where it is. Route is **not** admin-only. Invisible def → “no steps” is **not** `route_sample_type`.
 11. **P2-2/3 list-key:** routing map and receive use the **same** sample-type list (`sample_types`). `sample_type` vs `sample_types` empty select is a list-key bug, not a type gate.
+
+---
+
+## 1. Problem (technical)
+
+Receive writes Sample + Containers + Contents. Nothing records the request. Classic `POST /tests` mints a Test, which collides with WO-7 (Test at LimsRun start). Work_order / routing tables do not exist. SOP Apply writes templates only. Parser engine exists; setup UX is the gap.
+
+## 2. Architecture
+
+```
+UI /asked-for ──▶ asked_for (P1)
+                      │
+                      ▼  (P2)
+              routing_map match?
+                 │ yes          │ no
+                 ▼              ▼
+            work_orders      stop (configure)
+                 │
+                 ▼
+         existing /v1/eln-processes
+                 │
+                 ▼
+         LimsRun start → Test (WO-7)
+                 │
+                 ▼
+         results persist (P3)  or  parser import (P5) → publish
+```
+
+SOP Apply (P4) writes **process definitions** that routing_map points at.
+
+No new execute runtime. No second AuthZ. No second workflow engine.
+
+## 3. P1 design
+
+### 3.1 Tables and param bind
+
+Three layers (normative with [analysis-param-defs working note](../../decision-logs/2026-08-28-analysis-param-defs.md) — **example data, not seed**):
+
+| Layer | Where | When |
+|-------|--------|------|
+| **Catalog** | `analysis_param_defs.analysis_id` | Admin associates keys to an **assay** (`config:edit`). `unit`, `data_type`, `required`, optional `source_list_id` / `allowed_values`. RLS may be any logged-in user; mutate stays `config:edit` in the router. Empty OOB seed is OK. |
+| **Order (P1)** | `asked_for.params` jsonb | User fills values for that analysis on the request (**order capture**, not the Test snapshot). Validate keys vs defs. **No Test.** |
+| **Execute (P2)** | `tests.asked_for_params` jsonb | **LimsRun start:** copy asked-for JSON and freeze. Not receive. Not publish. Not result fields. |
+
+`asked_for` — request row. FK sample, analysis. `tat_days int`. `params jsonb`. `status` check constraint. P1 writes `requested` / `cancelled` only — **must not write `routed`**.
+
+Fitted IC50 / Hill / CLint / fu / % remaining are **results**, not catalog keys.
+
+Partial unique index: `(sample_id, analysis_id) WHERE status <> 'cancelled'`.
+
+### 3.2 Service
+
+`AskedForService.create`:
+
+1. AuthZ `test:assign` + **dual-belt `has_project_access`** (403 if hidden) — not RLS-only
+2. Sample.status should be Available for Testing (422 otherwise for v1 — do not order on discarded)
+3. Validate analysis active
+4. Validate params vs defs (`params` = **order capture**, not a Test snapshot; unknown key / missing `required` → 422). **OQ-AF-6:** `required` is boolean only, set on the analysis. No “required if …” engine.
+5. Insert `requested` only — P1 must **not** write `routed`
+6. **Do not** write `tests.asked_for_params`. **Do not** call `_create_tests` / `_create_asked_for_tests`. Bounce Test / Result / Process / Experiment / LimsRun / work_order mint. No silent Order→work. No second workflow engine.
+
+`AskedForService.list` (`GET /asked-for`): must **dual-belt `has_project_access`** (same as create), **not RLS-only**. Filter every returned row by project access before respond.
+
+`analysis_param_defs` RLS may be any logged-in user; mutate stays `config:edit` in the router.
+
+P1 **does not** call routing (table may not exist yet). Type × analysis eligibility is **P2 (L2)**, not this PR.
+
+**L1 (Lab Ops, same-phase P1):** Copy is “asked-for / requested analysis,” never assign/create test, start work, or order process. No Start/Execute CTA on `requested`. Multi-sample: one operator action (same analysis + TAT + params) writes one row per sample in the set **in one txn** (A3). Hidden sample → **403** (A1). **Client role cannot write** even with leftover `test:assign` (S2). No PATCH in P1 — cancel and recreate (BA4).
+
+### 3.3 Frontend
+
+`pages/AskedFor.tsx` + sample detail panel. Reuse analysis dropdown from Tests, **not** TestForm (TestForm creates Tests). Multi-select samples for one request (L1).
+
+Sidebar Sample Mgmt: after Receive, add **Asked-for**.
+
+No analysis picker on `/receive`. No Start/Execute CTA. Classic `/tests` type-a-number stays (WO-4). Asked-for ≠ Test assign.
+
+### 3.4 Tests
+
+Pytest: create, 409 dup, **403 dual-belt** (create **and** `list()` / `GET /asked-for` — `has_project_access`, not RLS-only), 422 params, receive still 422 on non-empty `analysis_ids`, asked-for leaves tests count 0, P1 never writes `routed`.
+
+## 4. P2 design
+
+`routing_map`: range-gist or exclusion constraint on `(analysis_id, sample_type_id, tat_range)`. Postgres: `int4range` + `EXCLUDE USING gist`.
+
+**OQ-WO-1 Decided:** Tech hits **Route**. No auto-route on asked-for save. `POST /api/v1/asked-for/{id}/route` (batch the same call for a selected set). Then:
+
+- Resolve sample_type
+- Select map row
+- **L2 / OQ-WO-4:** Type eligibility is **config on each process-definition step** (`eln_experiment` **and** `lims_run`) via `eln_process_definition_step_accepted_sample_types`. **Not** on the analysis. **Qubit is a LimsRun step.** Do **not** infer from `sample_type_transitions`. Until extract-hold dest-type execute writes dest type + `parent_sample_id` + `eln_process_samples`, **no earlier step mints DNA**. Chain Extract → Qubit keyed on **blood** is Qubit-on-blood → **422 `route_sample_type` on map save and on Route**. Empty accepted set on any step = fail closed. No OOB rows that claim blood → Qubit. Do not invent Qubit/blood testdata IDs.
+
+`work_orders.process_definition_id` snapshot at mint (**L4**). **One** existing process definition (typed Exp/LimsRun steps). Bounce `uuid[]` chain, completing N starts N+1, process-of-processes.
+
+Start: `ELNProcessService.instantiate_from_definition` on **that** definition; `work_orders.process_id`. Existing process AuthZ (`experiment:manage`). **P2-4:** Route / type-gate / start **read** that definition and its steps under the same AuthZ. Do not filter read by `created_by` / `is_admin()`. A mapped SOP created by admin must be visible to alice if she can run it. Fail-closed “no steps” because RLS hid the rows is **not** a type gate.
+
+**L3 / A5 / SC5:** At LimsRun start, insert Test if missing; copy `asked_for.params` → `tests.asked_for_params` and freeze. **First start wins** — do not overwrite `asked_for_params` on an existing Test. Column ships in the P2 migration. P1 does **not** write that Test snapshot. Shape: JSON object matching that analysis’s defs (see working-note §3 snapshots).
+
+WO-7: insert Test if missing at LimsRun start. Publish: **422 the whole run** if any Test is missing. Do not swallow into `plan.errors` and complete. **Remove** ensure-on-publish find-or-create.
+
+## 5. P3 design
+
+Single function `persist_typed_result(test, analyte, value)` used by UI results table and any manual LimsRun entry.
+
+No `results.unit_id`. Typed token → `reported_result` as-is (no float roundtrip). `qualifiers` remains **UUID FK** (SC1); NULL if none. Missing `units_default` → 422 for numeric quantities (SC3). Text/boolean exempt.
+
+## 6. P4 design
+
+`SopParseApplyService`: map extracted steps → `eln_process_definition_steps`. Experiment steps keep `experiment_template_id` (create template as today, then attach). LimsRun steps store `analysis_id` if parsed.
+
+**L5:** Apply writes a process definition. It does **not** close dest-type Hold. No blood → DNA → Qubit UAT in this packet.
+
+Job row: `process_definition_id` nullable.
+
+## 7. P5 design (interim)
+
+No new import engine. **Do not build “admin authors parsers” as the product.** Authoring belongs to [ai-sop-north-star](ai-sop-north-star.md) (SOP + example files → MCP → `data_parsers` draft). P5 is dry-run + activate. Day-to-day import: no LLM.
+
+## 8. Failure modes
+
+| Case | Behavior |
+|------|----------|
+| Hidden sample (create or list) | **403** via dual-belt `has_project_access` (not RLS-only) |
+| Cancelled asked-for re-create | Allowed (unique ignores cancelled) |
+| Route with empty map | 200, no WO |
+| Map overlap | 409 on map save |
+| Publish without Test | 422 the whole run |
+| Invisible process def (alice vs admin `created_by`) | **Read** the mapped def if she can run it. Not admin-only Route. Not `route_sample_type`. |
+| Routing select empty (`sample_type` vs `sample_types`) | List-key bug — fix the list, not a type refuse |
+| Parser AI on import | Impossible (no call site) |
+| Receive non-empty `analysis_ids` | **422** (freeze) |
+
+## 9. Delivery
+
+| PR | Scope |
+|----|--------|
+| 1 | P1 tables + API + `/asked-for` UI + pytest + UAT script. **Hold merge until UAT.** |
+| 2 | P2 routing + work_order + route + LimsRun WO-7. Architecture / UI / Spec Accept with conditions. **Hold merge until UAT.** Punches: publish-refuse-whole-run, first-start-wins, one process definition, P2-4 read visibility, list-key. |
+| 3 | P3 persist lock + results UAT fold (**closed**) |
+| 4 | P4 SOP Apply → process def (**closed**) |
+| 5 | P5 parser setup UX (**closed** this cycle) |
+
+Coding stays Grok Build. One phase per PR. Receive code freeze except bugs. Not IC50.
