@@ -63,7 +63,7 @@ PARSER SETUP (P5) instruments / CRO / parsers     THIS PACKET (config UX)
 | Phase | Name | MVP pillar | Implement when |
 |-------|------|------------|----------------|
 | **P1** | Asked-for (lake) | Test ordering | **Shipped** (PR 81; UAT Pass 2026-08-28) |
-| **P2** | Routing + work_order | Test ordering / processing | **CLOSED.** P1 shipped; OQ-TAT overlap Decided; L2 type × analysis eligibility |
+| **P2** | Routing + work_order | Test ordering / processing | OQs Decided (WO-1/3/4, TAT). Schema-changes lists step accepted-types. Then implement. |
 | **P3** | Results persist | Results entry | **CLOSED.** After P1 (may parallel P2 if Test exists via LimsRun or classic) |
 | **P4** | SOP+AI → process definition | Processing (not MVP bar) | **CLOSED.** P2 process chain is the Apply target; extract-hold dest type still Hold for blood→DNA→Qubit E2E |
 | **P5** | Instrument import configuration | Processing (parsers shipped) | **CLOSED this cycle.** Independent of P1 |
@@ -86,7 +86,7 @@ P1 is the **lake**. P2–P5 are specified here so reviews see the path. Coding a
 | **RQ-AF-8** | `GET /asked-for` `list()` must **dual-belt `has_project_access`** (same as create), **not RLS-only**. `asked_for` still FORCE RLS via sample → project. `analysis_param_defs` RLS may be any logged-in user; mutate stays `config:edit` in the router. No new AuthZ path / permission. |
 | **RQ-AF-9** | List views: by sample, by project, by analysis, status `requested`. |
 | **RQ-AF-10** | Cancel is allowed while `requested`. Cancel after `routed` is P2 (must cancel or complete the work_order first). |
-| **RQ-AF-11** | Type × analysis eligibility is **P2 (L2)**, not this PR. |
+| **RQ-AF-11** | Type eligibility is **P2 (L2 / OQ-WO-4)**, not this PR. Gate is on **steps** (experiment and LimsRun), not on the analysis. |
 
 ### 4.2 P2 — Routing map + work_order
 
@@ -96,7 +96,7 @@ P1 is the **lake**. P2–P5 are specified here so reviews see the path. Coding a
 | **RQ-WO-2** | Routing map keys: **analysis + sample_type + TAT day range** (WO-2). Output: **ordered** `process_definition_id[]` (WO-3). |
 | **RQ-WO-3** | Mutate routing map = **`config:edit` only**. Empty map mints **nothing**. |
 | **RQ-WO-4** | Overlapping TAT ranges for the same `(analysis_id, sample_type_id)` **refuse** on save (**409**). No silent “first match.” |
-| **RQ-WO-5** | **L2:** Qubit-on-blood (or any LimsRun step whose configured accepted sample type ≠ current sample type) → **422 `route_sample_type` on map save and on route**. Eligibility is **config** on the LimsRun step and/or analysis — **not** `sample_type_transitions`. Until dest-type execute writes DNA, Extract→Qubit on blood **refuses**. No OOB blood→Qubit routes. **Not the P1 PR.** |
+| **RQ-WO-5** | **L2 / OQ-WO-4:** Type gate is on **process-definition steps** for **both** `eln_experiment` and `lims_run` (`eln_process_definition_step_accepted_sample_types`). **Not** on the analysis. **Qubit is a LimsRun step.** Current sample type must be in **every** step’s accepted set. Empty set = fail closed. Named **422 `route_sample_type`** on **map save and on Route**. Do **not** read `sample_type_transitions`. Until dest-type execute writes DNA, Extract→Qubit on blood **refuses** (Qubit step does not accept blood). No OOB blood→Qubit routes. |
 | **RQ-WO-6** | **OQ-WO-1:** Tech hits **Route**. Asked-for create/save does **not** mint a work_order. `POST /asked-for/{id}/route` (UI may Route a selected set in one action). If a map row matches, mint **one** `work_order` per asked-for with the process-definition chain snapshot; asked-for → `routed`. No match → stay `requested`, `no_route`. Empty map mints nothing. **P1 never writes `routed`.** |
 | **RQ-WO-7** | Instantiating the first process uses **existing process AuthZ** (`experiment:manage`). No client expand. **L4:** completing process N starts N+1 from the **WO snapshot chain** — no second routing hop. |
 | **RQ-WO-11** | **L3 / SC5 / A5:** Asked-for `params` are **order capture**. At **LimsRun start**, copy `asked_for.params` → `tests.asked_for_params` (jsonb) and **freeze**. Tech does not re-type cell line / method params to run the assay. Empty defs → `{}`. Not receive, not publish, not result columns. P1 does not write the Test snapshot. |
