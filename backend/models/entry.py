@@ -633,16 +633,25 @@ class ELNProcessStepLimsRun(Base):
 
 class ELNProcessSample(Base):
     """
-    Sample assignment at the ELN Process level.
+    Process assignment is a sample in a container (Contents).
 
-    Authoritative for "this sample belongs to this process".
-    Per-step execution detail remains ExperimentSampleExecution / Entry (Phase 2).
+    A sample may occupy many vessels; only one container-with-sample is on
+    a process at a time (partial unique on process+sample where not removed).
     """
 
     __tablename__ = "eln_process_samples"
     __table_args__ = (
         UniqueConstraint(
-            "process_id", "sample_id", name="uq_eln_process_samples_process_sample"
+            "process_id",
+            "container_id",
+            name="uq_eln_process_samples_process_container",
+        ),
+        Index(
+            "uq_eln_process_samples_active_sample",
+            "process_id",
+            "sample_id",
+            unique=True,
+            postgresql_where=text("status <> 'removed'"),
         ),
     )
 
@@ -656,6 +665,12 @@ class ELNProcessSample(Base):
     sample_id = Column(
         PostgresUUID(as_uuid=True),
         ForeignKey("samples.id"),
+        nullable=False,
+        index=True,
+    )
+    container_id = Column(
+        PostgresUUID(as_uuid=True),
+        ForeignKey("containers.id"),
         nullable=False,
         index=True,
     )
@@ -684,6 +699,7 @@ class ELNProcessSample(Base):
 
     process = relationship("ELNProcess", back_populates="process_samples")
     sample = relationship("Sample")
+    container = relationship("Container", foreign_keys=[container_id])
     current_step = relationship("ELNProcessStep", foreign_keys=[current_step_id])
 
 

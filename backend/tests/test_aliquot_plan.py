@@ -737,6 +737,17 @@ class TestAliquotPlanExecute:
         )
         db_session.add(step)
         db_session.flush()
+        db_session.add(
+            ELNProcessSample(
+                process_id=process.id,
+                sample_id=sample.id,
+                container_id=tube.id,
+                status="in_progress",
+                current_step_id=step.id,
+                created_by=test_admin_user.id,
+                modified_by=test_admin_user.id,
+            )
+        )
         entry = (
             db_session.query(Entry).filter(Entry.id == plan_entry["entry"]["id"]).one()
         )
@@ -769,3 +780,13 @@ class TestAliquotPlanExecute:
         )
         assert process_sample.current_step_id == step.id
         assert process_sample.status == "in_progress"
+        parent_assignment = (
+            db_session.query(ELNProcessSample)
+            .filter(
+                ELNProcessSample.process_id == process.id,
+                ELNProcessSample.sample_id == sample.id,
+            )
+            .one()
+        )
+        assert parent_assignment.status == "removed"
+        assert parent_assignment.current_step_id is None

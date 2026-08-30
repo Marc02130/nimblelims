@@ -21,6 +21,7 @@ from app.schemas.eln_process import (
     ELNProcessStepRead,
     SampleJourneyResponse,
     SampleJourneyStep,
+    ProcessAssignmentItem,
 )
 from app.schemas.eln_process_definition import (
     ELNProcessDefinitionCreate,
@@ -38,6 +39,7 @@ from models.entry import (
     ELNProcessDefinition,
     STEP_KINDS,
 )
+from models.container import Contents
 from models.experiment import Experiment
 from models.flexible_experiment import LimsRun
 from models.user import User
@@ -264,11 +266,12 @@ class ELNProcessService:
                 created_by=self._user_id(),
                 modified_by=self._user_id(),
             )
-        if data.sample_ids:
+        if data.assignments or data.sample_ids:
             self.assign_samples(
                 p.id,
                 ELNProcessSampleAssignRequest(
                     sample_ids=data.sample_ids,
+                    assignments=data.assignments,
                     set_to_first_step=data.set_to_first_step,
                 ),
             )
@@ -699,37 +702,103 @@ class ELNProcessService:
         )
         return exp_svc.list_cohort_eligible_for_process(process_id, step_id=step_id)
 
+    def _contents_for_sample(self, sample_id: UUID) -> List[Contents]:
+        return (
+            self.db.query(Contents)
+            .filter(Contents.sample_id == sample_id)
+            .order_by(Contents.container_id)
+            .all()
+        )
+
+    def _resolve_assignment(
+        self, sample_id: UUID, container_id: Optional[UUID] = None
+    ) -> ProcessAssignmentItem:
+        if not self.repo.sample_exists(sample_id):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Sample {sample_id} not found",
+            )
+        rows = self._contents_for_sample(sample_id)
+        if container_id is not None:
+            if not any(row.container_id == container_id for row in rows):
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail={
+                        "code": "process_container_required",
+                        "message": (
+                            "Sample is not in that container; only a sample in a "
+                            "container can be assigned to a process"
+                        ),
+                    },
+                )
+            return ProcessAssignmentItem(
+                sample_id=sample_id, container_id=container_id
+            )
+        if not rows:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail={
+                    "code": "process_container_required",
+                    "message": (
+                        "Sample has no container; only a sample in a container "
+                        "can be assigned to a process"
+                    ),
+                },
+            )
+        if len(rows) > 1:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail={
+                    "code": "process_container_required",
+                    "message": (
+                        "Sample is in more than one container; specify which "
+                        "container is in the process"
+                    ),
+                },
+            )
+        return ProcessAssignmentItem(
+            sample_id=sample_id, container_id=rows[0].container_id
+        )
+
     def assign_samples(
         self,
         process_id: UUID,
         data: ELNProcessSampleAssignRequest,
     ) -> List[ELNProcessSample]:
-        """
-        Assign samples to the process queue.
-
-        Process-sample status = **queued** (not in_progress).
-        Does **not** change Sample.status (Available for Testing remains a separate gate).
-        """
+        """Assign container-with-sample (Contents) to the process queue."""
         self.get_process(process_id)
         steps = self.repo.list_steps(process_id)
         first_step_id = steps[0].id if steps and data.set_to_first_step else None
+        items: List[ProcessAssignmentItem] = list(data.assignments or [])
+        if data.sample_ids:
+            items.extend(
+                self._resolve_assignment(sample_id) for sample_id in data.sample_ids
+            )
+        if not items:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail={
+                    "code": "process_container_required",
+                    "message": "Provide sample_ids or assignments (sample + container)",
+                },
+            )
         created: List[ELNProcessSample] = []
-        for sample_id in data.sample_ids:
-            if not self.repo.sample_exists(sample_id):
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Sample {sample_id} not found",
-                )
-            existing = self.repo.get_process_sample(process_id, sample_id)
+        for item in items:
+            resolved = self._resolve_assignment(item.sample_id, item.container_id)
+            existing = self.repo.get_process_sample(
+                process_id, resolved.sample_id
+            )
             if existing:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Sample {sample_id} is already assigned to this process",
+                    detail=(
+                        f"Sample {resolved.sample_id} is already assigned to this process"
+                    ),
                 )
-            # queued = ready/waiting for experiment start; in_progress only after Start
             ps = self.repo.create_process_sample(
                 process_id=process_id,
-                sample_id=sample_id,
+                sample_id=resolved.sample_id,
+                container_id=resolved.container_id,
                 status='queued',
                 current_step_id=first_step_id,
                 created_by=self._user_id(),

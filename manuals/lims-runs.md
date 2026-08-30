@@ -12,6 +12,8 @@ Primary goals:
 
 **Receive / asked-for / Route:** `POST /samples/receive` still refuses non-empty `analysis_ids` (**422**). Recording **requested analysis** on `/asked-for` does **not** create a `work_order`, start a LimsRun, or mint a Test. A separate, unnumbered later Route action may mint a queued work order for planning; it requires `test:assign` plus project access, not `experiment:manage`, and the mint is not work started. Route/Start do **not** instantiate the whole chain: Start is the first process only. The WO-7 lock puts the Test and assay-param freeze on the **first LimsRun start** — not at receive, asked-for save, Route, or work-order start. Freeze: new-Test write is **Tobias-signed Pass** on `8cfa2a9` (Test `99b692d3`); classic `/tests` skip **OPEN**; see [Promote-on-publish](#promote-on-publish-structured-tests--results).
 
+**Sequencing:** A LimsRun for WES/WGS/hybrid capture records **prep and run metadata** (and optional **metrics**). **Sequence data stays out of NimbleLIMS** (too large). Do not expect FASTQ/BAM/reads on publish. Qubit and other QC assays still promote numeric results as usual.
+
 **Important distinction**: An LIMS Run is **not** the same as a Batch.
 - Batches are operational groupings for processing samples through tests and results entry.
 - LIMS Runs represent execution of a protocol/template with focus on data capture, structure, lifecycle, and derived analysis.

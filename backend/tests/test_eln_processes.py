@@ -102,6 +102,25 @@ def sample_id(db_session, test_admin_user, test_org):
         modified_by=test_admin_user.id,
     )
     db_session.add(s)
+    db_session.flush()
+    from models.container import Container, ContainerType, Contents
+
+    ctype = ContainerType(
+        name=f"tube_{uuid4().hex[:6]}",
+        created_by=test_admin_user.id,
+        modified_by=test_admin_user.id,
+    )
+    db_session.add(ctype)
+    db_session.flush()
+    tube = Container(
+        name=f"TUBE-{uuid4().hex[:6]}",
+        type_id=ctype.id,
+        created_by=test_admin_user.id,
+        modified_by=test_admin_user.id,
+    )
+    db_session.add(tube)
+    db_session.flush()
+    db_session.add(Contents(container_id=tube.id, sample_id=s.id, amount=None))
     db_session.commit()
     return str(s.id)
 
@@ -332,7 +351,8 @@ class TestELNProcessSamples:
         assert len(assignments) == 1
         assert assignments[0]["sample_id"] == sample_id
         assert assignments[0]["current_step_id"] == steps[0]["id"]
-        assert assignments[0]["status"] == "in_progress"
+        assert assignments[0]["status"] in ("queued", "in_progress")
+        assert assignments[0]["container_id"] is not None
 
         # Duplicate assign rejected
         r = client.post(
@@ -374,6 +394,61 @@ class TestELNProcessSamples:
             headers=auth_headers,
         )
         assert r.json() == []
+
+    def test_assign_without_container_422(
+        self, client: TestClient, auth_headers, template_a, db_session, test_admin_user, test_org
+    ):
+        from datetime import datetime, timedelta
+        from models.sample import Sample
+        from models.project import Project
+        from models.list import List, ListEntry
+
+        lst = List(name=f"bare_{uuid4().hex[:6]}")
+        db_session.add(lst)
+        db_session.flush()
+        st = ListEntry(list_id=lst.id, name=f"t_{uuid4().hex[:4]}")
+        stt = ListEntry(list_id=lst.id, name=f"s_{uuid4().hex[:4]}")
+        mx = ListEntry(list_id=lst.id, name=f"m_{uuid4().hex[:4]}")
+        db_session.add_all([st, stt, mx])
+        db_session.flush()
+        project = Project(
+            name=f"Bare {uuid4().hex[:8]}",
+            client_id=test_org.id,
+            status=stt.id,
+            start_date=datetime.utcnow(),
+            due_date=datetime.utcnow() + timedelta(days=7),
+        )
+        db_session.add(project)
+        db_session.flush()
+        bare = Sample(
+            name=f"Bare {uuid4().hex[:8]}",
+            sample_type=st.id,
+            status=stt.id,
+            matrix=mx.id,
+            project_id=project.id,
+            created_by=test_admin_user.id,
+            modified_by=test_admin_user.id,
+        )
+        db_session.add(bare)
+        db_session.commit()
+        r = client.post(
+            "/v1/eln-processes",
+            json={
+                "name": f"No vessel {uuid4().hex[:8]}",
+                "steps": [{"experiment_template_id": template_a["id"], "name": "S1"}],
+            },
+            headers=auth_headers,
+        )
+        process_id = r.json()["id"]
+        assigned = client.post(
+            f"/v1/eln-processes/{process_id}/samples",
+            json={"sample_ids": [str(bare.id)], "set_to_first_step": True},
+            headers=auth_headers,
+        )
+        assert assigned.status_code == 422, assigned.text
+        detail = assigned.json()["detail"]
+        assert isinstance(detail, dict)
+        assert detail["code"] == "process_container_required"
 
     def test_filter_samples_by_step(
         self, client: TestClient, auth_headers, template_a, template_b, sample_id

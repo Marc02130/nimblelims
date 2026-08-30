@@ -88,8 +88,14 @@ class ELNProcessStepStartResponse(BaseModel):
 # ---------- Samples ----------
 
 
+class ProcessAssignmentItem(BaseModel):
+    sample_id: UUID
+    container_id: UUID
+
+
 class ELNProcessSampleAssignRequest(BaseModel):
-    sample_ids: List[UUID] = Field(..., min_length=1)
+    sample_ids: Optional[List[UUID]] = None
+    assignments: Optional[List[ProcessAssignmentItem]] = None
     set_to_first_step: bool = True
 
 
@@ -97,6 +103,7 @@ class ELNProcessSampleRead(BaseModel):
     id: UUID
     process_id: UUID
     sample_id: UUID
+    container_id: UUID
     status: str
     current_step_id: Optional[UUID] = None
     assigned_at: Optional[datetime] = None

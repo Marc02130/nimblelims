@@ -24,7 +24,7 @@ Aliquot/pool execute creates a dest that inherits parent identity and does not j
 
 **Atomic pair on add (Rolf CEO + Heidi + Mathilda 2026-08-23):** When adding aliquot/pool to a **template** or **ad hoc** experiment, **both** entries are created together. UI must not offer adding only one. One “Add aliquot/pool” action → pair. Dest entry stays **empty until after execute**. No new plan object.
 
-**Flow:** Add → both entries exist (dest empty) → operator selects method → METHOD_CATALOG attaches plan columns + dest FieldDefinitions immediately → Execute reads `aliquot_pool_plan` → mints dests → L1/S1 join → `aliquots_pools` lists them (with attached FieldDefinitions). **No re-prompt.** No new experiment-plan object.
+**Flow:** Add → both entries exist (dest empty) → operator selects method → METHOD_CATALOG attaches plan columns + dest FieldDefinitions immediately → **Submit** / execute of the pair mints dest **sample + container** → dest **joins** the process (`in_progress`) and the inbound sample is **`removed`** from the process → `aliquots_pools` lists dests. **No re-prompt.** Mint is **this OOB entry**, not process or routing. Later route Start follows continuing (non-removed) process samples.
 
 **Parked (separate entries docs fold):** Header-pins-to-top (Add Header → always pins to top of entries list; no drag below). Not this packet.
 
