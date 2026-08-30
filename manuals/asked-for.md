@@ -1,6 +1,6 @@
 # Manual: Asked-for (requested analysis)
 
-**Status:** P1 lake shipped. P2 Route / work_orders / WO-7 surfaces are on `feat/work-order-p2` @ `8cfa2a9`. Live AC-P2 **unsigned** overall. Freeze skip **unsigned**: `{}` is ambiguous until classic `/tests` leaves NULL or a freeze marker exists. Empty Route 422 / map 409 / 201-not-AND **Pass**. Later-step type-gate **unsigned**. Hold product merge.  
+**Status:** P1 lake shipped. P2 Route / work_orders / WO-7 surfaces are on `feat/work-order-p2` @ `8cfa2a9`. Live AC-P2 **unsigned** overall. Freeze skip **unsigned**: `{}` is ambiguous until classic `/tests` leaves NULL or a freeze marker exists. Empty Route 422 / map 409 / 201-not-AND **Pass** (**UI click-save**, not API-only). Later-step type-gate **unsigned**. Hold product merge.  
 **UI:** `/asked-for` — sidebar **Asked-for** (listed after **Receive**; nav order only, not a work queue) · sample-detail **Asked-for** section · **Route** CTA on `requested`  
 **API:** `POST /v1/asked-for` · `GET /v1/asked-for` · `POST /v1/asked-for/{id}/cancel` · `POST /v1/asked-for/{id}/route` · `POST /v1/asked-for/route`  
 **UAT:** [`UAT_Scripts/uat-post-receive-work-spine.md`](../UAT_Scripts/uat-post-receive-work-spine.md)  

@@ -107,7 +107,7 @@ Params: intent only. P1 sends `{}` OOB — do not type assay params here, and do
 
 **If first Start also mints later processes (Qubit/reporting) or their Tests, that is a punch — do not teach it as shipped.**
 
-Empty Route 0→**422** is **Tobias-signed Pass** on `8cfa2a9` (“No routing-map row accepts this analysis, TAT, and sample type”). Map overlap **409** and blood+qPCR map-save **201** (not AND) are **Pass**. Route two-accept **409** is **unsigned**. First-start freeze skip is **unsigned**: a write of `{}` onto new Test `99b692d3` is not a skip Pass — `{}` is ambiguous. Later-start type gates are **unsigned**. Do not write overall P2 Pass or freeze-closed.
+Empty Route 0→**422** is **Tobias-signed Pass** on `8cfa2a9` (“No routing-map row accepts this analysis, TAT, and sample type”). Routing-map Pass is **click-save in the UI**, not API-only: no sample-type picker; ELISA TAT 1–7 saved; Blood extract + later DNA qPCR chain saved (no AND 422); second ELISA overlap **409**. Route two-accept **409** is **unsigned**. First-start freeze skip is **unsigned**: a write of `{}` onto new Test `99b692d3` is not a skip Pass — `{}` is ambiguous. Later-start type gates are **unsigned**. Do not write overall P2 Pass or freeze-closed.
 
 **Leadership honesty locks (Hans / Heidi / Günter) — live AC-P2 **unsigned** overall. Hold product merge. Dest-type Hold out. Not IC50.**
 
