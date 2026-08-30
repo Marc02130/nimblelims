@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-28  
 **Stem:** `post-receive-work-spine`  
-**Status:** Architecture / UI / Spec **Accept with conditions** on `feat/work-order-p2`. **Hold product merge.** Signed AC-P2-9..11 history: `9342439`. Deiter Contents click on product `4671ba8` / assignment commit `02fe95f`: C1 **Pass**, C2 **Fail**, dest mint Hold **Pass**. C2 records execute mints dest, does not join dest or remove source; emptied-source assign is a **201 mix-up**; **PATCH is not a path**. Docs Confirm `84d2810` is not a new execute and not the click SHA. Do not teach dest-follows as shipped. Freeze skip **OPEN**. **OQ-WO-6 stays OPEN**. Route stays `test:assign`. Round 2 **Leadership Confirm** (Rolf/Deiter/Hans/Heidi/Günter; R2-1…R2-4). Overall P2 unsigned / not Pass. Send: [2026-08-30-p2-route-lock](../../discussions/2026-08-30-p2-route-lock.md). `8cfa2a9` / `b005cfe` signed history. Not IC50.
+**Status:** Architecture / UI / Spec **C2 Fail** on `02fe95f` (Deiter click C1 **Pass**, dest mint Hold **Pass**). **Hold product merge.** Execute mints dest but does **not** join dest onto the process or remove inbound source. `_join_minted_destination` / `_release_source_from_process` **no-op** unless `entry.process_step_id` is set. Emptied-source assign **201** is leftover Contents at amount 0 (`_contents_for_sample` does not require remaining volume) — not dest-follow; must **422**. PATCH of `eln_process_samples` is **not** a path. Follow lands in the **execute txn** (retarget `container_id`, or remove source then insert dest pair; `uq_eln_process_samples_active_sample` = one active row per sample). Dest mint **Hold**: equivalent aliquot is same sample, new container — a new Sample with `dest_sample_type` is not this fix. OQ-WO-6 and freeze skip stay OPEN. Route stays `test:assign`. Signed AC-P2-9..11: `9342439`. Overall P2 unsigned. Not IC50.
 **Requirements:** [`.docs/review/requirements/post-receive-work-spine.md`](../requirements/post-receive-work-spine.md)  
 **Schema:** [`.docs/review/schema-changes/post-receive-work-spine.md`](../schema-changes/post-receive-work-spine.md)  
 **Spec:** [`.docs/internal/specs/post-receive-work-spine/SPEC.md`](../../internal/specs/post-receive-work-spine/SPEC.md)  
@@ -20,14 +20,14 @@ P1 is on `main`. P2 is on `feat/work-order-p2` (Accept with conditions). Do not 
 4. **Mathilda U1 / U2:** asked-for ≠ Test assign. Label params as order capture, not Test snapshot.
 5. Architecture / UI / Spec **Accept with conditions** on P2 @ `8cfa2a9`. Hold merge until UAT. Not IC50.
 6. **Receive freeze:** non-empty `analysis_ids` still **422**.
-7. **P2 ordered route (AC-P2-9..11 Pass on `9342439`; prior signed on `8cfa2a9`):** Route snapshots the ordered list, **zero Tests**. First Start = process[0] / `chain[0]` only — **Tobias-signed Pass**. Empty Route **422** Pass. Later-step type-gate **Met** on `9342439` (qPCR-on-blood / still-Blood **422**; not dest-type E2E). Deiter `0077` click at `4671ba8` / `02fe95f`: C1 **Pass**, C2 **Fail**, dest mint Hold **Pass**. C2 means later Start dest-follows is not verified shipped behavior.
+7. **P2 ordered route (AC-P2-9..11 Pass on `9342439`; prior signed on `8cfa2a9`):** Route snapshots the ordered list, **zero Tests**. First Start = process[0] / `chain[0]` only — **Tobias-signed Pass**. Empty Route **422** Pass. Later-step type-gate **Met** on `9342439`. Deiter `0077` click at `4671ba8` / `02fe95f`: C1 **Pass**, C2 **Fail**, dest mint Hold **Pass**. C2 means later Start dest-follows is not verified shipped behavior.
 8. **WO-7 publish (Tobias-signed Pass @ `8cfa2a9` and history @ `b005cfe`):** `_require_wo7_tests` 422s before promote if any cohort sample lacks an active Test. Status stays unpublished (complete). Do **not** fold first-start freeze into this Pass.
 9. **Hans freeze (classic skip still OPEN / unsigned on `8cfa2a9`):** `if test: continue` is **not** a freeze. Classic `/tests` must leave `asked_for_params` **NULL**, or we need a **freeze marker**. Until then `{}` is **ambiguous**. Do **not** teach skip-on-frozen-`{}`. **OQ-WO-6:** earlier LimsRun must **not** share asked-for `analysis_id` (extract is not a special assay).
 10. **P2-4 visibility:** Route is `test:assign` and must **read** the mapped def/steps. Do **not** put `experiment:manage` on Route. **`0074` still open** on `8cfa2a9`. Mutate stays `config:edit`.
 11. **No sample-type picker (Tobias-signed Pass on `8cfa2a9` — UI click-save):** ELISA TAT 1–7 saved; Blood extract + later DNA qPCR chain saved (no AND 422); second ELISA overlap **409**. Empty Route **422** Pass. Two-accept **409** unsigned that SHA.
 12. **Earlier LimsRun `analysis_id` (OQ-WO-6 stays OPEN — Leadership Confirm R2-3):** Earlier LimsRun must **not** share asked-for `analysis_id`. Do not teach extract-as-special-assay. Type gates catch blood-on-Qubit. Any earlier LimsRun that reuses the asked-for analysis freezes the panel Test on the parent.
 13. **After `8cfa2a9` (Round 1 Leadership Confirm; Round 2 Leadership Confirm R2-1…R2-4):** no map analysis picker. A route **may have multiple analyses**. Asked-for → any chain that **contains** that LimsRun analysis. Map 409 = TAT ∩ first-step types ∩ analysis **sets**. Map 422 handoff is **map-save only**; dest mint Hold. Parser at import. Send: [2026-08-30-p2-route-lock](../../discussions/2026-08-30-p2-route-lock.md).
-14. **0077 assignment / dest follow (`02fe95f` — Heidi / Mathilda / Rolf):** Deiter C1 **Pass**: no-vessel and ambiguous multi-vessel assign **422**; receive-tube assign **201**. Deiter C2 **Fail**: execute mints dest, does not join dest or remove source; emptied-source assign is a **201 mix-up**; **PATCH is not a path**. The target equivalent aliquot remains same sample, new container, but do not teach dest-follows as shipped. Dest mint Hold **Pass** is distinct: Start extract remains Blood with **0 DNA**; `_execute_transfer` dest mint is still open. OQ-WO-6 and freeze skip stay OPEN. Route stays `test:assign`.
+14. **C2 Fail on `02fe95f` (Heidi / Mathilda / Rolf; Deiter click):** C1 **Pass**. Execute mints dest (`_execute_transfer` always inserts a new Sample) and never writes the same-sample dest container onto `eln_process_samples`. `_join_minted_destination` and `_release_source_from_process` both **no-op** unless `entry.process_step_id` is set — dest vessel can exist while inbound source stays on the process. Later Start via `_continuing_assignments` then rides that emptied parent. Emptied-source assign **201** is leftover Contents at amount 0 — **not** dest-follow; must **422**. PATCH of `eln_process_samples` is **not** a path. Follow has to land in the **execute txn**: retarget `container_id`, or remove source then insert the dest pair (`uq_eln_process_samples_active_sample` = one active row per sample). **Equivalent aliquot** = same sample, new container. Dest mint **Hold** (Deiter Pass): Start extract remains Blood / 0 DNA — a new Sample with `dest_sample_type` is **not** this C2 fix. OQ-WO-6 and freeze skip stay OPEN. Route stays `test:assign`. Coding stays Grok Build. Hold merge. Not IC50.
 
 ---
 
@@ -50,7 +50,8 @@ UI /asked-for ──▶ asked_for (P1)
          existing /v1/eln-processes
                  │
                  ▼ Target Later Start = next process, dest container-with-sample
-                    (C2 Fail: dest not joined; source not removed)
+                    (C2 Fail: dest not joined; source not removed;
+                     emptied-source 201 is not dest-follow)
          LimsRun start → Test (WO-7) for that process only
                  │
                  ▼
@@ -59,7 +60,7 @@ UI /asked-for ──▶ asked_for (P1)
 
 SOP Apply (P4) writes **process definitions** that routing_map points at.
 
-No new execute runtime. No second AuthZ. No second workflow engine. First Start must not mint later processes or their Tests. Dest mint (new DNA Sample) is **not** the P2 follow.
+No new execute runtime. No second AuthZ. No second workflow engine. First Start must not mint later processes or their Tests. Dest mint (new DNA Sample) is **not** the P2 follow. PATCH of process samples is not a path.
 
 ## 3. P1 design
 
@@ -125,9 +126,9 @@ Pytest: create, 409 dup, **403 dual-belt** (create **and** `list()` / `GET /aske
 
 `work_orders.process_definition_ids` snapshot at mint (**L4**), **zero Tests**. Ordered list is the lock. Punch (3): **first Start must not mint later processes or their Tests** — do not teach that mint as shipped.
 
-Start: `ELNProcessService.instantiate_from_definition` on **process[0] / `chain[0]` only**. Assignment is a Contents pair: `container_id` NOT NULL (`0077`). Deiter C1 **Pass** verifies no-vessel/two-vessel **422** and receive-tube **201**. The target Later Start follows dest vessels via `_continuing_assignments`, but Deiter C2 **Fail** records that execute did not join dest or remove source. **PATCH is not a path.** Instantiate stays `experiment:manage`. Route stays `test:assign`.
+Start: `ELNProcessService.instantiate_from_definition` on **process[0] / `chain[0]` only**. Assignment is a Contents pair: `container_id` NOT NULL (`0077`). Deiter C1 **Pass**: no-vessel / two-vessel **422**, receive-tube **201**. Emptied-source (Contents amount 0) must **422**, not 201. Target Later Start follows dest vessels via `_continuing_assignments`. **C2 Fail:** execute did not join dest or remove source. Join/release no-op unless `entry.process_step_id`. Follow must land in the **execute txn** (retarget `container_id`, or remove source then insert dest pair). **PATCH is not a path.** Instantiate stays `experiment:manage`. Route stays `test:assign`.
 
-**Punch dest mint on `02fe95f`:** `_execute_transfer` still inserts a new Sample with `dest_sample_type` (can be DNA) and `_join_minted_destination` puts that row on the process. That is dest mint at execute, not vessel-bind. Parent `sample_type` is not rewritten. Hold: no new DNA row, no type rewrite. P2 follow is a **same-sample dest container**.
+**Dest mint Hold (Deiter Pass, distinct from C2):** Start extract remains Blood / 0 DNA. `_execute_transfer` still inserts a new Sample with `dest_sample_type` — that is **not** this C2 fix. Equivalent aliquot is same sample, new container.
 
 **L3 / A5 / SC5 / Hans:** `if test: continue` is **not** a freeze. At LimsRun start for the asked-for analysis, insert the Test if missing and **write** `asked_for.params` → `tests.asked_for_params`. Classic `/tests` must leave `asked_for_params` **NULL**, or we need a **freeze marker**. Until one of those exists, `{}` is **ambiguous**. Do **not** teach skip-on-frozen-`{}`. **OQ-WO-6:** any earlier LimsRun must **not** reuse the asked-for `analysis_id` (extract is not special; type gates are a different axis). P1 does **not** write that Test snapshot. Freeze skip stays unsigned.
 
@@ -162,9 +163,12 @@ No new import engine. **Do not build “admin authors parsers” as the product.
 | Map save, same analysis + overlapping TAT + overlapping first-step allow-lists | **409** |
 | Map save, same analysis + overlapping TAT, disjoint first-step allow-lists | Save succeeds (extract-first vs Qubit-first) |
 | First Start mints later processes or their Tests | Bounce — punch (3). Snapshot is the list only |
-| Assign omit container / 0 vessels / 2+ without a pick | **422** `process_container_required`, lab-readable |
-| Later Start follows inbound parent when dests exist | Known C2 **Fail**; target is `_continuing_assignments`, but do not teach the follow as shipped |
-| Dest mint (new DNA Sample / dest-type rewrite as P2 extract story) | Execute still mints dest; dest mint Hold **Pass** only says Start extract stays Blood / **0 DNA** |
+| Assign omit container / 0 vessels / 2+ without a pick | **422** `process_container_required`, lab-readable. C1 **Pass**. |
+| Emptied-source assign (Contents amount 0) | **422** — leftover 201 is not dest-follow |
+| Execute does not join dest / remove inbound in the same txn | **C2 Fail** — follow must land in execute txn; PATCH is not a path |
+| Join / release no-op without `entry.process_step_id` | Bounce — dest vessel exists, inbound stays |
+| Later Start follows inbound parent / emptied source | Bounce — follow `_continuing_assignments` dest container |
+| Dest mint (new Sample with `dest_sample_type`) | Hold — not this C2 fix. Equivalent aliquot is same sample, new container |
 | Later Start | Target is next process on dest container; C2 **Fail** because execute did not join dest or remove source |
 | Later step start with current type outside that step’s accepted types | **422 `route_sample_type`**; sample is not broken. **Unsigned on `8cfa2a9`** — not click-run |
 | Publish without Test | **422** the whole run (`_require_wo7_tests` / `plan.errors`). Stay unpublished. Zero Results. Publish-refuse **Pass** on `8cfa2a9` and history on `b005cfe`. Freeze skip unsigned: `{}` on `99b692d3` is ambiguous, not a skip Pass. |
@@ -181,7 +185,7 @@ No new import engine. **Do not build “admin authors parsers” as the product.
 | PR | Scope |
 |----|--------|
 | 1 | P1 tables + API + `/asked-for` UI + pytest + UAT script. **Hold merge until UAT.** |
-| 2 | P2 routing + work_order + ordered `process_definition[]` + LimsRun WO-7 + 0077 assignment. Signed AC-P2-9..11 `9342439`. Deiter click at `4671ba8` / `02fe95f`: C1 **Pass**, C2 **Fail**, dest mint Hold **Pass**. Overall P2 **unsigned / not Pass**. **Hold product merge to main.** Still open: Hans freeze (`{}` ambiguous), **OQ-WO-6**, `_execute_transfer` dest mint, P2-4 `0074`. |
+| 2 | P2 routing + work_order + ordered `process_definition[]` + LimsRun WO-7 + 0077 assignment. Signed AC-P2-9..11 `9342439`. Deiter click at `4671ba8` / `02fe95f`: C1 **Pass**, C2 **Fail**, dest mint Hold **Pass**. Overall P2 **unsigned / not Pass**. **Hold product merge to main.** Still open: C2 dest-follow in execute txn, emptied-source 422, `_execute_transfer` dest mint Hold, Hans freeze, **OQ-WO-6**, P2-4 `0074`. |
 | 3 | P3 persist lock + results UAT fold (**closed**) |
 | 4 | P4 SOP Apply → process def (**closed**) |
 | 5 | P5 parser setup UX (**closed** this cycle) |
