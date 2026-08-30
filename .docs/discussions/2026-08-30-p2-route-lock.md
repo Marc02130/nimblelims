@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-30  
 **Team:** Leadership (Lab Ops, CEO, Security CSO, Scientific CSO)  
-**Ask:** Round 1 remains **Leadership Confirmed** (Rolf, Deiter, Hans, Heidi, Günter; all five asks). Round 2 is **Leadership Confirm** (Rolf, Deiter, Hans, Heidi, Günter; R2-1…R2-4). **Contents grain / `0077` is a Leadership Confirm** (Rolf, Deiter, Hans, Heidi, Günter) in the last section — process assignment is a **sample in a container**. **Dest mint stays Hold** (`_execute_transfer` still inserts a new Sample with `dest_sample_type`). **AC-P2-C1/C2 stay unsigned** until Tobias clicks. Not a merge stamp. Overall P2 UAT remains unsigned.  
+**Ask:** Round 1 remains **Leadership Confirmed** (Rolf, Deiter, Hans, Heidi, Günter; all five asks). Round 2 is **Leadership Confirm** (Rolf, Deiter, Hans, Heidi, Günter; R2-1…R2-4). **Contents grain / `0077` remains a Leadership Confirm** (Rolf, Deiter, Hans, Heidi, Günter) in the last section — process assignment is a **sample in a container**. Deiter clicked product `4671ba8` / assignment commit `02fe95f`: C1 **Pass**, C2 **Fail**, dest mint Hold **Pass**. Docs Confirm `84d2810` is not a new execute and not the click SHA. Not a Tobias QA Pass and not a merge stamp. Overall P2 UAT remains unsigned / not Pass.
 **Implement gate:** **OPEN for P2 coding on `feat/work-order-p2`.** Merge to `main` **held** until signed UAT Pass.  
 **Stem:** [post-receive-work-spine](../review/requirements/post-receive-work-spine.md)
 
@@ -231,7 +231,11 @@ Send: this file, Round 2. OQ-WO-4 / OQ-TAT-1 / OQ-WO-5 stay **Leadership Confirm
 
 ## Contents grain / `0077` — Leadership Confirm — 2026-08-30 (live clicks)
 
-**Full Leadership Confirm** that process assignment is a **sample in a container**. Rolf, Deiter, Hans, Heidi, Günter. Round 1 and Round 2 above are unchanged — this section does **not** rewrite them, and Round 1 / Round 2 live-clicks stay as written. Product SHA `4671ba8`; the assignment commit is `02fe95f` (migration `0077` in that commit). **AC-P2-C1/C2 stay unsigned** until Tobias clicks. **Dest mint stays Hold.** Do **not** rewrite Tobias `9342439` / `8cfa2a9` / P1 Results. **OQ-WO-6 stays OPEN.** Freeze skip (`{}` vs NULL) stays **OPEN**. Route stays `test:assign`. Not a merge stamp. Overall P2 remains **not Pass**. Hold product merge to `main`. Not IC50.
+**Full Leadership Confirm** that process assignment is a **sample in a container**. Rolf, Deiter, Hans, Heidi, Günter. Round 1 and Round 2 above are unchanged — this section does **not** rewrite them, and Round 1 / Round 2 live-clicks stay as written. Product SHA `4671ba8`; the assignment commit is `02fe95f` (migration `0077` in that commit). **Dest mint stays Hold.** Do **not** rewrite Tobias `9342439` / `8cfa2a9` / P1 Results. **OQ-WO-6 stays OPEN.** Freeze skip (`{}` vs NULL) stays **OPEN**. Route stays `test:assign`. Not a merge stamp. Overall P2 remains **not Pass**. Hold product merge to `main`. Not IC50.
+
+### Deiter click — Contents grain
+
+Deiter (Lab Ops), 2026-08-30, product `4671ba8` / assignment commit `02fe95f`: AC-P2-C1 **Pass**; AC-P2-C2 **Fail** — execute mints dest, does not join dest or remove source, emptied-source assign is a **201 mix-up**, and **PATCH is not a path**; dest mint Hold **Pass** — Start extract remains **Blood**, with **0 DNA**. Docs Confirm `84d2810` is not a new execute and not the click SHA. This is not a Tobias QA Pass. No overall P2 Pass.
 
 ### Product being confirmed (their words)
 
@@ -247,15 +251,15 @@ Send: this file, Round 2. OQ-WO-4 / OQ-TAT-1 / OQ-WO-5 stay **Leadership Confirm
 | 0 vessels / 2+ vessels → **422**, no silent pick | **Yes.** Lab-readable refusal beats a wrong tube | **Yes.** Refuse at assign | **Yes.** A guessed vessel is a wrong measurement | **Yes.** 422 both ways; never `first()` | **Yes.** Ambiguity resolves to 422, not to a pick |
 | Equivalent aliquot = same sample, new container; later Start follows dest **container** | **Yes.** Tube→plate is the same material in a new vessel | **Yes.** Follow the vessel that carries the work | **Yes.** Same sample, new vessel — not a new identity | **Yes.** Follow is by container, not by type | **Yes.** Follow is a join, not a rewrite |
 | Dest-type mint stays **Hold** (`_execute_transfer` new Sample) | **Hard lock.** Do not tell a tech the tube is DNA | **Hold.** Do not sell daughters in P2 UAT | **Hard lock.** Blood→DNA is a derivative, a different packet | **Punch.** `_execute_transfer` inserting a Sample with `dest_sample_type` **is** dest mint at execute | **Hold.** Minting identity at execute needs its own STRIDE |
-| AC-P2-C1/C2 unsigned; OQ-WO-6 OPEN; freeze skip OPEN | **Yes** | **Yes** | **Yes** | **Yes** | **Yes** |
+| OQ-WO-6 OPEN; freeze skip OPEN; overall P2 not Pass | **Yes** | **Yes** | **Yes** | **Yes** | **Yes** |
 
-**Consensus:** Leadership Confirm of the Contents grain at `4671ba8` / `02fe95f`. **Dest mint stays Hold** — `_execute_transfer` is not closed and must not be taught as the equivalent aliquot. **AC-P2-C1/C2 stay unsigned.** OQ-WO-6 and freeze skip stay **OPEN**. No overall P2 Pass. Hold merge. Not IC50.
+**Consensus:** Leadership Confirm of the Contents grain at `4671ba8` / `02fe95f`. Deiter later clicked C1 **Pass**, C2 **Fail**, and dest mint Hold **Pass** on that product/assignment SHA pair. `_execute_transfer` is not closed and must not be taught as the equivalent aliquot. OQ-WO-6 and freeze skip stay **OPEN**. No overall P2 Pass. Hold merge. Not IC50.
 
 ### Deiter (Lab Ops)
 
 **Confirm the Contents grain.** Assign is the **tube in hand** — a container that holds the sample, not a naked sample id. No vessel is **422**. Two tubes for the same sample with no pick is **422**, lab-readable, and the app must **not** pick one for me. After an equivalent aliquot the work rides the **new vessel**; the emptied source comes off the process. Later Start follows that **container**.
 
-**Punch:** do not teach the equivalent aliquot as a type change. **Dest-type mint stays Hold** — Start extract leaves the tube **Blood**, and a tech must never read “DNA” off this click. Test stays `(sample, analysis)`; the container records **which vessel was measured**, and a concentration write-through hits **that** container. AC-P2-C1/C2 are **unsigned** until Tobias clicks. Hold merge.
+**Punch:** do not teach the equivalent aliquot as a type change. The later Deiter click records C1 **Pass**, C2 **Fail**, and dest mint Hold **Pass**. Start extract leaves the tube **Blood**, with **0 DNA**. Execute still mints dest and does not join dest or remove source; emptied-source assign is a **201 mix-up**; **PATCH is not a path**. Test stays `(sample, analysis)`; the container records **which vessel was measured**, and a concentration write-through hits **that** container. Hold merge.
 
 ### Hans (Sci CSO)
 
@@ -267,7 +271,7 @@ Send: this file, Round 2. OQ-WO-4 / OQ-TAT-1 / OQ-WO-5 stay **Leadership Confirm
 
 **Confirm the Contents grain.** `eln_process_samples.container_id` required is the right grain: assignment is a Contents pair. Follow-on Start reads non-`removed` dest assignments and follows the dest **container**, not the dest **type**.
 
-**Punch — dest mint is still open in code.** `_execute_transfer` still inserts a **new Sample** with `dest_sample_type` (which can be DNA) and `_join_minted_destination` puts that row on the process. That is **dest mint at execute** — a write of identity — and it stays **Hold**. The equivalent aliquot this grain confirms is **same sample, new container**; do **not** teach C2 as that mint. Coding stays **Grok Build**: do not claim equivalent-aliquot code is closed while `_execute_transfer` still mints a Sample. Route stays `test:assign`. AC-P2-C1/C2 **unsigned**. Freeze skip stays **OPEN**.
+**Punch — dest mint is still open in code.** `_execute_transfer` still inserts a **new Sample** with `dest_sample_type` (which can be DNA). Deiter C2 **Fail** records that execute mints dest and does not join dest or remove source. That is **dest mint at execute** — a write of identity — and the target equivalent aliquot remains **same sample, new container**. Do not teach C2 or PATCH as a shipped dest-follows path. Route stays `test:assign`. Freeze skip stays **OPEN**.
 
 ### Günter (Sec CSO)
 
@@ -283,5 +287,5 @@ Send: this file, Round 2. OQ-WO-4 / OQ-TAT-1 / OQ-WO-5 stay **Leadership Confirm
 | OQ-WO-6 | **OPEN.** Earlier LimsRun must not share asked-for `analysis_id`. |
 | Freeze skip (`{}` vs NULL) | **OPEN.** |
 | Dest-type mint (`_execute_transfer` new Sample with `dest_sample_type`) | **Hold.** Not closed by this Confirm. |
-| AC-P2-C1 / AC-P2-C2 | **Unsigned** at `4671ba8` / `02fe95f` until Tobias clicks. |
+| AC-P2-C1 / AC-P2-C2 | Deiter click at `4671ba8` / `02fe95f`: C1 **Pass**; C2 **Fail**. Not a Tobias QA Pass. |
 | Overall P2 | **unsigned / not Pass.** Hold merge to `main`. |
