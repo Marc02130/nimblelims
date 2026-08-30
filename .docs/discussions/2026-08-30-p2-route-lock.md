@@ -2,13 +2,13 @@
 
 **Date:** 2026-08-30  
 **Team:** Leadership (Lab Ops, CEO, Security CSO, Scientific CSO)  
-**Ask:** **CEO Confirmed** (all five asks). Still pending **Deiter / Hans / Heidi / Günter overwrite-or-confirm**. Not a merge stamp. Not a full Leadership lock. Overall P2 UAT remains unsigned.  
+**Ask:** Leadership **Confirmed** (Rolf, Deiter, Hans, Heidi, Günter). All five asks. Not a merge stamp. Overall P2 UAT remains unsigned.  
 **Implement gate:** **OPEN for P2 coding on `feat/work-order-p2`.** Merge to `main` **held** until signed UAT Pass.  
 **Stem:** [post-receive-work-spine](../review/requirements/post-receive-work-spine.md)
 
 **Code:** `feat/work-order-p2`. Latest **signed** AC-P2 is `8cfa2a9` (per-AC; overall **not Pass**; PR **#92** honesty fold). **This commit** is `9342439` (`93424396ce3d02f01a8a8388abda39ae6ebf8010`): analysis is not a map field; Route matches a LIMS Run in the chain; process *x* → *x+1* emerging-type handoff; create-route UI shows types/analyses/emerging types.
 
-**UAT:** do **not** rewrite `8cfa2a9` / `b005cfe` / `9c4f9da` / `3b56cfb` / P1. Live AC-P2 stamp on `9342439` in `UAT_Scripts/uat-post-receive-work-spine.md` covers analysis-in-chain + display + handoff and stays **unsigned**. Tobias restamps on this committed SHA. Overall P2 remains **not Pass**.
+**UAT:** do **not** rewrite `8cfa2a9` / `b005cfe` / `9c4f9da` / `3b56cfb` / P1. Live AC-P2 stamp on `9342439` in `UAT_Scripts/uat-post-receive-work-spine.md` covers analysis-in-chain + display + handoff and stays **unsigned until Tobias clicks**. Tobias **may click** `9342439` now. Do **not** stamp Pass on AC-P2-9..11. Overall P2 remains **not Pass**.
 
 **Dest-type Hold:** execute still does **not** mint a DNA daughter. Authoring may still read a declared aliquot/pool dest on a template.
 
@@ -87,7 +87,7 @@ No new permission. `config:edit` still writes the map; Route stays `test:assign`
 
 ## CEO Confirm — 2026-08-30 (Rolf)
 
-**CEO is the only live Confirm.** Round 1 above remains persona-applied history. Do **not** read Lab Ops / Security / Sci CSO round-1 cells as live clicks. Still pending **Deiter / Hans / Heidi / Günter overwrite-or-confirm**. Not a full Leadership lock. Not a merge stamp.
+Rolf’s Confirm of all five asks. Round 1 above remains persona-applied history. Do **not** read Lab Ops / Security / Sci CSO round-1 cells as live clicks. Full Leadership Confirm is the next section. Not a merge stamp.
 
 | Ask | CEO Confirm |
 |-----|-------------|
@@ -99,12 +99,40 @@ No new permission. `config:edit` still writes the map; Route stays `test:assign`
 
 ---
 
+## Leadership Confirm — 2026-08-30 (live clicks)
+
+**Full Leadership Confirm** of all five asks + OQ-WO-4 / OQ-TAT-1 / OQ-WO-5. Rolf (CEO Confirm above), then Deiter, Hans, Heidi, Günter. Round 1 remains persona-applied history. Dest-type mint remains Hold. Not a merge stamp. Tobias **may click** `9342439` now. Live AC-P2-9..11 stay **unsigned until he clicks**.
+
+### Deiter (Lab Ops)
+
+**Confirm 1–5.** Analysis in the chain. 409 = TAT ∩ first-step types ∩ LimsRun analyses. Handoff 422 if *x* dest is not accepted by *x+1*. Dest mint Hold. Restamp `9342439` now; no daughter E2E. OQ-WO-4 / OQ-TAT-1 / OQ-WO-5 signed.
+
+**Punch:** handoff 422 is **authoring**, not a runnable extract→Qubit. The tube is still blood until dest mint. Later-step type-gate (Qubit-on-blood at start) is **not** dest-type E2E — still click it on this SHA.
+
+### Hans (Sci CSO)
+
+**Confirm 1–5.** Assay identity lives on the LimsRun in the chain, not a map picker. Handoff 422 is catalog intent (`default_dest_sample_type` on the last step of *x*, else that step’s accepted types — not SOP title, not `sample_type_transitions`). Dest mint Hold. Restamp now; no daughter E2E.
+
+**Punch:** analysis-in-chain does **not** close extract sharing the asked-for `analysis_id`. Extract LimsRun must not be ELISA or it freezes the panel Test at process 1. Later-step type-gate is still current type and still unsigned — click it; it is not dest-type E2E. Freeze skip (`{}` vs NULL) stays open.
+
+### Heidi (Arch)
+
+**Confirm 1–5.** Same lock.
+
+**Punches that stay open — not this restamp:** classic `/tests` must leave `asked_for_params` NULL (or a freeze marker); skip-on-`{}` is not a freeze. Extract LimsRun must not share the asked-for `analysis_id`. Derive first-step types and chain LimsRun analyses at read; do **not** keep `routing_map.analysis_id` as a required create field. Later-step type-gate is current type at start — still click it. First Start = `chain[0]` only. Route stays `test:assign`.
+
+### Günter (Sec CSO)
+
+**Confirm 1–5.** No silent `first()`. Handoff 422 is catalog intent. Dest mint Hold — no execute rewrite of `sample_type`. Freeze skip and extract sharing stay open.
+
+---
+
 ## Open questions to stamp
 
-| ID | Status until you reply | Proposed |
-|----|------------------------|----------|
-| OQ-WO-4 | **CEO Confirm** — pending Deiter/Hans/Heidi/Günter overwrite-or-confirm. Not full Leadership Decided. | No map analysis field; Route matches a LIMS Run in the chain |
-| OQ-TAT-1 | **CEO Confirm** — pending same. | 409 = TAT ∩ first-step types ∩ LIMS Run analyses |
-| OQ-WO-5 | **CEO Confirm** (was Open) — pending same. Dest mint remains Hold. | Process *x* emerging type must be accepted by *x+1* |
+| ID | Status | Proposed |
+|----|--------|----------|
+| OQ-WO-4 | **Leadership Confirm** (Rolf/Deiter/Hans/Heidi/Günter). Dest mint remains Hold. | No map analysis field; Route matches a LIMS Run in the chain |
+| OQ-TAT-1 | **Leadership Confirm** (Rolf/Deiter/Hans/Heidi/Günter). | 409 = TAT ∩ first-step types ∩ LIMS Run analyses |
+| OQ-WO-5 | **Leadership Confirm** (Rolf/Deiter/Hans/Heidi/Günter). Dest mint remains Hold. | Process *x* emerging type must be accepted by *x+1* |
 
-Deiter / Hans / Heidi / Günter: overwrite round 1 if needed. Then QA restamps `UAT_Scripts/uat-post-receive-work-spine.md` on `9342439`. Live AC-P2 stays **unsigned**. Not IC50.
+Tobias may click `UAT_Scripts/uat-post-receive-work-spine.md` on `9342439`. Live AC-P2-9..11 stay **unsigned until he clicks**. Not IC50.

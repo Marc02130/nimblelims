@@ -658,11 +658,11 @@ The preceding `8cfa2a9` section is retained verbatim as the latest **signed** pe
 
 **Branch / build:** `feat/work-order-p2` at `9342439` (`93424396ce3d02f01a8a8388abda39ae6ebf8010`). **Not click-run. Not Pass.**
 
-**QA signature:** **unsigned**. Tobias restamps on this SHA. Do **not** write Pass on AC-P2-9 / AC-P2-10 / AC-P2-11. Do **not** write overall P2 Pass. Dest-type **mint** remains Hold — do not UAT blood→DNA daughter.
+**QA signature:** **unsigned**. Tobias **may click** `9342439` now. Do **not** write Pass on AC-P2-9 / AC-P2-10 / AC-P2-11 until he clicks. Do **not** write overall P2 Pass. Dest-type **mint** remains Hold — do not UAT blood→DNA daughter.
 
-**Leadership send:** [`.docs/discussions/2026-08-30-p2-route-lock.md`](../.docs/discussions/2026-08-30-p2-route-lock.md) — **CEO Confirm** of all five asks. Still pending Deiter/Hans/Heidi/Günter overwrite-or-confirm. OQ-WO-4 / OQ-TAT-1 / OQ-WO-5 **CEO-signed**, not full Leadership. Not a merge stamp.
+**Leadership send:** [`.docs/discussions/2026-08-30-p2-route-lock.md`](../.docs/discussions/2026-08-30-p2-route-lock.md) — **Confirmed** (Rolf, Deiter, Hans, Heidi, Günter; all five asks). OQ-WO-4 / OQ-TAT-1 / OQ-WO-5 **Leadership Confirm**. Not a merge stamp.
 
-**Product under test (CEO-confirmed lock; not a full Leadership lock; not QA Pass):**
+**Product under test (Leadership-confirmed lock; not QA Pass):**
 - Map row = TAT + ordered `process_definition[]`. **No** admin analysis picker and **no** admin sample-type picker.
 - Create-route UI **displays** each selected process’s allowed sample types, LIMS Run analyses, and emerging types.
 - Route assigns when (1) current sample type is on the **first process’s first** Experiment/LimsRun allow-list **and** (2) the asked-for analysis matches a **LimsRun somewhere in the route**.
@@ -670,7 +670,9 @@ The preceding `8cfa2a9` section is retained verbatim as the latest **signed** pe
 - Map save **409** only when overlapping TAT **and** overlapping first-step allow-lists **and** overlapping LimsRun analyses. Extract-first vs Qubit-first for the same TAT is legal. Two extract routes, same TAT and inbound types, **different** assays are legal.
 - Map save **422** when the type emerging from process *x* is not accepted by process *x+1*. Emerging = aliquot/pool `default_dest_sample_type` on the last Experiment/LimsRun of *x* if set; else last-step accepted types. Dest-type mint remains Hold.
 
-**Still open from `8cfa2a9` (do not fold closed):** Hans freeze skip (`{}` ambiguous). Extract LimsRun must **not** share asked-for `analysis_id`. Later-step type-gate at start (current tube) unsigned that SHA. Route two-accept **409** unsigned that SHA. Overall P2 unsigned.
+**Still click on this SHA (not dest-type E2E):** later-step type-gate (Qubit-on-blood at start / current type).
+
+**Still OPEN, not this restamp:** Hans freeze skip (`{}` vs NULL). Extract LimsRun must **not** share asked-for `analysis_id` — analysis-in-chain does **not** close that; extract must not be ELISA or it freezes the panel Test at process 1. Route two-accept **409** unsigned that SHA (`8cfa2a9`). Overall P2 unsigned.
 
 | Slice on this SHA | Tobias |
 |-------------------|--------|
@@ -681,7 +683,10 @@ The preceding `8cfa2a9` section is retained verbatim as the latest **signed** pe
 | Map save: dest DNA → next process accepts DNA → **201** | **unsigned** |
 | Map save: dest DNA → next process plasma-only → **422** | **unsigned** |
 | Map save: extract plasma (no dest) → Qubit DNA-only → **422** | **unsigned** |
+| Later-step type-gate (Qubit-on-blood at start / current type) — **click this SHA; not dest-type E2E** | **unsigned** |
 | Dest-type mint / blood→DNA daughter | **out** (Hold) |
+| Freeze skip (`{}` vs NULL) | **OPEN** (not this restamp) |
+| Extract LimsRun must not share asked-for `analysis_id` (extract must not be ELISA) | **OPEN** (not this restamp) |
 | Overall P2 | **unsigned / not Pass** |
 
 ### AC-P2-9 — analyses come from LimsRuns in the chain
