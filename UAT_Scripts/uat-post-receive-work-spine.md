@@ -663,7 +663,7 @@ The preceding `8cfa2a9` section is retained verbatim as signed history (first St
 **Executor / environment / date:** Tobias · local docker compose (`lims-*`) · 2026-08-30 · compose **down** after run
 **Merge:** hold product merge of `feat/work-order-p2`. Not IC50.
 
-**Leadership send:** [`.docs/discussions/2026-08-30-p2-route-lock.md`](../.docs/discussions/2026-08-30-p2-route-lock.md) — **Confirmed** (Rolf, Deiter, Hans, Heidi, Günter; all five asks). OQ-WO-4 / OQ-TAT-1 / OQ-WO-5 **Leadership Confirm**. Not a merge stamp.
+**Leadership send:** [`.docs/discussions/2026-08-30-p2-route-lock.md`](../.docs/discussions/2026-08-30-p2-route-lock.md) — **Confirmed** (Rolf, Deiter, Hans, Heidi, Günter; all five asks). OQ-WO-4 / OQ-TAT-1 / OQ-WO-5 **Leadership Confirm**. Deiter / Hans / Heidi / Günter **confirmed Tobias’s `9342439` restamp** (honesty, **not** a merge vote). Not a merge stamp.
 
 **Product under test (Leadership-confirmed lock; AC-P2-9..11 Pass; not overall P2 Pass):**
 - Map row = TAT + ordered `process_definition[]`. **No** admin analysis picker and **no** admin sample-type picker.
@@ -684,7 +684,7 @@ The preceding `8cfa2a9` section is retained verbatim as signed history (first St
 | Map save: dest DNA → next process accepts DNA → **201** | **Pass** |
 | Map save: dest DNA → next process plasma-only → **422** | **Pass** |
 | Map save: extract plasma (no dest) → qPCR DNA-only → **422** | **Pass** |
-| Later-step type-gate (qPCR start on still-Blood / current type) — **not dest-type E2E** | **Pass** |
+| Later-step type-gate (qPCR start on still-Blood / current type) — **not dest-type E2E** | **Pass** (Tobias). Leadership **Met**. |
 | Dest-type mint / blood→DNA daughter | **out (Hold)** — after Start first extract, tube still Blood, **0 DNA daughters** |
 | Freeze skip (`{}` vs NULL) | **OPEN** (not this restamp) |
 | Extract LimsRun must not share asked-for `analysis_id` (extract must not be ELISA) | **OPEN** (not this restamp) |
@@ -742,7 +742,7 @@ The preceding `8cfa2a9` section is retained verbatim as signed history (first St
 
 ### Later-step type-gate (this SHA; not dest-type E2E)
 
-**Result:** **Pass** (Tobias signed, 2026-08-30, `9342439`). Later qPCR start on still-Blood tube **422** `route_sample_type` (wrong type, sample not dead). This is **not** dest-type E2E.
+**Result:** **Pass** (Tobias signed, 2026-08-30, `9342439`). Later qPCR start on still-Blood tube **422** `route_sample_type` (wrong type, sample not dead). This is **not** dest-type E2E. Leadership: later-step type-gate is **Met** on this SHA.
 
 ---
 
@@ -751,6 +751,15 @@ The preceding `8cfa2a9` section is retained verbatim as signed history (first St
 **Signed AC-P2-9..11 Pass** — Tobias, 2026-08-30, local compose (down after). Product SHA `9342439`. Docs merge `50c1f24` does not change the click SHA.
 
 AC-P2-9 **Pass** (no analysis/type picker; extract Identity/Plasma then ELISA click-save **201**; alice Route ELISA **200**; qPCR not in chain Route **422**, stayed requested, no WO) · AC-P2-10 **Pass** (create-route derived; add-process types+analyses; reorder refreshes; Save disabled on empty first-step types / no LimsRun analysis / incompatible handoff) · AC-P2-11 **Pass** (map-save only: dest-DNA → qPCR DNA **201**; dest-DNA → plasma-only **422**; no-dest Plasma → qPCR DNA **422**) · dest-type mint **Hold** (tube still Blood, **0 DNA daughters**) · later-step type-gate **Pass** (later qPCR start on still-Blood **422** `route_sample_type`; not dest-type E2E).
+
+**Leadership notes (Deiter / Hans / Heidi / Günter) — restamp honesty, not a merge vote.** Confirmed Tobias’s `9342439` click.
+
+- Later-step type-gate is **Met** on `9342439`: qPCR-on-blood / still-Blood start **422** `route_sample_type` (current type vs that step; sample not dead). This is **not** dest-type E2E.
+- AC-P2-11 / handoff Pass is **map-save only**. Dest mint stays **Hold** — no execute rewrite of `sample_type`; tube still Blood; 0 DNA daughters.
+- Freeze skip (`{}` vs NULL) stays **OPEN**.
+- Extract sharing asked-for `analysis_id` stays **OPEN**.
+- Route stays `test:assign`.
+- No overall P2 Pass.
 
 **Still OPEN — not this restamp:** freeze skip (`{}` vs NULL). Classic `/tests` must leave `asked_for_params` NULL or we need a freeze marker. Extract LimsRun must **not** share asked-for `analysis_id` (analysis-in-chain does not close that; extract must not be ELISA).
 
