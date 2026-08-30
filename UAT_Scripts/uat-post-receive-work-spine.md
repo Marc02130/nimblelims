@@ -526,7 +526,7 @@ This block records Tobias’s `8cfa2a9` click. It does **not** rewrite or transf
 | Freeze **wrote** `asked_for_params` `{}` onto **new** Test `99b692d3` (not SQL NULL, not a skipped classic row) | Observed write. **Not** a verified freeze skip — `{}` is ambiguous. |
 | Classic `/tests` skip / skip-on-frozen-`{}` | **OPEN, unsigned, not Pass.** Do not fold later-start no-overwrite of `{}` as Pass. |
 | carol publish **422** `test_missing`; run stayed complete unpublished | **Pass** |
-| Routing-map UI: no sample-type picker; copy “First process is sample-type dependent. Later processes are not.” Overlap **409**. Blood+qPCR chain map-save **201** (not AND) | **Pass** |
+| Routing-map UI **click-save** (not API-only): no sample-type picker; ELISA TAT 1–7 saved; Blood extract + later DNA qPCR chain saved (no AND 422); second ELISA overlap **409** | **Pass** (do not re-score) |
 | Later-step type-gate at start (current tube) | **unsigned** — not click-run this SHA. Not Pass. |
 | Route two-accept **409** | **unsigned** — not claimed this SHA |
 | Overall P2 | **unsigned / not Pass** |
@@ -607,7 +607,7 @@ This block records Tobias’s `8cfa2a9` click. It does **not** rewrite or transf
 
 ### AC-P2-5 — ordered route; first-process first-step types
 
-**Result:** **Pass** for routing-map UI / overlap **409** / blood+qPCR map-save **201** (not AND) / empty Route **422**. **Later-step type-gate at start (current tube) unsigned** — not click-run this SHA; not Pass. Route two-accept **409** unsigned this SHA. Do **not** score or carry `b005cfe` chain-AND map-save 422. Tobias signed, 2026-08-30, `8cfa2a9`.
+**Result:** **Pass** for routing-map UI **click-save** (not API-only) / ELISA TAT 1–7 saved / Blood extract + later DNA qPCR chain saved (no AND 422) / second ELISA overlap **409** / empty Route **422**. **Later-step type-gate at start (current tube) unsigned** — not click-run this SHA; not Pass. Route two-accept **409** unsigned this SHA. Do **not** score or carry `b005cfe` chain-AND map-save 422. Tobias signed, 2026-08-30, `8cfa2a9`. **Do not re-score.**
 
 1. Confirm map create has analysis, TAT, and sortable ordered `process_definition[]`, with no sample-type picker.
 2. Confirm the form displays the first process and its first ordered Experiment/LimsRun allow-list. Change process order or first-step acceptance and verify derived display refreshes.
@@ -622,7 +622,7 @@ This block records Tobias’s `8cfa2a9` click. It does **not** rewrite or transf
 
 **Expect**
 - Map row = analysis + TAT + ordered `process_definition[]`. UI preserves order. Allowed types are derived from the first process / first step, not admin-authored.
-- Map save **409**s only when the same analysis, overlapping TAT, **and** overlapping first-step allow-lists all hold. Extract-first vs Qubit-first for the same TAT is legal. Blood+qPCR chain map-save is **201**, not AND.
+- Map save **409**s only when the same analysis, overlapping TAT, **and** overlapping first-step allow-lists all hold. Extract-first vs Qubit-first for the same TAT is legal. Blood extract + later DNA qPCR chain map-save is **click-save 201**, not AND.
 - Zero acceptable rows returns **422** and mints no work order.
 - Two saved rows that both accept this sample’s current type return **409**; no silent `first()`. **Unsigned this SHA** unless clicked.
 - Exactly one row **snapshots the ordered list** and mints **zero Tests**.
@@ -632,7 +632,7 @@ This block records Tobias’s `8cfa2a9` click. It does **not** rewrite or transf
 - Each later process/step start checks current type; empty or incompatible fails with **422** then. **This later-step type-gate was not click-run this SHA — leave unsigned, not Pass.**
 - Dest-type Hold remains out; do not claim an earlier step changed type unless the product did so.
 
-**Verified holds:** routing-map UI has **no sample-type picker**; copy reads “First process is sample-type dependent. Later processes are not.” Overlap **409**. Blood+qPCR chain map-save **201** (not AND). Empty Route **422** “No routing-map row accepts this analysis, TAT, and sample type”.
+**Verified holds (click-save in the UI, not API-only — do not re-score):** `/admin/routing-map` has **no sample-type picker**. ELISA TAT **1–7** saved. Blood extract + later DNA qPCR chain saved (**no AND 422**). Second ELISA overlap **409**. Copy reads “First process is sample-type dependent. Later processes are not.” Empty Route **422** “No routing-map row accepts this analysis, TAT, and sample type”.
 
 **Unsigned this SHA:** later-step type-gate at start (current tube). Route two-accept **409**.
 
@@ -642,6 +642,8 @@ This block records Tobias’s `8cfa2a9` click. It does **not** rewrite or transf
 
 **Signed by Tobias, 2026-08-30; local docker compose, compose down.**
 
-AC-P2-1 **Pass** (receive stay-on-form) · AC-P2-2 **Pass** (asked-for save 0 WO) · AC-P2-3 **Pass** (alice Route+Start first process only) · AC-P2-4 **publish-refuse Pass**; freeze skip **unsigned / not Pass** (`{}` on `99b692d3` is ambiguous) · AC-P2-5 **Pass** for map UI / overlap 409 / 201 not AND / empty Route 422; later-step type-gate **unsigned**.
+AC-P2-1 **Pass** (receive stay-on-form) · AC-P2-2 **Pass** (asked-for save 0 WO) · AC-P2-3 **Pass** (alice Route+Start first process only) · AC-P2-4 **publish-refuse Pass**; freeze skip **unsigned / not Pass** (`{}` on `99b692d3` is ambiguous) · AC-P2-5 **Pass** for routing-map **UI click-save** (ELISA TAT 1–7 saved; Blood extract + later DNA qPCR chain saved, no AND 422; second ELISA overlap 409) / empty Route 422; later-step type-gate **unsigned**. Do not re-score.
+
+**Addendum (same stamp, do not re-score):** Routing-map Pass on `8cfa2a9` was **click-save in the UI**, not API-only: no sample-type picker; ELISA TAT 1–7 saved; Blood extract + later DNA qPCR chain saved (no AND 422); second ELISA overlap **409**. Later-step type-gate still **unsigned**. Everything else in this stamp stands.
 
 **Overall P2 remains unsigned.** Do not write overall P2 Pass, signed Pass, or merge-ready. Hans: `{}` is ambiguous until classic `/tests` leaves NULL or a freeze marker exists. Hold product merge. Not IC50.

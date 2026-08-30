@@ -117,7 +117,7 @@ Already normative (restated so implementers do not drop them): empty routing map
 
 | ID | Phase | Notes |
 |----|-------|--------|
-| AF-WO-* | P2 | Ordered `process_definition[]`; no type picker; map-save 409 only on TAT **and** first-step overlap; empty Route 422 Pass on `8cfa2a9`; two-accept 409 unsigned; first process starts first **Pass**; later-step type-gate unsigned; freeze skip unsigned (`{}` ambiguous); publish missing-Test 422 Pass on `8cfa2a9` (`b005cfe` history) |
+| AF-WO-* | P2 | Ordered `process_definition[]`; no type picker; map-save 409 only on TAT **and** first-step overlap (**UI click-save** on `8cfa2a9`: ELISA TAT 1–7 saved; Blood extract + later DNA qPCR chain saved, no AND 422; second ELISA overlap 409); empty Route 422 Pass; two-accept 409 unsigned; first process starts first **Pass**; later-step type-gate unsigned; freeze skip unsigned (`{}` ambiguous); publish missing-Test 422 Pass on `8cfa2a9` (`b005cfe` history) |
 | AF-RES-* | P3 | Fold AR-RES-01/02 after OQ-RES-1. Not on asked-for. |
 | AF-SOP-* / AF-IMP-* | P4/P5 | Apply process def; L5 no dest-type E2E; parser dry-run + activate; no LLM on import |
 

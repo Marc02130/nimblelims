@@ -42,6 +42,7 @@ Product commit `8cfa2a9` closed WO-7 first-start freeze, Route 422/409, later-st
 | **DOC-H8** | Hans: the fold still taught “skip only when a snapshot **already exists** (including frozen `{}`)” as if `{}` proved a first-start snapshot. A classic default `{}` and a frozen `{}` are the **same JSON**, so skip-on-`{}` cannot be a freeze. Classic `/tests` must leave `asked_for_params` **NULL**. | Strike skip-on-`{}`. **The “skip on a provable LimsRun-start snapshot / skip-on-frozen-`{}`” half is superseded by DOC-H10** — first start cannot tell classic default `{}` from frozen `{}`. |
 | **DOC-H9** | Tobias clicked `8cfa2a9` (compose down). Live stamp was still “unsigned — Tobias has not clicked.” | Fold per-AC Results: receive stay-on-form Pass; asked-for 0 WO Pass; empty Route 422 Pass; alice first process only Pass; carol publish 422 Pass; map UI / overlap 409 / 201-not-AND Pass; later-step type-gate **unsigned**. Do **not** write overall P2 Pass. Do **not** rewrite P1 or `b005cfe` (chain-AND stays history, not carried). Freeze skip stays **unsigned** — a write of `{}` onto `99b692d3` is not a skip Pass. |
 | **DOC-H10** | Hans: HOWTO/UAT still taught skip-on-frozen-`{}` / later-start no-overwrite of `{}` as if first start could tell a frozen `{}` from a classic default `{}`. They are the **same JSON**. | Strike skip-on-frozen-`{}`. Fold: classic `/tests` must leave `asked_for_params` **NULL**, or we need a freeze marker. Until one of those exists, `{}` is **ambiguous** — not a verified freeze skip. Extract still must not share asked-for `analysis_id`. `if test: continue` is still not a freeze. Live freeze skip stays **unsigned**. Do not rewrite P1 or `b005cfe`. |
+| **DOC-H11** | Tobias addendum: routing-map Pass on `8cfa2a9` could be read as API-only. | Same stamp, do not re-score. Record **UI click-save**: no sample-type picker; ELISA TAT 1–7 saved; Blood extract + later DNA qPCR chain saved (no AND 422); second ELISA overlap **409**. Later-step type-gate still unsigned. |
 
 Operator how-tos stay in git-tracked [`manuals/`](../../../manuals/). Formal stamps stay under `.docs/review/`. Do not commit `.docs/internal/` or `.docs/manuals/`.
 
@@ -49,13 +50,13 @@ Operator how-tos stay in git-tracked [`manuals/`](../../../manuals/). Formal sta
 
 | Field | Value |
 |-------|--------|
-| **Verdict** | **Accept with conditions** (DOC-H1–H10 land in this docs-only PR) |
+| **Verdict** | **Accept with conditions** (DOC-H1–H11 land in this docs-only PR) |
 | **Docs ready for Cursor** | Yes for this honesty fold — **no product implement** |
 | **Merge** | **Hold** product merge of `feat/work-order-p2` to `main` until QA restamps live AC-P2 |
 | **Not licensed** | Teaching freeze/422/409 as QA Pass · rewriting `b005cfe` / P1 Results · dest-type E2E · IC50 |
 
 ```
-DOCUMENTARIAN REVIEW: Accept with conditions (DOC-H1–H10 honesty fold)
+DOCUMENTARIAN REVIEW: Accept with conditions (DOC-H1–H11 honesty fold)
 DOCS READY FOR CURSOR: Yes with conditions (docs-only; hold product merge)
 ```
 
