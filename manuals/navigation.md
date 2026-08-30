@@ -194,7 +194,7 @@ The Admin section uses a Material-UI Accordion component for collapsible submenu
 | **Users Management** | `/admin/users` | People | User CRUD operations |
 | **Roles & Permissions** | `/admin/roles` | Security | Role and permission management |
 | **Analyses Management** | `/admin/analyses` | Science | Test analysis configuration |
-| **Routing map** | `/admin/routing-map` | AltRoute | Configure TAT + ordered `process_definition[]`. No analysis or sample-type picker. Show route order, first-process first-step types, and LIMS Run analyses in the chain. Map save 409s on overlapping TAT **and** first-step types **and** LIMS Run analyses. Route 409s when two saved rows both accept current type and asked-for analysis |
+| **Routing map** | `/admin/routing-map` | AltRoute | Configure TAT + ordered `process_definition[]`. No analysis or sample-type picker. A route may have multiple LimsRun analyses. Show route order, first-process first-step types, and LIMS Run analyses in the chain. Asked-for matches any route that **contains** that analysis. Map save 409s on overlapping TAT **and** first-step types **and** LIMS Run analysis sets. Route 409s when two saved rows both accept current type and asked-for analysis |
 | **Analytes Management** | `/admin/analytes` | Biotech | Analyte definitions |
 | **Test Batteries** | `/admin/test-batteries` | BatteryChargingFull | Test battery configuration |
 | **Custom Fields** | `/admin/custom-fields` | Tune | Manage custom attribute configurations (EAV) |

@@ -27,7 +27,7 @@ The three-step `/accessioning` wizard is **removed**. `/accessioning` redirects 
 
 **Status:** Sample is **Available for Testing**. Zero Tests. Zero Results.
 
-**Separate later look-up:** **Asked-for** records requested analysis + TAT and creates zero Tests/work orders. Later Route assigns when current type is on the first process’s first step **and** the asked-for analysis is a LIMS Run in the route: zero acceptable → 422; two saved rows that both accept this type and this analysis → 409; exactly one snapshots ordered `process_definition[]`. Work Orders starts the first process only; later starts advance in order. None of this is part of Receive.
+**Separate later look-up:** **Asked-for** records requested analysis + TAT and creates zero Tests/work orders. Later Route assigns when current type is on the first process’s first step **and** the asked-for analysis is **contained** in the route (a route may have multiple LimsRun analyses): zero acceptable → 422; two saved rows that both accept this type and this analysis → 409; exactly one snapshots ordered `process_definition[]`. Work Orders starts the first process only; later starts advance in order. None of this is part of Receive.
 
 ### Stage 1.5: Sample/Test/Container Editing (Post-Accessioning)
 
