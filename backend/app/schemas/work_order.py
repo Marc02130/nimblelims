@@ -17,7 +17,10 @@ class StepAcceptedSampleTypesResponse(BaseModel):
 
 
 class RoutingMapCreate(BaseModel):
-    analysis_id: UUID
+    analysis_id: Optional[UUID] = Field(
+        None,
+        description="Ignored. Analyses come from LIMS Run steps in the process chain.",
+    )
     sample_type_id: Optional[UUID] = Field(
         None,
         description="Ignored. Sample types are taken from the first process's first experiment/LIMS Run.",
@@ -43,7 +46,8 @@ class RoutingMapUpdate(BaseModel):
 
 class RoutingMapRead(BaseModel):
     id: UUID
-    analysis_id: UUID
+    analysis_id: Optional[UUID] = None
+    analysis_ids: List[UUID] = Field(default_factory=list)
     sample_type_id: UUID
     tat_min: int
     tat_max: int

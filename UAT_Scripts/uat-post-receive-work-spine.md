@@ -515,7 +515,7 @@ This block records Tobias’s `8cfa2a9` click. It does **not** rewrite or transf
 
 **Copy and permission locks:** Receive ends on `/receive`. Asked-for is a separate later look-up. Route is an **unnumbered** later planner requiring `test:assign` plus project access; it does not require `experiment:manage`. Client and inaccessible-project Route writes return **403**, not 404. **Start process** and LimsRun start require `experiment:manage`; publish requires `experiment:publish`. **Start instantiates `chain[0]` only.** Dest-type Hold out.
 
-**Hans freeze punch (still open — live freeze skip unsigned, not Pass):** Classic `/tests` must leave `asked_for_params` **NULL**, or we need a **freeze marker**. Until one of those exists, `{}` is **ambiguous** — first start cannot tell a classic default `{}` from a frozen `{}` (same JSON). Do **not** teach skip-on-frozen-`{}` as if that distinguishes a classic `/tests` row. `{}` is **not** a verified freeze skip. `if test: continue` is **not** a freeze. Extract LimsRun must **not** share the asked-for `analysis_id`.
+**Hans freeze punch (still open — live freeze skip unsigned, not Pass):** Classic `/tests` must leave `asked_for_params` **NULL**, or we need a **freeze marker**. Until one of those exists, `{}` is **ambiguous** — first start cannot tell a classic default `{}` from a frozen `{}` (same JSON). Do **not** teach skip-on-frozen-`{}`. `{}` is **not** a verified freeze skip. `if test: continue` is **not** a freeze. Extract LimsRun must **not** share the asked-for `analysis_id`.
 
 | Slice on `8cfa2a9` | Tobias |
 |--------------------|--------|
@@ -647,3 +647,83 @@ AC-P2-1 **Pass** (receive stay-on-form) · AC-P2-2 **Pass** (asked-for save 0 WO
 **Addendum (same stamp, do not re-score):** Routing-map Pass on `8cfa2a9` was **click-save in the UI**, not API-only: no sample-type picker; ELISA TAT 1–7 saved; Blood extract + later DNA qPCR chain saved (no AND 422); second ELISA overlap **409**. Later-step type-gate still **unsigned**. Everything else in this stamp stands.
 
 **Overall P2 remains unsigned.** Do not write overall P2 Pass, signed Pass, or merge-ready. Hans: `{}` is ambiguous until classic `/tests` leaves NULL or a freeze marker exists. Hold product merge. Not IC50.
+
+---
+
+## Next unsigned stamp — analysis-in-chain + process handoff (after `8cfa2a9`)
+
+**Not Pass.** Do **not** rewrite or transfer outcomes from `8cfa2a9`, `b005cfe`, `9c4f9da`, `3b56cfb`, or P1. AC-P2-5 Pass on `8cfa2a9` remains **analysis+TAT map / UI click-save** history. This block is the restamp script for the lock after that SHA.
+
+**Branch / build:** `feat/work-order-p2` after PR **#92** (`2f33008`) honesty fold. SHA = this commit (rebase of `2ef54d1`). **Not click-run. Not Pass.**
+
+**QA signature:** unsigned. Tobias restamps on this committed SHA. Do **not** write overall P2 Pass. Dest-type **mint** remains Hold — do not UAT blood→DNA daughter.
+
+**Leadership send (confirm before scoring):** [`.docs/discussions/2026-08-30-p2-route-lock.md`](../.docs/discussions/2026-08-30-p2-route-lock.md). OQ-WO-4 / OQ-TAT-1 provisional pending confirm. OQ-WO-5 **Open** until confirm.
+
+**Product under test (proposed; not a signed lock):**
+- Map row = TAT + ordered `process_definition[]`. **No** admin analysis picker and **no** admin sample-type picker.
+- Create-route UI **displays** each selected process’s allowed sample types, LIMS Run analyses, and emerging types.
+- Route assigns when (1) current sample type is on the **first process’s first** Experiment/LimsRun allow-list **and** (2) the asked-for analysis matches a **LimsRun somewhere in the route**.
+- Zero acceptable → **422**. Two saved rows that both accept this type **and** this analysis → **409**. Never silent `first()`.
+- Map save **409** only when overlapping TAT **and** overlapping first-step allow-lists **and** overlapping LimsRun analyses. Extract-first vs Qubit-first for the same TAT is legal. Two extract routes, same TAT and inbound types, **different** assays are legal.
+- Map save **422** when the type emerging from process *x* is not accepted by process *x+1*. Emerging = aliquot/pool `default_dest_sample_type` on the last Experiment/LimsRun of *x* if set; else last-step accepted types. Dest-type mint remains Hold.
+
+**Still open from `8cfa2a9` (do not fold closed):** Hans freeze skip (`{}` ambiguous). Extract LimsRun must **not** share asked-for `analysis_id`. Later-step type-gate at start (current tube) unsigned that SHA. Route two-accept **409** unsigned that SHA. Overall P2 unsigned.
+
+| Slice on this SHA | Tobias |
+|-------------------|--------|
+| Create-route display: types + LimsRun analyses + emerging (no analysis/type picker) | **unsigned** |
+| Route: analysis on a **later** LimsRun in the chain | **unsigned** |
+| Route: asked-for analysis **not** in the chain → **422** | **unsigned** |
+| Map save: same first-step types, different LimsRun analyses, same TAT → **201** | **unsigned** |
+| Map save: dest DNA → next process accepts DNA → **201** | **unsigned** |
+| Map save: dest DNA → next process plasma-only → **422** | **unsigned** |
+| Map save: extract plasma (no dest) → Qubit DNA-only → **422** | **unsigned** |
+| Dest-type mint / blood→DNA daughter | **out** (Hold) |
+| Overall P2 | **unsigned / not Pass** |
+
+### AC-P2-9 — analyses come from LimsRuns in the chain
+
+**Result:** **unsigned** — not click-run this SHA. Not Pass.
+
+1. Open `/admin/routing-map`. Confirm there is **no** analysis picker and **no** sample-type picker.
+2. Build TAT + ordered processes: extract first (no asked-for analysis on its LimsRun), then a later process whose LimsRun is the asked-for analysis (e.g. ELISA or qPCR).
+3. Save. Confirm **201** (not 422 for missing map analysis).
+4. Record asked-for for that later-process analysis + overlapping TAT on a sample whose current type is on extract’s **first** Experiment/LimsRun allow-list.
+5. Route.
+6. Repeat with an asked-for analysis that appears on **no** LimsRun in the saved chain. Confirm **422**, no work order.
+
+**Expect**
+- Map row has no analysis field. Analyses are derived from LimsRun steps in the ordered processes.
+- Route succeeds when current type is on first-process first-step **and** the asked-for analysis is a LimsRun somewhere in the chain.
+- Route **422** when the analysis is not in the chain, even if TAT and first-step type match.
+- Do **not** score `8cfa2a9` “map row = analysis + TAT” here. That SHA stays signed history.
+
+### AC-P2-10 — create-route displays types, analyses, emerging
+
+**Result:** **unsigned** — not click-run this SHA. Not Pass.
+
+1. Open `/admin/routing-map` create.
+2. Add two processes. For each selected process, record that the UI shows: ordered steps, allowed sample types, LimsRun analyses, and emerging types.
+3. Confirm the add-process list itself shows types and analyses (so the admin is not picking blind).
+4. Reorder processes. Confirm display refreshes (first-process types follow the new first process; emerging of *x* vs accept of *x+1* updates).
+5. Confirm Save stays disabled when first-process first-step types are empty, when the chain has no LimsRun analysis, or when a displayed handoff is incompatible.
+
+**Expect**
+- Display is derived, not admin-authored.
+- No type picker. No analysis picker.
+
+### AC-P2-11 — process *x* → *x+1* emerging-type handoff
+
+**Result:** **unsigned** — not click-run this SHA. Not Pass. Do **not** UAT dest-type mint.
+
+1. Author extract whose last Experiment/LimsRun has an aliquot/pool dest of DNA, then Qubit/qPCR whose first step accepts DNA. Save. Confirm **201**.
+2. Same extract dest DNA, next process first-step plasma-only. Save. Confirm **422**.
+3. Extract with **no** dest (emerging = last-step accepted types, e.g. plasma) then Qubit DNA-only. Save. Confirm **422**.
+4. Confirm execute still does **not** mint a DNA daughter (dest-type Hold). A 201 map save is catalog intent, not “the tube became DNA.”
+
+**Expect**
+- Handoff 422 is map-save, not Route chain-AND of inbound type.
+- Dest-type mint remains Hold. Do not claim blood→DNA→Qubit E2E.
+
+**Do not write overall P2 Pass on this block.** Hold product merge. Not IC50.
