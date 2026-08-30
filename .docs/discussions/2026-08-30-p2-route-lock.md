@@ -151,3 +151,29 @@ Deiter / Hans / Heidi / Günter. **Restamp honesty, not a merge vote.** Confirme
 | Extract sharing asked-for `analysis_id` | **OPEN** |
 | Route permission | stays `test:assign` |
 | Overall P2 | **unsigned / not Pass** |
+
+---
+
+## Round 2 — Marc product honesty (send back for review) — 2026-08-30
+
+Not a merge stamp. Do **not** rewrite Tobias `9342439` / `8cfa2a9` Results. Do **not** rewrite Hans/Heidi punches above. Overall P2 stays **not Pass**. Dest-type mint **Hold**.
+
+**What this round is:** fold how Route and WO-7 actually work, so “extract” is not treated as a special assay.
+
+### Product (please confirm)
+
+1. **Available routes = contain the analysis.** For one asked-for assay, every map whose chain has that analysis as a LimsRun is eligible (plus TAT + first-step type). A route **may have multiple analyses** (extract QC + Qubit + ELISA). Asked-for ELISA matches extract→Qubit→ELISA because ELISA is **in** the chain, not because the map is “an ELISA row.” One asked-for row still mints one work order.
+2. **Extract is not a special sample kind.** Blood → extracted DNA is a **derivative** (new sample, new type). DNA tube → plated aliquot is the **same sample** (equivalent). Plate → indexed library is a **derivative** again. Type gates on process steps catch blood-on-Qubit. Dest-type **mint** (actually creating the DNA row) remains Hold.
+3. **WO-7 punch is Test identity, not extract science.** `_mint_tests_at_start` keys `(cohort sample, run.analysis_id)`. Any **earlier** LimsRun in the chain that reuses the asked-for analysis mints/freezes the panel Test on the parent (usually blood). Extract is only the usual process 1. A correct extract is often experiment-only (dest DNA), or a LimsRun with its **own** analysis (not the panel). Same rule for library prep vs sequencing.
+4. **Parser is not on the process.** An analysis may have many parsers (instrument XOR CRO). Process LimsRun step stores `analysis_id` only. Parser is chosen at **import**.
+
+### Asks
+
+| # | Confirm? |
+|---|----------|
+| R2-1 | Asked-for assay → any route that **contains** that LimsRun analysis. Multi-analysis routes are the product. |
+| R2-2 | Type gates (not extract-as-assay) catch blood-in-Qubit. Dest mint stays Hold. |
+| R2-3 | OPEN punch stays: **earlier LimsRun must not share asked-for `analysis_id`**. Do not teach “extract is special.” |
+| R2-4 | Parser chosen at import, not at process authoring. |
+
+Freeze skip (`{}` vs NULL) stays OPEN. Route two-accept 409 still unsigned from `8cfa2a9`. Map save same-types / different-analyses / same TAT 201 unsigned on the `9342439` click. Overall P2 unsigned.

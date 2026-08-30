@@ -761,6 +761,17 @@ AC-P2-9 **Pass** (no analysis/type picker; extract Identity/Plasma then ELISA cl
 - Route stays `test:assign`.
 - No overall P2 Pass.
 
-**Still OPEN — not this restamp:** freeze skip (`{}` vs NULL). Classic `/tests` must leave `asked_for_params` NULL or we need a freeze marker. Extract LimsRun must **not** share asked-for `analysis_id` (analysis-in-chain does not close that; extract must not be ELISA).
+**Still OPEN — not this restamp:** freeze skip (`{}` vs NULL). Classic `/tests` must leave `asked_for_params` NULL or we need a freeze marker. **OQ-WO-6:** an earlier LimsRun must **not** share asked-for `analysis_id` (analysis-in-chain does not close that). Extract is **not** a special assay; type gates catch blood-on-Qubit.
 
 **Overall P2 remains unsigned.** Do not write overall P2 Pass, signed Pass, or merge-ready. Hold product merge. Not IC50.
+
+---
+
+## Addendum (docs honesty after `9342439` — do not re-score)
+
+Marc 2026-08-30. Does **not** rewrite Tobias Results above. Not Pass. Send: [`.docs/discussions/2026-08-30-p2-route-lock.md`](../.docs/discussions/2026-08-30-p2-route-lock.md) Round 2.
+
+- Available routes for an asked-for assay = **any** map whose chain **contains** that LimsRun analysis. A route **may have multiple analyses**.
+- Extract is not a special sample/assay. Blood→DNA is a **derivative** (dest mint Hold). Tube→plate aliquot is equivalent. Library is a new sample. Type gates on process steps catch blood-on-Qubit.
+- The OPEN `analysis_id` punch is **OQ-WO-6**: any **earlier** LimsRun that reuses the asked-for analysis mints/freezes the panel Test on the parent. Extract is only usually process 1.
+- Parser is chosen at **import**, not on the process.

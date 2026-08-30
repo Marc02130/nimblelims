@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-28  
 **Stem:** `post-receive-work-spine`  
-**Status:** Architecture / UI / Spec **Accept with conditions** on `feat/work-order-p2`. **Hold product merge.** Live SHA `9342439` — **Tobias-signed AC-P2-9..11 Pass**. Deiter / Hans / Heidi / Günter restamp notes (honesty, **not** a merge vote): later-step type-gate **Met** (qPCR-on-blood / still-Blood **422** `route_sample_type`; not dest-type E2E); AC-P2-11 / handoff Pass is **map-save only**; dest mint **Hold** (no execute rewrite of `sample_type`; tube still Blood; 0 DNA daughters); freeze skip **OPEN**; extract `analysis_id` **OPEN**; Route stays `test:assign`; **overall P2 unsigned**. Prior signed history `8cfa2a9`: First Start = `chain[0]` only Pass; empty Route 422 / map 409 / 201-not-AND Pass. No map analysis field; Route matches a LIMS Run in the chain; *x*→*x+1* emerging-type handoff — **Leadership Confirm** (Rolf/Deiter/Hans/Heidi/Günter) ([send](../../discussions/2026-08-30-p2-route-lock.md)). `b005cfe` signed history. Not IC50.
+**Status:** Architecture / UI / Spec **Accept with conditions** on `feat/work-order-p2`. **Hold product merge.** Live SHA `9342439` — **Tobias-signed AC-P2-9..11 Pass**. Restamp notes honesty, **not** a merge vote. Freeze skip **OPEN**. **OQ-WO-6 OPEN** (earlier LimsRun must not share asked-for `analysis_id`; extract is not a special assay). A route **may have multiple LimsRun analyses**; asked-for matches any chain that **contains** that analysis. Round 2 send: [2026-08-30-p2-route-lock](../../discussions/2026-08-30-p2-route-lock.md). `8cfa2a9` / `b005cfe` signed history. Not IC50.
 **Requirements:** [`.docs/review/requirements/post-receive-work-spine.md`](../requirements/post-receive-work-spine.md)  
 **Schema:** [`.docs/review/schema-changes/post-receive-work-spine.md`](../schema-changes/post-receive-work-spine.md)  
 **Spec:** [`.docs/internal/specs/post-receive-work-spine/SPEC.md`](../../internal/specs/post-receive-work-spine/SPEC.md)  
@@ -22,11 +22,11 @@ P1 is on `main`. P2 is on `feat/work-order-p2` (Accept with conditions). Do not 
 6. **Receive freeze:** non-empty `analysis_ids` still **422**.
 7. **P2 ordered route (AC-P2-9..11 Pass on `9342439`; prior signed on `8cfa2a9`):** Route snapshots the ordered list, **zero Tests**. First Start = process[0] / `chain[0]` only — **Tobias-signed Pass**. Later Start = next process, on the sample that exists then. Empty Route **422** Pass. Later-step type-gate **Met** on `9342439` (qPCR-on-blood / still-Blood **422**; not dest-type E2E).
 8. **WO-7 publish (Tobias-signed Pass @ `8cfa2a9` and history @ `b005cfe`):** `_require_wo7_tests` 422s before promote if any cohort sample lacks an active Test. Status stays unpublished (complete). Do **not** fold first-start freeze into this Pass.
-9. **Hans freeze (classic skip still OPEN / unsigned on `8cfa2a9`):** `if test: continue` is **not** a freeze. Classic `/tests` must leave `asked_for_params` **NULL**, or we need a **freeze marker**. Until then `{}` is **ambiguous**. Do **not** teach skip-on-frozen-`{}`. Extract must **not** share asked-for `analysis_id`.
+9. **Hans freeze (classic skip still OPEN / unsigned on `8cfa2a9`):** `if test: continue` is **not** a freeze. Classic `/tests` must leave `asked_for_params` **NULL**, or we need a **freeze marker**. Until then `{}` is **ambiguous**. Do **not** teach skip-on-frozen-`{}`. **OQ-WO-6:** earlier LimsRun must **not** share asked-for `analysis_id` (extract is not a special assay).
 10. **P2-4 visibility:** Route is `test:assign` and must **read** the mapped def/steps. Do **not** put `experiment:manage` on Route. **`0074` still open** on `8cfa2a9`. Mutate stays `config:edit`.
 11. **No sample-type picker (Tobias-signed Pass on `8cfa2a9` — UI click-save):** ELISA TAT 1–7 saved; Blood extract + later DNA qPCR chain saved (no AND 422); second ELISA overlap **409**. Empty Route **422** Pass. Two-accept **409** unsigned that SHA.
-12. **Extract `analysis_id` (still open):** Extract LimsRun must **not** share the asked-for `analysis_id`.
-13. **After `8cfa2a9` (Leadership Confirm — Rolf/Deiter/Hans/Heidi/Günter):** no map analysis picker. Route matches a LIMS Run in the chain. Map 409 = TAT ∩ first-step types ∩ LIMS Run analyses. Map 422 when process *x* emerging type is not accepted by *x+1* (**map-save only**; dest mint Hold). Dest-type mint Hold. Live SHA `9342439` — **Tobias-signed AC-P2-9..11 Pass**; Deiter / Hans / Heidi / Günter restamp notes (honesty, **not** a merge vote): later-step **Met**; freeze skip OPEN; extract `analysis_id` OPEN; Route stays `test:assign`; overall P2 unsigned. Do not keep `routing_map.analysis_id` as a required create field. Send: [2026-08-30-p2-route-lock](../../discussions/2026-08-30-p2-route-lock.md).
+12. **Earlier LimsRun `analysis_id` (OQ-WO-6 Open):** Extract is not a special assay. Type gates catch blood-on-Qubit. Any earlier LimsRun that reuses the asked-for analysis freezes the panel Test on the parent.
+13. **After `8cfa2a9` (Leadership Confirm):** no map analysis picker. A route **may have multiple analyses**. Asked-for → any chain that **contains** that LimsRun analysis. Map 409 = TAT ∩ first-step types ∩ analysis **sets**. Map 422 handoff is **map-save only**; dest mint Hold. Round 2 send: [2026-08-30-p2-route-lock](../../discussions/2026-08-30-p2-route-lock.md).
 
 ---
 
@@ -114,7 +114,7 @@ Pytest: create, 409 dup, **403 dual-belt** (create **and** `list()` / `GET /aske
 
 **OQ-WO-1 Decided:** Tech hits **Route**. No auto-route on asked-for save. `POST /api/v1/asked-for/{id}/route` (batch the same call for a selected set). Then:
 
-- Select TAT candidates; keep a row when current type is on the first process / first ordered Experiment-LimsRun list **and** the asked-for analysis matches a LIMS Run in that route
+- Select TAT candidates; keep a row when current type is on the first process / first ordered Experiment-LimsRun list **and** the asked-for analysis is **among** the LimsRun analyses in that route (a route may have several)
 - Zero acceptable rows → 422; two saved rows that both accept this type and this analysis → 409; exactly one snapshots its ordered `process_definition[]` and mints **zero Tests**
 - Never silently use `first()`
 - Denorm `sample_type_id` is display/sync only — Route uses the live first-step list
@@ -125,7 +125,7 @@ Pytest: create, 409 dup, **403 dual-belt** (create **and** `list()` / `GET /aske
 
 Start: `ELNProcessService.instantiate_from_definition` on **process[0] / `chain[0]` only**. Later Start = next pending process, on the sample that exists then. Instantiate stays `experiment:manage`. Route stays `test:assign`. Later process/step starts type-gate current type vs **that** step only. Dest-type Hold out.
 
-**L3 / A5 / SC5 / Hans:** `if test: continue` is **not** a freeze. At LimsRun start for the asked-for analysis, insert the Test if missing and **write** `asked_for.params` → `tests.asked_for_params`. Classic `/tests` must leave `asked_for_params` **NULL**, or we need a **freeze marker**. Until one of those exists, `{}` is **ambiguous** — first start cannot tell a classic default `{}` from a frozen `{}` (same JSON). Do **not** teach skip-on-frozen-`{}`. Extract must **not** share the asked-for `analysis_id`. P1 does **not** write that Test snapshot. Freeze skip stays unsigned. Do not claim freeze closed on `8cfa2a9`.
+**L3 / A5 / SC5 / Hans:** `if test: continue` is **not** a freeze. At LimsRun start for the asked-for analysis, insert the Test if missing and **write** `asked_for.params` → `tests.asked_for_params`. Classic `/tests` must leave `asked_for_params` **NULL**, or we need a **freeze marker**. Until one of those exists, `{}` is **ambiguous**. Do **not** teach skip-on-frozen-`{}`. **OQ-WO-6:** any earlier LimsRun must **not** reuse the asked-for `analysis_id` (extract is not special; type gates are a different axis). P1 does **not** write that Test snapshot. Freeze skip stays unsigned.
 
 WO-7 publish @ `8cfa2a9` is Tobias-signed Pass (carol **422** `test_missing`) and remains history @ `b005cfe`: `_require_wo7_tests` + `plan.errors` 422 the whole run. Status stays complete / unpublished. Zero Results. A write of `{}` onto `99b692d3` is not a freeze-skip Pass (`{}` is ambiguous). Freeze skip **unsigned**. Overall P2 Pass is unsigned.
 
@@ -165,7 +165,7 @@ No new import engine. **Do not build “admin authors parsers” as the product.
 | Empty accepted set at step start | **422 `route_sample_type`** |
 | Classic `/tests` default `{}` | Not a freeze — LimsRun start must still snapshot. Classic `/tests` must leave `asked_for_params` NULL |
 | Skip-on-frozen-`{}` treated as a freeze | Bounce — classic default `{}` and frozen `{}` are the same JSON. `{}` is ambiguous until classic NULL or a freeze marker |
-| Extract LimsRun shares asked-for `analysis_id` | Bounce |
+| Earlier LimsRun shares asked-for `analysis_id` (OQ-WO-6) | Bounce — extract is not a special assay |
 | Parser AI on import | Impossible (no call site) |
 | Receive non-empty `analysis_ids` | **422** (freeze) |
 
@@ -174,7 +174,7 @@ No new import engine. **Do not build “admin authors parsers” as the product.
 | PR | Scope |
 |----|--------|
 | 1 | P1 tables + API + `/asked-for` UI + pytest + UAT script. **Hold merge until UAT.** |
-| 2 | P2 routing + work_order + ordered `process_definition[]` + LimsRun WO-7. Architecture / UI / Spec Accept with conditions @ `8cfa2a9`. Live SHA `9342439` — **Tobias-signed AC-P2-9..11 Pass**; Leadership restamp notes (Deiter/Hans/Heidi/Günter, **not** a merge vote): later-step **Met**; AC-P2-11 map-save only; dest mint Hold. Overall P2 **unsigned**. **Hold product merge to main.** First Start = chain[0] only **Pass**. Still open: Hans freeze (`{}` ambiguous until NULL or freeze marker), extract `analysis_id`, P2-4 `0074`. |
+| 2 | P2 routing + work_order + ordered `process_definition[]` + LimsRun WO-7. Live SHA `9342439` — **Tobias-signed AC-P2-9..11 Pass**. Overall P2 **unsigned**. **Hold product merge to main.** Still open: Hans freeze (`{}` ambiguous), **OQ-WO-6** (earlier LimsRun `analysis_id`; extract is not special), P2-4 `0074`. |
 | 3 | P3 persist lock + results UAT fold (**closed**) |
 | 4 | P4 SOP Apply → process def (**closed**) |
 | 5 | P5 parser setup UX (**closed** this cycle) |
