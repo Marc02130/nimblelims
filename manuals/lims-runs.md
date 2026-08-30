@@ -10,7 +10,7 @@ Primary goals:
 - Enable structured data import with validation.
 - Serve as a foundation for analysis (currently dose-response is the most mature example; the intent is to support other analyses).
 
-**Receive / asked-for / Route:** `POST /samples/receive` still refuses non-empty `analysis_ids` (**422**). Recording **requested analysis** on `/asked-for` does **not** create a `work_order`, start a LimsRun, or mint a Test. A separate, unnumbered later Route action may mint a queued work order for planning; it requires `test:assign` plus project access, not `experiment:manage`, and the mint is not work started. The WO-7 lock puts the Test and assay-param freeze on the **first LimsRun start** — not at receive, asked-for save, Route, or work-order start. Later starts do not overwrite that snapshot; see [Promote-on-publish](#promote-on-publish-structured-tests--results).
+**Receive / asked-for / Route:** `POST /samples/receive` still refuses non-empty `analysis_ids` (**422**). Recording **requested analysis** on `/asked-for` does **not** create a `work_order`, start a LimsRun, or mint a Test. A separate, unnumbered later Route action may mint a queued work order for planning; it requires `test:assign` plus project access, not `experiment:manage`, and the mint is not work started. Route/Start do **not** instantiate the whole chain: Start is the first process only. The WO-7 lock puts the Test and assay-param freeze on the **first LimsRun start** — not at receive, asked-for save, Route, or work-order start. Freeze: new-Test write is **Tobias-signed Pass** on `8cfa2a9` (Test `99b692d3`); classic `/tests` skip **OPEN**; see [Promote-on-publish](#promote-on-publish-structured-tests--results).
 
 **Important distinction**: An LIMS Run is **not** the same as a Batch.
 - Batches are operational groupings for processing samples through tests and results entry.
@@ -66,8 +66,8 @@ Shipped v1 — see local `.docs/internal/ideas/run-results.md` (not committed).
 | **When** | Status → `published` (run always has **`analysis_id`**) |
 | **No analysis** | **Not allowed** — set analysis on create/edit; no non-reportable / continue-without path |
 | **Mapping** | JSONB column → analyte via **name** or **analyte alias** (casefold); known non-analyte keys (`units`, etc.) skipped |
-| **Tests** | Use the active Test created or attached at the first LimsRun start for `(sample_id, analysis_id)`. If any cohort sample lacks one, WO-7 returns **422**, refuses the whole run, writes no Results, invents no Test, and leaves the run `complete`. Publish-refuse is **Tobias-signed Pass** on `b005cfe`; overall P2 Pass remains unsigned. Historical `9c4f9da` stays signed not Pass |
-| **First-start freeze** | **In code.** `_mint_tests_at_start` skips `asked_for_params` on an existing Test, so a later start that finds the active Test keeps the first-start snapshot — including empty `{}`. Empty `{}` is a freeze, not a hole to refill. UAT restamp unsigned |
+| **Tests** | Use the active Test created or attached at the first LimsRun start for `(sample_id, analysis_id)`. If any cohort sample lacks one, WO-7 returns **422**, refuses the whole run, writes no Results, invents no Test, and leaves the run `complete`. Publish-refuse is **Tobias-signed Pass** on `8cfa2a9` and remains history on `b005cfe`; overall P2 Pass remains unsigned. Historical `9c4f9da` stays signed not Pass |
+| **First-start freeze** | **Not closed. Freeze skip unsigned.** First start **wrote** `{}` onto new Test `99b692d3` (not SQL NULL, not a skipped classic row). That `{}` is **ambiguous** — first start cannot tell a classic default `{}` from a frozen `{}` (same JSON). Do **not** teach skip-on-frozen-`{}` or later-start no-overwrite of `{}` as a verified freeze skip. Classic `/tests` must leave `asked_for_params` **NULL**, or we need a **freeze marker**. `if test: continue` is **not** a freeze. Extract LimsRun must not share the asked-for `analysis_id` |
 | **Results** | Write `raw_result`, `replicate` (from JSONB or row order), `lims_run_id` lineage |
 | **Conflicts** | Same run → update; other run / manual result owns triple → **409**, publish blocked |
 | **Preview** | `GET /v1/lims-runs/{id}/promotion/preview` — dry-run; UI shows counts on Publish confirm |
@@ -90,7 +90,7 @@ Instrument JSONB remains SoT for raw import; Results are the published structure
 - **Samples**: Linked via imported data rows. Less rich than `ExperimentSampleExecution` (no built-in role/replicate/conditions on the junction itself).
 - **Batches**: Different concept. See warning above. Do not model a Run as "the batch of samples tested".
 - **ELN Experiments**: Separate. Runs are the structured LIMS execution path. Future linking may be added.
-- **Analyses / Analytes**: Catalog assays. Aliases on analytes support multi-CRO column names. Every run **must** have an analysis; the lock is that first start creates or attaches the Test and freezes asked-for params, then publish promotes into that Test’s Results. Later starts do not overwrite the snapshot. UAT restamp unsigned.
+- **Analyses / Analytes**: Catalog assays. Aliases on analytes support multi-CRO column names. Every run **must** have an analysis. The WO-7 lock is that the first start of the **asked-for** analysis creates or attaches the Test and writes `asked_for_params`. Classic `/tests` must leave it **NULL**, or we need a freeze marker. Until then `{}` is **ambiguous** (classic default and frozen `{}` are the same JSON) — not a verified freeze skip. Do **not** teach skip-on-frozen-`{}`. Extract LimsRun must not share that `analysis_id`. A write of `{}` onto `99b692d3` is not a skip Pass. Freeze skip **unsigned**.
 - **Dose Response**: Specialized analysis on top of Runs (curve fitting, exclusions, review)—orthogonal to classic promote-to-results.
 
 ## In-House vs CRO
@@ -143,7 +143,7 @@ You can still enforce strict state-machine rules in the application service laye
 
 - Routes: `/runs`, `/runs/:id`, `/runs/:id/dose-response`
 - Main pages: RunsManagement, LimsRunDetail (Overview / Data / Dose Response tabs)
-  - Overview: **Analysis** and cohort required to start; first start locks the cohort, creates or attaches each Test, and freezes asked-for params. Later starts do not overwrite that snapshot. **Publish** opens promotion preview. If any cohort Test is missing, WO-7 refuses the whole publish with **422**, writes no Results, creates no Test, and leaves the run `complete`. Publish-refuse is **Tobias-signed Pass** on `b005cfe`; first-start freeze is in code; overall P2 Pass remains unsigned pending UAT restamp. `9c4f9da` / `b005cfe` remain signed history.
+  - Overview: **Analysis** and cohort required to start; first start locks the cohort, creates or attaches each Test, and writes asked-for params (new-Test write **Pass** on `99b692d3`; classic skip **OPEN**). **Publish** opens promotion preview. If any cohort Test is missing, WO-7 refuses the whole publish with **422**, writes no Results, creates no Test, and leaves the run `complete`. Publish-refuse is **Tobias-signed Pass** on `8cfa2a9` and remains history on `b005cfe`. Overall P2 Pass remains unsigned. `9c4f9da` / `b005cfe` remain signed history.
 - API under `/v1/lims-runs` (including `GET …/promotion/preview`, publish = `PATCH …/complete`)
 
 ## Next Steps / Open Questions

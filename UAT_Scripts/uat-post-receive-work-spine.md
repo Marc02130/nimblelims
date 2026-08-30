@@ -502,23 +502,38 @@ AC-P2-1 **Pass** · AC-P2-2 **Pass** · AC-P2-3 **Pass** · AC-P2-4 **publish-re
 
 The preceding `b005cfe` section is retained verbatim as signed history, including its original “Live” heading and Results. It is not the current stamp. Do not rewrite or transfer those observations to another SHA. AC-P2-5 Pass on `b005cfe` is **chain-AND history only**.
 
-## Live AC-P2 stamp — ordered route + first-start freeze (unsigned)
+## Live AC-P2 stamp — `8cfa2a9` (per-AC signed; overall P2 unsigned / not Pass)
 
-**Result:** **unsigned / not Pass.** Do **not** report P2 Pass. Hold merge.
+**Branch / build tested:** `feat/work-order-p2` at `8cfa2a9` (`8cfa2a9be646630f5d4edba0ac64e47069312bfa`)
 
-**Branch / build under test:** `feat/work-order-p2` — fill SHA at restamp. Code under this stamp: Route 422/409 (no silent `first()`), first-process first-step types, ordered later starts, WO-7 first-start freeze guard.
+**QA signature:** Tobias — signed per-AC results below. **Overall P2 Pass remains unsigned and is not claimed.** Do **not** write overall P2 Pass.
 
-**Executor / environment / date:** fill at restamp · local docker compose (`lims-*`) · compose **down** after the run. Not IC50.
+**Executor / environment / date:** Tobias · local docker compose (`lims-*`) · 2026-08-30 · compose **down** after run
+**Merge:** hold product merge of `feat/work-order-p2`. Not IC50.
 
-**History boundary:** Do not copy outcomes from `b005cfe`, `9c4f9da`, `3b56cfb`, or P1 into this live stamp.
+This block records Tobias’s `8cfa2a9` click. It does **not** rewrite or transfer outcomes from `b005cfe`, `9c4f9da`, `3b56cfb`, or P1. AC-P2-5 Pass on `b005cfe` stays **chain-AND history only** and is **not** carried here.
 
-**Copy and permission locks:** Receive ends on `/receive`. Asked-for is a separate later look-up. Route is an unnumbered later planner requiring `test:assign` plus project access; it does not require `experiment:manage`. Client and inaccessible-project Route writes return **403**, not 404. **Start process** and LimsRun start require `experiment:manage`; publish requires `experiment:publish`.
+**Copy and permission locks:** Receive ends on `/receive`. Asked-for is a separate later look-up. Route is an **unnumbered** later planner requiring `test:assign` plus project access; it does not require `experiment:manage`. Client and inaccessible-project Route writes return **403**, not 404. **Start process** and LimsRun start require `experiment:manage`; publish requires `experiment:publish`. **Start instantiates `chain[0]` only.** Dest-type Hold out.
 
-**Routing lock (live):** map create has analysis, TAT, and sortable ordered `process_definition[]`, **no sample-type picker**. Allowed types are derived from the first process’s first ordered Experiment/LimsRun. Map save **409**s only when the same analysis, overlapping TAT, **and** overlapping first-step allow-lists all hold. Extract-first vs Qubit-first for the same TAT is legal. Route: analysis + TAT candidates filtered by live first-step current-type acceptance. Zero acceptable → **422** (`route_sample_type` on type refusal); two saved rows that both accept current type → **409**; exactly one snapshots the ordered route. Never silent `first()`. Start instantiates the next pending process only. Each later process/step start gates current type; empty or incompatible → **422** `route_sample_type`. Dest-type Hold remains out.
+**Hans freeze punch (still open — live freeze skip unsigned, not Pass):** Classic `/tests` must leave `asked_for_params` **NULL**, or we need a **freeze marker**. Until one of those exists, `{}` is **ambiguous** — first start cannot tell a classic default `{}` from a frozen `{}` (same JSON). Do **not** teach skip-on-frozen-`{}` as if that distinguishes a classic `/tests` row. `{}` is **not** a verified freeze skip. `if test: continue` is **not** a freeze. Extract LimsRun must **not** share the asked-for `analysis_id`.
+
+| Slice on `8cfa2a9` | Tobias |
+|--------------------|--------|
+| Receive stay-on-form | **Pass** |
+| Asked-for save 0 work orders | **Pass** |
+| Empty Route **422** `No routing-map row accepts this analysis, TAT, and sample type` | **Pass** |
+| alice Route+Start **first process only** (ELISA first LimsRun, 1 step, no Qubit/qPCR Tests) | **Pass** |
+| Freeze **wrote** `asked_for_params` `{}` onto **new** Test `99b692d3` (not SQL NULL, not a skipped classic row) | Observed write. **Not** a verified freeze skip — `{}` is ambiguous. |
+| Classic `/tests` skip / skip-on-frozen-`{}` | **OPEN, unsigned, not Pass.** Do not fold later-start no-overwrite of `{}` as Pass. |
+| carol publish **422** `test_missing`; run stayed complete unpublished | **Pass** |
+| Routing-map UI **click-save** (not API-only): no sample-type picker; ELISA TAT 1–7 saved; Blood extract + later DNA qPCR chain saved (no AND 422); second ELISA overlap **409** | **Pass** (do not re-score) |
+| Later-step type-gate at start (current tube) | **unsigned** — not click-run this SHA. Not Pass. |
+| Route two-accept **409** | **unsigned** — not claimed this SHA |
+| Overall P2 | **unsigned / not Pass** |
 
 ### AC-P2-1 — Route remains a separate later planner
 
-**Result:** unsigned
+**Result:** **Pass** (receive stay-on-form, Tobias signed, 2026-08-30, `8cfa2a9`)
 
 1. As a lab user with `sample:create`, receive a sample on `/receive`.
 2. Confirm the successful receive stays on `/receive`, clears the barcode, and is ready for the next tube.
@@ -530,9 +545,11 @@ The preceding `b005cfe` section is retained verbatim as signed history, includin
 - Asked-for is not a numbered post-receive step or Start queue.
 - Only the explicit later Route action evaluates the routing map.
 
+**Verified holds:** receive stay-on-form **Pass**. Route stays an unnumbered later planner.
+
 ### AC-P2-2 — Asked-for save mints no work order or Test
 
-**Result:** unsigned
+**Result:** **Pass** (asked-for save 0 WO, Tobias signed, 2026-08-30, `8cfa2a9`)
 
 1. Record work-order and Test counts for the project.
 2. Save requested analysis + TAT on `/asked-for`.
@@ -542,9 +559,11 @@ The preceding `b005cfe` section is retained verbatim as signed history, includin
 - The row stays `requested`.
 - Work-order and Test counts remain zero.
 
+**Verified holds:** asked-for save left **0 work orders**.
+
 ### AC-P2-3 — queued work order feeds the existing execution engine
 
-**Result:** unsigned
+**Result:** **Pass** (alice Route+Start **first process only**, Tobias signed, 2026-08-30, `8cfa2a9`)
 
 1. Admin-create an extract-then-later-process definition/map (ordered chain). Do not invent seed IDs.
 2. Explicitly Route a requested row that the first process’s first Experiment/LimsRun accepts.
@@ -552,14 +571,17 @@ The preceding `b005cfe` section is retained verbatim as signed history, includin
 4. Start the work order, follow the linked process, and open its typed Experiment/LimsRun step.
 
 **Expect**
-- Route creates one queued `work_order`, snapshots the full ordered chain, changes asked-for to `routed`, and creates zero Tests.
+- Route creates one queued `work_order`, **snapshots the ordered list**, changes asked-for to `routed`, and creates **zero Tests**.
 - The queued record is planning only; **Start process** begins execution and requires `experiment:manage`.
-- Start instantiates **process 1 only**. Route/process views make order apparent (`1. … → 2. …`).
+- **First Start instantiates `chain[0]` only.** If first Start also mints later processes (Qubit/reporting) or their Tests, that is a punch — record it; do not teach as shipped.
+- **Later Start** = next pending process, on the sample that exists then. Dest-type Hold is out.
 - Process detail renders even when a step has a null template id; no `tid.slice` blank page.
+
+**Verified holds:** alice Route+Start instantiated **first process only** — ELISA first LimsRun, **1 step**, **no Qubit/qPCR Tests**. Route remains unnumbered. Do not teach whole-chain-at-Start.
 
 ### AC-P2-4 — WO-7 first-start freeze and whole-run refusal
 
-**Result:** unsigned
+**Result:** **Publish-refuse Pass** (carol **422** `test_missing`, run stayed complete unpublished). Freeze skip remains **unsigned / not Pass**. Tobias signed publish-refuse, 2026-08-30, `8cfa2a9`. Do **not** fold freeze skip or overall P2 as Pass. Do **not** claim freeze closed.
 
 1. For a routed row, save a valid asked-for param before starting its typed LimsRun.
 2. Select the routed cohort and call `PATCH /v1/lims-runs/{id}/start` for the first start.
@@ -570,22 +592,29 @@ The preceding `b005cfe` section is retained verbatim as signed history, includin
 7. Call publish with `PATCH /v1/lims-runs/{id}/complete`, then inspect run status, Tests, and every candidate Result.
 
 **Expect**
-- Receive, asked-for save, Route, and work-order start create no Test.
-- First LimsRun start creates or attaches one active Test per cohort sample and freezes the then-current params into `tests.asked_for_params`. Empty `{}` is a freeze, not a hole to refill.
-- A later start neither replaces the Test nor rewrites the first-start snapshot, including never overwriting a snapshot with `{}`.
+- Receive, asked-for save, Route, and work-order start create no Test. Route snapshots the ordered list, **zero Tests**.
+- First LimsRun start of the **asked-for** analysis **writes** `asked_for_params` onto a **new** Test.
+- Classic `/tests` must leave `asked_for_params` **NULL**, or we need a **freeze marker**. Until one of those exists, `{}` is **ambiguous** — first start cannot tell a classic default `{}` from a frozen `{}` (same JSON). Do **not** teach skip-on-frozen-`{}`. `{}` is **not** a verified freeze skip.
+- `if test: continue` is **not** a freeze. Extract LimsRun must **not** share the asked-for `analysis_id`.
 - With any cohort Test missing, publish returns **422**, not **200 published**.
 - The whole run is refused: it stays `complete`, no Test is invented, and no Results are written, including for cohort samples whose Tests still exist.
 
+**Verified holds (new-Test write, not a freeze-skip Pass):** first start **wrote** `asked_for_params` `{}` onto **new** Test `99b692d3` (not SQL NULL, not a skipped classic row). That `{}` is still **ambiguous**. Do **not** score later-start no-overwrite of `{}` as a verified freeze skip.
+
+**Not scored / still open (Hans):** freeze skip stays **unsigned**. Classic `/tests` must leave `asked_for_params` **NULL**, or a freeze marker must land. Until then skip-on-`{}` / skip-on-frozen-`{}` is not a freeze.
+
+**Verified holds (publish-refuse):** carol publish returned **422** `test_missing`. Run stayed **complete** unpublished.
+
 ### AC-P2-5 — ordered route; first-process first-step types
 
-**Result:** unsigned. Do **not** score chain-AND map-save 422. That Pass lives only on `b005cfe` history.
+**Result:** **Pass** for routing-map UI **click-save** (not API-only) / ELISA TAT 1–7 saved / Blood extract + later DNA qPCR chain saved (no AND 422) / second ELISA overlap **409** / empty Route **422**. **Later-step type-gate at start (current tube) unsigned** — not click-run this SHA; not Pass. Route two-accept **409** unsigned this SHA. Do **not** score or carry `b005cfe` chain-AND map-save 422. Tobias signed, 2026-08-30, `8cfa2a9`. **Do not re-score.**
 
 1. Confirm map create has analysis, TAT, and sortable ordered `process_definition[]`, with no sample-type picker.
 2. Confirm the form displays the first process and its first ordered Experiment/LimsRun allow-list. Change process order or first-step acceptance and verify derived display refreshes.
 3. Save an extract-first route with a later Qubit process/step; confirm map save does not chain-AND later processes or steps.
 4. Save extract-first and Qubit-first rows for the **same analysis and overlapping TAT**. Confirm map save succeeds because first-step allow-lists do not overlap.
 5. Save a second extract-first row whose first-step allow-list overlaps the first extract-first row and whose TAT overlaps. Confirm **409**.
-6. Route with zero acceptable rows (no analysis + TAT candidate, or no candidate whose first process/step accepts current type). Confirm **422** and no work order. Type refusal uses `route_sample_type`.
+6. Route with zero acceptable rows (no analysis + TAT candidate, or no candidate whose first process/step accepts current type). Confirm **422** and no work order.
 7. Using a fixture with two saved rows that both accept current type (e.g. change a Qubit-first first-step list so it also accepts the extract-first type), Route again. Confirm **409**; no silent `first()`.
 8. Route with exactly one acceptable row and inspect the work-order snapshot order.
 9. Choose Start; inspect created process instances. Complete or leave the first process, then invoke the later start. Confirm the second process instance and `work_order_route_position`.
@@ -593,17 +622,28 @@ The preceding `b005cfe` section is retained verbatim as signed history, includin
 
 **Expect**
 - Map row = analysis + TAT + ordered `process_definition[]`. UI preserves order. Allowed types are derived from the first process / first step, not admin-authored.
-- Map save **409**s only when the same analysis, overlapping TAT, **and** overlapping first-step allow-lists all hold. Extract-first vs Qubit-first for the same TAT is legal.
-- Zero acceptable rows returns **422** and mints no work order. A first-step type refusal uses `route_sample_type`.
-- Two saved rows that both accept this sample’s current type return **409**; no silent `first()`.
-- Exactly one row snapshots the full ordered route.
-- Start instantiates the first process only. Later processes require later starts in route order; Route does not mint a process-of-processes.
+- Map save **409**s only when the same analysis, overlapping TAT, **and** overlapping first-step allow-lists all hold. Extract-first vs Qubit-first for the same TAT is legal. Blood extract + later DNA qPCR chain map-save is **click-save 201**, not AND.
+- Zero acceptable rows returns **422** and mints no work order.
+- Two saved rows that both accept this sample’s current type return **409**; no silent `first()`. **Unsigned this SHA** unless clicked.
+- Exactly one row **snapshots the ordered list** and mints **zero Tests**.
+- **First Start instantiates `chain[0]` only.** Scored on AC-P2-3 (ELISA first LimsRun, 1 step, no Qubit/qPCR Tests).
+- **Later Start** = next pending process, on the sample that exists then. Route does not mint a process-of-processes.
 - Map save/Route do not AND later-process or later-step allow-lists.
-- Each later process/step start checks current type; empty or incompatible fails with **422** then.
+- Each later process/step start checks current type; empty or incompatible fails with **422** then. **This later-step type-gate was not click-run this SHA — leave unsigned, not Pass.**
 - Dest-type Hold remains out; do not claim an earlier step changed type unless the product did so.
+
+**Verified holds (click-save in the UI, not API-only — do not re-score):** `/admin/routing-map` has **no sample-type picker**. ELISA TAT **1–7** saved. Blood extract + later DNA qPCR chain saved (**no AND 422**). Second ELISA overlap **409**. Copy reads “First process is sample-type dependent. Later processes are not.” Empty Route **422** “No routing-map row accepts this analysis, TAT, and sample type”.
+
+**Unsigned this SHA:** later-step type-gate at start (current tube). Route two-accept **409**.
 
 ---
 
-## Live ordered-route restamp — unsigned
+## Live `8cfa2a9` per-AC sign-off
 
-**Do not sign overall P2 Pass on this block until QA restamps it.** Fill SHA, executor, and per-AC Results at restamp. Hold product merge. Not IC50.
+**Signed by Tobias, 2026-08-30; local docker compose, compose down.**
+
+AC-P2-1 **Pass** (receive stay-on-form) · AC-P2-2 **Pass** (asked-for save 0 WO) · AC-P2-3 **Pass** (alice Route+Start first process only) · AC-P2-4 **publish-refuse Pass**; freeze skip **unsigned / not Pass** (`{}` on `99b692d3` is ambiguous) · AC-P2-5 **Pass** for routing-map **UI click-save** (ELISA TAT 1–7 saved; Blood extract + later DNA qPCR chain saved, no AND 422; second ELISA overlap 409) / empty Route 422; later-step type-gate **unsigned**. Do not re-score.
+
+**Addendum (same stamp, do not re-score):** Routing-map Pass on `8cfa2a9` was **click-save in the UI**, not API-only: no sample-type picker; ELISA TAT 1–7 saved; Blood extract + later DNA qPCR chain saved (no AND 422); second ELISA overlap **409**. Later-step type-gate still **unsigned**. Everything else in this stamp stands.
+
+**Overall P2 remains unsigned.** Do not write overall P2 Pass, signed Pass, or merge-ready. Hans: `{}` is ambiguous until classic `/tests` leaves NULL or a freeze marker exists. Hold product merge. Not IC50.
