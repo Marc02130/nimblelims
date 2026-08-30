@@ -26,7 +26,7 @@
 | 1.4 | Set the line to **Same as parent.** and save. | The explicit line clear overrides entry DNA and resolves to the parent type. |
 | 1.5 | Select **DNA** as a line override and save. | Plan line stores `dest_sample_type` as the DNA list-entry UUID. |
 | 1.6 | Reload the entry. | Method, default, and line override remain selected. Method is locked because lines exist; the UI directs the operator to cancel the experiment to change it. |
-| 1.7 | Execute without changing the plan. | There is no execute-time type prompt. The child has sample type DNA, a new container, and the parent link. **That dest container-with-sample joins the process.** The inbound source assignment is **removed** from the process. Dest appears on **Aliquots / pools**. Matrix remains inherited. |
+| 1.7 | Execute without changing the plan. | There is no execute-time type prompt. Dest **container-with-sample** joins the process; inbound source assignment is **removed**. Dest appears on **Aliquots / pools**. Matrix remains inherited. This is **not** dest-type Hold closed. This is **not** P2 extract minting a DNA daughter. Start extract still leaves the tube Blood. Do **not** say the dest is DNA, a DNA daughter, or that blood became DNA. |
 
 ## 2. Catalog filtering
 
@@ -79,4 +79,5 @@ Verify the plan and execute flows contain none of the following:
 - Execute-minted dest **container-with-sample** continues the process; inbound source assignment is removed.
 - Assign to process without a container (or with an ambiguous multi-vessel sample and no container pick) → **422**.
 - A sample may have many containers; only one container-with-sample is on the process.
+- Do **not** score 1.7 as a DNA daughter or as dest-type Hold closed. Catalog fixture `Blood × aliquot → DNA` is catalog language, not “execute produced a DNA daughter as the P2 extract story.”
 - Normalization consumes a prior concentration result, never free-typed source concentration.

@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-28  
 **Stem:** `post-receive-work-spine`  
-**Status:** Architecture / UI / Spec **Accept with conditions** on `02fe95f` (tip `4671ba8` is extra internal docs). **Hold merge until QA clicks C1/C2.** Assignment is a Contents pair (`container_id` NOT NULL). Later Start follows `_continuing_assignments` (non-`removed` dest), not inbound parent. **Punch dest mint:** `_execute_transfer` still inserts a new Sample with `dest_sample_type` (can be DNA) + `_join_minted_destination`. Hold: no new DNA row, no type rewrite. P2 follow is a same-sample dest **container**. OQ-WO-6 and freeze skip stay OPEN. Route stays `test:assign`. Live SHA `9342439` remains Tobias-signed AC-P2-9..11 Pass (not a merge vote). Not IC50.
+**Status:** Architecture / UI / Spec **Accept with conditions** on `feat/work-order-p2`. **Hold product merge.** **Hold merge until QA clicks C1/C2.** Signed AC-P2-9..11 history: `9342439`. Product SHA for `0077` assignment slices: `4671ba8`. AC-P2-C1/C2 **unsigned**. Assignment is a Contents pair. Later Start follows `_continuing_assignments` (non-`removed` dest), not inbound parent. Dest mint **Hold**: Start extract does not mint a DNA daughter; P2 follow is a same-sample dest **container**. Freeze skip **OPEN**. **OQ-WO-6 stays OPEN**. Route stays `test:assign`. Round 2 **Leadership Confirm** (Rolf/Deiter/Hans/Heidi/Günter; R2-1…R2-4). Send: [2026-08-30-p2-route-lock](../../discussions/2026-08-30-p2-route-lock.md). `8cfa2a9` / `b005cfe` signed history. Not IC50.
 **Requirements:** [`.docs/review/requirements/post-receive-work-spine.md`](../requirements/post-receive-work-spine.md)  
 **Schema:** [`.docs/review/schema-changes/post-receive-work-spine.md`](../schema-changes/post-receive-work-spine.md)  
 **Spec:** [`.docs/internal/specs/post-receive-work-spine/SPEC.md`](../../internal/specs/post-receive-work-spine/SPEC.md)  
@@ -20,7 +20,7 @@ P1 is on `main`. P2 is on `feat/work-order-p2` (Accept with conditions). Do not 
 4. **Mathilda U1 / U2:** asked-for ≠ Test assign. Label params as order capture, not Test snapshot.
 5. Architecture / UI / Spec **Accept with conditions** on P2 @ `8cfa2a9`. Hold merge until UAT. Not IC50.
 6. **Receive freeze:** non-empty `analysis_ids` still **422**.
-7. **P2 ordered route (AC-P2-9..11 Pass on `9342439`; prior signed on `8cfa2a9`):** Route snapshots the ordered list, **zero Tests**. First Start = process[0] / `chain[0]` only — **Tobias-signed Pass**. Later Start = next process, on dest vessels that exist then. Empty Route **422** Pass. Later-step type-gate **Met** on `9342439` (qPCR-on-blood / still-Blood **422**; not dest-type E2E).
+7. **P2 ordered route (AC-P2-9..11 Pass on `9342439`; prior signed on `8cfa2a9`):** Route snapshots the ordered list, **zero Tests**. First Start = process[0] / `chain[0]` only — **Tobias-signed Pass**. Later Start = next process on dest container-with-sample after execute (source removed). Empty Route **422** Pass. Later-step type-gate **Met** on `9342439` (qPCR-on-blood / still-Blood **422**; not dest-type E2E). Dest mint Hold. `0077` @ `4671ba8`; AC-P2-C1/C2 **unsigned**.
 8. **WO-7 publish (Tobias-signed Pass @ `8cfa2a9` and history @ `b005cfe`):** `_require_wo7_tests` 422s before promote if any cohort sample lacks an active Test. Status stays unpublished (complete). Do **not** fold first-start freeze into this Pass.
 9. **Hans freeze (classic skip still OPEN / unsigned on `8cfa2a9`):** `if test: continue` is **not** a freeze. Classic `/tests` must leave `asked_for_params` **NULL**, or we need a **freeze marker**. Until then `{}` is **ambiguous**. Do **not** teach skip-on-frozen-`{}`. **OQ-WO-6:** earlier LimsRun must **not** share asked-for `analysis_id` (extract is not a special assay).
 10. **P2-4 visibility:** Route is `test:assign` and must **read** the mapped def/steps. Do **not** put `experiment:manage` on Route. **`0074` still open** on `8cfa2a9`. Mutate stays `config:edit`.
@@ -49,7 +49,7 @@ UI /asked-for ──▶ asked_for (P1)
                  ▼ First Start = process[0] only
          existing /v1/eln-processes
                  │
-                 ▼ Later Start = next process, on dest vessels that exist then
+                 ▼ Later Start = next process, dest container-with-sample (source removed)
                     (_continuing_assignments; not inbound parent)
          LimsRun start → Test (WO-7) for that process only
                  │
@@ -164,8 +164,8 @@ No new import engine. **Do not build “admin authors parsers” as the product.
 | First Start mints later processes or their Tests | Bounce — punch (3). Snapshot is the list only |
 | Assign omit container / 0 vessels / 2+ without a pick | **422** `process_container_required`, lab-readable |
 | Later Start follows inbound parent when dests exist | Bounce — follow `_continuing_assignments` |
-| Dest mint (new DNA Sample / dest-type rewrite at execute) | Bounce — P2 follow is same-sample dest **container** |
-| Later Start | Next pending process, on dest vessels that exist then |
+| Dest mint (new DNA Sample / dest-type rewrite as P2 extract story) | Bounce — dest mint **Hold**; P2 follow is same-sample dest **container**; Start extract leaves tube Blood |
+| Later Start | Next pending process on dest container-with-sample after execute; not parent vessel |
 | Later step start with current type outside that step’s accepted types | **422 `route_sample_type`**; sample is not broken. **Unsigned on `8cfa2a9`** — not click-run |
 | Publish without Test | **422** the whole run (`_require_wo7_tests` / `plan.errors`). Stay unpublished. Zero Results. Publish-refuse **Pass** on `8cfa2a9` and history on `b005cfe`. Freeze skip unsigned: `{}` on `99b692d3` is ambiguous, not a skip Pass. |
 | Invisible process def (`0074` `has_experiment_access`) | Catalog-visible **read**. Route stays `test:assign`. Not `experiment:manage` on Route. |
@@ -181,7 +181,7 @@ No new import engine. **Do not build “admin authors parsers” as the product.
 | PR | Scope |
 |----|--------|
 | 1 | P1 tables + API + `/asked-for` UI + pytest + UAT script. **Hold merge until UAT.** |
-| 2 | P2 routing + work_order + ordered `process_definition[]` + LimsRun WO-7 + 0077 assignment. Live code `02fe95f`. **Hold merge until QA clicks C1/C2.** Punch dest mint open. Still open: Hans freeze, **OQ-WO-6**, P2-4 `0074`. `9342439` AC-P2-9..11 Pass stays signed history. |
+| 2 | P2 routing + work_order + ordered `process_definition[]` + LimsRun WO-7 + 0077 assignment. Signed AC-P2-9..11 `9342439`. `0077` assignment slices `4671ba8`; AC-P2-C1/C2 **unsigned**. Overall P2 **unsigned**. **Hold product merge to main.** Still open: Hans freeze (`{}` ambiguous), **OQ-WO-6**, dest mint Hold, P2-4 `0074`. |
 | 3 | P3 persist lock + results UAT fold (**closed**) |
 | 4 | P4 SOP Apply → process def (**closed**) |
 | 5 | P5 parser setup UX (**closed** this cycle) |
