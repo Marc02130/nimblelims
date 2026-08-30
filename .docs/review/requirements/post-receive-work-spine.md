@@ -1,7 +1,7 @@
 # Requirements: Post-receive work spine
 
 **Date:** 2026-08-28  
-**Status:** Spec **Accept with conditions** on P2 (`feat/work-order-p2`). **P1 shipped** on `main` (PR 81; UAT Pass). **Hold product merge to main.** Latest **signed** AC-P2 is `8cfa2a9` (overall unsigned): First Start = `chain[0]` only Pass; empty Route 422 / map 409 / 201-not-AND Pass; freeze skip **unsigned** (`{}` ambiguous until classic `/tests` leaves NULL or a freeze marker). Code after that SHA: no map analysis field; Route matches a LIMS Run in the chain; process *x*→*x+1* emerging-type handoff — pending Leadership confirm ([send](../../discussions/2026-08-30-p2-route-lock.md)). `b005cfe` remains signed history. Not IC50.
+**Status:** Spec **Accept with conditions** on P2 (`feat/work-order-p2`). **P1 shipped** on `main` (PR 81; UAT Pass). **Hold product merge to main.** Latest **signed** AC-P2 is `8cfa2a9` (overall unsigned): First Start = `chain[0]` only Pass; empty Route 422 / map 409 / 201-not-AND Pass; freeze skip **unsigned** (`{}` ambiguous until classic `/tests` leaves NULL or a freeze marker). Live SHA `9342439` — AC-P2 **unsigned** until Tobias. No map analysis field; Route matches a LIMS Run in the chain; process *x*→*x+1* emerging-type handoff — **Leadership Confirm** (Rolf/Deiter/Hans/Heidi/Günter) ([send](../../discussions/2026-08-30-p2-route-lock.md)). Dest-type mint Hold. `b005cfe` remains signed history. Not IC50.
 **Stem:** `post-receive-work-spine`  
 **Leadership sequencing (2026-08-28):** order (asked-for) → work_order → results → SOP+AI → process → instrument import config  
 **Do not implement P2+ until those phase reviews Accept / Accept-with-conditions and open questions that block the named phase are Decided.**
@@ -33,7 +33,7 @@
 11. **P2-4 / Heidi belt:** Route is `test:assign` and must **read** the mapped def/steps. Do not put `experiment:manage` on Route. **`0074`:** `is_admin() OR has_experiment_access()` is not catalog-visible. Mutate stays `config:edit`. Instantiate stays. **Still open** on `8cfa2a9`.
 12. **No sample-type picker (Tobias-signed Pass on `8cfa2a9` — UI click-save):** ELISA TAT 1–7 saved; Blood extract + later DNA qPCR chain saved (no AND 422); second ELISA overlap **409**. Empty Route **422** Pass. Two-accept **409** unsigned that SHA.
 13. **Extract `analysis_id` (still open):** Extract LimsRun must **not** share the asked-for `analysis_id` or it attaches/freezes the panel Test at extract start.
-14. **Proposed after `8cfa2a9` (pending Leadership confirm):** no map analysis picker. Route matches a LIMS Run **in the chain**. Map 409 = TAT ∩ first-step types ∩ LIMS Run analyses. Map 422 when process *x* emerging type is not accepted by *x+1*. Send: [2026-08-30-p2-route-lock](../../discussions/2026-08-30-p2-route-lock.md).
+14. **After `8cfa2a9` (Leadership Confirm — Rolf/Deiter/Hans/Heidi/Günter):** no map analysis picker. Route matches a LIMS Run **in the chain**. Map 409 = TAT ∩ first-step types ∩ LIMS Run analyses. Map 422 when process *x* emerging type is not accepted by *x+1*. Dest-type mint Hold. Live SHA `9342439` unsigned until Tobias. Do not keep `routing_map.analysis_id` as a required create field. Send: [2026-08-30-p2-route-lock](../../discussions/2026-08-30-p2-route-lock.md).
 
 ---
 
