@@ -20,10 +20,7 @@ from app.schemas.work_order import (
     WorkOrderListResponse,
     WorkOrderRead,
 )
-from app.services.routing_service import (
-    RoutingService,
-    map_to_read,
-)
+from app.services.routing_service import RoutingService
 from models.user import User
 
 routing_map_router = APIRouter(prefix="/routing-map", tags=["routing-map"])
@@ -42,12 +39,13 @@ def list_routing_map(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    rows = _svc(db, user).list_maps(
+    svc = _svc(db, user)
+    rows = svc.list_maps(
         analysis_id=analysis_id,
         sample_type_id=sample_type_id,
         active_only=active_only,
     )
-    return [RoutingMapRead(**map_to_read(r)) for r in rows]
+    return [RoutingMapRead(**payload) for payload in svc.read_maps(rows)]
 
 
 @routing_map_router.post(
@@ -60,14 +58,15 @@ def create_routing_map(
     user: User = Depends(require_config_edit),
     db: Session = Depends(get_db),
 ):
-    rows = _svc(db, user).create_map(
-        analysis_id=body.analysis_id,
+    svc = _svc(db, user)
+    rows = svc.create_map(
         tat_min=body.tat_min,
         tat_max=body.tat_max,
         process_definition_ids=body.process_definition_ids,
         active=body.active,
+        analysis_id=body.analysis_id,
     )
-    return [RoutingMapRead(**map_to_read(r)) for r in rows]
+    return [RoutingMapRead(**payload) for payload in svc.read_maps(rows)]
 
 
 @routing_map_router.patch("/{map_id}", response_model=RoutingMapRead)
@@ -77,14 +76,15 @@ def update_routing_map(
     user: User = Depends(require_config_edit),
     db: Session = Depends(get_db),
 ):
-    row = _svc(db, user).update_map(
+    svc = _svc(db, user)
+    row = svc.update_map(
         map_id,
         tat_min=body.tat_min,
         tat_max=body.tat_max,
         process_definition_ids=body.process_definition_ids,
         active=body.active,
     )
-    return RoutingMapRead(**map_to_read(row))
+    return RoutingMapRead(**svc.read_map(row))
 
 
 @routing_map_router.delete("/{map_id}", status_code=status.HTTP_204_NO_CONTENT)

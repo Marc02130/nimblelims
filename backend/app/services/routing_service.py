@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.services.asked_for_service import AskedForService, deny_client_write
 from models.entry import ELNProcessDefinition, ELNProcessDefinitionStep
+from models.experiment import ExperimentTemplate
 from models.sample import Sample
 from models.user import User
 from models.work_order import RoutingMap, StepAcceptedSampleType, WorkOrder
@@ -116,32 +117,41 @@ class RoutingService:
         active_only: bool = True,
     ) -> List[RoutingMap]:
         q = self.db.query(RoutingMap)
-        if analysis_id is not None:
-            q = q.filter(RoutingMap.analysis_id == analysis_id)
         if sample_type_id is not None:
             q = q.filter(RoutingMap.sample_type_id == sample_type_id)
         if active_only:
             q = q.filter(RoutingMap.active == True)  # noqa: E712
-        return q.order_by(RoutingMap.created_at.desc()).all()
+        rows = q.order_by(RoutingMap.created_at.desc()).all()
+        if analysis_id is None:
+            return rows
+        return [
+            row
+            for row in rows
+            if analysis_id in self._chain_lims_analysis_ids(
+                list(row.process_definition_ids or [])
+            )
+        ]
 
     def create_map(
         self,
-        analysis_id: UUID,
         tat_min: int,
         tat_max: int,
         process_definition_ids: Sequence[UUID],
         active: bool = True,
+        analysis_id: Optional[UUID] = None,
     ) -> List[RoutingMap]:
-        """Sample types come from the first process's first experiment/LIMS Run."""
+        """A route is an ordered process list. analysis_id is ignored."""
         chain = list(process_definition_ids)
         self._require_definitions(chain)
         types = self._require_first_step_types(chain)
-        for sid in types:
-            self._refuse_overlap(analysis_id, sid, tat_min, tat_max)
+        analyses = self._require_chain_analyses(chain)
+        self._assert_chain_handoffs(chain)
+        self._refuse_map_overlap(chain, types, analyses, tat_min, tat_max)
+        hint = analyses[0]
         created: List[RoutingMap] = []
         for sid in types:
             row = RoutingMap(
-                analysis_id=analysis_id,
+                analysis_id=hint,
                 sample_type_id=sid,
                 tat_range=_range(tat_min, tat_max),
                 process_definition_ids=chain,
@@ -158,7 +168,10 @@ class RoutingService:
             logger.info("Routing map overlap: %s", e)
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail="Overlapping TAT range for this analysis and sample type",
+                detail=(
+                    "Overlapping TAT, first-step sample types, and LIMS Run "
+                    "analyses"
+                ),
             ) from e
         for row in created:
             self.db.refresh(row)
@@ -191,11 +204,22 @@ class RoutingService:
         )
         if process_definition_ids is not None:
             self._require_definitions(chain)
-        self._refuse_overlap(
-            row.analysis_id, row.sample_type_id, lo, hi, exclude_id=row.id
+        types = self._require_first_step_types(chain)
+        analyses = self._require_chain_analyses(chain)
+        self._assert_chain_handoffs(chain)
+        exclude_ids = {
+            m.id
+            for m in self.db.query(RoutingMap).all()
+            if tuple(m.process_definition_ids or [])
+            == tuple(row.process_definition_ids or [])
+            and _range_bounds(m.tat_range) == _range_bounds(row.tat_range)
+        }
+        self._refuse_map_overlap(
+            chain, types, analyses, lo, hi, exclude_ids=exclude_ids
         )
         row.tat_range = _range(lo, hi)
         row.process_definition_ids = chain
+        row.analysis_id = analyses[0]
         if active is not None:
             row.active = active
         row.modified_by = self.user.id
@@ -208,7 +232,10 @@ class RoutingService:
             self.db.rollback()
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail="Overlapping TAT range for this analysis and sample type",
+                detail=(
+                    "Overlapping TAT, first-step sample types, and LIMS Run "
+                    "analyses"
+                ),
             ) from e
         refreshed = self.db.query(RoutingMap).filter(RoutingMap.id == map_id).first()
         return refreshed or row
@@ -271,7 +298,10 @@ class RoutingService:
             self.db.rollback()
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail="Overlapping TAT range for this analysis and sample type",
+                detail=(
+                    "Overlapping TAT, first-step sample types, and LIMS Run "
+                    "analyses"
+                ),
             ) from e
         return list(seen)
 
@@ -294,6 +324,93 @@ class RoutingService:
     def _is_first_typed_step(self, step: ELNProcessDefinitionStep) -> bool:
         first = self._first_typed_step(step.process_definition_id)
         return first is not None and first.id == step.id
+
+    def _typed_steps(
+        self, process_definition_id: UUID
+    ) -> List[ELNProcessDefinitionStep]:
+        steps = (
+            self.db.query(ELNProcessDefinitionStep)
+            .filter(
+                ELNProcessDefinitionStep.process_definition_id
+                == process_definition_id
+            )
+            .order_by(ELNProcessDefinitionStep.sort_order.asc())
+            .all()
+        )
+        typed = [
+            s
+            for s in steps
+            if (s.step_kind or "") in ("eln_experiment", "lims_run")
+        ]
+        return typed or list(steps)
+
+    def _dest_types_from_step(
+        self, step: ELNProcessDefinitionStep
+    ) -> List[UUID]:
+        tid = getattr(step, "experiment_template_id", None)
+        if not tid:
+            return []
+        tpl = (
+            self.db.query(ExperimentTemplate)
+            .filter(ExperimentTemplate.id == tid)
+            .first()
+        )
+        if not tpl:
+            return []
+        entries = (tpl.template_definition or {}).get("entries") or []
+        dests: List[UUID] = []
+        seen = set()
+        for entry in entries:
+            cfg = entry.get("config") or {}
+            raw = cfg.get("default_dest_sample_type")
+            if not raw:
+                continue
+            try:
+                dest = raw if isinstance(raw, UUID) else UUID(str(raw))
+            except (ValueError, TypeError, AttributeError):
+                continue
+            if dest not in seen:
+                seen.add(dest)
+                dests.append(dest)
+        return dests
+
+    def emerging_types_for_process(
+        self, process_definition_id: UUID
+    ) -> List[UUID]:
+        """Type(s) that leave this process: aliquot/pool dest on the last
+        experiment/LIMS Run, else that last step's accepted types."""
+        steps = self._typed_steps(process_definition_id)
+        if not steps:
+            return []
+        last = steps[-1]
+        dest = self._dest_types_from_step(last)
+        if dest:
+            return dest
+        return self.list_step_accepted_types(last.id)
+
+    def _assert_chain_handoffs(self, chain: Sequence[UUID]) -> None:
+        for idx in range(len(chain) - 1):
+            emerging = self.emerging_types_for_process(chain[idx])
+            next_step = self._first_typed_step(chain[idx + 1])
+            next_types = (
+                self.list_step_accepted_types(next_step.id) if next_step else []
+            )
+            if not emerging:
+                raise _type_error(
+                    f"Process {idx + 1} last experiment/LIMS Run has no "
+                    "emerging sample type (set aliquot/pool dest or accepted types)"
+                )
+            if not next_types:
+                raise _type_error(
+                    f"Process {idx + 2} first experiment/LIMS Run has no "
+                    "accepted sample types"
+                )
+            missing = [t for t in emerging if t not in next_types]
+            if missing:
+                raise _type_error(
+                    f"Sample type emerging from process {idx + 1} is not "
+                    f"accepted by process {idx + 2}"
+                )
 
     def _require_first_step_types(self, chain: Sequence[UUID]) -> List[UUID]:
         if not chain:
@@ -342,6 +459,44 @@ class RoutingService:
                 },
             )
 
+    def _chain_lims_analysis_ids(self, chain: Sequence[UUID]) -> List[UUID]:
+        if not chain:
+            return []
+        steps = (
+            self.db.query(ELNProcessDefinitionStep)
+            .filter(ELNProcessDefinitionStep.process_definition_id.in_(list(chain)))
+            .all()
+        )
+        by_def: dict = {}
+        for step in steps:
+            by_def.setdefault(step.process_definition_id, []).append(step)
+        ids: List[UUID] = []
+        seen = set()
+        for def_id in chain:
+            ordered = sorted(
+                by_def.get(def_id, []), key=lambda s: s.sort_order or 0
+            )
+            for step in ordered:
+                if (step.step_kind or "") != "lims_run":
+                    continue
+                aid = getattr(step, "analysis_id", None)
+                if aid and aid not in seen:
+                    seen.add(aid)
+                    ids.append(aid)
+        return ids
+
+    def _require_chain_analyses(self, chain: Sequence[UUID]) -> List[UUID]:
+        ids = self._chain_lims_analysis_ids(chain)
+        if not ids:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail={
+                    "code": ROUTE_SAMPLE_TYPE,
+                    "message": "Route has no LIMS Run analysis",
+                },
+            )
+        return ids
+
     def _sync_maps_for_first_process(self, process_definition_id: UUID) -> None:
         """Keep routing_map.sample_type_id in line with the first typed step."""
         step = self._first_typed_step(process_definition_id)
@@ -359,30 +514,37 @@ class RoutingService:
         for row in maps:
             lo, hi = _range_bounds(row.tat_range)
             key = (
-                row.analysis_id,
                 lo,
                 hi,
                 tuple(row.process_definition_ids or []),
                 row.active,
             )
             groups.setdefault(key, []).append(row)
-        for (analysis_id, lo, hi, chain, active), group in groups.items():
+        for (lo, hi, chain, active), group in groups.items():
             existing = {m.sample_type_id: m for m in group}
             for sid, row in existing.items():
                 if sid not in desired:
                     self.db.delete(row)
             self.db.flush()
             owner = group[0]
+            analyses = self._chain_lims_analysis_ids(chain)
+            hint = analyses[0] if analyses else owner.analysis_id
+            group_ids = {m.id for m in group}
             for sid in desired:
                 if sid in existing:
                     continue
-                if self._has_overlap(analysis_id, sid, lo, hi):
-                    # Live first-step list is SoT. Skip a denorm row that
-                    # would collide; Route 409s when two maps accept the type.
+                if self._map_conflicts(
+                    list(chain),
+                    desired,
+                    analyses,
+                    lo,
+                    hi,
+                    exclude_ids=group_ids,
+                ):
                     continue
                 self.db.add(
                     RoutingMap(
-                        analysis_id=analysis_id,
+                        analysis_id=hint,
                         sample_type_id=sid,
                         tat_range=_range(lo, hi),
                         process_definition_ids=list(chain),
@@ -399,14 +561,11 @@ class RoutingService:
         acceptable = self._acceptable_maps(analysis_id, sample_type_id, tat_days)
         return acceptable[0] if len(acceptable) == 1 else None
 
-    def _analysis_tat_candidates(
-        self, analysis_id: UUID, tat_days: int
-    ) -> List[RoutingMap]:
+    def _tat_candidates(self, tat_days: int) -> List[RoutingMap]:
         return (
             self.db.query(RoutingMap)
             .filter(
                 RoutingMap.active == True,  # noqa: E712
-                RoutingMap.analysis_id == analysis_id,
                 RoutingMap.tat_range.op("@>")(tat_days),
             )
             .all()
@@ -416,64 +575,81 @@ class RoutingService:
         seen: dict[tuple, RoutingMap] = {}
         for row in rows:
             lo, hi = _range_bounds(row.tat_range)
-            key = (
-                row.analysis_id,
-                lo,
-                hi,
-                tuple(row.process_definition_ids or []),
-            )
+            key = (lo, hi, tuple(row.process_definition_ids or []))
             seen.setdefault(key, row)
         return list(seen.values())
 
     def _acceptable_maps(
         self, analysis_id: UUID, sample_type_id: UUID, tat_days: int
     ) -> List[RoutingMap]:
-        unique = self._unique_logical_maps(
-            self._analysis_tat_candidates(analysis_id, tat_days)
-        )
+        unique = self._unique_logical_maps(self._tat_candidates(tat_days))
         acceptable: List[RoutingMap] = []
         for row in unique:
             chain = list(row.process_definition_ids or [])
             try:
                 types = self._require_first_step_types(chain)
+                analyses = self._require_chain_analyses(chain)
             except HTTPException:
                 continue
-            if sample_type_id in types:
+            if sample_type_id in types and analysis_id in analyses:
                 acceptable.append(row)
         return acceptable
 
-    def _has_overlap(
+    def _map_conflicts(
         self,
-        analysis_id: UUID,
-        sample_type_id: UUID,
+        chain: Sequence[UUID],
+        types: Sequence[UUID],
+        analyses: Sequence[UUID],
         tat_min: int,
         tat_max: int,
-        exclude_id: Optional[UUID] = None,
+        exclude_ids: Optional[set] = None,
     ) -> bool:
-        q = self.db.query(RoutingMap).filter(
-            RoutingMap.active == True,  # noqa: E712
-            RoutingMap.analysis_id == analysis_id,
-            RoutingMap.sample_type_id == sample_type_id,
-            RoutingMap.tat_range.op("&&")(_range(tat_min, tat_max)),
+        exclude_ids = exclude_ids or set()
+        proposed_types = set(types)
+        proposed_analyses = set(analyses)
+        unique = self._unique_logical_maps(
+            [
+                m
+                for m in self.db.query(RoutingMap)
+                .filter(RoutingMap.active == True)  # noqa: E712
+                .all()
+                if m.id not in exclude_ids
+            ]
         )
-        if exclude_id is not None:
-            q = q.filter(RoutingMap.id != exclude_id)
-        return q.first() is not None
+        for other in unique:
+            if other.id in exclude_ids:
+                continue
+            olo, ohi = _range_bounds(other.tat_range)
+            if ohi < tat_min or olo > tat_max:
+                continue
+            other_chain = list(other.process_definition_ids or [])
+            try:
+                other_types = set(self._require_first_step_types(other_chain))
+                other_analyses = set(self._chain_lims_analysis_ids(other_chain))
+            except HTTPException:
+                continue
+            if proposed_types & other_types and proposed_analyses & other_analyses:
+                return True
+        return False
 
-    def _refuse_overlap(
+    def _refuse_map_overlap(
         self,
-        analysis_id: UUID,
-        sample_type_id: UUID,
+        chain: Sequence[UUID],
+        types: Sequence[UUID],
+        analyses: Sequence[UUID],
         tat_min: int,
         tat_max: int,
-        exclude_id: Optional[UUID] = None,
+        exclude_ids: Optional[set] = None,
     ) -> None:
-        if self._has_overlap(
-            analysis_id, sample_type_id, tat_min, tat_max, exclude_id=exclude_id
+        if self._map_conflicts(
+            chain, types, analyses, tat_min, tat_max, exclude_ids=exclude_ids
         ):
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail="Overlapping TAT range for this analysis and sample type",
+                detail=(
+                    "Overlapping TAT, first-step sample types, and LIMS Run "
+                    "analyses"
+                ),
             )
 
     def route_one(self, asked_for_id: UUID) -> dict:
@@ -510,7 +686,7 @@ class RoutingService:
         if len(acceptable) > 1:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail="Two routing-map rows accept this sample type",
+                detail="Two routing-map rows accept this analysis and sample type",
             )
         match = acceptable[0]
         chain = list(match.process_definition_ids or [])
@@ -649,6 +825,19 @@ class RoutingService:
             .first()
         )
 
+    def read_maps(self, rows: Sequence[RoutingMap]) -> List[dict]:
+        cache: dict[tuple, List[UUID]] = {}
+        payloads = []
+        for row in rows:
+            key = tuple(row.process_definition_ids or [])
+            if key not in cache:
+                cache[key] = self._chain_lims_analysis_ids(key)
+            payloads.append(map_to_read(row, cache[key]))
+        return payloads
+
+    def read_map(self, row: RoutingMap) -> dict:
+        return self.read_maps([row])[0]
+
     def read_work_order(self, row: WorkOrder) -> dict:
         started = self._started_processes([row.id]).get(row.id, [])
         return work_order_to_read(row, started)
@@ -680,11 +869,13 @@ class RoutingService:
             )
 
 
-def map_to_read(row: RoutingMap) -> dict:
+def map_to_read(row: RoutingMap, analysis_ids: Optional[Sequence[UUID]] = None) -> dict:
     lo, hi = _range_bounds(row.tat_range)
+    ids = list(analysis_ids or [])
     return {
         "id": row.id,
-        "analysis_id": row.analysis_id,
+        "analysis_id": row.analysis_id or (ids[0] if ids else None),
+        "analysis_ids": ids,
         "sample_type_id": row.sample_type_id,
         "tat_min": lo,
         "tat_max": hi,

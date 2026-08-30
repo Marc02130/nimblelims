@@ -3,7 +3,7 @@
 **Feature / cycle:** post-receive work spine  
 **Phases covered:** P1 (asked-for) required this cycle; P2 tables specified so architecture can Accept the spine; P3 none; P4 additive FKs; P5 none  
 **Status:** Draft for architecture review  
-**Alembic revisions:** `0072_asked_for_p1` (P1: `analysis_param_defs` + `asked_for`); `0073_routing_work_orders_p2` (P2: `routing_map`, `work_orders`, step accepted types, nullable LimsRun templates + `analysis_id`, `tests.asked_for_params`); `0074_p2_uat_visibility_publish`; `0075_wo7_freeze_route_position` (`eln_processes.work_order_route_position`)  
+**Alembic revisions:** `0072_asked_for_p1` (P1: `analysis_param_defs` + `asked_for`); `0073_routing_work_orders_p2` (P2: `routing_map`, `work_orders`, step accepted types, nullable LimsRun templates + `analysis_id`, `tests.asked_for_params`); `0074_p2_uat_visibility_publish`; `0075_wo7_freeze_route_position` (`eln_processes.work_order_route_position`); `0076_route_analysis_from_lims_runs` (drop gist on map analysis+type+TAT)  
 **Requirements:** [`.docs/review/requirements/post-receive-work-spine.md`](../requirements/post-receive-work-spine.md)  
 **Tech sketch:** [`.docs/review/tech-sketch/post-receive-work-spine.md`](../tech-sketch/post-receive-work-spine.md)
 
@@ -45,7 +45,8 @@ Do **not** add `results.unit_id`. Do **not** add asked-for columns on `samples`.
 | `uq_asked_for_open` | unique `(sample_id, analysis_id)` WHERE status <> 'cancelled' | RQ-AF-4 |
 | `asked_for_status_chk` | status in (`requested`,`routed`,`cancelled`) | |
 | `work_orders_status_chk` | status in (`queued`,`in_progress`,`completed`,`cancelled`) | |
-| `routing_map_overlap_chk` | Service-side: refuse save (**409**) only when same `analysis_id`, `tat_range &&`, **and** first-step allow-lists intersect | Extract-first vs Qubit-first for the same TAT is legal; gist-on-TAT-alone is too coarse |
+| `routing_map_overlap_chk` | Service-side: refuse save (**409**) when `tat_range &&`, first-step allow-lists intersect, **and** LIMS Run analysis sets intersect | Extract-first vs Qubit-first for the same TAT is legal; two methods sharing extract types are legal; gist-on-TAT-alone is too coarse |
+| `routing_map_handoff_chk` | Service-side: refuse save (**422**) when process *x* emerging types are not ⊆ process *x+1* first-step types | Emerging = aliquot/pool dest on *x* last Experiment/LIMS Run if set; else last-step accepted types. Dest mint remains Hold |
 | `routing_map_defs_chk` | non-empty ordered `process_definition_ids`; every UUID resolves; reject duplicate positions | ordered route, not one definition or an unordered bag |
 | `work_order_route_instance_uq` | unique (`work_order_id`, `work_order_route_position`) where work_order_id not null | one instance per route position |
 | `uq_step_accepted_sample_type` | unique `(step_id, sample_type_id)` | OQ-WO-4 |

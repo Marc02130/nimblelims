@@ -13,6 +13,6 @@ Do not assign analyses on receive. Non-empty `analysis_ids` on `POST /samples/re
 
 Receive ends on the form: commit, then scan the next tube. Samples sit **Available for Testing** and nothing at the bench is owed next.
 
-Separately, **Asked-for** records requested analysis + TAT without minting work. Later Route yields 422 for zero acceptable rows, 409 when two saved rows both accept current type, and snapshots an ordered process route only when exactly one accepts. Start instantiates its first process only. See [asked-for.md](asked-for.md). All remain **out of Receive**.
+Separately, **Asked-for** records requested analysis + TAT without minting work. Later Route yields 422 for zero acceptable rows, 409 when two saved rows both accept current type and the asked-for analysis, and snapshots an ordered process route only when exactly one accepts. Start instantiates its first process only. See [asked-for.md](asked-for.md). All remain **out of Receive**.
 
 Classic Tests (`/tests` / TestForm) still exist for typing a number on an **existing** Test. That is **not** the request path.

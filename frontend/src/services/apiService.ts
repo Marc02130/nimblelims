@@ -486,7 +486,7 @@ export class ApiService {
   }
 
   async createRoutingMap(data: {
-    analysis_id: string;
+    analysis_id?: string;
     tat_min: number;
     tat_max: number;
     process_definition_ids: string[];

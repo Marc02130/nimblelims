@@ -27,7 +27,8 @@ import { FillHeightPage, FillHeightTable } from '../../components/common/FillHei
 
 interface RoutingMapRow {
   id: string;
-  analysis_id: string;
+  analysis_id?: string | null;
+  analysis_ids?: string[];
   sample_type_id: string;
   tat_min: number;
   tat_max: number;
@@ -38,7 +39,7 @@ interface RoutingMapRow {
 interface GroupedMapRow {
   id: string;
   ids: string[];
-  analysis_id: string;
+  analysis_ids: string[];
   sample_type_ids: string[];
   tat_min: number;
   tat_max: number;
@@ -50,7 +51,9 @@ interface DefinitionStep {
   id: string;
   name?: string;
   step_kind?: string;
+  analysis_id?: string | null;
   sort_order: number;
+  acceptedTypeIds?: string[];
 }
 
 interface DefinitionDetail {
@@ -58,6 +61,8 @@ interface DefinitionDetail {
   name: string;
   steps: DefinitionStep[];
   firstAcceptedTypeIds: string[];
+  limsAnalysisIds: string[];
+  emergingTypeIds: string[];
 }
 
 const kindLabel = (kind?: string) => (kind === 'lims_run' ? 'LIMS Run' : 'ELN Experiment');
@@ -84,7 +89,6 @@ const groupMapRows = (rows: RoutingMapRow[]): GroupedMapRow[] => {
   const grouped = new Map<string, GroupedMapRow>();
   rows.forEach((row) => {
     const key = [
-      row.analysis_id,
       row.tat_min,
       row.tat_max,
       (row.process_definition_ids || []).join(','),
@@ -95,7 +99,7 @@ const groupMapRows = (rows: RoutingMapRow[]): GroupedMapRow[] => {
       grouped.set(key, {
         id: row.id,
         ids: [row.id],
-        analysis_id: row.analysis_id,
+        analysis_ids: [...(row.analysis_ids || [])],
         sample_type_ids: row.sample_type_id ? [row.sample_type_id] : [],
         tat_min: row.tat_min,
         tat_max: row.tat_max,
@@ -106,6 +110,9 @@ const groupMapRows = (rows: RoutingMapRow[]): GroupedMapRow[] => {
       return;
     }
     existing.ids.push(row.id);
+    (row.analysis_ids || []).forEach((id) => {
+      if (!existing.analysis_ids.includes(id)) existing.analysis_ids.push(id);
+    });
     if (row.sample_type_id && !existing.sample_type_ids.includes(row.sample_type_id)) {
       existing.sample_type_ids.push(row.sample_type_id);
     }
@@ -124,7 +131,6 @@ const RoutingMapManagement: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
-  const [analysisId, setAnalysisId] = useState('');
   const [tatMin, setTatMin] = useState(1);
   const [tatMax, setTatMax] = useState(10);
   const [chainIds, setChainIds] = useState<string[]>([]);
@@ -134,27 +140,55 @@ const RoutingMapManagement: React.FC = () => {
   const nameOf = (id: string, list: { id: string; name: string }[]) =>
     list.find((x) => x.id === id)?.name || id;
 
+  const typeNames = (ids: string[] = []) =>
+    ids.map((id) => nameOf(id, sampleTypes)).join(', ') || 'none';
+
+  const analysisNames = (ids: string[] = []) =>
+    ids.map((id) => nameOf(id, analyses)).join(', ') || 'none';
+
+  const processPickerLabel = (id: string) => {
+    const detail = definitionDetails[id];
+    const name = detail?.name || nameOf(id, definitions);
+    const types = typeNames(detail?.firstAcceptedTypeIds);
+    const anals = analysisNames(detail?.limsAnalysisIds);
+    return `${name} — types: ${types} · analyses: ${anals}`;
+  };
+
   const loadDefinitionDetail = async (id: string): Promise<DefinitionDetail | null> => {
     try {
       const def: any = await apiService.getElnProcessDefinition(id);
-      const steps: DefinitionStep[] = Array.isArray(def?.steps) ? def.steps : [];
+      const rawSteps: DefinitionStep[] = Array.isArray(def?.steps) ? def.steps : [];
+      const steps = await Promise.all(
+        sortSteps(rawSteps).map(async (step) => {
+          const typed =
+            step.step_kind === 'eln_experiment' || step.step_kind === 'lims_run';
+          if (!typed || !step.id) return { ...step, acceptedTypeIds: [] as string[] };
+          try {
+            const types: any = await apiService.getStepAcceptedSampleTypes(id, step.id);
+            return {
+              ...step,
+              acceptedTypeIds: Array.isArray(types?.sample_type_ids)
+                ? types.sample_type_ids
+                : [],
+            };
+          } catch {
+            return { ...step, acceptedTypeIds: [] as string[] };
+          }
+        })
+      );
       const first = firstTypedStep(steps);
-      let firstAcceptedTypeIds: string[] = [];
-      if (first?.id) {
-        try {
-          const types: any = await apiService.getStepAcceptedSampleTypes(id, first.id);
-          firstAcceptedTypeIds = Array.isArray(types?.sample_type_ids)
-            ? types.sample_type_ids
-            : [];
-        } catch {
-          firstAcceptedTypeIds = [];
-        }
-      }
       return {
         id,
         name: def?.name || id,
-        steps: sortSteps(steps),
-        firstAcceptedTypeIds,
+        steps,
+        firstAcceptedTypeIds: first?.acceptedTypeIds || [],
+        limsAnalysisIds: steps
+          .filter((s) => s.step_kind === 'lims_run' && s.analysis_id)
+          .map((s) => s.analysis_id as string)
+          .filter((aid, i, arr) => arr.indexOf(aid) === i),
+        emergingTypeIds: Array.isArray(def?.emerging_sample_type_ids)
+          ? def.emerging_sample_type_ids
+          : first?.acceptedTypeIds || [],
       };
     } catch {
       return null;
@@ -195,7 +229,6 @@ const RoutingMapManagement: React.FC = () => {
 
   const firstProcessId = chainIds[0] || '';
   const selectedDetail = firstProcessId ? definitionDetails[firstProcessId] : undefined;
-  const firstTyped = selectedDetail ? firstTypedStep(selectedDetail.steps) : null;
   const firstTypeNames = useMemo(() => {
     if (!selectedDetail) return [];
     return selectedDetail.firstAcceptedTypeIds.map((id) => nameOf(id, sampleTypes));
@@ -220,8 +253,9 @@ const RoutingMapManagement: React.FC = () => {
       .map((id, i) => {
         const detail = definitionDetails[id];
         const name = detail?.name || nameOf(id, definitions);
-        const tag = i === 0 ? 'sample-type' : 'type-independent';
-        return `${i + 1}. ${name} (${tag})`;
+        const types = typeNames(detail?.firstAcceptedTypeIds);
+        const anals = analysisNames(detail?.limsAnalysisIds);
+        return `${i + 1}. ${name} (types: ${types}; analyses: ${anals})`;
       })
       .join(' → ');
   };
@@ -234,18 +268,37 @@ const RoutingMapManagement: React.FC = () => {
     setChainIds(next);
   };
 
+  const handoffOk = useMemo(() => {
+    for (let i = 0; i < chainIds.length - 1; i += 1) {
+      const emerging = definitionDetails[chainIds[i]]?.emergingTypeIds || [];
+      const nextTypes = definitionDetails[chainIds[i + 1]]?.firstAcceptedTypeIds || [];
+      if (!emerging.length || emerging.some((t) => !nextTypes.includes(t))) {
+        return false;
+      }
+    }
+    return true;
+  }, [chainIds, definitionDetails]);
+
+  const chainAnalysisIds = useMemo(() => {
+    const ids: string[] = [];
+    chainIds.forEach((id) => {
+      (definitionDetails[id]?.limsAnalysisIds || []).forEach((aid) => {
+        if (!ids.includes(aid)) ids.push(aid);
+      });
+    });
+    return ids;
+  }, [chainIds, definitionDetails]);
+
   const handleCreate = async () => {
-    if (!analysisId || !chainIds.length) return;
+    if (!chainIds.length) return;
     setSaving(true);
     try {
       await apiService.createRoutingMap({
-        analysis_id: analysisId,
         tat_min: tatMin,
         tat_max: tatMax,
         process_definition_ids: chainIds,
       });
       setOpen(false);
-      setAnalysisId('');
       setChainIds([]);
       setAddProcessId('');
       await load();
@@ -267,11 +320,20 @@ const RoutingMapManagement: React.FC = () => {
 
   const columns: GridColDef[] = [
     {
-      field: 'analysis_id',
-      headerName: 'Analysis',
-      flex: 1,
-      minWidth: 160,
-      valueGetter: (_v, row) => nameOf(row.analysis_id, analyses),
+      field: 'analysis_ids',
+      headerName: 'LIMS Run analyses',
+      flex: 1.2,
+      minWidth: 180,
+      valueGetter: (_v, row) => {
+        const fromChain: string[] = [];
+        (row.process_definition_ids || []).forEach((id: string) => {
+          (definitionDetails[id]?.limsAnalysisIds || []).forEach((aid) => {
+            if (!fromChain.includes(aid)) fromChain.push(aid);
+          });
+        });
+        const ids = fromChain.length ? fromChain : row.analysis_ids || [];
+        return ids.map((id: string) => nameOf(id, analyses)).join(', ') || '—';
+      },
     },
     {
       field: 'first_step_types',
@@ -315,10 +377,11 @@ const RoutingMapManagement: React.FC = () => {
 
   const canSave =
     !saving &&
-    Boolean(analysisId) &&
     chainIds.length > 0 &&
     tatMax >= tatMin &&
-    firstTypeNames.length > 0;
+    firstTypeNames.length > 0 &&
+    chainAnalysisIds.length > 0 &&
+    handoffOk;
   const unusedDefinitions = definitions.filter((d) => !chainIds.includes(d.id));
 
   return (
@@ -334,11 +397,10 @@ const RoutingMapManagement: React.FC = () => {
             )}
           </Box>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            analysis × TAT range → an ordered process chain. The first process is sample-type
-            dependent (extract). Later processes are sample-type independent (analysis, reporting).
-            Route assignment checks the sample against the first experiment or LIMS Run of the
-            first process only. Overlapping TAT ranges for the same analysis and first-step type
-            are refused.
+            A route is an ordered process chain plus TAT. No analysis or sample-type picker.
+            Route assignment requires the sample type on the first process’s first experiment /
+            LIMS Run, and the asked-for analysis on a LIMS Run somewhere in the chain.
+            Overlapping TAT + first-step types + LIMS Run analyses is refused.
           </Typography>
           {error && (
             <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
@@ -359,22 +421,8 @@ const RoutingMapManagement: React.FC = () => {
         />
       </FillHeightTable>
       <Dialog open={open} onClose={() => setOpen(false)} maxWidth="md" fullWidth>
-        <DialogTitle>Add routing map row</DialogTitle>
+        <DialogTitle>Add route</DialogTitle>
         <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
-          <FormControl fullWidth>
-            <InputLabel>Analysis</InputLabel>
-            <Select
-              label="Analysis"
-              value={analysisId}
-              onChange={(e) => setAnalysisId(e.target.value)}
-            >
-              {analyses.map((a) => (
-                <MenuItem key={a.id} value={a.id}>
-                  {a.name}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
           <Box display="flex" gap={1}>
             <TextField
               label="TAT min"
@@ -393,12 +441,14 @@ const RoutingMapManagement: React.FC = () => {
           </Box>
           <Typography variant="subtitle2">Ordered processes</Typography>
           <Typography variant="caption" color="text.secondary">
-            First process is sample-type dependent. Later processes are not (analysis / target
-            genes / reporting).
+            Each process shows its allowed sample types and LIMS Run analyses. Route assignment
+            uses the first process’s first experiment / LIMS Run types, and any LIMS Run
+            analysis in this list.
           </Typography>
           {chainIds.map((id, idx) => {
             const detail = definitionDetails[id];
             const name = detail?.name || nameOf(id, definitions);
+            const firstStep = detail ? firstTypedStep(detail.steps) : null;
             return (
               <Box key={`${id}-${idx}`}>
                 <Box display="flex" gap={1} alignItems="center" flexWrap="wrap">
@@ -409,7 +459,7 @@ const RoutingMapManagement: React.FC = () => {
                   <Chip
                     size="small"
                     color={idx === 0 ? 'primary' : 'default'}
-                    label={idx === 0 ? 'sample-type' : 'type-independent'}
+                    label={idx === 0 ? 'gates sample type' : 'later process'}
                   />
                   <IconButton
                     size="small"
@@ -435,36 +485,88 @@ const RoutingMapManagement: React.FC = () => {
                     <DeleteIcon fontSize="small" />
                   </IconButton>
                 </Box>
-                {idx === 0 && detail && (
-                  <Box sx={{ pl: 5, mt: 0.5 }}>
-                    {detail.steps.map((s, i) => (
+                <Box sx={{ pl: 5, mt: 0.5 }}>
+                  {(detail?.steps || []).map((s, i) => {
+                    const analysis =
+                      s.step_kind === 'lims_run' && s.analysis_id
+                        ? nameOf(s.analysis_id, analyses)
+                        : '';
+                    const types = typeNames(s.acceptedTypeIds);
+                    return (
                       <Typography key={s.id || i} variant="body2">
                         {stepLine(s, i)}
-                        {firstTyped && s.id === firstTyped.id
-                          ? ' (first experiment / LIMS Run)'
-                          : ''}
+                        {firstStep && s.id === firstStep.id ? ' (first experiment / LIMS Run)' : ''}
+                        {analysis ? ` — analysis: ${analysis}` : ''}
+                        {` — sample types: ${types}`}
                       </Typography>
-                    ))}
-                    <Typography variant="body2" sx={{ mt: 0.5 }}>
-                      First experiment / LIMS Run sample types:{' '}
-                      {firstTypeNames.length ? firstTypeNames.join(', ') : 'none recorded'}
-                    </Typography>
-                  </Box>
-                )}
+                    );
+                  })}
+                  <Typography variant="body2" sx={{ mt: 0.5 }}>
+                    Allowed sample types (first experiment / LIMS Run):{' '}
+                    {typeNames(detail?.firstAcceptedTypeIds)}
+                    {idx === 0 ? ' — used at Route' : ''}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    LIMS Run analyses: {analysisNames(detail?.limsAnalysisIds)}
+                  </Typography>
+                  <Typography variant="body2">
+                    Emerging sample types (after last experiment / LIMS Run):{' '}
+                    {typeNames(detail?.emergingTypeIds)}
+                  </Typography>
+                  {idx < chainIds.length - 1 &&
+                    (() => {
+                      const nextTypes =
+                        definitionDetails[chainIds[idx + 1]]?.firstAcceptedTypeIds || [];
+                      const emerging = detail?.emergingTypeIds || [];
+                      const ok =
+                        emerging.length > 0 &&
+                        emerging.every((t) => nextTypes.includes(t));
+                      return (
+                        <Typography
+                          variant="body2"
+                          color={ok ? 'text.secondary' : 'error'}
+                        >
+                          {ok
+                            ? `Process ${idx + 2} accepts these emerging types`
+                            : `Process ${idx + 2} does not accept the type emerging from process ${idx + 1}`}
+                        </Typography>
+                      );
+                    })()}
+                </Box>
               </Box>
             );
           })}
-          <Box display="flex" gap={1} alignItems="center">
+          <Typography variant="body2">
+            Sample types this route accepts at assignment:{' '}
+            {firstTypeNames.length ? firstTypeNames.join(', ') : 'none — first process needs types'}
+          </Typography>
+          <Typography variant="body2">
+            Asked-for analyses this route can take:{' '}
+            {chainAnalysisIds.length
+              ? analysisNames(chainAnalysisIds)
+              : 'none — add a process with a LIMS Run analysis'}
+          </Typography>
+          <Box display="flex" gap={1} alignItems="flex-start">
             <FormControl fullWidth>
               <InputLabel>Add process</InputLabel>
               <Select
                 label="Add process"
                 value={addProcessId}
                 onChange={(e) => setAddProcessId(e.target.value)}
+                renderValue={(value) =>
+                  value ? processPickerLabel(String(value)).split(' — ')[0] : ''
+                }
               >
                 {unusedDefinitions.map((d) => (
-                  <MenuItem key={d.id} value={d.id}>
-                    {d.name}
+                  <MenuItem key={d.id} value={d.id} sx={{ whiteSpace: 'normal' }}>
+                    <Box>
+                      <Typography variant="body2">{d.name}</Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        Sample types: {typeNames(definitionDetails[d.id]?.firstAcceptedTypeIds)}
+                        {' · '}
+                        Analyses: {analysisNames(definitionDetails[d.id]?.limsAnalysisIds)}
+                      </Typography>
+                    </Box>
                   </MenuItem>
                 ))}
               </Select>

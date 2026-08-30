@@ -73,6 +73,13 @@ class ELNProcessDefinitionRead(BaseModel):
     modified_at: datetime
     modified_by: Optional[UUID] = None
     steps: List[ELNProcessDefinitionStepRead] = Field(default_factory=list)
+    emerging_sample_type_ids: List[UUID] = Field(
+        default_factory=list,
+        description=(
+            "Sample types that leave this process: aliquot/pool dest on the "
+            "last experiment/LIMS Run, else that last step's accepted types"
+        ),
+    )
 
     class Config:
         from_attributes = True

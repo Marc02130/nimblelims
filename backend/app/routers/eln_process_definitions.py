@@ -36,6 +36,16 @@ def get_service(
     return ELNProcessService(db, current_user=current_user)
 
 
+def _read_definition(service: ELNProcessService, definition) -> ELNProcessDefinitionRead:
+    payload = ELNProcessDefinitionRead.model_validate(definition)
+    from app.services.routing_service import RoutingService
+
+    payload.emerging_sample_type_ids = RoutingService(
+        service.db, service.current_user
+    ).emerging_types_for_process(definition.id)
+    return payload
+
+
 @router.get("", response_model=ELNProcessDefinitionListResponse)
 def list_definitions(
     active: Optional[bool] = Query(True),
@@ -70,7 +80,7 @@ def create_definition(
     data: ELNProcessDefinitionCreate,
     service: ELNProcessService = Depends(get_service),
 ):
-    return ELNProcessDefinitionRead.model_validate(service.create_definition(data))
+    return _read_definition(service, service.create_definition(data))
 
 
 @router.get("/{definition_id}", response_model=ELNProcessDefinitionRead)
@@ -78,7 +88,7 @@ def get_definition(
     definition_id: UUID,
     service: ELNProcessService = Depends(get_service),
 ):
-    return ELNProcessDefinitionRead.model_validate(service.get_definition(definition_id))
+    return _read_definition(service, service.get_definition(definition_id))
 
 
 @router.patch("/{definition_id}", response_model=ELNProcessDefinitionRead)
@@ -87,8 +97,8 @@ def update_definition(
     data: ELNProcessDefinitionUpdate,
     service: ELNProcessService = Depends(get_service),
 ):
-    return ELNProcessDefinitionRead.model_validate(
-        service.update_definition(definition_id, data)
+    return _read_definition(
+        service, service.update_definition(definition_id, data)
     )
 
 
@@ -102,8 +112,8 @@ def add_definition_step(
     data: ELNProcessDefinitionStepCreate,
     service: ELNProcessService = Depends(get_service),
 ):
-    return ELNProcessDefinitionRead.model_validate(
-        service.add_definition_step(definition_id, data)
+    return _read_definition(
+        service, service.add_definition_step(definition_id, data)
     )
 
 

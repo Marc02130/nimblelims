@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-28  
 **Stem:** `post-receive-work-spine`  
-**Status:** Architecture / UI / Spec **Accept with conditions** on `feat/work-order-p2` @ `8cfa2a9`. **Hold product merge to main.** Live AC-P2 **unsigned** overall. First Start = process[0] / `chain[0]` only is **Pass** (ELISA first LimsRun, 1 step, no Qubit/qPCR Tests). Empty Route 422 / map 409 / 201-not-AND **Pass**. **Hans freeze open / unsigned:** classic `/tests` must leave `asked_for_params` NULL, or we need a freeze marker. Until then `{}` is **ambiguous** (classic default and frozen `{}` are the same JSON). Do not teach skip-on-frozen-`{}`. Later-step type-gate **unsigned**. Extract must not share asked-for `analysis_id`. P2-4 still `0074`. `b005cfe` signed history: publish-refuse Pass, freeze OPEN then, AC-P2-5 chain-AND (not carried). Not IC50.
+**Status:** Architecture / UI / Spec **Accept with conditions** on `feat/work-order-p2`. **Hold product merge.** Latest signed AC-P2 is `8cfa2a9` (overall unsigned): First Start = `chain[0]` only Pass; empty Route 422 / map 409 / 201-not-AND Pass; Hans freeze skip **unsigned** (`{}` ambiguous). Code after that: no map analysis field; Route matches a LIMS Run in the chain; *x*→*x+1* emerging-type handoff — pending Leadership confirm ([send](../../discussions/2026-08-30-p2-route-lock.md)). `b005cfe` signed history. Not IC50.
 **Requirements:** [`.docs/review/requirements/post-receive-work-spine.md`](../requirements/post-receive-work-spine.md)  
 **Schema:** [`.docs/review/schema-changes/post-receive-work-spine.md`](../schema-changes/post-receive-work-spine.md)  
 **Spec:** [`.docs/internal/specs/post-receive-work-spine/SPEC.md`](../../internal/specs/post-receive-work-spine/SPEC.md)  
@@ -20,12 +20,13 @@ P1 is on `main`. P2 is on `feat/work-order-p2` (Accept with conditions). Do not 
 4. **Mathilda U1 / U2:** asked-for ≠ Test assign. Label params as order capture, not Test snapshot.
 5. Architecture / UI / Spec **Accept with conditions** on P2 @ `8cfa2a9`. Hold merge until UAT. Not IC50.
 6. **Receive freeze:** non-empty `analysis_ids` still **422**.
-7. **P2 ordered route (Leadership / Heidi / Günter; per-AC signed on `8cfa2a9`):** a route is analysis + TAT + **ordered** `process_definition[]`. Route snapshots the list, **zero Tests**. First Start = process[0] / `chain[0]` only — **Tobias-signed Pass** (ELISA first LimsRun, 1 step, no Qubit/qPCR Tests). Later Start = next process, on the sample that exists then. Empty Route **422** Pass. Later-step type-gate **unsigned**.
-8. **WO-7 publish (Tobias-signed Pass @ `8cfa2a9` and history @ `b005cfe`):** `_require_wo7_tests` 422s before promote if any cohort sample lacks an active Test. `plan.errors` also 422s. Status stays unpublished (complete). Do **not** fold first-start freeze into this Pass.
-9. **Hans freeze (classic skip still OPEN / unsigned on `8cfa2a9`):** `if test: continue` is **not** a freeze. Classic `/tests` must leave `asked_for_params` **NULL**, or we need a **freeze marker**. Until one of those exists, `{}` is **ambiguous** — first start cannot tell a classic default `{}` from a frozen `{}` (same JSON). Do **not** teach skip-on-frozen-`{}`. A write of `{}` onto `99b692d3` is not a skip Pass. Extract must **not** share asked-for `analysis_id`.
-10. **P2-4 visibility:** Route is `test:assign` and must **read** the mapped def/steps (catalog-visible, same client / logged-in, like `routing_map`). Do **not** put `experiment:manage` on Route. **`0074`:** `is_admin() OR has_experiment_access()` is **not** catalog-visible. Mutate stays `config:edit`. Instantiate stays. **Still open** on `8cfa2a9`.
-11. **No sample-type picker (Tobias-signed Pass on `8cfa2a9` — UI click-save, not API-only):** no picker; ELISA TAT 1–7 saved; Blood extract + later DNA qPCR chain saved (no AND 422); second ELISA overlap **409**. Copy: “First process is sample-type dependent. Later processes are not.” Empty Route **422** Pass. Two-accept **409** unsigned this SHA. Later-step type-gate **unsigned**.
-12. **Extract `analysis_id` (still open):** Extract LimsRun must **not** share the asked-for `analysis_id` or it attaches/freezes the panel Test at extract start.
+7. **P2 ordered route (per-AC signed on `8cfa2a9`):** Route snapshots the ordered list, **zero Tests**. First Start = process[0] / `chain[0]` only — **Tobias-signed Pass**. Later Start = next process, on the sample that exists then. Empty Route **422** Pass. Later-step type-gate **unsigned**.
+8. **WO-7 publish (Tobias-signed Pass @ `8cfa2a9` and history @ `b005cfe`):** `_require_wo7_tests` 422s before promote if any cohort sample lacks an active Test. Status stays unpublished (complete). Do **not** fold first-start freeze into this Pass.
+9. **Hans freeze (classic skip still OPEN / unsigned on `8cfa2a9`):** `if test: continue` is **not** a freeze. Classic `/tests` must leave `asked_for_params` **NULL**, or we need a **freeze marker**. Until then `{}` is **ambiguous**. Do **not** teach skip-on-frozen-`{}`. Extract must **not** share asked-for `analysis_id`.
+10. **P2-4 visibility:** Route is `test:assign` and must **read** the mapped def/steps. Do **not** put `experiment:manage` on Route. **`0074` still open** on `8cfa2a9`. Mutate stays `config:edit`.
+11. **No sample-type picker (Tobias-signed Pass on `8cfa2a9` — UI click-save):** ELISA TAT 1–7 saved; Blood extract + later DNA qPCR chain saved (no AND 422); second ELISA overlap **409**. Empty Route **422** Pass. Two-accept **409** unsigned that SHA.
+12. **Extract `analysis_id` (still open):** Extract LimsRun must **not** share the asked-for `analysis_id`.
+13. **Proposed after `8cfa2a9` (pending Leadership confirm):** no map analysis picker. Route matches a LIMS Run in the chain. Map 409 = TAT ∩ first-step types ∩ LIMS Run analyses. Map 422 when process *x* emerging type is not accepted by *x+1*. Send: [2026-08-30-p2-route-lock](../../discussions/2026-08-30-p2-route-lock.md).
 
 ---
 
@@ -109,15 +110,16 @@ Pytest: create, 409 dup, **403 dual-belt** (create **and** `list()` / `GET /aske
 
 ## 4. P2 design
 
-`routing_map`: analysis + TAT + **ordered** `process_definition[]`. No sample-type picker; derive first Exp/LimsRun allow-list of process[0]. Save **409**s when the same analysis, overlapping TAT, **and** overlapping first-step allow-lists all hold.
+`routing_map`: TAT + ordered `process_definition_ids`. No analysis or sample-type picker. Do **not** gist-exclude on analysis+TAT. Save **409**s when overlapping TAT, overlapping first-step allow-lists, **and** overlapping LIMS Run analyses in the chains all hold. (`8cfa2a9` UAT scored analysis+TAT map rows; that SHA remains signed history.)
 
 **OQ-WO-1 Decided:** Tech hits **Route**. No auto-route on asked-for save. `POST /api/v1/asked-for/{id}/route` (batch the same call for a selected set). Then:
 
-- Select analysis + TAT candidates; filter by current type against process[0]’s first Exp/LimsRun step allow-list
-- Zero acceptable rows → 422; two saved rows that both accept this current type → 409; exactly one **snapshots the ordered list** and mints **zero Tests**
+- Select TAT candidates; keep a row when current type is on the first process / first ordered Experiment-LimsRun list **and** the asked-for analysis matches a LIMS Run in that route
+- Zero acceptable rows → 422; two saved rows that both accept this type and this analysis → 409; exactly one snapshots its ordered `process_definition[]` and mints **zero Tests**
 - Never silently use `first()`
 - Denorm `sample_type_id` is display/sync only — Route uses the live first-step list
-- Empty first-step allow-list fails closed at **start**, not map-save
+- Prefer deriving first-process types, chain LIMS Run analyses, and emerging types on read
+- Map save/Route do not AND inbound sample types across later processes or steps. Map save **422**s when the type emerging from process *x* is not accepted by process *x+1* (aliquot/pool dest on *x* last Experiment/LIMS Run if set; else last-step accepted types). Dest-type **mint** remains Hold.
 
 `work_orders.process_definition_ids` snapshot at mint (**L4**), **zero Tests**. Ordered list is the lock. Punch (3): **first Start must not mint later processes or their Tests** — do not teach that mint as shipped.
 
