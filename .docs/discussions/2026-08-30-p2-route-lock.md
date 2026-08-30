@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-30  
 **Team:** Leadership (Lab Ops, CEO, Security CSO, Scientific CSO)  
-**Ask:** Leadership **Confirmed** (Rolf, Deiter, Hans, Heidi, Günter). All five asks. Not a merge stamp. Overall P2 UAT remains unsigned.  
+**Ask:** Round 1 remains **Leadership Confirmed** (Rolf, Deiter, Hans, Heidi, Günter; all five asks). Round 2 is **CEO Confirm** (R2-1…R2-4) pending Deiter / Hans / Heidi / Günter overwrite-or-confirm. Not a full Leadership lock for Round 2. Not a merge stamp. Overall P2 UAT remains unsigned.  
 **Implement gate:** **OPEN for P2 coding on `feat/work-order-p2`.** Merge to `main` **held** until signed UAT Pass.  
 **Stem:** [post-receive-work-spine](../review/requirements/post-receive-work-spine.md)
 
@@ -131,11 +131,12 @@ Rolf’s Confirm of all five asks. Round 1 above remains persona-applied history
 
 | ID | Status | Proposed |
 |----|--------|----------|
-| OQ-WO-4 | **Leadership Confirm** (Rolf/Deiter/Hans/Heidi/Günter). Dest mint remains Hold. | No map analysis field; Route matches a LIMS Run in the chain |
-| OQ-TAT-1 | **Leadership Confirm** (Rolf/Deiter/Hans/Heidi/Günter). | 409 = TAT ∩ first-step types ∩ LIMS Run analyses |
-| OQ-WO-5 | **Leadership Confirm** (Rolf/Deiter/Hans/Heidi/Günter). Dest mint remains Hold. | Process *x* emerging type must be accepted by *x+1* |
+| OQ-WO-4 | **Leadership Confirm** (Rolf/Deiter/Hans/Heidi/Günter). Dest mint remains Hold. Round 1 only — do not restamp. | No map analysis field; Route matches a LIMS Run in the chain |
+| OQ-TAT-1 | **Leadership Confirm** (Rolf/Deiter/Hans/Heidi/Günter). Round 1 only — do not restamp. | 409 = TAT ∩ first-step types ∩ LIMS Run analyses |
+| OQ-WO-5 | **Leadership Confirm** (Rolf/Deiter/Hans/Heidi/Günter). Dest mint remains Hold. Round 1 only — do not restamp. | Process *x* emerging type must be accepted by *x+1* |
+| OQ-WO-6 | **OPEN.** CEO Confirm that it **stays Open** (R2-3). Pending Deiter / Hans / Heidi / Günter overwrite-or-confirm. | Earlier LimsRun in the chain must **not** share asked-for `analysis_id`. Do not teach extract-as-special-assay. |
 
-Tobias signed **AC-P2-9..11 Pass** on `9342439`. Overall P2 remains **not Pass**. Freeze skip and extract `analysis_id` still **OPEN**. Dest-type mint **Hold**. Not IC50.
+Tobias signed **AC-P2-9..11 Pass** on `9342439`. Overall P2 remains **not Pass**. Freeze skip and OQ-WO-6 still **OPEN**. Dest-type mint **Hold**. Not IC50.
 
 ---
 
@@ -177,3 +178,18 @@ Not a merge stamp. Do **not** rewrite Tobias `9342439` / `8cfa2a9` Results. Do *
 | R2-4 | Parser chosen at import, not at process authoring. |
 
 Freeze skip (`{}` vs NULL) stays OPEN. Route two-accept 409 still unsigned from `8cfa2a9`. Map save same-types / different-analyses / same TAT 201 unsigned on the `9342439` click. Overall P2 unsigned.
+
+---
+
+## CEO Confirm — Round 2 — 2026-08-30 (Rolf)
+
+Rolf’s Confirm of R2-1…R2-4. Round 1 remains **Leadership Confirmed**. This is **CEO Confirm only** — pending Deiter / Hans / Heidi / Günter overwrite-or-confirm. Not a full Leadership lock for Round 2. Not a merge stamp. Do **not** rewrite Tobias `9342439` / `8cfa2a9` Results. Freeze skip stays **OPEN**. Dest mint **Hold**. Overall P2 remains **not Pass**. Not IC50.
+
+| Ask | CEO Confirm |
+|-----|-------------|
+| R2-1. Asked-for assay → any route that **contains** that LimsRun analysis | **Yes.** Asked-for assay → any route whose chain **contains** that LimsRun analysis. Multi-analysis routes are the product. One asked-for row → one work order. |
+| R2-2. Type gates catch blood-on-Qubit; dest mint Hold | **Yes.** Extract is not a special assay. Type gates catch blood-on-Qubit. Dest mint **Hold**. |
+| R2-3. OQ-WO-6 stays OPEN | **Yes.** OQ-WO-6 stays **OPEN** — earlier LimsRun must not share asked-for `analysis_id`. Do not teach “extract is special.” |
+| R2-4. Parser at import | **Yes.** Parser chosen at import, not process authoring. Process LimsRun stores `analysis_id` only. |
+
+Send: this file, Round 2. OQ-WO-4 / OQ-TAT-1 / OQ-WO-5 stay **Leadership Confirm** from round 1.
