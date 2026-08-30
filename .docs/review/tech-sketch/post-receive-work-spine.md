@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-28  
 **Stem:** `post-receive-work-spine`  
-**Status:** Architecture / UI / Spec **Accept with conditions** on `feat/work-order-p2` @ `8cfa2a9`. **Hold product merge to main.** Live AC-P2 **per-AC signed; overall P2 unsigned**. First Start = process[0] / `chain[0]` only is **Pass** (ELISA first LimsRun, 1 step, no Qubit/qPCR Tests). Empty Route 422 / map 409 / 201-not-AND **Pass**. New-Test freeze write **Pass** on `99b692d3`. **Hans freeze still open:** classic `/tests` must leave `asked_for_params` NULL; skip-on-`{}` is not a freeze until that or a freeze marker lands — classic default `{}` and frozen `{}` are the same JSON. Later-step type-gate **unsigned**. Extract must not share asked-for `analysis_id`. P2-4 still `0074`. `b005cfe` signed history: publish-refuse Pass, freeze OPEN then, AC-P2-5 chain-AND (not carried). Not IC50.
+**Status:** Architecture / UI / Spec **Accept with conditions** on `feat/work-order-p2` @ `8cfa2a9`. **Hold product merge to main.** Live AC-P2 **unsigned** overall. First Start = process[0] / `chain[0]` only is **Pass** (ELISA first LimsRun, 1 step, no Qubit/qPCR Tests). Empty Route 422 / map 409 / 201-not-AND **Pass**. **Hans freeze open / unsigned:** classic `/tests` must leave `asked_for_params` NULL, or we need a freeze marker. Until then `{}` is **ambiguous** (classic default and frozen `{}` are the same JSON). Do not teach skip-on-frozen-`{}`. Later-step type-gate **unsigned**. Extract must not share asked-for `analysis_id`. P2-4 still `0074`. `b005cfe` signed history: publish-refuse Pass, freeze OPEN then, AC-P2-5 chain-AND (not carried). Not IC50.
 **Requirements:** [`.docs/review/requirements/post-receive-work-spine.md`](../requirements/post-receive-work-spine.md)  
 **Schema:** [`.docs/review/schema-changes/post-receive-work-spine.md`](../schema-changes/post-receive-work-spine.md)  
 **Spec:** [`.docs/internal/specs/post-receive-work-spine/SPEC.md`](../../internal/specs/post-receive-work-spine/SPEC.md)  
@@ -22,7 +22,7 @@ P1 is on `main`. P2 is on `feat/work-order-p2` (Accept with conditions). Do not 
 6. **Receive freeze:** non-empty `analysis_ids` still **422**.
 7. **P2 ordered route (Leadership / Heidi / Günter; per-AC signed on `8cfa2a9`):** a route is analysis + TAT + **ordered** `process_definition[]`. Route snapshots the list, **zero Tests**. First Start = process[0] / `chain[0]` only — **Tobias-signed Pass** (ELISA first LimsRun, 1 step, no Qubit/qPCR Tests). Later Start = next process, on the sample that exists then. Empty Route **422** Pass. Later-step type-gate **unsigned**.
 8. **WO-7 publish (Tobias-signed Pass @ `8cfa2a9` and history @ `b005cfe`):** `_require_wo7_tests` 422s before promote if any cohort sample lacks an active Test. `plan.errors` also 422s. Status stays unpublished (complete). Do **not** fold first-start freeze into this Pass.
-9. **Hans freeze (classic skip still OPEN on `8cfa2a9` — not closed):** New-Test write is **Pass** on `99b692d3`. `if test: continue` is **not** a freeze. **Skip-on-`{}` is not a freeze until classic `/tests` leaves `asked_for_params` NULL or a freeze marker lands** — classic default `{}` and frozen `{}` are the same JSON; do **not** claim they are distinguishable. First LimsRun start must **write**. Do not fold classic skip as Pass.
+9. **Hans freeze (classic skip still OPEN / unsigned on `8cfa2a9`):** `if test: continue` is **not** a freeze. Classic `/tests` must leave `asked_for_params` **NULL**, or we need a **freeze marker**. Until one of those exists, `{}` is **ambiguous** — first start cannot tell a classic default `{}` from a frozen `{}` (same JSON). Do **not** teach skip-on-frozen-`{}`. A write of `{}` onto `99b692d3` is not a skip Pass. Extract must **not** share asked-for `analysis_id`.
 10. **P2-4 visibility:** Route is `test:assign` and must **read** the mapped def/steps (catalog-visible, same client / logged-in, like `routing_map`). Do **not** put `experiment:manage` on Route. **`0074`:** `is_admin() OR has_experiment_access()` is **not** catalog-visible. Mutate stays `config:edit`. Instantiate stays. **Still open** on `8cfa2a9`.
 11. **No sample-type picker (Tobias-signed Pass on `8cfa2a9` for UI / overlap 409 / 201-not-AND):** derive first Exp/LimsRun allow-list. Copy: “First process is sample-type dependent. Later processes are not.” `assert_chain_accepts_sample_type` is gone. Empty Route **422** Pass. Two-accept **409** unsigned this SHA. Map-save 409 when TAT **and** first-step allow-lists overlap. Denorm `sample_type_id` is display/sync only. Empty first-step allow-list fails closed at **start**, not map-save. Later-step type-gate **unsigned**.
 12. **Extract `analysis_id` (still open):** Extract LimsRun must **not** share the asked-for `analysis_id` or it attaches/freezes the panel Test at extract start.
@@ -123,9 +123,9 @@ Pytest: create, 409 dup, **403 dual-belt** (create **and** `list()` / `GET /aske
 
 Start: `ELNProcessService.instantiate_from_definition` on **process[0] / `chain[0]` only**. Later Start = next pending process, on the sample that exists then. Instantiate stays `experiment:manage`. Route stays `test:assign`. Later process/step starts type-gate current type vs **that** step only. Dest-type Hold out.
 
-**L3 / A5 / SC5 / Hans:** `if test: continue` is **not** a freeze. At LimsRun start for the asked-for analysis, insert the Test if missing and **write** `asked_for.params` → `tests.asked_for_params`. Classic `/tests` must leave `asked_for_params` **NULL**; NULL or default `{}` is **not** frozen. **Skip-on-`{}` is not a freeze** — classic default `{}` and frozen `{}` are the same JSON, so `{}` cannot prove a LimsRun-start snapshot. Skip is honest only once classic `/tests` leaves NULL or a **freeze marker** lands. Extract must **not** share the asked-for `analysis_id` or it attaches/freezes the panel Test at extract start. P1 does **not** write that Test snapshot. Do not claim freeze closed/verified on `8cfa2a9`.
+**L3 / A5 / SC5 / Hans:** `if test: continue` is **not** a freeze. At LimsRun start for the asked-for analysis, insert the Test if missing and **write** `asked_for.params` → `tests.asked_for_params`. Classic `/tests` must leave `asked_for_params` **NULL**, or we need a **freeze marker**. Until one of those exists, `{}` is **ambiguous** — first start cannot tell a classic default `{}` from a frozen `{}` (same JSON). Do **not** teach skip-on-frozen-`{}`. Extract must **not** share the asked-for `analysis_id`. P1 does **not** write that Test snapshot. Freeze skip stays unsigned. Do not claim freeze closed on `8cfa2a9`.
 
-WO-7 publish @ `8cfa2a9` is Tobias-signed Pass (carol **422** `test_missing`) and remains history @ `b005cfe`: `_require_wo7_tests` + `plan.errors` 422 the whole run. Status stays complete / unpublished. Zero Results. New-Test freeze write is **Pass** on `99b692d3`; classic skip **OPEN**. Overall P2 Pass is unsigned.
+WO-7 publish @ `8cfa2a9` is Tobias-signed Pass (carol **422** `test_missing`) and remains history @ `b005cfe`: `_require_wo7_tests` + `plan.errors` 422 the whole run. Status stays complete / unpublished. Zero Results. A write of `{}` onto `99b692d3` is not a freeze-skip Pass (`{}` is ambiguous). Freeze skip **unsigned**. Overall P2 Pass is unsigned.
 
 ## 5. P3 design
 
@@ -158,11 +158,11 @@ No new import engine. **Do not build “admin authors parsers” as the product.
 | First Start mints later processes or their Tests | Bounce — punch (3). Snapshot is the list only |
 | Later Start | Next pending process, on the sample that exists then |
 | Later step start with current type outside that step’s accepted types | **422 `route_sample_type`**; sample is not broken. **Unsigned on `8cfa2a9`** — not click-run |
-| Publish without Test | **422** the whole run (`_require_wo7_tests` / `plan.errors`). Stay unpublished. Zero Results. Publish-refuse **Pass** on `8cfa2a9` and history on `b005cfe`. New-Test freeze write Pass on `99b692d3`; classic skip OPEN. |
+| Publish without Test | **422** the whole run (`_require_wo7_tests` / `plan.errors`). Stay unpublished. Zero Results. Publish-refuse **Pass** on `8cfa2a9` and history on `b005cfe`. Freeze skip unsigned: `{}` on `99b692d3` is ambiguous, not a skip Pass. |
 | Invisible process def (`0074` `has_experiment_access`) | Catalog-visible **read**. Route stays `test:assign`. Not `experiment:manage` on Route. |
 | Empty accepted set at step start | **422 `route_sample_type`** |
 | Classic `/tests` default `{}` | Not a freeze — LimsRun start must still snapshot. Classic `/tests` must leave `asked_for_params` NULL |
-| Skip-on-`{}` treated as a freeze | Bounce — classic default `{}` and frozen `{}` are the same JSON. Honest only after classic NULL or a freeze marker |
+| Skip-on-frozen-`{}` treated as a freeze | Bounce — classic default `{}` and frozen `{}` are the same JSON. `{}` is ambiguous until classic NULL or a freeze marker |
 | Extract LimsRun shares asked-for `analysis_id` | Bounce |
 | Parser AI on import | Impossible (no call site) |
 | Receive non-empty `analysis_ids` | **422** (freeze) |
@@ -172,7 +172,7 @@ No new import engine. **Do not build “admin authors parsers” as the product.
 | PR | Scope |
 |----|--------|
 | 1 | P1 tables + API + `/asked-for` UI + pytest + UAT script. **Hold merge until UAT.** |
-| 2 | P2 routing + work_order + ordered `process_definition[]` + LimsRun WO-7. Architecture / UI / Spec Accept with conditions @ `8cfa2a9`. Live AC-P2 **per-AC signed; overall unsigned**. **Hold product merge to main.** First Start = chain[0] only **Pass**. Still open: Hans freeze (skip-on-`{}` is not a freeze), extract `analysis_id`, P2-4 `0074`, later-step type-gate. |
+| 2 | P2 routing + work_order + ordered `process_definition[]` + LimsRun WO-7. Architecture / UI / Spec Accept with conditions @ `8cfa2a9`. Live AC-P2 **unsigned** overall. **Hold product merge to main.** First Start = chain[0] only **Pass**. Still open: Hans freeze (`{}` ambiguous until NULL or freeze marker), extract `analysis_id`, P2-4 `0074`, later-step type-gate. |
 | 3 | P3 persist lock + results UAT fold (**closed**) |
 | 4 | P4 SOP Apply → process def (**closed**) |
 | 5 | P5 parser setup UX (**closed** this cycle) |
