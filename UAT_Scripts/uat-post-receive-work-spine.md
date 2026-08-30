@@ -650,17 +650,19 @@ AC-P2-1 **Pass** (receive stay-on-form) · AC-P2-2 **Pass** (asked-for save 0 WO
 
 ---
 
-## Next unsigned stamp — analysis-in-chain + process handoff (after `8cfa2a9`)
+The preceding `8cfa2a9` section is retained verbatim as the latest **signed** per-AC history. It is not the current live stamp. Do not rewrite or transfer those observations to another SHA.
+
+## Live AC-P2 stamp — `9342439` (unsigned)
 
 **Not Pass.** Do **not** rewrite or transfer outcomes from `8cfa2a9`, `b005cfe`, `9c4f9da`, `3b56cfb`, or P1. AC-P2-5 Pass on `8cfa2a9` remains **analysis+TAT map / UI click-save** history. This block is the restamp script for the lock after that SHA.
 
-**Branch / build:** `feat/work-order-p2` after PR **#92** (`2f33008`) honesty fold. SHA = this commit (rebase of `2ef54d1`). **Not click-run. Not Pass.**
+**Branch / build:** `feat/work-order-p2` at `9342439` (`93424396ce3d02f01a8a8388abda39ae6ebf8010`). **Not click-run. Not Pass.**
 
-**QA signature:** unsigned. Tobias restamps on this committed SHA. Do **not** write overall P2 Pass. Dest-type **mint** remains Hold — do not UAT blood→DNA daughter.
+**QA signature:** **unsigned**. Tobias restamps on this SHA. Do **not** write Pass on AC-P2-9 / AC-P2-10 / AC-P2-11. Do **not** write overall P2 Pass. Dest-type **mint** remains Hold — do not UAT blood→DNA daughter.
 
-**Leadership send (confirm before scoring):** [`.docs/discussions/2026-08-30-p2-route-lock.md`](../.docs/discussions/2026-08-30-p2-route-lock.md). OQ-WO-4 / OQ-TAT-1 provisional pending confirm. OQ-WO-5 **Open** until confirm.
+**Leadership send:** [`.docs/discussions/2026-08-30-p2-route-lock.md`](../.docs/discussions/2026-08-30-p2-route-lock.md) — **CEO Confirm** of all five asks. Still pending Deiter/Hans/Heidi/Günter overwrite-or-confirm. OQ-WO-4 / OQ-TAT-1 / OQ-WO-5 **CEO-signed**, not full Leadership. Not a merge stamp.
 
-**Product under test (proposed; not a signed lock):**
+**Product under test (CEO-confirmed lock; not a full Leadership lock; not QA Pass):**
 - Map row = TAT + ordered `process_definition[]`. **No** admin analysis picker and **no** admin sample-type picker.
 - Create-route UI **displays** each selected process’s allowed sample types, LIMS Run analyses, and emerging types.
 - Route assigns when (1) current sample type is on the **first process’s first** Experiment/LimsRun allow-list **and** (2) the asked-for analysis matches a **LimsRun somewhere in the route**.

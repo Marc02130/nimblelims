@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-28  
 **Stem:** `post-receive-work-spine`  
-**Status:** Architecture / UI / Spec **Accept with conditions** on `feat/work-order-p2`. **Hold product merge.** Latest signed AC-P2 is `8cfa2a9` (overall unsigned): First Start = `chain[0]` only Pass; empty Route 422 / map 409 / 201-not-AND Pass; Hans freeze skip **unsigned** (`{}` ambiguous). Code after that: no map analysis field; Route matches a LIMS Run in the chain; *x*→*x+1* emerging-type handoff — pending Leadership confirm ([send](../../discussions/2026-08-30-p2-route-lock.md)). `b005cfe` signed history. Not IC50.
+**Status:** Architecture / UI / Spec **Accept with conditions** on `feat/work-order-p2`. **Hold product merge.** Latest signed AC-P2 is `8cfa2a9` (overall unsigned): First Start = `chain[0]` only Pass; empty Route 422 / map 409 / 201-not-AND Pass; Hans freeze skip **unsigned** (`{}` ambiguous). Live SHA `9342439` — AC-P2 **unsigned**. No map analysis field; Route matches a LIMS Run in the chain; *x*→*x+1* emerging-type handoff — **CEO Confirm**; pending Deiter/Hans/Heidi/Günter overwrite-or-confirm ([send](../../discussions/2026-08-30-p2-route-lock.md)). Not full Leadership Accept. `b005cfe` signed history. Not IC50.
 **Requirements:** [`.docs/review/requirements/post-receive-work-spine.md`](../requirements/post-receive-work-spine.md)  
 **Schema:** [`.docs/review/schema-changes/post-receive-work-spine.md`](../schema-changes/post-receive-work-spine.md)  
 **Spec:** [`.docs/internal/specs/post-receive-work-spine/SPEC.md`](../../internal/specs/post-receive-work-spine/SPEC.md)  
@@ -26,7 +26,7 @@ P1 is on `main`. P2 is on `feat/work-order-p2` (Accept with conditions). Do not 
 10. **P2-4 visibility:** Route is `test:assign` and must **read** the mapped def/steps. Do **not** put `experiment:manage` on Route. **`0074` still open** on `8cfa2a9`. Mutate stays `config:edit`.
 11. **No sample-type picker (Tobias-signed Pass on `8cfa2a9` — UI click-save):** ELISA TAT 1–7 saved; Blood extract + later DNA qPCR chain saved (no AND 422); second ELISA overlap **409**. Empty Route **422** Pass. Two-accept **409** unsigned that SHA.
 12. **Extract `analysis_id` (still open):** Extract LimsRun must **not** share the asked-for `analysis_id`.
-13. **Proposed after `8cfa2a9` (pending Leadership confirm):** no map analysis picker. Route matches a LIMS Run in the chain. Map 409 = TAT ∩ first-step types ∩ LIMS Run analyses. Map 422 when process *x* emerging type is not accepted by *x+1*. Send: [2026-08-30-p2-route-lock](../../discussions/2026-08-30-p2-route-lock.md).
+13. **After `8cfa2a9` (CEO Confirm; pending Deiter/Hans/Heidi/Günter overwrite-or-confirm):** no map analysis picker. Route matches a LIMS Run in the chain. Map 409 = TAT ∩ first-step types ∩ LIMS Run analyses. Map 422 when process *x* emerging type is not accepted by *x+1*. Dest-type mint Hold. Live SHA `9342439`. Send: [2026-08-30-p2-route-lock](../../discussions/2026-08-30-p2-route-lock.md). Not full Leadership Accept.
 
 ---
 
