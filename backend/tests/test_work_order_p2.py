@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 from fastapi.testclient import TestClient
@@ -11,7 +11,8 @@ from sqlalchemy.orm import Session
 from models.analysis import Analysis
 from models.asked_for import AskedFor
 from models.container import ContainerType
-from models.entry import ELNProcess
+from models.entry import ELNProcess, ELNProcessSample
+from models.sample import Sample
 from models.list import List, ListEntry
 from models.project import Project, ProjectUser
 from models.test import Test
@@ -987,6 +988,106 @@ class TestWorkOrderP2:
             )
         ]
         assert sorted(positions) == [1, 2, 3]
+
+    def test_later_start_follows_aliquot_product_not_parent(
+        self,
+        client: TestClient,
+        admin_token: str,
+        p2_seed,
+        db_session: Session,
+        test_admin_user: User,
+    ):
+        extract = _create_lims_run_definition(
+            client, admin_token, p2_seed["analysis_a"].id
+        )
+        later = _create_lims_run_definition(
+            client, admin_token, p2_seed["analysis_a"].id
+        )
+        _put_step_types(client, admin_token, extract, p2_seed["sample_type"].id)
+        _put_step_types(client, admin_token, later, p2_seed["sample_type"].id)
+        mapped = _create_map(
+            client,
+            admin_token,
+            definition_ids=[extract["id"], later["id"]],
+        )
+        assert mapped.status_code == 201, mapped.text
+        sample_id = _receive_sample(client, admin_token, p2_seed, "NBIO-P2-DEST")
+        created = client.post(
+            "/v1/asked-for",
+            json=_asked_for_body([sample_id], p2_seed["analysis_a"].id),
+            headers=_auth(admin_token),
+        )
+        routed = client.post(
+            f"/v1/asked-for/{created.json()['items'][0]['id']}/route",
+            headers=_auth(admin_token),
+        )
+        wo_id = routed.json()["items"][0]["work_order"]["id"]
+        first = client.post(
+            f"/v1/work-orders/{wo_id}/start", headers=_auth(admin_token)
+        )
+        assert first.status_code == 200, first.text
+        first_process_id = first.json()["process_id"]
+        db_session.expire_all()
+        dest = Sample(
+            name=f"plated-{uuid4().hex[:6]}",
+            sample_type=p2_seed["sample_type"].id,
+            status=p2_seed["available"].id,
+            project_id=p2_seed["project"].id,
+            parent_sample_id=UUID(str(sample_id)),
+            created_by=test_admin_user.id,
+            modified_by=test_admin_user.id,
+        )
+        db_session.add(dest)
+        db_session.flush()
+        from models.container import Container, Contents
+
+        dest_tube = Container(
+            name=f"DEST-{uuid4().hex[:6]}",
+            type_id=p2_seed["tube"].id,
+            created_by=test_admin_user.id,
+            modified_by=test_admin_user.id,
+        )
+        db_session.add(dest_tube)
+        db_session.flush()
+        db_session.add(
+            Contents(container_id=dest_tube.id, sample_id=dest.id, amount=None)
+        )
+        parent_row = (
+            db_session.query(ELNProcessSample)
+            .filter(
+                ELNProcessSample.process_id == first_process_id,
+                ELNProcessSample.sample_id == sample_id,
+            )
+            .one()
+        )
+        parent_row.status = "removed"
+        parent_row.current_step_id = None
+        db_session.add(
+            ELNProcessSample(
+                process_id=first_process_id,
+                sample_id=dest.id,
+                container_id=dest_tube.id,
+                status="in_progress",
+                created_by=test_admin_user.id,
+                modified_by=test_admin_user.id,
+            )
+        )
+        db_session.commit()
+
+        second = client.post(
+            f"/v1/work-orders/{wo_id}/start", headers=_auth(admin_token)
+        )
+        assert second.status_code == 200, second.text
+        later_id = second.json()["latest_process_id"]
+        db_session.expire_all()
+        later_ids = {
+            str(row.sample_id)
+            for row in db_session.query(ELNProcessSample).filter(
+                ELNProcessSample.process_id == later_id,
+                ELNProcessSample.status != "removed",
+            )
+        }
+        assert later_ids == {str(dest.id)}
 
     def test_later_process_start_incompatible_type_422(
         self,

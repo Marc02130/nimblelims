@@ -1832,12 +1832,13 @@ Tables (migrations `0047` + `0051`): `eln_process_definitions`, `eln_process_def
   - `eln_experiment` → create Experiment (+ entries); returns `{ step, experiment_id, warning? }`
   - `lims_run` → lazy create LimsRun; history in `eln_process_step_lims_runs`; `force_new` for retest
 
-**Samples**
-- `GET /eln-processes/{process_id}/samples` — Optional filters: `current_step_id`, `sample_status`.
-- `POST /eln-processes/{process_id}/samples` — Body: `{ "sample_ids": [...], "set_to_first_step": true }`.
+**Samples (assignment = sample in a container)**
+- `GET /eln-processes/{process_id}/samples` — Optional filters: `current_step_id`, `sample_status`. Each row includes `container_id`.
+- `POST /eln-processes/{process_id}/samples` — Body: `{ "sample_ids": [...], "set_to_first_step": true }` **or** `{ "assignments": [{ "sample_id", "container_id" }], ... }`. `sample_ids` resolves when the sample has **exactly one** Contents vessel. No container or more than one vessel without `assignments` → **422** `process_container_required`.
 - `DELETE /eln-processes/{process_id}/samples/{sample_id}`
 - `PATCH /eln-processes/{process_id}/samples/{sample_id}/step` — Set `step_id` / `status`.
 - `POST /eln-processes/{process_id}/samples/{sample_id}/advance` — Soft gate: returns `{ sample, warning?, advanced }` (warns if lims_run step incomplete; still advances).
+- After aliquot/pool **execute**, dest container-with-sample is on the process (`in_progress`); inbound source assignment is `removed`. Later `POST /work-orders/{id}/start` instantiates the next process with those continuing assignments.
 
 **Sample journey (Phase 3, Decision #7)** — any user who can read the sample
 - `GET /samples/{sample_id}/journey` — Process progress for that sample (process name, current step kind, experiment/run links). Not gated on `experiment:manage`.

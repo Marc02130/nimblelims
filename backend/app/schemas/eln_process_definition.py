@@ -5,6 +5,7 @@ from datetime import datetime
 from uuid import UUID
 
 from models.entry import STEP_KINDS, EXECUTION_MODES
+from app.schemas.eln_process import ProcessAssignmentItem
 
 
 class ELNProcessDefinitionStepCreate(BaseModel):
@@ -116,6 +117,7 @@ class InstantiateProcessFromDefinitionRequest(BaseModel):
     description: Optional[str] = None
     status_id: Optional[UUID] = None
     sample_ids: Optional[List[UUID]] = None
+    assignments: Optional[List[ProcessAssignmentItem]] = None
     set_to_first_step: bool = True
     work_order_id: Optional[UUID] = None
     work_order_route_position: Optional[int] = None

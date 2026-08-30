@@ -123,7 +123,7 @@ Pytest: create, 409 dup, **403 dual-belt** (create **and** `list()` / `GET /aske
 
 `work_orders.process_definition_ids` snapshot at mint (**L4**), **zero Tests**. Ordered list is the lock. Punch (3): **first Start must not mint later processes or their Tests** — do not teach that mint as shipped.
 
-Start: `ELNProcessService.instantiate_from_definition` on **process[0] / `chain[0]` only**. Later Start = next pending process, on the sample that exists then. Instantiate stays `experiment:manage`. Route stays `test:assign`. Later process/step starts type-gate current type vs **that** step only. Dest-type Hold out.
+Start: `ELNProcessService.instantiate_from_definition` on **process[0] / `chain[0]` only**. Later Start = next pending process, on samples **still assigned** to the previous process (aliquot/pool product continues; inbound sample is `removed`). Instantiate stays `experiment:manage`. Route stays `test:assign`. Later process/step starts type-gate current type vs **that** step only (skip `removed`). Mint itself is aliquot/pool OOB, not this start.
 
 **L3 / A5 / SC5 / Hans:** `if test: continue` is **not** a freeze. At LimsRun start for the asked-for analysis, insert the Test if missing and **write** `asked_for.params` → `tests.asked_for_params`. Classic `/tests` must leave `asked_for_params` **NULL**, or we need a **freeze marker**. Until one of those exists, `{}` is **ambiguous**. Do **not** teach skip-on-frozen-`{}`. **OQ-WO-6:** any earlier LimsRun must **not** reuse the asked-for `analysis_id` (extract is not special; type gates are a different axis). P1 does **not** write that Test snapshot. Freeze skip stays unsigned.
 

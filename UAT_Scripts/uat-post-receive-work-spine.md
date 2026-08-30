@@ -775,3 +775,35 @@ Marc 2026-08-30. Does **not** rewrite Tobias Results above. Not Pass. Send: [`.d
 - Extract is not a special sample/assay. Blood→DNA is a **derivative** (dest mint Hold). Tube→plate aliquot is equivalent. Library is a new sample. Type gates on process steps catch blood-on-Qubit.
 - The OPEN `analysis_id` punch is **OQ-WO-6**: any **earlier** LimsRun that reuses the asked-for analysis mints/freezes the panel Test on the parent. Extract is only usually process 1.
 - Parser is chosen at **import**, not on the process.
+
+---
+
+## Unsigned — process assignment is a sample in a container (`0077`)
+
+**Not Pass.** Do **not** transfer `9342439` / `8cfa2a9` Results. Click after this SHA is on the branch.
+
+**Product:** A sample may have many physical containers. Only a **container-with-sample** (Contents) is assigned to a process.
+
+| Slice | Tobias |
+|-------|--------|
+| Assign sample with no container → **422** `process_container_required` | **unsigned** |
+| Assign receive tube (one Contents) by `sample_ids` → 201, `container_id` set | **unsigned** |
+| Aliquot/pool execute: dest joins process; inbound source `removed` | **unsigned** |
+| Later work-order Start uses dest container-with-sample, not the parent vessel | **unsigned** |
+| Overall P2 | **unsigned / not Pass** |
+
+### AC-P2-C1 — assign requires a container
+
+1. Create a process definition instance.
+2. Try to assign a sample that has **no** Contents. Confirm **422**.
+3. Receive a tube (one container). Assign that sample by id. Confirm **201** and `container_id` is the receive tube.
+
+### AC-P2-C2 — dest continues the process
+
+1. Start a work order (or process) with the receive tube assigned.
+2. Execute aliquot/pool so a dest sample+container is minted.
+3. Confirm dest assignment `in_progress` with dest `container_id`.
+4. Confirm inbound source assignment `removed`.
+5. Later Start of the next process in the route. Confirm the new process instance has the **dest** container-with-sample, not the original tube.
+
+Mint remains aliquot/pool OOB **execute**, not Route/Start. Sequencing data still not in NimbleLIMS.

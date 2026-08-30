@@ -541,8 +541,51 @@ class AliquotPlanService:
         )
         return {r[0] for r in rows if r[0]}
 
-    def _join_minted_destination(self, entry: Entry, sample: Sample) -> None:
-        """Join an execute-minted daughter to its experiment and process instance."""
+    def _release_source_from_process(
+        self,
+        entry: Entry,
+        source_sample_id: UUID,
+        dest_sample_id: UUID,
+        source_container_id: Optional[UUID] = None,
+        dest_container_id: Optional[UUID] = None,
+    ) -> None:
+        """Inbound container-with-sample no longer continues the process."""
+        if not entry.process_step_id:
+            return
+        if (
+            source_sample_id == dest_sample_id
+            and source_container_id
+            and dest_container_id
+            and source_container_id == dest_container_id
+        ):
+            return
+        process_step = (
+            self.db.query(ELNProcessStep)
+            .filter(ELNProcessStep.id == entry.process_step_id)
+            .first()
+        )
+        if not process_step:
+            return
+        query = self.db.query(ELNProcessSample).filter(
+            ELNProcessSample.process_id == process_step.process_id,
+            ELNProcessSample.sample_id == source_sample_id,
+            ELNProcessSample.status != "removed",
+        )
+        if source_container_id is not None:
+            query = query.filter(
+                ELNProcessSample.container_id == source_container_id
+            )
+        process_sample = query.first()
+        if not process_sample:
+            return
+        process_sample.status = "removed"
+        process_sample.current_step_id = None
+        process_sample.modified_by = self._user_id()
+
+    def _join_minted_destination(
+        self, entry: Entry, sample: Sample, container_id: UUID
+    ) -> None:
+        """Join minted dest container-with-sample to experiment and process."""
         execution = (
             self.db.query(ExperimentSampleExecution)
             .filter(
@@ -576,7 +619,7 @@ class AliquotPlanService:
                     self.db.query(ELNProcessSample)
                     .filter(
                         ELNProcessSample.process_id == process_step.process_id,
-                        ELNProcessSample.sample_id == sample.id,
+                        ELNProcessSample.container_id == container_id,
                     )
                     .first()
                 )
@@ -585,12 +628,18 @@ class AliquotPlanService:
                         ELNProcessSample(
                             process_id=process_step.process_id,
                             sample_id=sample.id,
+                            container_id=container_id,
                             status="in_progress",
                             current_step_id=process_step.id,
                             created_by=self._user_id(),
                             modified_by=self._user_id(),
                         )
                     )
+                else:
+                    process_sample.sample_id = sample.id
+                    process_sample.status = "in_progress"
+                    process_sample.current_step_id = process_step.id
+                    process_sample.modified_by = self._user_id()
 
         destination_entries = (
             self.db.query(Entry)
@@ -733,7 +782,15 @@ class AliquotPlanService:
         try:
             for r in resolved:
                 dest_sample, dest_c = self._execute_transfer(r, pool_containers)
-                self._join_minted_destination(entry, dest_sample)
+                if dest_sample is not None and dest_c is not None:
+                    self._join_minted_destination(entry, dest_sample, dest_c.id)
+                    self._release_source_from_process(
+                        entry,
+                        r.source_sample_id,
+                        dest_sample.id,
+                        source_container_id=r.source_container_id,
+                        dest_container_id=dest_c.id,
+                    )
                 results.append(
                     AliquotExecuteLineResult(
                         line_id=r.line_id,

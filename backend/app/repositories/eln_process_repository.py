@@ -331,15 +331,19 @@ class ELNProcessRepository:
         self,
         process_id: UUID,
         sample_id: UUID,
+        container_id: Optional[UUID] = None,
+        *,
+        include_removed: bool = False,
     ) -> Optional[ELNProcessSample]:
-        return (
-            self.db.query(ELNProcessSample)
-            .filter(
-                ELNProcessSample.process_id == process_id,
-                ELNProcessSample.sample_id == sample_id,
-            )
-            .first()
+        query = self.db.query(ELNProcessSample).filter(
+            ELNProcessSample.process_id == process_id,
+            ELNProcessSample.sample_id == sample_id,
         )
+        if container_id is not None:
+            query = query.filter(ELNProcessSample.container_id == container_id)
+        if not include_removed:
+            query = query.filter(ELNProcessSample.status != "removed")
+        return query.first()
 
     def get_process_sample_by_id(self, assignment_id: UUID) -> Optional[ELNProcessSample]:
         return (
@@ -372,6 +376,7 @@ class ELNProcessRepository:
         self,
         process_id: UUID,
         sample_id: UUID,
+        container_id: UUID,
         status: str = 'queued',
         current_step_id: Optional[UUID] = None,
         created_by: Optional[UUID] = None,
@@ -380,6 +385,7 @@ class ELNProcessRepository:
         ps = ELNProcessSample(
             process_id=process_id,
             sample_id=sample_id,
+            container_id=container_id,
             status=status,
             current_step_id=current_step_id,
             created_by=created_by,

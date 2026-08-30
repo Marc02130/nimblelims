@@ -3,7 +3,7 @@
 **Feature / cycle:** post-receive work spine  
 **Phases covered:** P1 (asked-for) required this cycle; P2 tables specified so architecture can Accept the spine; P3 none; P4 additive FKs; P5 none  
 **Status:** Draft for architecture review  
-**Alembic revisions:** `0072_asked_for_p1` (P1: `analysis_param_defs` + `asked_for`); `0073_routing_work_orders_p2` (P2: `routing_map`, `work_orders`, step accepted types, nullable LimsRun templates + `analysis_id`, `tests.asked_for_params`); `0074_p2_uat_visibility_publish`; `0075_wo7_freeze_route_position` (`eln_processes.work_order_route_position`); `0076_route_analysis_from_lims_runs` (drop gist on map analysis+type+TAT)  
+**Alembic revisions:** `0072_asked_for_p1` (P1: `analysis_param_defs` + `asked_for`); `0073_routing_work_orders_p2` (P2: `routing_map`, `work_orders`, step accepted types, nullable LimsRun templates + `analysis_id`, `tests.asked_for_params`); `0074_p2_uat_visibility_publish`; `0075_wo7_freeze_route_position` (`eln_processes.work_order_route_position`); `0076_route_analysis_from_lims_runs` (drop gist on map analysis+type+TAT); `0077_process_assignment_container` (`eln_process_samples.container_id`)  
 **Requirements:** [`.docs/review/requirements/post-receive-work-spine.md`](../requirements/post-receive-work-spine.md)  
 **Tech sketch:** [`.docs/review/tech-sketch/post-receive-work-spine.md`](../tech-sketch/post-receive-work-spine.md)
 
@@ -31,6 +31,7 @@ RLS: asked_for and work_orders follow sample → project (same pattern as tests)
 |-------|--------|-------|
 | `sop_parse_jobs` (name as in code) | ADD `process_definition_id` uuid null FK | P4 |
 | `eln_processes` | ADD `work_order_id` uuid null FK; ADD `work_order_route_position` int null | Each later start creates one process instance for one ordered definition. Unique `(work_order_id, work_order_route_position)`; no process-of-processes minted at Route |
+| `eln_process_samples` | ADD `container_id` UUID NOT NULL FK `containers` (`0077`) | Process assignment is Contents (sample in a container). Unique `(process_id, container_id)`; active unique `(process_id, sample_id)` WHERE status <> removed |
 | `eln_process_definition_steps` | P2: `experiment_template_id` **nullable**; ADD `analysis_id` uuid null FK `analyses` | Pulled from A8 so a **Qubit LimsRun** step does not need a fake ExperimentTemplate. CHECK: `eln_experiment` ⇒ template NOT NULL; `lims_run` ⇒ `analysis_id` NOT NULL. |
 | `results` | none | P3 uses `reported_result`, `qualifiers` (UUID FK), `raw_result`. Fitted IC50 etc. live here, **not** in param JSON. |
 | `tests` | **P2:** ADD `asked_for_params jsonb not null default '{}'` | **A5 / L3 / SC5.** Frozen copy of `asked_for.params` at **LimsRun start**. P1 does not write this column. |

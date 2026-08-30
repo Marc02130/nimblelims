@@ -10,7 +10,7 @@
 
 **UAT:** do **not** rewrite `8cfa2a9` / `b005cfe` / `9c4f9da` / `3b56cfb` / P1. Tobias signed **AC-P2-9..11 Pass** on `9342439` (local compose, down after; docs merge `50c1f24` does not change the click SHA). Deiter / Hans / Heidi / Günter confirmed that restamp (honesty, **not** a merge vote): later-step type-gate **Met**; AC-P2-11 / handoff Pass is **map-save only**; dest mint **Hold**; freeze skip **OPEN**; extract `analysis_id` **OPEN**; Route stays `test:assign`. Overall P2 remains **not Pass**.
 
-**Dest-type Hold:** execute still does **not** mint a DNA daughter. Authoring may still read a declared aliquot/pool dest on a template.
+**Dest-type Hold:** mint is **not** P2. It is aliquot/pool **OOB entry** submit (new sample + container). Process Start / Route / map save do **not** create daughters. Authoring may still **read** a declared dest on the template for handoff 422.
 
 ---
 

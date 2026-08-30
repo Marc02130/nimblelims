@@ -78,6 +78,8 @@ def assert_instance_step_accepts_current_type(
         .filter(ELNProcessSample.process_id == process.id)
         .all()
     ):
+        if assignment.status == "removed":
+            continue
         sample_ids.add(assignment.sample_id)
     for sid in extra_sample_ids or []:
         sample_ids.add(sid)
@@ -754,6 +756,56 @@ class RoutingService:
             )
         return grouped
 
+    def _continuing_assignments(self, process) -> List[dict]:
+        """Container-with-sample still on the process after aliquot/pool mint."""
+        from models.entry import ELNProcessSample
+
+        rows = (
+            self.db.query(ELNProcessSample)
+            .filter(
+                ELNProcessSample.process_id == process.id,
+                ELNProcessSample.status != "removed",
+            )
+            .all()
+        )
+        return [
+            {"sample_id": row.sample_id, "container_id": row.container_id}
+            for row in rows
+        ]
+
+    def _assignment_for_sample(self, sample_id: UUID) -> dict:
+        from models.container import Contents
+
+        rows = (
+            self.db.query(Contents)
+            .filter(Contents.sample_id == sample_id)
+            .order_by(Contents.container_id)
+            .all()
+        )
+        if not rows:
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail={
+                    "code": "process_container_required",
+                    "message": (
+                        "Sample has no container; only a sample in a container "
+                        "can be assigned to a process"
+                    ),
+                },
+            )
+        if len(rows) > 1:
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail={
+                    "code": "process_container_required",
+                    "message": (
+                        "Sample is in more than one container; specify which "
+                        "container is in the process"
+                    ),
+                },
+            )
+        return {"sample_id": sample_id, "container_id": rows[0].container_id}
+
     def start_work_order(self, work_order_id: UUID):
         """Instantiate the next pending process in snapshot order."""
         deny_client_write(self.user)
@@ -790,14 +842,24 @@ class RoutingService:
                 status.HTTP_422_UNPROCESSABLE_ENTITY,
                 "All processes in the route have been started",
             )
-        sample_type_id = getattr(wo.sample, "sample_type", None)
-        if sample_type_id is None:
-            raise HTTPException(
-                status.HTTP_422_UNPROCESSABLE_ENTITY,
-                "Work order sample has no sample type",
+        assignments = (
+            self._continuing_assignments(started[-1]) if started else []
+        )
+        if not assignments:
+            assignments = [self._assignment_for_sample(wo.sample_id)]
+        for item in assignments:
+            sample = (
+                self.db.query(Sample).filter(Sample.id == item["sample_id"]).first()
             )
-        self._assert_sample_matches_first_step([chain[next_idx]], sample_type_id)
+            sample_type_id = getattr(sample, "sample_type", None) if sample else None
+            if sample_type_id is None:
+                raise HTTPException(
+                    status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    "Work order sample has no sample type",
+                )
+            self._assert_sample_matches_first_step([chain[next_idx]], sample_type_id)
         from app.schemas.eln_process_definition import InstantiateProcessFromDefinitionRequest
+        from app.schemas.eln_process import ProcessAssignmentItem
         from app.services.eln_process_service import ELNProcessService
 
         sample_name = getattr(wo.sample, "name", None) or "sample"
@@ -807,7 +869,13 @@ class RoutingService:
             chain[next_idx],
             InstantiateProcessFromDefinitionRequest(
                 name=f"WO {sample_name} {analysis_name} p{position} {uuid4().hex[:6]}"[:240],
-                sample_ids=[wo.sample_id],
+                assignments=[
+                    ProcessAssignmentItem(
+                        sample_id=item["sample_id"],
+                        container_id=item["container_id"],
+                    )
+                    for item in assignments
+                ],
                 work_order_id=wo.id,
                 work_order_route_position=position,
             ),
