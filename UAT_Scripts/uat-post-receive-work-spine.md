@@ -780,30 +780,37 @@ Marc 2026-08-30. Does **not** rewrite Tobias Results above. Not Pass. Send: [`.d
 
 ## Unsigned — process assignment is a sample in a container (`0077`)
 
-**Not Pass.** Do **not** transfer `9342439` / `8cfa2a9` Results. Tobias click SHA for AC-P2-C1/C2 is product **`4671ba8`** (migration **`0077`** in that commit). **Unsigned** until Tobias clicks. Do **not** write Pass.
+**Not Pass.** Do **not** transfer `9342439` / `8cfa2a9` / P1 Results. Tobias click SHA for AC-P2-C1/C2 is product **`4671ba8`**; the assignment commit is **`02fe95f`** (migration **`0077`** in that commit). **Unsigned** until Tobias clicks. Do **not** write Pass.
 
-**Product:** A sample may have many physical containers. Only a **container-with-sample** (Contents) is assigned to a process. Assign without a container → **422** `process_container_required`.
+**Leadership Confirm of this grain** (Rolf / Deiter / Hans / Heidi / Günter, 2026-08-30) is in [`.docs/discussions/2026-08-30-p2-route-lock.md`](../.docs/discussions/2026-08-30-p2-route-lock.md), section “Contents grain / `0077`”. Confirm is **not** a click and **not** a merge stamp. Dest mint stays **Hold**. OQ-WO-6 and freeze skip stay **OPEN**.
+
+**Product:** A sample may have many physical containers. Only a **container-with-sample** (Contents) is assigned to a process — the **tube in hand**. Assign without a container → **422** `process_container_required`. Two tubes for the same sample and no pick → **422**, no silent pick, never `first()`.
+
+**Equivalent aliquot vs dest mint — read this before scoring C2.** An **equivalent aliquot** is the **same sample in a new container**: no new sample identity, no `sample_type` rewrite. Later Start follows the dest **container**, not a dest **type**. **Dest mint** is different and stays **Hold**: `_execute_transfer` still inserts a **new Sample** carrying `dest_sample_type` (which can be DNA) and `_join_minted_destination` joins that row to the process. If a click produces that new Sample row, it is **dest mint Hold** — **not** AC-P2-C2, and it must not be scored here.
 
 | Slice | Tobias |
 |-------|--------|
-| Assign sample with no container → **422** `process_container_required` | **unsigned** |
-| Assign receive tube (one Contents) by `sample_ids` → 201, `container_id` set | **unsigned** |
-| Aliquot/pool execute: dest joins process; inbound source `removed` | **unsigned** |
-| Later work-order Start uses dest container-with-sample, not the parent vessel | **unsigned** |
+| Assign sample with **no** vessel → **422** `process_container_required` | **unsigned** |
+| Assign sample in **two** vessels with no `container_id` pick → **422**, no silent pick | **unsigned** |
+| Assign receive tube (one Contents) by `sample_ids` → **201**, `container_id` set to that tube | **unsigned** |
+| Equivalent aliquot (same sample, new container): dest container-with-sample stays on the process; emptied inbound source comes off (`removed`) | **unsigned** |
+| Later work-order Start follows the dest **container**, not the parent vessel and not a dest type | **unsigned** |
+| Dest mint (`_execute_transfer` new Sample with `dest_sample_type`) | **Hold — not an AC here** |
 | Overall P2 | **unsigned / not Pass** |
 
-### AC-P2-C1 — assign requires a container
+### AC-P2-C1 — assign is the tube in hand
 
 1. Create a process definition instance.
-2. Try to assign a sample that has **no** Contents. Confirm **422**.
-3. Receive a tube (one container). Assign that sample by id. Confirm **201** and `container_id` is the receive tube.
+2. Try to assign a sample that has **no** Contents. Confirm **422** `process_container_required`, lab-readable, and nothing assigned.
+3. Take a sample sitting in **two** containers and assign it without a `container_id` pick. Confirm **422** and that the app did **not** silently pick a vessel.
+4. Receive a tube (one container). Assign that sample by id. Confirm **201** and that `container_id` is the receive tube.
 
-### AC-P2-C2 — dest continues the process
+### AC-P2-C2 — equivalent aliquot: same sample, new container
 
 1. Start a work order (or process) with the receive tube assigned.
-2. Execute aliquot/pool so a dest sample+container is minted.
-3. Confirm dest assignment `in_progress` with dest `container_id`.
-4. Confirm inbound source assignment `removed`.
-5. Later Start of the next process in the route. Confirm the new process instance has the **dest** container-with-sample, not the original tube.
+2. Execute an **equivalent aliquot** — the **same sample** moved into a **new container**. Confirm no new sample identity was created for this AC and `sample_type` was **not** rewritten.
+3. Confirm the dest assignment is `in_progress` with the dest `container_id`.
+4. Confirm the emptied inbound source assignment is `removed`.
+5. Later Start of the next process in the route. Confirm the new process instance carries the **dest container**, not the original tube. The follow is by **container**, not by dest **type**.
 
-Mint remains aliquot/pool OOB **execute**, not Route/Start. Dest-type mint **Hold** is a different motion: P2 extract / work-order Start still does **not** mint a DNA daughter. After Start first extract, tube is still Blood, 0 DNA daughters. Sequencing data still not in NimbleLIMS.
+**Do not score here:** if execute inserts a **new Sample** with `dest_sample_type` (`_execute_transfer`), that is **dest mint** and stays **Hold** — it is a different motion, not AC-P2-C2. Do **not** write “dest sample minted”, “DNA daughter”, or any `sample_type` change against this AC. P2 extract / work-order Start still does **not** mint a DNA daughter: after Start first extract the tube is still **Blood**, 0 DNA daughters. Extract-hold UAT step **1.7** is **OOB execute**, not this P2 Contents click. Test identity stays `(sample, analysis)` — the container is **which vessel was measured**, and a concentration write-through hits that container. Route stays `test:assign`. Sequencing data still not in NimbleLIMS.
