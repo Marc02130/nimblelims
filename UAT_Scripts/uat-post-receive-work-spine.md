@@ -515,7 +515,7 @@ This block records Tobias’s `8cfa2a9` click. It does **not** rewrite or transf
 
 **Copy and permission locks:** Receive ends on `/receive`. Asked-for is a separate later look-up. Route is an **unnumbered** later planner requiring `test:assign` plus project access; it does not require `experiment:manage`. Client and inaccessible-project Route writes return **403**, not 404. **Start process** and LimsRun start require `experiment:manage`; publish requires `experiment:publish`. **Start instantiates `chain[0]` only.** Dest-type Hold out.
 
-**Hans freeze punch (still open — do not score as Pass):** Classic `/tests` must leave `asked_for_params` **NULL**. **Skip-on-`{}` is not a freeze** until that or a freeze marker lands. A classic default `{}` and a frozen `{}` are the **same JSON**; do **not** claim they are distinguishable. `if test: continue` is **not** a freeze. Extract LimsRun must **not** share the asked-for `analysis_id`.
+**Hans freeze punch (still open — live freeze skip unsigned, not Pass):** Classic `/tests` must leave `asked_for_params` **NULL**, or we need a **freeze marker**. Until one of those exists, `{}` is **ambiguous** — first start cannot tell a classic default `{}` from a frozen `{}` (same JSON). Do **not** teach skip-on-frozen-`{}` as if that distinguishes a classic `/tests` row. `{}` is **not** a verified freeze skip. `if test: continue` is **not** a freeze. Extract LimsRun must **not** share the asked-for `analysis_id`.
 
 | Slice on `8cfa2a9` | Tobias |
 |--------------------|--------|
@@ -523,8 +523,8 @@ This block records Tobias’s `8cfa2a9` click. It does **not** rewrite or transf
 | Asked-for save 0 work orders | **Pass** |
 | Empty Route **422** `No routing-map row accepts this analysis, TAT, and sample type` | **Pass** |
 | alice Route+Start **first process only** (ELISA first LimsRun, 1 step, no Qubit/qPCR Tests) | **Pass** |
-| Freeze **wrote** `asked_for_params` `{}` onto **new** Test `99b692d3` (not SQL NULL, not a skipped classic row); later start no overwrite | **Pass** for that **new-Test** path only |
-| Classic `/tests` skip / skip-on-`{}` | **OPEN, not Pass.** Do not fold as Pass. |
+| Freeze **wrote** `asked_for_params` `{}` onto **new** Test `99b692d3` (not SQL NULL, not a skipped classic row) | Observed write. **Not** a verified freeze skip — `{}` is ambiguous. |
+| Classic `/tests` skip / skip-on-frozen-`{}` | **OPEN, unsigned, not Pass.** Do not fold later-start no-overwrite of `{}` as Pass. |
 | carol publish **422** `test_missing`; run stayed complete unpublished | **Pass** |
 | Routing-map UI: no sample-type picker; copy “First process is sample-type dependent. Later processes are not.” Overlap **409**. Blood+qPCR chain map-save **201** (not AND) | **Pass** |
 | Later-step type-gate at start (current tube) | **unsigned** — not click-run this SHA. Not Pass. |
@@ -581,7 +581,7 @@ This block records Tobias’s `8cfa2a9` click. It does **not** rewrite or transf
 
 ### AC-P2-4 — WO-7 first-start freeze and whole-run refusal
 
-**Result:** **Publish-refuse Pass** (carol **422** `test_missing`, run stayed complete unpublished). **New-Test freeze write Pass** on Test `99b692d3` only. **Classic `/tests` skip remains OPEN, not Pass.** Tobias signed, 2026-08-30, `8cfa2a9`. Do **not** fold this into overall P2 Pass. Do **not** claim freeze closed.
+**Result:** **Publish-refuse Pass** (carol **422** `test_missing`, run stayed complete unpublished). Freeze skip remains **unsigned / not Pass**. Tobias signed publish-refuse, 2026-08-30, `8cfa2a9`. Do **not** fold freeze skip or overall P2 as Pass. Do **not** claim freeze closed.
 
 1. For a routed row, save a valid asked-for param before starting its typed LimsRun.
 2. Select the routed cohort and call `PATCH /v1/lims-runs/{id}/start` for the first start.
@@ -594,14 +594,14 @@ This block records Tobias’s `8cfa2a9` click. It does **not** rewrite or transf
 **Expect**
 - Receive, asked-for save, Route, and work-order start create no Test. Route snapshots the ordered list, **zero Tests**.
 - First LimsRun start of the **asked-for** analysis **writes** `asked_for_params` onto a **new** Test.
-- Classic `/tests` must leave `asked_for_params` **NULL**; a row with NULL or default `{}` is **not** frozen. **Skip-on-`{}` is not a freeze**: classic default `{}` and frozen `{}` are the same JSON. Do **not** claim they are distinguishable. Skip is honest only once classic `/tests` leaves NULL or a **freeze marker** lands.
+- Classic `/tests` must leave `asked_for_params` **NULL**, or we need a **freeze marker**. Until one of those exists, `{}` is **ambiguous** — first start cannot tell a classic default `{}` from a frozen `{}` (same JSON). Do **not** teach skip-on-frozen-`{}`. `{}` is **not** a verified freeze skip.
 - `if test: continue` is **not** a freeze. Extract LimsRun must **not** share the asked-for `analysis_id`.
 - With any cohort Test missing, publish returns **422**, not **200 published**.
 - The whole run is refused: it stays `complete`, no Test is invented, and no Results are written, including for cohort samples whose Tests still exist.
 
-**Verified holds (new-Test freeze write):** first start **wrote** `asked_for_params` `{}` onto **new** Test `99b692d3` (not SQL NULL, not a skipped classic row). Later start did **not** overwrite that new-Test snapshot. **Pass for that new-Test path only.**
+**Verified holds (new-Test write, not a freeze-skip Pass):** first start **wrote** `asked_for_params` `{}` onto **new** Test `99b692d3` (not SQL NULL, not a skipped classic row). That `{}` is still **ambiguous**. Do **not** score later-start no-overwrite of `{}` as a verified freeze skip.
 
-**Not scored / still open (Hans):** do **not** fold classic `/tests` skip as Pass. Do **not** claim `{}` vs frozen `{}` is distinguishable. Classic `/tests` must still leave `asked_for_params` NULL (or a freeze marker must land) before skip-on-`{}` can be a freeze.
+**Not scored / still open (Hans):** freeze skip stays **unsigned**. Classic `/tests` must leave `asked_for_params` **NULL**, or a freeze marker must land. Until then skip-on-`{}` / skip-on-frozen-`{}` is not a freeze.
 
 **Verified holds (publish-refuse):** carol publish returned **422** `test_missing`. Run stayed **complete** unpublished.
 
@@ -642,6 +642,6 @@ This block records Tobias’s `8cfa2a9` click. It does **not** rewrite or transf
 
 **Signed by Tobias, 2026-08-30; local docker compose, compose down.**
 
-AC-P2-1 **Pass** (receive stay-on-form) · AC-P2-2 **Pass** (asked-for save 0 WO) · AC-P2-3 **Pass** (alice Route+Start first process only) · AC-P2-4 **publish-refuse Pass** + **new-Test freeze write Pass** on `99b692d3`; classic `/tests` skip **OPEN, not Pass** · AC-P2-5 **Pass** for map UI / overlap 409 / 201 not AND / empty Route 422; later-step type-gate **unsigned**.
+AC-P2-1 **Pass** (receive stay-on-form) · AC-P2-2 **Pass** (asked-for save 0 WO) · AC-P2-3 **Pass** (alice Route+Start first process only) · AC-P2-4 **publish-refuse Pass**; freeze skip **unsigned / not Pass** (`{}` on `99b692d3` is ambiguous) · AC-P2-5 **Pass** for map UI / overlap 409 / 201 not AND / empty Route 422; later-step type-gate **unsigned**.
 
-**Overall P2 remains unsigned.** Do not write overall P2 Pass, signed Pass, or merge-ready. Hans classic-NULL / skip-on-`{}` punch still open. Hold product merge. Not IC50.
+**Overall P2 remains unsigned.** Do not write overall P2 Pass, signed Pass, or merge-ready. Hans: `{}` is ambiguous until classic `/tests` leaves NULL or a freeze marker exists. Hold product merge. Not IC50.

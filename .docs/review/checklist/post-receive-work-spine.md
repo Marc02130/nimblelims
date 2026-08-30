@@ -34,7 +34,7 @@
 - [ ] work_orders
 - [ ] route + start
 - [ ] WO-7 LimsRun start / publish refuse
-- [x] UAT P2 live stamp — per-AC signed on `8cfa2a9` (overall P2 unsigned; classic skip OPEN; later-step type-gate unsigned)
+- [x] UAT P2 live stamp — overall **unsigned** on `8cfa2a9` (freeze skip unsigned: `{}` ambiguous; later-step type-gate unsigned)
 
 ## P3 results persist
 
