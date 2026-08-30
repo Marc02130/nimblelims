@@ -138,7 +138,7 @@ The **Experiments** section is its own top-level accordion, placed immediately a
 | **Work Orders** | `/work-orders` | AssignmentTurnedIn | Routed work orders | view `sample:read`; Start `experiment:manage` | Planning backlog with ordered process routes. **Start instantiates the first process only**; later starts advance in snapshot order. Route/Start do not start the whole chain. A queued work order is not started work |
 | **Processes** | `/experiments/processes` | AccountTree | ELN multi-step processes | `experiment:manage` | Existing process definitions and instances with typed Experiment/LimsRun steps |
 | **Experiment Templates** | `/experiments/templates` | ViewList | Experiment template definitions | `experiment:manage` (same as section) | Template CRUD, SOP/AI-assisted creation, sign-off, activation (`ExperimentTemplatesManagement`) |
-| **Runs** | `/runs` | PlayCircleOutline | Experiment Runs | `experiment:manage` | LimsRun list; the WO-7 lock puts Test create/attach and the asked-for parameter freeze at first start. Freeze is in code on `8cfa2a9`, unsigned until QA |
+| **Runs** | `/runs` | PlayCircleOutline | Experiment Runs | `experiment:manage` | LimsRun list; the WO-7 lock puts Test create/attach and the asked-for parameter freeze at first start. New-Test write Pass on `8cfa2a9`; classic skip OPEN |
 
 **Templates visibility:** The "Experiment Templates" sub-item is shown whenever the user has `experiment:manage` (Administrator, Lab Manager, Lab Technician in default seed roles). It is not restricted to `config:edit`.
 
