@@ -5,12 +5,12 @@
 | Path | Former | Role |
 |------|--------|------|
 | [`.docs/review/`](review/) | `.docs-review/` | Review spine: stamps, sketches, cycle requirements, process, OQs (not published operator manuals) |
-| [`.docs/internal/`](internal/) | `.docs-internal/` | Working PRDs, specs, design, ideas, user stories, SOP packs, private |
+| [`.docs/internal/`](internal/) | `.docs-internal/` | Working PRDs, specs, design, ideas, user stories, SOP packs (**git-tracked**) |
 | [`.docs/discussions/`](discussions/) | (from internal) | Multi-persona Leadership discussions |
 | [`.docs/decision-logs/`](decision-logs/) | (from internal) | Short stamps (e.g. framework FW/WO) |
 
 **Published how-tos (git):** [`/manuals/`](../manuals/) — start with [`HOWTO.md`](../manuals/HOWTO.md). Operator handbooks that used to live under `.docs/review/manuals/` are in that folder.  
-**Working PRDs / private (not on git):** `.docs/internal/`.  
+**Working PRDs / specs / design (git-tracked under `.docs/internal/`):** [`.docs/internal/`](internal/).  
 **Local vendor dumps (not on git):** `.docs/manuals/` (PDFs; not Nimble operator how-tos).
 
 **Agents / skills:** Prefer these paths. Do not write new artifacts under the old `.docs-review/` or `.docs-internal/` names. Do not put operator how-tos back under `.docs/review/manuals/`.

@@ -78,7 +78,7 @@ Tiny/small must **not** skip security or product decisions on sensitive changes 
 
 | Stage | Purpose | Where artifacts live |
 |-------|---------|----------------------|
-| **Ideation** | Problem, one-liner, non-goals, rough success metric | local `.docs/internal/ideas/` (not committed) |
+| **Ideation** | Problem, one-liner, non-goals, rough success metric | git-tracked under `.docs/internal/ideas/` |
 | **Requirements** | FR/NFR, phases, acceptance criteria, review packet links | [`.docs/review/requirements/`](../requirements/) |
 | **Tech sketch** | Lightweight *how*: APIs, engine, flows (may draft model) | [`.docs/review/tech-sketch/`](../tech-sketch/) |
 | **Schema changes** | **Authoritative DB delta for this cycle** (architecture verifies here) | [`.docs/review/schema-changes/`](../schema-changes/) |
@@ -91,7 +91,7 @@ Tiny/small must **not** skip security or product decisions on sensitive changes 
 | **Review skills (how agents run reviews)** | Formal Grok skills + packet rules | [`.grok/skills/nimble-reviews/`](../../.grok/skills/nimble-reviews/) |
 | **Open questions** | Decision log; phase gate | [`.docs/review/open-questions/`](../open-questions/) |
 | **Implementation tracking** | Phase checklists / tasks | [`.docs/review/checklist/`](../checklist/) |
-| **Long-form design** (optional) | Deeper tech design | local `.docs/internal/design/` (not committed) |
+| **Long-form design** (optional) | Deeper tech design | git-tracked under `.docs/internal/design/` |
 | **Docs sync** | User/operator how-tos + API notes for the feature | [`/manuals/`](../../../manuals/) (git), local `.docs/manuals/` (legacy, not on git), root `README.md` |
 | **Dogfood notes** | Internal exercise log / known issues | [`.docs/review/development-process/dogfood/`](./dogfood/) or checklist |
 | **UAT scripts & results** | Scripted acceptance | [`UAT_Scripts/`](../../UAT_Scripts/) (repo root); optional feature notes under [`.docs/review/development-process/uat/`](./uat/) |
@@ -138,7 +138,7 @@ When QA review is required:
 | **Tech sketch** | Early *how*—APIs, engine, flows; may include draft model |
 | **schema-changes/** | **Only** DB/RLS/backfill delta for this cycle — **architecture’s schema checklist** |
 | **Architecture review** | Verdict on sketch + **schema-changes** + requirements |
-| local `.docs/internal/design/schema-evolution.md` (not committed) | Platform product for *dynamic* field management — **not** per-cycle migration lists |
+| `.docs/internal/design/schema-evolution.md` | Platform product for *dynamic* field management — **not** per-cycle migration lists |
 
 **Rule:** If the cycle includes Alembic work, create `schema-changes/<stem>.md` before architecture review. Do not expect reviewers to reconstruct the delta from seven narrative docs.
 
@@ -297,7 +297,7 @@ After merge: **monitor** production, then **update requirements** with learnings
 
 | Doc | Role |
 |-----|------|
-| local `.docs/internal/ideas/<stem>.md` (not committed) | Ideation |
+| `.docs/internal/ideas/<stem>.md` | Ideation |
 | `requirements/<stem>.md` | Cycle requirements |
 | `tech-sketch/<stem>.md` | Tech sketch |
 | `schema-changes/<stem>.md` | **DB delta** (if migrations in scope) |

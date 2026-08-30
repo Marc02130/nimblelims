@@ -1,7 +1,7 @@
 # Containers — decision log
 
 **Status:** Core inventory model **Decided** (2026-08-11)  
-**Related:** [experiments.md](experiments.md) (aliquot/pool), [mass-concentration-contents.md](../tech-sketch/mass-concentration-contents.md) (four targets + Hans Result locks), local `.docs/internal/ideas/containers-model-update.md` (not committed) (implement slice), local `.docs/internal/ideas/materials-and-lot-tracking.md` (not committed), tech sketch §0.8 containers/amount/aliquot
+**Related:** [experiments.md](experiments.md) (aliquot/pool), [mass-concentration-contents.md](../tech-sketch/mass-concentration-contents.md) (four targets + Hans Result locks), `.docs/internal/ideas/containers-model-update.md` (implement slice), `.docs/internal/ideas/materials-and-lot-tracking.md`, tech sketch §0.8 containers/amount/aliquot
 
 ## Gate rule
 
@@ -129,7 +129,7 @@ Tracked for a future containers schema slice:
 | Admin UI / forms | Rows + columns instead of Dimensions |
 | Seeds / UAT / tests | Update tube=1×1, 96-well plate=8×12, well=1×1 |
 
-**Status of implementation:** **Partial (2026-08-27):** migration `0069` adds `rows`/`columns`, drops `dimensions`; receive + admin UI use rows/columns. Remaining: Contents-only-on-1×1 DB check, amount/conc semantics, aliquot alignment — see local `.docs/internal/ideas/containers-model-update.md` (not committed).
+**Status of implementation:** **Partial (2026-08-27):** migration `0069` adds `rows`/`columns`, drops `dimensions`; receive + admin UI use rows/columns. Remaining: Contents-only-on-1×1 DB check, amount/conc semantics, aliquot alignment — see `.docs/internal/ideas/containers-model-update.md`.
 
 ---
 

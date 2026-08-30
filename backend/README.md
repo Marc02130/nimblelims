@@ -412,7 +412,7 @@ The `start.sh` script:
 ## Related Documentation
 
 - [How to run the lab path](../manuals/HOWTO.md)
-- local `.docs/internal/design/experiment-planning.md` (not committed)
+- `.docs/internal/design/experiment-planning.md`
 - [Operator manuals](../manuals/) (HOWTO, API, navigation, domain handbooks)
-- local `.docs/internal/design/nimblelims-tech.md` (not committed)
+- `.docs/internal/design/nimblelims-tech.md`
 
