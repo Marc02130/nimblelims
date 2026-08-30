@@ -780,9 +780,9 @@ Marc 2026-08-30. Does **not** rewrite Tobias Results above. Not Pass. Send: [`.d
 
 ## Unsigned — process assignment is a sample in a container (`0077`)
 
-**Not Pass.** Do **not** transfer `9342439` / `8cfa2a9` Results. Click after this SHA is on the branch.
+**Not Pass.** Do **not** transfer `9342439` / `8cfa2a9` Results. Tobias click SHA for AC-P2-C1/C2 is product **`4671ba8`** (migration **`0077`** in that commit). **Unsigned** until Tobias clicks. Do **not** write Pass.
 
-**Product:** A sample may have many physical containers. Only a **container-with-sample** (Contents) is assigned to a process.
+**Product:** A sample may have many physical containers. Only a **container-with-sample** (Contents) is assigned to a process. Assign without a container → **422** `process_container_required`.
 
 | Slice | Tobias |
 |-------|--------|
@@ -806,4 +806,4 @@ Marc 2026-08-30. Does **not** rewrite Tobias Results above. Not Pass. Send: [`.d
 4. Confirm inbound source assignment `removed`.
 5. Later Start of the next process in the route. Confirm the new process instance has the **dest** container-with-sample, not the original tube.
 
-Mint remains aliquot/pool OOB **execute**, not Route/Start. Sequencing data still not in NimbleLIMS.
+Mint remains aliquot/pool OOB **execute**, not Route/Start. Dest-type mint **Hold** is a different motion: P2 extract / work-order Start still does **not** mint a DNA daughter. After Start first extract, tube is still Blood, 0 DNA daughters. Sequencing data still not in NimbleLIMS.
