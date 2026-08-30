@@ -812,10 +812,10 @@ Marc 2026-08-30. Does **not** rewrite Tobias Results above. Not Pass. Send: [`.d
 
 **Verified holds:** execute **mints dest**; it does **not** join dest or remove source; emptied-source assign returns **201 mix-up**; **PATCH is not a path**.
 
-**Leadership Confirm of this Fail** (Rolf / Hans / Heidi / Günter, 2026-08-30) — Deiter remains the click. Do **not** treat C1/C2 as unsigned. Do **not** invent a Tobias Pass. Grok Build owns dest-join / source-remove.
+**Leadership Confirm of this Fail** (Rolf / Hans / Heidi / Günter, 2026-08-30) — Deiter remains the click. Wilhelmina folded the C2 Fail into sketch **`a3741d1`** and requirements **`60a9447`**. Do **not** treat C1/C2 as unsigned. Do **not** invent a Tobias Pass. Grok Build owns dest-join / source-remove.
 
 - **Hans:** dest not on the process; emptied source still assignable (201) is the mix-up. Later Start would still follow the parent tube; results would not be attributable to the dest vessel.
-- **Heidi:** Execute never writes the same-sample dest container onto `eln_process_samples`; join/release no-op without `entry.process_step_id`, so later Start via `_continuing_assignments` rides the emptied parent. Emptied-source 201 is leftover amount-0 Contents, not dest-follow. PATCH is not a path. Dest mint Hold is a different punch (new Sample with dest_sample_type is not this fix). Coding stays Grok Build.
+- **Heidi / Mathilda / Wilhelmina:** Execute never writes the same-sample dest container onto `eln_process_samples`; join/release no-op without `entry.process_step_id`, so later Start via `_continuing_assignments` rides the emptied parent. Emptied-source assign **201** is leftover Contents at amount 0 (`_contents_for_sample` does not require remaining volume) — it must **422**, not dest-follow. Follow has to land in the **execute txn**: retarget `container_id`, or remove source then insert the dest pair. PATCH of `eln_process_samples` is not a path. Dest mint Hold is a different punch: a new Sample with `dest_sample_type` is not this fix. Equivalent aliquot is same sample, new container. Coding stays Grok Build.
 - **Günter:** Emptied-source assign 201 is a leftover process-join — the wrong tube stays on the instance. Dest never lands on `eln_process_samples`. Dest mint Hold is a different punch.
 - **Rolf:** QA restamps that Fail on `02fe95f` — do not treat C1/C2 as unsigned.
 

@@ -294,7 +294,7 @@ Deiter (Lab Ops), 2026-08-30, product `4671ba8` / assignment commit `02fe95f`: A
 
 ## Leadership Confirm of Deiter’s Contents click — 2026-08-30
 
-**Full Leadership Confirm** of Deiter’s click. Rolf, Hans, Heidi, Günter. Round 1, Round 2, and the Contents-grain Confirm above stay as written — this section does **not** rewrite them. Deiter remains the click. Product SHA `4671ba8` / assignment commit `02fe95f`. Docs Confirm `84d2810` is not a new execute and not the click SHA. Do **not** rewrite Tobias `9342439` / `8cfa2a9` / P1 Results. Do **not** invent a Tobias Pass for C1/C2. C1/C2 are **not** unsigned. Grok Build owns dest-join / source-remove. Not a merge stamp. Overall P2 remains **not Pass**. Hold product merge to `main`. Not IC50.
+**Full Leadership Confirm** of Deiter’s click. Rolf, Hans, Heidi, Günter. Round 1, Round 2, and the Contents-grain Confirm above stay as written — this section does **not** rewrite them. Deiter remains the click. Product SHA `4671ba8` / assignment commit `02fe95f`. Wilhelmina folded the C2 Fail into sketch **`a3741d1`** and requirements **`60a9447`**. Docs Confirm `84d2810` is not a new execute and not the click SHA. Do **not** rewrite Tobias `9342439` / `8cfa2a9` / P1 Results. Do **not** invent a Tobias Pass for C1/C2. C1/C2 are **not** unsigned. Grok Build owns dest-join / source-remove. Not a merge stamp. Overall P2 remains **not Pass**. Hold product merge to `main`. Not IC50.
 
 | Slice | Confirm |
 |-------|---------|
@@ -313,9 +313,9 @@ Deiter (Lab Ops), 2026-08-30, product `4671ba8` / assignment commit `02fe95f`: A
 
 **Confirm the Fail holds.** Dest not on the process; emptied source still assignable (201) is the mix-up. Later Start would still follow the parent tube; results would not be attributable to the dest vessel. Dest mint Hold remains a different punch (still Blood, 0 DNA). Do not rewrite `9342439`. No overall P2 Pass.
 
-### Heidi (Arch)
+### Heidi / Mathilda / Wilhelmina (Arch / Dev)
 
-**Confirm the Fail holds.** Execute never writes the same-sample dest container onto `eln_process_samples`; join/release no-op without `entry.process_step_id`, so later Start via `_continuing_assignments` rides the emptied parent. Emptied-source 201 is leftover amount-0 Contents, not dest-follow. PATCH is not a path. Dest mint Hold is a different punch (new Sample with dest_sample_type is not this fix). Coding stays Grok Build.
+**Confirm the Fail holds.** Execute never writes the same-sample dest container onto `eln_process_samples`; join/release no-op without `entry.process_step_id`, so later Start via `_continuing_assignments` rides the emptied parent. Emptied-source assign **201** is leftover Contents at amount 0 (`_contents_for_sample` does not require remaining volume) — it must **422**, not dest-follow. Follow has to land in the **execute txn**: retarget `container_id`, or remove source then insert the dest pair. PATCH of `eln_process_samples` is not a path. Dest mint Hold stays Hold — a new Sample with `dest_sample_type` is not this fix. Equivalent aliquot is same sample, new container. Coding stays Grok Build.
 
 ### Günter (Sec CSO)
 
