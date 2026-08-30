@@ -1896,7 +1896,7 @@ Endpoints require specific permissions. The system currently has 17 permissions:
 
 **Note**: The code references `test:configure` permission in analyses, analytes, and test batteries endpoints, but this permission is not currently in the database. These endpoints use `require_any_permission(["config:edit", "test:configure"])`, which effectively requires `config:edit` permission.
 
-See local `.docs/internal/prd/nimblelims-prd.md` (not committed) for product requirements; permission list is maintained with seed data and this API reference.
+See `.docs/internal/prd/nimblelims-prd.md` for product requirements; permission list is maintained with seed data and this API reference.
 
 ## Help Endpoints
 

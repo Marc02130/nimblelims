@@ -59,7 +59,7 @@ draft → ordered → running → results_received → complete → published
 
 ### Promote-on-publish (structured Tests / Results)
 
-Shipped v1 — see local `.docs/internal/ideas/run-results.md` (not committed).
+Shipped v1 — see `.docs/internal/ideas/run-results.md`.
 
 | Rule | Behavior |
 |------|----------|
@@ -152,12 +152,12 @@ You can still enforce strict state-machine rules in the application service laye
 - Decide on status implementation (enum vs lookup table) before adding many more phases.
 - Define what "more flexible" data structures are needed for general ADME / non-dose-response work.
 - Consider whether `LimsRun` should eventually be able to live inside (or be referenced by) an ELN Experiment.
-- Follow-on ideas: local `.docs/internal/ideas/ai-data-import.md` (not committed), local `.docs/internal/ideas/ai-data-analysis.md` (not committed), local `.docs/internal/ideas/ai-analyte-resolution.md` (not committed).
+- Follow-on ideas: `.docs/internal/ideas/ai-data-import.md`, `.docs/internal/ideas/ai-data-analysis.md`, `.docs/internal/ideas/ai-analyte-resolution.md`.
 
 ---
 
 **Related Documents**
-- local `.docs/internal/ideas/run-results.md` (not committed) — promote-on-publish design + shipped phases
+- `.docs/internal/ideas/run-results.md` — promote-on-publish design + shipped phases
 - [open-questions/run-results.md](../.docs/review/open-questions/run-results.md) — decisions
 - `processes.md`
 - `.docs/internal/design/gap-analysis-process-and-experiment.md`

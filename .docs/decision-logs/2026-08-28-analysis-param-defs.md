@@ -3,7 +3,7 @@
 **Date:** 2026-08-28  
 **Status:** Working note (not a house SOP; **not seed**)  
 **Stem:** `post-receive-work-spine`  
-**Why this file:** Domain PRD/SPEC live under gitignored `.docs/internal/` and are **not on git**. Do **not** invent an internal tree. Documentarian folds this into `.docs/internal/prd/post-receive-work-spine/PRD.md` and `.docs/internal/specs/post-receive-work-spine/SPEC.md` when the host is back.
+**Why this file:** Domain PRD/SPEC are git-tracked under `.docs/internal/`. Documentarian folds this into `.docs/internal/prd/post-receive-work-spine/PRD.md` and `.docs/internal/specs/post-receive-work-spine/SPEC.md` when those files land.
 
 **Related (committed):**  
 - [requirements](../review/requirements/post-receive-work-spine.md) (RQ-AF-6, RQ-WO-11 / L3)  
@@ -313,6 +313,6 @@ Katinka snapshot named **`readout`** and **`wavelength_nm`**. Other **required**
 
 ## 5. Fold-in
 
-**2026-08-28 (packet):** Three-layer bind is now in committed [requirements RQ-AF-6 / RQ-WO-11](../review/requirements/post-receive-work-spine.md), [schema-changes](../review/schema-changes/post-receive-work-spine.md) (`unit`, `allowed_values`, `tests.asked_for_params` at P2), and [tech sketch §3.1](../review/tech-sketch/post-receive-work-spine.md). Internal PRD/SPEC have a short params section (gitignored).
+**2026-08-28 (packet):** Three-layer bind is now in committed [requirements RQ-AF-6 / RQ-WO-11](../review/requirements/post-receive-work-spine.md), [schema-changes](../review/schema-changes/post-receive-work-spine.md) (`unit`, `allowed_values`, `tests.asked_for_params` at P2), and [tech sketch §3.1](../review/tech-sketch/post-receive-work-spine.md). Internal PRD/SPEC have a short params section (git-tracked under `.docs/internal/`).
 
 Do **not** seed these example rows in Alembic/OOB except the bind-note rule (`EX_CTG` / `EX_NCI60` → existing `NBIO-CMPD-001` / A549 when seed is allowed).
