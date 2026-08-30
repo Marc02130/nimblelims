@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-28  
 **Stem:** `post-receive-work-spine`  
-**Status:** Architecture / UI / Spec **Accept with conditions** on `feat/work-order-p2`. **Hold product merge.** Latest signed AC-P2 is `8cfa2a9` (overall unsigned): First Start = `chain[0]` only Pass; empty Route 422 / map 409 / 201-not-AND Pass; Hans freeze skip **unsigned** (`{}` ambiguous). Live SHA `9342439` — AC-P2 **unsigned** until Tobias. No map analysis field; Route matches a LIMS Run in the chain; *x*→*x+1* emerging-type handoff — **Leadership Confirm** (Rolf/Deiter/Hans/Heidi/Günter) ([send](../../discussions/2026-08-30-p2-route-lock.md)). Dest-type mint Hold. `b005cfe` signed history. Not IC50.
+**Status:** Architecture / UI / Spec **Accept with conditions** on `feat/work-order-p2`. **Hold product merge.** Live SHA `9342439` — **Tobias-signed AC-P2-9..11 Pass**. Deiter / Hans / Heidi / Günter restamp notes (honesty, **not** a merge vote): later-step type-gate **Met** (qPCR-on-blood / still-Blood **422** `route_sample_type`; not dest-type E2E); AC-P2-11 / handoff Pass is **map-save only**; dest mint **Hold** (no execute rewrite of `sample_type`; tube still Blood; 0 DNA daughters); freeze skip **OPEN**; extract `analysis_id` **OPEN**; Route stays `test:assign`; **overall P2 unsigned**. Prior signed history `8cfa2a9`: First Start = `chain[0]` only Pass; empty Route 422 / map 409 / 201-not-AND Pass. No map analysis field; Route matches a LIMS Run in the chain; *x*→*x+1* emerging-type handoff — **Leadership Confirm** (Rolf/Deiter/Hans/Heidi/Günter) ([send](../../discussions/2026-08-30-p2-route-lock.md)). `b005cfe` signed history. Not IC50.
 **Requirements:** [`.docs/review/requirements/post-receive-work-spine.md`](../requirements/post-receive-work-spine.md)  
 **Schema:** [`.docs/review/schema-changes/post-receive-work-spine.md`](../schema-changes/post-receive-work-spine.md)  
 **Spec:** [`.docs/internal/specs/post-receive-work-spine/SPEC.md`](../../internal/specs/post-receive-work-spine/SPEC.md)  
@@ -20,13 +20,13 @@ P1 is on `main`. P2 is on `feat/work-order-p2` (Accept with conditions). Do not 
 4. **Mathilda U1 / U2:** asked-for ≠ Test assign. Label params as order capture, not Test snapshot.
 5. Architecture / UI / Spec **Accept with conditions** on P2 @ `8cfa2a9`. Hold merge until UAT. Not IC50.
 6. **Receive freeze:** non-empty `analysis_ids` still **422**.
-7. **P2 ordered route (per-AC signed on `8cfa2a9`):** Route snapshots the ordered list, **zero Tests**. First Start = process[0] / `chain[0]` only — **Tobias-signed Pass**. Later Start = next process, on the sample that exists then. Empty Route **422** Pass. Later-step type-gate **unsigned**.
+7. **P2 ordered route (AC-P2-9..11 Pass on `9342439`; prior signed on `8cfa2a9`):** Route snapshots the ordered list, **zero Tests**. First Start = process[0] / `chain[0]` only — **Tobias-signed Pass**. Later Start = next process, on the sample that exists then. Empty Route **422** Pass. Later-step type-gate **Met** on `9342439` (qPCR-on-blood / still-Blood **422**; not dest-type E2E).
 8. **WO-7 publish (Tobias-signed Pass @ `8cfa2a9` and history @ `b005cfe`):** `_require_wo7_tests` 422s before promote if any cohort sample lacks an active Test. Status stays unpublished (complete). Do **not** fold first-start freeze into this Pass.
 9. **Hans freeze (classic skip still OPEN / unsigned on `8cfa2a9`):** `if test: continue` is **not** a freeze. Classic `/tests` must leave `asked_for_params` **NULL**, or we need a **freeze marker**. Until then `{}` is **ambiguous**. Do **not** teach skip-on-frozen-`{}`. Extract must **not** share asked-for `analysis_id`.
 10. **P2-4 visibility:** Route is `test:assign` and must **read** the mapped def/steps. Do **not** put `experiment:manage` on Route. **`0074` still open** on `8cfa2a9`. Mutate stays `config:edit`.
 11. **No sample-type picker (Tobias-signed Pass on `8cfa2a9` — UI click-save):** ELISA TAT 1–7 saved; Blood extract + later DNA qPCR chain saved (no AND 422); second ELISA overlap **409**. Empty Route **422** Pass. Two-accept **409** unsigned that SHA.
 12. **Extract `analysis_id` (still open):** Extract LimsRun must **not** share the asked-for `analysis_id`.
-13. **After `8cfa2a9` (Leadership Confirm — Rolf/Deiter/Hans/Heidi/Günter):** no map analysis picker. Route matches a LIMS Run in the chain. Map 409 = TAT ∩ first-step types ∩ LIMS Run analyses. Map 422 when process *x* emerging type is not accepted by *x+1*. Dest-type mint Hold. Live SHA `9342439` unsigned until Tobias. Do not keep `routing_map.analysis_id` as a required create field. Send: [2026-08-30-p2-route-lock](../../discussions/2026-08-30-p2-route-lock.md).
+13. **After `8cfa2a9` (Leadership Confirm — Rolf/Deiter/Hans/Heidi/Günter):** no map analysis picker. Route matches a LIMS Run in the chain. Map 409 = TAT ∩ first-step types ∩ LIMS Run analyses. Map 422 when process *x* emerging type is not accepted by *x+1* (**map-save only**; dest mint Hold). Dest-type mint Hold. Live SHA `9342439` — **Tobias-signed AC-P2-9..11 Pass**; Deiter / Hans / Heidi / Günter restamp notes (honesty, **not** a merge vote): later-step **Met**; freeze skip OPEN; extract `analysis_id` OPEN; Route stays `test:assign`; overall P2 unsigned. Do not keep `routing_map.analysis_id` as a required create field. Send: [2026-08-30-p2-route-lock](../../discussions/2026-08-30-p2-route-lock.md).
 
 ---
 
@@ -174,7 +174,7 @@ No new import engine. **Do not build “admin authors parsers” as the product.
 | PR | Scope |
 |----|--------|
 | 1 | P1 tables + API + `/asked-for` UI + pytest + UAT script. **Hold merge until UAT.** |
-| 2 | P2 routing + work_order + ordered `process_definition[]` + LimsRun WO-7. Architecture / UI / Spec Accept with conditions @ `8cfa2a9`. Live AC-P2 **unsigned** overall. **Hold product merge to main.** First Start = chain[0] only **Pass**. Still open: Hans freeze (`{}` ambiguous until NULL or freeze marker), extract `analysis_id`, P2-4 `0074`, later-step type-gate. |
+| 2 | P2 routing + work_order + ordered `process_definition[]` + LimsRun WO-7. Architecture / UI / Spec Accept with conditions @ `8cfa2a9`. Live SHA `9342439` — **Tobias-signed AC-P2-9..11 Pass**; Leadership restamp notes (Deiter/Hans/Heidi/Günter, **not** a merge vote): later-step **Met**; AC-P2-11 map-save only; dest mint Hold. Overall P2 **unsigned**. **Hold product merge to main.** First Start = chain[0] only **Pass**. Still open: Hans freeze (`{}` ambiguous until NULL or freeze marker), extract `analysis_id`, P2-4 `0074`. |
 | 3 | P3 persist lock + results UAT fold (**closed**) |
 | 4 | P4 SOP Apply → process def (**closed**) |
 | 5 | P5 parser setup UX (**closed** this cycle) |
