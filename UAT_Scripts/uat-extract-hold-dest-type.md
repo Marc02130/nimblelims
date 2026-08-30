@@ -26,7 +26,7 @@
 | 1.4 | Set the line to **Same as parent.** and save. | The explicit line clear overrides entry DNA and resolves to the parent type. |
 | 1.5 | Select **DNA** as a line override and save. | Plan line stores `dest_sample_type` as the DNA list-entry UUID. |
 | 1.6 | Reload the entry. | Method, default, and line override remain selected. Method is locked because lines exist; the UI directs the operator to cancel the experiment to change it. |
-| 1.7 | Execute without changing the plan. | There is no execute-time type prompt. Dest **container-with-sample** joins the process; inbound source assignment is **removed**. Dest appears on **Aliquots / pools**. Matrix remains inherited. This is **not** dest-type Hold closed. This is **not** P2 extract minting a DNA daughter. Start extract still leaves the tube Blood. Do **not** say the dest is DNA, a DNA daughter, or that blood became DNA. |
+| 1.7 **(OOB execute — not the P2 Contents click)** | Execute without changing the plan. | There is no execute-time type prompt. Dest **container-with-sample** joins the process; inbound source assignment is **removed**. Dest appears on **Aliquots / pools**. Matrix remains inherited. This is **not** dest-type Hold closed. This is **not** P2 extract minting a DNA daughter. Start extract still leaves the tube Blood. Do **not** say the dest is DNA, a DNA daughter, or that blood became DNA. This step is **OOB entry execute**; it is **not** AC-P2-C1/C2, which stay **unsigned** at `4671ba8` / `02fe95f`. |
 
 ## 2. Catalog filtering
 
@@ -77,7 +77,9 @@ Verify the plan and execute flows contain none of the following:
 - Mixed-type pools are refused in both UI and API.
 - Execute resolves line override → entry default → parent without re-prompting.
 - Execute-minted dest **container-with-sample** continues the process; inbound source assignment is removed.
-- Assign to process without a container (or with an ambiguous multi-vessel sample and no container pick) → **422**.
+- Assign to process is the **tube in hand**: no vessel, or two vessels with no `container_id` pick → **422**, lab-readable, **no silent pick**.
 - A sample may have many containers; only one container-with-sample is on the process.
-- Do **not** score 1.7 as a DNA daughter or as dest-type Hold closed. Catalog fixture `Blood × aliquot → DNA` is catalog language, not “execute produced a DNA daughter as the P2 extract story.”
+- Later Start follows the dest **container**, not a dest **type**.
+- An **equivalent aliquot** is the **same sample in a new container** — no new identity, no `sample_type` rewrite. **Dest mint** (a new Sample row carrying `dest_sample_type`, via `_execute_transfer`) is a different motion and stays **Hold**.
+- Do **not** score 1.7 as a DNA daughter or as dest-type Hold closed. Step 1.7 is **OOB entry execute**, **not** the P2 Contents click; AC-P2-C1/C2 stay **unsigned** at `4671ba8` / `02fe95f`. Catalog fixture `Blood × aliquot → DNA` is catalog language, not “execute produced a DNA daughter as the P2 extract story.”
 - Normalization consumes a prior concentration result, never free-typed source concentration.
