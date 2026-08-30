@@ -14,7 +14,7 @@ This is a how-to, not a PRD. Marc keeps it current as features ship.
 |------|--------|
 | Receive (`/receive`) | Shipped on `main` |
 | Requested analysis (`/asked-for`) — later look-up, off the bench path | Shipped on `main` (P1 lake) |
-| Later Route / work order (planner, not after receive) | Surfaces on this P2 branch. **Signed** at `8cfa2a9`: Route snapshots the ordered list, **zero Tests**; First Start = `chain[0]` only — Tobias-signed **Pass** (ELISA first LimsRun, 1 step, no Qubit/qPCR Tests); empty Route **422** Pass. **Code after that SHA (unsigned):** no map analysis picker; Route matches a LimsRun in the chain; process *x*→*x+1* handoff. Live AC-P2 **unsigned** overall. Freeze skip **unsigned**. Hold product merge |
+| Later Route / work order (planner, not after receive) | Surfaces on this P2 branch. Latest **signed** per-AC is `8cfa2a9`: Route snapshots the ordered list, **zero Tests**; First Start = `chain[0]` only — Tobias-signed **Pass** (ELISA first LimsRun, 1 step, no Qubit/qPCR Tests); empty Route **422** Pass. **Live SHA `9342439` — AC-P2 unsigned.** **CEO Confirm** of analysis-in-chain / overlap 409 / handoff 422 (pending Deiter/Hans/Heidi/Günter overwrite-or-confirm; not full Leadership). Dest-type mint **Hold**. Freeze skip **OPEN**. Extract `analysis_id` **OPEN**. Hold product merge |
 | Process / Experiment / LimsRun | Execute substrate shipped. Later Start = next pending process, on the sample that exists then. Freeze skip is **unsigned**: `{}` is ambiguous until classic `/tests` leaves NULL or a freeze marker exists. Later-step type-gate **unsigned**. Do not claim freeze closed |
 | Results | Classic type-a-number on a Test; persist lock is a later packet. WO-7 whole-run publish-refuse is **Tobias-signed Pass** on `8cfa2a9` (carol **422** `test_missing`) and remains history on `b005cfe`. Overall P2 Pass remains unsigned |
 
@@ -105,9 +105,9 @@ Params: intent only. P1 sends `{}` OOB — do not type assay params here, and do
 
 **Punch:** Route does **not** start the chain. Start does **not** start the chain. Route snapshots the ordered list and mints **zero Tests**. **First Start instantiates `chain[0]` only.** Later Start = the next pending process, on the sample that exists then.
 
-Empty Route 0→**422** is **Tobias-signed Pass** on `8cfa2a9`. Routing-map Pass on that SHA is **click-save in the UI**: no sample-type picker; ELISA TAT 1–7 saved; Blood extract + later DNA qPCR chain saved (no AND 422); second ELISA overlap **409**. Route two-accept **409** is **unsigned**. Freeze skip is **unsigned** (`{}` on `99b692d3` is ambiguous). Later-start type gates are **unsigned**. Do not write overall P2 Pass.
+Empty Route 0→**422** is **Tobias-signed Pass** on `8cfa2a9`. Routing-map Pass on that SHA is **click-save in the UI**: no sample-type picker; ELISA TAT 1–7 saved; Blood extract + later DNA qPCR chain saved (no AND 422); second ELISA overlap **409**. Live SHA is `9342439`; AC-P2 **unsigned** (Tobias restamps). **CEO Confirm** of analysis-in-chain / overlap 409 / handoff 422; still pending Deiter/Hans/Heidi/Günter overwrite-or-confirm. Dest-type mint **Hold**. Freeze skip **OPEN** (`{}` on `99b692d3` is ambiguous). Extract `analysis_id` **OPEN**. Later-start type gates are **unsigned**. Do not write overall P2 Pass. Hold product merge.
 
-**Leadership honesty locks (Hans / Heidi / Günter) — live AC-P2 unsigned overall. Hold product merge. Dest-type Hold out. Not IC50.**
+**Leadership honesty locks (Hans / Heidi / Günter) — live AC-P2 on `9342439` unsigned. CEO Confirm of the route lock is not a full Leadership lock. Hold product merge. Dest-type mint Hold. Not IC50.**
 
 1. **Freeze skip:** `if test: continue` is **not** a freeze. Classic `/tests` must leave `asked_for_params` **NULL**, or we need a **freeze marker**. Until then `{}` is **ambiguous**. Do **not** teach skip-on-frozen-`{}`. Extract LimsRun must **not** share the asked-for `analysis_id`.
 2. **Extract `analysis_id`:** Extract LimsRun must **not** share the asked-for `analysis_id`.
@@ -185,5 +185,5 @@ UAT (classic): [`UAT_Scripts/uat-results-entry-review.md`](../UAT_Scripts/uat-re
 - Do **not** give an extract LimsRun the asked-for `analysis_id` — that attaches/freezes the panel Test at extract start.
 - Do **not** teach first Start minting later processes (Qubit/reporting) or their Tests as shipped. First Start instantiates `chain[0]` only. Later Start = next pending process, on the sample that exists then.
 - Do **not** teach Route as starting work. Route snapshots the ordered list, **zero Tests**.
-- Do **not** claim freeze closed/verified on `8cfa2a9`. Live AC-P2 stays unsigned.
+- Do **not** claim freeze closed/verified on `8cfa2a9`. Live AC-P2 on `9342439` stays unsigned. Do not claim full Leadership Accept or overall P2 Pass.
 - Not IC50. Not a fake Route how-to.
