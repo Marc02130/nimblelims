@@ -208,8 +208,8 @@ This requirements doc consolidates feedback from CEO, Security, and Design revie
 
 - [`.docs/review/manuals/experiments.md`](../manuals/experiments.md)
 - [`.docs/review/manuals/processes.md`](../manuals/processes.md)
-- local `.docs/internal/design/gap-analysis-process-and-experiment.md` (not committed)
-- local `.docs/internal/design/experiment-planning.md` (not committed)
+- `.docs/internal/design/gap-analysis-process-and-experiment.md`
+- `.docs/internal/design/experiment-planning.md`
 - [`.docs/review/ui-review/process-and-experiment.md`](../ui-review/process-and-experiment.md)
 - [`.docs/review/manuals/lims-runs.md`](../manuals/lims-runs.md)
 - [`.docs/review/checklist/experiment-rework-prerequisites.md`](../checklist/experiment-rework-prerequisites.md)

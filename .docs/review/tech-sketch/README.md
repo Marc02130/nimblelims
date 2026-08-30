@@ -9,7 +9,7 @@ Lightweight **how** documents produced **after requirements** and **before or al
 | Proposed data model, APIs, engine contracts | Full product requirements (that’s `requirements/`) |
 | Sequence of runtime steps | CEO / market justification |
 | Risks and open technical questions | Final architecture verdict (that’s `architecture-review/`) |
-| Enough detail to review and implement a phase | Always a long design novel (optional deeper writeups go to local `.docs/internal/design/`, not committed) |
+| Enough detail to review and implement a phase | Always a long design novel (optional deeper writeups go to `.docs/internal/design/`) |
 
 ## When to write one
 
