@@ -510,13 +510,13 @@ The preceding `b005cfe` section is retained verbatim as signed history, includin
 
 **Executor / environment / date:** **unsigned** — Tobias has not clicked this SHA. Local docker compose (`lims-*`) when restamped; compose **down** after that run. Not IC50.
 
-**Maturity on this SHA (do not teach as QA-verified):** freeze, Route 422/409, later-start type gate, and next-pending instantiate are **unsigned on `8cfa2a9`**. Do **not** claim freeze closed or verified. Do not copy Pass/Fail from `b005cfe` / `9c4f9da` / `3b56cfb` / P1 into this block.
+**Maturity on this SHA (do not teach as QA-verified):** freeze, Route 422/409, later-start type gate, and next-pending instantiate are **unsigned on `8cfa2a9`**. Do **not** claim freeze closed or verified. Skip-on-`{}` does not close it: a classic default `{}` and a frozen `{}` are the same JSON. Do not copy Pass/Fail from `b005cfe` / `9c4f9da` / `3b56cfb` / P1 into this block.
 
 **Copy and permission locks:** Receive ends on `/receive`. Asked-for is a separate later look-up. Route is an unnumbered later planner requiring `test:assign` plus project access; it does not require `experiment:manage`. Client and inaccessible-project Route writes return **403**, not 404. **Start process** and LimsRun start require `experiment:manage`; publish requires `experiment:publish`.
 
 **Leadership honesty locks (Hans / Heidi / Günter) — unsigned. Dest-type Hold out. Not IC50.**
 
-1. **Freeze skip:** `if test: continue` is **not** a freeze. A classic `/tests` row with `asked_for_params` NULL or default `{}` is **not** frozen. First LimsRun start must **write** the snapshot onto that Test. Skip only when a snapshot **already exists**, including a frozen `{}`.
+1. **Freeze skip:** `if test: continue` is **not** a freeze. Classic `/tests` must leave `asked_for_params` **NULL**; a row with NULL or default `{}` is **not** frozen. First LimsRun start must **write** the snapshot onto that Test. **Skip-on-`{}` is not a freeze either** — a classic default `{}` and a frozen `{}` are the same JSON, so `{}` cannot prove a first-start snapshot. Skip is honest only once classic `/tests` leaves `asked_for_params` NULL or a **freeze marker** lands; until then, skip only on a provable LimsRun-start snapshot.
 2. **Extract `analysis_id`:** Extract LimsRun must **not** share the asked-for `analysis_id` or it attaches/freezes the panel Test at extract start.
 3. **Start:** First Start instantiates `chain[0]` only. If first Start also mints later processes (Qubit/reporting) or their Tests, that is a punch — do not teach it as shipped. Later Start = next pending process, on the sample that exists then.
 4. **Route:** snapshots the ordered list, **zero Tests**.
@@ -579,8 +579,9 @@ The preceding `b005cfe` section is retained verbatim as signed history, includin
 
 **Expect**
 - Receive, asked-for save, Route, and work-order start create no Test. Route snapshots the ordered list, **zero Tests**.
-- `if test: continue` is **not** a freeze. First LimsRun start of the **asked-for** analysis **writes** `asked_for_params` unless a snapshot already exists.
-- Skip later overwrite only when a snapshot **already exists** (including frozen `{}`). A classic `/tests` row with `asked_for_params` NULL or default `{}` is **not** frozen — that first start must **write**.
+- `if test: continue` is **not** a freeze. First LimsRun start of the **asked-for** analysis **writes** `asked_for_params`.
+- Classic `/tests` must leave `asked_for_params` **NULL**; a row with NULL or default `{}` is **not** frozen — that first start must **write**.
+- **Skip-on-`{}` is not a freeze**: classic default `{}` and frozen `{}` are the same JSON, so an empty object cannot prove a first-start snapshot. Skip is honest only once classic `/tests` leaves NULL or a **freeze marker** lands; until then, skip only on a provable LimsRun-start snapshot. Record what step 5 actually shows; do not score it Pass.
 - Extract LimsRun must **not** share the asked-for `analysis_id` or it attaches/freezes the panel Test at extract start.
 - Do **not** claim freeze closed/verified on `8cfa2a9`.
 - With any cohort Test missing, publish returns **422**, not **200 published**.
@@ -617,4 +618,4 @@ The preceding `b005cfe` section is retained verbatim as signed history, includin
 
 ## Live `8cfa2a9` restamp — unsigned
 
-**No Pass / Fail on this block.** SHA is `8cfa2a9`. Do **not** claim freeze closed/verified. `if test: continue` is not a freeze. First Start = `chain[0]` only. Route = ordered snapshot, zero Tests. Hold product merge. Not IC50.
+**No Pass / Fail on this block.** SHA is `8cfa2a9`. Do **not** claim freeze closed/verified. `if test: continue` is not a freeze, and skip-on-`{}` is not a freeze until classic `/tests` leaves `asked_for_params` NULL or a freeze marker lands. First Start = `chain[0]` only. Route = ordered snapshot, zero Tests. Hold product merge. Not IC50.
