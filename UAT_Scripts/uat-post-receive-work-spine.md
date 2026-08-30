@@ -663,7 +663,7 @@ The preceding `8cfa2a9` section is retained verbatim as signed history (first St
 **Executor / environment / date:** Tobias · local docker compose (`lims-*`) · 2026-08-30 · compose **down** after run
 **Merge:** hold product merge of `feat/work-order-p2`. Not IC50.
 
-**Leadership send:** [`.docs/discussions/2026-08-30-p2-route-lock.md`](../.docs/discussions/2026-08-30-p2-route-lock.md) — Round 1 **Leadership Confirmed**. Round 2 **CEO Confirm** (R2-1…R2-4) landed 2026-08-30; **OQ-WO-6 stays OPEN**; still pending Deiter / Hans / Heidi / Günter overwrite-or-confirm. OQ-WO-4 / OQ-TAT-1 / OQ-WO-5 **Leadership Confirm** (round 1). Deiter / Hans / Heidi / Günter **confirmed Tobias’s `9342439` restamp** (honesty, **not** a merge vote). Not a merge stamp.
+**Leadership send:** [`.docs/discussions/2026-08-30-p2-route-lock.md`](../.docs/discussions/2026-08-30-p2-route-lock.md) — Round 1 **Leadership Confirmed**. Round 2 **Leadership Confirm** (R2-1…R2-4) landed 2026-08-30 (Rolf, Deiter, Hans, Heidi, Günter). **OQ-WO-6 stays OPEN** (Leadership Confirm that it stays Open). OQ-WO-4 / OQ-TAT-1 / OQ-WO-5 **Leadership Confirm** (round 1). Deiter / Hans / Heidi / Günter **confirmed Tobias’s `9342439` restamp** (honesty, **not** a merge vote). Not a merge stamp.
 
 **Product under test (Leadership-confirmed lock; AC-P2-9..11 Pass; not overall P2 Pass):**
 - Map row = TAT + ordered `process_definition[]`. **No** admin analysis picker and **no** admin sample-type picker.
@@ -748,7 +748,7 @@ The preceding `8cfa2a9` section is retained verbatim as signed history (first St
 
 ## Live `9342439` per-AC sign-off
 
-**Signed AC-P2-9..11 Pass** — Tobias, 2026-08-30, local compose (down after). Product SHA `9342439`. Docs merge `50c1f24` does not change the click SHA. Round 2 **CEO Confirm** landed (R2-1…R2-4); OQ-WO-6 stays OPEN; still pending Deiter / Hans / Heidi / Günter. AC-P2-9..11 Pass Results unchanged.
+**Signed AC-P2-9..11 Pass** — Tobias, 2026-08-30, local compose (down after). Product SHA `9342439`. Docs merge `50c1f24` does not change the click SHA. Round 2 **Leadership Confirm** landed (R2-1…R2-4; Rolf/Deiter/Hans/Heidi/Günter); OQ-WO-6 stays OPEN. AC-P2-9..11 Pass Results unchanged.
 
 AC-P2-9 **Pass** (no analysis/type picker; extract Identity/Plasma then ELISA click-save **201**; alice Route ELISA **200**; qPCR not in chain Route **422**, stayed requested, no WO) · AC-P2-10 **Pass** (create-route derived; add-process types+analyses; reorder refreshes; Save disabled on empty first-step types / no LimsRun analysis / incompatible handoff) · AC-P2-11 **Pass** (map-save only: dest-DNA → qPCR DNA **201**; dest-DNA → plasma-only **422**; no-dest Plasma → qPCR DNA **422**) · dest-type mint **Hold** (tube still Blood, **0 DNA daughters**) · later-step type-gate **Pass** (later qPCR start on still-Blood **422** `route_sample_type`; not dest-type E2E).
 
@@ -769,7 +769,7 @@ AC-P2-9 **Pass** (no analysis/type picker; extract Identity/Plasma then ELISA cl
 
 ## Addendum (docs honesty after `9342439` — do not re-score)
 
-Marc 2026-08-30. Does **not** rewrite Tobias Results above. Not Pass. Send: [`.docs/discussions/2026-08-30-p2-route-lock.md`](../.docs/discussions/2026-08-30-p2-route-lock.md) Round 2. **CEO Confirm** of R2-1…R2-4 (2026-08-30); OQ-WO-6 stays OPEN; pending Deiter / Hans / Heidi / Günter.
+Marc 2026-08-30. Does **not** rewrite Tobias Results above. Not Pass. Send: [`.docs/discussions/2026-08-30-p2-route-lock.md`](../.docs/discussions/2026-08-30-p2-route-lock.md) Round 2. **Leadership Confirm** of R2-1…R2-4 (2026-08-30; Rolf/Deiter/Hans/Heidi/Günter); OQ-WO-6 stays OPEN.
 
 - Available routes for an asked-for assay = **any** map whose chain **contains** that LimsRun analysis. A route **may have multiple analyses**.
 - Extract is not a special sample/assay. Blood→DNA is a **derivative** (dest mint Hold). Tube→plate aliquot is equivalent. Library is a new sample. Type gates on process steps catch blood-on-Qubit.
