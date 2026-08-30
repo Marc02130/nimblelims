@@ -8,7 +8,7 @@
 
 **Code:** `feat/work-order-p2`. Latest **signed** AC-P2 is `8cfa2a9` (per-AC; overall **not Pass**; PR **#92** honesty fold). **This commit** is `9342439` (`93424396ce3d02f01a8a8388abda39ae6ebf8010`): analysis is not a map field; Route matches a LIMS Run in the chain; process *x* → *x+1* emerging-type handoff; create-route UI shows types/analyses/emerging types.
 
-**UAT:** do **not** rewrite `8cfa2a9` / `b005cfe` / `9c4f9da` / `3b56cfb` / P1. Live AC-P2 stamp on `9342439` in `UAT_Scripts/uat-post-receive-work-spine.md` covers analysis-in-chain + display + handoff and stays **unsigned until Tobias clicks**. Tobias **may click** `9342439` now. Do **not** stamp Pass on AC-P2-9..11. Overall P2 remains **not Pass**.
+**UAT:** do **not** rewrite `8cfa2a9` / `b005cfe` / `9c4f9da` / `3b56cfb` / P1. Tobias signed **AC-P2-9..11 Pass** on `9342439` (local compose, down after; docs merge `50c1f24` does not change the click SHA). Overall P2 remains **not Pass**. Dest-type mint **Hold**. Freeze skip and extract `analysis_id` still **OPEN**.
 
 **Dest-type Hold:** execute still does **not** mint a DNA daughter. Authoring may still read a declared aliquot/pool dest on a template.
 
@@ -101,7 +101,7 @@ Rolf’s Confirm of all five asks. Round 1 above remains persona-applied history
 
 ## Leadership Confirm — 2026-08-30 (live clicks)
 
-**Full Leadership Confirm** of all five asks + OQ-WO-4 / OQ-TAT-1 / OQ-WO-5. Rolf (CEO Confirm above), then Deiter, Hans, Heidi, Günter. Round 1 remains persona-applied history. Dest-type mint remains Hold. Not a merge stamp. Tobias **may click** `9342439` now. Live AC-P2-9..11 stay **unsigned until he clicks**.
+**Full Leadership Confirm** of all five asks + OQ-WO-4 / OQ-TAT-1 / OQ-WO-5. Rolf (CEO Confirm above), then Deiter, Hans, Heidi, Günter. Round 1 remains persona-applied history. Dest-type mint remains Hold. Not a merge stamp. Tobias signed **AC-P2-9..11 Pass** on `9342439` after this Confirm. Overall P2 remains **not Pass**.
 
 ### Deiter (Lab Ops)
 
@@ -135,4 +135,4 @@ Rolf’s Confirm of all five asks. Round 1 above remains persona-applied history
 | OQ-TAT-1 | **Leadership Confirm** (Rolf/Deiter/Hans/Heidi/Günter). | 409 = TAT ∩ first-step types ∩ LIMS Run analyses |
 | OQ-WO-5 | **Leadership Confirm** (Rolf/Deiter/Hans/Heidi/Günter). Dest mint remains Hold. | Process *x* emerging type must be accepted by *x+1* |
 
-Tobias may click `UAT_Scripts/uat-post-receive-work-spine.md` on `9342439`. Live AC-P2-9..11 stay **unsigned until he clicks**. Not IC50.
+Tobias signed **AC-P2-9..11 Pass** on `9342439`. Overall P2 remains **not Pass**. Freeze skip and extract `analysis_id` still **OPEN**. Dest-type mint **Hold**. Not IC50.
