@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-30  
 **Team:** Leadership (Lab Ops, CEO, Security CSO, Scientific CSO)  
-**Ask:** Round 1 remains **Leadership Confirmed** (Rolf, Deiter, Hans, Heidi, Günter; all five asks). Round 2 is **CEO Confirm** (R2-1…R2-4) pending Deiter / Hans / Heidi / Günter overwrite-or-confirm. Not a full Leadership lock for Round 2. Not a merge stamp. Overall P2 UAT remains unsigned.  
+**Ask:** Round 1 remains **Leadership Confirmed** (Rolf, Deiter, Hans, Heidi, Günter; all five asks). Round 2 is **Leadership Confirm** (Rolf, Deiter, Hans, Heidi, Günter; R2-1…R2-4). Not a merge stamp. Overall P2 UAT remains unsigned.  
 **Implement gate:** **OPEN for P2 coding on `feat/work-order-p2`.** Merge to `main` **held** until signed UAT Pass.  
 **Stem:** [post-receive-work-spine](../review/requirements/post-receive-work-spine.md)
 
@@ -134,7 +134,7 @@ Rolf’s Confirm of all five asks. Round 1 above remains persona-applied history
 | OQ-WO-4 | **Leadership Confirm** (Rolf/Deiter/Hans/Heidi/Günter). Dest mint remains Hold. Round 1 only — do not restamp. | No map analysis field; Route matches a LIMS Run in the chain |
 | OQ-TAT-1 | **Leadership Confirm** (Rolf/Deiter/Hans/Heidi/Günter). Round 1 only — do not restamp. | 409 = TAT ∩ first-step types ∩ LIMS Run analyses |
 | OQ-WO-5 | **Leadership Confirm** (Rolf/Deiter/Hans/Heidi/Günter). Dest mint remains Hold. Round 1 only — do not restamp. | Process *x* emerging type must be accepted by *x+1* |
-| OQ-WO-6 | **OPEN.** CEO Confirm that it **stays Open** (R2-3). Pending Deiter / Hans / Heidi / Günter overwrite-or-confirm. | Earlier LimsRun in the chain must **not** share asked-for `analysis_id`. Do not teach extract-as-special-assay. |
+| OQ-WO-6 | **OPEN.** Leadership Confirm that it **stays Open** (R2-3; Rolf/Deiter/Hans/Heidi/Günter). | Earlier LimsRun in the chain must **not** share asked-for `analysis_id`. Do not teach extract-as-special-assay. |
 
 Tobias signed **AC-P2-9..11 Pass** on `9342439`. Overall P2 remains **not Pass**. Freeze skip and OQ-WO-6 still **OPEN**. Dest-type mint **Hold**. Not IC50.
 
@@ -183,7 +183,7 @@ Freeze skip (`{}` vs NULL) stays OPEN. Route two-accept 409 still unsigned from 
 
 ## CEO Confirm — Round 2 — 2026-08-30 (Rolf)
 
-Rolf’s Confirm of R2-1…R2-4. Round 1 remains **Leadership Confirmed**. This is **CEO Confirm only** — pending Deiter / Hans / Heidi / Günter overwrite-or-confirm. Not a full Leadership lock for Round 2. Not a merge stamp. Do **not** rewrite Tobias `9342439` / `8cfa2a9` Results. Freeze skip stays **OPEN**. Dest mint **Hold**. Overall P2 remains **not Pass**. Not IC50.
+Rolf’s Confirm of R2-1…R2-4. Round 1 remains **Leadership Confirmed**. This section is **CEO Confirm history**. Do **not** read it as the live Round 2 status. Full Leadership Confirm of Round 2 is the next section. Not a merge stamp. Do **not** rewrite Tobias `9342439` / `8cfa2a9` Results. Freeze skip stays **OPEN**. Dest mint **Hold**. Overall P2 remains **not Pass**. Not IC50.
 
 | Ask | CEO Confirm |
 |-----|-------------|
@@ -193,3 +193,36 @@ Rolf’s Confirm of R2-1…R2-4. Round 1 remains **Leadership Confirmed**. This 
 | R2-4. Parser at import | **Yes.** Parser chosen at import, not process authoring. Process LimsRun stores `analysis_id` only. |
 
 Send: this file, Round 2. OQ-WO-4 / OQ-TAT-1 / OQ-WO-5 stay **Leadership Confirm** from round 1.
+
+---
+
+## Leadership Confirm — Round 2 — 2026-08-30 (live clicks)
+
+**Full Leadership Confirm** of R2-1…R2-4. Rolf (CEO Confirm above), then Deiter, Hans, Heidi, Günter. Round 1 remains **Leadership Confirmed**. Round 2 CEO Confirm remains history. Dest-type mint remains Hold. OQ-WO-6 stays **OPEN** (Leadership Confirm that it stays Open). Freeze skip (`{}` vs NULL) stays **OPEN**. Route two-accept 409 and map-save same-types / different-analyses stay unsigned. Do **not** rewrite Tobias `9342439` / `8cfa2a9` Results. Not a merge stamp. Overall P2 remains **not Pass**. Hold merge. Not IC50.
+
+### Roll-up
+
+| Ask | Lab Ops | CEO | Security CSO | Sci CSO |
+|-----|---------|-----|----------------|---------|
+| R2-1. Contain = Route matching | **Yes.** Available routes = any chain that contains that LimsRun analysis; multi-analysis is the product | **Yes.** Asked-for assay → any route whose chain **contains** that LimsRun analysis. Multi-analysis routes are the product. One asked-for row → one work order | **Yes.** Contain is Route matching: asked-for assay → any chain that has that LimsRun analysis. Multi-analysis routes are the product; each LimsRun keeps its own analysis_id | **Yes.** Contain is Route matching, not Test identity: multi-analysis chains are the product, but each LimsRun keeps its own analysis_id |
+| R2-2. Type gates; dest mint Hold | **Yes.** Extract is not a special assay — type gates catch blood-on-Qubit; dest mint stays Hold | **Yes.** Extract is not a special assay. Type gates catch blood-on-Qubit. Dest mint **Hold** | **Yes.** Type gates catch blood-on-Qubit; dest mint stays Hold | **Yes.** Type gates catch blood-on-Qubit; dest mint stays Hold (DNA from blood is a new sample, not a type rewrite) |
+| R2-3. OQ-WO-6 stays OPEN | **Yes — stays Open.** Earlier LimsRun must not share asked-for analysis_id | **Yes.** OQ-WO-6 stays **OPEN** — earlier LimsRun must not share asked-for `analysis_id`. Do not teach “extract is special.” | **Yes — stays Open.** Earlier LimsRun must not reuse asked-for analysis_id (WO-7 would mint the panel Test on the parent) | **Yes — stays Open.** An earlier LimsRun that reuses asked-for analysis_id would freeze the panel Test on the parent |
+| R2-4. Parser at import | **Yes.** Parser is import, not process authoring | **Yes.** Parser chosen at import, not process authoring. Process LimsRun stores `analysis_id` only | **Yes.** Parser is import, not authoring | **Yes.** Parser is import, not authoring |
+
+**Consensus:** Leadership Confirm of R2-1…R2-4. OQ-WO-6 **stays OPEN**. Do not rewrite `9342439` Pass. No overall P2 Pass. Hold merge. Not IC50.
+
+### Deiter (Lab Ops)
+
+**Confirm R2-1…4.** Available routes = any chain that contains that LimsRun analysis; multi-analysis is the product. Extract is not a special assay — type gates catch blood-on-Qubit; dest mint stays Hold. Earlier LimsRun must not share asked-for analysis_id (OQ-WO-6 OPEN). Parser is import, not process authoring. Do not rewrite `9342439` Pass. Two-accept 409 and map-save same-types/different-analyses stay unsigned. Freeze skip stays OPEN. One asked-for still mints one WO — starting extract QC must not look like ELISA is on the tube. No overall P2 Pass. Hold merge. Not IC50.
+
+### Hans (Sci CSO)
+
+**Confirm R2-1…4.** Contain is Route matching, not Test identity: multi-analysis chains are the product, but each LimsRun keeps its own analysis_id. Type gates catch blood-on-Qubit; dest mint stays Hold (DNA from blood is a new sample, not a type rewrite). OQ-WO-6 stays OPEN: an earlier LimsRun that reuses asked-for analysis_id would freeze the panel Test on the parent. Parser is import, not authoring. Do not rewrite `9342439` Pass. Freeze skip (`{}` vs NULL) stays OPEN. Starting extract QC must not look like ELISA is on the tube. No overall P2 Pass. Hold merge. Not IC50.
+
+### Heidi (Arch)
+
+**Confirm R2-1…4.** Contain is Route matching: asked-for assay → any chain that has that LimsRun analysis. Multi-analysis routes are the product; each LimsRun keeps its own analysis_id. Type gates catch blood-on-Qubit; dest mint stays Hold. OQ-WO-6 stays OPEN — earlier LimsRun must not reuse asked-for analysis_id (WO-7 would mint the panel Test on the parent). Parser is import, not process authoring. Do not rewrite `9342439` Pass. Freeze skip (`{}` vs NULL) stays OPEN. One asked-for still mints one WO. Starting extract QC must not look like ELISA is on the tube. No overall P2 Pass. Hold merge. Not IC50.
+
+### Günter (Sec CSO)
+
+**Confirm R2-1…4.** Contain is Route matching: asked-for assay → any chain that has that LimsRun analysis. Multi-analysis routes are the product; each LimsRun keeps its own analysis_id. Type gates catch blood-on-Qubit; dest mint stays Hold. OQ-WO-6 stays OPEN — earlier LimsRun must not reuse asked-for analysis_id (WO-7 would mint the panel Test on the parent). Parser is import, not authoring. Do not rewrite `9342439`. Freeze skip stays OPEN. Hold merge. Not IC50.
