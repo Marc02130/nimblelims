@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-28  
 **Stem:** `post-receive-work-spine`  
-**Status:** Architecture / UI / Spec **Accept with conditions** on `feat/work-order-p2`. **Hold product merge.** Signed AC-P2-9..11 history: `9342439`. Product SHA for `0077` assignment slices: `4671ba8`. AC-P2-C1/C2 **unsigned**. Restamp notes honesty, **not** a merge vote. Freeze skip **OPEN**. **OQ-WO-6 stays OPEN** (Leadership Confirm R2-3: earlier LimsRun must not share asked-for `analysis_id`; do not teach extract-as-special). Round 2 **Leadership Confirm** (Rolf/Deiter/Hans/Heidi/Günter; R2-1…R2-4). A route **may have multiple LimsRun analyses**; asked-for matches any chain that **contains** that analysis. Parser at import. Send: [2026-08-30-p2-route-lock](../../discussions/2026-08-30-p2-route-lock.md). `8cfa2a9` / `b005cfe` signed history. Not IC50.
+**Status:** Architecture / UI / Spec **Accept with conditions** on `feat/work-order-p2`. **Hold product merge.** **Hold merge until QA clicks C1/C2.** Signed AC-P2-9..11 history: `9342439`. Product SHA for `0077` assignment slices: `4671ba8`. AC-P2-C1/C2 **unsigned**. Assignment is a Contents pair. Later Start follows `_continuing_assignments` (non-`removed` dest), not inbound parent. Dest mint **Hold**: Start extract does not mint a DNA daughter; P2 follow is a same-sample dest **container**. Freeze skip **OPEN**. **OQ-WO-6 stays OPEN**. Route stays `test:assign`. Round 2 **Leadership Confirm** (Rolf/Deiter/Hans/Heidi/Günter; R2-1…R2-4). Send: [2026-08-30-p2-route-lock](../../discussions/2026-08-30-p2-route-lock.md). `8cfa2a9` / `b005cfe` signed history. Not IC50.
 **Requirements:** [`.docs/review/requirements/post-receive-work-spine.md`](../requirements/post-receive-work-spine.md)  
 **Schema:** [`.docs/review/schema-changes/post-receive-work-spine.md`](../schema-changes/post-receive-work-spine.md)  
 **Spec:** [`.docs/internal/specs/post-receive-work-spine/SPEC.md`](../../internal/specs/post-receive-work-spine/SPEC.md)  
@@ -27,6 +27,7 @@ P1 is on `main`. P2 is on `feat/work-order-p2` (Accept with conditions). Do not 
 11. **No sample-type picker (Tobias-signed Pass on `8cfa2a9` — UI click-save):** ELISA TAT 1–7 saved; Blood extract + later DNA qPCR chain saved (no AND 422); second ELISA overlap **409**. Empty Route **422** Pass. Two-accept **409** unsigned that SHA.
 12. **Earlier LimsRun `analysis_id` (OQ-WO-6 stays OPEN — Leadership Confirm R2-3):** Earlier LimsRun must **not** share asked-for `analysis_id`. Do not teach extract-as-special-assay. Type gates catch blood-on-Qubit. Any earlier LimsRun that reuses the asked-for analysis freezes the panel Test on the parent.
 13. **After `8cfa2a9` (Round 1 Leadership Confirm; Round 2 Leadership Confirm R2-1…R2-4):** no map analysis picker. A route **may have multiple analyses**. Asked-for → any chain that **contains** that LimsRun analysis. Map 409 = TAT ∩ first-step types ∩ analysis **sets**. Map 422 handoff is **map-save only**; dest mint Hold. Parser at import. Send: [2026-08-30-p2-route-lock](../../discussions/2026-08-30-p2-route-lock.md).
+14. **0077 assignment / dest follow (`02fe95f` — Heidi / Mathilda / Rolf):** `eln_process_samples.container_id` required. Assign **422** if no vessel or ambiguous multi-vessel (lab-readable). Omit `container_id` is 422 unless exactly one vessel. Aliquot/pool execute: dest container-with-sample stays on the process; inbound source `removed`. Later Start follows non-`removed` dest assignments (`_continuing_assignments`), not bare `wo.sample_id` when dests exist. **Punch dest mint:** `_execute_transfer` still inserts a new Sample with `dest_sample_type` (can be DNA) and `_join_minted_destination` puts that row on the process — later Start then type-gates the daughter. Parent `sample_type` is not rewritten (good). Hold: **no new DNA row, no type rewrite.** P2 follow is a **same-sample dest container**. OQ-WO-6 and freeze skip stay OPEN. Route stays `test:assign`. Hold merge until QA clicks C1/C2.
 
 ---
 
@@ -49,6 +50,7 @@ UI /asked-for ──▶ asked_for (P1)
          existing /v1/eln-processes
                  │
                  ▼ Later Start = next process, dest container-with-sample (source removed)
+                    (_continuing_assignments; not inbound parent)
          LimsRun start → Test (WO-7) for that process only
                  │
                  ▼
@@ -57,7 +59,7 @@ UI /asked-for ──▶ asked_for (P1)
 
 SOP Apply (P4) writes **process definitions** that routing_map points at.
 
-No new execute runtime. No second AuthZ. No second workflow engine. First Start must not mint later processes or their Tests.
+No new execute runtime. No second AuthZ. No second workflow engine. First Start must not mint later processes or their Tests. Dest mint (new DNA Sample) is **not** the P2 follow.
 
 ## 3. P1 design
 
@@ -123,7 +125,9 @@ Pytest: create, 409 dup, **403 dual-belt** (create **and** `list()` / `GET /aske
 
 `work_orders.process_definition_ids` snapshot at mint (**L4**), **zero Tests**. Ordered list is the lock. Punch (3): **first Start must not mint later processes or their Tests** — do not teach that mint as shipped.
 
-Start: `ELNProcessService.instantiate_from_definition` on **process[0] / `chain[0]` only**. Later Start = next pending process, on samples **still assigned** to the previous process (aliquot/pool product continues; inbound sample is `removed`). Instantiate stays `experiment:manage`. Route stays `test:assign`. Later process/step starts type-gate current type vs **that** step only (skip `removed`). Mint itself is aliquot/pool OOB, not this start.
+Start: `ELNProcessService.instantiate_from_definition` on **process[0] / `chain[0]` only**. Assignment is a Contents pair: `container_id` NOT NULL (`0077`). Omit is 422 unless exactly one vessel. Later Start = next pending process, on dest vessels still assigned (`_continuing_assignments`); not inbound parent / bare `wo.sample_id` when dests exist. Instantiate stays `experiment:manage`. Route stays `test:assign`. Later process/step starts type-gate current type vs **that** step only (skip `removed`).
+
+**Punch dest mint on `02fe95f`:** `_execute_transfer` still inserts a new Sample with `dest_sample_type` (can be DNA) and `_join_minted_destination` puts that row on the process. That is dest mint at execute, not vessel-bind. Parent `sample_type` is not rewritten. Hold: no new DNA row, no type rewrite. P2 follow is a **same-sample dest container**.
 
 **L3 / A5 / SC5 / Hans:** `if test: continue` is **not** a freeze. At LimsRun start for the asked-for analysis, insert the Test if missing and **write** `asked_for.params` → `tests.asked_for_params`. Classic `/tests` must leave `asked_for_params` **NULL**, or we need a **freeze marker**. Until one of those exists, `{}` is **ambiguous**. Do **not** teach skip-on-frozen-`{}`. **OQ-WO-6:** any earlier LimsRun must **not** reuse the asked-for `analysis_id` (extract is not special; type gates are a different axis). P1 does **not** write that Test snapshot. Freeze skip stays unsigned.
 
@@ -158,6 +162,9 @@ No new import engine. **Do not build “admin authors parsers” as the product.
 | Map save, same analysis + overlapping TAT + overlapping first-step allow-lists | **409** |
 | Map save, same analysis + overlapping TAT, disjoint first-step allow-lists | Save succeeds (extract-first vs Qubit-first) |
 | First Start mints later processes or their Tests | Bounce — punch (3). Snapshot is the list only |
+| Assign omit container / 0 vessels / 2+ without a pick | **422** `process_container_required`, lab-readable |
+| Later Start follows inbound parent when dests exist | Bounce — follow `_continuing_assignments` |
+| Dest mint (new DNA Sample / dest-type rewrite as P2 extract story) | Bounce — dest mint **Hold**; P2 follow is same-sample dest **container**; Start extract leaves tube Blood |
 | Later Start | Next pending process on dest container-with-sample after execute; not parent vessel |
 | Later step start with current type outside that step’s accepted types | **422 `route_sample_type`**; sample is not broken. **Unsigned on `8cfa2a9`** — not click-run |
 | Publish without Test | **422** the whole run (`_require_wo7_tests` / `plan.errors`). Stay unpublished. Zero Results. Publish-refuse **Pass** on `8cfa2a9` and history on `b005cfe`. Freeze skip unsigned: `{}` on `99b692d3` is ambiguous, not a skip Pass. |
@@ -174,7 +181,7 @@ No new import engine. **Do not build “admin authors parsers” as the product.
 | PR | Scope |
 |----|--------|
 | 1 | P1 tables + API + `/asked-for` UI + pytest + UAT script. **Hold merge until UAT.** |
-| 2 | P2 routing + work_order + ordered `process_definition[]` + LimsRun WO-7. Signed AC-P2-9..11 `9342439`. `0077` assignment slices `4671ba8`; AC-P2-C1/C2 **unsigned**. Overall P2 **unsigned**. **Hold product merge to main.** Still open: Hans freeze (`{}` ambiguous), **OQ-WO-6** (earlier LimsRun `analysis_id`; extract is not special), P2-4 `0074`. |
+| 2 | P2 routing + work_order + ordered `process_definition[]` + LimsRun WO-7 + 0077 assignment. Signed AC-P2-9..11 `9342439`. `0077` assignment slices `4671ba8`; AC-P2-C1/C2 **unsigned**. Overall P2 **unsigned**. **Hold product merge to main.** Still open: Hans freeze (`{}` ambiguous), **OQ-WO-6**, dest mint Hold, P2-4 `0074`. |
 | 3 | P3 persist lock + results UAT fold (**closed**) |
 | 4 | P4 SOP Apply → process def (**closed**) |
 | 5 | P5 parser setup UX (**closed** this cycle) |
