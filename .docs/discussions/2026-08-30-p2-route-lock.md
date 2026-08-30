@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-30  
 **Team:** Leadership (Lab Ops, CEO, Security CSO, Scientific CSO)  
-**Ask:** Round 1 remains **Leadership Confirmed** (Rolf, Deiter, Hans, Heidi, Günter; all five asks). Round 2 is **Leadership Confirm** (Rolf, Deiter, Hans, Heidi, Günter; R2-1…R2-4). **Contents grain / `0077` remains a Leadership Confirm** (Rolf, Deiter, Hans, Heidi, Günter) in the last section — process assignment is a **sample in a container**. Deiter clicked product `4671ba8` / assignment commit `02fe95f`: C1 **Pass**, C2 **Fail**, dest mint Hold **Pass**. Docs Confirm `84d2810` is not a new execute and not the click SHA. Not a Tobias QA Pass and not a merge stamp. Overall P2 UAT remains unsigned / not Pass.
+**Ask:** Round 1 remains **Leadership Confirmed** (Rolf, Deiter, Hans, Heidi, Günter; all five asks). Round 2 is **Leadership Confirm** (Rolf, Deiter, Hans, Heidi, Günter; R2-1…R2-4). **Contents grain / `0077` remains a Leadership Confirm** (Rolf, Deiter, Hans, Heidi, Günter) — process assignment is a **sample in a container**. Leadership later **Confirmed Deiter’s click**: C1 **Pass**, C2 **Fail**, dest mint Hold **Pass** on product `4671ba8` / `02fe95f`. C1/C2 are **not** unsigned. Docs Confirm `84d2810` is not a new execute and not the click SHA. Not a Tobias QA Pass and not a merge stamp. Grok Build owns dest-join / source-remove. Overall P2 UAT remains unsigned / not Pass.
 **Implement gate:** **OPEN for P2 coding on `feat/work-order-p2`.** Merge to `main` **held** until signed UAT Pass.  
 **Stem:** [post-receive-work-spine](../review/requirements/post-receive-work-spine.md)
 
@@ -287,5 +287,36 @@ Deiter (Lab Ops), 2026-08-30, product `4671ba8` / assignment commit `02fe95f`: A
 | OQ-WO-6 | **OPEN.** Earlier LimsRun must not share asked-for `analysis_id`. |
 | Freeze skip (`{}` vs NULL) | **OPEN.** |
 | Dest-type mint (`_execute_transfer` new Sample with `dest_sample_type`) | **Hold.** Not closed by this Confirm. |
-| AC-P2-C1 / AC-P2-C2 | Deiter click at `4671ba8` / `02fe95f`: C1 **Pass**; C2 **Fail**. Not a Tobias QA Pass. |
+| AC-P2-C1 / AC-P2-C2 | Deiter click at `4671ba8` / `02fe95f`: C1 **Pass**; C2 **Fail**. Not unsigned. Not a Tobias QA Pass. |
 | Overall P2 | **unsigned / not Pass.** Hold merge to `main`. |
+
+---
+
+## Leadership Confirm of Deiter’s Contents click — 2026-08-30
+
+**Full Leadership Confirm** of Deiter’s click. Rolf, Hans, Heidi, Günter. Round 1, Round 2, and the Contents-grain Confirm above stay as written — this section does **not** rewrite them. Deiter remains the click. Product SHA `4671ba8` / assignment commit `02fe95f`. Docs Confirm `84d2810` is not a new execute and not the click SHA. Do **not** rewrite Tobias `9342439` / `8cfa2a9` / P1 Results. Do **not** invent a Tobias Pass for C1/C2. C1/C2 are **not** unsigned. Grok Build owns dest-join / source-remove. Not a merge stamp. Overall P2 remains **not Pass**. Hold product merge to `main`. Not IC50.
+
+| Slice | Confirm |
+|-------|---------|
+| AC-P2-C1 | **Pass** (Deiter click, `4671ba8` / `02fe95f`) |
+| AC-P2-C2 | **Fail** (Deiter click; Leadership restamp of that Fail on `02fe95f`) |
+| Dest mint Hold | **Pass** — still Blood, **0 DNA**. Different punch from C2 Fail. |
+| Overall P2 | **unsigned / not Pass** |
+
+**Consensus:** Confirm Deiter C1 **Pass**, C2 **Fail**, dest mint Hold **Pass**. C1/C2 are signed. Dest never lands on `eln_process_samples`; emptied-source assign **201** is leftover amount-0 Contents / leftover process-join, not dest-follow. Later Start via `_continuing_assignments` rides the emptied parent. **PATCH is not a path.** Dest mint Hold is a different punch. Coding stays **Grok Build**. OQ-WO-6 and freeze skip stay **OPEN**. Hold merge. Not IC50.
+
+### Rolf (CEO)
+
+**Confirm Deiter’s click.** C1 **Pass**. C2 **Fail**. Dest mint Hold **Pass** (still Blood, 0 DNA). QA restamps that Fail on `02fe95f` — do not treat C1/C2 as unsigned. Docs Confirm `84d2810` is not a new execute. No overall P2 Pass. Hold merge. Not IC50. Grok Build owns dest-join / source-remove.
+
+### Hans (Sci CSO)
+
+**Confirm the Fail holds.** Dest not on the process; emptied source still assignable (201) is the mix-up. Later Start would still follow the parent tube; results would not be attributable to the dest vessel. Dest mint Hold remains a different punch (still Blood, 0 DNA). Do not rewrite `9342439`. No overall P2 Pass.
+
+### Heidi (Arch)
+
+**Confirm the Fail holds.** Execute never writes the same-sample dest container onto `eln_process_samples`; join/release no-op without `entry.process_step_id`, so later Start via `_continuing_assignments` rides the emptied parent. Emptied-source 201 is leftover amount-0 Contents, not dest-follow. PATCH is not a path. Dest mint Hold is a different punch (new Sample with dest_sample_type is not this fix). Coding stays Grok Build.
+
+### Günter (Sec CSO)
+
+**Confirm the Fail holds.** Emptied-source assign 201 is a leftover process-join — the wrong tube stays on the instance. Dest never lands on `eln_process_samples`. Dest mint Hold is a different punch. Hold product merge to `main`. Not IC50.
