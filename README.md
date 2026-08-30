@@ -168,7 +168,8 @@ nimblelims/
 │   ├── Dockerfile          # Database container config
 │   └── init.sql            # Database initialization
 ├── .docs/                  # Documentation root
-│   ├── review/             # Review stamps, tech sketches, process, manuals, OQs
+│   ├── review/             # Review stamps, tech sketches, process, OQs
+│   ├── internal/           # Working PRDs, specs, design, ideas (git-tracked)
 │   ├── discussions/        # Multi-persona Leadership discussions
 │   └── decision-logs/      # Leadership stamps (FW/WO, reorg)
 ├── services/               # Auxiliary microservices
@@ -183,7 +184,7 @@ nimblelims/
 
 ## Features (MVP Scope)
 
-**Note:** This section describes **all implemented features in the codebase**. However, the **MVP release bar** focuses on three core pillars: (1) **track samples** (receive, status, lineage), (2) **requested analysis** (asked-for lake — a later look-up that does **not** assign a Test or start work), and (3) **enter results** (capture and review). Additional features listed below (ELN experiments, dose-response analysis, LimsRuns/parsers, workflow templates, custom fields) are **shipped/in-tree but not the MVP release bar**—they are enhancements that demonstrate platform capability and remain available for users who need them. See local `.docs/internal/prd/nimblelims-prd.md` (not committed) for the complete MVP definition.
+**Note:** This section describes **all implemented features in the codebase**. However, the **MVP release bar** focuses on three core pillars: (1) **track samples** (receive, status, lineage), (2) **requested analysis** (asked-for lake — a later look-up that does **not** assign a Test or start work), and (3) **enter results** (capture and review). Additional features listed below (ELN experiments, dose-response analysis, LimsRuns/parsers, workflow templates, custom fields) are **shipped/in-tree but not the MVP release bar**—they are enhancements that demonstrate platform capability and remain available for users who need them. See [`.docs/internal/prd/nimblelims-prd.md`](.docs/internal/prd/nimblelims-prd.md) for the complete MVP definition.
 
 ### Core Workflows for BioTech/Pharma Startups (**MVP Release Bar** + Shipped Enhancements)
 - **Compound & Sample Tracking** **(MVP)**: Receive (`/receive`), status management, lineage (aliquots/derivatives), container hierarchy. Non-empty `analysis_ids` on receive → **422**.
@@ -212,7 +213,7 @@ nimblelims/
 - **Promote on publish**: Status → `published` maps columns to analytes (name + **aliases** for CRO/instrument vendor column names) and writes **Results** (`raw_result`, `replicate`, `lims_run_id`) only into active Tests from first start of the asked-for analysis. If any cohort Test is missing, WO-7 refuses the whole publish with **422**. Publish-refuse is Tobias-signed Pass on `8cfa2a9` (carol **422** `test_missing`) and remains history on `b005cfe`. A write of `{}` onto Test `99b692d3` is not a freeze-skip Pass (`{}` is ambiguous). Do **not** fold classic `/tests` skip as Pass. `if test: continue` is not a freeze. Classic `/tests` must leave `asked_for_params` NULL, or we need a freeze marker. Until then `{}` is **ambiguous** — a classic default `{}` is the same JSON as a frozen `{}`, so first start cannot tell them apart. Do not teach skip-on-frozen-`{}`. Overall P2 Pass remains unsigned.
 - **Conflicts**: Same run updates; other run/manual ownership fails publish with **409** to protect data integrity.
 - **Preview**: Publish confirmation dry-runs create/update/conflict/unresolved columns (`GET /v1/lims-runs/{id}/promotion/preview`).
-- **Docs**: [manuals/HOWTO.md](manuals/HOWTO.md) · [manuals/lims-runs.md](manuals/lims-runs.md) · local `.docs/internal/ideas/run-results.md` (not committed).
+- **Docs**: [manuals/HOWTO.md](manuals/HOWTO.md) · [manuals/lims-runs.md](manuals/lims-runs.md) · [`.docs/internal/ideas/run-results.md`](.docs/internal/ideas/run-results.md).
 
 ### Experiment Management **(Shipped, Not MVP)** (ELN-style Process Tracking)
 - **Experiments**: Full CRUD for experiments; list/detail UI with tabs (Overview, Sample Executions, Details/Steps, Lineage, Linked Processes). Permission: `experiment:manage` (Administrator, Lab Manager, Lab Technician).
@@ -325,11 +326,12 @@ See [manuals/HOWTO.md](manuals/HOWTO.md) for the lab path. [manuals/navigation.m
 
 **Published how-tos** are git-tracked under [`manuals/`](manuals/) — start with [HOWTO.md](manuals/HOWTO.md). Review stamps live under [`.docs/review/`](.docs/review/). **Start here:** [`.docs/README.md`](.docs/README.md).
 
-Umbrella PRD, long-form design, ideas, SOP packs, user stories, and private notes live under local `.docs/internal/` (not committed). Operator handbooks are git-tracked under [`manuals/`](manuals/).
+Umbrella PRD, long-form design, ideas, SOP packs, and user stories are git-tracked under [`.docs/internal/`](.docs/internal/). Operator handbooks are git-tracked under [`manuals/`](manuals/). `.docs/manuals/` stays gitignored (vendor PDFs / legacy local manuals).
 
 | Folder | Contents |
 |--------|----------|
 | [`manuals/`](manuals/) | Git-tracked operator how-tos (`HOWTO.md` plus receive, asked-for, navigation, API, processes, …) |
+| [`.docs/internal/`](.docs/internal/) | Git-tracked working PRDs, specs, design, ideas, user stories, SOP packs |
 | [`requirements/`](.docs/review/requirements/) | Cycle feature requirements |
 | [`checklist/`](.docs/review/checklist/) | Implementation checklists |
 | [`open-questions/`](.docs/review/open-questions/) | Cycle/feature gates (block a packet until Decided; not Leadership stamps) |
@@ -355,6 +357,6 @@ See [manuals/HOWTO.md](manuals/HOWTO.md), [`.docs/README.md`](.docs/README.md), 
 
 **Key files (backend):** `backend/app/routers/experiments.py`, `backend/app/routers/sop_parse.py`, `backend/app/services/sop_parse_service.py`, `backend/app/services/experiment_service.py`, flexible experiment models/migrations.
 
-**Documentation:** [manuals/HOWTO.md](manuals/HOWTO.md), `.docs/review/checklist/experiment-checklist.md`, [processes.md](manuals/processes.md), [experiments.md](manuals/experiments.md), [lims-runs.md](manuals/lims-runs.md), [navigation.md](manuals/navigation.md), [api-endpoints.md](manuals/api-endpoints.md), local `.docs/internal/design/experiment-planning.md` (not committed), `UAT_Scripts/uat-experiment-templates.md`.
+**Documentation:** [manuals/HOWTO.md](manuals/HOWTO.md), `.docs/review/checklist/experiment-checklist.md`, [processes.md](manuals/processes.md), [experiments.md](manuals/experiments.md), [lims-runs.md](manuals/lims-runs.md), [navigation.md](manuals/navigation.md), [api-endpoints.md](manuals/api-endpoints.md), [`.docs/internal/design/experiment-planning.md`](.docs/internal/design/experiment-planning.md), `UAT_Scripts/uat-experiment-templates.md`.
 
 **Optional env:** `ANTHROPIC_API_KEY` on the backend for SOP extraction (see `backend/app/core/config.py`).

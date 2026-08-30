@@ -16,7 +16,7 @@ The following are implemented in the repo:
 - **`frontend/src/App.tsx`** — `/experiments/templates` → `ExperimentTemplatesManagement`, gated by **`experiment:manage`** (same as list/detail).
 - **`frontend/src/components/Sidebar.tsx`** — Experiment Templates sub-item visible when **`experiment:manage`** (not `config:edit`-only).
 
-**Doc alignment:** README, `.docs/review/manuals/navigation.md`, `.docs/review/manuals/api-endpoints.md`, local `.docs/internal/design/experiment-planning.md` (not committed), backend/frontend READMEs, and `UAT_Scripts/uat-experiment-templates.md` describe the shipped behavior.
+**Doc alignment:** README, `.docs/review/manuals/navigation.md`, `.docs/review/manuals/api-endpoints.md`, `.docs/internal/design/experiment-planning.md`, backend/frontend READMEs, and `UAT_Scripts/uat-experiment-templates.md` describe the shipped behavior.
 
 **Operational note:** SOP extraction requires **`ANTHROPIC_API_KEY`** on the backend (`app/core/config.py`).
 

@@ -149,10 +149,10 @@ Current lineage via `experiment_link` details may be superseded or augmented by 
 
 **Related Documents**
 
-- local `.docs/internal/design/process-and-experiment-structural.md` (not committed)
-- local `.docs/internal/design/gap-analysis-process-and-experiment.md` (not committed)
+- `.docs/internal/design/process-and-experiment-structural.md`
+- `.docs/internal/design/gap-analysis-process-and-experiment.md`
 - [experiments.md](experiments.md)
 - [`lims-runs.md`](lims-runs.md)
-- local `.docs/internal/design/experiment-planning.md` (not committed)
+- `.docs/internal/design/experiment-planning.md`
 - [`.docs/review/checklist/experiment-rework-prerequisites.md`](../.docs/review/checklist/experiment-rework-prerequisites.md)
 - [`workflow-accessioning-to-reporting.md`](workflow-accessioning-to-reporting.md) (for contrast with Workflow Templates)

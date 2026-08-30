@@ -15,7 +15,7 @@
 | [`.docs/review/tech-sketch/experiment-template-entries.md`](experiment-template-entries.md) §0.8 | Same container/amount/aliquot spine |
 | [`.docs/review/tech-sketch/configurable-entries-framework.md`](configurable-entries-framework.md) | Two kinds; dest FieldDefinitions not Sample schema |
 | [`.docs/review/tech-sketch/extract-hold-dest-type.md`](extract-hold-dest-type.md) | Aliquot/pool execute; dest fields on dest entry; normalization bounce free type-in |
-| local `.docs/internal/ideas/containers-model-update.md` (not committed) | Implement slice still pending for rows×columns / 1×1 enforce |
+| `.docs/internal/ideas/containers-model-update.md` | Implement slice still pending for rows×columns / 1×1 enforce |
 
 This document folds the existing container locks with the Result decisions recorded for this packet. It states why per-sample amount belongs on **Contents**, why vessel total amount and inventory concentration belong on the **1×1 Container**, and why write-back / destination fields / normalization must not put mass or concentration on **Sample**.
 

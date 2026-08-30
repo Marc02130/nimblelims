@@ -202,14 +202,14 @@ Rule: no new phase / major feature until blocking questions for that work are re
 | [manuals/processes.md](../manuals/processes.md) | Process concept |
 | [manuals/experiments.md](../manuals/experiments.md) | ELN Experiments |
 | [manuals/lims-runs.md](../manuals/lims-runs.md) | LIMS Runs boundary |
-| local `.docs/internal/design/gap-analysis-process-and-experiment.md` (not committed) | Gaps |
+| `.docs/internal/design/gap-analysis-process-and-experiment.md` | Gaps |
 | [experiment-rework-prerequisites.md](experiment-rework-prerequisites.md) | Pre-rework issues |
 | [ceo-review/process-and-experiment.md](../ceo-review/process-and-experiment.md) | CEO review (Phase 1–3) |
 | [ceo-review/experiment-template-entries.md](../ceo-review/experiment-template-entries.md) | CEO review (template entries) |
 | [ui-review/experiment-template-entries.md](../ui-review/experiment-template-entries.md) | UI review (template entries) |
 | [architecture-review/experiment-template-entries.md](../architecture-review/experiment-template-entries.md) | Architecture review |
 | [security-review/experiment-template-entries.md](../security-review/experiment-template-entries.md) | Security review |
-| local `.docs/internal/design/experiment-planning.md` (not committed) | Chunk 1–2 history |
+| `.docs/internal/design/experiment-planning.md` | Chunk 1–2 history |
 | [Docs index](../README.md) | Full documentation map |
 
 ---

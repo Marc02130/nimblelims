@@ -2,10 +2,10 @@
 
 **Date:** 2026-07-12  
 **Status:** **Accepted for implementation** (2026-07-19) — CEO re-confirm; Architecture · Security · UI **Accept with conditions**  
-**Idea / direction:** local `.docs/internal/ideas/ai-data-import.md` (not committed)  
+**Idea / direction:** `.docs/internal/ideas/ai-data-import.md`  
 **Tech sketch:** [`.docs/review/tech-sketch/data-parsers-lims-runs.md`](../tech-sketch/data-parsers-lims-runs.md)  
 **Open questions:** [`.docs/review/open-questions/data-parsers-lims-runs.md`](../open-questions/data-parsers-lims-runs.md)  
-**Depends on (shipped):** local `.docs/internal/ideas/run-results.md` (not committed) promote-on-publish (`analysis_id`, analyte aliases, `ResultPromotionService`)  
+**Depends on (shipped):** `.docs/internal/ideas/run-results.md` promote-on-publish (`analysis_id`, analyte aliases, `ResultPromotionService`)  
 **Related:** [manuals/lims-runs.md](../manuals/lims-runs.md), SOP parse (template-centric AI, separate)
 
 ## 1. Introduction
@@ -40,7 +40,7 @@ Promote-on-publish already maps JSONB columns → analytes/results when `analysi
 - Binary proprietary formats as MVP (XLSX may be a later phase)  
 - Replacing SOP→template AI (that path remains template-centric)  
 - Changing promote-on-publish product rules (already shipped)  
-- **Multi-tenant / org segregation** of instruments, CRO sources, or parsers (local `.docs/internal/ideas/multi-tenant.md` (not committed))
+- **Multi-tenant / org segregation** of instruments, CRO sources, or parsers (`.docs/internal/ideas/multi-tenant.md`)
 
 ### 1.3b Multi-tenant readiness (consideration only)
 
@@ -85,7 +85,7 @@ Optional `cro_sources.client_id` is a **label** (related client), not a tenant s
 | FR-1.1 | System shall support CRUD for **instrument types** with **vendor** and **model** (plus name/description/active). |
 | FR-1.2 | System shall support CRUD for **instrument instances** with **FK to instrument type**, **name** (lab nickname), optional **serial number**, description, active. |
 | FR-1.3 | Instruments are **lab configuration**, not full CMMS (no calibration/IQ-OQ this cycle). |
-| FR-1.4 | **No location** on instruments this cycle. Existing `locations` is client address data—not lab rooms. Future: local `.docs/internal/ideas/lab-locations.md` (not committed). |
+| FR-1.4 | **No location** on instruments this cycle. Existing `locations` is client address data—not lab rooms. Future: `.docs/internal/ideas/lab-locations.md`. |
 | FR-1.5 | Soft-deactivate preferred over hard delete when parsers/runs reference the instrument. |
 | FR-1.6 | Parsers and lims_runs reference the **instance** (not the type). Type is available via join for display/AI context (vendor/model). |
 | FR-1.7 | Permission: **`config:edit`** for instrument types/instances (and related config). |
@@ -158,7 +158,7 @@ User testing is part of the **parser framework**, not a separate product.
 | FR-6.7 | Optional AI may **suggest edge test cases** based on observed data (e.g. negative values, empties, type stress, structural noise); suggestions become fixtures only after user accepts. |
 | FR-6.8 | Edge tests and all test files are judged by the **code engine**, not by the LLM alone. |
 | FR-6.9 | AI shall not invent official result values or run on production LimsRun import. |
-| FR-6.10 | Optional: AI may suggest analyte aliases (human confirm)—see local `.docs/internal/ideas/ai-analyte-resolution.md` (not committed). |
+| FR-6.10 | Optional: AI may suggest analyte aliases (human confirm)—see `.docs/internal/ideas/ai-analyte-resolution.md`. |
 | FR-6.11 | LLM path requires server credentials; degrade with clear error if missing. Async job pattern recommended (cf. SOP parse). |
 
 ### FR-7: Compatibility and migration
@@ -176,7 +176,7 @@ User testing is part of the **parser framework**, not a separate product.
 | FR-8.1 | Catalog and parser CRUD require **`config:edit`** (not lab client users). |
 | FR-8.2 | Run field changes (analysis, source, parser) require run edit permissions consistent with existing LimsRun RBAC. |
 | FR-8.3 | Import and parser CRUD actions are auditable (who, when, entity ids, including **new version** and **activate** events). |
-| FR-8.4 | Instruments / CRO sources / parsers are **lab-global** config (not client-configurable). **Multi-tenant / org segregation is out of scope** — see local `.docs/internal/ideas/multi-tenant.md` (not committed). |
+| FR-8.4 | Instruments / CRO sources / parsers are **lab-global** config (not client-configurable). **Multi-tenant / org segregation is out of scope** — see `.docs/internal/ideas/multi-tenant.md`. |
 
 ### FR-9: Analysis required on every run (no non-reportable path)
 
@@ -184,7 +184,7 @@ User testing is part of the **parser framework**, not a separate product.
 |----|-------------|
 | FR-9.1 | **No non-reportable runs** (Decision #6). `analysis_id` required on create/edit. |
 | FR-9.2 | Start, import, and publish shall **reject** if `analysis_id` is null (no ack / continue-without). |
-| FR-9.3 | Method-dev / scratch is **out of scope** until local `.docs/internal/ideas/orders-and-projects.md` (not committed)—not solved by null analysis. |
+| FR-9.3 | Method-dev / scratch is **out of scope** until `.docs/internal/ideas/orders-and-projects.md`—not solved by null analysis. |
 | FR-9.4 | Target schema: `lims_runs.analysis_id` **NOT NULL** when implementation aligns with this lock. |
 
 ---
@@ -289,7 +289,7 @@ File column  --parser-->  row_data[field_name]  --promote-->  Result(analyte)
 | 4 | Allow override to a parser from a different analysis? | No without strong warning / block |
 | 5 | Snapshot vs versioning? | **Version + active**; no import JSON snapshot; updates create new versions |
 | 6 | Non-reportable / null analysis import? | **Decided:** no non-reportable runs; require analysis; method-dev deferred to lab projects |
-| 7 | Multi-tenant / org segregation? | **Out of scope** — lab-global config; local `.docs/internal/ideas/multi-tenant.md` (not committed) |
+| 7 | Multi-tenant / org segregation? | **Out of scope** — lab-global config; `.docs/internal/ideas/multi-tenant.md` |
 
 ---
 
@@ -305,6 +305,6 @@ File column  --parser-->  row_data[field_name]  --promote-->  Result(analyte)
 | UI / UX | [ui-review/data-parsers-lims-runs.md](../ui-review/data-parsers-lims-runs.md) | **Accept with conditions** (U1–U4 must; U5–U7 nice) |
 | Open questions | [open-questions/data-parsers-lims-runs.md](../open-questions/data-parsers-lims-runs.md) | Product closed (Q8 provisional) |
 | Schema changes | [schema-changes/data-parsers-lims-runs.md](../schema-changes/data-parsers-lims-runs.md) | Architecture re-verified |
-| Idea | local `.docs/internal/ideas/ai-data-import.md` (not committed) | Direction sketch |
+| Idea | `.docs/internal/ideas/ai-data-import.md` | Direction sketch |
 
 **Gate:** Product + reviews complete for P0/P1. Implement conditions in review docs. P2 still requires Security S6–S8.

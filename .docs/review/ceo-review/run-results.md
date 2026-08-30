@@ -3,7 +3,7 @@
 **Date:** 2026-07-11  
 **Branch:** `run-results`  
 **Reviewer:** CEO / Product Strategy  
-**Idea:** local `.docs/internal/ideas/run-results.md` (not committed)
+**Idea:** `.docs/internal/ideas/run-results.md`
 
 ## Executive Summary
 
@@ -93,4 +93,4 @@ Promoting run data into **structured `results` rows when the run is published** 
 
 ---
 
-Related: [ui-review](../ui-review/run-results.md) · local `.docs/internal/design/run-results.md` (not committed) · [security](../security-review/run-results.md)
+Related: [ui-review](../ui-review/run-results.md) · `.docs/internal/design/run-results.md` · [security](../security-review/run-results.md)
