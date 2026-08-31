@@ -26,7 +26,7 @@
 | 1.4 | Set the line to **Same as parent.** and save. | The explicit line clear overrides entry DNA and resolves to the parent type. |
 | 1.5 | Select **DNA** as a line override and save. | Plan line stores `dest_sample_type` as the DNA list-entry UUID. |
 | 1.6 | Reload the entry. | Method, default, and line override remain selected. Method is locked because lines exist; the UI directs the operator to cancel the experiment to change it. |
-| 1.7 **(OOB execute — not the P2 Contents click)** | Execute without changing the plan. | This remains OOB; it has no Result stamp. The dest-type split is **Leadership Confirmed**, but this click is not. **Different dest type = new derivative Sample in a new container (`parent_sample_id`).** The parent Sample row stays with its original type, Tests, and parent-type work; it is not retargeted onto the destination tube. Type-changing execute mints and joins the destination Sample + container pair on `eln_process_samples` and marks the inbound source assignment `removed`; only that destination pair continues on the process. Route / Start / map-save mint zero daughters. Deiter’s separate `02fe95f` C2 **Fail** and dest mint Hold **Pass** remain signed history; the Hold Pass records Start extract still Blood with **0 DNA**, not a ban on type-changing execute minting a derivative. Live C2 on `1572071` is same-type dest-follow only and remains **unsigned** until Tobias. C2 and step 1.7 remain two clicks. |
+| 1.7 | Leave dest type **DNA**. Execute. Same click as spine **AC-P2-C3**. | **New Sample** in a **new container**, `parent_sample_id` = Blood source. Dest type DNA. Parent Sample stays Blood. If the experiment is under a process: dest pair is the only **active** process assignment; inbound source is `removed`. Do **not** score this as AC-P2-C2 (same dest type). **Result:** unsigned until Tobias (`1572071`). |
 
 ## 2. Catalog filtering
 
@@ -76,11 +76,8 @@ Verify the plan and execute flows contain none of the following:
 - Catalog choices are many-to-many and client/source/operation filtered.
 - Mixed-type pools are refused in both UI and API.
 - Execute resolves line override → entry default → parent without re-prompting.
-- **Same dest type = same sample, additional container.** Live C2 on `1572071` covers only this same-type dest-follow path and remains **unsigned** until Tobias.
-- Assign to process is the **tube in hand**: no vessel, or two vessels with no `container_id` pick → **422**, lab-readable, **no silent pick**.
-- A sample may have many containers; only one container-with-sample is on the process.
-- Do not teach Later Start dest-follows as shipped, and do not teach PATCH as that path.
-- `_follow_destination_in_process` retarget is the **same-sample additional-container** path. Do not use parent `container_id` retarget for a type-changing destination.
-- **Different dest type = new derivative sample** in a new container with `parent_sample_id`; the parent Sample row stays with its original type, while the destination pair continues on the process and the inbound source assignment is `removed`. Dest mint Hold is lifted only for type-changing execute.
-- Do **not** score step 1.7. It is **OOB entry execute**, not the P2 Contents click. Deiter C1 **Pass**, C2 **Fail**, and dest mint Hold **Pass** remain signed history at `4671ba8` / `02fe95f`; that Hold Pass is Start extract still Blood / **0 DNA** history. Live C2 on `1572071` remains unsigned.
+- **1.7 / AC-P2-C3:** dest type DNA mints a new Sample + container; parent stays Blood; dest pair continues the process. Unsigned until Tobias. Do not score 1.7 as C2.
+- **C2** (spine): dest type Same as parent = same sample, new container; dest on process; emptied source 422. Unsigned until Tobias.
+- Assign to process: no vessel, or two vessels with no pick → **422**. No silent pick.
+- PATCH of process assignment is not a path.
 - Normalization consumes a prior concentration result, never free-typed source concentration.
