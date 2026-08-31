@@ -850,7 +850,7 @@ The preceding Deiter click (`4671ba8` / `02fe95f`) is retained verbatim as signe
 **Leadership Confirm — mint-only-at-execute** (memo, not a numbered step). Dest sample/container exists only after aliquot/pool **execute**. Route / Start / map-save / asked-for mint **zero** daughters. Plan dest type is catalog intent, **not** a Sample. Receive still mints identity + first vessel — that is **not** dest mint. Do **not** teach dest existing at Route / Start / map-save.
 
 **C2/C3 execute clicks** (unsigned until Tobias). `570bbc0` does **not** inherit `1572071` C2 Pass or Fail. Same click as extract-hold UAT **1.7** for C3. Two clicks.
-- **C2 execute:** extra container, same sample; dest joins; source off; emptied-source **422**; later Start follows dest.
+- **C2 execute:** extra container, same sample; dest joins; inbound assignment off; later Start follows dest. Source tube leftover volume is whatever was not transferred — emptying is not required.
 - **C3 execute:** new derivative (`parent_sample_id`); parent stays Blood; dest sample + container on the process; inbound source **removed**. **Fail C3** if dest tube lands on the blood Sample, parent `container_id` is retargeted, or later Start follows blood.
 - Günter: after execute, the process-sample is **only** that execute-minted dest.
 
@@ -862,16 +862,17 @@ The preceding Deiter click (`4671ba8` / `02fe95f`) is retained verbatim as signe
 
 **Setup**
 - Receive one tube. Asked-for. Route a two-process map (first process has an Aliquot / pool plan experiment). First Start. Confirm the receive tube is on process 1.
-- Dest type on the plan is **Same as parent.** (blank). Tracked source amount is enough to empty the tube.
+- Dest type on the plan is **Same as parent.** (blank). Source has a tracked amount so execute can transfer.
 
 **Steps**
-1. Execute Aliquot — by volume (or by target amount) so the source tube amount becomes **0** and a **new container** is created.
+1. Execute Aliquot — by volume (or by target amount). Transfer **some** of the source into a **new container**. Do **not** require the source tube to go to amount 0. Leftover on the inbound tube is whatever was not transferred.
 2. Confirm **no new Sample row**: dest `sample_id` is the receive sample. Dest `container_id` is not the receive tube. Sample type is unchanged.
-3. Confirm process 1’s **active** assignment is that dest container (same sample). The receive-tube assignment is **`removed`**.
-4. Assign the emptied receive tube (amount 0) to a process. Confirm **422** `process_container_required`.
-5. Later Start the next process. Confirm it carries the **dest container**, not the original tube.
+3. Confirm process 1’s **active** assignment is that dest container (same sample). The inbound-tube assignment is **`removed`** even if that tube still has leftover volume.
+4. Later Start the next process. Confirm it carries the **dest container**, not the original tube.
 
-**Pass this AC if** steps 1–5 match. Fail if execute creates a new Sample, dest is not on the process, the emptied tube is still assignable (201), or Later Start follows the parent tube.
+**Pass this AC if** steps 1–4 match. Fail if execute creates a new Sample, dest is not on the process, or Later Start follows the parent tube. Leftover volume on the inbound tube is **not** a Fail.
+
+**Edge (not C2 core):** If the transfer **does** leave amount 0 on the inbound tube, assigning that container is **422** `process_container_required`. If leftover remains, that tube is still a vessel with Contents; it is just not the process assignment.
 
 ### AC-P2-C3 — different dest type (Blood → DNA)
 

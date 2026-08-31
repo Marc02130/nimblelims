@@ -77,7 +77,7 @@ Verify the plan and execute flows contain none of the following:
 - Mixed-type pools are refused in both UI and API.
 - Execute resolves line override → entry default → parent without re-prompting. Dest type on the plan is catalog intent, **not** a Sample; dest exists **only after execute**. Route / Start / map-save / asked-for mint **zero** daughters. Receive still mints identity + first vessel — that is **not** dest mint.
 - **1.7 / AC-P2-C3 execute click:** dest type DNA mints a new Sample + container; parent stays Blood; dest pair continues the process. **Fail C3** if dest tube lands on the blood Sample, parent `container_id` is retargeted, or later Start follows blood. Unsigned until Tobias. Numbered on `570bbc0`; execute is `1572071`. Do not score 1.7 as C2. `570bbc0` does **not** inherit `1572071` C2 Pass or Fail.
-- **C2 execute click** (spine): extra container, same sample; dest joins; source off; emptied-source **422**; later Start follows dest. Unsigned until Tobias. Numbered on `570bbc0`; execute is `1572071`. `570bbc0` does **not** inherit `1572071` C2 Pass or Fail.
+- **C2 execute click** (spine): extra container, same sample; dest joins; inbound assignment off; later Start follows dest. Leftover on the inbound tube is whatever was not transferred — emptying is not required. Unsigned until Tobias.
 - Assign to process: no vessel, or two vessels with no pick → **422**. No silent pick.
 - PATCH of process assignment is not a path.
 - Normalization consumes a prior concentration result, never free-typed source concentration.
