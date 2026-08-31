@@ -352,3 +352,20 @@ Deiter C2 **Fail** on `02fe95f` stands as signed history. Do **not** write C2 Pa
 6. **Historical Hold:** `9342439` Dest-type mint Hold is history of Start extract (still Blood, 0 DNA) and Route/Start minting zero daughters. It is not a live ban on type-changing execute.
 
 OQ-WO-6 and freeze skip stay **OPEN**. Deiter C2 **Fail** on `02fe95f` stays signed history. Overall P2 remains unsigned / not Pass. Hold product merge to `main`. Not IC50.
+
+---
+
+## Live restamp SHA pinned to `570bbc0` — 2026-08-31
+
+Docs-only honesty fold (Rolf). Does **not** rewrite Round 1, Round 2, the Contents-grain Confirm, Deiter `02fe95f` Results, or Tobias `9342439` AC-P2-9..11 Pass Results. Not a Pass and not a merge vote.
+
+The two preceding 2026-08-31 sections are retained verbatim as sent. Where they read “live … `1572071`” or “1.7 remains OOB with no Result stamp”, this section supersedes them: the live restamp SHA is `570bbc0` and 1.7 is the AC-P2-C3 click.
+
+1. **Live click SHA is `570bbc0`** (`570bbc01ff50fdac2d529448ceb95683c535401f` — docs/uat split of C2 and C3 into numbered clicks). The live dest-follow stamp heading in [`UAT_Scripts/uat-post-receive-work-spine.md`](../../UAT_Scripts/uat-post-receive-work-spine.md) now reads `570bbc0`.
+2. **`1572071` is the implementation SHA**, not the current click SHA. It may still be cited as where the dest-follow execute-txn work landed. No live block claims it as the live restamp.
+3. **C2 and C3 are two unsigned clicks.** AC-P2-C2 is same dest type (tube → plate). AC-P2-C3 is different dest type (Blood → DNA), the same click as extract-hold UAT **1.7**. Neither is Pass. Do not teach Pass.
+4. **The split is the dest type on the aliquot/pool entry.** Same type → same Sample, extra container, `container_id` retarget. Different type → new derivative Sample with `parent_sample_id`; the parent Sample stays with its own type; the inbound assignment is `removed`. Route / Start / map-save still mint **zero** daughters.
+5. **Hold-as-ban stays punched (PR 103).** `9342439` Dest-type mint Hold and Deiter’s `02fe95f` Hold **Pass** remain Start-extract still Blood / **0 DNA** **history**. No doc carries a live “dest mint Hold” ban on type-changing aliquot/pool execute.
+6. **`02fe95f` C2 Fail and the `9342439` Pass Results are byte-stable.** Nothing in this fold re-scores them.
+
+OQ-WO-6 and freeze skip stay **OPEN**. Overall P2 remains unsigned / not Pass. Hold product merge to `main`. Not IC50.

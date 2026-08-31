@@ -26,7 +26,7 @@
 | 1.4 | Set the line to **Same as parent.** and save. | The explicit line clear overrides entry DNA and resolves to the parent type. |
 | 1.5 | Select **DNA** as a line override and save. | Plan line stores `dest_sample_type` as the DNA list-entry UUID. |
 | 1.6 | Reload the entry. | Method, default, and line override remain selected. Method is locked because lines exist; the UI directs the operator to cancel the experiment to change it. |
-| 1.7 | Leave dest type **DNA**. Execute. Same click as spine **AC-P2-C3**. | **New Sample** in a **new container**, `parent_sample_id` = Blood source. Dest type DNA. Parent Sample stays Blood. If the experiment is under a process: dest pair is the only **active** process assignment; inbound source is `removed`. Do **not** score this as AC-P2-C2 (same dest type). **Result:** unsigned until Tobias (`1572071`). |
+| 1.7 | Leave dest type **DNA**. Execute. Same click as spine **AC-P2-C3**. | **New Sample** in a **new container**, `parent_sample_id` = Blood source. Dest type DNA. Parent Sample stays Blood. If the experiment is under a process: dest pair is the only **active** process assignment; inbound source is `removed`. Do **not** score this as AC-P2-C2 (same dest type). **Result:** unsigned until Tobias (`570bbc0`). |
 
 ## 2. Catalog filtering
 
@@ -76,8 +76,8 @@ Verify the plan and execute flows contain none of the following:
 - Catalog choices are many-to-many and client/source/operation filtered.
 - Mixed-type pools are refused in both UI and API.
 - Execute resolves line override → entry default → parent without re-prompting.
-- **1.7 / AC-P2-C3:** dest type DNA mints a new Sample + container; parent stays Blood; dest pair continues the process. Unsigned until Tobias. Do not score 1.7 as C2.
-- **C2** (spine): dest type Same as parent = same sample, new container; dest on process; emptied source 422. Unsigned until Tobias.
+- **1.7 / AC-P2-C3:** dest type DNA mints a new Sample + container; parent stays Blood; dest pair continues the process. Unsigned until Tobias on `570bbc0`. Do not score 1.7 as C2.
+- **C2** (spine): dest type Same as parent = same sample, new container; dest on process; emptied source 422. Unsigned until Tobias on `570bbc0`.
 - Assign to process: no vessel, or two vessels with no pick → **422**. No silent pick.
 - PATCH of process assignment is not a path.
 - Normalization consumes a prior concentration result, never free-typed source concentration.

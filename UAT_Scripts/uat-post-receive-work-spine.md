@@ -774,7 +774,7 @@ AC-P2-9 **Pass** (no analysis/type picker; extract Identity/Plasma then ELISA cl
 Marc 2026-08-30. Does **not** rewrite Tobias Results above. Not Pass. Send: [`.docs/discussions/2026-08-30-p2-route-lock.md`](../.docs/discussions/2026-08-30-p2-route-lock.md) Round 2. **Leadership Confirm** of R2-1…R2-4 (2026-08-30; Rolf/Deiter/Hans/Heidi/Günter); OQ-WO-6 stays OPEN.
 
 - Available routes for an asked-for assay = **any** map whose chain **contains** that LimsRun analysis. A route **may have multiple analyses**.
-- Extract is not a special sample/assay. Blood→DNA is a **derivative** (dest mint Hold). Tube→plate aliquot is equivalent. Library is a new sample. Type gates on process steps catch blood-on-Qubit.
+- Extract is not a special sample/assay. Blood→DNA is a **derivative**: a new Sample in a new container with `parent_sample_id`, while the parent Sample stays Blood. Tube→plate aliquot is equivalent (same Sample, extra container). Library is a new sample. Type gates on process steps catch blood-on-Qubit. The `9342439` Dest-type mint Hold above is Start-extract still Blood / **0 DNA** **history**, not a live ban on type-changing aliquot/pool execute — this bullet does not re-score that Result.
 - The OPEN `analysis_id` punch is **OQ-WO-6**: any **earlier** LimsRun that reuses the asked-for analysis mints/freezes the panel Test on the parent. Extract is only usually process 1.
 - Parser is chosen at **import**, not on the process.
 
@@ -837,9 +837,9 @@ Extract-hold UAT step **1.7** stays **OOB execute** with no Result stamp. It mus
 
 The preceding Deiter click (`4671ba8` / `02fe95f`) is retained verbatim as signed history, including its original “Live” heading and Results (C1 **Pass**, C2 **Fail**, dest mint Hold **Pass**). It is not the current live stamp. Do not rewrite or transfer those observations to another SHA.
 
-## Live dest-follow stamp — `1572071` (unsigned until Tobias)
+## Live dest-follow stamp — `570bbc0` (unsigned until Tobias)
 
-**Not Pass overall.** Product SHA **`1572071`**. Do **not** rewrite Deiter `02fe95f`, Tobias `9342439` / `8cfa2a9`, or P1. Do **not** restamp C1. Two clicks: **C2** = same dest type; **C3** = different dest type. PATCH is not a path. OQ-WO-6 and freeze skip stay OPEN. Hold merge.
+**Not Pass overall.** Live product SHA **`570bbc0`** (`570bbc01ff50fdac2d529448ceb95683c535401f`). The dest-follow execute-txn implementation cited below landed earlier on `1572071` (`15720716c7cc927f1b498602ea87dec8a2bee85b`); `1572071` is the implementation SHA, **not** the current click SHA. Do **not** rewrite Deiter `02fe95f`, Tobias `9342439` / `8cfa2a9`, or P1. Do **not** restamp C1. Two clicks: **C2** = same dest type; **C3** = different dest type. PATCH is not a path. OQ-WO-6 and freeze skip stay OPEN. Hold merge.
 
 | Slice | Tobias |
 |-------|--------|
@@ -847,9 +847,11 @@ The preceding Deiter click (`4671ba8` / `02fe95f`) is retained verbatim as signe
 | AC-P2-C3 type-changing dest-follow | **unsigned** |
 | Overall P2 | **unsigned / not Pass** |
 
+**The split is the dest type on the aliquot/pool entry** (memo, not a numbered step). Same type → **C2**: same Sample, extra container, `container_id` retarget. Different type → **C3**: new derivative Sample with `parent_sample_id`; the parent Sample stays with its own type; the inbound assignment is `removed`. Route / Start / map-save still mint **zero** daughters. `9342439` Dest-type mint Hold stays Start-extract still Blood / **0 DNA** history — **not** a live ban on type-changing execute.
+
 ### AC-P2-C2 — same dest type (tube → plate)
 
-**Result:** **unsigned** until Tobias (`1572071`). Do **not** write Pass. Do **not** score Blood→DNA here — that is AC-P2-C3.
+**Result:** **unsigned** until Tobias (`570bbc0`). Do **not** write Pass. Do **not** score Blood→DNA here — that is AC-P2-C3.
 
 **Setup**
 - Receive one tube. Asked-for. Route a two-process map (first process has an Aliquot / pool plan experiment). First Start. Confirm the receive tube is on process 1.
@@ -866,7 +868,7 @@ The preceding Deiter click (`4671ba8` / `02fe95f`) is retained verbatim as signe
 
 ### AC-P2-C3 — different dest type (Blood → DNA)
 
-**Result:** **unsigned** until Tobias (`1572071`). Do **not** write Pass. Do **not** fold into C2. Same click as extract-hold UAT **1.7**.
+**Result:** **unsigned** until Tobias (`570bbc0`). Do **not** write Pass. Do **not** fold into C2. Same click as extract-hold UAT **1.7**.
 
 **Setup**
 - Same as C2, but the source type has a catalog dest (e.g. Blood × aliquot → DNA). First Start still leaves the parent **Blood**.
