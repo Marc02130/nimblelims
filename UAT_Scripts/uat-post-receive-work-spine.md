@@ -847,7 +847,8 @@ The preceding Deiter click (`4671ba8` / `02fe95f`) is retained verbatim as signe
 | Emptied-source assign (amount 0) → **422** `process_container_required` | **unsigned** — in code on this SHA; not QA-clicked |
 | Same dest type = **same sample, additional container** (no new Sample row) | **unsigned** — in code on this SHA; not QA-clicked |
 | Later Start follows dest container | **unsigned** — in code on this SHA; not QA-clicked |
-| Different dest type = **new derivative sample** in a new container (`parent_sample_id`); parent stays | OOB from C2 — type-changing execute only; not a parent `container_id` retarget |
+| Different dest type = **new derivative sample** in a new container (`parent_sample_id`); parent Sample row stays, inbound process assignment is `removed` | OOB from C2 — type-changing execute only; not a parent `container_id` retarget |
+| Process follow for both grains | Destination sample + destination container land on `eln_process_samples` in the execute transaction; inbound source assignment becomes `removed` |
 | Dest mint Hold | Lifted only for type-changing execute. Deiter Hold **Pass** on `02fe95f` remains Start-extract Blood / 0 DNA history |
 | C1 no-vessel / two-vessel 422 + receive-tube 201 | Deiter **Pass** history on `02fe95f` — not restamped |
 | Overall P2 | **unsigned / not Pass** |
@@ -860,8 +861,10 @@ The preceding Deiter click (`4671ba8` / `02fe95f`) is retained verbatim as signe
 - Same dest type = **same sample, additional container**.
 - `_follow_destination_in_process` retarget is the same-sample additional-container path: retarget `container_id` on the active assignment, or remove source then insert the same-sample dest pair. Does **not** require `entry.process_step_id`.
 - Emptied-source assign (Contents amount 0) → **422** `process_container_required`.
-- Different dest type = **new derivative sample** in a new container (`parent_sample_id`). **Parent stays.** The dest is the new sample+container; do not retarget the parent assignment’s `container_id`.
+- Different dest type = **new derivative sample** in a new container (`parent_sample_id`). The parent **Sample row** stays with its original type and parent-type work; do not retarget it onto the destination tube.
+- For both grains, the destination sample + destination container pair lands on `eln_process_samples` in the execute transaction and the inbound source assignment becomes `removed`.
 - Dest mint Hold is lifted only for type-changing execute. Deiter’s Hold Pass on `02fe95f` remains history of Start extract still Blood / 0 DNA, not a ban on type-changing derivative mint.
+- Test identity stays `(sample, analysis)`; the container records which vessel was measured.
 - **PATCH is not a path.**
 
 Do **not** teach dest-follow as shipped. Deiter C2 **Fail** on `02fe95f` stands as signed history until Tobias restamps. Overall P2 remains **unsigned / not Pass**.
