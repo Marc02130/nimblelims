@@ -395,3 +395,18 @@ Docs-only. Does **not** rewrite Round 1, Round 2, the Contents-grain Confirm, De
 3. **`570bbc0` does not inherit C2 Pass or Fail.** It is the UAT split + pytest, not a new execute. Live C2/C3 remain **unsigned** until Tobias. Execute txn remains `1572071`.
 4. Hold-as-ban stays punched. OQ-WO-6 and freeze skip stay **OPEN**. Hold merge. Not IC50.
 
+---
+
+## Leadership Confirm — mint-only-at-execute — 2026-08-31
+
+**Full Leadership Confirm** from Rolf, Deiter, Hans, Heidi, and Günter. Does **not** rewrite Round 1, Round 2, the Contents-grain Confirm, Deiter `02fe95f` Results, or Tobias `9342439` AC-P2-9..11 Pass Results. The Marc lock and Wilhelmina punch above are retained as sent. Not Pass. Not a merge vote.
+
+1. **Dest sample/container exists only after aliquot/pool execute.** Route / Start / map-save / asked-for mint **zero** daughters. Plan dest type is catalog intent, **not** a Sample.
+2. **Receive still mints identity + first vessel.** That is **not** dest mint. A tech must **not** scan DNA before extract execute.
+3. **C2 and C3 are execute clicks**, unsigned until Tobias. `570bbc0` does **not** inherit `1572071` C2 Pass or Fail (UAT split + pytest; execute joints still `1572071`). Same click as extract-hold 1.7 for C3. Two clicks.
+4. **C2 execute:** extra container, same sample; dest joins; source off; emptied-source **422**; later Start follows dest.
+5. **C3 execute:** new derivative (`parent_sample_id`); parent stays Blood; dest sample + container on the process; inbound source **removed**. **Fail C3** if dest tube lands on the blood Sample, parent `container_id` is retargeted, or later Start follows blood.
+6. **Günter:** after execute, the process-sample is **only** that execute-minted dest.
+
+OQ-WO-6 and freeze skip stay **OPEN**. Hold merge to `main`. Not IC50.
+
