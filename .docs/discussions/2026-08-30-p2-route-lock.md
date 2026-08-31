@@ -384,3 +384,14 @@ Docs-only. Does **not** rewrite Round 1, Round 2, the Contents-grain Confirm, De
 
 Not IC50.
 
+---
+
+## Marc lock — no dest until aliquot/pool execute — 2026-08-31
+
+Docs-only. Does **not** rewrite Round 1, Round 2, the Contents-grain Confirm, Deiter `02fe95f` Results, or Tobias `9342439` AC-P2-9..11 Pass Results. The Wilhelmina punch above is retained as sent. Not Pass.
+
+1. **No sample/container mint until aliquot/pool execute.** Route / Start / map-save / receive / asked-for mint **zero**. Plan may declare dest type; dest exists only after execute. Dest type on the plan is catalog intent until execute. Do **not** teach dest existing at Route / Start / map-save.
+2. **C2 execute** = extra container, same sample. **C3 execute** = new derivative; parent Sample stays. **Fail C3 if dest tube is on the blood sample.**
+3. **`570bbc0` does not inherit C2 Pass or Fail.** It is the UAT split + pytest, not a new execute. Live C2/C3 remain **unsigned** until Tobias. Execute txn remains `1572071`.
+4. Hold-as-ban stays punched. OQ-WO-6 and freeze skip stay **OPEN**. Hold merge. Not IC50.
+
