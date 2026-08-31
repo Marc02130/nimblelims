@@ -437,7 +437,7 @@ Click SHA for C2/C3 remains `570bbc0`. Tobias QA restamp stays **unsigned** unti
 3. **Extract and Qubit may still sit in the chain:** extract as **process**, Qubit as **supporting LimsRun** (other analysis, own Test). A route may list several LimsRun analyses; only one of them is the asked-for assay.
 4. **Map-save / Route 422** if the asked-for analysis appears **0 or 2+** times among LimsRuns. Two ELISA LimsRuns are **refused** — they would share one Test `(sample, ELISA)`. That is **not** QC.
 5. **OQ-WO-6 for extract CLOSES.** Cardinality 1 cannot land on extract because extract is not a LimsRun. Extract cannot wear ELISA. Hans’s punch (1-count on extract still freezes the panel Test on blood) is **closed** by this grain. Strike leftover “extract LimsRun must not share asked-for `analysis_id`” as if extract were a LimsRun. Remaining OPEN on `analysis_id` is **not** extract-as-ELISA.
-6. **Keep prior lock:** one asked-for per process instance; DNA extract once (C3); that DNA sample may join many work orders, each with one asked-for. Supporting QC = other analyses, own Tests (Qubit), not a second asked-for on the same process.
+6. **Keep prior lock (extract / QC grain only):** one asked-for per process instance; DNA extract once (C3). Supporting QC = other analyses, own Tests (Qubit), not a second asked-for on the same process. **Do not read this point as DNA dest auto-joining many WOs.** That copy is **superseded** by sequential asked-fors (no route branching) — punch below.
 
 **Freeze skip** (`{}` vs NULL) stays **OPEN**. Classic `/tests` must leave `asked_for_params` **NULL**, or we need a freeze marker. Do **not** teach skip-on-`{}` as freeze. Tobias C2/C3 remain **unsigned**. Deiter Met on `570bbc0` is Lab Ops only. `9342439` / `02fe95f` / `8cfa2a9` untouched. No overall P2 Pass. Hold merge of `feat/work-order-p2` to `main`. Not IC50.
 
@@ -497,5 +497,17 @@ The Marc Confirm immediately above is retained. This Confirm is the **general** 
 2. Supporting runs are other `analysis_id`s with their **own** Tests `(sample, analysis)` and their **own** params freeze. Do **not** invent a second asked-for for QC. Do **not** put Nanodrop on extract.
 3. The asked-for analysis still appears **once**, on the **assay** LimsRun.
 4. **Extract stays a process**, not a LimsRun, no asked-for `analysis_id`.
+5. Freeze skip (`{}` vs NULL) stays **OPEN**. Hold merge of `feat/work-order-p2` to `main`. Not IC50.
+
+---
+
+## Marc lock overwrite — sequential asked-fors, not DNA joining many WOs — 2026-08-31
+
+**Not Leadership Confirm of branching.** Does **not** rewrite the extract-is-process + exactly-one asked-for LimsRun Confirm (OQ-WO-6 extract **CLOSED** still stands). Does **not** rewrite Round 1, Round 2, supporting-QC Confirm, `9342439`, `02fe95f`, or `570bbc0`. Overwrites leftover “DNA sample may join many work orders” copy from this Confirm’s point 6. Not Pass. Not IC50.
+
+1. **No route branching this phase.** Shared extract as one WO splitting to two assays is **out of scope**.
+2. Route **blood** for WGS (extraction → sequencing). That asked-for **owns WGS params**. C3 execute mints DNA. A **C2 aliquot** of that DNA continues the WGS WO.
+3. WES is a **new asked-for on a DNA aliquot** (post-extraction → sequencing) and **owns WES params**. Two asked-fors, two param snapshots, two WOs.
+4. Do **not** teach dest auto-joining a second WO. Do **not** copy WGS params onto WES.
 5. Freeze skip (`{}` vs NULL) stays **OPEN**. Hold merge of `feat/work-order-p2` to `main`. Not IC50.
 
