@@ -193,7 +193,7 @@ UAT (classic): [`UAT_Scripts/uat-results-entry-review.md`](../UAT_Scripts/uat-re
 - Do **not** teach later Start as following the parent/source tube after an equivalent aliquot, or as legal assign of a sample with no container.
 - Do **not** teach later Start as following a dest **type**. The follow is by dest **container**.
 - Do **not** teach the equivalent aliquot as a dest **mint**. Equivalent aliquot = same sample, new container. A new Sample row carrying `dest_sample_type` (`_execute_transfer`) is dest mint and stays **Hold**.
-- Do **not** claim equivalent-aliquot dest-join / source-remove is closed. Deiter C2 **Fail** (Leadership restamp on `02fe95f`): dest never lands on `eln_process_samples`; emptied-source assign **201** is leftover amount-0 Contents / leftover process-join. Coding stays **Grok Build**.
+- Do **not** write C2 Pass. Deiter C2 **Fail** on `02fe95f` stands until a restamp. Dest-join / source-remove is **coded** (`_follow_destination_in_process` in the execute txn; equivalent aliquot = same sample, new container; emptied-source assign **422**). Not a restamp. **PATCH is not a path.**
 - Do **not** teach PATCH as a dest-follows path.
 - Do **not** treat C1/C2 as unsigned. Deiter clicked them; Leadership Confirmed that stamp. Do not invent a Tobias Pass.
 - Do **not** silently pick a vessel when a sample sits in two containers. That is **422**, not `first()`.
