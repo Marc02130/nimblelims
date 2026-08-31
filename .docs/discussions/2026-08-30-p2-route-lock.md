@@ -424,3 +424,78 @@ OQ-WO-6 and freeze skip stay **OPEN**. Hold merge to `main`. Not IC50.
 
 Click SHA for C2/C3 remains `570bbc0`. Tobias QA restamp stays **unsigned** until Tobias Results land. Deiter Met is Lab Ops only. C2 leftover inbound volume is not Fail; emptying is an edge. `02fe95f` / `9342439` untouched. Hold Pass is Start-extract still Blood / 0 DNA history, not a ban on C3. Route two-accept 409 stays OPEN/unsigned. No overall P2 Pass. Hold merge of `feat/work-order-p2` to `main`.
 
+---
+
+## Leadership Confirm — OQ-WO-6 extract is a process; exactly one asked-for LimsRun — 2026-08-31
+
+**Full Leadership Confirm** from Rolf, Deiter, Hans, Heidi, and Günter. Docs-only. Does **not** rewrite Round 1, Round 2 (including R2-3 “OQ-WO-6 stays Open” history), Contents-grain Confirm, Deiter `02fe95f` Results, Tobias `9342439` AC-P2-9..11 Pass, dest-type split Confirm, mint-only-at-execute Confirm, or the `570bbc0` restamp notes. The Marc lock — one asked-for per process (pending overwrite) above is retained for points 1–4; this Confirm **overwrites** that lock’s OQ-WO-6 extract wording. Not Pass. Not a merge vote. Not IC50.
+
+### Confirmed product
+
+1. **Extract is a process.** Experiment / aliquot-pool **execute**; derivative dest (C3 DNA dest is that execute). Manual or robot does **not** make it a LimsRun. Extract has **no** asked-for `analysis_id`. Do **not** teach extract as a LimsRun that may carry “other analyses.”
+2. **Exactly one asked-for LimsRun** in the route. That LimsRun’s `analysis_id` is the asked-for analysis. That LimsRun is the **assay step** (e.g. ELISA), not extract / library prep.
+3. **Extract and Qubit may still sit in the chain:** extract as **process**, Qubit as **supporting LimsRun** (other analysis, own Test). A route may list several LimsRun analyses; only one of them is the asked-for assay.
+4. **Map-save / Route 422** if the asked-for analysis appears **0 or 2+** times among LimsRuns. Two ELISA LimsRuns are **refused** — they would share one Test `(sample, ELISA)`. That is **not** QC.
+5. **OQ-WO-6 for extract CLOSES.** Cardinality 1 cannot land on extract because extract is not a LimsRun. Extract cannot wear ELISA. Hans’s punch (1-count on extract still freezes the panel Test on blood) is **closed** by this grain. Strike leftover “extract LimsRun must not share asked-for `analysis_id`” as if extract were a LimsRun. Remaining OPEN on `analysis_id` is **not** extract-as-ELISA.
+6. **Keep prior lock:** one asked-for per process instance; DNA extract once (C3); that DNA sample may join many work orders, each with one asked-for. Supporting QC = other analyses, own Tests (Qubit), not a second asked-for on the same process.
+
+**Freeze skip** (`{}` vs NULL) stays **OPEN**. Classic `/tests` must leave `asked_for_params` **NULL**, or we need a freeze marker. Do **not** teach skip-on-`{}` as freeze. Tobias C2/C3 remain **unsigned**. Deiter Met on `570bbc0` is Lab Ops only. `9342439` / `02fe95f` / `8cfa2a9` untouched. No overall P2 Pass. Hold merge of `feat/work-order-p2` to `main`. Not IC50.
+
+### Roll-up
+
+| Ask | Lab Ops (Deiter) | CEO (Rolf) | Sci CSO (Hans) | Arch (Heidi) | Sec CSO (Günter) |
+|-----|------------------|------------|----------------|--------------|------------------|
+| Extract is a process, not a LimsRun; no asked-for `analysis_id` | **Yes** | **Yes** | **Yes** | **Yes** | **Yes** |
+| Exactly one asked-for LimsRun = assay step | **Yes** | **Yes** | **Yes** | **Yes** | **Yes** |
+| Extract (process) + Qubit (supporting LimsRun) may sit in the chain | **Yes** | **Yes** | **Yes** | **Yes** | **Yes** |
+| Map-save / Route **422** on asked-for count 0 or 2+; two ELISA LimsRuns refused | **Yes** | **Yes** | **Yes** | **Yes** | **Yes** |
+| OQ-WO-6 extract punch **CLOSED**; Hans 1-count-on-extract freeze **closed** | **Yes** | **Yes** | **Yes** | **Yes** | **Yes** |
+| Freeze skip OPEN; no overall P2 Pass; hold merge | **Yes** | **Yes** | **Yes** | **Yes** | **Yes** |
+
+**Consensus:** Leadership Confirm of the extract-is-a-process grain and the exactly-one asked-for LimsRun gate. OQ-WO-6 for extract **CLOSED**. Freeze skip stays **OPEN**. Do not rewrite `9342439`. Tobias C2/C3 unsigned. Hold merge. Not IC50.
+
+### Deiter (Lab Ops)
+
+**Confirm.** Extract is the process on the bench — aliquot/pool execute, DNA dest — not a LimsRun. The ELISA tube is the assay LimsRun. Qubit can sit as a supporting run. Two ELISA LimsRuns is a mix-up; refuse 422. Do not tell a tech extract “is ELISA.” Freeze skip stays OPEN. Hold merge.
+
+### Hans (Sci CSO)
+
+**Confirm.** Assay identity lives on exactly one LimsRun. Extract has no `analysis_id`, so it cannot freeze the panel Test on blood. The old 1-count-on-extract punch is closed by this grain. Two ELISA LimsRuns would share one Test `(sample, ELISA)` — that is not QC. Qubit is a different analysis, own Test. Freeze skip (`{}` vs NULL) stays OPEN.
+
+### Heidi (Arch)
+
+**Confirm.** Cardinality 1 is counted among **LimsRuns** only. Extract is `eln_process` / experiment execute, not a run row. Map-save and Route **422** when asked-for `analysis_id` appears 0 or 2+ times on LimsRuns. Do not keep a required `analysis_id` on extract. Freeze skip stays OPEN. Route stays `test:assign`.
+
+### Günter (Sec CSO)
+
+**Confirm.** No silent `first()` when two ELISA LimsRuns share one Test. Refuse 422; do not guess which run is the assay. Extract is not a write of Test identity. Freeze skip stays OPEN. Hold product merge to `main`. Not IC50.
+
+### Rolf (CEO)
+
+**Confirm.** One extract→assay→report route is still the product: extract as process, Qubit optional as supporting LimsRun, ELISA as the one asked-for assay LimsRun. OQ-WO-6 extract punch closes. Do not sell freeze skip as shipped. No overall P2 Pass. Hold merge. Not IC50.
+
+---
+
+## Marc Confirm — supporting LimsRuns in the same route (Qubit / Nanodrop) — 2026-08-31
+
+**Marc Confirm.** Docs-only. Does **not** rewrite the Leadership Confirm wall above (extract-as-process + exactly-one asked-for LimsRun still stands). Does **not** rewrite Round 1, Round 2, `9342439`, `02fe95f`, or `570bbc0` restamp notes. Not Pass. Not IC50.
+
+1. **Qubit / Nanodrop / etc. are supporting LimsRuns in the same route** as the asked-for assay. They are other `analysis_id`s with their **own** Tests `(sample, analysis)`.
+2. Asked-for analysis still appears **once**, on the **assay** LimsRun. Supporting runs do not take that `analysis_id`.
+3. **Extract remains a process**, not a LimsRun, and has **no** asked-for `analysis_id`. Do **not** put Nanodrop (or Qubit) on extract. Do **not** invent a second asked-for for QC.
+4. Freeze skip (`{}` vs NULL) stays **OPEN**. Hold merge of `feat/work-order-p2` to `main`. Not IC50.
+
+---
+
+## Leadership Confirm (Rolf, Marc) — supporting LimsRuns in the same route as the asked-for assay — 2026-08-31
+
+**Leadership room Confirm (Rolf, Marc).** Docs-only. Does **not** rewrite the extract-as-process + exactly-one asked-for LimsRun Confirm wall above. Does **not** rewrite Round 1, Round 2, `9342439`, `02fe95f`, or `570bbc0` restamp notes. Not Pass. Not IC50.
+
+The Marc Confirm immediately above is retained. This Confirm is the **general** supporting-QC rule — sequencing is one example, not the only path.
+
+1. Qubit / Nanodrop / etc. sit as **supporting LimsRuns in the same route as whatever the asked-for assay is** (ELISA, NGS, Qubit-as-asked-for, sequencing, …).
+2. Supporting runs are other `analysis_id`s with their **own** Tests `(sample, analysis)` and their **own** params freeze. Do **not** invent a second asked-for for QC. Do **not** put Nanodrop on extract.
+3. The asked-for analysis still appears **once**, on the **assay** LimsRun.
+4. **Extract stays a process**, not a LimsRun, no asked-for `analysis_id`.
+5. Freeze skip (`{}` vs NULL) stays **OPEN**. Hold merge of `feat/work-order-p2` to `main`. Not IC50.
+
