@@ -843,6 +843,8 @@ The preceding Deiter click (`4671ba8` / `02fe95f`) is retained verbatim as signe
 
 **QA signature:** AC-P2-C2 **unsigned** until Tobias clicks. Do **not** write C2 Pass. Do **not** teach dest-follow as shipped.
 
+**Leadership Confirm — dest-type split (Rolf / Deiter / Hans / Heidi / Günter):** same type is the same Sample in an additional container; different type is a new derivative Sample + new container with `parent_sample_id`. Parent type, Tests, and parent-type work stay on the parent. The `1572071` `container_id` retarget is same-type C2 only. Type-changing execute mints and joins the destination pair and marks the inbound source assignment `removed`; only that destination pair continues on the process. Route / Start / map-save mint zero daughters. This Confirm does not sign C2 or extract-hold 1.7.
+
 | Slice on this SHA | Status |
 |-------------------|--------|
 | Same-type dest-follow in the execute txn (`_follow_destination_in_process`) | **unsigned** — in code on this SHA; not QA-clicked |
@@ -865,7 +867,9 @@ The preceding Deiter click (`4671ba8` / `02fe95f`) is retained verbatim as signe
 - Emptied-source assign (Contents amount 0) → **422** `process_container_required`.
 - Different dest type = **new derivative sample** in a new container (`parent_sample_id`). The parent **Sample row** stays with its original type and parent-type work; do not retarget it onto the destination tube.
 - For both grains, the destination sample + destination container pair lands on `eln_process_samples` in the execute transaction and the inbound source assignment becomes `removed`.
+- Günter: after type-changing execute, the only continuing process sample is that execute-minted destination pair.
 - Dest mint Hold is lifted only for type-changing execute. Deiter’s Hold Pass on `02fe95f` remains history of Start extract still Blood / 0 DNA, not a ban on type-changing derivative mint.
+- C2 same-type dest-follow and extract-hold UAT 1.7 DNA-daughter execute remain two clicks; 1.7 stays OOB with no Result stamp.
 - Test identity stays `(sample, analysis)`; the container records which vessel was measured.
 - **PATCH is not a path.**
 

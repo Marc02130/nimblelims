@@ -337,3 +337,18 @@ Dest-follow is **in code** on product SHA **`1572071`** (`15720716c7cc927f1b4986
 - Test identity remains `(sample, analysis)`; the process container records which vessel carries the work.
 
 Deiter C2 **Fail** on `02fe95f` stands as signed history. Do **not** write C2 Pass. Do **not** teach dest-follow as shipped. OQ-WO-6 and freeze skip stay **OPEN**. Overall P2 unsigned. Hold product merge to `main`. Not IC50.
+
+---
+
+## Leadership Confirm — dest-type split — 2026-08-31
+
+**Full Leadership Confirm** from Rolf, Deiter, Hans, Heidi, and Günter. This Confirm does **not** rewrite Round 1, Round 2, the Contents-grain Confirm, Deiter `02fe95f` Results, or Tobias `9342439` AC-P2-9..11 Pass Results. It is not a C2 Pass or an overall P2 Pass.
+
+1. **Same type:** aliquot/pool destination is the same Sample in an additional container. The `1572071` `container_id` retarget belongs only to this same-type C2 path.
+2. **Different type:** aliquot/pool execute mints a new Sample in a new container with `parent_sample_id`. The parent Sample row stays; its `sample_type`, Tests, and work attributable to the parent type stay on that parent. Retargeting the parent onto the destination tube would put a DNA tube on the Blood Sample and is forbidden.
+3. **Execute transaction:** for a type-changing destination, execute mints and joins the destination Sample + destination container pair and marks the inbound process assignment `removed`. Günter’s lock: after the later Start, the process sample is only that execute-minted destination pair.
+4. **Mint boundary:** dest mint Hold lifts only for type-changing aliquot/pool execute. Route, Start, and map-save still mint zero daughters. The live lock is the destination type declared on the aliquot/pool entry.
+5. **Two clicks:** same-type C2 dest-follow and extract-hold UAT 1.7 DNA-daughter execute remain separate clicks. Live C2 on `1572071` remains unsigned until Tobias; extract-hold 1.7 remains OOB with no Result stamp.
+6. **Historical Hold:** `9342439` Dest-type mint Hold is history of Start extract (still Blood, 0 DNA) and Route/Start minting zero daughters. It is not a live ban on type-changing execute.
+
+OQ-WO-6 and freeze skip stay **OPEN**. Deiter C2 **Fail** on `02fe95f` stays signed history. Overall P2 remains unsigned / not Pass. Hold product merge to `main`. Not IC50.
