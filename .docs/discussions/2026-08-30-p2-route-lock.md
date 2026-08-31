@@ -507,7 +507,7 @@ The Marc Confirm immediately above is retained. This Confirm is the **general** 
 
 1. **No route branching this phase.** Shared extract as one WO splitting to two assays is **out of scope**.
 2. Route **blood** for WGS (extraction → sequencing). That asked-for **owns WGS params**. C3 execute mints DNA. A **C2 aliquot** of that DNA continues the WGS WO.
-3. WES is a **new asked-for on a DNA aliquot** (post-extraction → sequencing) and **owns WES params**. Two asked-fors, two param snapshots, two WOs.
+3. **WES is a new asked-for on the DNA tube** (post-extraction → sequencing) and **owns WES params**. That DNA tube is then **aliquoted or used up**. Two asked-fors, two param snapshots, two WOs.
 4. Do **not** teach dest auto-joining a second WO. Do **not** copy WGS params onto WES.
 5. Freeze skip (`{}` vs NULL) stays **OPEN**. Hold merge of `feat/work-order-p2` to `main`. Not IC50.
 
