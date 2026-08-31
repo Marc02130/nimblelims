@@ -839,9 +839,9 @@ The preceding Deiter click (`4671ba8` / `02fe95f`) is retained verbatim as signe
 
 ## Live dest-follow stamp — `570bbc0` Deiter Lab Ops Met; Tobias QA restamp pending
 
-**Not Pass overall.** Deiter’s execute click on **`570bbc0`** (`570bbc01ff50fdac2d529448ceb95683c535401f`) is **Met for Lab Ops identity only**: same-type plate, DNA new Sample, and Later Start following the destination. It is not Tobias QA Pass. Execute joints stay **`1572071`** (`15720716c7cc927f1b498602ea87dec8a2bee85b`) and have **no Tobias Result**. Do **not** rewrite Deiter `02fe95f`, Tobias `9342439` / `8cfa2a9`, or P1. PATCH is not a path. Freeze skip, OQ-WO-6, and Route two-accept 409 stay OPEN. Hold merge. Not IC50.
+**Not Pass overall.** Deiter’s execute click on **`570bbc0`** (`570bbc01ff50fdac2d529448ceb95683c535401f`) is **Met for Lab Ops identity only**: same-type plate, DNA new Sample, and Later Start following the destination. It is not Tobias QA Pass. Execute joints stay **`1572071`** (`15720716c7cc927f1b498602ea87dec8a2bee85b`) and have **no Tobias Result**. Do **not** rewrite Deiter `02fe95f`, Tobias `9342439` / `8cfa2a9`, or P1. PATCH is not a path. Freeze skip and Route two-accept 409 stay OPEN. **OQ-WO-6 extract CLOSED.** Hold merge. Not IC50.
 
-**Marc lock pending Leadership overwrite (2026-08-31) — not Confirm:** one asked-for per process instance; supporting QC = other analyses / own Tests; **no route branching** — Route blood for extract-first (e.g. WGS), then Route the DNA tube as a new asked-for for post-extract (e.g. WES); freeze skip OPEN; OQ-WO-6 OPEN. Not Pass.
+**Leadership Confirm (2026-08-31):** extract is a process; exactly one asked-for LimsRun is the assay step. **Rolf/Marc:** Qubit / Nanodrop are supporting LimsRuns in the **same route as whatever the asked-for assay is** (ELISA, NGS, Qubit-as-asked-for, sequencing, …; own Tests, own params freeze). **No route branching:** Route blood for extract-first (e.g. WGS), then Route the DNA tube as a new asked-for for post-extract (e.g. WES). Freeze skip OPEN. **OQ-WO-6 extract CLOSED.** Not Pass.
 
 | Slice | Deiter Lab Ops on `570bbc0` | Tobias QA restamp |
 |-------|-------------------------------|-------------------|
@@ -906,4 +906,4 @@ The preceding Deiter click (`4671ba8` / `02fe95f`) is retained verbatim as signe
 
 Route / Start / map-save / asked-for still mint **zero** daughters. Receive still mints identity + first vessel — that is **not** dest mint. Dest exists only after execute. That is not this click.
 
-Deiter C2 **Fail** on `02fe95f` stays history. `9342439` untouched. Deiter’s `570bbc0` execute is Lab Ops **Met**, not a Tobias QA Pass. Tobias’s QA restamp remains unsigned until his execute Results land here. Freeze skip, OQ-WO-6, and Route two-accept 409 stay OPEN. Overall P2 remains **unsigned / not Pass**. Hold merge. Not IC50.
+Deiter C2 **Fail** on `02fe95f` stays history. `9342439` untouched. Deiter’s `570bbc0` execute is Lab Ops **Met**, not a Tobias QA Pass. Tobias’s QA restamp remains unsigned until his execute Results land here. Freeze skip and Route two-accept 409 stay OPEN. **OQ-WO-6 extract CLOSED.** Overall P2 remains **unsigned / not Pass**. Hold merge. Not IC50.
