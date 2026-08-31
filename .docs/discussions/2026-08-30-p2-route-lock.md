@@ -320,3 +320,11 @@ Deiter (Lab Ops), 2026-08-30, product `4671ba8` / assignment commit `02fe95f`: A
 ### Günter (Sec CSO)
 
 **Confirm the Fail holds.** Emptied-source assign 201 is a leftover process-join — the wrong tube stays on the instance. Dest never lands on `eln_process_samples`. Dest mint Hold is a different punch. Hold product merge to `main`. Not IC50.
+
+---
+
+## Honesty fold — dest-follow on `1572071` (unsigned until Tobias) — 2026-08-31
+
+Short note. Does **not** rewrite Round 1, Round 2, Contents-grain Confirm, or Deiter click Results above.
+
+Dest-follow is **in code** on product SHA **`1572071`** (`15720716c7cc927f1b498602ea87dec8a2bee85b`): `_follow_destination_in_process` in the execute txn; emptied-source assign **422** `process_container_required`; equivalent aliquot = same sample, new container. Live AC-P2-C2 is **unsigned** until Tobias clicks. Deiter C2 **Fail** on `02fe95f` stands as signed history. Do **not** write C2 Pass. Do **not** teach dest-follow as shipped. Dest mint Hold stays Hold. OQ-WO-6 and freeze skip stay **OPEN**. Overall P2 unsigned. Hold product merge to `main`. Not IC50.

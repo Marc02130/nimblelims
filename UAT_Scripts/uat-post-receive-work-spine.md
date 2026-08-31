@@ -831,13 +831,35 @@ This Hold Pass does not close `_execute_transfer` dest mint. AC-P2-C2 records th
 
 Extract-hold UAT step **1.7** stays **OOB execute** and must not teach a DNA daughter. Test identity stays `(sample, analysis)` — the container is **which vessel was measured**, and a concentration write-through hits that container. Route stays `test:assign`. Sequencing data still not in NimbleLIMS.
 
-### Code closed — dest-join / source-remove (not a restamp)
+---
 
-Grok Build coded the C2 hole after Deiter’s Fail. **Do not rewrite** the Deiter Results above. **Not Pass.** No Tobias restamp.
+The preceding Deiter click (`4671ba8` / `02fe95f`) is retained verbatim as signed history, including its original “Live” heading and Results (C1 **Pass**, C2 **Fail**, dest mint Hold **Pass**). It is not the current live stamp. Do not rewrite or transfer those observations to another SHA.
 
-- Equivalent aliquot (`aliquot_*`, dest type blank or same as parent): same sample, new container. `_execute_transfer` does **not** insert a Sample row.
-- Follow lands in the **execute txn** (`_follow_destination_in_process`): retarget `container_id` on the active assignment, or remove source then insert the dest pair. Does **not** require `entry.process_step_id` (resolves via experiment step or source assignment).
-- Emptied-source assign (Contents amount 0 / null) → **422** `process_container_required`. Not dest-follow.
-- **PATCH is still not a path.** Dest mint Hold (new Sample with `dest_sample_type`) stays Hold.
+## Live AC-P2-C2 stamp — `1572071` (unsigned until Tobias; overall P2 unsigned / not Pass)
 
-Deiter C2 **Fail** on `02fe95f` stands until a restamp. Overall P2 remains **unsigned / not Pass**.
+**Not Pass overall.** Product SHA **`1572071`** (`15720716c7cc927f1b498602ea87dec8a2bee85b` — dest-follow in execute txn; emptied-source assign 422). Do **not** rewrite Deiter `02fe95f` Results, Tobias `9342439` / `8cfa2a9`, or P1. C1 Deiter **Pass** on `02fe95f` stays history — do **not** restamp C1 as Tobias. OQ-WO-6 and freeze skip stay **OPEN**. Hold product merge to `main`. Not IC50.
+
+**QA signature:** AC-P2-C2 **unsigned** until Tobias clicks. Do **not** write C2 Pass. Do **not** teach dest-follow as shipped.
+
+| Slice on this SHA | Status |
+|-------------------|--------|
+| Dest-follow in the execute txn (`_follow_destination_in_process`) | **unsigned** — in code on this SHA; not QA-clicked |
+| Emptied-source assign (amount 0) → **422** `process_container_required` | **unsigned** — in code on this SHA; not QA-clicked |
+| Equivalent aliquot = same sample, new container (no new Sample row) | **unsigned** — in code on this SHA; not QA-clicked |
+| Later Start follows dest container | **unsigned** — in code on this SHA; not QA-clicked |
+| Dest mint Hold (new Sample with `dest_sample_type`) | **Hold** — Deiter Hold **Pass** on `02fe95f` remains history |
+| C1 no-vessel / two-vessel 422 + receive-tube 201 | Deiter **Pass** history on `02fe95f` — not restamped |
+| Overall P2 | **unsigned / not Pass** |
+
+### AC-P2-C2 — lock (expect, not Result)
+
+**Result:** **unsigned** until Tobias (product `1572071`). Do **not** write Pass.
+
+**Expect (in code on this SHA; not QA-clicked)**
+- Dest-follow in the execute txn (`_follow_destination_in_process`): retarget `container_id` on the active assignment, or remove source then insert the dest pair. Does **not** require `entry.process_step_id`.
+- Emptied-source assign (Contents amount 0) → **422** `process_container_required`.
+- Equivalent aliquot = **same sample, new container** (no new Sample row).
+- Dest mint Hold (new Sample with `dest_sample_type`) is unchanged.
+- **PATCH is not a path.**
+
+Do **not** teach dest-follow as shipped. Deiter C2 **Fail** on `02fe95f` stands as signed history until Tobias restamps. Overall P2 remains **unsigned / not Pass**.
