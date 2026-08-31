@@ -487,15 +487,15 @@ Click SHA for C2/C3 remains `570bbc0`. Tobias QA restamp stays **unsigned** unti
 
 ---
 
-## Leadership Confirm (Rolf, Marc) — sequencing asked-for; supporting LimsRuns in the same route — 2026-08-31
+## Leadership Confirm (Rolf, Marc) — supporting LimsRuns in the same route as the asked-for assay — 2026-08-31
 
 **Leadership room Confirm (Rolf, Marc).** Docs-only. Does **not** rewrite the extract-as-process + exactly-one asked-for LimsRun Confirm wall above. Does **not** rewrite Round 1, Round 2, `9342439`, `02fe95f`, or `570bbc0` restamp notes. Not Pass. Not IC50.
 
-The Marc Confirm immediately above is retained; this Confirm names the sequencing grain:
+The Marc Confirm immediately above is retained. This Confirm is the **general** supporting-QC rule — sequencing is one example, not the only path.
 
-1. For a **sequencing** asked-for, Qubit / Nanodrop / etc. are **supporting LimsRuns in the same route** as that assay.
+1. Qubit / Nanodrop / etc. sit as **supporting LimsRuns in the same route as whatever the asked-for assay is** (ELISA, NGS, Qubit-as-asked-for, sequencing, …).
 2. Supporting runs are other `analysis_id`s with their **own** Tests `(sample, analysis)` and their **own** params freeze. Do **not** invent a second asked-for for QC. Do **not** put Nanodrop on extract.
-3. The asked-for analysis (**sequencing**) still appears **once**, on the **assay** LimsRun.
+3. The asked-for analysis still appears **once**, on the **assay** LimsRun.
 4. **Extract stays a process**, not a LimsRun, no asked-for `analysis_id`.
 5. Freeze skip (`{}` vs NULL) stays **OPEN**. Hold merge of `feat/work-order-p2` to `main`. Not IC50.
 
