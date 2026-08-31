@@ -829,7 +829,7 @@ Do **not** teach dest-follows as shipped. Do **not** teach PATCH as the dest-fol
 
 This Hold Pass does not close `_execute_transfer` dest mint. AC-P2-C2 records that execute still mints dest and does not join dest or remove source. Do not fold the C2 Fail into the dest-mint Hold Pass.
 
-Extract-hold UAT step **1.7** stays **OOB execute** and must not teach a DNA daughter. Test identity stays `(sample, analysis)` — the container is **which vessel was measured**, and a concentration write-through hits that container. Route stays `test:assign`. Sequencing data still not in NimbleLIMS.
+Extract-hold UAT step **1.7** stays **OOB execute** with no Result stamp. It must not imply DNA on the parent: different dest type mints a **new derivative sample** in a new container with `parent_sample_id`; the parent stays. Test identity stays `(sample, analysis)` — the container is **which vessel was measured**, and a concentration write-through hits that container. Route stays `test:assign`. Sequencing data still not in NimbleLIMS.
 
 ---
 
@@ -843,23 +843,25 @@ The preceding Deiter click (`4671ba8` / `02fe95f`) is retained verbatim as signe
 
 | Slice on this SHA | Status |
 |-------------------|--------|
-| Dest-follow in the execute txn (`_follow_destination_in_process`) | **unsigned** — in code on this SHA; not QA-clicked |
+| Same-type dest-follow in the execute txn (`_follow_destination_in_process`) | **unsigned** — in code on this SHA; not QA-clicked |
 | Emptied-source assign (amount 0) → **422** `process_container_required` | **unsigned** — in code on this SHA; not QA-clicked |
-| Equivalent aliquot = same sample, new container (no new Sample row) | **unsigned** — in code on this SHA; not QA-clicked |
+| Same dest type = **same sample, additional container** (no new Sample row) | **unsigned** — in code on this SHA; not QA-clicked |
 | Later Start follows dest container | **unsigned** — in code on this SHA; not QA-clicked |
-| Dest mint Hold (new Sample with `dest_sample_type`) | **Hold** — Deiter Hold **Pass** on `02fe95f` remains history |
+| Different dest type = **new derivative sample** in a new container (`parent_sample_id`); parent stays | OOB from C2 — type-changing execute only; not a parent `container_id` retarget |
+| Dest mint Hold | Lifted only for type-changing execute. Deiter Hold **Pass** on `02fe95f` remains Start-extract Blood / 0 DNA history |
 | C1 no-vessel / two-vessel 422 + receive-tube 201 | Deiter **Pass** history on `02fe95f` — not restamped |
 | Overall P2 | **unsigned / not Pass** |
 
 ### AC-P2-C2 — lock (expect, not Result)
 
-**Result:** **unsigned** until Tobias (product `1572071`). Do **not** write Pass.
+**Result:** **unsigned** until Tobias (product `1572071`). C2 is same-type dest-follow only. Do **not** write Pass.
 
 **Expect (in code on this SHA; not QA-clicked)**
-- Dest-follow in the execute txn (`_follow_destination_in_process`): retarget `container_id` on the active assignment, or remove source then insert the dest pair. Does **not** require `entry.process_step_id`.
+- Same dest type = **same sample, additional container**.
+- `_follow_destination_in_process` retarget is the same-sample additional-container path: retarget `container_id` on the active assignment, or remove source then insert the same-sample dest pair. Does **not** require `entry.process_step_id`.
 - Emptied-source assign (Contents amount 0) → **422** `process_container_required`.
-- Equivalent aliquot = **same sample, new container** (no new Sample row).
-- Dest mint Hold (new Sample with `dest_sample_type`) is unchanged.
+- Different dest type = **new derivative sample** in a new container (`parent_sample_id`). **Parent stays.** The dest is the new sample+container; do not retarget the parent assignment’s `container_id`.
+- Dest mint Hold is lifted only for type-changing execute. Deiter’s Hold Pass on `02fe95f` remains history of Start extract still Blood / 0 DNA, not a ban on type-changing derivative mint.
 - **PATCH is not a path.**
 
 Do **not** teach dest-follow as shipped. Deiter C2 **Fail** on `02fe95f` stands as signed history until Tobias restamps. Overall P2 remains **unsigned / not Pass**.
