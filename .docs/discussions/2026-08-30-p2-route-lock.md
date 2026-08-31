@@ -330,8 +330,10 @@ Short note. Does **not** rewrite Round 1, Round 2, Contents-grain Confirm, or De
 Dest-follow is **in code** on product SHA **`1572071`** (`15720716c7cc927f1b498602ea87dec8a2bee85b`). Live AC-P2-C2 is **same-type dest-follow only** and remains **unsigned** until Tobias clicks:
 
 - Same dest type = **same sample, additional container**.
-- `_follow_destination_in_process` retarget is the same-sample additional-container path.
-- Different dest type = **new derivative sample** in a new container (`parent_sample_id`). **Parent stays.** The dest is the new sample+container; do not retarget the parent assignment’s `container_id`.
+- `_follow_destination_in_process` may retarget `container_id` only on the same-sample additional-container path.
+- Different dest type = **new derivative sample** in a new container (`parent_sample_id`). The parent **Sample row** stays for lineage, keeps its original type, and keeps work attributable to the parent type. Do not rewrite `sample_type` or retarget the parent Sample onto the destination tube.
+- For both destination grains, the destination sample + destination container pair lands on `eln_process_samples` in the execute transaction; the inbound source assignment becomes `removed`. “Parent stays” never means the parent process assignment stays.
 - Dest mint Hold is lifted only for type-changing execute. Deiter’s dest mint Hold **Pass** on `02fe95f` remains history of Start extract still Blood / **0 DNA**, not a ban on type-changing derivative mint.
+- Test identity remains `(sample, analysis)`; the process container records which vessel carries the work.
 
 Deiter C2 **Fail** on `02fe95f` stands as signed history. Do **not** write C2 Pass. Do **not** teach dest-follow as shipped. OQ-WO-6 and freeze skip stay **OPEN**. Overall P2 unsigned. Hold product merge to `main`. Not IC50.
