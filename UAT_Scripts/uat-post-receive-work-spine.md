@@ -837,32 +837,31 @@ Extract-hold UAT step **1.7** stays **OOB execute** with no Result stamp. It mus
 
 The preceding Deiter click (`4671ba8` / `02fe95f`) is retained verbatim as signed history, including its original “Live” heading and Results (C1 **Pass**, C2 **Fail**, dest mint Hold **Pass**). It is not the current live stamp. Do not rewrite or transfer those observations to another SHA.
 
-## Live dest-follow stamp — C2/C3 numbered on `570bbc0`; execute `1572071` (unsigned until Tobias)
+## Live dest-follow stamp — `570bbc0` Deiter Lab Ops Met; Tobias QA restamp pending
 
-**Not Pass overall.** **Leadership Confirm** of mint-only-at-execute (Rolf, Deiter, Hans, Heidi, Günter). C2/C3 are **execute clicks**, **unsigned** until Tobias. Numbered on **`570bbc0`** (`570bbc01ff50fdac2d529448ceb95683c535401f` — UAT split + pytest, **not** a new execute). `570bbc0` does **not** inherit `1572071` C2 Pass or Fail. Execute joints stay **`1572071`** (`15720716c7cc927f1b498602ea87dec8a2bee85b`). Do **not** rewrite Deiter `02fe95f`, Tobias `9342439` / `8cfa2a9`, or P1. PATCH is not a path. OQ-WO-6 and freeze skip stay OPEN. Hold merge. Not IC50.
+**Not Pass overall.** Deiter’s execute click on **`570bbc0`** (`570bbc01ff50fdac2d529448ceb95683c535401f`) is **Met for Lab Ops identity only**: same-type plate, DNA new Sample, and Later Start following the destination. It is not Tobias QA Pass. Execute joints stay **`1572071`** (`15720716c7cc927f1b498602ea87dec8a2bee85b`) and have **no Tobias Result**. Do **not** rewrite Deiter `02fe95f`, Tobias `9342439` / `8cfa2a9`, or P1. PATCH is not a path. Freeze skip, OQ-WO-6, and Route two-accept 409 stay OPEN. Hold merge. Not IC50.
 
-| Slice | Tobias |
-|-------|--------|
-| AC-P2-C2 same-type dest-follow | **unsigned** |
-| AC-P2-C3 type-changing dest-follow | **unsigned** |
-| Overall P2 | **unsigned / not Pass** |
+| Slice | Deiter Lab Ops on `570bbc0` | Tobias QA restamp |
+|-------|-------------------------------|-------------------|
+| AC-P2-C1 assignment identity | **Met** | **unsigned** |
+| AC-P2-C2 same-type dest-follow | **Met** | **unsigned** |
+| AC-P2-C3 type-changing dest-follow | **Met** | **unsigned** |
+| Overall P2 | **not Pass** | **unsigned / not Pass** |
 
-**Leadership Confirm — mint-only-at-execute** (memo, not a numbered step). Dest sample/container exists only after aliquot/pool **execute**. Route / Start / map-save / asked-for mint **zero** daughters. Plan dest type is catalog intent, **not** a Sample. Receive still mints identity + first vessel — that is **not** dest mint. Do **not** teach dest existing at Route / Start / map-save.
-
-**C2/C3 execute clicks** (unsigned until Tobias). `570bbc0` does **not** inherit `1572071` C2 Pass or Fail. Same click as extract-hold UAT **1.7** for C3. Two clicks.
-- **C2 execute:** extra container, same sample; dest joins; inbound assignment off; later Start follows dest. Source tube leftover volume is whatever was not transferred — emptying is not required.
-- **C3 execute:** new derivative (`parent_sample_id`); parent stays Blood; dest sample + container on the process; inbound source **removed**. **Fail C3** if dest tube lands on the blood Sample, parent `container_id` is retargeted, or later Start follows blood.
-- Günter: after execute, the process-sample is **only** that execute-minted dest.
+**Leadership Confirm** (Rolf / Deiter / Hans / Heidi / Günter): two grains at execute — C2 same-type destination; C3 derivative destination. Dest exists only after aliquot/pool execute; Route / Start / map-save / asked-for mint zero daughters; receive identity + first vessel is not dest mint. C2 leftover inbound volume is whatever was not transferred — emptying is not required.
 
 `9342439` Dest-type mint Hold stays Start-extract still Blood / **0 DNA** history — **not** a live ban on type-changing execute.
 
 ### AC-P2-C2 — same dest type (tube → plate)
 
-**Result:** **unsigned** until Tobias (numbered on `570bbc0`; execute `1572071`). Do **not** write Pass. Do **not** score Blood→DNA here — that is AC-P2-C3.
+**Lab Ops Result:** **Met** (Deiter execute click on `570bbc0`; Lab Ops identity only, not Tobias QA Pass).
 
-**Setup**
-- Receive one tube. Asked-for. Route a two-process map (first process has an Aliquot / pool plan experiment). First Start. Confirm the receive tube is on process 1.
-- Dest type on the plan is **Same as parent.** (blank). Source has a tracked amount so execute can transfer.
+**Tobias QA restamp:** **unsigned** until Tobias execute Results land on this numbered AC. Fold those Results here in a later commit; do **not** write Pass or Fail now. Do **not** score Blood→DNA here — that is AC-P2-C3.
+
+**Setup (numbered)**
+1. Receive one tube. Receive does **not** weigh it and often leaves Contents `amount` **NULL**.
+2. Asked-for. Route a two-process map whose first process has an Aliquot / pool plan experiment. First Start. Confirm the receive tube is on process 1 and the plan dest type is **Same as parent.** (blank).
+3. **Before execute, set a tracked source amount (and units) so the transfer can run.** Receive does not weigh. For fixture setup, use `PATCH /containers/{container_id}/contents/{sample_id}` with `amount` (`sample:update`; this is Contents setup, not an `eln_process_samples` PATCH). If execute returns **400** `source_amount_null`, set the tracked amount and retry; that response is a fixture gap, not dest-follow Fail. Do **not** require the amount to empty the tube.
 
 **Steps**
 1. Execute Aliquot — by volume (or by target amount). Transfer **some** of the source into a **new container**. Do **not** require the source tube to go to amount 0. Leftover on the inbound tube is whatever was not transferred.
@@ -870,16 +869,25 @@ The preceding Deiter click (`4671ba8` / `02fe95f`) is retained verbatim as signe
 3. Confirm process 1’s **active** assignment is that dest container (same sample). The inbound-tube assignment is **`removed`** even if that tube still has leftover volume.
 4. Later Start the next process. Confirm it carries the **dest container**, not the original tube.
 
-**Pass this AC if** steps 1–4 match. Fail if execute creates a new Sample, dest is not on the process, or Later Start follows the parent tube. Leftover volume on the inbound tube is **not** a Fail.
+**Expect:** steps 1–4 are the fair click: same `sample_id`, new `container_id`, destination on the process, inbound assignment `removed` even with leftover volume, and Later Start follows the destination. **Fail C2** if execute creates a new Sample, the destination is not on the process, or Later Start follows the parent tube. Leftover volume on the inbound tube is **not** a Fail.
 
 **Edge (not C2 core):** If the transfer **does** leave amount 0 on the inbound tube, assigning that container is **422** `process_container_required`. If leftover remains, that tube is still a vessel with Contents; it is just not the process assignment.
 
+**Observations (not fails):**
+- **No dest at Route or Start.** Dest does not exist until execute. Route / map-save / asked-for mint **zero** daughters. Process 1 carrying only the receive tube before step 1 is correct. Do **not** treat no dest at Route or Start as dest-follow Fail.
+- **A DNA execute is AC-P2-C3**, not a C2 Fail. Score type-changing dest there; do not fold Blood→DNA into C2.
+- **400 `source_amount_null`** is the Setup fixture gap above, not dest-follow Fail. Do **not** treat execute 400 `source_amount_null` as dest-follow Fail.
+- **Leftover inbound volume** is whatever was not transferred. Emptying is not required.
+
 ### AC-P2-C3 — different dest type (Blood → DNA)
 
-**Result:** **unsigned** until Tobias (numbered on `570bbc0`; execute `1572071`). Do **not** write Pass. Do **not** fold into C2. Same click as extract-hold UAT **1.7**.
+**Lab Ops Result:** **Met** (Deiter execute click on `570bbc0`; Lab Ops identity only, not Tobias QA Pass).
 
-**Setup**
-- Same as C2, but the source type has a catalog dest (e.g. Blood × aliquot → DNA). First Start still leaves the parent **Blood**.
+**Tobias QA restamp:** **unsigned** until Tobias execute Results land on this numbered AC. Fold those Results here in a later commit; do **not** write Pass or Fail now. Do **not** fold into C2. Same click as extract-hold UAT **1.7**.
+
+**Setup (numbered)**
+1. Use the prepared tracked-amount fixture from C2; 400 `source_amount_null` is setup, not dest-follow Fail.
+2. Set a catalog destination on the plan (e.g. Blood × aliquot → DNA). First Start still leaves the parent **Blood**.
 
 **Steps**
 1. Execute aliquot with dest type **DNA** (not Same as parent).
@@ -887,8 +895,13 @@ The preceding Deiter click (`4671ba8` / `02fe95f`) is retained verbatim as signe
 3. Confirm process 1’s **only active** assignment is dest sample + dest container. The inbound source assignment is **`removed`**.
 4. Later Start the next process. Confirm it carries the **DNA dest pair**, not the Blood tube.
 
-**Pass this AC if** steps 1–4 match. **Fail C3** if dest tube lands on the blood Sample, parent `container_id` is retargeted, dest is not on the process, or later Start follows blood.
+**Expect:** steps 1–4 are the fair click: new Sample + new container, parent still Blood, destination pair is the only active assignment, and Later Start follows DNA. **Fail C3** if the destination tube lands on the Blood Sample, the parent `container_id` is retargeted, the destination is not on the process, or Later Start follows Blood.
+
+**Observations (not fails):**
+- **Parent still Blood at Start extract.** Start is not execute and dest does not exist yet. The `9342439` dest-type mint Hold (still Blood / 0 DNA) is history, not a live ban on type-changing execute.
+- **No dest at Route or Start.** Route / map-save / asked-for mint **zero** daughters; the plan dest type is catalog intent, **not** a Sample. Do **not** treat no dest at Route or Start as dest-follow Fail.
+- **400 `source_amount_null`** is the C2 Setup fixture gap (receive amount often NULL), not dest-follow Fail.
 
 Route / Start / map-save / asked-for still mint **zero** daughters. Receive still mints identity + first vessel — that is **not** dest mint. Dest exists only after execute. That is not this click.
 
-Deiter C2 **Fail** on `02fe95f` stays history. `570bbc0` does **not** inherit `1572071` C2 Pass or Fail. Overall P2 remains **unsigned / not Pass**.
+Deiter C2 **Fail** on `02fe95f` stays history. `9342439` untouched. Deiter’s `570bbc0` execute is Lab Ops **Met**, not a Tobias QA Pass. Tobias’s QA restamp remains unsigned until his execute Results land here. Freeze skip, OQ-WO-6, and Route two-accept 409 stay OPEN. Overall P2 remains **unsigned / not Pass**. Hold merge. Not IC50.
