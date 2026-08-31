@@ -858,7 +858,7 @@ The preceding Deiter click (`4671ba8` / `02fe95f`) is retained verbatim as signe
 
 ### AC-P2-C2 — same dest type (tube → plate)
 
-**Result:** **unsigned** until Tobias (numbered on `570bbc0`; execute `1572071`). Do **not** write Pass. Do **not** score Blood→DNA here — that is AC-P2-C3.
+**Result:** **unsigned** until Tobias (numbered on `570bbc0`; execute `1572071`). Do **not** write Pass. Tobias is the QA restamp; Deiter Met is Lab Ops only — do **not** treat Deiter Met as this restamp or as Pass. When Tobias later clicks, fold Results onto this AC. Do **not** score Blood→DNA here — that is AC-P2-C3.
 
 **Setup**
 - Receive one tube. Asked-for. Route a two-process map (first process has an Aliquot / pool plan experiment). First Start. Confirm the receive tube is on process 1.
@@ -875,13 +875,13 @@ The preceding Deiter click (`4671ba8` / `02fe95f`) is retained verbatim as signe
 **Pass this AC if** steps 1–5 match. Fail if execute creates a new Sample, dest is not on the process, the emptied tube is still assignable (201), or Later Start follows the parent tube. Emptied-source assign **422** is the C2 expect only after a successful empty.
 
 **Observations (not fails):**
-- **No dest at Start.** Dest does not exist until execute, so process 1 carrying only the receive tube before step 1 is correct.
+- **No dest at Route or Start.** Dest does not exist until execute. Route / map-save / asked-for mint **zero** daughters. Process 1 carrying only the receive tube before step 1 is correct. Do **not** treat no dest at Route or Start as dest-follow Fail.
 - **A DNA execute is AC-P2-C3**, not a C2 Fail. Score type-changing dest there; do not fold Blood→DNA into C2.
-- **400 `source_amount_null`** is the Setup fixture gap above, not dest-follow Fail.
+- **400 `source_amount_null`** is the Setup fixture gap above, not dest-follow Fail. Do **not** treat execute 400 `source_amount_null` as dest-follow Fail.
 
 ### AC-P2-C3 — different dest type (Blood → DNA)
 
-**Result:** **unsigned** until Tobias (numbered on `570bbc0`; execute `1572071`). Do **not** write Pass. Do **not** fold into C2. Same click as extract-hold UAT **1.7**.
+**Result:** **unsigned** until Tobias (numbered on `570bbc0`; execute `1572071`). Do **not** write Pass. Tobias is the QA restamp; Deiter Met is Lab Ops only — do **not** treat Deiter Met as this restamp or as Pass. When Tobias later clicks, fold Results onto this AC. Do **not** fold into C2. Same click as extract-hold UAT **1.7**.
 
 **Setup**
 - Same as C2 — including the tracked-amount fixture setup (400 `source_amount_null` is a fixture gap, not a Fail) — but the source type has a catalog dest (e.g. Blood × aliquot → DNA). First Start still leaves the parent **Blood**.
@@ -896,8 +896,9 @@ The preceding Deiter click (`4671ba8` / `02fe95f`) is retained verbatim as signe
 
 **Observations (not fails):**
 - **Parent still Blood at Start extract.** Start is not execute and dest does not exist yet. The `9342439` dest-type mint Hold (still Blood / 0 DNA) is history, not a live ban on type-changing execute.
-- **No dest at Route.** Route / map-save / asked-for mint **zero** daughters; the plan dest type is catalog intent, **not** a Sample.
+- **No dest at Route or Start.** Route / map-save / asked-for mint **zero** daughters; the plan dest type is catalog intent, **not** a Sample. Do **not** treat no dest at Route or Start as dest-follow Fail.
+- **400 `source_amount_null`** is the C2 Setup fixture gap (receive amount often NULL), not dest-follow Fail.
 
 Route / Start / map-save / asked-for still mint **zero** daughters. Receive still mints identity + first vessel — that is **not** dest mint. Dest exists only after execute. That is not this click.
 
-Deiter C2 **Fail** on `02fe95f` stays history. `570bbc0` does **not** inherit `1572071` C2 Pass or Fail. Overall P2 remains **unsigned / not Pass**.
+Deiter C2 **Fail** on `02fe95f` stays history. `9342439` untouched. Freeze skip, OQ-WO-6, Route 409 stay OPEN. `570bbc0` does **not** inherit `1572071` C2 Pass or Fail. Overall P2 remains **unsigned / not Pass**. Hold merge. Not IC50.
