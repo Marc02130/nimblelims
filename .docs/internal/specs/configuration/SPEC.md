@@ -2,7 +2,7 @@
 
 **PRD:** [../../prd/configuration/PRD.md](../../prd/configuration/PRD.md)  
 **Date:** 2026-08-30  
-**Status:** Working contracts for the four-layer spine. **Not an implement packet.** P2 merge held. Dest-type mint Hold.
+**Status:** Working contracts for the four-layer spine. **Not an implement packet.** P2 merge held. Dest-type mint Hold on `9342439` / `02fe95f` is Start-extract still Blood / **0 DNA** history, not a live ban on type-changing aliquot/pool execute. Route / Start / map-save still mint zero daughters.
 
 Product rules live in the PRD. This file names tables, APIs, and UI. Do not fork a second execute API.
 
