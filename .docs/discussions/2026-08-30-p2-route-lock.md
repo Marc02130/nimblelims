@@ -8,9 +8,9 @@
 
 **Code:** `feat/work-order-p2`. Latest **signed** AC-P2 is `8cfa2a9` (per-AC; overall **not Pass**; PR **#92** honesty fold). **This commit** is `9342439` (`93424396ce3d02f01a8a8388abda39ae6ebf8010`): analysis is not a map field; Route matches a LIMS Run in the chain; process *x* → *x+1* emerging-type handoff; create-route UI shows types/analyses/emerging types.
 
-**UAT:** do **not** rewrite `8cfa2a9` / `b005cfe` / `9c4f9da` / `3b56cfb` / P1. Tobias signed **AC-P2-9..11 Pass** on `9342439` (local compose, down after; docs merge `50c1f24` does not change the click SHA). Deiter / Hans / Heidi / Günter confirmed that restamp (honesty, **not** a merge vote): later-step type-gate **Met**; AC-P2-11 / handoff Pass is **map-save only**; dest mint **Hold**; freeze skip **OPEN**; extract `analysis_id` **OPEN**; Route stays `test:assign`. Overall P2 remains **not Pass**.
+**UAT:** do **not** rewrite `8cfa2a9` / `b005cfe` / `9c4f9da` / `3b56cfb` / P1. Tobias signed **AC-P2-9..11 Pass** on `9342439` (local compose, down after; docs merge `50c1f24` does not change the click SHA). Deiter / Hans / Heidi / Günter confirmed that restamp (honesty, **not** a merge vote): later-step type-gate **Met**; AC-P2-11 / handoff Pass is **map-save only**; dest mint **Hold** on that SHA is Start-extract still Blood / **0 DNA** history, not a live ban on type-changing execute; freeze skip **OPEN**; extract `analysis_id` **OPEN**; Route stays `test:assign`. Overall P2 remains **not Pass**.
 
-**Dest-type Hold:** mint is **not** P2. It is aliquot/pool **OOB entry** submit (new sample + container). Process Start / Route / map save do **not** create daughters. Authoring may still **read** a declared dest on the template for handoff 422.
+**Dest-type Hold (dated to `9342439` / `02fe95f` Start-extract):** that restamp is tube still Blood, **0 DNA** — catalog handoff, not “blood became DNA at Start.” It is **not** a live ban on type-changing aliquot/pool execute. Route / Start / map-save still mint **zero** daughters. Authoring may still **read** a declared dest on the template for handoff 422. Hold lifts for type-changing execute only.
 
 ---
 
@@ -101,7 +101,7 @@ Rolf’s Confirm of all five asks. Round 1 above remains persona-applied history
 
 ## Leadership Confirm — 2026-08-30 (live clicks)
 
-**Full Leadership Confirm** of all five asks + OQ-WO-4 / OQ-TAT-1 / OQ-WO-5. Rolf (CEO Confirm above), then Deiter, Hans, Heidi, Günter. Round 1 remains persona-applied history. Dest-type mint remains Hold. Not a merge stamp. Tobias signed **AC-P2-9..11 Pass** on `9342439` after this Confirm. Restamp notes (Deiter / Hans / Heidi / Günter) after that click are in the section below — honesty, **not** a merge vote. Overall P2 remains **not Pass**.
+**Full Leadership Confirm** of all five asks + OQ-WO-4 / OQ-TAT-1 / OQ-WO-5. Rolf (CEO Confirm above), then Deiter, Hans, Heidi, Günter. Round 1 remains persona-applied history. Dest-type mint Hold on this round is Start-extract / catalog-handoff history (`9342439`), not a live ban on type-changing execute. Not a merge stamp. Tobias signed **AC-P2-9..11 Pass** on `9342439` after this Confirm. Restamp notes (Deiter / Hans / Heidi / Günter) after that click are in the section below — honesty, **not** a merge vote. Overall P2 remains **not Pass**.
 
 ### Deiter (Lab Ops)
 
@@ -198,7 +198,7 @@ Send: this file, Round 2. OQ-WO-4 / OQ-TAT-1 / OQ-WO-5 stay **Leadership Confirm
 
 ## Leadership Confirm — Round 2 — 2026-08-30 (live clicks)
 
-**Full Leadership Confirm** of R2-1…R2-4. Rolf (CEO Confirm above), then Deiter, Hans, Heidi, Günter. Round 1 remains **Leadership Confirmed**. Round 2 CEO Confirm remains history. Dest-type mint remains Hold. OQ-WO-6 stays **OPEN** (Leadership Confirm that it stays Open). Freeze skip (`{}` vs NULL) stays **OPEN**. Route two-accept 409 and map-save same-types / different-analyses stay unsigned. Do **not** rewrite Tobias `9342439` / `8cfa2a9` Results. Not a merge stamp. Overall P2 remains **not Pass**. Hold merge. Not IC50.
+**Full Leadership Confirm** of R2-1…R2-4. Rolf (CEO Confirm above), then Deiter, Hans, Heidi, Günter. Round 1 remains **Leadership Confirmed**. Round 2 CEO Confirm remains history. Dest-type mint Hold in this round is Start-extract / catalog history, not a live ban on type-changing execute. OQ-WO-6 stays **OPEN** (Leadership Confirm that it stays Open). Freeze skip (`{}` vs NULL) stays **OPEN**. Route two-accept 409 and map-save same-types / different-analyses stay unsigned. Do **not** rewrite Tobias `9342439` / `8cfa2a9` Results. Not a merge stamp. Overall P2 remains **not Pass**. Hold merge. Not IC50.
 
 ### Roll-up
 
@@ -333,7 +333,7 @@ Dest-follow is **in code** on product SHA **`1572071`** (`15720716c7cc927f1b4986
 - `_follow_destination_in_process` may retarget `container_id` only on the same-sample additional-container path.
 - Different dest type = **new derivative sample** in a new container (`parent_sample_id`). The parent **Sample row** stays for lineage, keeps its original type, and keeps work attributable to the parent type. Do not rewrite `sample_type` or retarget the parent Sample onto the destination tube.
 - For both destination grains, the destination sample + destination container pair lands on `eln_process_samples` in the execute transaction; the inbound source assignment becomes `removed`. “Parent stays” never means the parent process assignment stays.
-- Dest mint Hold is lifted only for type-changing execute. Deiter’s dest mint Hold **Pass** on `02fe95f` remains history of Start extract still Blood / **0 DNA**, not a ban on type-changing derivative mint.
+- Dest mint Hold is lifted only for type-changing execute. Deiter’s dest mint Hold **Pass** on `02fe95f` and dest-type mint Hold on `9342439` remain history of Start extract still Blood / **0 DNA**, not a ban on type-changing derivative mint. Route / Start / map-save still mint **zero** daughters.
 - Test identity remains `(sample, analysis)`; the process container records which vessel carries the work.
 
 Deiter C2 **Fail** on `02fe95f` stands as signed history. Do **not** write C2 Pass. Do **not** teach dest-follow as shipped. OQ-WO-6 and freeze skip stay **OPEN**. Overall P2 unsigned. Hold product merge to `main`. Not IC50.

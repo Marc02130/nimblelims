@@ -755,13 +755,15 @@ AC-P2-9 **Pass** (no analysis/type picker; extract Identity/Plasma then ELISA cl
 **Leadership notes (Deiter / Hans / Heidi / Günter) — restamp honesty, not a merge vote.** Confirmed Tobias’s `9342439` click.
 
 - Later-step type-gate is **Met** on `9342439`: qPCR-on-blood / still-Blood start **422** `route_sample_type` (current type vs that step; sample not dead). This is **not** dest-type E2E.
-- AC-P2-11 / handoff Pass is **map-save only**. Dest mint stays **Hold** — no execute rewrite of `sample_type`; tube still Blood; 0 DNA daughters.
+- AC-P2-11 / handoff Pass is **map-save only**. Dest mint **Hold** on this SHA is Start extract still Blood / 0 DNA — **history**, not a live ban on type-changing aliquot/pool execute.
 - Freeze skip (`{}` vs NULL) stays **OPEN**.
 - Extract sharing asked-for `analysis_id` stays **OPEN**.
 - Route stays `test:assign`.
 - No overall P2 Pass.
 
 **Still OPEN — not this restamp:** freeze skip (`{}` vs NULL). Classic `/tests` must leave `asked_for_params` NULL or we need a freeze marker. **OQ-WO-6:** an earlier LimsRun must **not** share asked-for `analysis_id` (analysis-in-chain does not close that). Extract is **not** a special assay; type gates catch blood-on-Qubit.
+
+**Honesty (not a Result rewrite):** Dest-type mint Hold on `9342439` is history of Start extract (tube still Blood, **0 DNA**), not a live ban on type-changing aliquot/pool execute.
 
 **Overall P2 remains unsigned.** Do not write overall P2 Pass, signed Pass, or merge-ready. Hold product merge. Not IC50.
 
@@ -849,7 +851,7 @@ The preceding Deiter click (`4671ba8` / `02fe95f`) is retained verbatim as signe
 | Later Start follows dest container | **unsigned** — in code on this SHA; not QA-clicked |
 | Different dest type = **new derivative sample** in a new container (`parent_sample_id`); parent Sample row stays, inbound process assignment is `removed` | OOB from C2 — type-changing execute only; not a parent `container_id` retarget |
 | Process follow for both grains | Destination sample + destination container land on `eln_process_samples` in the execute transaction; inbound source assignment becomes `removed` |
-| Dest mint Hold | Lifted only for type-changing execute. Deiter Hold **Pass** on `02fe95f` remains Start-extract Blood / 0 DNA history |
+| Dest mint Hold | Lifted only for type-changing execute. Deiter Hold **Pass** on `02fe95f` / dest-type mint Hold on `9342439` remain Start-extract Blood / 0 DNA **history**, not a live ban |
 | C1 no-vessel / two-vessel 422 + receive-tube 201 | Deiter **Pass** history on `02fe95f` — not restamped |
 | Overall P2 | **unsigned / not Pass** |
 
