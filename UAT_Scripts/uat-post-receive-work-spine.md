@@ -862,7 +862,8 @@ The preceding Deiter click (`4671ba8` / `02fe95f`) is retained verbatim as signe
 
 **Setup**
 - Receive one tube. Asked-for. Route a two-process map (first process has an Aliquot / pool plan experiment). First Start. Confirm the receive tube is on process 1.
-- Dest type on the plan is **Same as parent.** (blank). Tracked source amount is enough to empty the tube.
+- Dest type on the plan is **Same as parent.** (blank).
+- **Fixture gap — set the tracked amount before execute.** Receive leaves the tube’s Contents `amount` **NULL**. Set a tracked amount (and units) big enough for the transfer to empty the tube — e.g. `PATCH /containers/{container_id}/contents/{sample_id}` with `amount` (`sample:update`; this is Contents fixture setup, not the `eln_process_samples` PATCH that is not a path). If execute returns **400** `source_amount_null`, that is a **fixture gap**: set the amount and re-execute. Do **not** score 400 `source_amount_null` as a dest-follow Fail.
 
 **Steps**
 1. Execute Aliquot — by volume (or by target amount) so the source tube amount becomes **0** and a **new container** is created.
@@ -871,14 +872,19 @@ The preceding Deiter click (`4671ba8` / `02fe95f`) is retained verbatim as signe
 4. Assign the emptied receive tube (amount 0) to a process. Confirm **422** `process_container_required`.
 5. Later Start the next process. Confirm it carries the **dest container**, not the original tube.
 
-**Pass this AC if** steps 1–5 match. Fail if execute creates a new Sample, dest is not on the process, the emptied tube is still assignable (201), or Later Start follows the parent tube.
+**Pass this AC if** steps 1–5 match. Fail if execute creates a new Sample, dest is not on the process, the emptied tube is still assignable (201), or Later Start follows the parent tube. Emptied-source assign **422** is the C2 expect only after a successful empty.
+
+**Observations (not fails):**
+- **No dest at Start.** Dest does not exist until execute, so process 1 carrying only the receive tube before step 1 is correct.
+- **A DNA execute is AC-P2-C3**, not a C2 Fail. Score type-changing dest there; do not fold Blood→DNA into C2.
+- **400 `source_amount_null`** is the Setup fixture gap above, not dest-follow Fail.
 
 ### AC-P2-C3 — different dest type (Blood → DNA)
 
 **Result:** **unsigned** until Tobias (numbered on `570bbc0`; execute `1572071`). Do **not** write Pass. Do **not** fold into C2. Same click as extract-hold UAT **1.7**.
 
 **Setup**
-- Same as C2, but the source type has a catalog dest (e.g. Blood × aliquot → DNA). First Start still leaves the parent **Blood**.
+- Same as C2 — including the tracked-amount fixture setup (400 `source_amount_null` is a fixture gap, not a Fail) — but the source type has a catalog dest (e.g. Blood × aliquot → DNA). First Start still leaves the parent **Blood**.
 
 **Steps**
 1. Execute aliquot with dest type **DNA** (not Same as parent).
@@ -887,6 +893,10 @@ The preceding Deiter click (`4671ba8` / `02fe95f`) is retained verbatim as signe
 4. Later Start the next process. Confirm it carries the **DNA dest pair**, not the Blood tube.
 
 **Pass this AC if** steps 1–4 match. **Fail C3** if dest tube lands on the blood Sample, parent `container_id` is retargeted, dest is not on the process, or later Start follows blood.
+
+**Observations (not fails):**
+- **Parent still Blood at Start extract.** Start is not execute and dest does not exist yet. The `9342439` dest-type mint Hold (still Blood / 0 DNA) is history, not a live ban on type-changing execute.
+- **No dest at Route.** Route / map-save / asked-for mint **zero** daughters; the plan dest type is catalog intent, **not** a Sample.
 
 Route / Start / map-save / asked-for still mint **zero** daughters. Receive still mints identity + first vessel — that is **not** dest mint. Dest exists only after execute. That is not this click.
 
