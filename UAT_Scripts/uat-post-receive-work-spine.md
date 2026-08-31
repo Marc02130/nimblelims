@@ -848,7 +848,7 @@ The preceding Deiter click (`4671ba8` / `02fe95f`) is retained verbatim as signe
 | AC-P2-C3 type-changing dest-follow | **Met** | **unsigned** |
 | Overall P2 | **not Pass** | **unsigned / not Pass** |
 
-**Leadership Confirm** (Rolf / Deiter / Hans / Heidi / Günter): two grains at execute — C2 same-type destination; C3 derivative destination. Dest exists only after aliquot/pool execute; Route / Start / map-save / asked-for mint zero daughters; receive identity + first vessel is not dest mint.
+**Leadership Confirm** (Rolf / Deiter / Hans / Heidi / Günter): two grains at execute — C2 same-type destination; C3 derivative destination. Dest exists only after aliquot/pool execute; Route / Start / map-save / asked-for mint zero daughters; receive identity + first vessel is not dest mint. C2 leftover inbound volume is whatever was not transferred — emptying is not required.
 
 `9342439` Dest-type mint Hold stays Start-extract still Blood / **0 DNA** history — **not** a live ban on type-changing execute.
 
@@ -861,21 +861,23 @@ The preceding Deiter click (`4671ba8` / `02fe95f`) is retained verbatim as signe
 **Setup (numbered)**
 1. Receive one tube. Receive does **not** weigh it and often leaves Contents `amount` **NULL**.
 2. Asked-for. Route a two-process map whose first process has an Aliquot / pool plan experiment. First Start. Confirm the receive tube is on process 1 and the plan dest type is **Same as parent.** (blank).
-3. **Before execute, set the tracked source amount (and units) high enough for the transfer to empty the tube.** For fixture setup, use `PATCH /containers/{container_id}/contents/{sample_id}` with `amount` (`sample:update`; this is Contents setup, not an `eln_process_samples` PATCH). If execute returns **400** `source_amount_null`, set the tracked amount and retry; that response is a fixture gap, not dest-follow Fail.
+3. **Before execute, set a tracked source amount (and units) so the transfer can run.** Receive does not weigh. For fixture setup, use `PATCH /containers/{container_id}/contents/{sample_id}` with `amount` (`sample:update`; this is Contents setup, not an `eln_process_samples` PATCH). If execute returns **400** `source_amount_null`, set the tracked amount and retry; that response is a fixture gap, not dest-follow Fail. Do **not** require the amount to empty the tube.
 
 **Steps**
-1. Execute Aliquot — by volume (or by target amount) so the source tube amount becomes **0** and a **new container** is created.
+1. Execute Aliquot — by volume (or by target amount). Transfer **some** of the source into a **new container**. Do **not** require the source tube to go to amount 0. Leftover on the inbound tube is whatever was not transferred.
 2. Confirm **no new Sample row**: dest `sample_id` is the receive sample. Dest `container_id` is not the receive tube. Sample type is unchanged.
-3. Confirm process 1’s **active** assignment is that dest container (same sample). The receive-tube assignment is **`removed`**.
-4. Assign the emptied receive tube (amount 0) to a process. Confirm **422** `process_container_required`.
-5. Later Start the next process. Confirm it carries the **dest container**, not the original tube.
+3. Confirm process 1’s **active** assignment is that dest container (same sample). The inbound-tube assignment is **`removed`** even if that tube still has leftover volume.
+4. Later Start the next process. Confirm it carries the **dest container**, not the original tube.
 
-**Expect:** steps 1–5 are the fair click: same `sample_id`, new `container_id`, destination on the process, emptied tube **422**, and Later Start follows the destination. **Fail C2** if execute creates a new Sample, the destination is not on the process, the emptied tube is still assignable (201), or Later Start follows the parent tube. Emptied-source assign **422** is scored only after a successful empty.
+**Expect:** steps 1–4 are the fair click: same `sample_id`, new `container_id`, destination on the process, inbound assignment `removed` even with leftover volume, and Later Start follows the destination. **Fail C2** if execute creates a new Sample, the destination is not on the process, or Later Start follows the parent tube. Leftover volume on the inbound tube is **not** a Fail.
+
+**Edge (not C2 core):** If the transfer **does** leave amount 0 on the inbound tube, assigning that container is **422** `process_container_required`. If leftover remains, that tube is still a vessel with Contents; it is just not the process assignment.
 
 **Observations (not fails):**
 - **No dest at Route or Start.** Dest does not exist until execute. Route / map-save / asked-for mint **zero** daughters. Process 1 carrying only the receive tube before step 1 is correct. Do **not** treat no dest at Route or Start as dest-follow Fail.
 - **A DNA execute is AC-P2-C3**, not a C2 Fail. Score type-changing dest there; do not fold Blood→DNA into C2.
 - **400 `source_amount_null`** is the Setup fixture gap above, not dest-follow Fail. Do **not** treat execute 400 `source_amount_null` as dest-follow Fail.
+- **Leftover inbound volume** is whatever was not transferred. Emptying is not required.
 
 ### AC-P2-C3 — different dest type (Blood → DNA)
 
