@@ -822,3 +822,124 @@ class TestAliquotPlanExecute:
         detail = emptied.json()["detail"]
         assert isinstance(detail, dict)
         assert detail["code"] == "process_container_required"
+
+    def test_type_changing_aliquot_joins_derivative_not_parent(
+        self, client, auth_headers, plan_entry, db_session, test_admin_user, test_org
+    ):
+        from models.entry import ELNProcess, ELNProcessSample, ELNProcessStep, Entry
+        from models.list import ListEntry
+        from models.sample import Sample, SampleTypeTransition
+
+        exp = plan_entry["experiment"]
+        sample, tube, ctype = self._seed_sample_with_content(
+            db_session,
+            test_admin_user,
+            test_org,
+            amount=50.0,
+            experiment_id=exp["id"],
+        )
+        parent_type_id = sample.sample_type
+        source_type = (
+            db_session.query(ListEntry).filter(ListEntry.id == parent_type_id).one()
+        )
+        dest_type = ListEntry(
+            list_id=source_type.list_id,
+            name=f"dna_{uuid4().hex[:6]}",
+        )
+        db_session.add(dest_type)
+        db_session.flush()
+        db_session.add(
+            SampleTypeTransition(
+                client_id=test_org.id,
+                source_sample_type=parent_type_id,
+                operation="aliquot",
+                allowed_dest_sample_type=dest_type.id,
+                created_by=test_admin_user.id,
+                modified_by=test_admin_user.id,
+            )
+        )
+        process = ELNProcess(
+            name=f"Process {uuid4().hex[:6]}",
+            created_by=test_admin_user.id,
+            modified_by=test_admin_user.id,
+        )
+        db_session.add(process)
+        db_session.flush()
+        step = ELNProcessStep(
+            process_id=process.id,
+            experiment_template_id=exp["experiment_template_id"],
+            experiment_id=exp["id"],
+            name="Started extraction",
+            created_by=test_admin_user.id,
+            modified_by=test_admin_user.id,
+        )
+        db_session.add(step)
+        db_session.flush()
+        db_session.add(
+            ELNProcessSample(
+                process_id=process.id,
+                sample_id=sample.id,
+                container_id=tube.id,
+                status="in_progress",
+                current_step_id=step.id,
+                created_by=test_admin_user.id,
+                modified_by=test_admin_user.id,
+            )
+        )
+        entry = (
+            db_session.query(Entry).filter(Entry.id == plan_entry["entry"]["id"]).one()
+        )
+        entry.process_step_id = None
+        db_session.commit()
+
+        execute = client.post(
+            f"/v1/entries/{entry.id}/execute",
+            json={
+                "lines": [
+                    {
+                        "source_sample_id": str(sample.id),
+                        "source_container_id": str(tube.id),
+                        "volume": 5.0,
+                        "dest_container_type_id": str(ctype.id),
+                        "dest_sample_type": str(dest_type.id),
+                        "inherit_entry_dest_sample_type": False,
+                    }
+                ]
+            },
+            headers=auth_headers,
+        )
+        assert execute.status_code == 200, execute.text
+        body = execute.json()["results"][0]
+        dest_sample_id = body["dest_sample_id"]
+        dest_container_id = body["dest_container_id"]
+        assert dest_sample_id != str(sample.id)
+        assert dest_container_id != str(tube.id)
+
+        db_session.expire_all()
+        parent = db_session.query(Sample).filter(Sample.id == sample.id).one()
+        dest = db_session.query(Sample).filter(Sample.id == dest_sample_id).one()
+        assert parent.sample_type == parent_type_id
+        assert dest.sample_type == dest_type.id
+        assert dest.parent_sample_id == sample.id
+
+        active = (
+            db_session.query(ELNProcessSample)
+            .filter(
+                ELNProcessSample.process_id == process.id,
+                ELNProcessSample.status != "removed",
+            )
+            .one()
+        )
+        assert str(active.sample_id) == dest_sample_id
+        assert str(active.container_id) == dest_container_id
+
+        removed = (
+            db_session.query(ELNProcessSample)
+            .filter(
+                ELNProcessSample.process_id == process.id,
+                ELNProcessSample.sample_id == sample.id,
+                ELNProcessSample.container_id == tube.id,
+            )
+            .one()
+        )
+        assert removed.status == "removed"

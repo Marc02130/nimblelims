@@ -837,40 +837,48 @@ Extract-hold UAT step **1.7** stays **OOB execute** with no Result stamp. It mus
 
 The preceding Deiter click (`4671ba8` / `02fe95f`) is retained verbatim as signed history, including its original “Live” heading and Results (C1 **Pass**, C2 **Fail**, dest mint Hold **Pass**). It is not the current live stamp. Do not rewrite or transfer those observations to another SHA.
 
-## Live AC-P2-C2 stamp — `1572071` (unsigned until Tobias; overall P2 unsigned / not Pass)
+## Live dest-follow stamp — `1572071` (unsigned until Tobias)
 
-**Not Pass overall.** Product SHA **`1572071`** (`15720716c7cc927f1b498602ea87dec8a2bee85b` — dest-follow in execute txn; emptied-source assign 422). Do **not** rewrite Deiter `02fe95f` Results, Tobias `9342439` / `8cfa2a9`, or P1. C1 Deiter **Pass** on `02fe95f` stays history — do **not** restamp C1 as Tobias. OQ-WO-6 and freeze skip stay **OPEN**. Hold product merge to `main`. Not IC50.
+**Not Pass overall.** Product SHA **`1572071`**. Do **not** rewrite Deiter `02fe95f`, Tobias `9342439` / `8cfa2a9`, or P1. Do **not** restamp C1. Two clicks: **C2** = same dest type; **C3** = different dest type. PATCH is not a path. OQ-WO-6 and freeze skip stay OPEN. Hold merge.
 
-**QA signature:** AC-P2-C2 **unsigned** until Tobias clicks. Do **not** write C2 Pass. Do **not** teach dest-follow as shipped.
-
-**Leadership Confirm — dest-type split (Rolf / Deiter / Hans / Heidi / Günter):** same type is the same Sample in an additional container; different type is a new derivative Sample + new container with `parent_sample_id`. Parent type, Tests, and parent-type work stay on the parent. The `1572071` `container_id` retarget is same-type C2 only. Type-changing execute mints and joins the destination pair and marks the inbound source assignment `removed`; only that destination pair continues on the process. Route / Start / map-save mint zero daughters. This Confirm does not sign C2 or extract-hold 1.7.
-
-| Slice on this SHA | Status |
-|-------------------|--------|
-| Same-type dest-follow in the execute txn (`_follow_destination_in_process`) | **unsigned** — in code on this SHA; not QA-clicked |
-| Emptied-source assign (amount 0) → **422** `process_container_required` | **unsigned** — in code on this SHA; not QA-clicked |
-| Same dest type = **same sample, additional container** (no new Sample row) | **unsigned** — in code on this SHA; not QA-clicked |
-| Later Start follows dest container | **unsigned** — in code on this SHA; not QA-clicked |
-| Different dest type = **new derivative sample** in a new container (`parent_sample_id`); parent Sample row stays, inbound process assignment is `removed` | OOB from C2 — type-changing execute only; not a parent `container_id` retarget |
-| Process follow for both grains | Destination sample + destination container land on `eln_process_samples` in the execute transaction; inbound source assignment becomes `removed` |
-| Dest mint Hold | Lifted only for type-changing execute. Deiter Hold **Pass** on `02fe95f` / dest-type mint Hold on `9342439` remain Start-extract Blood / 0 DNA **history**, not a live ban |
-| C1 no-vessel / two-vessel 422 + receive-tube 201 | Deiter **Pass** history on `02fe95f` — not restamped |
+| Slice | Tobias |
+|-------|--------|
+| AC-P2-C2 same-type dest-follow | **unsigned** |
+| AC-P2-C3 type-changing dest-follow | **unsigned** |
 | Overall P2 | **unsigned / not Pass** |
 
-### AC-P2-C2 — lock (expect, not Result)
+### AC-P2-C2 — same dest type (tube → plate)
 
-**Result:** **unsigned** until Tobias (product `1572071`). C2 is same-type dest-follow only. Do **not** write Pass.
+**Result:** **unsigned** until Tobias (`1572071`). Do **not** write Pass. Do **not** score Blood→DNA here — that is AC-P2-C3.
 
-**Expect (in code on this SHA; not QA-clicked)**
-- Same dest type = **same sample, additional container**.
-- `_follow_destination_in_process` retarget is the same-sample additional-container path: retarget `container_id` on the active assignment, or remove source then insert the same-sample dest pair. Does **not** require `entry.process_step_id`.
-- Emptied-source assign (Contents amount 0) → **422** `process_container_required`.
-- Different dest type = **new derivative sample** in a new container (`parent_sample_id`). The parent **Sample row** stays with its original type and parent-type work; do not retarget it onto the destination tube.
-- For both grains, the destination sample + destination container pair lands on `eln_process_samples` in the execute transaction and the inbound source assignment becomes `removed`.
-- Günter: after type-changing execute, the only continuing process sample is that execute-minted destination pair.
-- Dest mint Hold is lifted only for type-changing execute. Deiter’s Hold Pass on `02fe95f` remains history of Start extract still Blood / 0 DNA, not a ban on type-changing derivative mint.
-- C2 same-type dest-follow and extract-hold UAT 1.7 DNA-daughter execute remain two clicks; 1.7 stays OOB with no Result stamp.
-- Test identity stays `(sample, analysis)`; the container records which vessel was measured.
-- **PATCH is not a path.**
+**Setup**
+- Receive one tube. Asked-for. Route a two-process map (first process has an Aliquot / pool plan experiment). First Start. Confirm the receive tube is on process 1.
+- Dest type on the plan is **Same as parent.** (blank). Tracked source amount is enough to empty the tube.
 
-Do **not** teach dest-follow as shipped. Deiter C2 **Fail** on `02fe95f` stands as signed history until Tobias restamps. Overall P2 remains **unsigned / not Pass**.
+**Steps**
+1. Execute Aliquot — by volume (or by target amount) so the source tube amount becomes **0** and a **new container** is created.
+2. Confirm **no new Sample row**: dest `sample_id` is the receive sample. Dest `container_id` is not the receive tube. Sample type is unchanged.
+3. Confirm process 1’s **active** assignment is that dest container (same sample). The receive-tube assignment is **`removed`**.
+4. Assign the emptied receive tube (amount 0) to a process. Confirm **422** `process_container_required`.
+5. Later Start the next process. Confirm it carries the **dest container**, not the original tube.
+
+**Pass this AC if** steps 1–5 match. Fail if execute creates a new Sample, dest is not on the process, the emptied tube is still assignable (201), or Later Start follows the parent tube.
+
+### AC-P2-C3 — different dest type (Blood → DNA)
+
+**Result:** **unsigned** until Tobias (`1572071`). Do **not** write Pass. Do **not** fold into C2. Same click as extract-hold UAT **1.7**.
+
+**Setup**
+- Same as C2, but the source type has a catalog dest (e.g. Blood × aliquot → DNA). First Start still leaves the parent **Blood**.
+
+**Steps**
+1. Execute aliquot with dest type **DNA** (not Same as parent).
+2. Confirm a **new Sample** in a **new container**, `parent_sample_id` = the receive sample. Dest type is DNA. The parent Sample is still Blood; it is not retargeted onto the DNA tube.
+3. Confirm process 1’s **only active** assignment is dest sample + dest container. The inbound source assignment is **`removed`**.
+4. Later Start the next process. Confirm it carries the **DNA dest pair**, not the Blood tube.
+
+**Pass this AC if** steps 1–4 match. Fail if the parent Sample becomes DNA, dest is not on the process, or Later Start follows the Blood tube.
+
+Route / Start / map-save still mint **zero** daughters. That is not this click.
+
+Deiter C2 **Fail** on `02fe95f` stays history until these restamp. Overall P2 remains **unsigned / not Pass**.

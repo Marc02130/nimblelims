@@ -197,7 +197,7 @@ UAT (classic): [`UAT_Scripts/uat-results-entry-review.md`](../UAT_Scripts/uat-re
 - Do **not** teach PATCH as a dest-follows path.
 - Do **not** treat C1/C2 as unsigned. Deiter clicked them; Leadership Confirmed that stamp. Do not invent a Tobias Pass.
 - Do **not** silently pick a vessel when a sample sits in two containers. That is **422**, not `first()`.
-- Do **not** score extract-hold UAT **1.7** as the P2 Contents click. It is **OOB execute**. If type-changing execute is described, the DNA is a new derivative sample with `parent_sample_id`, never the parent retargeted to a DNA container.
+- Do **not** score extract-hold **1.7** as AC-P2-C2. 1.7 is AC-P2-C3 (DNA daughter). C2 is same dest type only. Both unsigned until Tobias.
 - Do **not** turn Deiter’s Start-extract Hold history into a ban on type-changing execute minting a derivative.
 - Do **not** teach `routing_map.analysis_id` as a required create field. Derive first-step types and chain LimsRun analyses at read.
 - Not IC50. Not a fake Route how-to.
