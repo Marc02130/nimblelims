@@ -450,6 +450,86 @@ class TestELNProcessSamples:
         assert isinstance(detail, dict)
         assert detail["code"] == "process_container_required"
 
+    def test_assign_emptied_container_422(
+        self, client, auth_headers, template_a, db_session, test_admin_user, test_org
+    ):
+        from datetime import datetime, timedelta
+        from decimal import Decimal
+        from models.sample import Sample
+        from models.project import Project
+        from models.list import List, ListEntry
+        from models.container import Container, ContainerType, Contents
+
+        lst = List(name=f"empty_{uuid4().hex[:6]}")
+        db_session.add(lst)
+        db_session.flush()
+        st = ListEntry(list_id=lst.id, name=f"t_{uuid4().hex[:4]}")
+        stt = ListEntry(list_id=lst.id, name=f"s_{uuid4().hex[:4]}")
+        mx = ListEntry(list_id=lst.id, name=f"m_{uuid4().hex[:4]}")
+        db_session.add_all([st, stt, mx])
+        db_session.flush()
+        project = Project(
+            name=f"Empty {uuid4().hex[:8]}",
+            client_id=test_org.id,
+            status=stt.id,
+            start_date=datetime.utcnow(),
+            due_date=datetime.utcnow() + timedelta(days=7),
+        )
+        db_session.add(project)
+        db_session.flush()
+        sample = Sample(
+            name=f"Empty {uuid4().hex[:8]}",
+            sample_type=st.id,
+            status=stt.id,
+            matrix=mx.id,
+            project_id=project.id,
+            created_by=test_admin_user.id,
+            modified_by=test_admin_user.id,
+        )
+        db_session.add(sample)
+        db_session.flush()
+        ctype = ContainerType(
+            name=f"tube_{uuid4().hex[:6]}",
+            created_by=test_admin_user.id,
+            modified_by=test_admin_user.id,
+        )
+        db_session.add(ctype)
+        db_session.flush()
+        tube = Container(
+            name=f"TUBE-{uuid4().hex[:6]}",
+            type_id=ctype.id,
+            created_by=test_admin_user.id,
+            modified_by=test_admin_user.id,
+        )
+        db_session.add(tube)
+        db_session.flush()
+        db_session.add(
+            Contents(
+                container_id=tube.id,
+                sample_id=sample.id,
+                amount=Decimal("0"),
+            )
+        )
+        db_session.commit()
+        r = client.post(
+            "/v1/eln-processes",
+            json={
+                "name": f"Emptied {uuid4().hex[:8]}",
+                "steps": [{"experiment_template_id": template_a["id"], "name": "S1"}],
+            },
+            headers=auth_headers,
+        )
+        process_id = r.json()["id"]
+        assigned = client.post(
+            f"/v1/eln-processes/{process_id}/samples",
+            json={"sample_ids": [str(sample.id)], "set_to_first_step": True},
+            headers=auth_headers,
+        )
+        assert assigned.status_code == 422, assigned.text
+        detail = assigned.json()["detail"]
+        assert isinstance(detail, dict)
+        assert detail["code"] == "process_container_required"
+
     def test_filter_samples_by_step(
         self, client: TestClient, auth_headers, template_a, template_b, sample_id
     ):

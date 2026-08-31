@@ -265,9 +265,21 @@ class TestAliquotPlanExecute:
         assert float(content.amount) == 35.0
 
         dest_id = body["results"][0]["dest_sample_id"]
+        dest_container_id = body["results"][0]["dest_container_id"]
+        assert dest_id == str(sample.id)
+        assert dest_container_id != str(tube.id)
         dest = db_session.query(Sample).filter(Sample.id == dest_id).first()
         assert dest is not None
-        assert dest.parent_sample_id == sample.id
+        dest_content = (
+            db_session.query(Contents)
+            .filter(
+                Contents.sample_id == sample.id,
+                Contents.container_id == dest_container_id,
+            )
+            .first()
+        )
+        assert dest_content is not None
+        assert float(dest_content.amount) == 15.0
 
     def test_insufficient_amount(
         self, client, auth_headers, plan_entry, db_session, test_admin_user, test_org
@@ -707,10 +719,11 @@ class TestAliquotPlanExecute:
         )
         assert accepted.status_code == 200, accepted.text
 
-    def test_execute_minted_destination_joins_process_after_start(
+    def test_equivalent_aliquot_follows_dest_without_process_step_id(
         self, client, auth_headers, plan_entry, db_session, test_admin_user, test_org
     ):
         from models.entry import ELNProcess, ELNProcessSample, ELNProcessStep, Entry
+        from models.container import Contents
 
         exp = plan_entry["experiment"]
         sample, tube, ctype = self._seed_sample_with_content(
@@ -751,7 +764,7 @@ class TestAliquotPlanExecute:
         entry = (
             db_session.query(Entry).filter(Entry.id == plan_entry["entry"]["id"]).one()
         )
-        entry.process_step_id = step.id
+        entry.process_step_id = None
         db_session.commit()
 
         execute = client.post(
@@ -761,7 +774,7 @@ class TestAliquotPlanExecute:
                     {
                         "source_sample_id": str(sample.id),
                         "source_container_id": str(tube.id),
-                        "volume": 0.5,
+                        "volume": 5.0,
                         "dest_container_type_id": str(ctype.id),
                     }
                 ]
@@ -769,24 +782,43 @@ class TestAliquotPlanExecute:
             headers=auth_headers,
         )
         assert execute.status_code == 200, execute.text
-        dest_id = execute.json()["results"][0]["dest_sample_id"]
-        process_sample = (
+        body = execute.json()["results"][0]
+        dest_sample_id = body["dest_sample_id"]
+        dest_container_id = body["dest_container_id"]
+        assert dest_sample_id == str(sample.id)
+        assert dest_container_id != str(tube.id)
+
+        db_session.expire_all()
+        active = (
             db_session.query(ELNProcessSample)
             .filter(
                 ELNProcessSample.process_id == process.id,
-                ELNProcessSample.sample_id == dest_id,
+                ELNProcessSample.status != "removed",
             )
             .one()
         )
-        assert process_sample.current_step_id == step.id
-        assert process_sample.status == "in_progress"
-        parent_assignment = (
-            db_session.query(ELNProcessSample)
-            .filter(
-                ELNProcessSample.process_id == process.id,
-                ELNProcessSample.sample_id == sample.id,
-            )
+        assert str(active.sample_id) == str(sample.id)
+        assert str(active.container_id) == dest_container_id
+        assert active.status == "in_progress"
+        assert active.current_step_id == step.id
+
+        source_content = (
+            db_session.query(Contents)
+            .filter(Contents.sample_id == sample.id, Contents.container_id == tube.id)
             .one()
         )
-        assert parent_assignment.status == "removed"
-        assert parent_assignment.current_step_id is None
+        assert float(source_content.amount) == 0.0
+
+        emptied = client.post(
+            f"/v1/eln-processes/{process.id}/samples",
+            json={
+                "assignments": [
+                    {"sample_id": str(sample.id), "container_id": str(tube.id)}
+                ]
+            },
+            headers=auth_headers,
+        )
+        assert emptied.status_code == 422, emptied.text
+        detail = emptied.json()["detail"]
+        assert isinstance(detail, dict)
+        assert detail["code"] == "process_container_required"

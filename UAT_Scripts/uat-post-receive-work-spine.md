@@ -830,3 +830,14 @@ Do **not** teach dest-follows as shipped. Do **not** teach PATCH as the dest-fol
 This Hold Pass does not close `_execute_transfer` dest mint. AC-P2-C2 records that execute still mints dest and does not join dest or remove source. Do not fold the C2 Fail into the dest-mint Hold Pass.
 
 Extract-hold UAT step **1.7** stays **OOB execute** and must not teach a DNA daughter. Test identity stays `(sample, analysis)` — the container is **which vessel was measured**, and a concentration write-through hits that container. Route stays `test:assign`. Sequencing data still not in NimbleLIMS.
+
+### Code closed — dest-join / source-remove (not a restamp)
+
+Grok Build coded the C2 hole after Deiter’s Fail. **Do not rewrite** the Deiter Results above. **Not Pass.** No Tobias restamp.
+
+- Equivalent aliquot (`aliquot_*`, dest type blank or same as parent): same sample, new container. `_execute_transfer` does **not** insert a Sample row.
+- Follow lands in the **execute txn** (`_follow_destination_in_process`): retarget `container_id` on the active assignment, or remove source then insert the dest pair. Does **not** require `entry.process_step_id` (resolves via experiment step or source assignment).
+- Emptied-source assign (Contents amount 0 / null) → **422** `process_container_required`. Not dest-follow.
+- **PATCH is still not a path.** Dest mint Hold (new Sample with `dest_sample_type`) stays Hold.
+
+Deiter C2 **Fail** on `02fe95f` stands until a restamp. Overall P2 remains **unsigned / not Pass**.

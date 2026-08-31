@@ -775,21 +775,26 @@ class RoutingService:
 
     def _assignment_for_sample(self, sample_id: UUID) -> dict:
         from models.container import Contents
+        from app.services.eln_process_service import contents_has_remaining
 
-        rows = (
-            self.db.query(Contents)
-            .filter(Contents.sample_id == sample_id)
-            .order_by(Contents.container_id)
-            .all()
-        )
+        rows = [
+            row
+            for row in (
+                self.db.query(Contents)
+                .filter(Contents.sample_id == sample_id)
+                .order_by(Contents.container_id)
+                .all()
+            )
+            if contents_has_remaining(row)
+        ]
         if not rows:
             raise HTTPException(
                 status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail={
                     "code": "process_container_required",
                     "message": (
-                        "Sample has no container; only a sample in a container "
-                        "can be assigned to a process"
+                        "Sample has no container with remaining amount; only a "
+                        "sample in a container can be assigned to a process"
                     ),
                 },
             )

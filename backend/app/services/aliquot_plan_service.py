@@ -541,51 +541,146 @@ class AliquotPlanService:
         )
         return {r[0] for r in rows if r[0]}
 
-    def _release_source_from_process(
+    def _process_step_for_entry(self, entry: Entry) -> Optional[ELNProcessStep]:
+        """Resolve the process step without requiring entry.process_step_id."""
+        if entry.process_step_id:
+            step = (
+                self.db.query(ELNProcessStep)
+                .filter(ELNProcessStep.id == entry.process_step_id)
+                .first()
+            )
+            if step:
+                return step
+        if entry.experiment_id:
+            return (
+                self.db.query(ELNProcessStep)
+                .filter(ELNProcessStep.experiment_id == entry.experiment_id)
+                .first()
+            )
+        return None
+
+    def _active_assignment(
+        self,
+        process_id: UUID,
+        sample_id: UUID,
+        container_id: Optional[UUID] = None,
+    ) -> Optional[ELNProcessSample]:
+        query = self.db.query(ELNProcessSample).filter(
+            ELNProcessSample.process_id == process_id,
+            ELNProcessSample.sample_id == sample_id,
+            ELNProcessSample.status != "removed",
+        )
+        if container_id is not None:
+            query = query.filter(ELNProcessSample.container_id == container_id)
+        return query.first()
+
+    def _insert_process_assignment(
+        self,
+        process_id: UUID,
+        sample_id: UUID,
+        container_id: UUID,
+        current_step_id: Optional[UUID],
+    ) -> None:
+        existing = (
+            self.db.query(ELNProcessSample)
+            .filter(
+                ELNProcessSample.process_id == process_id,
+                ELNProcessSample.container_id == container_id,
+            )
+            .first()
+        )
+        if existing:
+            existing.sample_id = sample_id
+            existing.status = "in_progress"
+            existing.current_step_id = current_step_id
+            existing.modified_by = self._user_id()
+            return
+        self.db.add(
+            ELNProcessSample(
+                process_id=process_id,
+                sample_id=sample_id,
+                container_id=container_id,
+                status="in_progress",
+                current_step_id=current_step_id,
+                created_by=self._user_id(),
+                modified_by=self._user_id(),
+            )
+        )
+
+    def _follow_destination_in_process(
         self,
         entry: Entry,
         source_sample_id: UUID,
         dest_sample_id: UUID,
-        source_container_id: Optional[UUID] = None,
-        dest_container_id: Optional[UUID] = None,
+        source_container_id: Optional[UUID],
+        dest_container_id: UUID,
     ) -> None:
-        """Inbound container-with-sample no longer continues the process."""
-        if not entry.process_step_id:
-            return
+        """In the execute txn: dest continues the process; inbound source does not.
+
+        Equivalent aliquot (same sample, new container) retargets container_id.
+        Dest mint / pool (new sample) removes the source then inserts the dest pair.
+        Does not require entry.process_step_id. PATCH of eln_process_samples is not
+        a path.
+        """
         if (
             source_sample_id == dest_sample_id
             and source_container_id
-            and dest_container_id
             and source_container_id == dest_container_id
         ):
             return
-        process_step = (
-            self.db.query(ELNProcessStep)
-            .filter(ELNProcessStep.id == entry.process_step_id)
-            .first()
-        )
-        if not process_step:
-            return
-        query = self.db.query(ELNProcessSample).filter(
-            ELNProcessSample.process_id == process_step.process_id,
-            ELNProcessSample.sample_id == source_sample_id,
-            ELNProcessSample.status != "removed",
-        )
-        if source_container_id is not None:
-            query = query.filter(
-                ELNProcessSample.container_id == source_container_id
+        step = self._process_step_for_entry(entry)
+        process_id = step.process_id if step else None
+        current_step_id = step.id if step else None
+        if process_id is None:
+            source_row = (
+                self.db.query(ELNProcessSample)
+                .filter(
+                    ELNProcessSample.sample_id == source_sample_id,
+                    ELNProcessSample.status != "removed",
+                )
             )
-        process_sample = query.first()
-        if not process_sample:
+            if source_container_id is not None:
+                source_row = source_row.filter(
+                    ELNProcessSample.container_id == source_container_id
+                )
+            assignment = source_row.first()
+            if assignment is None:
+                return
+            process_id = assignment.process_id
+            current_step_id = assignment.current_step_id
+
+        if dest_sample_id == source_sample_id:
+            active = self._active_assignment(process_id, source_sample_id)
+            if active:
+                active.container_id = dest_container_id
+                active.status = "in_progress"
+                if current_step_id:
+                    active.current_step_id = current_step_id
+                active.modified_by = self._user_id()
+                return
+            self._insert_process_assignment(
+                process_id, dest_sample_id, dest_container_id, current_step_id
+            )
             return
-        process_sample.status = "removed"
-        process_sample.current_step_id = None
-        process_sample.modified_by = self._user_id()
+
+        source_row = self._active_assignment(
+            process_id, source_sample_id, source_container_id
+        )
+        if source_row is None:
+            source_row = self._active_assignment(process_id, source_sample_id)
+        if source_row:
+            source_row.status = "removed"
+            source_row.current_step_id = None
+            source_row.modified_by = self._user_id()
+            self.db.flush()
+        self._insert_process_assignment(
+            process_id, dest_sample_id, dest_container_id, current_step_id
+        )
 
     def _join_minted_destination(
         self, entry: Entry, sample: Sample, container_id: UUID
     ) -> None:
-        """Join minted dest container-with-sample to experiment and process."""
+        """Record dest on the experiment cohort and Aliquots / pools list."""
         execution = (
             self.db.query(ExperimentSampleExecution)
             .filter(
@@ -607,39 +702,6 @@ class AliquotPlanService:
                     modified_by=self._user_id(),
                 )
             )
-
-        if entry.process_step_id:
-            process_step = (
-                self.db.query(ELNProcessStep)
-                .filter(ELNProcessStep.id == entry.process_step_id)
-                .first()
-            )
-            if process_step:
-                process_sample = (
-                    self.db.query(ELNProcessSample)
-                    .filter(
-                        ELNProcessSample.process_id == process_step.process_id,
-                        ELNProcessSample.container_id == container_id,
-                    )
-                    .first()
-                )
-                if not process_sample:
-                    self.db.add(
-                        ELNProcessSample(
-                            process_id=process_step.process_id,
-                            sample_id=sample.id,
-                            container_id=container_id,
-                            status="in_progress",
-                            current_step_id=process_step.id,
-                            created_by=self._user_id(),
-                            modified_by=self._user_id(),
-                        )
-                    )
-                else:
-                    process_sample.sample_id = sample.id
-                    process_sample.status = "in_progress"
-                    process_sample.current_step_id = process_step.id
-                    process_sample.modified_by = self._user_id()
 
         destination_entries = (
             self.db.query(Entry)
@@ -784,12 +846,12 @@ class AliquotPlanService:
                 dest_sample, dest_c = self._execute_transfer(r, pool_containers)
                 if dest_sample is not None and dest_c is not None:
                     self._join_minted_destination(entry, dest_sample, dest_c.id)
-                    self._release_source_from_process(
+                    self._follow_destination_in_process(
                         entry,
                         r.source_sample_id,
                         dest_sample.id,
-                        source_container_id=r.source_container_id,
-                        dest_container_id=dest_c.id,
+                        r.source_container_id,
+                        dest_c.id,
                     )
                 results.append(
                     AliquotExecuteLineResult(
@@ -977,29 +1039,41 @@ class AliquotPlanService:
         if r.pool_group and r.pool_group not in pool_containers:
             pool_containers[r.pool_group] = dest_c.id
 
-        # New dest sample (child of source)
-        status_id = self._available_status_id()
-        dest_sample = Sample(
-            name=(
-                f"{parent.name}-ALQ-{uuid4().hex[:6]}"
-                if parent.name
-                else f"ALQ-{uuid4().hex[:8]}"
-            ),
-            description=f"Aliquot from {parent.name or parent.id} ({r.method.value})",
-            sample_type=r.dest_sample_type or parent.sample_type,
-            status=status_id,
-            matrix=parent.matrix,
-            temperature=parent.temperature,
-            parent_sample_id=parent.id,
-            project_id=parent.project_id,
-            qc_type=parent.qc_type,
-            due_date=parent.due_date,
-            received_date=parent.received_date,
-            created_by=self._user_id(),
-            modified_by=self._user_id(),
+        equivalent = (
+            self._method_operation(r.method) == AliquotOperation.aliquot
+            and (
+                r.dest_sample_type is None
+                or r.dest_sample_type == parent.sample_type
+            )
         )
-        self.db.add(dest_sample)
-        self.db.flush()
+        if equivalent:
+            dest_sample = parent
+        else:
+            # Dest mint / pool: new sample row. Dest-type Hold is a different punch.
+            status_id = self._available_status_id()
+            dest_sample = Sample(
+                name=(
+                    f"{parent.name}-ALQ-{uuid4().hex[:6]}"
+                    if parent.name
+                    else f"ALQ-{uuid4().hex[:8]}"
+                ),
+                description=(
+                    f"Aliquot from {parent.name or parent.id} ({r.method.value})"
+                ),
+                sample_type=r.dest_sample_type or parent.sample_type,
+                status=status_id,
+                matrix=parent.matrix,
+                temperature=parent.temperature,
+                parent_sample_id=parent.id,
+                project_id=parent.project_id,
+                qc_type=parent.qc_type,
+                due_date=parent.due_date,
+                received_date=parent.received_date,
+                created_by=self._user_id(),
+                modified_by=self._user_id(),
+            )
+            self.db.add(dest_sample)
+            self.db.flush()
 
         # Dest contents amount = transfer (mass/count); conc from plan when present
         dest_amount = Decimal(str(r.transfer_amount))

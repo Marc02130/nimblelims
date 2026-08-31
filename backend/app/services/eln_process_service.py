@@ -1,6 +1,7 @@
 """
 Service layer for ELN Processes (Phase 1).
 """
+from decimal import Decimal
 from typing import Optional, List, Tuple, Dict, Any
 from uuid import UUID, uuid4
 from sqlalchemy.orm import Session
@@ -39,11 +40,21 @@ from models.entry import (
     ELNProcessDefinition,
     STEP_KINDS,
 )
-from models.container import Contents
 from models.experiment import Experiment
 from models.flexible_experiment import LimsRun
 from models.user import User
 from models.sample import Sample
+from models.container import Contents
+
+
+def contents_has_remaining(row: Contents) -> bool:
+    """Assignable vessel. Amount NULL is untracked (receive) and still a vessel.
+    Amount 0 is emptied and is not assignable.
+    """
+    if row.amount is None:
+        return True
+    return Decimal(str(row.amount)) > 0
+
 
 # Process-sample lifecycle (not Sample.status):
 #   queued      — assigned to process / waiting for experiment start
@@ -703,12 +714,13 @@ class ELNProcessService:
         return exp_svc.list_cohort_eligible_for_process(process_id, step_id=step_id)
 
     def _contents_for_sample(self, sample_id: UUID) -> List[Contents]:
-        return (
+        rows = (
             self.db.query(Contents)
             .filter(Contents.sample_id == sample_id)
             .order_by(Contents.container_id)
             .all()
         )
+        return [row for row in rows if contents_has_remaining(row)]
 
     def _resolve_assignment(
         self, sample_id: UUID, container_id: Optional[UUID] = None
@@ -718,34 +730,35 @@ class ELNProcessService:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Sample {sample_id} not found",
             )
-        rows = self._contents_for_sample(sample_id)
+        remaining = self._contents_for_sample(sample_id)
         if container_id is not None:
-            if not any(row.container_id == container_id for row in rows):
+            if not any(row.container_id == container_id for row in remaining):
                 raise HTTPException(
                     status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                     detail={
                         "code": "process_container_required",
                         "message": (
-                            "Sample is not in that container; only a sample in a "
-                            "container can be assigned to a process"
+                            "That container has no remaining amount; only a "
+                            "sample in a container with remaining amount can "
+                            "be assigned to a process"
                         ),
                     },
                 )
             return ProcessAssignmentItem(
                 sample_id=sample_id, container_id=container_id
             )
-        if not rows:
+        if not remaining:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail={
                     "code": "process_container_required",
                     "message": (
-                        "Sample has no container; only a sample in a container "
-                        "can be assigned to a process"
+                        "Sample has no container with remaining amount; only a "
+                        "sample in a container can be assigned to a process"
                     ),
                 },
             )
-        if len(rows) > 1:
+        if len(remaining) > 1:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail={
@@ -757,7 +770,7 @@ class ELNProcessService:
                 },
             )
         return ProcessAssignmentItem(
-            sample_id=sample_id, container_id=rows[0].container_id
+            sample_id=sample_id, container_id=remaining[0].container_id
         )
 
     def assign_samples(
