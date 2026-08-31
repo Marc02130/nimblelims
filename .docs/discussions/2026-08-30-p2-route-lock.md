@@ -410,3 +410,17 @@ Docs-only. Does **not** rewrite Round 1, Round 2, the Contents-grain Confirm, De
 
 OQ-WO-6 and freeze skip stay **OPEN**. Hold merge to `main`. Not IC50.
 
+---
+
+## Marc lock — one asked-for per process (pending Leadership overwrite) — 2026-08-31
+
+**Marc lock pending Leadership overwrite.** Docs-only. **Not Leadership Confirm.** If Leadership later Confirms, that is a later fold. Does **not** rewrite Round 1, Round 2, Contents-grain Confirm, Deiter `02fe95f` Results, Tobias `9342439` AC-P2-9..11 Pass, dest-type split Confirm, mint-only-at-execute Confirm, or the `570bbc0` restamp notes. Not Pass. Not a merge vote. Not IC50.
+
+1. **One asked-for per process instance.** A process instance is bound to one asked-for row. Do not teach one process carrying two asked-for assays. Round 2 “extract QC + Qubit + ELISA” is Route matching (a chain may list several LimsRun analyses). It is **not** two asked-for assays on one process.
+2. **Supporting QC = other analyses, own Tests.** QC is not a second asked-for on the same process. QC analyses get their own Tests `(sample, analysis)`. Do not fold QC into the asked-for `analysis_id` on the extract LimsRun.
+3. **DNA extract once (C3).** Type-changing execute mints the DNA Sample once. That DNA sample may **join many work orders**, each with **one asked-for**. Do not teach extract-every-WO. Do not teach one DNA sample = one WO forever.
+4. **Freeze is per Test `(sample, analysis)`.** First LimsRun start writes `asked_for_params`. Later start does **not** overwrite — including frozen `{}`. NULL = not frozen yet. `{}` after first start = locked empty. Classic `/tests` default `{}` makes skip-on-`{}` **not** a freeze. Freeze skip stays **OPEN** until classic `/tests` leaves NULL or a freeze marker exists. Do not close freeze skip. Do not teach skip-on-`{}` as shipped.
+5. **OQ-WO-6 stays OPEN** until extract LimsRun **cannot** share asked-for `analysis_id`. Analysis-in-chain does not close it. Extract must not be the panel assay or it freezes the panel Test on the parent (usually blood).
+
+Click SHA for C2/C3 remains `570bbc0`. Tobias QA restamp stays **unsigned** until Tobias Results land. Deiter Met is Lab Ops only. C2 leftover inbound volume is not Fail; emptying is an edge. `02fe95f` / `9342439` untouched. Hold Pass is Start-extract still Blood / 0 DNA history, not a ban on C3. Route two-accept 409 stays OPEN/unsigned. No overall P2 Pass. Hold merge of `feat/work-order-p2` to `main`.
+
