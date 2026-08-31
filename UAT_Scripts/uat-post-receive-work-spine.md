@@ -839,7 +839,7 @@ The preceding Deiter click (`4671ba8` / `02fe95f`) is retained verbatim as signe
 
 ## Live dest-follow stamp — C2/C3 numbered on `570bbc0`; execute `1572071` (unsigned until Tobias)
 
-**Not Pass overall.** Unsigned C2/C3 clicks are numbered on **`570bbc0`** (`570bbc01ff50fdac2d529448ceb95683c535401f`). That SHA is the **UAT split + pytest**, **not** a new execute. It does **not** inherit C2 Pass or Fail. Do **not** teach `570bbc0` as a product execute SHA. Dest-follow **execute txn** is **`1572071`** (`15720716c7cc927f1b498602ea87dec8a2bee85b`). Live C2/C3 stay **unsigned** until Tobias. Do **not** rewrite Deiter `02fe95f`, Tobias `9342439` / `8cfa2a9`, or P1. PATCH is not a path. OQ-WO-6 and freeze skip stay OPEN. Hold merge. Not IC50.
+**Not Pass overall.** **Leadership Confirm** of mint-only-at-execute (Rolf, Deiter, Hans, Heidi, Günter). C2/C3 are **execute clicks**, **unsigned** until Tobias. Numbered on **`570bbc0`** (`570bbc01ff50fdac2d529448ceb95683c535401f` — UAT split + pytest, **not** a new execute). `570bbc0` does **not** inherit `1572071` C2 Pass or Fail. Execute joints stay **`1572071`** (`15720716c7cc927f1b498602ea87dec8a2bee85b`). Do **not** rewrite Deiter `02fe95f`, Tobias `9342439` / `8cfa2a9`, or P1. PATCH is not a path. OQ-WO-6 and freeze skip stay OPEN. Hold merge. Not IC50.
 
 | Slice | Tobias |
 |-------|--------|
@@ -847,9 +847,14 @@ The preceding Deiter click (`4671ba8` / `02fe95f`) is retained verbatim as signe
 | AC-P2-C3 type-changing dest-follow | **unsigned** |
 | Overall P2 | **unsigned / not Pass** |
 
-**Marc lock — no sample/container mint until aliquot/pool execute** (memo, not a numbered step). Route / Start / map-save / receive / asked-for mint **zero**. Plan may declare dest type; dest exists **only after execute**. Dest type on the plan is **catalog intent** until execute. Do **not** teach dest existing at Route / Start / map-save.
+**Leadership Confirm — mint-only-at-execute** (memo, not a numbered step). Dest sample/container exists only after aliquot/pool **execute**. Route / Start / map-save / asked-for mint **zero** daughters. Plan dest type is catalog intent, **not** a Sample. Receive still mints identity + first vessel — that is **not** dest mint. Do **not** teach dest existing at Route / Start / map-save.
 
-**The split is the dest type on the aliquot/pool entry.** **C2 execute** = extra container, **same** sample (`container_id` retarget). **C3 execute** = new derivative; parent Sample stays. **Fail C3 if dest tube is on the blood sample.** Parent `sample_type` is **not** rewritten. Route / Start / map-save still mint **zero** daughters. `9342439` Dest-type mint Hold stays Start-extract still Blood / **0 DNA** history — **not** a live ban on type-changing execute.
+**C2/C3 execute clicks** (unsigned until Tobias). `570bbc0` does **not** inherit `1572071` C2 Pass or Fail. Same click as extract-hold UAT **1.7** for C3. Two clicks.
+- **C2 execute:** extra container, same sample; dest joins; source off; emptied-source **422**; later Start follows dest.
+- **C3 execute:** new derivative (`parent_sample_id`); parent stays Blood; dest sample + container on the process; inbound source **removed**. **Fail C3** if dest tube lands on the blood Sample, parent `container_id` is retargeted, or later Start follows blood.
+- Günter: after execute, the process-sample is **only** that execute-minted dest.
+
+`9342439` Dest-type mint Hold stays Start-extract still Blood / **0 DNA** history — **not** a live ban on type-changing execute.
 
 ### AC-P2-C2 — same dest type (tube → plate)
 
@@ -881,8 +886,8 @@ The preceding Deiter click (`4671ba8` / `02fe95f`) is retained verbatim as signe
 3. Confirm process 1’s **only active** assignment is dest sample + dest container. The inbound source assignment is **`removed`**.
 4. Later Start the next process. Confirm it carries the **DNA dest pair**, not the Blood tube.
 
-**Pass this AC if** steps 1–4 match. Fail if the parent Sample becomes DNA, dest is not on the process, Later Start follows the Blood tube, **or dest tube is on the blood sample**.
+**Pass this AC if** steps 1–4 match. **Fail C3** if dest tube lands on the blood Sample, parent `container_id` is retargeted, dest is not on the process, or later Start follows blood.
 
-Route / Start / map-save / receive / asked-for still mint **zero** daughters. Dest exists only after execute. That is not this click.
+Route / Start / map-save / asked-for still mint **zero** daughters. Receive still mints identity + first vessel — that is **not** dest mint. Dest exists only after execute. That is not this click.
 
-Deiter C2 **Fail** on `02fe95f` stays history. `570bbc0` does **not** inherit that Fail. Overall P2 remains **unsigned / not Pass**.
+Deiter C2 **Fail** on `02fe95f` stays history. `570bbc0` does **not** inherit `1572071` C2 Pass or Fail. Overall P2 remains **unsigned / not Pass**.
