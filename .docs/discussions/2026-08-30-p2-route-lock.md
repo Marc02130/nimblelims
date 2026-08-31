@@ -369,3 +369,18 @@ The two preceding 2026-08-31 sections are retained verbatim as sent. Where they 
 6. **`02fe95f` C2 Fail and the `9342439` Pass Results are byte-stable.** Nothing in this fold re-scores them.
 
 OQ-WO-6 and freeze skip stay **OPEN**. Overall P2 remains unsigned / not Pass. Hold product merge to `main`. Not IC50.
+
+---
+
+## Wilhelmina punch — `570bbc0` is UAT numbering, not execute — 2026-08-31
+
+Docs-only. Does **not** rewrite Round 1, Round 2, the Contents-grain Confirm, Deiter `02fe95f` Results, or Tobias `9342439` AC-P2-9..11 Pass Results. The preceding “Live restamp SHA pinned to `570bbc0`” section is retained as sent; this punch supersedes any reading of `570bbc0` as a product execute SHA.
+
+1. **`570bbc0` is the UAT split + pytest**, not a new execute. Do **not** teach it as a product execute SHA.
+2. **C2/C3 dest-follow execute remains `1572071`.** Unsigned C2/C3 clicks are numbered on `570bbc0`; the execute txn is `1572071`.
+3. **C2** retargets `container_id` on the same sample. **C3** mints a derivative (`parent_sample_id`) + dest container, joins dest, and marks source `removed`. Parent `sample_type` is not rewritten; the dest tube is not the parent sample.
+4. Do **not** write Pass. Route / Start / map-save still mint **zero** daughters. PATCH is not a path.
+5. Hold merge until QA clicks C1/C2/C3. OQ-WO-6 and freeze skip stay **OPEN**.
+
+Not IC50.
+
