@@ -464,6 +464,84 @@ export class ApiService {
     return response.data;
   }
 
+  async routeAskedFor(id: string) {
+    const response: AxiosResponse = await this.api.post(`/v1/asked-for/${id}/route`);
+    return response.data;
+  }
+
+  async routeAskedForBatch(asked_for_ids: string[]) {
+    const response: AxiosResponse = await this.api.post('/v1/asked-for/route', {
+      asked_for_ids,
+    });
+    return response.data;
+  }
+
+  async getRoutingMap(filters?: {
+    analysis_id?: string;
+    sample_type_id?: string;
+    active_only?: boolean;
+  }) {
+    const response: AxiosResponse = await this.api.get('/v1/routing-map', { params: filters });
+    return response.data;
+  }
+
+  async createRoutingMap(data: {
+    analysis_id?: string;
+    tat_min: number;
+    tat_max: number;
+    process_definition_ids: string[];
+    active?: boolean;
+  }) {
+    const response: AxiosResponse = await this.api.post('/v1/routing-map', data);
+    return response.data;
+  }
+
+  async updateRoutingMap(
+    id: string,
+    data: {
+      tat_min?: number;
+      tat_max?: number;
+      process_definition_ids?: string[];
+      active?: boolean;
+    }
+  ) {
+    const response: AxiosResponse = await this.api.patch(`/v1/routing-map/${id}`, data);
+    return response.data;
+  }
+
+  async deleteRoutingMap(id: string) {
+    await this.api.delete(`/v1/routing-map/${id}`);
+  }
+
+  async getWorkOrders(filters?: { status?: string; sample_id?: string }) {
+    const response: AxiosResponse = await this.api.get('/v1/work-orders', { params: filters });
+    return response.data;
+  }
+
+  async startWorkOrder(id: string) {
+    const response: AxiosResponse = await this.api.post(`/v1/work-orders/${id}/start`);
+    return response.data;
+  }
+
+  async getStepAcceptedSampleTypes(definitionId: string, stepId: string) {
+    const response: AxiosResponse = await this.api.get(
+      `/v1/eln-process-definitions/${definitionId}/steps/${stepId}/accepted-sample-types`
+    );
+    return response.data;
+  }
+
+  async putStepAcceptedSampleTypes(
+    definitionId: string,
+    stepId: string,
+    sample_type_ids: string[]
+  ) {
+    const response: AxiosResponse = await this.api.put(
+      `/v1/eln-process-definitions/${definitionId}/steps/${stepId}/accepted-sample-types`,
+      { sample_type_ids }
+    );
+    return response.data;
+  }
+
   async getAnalysisParamDefs(analysisId: string) {
     const response: AxiosResponse = await this.api.get(`/analyses/${analysisId}/param-defs`);
     return response.data;
@@ -1766,7 +1844,8 @@ export class ApiService {
     name: string;
     description?: string;
     steps?: Array<{
-      experiment_template_id: string;
+      experiment_template_id?: string;
+      analysis_id?: string;
       step_kind?: 'eln_experiment' | 'lims_run';
       execution_mode?: 'eln_experiment' | 'lims_run';
       name?: string;
@@ -1791,7 +1870,8 @@ export class ApiService {
   async addElnProcessDefinitionStep(
     definitionId: string,
     data: {
-      experiment_template_id: string;
+      experiment_template_id?: string;
+      analysis_id?: string;
       step_kind?: 'eln_experiment' | 'lims_run';
       execution_mode?: 'eln_experiment' | 'lims_run';
       name?: string;

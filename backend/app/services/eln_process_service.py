@@ -1,6 +1,7 @@
 """
 Service layer for ELN Processes (Phase 1).
 """
+from decimal import Decimal
 from typing import Optional, List, Tuple, Dict, Any
 from uuid import UUID, uuid4
 from sqlalchemy.orm import Session
@@ -21,6 +22,7 @@ from app.schemas.eln_process import (
     ELNProcessStepRead,
     SampleJourneyResponse,
     SampleJourneyStep,
+    ProcessAssignmentItem,
 )
 from app.schemas.eln_process_definition import (
     ELNProcessDefinitionCreate,
@@ -42,6 +44,17 @@ from models.experiment import Experiment
 from models.flexible_experiment import LimsRun
 from models.user import User
 from models.sample import Sample
+from models.container import Contents
+
+
+def contents_has_remaining(row: Contents) -> bool:
+    """Assignable vessel. Amount NULL is untracked (receive) and still a vessel.
+    Amount 0 is emptied and is not assignable.
+    """
+    if row.amount is None:
+        return True
+    return Decimal(str(row.amount)) > 0
+
 
 # Process-sample lifecycle (not Sample.status):
 #   queued      — assigned to process / waiting for experiment start
@@ -150,11 +163,6 @@ class ELNProcessService:
         s: ELNProcessDefinitionStepCreate,
         sort_order: int,
     ) -> None:
-        if not self.repo.template_exists(s.experiment_template_id):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Experiment template {s.experiment_template_id} not found",
-            )
         kind = s.step_kind
         mode = s.execution_mode or kind
         if mode != kind:
@@ -162,9 +170,27 @@ class ELNProcessService:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="execution_mode must match step_kind",
             )
+        if kind == "eln_experiment":
+            if not s.experiment_template_id:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="experiment_template_id is required for eln_experiment steps",
+                )
+            if not self.repo.template_exists(s.experiment_template_id):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Experiment template {s.experiment_template_id} not found",
+                )
+        elif kind == "lims_run":
+            if not s.analysis_id:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="analysis_id is required for lims_run steps",
+                )
         self.repo.create_definition_step(
             process_definition_id=definition_id,
             experiment_template_id=s.experiment_template_id,
+            analysis_id=getattr(s, "analysis_id", None),
             sort_order=sort_order,
             step_kind=kind,
             execution_mode=mode,
@@ -234,6 +260,8 @@ class ELNProcessService:
             description=data.description or definition.description,
             status_id=data.status_id,
             process_definition_id=definition_id,
+            work_order_id=data.work_order_id,
+            work_order_route_position=data.work_order_route_position,
             created_by=self._user_id(),
             modified_by=self._user_id(),
         )
@@ -241,6 +269,7 @@ class ELNProcessService:
             self.repo.create_step(
                 process_id=p.id,
                 experiment_template_id=s.experiment_template_id,
+                analysis_id=getattr(s, "analysis_id", None),
                 sort_order=s.sort_order,
                 name=s.name,
                 step_kind=s.step_kind,
@@ -248,11 +277,12 @@ class ELNProcessService:
                 created_by=self._user_id(),
                 modified_by=self._user_id(),
             )
-        if data.sample_ids:
+        if data.assignments or data.sample_ids:
             self.assign_samples(
                 p.id,
                 ELNProcessSampleAssignRequest(
                     sample_ids=data.sample_ids,
+                    assignments=data.assignments,
                     set_to_first_step=data.set_to_first_step,
                 ),
             )
@@ -366,10 +396,20 @@ class ELNProcessService:
         data: ELNProcessStepCreate,
         explicit_order: Optional[int] = None,
     ) -> ELNProcessStep:
-        if not self.repo.template_exists(data.experiment_template_id):
+        kind = data.step_kind or 'eln_experiment'
+        mode = data.execution_mode or kind
+        if kind == 'eln_experiment':
+            if not data.experiment_template_id or not self.repo.template_exists(
+                data.experiment_template_id
+            ):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="experiment_template_id is required for eln_experiment steps",
+                )
+        elif kind == 'lims_run' and not data.analysis_id:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Experiment template {data.experiment_template_id} not found",
+                detail="analysis_id is required for lims_run steps",
             )
         if explicit_order is not None:
             sort_order = explicit_order
@@ -380,11 +420,10 @@ class ELNProcessService:
                     self.repo.update_step(s, sort_order=s.sort_order + 1)
         else:
             sort_order = self.repo.next_sort_order(process_id)
-        kind = data.step_kind or 'eln_experiment'
-        mode = data.execution_mode or kind
         return self.repo.create_step(
             process_id=process_id,
             experiment_template_id=data.experiment_template_id,
+            analysis_id=getattr(data, 'analysis_id', None),
             sort_order=sort_order,
             name=data.name,
             step_kind=kind,
@@ -489,14 +528,31 @@ class ELNProcessService:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Process step not found",
             )
-        if not self.repo.template_exists(step.experiment_template_id):
+        extra_sample_ids = list(data.sample_ids) if data and data.sample_ids else []
+        kind = getattr(step, 'step_kind', None) or 'eln_experiment'
+        force_new = bool(data and data.force_new)
+        already_started = (
+            (kind == "lims_run" and step.current_lims_run_id and not force_new)
+            or (
+                kind != "lims_run"
+                and step.experiment_id is not None
+                and not force_new
+                and not extra_sample_ids
+            )
+        )
+        if not already_started:
+            from app.services.routing_service import (
+                assert_instance_step_accepts_current_type,
+            )
+
+            assert_instance_step_accepts_current_type(
+                self.db, process, step, extra_sample_ids=extra_sample_ids
+            )
+        if kind != 'lims_run' and not self.repo.template_exists(step.experiment_template_id):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Experiment template not found",
             )
-
-        kind = getattr(step, 'step_kind', None) or 'eln_experiment'
-        force_new = bool(data and data.force_new)
         step_label = step.name or f"Step {step.sort_order}"
         default_name = (
             (data.name if data and data.name else None)
@@ -504,6 +560,12 @@ class ELNProcessService:
         )
 
         if kind == 'lims_run':
+            analysis_id = getattr(step, 'analysis_id', None)
+            if not analysis_id:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="analysis_id is required to start a lims_run step",
+                )
             if step.current_lims_run_id and not force_new:
                 return ELNProcessStepStartResponse(
                     step=ELNProcessStepRead.model_validate(step),
@@ -519,6 +581,7 @@ class ELNProcessService:
                     name=default_name,
                     description=f"From process '{process.name}' step '{step_label}'",
                     experiment_template_id=step.experiment_template_id,
+                    analysis_id=analysis_id,
                 )
             )
             self.repo.update_step(
@@ -650,37 +713,105 @@ class ELNProcessService:
         )
         return exp_svc.list_cohort_eligible_for_process(process_id, step_id=step_id)
 
+    def _contents_for_sample(self, sample_id: UUID) -> List[Contents]:
+        rows = (
+            self.db.query(Contents)
+            .filter(Contents.sample_id == sample_id)
+            .order_by(Contents.container_id)
+            .all()
+        )
+        return [row for row in rows if contents_has_remaining(row)]
+
+    def _resolve_assignment(
+        self, sample_id: UUID, container_id: Optional[UUID] = None
+    ) -> ProcessAssignmentItem:
+        if not self.repo.sample_exists(sample_id):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Sample {sample_id} not found",
+            )
+        remaining = self._contents_for_sample(sample_id)
+        if container_id is not None:
+            if not any(row.container_id == container_id for row in remaining):
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail={
+                        "code": "process_container_required",
+                        "message": (
+                            "That container has no remaining amount; only a "
+                            "sample in a container with remaining amount can "
+                            "be assigned to a process"
+                        ),
+                    },
+                )
+            return ProcessAssignmentItem(
+                sample_id=sample_id, container_id=container_id
+            )
+        if not remaining:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail={
+                    "code": "process_container_required",
+                    "message": (
+                        "Sample has no container with remaining amount; only a "
+                        "sample in a container can be assigned to a process"
+                    ),
+                },
+            )
+        if len(remaining) > 1:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail={
+                    "code": "process_container_required",
+                    "message": (
+                        "Sample is in more than one container; specify which "
+                        "container is in the process"
+                    ),
+                },
+            )
+        return ProcessAssignmentItem(
+            sample_id=sample_id, container_id=remaining[0].container_id
+        )
+
     def assign_samples(
         self,
         process_id: UUID,
         data: ELNProcessSampleAssignRequest,
     ) -> List[ELNProcessSample]:
-        """
-        Assign samples to the process queue.
-
-        Process-sample status = **queued** (not in_progress).
-        Does **not** change Sample.status (Available for Testing remains a separate gate).
-        """
+        """Assign container-with-sample (Contents) to the process queue."""
         self.get_process(process_id)
         steps = self.repo.list_steps(process_id)
         first_step_id = steps[0].id if steps and data.set_to_first_step else None
+        items: List[ProcessAssignmentItem] = list(data.assignments or [])
+        if data.sample_ids:
+            items.extend(
+                self._resolve_assignment(sample_id) for sample_id in data.sample_ids
+            )
+        if not items:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail={
+                    "code": "process_container_required",
+                    "message": "Provide sample_ids or assignments (sample + container)",
+                },
+            )
         created: List[ELNProcessSample] = []
-        for sample_id in data.sample_ids:
-            if not self.repo.sample_exists(sample_id):
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Sample {sample_id} not found",
-                )
-            existing = self.repo.get_process_sample(process_id, sample_id)
+        for item in items:
+            resolved = self._resolve_assignment(item.sample_id, item.container_id)
+            existing = self.repo.get_process_sample(
+                process_id, resolved.sample_id
+            )
             if existing:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Sample {sample_id} is already assigned to this process",
+                    detail=(
+                        f"Sample {resolved.sample_id} is already assigned to this process"
+                    ),
                 )
-            # queued = ready/waiting for experiment start; in_progress only after Start
             ps = self.repo.create_process_sample(
                 process_id=process_id,
-                sample_id=sample_id,
+                sample_id=resolved.sample_id,
+                container_id=resolved.container_id,
                 status='queued',
                 current_step_id=first_step_id,
                 created_by=self._user_id(),

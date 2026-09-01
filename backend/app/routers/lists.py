@@ -15,6 +15,33 @@ from uuid import UUID
 
 router = APIRouter()
 
+# Receive / samples use the 0007 slug `sample_types`. A few UIs sent the singular.
+_LIST_NAME_ALIASES = {
+    "sample_type": "sample_types",
+    "matrix_type": "matrix_types",
+    "qc_type": "qc_types",
+    "unit_type": "unit_types",
+    "contact_type": "contact_types",
+}
+
+
+def _get_active_list(db: Session, list_name: str) -> ListModel:
+    names = [list_name]
+    alias = _LIST_NAME_ALIASES.get(list_name)
+    if alias:
+        names.append(alias)
+    list_obj = (
+        db.query(ListModel)
+        .filter(ListModel.name.in_(names), ListModel.active == True)  # noqa: E712
+        .first()
+    )
+    if not list_obj:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"List '{list_name}' not found",
+        )
+    return list_obj
+
 
 @router.post("", response_model=ListResponse, status_code=status.HTTP_201_CREATED)
 async def create_list(
@@ -201,18 +228,8 @@ async def get_list_entries(
     # Check if user has config:edit permission
     user_permissions = get_user_permissions(current_user, db)
     has_config_edit = "config:edit" in user_permissions
-    
-    # Find the list by name
-    list_obj = db.query(ListModel).filter(
-        ListModel.name == list_name,
-        ListModel.active == True
-    ).first()
-    
-    if not list_obj:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"List '{list_name}' not found"
-        )
+
+    list_obj = _get_active_list(db, list_name)
     
     # If user has config:edit permission, show all entries; otherwise, only active
     if has_config_edit:
@@ -239,17 +256,7 @@ async def create_list_entry(
     Create a new entry in a list.
     Requires config:edit permission.
     """
-    # Find the list by name
-    list_obj = db.query(ListModel).filter(
-        ListModel.name == list_name,
-        ListModel.active == True
-    ).first()
-    
-    if not list_obj:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"List '{list_name}' not found"
-        )
+    list_obj = _get_active_list(db, list_name)
     
     # Check if entry with same name already exists in this list
     existing_entry = db.query(ListEntry).filter(
@@ -293,17 +300,7 @@ async def update_list_entry(
     Update a list entry.
     Requires config:edit permission.
     """
-    # Find the list by name
-    list_obj = db.query(ListModel).filter(
-        ListModel.name == list_name,
-        ListModel.active == True
-    ).first()
-    
-    if not list_obj:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"List '{list_name}' not found"
-        )
+    list_obj = _get_active_list(db, list_name)
     
     # Find the entry
     entry = db.query(ListEntry).filter(
@@ -357,17 +354,7 @@ async def delete_list_entry(
     Soft delete a list entry (set active=False).
     Requires config:edit permission.
     """
-    # Find the list by name
-    list_obj = db.query(ListModel).filter(
-        ListModel.name == list_name,
-        ListModel.active == True
-    ).first()
-    
-    if not list_obj:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"List '{list_name}' not found"
-        )
+    list_obj = _get_active_list(db, list_name)
     
     # Find the entry
     entry = db.query(ListEntry).filter(

@@ -3,7 +3,7 @@
 **Date:** 2026-07-11  
 **Branch:** `run-results`  
 **Reviewer:** Design / UX  
-**Idea:** local `.docs/internal/ideas/run-results.md` (not committed)
+**Idea:** `.docs/internal/ideas/run-results.md`
 
 ## Executive Summary
 
@@ -105,4 +105,4 @@ Publish is already a high-intent action. Bundling structure creation there reduc
 
 ---
 
-Related: [ceo](../ceo-review/run-results.md) · local `.docs/internal/design/run-results.md` (not committed) · [security](../security-review/run-results.md)
+Related: [ceo](../ceo-review/run-results.md) · `.docs/internal/design/run-results.md` · [security](../security-review/run-results.md)

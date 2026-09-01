@@ -4,7 +4,7 @@
 **Status:** **Accepted for implementation** (reviews 2026-07-19)  
 **Requirements:** [`.docs/review/requirements/data-parsers-lims-runs.md`](../requirements/data-parsers-lims-runs.md)  
 **Open questions:** [`.docs/review/open-questions/data-parsers-lims-runs.md`](../open-questions/data-parsers-lims-runs.md)  
-**Idea:** local `.docs/internal/ideas/ai-data-import.md` (not committed)  
+**Idea:** `.docs/internal/ideas/ai-data-import.md`  
 **Process:** [`.docs/review/development-process/README.md`](../development-process/README.md)
 
 ## 1. Problem (technical)
@@ -37,7 +37,7 @@
 
 ### 2b. Multi-tenant readiness (not implementation)
 
-**Context:** Real multi-org users are not the current target. Full multi-tenant design lives in local `.docs/internal/ideas/multi-tenant.md` (not committed). Instruments/CRO/parsers are **prepared** so tenancy can be added later without redesigning the import pipeline.
+**Context:** Real multi-org users are not the current target. Full multi-tenant design lives in `.docs/internal/ideas/multi-tenant.md`. Instruments/CRO/parsers are **prepared** so tenancy can be added later without redesigning the import pipeline.
 
 | Principle | Application here |
 |-----------|------------------|
@@ -84,7 +84,7 @@
 
 Example: ICP parser maps all metals; run analysis RCRA-8 promotes only the eight; same parser usable on a RCRA-13 run.
 
-**No location on instruments** this cycle. Client table `locations` is address CRM—not lab rooms. Future: local `.docs/internal/ideas/lab-locations.md` (not committed).
+**No location on instruments** this cycle. Client table `locations` is address CRM—not lab rooms. Future: `.docs/internal/ideas/lab-locations.md`.
 
 **Setup path (not production import):**
 

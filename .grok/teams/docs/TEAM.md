@@ -23,5 +23,5 @@
 | Tree | Commit? |
 |------|---------|
 | `.docs/review/` | Yes (review spine) |
-| `.docs/internal/` | Working / often local — check `.gitignore` |
+| `.docs/internal/` | Yes (working PRDs / specs / design / ideas) |
 | `.docs/discussions/`, `.docs/decision-logs/` | As policy for the repo |

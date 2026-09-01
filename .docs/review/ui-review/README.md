@@ -4,4 +4,4 @@ Product and interaction design reviews (personas, flows, principles, empty state
 
 Formerly part of `ui-review/` — **UI** reviews live here; **architecture** reviews live in [`architecture-review/`](../architecture-review/).
 
-Tech design docs remain under local `.docs/internal/design/` (not committed).
+Tech design docs remain under `.docs/internal/design/`.

@@ -4,6 +4,8 @@ import MainLayout from './layouts/MainLayout';
 import Dashboard from './pages/Dashboard';
 import AtomicReceive from './pages/AtomicReceive';
 import AskedFor from './pages/AskedFor';
+import WorkOrders from './pages/WorkOrders';
+import RoutingMapManagement from './pages/admin/RoutingMapManagement';
 import SamplesManagement from './pages/SamplesManagement';
 import TestsManagement from './pages/TestsManagement';
 import ContainerManagement from './pages/ContainerManagement';
@@ -67,6 +69,16 @@ function AppRoutes() {
           element={
             hasPermission('sample:read') || hasPermission('test:assign') ? (
               <AskedFor />
+            ) : (
+              <Navigate to="/dashboard" replace />
+            )
+          }
+        />
+        <Route
+          path="/work-orders"
+          element={
+            hasPermission('sample:read') || hasPermission('experiment:manage') ? (
+              <WorkOrders />
             ) : (
               <Navigate to="/dashboard" replace />
             )
@@ -422,6 +434,16 @@ function AppRoutes() {
           element={
             hasPermission('config:edit') ? (
               <HelpManagement />
+            ) : (
+              <Navigate to="/dashboard" replace />
+            )
+          }
+        />
+        <Route
+          path="/admin/routing-map"
+          element={
+            hasPermission('config:edit') ? (
+              <RoutingMapManagement />
             ) : (
               <Navigate to="/dashboard" replace />
             )

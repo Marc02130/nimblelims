@@ -10,7 +10,19 @@
 
 ## 1. Purpose
 
-Dest type on `aliquot_pool_plan` (entry default + line override); daughters on `aliquots_pools` after execute. Entry `method` is a **concrete method** that implies exactly one mint op (aliquot XOR pool). Method picker and dest type are **separate** controls. **METHOD_CATALOG owns both maps:** (1) plan-line columns on `aliquot_pool_plan`, (2) dest-sample FieldDefinitions on `aliquots_pools` — attached **automatically** on method select (not optional later wiring). Dest fields are entry FieldDefinitions (`experiment_sample_data`), **not** Sample columns. Catalog + L1 + start allow-list. Adding aliquot/pool creates the **atomic pair** (plan + dest-sample entries) together.
+Dest type on `aliquot_pool_plan` (entry default + line override); daughters on `aliquots_pools` after **submit**. Entry `method` is a **concrete method** that implies exactly one mint op (aliquot XOR pool). Method picker and dest type are **separate** controls. **METHOD_CATALOG owns both maps:** (1) plan-line columns on `aliquot_pool_plan`, (2) dest-sample FieldDefinitions on `aliquots_pools` — attached **automatically** on method select (not optional later wiring). Dest fields are entry FieldDefinitions (`experiment_sample_data`), **not** Sample columns. Catalog + L1 + start allow-list. Adding aliquot/pool creates the **atomic pair** (plan + dest-sample entries) together.
+
+**Mint home (Marc 2026-08-30):** Dest mint is **aliquot/pool OOB entry** functionality. **Not** process Start. **Not** Route / work_order. **Not** routing-map save. **Not** LimsRun start. P2 may **read** declared dest for map-save handoff 422 only.
+
+**Submit vs execute (today vs product):**
+- **Save** — persist plan/values. No mint.
+- **`POST /v1/entries/{id}/submit`** — mark the entry complete and apply Sample write-back. Does **not** create samples or containers.
+- **`POST /v1/entries/{id}/execute`** — aliquot/pool **mint**: reduce source contents; create dest sample and/or container (vol / conc / mass; tube ID or plate/well).
+Product: one mint gate on the aliquot/pool pair. Do not mint from generic Submit. UI may label execute “submit” for the bench; the write is execute.
+
+**Process assignment is a container that holds a sample (Marc 2026-08-30):** A sample may exist in **many** containers at once. The process holds **one** assignment: that **container + sample**. Only a container-with-sample is in the process. After mint, **every dest** (sample+container) **continues**; **every inbound source** assignment is **removed**. Later work-order Start uses continuing assignments. Work order `sample_id` stays the asked-for parent (order identity / lineage root). Tests belong to the **sample that was assayed**; lineage traces back to the original.
+
+**Sequencing (Marc 2026-08-30):** NimbleLIMS tracks sample prep and **metadata / metrics** of a sequencing run. It does **not** store sequencing data (reads, FASTQ, BAM — too large). Do not teach LimsRun import/publish as “the genome landed in Nimble.”
 
 ## 2. Leadership locks (cite)
 
@@ -37,6 +49,9 @@ Dest type on `aliquot_pool_plan` (entry default + line override); daughters on `
 | UI Accept on METHOD_CATALOG dual-map | Mathilda 2026-08-23 |
 | Header-pins-to-top | Parked — separate entries docs fold |
 | Not IC50 | Marc |
+| **Mint = aliquot/pool OOB execute** (UI may say submit). Bounce mint from generic entry submit, process Start, routing, Route, LimsRun start | Marc 2026-08-30 |
+| **Process holds container+sample.** Many containers per sample exist; one container-with-sample is in the process. Every dest continues; every inbound source is removed | Marc 2026-08-30 |
+| **Test on the assayed sample**; lineage to original. Sequencing: prep + run metadata/metrics only — not sequence files | Marc 2026-08-30 |
 
 ## 3. Concrete methods (IN) — sketch columns + dest FieldDefinitions
 
@@ -69,7 +84,7 @@ Each method id has `mint_op`, plan-line columns (required/optional), **and** des
 
 ## 5. Non-goals
 
-Dual mint; mid-flight method warn/wipe; un-mint on cancel; method/type on `aliquots_pools`; new experiment-plan object; adding only one of the pair; **new Sample columns** for dest fields; **optional/later wiring** of catalog-owned columns/FieldDefinitions; Header-pins-to-top (parked); equimolar-by-size (parked until size/bp path); CUT methods above; Sample/`material_class`; matrix drop; if-blood-then; IC50.
+Dual mint; mid-flight method warn/wipe; un-mint on cancel; method/type on `aliquots_pools`; new experiment-plan object; adding only one of the pair; **new Sample columns** for dest fields; **optional/later wiring** of catalog-owned columns/FieldDefinitions; Header-pins-to-top (parked); equimolar-by-size (parked until size/bp path); CUT methods above; Sample/`material_class`; matrix drop; if-blood-then; IC50; **mint from process Start, Route, routing-map save, or LimsRun start**.
 
 ## 6. Acceptance criteria
 
@@ -77,7 +92,7 @@ Dual mint; mid-flight method warn/wipe; un-mint on cancel; method/type on `aliqu
 |----|-----------|
 | AC1 | `aliquot_pool_plan` + `aliquots_pools` only; no new plan object. |
 | AC1b | Adding aliquot/pool (template or ad hoc) always creates **both** entries as an atomic pair; UI does not offer plan-only or dest-only; one “Add aliquot/pool” → pair. |
-| AC1c | Dest-sample entry (`aliquots_pools`) stays empty until after execute. |
+| AC1c | Dest-sample entry (`aliquots_pools`) stays empty until **submit** of experiment sample data (mint sample + container). |
 | AC2 | Entry config has concrete `method` (implies exactly one `mint_op`) + optional default dest type. |
 | AC3 | Method picker and dest-type control are separate (Method ≠ dest type). |
 | AC3b | METHOD_CATALOG owns **both** maps: plan-line columns on `aliquot_pool_plan` **and** dest-sample FieldDefinitions on `aliquots_pools`. |

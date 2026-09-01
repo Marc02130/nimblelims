@@ -95,17 +95,19 @@ class ELNProcessRepository:
     def create_definition_step(
         self,
         process_definition_id: UUID,
-        experiment_template_id: UUID,
+        experiment_template_id: Optional[UUID],
         sort_order: int,
         step_kind: str = 'eln_experiment',
         execution_mode: str = 'eln_experiment',
         name: Optional[str] = None,
+        analysis_id: Optional[UUID] = None,
         created_by: Optional[UUID] = None,
         modified_by: Optional[UUID] = None,
     ) -> ELNProcessDefinitionStep:
         s = ELNProcessDefinitionStep(
             process_definition_id=process_definition_id,
             experiment_template_id=experiment_template_id,
+            analysis_id=analysis_id,
             step_kind=step_kind,
             execution_mode=execution_mode,
             name=name,
@@ -190,6 +192,8 @@ class ELNProcessRepository:
         active: bool = True,
         status_id: Optional[UUID] = None,
         process_definition_id: Optional[UUID] = None,
+        work_order_id: Optional[UUID] = None,
+        work_order_route_position: Optional[int] = None,
         created_by: Optional[UUID] = None,
         modified_by: Optional[UUID] = None,
     ) -> ELNProcess:
@@ -199,6 +203,8 @@ class ELNProcessRepository:
             active=active,
             status_id=status_id,
             process_definition_id=process_definition_id,
+            work_order_id=work_order_id,
+            work_order_route_position=work_order_route_position,
             created_by=created_by,
             modified_by=modified_by,
         )
@@ -243,10 +249,11 @@ class ELNProcessRepository:
     def create_step(
         self,
         process_id: UUID,
-        experiment_template_id: UUID,
+        experiment_template_id: Optional[UUID],
         sort_order: int,
         name: Optional[str] = None,
         experiment_id: Optional[UUID] = None,
+        analysis_id: Optional[UUID] = None,
         step_kind: str = 'eln_experiment',
         execution_mode: str = 'eln_experiment',
         current_lims_run_id: Optional[UUID] = None,
@@ -256,6 +263,7 @@ class ELNProcessRepository:
         step = ELNProcessStep(
             process_id=process_id,
             experiment_template_id=experiment_template_id,
+            analysis_id=analysis_id,
             experiment_id=experiment_id,
             step_kind=step_kind,
             execution_mode=execution_mode,
@@ -323,15 +331,19 @@ class ELNProcessRepository:
         self,
         process_id: UUID,
         sample_id: UUID,
+        container_id: Optional[UUID] = None,
+        *,
+        include_removed: bool = False,
     ) -> Optional[ELNProcessSample]:
-        return (
-            self.db.query(ELNProcessSample)
-            .filter(
-                ELNProcessSample.process_id == process_id,
-                ELNProcessSample.sample_id == sample_id,
-            )
-            .first()
+        query = self.db.query(ELNProcessSample).filter(
+            ELNProcessSample.process_id == process_id,
+            ELNProcessSample.sample_id == sample_id,
         )
+        if container_id is not None:
+            query = query.filter(ELNProcessSample.container_id == container_id)
+        if not include_removed:
+            query = query.filter(ELNProcessSample.status != "removed")
+        return query.first()
 
     def get_process_sample_by_id(self, assignment_id: UUID) -> Optional[ELNProcessSample]:
         return (
@@ -364,6 +376,7 @@ class ELNProcessRepository:
         self,
         process_id: UUID,
         sample_id: UUID,
+        container_id: UUID,
         status: str = 'queued',
         current_step_id: Optional[UUID] = None,
         created_by: Optional[UUID] = None,
@@ -372,6 +385,7 @@ class ELNProcessRepository:
         ps = ELNProcessSample(
             process_id=process_id,
             sample_id=sample_id,
+            container_id=container_id,
             status=status,
             current_step_id=current_step_id,
             created_by=created_by,

@@ -37,6 +37,7 @@ import {
   Folder as FolderIcon,
   AccountTree as AccountTreeIcon,
   AssignmentOutlined as AssignmentOutlinedIcon,
+  AssignmentTurnedIn as AssignmentTurnedInIcon,
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useUser } from '../contexts/UserContext';
@@ -78,7 +79,11 @@ const isLabMgmtRoute = (pathname: string): boolean => {
 
 // Helper to check if current path is in Experiments section
 const isExperimentsRoute = (pathname: string): boolean => {
-  return pathname.startsWith('/experiments') || pathname.startsWith('/runs');
+  return (
+    pathname.startsWith('/experiments') ||
+    pathname.startsWith('/runs') ||
+    pathname.startsWith('/work-orders')
+  );
 };
 
 const isSampleMgmtRoute = (pathname: string): boolean => {
@@ -253,6 +258,7 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onMobileClose, collapsed 
   }
   const experimentItems: ExperimentsNavItem[] = [
     { text: 'All Experiments', path: '/experiments', icon: <Biotech />, tooltip: 'Experiments' },
+    { text: 'Work Orders', path: '/work-orders', icon: <AssignmentTurnedInIcon />, tooltip: 'Routed work orders' },
     { text: 'Processes', path: '/experiments/processes', icon: <AccountTreeIcon />, tooltip: 'ELN multi-step processes' },
     { text: 'Experiment Templates', path: '/experiments/templates', icon: <ViewListIcon />, tooltip: 'Experiment template definitions', templatesOnly: true },
     { text: 'Runs', path: '/runs', icon: <AssessmentIcon />, tooltip: 'Experiment runs & dose response' },

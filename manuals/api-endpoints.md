@@ -134,13 +134,13 @@ Create a new sample.
 
 **Response:** `{ sample_id, sample_name, status, project_id, received_date, containers[], tests[] }` → **201**
 
-## Asked-for (P1 lake)
+## Asked-for and routing (P1 lake + P2)
 
 **Manual:** [asked-for.md](asked-for.md) · **UAT:** `UAT_Scripts/uat-post-receive-work-spine.md`
 
-UI: `/asked-for`. Copy: **requested analysis**. Write/cancel: `test:assign` and role ≠ Client. List/get: `sample:read`. Hidden/other-project sample → **403** (not 404).
+UI: `/asked-for`. Copy: **requested analysis**. Write/cancel/Route: `test:assign`, role ≠ Client, and project access/RLS. Route does **not** require `experiment:manage`. Client and hidden/other-project writes return **403** (not 404). List/get: `sample:read`.
 
-**Does not** create a Test row, start work, or execute an analysis. Route / work_orders / WO-7 are **not** this stamp. `analysis_param_defs` freeze at **LimsRun start** later — not on receive, not required to record a request.
+`POST /v1/asked-for` creates no Test or work order. Route later evaluates TAT candidates whose first-process first step accepts current type **and** whose chain **contains** a LimsRun for the asked-for analysis (a route may have multiple analyses). **Tobias-signed Pass on `8cfa2a9`:** zero → **422**; exactly one → ordered route snapshot. Two-accept **409** unsigned that SHA. Never silently choose `first()`. WO-7 writes `asked_for_params` on a **new** Test (observed `{}` on `99b692d3`); classic `/tests` skip remains OPEN (`{}` is ambiguous).
 
 ### POST /v1/asked-for
 Record requested analyses for a sample set (one row per sample, one transaction).
@@ -154,7 +154,7 @@ Record requested analyses for a sample set (one row per sample, one transaction)
 }
 ```
 
-`sample_id` is accepted as a 1-element alias. P1 uses empty `params` `{}`. Duplicate open `(sample, analysis)` → **409** (full rollback). **201** `{ items, count }`. **201 has no `tests`.** `COUNT(tests)` unchanged.
+`sample_id` is accepted as a 1-element alias. P1 uses empty `params` `{}`. Duplicate open `(sample, analysis)` → **409** (full rollback). **201** `{ items, count }`. **201 has no `tests` or `work_orders`.** `COUNT(tests)` and `COUNT(work_orders)` are unchanged.
 
 ### GET /v1/asked-for
 Query: `sample_id`, `project_id`, `analysis_id`, `status`. **200** `{ items, count }`.
@@ -162,7 +162,17 @@ Query: `sample_id`, `project_id`, `analysis_id`, `status`. **200** `{ items, cou
 ### GET /v1/asked-for/{id}
 
 ### POST /v1/asked-for/{id}/cancel
-Allowed while `requested`. Cancel after `routed` is **not this stamp** (P2).
+Allowed while `requested`. Cancel after `routed` → **422**.
+
+### POST /v1/asked-for/{id}/route
+### POST /v1/asked-for/route
+These are explicit later planning actions, not calls that Receive or asked-for create should chain automatically. Body for batch: `{ "asked_for_ids": ["uuid"] }`. Route finds TAT candidate rows, then keeps those whose first process / first ordered Experiment/LimsRun accepts current type **and** whose chain **contains** a LimsRun for the asked-for analysis (the route may have other analyses). **Tobias-signed Pass on `8cfa2a9`:** zero acceptable rows → **422** and no mint. Two-accept **409** unsigned that SHA. Exactly one snapshots ordered `process_definition[]`, creates a queued work order, sets `routed`, creates no Test. Never silently use `first()`. Write requires `test:assign` plus project access, not `experiment:manage`; Client and inaccessible-project writes return **403**, not 404. Route does not instantiate processes.
+
+### Routing map / work orders
+- `GET/POST /v1/routing-map` · `PATCH/DELETE /v1/routing-map/{id}` (write: `config:edit`). Rows author inclusive TAT range × ordered `process_definition[]`; the UI must preserve order. No analysis or sample-type create field. Analyses are derived from LIMS Run steps in the chain. **409** on save when overlapping TAT, overlapping first-step allow-lists, **and** overlapping LIMS Run analyses all hold. Extract-first and Qubit-first for the same TAT are legal. Map save **422**s when the type emerging from process *x* is not accepted by process *x+1* (aliquot/pool dest on *x* last Experiment/LIMS Run if set; else last-step accepted types). It does not AND inbound type across later processes or steps.
+- `GET/PUT /v1/eln-process-definitions/{id}/steps/{step_id}/accepted-sample-types`. Derive the first process and its first ordered Experiment/LimsRun allowed types on read. Any stored display copy must refresh when process order or first-step acceptance changes.
+- `GET /v1/work-orders` (requires `sample:read`; filters: `status`, `sample_id`) returns `{ items, count }`.
+- `POST /v1/work-orders/{id}/start` (requires `experiment:manage`) instantiates **the first process only** on the first start and returns its `process_id`. **Tobias-signed Pass on `8cfa2a9`:** alice Route+Start was ELISA first LimsRun, 1 step, no Qubit/qPCR Tests. A **later** start instantiates the next pending definition in snapshot order. Route never mints a process-of-processes. Each later process/step start compares current type with the allow-list at that start; empty or incompatible returns **422** `detail.code = "route_sample_type"`. **Later-step type-gate at start was not click-run this SHA — unsigned, not Pass.**
 
 ### Param defs (later — not receive, not this P1 stamp)
 `GET/PUT /analyses/{id}/param-defs` is catalog setup for freeze at **LimsRun start**. Do not put param defs on `POST /samples/receive`. P1 asked-for does not require filling defs.
@@ -1822,12 +1832,13 @@ Tables (migrations `0047` + `0051`): `eln_process_definitions`, `eln_process_def
   - `eln_experiment` → create Experiment (+ entries); returns `{ step, experiment_id, warning? }`
   - `lims_run` → lazy create LimsRun; history in `eln_process_step_lims_runs`; `force_new` for retest
 
-**Samples**
-- `GET /eln-processes/{process_id}/samples` — Optional filters: `current_step_id`, `sample_status`.
-- `POST /eln-processes/{process_id}/samples` — Body: `{ "sample_ids": [...], "set_to_first_step": true }`.
+**Samples (assignment = sample in a container)**
+- `GET /eln-processes/{process_id}/samples` — Optional filters: `current_step_id`, `sample_status`. Each row includes `container_id`.
+- `POST /eln-processes/{process_id}/samples` — Body: `{ "sample_ids": [...], "set_to_first_step": true }` **or** `{ "assignments": [{ "sample_id", "container_id" }], ... }`. `sample_ids` resolves when the sample has **exactly one** Contents vessel. No container or more than one vessel without `assignments` → **422** `process_container_required`.
 - `DELETE /eln-processes/{process_id}/samples/{sample_id}`
 - `PATCH /eln-processes/{process_id}/samples/{sample_id}/step` — Set `step_id` / `status`.
 - `POST /eln-processes/{process_id}/samples/{sample_id}/advance` — Soft gate: returns `{ sample, warning?, advanced }` (warns if lims_run step incomplete; still advances).
+- After aliquot/pool **execute**, dest container-with-sample is on the process (`in_progress`); inbound source assignment is `removed`. Later `POST /work-orders/{id}/start` instantiates the next process with those continuing assignments.
 
 **Sample journey (Phase 3, Decision #7)** — any user who can read the sample
 - `GET /samples/{sample_id}/journey` — Process progress for that sample (process name, current step kind, experiment/run links). Not gated on `experiment:manage`.
@@ -1886,7 +1897,7 @@ Endpoints require specific permissions. The system currently has 17 permissions:
 
 **Note**: The code references `test:configure` permission in analyses, analytes, and test batteries endpoints, but this permission is not currently in the database. These endpoints use `require_any_permission(["config:edit", "test:configure"])`, which effectively requires `config:edit` permission.
 
-See local `.docs/internal/prd/nimblelims-prd.md` (not committed) for product requirements; permission list is maintained with seed data and this API reference.
+See `.docs/internal/prd/nimblelims-prd.md` for product requirements; permission list is maintained with seed data and this API reference.
 
 ## Help Endpoints
 
@@ -2320,17 +2331,21 @@ Set the next value for the global sequence `name_template_seq_{entity_type}`.
 Full run lifecycle is under `/v1/lims-runs`. See [lims-runs.md](lims-runs.md) for product rules.
 
 ### GET /v1/lims-runs/{id}/promotion/preview
-Dry-run of what publish would write to Tests/Results when `analysis_id` is set. **No DB writes.**
+Dry-run of what publish would write to existing Tests/Results when `analysis_id` is set. **No DB writes and no Test creation.**
 
 **Response (shape):** `will_promote`, `create_count`, `update_count`, `conflict_count`, `skip_count`, `unresolved_columns[]`, `errors[]`, `items[]` (capped).
 
 ### PATCH /v1/lims-runs/{id}/complete
 Transition `complete → published` (requires `experiment:publish`).
 
-Promotes instrument JSONB → Tests/Results in the same transaction (**run always has `analysis_id`**). **409** with `code: promotion_conflict` if another run/manual result owns the same test/analyte/replicate.
+Promotes instrument JSONB → Tests/Results in one transaction (**run always has `analysis_id`**). Each active Test must already exist from the first LimsRun start (WO-7). If any cohort sample lacks one, publish returns **422**, refuses the whole run, writes no Results, invents no Test, and leaves the run `complete`. This refuse is **Tobias-signed Pass** on `8cfa2a9` (carol **422** `test_missing`) and remains history on `b005cfe`. Freeze skip stays **unsigned** — a write of `{}` onto `99b692d3` is not a skip Pass. Overall P2 Pass remains unsigned. Historical `9c4f9da` remains signed not Pass. **409** with `code: promotion_conflict` if another run/manual result owns the same test/analyte/replicate.
 
 ### PATCH /v1/lims-runs/{id}/start
-Start run. **Requires `analysis_id`** on the run — **400** if missing. No non-reportable / `acknowledge_no_analysis` path (product lock 2026-07-19; remove legacy ack if still in code).
+**Requires `analysis_id`** on the run and at least one cohort sample — **400** if either is missing. With `sample_ids` in the body, first start of the **asked-for** analysis locks the cohort, creates or attaches one active Test per `(sample, analysis)`, and **writes** `asked_for_params`. Classic `/tests` must leave `asked_for_params` **NULL**, or we need a **freeze marker**. Until then `{}` is **ambiguous** (classic default and frozen `{}` are the same JSON) — not a verified freeze skip. Do **not** teach skip-on-frozen-`{}`. **OQ-WO-6:** an earlier LimsRun must not share this `analysis_id`.
+
+**WO-7 first-start freeze is not closed. Freeze skip stays unsigned.** First start **wrote** `asked_for_params` `{}` onto new Test `99b692d3` (not SQL NULL, not a skipped classic row). That `{}` is **ambiguous** — first start cannot tell a classic default `{}` from a frozen `{}`. Do **not** teach later-start no-overwrite of `{}` or skip-on-frozen-`{}` as a verified freeze skip. Classic `/tests` must leave `asked_for_params` **NULL**, or we need a **freeze marker**. `if test: continue` is **not** a freeze. **OQ-WO-6:** an earlier LimsRun must not share the asked-for `analysis_id` or it attaches/freezes the panel Test on the parent sample at that start. Extract is not a special assay.
+
+No non-reportable / `acknowledge_no_analysis` path (product lock 2026-07-19; remove legacy ack if still in code).
 
 ### Analyte aliases
 - List/create/delete under `/analytes/{id}/aliases` (admin analyte form also manages aliases).

@@ -1,8 +1,8 @@
 # Schema change: Extract-hold destination sample type
 
 **Date:** 2026-08-23  
-**Migration:** `0068_sample_type_transitions.py`  
-**Scope:** Mathilda plan-entry destination-type slice
+**Migration:** `0068_sample_type_transitions.py`; process assignment grain `0077_process_assignment_container.py`  
+**Scope:** Mathilda plan-entry destination-type slice; process holds Contents (sample in container)
 
 ## Delta
 
@@ -20,6 +20,17 @@ Add `sample_type_transitions`, a client-scoped many-to-many catalog:
 
 Unique key:
 `(client_id, source_sample_type, operation, allowed_dest_sample_type)`.
+
+## Process assignment grain (`0077`)
+
+`eln_process_samples.container_id` UUID NOT NULL FK `containers.id`.
+
+| Index | Rule |
+|-------|------|
+| `uq_eln_process_samples_process_container` | unique `(process_id, container_id)` |
+| `uq_eln_process_samples_active_sample` | unique `(process_id, sample_id)` WHERE `status <> 'removed'` |
+
+Dropped `uq_eln_process_samples_process_sample`. Backfill from `contents`; rows with no container are deleted. Assign without Contents → **422** `process_container_required`. After aliquot/pool execute, dest container-with-sample continues; inbound source assignment is `removed`. Later work-order Start uses continuing assignments.
 
 No column is added to `samples`; existing `samples.sample_type`,
 `samples.parent_sample_id`, and `samples.matrix` remain unchanged. Plan-line

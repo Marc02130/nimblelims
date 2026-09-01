@@ -6,7 +6,7 @@
 **Schema changes:** [`.docs/review/schema-changes/post-receive-work-spine.md`](../schema-changes/post-receive-work-spine.md) — **present**; P1 tables OK; P2/P4 deltas incomplete vs L2/L3/L4 (A4–A6, A8, A10)  
 **Requirements:** [`.docs/review/requirements/post-receive-work-spine.md`](../requirements/post-receive-work-spine.md)  
 **Spec:** [`.docs/internal/specs/post-receive-work-spine/SPEC.md`](../../internal/specs/post-receive-work-spine/SPEC.md)  
-**Related reviews:** [Lab Ops](../lab-ops-review/post-receive-work-spine.md) (L1–L5; P1 OPEN; P2 CLOSED until L2–L4) · [Scientific CSO](../scientific-cso-review/post-receive-work-spine.md) (SC1–SC5)  
+**Related reviews:** [Lab Ops](../lab-ops-review/post-receive-work-spine.md) (ordered-route L2/L4 locked) · [Scientific CSO](../scientific-cso-review/post-receive-work-spine.md) (SC1–SC5)
 **Open questions:** [`.docs/review/open-questions/post-receive-work-spine.md`](../open-questions/post-receive-work-spine.md)  
 **Prior architecture review:** none for this stem
 
@@ -16,11 +16,11 @@
 
 The spine is the right system shape. Do not collapse layers. Do not add a third execute engine. P1 is implementable as a request lake on existing sample/project RLS + `test:assign`.
 
-Schema-changes exists and lists the four new tables. That is enough to Accept the spine **only with the locks below**. Lab Ops L2–L4 are prose in the sketch; they are **not** columns yet. `tests: none` contradicts L3 / SC5. Type eligibility has no config object. Chain walk cannot be `work_orders.process_id` only. Publish still **ensure-creates Tests**.
+Current schema sketch carries ordered process-definition IDs on map/work order and route position on each process instance. Type eligibility stays on definition steps. Publish refusal is signed Pass; first-start freeze remains the OPEN code gap.
 
-**P1 OPEN** if A1–A3 land in the same PR. **P2 CLOSED** until schema-changes names A4–A7 (and A10). **P3** persist lock is column-use only after SC1–SC4 fold; no `results.unit_id`. **P4** needs step `analysis_id` (A8) before Apply can write a real LimsRun step. **P5** is admin UX on shipped parser tables.
+**P2 ordered-route schema is now named in A4/A6.** Product merge remains held because first-start freeze is OPEN and overall P2 Pass unsigned.
 
-**This stamp decides OQ-WO-3:** SoT is `eln_processes.work_order_id`. See A6.
+**OQ-WO-3 is superseded by A6:** each process instance links to the work order with its route position.
 
 ---
 
@@ -30,15 +30,15 @@ Schema-changes exists and lists the four new tables. That is enough to Accept th
  /asked-for  ──► asked_for (requested)
                       │
                       │  P2: routing_map
-                      │  key = analysis × sample_type × TAT range
-                      │  type gate = step accepted sample types  (experiment AND lims_run; NOT analysis; NOT sample_type_transitions)
+                      │  key = analysis × TAT range
+                      │  Route gate = current type ∈ derived first-step types
                       ▼
-                 work_orders  (process_definition_ids[] snapshot)
+                 work_orders  (ordered process_definition[] snapshot)
                       │
                       ▼
          ELNProcessService.instantiate_from_definition  (existing)
                       │
-                      │  complete process N → surface N+1 from snapshot
+                      │  complete step N → next ordered step
                       ▼
          LimsRun.start  →  INSERT Test if missing  (WO-7)
                       │     snapshot asked_for.params → tests.asked_for_params (freeze)
@@ -61,10 +61,10 @@ SOP Apply (P4) writes **process definitions** that `routing_map` points at. Dest
 | `asked_for` | P1 | New table + `routed_work_order_id` | **Match.** Reverse FK is denorm; SoT is `work_orders.asked_for_id` (A6). |
 | Partial unique open `(sample_id, analysis_id)` | Yes | `uq_asked_for_open` | **Match.** |
 | P1 does not mint Tests / WO | Yes | No asked-for cols on `samples` | **Match.** |
-| `routing_map` gist exclude | P2 | `int4range` + `EXCLUDE gist` | **Match.** Must `CREATE EXTENSION btree_gist` (A10). |
-| Type eligibility | L2: config on LimsRun step and/or analysis; **not** `sample_type_transitions` | **Missing** | **Drift.** A4. |
+| `routing_map` overlap | P2 | Service-side: same analysis + TAT overlap **and** first-step allow-list overlap | **Match A4.** Do **not** gist-exclude on analysis+TAT alone. Optional btree_gist for candidate lookup (A10). |
+| Type eligibility | No map type field; Route gates derived first-step types; later steps gate at start; **not** `sample_type_transitions` | **Missing** | **Drift.** A4. |
 | L3 params snapshot on Test at LimsRun start | Yes | `tests: none` / WO-7 timing only | **Drift.** A5. Sci CSO SC5. |
-| L4 chain walk from WO snapshot | Yes | `process_definition_ids uuid[]`; FK “pick one” | **Under-specified.** A6 closes OQ-WO-3. |
+| L4 ordered work plan | Yes | Ordered process definitions; one instance per later start | **Under-specified.** A6. |
 | WO-7 mint at start; publish refuse | Yes | `tests: none` | Timing is app; **ensure-on-publish still in code** (A7). |
 | P3 columns | persist lock | `results: none` | **Match** after SC1: do not change `qualifiers` type. No `results.unit_id`. |
 | P4 Apply → process def | `process_definition_id` on job | ADD on `sop_parse_jobs` | **Partial.** Steps still require `experiment_template_id` NOT NULL; no `analysis_id` (A8). |
@@ -115,13 +115,13 @@ SOP Apply (P4) writes **process definitions** that `routing_map` points at. Dest
 | **A1** | **P1** | Same-phase | **RLS-hidden sample/project → 403, never 404.** Mirror `atomic_receive_service.require_project_for_receive`. Do not reuse `sample_access.require_accessible_sample` (that helper 404s). Unknown UUID that does not exist **and** is not hidden may 404; cross-project miss is 403. Pytest: no project access → 403 (AC-P1-3). Client POST asked-for → 403. |
 | **A2** | **P1** | Same-phase | **P1 migration is only `asked_for` + `analysis_param_defs`.** Unique `(analysis_id, key)` on param defs. `tat_days` check `> 0`. Partial unique `uq_asked_for_open`. Status check. FORCE RLS. Policy: USING/WITH CHECK via sample.project (mirror `tests_access`). Param-defs write: `config:edit` / admin. Rollback: DROP both tables. Do not create `routing_map` / `work_orders` in the P1 PR. |
 | **A3** | **P1** | Same-phase | **Zero Tests, zero work_orders, zero processes on asked-for save.** Never call `_create_tests_for_sample` or any `_create_asked_for_tests`. Receive stays 422 on non-empty `analysis_ids`. Copy = L1. Multi-sample: one operator action; **one transaction** (`sample_ids[]` on POST or equivalent); unique 409 rolls back the batch — no partial rack. API may still persist one row per sample. |
-| **A4** | **P2** | Blocks P2 | **Superseded in part (Leadership OQ-WO-4, 2026-08-28):** type eligibility is **not** `analysis_accepted_sample_types`. SoT: `eln_process_definition_step_accepted_sample_types (step_id, sample_type_id)` on **both** `eln_experiment` and `lims_run` steps. **Qubit is a LimsRun.** Empty set = fail closed on map save and on Route. Check: **current** sample type ∈ **every** step in the chain. Named error `route_sample_type` **422**. Do not read `sample_type_transitions`. Do not infer “an earlier extract will mint DNA.” Extract → Qubit keyed on blood **refuses**. No OOB blood→Qubit rows. Do not invent Qubit/blood testdata IDs. Still: CONFIG, not transitions. |
+| **A4** | **P2** | Blocks P2 | No map sample type. Match analysis + TAT, then current type against each candidate’s first process / first Experiment-LimsRun list. Zero acceptable → **422**; two saved rows that both accept current type → **409**; no `first()`. Map save **409**s only when TAT **and** first-step allow-lists overlap. Extract-first vs Qubit-first for the same TAT is legal. Later processes/steps gate only at their starts. Dest-type Hold remains. |
 | **A5** | **P2** | Blocks P2 | **L3 params snapshot column.** Schema-changes `tests: none` is wrong. ADD `tests.asked_for_params jsonb not null default '{}'` (Sci CSO SC5). At **LimsRun start**, copy matching asked-for `params` (sample + run.analysis_id, status `routed`) and freeze. Do not merge into `tests.custom_attributes`. Later asked-for edits do not mutate a started Test. Empty defs → `{}` only. |
-| **A6** | **P2** | Blocks P2 | **L4 WO snapshot is the work plan. OQ-WO-3 decided here.** SoT: ADD `eln_processes.work_order_id` uuid NULL FK (index). Every process instance in the chain points at the WO. `work_orders.process_id` if kept is **denorm of current only** — completing N and starting N+1 must not orphan N. `work_orders.asked_for_id` UNIQUE is the asked-for link; `asked_for.routed_work_order_id` is optional denorm set in the same txn (prefer drop reverse if insert-order bites). Start first definition via existing instantiate + process AuthZ. Completing process N **surfaces** start of N+1 from `process_definition_ids[i+1]` — no second routing hop, no first-only + route-next. Do not auto-instantiate N+1. `POST /work-orders/{id}/start` is first and next. Completed definition not in snapshot → 409. |
+| **A6** | **P2** | Blocks P2 | `routing_map` and work order snapshot ordered `process_definition_ids`. ADD `eln_processes.work_order_id` plus `work_order_route_position`; unique per WO/position. Start instantiates position 1 only; each later start instantiates the next pending definition. Route does not mint a process-of-processes. UI preserves route and step order. |
 | **A7** | **P2** | Blocks P2 | **WO-7: mint Test at LimsRun start; no ensure-on-publish.** `start_run` inserts Test if no active `(sample_id, analysis_id)` (reuse classic Test if present). Publish: Test missing → **422**. **Delete** the ensure path: `ResultPromotionService.ensure_test` must not run from `plan_promotion` when `dry_run=False`. Promote may only attach results to an existing Test. Classic `POST /tests` remains (WO-4). |
 | **A8** | **P2** (was P4) | Blocks P2 | **LimsRun steps need `analysis_id`.** Pulled into P2 because **Qubit is a LimsRun** (OQ-WO-4). ALTER `eln_process_definition_steps`: `experiment_template_id` nullable; ADD `analysis_id` uuid NULL FK `analyses`. CHECK: `eln_experiment` ⇒ template NOT NULL; `lims_run` ⇒ `analysis_id` NOT NULL. Same on instance steps if they snapshot the def. Apply never silent-activate remains L5/P4. No dest-type E2E in this packet. |
 | **A9** | **P3** | Blocks P3 coding until SC fold | **Persist lock uses live columns.** Typed token → `reported_result`; `raw_result` may copy on the manual path; `qualifiers` stays UUID FK (NULL for a clean number). Do not migrate `qualifiers` to JSON. No `results.unit_id`. Missing numeric `units_default` → 422. Two writers → 409. Fold SC1–SC4 into RQ-RES-1 / AC-P3-1 / sketch before the P3 PR. Promote must not ensure-create Tests (A7). |
-| **A10** | **P2 docs** | Before P2 PR | **Update schema-changes** with A4–A8 deltas, `CREATE EXTENSION IF NOT EXISTS btree_gist`, unique param-def key, rollback section, open-schema blockers (OQ-WO-3 closed by A6), and this review link. P1 PR may ship A2 without waiting for the P2 rows. |
+| **A10** | **P2 docs** | Before P2 PR | **Update schema-changes** with A4–A8 deltas, unique param-def key, rollback section, overlap check (not gist-on-TAT-alone), open-schema blockers (OQ-WO-3 closed by A6), and this review link. P1 PR may ship A2 without waiting for the P2 rows. |
 
 ---
 
@@ -134,10 +134,14 @@ SOP Apply (P4) writes **process definitions** that `routing_map` points at. Dest
 | Unknown / required param | Bad request | **422** | pytest 422 |
 | Discarded sample | Not orderable | **422** | pytest |
 | Multi-sample partial unique | Half rack | One txn; all-or-nothing 409 | pytest |
-| Empty routing map | Fake work | 200, `work_order: null`, stay `requested` | pytest AC-P2-2 |
-| TAT overlap on map save | Ambiguous route | **409** gist exclude | pytest |
-| Qubit-on-blood / type miss | Assay on wrong matrix | **422 `route_sample_type`** | pytest AC-P2-3; assert no `sample_type_transitions` query |
-| Empty accepted-types set | Unconfigured analysis | **422** fail closed | pytest |
+| Zero acceptable route rows | Missing/ineligible work plan | **422**, no WO, stay `requested` | pytest |
+| Two saved rows both accept current type | Ambiguous work plan | **409**, no silent `first()` | pytest |
+| Map save, overlapping TAT **and** overlapping first-step allow-lists | Ambiguous first assignment | **409** | pytest |
+| Map save, overlapping TAT, disjoint first-step allow-lists | Distinct first assignments | Save succeeds (extract-first vs Qubit-first) | pytest |
+| Map save validates intake type across all steps | Blocks valid type-changing flow | Remove chain-wide validation; display first-step types only | UI/API AC-P2-6 |
+| Route with incompatible first-step current type | Invalid assignment | **422 `route_sample_type`**, no WO | pytest AC-P2-3 |
+| Later step start with incompatible current type | Assay on wrong material | **422 `route_sample_type`** | pytest; assert no `sample_type_transitions` inference |
+| Empty accepted-types set | Unconfigured step | **422** at Route for first step or at later step start | pytest |
 | Publish without Test | WO-7 violation | **422**; no `ensure_test` | pytest; grep-guard optional |
 | Two writers on Test | Classic vs promote | **409** | existing + P3 |
 | Missing numeric `units_default` | Ununited number | **422**, no row | P3 |
@@ -168,13 +172,16 @@ Packet spine names (pytest, testcontainers, same style as `test_atomic_receive_p
 
 **P2 — `backend/tests/test_work_orders.py`** (when P2 opens)
 
-- Map match mints WO with ordered process ids; asked-for → `routed`
-- Empty map: no WO
-- Overlap save → 409
-- Blood / unaccepted type → 422 `route_sample_type`; **no** `sample_type_transitions` in the route path
+- Exactly one analysis + TAT + first-step-accepted row snapshots ordered `process_definition[]`; asked-for → `routed`
+- Zero acceptable rows → 422; two saved rows that both accept current type → 409
+- Map save 409 only when TAT **and** first-step allow-lists overlap; extract-first vs Qubit-first for the same TAT saves
+- Map create has no sample-type field; display first-process / first-step types as derived information
+- Route with unaccepted first-step current type → 422 `route_sample_type`; no WO
+- Later step start with unaccepted current type → 422; **no** `sample_type_transitions` inference
 - LimsRun start inserts Test + freezes `asked_for_params`
 - Publish with no Test → 422; `ensure_test` not invoked
-- Complete process N → next definition from snapshot (no second route)
+- Start instantiates first process only; later start advances in route order
+- Route/process UI exposes ordered process definitions and steps
 
 **P3** — persist_typed_result: `12.3` → `reported_result`; qualifiers NULL; missing units_default 422; no `unit_id` column
 
@@ -203,8 +210,8 @@ UAT script `UAT_Scripts/uat-post-receive-work-spine.md` at implement (P1 cases f
 
 | ID | This stamp |
 |----|------------|
-| **OQ-WO-3** | **Decided:** `eln_processes.work_order_id` is SoT (A6). |
-| **OQ-WO-1** | Not blocking P1. Agree with Lab Ops: auto-route when a map row matches; else stay `requested`. Resolve before P2 UX. Explicit `POST .../route` remains for rows created while the map was empty. |
+| **OQ-WO-3** | **Decided, superseded:** each process instance links to WO + route position (A6). |
+| **OQ-WO-1** | **Decided:** explicit Route; zero acceptable 422, two saved rows that both accept current type 409, exactly one snapshot. |
 | **OQ-SOP-2** | Architecture default: yes, inactive parser draft; never bind to production runs. Security still Open — do not code the draft until Security stamps. |
 | **OQ-RES-1** | Already **Decided** (Sci CSO). Architecture agrees (A9). |
 | Watch | Open uniqueness is `(sample_id, analysis_id)` — two ELISA cell lines cannot coexist. Fine for P1 empty params. Revisit when required param defs ship. |

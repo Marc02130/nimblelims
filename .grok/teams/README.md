@@ -10,7 +10,7 @@ Marc reorganized docs under **`.docs/`**:
 | Path | Role |
 |------|------|
 | `.docs/review/` | Committed review spine (was `.docs-review/`) |
-| `.docs/internal/` | Working PRDs / specs / design / ideas (was `.docs-internal/`) |
+| `.docs/internal/` | Working PRDs / specs / design / ideas (was `.docs-internal/`; git-tracked) |
 | `.docs/discussions/` | Multi-persona discussions |
 | `.docs/decision-logs/` | Stamps |
 

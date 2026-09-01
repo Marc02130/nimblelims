@@ -19,15 +19,58 @@
 
 ---
 
+## 2026-08-29 honesty fold (`8cfa2a9`)
+
+**Date:** 2026-08-29  
+**Status:** Accept with conditions — **this fold is the conditions**  
+**Product SHA:** `8cfa2a9` (`8cfa2a9be646630f5d4edba0ac64e47069312bfa`) on `feat/work-order-p2`  
+**Scope:** docs only. No product code. Hold product merge. Not IC50.
+
+Product commit `8cfa2a9` closed WO-7 first-start freeze, Route 422/409, later-start type gate, and next-pending instantiate **in code**, and the same commit already rewrote HOWTO/UAT/review toward “in code.” That is not a QA click. Leadership lock (Rolf): live AC-P2 is **unsigned** on this SHA; do not teach freeze or Route 422/409 as shipped/verified until QA clicks; keep ordered-route locks on the page; punch whole-chain-at-Route/Start; `b005cfe` Results stay signed history (publish-refuse Pass, freeze OPEN then, AC-P2-5 chain-AND); P1 `c649245` byte-for-byte.
+
+### Findings on `8cfa2a9` before this fold
+
+| ID | Finding | Fold |
+|----|---------|------|
+| **DOC-H1** | Live AC-P2 block said “fill SHA at restamp” and “Start instantiates the next pending process only,” so the live stamp was not pinned to `8cfa2a9` and could be read as Start running the chain. | Pin live unsigned stamp to `8cfa2a9`. No Pass/Fail. Start = first process only. |
+| **DOC-H2** | HOWTO/README/manuals taught freeze and Route 0→422 / two-accept→409 as current operator truth (“in code” / “shipped on this P2 branch”) without “unsigned until QA.” | Keep the lock on the page. Maturity = **in code on `8cfa2a9`, unsigned until QA**. Not UAT Pass. |
+| **DOC-H3** | HOWTO opener “Work (route → Process / Experiment / LimsRun)” and “next pending” Start copy could teach the whole chain starting at Route/Start. | Punch: Route is a planner; Start instantiates the first process only; later processes = later starts; not a process-of-processes at Route. Route stays an unnumbered planner. |
+| **DOC-H4** | Ordered-route locks (ordered `process_definition[]`, no create type picker, derive first-step types) must stay. Dest-type Hold out. No invented seed IDs. | Keep. |
+| **DOC-H5** | `b005cfe` signed Results and P1 `c649245` Pass must not be rewritten. | Live block only after the `b005cfe` retention line. P1 AC results untouched. |
+| **DOC-H6** | HOWTO/`_mint_tests_at_start` skip-on-existing-Test is a lie. Classic `/tests` NULL or default `{}` is not a freeze. Extract LimsRun must not share the asked-for `analysis_id`. | Strike skip-on-existing-Test. First asked-for LimsRun start must **write** onto a classic Test. Live AC-P2 stays unsigned. **The “skip when a snapshot already exists (including frozen `{}`)” half of this fold is superseded by DOC-H8** — `{}` cannot prove a snapshot. |
+| **DOC-H7** | Hans/Heidi/Günter: `if test: continue` is not a freeze; extract sharing `analysis_id` freezes the panel Test at extract start; first Start minting later processes/Tests is a punch; Route is ordered snapshot + zero Tests. | Fold those four locks into HOWTO, live UAT expect, and `.docs/review/`. Do not claim freeze closed on `8cfa2a9`. Dest-type Hold out. |
+| **DOC-H8** | Hans: the fold still taught “skip only when a snapshot **already exists** (including frozen `{}`)” as if `{}` proved a first-start snapshot. A classic default `{}` and a frozen `{}` are the **same JSON**, so skip-on-`{}` cannot be a freeze. Classic `/tests` must leave `asked_for_params` **NULL**. | Strike skip-on-`{}`. **The “skip on a provable LimsRun-start snapshot / skip-on-frozen-`{}`” half is superseded by DOC-H10** — first start cannot tell classic default `{}` from frozen `{}`. |
+| **DOC-H9** | Tobias clicked `8cfa2a9` (compose down). Live stamp was still “unsigned — Tobias has not clicked.” | Fold per-AC Results: receive stay-on-form Pass; asked-for 0 WO Pass; empty Route 422 Pass; alice first process only Pass; carol publish 422 Pass; map UI / overlap 409 / 201-not-AND Pass; later-step type-gate **unsigned**. Do **not** write overall P2 Pass. Do **not** rewrite P1 or `b005cfe` (chain-AND stays history, not carried). Freeze skip stays **unsigned** — a write of `{}` onto `99b692d3` is not a skip Pass. |
+| **DOC-H10** | Hans: HOWTO/UAT still taught skip-on-frozen-`{}` / later-start no-overwrite of `{}` as if first start could tell a frozen `{}` from a classic default `{}`. They are the **same JSON**. | Strike skip-on-frozen-`{}`. Fold: classic `/tests` must leave `asked_for_params` **NULL**, or we need a freeze marker. Until one of those exists, `{}` is **ambiguous** — not a verified freeze skip. Extract still must not share asked-for `analysis_id`. `if test: continue` is still not a freeze. Live freeze skip stays **unsigned**. Do not rewrite P1 or `b005cfe`. |
+| **DOC-H11** | Tobias addendum: routing-map Pass on `8cfa2a9` could be read as API-only. | Same stamp, do not re-score. Record **UI click-save**: no sample-type picker; ELISA TAT 1–7 saved; Blood extract + later DNA qPCR chain saved (no AND 422); second ELISA overlap **409**. Later-step type-gate still unsigned. |
+
+Operator how-tos stay in git-tracked [`manuals/`](../../../manuals/). Formal stamps stay under `.docs/review/`. Do not commit `.docs/internal/` or `.docs/manuals/`.
+
+### Verdict (this fold)
+
+| Field | Value |
+|-------|--------|
+| **Verdict** | **Accept with conditions** (DOC-H1–H11 land in this docs-only PR) |
+| **Docs ready for Cursor** | Yes for this honesty fold — **no product implement** |
+| **Merge** | **Hold** product merge of `feat/work-order-p2` to `main` until QA restamps live AC-P2 |
+| **Not licensed** | Teaching freeze/422/409 as QA Pass · rewriting `b005cfe` / P1 Results · dest-type E2E · IC50 |
+
+```
+DOCUMENTARIAN REVIEW: Accept with conditions (DOC-H1–H11 honesty fold)
+DOCS READY FOR CURSOR: Yes with conditions (docs-only; hold product merge)
+```
+
+---
+
 ## 1. Executive summary
 
 The spine packet is **documentable**. Core product docs exist (requirements, tech sketch, schema, PRD, SPEC, living OQ log). Lab Ops has spoken. P1 asked-for is the lake: record analysis + TAT + params after receive, **zero Tests**, UI **not** `/receive`. Wizard stays gone.
 
 **P1 docs are ready to attach to a Cursor implement prompt if the DOC list below lands in the same PR.** That prompt is **mandatory docs + UAT + README** — not optional polish.
 
-This stamp does **not** open product implement by itself. QA is **required** (test ordering / sample tracking / RLS). Architecture is **required** (new tables + RLS). Security should speak (AuthZ + RLS + client deny). Those artifacts are missing today. Documentarian does not invent them.
+Required reviews now exist. Current P2 lock is recorded in §4.2; product merge remains held.
 
-**Do not document P2–P5 as shipped in the P1 PR.** Routing, work_order, results persist, SOP Apply, parser setup stay specified-for-review. OQ-WO-1/3, OQ-RES-1, OQ-SOP-2 still **Open** and block those phases.
+**Do not document P2–P5 as shipped in the P1 history.** OQ-WO-1/3 are now Decided under the ordered-route lock. First-start freeze remains OPEN and overall P2 unsigned.
 
 Living manuals are the real gap. After CORE:
 
@@ -48,10 +91,10 @@ Living manuals are the real gap. After CORE:
 
 | Dimension | Notes |
 |-----------|--------|
-| **Completeness** | **Core packet present:** requirements, sketch, schema, PRD, SPEC, OQs, checklist, Lab Ops. **Missing formal reviews** for this stem: CEO, UI, Architecture, Security, Scientific CSO, BA, QA, Developer (this file is the first docs-review). UAT script **correctly deferred** to implement (requirements §8). No operator manual for asked-for yet. Schema omits template sections **Data migration / backfill**, **Rollback**, **Open schema blockers**, **Implementation checklist**. |
-| **Consistency** | Spine naming is coherent: asked-for ≠ Test ≠ work_order ≠ Process. L1 copy is in requirements, sketch, Lab Ops. **Drifts:** SPEC POST is single `sample_id` while RQ-AF-1 / L1 require one operator action on a **set** (API may stay one row per sample — **not written as a contract**). Schema lists **both** `work_orders.process_id` and `eln_processes.work_order_id` while OQ-WO-3 is **Open** (P2). RQ-WO-6 implies auto-route on save; OQ-WO-1 still **Open**. Framework stamps WO-7 bullet still says “TAT matching algorithm still open” while OQ-TAT-1 is **Decided (provisional)** refuse. Requirements **Status: Draft for formal review** after Lab Ops has already accepted P1. Checklist review boxes all empty (Lab Ops is done). Internal US-1 / US-7 / US-23 still mint Tests at accessioning. |
+| **Completeness** | Requirements, sketch, schema, reviews, manuals, and UAT exist. Current ordered-route fold is docs-only; product implementation remains held. |
+| **Consistency** | Current P2 SoT: analysis + TAT + ordered `process_definition[]`; explicit Route; zero acceptable 422; two saved rows that both accept current type 409; map-save 409 only on TAT **and** first-step allow-list overlap. Signed `b005cfe` chain-AND behavior remains history only. |
 | **Cross-references** | Requirements ↔ sketch ↔ schema ↔ PRD ↔ SPEC ↔ OQs ↔ Lab Ops are linked. Open-questions index already lists this stem. `.docs/review/README.md` does not name `docs-review/`. Atomic-receive manuals/UAT still say A-15 is **parked** rather than “opened by `post-receive-work-spine` P1 (not on `/receive`)”. |
-| **Living-doc hygiene** | OQ statuses and phase gate rule are correct: **P1 unblocked**; P2 blocked on OQ-WO-1/3; P3 on OQ-RES-1; P4 on OQ-SOP-2. Dest-type Hold stays on the extract-hold packet — do not fold it here. Checklist is a task list, not an OQ owner — good. Wizard-removed (PR 75) is already stamped on `uat-sample-accessioning.md` (retired) and the accessioning stub; **navigation.md was not fully cut over**. |
+| **Living-doc hygiene** | OQ-WO-1/3 are Decided. P2 remains unmerged because first-start freeze is OPEN and overall Pass unsigned. Dest-type Hold stays separate. |
 | **Review-artifact quality** | Lab Ops follows PACKET header + L* conditions + phase gate. This docs-review follows the Documentarian template. Other reviews: n/a until written. |
 | **Cursor hand-off readiness** | **Yes with conditions, P1 only.** Implement prompt **must** include DOC1–DOC9 (docs + UAT + README). One phase per PR. Do not code P2–P5 in the P1 PR. Product implement still waits on required reviews (QA, Architecture, Security at minimum). |
 | **Discoverability** | Stem is consistent (`post-receive-work-spine`). Findable from OQ index, requirements, Lab Ops. New `docs-review/` folder needs an index line. No `asked-for.md` manual yet — operators will not find the lake. |
@@ -78,11 +121,11 @@ Living manuals are the real gap. After CORE:
 | **DOC4** | **P1** | **Pointer hygiene on existing UAT.** [`uat-atomic-receive.md`](../../../UAT_Scripts/uat-atomic-receive.md) + [`atomic-receive/README.md`](../../../UAT_Scripts/atomic-receive/README.md) + [`scenarios.md`](../../../UAT_Scripts/atomic-receive/scenarios.md): A-15 is **this packet (P1 asked-for)**, still **not on receive**; CORE remains zero Tests. [`uat-test-ordering.md`](../../../UAT_Scripts/uat-test-ordering.md): banner that the **order path is** `uat-post-receive-work-spine.md` / `/asked-for`; TestForm is **not** asked-for; do **not** un-retire wizard cases. [`uat-testing-log.md`](../../../UAT_Scripts/uat-testing-log.md): insert `uat-post-receive-work-spine` after `uat-atomic-receive` (depends on receive + analyses). [`uat-navigation-ui.md`](../../../UAT_Scripts/uat-navigation-ui.md): Asked-for after Receive; `/accessioning` is not a sidebar item. | Otherwise three scripts still teach “assign tests from TestForm / A-15 parked.” |
 | **DOC5** | **P1** | **L1 terminology lock in every user-facing string this PR touches** (manuals, UAT, README, help if a help row is added, UI copy). Allowed: Asked-for, requested analysis, record request, cancel request. **Forbidden:** assign test, create test, start work, order process, Start/Execute on `requested`. Sidebar label **Asked-for** (not Tests, not Orders, not Projects). | If docs say Tests, WO-7 dies on arrival (Lab Ops L1). |
 | **DOC6** | **P1** | **SPEC + schema close-out in the P1 PR.** SPEC: document multi-sample as **UI one action → N `POST /asked-for` rows** (or a `sample_ids[]` body if the API changes — pick one, write it, match pytest). P1 does **not** write work_orders. Schema-changes: fill **Alembic revision id(s)**; add **Backfill: none**; **Rollback** (drop P1 tables / forward-only reason); note OQ-WO-3 does **not** block P1 (P2 tables may be specified but not migrated in PR 1 unless Arch says otherwise — **P1 migration = `asked_for` + `analysis_param_defs` only**). | SPEC vs L1 is an implement trap. Schema template gaps block Arch and Alembic matching. |
-| **DOC7** | **P1** | **Phase-scoped docs.** P1 PR must not publish live routing-map / work_order / results-persist / SOP-Apply-is-not-a-lie / parser-setup manuals. A one-line “P2–P5 specified, not shipped” in `asked-for.md` is enough. Do not claim dest-type Hold is closed (L5). Do not fold AR-RES into P1 UAT. | Sketch: one phase per PR. Lab Ops P2 closed until L2–L4 in sketch (already folded) **and** OQ-WO-1/3 Decided. |
+| **DOC7** | **P1 history** | Phase-scoped docs did not publish P2 as shipped. Current OQ-WO-1/3 are Decided under the ordered-route lock; dest-type Hold remains separate. | Historical P1 condition; superseded P2 gate. |
 | **DOC8** | **P1** | **Wizard stays removed (PR 75).** No new `/accessioning` wizard docs, no un-retiring `uat-sample-accessioning.md`, no Test Assignment step, no analysis picker on receive. Redirect mention only. | User lock + CORE bounce list. |
 | **DOC9** | **P1** | **Living hygiene in the same PR:** checklist — tick Lab Ops + Documentarian; leave other reviews until those artifacts exist. Requirements **Status** no longer “Draft for formal review” once P1 implement starts (e.g. “P1 implementing / P2–P5 specified”). Index `docs-review/` in [`.docs/review/README.md`](../README.md). Optional: one-line in [framework-stamps](../../decision-logs/framework-stamps-2026-08-26.md) WO-7 bullets that TAT overlap is **refuse** (OQ-TAT-1). Internal US-1/US-7/US-23 “tests at accessioning” — rewrite or stamp superseded by asked-for (working notes, not merge-blocking). | Orphan checkboxes and “draft” status after Lab Ops Accept confuse the next agent. |
 
-Already normative (restated so implementers do not drop them): empty routing map mints nothing; TAT overlap 409; client cannot write asked-for; no `results.unit_id`; no asked-for columns on `samples`; no projects→orders rename.
+Already normative (restated so implementers do not drop them): empty routing map mints nothing; map-save 409 only on overlapping TAT **and** overlapping first-step allow-lists; client cannot write asked-for; no `results.unit_id`; no asked-for columns on `samples`; no projects→orders rename.
 
 ---
 
@@ -123,7 +166,7 @@ Already normative (restated so implementers do not drop them): empty routing map
 
 | Phase | When | Docs |
 |-------|------|------|
-| **P2** | After OQ-WO-1/3 Decided and L2–L4 in sketch (already folded) + reviews | New `work-orders.md` (or section): routing map (`config:edit`), TAT overlap 409, empty map mints nothing, `route_sample_type` 422, WO snapshot chain, start via existing process AuthZ, **no Tests at WO save**. Update asked-for (`routed`, cancel-after-routed). Update `processes.md` (start N+1 from snapshot). Update `lims-runs.md`: Test at **LimsRun start**, publish **422** if missing (today’s “promoted on publish” language is WO-7-wrong). UAT P2 cases in the same stem script (new section, not a second file unless QA says so). No OOB blood→Qubit rows. |
+| **P2** | Heidi/Leadership ordered-route lock | Docs must teach analysis + TAT + ordered `process_definition[]`, no type picker, derived first-process / first-step display, map-save 409 only on overlapping TAT **and** overlapping first-step allow-lists, extract-first vs Qubit-first for the same TAT legal, Route zero→422 / two-accept→409, first-process-only Start, later starts/gates, and no chain-AND. Preserve `b005cfe` signed history; freeze OPEN. |
 | **P3** | After OQ-RES-1 | Fold AR-RES into this stem UAT (or `uat-results-entry-review.md` with a pointer). Manual: typed number → `reported_result` + `qualifiers`; missing `units_default` → 422; no `results.unit_id`; two writers 409. **Not** results on asked-for. |
 | **P4** | After OQ-SOP-2 for parser draft | `experiments.md` SOP Apply success path = **process definition** (template only if a step needs it). `processes.md` Apply. **L5 copy:** do not say NCI extract → Qubit is runnable. No SOP PDF bodies in git. |
 | **P5** | Independent | Parser/instrument admin manuals: example + test + dry-run + activate; AI draft setup-only; production import no LLM. |
