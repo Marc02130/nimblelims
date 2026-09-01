@@ -3,7 +3,7 @@
 **Date:** 2026-08-30  
 **Team:** Leadership (Lab Ops, CEO, Security CSO, Scientific CSO)  
 **Ask:** Round 1 remains **Leadership Confirmed** (Rolf, Deiter, Hans, Heidi, Günter; all five asks). Round 2 is **Leadership Confirm** (Rolf, Deiter, Hans, Heidi, Günter; R2-1…R2-4). **Contents grain / `0077` remains a Leadership Confirm** (Rolf, Deiter, Hans, Heidi, Günter) — process assignment is a **sample in a container**. Leadership later **Confirmed Deiter’s click**: C1 **Pass**, C2 **Fail**, dest mint Hold **Pass** on product `4671ba8` / `02fe95f`. C1/C2 are **not** unsigned. Docs Confirm `84d2810` is not a new execute and not the click SHA. Not a Tobias QA Pass and not a merge stamp. Grok Build owns dest-join / source-remove. Overall P2 UAT remains unsigned / not Pass.
-**Implement gate:** **OPEN for P2 coding on `feat/work-order-p2`.** Merge to `main` **held** until signed UAT Pass.  
+**Implement gate:** **OPEN for P2 coding on `feat/work-order-p2`.** **Merge bar Met** (Marc/CEO, 2026-09-01): product may merge to `main`. Closeout **1.2 dest-cohort lookup** is **OPEN post-merge**, not a merge hold. Older “held until signed UAT Pass / hold merge for 1.2” copy in walls below is **history** — do not restamp those walls.  
 **Stem:** [post-receive-work-spine](../review/requirements/post-receive-work-spine.md)
 
 **Code:** `feat/work-order-p2`. Latest **signed** AC-P2 is `8cfa2a9` (per-AC; overall **not Pass**; PR **#92** honesty fold). **This commit** is `9342439` (`93424396ce3d02f01a8a8388abda39ae6ebf8010`): analysis is not a map field; Route matches a LIMS Run in the chain; process *x* → *x+1* emerging-type handoff; create-route UI shows types/analyses/emerging types.
@@ -554,7 +554,20 @@ Does **not** rewrite Round 1, Round 2, Contents-grain Confirm, Deiter `02fe95f` 
 4. **One assay LimsRun** when the ask **is** an assay (ELISA, sequencing, Qubit-as-asked-for, …). That LimsRun carries the asked-for `analysis_id` once. Supporting QC (Qubit/Nanodrop/etc.) remain other analyses in the same route.
 5. **Do not forever-ban extract-as-LimsRun.** Prior Confirm that extract is typically a process (experiment / aliquot-pool execute) stands for the common path. Do **not** teach a permanent ban that extract can never be a LimsRun in any product future.
 6. **OQ-WO-6 extract close** from PR 110 stays in spirit for the common path (extract process does not wear the panel asked-for `analysis_id`). Reconcile: “exactly one asked-for LimsRun” applies when the ask is an assay; for Extracted DNA, zero assay LimsRuns is legal.
-7. **Merge hold is closeout 1.2 — dest-cohort asked-for lookup after C3.** After type-changing execute (Blood→DNA), the assay on the DNA dest looks up asked-for by **dest `sample_id`** and gets `{}` (wrong cohort / wrong sample). That is the merge hold. **Not freeze skip. Not dest-follow. Not extract-as-process.** Freeze skip NULL is **Tobias Pass** on **`bf51b19`** (classic `/tests` leave NULL; first start writes; later start does not overwrite). Older “freeze skip OPEN” copy in Confirm walls above is **superseded** by that Pass — do not restamp those walls. Hold merge of `feat/work-order-p2` to `main` for **1.2 dest-cohort lookup**.
+7. **Closeout 1.2 dest-cohort asked-for lookup after C3 is OPEN post-merge, not a merge hold.** After type-changing execute (Blood→DNA), the assay on the DNA dest looks up asked-for by **dest `sample_id`** and gets `{}` (wrong cohort / wrong sample). Known OPEN work after merge. **Not freeze skip. Not dest-follow. Not extract-as-process.** Freeze skip NULL is **Tobias Pass** on **`bf51b19`** (classic `/tests` leave NULL; first start writes; later start does not overwrite). Older “freeze skip OPEN” copy in Confirm walls above is **superseded** by that Pass — do not restamp those walls.
 
-Keep: one asked-for per process instance; supporting QC = other `analysis_id`s, own Tests, same route as whatever the asked-for assay is; DNA extract once (C3); that DNA sample may join many WOs as sequential asked-fors (no route branching this phase). `9342439` untouched.
+Keep: one asked-for per process instance; supporting QC = other `analysis_id`s, own Tests, same route as whatever the asked-for assay is; DNA extract once (C3); that DNA sample may join many WOs as sequential asked-fors (no route branching this phase). Asked-for-only Marc lock from PR **111** still stands. `9342439` untouched.
+
+---
+
+## Marc/CEO merge bar — Met — 2026-09-01
+
+**Marc/CEO:** merge `feat/work-order-p2` to `main` now. Docs-only punch. **Not overall P2 Pass.** Not IC50.
+
+Does **not** rewrite Round 1, Round 2, Contents-grain Confirm, Deiter `02fe95f` C2 **Fail**, Tobias `9342439` / `8cfa2a9` / P1 Results, dest-type split Confirm, mint-only-at-execute Confirm, Deiter Lab Ops Met on `570bbc0`, or unsigned Tobias C2/C3 on `570bbc0`. Does **not** rewrite freeze skip NULL **Pass** on `bf51b19`. Asked-for-only Marc lock from PR **111** still stands.
+
+1. **Merge bar Met.** Product may merge to `main`.
+2. **1.2 dest-cohort asked-for lookup** after C3 is **OPEN as post-merge follow-up**, **not** a merge hold. After Blood→DNA, assay on DNA dest looking up asked-for by dest `sample_id` → `{}` remains known OPEN work after merge.
+3. Freeze skip NULL Tobias Pass on `bf51b19` stands (not a merge hold).
+4. Do **not** invent overall P2 Pass from this fold.
 
