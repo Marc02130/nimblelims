@@ -10,7 +10,7 @@
 - PRD: [`.docs/internal/prd/post-receive-work-spine/PRD.md`](../../internal/prd/post-receive-work-spine/PRD.md)  
 - Spec: [`.docs/internal/specs/post-receive-work-spine/SPEC.md`](../../internal/specs/post-receive-work-spine/SPEC.md)  
 - Open questions: [`.docs/review/open-questions/post-receive-work-spine.md`](../open-questions/post-receive-work-spine.md)  
-**Related Lab Ops:** [lab-ops-review/post-receive-work-spine.md](../lab-ops-review/post-receive-work-spine.md) — ordered-route L2/L4 locked; dest-follow Met; P2 on `main` `5040f2d` with **OQ-WO-7 OPEN**
+**Related Lab Ops:** [lab-ops-review/post-receive-work-spine.md](../lab-ops-review/post-receive-work-spine.md) — ordered-route L2/L4 locked; dest-follow Met; P2 on `main` `5040f2d` with **OQ-WO-7 OPEN and in-bar** (**AC-P2-OQ-WO-7**; CEO Accept of Hans brief; Result unsigned)
 **Related:**  
 - Framework stamps WO-1…WO-7, FW-0/FW-2: [`.docs/decision-logs/framework-stamps-2026-08-26.md`](../../decision-logs/framework-stamps-2026-08-26.md)  
 - Promote-on-publish: [open-questions/run-results.md](../open-questions/run-results.md) (Decision #2 `raw_result`; Decision #7 ensure-on-publish **superseded by WO-7**)  
@@ -182,17 +182,19 @@ OQ-RES-1: Decided
 
 Clarifying the issue made the product better. Assay params are scientific context for the result (SC5). After Blood→DNA, the WGS Test on the DNA tube must freeze the **work order’s** WGS params (`{library_kit: …}`), **not** `{}`, **not** Qubit / process-QC params. Lookup by dest `sample_id` is the wrong cohort.
 
-Land OQ-WO-7 as **Brief → code → UAT with Pass/Fail and not-a-Fail → stamp → merge**. Do not close the OQ from leftover unmerged code. Do not invent overall P2 Pass.
+Land OQ-WO-7 as **Brief → code → UAT with Pass/Fail and not-a-Fail → stamp → merge**. Do not close the OQ from leftover unmerged code. Do not invent overall P2 Pass. Going forward OQ-WO-7 is **in-bar** for method complete / overall P2 Pass honesty. **CEO Accept (Rolf)** of Hans’s **AC-P2-OQ-WO-7** brief (written what/why) before Tobias. **Grok Build codes first**, then Tobias clicks. Result unsigned. Do not rewrite `bf51b19`.
 
 | Field | Value |
 |-------|--------|
-| **OQ-WO-7** | **OPEN** |
-| **Grain** | WGS params on the DNA Test from the WO after C3 |
-| **Merge** | `5040f2d` with this OPEN. Click never landed |
-| **Process** | Brief → code → UAT (Pass/Fail and not-a-Fail) → stamp → merge |
+| **OQ-WO-7** | **OPEN. In-bar.** **CEO Accept (Rolf)** of Hans **AC-P2-OQ-WO-7** brief. Result unsigned |
+| **Grain** | WGS params on the DNA Test from the WO asked-for after C3, not `{}` |
+| **Merge** | `5040f2d` with this OPEN. Click never landed. Do not pretend merge was held |
+| **Process** | Brief → code → UAT (Pass/Fail and not-a-Fail) → stamp → merge. Grok Build codes first, then Tobias |
 
 ```
-SCIENTIFIC CSO: OQ-WO-7 OPEN
+SCIENTIFIC CSO: OQ-WO-7 OPEN IN-BAR
+CEO ACCEPT (ROLF): AC-P2-OQ-WO-7 BRIEF
 P2 MERGE: 5040f2d with OQ-WO-7 OPEN
 CLICK: never landed
+GROK BUILD CODES FIRST; TOBIAS RESULT UNSIGNED
 ```
