@@ -3,7 +3,7 @@
 **Date:** 2026-08-30  
 **Team:** Leadership (Lab Ops, CEO, Security CSO, Scientific CSO)  
 **Ask:** Round 1 remains **Leadership Confirmed** (Rolf, Deiter, Hans, Heidi, Günter; all five asks). Round 2 is **Leadership Confirm** (Rolf, Deiter, Hans, Heidi, Günter; R2-1…R2-4). **Contents grain / `0077` remains a Leadership Confirm** (Rolf, Deiter, Hans, Heidi, Günter) — process assignment is a **sample in a container**. Leadership later **Confirmed Deiter’s click**: C1 **Pass**, C2 **Fail**, dest mint Hold **Pass** on product `4671ba8` / `02fe95f`. C1/C2 are **not** unsigned. Docs Confirm `84d2810` is not a new execute and not the click SHA. Not a Tobias QA Pass and not a merge stamp. Grok Build owns dest-join / source-remove. Overall P2 UAT remains unsigned / not Pass.
-**Implement gate:** P2 is on `main`. Product SHA for **AC-P2-OQ-WO-7** is **`80f054b`** (`80f054b274b02bb48f9dcbba5a05378419ea6b90`). Leftover **`9f86d14` is** the OQ-WO-7 Grok Build work. **Do not recode.** Remaining work is **Tobias**. **OQ-WO-7 OPEN / AC unsigned** until Tobias stamps (Hans brief **AC-P2-OQ-WO-7**; **CEO Accept (Rolf)** of the written what/why). Per-AC Pass on `bf51b19` — do **not** rewrite those Results. Overall P2 unsigned. Older “held until signed UAT Pass / hold merge for 1.2” copy in walls below is **history** — do not restamp those walls. Do **not** pretend `5040f2d` was held for OQ-WO-7. Do **not** invent Tobias Pass. Not IC50.  
+**Implement gate:** P2 is on `main`. Product SHA for **AC-P2-OQ-WO-7** is **`80f054b`** (`80f054b274b02bb48f9dcbba5a05378419ea6b90`). Leftover **`9f86d14` is** the OQ-WO-7 Grok Build work. **Do not recode.** **AC-P2-OQ-WO-7 Pass** (Tobias, 2026-09-01, `80f054b`): Test **`55f9cad9`** `(DNA, WGS)` `{library_kit: TruSeq}` from blood WO **`4ea9de0c`**. Lookup **`9f86d14`** was not recoded. **OQ-WO-7 Closed.** Per-AC Pass on `bf51b19` — do **not** rewrite those Results. Overall P2 unsigned. Closeout **1.4** stays OPEN. Older “held until signed UAT Pass / hold merge for 1.2 / OPEN until Tobias” copy in walls below is **history** — do not restamp those walls. Do **not** pretend `5040f2d` was held for OQ-WO-7. Do **not** invent overall P2 Pass. Not IC50.  
 **Stem:** [post-receive-work-spine](../review/requirements/post-receive-work-spine.md)
 
 **Code:** `feat/work-order-p2`. Latest **signed** AC-P2 is `8cfa2a9` (per-AC; overall **not Pass**; PR **#92** honesty fold). **This commit** is `9342439` (`93424396ce3d02f01a8a8388abda39ae6ebf8010`): analysis is not a map field; Route matches a LIMS Run in the chain; process *x* → *x+1* emerging-type handoff; create-route UI shows types/analyses/emerging types.
@@ -657,4 +657,20 @@ Does **not** rewrite Round 1, Round 2, Contents-grain Confirm, Deiter `02fe95f` 
 4. Remaining work is **Tobias**, not a new design. **OQ-WO-7 stays OPEN / AC unsigned** until Tobias stamps.
 5. Pass: Test `(DNA, WGS)` has `{library_kit: TruSeq}` from the blood WO asked-for. Fail: `{}` / missing kit; WGS Test on blood; assay hung on extract. Not a Fail: no dest at Route/Start; `source_amount_null`; Qubit empty supporting freeze; 1.4; ELISA on a second blood tube.
 6. Do **not** fold dest-follow, extract-as-LimsRun, freeze skip, cardinality, Route 409, closeout 1.4 as this work.
+
+---
+
+## Tobias Result — AC-P2-OQ-WO-7 Pass; OQ-WO-7 Closed — 2026-09-01
+
+**Tobias.** Living Result. Docs-only fold. Does **not** rewrite Round 1, Round 2, Contents-grain Confirm, Deiter `02fe95f`, Tobias `9342439` / `8cfa2a9` / `bf51b19` Results, P1, ELISA / second-tube Confirm, Science fold, CEO Accept of Hans brief, leftover-`9f86d14` Confirm, or Marc/CEO merge bar Met. Not overall P2 Pass. Not IC50.
+
+**AC-P2-OQ-WO-7 Pass** on product SHA **`80f054b`** (`80f054b274b02bb48f9dcbba5a05378419ea6b90`).
+
+Verified holds:
+- Test **`55f9cad9`** `(DNA, WGS)` has `asked_for_params` **`{library_kit: TruSeq}`** from blood work order **`4ea9de0c`**.
+- Leftover **`9f86d14`** is the lookup (WO asked-for same `analysis_id`, else parent lineage, else `{}`). **Was not recoded.**
+
+**OQ-WO-7 Closed.** Pass/Fail/not-a-Fail stay the AC definition in Hans’s brief. Closeout **1.4** (Extracted DNA zero assay LimsRuns) stays **OPEN**. Overall P2 remains **unsigned**. Leadership did not stamp overall Pass.
+
+Mirror: [`UAT_Scripts/uat-post-receive-work-spine.md`](../../UAT_Scripts/uat-post-receive-work-spine.md) **AC-P2-OQ-WO-7**.
 
