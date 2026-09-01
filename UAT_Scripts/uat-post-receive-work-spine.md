@@ -1064,4 +1064,28 @@ AC-P2-C1 **Pass** · AC-P2-C2 **Pass** · AC-P2-C3 **Pass** · AC-P2-card-1 **Pa
 
 **Not a restamp of Tobias Results above.** Does **not** rewrite `bf51b19` per-AC Pass, `8cfa2a9`, `9342439`, P1, Deiter `02fe95f`, or Deiter Lab Ops Met on `570bbc0`. Not IC50.
 
-**Science:** Per-AC on `bf51b19` **Pass**. **Overall P2 stayed unsigned.** We merged (`5040f2d`) with **OQ-WO-7 OPEN** (WGS params on the DNA Test from the WO after C3). **That click never landed.** Seq-1 on this stamp did **not** score dest-cohort params. Clarifying the issue made the product better. Land OQ-WO-7 as **Brief → code → UAT with Pass/Fail and not-a-Fail → stamp → merge**.
+**Science:** Per-AC on `bf51b19` **Pass**. **Overall P2 stayed unsigned.** We merged (`5040f2d`) with **OQ-WO-7 OPEN** (WGS params on the DNA Test from the WO after C3). **That click never landed.** Seq-1 on this stamp did **not** score dest-cohort params. Clarifying the issue made the product better. Land OQ-WO-7 as **Brief → code → UAT with Pass/Fail and not-a-Fail → stamp → merge**. Going forward that path is **in-bar** for method complete / overall P2 Pass honesty. Do **not** pretend `5040f2d` was held for it.
+
+---
+
+## AC-P2-OQ-WO-7 — WGS params on the DNA Test from the WO after C3
+
+**Living AC** (not a restamp of `bf51b19`). Does **not** rewrite Tobias Results on `bf51b19`, `8cfa2a9`, `9342439`, P1, Deiter `02fe95f`, or Deiter Lab Ops Met on `570bbc0`. Not IC50.
+
+**Result:** **unsigned** until Tobias. Do **not** invent Pass/Fail.
+
+**CEO Accept (Rolf, 2026-09-01):** Accept of this written what/why **before Tobias**. **Grok Build codes first**, then Tobias clicks.
+
+**OQ:** [OQ-WO-7](../.docs/review/open-questions/post-receive-work-spine.md) stays **OPEN** and **in-bar** for method complete / overall P2 Pass honesty. Closeout **1.4** is a different OPEN if still listed.
+
+**What / why:** After C3, WGS LimsRun starts on DNA; asked-for WGS with params still on blood. Lookup by dest `sample_id` freezes `{}` on Test `(DNA, WGS)`. Freeze from the work order’s asked-for. Not Qubit. Not extract=LimsRun. Not dest-follow.
+
+**Fixture:** Receive blood → asked-for WGS with real param (e.g. `library_kit`) → Route extract (dest DNA) → optional Qubit → one WGS LimsRun → C3 execute → Later Start WGS on DNA.
+
+**Pass:** Test `(DNA, WGS)` has `asked_for_params` = blood asked-for params (not `{}`). Parent stays Blood. Qubit own Test if present.
+
+**Fail:** `{}` / missing kit; WGS Test on blood; assay hung on extract.
+
+**Not a Fail:** no dest at Route/Start; `source_amount_null` setup; Qubit empty supporting freeze; 1.4 Extracted-DNA-only; ELISA on second blood tube.
+
+**Out of this AC:** freeze skip NULL Pass, C1/C2/C3, cardinality, Route 409, 1.4.
