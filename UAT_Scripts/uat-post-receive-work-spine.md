@@ -1056,4 +1056,12 @@ Do **not** re-score empty Route Pass on `8cfa2a9`.
 
 AC-P2-C1 **Pass** · AC-P2-C2 **Pass** · AC-P2-C3 **Pass** · AC-P2-card-1 **Pass** · AC-P2-card-2 **Pass** · AC-P2-card-3 **Pass** · AC-P2-qc-1 **Pass** · AC-P2-4 freeze skip NULL **Pass** (classic NULL; first start `{cell_line: A549}`; later start left it) · AC-P2-5 addendum Route two-accept **409** **Pass** · AC-P2-seq-1 **Pass** (two WOs; dest-cohort 1.2 not scored).
 
-**Overall P2 remains unsigned / not Pass.** Do not write overall P2 Pass, signed Pass, or merge-ready. Hold product merge. Stack down. Not IC50.
+**Overall P2 remains unsigned / not Pass.** Do not write overall P2 Pass, signed Pass, or merge-ready. Stack down. Not IC50.
+
+---
+
+## Science — OQ-WO-7 OPEN on the merge — 2026-09-01
+
+**Not a restamp of Tobias Results above.** Does **not** rewrite `bf51b19` per-AC Pass, `8cfa2a9`, `9342439`, P1, Deiter `02fe95f`, or Deiter Lab Ops Met on `570bbc0`. Not IC50.
+
+**Science:** Per-AC on `bf51b19` **Pass**. **Overall P2 stayed unsigned.** We merged (`5040f2d`) with **OQ-WO-7 OPEN** (WGS params on the DNA Test from the WO after C3). **That click never landed.** Seq-1 on this stamp did **not** score dest-cohort params. Clarifying the issue made the product better. Land OQ-WO-7 as **Brief → code → UAT with Pass/Fail and not-a-Fail → stamp → merge**.

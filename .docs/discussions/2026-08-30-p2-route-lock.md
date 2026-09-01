@@ -3,7 +3,7 @@
 **Date:** 2026-08-30  
 **Team:** Leadership (Lab Ops, CEO, Security CSO, Scientific CSO)  
 **Ask:** Round 1 remains **Leadership Confirmed** (Rolf, Deiter, Hans, Heidi, Günter; all five asks). Round 2 is **Leadership Confirm** (Rolf, Deiter, Hans, Heidi, Günter; R2-1…R2-4). **Contents grain / `0077` remains a Leadership Confirm** (Rolf, Deiter, Hans, Heidi, Günter) — process assignment is a **sample in a container**. Leadership later **Confirmed Deiter’s click**: C1 **Pass**, C2 **Fail**, dest mint Hold **Pass** on product `4671ba8` / `02fe95f`. C1/C2 are **not** unsigned. Docs Confirm `84d2810` is not a new execute and not the click SHA. Not a Tobias QA Pass and not a merge stamp. Grok Build owns dest-join / source-remove. Overall P2 UAT remains unsigned / not Pass.
-**Implement gate:** **OPEN for P2 coding on `feat/work-order-p2`.** **Merge bar Met** (Marc/CEO, 2026-09-01): product may merge to `main`. Closeout **1.2 dest-cohort lookup** is **OPEN post-merge**, not a merge hold. Older “held until signed UAT Pass / hold merge for 1.2” copy in walls below is **history** — do not restamp those walls.  
+**Implement gate:** P2 is on `main` (`5040f2d`). **OQ-WO-7 OPEN.** Per-AC Pass on `bf51b19`; overall P2 unsigned. Older “held until signed UAT Pass / hold merge for 1.2” copy in walls below is **history** — do not restamp those walls.  
 **Stem:** [post-receive-work-spine](../review/requirements/post-receive-work-spine.md)
 
 **Code:** `feat/work-order-p2`. Latest **signed** AC-P2 is `8cfa2a9` (per-AC; overall **not Pass**; PR **#92** honesty fold). **This commit** is `9342439` (`93424396ce3d02f01a8a8388abda39ae6ebf8010`): analysis is not a map field; Route matches a LIMS Run in the chain; process *x* → *x+1* emerging-type handoff; create-route UI shows types/analyses/emerging types.
@@ -604,4 +604,12 @@ Keep: asked-for-only lock; extract-as-process common path (not a forever ban on 
 After **two** UAT attempts on the same issue, the **next** run needs a written “what we are testing and why” **before** the click — fixtures, Pass/Fail, and what is **not** a Fail. Fold into living UAT / closeout. Do **not** rewrite signed stamps.
 
 Not IC50.
+
+---
+
+## Science — OQ-WO-7 OPEN on the merge — 2026-09-01
+
+**Science.** Does **not** rewrite Round 1, Round 2, Contents-grain Confirm, Deiter `02fe95f`, Tobias `9342439` / `8cfa2a9` / `bf51b19` Results, ELISA / second-tube Confirm, or Marc/CEO merge bar Met. Not overall P2 Pass. Not IC50.
+
+Per-AC on `bf51b19` **Pass**. **Overall P2 stayed unsigned.** We merged (`5040f2d`) with **OQ-WO-7 OPEN** (WGS params on the DNA Test from the WO after C3). **That click never landed.** Leftover `9f86d14` is not a UAT click and not on `main`. Clarifying the issue made the product better. Land OQ-WO-7 as **Brief → code → UAT with Pass/Fail and not-a-Fail → stamp → merge**.
 
