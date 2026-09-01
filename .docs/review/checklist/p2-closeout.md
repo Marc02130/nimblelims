@@ -9,7 +9,7 @@
 **Stem:** `post-receive-work-spine`  
 **UAT:** [`UAT_Scripts/uat-post-receive-work-spine.md`](../../../UAT_Scripts/uat-post-receive-work-spine.md) live stamp `bf51b19`
 
-**Now:** P2 is on `main` (`5040f2d`). Tobias signed **per-AC Pass** on `bf51b19`. **Overall P2 stayed unsigned / not Pass.** Merge landed with **OQ-WO-7 OPEN** (WGS params on the DNA Test from the WO after C3). **That click never landed** (`9f86d14` is leftover on this branch, not on `main`). Freeze skip NULL is **Tobias Pass** on `bf51b19`. Asked-for-only Marc lock from PR **111** still stands. **Leadership Confirm 2026-09-01** (ELISA not on DNA; second tube; extract LimsRun later). **Science (2026-09-01):** clarifying OQ-WO-7 made the product better. Land follow-up as **Brief → code → UAT with Pass/Fail and not-a-Fail → stamp → merge**. Stack **down**. Not IC50.
+**Now:** P2 is on `main` (`5040f2d`). Tobias signed **per-AC Pass** on `bf51b19`. **Overall P2 stayed unsigned / not Pass.** Merge landed with **OQ-WO-7 OPEN** (WGS params on the DNA Test from the WO after C3). **That click never landed** (`9f86d14` is leftover on this branch, not on `main`). Do **not** pretend merge was held for OQ-WO-7. Going forward OQ-WO-7 is **in-bar** for method complete / overall P2 Pass honesty: Brief → code → UAT Pass/Fail + not-a-Fail → stamp → merge. **Hans UAT brief** is numbered **AC-P2-OQ-WO-7**. **CEO Accept (Rolf)** of that written what/why before Tobias. **Grok Build codes first**, then Tobias clicks. Result **unsigned**. Do **not** invent Pass/Fail. Freeze skip NULL is **Tobias Pass** on `bf51b19`. Asked-for-only Marc lock from PR **111** still stands. **Leadership Confirm 2026-09-01** (ELISA not on DNA; second tube; extract LimsRun later). **Science (2026-09-01):** clarifying OQ-WO-7 made the product better. Closeout **1.4** may stay OPEN separately. Stack **down**. Not IC50.
 
 This is a working list, not a Leadership Confirm and not a UAT Result stamp. Do **not** rewrite signed UAT (`9342439`, `8cfa2a9`, `b005cfe`, `9c4f9da`, `3b56cfb`, P1 `c649245`, Deiter `02fe95f` C2 **Fail**). Do **not** rewrite Deiter Lab Ops Met on `570bbc0`. Do **not** restamp unsigned Tobias C2/C3 on `570bbc0`.
 
@@ -37,7 +37,7 @@ This is a working list, not a Leadership Confirm and not a UAT Result stamp. Do 
 | No route branching | **Marc lock, pending Leadership overwrite** |
 | Care about the asked-for only | **Marc lock 2026-09-01 (PR 111), pending Leadership overwrite** — still stands |
 | ELISA not on DNA; second tube own asked-for; separate containers = separate assignments | **Leadership Confirm 2026-09-01** (Rolf/Deiter/Hans/Heidi/Günter) |
-| OQ-WO-7 WGS params on DNA Test from WO after C3 | **OPEN.** Merged with this OPEN. **That click never landed.** Science 2026-09-01 |
+| OQ-WO-7 WGS params on DNA Test from WO after C3 | **OPEN. In-bar** for method complete / overall P2 Pass honesty. **CEO Accept (Rolf)** of Hans brief **AC-P2-OQ-WO-7**. Result unsigned. Merged with this OPEN (`5040f2d`) — that history stands. **That click never landed.** Science 2026-09-01 |
 | Overall P2 Pass | **Unsigned / not Pass** |
 | Merge to `main` | **Landed** `5040f2d` with OQ-WO-7 OPEN |
 
@@ -48,7 +48,7 @@ This is a working list, not a Leadership Confirm and not a UAT Result stamp. Do 
 ## Left after merge (not a merge hold)
 
 1. **Leadership Confirm** of sequential asked-fors (WGS on blood owns WGS params; C3 DNA; C2 aliquot continues WGS; WES = new asked-for on the DNA tube, then aliquoted or used up; own params). Marc lock is pending overwrite. Tobias Pass of two WOs is **not** that Confirm.
-2. **OQ-WO-7 / closeout 1.2 — OPEN. That click never landed.** After C3 (Blood→DNA) WGS start on the DNA dest must freeze **WGS params from the work order** onto the **DNA Test** (`{library_kit: …}`), **not** `{}`, **not** Qubit params. Seq-1 on `bf51b19` did **not** score this. Merge `5040f2d` did **not** include it. Leftover `9f86d14` on this branch is **not** a UAT click and **not** on `main`. Do **not** close OQ-WO-7 from leftover code. Land via **Brief → code → UAT with Pass/Fail and not-a-Fail → stamp → merge**. It is **not** freeze skip and **not** dest-follow.
+2. **OQ-WO-7 / closeout 1.2 — OPEN and in-bar. That click never landed.** After C3 (Blood→DNA) WGS start on the DNA dest must freeze **WGS params from the work order’s asked-for** onto the **DNA Test** (`{library_kit: …}`), **not** `{}`, **not** Qubit params. Lookup by dest `sample_id` only is Fail for this AC. Seq-1 on `bf51b19` did **not** score this. Merge `5040f2d` did **not** include it — do **not** rewrite that merge as a hold. Leftover `9f86d14` on this branch is **not** a UAT click and **not** on `main`. Do **not** close OQ-WO-7 from leftover code. Numbered AC: **AC-P2-OQ-WO-7**. **CEO Accept (Rolf)** of Hans’s written what/why. **Grok Build codes first**, then Tobias clicks. Result unsigned until Tobias. Land via **Brief → code → UAT with Pass/Fail and not-a-Fail → stamp → merge**. It is **not** freeze skip and **not** dest-follow.
 3. **Closeout 1.4 — Extracted DNA asked-for (zero assay LimsRuns):** If asked-for is Extracted DNA, they get a DNA tube. No sequencing. **Qubit/Nanodrop may sit** (Leadership Confirm 2026-09-01). Today map-save/Route **422** when a chain has **zero** LimsRuns (`Route has no LIMS Run analysis`). That 422 is **wrong** for this asked-for. Two ELISA LimsRuns still 422. Extract may be a LimsRun later if equipment is an instrument. Do **not** teach a forever ban.
 4. **Overall P2 Pass** — Tobias has not signed overall Pass. Do not write it from this fold.
 5. **Merge** — **Landed** `5040f2d` with OQ-WO-7 OPEN. Do not invent overall P2 Pass. Freeze skip NULL **Pass** on `bf51b19` is not a hold.
@@ -62,7 +62,7 @@ Do **not** recode dest-follow, cardinality, freeze skip NULL, or Route two-accep
 | # | Gap | Now | Do |
 |---|-----|-----|----|
 | **1.1 Cardinality 1** | Two ELISA LimsRuns must 422 | **Done.** Tobias Pass `bf51b19` | Do not re-score |
-| **1.2 / OQ-WO-7** | WGS params on the DNA Test from the WO after C3 | **OPEN.** Not on `main` (`5040f2d`). **That click never landed.** Seq-1 Pass without scoring dest-cohort params. Leftover `9f86d14` is not the merge | Brief → code → UAT (Pass/Fail and not-a-Fail) → stamp → merge. Freeze `{library_kit: …}` from WO, not `{}`, not Qubit |
+| **1.2 / OQ-WO-7** | WGS params on the DNA Test from the WO after C3 | **OPEN. In-bar.** Not on `main` (`5040f2d`). **CEO Accept (Rolf)** of Hans brief **AC-P2-OQ-WO-7**. Result unsigned. **That click never landed.** Seq-1 Pass without scoring dest-cohort params. Leftover `9f86d14` is not the merge | **Grok Build codes first**, then Tobias. Brief → code → UAT (Pass/Fail and not-a-Fail) → stamp → merge. Freeze `{library_kit: …}` from WO asked-for, not `{}`, not Qubit |
 | **1.3 Freeze skip NULL** | Classic `{}` vs frozen `{}` | **Done** (`0078`). Tobias Pass `bf51b19` | Do not transfer `99b692d3` |
 | **1.4 Extracted DNA asked-for** | Zero assay LimsRuns; DNA tube only | Map-save/Route still **422** on 0 LimsRuns | Code iff in-bar: allow extract-only route when asked-for is Extracted DNA |
 
@@ -75,6 +75,8 @@ Do **not** recode dest-follow, cardinality, freeze skip NULL, or Route two-accep
 After **two** UAT attempts on the same issue, the **next** run needs a written “what we are testing and why” **before** the click — fixtures, Pass/Fail, and what is **not** a Fail. Do **not** rewrite signed stamps (`bf51b19`, `8cfa2a9`, `9342439`, P1, `02fe95f`, Deiter `570bbc0` Lab Ops Met) to satisfy this rule.
 
 **Science (2026-09-01):** same grain. OQ-WO-7 lands as **Brief → code → UAT with Pass/Fail and not-a-Fail → stamp → merge**. Clarifying WGS params on the DNA Test from the WO after C3 made the product better. Not IC50.
+
+**CEO Accept (Rolf, 2026-09-01):** Accept Hans’s written what/why as **AC-P2-OQ-WO-7** before Tobias. Pass/Fail and not-a-Fail as in that brief. **Grok Build codes first**, then Tobias clicks. Result stays **unsigned**. OQ-WO-7 stays **OPEN** and **in-bar**. Do **not** rewrite `bf51b19`. Not IC50.
 
 ---
 
@@ -94,6 +96,7 @@ Live stamp is `bf51b19`. Tobias · local compose · 2026-08-31 · **down** after
 | AC-P2-4 freeze skip NULL | **Pass** |
 | AC-P2-5 addendum Route two-accept 409 | **Pass** |
 | AC-P2-seq-1 two WOs | **Pass** — 1.2 / OQ-WO-7 not scored |
+| AC-P2-OQ-WO-7 WGS params from WO after C3 | **Unsigned** — CEO Accept (Rolf) of Hans brief; Grok Build codes first; Tobias has not clicked |
 | Overall P2 | **unsigned / not Pass** |
 
 Do **not** re-score `8cfa2a9` / `9342439` / P1 / Deiter `02fe95f` C2 Fail. Do **not** score dest at Route/Start as Fail. Do **not** score leftover C2 volume as Fail. Do **not** score DNA as C2. Do **not** restamp unsigned Tobias C2/C3 on `570bbc0`.
@@ -109,12 +112,13 @@ Do **not** re-score `8cfa2a9` / `9342439` / P1 / Deiter `02fe95f` C2 Fail. Do **
 | C1 / C2 / C3 | **Pass** `bf51b19`. Deiter Lab Ops Met `570bbc0`. Tobias C2/C3 **unsigned** on `570bbc0`. Deiter C2 Fail `02fe95f` history | — |
 | Route two-accept 409 | **Pass** `bf51b19` | — |
 | Seq-1 two WOs | **Pass** `bf51b19` | Leadership Confirm of the lock (not a merge hold) |
-| OQ-WO-7 dest-cohort params (1.2) | **OPEN.** Not on `main`. **That click never landed** | WGS params on the DNA Test from the WO after C3. Brief → code → UAT (Pass/Fail and not-a-Fail) → stamp → merge |
+| OQ-WO-7 dest-cohort params (1.2) | **OPEN. In-bar.** Not on `main`. **CEO Accept (Rolf)** of **AC-P2-OQ-WO-7**. Result unsigned. **That click never landed** | WGS params on the DNA Test from the WO asked-for after C3, not `{}`. Grok Build codes first, then Tobias. Brief → code → UAT (Pass/Fail and not-a-Fail) → stamp → merge |
 | Extracted DNA asked-for (1.4) | Zero LimsRuns still map-save/Route **422** | Post-merge / iff in-bar |
 | Historical Route/WO-7/AC-P2-9..11 | **Signed Pass** | Do not re-score |
 | Asked-for-only Marc lock (PR 111) | **Stands** | Do not rewrite |
-| ELISA / second-tube | **Leadership Confirm 2026-09-01** | ELISA not on DNA; two blood tubes → two assignments (`container_id`); Extracted DNA may have Qubit/Nanodrop; OQ-WO-6 still assay LimsRun only; OQ-WO-7 OPEN |
+| ELISA / second-tube | **Leadership Confirm 2026-09-01** | ELISA not on DNA; two blood tubes → two assignments (`container_id`); Extracted DNA may have Qubit/Nanodrop; OQ-WO-6 still assay LimsRun only; OQ-WO-7 OPEN in-bar |
 | Standing UAT two-attempt rule | **Folded** | After two UAT attempts on the same issue, next run needs written “what we are testing and why” before the click |
 | Science 2026-09-01 | **Folded** | Per-AC Pass. Overall unsigned. Merged with OQ-WO-7 OPEN. Click never landed. Not IC50 |
+| CEO Accept (Rolf) of Hans AC-P2-OQ-WO-7 brief | **Folded** 2026-09-01 | Written what/why Accept before Tobias. Grok Build codes first. Result unsigned. In-bar Brief → code → UAT → stamp → merge. Not IC50 |
 | Overall P2 Pass | **Unsigned** | Do not invent from this fold |
 | Merge to `main` | **Landed** `5040f2d` | With OQ-WO-7 OPEN |
