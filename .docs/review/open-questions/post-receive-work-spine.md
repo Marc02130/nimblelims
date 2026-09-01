@@ -67,7 +67,13 @@ Qubit / Nanodrop / etc. are **supporting LimsRuns in the same route** as the ask
 
 Extract uses **equipment**, not instruments. Extract is an **experiment** that may occupy a process. **Never a LimsRun.** No asked-for `analysis_id`. LimsRun is instruments / analysis / Tests. Do not author extract as a LimsRun.
 
-**After extract**, a **QC LimsRun** (Qubit, Nanodrop, or other QC instrument) quantifies the DNA. Own Test. **Process QC is not an asked-for.** Do not invent a second asked-for for Qubit/Nanodrop. The asked-for assay still appears once, on the assay LimsRun.
+**After extract**, when the asked-for is an **assay** (WGS / WES / ELISA / …), a **QC LimsRun** (Qubit, Nanodrop, or other QC instrument) may quantify the DNA. Own Test. **Process QC is not an asked-for.**
+
+**If the asked-for is Extracted DNA:** they get a **tube of DNA**. No sequencing. **No other LimsRuns.** Extract may become a LimsRun later if the equipment is an instrument — not a forever ban.
+
+## Marc lock overwrite — Extracted DNA asked-for is a tube — 2026-08-31
+
+Asked-for **Extracted DNA** = DNA tube. No sequencing LimsRun. No other LimsRuns on that asked-for. Cardinality “exactly one asked-for LimsRun” does **not** apply to that asked-for (zero assay LimsRuns). Two ELISA LimsRuns still 422. Assay asked-fors still: extract experiment → optional QC LimsRun (not asked-for) → one assay LimsRun.
 
 ## Gate rule
 

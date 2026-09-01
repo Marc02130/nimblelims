@@ -525,3 +525,16 @@ The Marc Confirm immediately above is retained. This Confirm is the **general** 
 
 Hold merge. Not IC50.
 
+---
+
+## Marc lock overwrite — Extracted DNA asked-for is a tube; extract may LimsRun later — 2026-08-31
+
+**Not a restamp of OQ-WO-6 votes.** Does **not** rewrite C2/C3 / `bf51b19`. Overwrites “extract is never a LimsRun” as a forever ban, and the assumption that every asked-for is a sequencing/ELISA LimsRun. Not Pass. Not IC50.
+
+1. **Today** extract is an **experiment** (equipment). **Later**, if that equipment is an **instrument**, extract **may** be a LimsRun. Do not paint a forever ban.
+2. **If the asked-for is Extracted DNA:** they get a **tube of DNA**. No sequencing. **No other LimsRuns.** Route is extract experiment → dest DNA. Done. Process QC / Qubit / Nanodrop / WGS / WES are **not** on that asked-for.
+3. **If the asked-for is WGS / WES / ELISA / …:** extract experiment first; then (when needed) a QC LimsRun on the DNA; then the **one** asked-for assay LimsRun. Process QC is still **not** an asked-for.
+4. Cardinality “exactly one asked-for LimsRun” is for **assay** asked-fors. **Extracted DNA** has **zero** assay LimsRuns. Map-save/Route **422** on 0 LimsRuns is **wrong** for that asked-for (closeout **1.4**). Two ELISA LimsRuns still 422.
+
+Hold merge. Not IC50.
+
