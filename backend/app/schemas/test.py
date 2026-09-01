@@ -58,6 +58,7 @@ class TestResponse(TestBase):
     created_by: UUID
     modified_at: datetime
     modified_by: UUID
+    asked_for_params: Optional[Dict[str, Any]] = None
 
     class Config:
         from_attributes = True

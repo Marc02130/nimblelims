@@ -48,7 +48,7 @@ Recommended if the goal is “merge this to main now”: **A**, plus coding 1.1 
 
 | # | Gap | Why it fails UAT if scored as written | Where |
 |---|-----|----------------------------------------|--------|
-| **1.1 Cardinality 1 among LimsRuns** | Docs: map-save / Route **422** if the asked-for analysis appears **0 or 2+** times among LimsRun steps. Two ELISA LimsRuns refused (they would share one Test `(sample, ELISA)` — not QC). | Code today: `_chain_lims_analysis_ids` **dedupes**. Two ELISA LimsRuns still look like one analysis. Route match is `analysis_id in analyses` (containment), not a **count**. Zero LimsRuns already 422 (`Route has no LIMS Run analysis`). **2+ of the same analysis does not 422.** | `backend/app/services/routing_service.py` (`_chain_lims_analysis_ids`, `_require_chain_analyses`, `_acceptable_maps`, create/update map) |
+| **1.1 Cardinality 1 among LimsRuns** | Docs: map-save / Route **422** if the asked-for analysis appears **0 or 2+** times among LimsRun steps. Two ELISA LimsRuns refused (they would share one Test `(sample, ELISA)` — not QC). | **Coded.** Map-save 422 if any LimsRun `analysis_id` appears twice. Route requires asked-for count **exactly 1** (supporting QC other analyses still legal). Zero LimsRuns still 422. Overlap 409 still uses the unique analysis **set**. Pytest in `test_work_order_p2.py`. | `backend/app/services/routing_service.py` |
 | **1.2 WO-7 asked-for lookup after C3** | Docs: WGS asked-for on **blood** owns WGS params. C3 mints DNA; later LimsRun is the assay step on the dest cohort. | `_mint_tests_at_start` looks up `AskedFor` with `sample_id == cohort sample` **and** `analysis_id == run.analysis_id`. After C3 the cohort is **DNA**; the WGS asked-for is still on **blood** → params come back `{}`. Need lookup via the work order’s `asked_for_id` (or parent lineage), not dest `sample_id`. | `backend/app/services/lims_run_service.py` ~314–324 |
 
 Pytest to add with those patches:
@@ -62,7 +62,7 @@ Pytest to add with those patches:
 
 | # | Gap | Work |
 |---|-----|------|
-| **1.3 Classic NULL or freeze marker** | `tests.asked_for_params` is `nullable=False, server_default='{}'`. First start cannot tell classic default `{}` from frozen `{}`. `if test: continue` is **not** a freeze. | Alembic: allow NULL (or add a freeze marker). Classic `POST /tests` leaves NULL. First LimsRun start **writes** the snapshot. Later start does not overwrite, including frozen `{}`. Do **not** teach skip-on-`{}` on today’s schema. |
+| **1.3 Classic NULL or freeze marker** | `tests.asked_for_params` is `nullable=False, server_default='{}'`. First start cannot tell classic default `{}` from frozen `{}`. `if test: continue` is **not** a freeze. | **Coded (NULL path).** Alembic `0078`: column nullable, no `{}` server default. Existing `{}` rows left as frozen empty. Classic `POST /tests` writes NULL. First LimsRun start writes onto NULL. Later start does not overwrite NULL-after-write or frozen `{}`. Tobias still unsigned. |
 
 ### 2.3 Verify, do not recode unless Tobias Fails
 
@@ -110,17 +110,17 @@ Fixture honesty already in the script (keep):
 
 | New / punch | Expected | Notes |
 |-------------|----------|--------|
-| **AC-P2-card-1** map-save two ELISA LimsRuns | **422** | After 2.1 is coded. Not QC. |
-| **AC-P2-card-2** map-save extract (process) + Qubit LimsRun + ELISA LimsRun | **201** | Asked-for ELISA appears **once**. Qubit is supporting. |
-| **AC-P2-card-3** Route when asked-for analysis missing from chain / appears twice | **422**, asked-for stays `requested`, no WO | Pair with empty-Route Pass on `8cfa2a9` (do not re-score empty Route). |
-| **AC-P2-qc-1** Qubit in the **same** route as the asked-for assay | Qubit gets its **own** Test `(sample, Qubit)` at Qubit LimsRun start. Asked-for analysis still once on the assay LimsRun. Do **not** put Qubit/Nanodrop on extract. | |
-| **AC-P2-seq-1** sequential asked-fors (WGS then WES) | Route **blood** for WGS (extract process → seq LimsRun). C3 DNA. C2 aliquot of that DNA continues **WGS** (same WO, WGS params). **New asked-for on the DNA tube** for WES (own params); that tube is then **aliquoted or used up**. Two WOs. Dest does **not** auto-join WES. Do **not** copy WGS params onto WES. | Needs 2.1 + 2.2 in code or WGS params on DNA dest will be `{}`. |
-| **AC-P2-5 addendum** Route two-accept **409** | Two saved maps that both accept this type **and** this analysis → **409**, no silent `first()` | Script already has the step (`8cfa2a9` §7). **Unsigned that SHA.** Click it; do not re-score the rest of AC-P2-5. |
+| **AC-P2-card-1** map-save two ELISA LimsRuns | **422** | **In script** (live unsigned stamp). |
+| **AC-P2-card-2** map-save extract (process) + Qubit LimsRun + ELISA LimsRun | **201** | **In script.** |
+| **AC-P2-card-3** Route when asked-for analysis missing from chain / appears twice | **422**, asked-for stays `requested`, no WO | **In script.** Do not re-score empty Route on `8cfa2a9`. |
+| **AC-P2-qc-1** Qubit in the **same** route as the asked-for assay | Qubit gets its **own** Test `(sample, Qubit)` at Qubit LimsRun start. Asked-for analysis still once on the assay LimsRun. Do **not** put Qubit/Nanodrop on extract. | **In script.** |
+| **AC-P2-4 freeze skip NULL** | Classic `/tests` NULL; first start writes; later start does not overwrite | **In script.** Requires `0078`. Do not transfer `99b692d3` `{}`. |
+| **AC-P2-seq-1** sequential asked-fors (WGS then WES) | Route **blood** for WGS; C3 DNA; C2 aliquot continues WGS; **new asked-for on the DNA tube** for WES; aliquot or use up. Two WOs. Dest does **not** auto-join WES. | **In script.** Dest-cohort params (1.2) is **not** this AC. |
+| **AC-P2-5 addendum** Route two-accept **409** | Two saved maps that both accept this type **and** this analysis → **409**, no silent `first()` | **In script.** Do not re-score the rest of AC-P2-5. |
 | Extract is a process | Do **not** author extract as a LimsRun wearing ELISA. | Honesty for map-save, not a dest-follow Fail. |
 
 ### 3.3 Do not add / do not score
 
-- Freeze skip Pass (unless 1.3 lands).
 - Dest existing at Route, Start, or map-save.
 - Emptying the C2 source as a Pass condition.
 - DNA dest scored as C2.

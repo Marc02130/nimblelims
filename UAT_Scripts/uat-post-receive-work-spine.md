@@ -839,9 +839,9 @@ The preceding Deiter click (`4671ba8` / `02fe95f`) is retained verbatim as signe
 
 ## Live dest-follow stamp — `570bbc0` Deiter Lab Ops Met; Tobias QA restamp pending
 
-**Not Pass overall.** Deiter’s execute click on **`570bbc0`** (`570bbc01ff50fdac2d529448ceb95683c535401f`) is **Met for Lab Ops identity only**: same-type plate, DNA new Sample, and Later Start following the destination. It is not Tobias QA Pass. Execute joints stay **`1572071`** (`15720716c7cc927f1b498602ea87dec8a2bee85b`) and have **no Tobias Result**. Do **not** rewrite Deiter `02fe95f`, Tobias `9342439` / `8cfa2a9`, or P1. PATCH is not a path. Freeze skip and Route two-accept 409 stay OPEN. **OQ-WO-6 extract CLOSED.** Hold merge. Not IC50.
+**Not Pass overall.** Deiter’s execute click on **`570bbc0`** (`570bbc01ff50fdac2d529448ceb95683c535401f`) is **Met for Lab Ops identity only**: same-type plate, DNA new Sample, and Later Start following the destination. It is not Tobias QA Pass. Execute joints stay **`1572071`** (`15720716c7cc927f1b498602ea87dec8a2bee85b`) and have **no Tobias Result**. Do **not** rewrite Deiter `02fe95f`, Tobias `9342439` / `8cfa2a9`, or P1. PATCH is not a path. Cardinality / freeze-skip NULL / sequential asked-fors are **not this dest-follow click** — see the live unsigned stamp below. **OQ-WO-6 extract CLOSED.** Hold merge. Not IC50.
 
-**Leadership Confirm (2026-08-31):** extract is a process; exactly one asked-for LimsRun is the assay step. **Rolf/Marc:** Qubit / Nanodrop are supporting LimsRuns in the **same route as whatever the asked-for assay is** (ELISA, NGS, Qubit-as-asked-for, sequencing, …; own Tests, own params freeze). **No route branching:** WGS asked-for on blood owns WGS params (extract → seq); C3 DNA then C2 aliquot into WGS; WES is a new asked-for on the DNA tube, which is then aliquoted or used up (own params). Freeze skip OPEN. **OQ-WO-6 extract CLOSED.** Not Pass.
+**Leadership Confirm (2026-08-31):** extract is a process; exactly one asked-for LimsRun is the assay step. **Rolf/Marc:** Qubit / Nanodrop are supporting LimsRuns in the **same route as whatever the asked-for assay is** (ELISA, NGS, Qubit-as-asked-for, sequencing, …; own Tests, own params freeze). **No route branching:** WGS asked-for on blood owns WGS params (extract → seq); C3 DNA then C2 aliquot into WGS; WES is a new asked-for on the DNA tube, which is then aliquoted or used up (own params). **OQ-WO-6 extract CLOSED.** Not Pass.
 
 | Slice | Deiter Lab Ops on `570bbc0` | Tobias QA restamp |
 |-------|-------------------------------|-------------------|
@@ -906,4 +906,134 @@ The preceding Deiter click (`4671ba8` / `02fe95f`) is retained verbatim as signe
 
 Route / Start / map-save / asked-for still mint **zero** daughters. Receive still mints identity + first vessel — that is **not** dest mint. Dest exists only after execute. That is not this click.
 
-Deiter C2 **Fail** on `02fe95f` stays history. `9342439` untouched. Deiter’s `570bbc0` execute is Lab Ops **Met**, not a Tobias QA Pass. Tobias’s QA restamp remains unsigned until his execute Results land here. Freeze skip and Route two-accept 409 stay OPEN. **OQ-WO-6 extract CLOSED.** Overall P2 remains **unsigned / not Pass**. Hold merge. Not IC50.
+Deiter C2 **Fail** on `02fe95f` stays history. `9342439` untouched. Deiter’s `570bbc0` execute is Lab Ops **Met**, not a Tobias QA Pass. Tobias’s QA restamp remains unsigned until his execute Results land here. **OQ-WO-6 extract CLOSED.** Overall P2 remains **unsigned / not Pass**. Hold merge. Not IC50.
+
+---
+
+The preceding dest-follow stamp (`570bbc0` Lab Ops Met; C2/C3 numbered) is retained. It is not a freeze-skip, cardinality, or sequential-asked-for Result. Do not fold those clicks into C2/C3.
+
+## Live unsigned ACs — cardinality 1, freeze skip NULL, sequential asked-fors
+
+**Not Pass overall.** Do **not** rewrite `8cfa2a9`, `9342439`, Deiter `02fe95f`, or P1. Tobias clicks these on live `feat/work-order-p2` **after backend rebuild so Alembic `0078` is applied**. Cardinality 1 and freeze skip NULL are **coded**. WO-7 dest-cohort asked-for lookup (closeout 1.2) is **not** this stamp. Route two-accept **409** is coded; unsigned as a click. Hold merge. Not IC50.
+
+| AC | Coded | Tobias |
+|----|-------|--------|
+| AC-P2-card-1 two ELISA LimsRuns map-save **422** | Yes | **unsigned** |
+| AC-P2-card-2 extract process + Qubit + ELISA map-save **201** | Yes | **unsigned** |
+| AC-P2-card-3 Route asked-for count 0 or 2+ **422** | Yes | **unsigned** |
+| AC-P2-qc-1 Qubit supporting LimsRun, own Test | Yes | **unsigned** |
+| AC-P2-4 freeze skip NULL (classic `/tests` → first start writes) | Yes (`0078`) | **unsigned** |
+| AC-P2-5 addendum Route two-accept **409** | Yes | **unsigned** (`8cfa2a9` §7 not clicked) |
+| AC-P2-seq-1 sequential asked-fors (WGS then WES on DNA tube) | Partial — two WOs coded; dest-cohort params lookup is **not** this AC | **unsigned** |
+
+**Do not re-score** empty Route 422 / map overlap 409 / first Start `chain[0]` / publish-refuse / AC-P2-9..11. Those stay signed history.
+
+### AC-P2-card-1 — map-save two ELISA LimsRuns
+
+**Result:** **unsigned**
+
+**Setup**
+1. Admin `/admin/routing-map`. No analysis or sample-type picker.
+2. Author **one** process whose chain has **two LimsRun steps** with the **same** analysis (e.g. two ELISA). First step has accepted types. Extract is **not** this AC.
+
+**Steps**
+1. Save the map.
+
+**Expect:** **422** `route_sample_type`. Message: a LIMS Run analysis may appear only once; two LimsRuns with the same analysis are refused. No row saved. That is **not** QC.
+
+**Fail** if save is **201**.
+
+### AC-P2-card-2 — extract process + Qubit + ELISA
+
+**Result:** **unsigned**
+
+**Setup**
+1. Process 1 = **extract** as an Experiment (aliquot/pool plan). **No** `analysis_id` on extract. Dest type DNA (or same-as-parent if the next process accepts inbound).
+2. Process 2 = Qubit **LimsRun** (other analysis).
+3. Process 3 = ELISA **LimsRun** (the asked-for assay).
+4. Handoff types accept: extract emerging type is accepted by Qubit first step; Qubit emerging is accepted by ELISA first step.
+
+**Steps**
+1. Save TAT + that ordered chain.
+
+**Expect:** **201**. Asked-for ELISA appears **once**. Qubit is a supporting LimsRun. Extract is a process and is not counted.
+
+**Fail** if 422 because extract “has no analysis,” or because Qubit is treated as a second ELISA.
+
+### AC-P2-card-3 — Route 422 when asked-for count is 0 or 2+
+
+**Result:** **unsigned**
+
+Do **not** re-score empty Route Pass on `8cfa2a9`.
+
+**Steps**
+1. Asked-for ELISA on a received tube. Route against a map whose LimsRuns do **not** include ELISA (e.g. Qubit-only). Confirm **422**, row stays `requested`, **0** work orders.
+2. (Legacy / QA fixture only.) A map whose chain has **two** ELISA LimsRuns — map-save now refuses this, so insert is a fixture if needed. Route ELISA. Confirm **422**, stays `requested`, **0** work orders.
+
+**Expect:** asked-for analysis must appear on **exactly one** LimsRun. 0 or 2+ → **422**. Never silent `first()`.
+
+### AC-P2-qc-1 — supporting Qubit in the same route
+
+**Result:** **unsigned**
+
+**Setup:** Use the AC-P2-card-2 map (extract process + Qubit LimsRun + ELISA LimsRun). Route a blood (or inbound-type) tube as **ELISA** asked-for.
+
+**Steps**
+1. Route. Confirm one WO, ELISA asked-for, snapshot includes extract → Qubit → ELISA.
+2. Start extract (process). Do **not** expect an ELISA Test at extract start.
+3. Later Start Qubit LimsRun and start that run. Confirm a Test `(sample, Qubit)` — **own** Test, not the ELISA Test.
+4. Later Start ELISA LimsRun and start that run. Confirm a Test `(sample, ELISA)` with asked-for params freeze. ELISA still appears **once**.
+
+**Expect:** Qubit is not a second asked-for. Do **not** put Qubit/Nanodrop on extract. Do **not** fold Qubit into the ELISA `analysis_id`.
+
+**Fail** if extract start writes the ELISA Test, or if Qubit start writes ELISA params onto `(sample, ELISA)`.
+
+### AC-P2-4 — freeze skip NULL (live restamp)
+
+**Result:** **unsigned.** Do **not** transfer `8cfa2a9` (`{}` on `99b692d3`) as this Result. That write is history of a **new** Test, not classic skip.
+
+**Requires `0078`.** If classic `/tests` still stores `{}`, rebuild the backend and stop — that is setup, not a skip Pass.
+
+**Steps**
+1. Receive. Asked-for with a real param (e.g. `cell_line`). Route a one-assay LimsRun map.
+2. **Before** LimsRun start, classic `POST /tests/` for that `(sample, analysis)`. Inspect `asked_for_params`.
+3. `PATCH /v1/lims-runs/{id}/start` for the asked-for analysis. Re-read `asked_for_params`.
+4. Change the asked-for params. Start a **second** LimsRun over the same cohort and analysis. Re-read `asked_for_params`.
+
+**Expect**
+- Step 2: classic row is **NULL** (not `{}`).
+- Step 3: first start **writes** the asked-for snapshot onto that Test (does not mint a second Test).
+- Step 4: later start does **not** overwrite. Frozen `{}` (a prior first-start empty write) also must not overwrite — that is locked empty, not classic NULL.
+
+**Fail** if classic stores `{}`, if first start skips the NULL row, or if later start overwrites.
+
+**Not this AC:** publish-refuse (`test_missing` 422) — already Tobias-signed Pass on `8cfa2a9`.
+
+### AC-P2-5 addendum — Route two-accept 409
+
+**Result:** **unsigned.** Do **not** re-score AC-P2-5 click-save Pass on `8cfa2a9`. This is only step 7 of that AC, which was **not** clicked that SHA.
+
+**Steps**
+1. Two saved maps that both accept this sample’s current type **and** this asked-for analysis (e.g. widen a Qubit-first first-step list so it also accepts the extract-first type, same assay in both chains).
+2. Route.
+
+**Expect:** **409**. No silent `first()`. No work order. Asked-for stays `requested`. No picker this phase.
+
+### AC-P2-seq-1 — sequential asked-fors (WGS then WES)
+
+**Result:** **unsigned.** **No route branching.** Dest does **not** auto-join a second WO.
+
+**Setup**
+1. WGS route: **blood** inbound. Process 1 = extract (Experiment, dest DNA). Process 2 = WGS sequencing LimsRun (exactly one asked-for LimsRun). WGS asked-for **owns WGS params**.
+2. WES route: **DNA** inbound. Post-extract → WES sequencing LimsRun. **No** extract on this route.
+
+**Steps**
+1. Route blood as WGS. C3 execute mints the DNA tube. A **C2 aliquot** of that DNA continues the **WGS** WO (same asked-for, WGS params).
+2. Record a **new asked-for on the DNA tube** for WES (own params). Route WES. That DNA tube is then **aliquoted or used up** on the WES WO.
+3. Confirm **two** asked-fors, **two** param snapshots, **two** WOs. Dest from WGS extract does **not** appear on the WES WO until WES Route/Start.
+
+**Expect:** Do **not** copy WGS params onto WES. Do **not** teach one WO splitting to two assays.
+
+**Not this AC:** WGS params freeze onto a Test whose cohort sample is the **DNA dest** (WO-7 still looks up asked-for by cohort `sample_id` — closeout **1.2**, not coded). Do not Fail seq-1 if dest-cohort params are `{}`. Do Fail seq-1 if dest auto-joins WES or WES is not a new asked-for on the DNA tube.
+
+**Overall P2 remains unsigned / not Pass.** Hold merge. Not IC50.

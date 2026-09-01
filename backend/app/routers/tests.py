@@ -188,6 +188,7 @@ async def create_test(
         test_date=test_data.test_date,
         technician_id=test_data.technician_id,
         custom_attributes=validated_custom_attributes,
+        asked_for_params=None,
         created_by=current_user.id,
         modified_by=current_user.id
     )
@@ -258,6 +259,7 @@ async def assign_test_to_sample(
         status=in_process_status.id,
         test_date=assignment_data.test_date,
         technician_id=assignment_data.technician_id or current_user.id,
+        asked_for_params=None,
         created_by=current_user.id,
         modified_by=current_user.id
     )

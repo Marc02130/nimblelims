@@ -129,9 +129,10 @@ class RoutingService:
         return [
             row
             for row in rows
-            if analysis_id in self._chain_lims_analysis_ids(
-                list(row.process_definition_ids or [])
+            if self._asked_for_lims_run_count(
+                list(row.process_definition_ids or []), analysis_id
             )
+            == 1
         ]
 
     def create_map(
@@ -461,7 +462,11 @@ class RoutingService:
                 },
             )
 
-    def _chain_lims_analysis_ids(self, chain: Sequence[UUID]) -> List[UUID]:
+    def _lims_run_analysis_ids_in_chain(self, chain: Sequence[UUID]) -> List[UUID]:
+        """LimsRun analysis_ids in chain order, including duplicates.
+
+        Extract / experiment steps are not LimsRuns and are not counted.
+        """
         if not chain:
             return []
         steps = (
@@ -473,7 +478,6 @@ class RoutingService:
         for step in steps:
             by_def.setdefault(step.process_definition_id, []).append(step)
         ids: List[UUID] = []
-        seen = set()
         for def_id in chain:
             ordered = sorted(
                 by_def.get(def_id, []), key=lambda s: s.sort_order or 0
@@ -482,14 +486,22 @@ class RoutingService:
                 if (step.step_kind or "") != "lims_run":
                     continue
                 aid = getattr(step, "analysis_id", None)
-                if aid and aid not in seen:
-                    seen.add(aid)
+                if aid:
                     ids.append(aid)
         return ids
 
+    def _chain_lims_analysis_ids(self, chain: Sequence[UUID]) -> List[UUID]:
+        """Unique LimsRun analysis_ids in chain order (overlap 409 / map read)."""
+        return list(dict.fromkeys(self._lims_run_analysis_ids_in_chain(chain)))
+
+    def _asked_for_lims_run_count(
+        self, chain: Sequence[UUID], analysis_id: UUID
+    ) -> int:
+        return self._lims_run_analysis_ids_in_chain(chain).count(analysis_id)
+
     def _require_chain_analyses(self, chain: Sequence[UUID]) -> List[UUID]:
-        ids = self._chain_lims_analysis_ids(chain)
-        if not ids:
+        raw = self._lims_run_analysis_ids_in_chain(chain)
+        if not raw:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail={
@@ -497,7 +509,22 @@ class RoutingService:
                     "message": "Route has no LIMS Run analysis",
                 },
             )
-        return ids
+        seen = set()
+        for aid in raw:
+            if aid in seen:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail={
+                        "code": ROUTE_SAMPLE_TYPE,
+                        "message": (
+                            "A LIMS Run analysis may appear only once in the "
+                            "route; two LimsRuns with the same analysis are "
+                            "refused"
+                        ),
+                    },
+                )
+            seen.add(aid)
+        return list(dict.fromkeys(raw))
 
     def _sync_maps_for_first_process(self, process_definition_id: UUID) -> None:
         """Keep routing_map.sample_type_id in line with the first typed step."""
@@ -590,10 +617,13 @@ class RoutingService:
             chain = list(row.process_definition_ids or [])
             try:
                 types = self._require_first_step_types(chain)
-                analyses = self._require_chain_analyses(chain)
+                self._require_chain_analyses(chain)
             except HTTPException:
                 continue
-            if sample_type_id in types and analysis_id in analyses:
+            if (
+                sample_type_id in types
+                and self._asked_for_lims_run_count(chain, analysis_id) == 1
+            ):
                 acceptable.append(row)
         return acceptable
 
