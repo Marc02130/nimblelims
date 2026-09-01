@@ -10,7 +10,7 @@
 - PRD: [`.docs/internal/prd/post-receive-work-spine/PRD.md`](../../internal/prd/post-receive-work-spine/PRD.md)  
 - Spec: [`.docs/internal/specs/post-receive-work-spine/SPEC.md`](../../internal/specs/post-receive-work-spine/SPEC.md)  
 - Open questions: [`.docs/review/open-questions/post-receive-work-spine.md`](../open-questions/post-receive-work-spine.md)  
-**Related Lab Ops:** [lab-ops-review/post-receive-work-spine.md](../lab-ops-review/post-receive-work-spine.md) — ordered-route L2/L4 locked; product merge held on OPEN freeze / unsigned P2
+**Related Lab Ops:** [lab-ops-review/post-receive-work-spine.md](../lab-ops-review/post-receive-work-spine.md) — ordered-route L2/L4 locked; dest-follow Met; P2 on `main` `5040f2d` with **OQ-WO-7 OPEN**
 **Related:**  
 - Framework stamps WO-1…WO-7, FW-0/FW-2: [`.docs/decision-logs/framework-stamps-2026-08-26.md`](../../decision-logs/framework-stamps-2026-08-26.md)  
 - Promote-on-publish: [open-questions/run-results.md](../open-questions/run-results.md) (Decision #2 `raw_result`; Decision #7 ensure-on-publish **superseded by WO-7**)  
@@ -170,4 +170,29 @@ Already normative (restated so P3 does not drop them): no `results.unit_id`; mis
 SCIENTIFIC CSO REVIEW: Accept with conditions (SC1–SC5)
 IMPLEMENT RELEVANCE: OPEN (P1 only)
 OQ-RES-1: Decided
+```
+
+---
+
+## 9. Science fold — P2 merge with OQ-WO-7 OPEN — 2026-09-01
+
+**Not a restamp of the 2026-08-28 Accept.** Does **not** rewrite SC1–SC5, OQ-RES-1, or Tobias Results on `bf51b19`. Not IC50.
+
+**Science:** Per-AC on `bf51b19` **Pass**. **Overall P2 stayed unsigned.** We merged (`5040f2d`, feat tip `4b8c41f`) with **OQ-WO-7 OPEN**: **WGS params on the DNA Test from the WO after C3**. **That click never landed.** Leftover `9f86d14` is not a UAT click and is not on `main`.
+
+Clarifying the issue made the product better. Assay params are scientific context for the result (SC5). After Blood→DNA, the WGS Test on the DNA tube must freeze the **work order’s** WGS params (`{library_kit: …}`), **not** `{}`, **not** Qubit / process-QC params. Lookup by dest `sample_id` is the wrong cohort.
+
+Land OQ-WO-7 as **Brief → code → UAT with Pass/Fail and not-a-Fail → stamp → merge**. Do not close the OQ from leftover unmerged code. Do not invent overall P2 Pass.
+
+| Field | Value |
+|-------|--------|
+| **OQ-WO-7** | **OPEN** |
+| **Grain** | WGS params on the DNA Test from the WO after C3 |
+| **Merge** | `5040f2d` with this OPEN. Click never landed |
+| **Process** | Brief → code → UAT (Pass/Fail and not-a-Fail) → stamp → merge |
+
+```
+SCIENTIFIC CSO: OQ-WO-7 OPEN
+P2 MERGE: 5040f2d with OQ-WO-7 OPEN
+CLICK: never landed
 ```
