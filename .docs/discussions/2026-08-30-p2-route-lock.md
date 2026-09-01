@@ -3,7 +3,7 @@
 **Date:** 2026-08-30  
 **Team:** Leadership (Lab Ops, CEO, Security CSO, Scientific CSO)  
 **Ask:** Round 1 remains **Leadership Confirmed** (Rolf, Deiter, Hans, Heidi, Günter; all five asks). Round 2 is **Leadership Confirm** (Rolf, Deiter, Hans, Heidi, Günter; R2-1…R2-4). **Contents grain / `0077` remains a Leadership Confirm** (Rolf, Deiter, Hans, Heidi, Günter) — process assignment is a **sample in a container**. Leadership later **Confirmed Deiter’s click**: C1 **Pass**, C2 **Fail**, dest mint Hold **Pass** on product `4671ba8` / `02fe95f`. C1/C2 are **not** unsigned. Docs Confirm `84d2810` is not a new execute and not the click SHA. Not a Tobias QA Pass and not a merge stamp. Grok Build owns dest-join / source-remove. Overall P2 UAT remains unsigned / not Pass.
-**Implement gate:** P2 is on `main` (`5040f2d`). **OQ-WO-7 OPEN and in-bar** for method complete / overall P2 Pass honesty (Hans brief **AC-P2-OQ-WO-7**; **CEO Accept (Rolf)** of the written what/why; **Grok Build codes first**, then Tobias; Result unsigned). Per-AC Pass on `bf51b19`; overall P2 unsigned. Older “held until signed UAT Pass / hold merge for 1.2” copy in walls below is **history** — do not restamp those walls. Do **not** pretend `5040f2d` was held for OQ-WO-7.  
+**Implement gate:** P2 is on `main`. Product SHA for **AC-P2-OQ-WO-7** is **`80f054b`** (`80f054b274b02bb48f9dcbba5a05378419ea6b90`). Leftover **`9f86d14` is** the OQ-WO-7 Grok Build work. **Do not recode.** Remaining work is **Tobias**. **OQ-WO-7 OPEN / AC unsigned** until Tobias stamps (Hans brief **AC-P2-OQ-WO-7**; **CEO Accept (Rolf)** of the written what/why). Per-AC Pass on `bf51b19` — do **not** rewrite those Results. Overall P2 unsigned. Older “held until signed UAT Pass / hold merge for 1.2” copy in walls below is **history** — do not restamp those walls. Do **not** pretend `5040f2d` was held for OQ-WO-7. Do **not** invent Tobias Pass. Not IC50.  
 **Stem:** [post-receive-work-spine](../review/requirements/post-receive-work-spine.md)
 
 **Code:** `feat/work-order-p2`. Latest **signed** AC-P2 is `8cfa2a9` (per-AC; overall **not Pass**; PR **#92** honesty fold). **This commit** is `9342439` (`93424396ce3d02f01a8a8388abda39ae6ebf8010`): analysis is not a map field; Route matches a LIMS Run in the chain; process *x* → *x+1* emerging-type handoff; create-route UI shows types/analyses/emerging types.
@@ -611,7 +611,7 @@ Not IC50.
 
 **Science.** Does **not** rewrite Round 1, Round 2, Contents-grain Confirm, Deiter `02fe95f`, Tobias `9342439` / `8cfa2a9` / `bf51b19` Results, ELISA / second-tube Confirm, or Marc/CEO merge bar Met. Not overall P2 Pass. Not IC50.
 
-Per-AC on `bf51b19` **Pass**. **Overall P2 stayed unsigned.** We merged (`5040f2d`) with **OQ-WO-7 OPEN** (WGS params on the DNA Test from the WO after C3). **That click never landed.** Leftover `9f86d14` is not a UAT click and not on `main`. Clarifying the issue made the product better. Land OQ-WO-7 as **Brief → code → UAT with Pass/Fail and not-a-Fail → stamp → merge**. Going forward that path is **in-bar**. Do **not** pretend `5040f2d` was held for it.
+Per-AC on `bf51b19` **Pass**. **Overall P2 stayed unsigned.** We merged (`5040f2d`) with **OQ-WO-7 OPEN** (WGS params on the DNA Test from the WO after C3). Leftover **`9f86d14`** on **`80f054b`** **is** that Grok Build work. **Do not recode.** Leftover is **not** a UAT click. Remaining work is **Tobias**. **OQ-WO-7 stays OPEN / AC unsigned** until Tobias stamps. Clarifying the issue made the product better. Going forward that path is **in-bar**. Do **not** pretend `5040f2d` was held for it. Do **not** invent Tobias Pass.
 
 ---
 
@@ -623,13 +623,13 @@ Per-AC on `bf51b19` **Pass**. **Overall P2 stayed unsigned.** We merged (`5040f2
 
 **Fixture:** Receive blood → asked-for WGS with real param (e.g. `library_kit`) → Route extract (dest DNA) → optional Qubit → one WGS LimsRun → C3 execute → Later Start WGS on DNA.
 
-**Pass:** Test `(DNA, WGS)` has `asked_for_params` = blood asked-for params (not `{}`). Parent stays Blood. Qubit own Test if present.
+**Pass:** Test `(DNA, WGS)` has `{library_kit: TruSeq}` from the blood WO asked-for.
 
 **Fail:** `{}` / missing kit; WGS Test on blood; assay hung on extract.
 
-**Not a Fail:** no dest at Route/Start; `source_amount_null` setup; Qubit empty supporting freeze; 1.4 Extracted-DNA-only; ELISA on second blood tube.
+**Not a Fail:** no dest at Route/Start; `source_amount_null`; Qubit empty supporting freeze; 1.4; ELISA on a second blood tube.
 
-**Out of this AC:** freeze skip NULL Pass, C1/C2/C3, cardinality, Route 409, 1.4.
+**Out of this AC:** dest-follow, extract-as-LimsRun, freeze skip, cardinality, Route 409, closeout 1.4.
 
 ---
 
@@ -640,8 +640,21 @@ Per-AC on `bf51b19` **Pass**. **Overall P2 stayed unsigned.** We merged (`5040f2
 Does **not** rewrite Round 1, Round 2, Contents-grain Confirm, Deiter `02fe95f` Results, Tobias `9342439` / `8cfa2a9` / `bf51b19` / P1, dest-type split Confirm, mint-only-at-execute Confirm, `570bbc0` Lab Ops Met, ELISA / second-tube Confirm, Science fold, or Marc/CEO merge bar Met.
 
 1. Accept **AC-P2-OQ-WO-7** as written (Pass / Fail / not-a-Fail as in Hans’s brief).
-2. **Grok Build codes first**, then Tobias clicks.
-3. **OQ-WO-7 stays OPEN** until Tobias stamps Pass/Fail. **In-bar** for method complete / overall P2 Pass honesty: Brief → code → UAT Pass/Fail + not-a-Fail → stamp → merge. P2 already merged (`5040f2d`) with this OPEN — that history stands.
+2. **Grok Build codes first** was remaining work at this Accept. Leftover **`9f86d14`** on **`80f054b`** **is** that work. **Do not recode.** Remaining work is **Tobias**.
+3. **OQ-WO-7 stays OPEN / AC unsigned** until Tobias stamps Pass/Fail. **In-bar** for method complete / overall P2 Pass honesty. Tobias clicks **AC-P2-OQ-WO-7** on `80f054b`. P2 already merged (`5040f2d`) with this OPEN — that history stands.
 4. Closeout **1.4** may stay OPEN separately.
-5. Overall P2 Pass still **unsigned**.
+5. Overall P2 Pass still **unsigned**. Do **not** invent Tobias Pass. Do **not** rewrite `bf51b19`.
+
+---
+
+## Leadership Confirm — leftover `9f86d14` on `80f054b` is OQ-WO-7 Grok Build — 2026-09-01
+
+**Leadership Confirm** (Rolf, Deiter, Hans, Heidi, Günter). Docs-only honesty punch. Not a UAT Result. Not overall P2 Pass. Not IC50. Does **not** rewrite Tobias Results on `bf51b19`.
+
+1. Leftover **`9f86d14`** on product SHA **`80f054b`** (`80f054b274b02bb48f9dcbba5a05378419ea6b90`) **is** the OQ-WO-7 Grok Build work. **Do not recode.**
+2. Tobias clicks **AC-P2-OQ-WO-7** on that SHA. Pytest for the AC landed in `9f86d14`.
+3. Lookup already on that SHA: (1) WO asked-for **only if** `asked.analysis_id == run.analysis_id` so Qubit/Nanodrop do not steal WGS `{library_kit: TruSeq}`; (2) else walk `parent_sample_id` for a routed asked-for of that analysis; (3) else `{}`; (4) freeze skip: write onto NULL; do not overwrite an already-frozen payload including locked empty `{}`.
+4. Remaining work is **Tobias**, not a new design. **OQ-WO-7 stays OPEN / AC unsigned** until Tobias stamps.
+5. Pass: Test `(DNA, WGS)` has `{library_kit: TruSeq}` from the blood WO asked-for. Fail: `{}` / missing kit; WGS Test on blood; assay hung on extract. Not a Fail: no dest at Route/Start; `source_amount_null`; Qubit empty supporting freeze; 1.4; ELISA on a second blood tube.
+6. Do **not** fold dest-follow, extract-as-LimsRun, freeze skip, cardinality, Route 409, closeout 1.4 as this work.
 

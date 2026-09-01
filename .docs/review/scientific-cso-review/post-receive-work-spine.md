@@ -178,23 +178,23 @@ OQ-RES-1: Decided
 
 **Not a restamp of the 2026-08-28 Accept.** Does **not** rewrite SC1–SC5, OQ-RES-1, or Tobias Results on `bf51b19`. Not IC50.
 
-**Science:** Per-AC on `bf51b19` **Pass**. **Overall P2 stayed unsigned.** We merged (`5040f2d`, feat tip `4b8c41f`) with **OQ-WO-7 OPEN**: **WGS params on the DNA Test from the WO after C3**. **That click never landed.** Leftover `9f86d14` is not a UAT click and is not on `main`.
+**Science:** Per-AC on `bf51b19` **Pass**. **Overall P2 stayed unsigned.** We merged (`5040f2d`, feat tip `4b8c41f`) with **OQ-WO-7 OPEN**: **WGS params on the DNA Test from the WO after C3**. Leftover **`9f86d14`** on **`80f054b`** **is** that Grok Build work. Leftover is **not** a UAT click. **Do not recode.** Remaining work is **Tobias**. **OQ-WO-7 stays OPEN / AC unsigned** until Tobias stamps.
 
-Clarifying the issue made the product better. Assay params are scientific context for the result (SC5). After Blood→DNA, the WGS Test on the DNA tube must freeze the **work order’s** WGS params (`{library_kit: …}`), **not** `{}`, **not** Qubit / process-QC params. Lookup by dest `sample_id` is the wrong cohort.
+Clarifying the issue made the product better. Assay params are scientific context for the result (SC5). After Blood→DNA, the WGS Test on the DNA tube must freeze the **work order’s** WGS params (`{library_kit: TruSeq}`), **not** `{}`, **not** Qubit / process-QC params.
 
-Land OQ-WO-7 as **Brief → code → UAT with Pass/Fail and not-a-Fail → stamp → merge**. Do not close the OQ from leftover unmerged code. Do not invent overall P2 Pass. Going forward OQ-WO-7 is **in-bar** for method complete / overall P2 Pass honesty. **CEO Accept (Rolf)** of Hans’s **AC-P2-OQ-WO-7** brief (written what/why) before Tobias. **Grok Build codes first**, then Tobias clicks. Result unsigned. Do not rewrite `bf51b19`.
+Do not close the OQ without a Tobias stamp. Do not invent overall P2 Pass. Do not invent Tobias Pass. Going forward OQ-WO-7 is **in-bar** for method complete / overall P2 Pass honesty. **CEO Accept (Rolf)** of Hans’s **AC-P2-OQ-WO-7** brief stands; “Grok Build codes first” is **done**. Tobias clicks on `80f054b`. Result unsigned. Do not rewrite `bf51b19`.
 
 | Field | Value |
 |-------|--------|
-| **OQ-WO-7** | **OPEN. In-bar.** **CEO Accept (Rolf)** of Hans **AC-P2-OQ-WO-7** brief. Result unsigned |
-| **Grain** | WGS params on the DNA Test from the WO asked-for after C3, not `{}` |
-| **Merge** | `5040f2d` with this OPEN. Click never landed. Do not pretend merge was held |
-| **Process** | Brief → code → UAT (Pass/Fail and not-a-Fail) → stamp → merge. Grok Build codes first, then Tobias |
+| **OQ-WO-7** | **OPEN / AC unsigned** until Tobias stamps. **In-bar.** **CEO Accept (Rolf)** of Hans **AC-P2-OQ-WO-7** brief |
+| **Grain** | WGS params `{library_kit: TruSeq}` on the DNA Test from the blood WO asked-for after C3, not `{}` |
+| **Merge** | `5040f2d` with this OPEN. Code later on `80f054b` via leftover `9f86d14`. Do not pretend `5040f2d` was held |
+| **Process** | Remaining work is **Tobias**. **Do not recode.** |
 
 ```
 SCIENTIFIC CSO: OQ-WO-7 OPEN IN-BAR
 CEO ACCEPT (ROLF): AC-P2-OQ-WO-7 BRIEF
 P2 MERGE: 5040f2d with OQ-WO-7 OPEN
-CLICK: never landed
-GROK BUILD CODES FIRST; TOBIAS RESULT UNSIGNED
+PRODUCT SHA: 80f054b (leftover 9f86d14 is this Grok Build work)
+TOBIAS RESULT UNSIGNED; DO NOT RECODE
 ```
