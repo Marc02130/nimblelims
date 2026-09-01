@@ -585,3 +585,23 @@ Does **not** rewrite Round 1, Round 2, Contents-grain Confirm, Deiter `02fe95f` 
 
 Keep: asked-for-only lock; extract-as-process common path (not a forever ban on extract-as-LimsRun); supporting QC same-route; freeze skip Pass on `bf51b19`. `9342439` / `8cfa2a9` / P1 / `02fe95f` / Deiter `570bbc0` Lab Ops Met untouched.
 
+---
+
+## Leadership Confirm — ELISA not on DNA; second tube; extract LimsRun later — 2026-09-01
+
+**Full Leadership Confirm** (Rolf, Deiter, Hans, Heidi, Günter). Docs-only. Overwrites the Marc lock immediately above (pending overwrite) for this wording. Does **not** rewrite Round 1, Round 2, Contents-grain Confirm, Deiter `02fe95f` Results, Tobias `9342439` / `8cfa2a9` / P1, dest-type split Confirm, mint-only-at-execute Confirm, `570bbc0` Lab Ops Met, Tobias Results on `bf51b19`, asked-for-only Marc lock (PR **111**), or **Marc/CEO merge bar Met**. Not overall P2 Pass. Not IC50. P2 is on `main`.
+
+### Confirmed product
+
+1. **ELISA is not on DNA** (wrong matrix). Do **not** hang ELISA on the DNA dest after C3. A blood ELISA ask is not extract → ELISA-on-DNA.
+2. **Same blood Sample, second tube (Contents)** can carry its **own asked-for and route**. Two blood tubes → **two process assignments** (`container_id`). ELISA route and WGS/extract route stay apart. Do not collapse two in-play tubes into one process-sample row.
+3. Do **not** teach “extract can never be a LimsRun” as a forever ban. **Hans’s punch:** do not hang the asked-for assay `analysis_id` on extract so the panel Test freezes on blood. **Asked-for Extracted DNA can have Qubit/Nanodrop.** Extract-as-instrument LimsRun is **later**.
+4. **OQ-WO-6 still:** asked-for `analysis_id` belongs **once** on the **assay** LimsRun, not on extract. Common-path extract does not wear the panel `analysis_id`.
+5. **OQ-WO-7 stays OPEN.** Blood WGS asked-for → C3 DNA → WGS start on DNA must freeze **WO params** (`{library_kit: …}`), **not** `{}`. **Not** Qubit params. Dest-cohort lookup after C3 remains post-merge follow-up. Do not close this OQ.
+
+### Standing UAT rule (this Confirm)
+
+After **two** UAT attempts on the same issue, the **next** run needs a written “what we are testing and why” **before** the click — fixtures, Pass/Fail, and what is **not** a Fail. Fold into living UAT / closeout. Do **not** rewrite signed stamps.
+
+Not IC50.
+
