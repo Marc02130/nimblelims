@@ -538,3 +538,23 @@ Hold merge. Not IC50.
 
 Hold merge. Not IC50.
 
+---
+
+## Marc lock — care about the asked-for only — 2026-09-01
+
+**Marc lock pending Leadership overwrite if Confirm has not landed for this exact wording.** Docs-only. **Not Leadership Confirm.** Not overall P2 Pass. Not a merge vote. Not IC50.
+
+Does **not** rewrite Round 1, Round 2, Contents-grain Confirm, Deiter `02fe95f` Results, Tobias `9342439` / `8cfa2a9` / P1, dest-type split Confirm, mint-only-at-execute Confirm, `570bbc0` Lab Ops Met, or Tobias C2/C3 Results on `bf51b19`. Do **not** invent overall P2 Pass.
+
+**Care about the asked-for only.**
+
+1. **Extracted DNA ask** = the customer asked for a DNA tube. Process however (extract experiment / aliquot-pool execute). The ask is the DNA sample, not a panel assay LimsRun.
+2. **Sequencing ask with blood** = sequencing is the ask; extract is **route machinery** to get to the right matrix, not a second ask.
+3. **Zero LimsRuns is legal** when the asked-for is Extracted DNA (closeout **1.4**). Do **not** teach map-save/Route always requiring exactly one asked-for LimsRun for every ask type.
+4. **One assay LimsRun** when the ask **is** an assay (ELISA, sequencing, Qubit-as-asked-for, …). That LimsRun carries the asked-for `analysis_id` once. Supporting QC (Qubit/Nanodrop/etc.) remain other analyses in the same route.
+5. **Do not forever-ban extract-as-LimsRun.** Prior Confirm that extract is typically a process (experiment / aliquot-pool execute) stands for the common path. Do **not** teach a permanent ban that extract can never be a LimsRun in any product future.
+6. **OQ-WO-6 extract close** from PR 110 stays in spirit for the common path (extract process does not wear the panel asked-for `analysis_id`). Reconcile: “exactly one asked-for LimsRun” applies when the ask is an assay; for Extracted DNA, zero assay LimsRuns is legal.
+7. **Merge hold is closeout 1.2 — dest-cohort asked-for lookup after C3.** After type-changing execute (Blood→DNA), the assay on the DNA dest looks up asked-for by **dest `sample_id`** and gets `{}` (wrong cohort / wrong sample). That is the merge hold. **Not freeze skip. Not dest-follow. Not extract-as-process.** Freeze skip NULL is **Tobias Pass** on **`bf51b19`** (classic `/tests` leave NULL; first start writes; later start does not overwrite). Older “freeze skip OPEN” copy in Confirm walls above is **superseded** by that Pass — do not restamp those walls. Hold merge of `feat/work-order-p2` to `main` for **1.2 dest-cohort lookup**.
+
+Keep: one asked-for per process instance; supporting QC = other `analysis_id`s, own Tests, same route as whatever the asked-for assay is; DNA extract once (C3); that DNA sample may join many WOs as sequential asked-fors (no route branching this phase). `9342439` untouched.
+
