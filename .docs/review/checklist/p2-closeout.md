@@ -45,8 +45,9 @@ This is a working list, not a Leadership Confirm and not a UAT Result stamp. Do 
 
 1. **Leadership Confirm** of sequential asked-fors (WGS on blood owns WGS params; C3 DNA; C2 aliquot continues WGS; WES = new asked-for on the DNA tube, then aliquoted or used up; own params). Marc lock is pending overwrite. Tobias Pass of two WOs is **not** that Confirm.
 2. **Closeout 1.2 (optional for merge bar):** WO-7 `_mint_tests_at_start` still looks up `AskedFor` by cohort `sample_id`. After C3 the cohort is DNA; WGS asked-for is on blood → dest-cohort params can be `{}`. **Not scored** on seq-1. Code only if dest-cohort params are in-bar. Lookup should go through the work order’s `asked_for_id` (or parent lineage).
-3. **Overall P2 Pass** — Tobias has not signed overall Pass. Do not write it from this fold.
-4. **Merge** — after overall P2 Pass (and 1.2 if Leadership puts dest-cohort params in-bar).
+3. **Closeout 1.4 — Extracted DNA asked-for (zero assay LimsRuns):** If asked-for is Extracted DNA, they get a DNA tube. No sequencing. No other LimsRuns. Today map-save/Route **422** when a chain has **zero** LimsRuns (`Route has no LIMS Run analysis`). That 422 is **wrong** for this asked-for. Two ELISA LimsRuns still 422. Extract may be a LimsRun later if equipment is an instrument.
+4. **Overall P2 Pass** — Tobias has not signed overall Pass. Do not write it from this fold.
+5. **Merge** — after overall P2 Pass (and 1.2 / 1.4 if in-bar).
 
 Do **not** recode dest-follow, cardinality, freeze skip NULL, or Route two-accept 409 unless a new Fail lands.
 
@@ -59,8 +60,9 @@ Do **not** recode dest-follow, cardinality, freeze skip NULL, or Route two-accep
 | **1.1 Cardinality 1** | Two ELISA LimsRuns must 422 | **Done.** Tobias Pass `bf51b19` | Do not re-score |
 | **1.2 WO-7 asked-for after C3** | Lookup is `sample_id == cohort` + `analysis_id` | **Not coded.** Seq-1 Pass without scoring dest-cohort params | Code iff in-bar: use `work_order.asked_for_id` |
 | **1.3 Freeze skip NULL** | Classic `{}` vs frozen `{}` | **Done** (`0078`). Tobias Pass `bf51b19` | Do not transfer `99b692d3` |
+| **1.4 Extracted DNA asked-for** | Zero assay LimsRuns; DNA tube only | Map-save/Route still **422** on 0 LimsRuns | Code iff in-bar: allow extract-only route when asked-for is Extracted DNA |
 
-**Do not code:** route branching; dest auto-join second WO; copy WGS params onto WES; extract as a LimsRun; second asked-for for Qubit; analysis picker on `/receive`; 2+ routes picker; P3–P5.
+**Do not code:** route branching; dest auto-join second WO; copy WGS params onto WES; second asked-for for Qubit; analysis picker on `/receive`; 2+ routes picker; P3–P5. Do not forever-ban extract-as-LimsRun — later, if equipment is an instrument.
 
 ---
 
@@ -96,6 +98,7 @@ Do **not** re-score `8cfa2a9` / `9342439` / P1. Do **not** score dest at Route/S
 | Route two-accept 409 | **Pass** `bf51b19` | — |
 | Seq-1 two WOs | **Pass** `bf51b19` | Leadership Confirm of the lock |
 | Dest-cohort params (1.2) | **Not coded / not scored** | Code only if in-bar |
+| Extracted DNA asked-for (1.4) | Zero LimsRuns still map-save/Route **422** | Code iff in-bar |
 | Historical Route/WO-7/AC-P2-9..11 | **Signed Pass** | Do not re-score |
 | Overall P2 Pass | **Unsigned** | Tobias + Leadership |
 | Merge to `main` | **Held** | After overall P2 Pass |
