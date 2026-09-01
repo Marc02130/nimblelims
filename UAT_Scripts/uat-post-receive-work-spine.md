@@ -920,6 +920,8 @@ The preceding dest-follow stamp (`570bbc0` Lab Ops Met; C2/C3 numbered) is retai
 
 **QA signature:** Tobias — signed per-AC results below. **Overall P2 Pass remains unsigned and is not claimed.** Freeze skip NULL is **Pass** on this SHA. **Merge hold is closeout 1.2 dest-cohort lookup** after C3 (asked-for by dest `sample_id` → `{}`), not freeze skip. Hold product merge. Stack **down** after. Not IC50.
 
+**Standing UAT rule (Leadership Confirm 2026-09-01, Rolf/Deiter/Hans/Heidi/Günter):** after **two** UAT attempts on the same issue, the **next** run needs a written “what we are testing and why” **before** the click — fixtures, Pass/Fail, and what is **not** a Fail. Do **not** rewrite signed Results on this stamp to satisfy that rule.
+
 **Executor / environment / date:** Tobias · local docker compose (`lims-*`) · 2026-08-31 · compose **down** after run
 
 | AC | Tobias |
