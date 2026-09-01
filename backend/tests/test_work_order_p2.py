@@ -833,6 +833,277 @@ class TestWorkOrderP2:
         )
         assert test.asked_for_params == {"cell_line": "A549"}
 
+    def test_wo7_freezes_params_from_parent_asked_for(
+        self,
+        client: TestClient,
+        admin_token: str,
+        p2_seed,
+        db_session: Session,
+        test_admin_user: User,
+    ):
+        """Blood WGS asked-for params freeze onto the DNA dest Test."""
+        definition = _create_lims_run_definition(
+            client, admin_token, p2_seed["analysis_a"].id
+        )
+        _put_step_types(client, admin_token, definition, p2_seed["sample_type"].id)
+        assert (
+            _create_map(
+                client, admin_token, definition_id=definition["id"]
+            ).status_code
+            == 201
+        )
+        blood_id = _receive_sample(client, admin_token, p2_seed, "NBIO-P2-KIT-B")
+        defs = client.put(
+            f"/analyses/{p2_seed['analysis_a'].id}/param-defs",
+            json={
+                "items": [
+                    {
+                        "key": "library_kit",
+                        "data_type": "text",
+                        "required": False,
+                        "sort_order": 0,
+                    }
+                ]
+            },
+            headers=_auth(admin_token),
+        )
+        assert defs.status_code == 200, defs.text
+        created = client.post(
+            "/v1/asked-for",
+            json=_asked_for_body(
+                [blood_id],
+                p2_seed["analysis_a"].id,
+                params={"library_kit": "TruSeq"},
+            ),
+            headers=_auth(admin_token),
+        )
+        af_id = created.json()["items"][0]["id"]
+        routed = client.post(f"/v1/asked-for/{af_id}/route", headers=_auth(admin_token))
+        assert routed.status_code == 200, routed.text
+
+        dna = Sample(
+            name=f"DNA-{uuid4().hex[:6]}",
+            sample_type=p2_seed["dna_type"].id,
+            status=p2_seed["available"].id,
+            project_id=p2_seed["project"].id,
+            parent_sample_id=UUID(str(blood_id)),
+            created_by=test_admin_user.id,
+            modified_by=test_admin_user.id,
+        )
+        db_session.add(dna)
+        db_session.commit()
+
+        run = client.post(
+            "/v1/lims-runs",
+            json={
+                "name": f"Run {uuid4().hex[:8]}",
+                "analysis_id": str(p2_seed["analysis_a"].id),
+            },
+            headers=_auth(admin_token),
+        )
+        started = client.patch(
+            f"/v1/lims-runs/{run.json()['id']}/start",
+            json={"sample_ids": [str(dna.id)]},
+            headers=_auth(admin_token),
+        )
+        assert started.status_code == 200, started.text
+        db_session.expire_all()
+        test = (
+            db_session.query(Test)
+            .filter(
+                Test.sample_id == dna.id,
+                Test.analysis_id == p2_seed["analysis_a"].id,
+            )
+            .one()
+        )
+        assert test.asked_for_params == {"library_kit": "TruSeq"}
+
+    def test_wo7_freezes_params_from_work_order_asked_for(
+        self,
+        client: TestClient,
+        admin_token: str,
+        p2_seed,
+        db_session: Session,
+        test_admin_user: User,
+    ):
+        """Dest cohort with no parent still freezes from work_order.asked_for_id."""
+        extract = _create_extract_process(
+            client,
+            admin_token,
+            dest_type_id=p2_seed["sample_type"].id,
+            inbound_type_id=p2_seed["sample_type"].id,
+        )
+        wgs = _create_lims_run_definition(
+            client, admin_token, p2_seed["analysis_a"].id
+        )
+        _put_step_types(client, admin_token, wgs, p2_seed["sample_type"].id)
+        mapped = _create_map(
+            client,
+            admin_token,
+            definition_ids=[extract["id"], wgs["id"]],
+        )
+        assert mapped.status_code == 201, mapped.text
+        blood_id = _receive_sample(client, admin_token, p2_seed, "NBIO-P2-KIT-WO")
+        defs = client.put(
+            f"/analyses/{p2_seed['analysis_a'].id}/param-defs",
+            json={
+                "items": [
+                    {
+                        "key": "library_kit",
+                        "data_type": "text",
+                        "required": False,
+                        "sort_order": 0,
+                    }
+                ]
+            },
+            headers=_auth(admin_token),
+        )
+        assert defs.status_code == 200, defs.text
+        created = client.post(
+            "/v1/asked-for",
+            json=_asked_for_body(
+                [blood_id],
+                p2_seed["analysis_a"].id,
+                params={"library_kit": "TruSeq"},
+            ),
+            headers=_auth(admin_token),
+        )
+        af_id = created.json()["items"][0]["id"]
+        routed = client.post(f"/v1/asked-for/{af_id}/route", headers=_auth(admin_token))
+        assert routed.status_code == 200, routed.text
+        wo_id = routed.json()["items"][0]["work_order"]["id"]
+        first = client.post(
+            f"/v1/work-orders/{wo_id}/start", headers=_auth(admin_token)
+        )
+        assert first.status_code == 200, first.text
+        second = client.post(
+            f"/v1/work-orders/{wo_id}/start", headers=_auth(admin_token)
+        )
+        assert second.status_code == 200, second.text
+        later_id = second.json()["latest_process_id"]
+        proc = client.get(
+            f"/v1/eln-processes/{later_id}", headers=_auth(admin_token)
+        )
+        assert proc.status_code == 200, proc.text
+        inst_steps = sorted(proc.json()["steps"], key=lambda s: s["sort_order"])
+        started_step = client.post(
+            f"/v1/eln-processes/{later_id}/steps/{inst_steps[0]['id']}/start",
+            json={},
+            headers=_auth(admin_token),
+        )
+        assert started_step.status_code == 201, started_step.text
+        run_id = started_step.json()["lims_run_id"]
+        dna = Sample(
+            name=f"DNA-{uuid4().hex[:6]}",
+            sample_type=p2_seed["dna_type"].id,
+            status=p2_seed["available"].id,
+            project_id=p2_seed["project"].id,
+            created_by=test_admin_user.id,
+            modified_by=test_admin_user.id,
+        )
+        db_session.add(dna)
+        db_session.commit()
+        started = client.patch(
+            f"/v1/lims-runs/{run_id}/start",
+            json={"sample_ids": [str(dna.id)]},
+            headers=_auth(admin_token),
+        )
+        assert started.status_code == 200, started.text
+        db_session.expire_all()
+        test = (
+            db_session.query(Test)
+            .filter(
+                Test.sample_id == dna.id,
+                Test.analysis_id == p2_seed["analysis_a"].id,
+            )
+            .one()
+        )
+        assert test.asked_for_params == {"library_kit": "TruSeq"}
+
+    def test_wo7_qc_run_does_not_steal_asked_for_params(
+        self,
+        client: TestClient,
+        admin_token: str,
+        p2_seed,
+        db_session: Session,
+        test_admin_user: User,
+    ):
+        definition = _create_lims_run_definition(
+            client, admin_token, p2_seed["analysis_a"].id
+        )
+        _put_step_types(client, admin_token, definition, p2_seed["sample_type"].id)
+        assert (
+            _create_map(
+                client, admin_token, definition_id=definition["id"]
+            ).status_code
+            == 201
+        )
+        blood_id = _receive_sample(client, admin_token, p2_seed, "NBIO-P2-KIT-QC")
+        defs = client.put(
+            f"/analyses/{p2_seed['analysis_a'].id}/param-defs",
+            json={
+                "items": [
+                    {
+                        "key": "library_kit",
+                        "data_type": "text",
+                        "required": False,
+                        "sort_order": 0,
+                    }
+                ]
+            },
+            headers=_auth(admin_token),
+        )
+        assert defs.status_code == 200, defs.text
+        created = client.post(
+            "/v1/asked-for",
+            json=_asked_for_body(
+                [blood_id],
+                p2_seed["analysis_a"].id,
+                params={"library_kit": "TruSeq"},
+            ),
+            headers=_auth(admin_token),
+        )
+        routed = client.post(
+            f"/v1/asked-for/{created.json()['items'][0]['id']}/route",
+            headers=_auth(admin_token),
+        )
+        assert routed.status_code == 200, routed.text
+        dna = Sample(
+            name=f"DNA-{uuid4().hex[:6]}",
+            sample_type=p2_seed["dna_type"].id,
+            status=p2_seed["available"].id,
+            project_id=p2_seed["project"].id,
+            parent_sample_id=UUID(str(blood_id)),
+            created_by=test_admin_user.id,
+            modified_by=test_admin_user.id,
+        )
+        db_session.add(dna)
+        db_session.commit()
+        run = client.post(
+            "/v1/lims-runs",
+            json={
+                "name": f"Run {uuid4().hex[:8]}",
+                "analysis_id": str(p2_seed["analysis_b"].id),
+            },
+            headers=_auth(admin_token),
+        )
+        started = client.patch(
+            f"/v1/lims-runs/{run.json()['id']}/start",
+            json={"sample_ids": [str(dna.id)]},
+            headers=_auth(admin_token),
+        )
+        assert started.status_code == 200, started.text
+        db_session.expire_all()
+        test = (
+            db_session.query(Test)
+            .filter(
+                Test.sample_id == dna.id,
+                Test.analysis_id == p2_seed["analysis_b"].id,
+            )
+            .one()
+        )
+        assert test.asked_for_params == {}
+
     def test_wo7_classic_null_first_start_writes(
         self,
         client: TestClient,

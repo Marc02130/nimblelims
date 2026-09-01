@@ -274,7 +274,6 @@ class LimsRunService:
         """WO-7: insert Test if missing; snapshot asked-for params and freeze."""
         from datetime import datetime
         from models.analysis import Analysis
-        from models.asked_for import AskedFor
         from models.list import List, ListEntry
         from models.sample import Sample
         from models.test import Test
@@ -312,16 +311,7 @@ class LimsRunService:
 
         analysis = self.db.query(Analysis).filter(Analysis.id == run.analysis_id).first()
         for sid in sample_ids:
-            asked = (
-                self.db.query(AskedFor)
-                .filter(
-                    AskedFor.sample_id == sid,
-                    AskedFor.analysis_id == run.analysis_id,
-                    AskedFor.status == "routed",
-                )
-                .first()
-            )
-            params = dict(asked.params or {}) if asked else {}
+            params = self._asked_for_params_snapshot(run, sid)
             test = (
                 self.db.query(Test)
                 .filter(
@@ -362,6 +352,86 @@ class LimsRunService:
                 )
             )
         self.db.flush()
+
+    def _asked_for_params_snapshot(self, run: LimsRun, cohort_sample_id: uuid.UUID) -> dict:
+        """Freeze asked-for assay params onto the dest Test.
+
+        Lookup is the work order's asked-for (blood WGS kit still applies on
+        the DNA tube), then parent lineage, then the cohort sample itself.
+        Process QC LimsRuns (Qubit) do not steal the assay asked-for.
+        """
+        from models.asked_for import AskedFor
+
+        asked = self._asked_for_from_work_order(run)
+        if asked is None:
+            asked = self._asked_for_from_lineage(cohort_sample_id, run.analysis_id)
+        if asked is None:
+            return {}
+        return dict(asked.params or {})
+
+    def _asked_for_from_work_order(self, run: LimsRun):
+        from models.asked_for import AskedFor
+        from models.entry import ELNProcess, ELNProcessStep, ELNProcessStepLimsRun
+        from models.work_order import WorkOrder
+
+        step = (
+            self.db.query(ELNProcessStep)
+            .filter(ELNProcessStep.current_lims_run_id == run.id)
+            .first()
+        )
+        if step is None:
+            link = (
+                self.db.query(ELNProcessStepLimsRun)
+                .filter(ELNProcessStepLimsRun.lims_run_id == run.id)
+                .first()
+            )
+            if link is not None:
+                step = (
+                    self.db.query(ELNProcessStep)
+                    .filter(ELNProcessStep.id == link.process_step_id)
+                    .first()
+                )
+        if step is None:
+            return None
+        process = (
+            self.db.query(ELNProcess).filter(ELNProcess.id == step.process_id).first()
+        )
+        if process is None or process.work_order_id is None:
+            return None
+        wo = (
+            self.db.query(WorkOrder).filter(WorkOrder.id == process.work_order_id).first()
+        )
+        if wo is None:
+            return None
+        asked = (
+            self.db.query(AskedFor).filter(AskedFor.id == wo.asked_for_id).first()
+        )
+        if asked is None or asked.analysis_id != run.analysis_id:
+            return None
+        return asked
+
+    def _asked_for_from_lineage(self, sample_id: uuid.UUID, analysis_id: uuid.UUID):
+        from models.asked_for import AskedFor
+        from models.sample import Sample
+
+        cursor: Optional[uuid.UUID] = sample_id
+        seen: set = set()
+        while cursor and cursor not in seen:
+            seen.add(cursor)
+            asked = (
+                self.db.query(AskedFor)
+                .filter(
+                    AskedFor.sample_id == cursor,
+                    AskedFor.analysis_id == analysis_id,
+                    AskedFor.status == "routed",
+                )
+                .first()
+            )
+            if asked is not None:
+                return asked
+            sample = self.db.query(Sample).filter(Sample.id == cursor).first()
+            cursor = sample.parent_sample_id if sample is not None else None
+        return None
 
     def set_cohort(
         self,
