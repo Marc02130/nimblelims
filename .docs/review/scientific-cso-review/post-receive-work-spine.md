@@ -10,7 +10,7 @@
 - PRD: [`.docs/internal/prd/post-receive-work-spine/PRD.md`](../../internal/prd/post-receive-work-spine/PRD.md)  
 - Spec: [`.docs/internal/specs/post-receive-work-spine/SPEC.md`](../../internal/specs/post-receive-work-spine/SPEC.md)  
 - Open questions: [`.docs/review/open-questions/post-receive-work-spine.md`](../open-questions/post-receive-work-spine.md)  
-**Related Lab Ops:** [lab-ops-review/post-receive-work-spine.md](../lab-ops-review/post-receive-work-spine.md) — ordered-route L2/L4 locked; dest-follow Met; P2 on `main` `5040f2d` with **OQ-WO-7 OPEN and in-bar** (**AC-P2-OQ-WO-7**; CEO Accept of Hans brief; Result unsigned)
+**Related Lab Ops:** [lab-ops-review/post-receive-work-spine.md](../lab-ops-review/post-receive-work-spine.md) — ordered-route L2/L4 locked; dest-follow Met; P2 on `main` `5040f2d`. **OQ-WO-7 Closed.** **AC-P2-OQ-WO-7 Pass** (Tobias, 2026-09-01, `80f054b`). Closeout **1.4** stays OPEN. Overall P2 unsigned
 **Related:**  
 - Framework stamps WO-1…WO-7, FW-0/FW-2: [`.docs/decision-logs/framework-stamps-2026-08-26.md`](../../decision-logs/framework-stamps-2026-08-26.md)  
 - Promote-on-publish: [open-questions/run-results.md](../open-questions/run-results.md) (Decision #2 `raw_result`; Decision #7 ensure-on-publish **superseded by WO-7**)  
@@ -197,4 +197,27 @@ CEO ACCEPT (ROLF): AC-P2-OQ-WO-7 BRIEF
 P2 MERGE: 5040f2d with OQ-WO-7 OPEN
 PRODUCT SHA: 80f054b (leftover 9f86d14 is this Grok Build work)
 TOBIAS RESULT UNSIGNED; DO NOT RECODE
+```
+
+---
+
+## 10. Tobias Result — AC-P2-OQ-WO-7 Pass; OQ-WO-7 Closed — 2026-09-01
+
+**Not a restamp of section 9.** Does **not** rewrite SC1–SC5, OQ-RES-1, or Tobias Results on `bf51b19` / `8cfa2a9` / `9342439` / P1 / `02fe95f`. Does **not** recode **`9f86d14`**. Not overall P2 Pass. Not IC50.
+
+**AC-P2-OQ-WO-7 Pass** (Tobias, 2026-09-01) on product SHA **`80f054b`**. Test **`55f9cad9`** `(DNA, WGS)` has `asked_for_params` **`{library_kit: TruSeq}`** from blood work order **`4ea9de0c`**. Leftover **`9f86d14`** is the lookup (WO asked-for same `analysis_id`, else parent lineage, else `{}`). **Was not recoded.**
+
+**OQ-WO-7 Closed.** Closeout **1.4** (Extracted DNA zero assay LimsRuns) stays **OPEN**. Overall P2 remains **unsigned**. Leadership did not stamp overall Pass.
+
+| Field | Value |
+|-------|--------|
+| **OQ-WO-7** | **Closed.** **AC-P2-OQ-WO-7 Pass** (Tobias, 2026-09-01, `80f054b`) |
+| **Holds** | Test `55f9cad9` TruSeq from WO `4ea9de0c`; leftover `9f86d14` not recoded |
+| **1.4** | Still OPEN |
+| **Overall P2** | Unsigned |
+
+```
+SCIENTIFIC CSO: OQ-WO-7 CLOSED
+TOBIAS: AC-P2-OQ-WO-7 PASS ON 80f054b
+1.4 STILL OPEN; OVERALL P2 UNSIGNED
 ```
