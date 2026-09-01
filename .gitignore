@@ -47,10 +47,10 @@ yarn-error.log*
 .DS_Store
 Thumbs.db
 
-# --- Docs (working / private) ---
+# --- Docs ---
 # Published operator how-tos (committed): /manuals/  (e.g. HOWTO.md)
-# Local working PRDs/specs/private + legacy operator manuals: keep out of git
-.docs/internal/
+# Working PRDs/specs/design under .docs/internal/ are git-tracked
+# Legacy vendor dumps / old operator manuals under .docs/manuals/ stay local-only (not git)
 .docs/manuals/
 
 # Vendor / third-party PDFs must not sit in published /manuals/

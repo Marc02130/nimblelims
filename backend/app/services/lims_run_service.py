@@ -267,7 +267,101 @@ class LimsRunService:
             run.modified_by = self._user_id()
             self.db.flush()
 
+        self._mint_tests_at_start(run)
         return self._transition(run, LimsRunStatus.running)
+
+    def _mint_tests_at_start(self, run: LimsRun) -> None:
+        """WO-7: insert Test if missing; snapshot asked-for params and freeze."""
+        from datetime import datetime
+        from models.analysis import Analysis
+        from models.asked_for import AskedFor
+        from models.list import List, ListEntry
+        from models.sample import Sample
+        from models.test import Test
+
+        cohort = dict(run.cohort or {})
+        raw_ids = cohort.get("sample_ids") or []
+        sample_ids = []
+        for sid in raw_ids:
+            sample_ids.append(sid if isinstance(sid, uuid.UUID) else uuid.UUID(str(sid)))
+        if not sample_ids or run.analysis_id is None:
+            return
+
+        status_row = (
+            self.db.query(ListEntry)
+            .join(List, ListEntry.list_id == List.id)
+            .filter(
+                List.name.in_(("Test Status", "test_status")),
+                ListEntry.name.in_(("Assigned/Pending", "In Process", "Pending")),
+            )
+            .first()
+        )
+        if not status_row:
+            status_row = (
+                self.db.query(ListEntry)
+                .filter(
+                    ListEntry.name.in_(("Assigned/Pending", "In Process", "Pending"))
+                )
+                .first()
+            )
+        if not status_row:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Test status 'Assigned/Pending' not found",
+            )
+
+        analysis = self.db.query(Analysis).filter(Analysis.id == run.analysis_id).first()
+        for sid in sample_ids:
+            asked = (
+                self.db.query(AskedFor)
+                .filter(
+                    AskedFor.sample_id == sid,
+                    AskedFor.analysis_id == run.analysis_id,
+                    AskedFor.status == "routed",
+                )
+                .first()
+            )
+            params = dict(asked.params or {}) if asked else {}
+            test = (
+                self.db.query(Test)
+                .filter(
+                    Test.sample_id == sid,
+                    Test.analysis_id == run.analysis_id,
+                    Test.active == True,  # noqa: E712
+                )
+                .first()
+            )
+            if test:
+                if test.asked_for_params is not None:
+                    # Already frozen, including locked empty {}. Do not overwrite.
+                    continue
+                # Classic /tests left NULL: first start writes the snapshot.
+                test.asked_for_params = params
+                test.modified_by = self._user_id()
+                continue
+            sample = self.db.query(Sample).filter(Sample.id == sid).first()
+            if not sample or not analysis:
+                continue
+            base_name = f"{sample.name}_{analysis.name}"
+            name = base_name[:240]
+            n = 0
+            while self.db.query(Test.id).filter(Test.name == name).first():
+                n += 1
+                name = f"{base_name[:220]}_{n}"
+            self.db.add(
+                Test(
+                    name=name,
+                    sample_id=sid,
+                    analysis_id=run.analysis_id,
+                    status=status_row.id,
+                    asked_for_params=params,
+                    test_date=datetime.utcnow(),
+                    technician_id=self._user_id(),
+                    created_by=self._user_id(),
+                    modified_by=self._user_id(),
+                )
+            )
+        self.db.flush()
 
     def set_cohort(
         self,
@@ -342,12 +436,12 @@ class LimsRunService:
         from app.services.result_promotion_service import ResultPromotionService
 
         promo = ResultPromotionService(self.db, current_user=self.current_user)
-        # Plan first (may create tests via ensure); apply if analysis set
         if not run.analysis_id:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="analysis_id is required to publish",
             )
+        self._require_wo7_tests(run)
         plan = promo.plan_promotion(run)
         if plan.conflict_count:
             raise HTTPException(
@@ -363,11 +457,73 @@ class LimsRunService:
                     "preview": plan.to_dict(),
                 },
             )
+        if plan.errors:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail={
+                    "code": "test_missing",
+                    "message": (
+                        "Test missing; Tests are created at LimsRun start (WO-7). "
+                        "Publish refuses the whole run."
+                    ),
+                    "errors": plan.errors[:20],
+                },
+            )
         promo.apply_plan(run, plan)
 
         self.run_repo.update_status(run, LimsRunStatus.published, self._user_id())
         self._commit_refresh(run)
         return run
+
+    def _require_wo7_tests(self, run: LimsRun) -> None:
+        """WO-7: refuse publish if any cohort sample lacks an active Test.
+
+        Empty instrument data is the same Fail as a missing Test: do not
+        publish a run that never minted Tests at start.
+        """
+        from models.test import Test
+
+        cohort = dict(run.cohort or {})
+        raw_ids = cohort.get("sample_ids") or []
+        sample_ids = []
+        for sid in raw_ids:
+            sample_ids.append(sid if isinstance(sid, uuid.UUID) else uuid.UUID(str(sid)))
+        if not sample_ids:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail={
+                    "code": "test_missing",
+                    "message": (
+                        "Test missing; Tests are created at LimsRun start (WO-7). "
+                        "Publish refuses the whole run."
+                    ),
+                },
+            )
+        missing = []
+        for sid in sample_ids:
+            test = (
+                self.db.query(Test)
+                .filter(
+                    Test.sample_id == sid,
+                    Test.analysis_id == run.analysis_id,
+                    Test.active == True,  # noqa: E712
+                )
+                .first()
+            )
+            if not test:
+                missing.append(str(sid))
+        if missing:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail={
+                    "code": "test_missing",
+                    "message": (
+                        "Test missing; Tests are created at LimsRun start (WO-7). "
+                        "Publish refuses the whole run."
+                    ),
+                    "sample_ids": missing,
+                },
+            )
 
     def promotion_preview(self, run_id: uuid.UUID) -> dict:
         """Dry-run of promote-on-publish (no DB writes)."""

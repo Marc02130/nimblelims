@@ -168,7 +168,8 @@ nimblelims/
 │   ├── Dockerfile          # Database container config
 │   └── init.sql            # Database initialization
 ├── .docs/                  # Documentation root
-│   ├── review/             # Review stamps, tech sketches, process, manuals, OQs
+│   ├── review/             # Review stamps, tech sketches, process, OQs
+│   ├── internal/           # Working PRDs, specs, design, ideas (git-tracked)
 │   ├── discussions/        # Multi-persona Leadership discussions
 │   └── decision-logs/      # Leadership stamps (FW/WO, reorg)
 ├── services/               # Auxiliary microservices
@@ -183,11 +184,12 @@ nimblelims/
 
 ## Features (MVP Scope)
 
-**Note:** This section describes **all implemented features in the codebase**. However, the **MVP release bar** focuses on three core pillars: (1) **track samples** (receive, status, lineage), (2) **requested analysis** (asked-for lake — a later look-up that does **not** assign a Test or start work), and (3) **enter results** (capture and review). Additional features listed below (ELN experiments, dose-response analysis, LimsRuns/parsers, workflow templates, custom fields) are **shipped/in-tree but not the MVP release bar**—they are enhancements that demonstrate platform capability and remain available for users who need them. See local `.docs/internal/prd/nimblelims-prd.md` (not committed) for the complete MVP definition.
+**Note:** This section describes **all implemented features in the codebase**. However, the **MVP release bar** focuses on three core pillars: (1) **track samples** (receive, status, lineage), (2) **requested analysis** (asked-for lake — a later look-up that does **not** assign a Test or start work), and (3) **enter results** (capture and review). Additional features listed below (ELN experiments, dose-response analysis, LimsRuns/parsers, workflow templates, custom fields) are **shipped/in-tree but not the MVP release bar**—they are enhancements that demonstrate platform capability and remain available for users who need them. See [`.docs/internal/prd/nimblelims-prd.md`](.docs/internal/prd/nimblelims-prd.md) for the complete MVP definition.
 
 ### Core Workflows for BioTech/Pharma Startups (**MVP Release Bar** + Shipped Enhancements)
 - **Compound & Sample Tracking** **(MVP)**: Receive (`/receive`), status management, lineage (aliquots/derivatives), container hierarchy. Non-empty `analysis_ids` on receive → **422**.
-- **Requested analysis** **(MVP, P1)**: **Asked-for** (`/asked-for`) records requested analysis + TAT for already-received samples (zero Tests, no execute). A later look-up, not the after-receive step — receive ends on `/receive`. See [manuals/HOWTO.md](manuals/HOWTO.md), [manuals/asked-for.md](manuals/asked-for.md), and `UAT_Scripts/uat-post-receive-work-spine.md`. Route / work_orders / WO-7 are **not** this stamp. Classic `/tests` is not the request path.
+- **Requested analysis** **(MVP, P1)**: **Asked-for** (`/asked-for`) records requested analysis + TAT for already-received samples (zero Tests, no execute). A later look-up, not the after-receive step — receive ends on `/receive`. See [manuals/HOWTO.md](manuals/HOWTO.md), [manuals/asked-for.md](manuals/asked-for.md), and `UAT_Scripts/uat-post-receive-work-spine.md`. Classic `/tests` is not the request path.
+- **Route / work orders (P2):** A route is TAT + ordered `process_definition[]` and **may have multiple LimsRun analyses**; no analysis or type picker. Asked-for assay matches **any** route whose chain has that analysis on **exactly one** LimsRun (plus first-step type + TAT). Extract is an **experiment** (equipment execute) on a process, **never** a LimsRun. LimsRun is instruments. Map-save / Route **422** if asked-for analysis appears 0 or 2+ times among LimsRuns. Map save **409**s when overlapping TAT, first-step types, **and** LimsRun analysis **sets** all hold. Map save **422**s when process *x* emerging type is not accepted by *x+1* (**map-save only**). Dest-follow execute SHA **`1572071`**. UAT numbering SHA **`570bbc0`** (docs/uat split + pytest, **not** a new execute). Signed AC-P2-9..11 history: `9342439`. Deiter Contents click on product `4671ba8` / assignment commit `02fe95f` (`0077`): C1 **Pass**, C2 **Fail**, dest mint Hold **Pass** — signed history. Tobias QA **Pass** on **`bf51b19`**. C2 numbered on `570bbc0`; execute `1572071` is **same-type dest-follow only** and remains unsigned until Tobias: same dest type = same sample, additional container. Unsigned AC-P2-C3 numbered on `570bbc0`; execute `1572071` is the different-dest-type click: new derivative sample in a new container (`parent_sample_id`); parent stays. **Leadership Confirm** of mint-only-at-execute (Rolf / Deiter / Hans / Heidi / Günter): dest sample/container exists only after aliquot/pool **execute**. Route / Start / map-save / asked-for mint **zero** daughters. Plan dest type is catalog intent, not a Sample. Receive still mints identity + first vessel — that is **not** dest mint. `570bbc0` does **not** inherit `1572071` C2 Pass or Fail. Dest-follow execute txn is `1572071`. Dest mint Hold is lifted only for type-changing execute; Deiter’s Hold Pass remains Start-extract Blood / **0 DNA** history. Do not write C2 or C3 Pass. **Fail C3** if dest tube lands on the blood Sample, parent `container_id` is retargeted, or later Start follows blood. Do not teach type-changing dest as parent `container_id` retarget. Docs Confirm `84d2810` is not a new execute and not the click SHA. Freeze skip **OPEN**. **OQ-WO-6 extract CLOSED**. **No route branching:** WGS asked-for on blood owns WGS params; C3 DNA then C2 aliquot into WGS; WES is a new asked-for on the DNA tube, which is then aliquoted or used up (own params). Overall P2 unsigned / not Pass. Hold product merge. Not IC50. Send: [`.docs/discussions/2026-08-30-p2-route-lock.md`](.docs/discussions/2026-08-30-p2-route-lock.md).
 - **Results Entry** **(MVP)**: Manual results entry with real-time validation
 - **Batch Management** **(MVP + Enhancements)**: Create and manage batches (basic is MVP; cross-project support, automatic QC generation, and sample prioritization are shipped enhancements)
 - **Sample Prioritization** **(Shipped, Not MVP)** (US-11): Sort compounds and biological samples by shelf-life expiration and assay deadlines during batch creation
@@ -208,10 +210,10 @@ nimblelims/
 ### LIMS Runs → Structured Results **(Shipped, Not MVP)** (promote-on-publish)
 - **Analysis required**: Every LimsRun (e.g., plate reader output, screening campaign) has an **Analysis** from create (no non-reportable path).
 - **Import remains flexible JSONB** (`lims_run_data`); parsers/import are analysis-scoped for different instrument vendors.
-- **Promote on publish**: Status → `published` maps columns to analytes (name + **aliases** for CRO/instrument vendor column names), ensures Tests per sample, writes **Results** (`raw_result`, `replicate`, `lims_run_id`).
+- **Promote on publish**: Status → `published` maps columns to analytes (name + **aliases** for CRO/instrument vendor column names) and writes **Results** (`raw_result`, `replicate`, `lims_run_id`) only into active Tests from first start of the asked-for analysis. If any cohort Test is missing, WO-7 refuses the whole publish with **422**. Publish-refuse is Tobias-signed Pass on `8cfa2a9` (carol **422** `test_missing`) and remains history on `b005cfe`. A write of `{}` onto Test `99b692d3` is not a freeze-skip Pass (`{}` is ambiguous). Do **not** fold classic `/tests` skip as Pass. `if test: continue` is not a freeze. Classic `/tests` must leave `asked_for_params` NULL, or we need a freeze marker. Until then `{}` is **ambiguous** — a classic default `{}` is the same JSON as a frozen `{}`, so first start cannot tell them apart. Do not teach skip-on-frozen-`{}`. Overall P2 Pass remains unsigned.
 - **Conflicts**: Same run updates; other run/manual ownership fails publish with **409** to protect data integrity.
 - **Preview**: Publish confirmation dry-runs create/update/conflict/unresolved columns (`GET /v1/lims-runs/{id}/promotion/preview`).
-- **Docs**: [manuals/HOWTO.md](manuals/HOWTO.md) · [manuals/lims-runs.md](manuals/lims-runs.md) · local `.docs/internal/ideas/run-results.md` (not committed).
+- **Docs**: [manuals/HOWTO.md](manuals/HOWTO.md) · [manuals/lims-runs.md](manuals/lims-runs.md) · [`.docs/internal/ideas/run-results.md`](.docs/internal/ideas/run-results.md).
 
 ### Experiment Management **(Shipped, Not MVP)** (ELN-style Process Tracking)
 - **Experiments**: Full CRUD for experiments; list/detail UI with tabs (Overview, Sample Executions, Details/Steps, Lineage, Linked Processes). Permission: `experiment:manage` (Administrator, Lab Manager, Lab Technician).
@@ -324,11 +326,12 @@ See [manuals/HOWTO.md](manuals/HOWTO.md) for the lab path. [manuals/navigation.m
 
 **Published how-tos** are git-tracked under [`manuals/`](manuals/) — start with [HOWTO.md](manuals/HOWTO.md). Review stamps live under [`.docs/review/`](.docs/review/). **Start here:** [`.docs/README.md`](.docs/README.md).
 
-Umbrella PRD, long-form design, ideas, SOP packs, user stories, and private notes live under local `.docs/internal/` (not committed). Operator handbooks are git-tracked under [`manuals/`](manuals/).
+Umbrella PRD, long-form design, ideas, SOP packs, and user stories are git-tracked under [`.docs/internal/`](.docs/internal/). Operator handbooks are git-tracked under [`manuals/`](manuals/). `.docs/manuals/` stays gitignored (vendor PDFs / legacy local manuals).
 
 | Folder | Contents |
 |--------|----------|
 | [`manuals/`](manuals/) | Git-tracked operator how-tos (`HOWTO.md` plus receive, asked-for, navigation, API, processes, …) |
+| [`.docs/internal/`](.docs/internal/) | Git-tracked working PRDs, specs, design, ideas, user stories, SOP packs |
 | [`requirements/`](.docs/review/requirements/) | Cycle feature requirements |
 | [`checklist/`](.docs/review/checklist/) | Implementation checklists |
 | [`open-questions/`](.docs/review/open-questions/) | Cycle/feature gates (block a packet until Decided; not Leadership stamps) |
@@ -338,7 +341,7 @@ Umbrella PRD, long-form design, ideas, SOP packs, user stories, and private note
 | [`schema-changes/`](.docs/review/schema-changes/) | Per-cycle DB deltas |
 | [`lab-ops-review/`](.docs/review/lab-ops-review/), [`ceo-review/`](.docs/review/ceo-review/), [`ui-review/`](.docs/review/ui-review/), [`architecture-review/`](.docs/review/architecture-review/), [`security-review/`](.docs/review/security-review/), [`qa-review/`](.docs/review/qa-review/) | Formal reviews |
 
-UAT scripts: `UAT_Scripts/` — receive `uat-atomic-receive.md`; P1 asked-for `uat-post-receive-work-spine.md` (**P1 Pass**, merged PR 81).
+UAT scripts: `UAT_Scripts/` — receive `uat-atomic-receive.md`; P1 asked-for `uat-post-receive-work-spine.md` (**P1 Pass** on `c649245`, merged PR 81). Dest-follow execute SHA **`1572071`**. UAT numbering SHA **`570bbc0`** (docs/uat split + pytest, **not** a new execute). Signed AC-P2-9..11 history `9342439`. Deiter clicked `0077` at product `4671ba8` / assignment commit `02fe95f`: C1 **Pass**, C2 **Fail**, dest mint Hold **Pass** — signed history. Leadership Confirmed that click; C1/C2 are **not** unsigned. Docs Confirm `84d2810` is not the click SHA. Tobias QA **Pass** on **`bf51b19`**: C1/C2/C3, cardinality 1, freeze skip NULL, Route two-accept **409**, seq-1 (two WOs; dest-cohort 1.2 not scored). Execute `1572071`. **OQ-WO-6 extract CLOSED**. Overall P2 **unsigned / not Pass**. Hold product merge. Stack down.
 
 ## Support
 
@@ -354,6 +357,6 @@ See [manuals/HOWTO.md](manuals/HOWTO.md), [`.docs/README.md`](.docs/README.md), 
 
 **Key files (backend):** `backend/app/routers/experiments.py`, `backend/app/routers/sop_parse.py`, `backend/app/services/sop_parse_service.py`, `backend/app/services/experiment_service.py`, flexible experiment models/migrations.
 
-**Documentation:** [manuals/HOWTO.md](manuals/HOWTO.md), `.docs/review/checklist/experiment-checklist.md`, [processes.md](manuals/processes.md), [experiments.md](manuals/experiments.md), [lims-runs.md](manuals/lims-runs.md), [navigation.md](manuals/navigation.md), [api-endpoints.md](manuals/api-endpoints.md), local `.docs/internal/design/experiment-planning.md` (not committed), `UAT_Scripts/uat-experiment-templates.md`.
+**Documentation:** [manuals/HOWTO.md](manuals/HOWTO.md), `.docs/review/checklist/experiment-checklist.md`, [processes.md](manuals/processes.md), [experiments.md](manuals/experiments.md), [lims-runs.md](manuals/lims-runs.md), [navigation.md](manuals/navigation.md), [api-endpoints.md](manuals/api-endpoints.md), [`.docs/internal/design/experiment-planning.md`](.docs/internal/design/experiment-planning.md), `UAT_Scripts/uat-experiment-templates.md`.
 
 **Optional env:** `ANTHROPIC_API_KEY` on the backend for SOP extraction (see `backend/app/core/config.py`).

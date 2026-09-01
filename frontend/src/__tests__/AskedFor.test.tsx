@@ -19,6 +19,8 @@ jest.mock('../services/apiService', () => ({
     getAnalysisParamDefs: jest.fn().mockResolvedValue({ items: [], count: 0 }),
     createAskedFor: jest.fn(),
     cancelAskedFor: jest.fn(),
+    routeAskedFor: jest.fn(),
+    routeAskedForBatch: jest.fn(),
   },
   ApiService: {
     unwrapAnalysesList: () => [],
@@ -47,10 +49,11 @@ describe('AskedFor', () => {
     );
 
     expect(screen.getByText('Asked-for')).toBeInTheDocument();
-    expect(screen.getByText(/Record requested analysis/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/Record requested analysis/i).length).toBeGreaterThan(0);
     expect(screen.queryByText(/Assign test/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/^Start$/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/Execute/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/Route selected/i)).toBeInTheDocument();
     await waitFor(() => {
       expect(screen.getByRole('grid')).toBeInTheDocument();
     });

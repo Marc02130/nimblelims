@@ -6,7 +6,7 @@
 **Open questions:** [`.docs/review/open-questions/experiments.md`](../open-questions/experiments.md) (Decision #23 + session locks below)  
 **Schema changes:** [`.docs/review/schema-changes/experiment-template-entries.md`](../schema-changes/experiment-template-entries.md)  
 **Reviews:** [Lab Ops](../lab-ops-review/experiment-template-entries.md) · [CEO](../ceo-review/experiment-template-entries.md) · [UI](../ui-review/experiment-template-entries.md) · [Architecture](../architecture-review/experiment-template-entries.md) · [Security](../security-review/experiment-template-entries.md)  
-**Ideas (OOS):** local `.docs/internal/ideas/accessioning-and-workflows-revisit.md` (not committed) · local `.docs/internal/ideas/materials-and-lot-tracking.md` (not committed) · local `.docs/internal/ideas/index-sets-and-sequencing-setup.md` (not committed)  
+**Ideas (OOS):** `.docs/internal/ideas/accessioning-and-workflows-revisit.md` · `.docs/internal/ideas/materials-and-lot-tracking.md` · `.docs/internal/ideas/index-sets-and-sequencing-setup.md`  
 **Reference:** external competitive reference (not stored in repo) (external reference; PDF is not present in this repository snapshot)
 **Related manuals:** [experiments.md](../manuals/experiments.md), [processes.md](../manuals/processes.md), [lims-runs.md](../manuals/lims-runs.md)  
 **Process:** Lab Ops first, then other reviews ([lab-ops-review/README.md](../lab-ops-review/README.md))

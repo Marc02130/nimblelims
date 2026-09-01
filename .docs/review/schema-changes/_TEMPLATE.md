@@ -62,7 +62,7 @@ List tables/columns **not** changing so reviewers do not hunt elsewhere.
 
 - Lab-global vs tenant-scoped **this cycle**  
 - Cheap readiness (FKs, soft active) vs forbidden over-design (null tenant_id, dual paths)  
-- Link: local `.docs/internal/ideas/multi-tenant.md` (not committed)
+- Link: `.docs/internal/ideas/multi-tenant.md`
 
 ## 7. Open schema blockers
 

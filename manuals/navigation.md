@@ -8,9 +8,9 @@ NimbleLIMS uses a **unified sidebar navigation** (left drawer) for all authentic
 |--------|------------|----------|
 | **Core Features** | All users | Dashboard, Help |
 | **Sample Mgmt** | Any of: sample:create, sample:read, sample:update, test:update, test:assign, batch:manage, result:enter | Receive, Asked-for, Samples, Tests, Containers, Batches, Results |
-| **Experiments** | experiment:manage | All Experiments (/experiments), Experiment Templates (/experiments/templates; same permission as section) |
+| **Experiments** | experiment:manage | All Experiments, Work Orders (`/work-orders`), Processes, Experiment Templates, Runs |
 | **Lab Mgmt** | Any of: project:manage, analysis:manage | Projects, Clients, Client Proj, Analyses, Analytes |
-| **Admin** | config:edit | Overview, Name Templates, Custom Attributes, Lists, Container Types, Units, Users, Roles, Analyses, Analytes, Test Batteries, Custom Fields, Custom Names, Workflow Templates, Help Management |
+| **Admin** | config:edit | Overview, Name Templates, Custom Attributes, Lists, Container Types, Units, Users, Roles, Analyses, Routing map, Analytes, Test Batteries, Custom Fields, Custom Names, Workflow Templates, Help Management |
 
 The sidebar is a persistent left-side drawer (240px expanded, 56px collapsed on desktop; temporary overlay on mobile). Navigation is permission-based: menu items and routes are shown or hidden by role/permissions.
 
@@ -55,8 +55,11 @@ The sidebar is a persistent left-side drawer (240px expanded, 56px collapsed on 
 │ ▼ Experiments│ ← Accordion (experiment:manage; both sub-items require experiment:manage)
 │   All       │
 │   Experiments│
+│   Work Orders│
+│   Processes  │
 │   Experiment │
 │   Templates  │
+│   Runs       │
 ├─────────────┤
 │ ▼ Lab Mgmt  │ ← Accordion (collapsible, requires project:manage | analysis:manage)
 │   Projects  │
@@ -110,7 +113,7 @@ The Sample Management section uses a Material-UI Accordion component for collaps
 | Menu Item | Route | Icon | Permission Required | Description |
 |-----------|-------|------|---------------------|-------------|
 | **Receive** | `/receive` | Science | `sample:create` | Atomic receive (CORE happy path): scan 1..N vessels. No analysis picker. |
-| **Asked-for** | `/asked-for` | Assignment | view `sample:read`; create `test:assign` (not Client) | Record **requested analysis + TAT** for already-received samples — a later look-up, not the click after a receive commit. Does **not** mint a Test or start work. Listed after Receive in the sidebar; that is nav order, not a work queue. |
+| **Asked-for** | `/asked-for` | Assignment | view `sample:read`; create/cancel/Route `test:assign` + project access (not Client) | Record **requested analysis + TAT** for already-received samples — a later look-up, not the click after a receive commit. Route is an unnumbered later planner and does **not** require `experiment:manage`. Unauthorized Client or project-scoped writes return **403**, not 404. Listed after Receive in the sidebar; that is nav order, not a work queue. |
 | **Samples** | `/samples` | Science | `sample:read` | Sample management interface with list and edit functionality |
 | **Tests** | `/tests` | Biotech | `test:update` | Tests on existing Test rows (not the request path) |
 | **Containers** | `/containers` | Inventory | `sample:update` | Container management interface with list, create, and edit functionality |
@@ -118,10 +121,10 @@ The Sample Management section uses a Material-UI Accordion component for collaps
 | **Results** | `/results` | Assessment | `result:enter` | Results entry interface |
 
 #### Experiments Section (Accordion) — Navigation Refactor v2.1
-The **Experiments** section is its own top-level accordion, placed immediately after Sample Mgmt and before Lab Mgmt. It is only visible to users with `experiment:manage` permission (assigned to Administrator, Lab Manager, and Lab Technician). Both sub-items (**All Experiments** and **Experiment Templates**) use the same permission: `experiment:manage`. A separate `experiment_template:manage` permission may be introduced later for finer-grained template-only access.
+The **Experiments** section is its own top-level accordion, placed immediately after Sample Mgmt and before Lab Mgmt. It is visible to users with `experiment:manage`; Work Orders is also visible with `sample:read`. Route remains a separate, later action on `/asked-for`: this section is not the next stop after Receive or asked-for save.
 
 **Accordion Behavior:**
-- Auto-expands when user navigates to any `/experiments` route (e.g. `/experiments`, `/experiments/:id`, `/experiments/templates`)
+- Auto-expands on `/experiments`, `/work-orders`, and `/runs` routes
 - Can be manually collapsed/expanded by clicking the accordion header
 - Shows active state (primary color icon) when on any experiments route
 - Header displays "Experiments" with tooltip "Experiments & Processes"
@@ -132,7 +135,10 @@ The **Experiments** section is its own top-level accordion, placed immediately a
 | Menu Item | Route | Icon | Tooltip | Permission | Description |
 |-----------|-------|------|---------|------------|-------------|
 | **All Experiments** | `/experiments` | Biotech | Experiments & Processes | (section) `experiment:manage` | List and detail of experiments; sample executions, lineage, linked processes |
+| **Work Orders** | `/work-orders` | AssignmentTurnedIn | Routed work orders | view `sample:read`; Start `experiment:manage` | Planning backlog with ordered process routes. **Start instantiates the first process only**; later starts advance in snapshot order. Route/Start do not start the whole chain. A queued work order is not started work |
+| **Processes** | `/experiments/processes` | AccountTree | ELN multi-step processes | `experiment:manage` | Existing process definitions and instances with typed Experiment/LimsRun steps |
 | **Experiment Templates** | `/experiments/templates` | ViewList | Experiment template definitions | `experiment:manage` (same as section) | Template CRUD, SOP/AI-assisted creation, sign-off, activation (`ExperimentTemplatesManagement`) |
+| **Runs** | `/runs` | PlayCircleOutline | Experiment Runs | `experiment:manage` | LimsRun list; the WO-7 lock puts Test create/attach and the asked-for parameter freeze at first start. New-Test write Pass on `8cfa2a9`; classic skip OPEN |
 
 **Templates visibility:** The "Experiment Templates" sub-item is shown whenever the user has `experiment:manage` (Administrator, Lab Manager, Lab Technician in default seed roles). It is not restricted to `config:edit`.
 
@@ -188,6 +194,7 @@ The Admin section uses a Material-UI Accordion component for collapsible submenu
 | **Users Management** | `/admin/users` | People | User CRUD operations |
 | **Roles & Permissions** | `/admin/roles` | Security | Role and permission management |
 | **Analyses Management** | `/admin/analyses` | Science | Test analysis configuration |
+| **Routing map** | `/admin/routing-map` | AltRoute | Configure TAT + ordered `process_definition[]`. No analysis or sample-type picker. A route may have multiple LimsRun analyses. Show route order, first-process first-step types, and LIMS Run analyses in the chain. Asked-for matches any route that **contains** that analysis. Map save 409s on overlapping TAT **and** first-step types **and** LIMS Run analysis sets. Route 409s when two saved rows both accept current type and asked-for analysis |
 | **Analytes Management** | `/admin/analytes` | Biotech | Analyte definitions |
 | **Test Batteries** | `/admin/test-batteries` | BatteryChargingFull | Test battery configuration |
 | **Custom Fields** | `/admin/custom-fields` | Tune | Manage custom attribute configurations (EAV) |
@@ -265,7 +272,12 @@ The AppBar title is automatically determined from the current route:
 | `/analytes` | Analytes |
 | `/experiments` | Experiments |
 | `/experiments/:id` | Experiment Detail |
+| `/work-orders` | Work Orders |
+| `/experiments/processes` | ELN Processes |
+| `/experiments/processes/:id` | Process Detail |
 | `/experiments/templates` | Experiment Templates |
+| `/runs` | Experiment Runs |
+| `/runs/:id` | Run Detail |
 | `/help` | Help |
 | `/admin` | Admin Dashboard |
 | `/admin/lists` | Lists Management |
@@ -275,6 +287,7 @@ The AppBar title is automatically determined from the current route:
 | `/admin/users` | Users Management |
 | `/admin/roles` | Roles & Permissions |
 | `/admin/analyses` | Analyses Management |
+| `/admin/routing-map` | Routing Map |
 | `/admin/analyses/:id/analytes` | Analysis Analytes Configuration |
 | `/admin/analytes` | Analytes Management |
 | `/admin/test-batteries` | Test Batteries |
@@ -310,7 +323,12 @@ All authenticated routes use the `MainLayout` component, which provides the unif
 | `/analytes` | AnalytesManagement | MainLayout |
 | `/experiments` | ExperimentsManagement | MainLayout |
 | `/experiments/:id` | ExperimentsManagement (detail view) | MainLayout |
+| `/work-orders` | WorkOrders | MainLayout |
+| `/experiments/processes` | ProcessesManagement | MainLayout |
+| `/experiments/processes/:id` | ProcessesManagement (detail view) | MainLayout |
 | `/experiments/templates` | ExperimentTemplatesManagement | MainLayout |
+| `/runs` | RunsManagement | MainLayout |
+| `/runs/:id` | LimsRunDetail | MainLayout |
 | `/help` | HelpPage | MainLayout |
 | `/admin` | AdminOverview | MainLayout |
 | `/admin/name-templates` | NameTemplatesAdmin | MainLayout |
@@ -320,6 +338,7 @@ All authenticated routes use the `MainLayout` component, which provides the unif
 | `/admin/users` | UsersManagement | MainLayout |
 | `/admin/roles` | RolesManagement | MainLayout |
 | `/admin/analyses` | AnalysesManagement | MainLayout |
+| `/admin/routing-map` | RoutingMapManagement | MainLayout |
 | `/admin/analyses/:analysisId/analytes` | AnalysisAnalytesConfig | MainLayout |
 | `/admin/analytes` | AnalytesManagement | MainLayout |
 | `/admin/test-batteries` | TestBatteriesManagement | MainLayout |
@@ -333,9 +352,10 @@ All authenticated routes use the `MainLayout` component, which provides the unif
 
 - **Authentication**: All routes require user authentication (redirects to `/login` if not authenticated)
 - **Permission-Based Routes**: Routes check permissions and redirect to `/dashboard` if unauthorized
-  - Admin routes require `config:edit` or specific permissions (e.g., `user:manage` for users/roles, `test:configure` for analyses/analytes/batteries)
+  - Admin routes require `config:edit` or specific permissions; `/admin/routing-map` requires `config:edit`
   - Core feature routes require respective permissions (e.g., `sample:create` for `/receive`, `sample:read` for samples list, `sample:update` for sample/edit/containers)
-  - Experiments routes: `/experiments`, `/experiments/:id`, and `/experiments/templates` all require `experiment:manage`
+  - Asked-for Route actions require `test:assign` plus project access; Client and inaccessible-project writes return **403**, not 404. Route does not require `experiment:manage`
+  - Experiments routes: `/experiments`, `/experiments/:id`, `/experiments/processes`, `/experiments/templates`, and `/runs` require `experiment:manage`; `/work-orders` route is visible with `sample:read` or `experiment:manage`, while its list API requires `sample:read` and Start requires `experiment:manage`
   - Lab Mgmt routes: `/clients`, `/projects`, `/client-projects` require `project:manage`; `/analyses`, `/analytes` require `analysis:manage`
   - Edit routes (`/samples/:id`, `/tests/:id`, `/containers/:id`) require `sample:update` or `test:update` permissions respectively
 - **Permission-Based Visibility**: Sidebar items hidden if user lacks required permission

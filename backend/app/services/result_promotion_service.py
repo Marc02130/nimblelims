@@ -182,43 +182,10 @@ class ResultPromotionService:
         if test:
             cache[sample_id] = test
             return test
-
-        sample = self.db.query(Sample).filter(Sample.id == sample_id).first()
-        analysis = self.db.query(Analysis).filter(Analysis.id == analysis_id).first()
-        if not sample:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Sample {sample_id} not found",
-            )
-        if not analysis:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Analysis {analysis_id} not found",
-            )
-
-        status_id = self._default_test_status_id()
-        base_name = f"{sample.name}_{analysis.name}"
-        name = base_name[:240]
-        # Ensure global unique name
-        n = 0
-        while self.db.query(Test.id).filter(Test.name == name).first():
-            n += 1
-            name = f"{base_name[:220]}_{n}"
-
-        test = Test(
-            name=name,
-            sample_id=sample_id,
-            analysis_id=analysis_id,
-            status=status_id,
-            test_date=datetime.now(),
-            technician_id=self._user_id(),
-            created_by=self._user_id(),
-            modified_by=self._user_id(),
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Test missing; Tests are created at LimsRun start (WO-7)",
         )
-        self.db.add(test)
-        self.db.flush()
-        cache[sample_id] = test
-        return test
 
     def _get_or_none_test(
         self,

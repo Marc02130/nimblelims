@@ -5,7 +5,7 @@
 
 ## Prerequisites
 
-1. Apply migrations through `0068`.
+1. Apply migrations through `0077` (process assignment is sample-in-a-container).
 2. Log in as Administrator, Lab Manager, or Lab Technician with
    `experiment:manage`.
 3. Create or open an experiment with an **Aliquot / pool plan** entry and at
@@ -26,7 +26,7 @@
 | 1.4 | Set the line to **Same as parent.** and save. | The explicit line clear overrides entry DNA and resolves to the parent type. |
 | 1.5 | Select **DNA** as a line override and save. | Plan line stores `dest_sample_type` as the DNA list-entry UUID. |
 | 1.6 | Reload the entry. | Method, default, and line override remain selected. Method is locked because lines exist; the UI directs the operator to cancel the experiment to change it. |
-| 1.7 | Execute without changing the plan. | There is no execute-time type prompt. The child has sample type DNA and the parent link, joins the active process, and appears on **Aliquots / pools**. Matrix remains inherited. |
+| 1.7 | Leave dest type **DNA**. Execute. Same click as spine **AC-P2-C3**. | Dest exists **only after execute**. Plan dest type is catalog intent, **not** a Sample. **New Sample** in a **new container**, `parent_sample_id` = Blood source. Dest type DNA. Parent Sample stays Blood. Dest sample + container on the process; inbound source `removed`. **Fail C3** if dest tube lands on the blood Sample, parent `container_id` is retargeted, or later Start follows blood. Do **not** score this as AC-P2-C2. **Result:** unsigned until Tobias (numbered on `570bbc0`; execute `1572071`). |
 
 ## 2. Catalog filtering
 
@@ -75,6 +75,9 @@ Verify the plan and execute flows contain none of the following:
 - Blank always means **Same as parent.**
 - Catalog choices are many-to-many and client/source/operation filtered.
 - Mixed-type pools are refused in both UI and API.
-- Execute resolves line override → entry default → parent without re-prompting.
-- Execute-minted daughters join `eln_process_samples` after process start.
+- Execute resolves line override → entry default → parent without re-prompting. Dest type on the plan is catalog intent, **not** a Sample; dest exists **only after execute**. Route / Start / map-save / asked-for mint **zero** daughters. Receive still mints identity + first vessel — that is **not** dest mint.
+- **1.7 / AC-P2-C3 execute click:** dest type DNA mints a new Sample + container; parent stays Blood; dest pair continues the process. **Fail C3** if dest tube lands on the blood Sample, parent `container_id` is retargeted, or later Start follows blood. Unsigned until Tobias. Numbered on `570bbc0`; execute is `1572071`. Do not score 1.7 as C2. `570bbc0` does **not** inherit `1572071` C2 Pass or Fail.
+- **C2 execute click** (spine): extra container, same sample; dest joins; inbound assignment off; later Start follows dest. Leftover on the inbound tube is whatever was not transferred — emptying is not required. Unsigned until Tobias.
+- Assign to process: no vessel, or two vessels with no pick → **422**. No silent pick.
+- PATCH of process assignment is not a path.
 - Normalization consumes a prior concentration result, never free-typed source concentration.

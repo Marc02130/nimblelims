@@ -11,7 +11,13 @@ Key characteristics:
 
 Processes sit above individual Experiments and provide structure for multi-step experimental work.
 
-**P1 asked-for does not start a process.** Recording **requested analysis** on `/asked-for` does not assign samples to a process, does not execute, and does not mint a Test. Process start remains this UI (`/experiments/processes`). Route / work_orders are a later stamp.
+**Asked-for does not start a process.** Recording **requested analysis** does not execute or mint a Test. A routing-map row authors TAT + ordered `process_definition[]`, with no analysis or sample-type picker. A route **may have multiple LimsRun analyses**. Map save **409**s when overlapping TAT, overlapping first-step allow-lists, **and** overlapping LIMS Run analysis **sets** all hold; extract-first and Qubit-first for the same TAT are legal. Route assigns when current type is on the first process’s first Experiment/LimsRun list **and** the asked-for analysis is **contained** in the route: zero acceptable → **422**, two saved rows that both accept this type and this analysis → **409**, exactly one → queued work order. Never silently use `first()`. Map save **422**s when the type emerging from process *x* is not accepted by process *x+1*. **Start process** requires `experiment:manage` and instantiates only the first process. A process assignment is the **tube in hand** — a **container that holds a sample** (`eln_process_samples.container_id` required). A sample may have many containers; only one container-with-sample is in the process. Deiter C1 **Pass** on `4671ba8` / `02fe95f`: no-vessel assign → **422** `process_container_required`; two-vessel assign with no pick → **422**; receive-tube assign → **201**. There is **no silent pick** — never `first()`. Deiter C2 **Fail** on `02fe95f` is signed history. Dest-follow execute lock on **`1572071`** (C2 and C3 numbered unsigned on `570bbc0`): emptied-source assign **422**; later Start follows dest container. Do not teach dest-follow as shipped. **OQ-WO-6** stays **OPEN**: an earlier LimsRun must not share the asked-for `analysis_id`.
+
+**Leadership-confirmed dest-type split (Rolf / Deiter / Hans / Heidi / Günter).** Same dest type = **same sample, additional container**. Unsigned C2 numbered on **`570bbc0`**; execute **`1572071`** covers only this path and remains unsigned until Tobias. `_follow_destination_in_process` may retarget `container_id` only on this same-sample path. Different dest type = **new derivative sample** in a new container with `parent_sample_id`; the parent **Sample row** stays as lineage and keeps its original type, Tests, and parent-type work. Execute never rewrites the parent `sample_type` or retargets the parent Sample onto the destination tube. Type-changing execute mints and joins the destination sample + destination container pair on `eln_process_samples` and marks the inbound source assignment `removed` in the same transaction; after execute, only that destination pair continues on the process. Route / Start / map-save / asked-for mint **zero** daughters. Receive still mints identity + first vessel — that is **not** dest mint. Dest type on the plan is catalog intent until execute; dest exists only after aliquot/pool execute. Dest mint Hold is lifted only for type-changing execute. Deiter C2 **Fail** and dest mint Hold **Pass** on `02fe95f` remain signed history; the Hold Pass records Start extract still **Blood**, **0 DNA** — history, not a live ban on type-changing execute. C2 and extract-hold UAT step **1.7** remain two clicks; 1.7 is the **C3** click and is unsigned on `570bbc0`. **PATCH is not a path.**
+
+**Test identity is `(sample, analysis)`.** The container on the process records **which vessel was measured**; a concentration write-through hits that container. The container is not a Test key.
+
+Contents grain is **Leadership Confirmed** (Rolf / Deiter / Hans / Heidi / Günter). Deiter clicked product `4671ba8` / assignment commit `02fe95f` (migration `0077`): C1 **Pass**, C2 **Fail**, dest mint Hold **Pass** — signed history. Leadership Confirmed that click — C1/C2 are **not** unsigned. UAT numbering SHA **`570bbc0`** (docs/uat split + pytest, **not** a new execute); dest-follow execute txn **`1572071`**: AC-P2-C2 and AC-P2-C3 **unsigned**. Docs Confirm `84d2810` is not a new execute and not the click SHA. Overall P2 remains **unsigned / not Pass**. Route stays `test:assign`.
 
 ### Product rule (Decision #6)
 
@@ -149,10 +155,10 @@ Current lineage via `experiment_link` details may be superseded or augmented by 
 
 **Related Documents**
 
-- local `.docs/internal/design/process-and-experiment-structural.md` (not committed)
-- local `.docs/internal/design/gap-analysis-process-and-experiment.md` (not committed)
+- `.docs/internal/design/process-and-experiment-structural.md`
+- `.docs/internal/design/gap-analysis-process-and-experiment.md`
 - [experiments.md](experiments.md)
 - [`lims-runs.md`](lims-runs.md)
-- local `.docs/internal/design/experiment-planning.md` (not committed)
+- `.docs/internal/design/experiment-planning.md`
 - [`.docs/review/checklist/experiment-rework-prerequisites.md`](../.docs/review/checklist/experiment-rework-prerequisites.md)
 - [`workflow-accessioning-to-reporting.md`](workflow-accessioning-to-reporting.md) (for contrast with Workflow Templates)

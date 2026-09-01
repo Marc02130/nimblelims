@@ -16,6 +16,7 @@ class Test(BaseModel):
     test_date = Column(DateTime)
     technician_id = Column(PostgresUUID(as_uuid=True), ForeignKey('users.id'))
     custom_attributes = Column(JSONB, nullable=True, server_default='{}')
+    asked_for_params = Column(JSONB, nullable=True)
     
     # Relationships
     sample = relationship("Sample", back_populates="tests")

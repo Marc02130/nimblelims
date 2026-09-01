@@ -750,3 +750,49 @@ class TestElnProcess0047RlsIsolation:
         ids = {str(r[0]) for r in rows}
         assert str(rls_seed_0047["eln_proc_a_id"]) in ids
         assert str(rls_seed_0047["eln_proc_b_id"]) in ids
+
+
+class TestProcessDefinitionCatalogRls:
+    """0074: process definitions are lab catalog, not tenant-scoped.
+
+    AC-P2-4: a Lab Technician on another client must see admin-created SOPs.
+    Instances (eln_processes) stay client-scoped above.
+    """
+
+    def test_lab_tech_sees_other_client_definition(self, migrated_engine, rls_seed):
+        def_id = uuid.uuid4()
+        conn = migrated_engine.connect()
+        conn.execute(text("BEGIN"))
+        conn.execute(
+            text(
+                """
+                INSERT INTO eln_process_definitions
+                    (id, name, description, active, created_by, modified_by)
+                VALUES (:id, 'RLS Catalog SOP', NULL, true, :adm, :adm)
+                """
+            ),
+            {"id": str(def_id), "adm": str(rls_seed["admin_id"])},
+        )
+        conn.execute(text("COMMIT"))
+        conn.close()
+
+        try:
+            with migrated_engine.connect() as c:
+                _set_rls_context(c, rls_seed["user_b_id"])
+                rows = c.execute(
+                    text("SELECT id FROM eln_process_definitions WHERE id = :id"),
+                    {"id": str(def_id)},
+                ).fetchall()
+            assert rows, (
+                "Lab Technician on Org B must see admin-created process definition "
+                "(catalog, not created_by.client_id)"
+            )
+        finally:
+            conn = migrated_engine.connect()
+            conn.execute(text("BEGIN"))
+            conn.execute(
+                text("DELETE FROM eln_process_definitions WHERE id = :id"),
+                {"id": str(def_id)},
+            )
+            conn.execute(text("COMMIT"))
+            conn.close()

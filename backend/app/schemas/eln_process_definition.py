@@ -5,10 +5,12 @@ from datetime import datetime
 from uuid import UUID
 
 from models.entry import STEP_KINDS, EXECUTION_MODES
+from app.schemas.eln_process import ProcessAssignmentItem
 
 
 class ELNProcessDefinitionStepCreate(BaseModel):
-    experiment_template_id: UUID
+    experiment_template_id: Optional[UUID] = None
+    analysis_id: Optional[UUID] = None
     step_kind: str = Field(default='eln_experiment', description='eln_experiment | lims_run')
     execution_mode: Optional[str] = Field(
         None,
@@ -37,7 +39,8 @@ class ELNProcessDefinitionStepRead(BaseModel):
     process_definition_id: UUID
     step_kind: str
     execution_mode: str
-    experiment_template_id: UUID
+    experiment_template_id: Optional[UUID] = None
+    analysis_id: Optional[UUID] = None
     name: Optional[str] = None
     sort_order: int
     created_at: datetime
@@ -71,6 +74,13 @@ class ELNProcessDefinitionRead(BaseModel):
     modified_at: datetime
     modified_by: Optional[UUID] = None
     steps: List[ELNProcessDefinitionStepRead] = Field(default_factory=list)
+    emerging_sample_type_ids: List[UUID] = Field(
+        default_factory=list,
+        description=(
+            "Sample types that leave this process: aliquot/pool dest on the "
+            "last experiment/LIMS Run, else that last step's accepted types"
+        ),
+    )
 
     class Config:
         from_attributes = True
@@ -107,4 +117,7 @@ class InstantiateProcessFromDefinitionRequest(BaseModel):
     description: Optional[str] = None
     status_id: Optional[UUID] = None
     sample_ids: Optional[List[UUID]] = None
+    assignments: Optional[List[ProcessAssignmentItem]] = None
     set_to_first_step: bool = True
+    work_order_id: Optional[UUID] = None
+    work_order_route_position: Optional[int] = None

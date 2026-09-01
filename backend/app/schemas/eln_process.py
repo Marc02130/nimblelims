@@ -15,7 +15,8 @@ from models.entry import STEP_KINDS, EXECUTION_MODES
 
 
 class ELNProcessStepCreate(BaseModel):
-    experiment_template_id: UUID
+    experiment_template_id: Optional[UUID] = None
+    analysis_id: Optional[UUID] = None
     step_kind: str = Field(default='eln_experiment')
     execution_mode: Optional[str] = None
     name: Optional[str] = Field(None, max_length=255)
@@ -44,7 +45,8 @@ class ELNProcessStepRead(BaseModel):
     process_id: UUID
     step_kind: str = 'eln_experiment'
     execution_mode: str = 'eln_experiment'
-    experiment_template_id: UUID
+    experiment_template_id: Optional[UUID] = None
+    analysis_id: Optional[UUID] = None
     experiment_id: Optional[UUID] = None
     current_lims_run_id: Optional[UUID] = None
     name: Optional[str] = None
@@ -86,8 +88,14 @@ class ELNProcessStepStartResponse(BaseModel):
 # ---------- Samples ----------
 
 
+class ProcessAssignmentItem(BaseModel):
+    sample_id: UUID
+    container_id: UUID
+
+
 class ELNProcessSampleAssignRequest(BaseModel):
-    sample_ids: List[UUID] = Field(..., min_length=1)
+    sample_ids: Optional[List[UUID]] = None
+    assignments: Optional[List[ProcessAssignmentItem]] = None
     set_to_first_step: bool = True
 
 
@@ -95,6 +103,7 @@ class ELNProcessSampleRead(BaseModel):
     id: UUID
     process_id: UUID
     sample_id: UUID
+    container_id: UUID
     status: str
     current_step_id: Optional[UUID] = None
     assigned_at: Optional[datetime] = None
@@ -154,6 +163,8 @@ class ELNProcessRead(BaseModel):
     active: bool
     status_id: Optional[UUID] = None
     process_definition_id: Optional[UUID] = None
+    work_order_id: Optional[UUID] = None
+    work_order_route_position: Optional[int] = None
     created_at: datetime
     created_by: Optional[UUID] = None
     modified_at: datetime

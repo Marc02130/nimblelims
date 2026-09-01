@@ -8,8 +8,9 @@ import {
   DialogTitle,
   Typography,
 } from '@mui/material';
-import { DataGrid, GridColDef, GridActionsCellItem } from '@mui/x-data-grid';
+import { DataGrid, GridColDef, GridActionsCellItem, GridRowSelectionModel } from '@mui/x-data-grid';
 import CancelOutlinedIcon from '@mui/icons-material/CancelOutlined';
+import AltRouteIcon from '@mui/icons-material/AltRoute';
 import { apiService, ApiService } from '../services/apiService';
 import { useUser } from '../contexts/UserContext';
 import { FillHeightPage, FillHeightTable } from '../components/common/FillHeightPage';
@@ -24,6 +25,7 @@ interface AskedForRow {
   tat_days: number;
   params: Record<string, unknown>;
   status: string;
+  routed_work_order_id?: string | null;
   created_at: string;
 }
 
@@ -41,7 +43,13 @@ const AskedFor: React.FC = () => {
   const [samples, setSamples] = useState<SampleOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const [selection, setSelection] = useState<GridRowSelectionModel>({
+    type: 'include',
+    ids: new Set(),
+  });
+  const selectedIds = Array.from(selection.ids).map(String);
 
   const loadData = async () => {
     try {
@@ -92,6 +100,38 @@ const AskedFor: React.FC = () => {
     }
   };
 
+  const summarizeRoute = (items: Array<{ work_order?: unknown }>) => {
+    const routed = items.filter((i) => i.work_order).length;
+    return routed ? `${routed} routed` : 'Route complete';
+  };
+
+  const handleRouteOne = async (id: string) => {
+    try {
+      const res = await apiService.routeAskedFor(id);
+      setInfo(summarizeRoute(res?.items || []));
+      setError(null);
+      await loadData();
+    } catch (err) {
+      setError(ApiService.formatError(err, 'Could not route asked-for'));
+    }
+  };
+
+  const handleRouteSelected = async () => {
+    const ids = selectedIds.filter(
+      (id) => rows.find((r) => r.id === id)?.status === 'requested'
+    );
+    if (!ids.length) return;
+    try {
+      const res = await apiService.routeAskedForBatch(ids);
+      setInfo(summarizeRoute(res?.items || []));
+      setError(null);
+      setSelection({ type: 'include', ids: new Set() });
+      await loadData();
+    } catch (err) {
+      setError(ApiService.formatError(err, 'Could not route asked-for'));
+    }
+  };
+
   const columns: GridColDef[] = [
     { field: 'sample_name', headerName: 'Sample', flex: 1, minWidth: 140 },
     { field: 'analysis_name', headerName: 'Requested analysis', flex: 1, minWidth: 180 },
@@ -112,10 +152,17 @@ const AskedFor: React.FC = () => {
       field: 'actions',
       type: 'actions',
       headerName: 'Actions',
-      width: 100,
+      width: 140,
       getActions: (params) => {
         if (!canAssign || params.row.status !== 'requested') return [];
         return [
+          <GridActionsCellItem
+            key="route"
+            icon={<AltRouteIcon />}
+            label="Route"
+            onClick={() => void handleRouteOne(params.id as string)}
+            showInMenu={false}
+          />,
           <GridActionsCellItem
             key="cancel"
             icon={<CancelOutlinedIcon />}
@@ -132,20 +179,43 @@ const AskedFor: React.FC = () => {
     <FillHeightPage
       header={
         <>
-          <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+          <Box display="flex" justifyContent="space-between" alignItems="center" mb={2} gap={1} flexWrap="wrap">
             <Typography variant="h4">Asked-for</Typography>
-            {canAssign && (
-              <Button variant="contained" onClick={() => setShowForm(true)}>
-                Record requested analysis
-              </Button>
-            )}
+            <Box display="flex" gap={1}>
+              {canAssign && (
+                <Button
+                  variant="outlined"
+                  startIcon={<AltRouteIcon />}
+                  disabled={
+                    !selectedIds.length ||
+                    !rows.some(
+                      (r) => selectedIds.includes(r.id) && r.status === 'requested'
+                    )
+                  }
+                  onClick={() => void handleRouteSelected()}
+                >
+                  Route selected
+                </Button>
+              )}
+              {canAssign && (
+                <Button variant="contained" onClick={() => setShowForm(true)}>
+                  Record requested analysis
+                </Button>
+              )}
+            </Box>
           </Box>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            After receive, record what was asked for. This does not assign a test or start work.
+            Record requested analysis + TAT. Route matches a routing map and mints a work
+            order; it does not start a Test or a LimsRun. No match stays requested.
           </Typography>
           {error && (
             <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
               {error}
+            </Alert>
+          )}
+          {info && (
+            <Alert severity="info" sx={{ mb: 2 }} onClose={() => setInfo(null)}>
+              {info}
             </Alert>
           )}
         </>
@@ -160,7 +230,11 @@ const AskedFor: React.FC = () => {
           initialState={{
             pagination: { paginationModel: { page: 0, pageSize: 25 } },
           }}
+          checkboxSelection={canAssign}
           disableRowSelectionOnClick
+          rowSelectionModel={selection}
+          onRowSelectionModelChange={setSelection}
+          isRowSelectable={(params) => params.row.status === 'requested'}
         />
       </FillHeightTable>
 

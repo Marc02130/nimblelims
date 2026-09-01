@@ -80,6 +80,7 @@ class AskedForRead(BaseModel):
     tat_days: int
     params: Dict[str, Any]
     status: str
+    routed_work_order_id: Optional[UUID] = None
     created_at: datetime
     created_by: Optional[UUID] = None
     modified_at: datetime

@@ -8,7 +8,9 @@ from sqlalchemy.orm import Session
 from app.core.rbac import require_sample_read, require_test_assign
 from app.database import get_db
 from app.schemas.asked_for import AskedForCreate, AskedForListResponse, AskedForRead
+from app.schemas.work_order import RouteItem, RouteRequest, RouteResponse, WorkOrderRead
 from app.services.asked_for_service import AskedForService
+from app.services.routing_service import RoutingService
 from models.user import User
 
 router = APIRouter(prefix="/asked-for", tags=["asked-for"])
@@ -73,3 +75,41 @@ def cancel_asked_for(
 ):
     svc = _svc(db, user)
     return AskedForRead(**svc.to_read(svc.cancel(asked_for_id)))
+
+
+@router.post("/route", response_model=RouteResponse)
+def route_asked_for_batch(
+    body: RouteRequest,
+    user: User = Depends(require_test_assign),
+    db: Session = Depends(get_db),
+):
+    svc = RoutingService(db, user)
+    results = svc.route_many(body.asked_for_ids)
+    items = []
+    for result in results:
+        wo = result["work_order"]
+        items.append(
+            RouteItem(
+                asked_for_id=result["asked_for_id"],
+                work_order=WorkOrderRead(**svc.read_work_order(wo)) if wo else None,
+                no_route=result["no_route"],
+            )
+        )
+    return RouteResponse(items=items, count=len(items))
+
+
+@router.post("/{asked_for_id}/route", response_model=RouteResponse)
+def route_asked_for(
+    asked_for_id: UUID,
+    user: User = Depends(require_test_assign),
+    db: Session = Depends(get_db),
+):
+    svc = RoutingService(db, user)
+    result = svc.route_one(asked_for_id)
+    wo = result["work_order"]
+    item = RouteItem(
+        asked_for_id=result["asked_for_id"],
+        work_order=WorkOrderRead(**svc.read_work_order(wo)) if wo else None,
+        no_route=result["no_route"],
+    )
+    return RouteResponse(items=[item], count=1)

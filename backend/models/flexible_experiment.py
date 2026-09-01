@@ -102,7 +102,7 @@ class LimsRun(Base):
     experiment_template_id = Column(
         PostgresUUID(as_uuid=True),
         ForeignKey('experiment_templates.id'),
-        nullable=False,
+        nullable=True,
         index=True,
     )
     # Opt-in for promote-on-publish: when set, publish writes tests/results for this analysis

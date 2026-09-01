@@ -29,7 +29,7 @@ This packet is **required QA** (test ordering + sample lifecycle + RLS + results
 3. Product ACs do not list **422** / **cancel** / **copy** / **receive freeze**. Those are in RQ-AF-* and bounce; they **must** be P1 must-pass UAT, not “nice pytest.”
 4. **Classic Tests / TestForm** still mints Tests. P1 UAT happy path is **Asked-for**, never TestForm, never the retired wizard.
 
-**P2–P5 are not this PR.** Suggested scenarios are recorded so later phases inherit locks (Qubit-on-blood 422, empty map mints nothing, WO-7, persist lock, SOP Apply ≠ dest-type). **P3 stays Hold for UAT until OQ-RES-1.** Do not type numbers on asked-for. Do not invent Qubit/blood testdata IDs.
+**P2–P5 are not this PR.** Later scenarios inherit zero-acceptable Route 422, two-accept Route 409, map-save 409 only on TAT **and** first-step overlap, ordered process starts, WO-7, persist lock, and SOP Apply ≠ dest-type. Do not invent Qubit/blood testdata IDs.
 
 QA review is **not** a substitute for the post-implement UAT pass.
 
@@ -77,7 +77,7 @@ P1 conditions **QA1–QA12** land with the P1 PR. QA13–QA15 bind later PRs; th
 | **QA10** | **P1** | **Pytest gate (sketch §3.4) before merge to the feature branch’s CI.** Minimum: create 201 + zero Tests; 409 dup; 403 RLS (hidden sample); 422 params + TAT; receive non-empty `analysis_ids` still 422 and zero rows; cancel + re-create; concurrent unique; second analysis on same sample 201. FORCE RLS on `asked_for`. Audit: `created_by` / `modified_by` set; cancel updates `modified_*`. | Sketch §3.4. Human UAT does not replace this. |
 | **QA11** | **P1** | **Docs + UAT at implement (Cursor must-include).** Create [`UAT_Scripts/uat-post-receive-work-spine.md`](../../UAT_Scripts/uat-post-receive-work-spine.md) with P1 must-pass AF-* cases below. Update manuals: [accessioning-workflow.md](../manuals/accessioning-workflow.md), [workflow-accessioning-to-reporting.md](../manuals/workflow-accessioning-to-reporting.md), [navigation.md](../manuals/navigation.md), [api-endpoints.md](../manuals/api-endpoints.md), [atomic-receive.md](../manuals/atomic-receive.md) (pointer: asked-for is this packet, not receive). Header-note [`uat-test-ordering.md`](../../UAT_Scripts/uat-test-ordering.md): request path is Asked-for; wizard cases stay retired; classic TestForm is **not** the P1 happy path (WO-4 type-a-number remains for later). Do **not** use `uat-sample-accessioning.md`. | Process docs + UAT gate. |
 | **QA12** | **P1** | **Fixtures.** Do **not** invent Qubit / whole-blood / DNA-daughter testdata IDs. Use 0058 ELISA (`analysis-elisa-001`) + CORE receive. New barcodes `NBIO-AF-*` (do not reuse consumed `NBIO-AR-*`). Actors: `alice-tech` / `alice123` (mAb-2301); `bob-tech` / `bob123` (CAR-T, 403); `david-cro` / `david123` (client). Optional qPCR (`analysis-qpcr-001`) for second-analysis case. Param defs: empty OOB unless a documented ELISA `cell_line` seed lands — then UAT says so. | Extract-then-qubit testdata Hold. AR barcode collision. |
-| **QA13** | **P2** | UAT later: AC-P2-1 matching route mints WO + asked-for `routed`; AC-P2-2 empty map → no WO, UI “configure routing,” not a success-queued toast; AC-P2-3 Qubit-on-blood → **422 `route_sample_type`** on map save **and** route; TAT overlap **409**; WO does not mint Tests; LimsRun start mints Test (WO-7); publish without Test **422** (no ensure-on-publish); params snapshot onto Test and freeze (L3); complete process N starts N+1 from **WO snapshot** (L4). No OOB blood→Qubit rows. | Lab Ops L2–L4. OQ-WO-1/3 still Open — do not code P2 UX/FK until Decided. |
+| **QA13** | **P2** | Map row = analysis + TAT + ordered list; no type picker. Route snapshots that list, **zero Tests**. First Start instantiates `chain[0]` only — **Tobias-signed Pass** on `8cfa2a9` (ELISA first LimsRun, 1 step, no Qubit/qPCR Tests). Later Start = next pending process on dest container-with-sample after execute (source removed); not the parent vessel. `if test: continue` is not a freeze; classic `/tests` must leave `asked_for_params` NULL or we need a freeze marker; until then `{}` is **ambiguous** (classic default and frozen `{}` are the same JSON) — do **not** teach skip-on-frozen-`{}`; a write of `{}` onto `99b692d3` is not a skip Pass; extract LimsRun must not share asked-for `analysis_id`. Live AC-P2 **unsigned** overall on `8cfa2a9`. Freeze skip **unsigned**. Later-step type-gate **unsigned**. Dest-type Hold out. Hold product merge. | Hans/Heidi/Günter lock. Live Tobias click 2026-08-30. |
 | **QA14** | **P3** | **Hold UAT until OQ-RES-1.** Then fold AR-RES-01/02: typed number → `reported_result` + `qualifiers`; missing `units_default` → 422, no row; two writers **409**; **no** `results.unit_id`; **no** results column on asked-for. | OQ-RES-1 Open. Lab Ops: persist lock, not a results product. |
 | **QA15** | **P4 / P5** | P4: Apply → process definition with ≥1 typed step; human save; never silent auto-activate; **L5** — success copy / UAT must **not** claim NCI extract → DNA daughter → Qubit is runnable; no SOP PDFs in git. P5: dry-run pass then activate; production import with LLM disabled; `config:edit` mutate; client cannot write parsers. | L5, RQ-SOP-*, RQ-IMP-*, bounce #6–8. |
 
@@ -117,13 +117,13 @@ Already normative (restated so implementers do not drop them): empty routing map
 
 | ID | Phase | Notes |
 |----|-------|--------|
-| AF-WO-* | P2 | AC-P2-1…3; L2 `route_sample_type`; L3 params snapshot; L4 chain walk; TAT overlap 409; publish without Test 422 |
+| AF-WO-* | P2 | Ordered `process_definition[]`; no type picker; map-save 409 only on TAT **and** first-step overlap (**UI click-save** on `8cfa2a9`: ELISA TAT 1–7 saved; Blood extract + later DNA qPCR chain saved, no AND 422; second ELISA overlap 409); empty Route 422 Pass; two-accept 409 unsigned; first process starts first **Pass**; later-step type-gate unsigned; freeze skip unsigned (`{}` ambiguous); publish missing-Test 422 Pass on `8cfa2a9` (`b005cfe` history) |
 | AF-RES-* | P3 | Fold AR-RES-01/02 after OQ-RES-1. Not on asked-for. |
 | AF-SOP-* / AF-IMP-* | P4/P5 | Apply process def; L5 no dest-type E2E; parser dry-run + activate; no LLM on import |
 
 ### Out of this packet (do not fail P1 UAT on)
 
-- Work_order / routing map / Route button (OQ-WO-1 Open)
+- Work_order / ordered routing map / explicit Route (OQ-WO-1/3 Decided)
 - Qubit-on-blood, extract-hold dest type, blood → DNA → Qubit E2E, Qubit/blood testdata IDs
 - Results entry / `qualifiers` shape / `results.unit_id`
 - SOP Apply / parser setup / LLM draft
@@ -162,7 +162,7 @@ Classic `lab-tech` / `client` logins are acceptable extras; **0058 actors are th
 |-------|--------|
 | **Verdict** | **Accept with conditions** (QA1–QA12 for P1; QA13–QA15 recorded for later phases) |
 | **Date** | 2026-08-28 |
-| **Implement gate** | **OPEN for P1 only** (matches Lab Ops). P2 closed until OQ-WO-1/3 Decided and L2–L4 stay in the sketch. P3 Hold on OQ-RES-1. P4/P5 not this PR. |
+| **Implement gate** | P2 OQ-WO-1/3 are Decided under the ordered-route lock; product merge remains held because live AC-P2 on `8cfa2a9` is **unsigned** (freeze / Route 422/409 in code, not QA-clicked). |
 | **UAT pass** | Still required after implement, before merge to `main`. Source: new `uat-post-receive-work-spine.md` P1 must-pass. Not a substitute: this review. |
 | **Not licensed** | Extract-hold dest type · blood → DNA → Qubit E2E · minting Tests at asked-for · results on asked-for · wizard UAT |
 
