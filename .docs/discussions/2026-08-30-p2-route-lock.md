@@ -511,3 +511,17 @@ The Marc Confirm immediately above is retained. This Confirm is the **general** 
 4. Do **not** teach dest auto-joining a second WO. Do **not** copy WGS params onto WES.
 5. Freeze skip (`{}` vs NULL) stays **OPEN**. Hold merge of `feat/work-order-p2` to `main`. Not IC50.
 
+---
+
+## Marc lock overwrite — extract is experiment / equipment, never a LimsRun — 2026-08-31
+
+**Not a restamp of the OQ-WO-6 Confirm votes.** Extract **CLOSED** as not-a-LimsRun still stands. This punch overwrites the sloppy “extract is a process” shorthand. Not Pass. Not IC50.
+
+1. **Extract uses equipment, not instruments.** Centrifuge, robot, columns — equipment. That does **not** make a LimsRun.
+2. **Extract is an experiment** (aliquot/pool execute; dest). It may occupy a **process** whose steps are that experiment. Process contains extract. Extract is not “a process” as if process and experiment were the same thing.
+3. **Extract is never a LimsRun.** No asked-for `analysis_id`. No Test freeze at extract start. Do not author extract as a LimsRun. LimsRun is **instruments / analysis / Tests**.
+4. **After extract, DNA is quantified on a QC instrument** (Qubit, Nanodrop, or other). That is a **supporting LimsRun** on the dest DNA. Own Test `(sample, Qubit)` / `(sample, Nanodrop)`. Own params freeze.
+5. **Process QC is not an asked-for.** Do not invent a second asked-for for Qubit/Nanodrop. The asked-for assay still appears **once**, on the assay LimsRun (ELISA, WGS, WES, …). Do not put QC on extract.
+
+Hold merge. Not IC50.
+
