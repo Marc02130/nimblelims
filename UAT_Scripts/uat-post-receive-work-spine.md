@@ -918,7 +918,7 @@ The preceding dest-follow stamp (`570bbc0` Lab Ops Met; C2/C3 numbered) is retai
 
 **Branch / build tested:** `feat/work-order-p2` at `bf51b19` (`bf51b192b417663f677b80be6d8b9afd790cb78a`). Alembic **`0078`**. Execute joints remain **`1572071`**. UAT numbering SHA `570bbc0` is **not** this click SHA.
 
-**QA signature:** Tobias — signed per-AC results below. **Overall P2 Pass remains unsigned and is not claimed.** Hold product merge. Stack **down** after. Not IC50.
+**QA signature:** Tobias — signed per-AC results below. **Overall P2 Pass remains unsigned and is not claimed.** Freeze skip NULL is **Pass** on this SHA. **Merge hold is closeout 1.2 dest-cohort lookup** after C3 (asked-for by dest `sample_id` → `{}`), not freeze skip. Hold product merge. Stack **down** after. Not IC50.
 
 **Executor / environment / date:** Tobias · local docker compose (`lims-*`) · 2026-08-31 · compose **down** after run
 
@@ -980,7 +980,7 @@ Do **not** re-score empty Route Pass on `8cfa2a9`.
 1. Asked-for ELISA on a received tube. Route against a map whose LimsRuns do **not** include ELISA (e.g. Qubit-only). Confirm **422**, row stays `requested`, **0** work orders.
 2. (Legacy / QA fixture only.) A map whose chain has **two** ELISA LimsRuns — map-save now refuses this, so insert is a fixture if needed. Route ELISA. Confirm **422**, stays `requested`, **0** work orders.
 
-**Expect:** asked-for analysis must appear on **exactly one** LimsRun. 0 or 2+ → **422**. Never silent `first()`.
+**Expect:** for an **assay** asked-for (this AC: ELISA), the asked-for analysis must appear on **exactly one** LimsRun. 0 or 2+ → **422**. Never silent `first()`. **Not this AC / closeout 1.4:** Extracted DNA asked-for may have **zero** LimsRuns (DNA tube only) — do not Fail that ask type here.
 
 ### AC-P2-qc-1 — supporting Qubit in the same route
 
