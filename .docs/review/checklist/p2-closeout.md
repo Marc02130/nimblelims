@@ -8,7 +8,7 @@
 **Stem:** `post-receive-work-spine`  
 **UAT:** [`UAT_Scripts/uat-post-receive-work-spine.md`](../../../UAT_Scripts/uat-post-receive-work-spine.md) live stamp `bf51b19`
 
-**Now:** **Merge bar Met** (Marc/CEO). Product may merge `feat/work-order-p2` to `main`. Tobias signed **per-AC Pass**. **Overall P2 is unsigned / not Pass.** Closeout **1.2 dest-cohort asked-for lookup** after C3 is **OPEN as post-merge follow-up**, **not** a merge hold. Freeze skip NULL is **Tobias Pass** on `bf51b19` (not a merge hold). Asked-for-only Marc lock from PR **111** still stands. Stack **down**. Not IC50.
+**Now:** **Merge bar Met** (Marc/CEO). Product may merge `feat/work-order-p2` to `main`. Tobias signed **per-AC Pass**. **Overall P2 is unsigned / not Pass.** Closeout **1.2 dest-cohort asked-for lookup** after C3 is **OPEN as post-merge follow-up**, **not** a merge hold. Freeze skip NULL is **Tobias Pass** on `bf51b19` (not a merge hold). Asked-for-only Marc lock from PR **111** still stands. **Leadership Confirm 2026-09-01** (ELISA not on DNA; second tube; extract LimsRun later). Stack **down**. Not IC50.
 
 This is a working list, not a Leadership Confirm and not a UAT Result stamp. Do **not** rewrite signed UAT (`9342439`, `8cfa2a9`, `b005cfe`, `9c4f9da`, `3b56cfb`, P1 `c649245`, Deiter `02fe95f` C2 **Fail**). Do **not** rewrite Deiter Lab Ops Met on `570bbc0`. Do **not** restamp unsigned Tobias C2/C3 on `570bbc0`.
 
@@ -35,7 +35,7 @@ This is a working list, not a Leadership Confirm and not a UAT Result stamp. Do 
 | Dest mint only at execute | **Leadership Confirm** |
 | No route branching | **Marc lock, pending Leadership overwrite** |
 | Care about the asked-for only | **Marc lock 2026-09-01 (PR 111), pending Leadership overwrite** — still stands |
-| ELISA not on DNA; second tube own asked-for; separate containers = separate assignments | **Marc lock 2026-09-01, pending Leadership overwrite** |
+| ELISA not on DNA; second tube own asked-for; separate containers = separate assignments | **Leadership Confirm 2026-09-01** (Rolf/Deiter/Hans/Heidi/Günter) |
 | Overall P2 Pass | **Unsigned / not Pass** |
 | Merge to `main` | **Met** (Marc/CEO). Product may merge |
 
@@ -46,8 +46,8 @@ This is a working list, not a Leadership Confirm and not a UAT Result stamp. Do 
 ## Left after merge (not a merge hold)
 
 1. **Leadership Confirm** of sequential asked-fors (WGS on blood owns WGS params; C3 DNA; C2 aliquot continues WGS; WES = new asked-for on the DNA tube, then aliquoted or used up; own params). Marc lock is pending overwrite. Tobias Pass of two WOs is **not** that Confirm.
-2. **Closeout 1.2 — OPEN post-merge follow-up (not a merge hold):** WO-7 `_mint_tests_at_start` still looks up `AskedFor` by cohort `sample_id`. After C3 (Blood→DNA) the assay on the DNA dest looks up asked-for by **dest `sample_id`** and gets `{}` (wrong cohort / wrong sample). **Not scored** on seq-1. Lookup should go through the work order’s `asked_for_id` (or parent lineage). Known OPEN after merge. It is **not** freeze skip and **not** dest-follow.
-3. **Closeout 1.4 — Extracted DNA asked-for (zero assay LimsRuns):** If asked-for is Extracted DNA, they get a DNA tube. No sequencing. No other LimsRuns. Today map-save/Route **422** when a chain has **zero** LimsRuns (`Route has no LIMS Run analysis`). That 422 is **wrong** for this asked-for. Two ELISA LimsRuns still 422. Extract may be a LimsRun later if equipment is an instrument.
+2. **Closeout 1.2 — OPEN post-merge follow-up (not a merge hold):** WO-7 `_mint_tests_at_start` still looks up `AskedFor` by cohort `sample_id`. After C3 (Blood→DNA) WGS start on the DNA dest looks up asked-for by **dest `sample_id`** and gets `{}` (wrong cohort / wrong sample). **Leadership Confirm:** intended freeze is `{library_kit: …}` from the blood WGS asked-for, **not** `{}`, **not** Qubit params. **Not scored** on seq-1. Lookup should go through the work order’s `asked_for_id` (or parent lineage). Known OPEN after merge. It is **not** freeze skip and **not** dest-follow.
+3. **Closeout 1.4 — Extracted DNA asked-for (zero assay LimsRuns):** If asked-for is Extracted DNA, they get a DNA tube. No sequencing. **Qubit/Nanodrop may sit** (Leadership Confirm 2026-09-01). Today map-save/Route **422** when a chain has **zero** LimsRuns (`Route has no LIMS Run analysis`). That 422 is **wrong** for this asked-for. Two ELISA LimsRuns still 422. Extract may be a LimsRun later if equipment is an instrument. Do **not** teach a forever ban.
 4. **Overall P2 Pass** — Tobias has not signed overall Pass. Do not write it from this fold.
 5. **Merge** — **Met.** Marc/CEO: merge `feat/work-order-p2` to `main` now. Do not invent overall P2 Pass. Freeze skip NULL **Pass** on `bf51b19` is not a hold.
 
@@ -60,11 +60,17 @@ Do **not** recode dest-follow, cardinality, freeze skip NULL, or Route two-accep
 | # | Gap | Now | Do |
 |---|-----|-----|----|
 | **1.1 Cardinality 1** | Two ELISA LimsRuns must 422 | **Done.** Tobias Pass `bf51b19` | Do not re-score |
-| **1.2 WO-7 asked-for after C3** | Lookup is `sample_id == cohort` + `analysis_id` | **Not coded.** Seq-1 Pass without scoring dest-cohort params. **OPEN post-merge.** After Blood→DNA, assay on DNA dest looking up asked-for by dest `sample_id` → `{}` | Use `work_order.asked_for_id` (or parent lineage) so DNA dest does not get `{}` |
+| **1.2 WO-7 asked-for after C3** | Lookup is `sample_id == cohort` + `analysis_id` | **Not coded.** Seq-1 Pass without scoring dest-cohort params. **OPEN post-merge.** After Blood→DNA, WGS start on DNA dest looking up asked-for by dest `sample_id` → `{}`. **Intended freeze:** `{library_kit: …}` from the WGS asked-for, **not** `{}`, **not** Qubit params | Use `work_order.asked_for_id` (or parent lineage) so DNA dest does not get `{}` |
 | **1.3 Freeze skip NULL** | Classic `{}` vs frozen `{}` | **Done** (`0078`). Tobias Pass `bf51b19` | Do not transfer `99b692d3` |
 | **1.4 Extracted DNA asked-for** | Zero assay LimsRuns; DNA tube only | Map-save/Route still **422** on 0 LimsRuns | Code iff in-bar: allow extract-only route when asked-for is Extracted DNA |
 
 **Do not code:** route branching; dest auto-join second WO; copy WGS params onto WES; second asked-for for Qubit; analysis picker on `/receive`; 2+ routes picker; P3–P5. Do not forever-ban extract-as-LimsRun — later, if equipment is an instrument.
+
+---
+
+## Standing UAT rule (Leadership Confirm 2026-09-01)
+
+After **two** UAT attempts on the same issue, the **next** run needs a written “what we are testing and why” **before** the click — fixtures, Pass/Fail, and what is **not** a Fail. Do **not** rewrite signed stamps (`bf51b19`, `8cfa2a9`, `9342439`, P1, `02fe95f`, Deiter `570bbc0` Lab Ops Met) to satisfy this rule.
 
 ---
 
@@ -103,6 +109,7 @@ Do **not** re-score `8cfa2a9` / `9342439` / P1 / Deiter `02fe95f` C2 Fail. Do **
 | Extracted DNA asked-for (1.4) | Zero LimsRuns still map-save/Route **422** | Post-merge / iff in-bar |
 | Historical Route/WO-7/AC-P2-9..11 | **Signed Pass** | Do not re-score |
 | Asked-for-only Marc lock (PR 111) | **Stands** | Do not rewrite |
-| ELISA / second-tube Marc lock | **Folded (pending Leadership overwrite)** | ELISA not on DNA; second blood tube own asked-for+route; separate containers = separate process assignments. OQ-WO-7 unchanged |
+| ELISA / second-tube | **Leadership Confirm 2026-09-01** | ELISA not on DNA; two blood tubes → two assignments (`container_id`); Extracted DNA may have Qubit/Nanodrop; OQ-WO-6 still assay LimsRun only; OQ-WO-7 OPEN (`{library_kit: …}` not `{}`) |
+| Standing UAT two-attempt rule | **Folded** | After two UAT attempts on the same issue, next run needs written “what we are testing and why” before the click |
 | Overall P2 Pass | **Unsigned** | Do not invent from this fold |
 | Merge to `main` | **Met** (Marc/CEO) | Not freeze skip (Pass on `bf51b19`). Not 1.2 |
