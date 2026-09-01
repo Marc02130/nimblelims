@@ -35,6 +35,7 @@ This is a working list, not a Leadership Confirm and not a UAT Result stamp. Do 
 | Dest mint only at execute | **Leadership Confirm** |
 | No route branching | **Marc lock, pending Leadership overwrite** |
 | Care about the asked-for only | **Marc lock 2026-09-01 (PR 111), pending Leadership overwrite** — still stands |
+| ELISA not on DNA; second tube own asked-for; separate containers = separate assignments | **Marc lock 2026-09-01, pending Leadership overwrite** |
 | Overall P2 Pass | **Unsigned / not Pass** |
 | Merge to `main` | **Met** (Marc/CEO). Product may merge |
 
@@ -102,5 +103,6 @@ Do **not** re-score `8cfa2a9` / `9342439` / P1 / Deiter `02fe95f` C2 Fail. Do **
 | Extracted DNA asked-for (1.4) | Zero LimsRuns still map-save/Route **422** | Post-merge / iff in-bar |
 | Historical Route/WO-7/AC-P2-9..11 | **Signed Pass** | Do not re-score |
 | Asked-for-only Marc lock (PR 111) | **Stands** | Do not rewrite |
+| ELISA / second-tube Marc lock | **Folded (pending Leadership overwrite)** | ELISA not on DNA; second blood tube own asked-for+route; separate containers = separate process assignments. OQ-WO-7 unchanged |
 | Overall P2 Pass | **Unsigned** | Do not invent from this fold |
 | Merge to `main` | **Met** (Marc/CEO) | Not freeze skip (Pass on `bf51b19`). Not 1.2 |
