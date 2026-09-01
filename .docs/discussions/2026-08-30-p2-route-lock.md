@@ -571,3 +571,17 @@ Does **not** rewrite Round 1, Round 2, Contents-grain Confirm, Deiter `02fe95f` 
 3. Freeze skip NULL Tobias Pass on `bf51b19` stands (not a merge hold).
 4. Do **not** invent overall P2 Pass from this fold.
 
+---
+
+## Marc lock — ELISA not on DNA; second tube own asked-for — 2026-09-01
+
+**Marc lock pending Leadership overwrite if Confirm has not landed for this exact wording.** Docs-only. **Not Leadership Confirm.** Not overall P2 Pass. Not a merge vote. Not IC50.
+
+Does **not** rewrite Round 1, Round 2, Contents-grain Confirm, Deiter `02fe95f` Results, Tobias `9342439` / `8cfa2a9` / P1, dest-type split Confirm, mint-only-at-execute Confirm, `570bbc0` Lab Ops Met, Tobias Results on `bf51b19`, asked-for-only Marc lock (PR **111**), or **Marc/CEO merge bar Met**. **OQ-WO-7 stays OPEN** as post-merge follow-up — do not close it.
+
+1. **ELISA not on DNA.** The panel/asked-for ELISA assay is **not** run on the DNA derivative as the intended matrix for that ask. Do **not** teach ELISA-on-DNA as the happy path for a blood ELISA ask. Extract-as-route-machinery is for **WGS / WES / Extracted DNA**, not for ELISA.
+2. **Same blood Sample may have a second tube** with its **own asked-for + route**. Equivalent aliquot / extra receive container on the same Sample can carry a separate asked-for and a separate route. Open uniqueness remains `(sample, analysis)` — typically ELISA on one tube and WGS (or Extracted DNA) on the other.
+3. **Separate containers = separate process assignments.** Process holds a sample-in-a-container pair. Two tubes on the same Sample that are both in play are **two assignments** — do **not** collapse them into one process-sample row.
+
+Keep: asked-for-only lock; extract-as-process common path (not a forever ban on extract-as-LimsRun); supporting QC same-route; freeze skip Pass on `bf51b19`. `9342439` / `8cfa2a9` / P1 / `02fe95f` / Deiter `570bbc0` Lab Ops Met untouched.
+
