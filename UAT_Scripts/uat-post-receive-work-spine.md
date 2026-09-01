@@ -837,17 +837,17 @@ Extract-hold UAT step **1.7** stays **OOB execute** with no Result stamp. It mus
 
 The preceding Deiter click (`4671ba8` / `02fe95f`) is retained verbatim as signed history, including its original “Live” heading and Results (C1 **Pass**, C2 **Fail**, dest mint Hold **Pass**). It is not the current live stamp. Do not rewrite or transfer those observations to another SHA.
 
-## Live dest-follow stamp — `570bbc0` Deiter Lab Ops Met; Tobias QA restamp pending
+## Preceding dest-follow stamp — `570bbc0` Deiter Lab Ops Met
 
-**Not Pass overall.** Deiter’s execute click on **`570bbc0`** (`570bbc01ff50fdac2d529448ceb95683c535401f`) is **Met for Lab Ops identity only**: same-type plate, DNA new Sample, and Later Start following the destination. It is not Tobias QA Pass. Execute joints stay **`1572071`** (`15720716c7cc927f1b498602ea87dec8a2bee85b`) and have **no Tobias Result**. Do **not** rewrite Deiter `02fe95f`, Tobias `9342439` / `8cfa2a9`, or P1. PATCH is not a path. Cardinality / freeze-skip NULL / sequential asked-fors are **not this dest-follow click** — see the live unsigned stamp below. **OQ-WO-6 extract CLOSED.** Hold merge. Not IC50.
+**Not Pass overall.** Deiter’s execute click on **`570bbc0`** (`570bbc01ff50fdac2d529448ceb95683c535401f`) is **Met for Lab Ops identity only**: same-type plate, DNA new Sample, and Later Start following the destination. It is not Tobias QA Pass. Execute joints stay **`1572071`**. Do **not** rewrite Deiter `02fe95f`, Tobias `9342439` / `8cfa2a9`, or P1. PATCH is not a path. Tobias QA restamp of C1/C2/C3 is the **live stamp `bf51b19`** below. **OQ-WO-6 extract CLOSED.** Hold merge. Not IC50.
 
 **Leadership Confirm (2026-08-31):** extract is a process; exactly one asked-for LimsRun is the assay step. **Rolf/Marc:** Qubit / Nanodrop are supporting LimsRuns in the **same route as whatever the asked-for assay is** (ELISA, NGS, Qubit-as-asked-for, sequencing, …; own Tests, own params freeze). **No route branching:** WGS asked-for on blood owns WGS params (extract → seq); C3 DNA then C2 aliquot into WGS; WES is a new asked-for on the DNA tube, which is then aliquoted or used up (own params). **OQ-WO-6 extract CLOSED.** Not Pass.
 
-| Slice | Deiter Lab Ops on `570bbc0` | Tobias QA restamp |
-|-------|-------------------------------|-------------------|
-| AC-P2-C1 assignment identity | **Met** | **unsigned** |
-| AC-P2-C2 same-type dest-follow | **Met** | **unsigned** |
-| AC-P2-C3 type-changing dest-follow | **Met** | **unsigned** |
+| Slice | Deiter Lab Ops on `570bbc0` | Tobias QA on `bf51b19` |
+|-------|-------------------------------|-------------------------|
+| AC-P2-C1 assignment identity | **Met** | **Pass** (live stamp below) |
+| AC-P2-C2 same-type dest-follow | **Met** | **Pass** (live stamp below) |
+| AC-P2-C3 type-changing dest-follow | **Met** | **Pass** (live stamp below) |
 | Overall P2 | **not Pass** | **unsigned / not Pass** |
 
 **Leadership Confirm** (Rolf / Deiter / Hans / Heidi / Günter): two grains at execute — C2 same-type destination; C3 derivative destination. Dest exists only after aliquot/pool execute; Route / Start / map-save / asked-for mint zero daughters; receive identity + first vessel is not dest mint. C2 leftover inbound volume is whatever was not transferred — emptying is not required.
@@ -858,7 +858,7 @@ The preceding Deiter click (`4671ba8` / `02fe95f`) is retained verbatim as signe
 
 **Lab Ops Result:** **Met** (Deiter execute click on `570bbc0`; Lab Ops identity only, not Tobias QA Pass).
 
-**Tobias QA restamp:** **unsigned** until Tobias execute Results land on this numbered AC. Fold those Results here in a later commit; do **not** write Pass or Fail now. Do **not** score Blood→DNA here — that is AC-P2-C3.
+**Tobias QA Result:** **Pass** (Tobias, 2026-08-31, `bf51b19`). Execute joints remain **`1572071`**. Do **not** rewrite Deiter Met. Do **not** score Blood→DNA here — that is AC-P2-C3. Stack down after.
 
 **Setup (numbered)**
 1. Receive one tube. Receive does **not** weigh it and often leaves Contents `amount` **NULL**.
@@ -885,7 +885,7 @@ The preceding Deiter click (`4671ba8` / `02fe95f`) is retained verbatim as signe
 
 **Lab Ops Result:** **Met** (Deiter execute click on `570bbc0`; Lab Ops identity only, not Tobias QA Pass).
 
-**Tobias QA restamp:** **unsigned** until Tobias execute Results land on this numbered AC. Fold those Results here in a later commit; do **not** write Pass or Fail now. Do **not** fold into C2. Same click as extract-hold UAT **1.7**.
+**Tobias QA Result:** **Pass** (Tobias, 2026-08-31, `bf51b19`). Execute joints remain **`1572071`**. Do **not** rewrite Deiter Met. Do **not** fold into C2. Same click as extract-hold UAT **1.7**. Stack down after.
 
 **Setup (numbered)**
 1. Use the prepared tracked-amount fixture from C2; 400 `source_amount_null` is setup, not dest-follow Fail.
@@ -906,31 +906,41 @@ The preceding Deiter click (`4671ba8` / `02fe95f`) is retained verbatim as signe
 
 Route / Start / map-save / asked-for still mint **zero** daughters. Receive still mints identity + first vessel — that is **not** dest mint. Dest exists only after execute. That is not this click.
 
-Deiter C2 **Fail** on `02fe95f` stays history. `9342439` untouched. Deiter’s `570bbc0` execute is Lab Ops **Met**, not a Tobias QA Pass. Tobias’s QA restamp remains unsigned until his execute Results land here. **OQ-WO-6 extract CLOSED.** Overall P2 remains **unsigned / not Pass**. Hold merge. Not IC50.
+Deiter C2 **Fail** on `02fe95f` stays history. `9342439` untouched. Deiter’s `570bbc0` execute is Lab Ops **Met**. Tobias QA of C1/C2/C3 is **Pass** on **`bf51b19`** (live stamp below). **OQ-WO-6 extract CLOSED.** Overall P2 remains **unsigned / not Pass**. Hold merge. Not IC50.
 
 ---
 
-The preceding dest-follow stamp (`570bbc0` Lab Ops Met; C2/C3 numbered) is retained. It is not a freeze-skip, cardinality, or sequential-asked-for Result. Do not fold those clicks into C2/C3.
+The preceding dest-follow stamp (`570bbc0` Lab Ops Met; C2/C3 numbered) is retained as Lab Ops history. Tobias QA Results for those numbered ACs, plus cardinality / freeze skip / sequential asked-fors, are the live stamp below.
 
-## Live unsigned ACs — cardinality 1, freeze skip NULL, sequential asked-fors
+## Live AC-P2 stamp — `bf51b19` (per-AC Pass; overall P2 unsigned / not Pass)
 
-**Not Pass overall.** Do **not** rewrite `8cfa2a9`, `9342439`, Deiter `02fe95f`, or P1. Tobias clicks these on live `feat/work-order-p2` **after backend rebuild so Alembic `0078` is applied**. Cardinality 1 and freeze skip NULL are **coded**. WO-7 dest-cohort asked-for lookup (closeout 1.2) is **not** this stamp. Route two-accept **409** is coded; unsigned as a click. Hold merge. Not IC50.
+**Not Pass overall.** Do **not** rewrite `8cfa2a9`, `9342439`, Deiter `02fe95f`, or P1. Do **not** rewrite Deiter Met on `570bbc0`.
 
-| AC | Coded | Tobias |
-|----|-------|--------|
-| AC-P2-card-1 two ELISA LimsRuns map-save **422** | Yes | **unsigned** |
-| AC-P2-card-2 extract process + Qubit + ELISA map-save **201** | Yes | **unsigned** |
-| AC-P2-card-3 Route asked-for count 0 or 2+ **422** | Yes | **unsigned** |
-| AC-P2-qc-1 Qubit supporting LimsRun, own Test | Yes | **unsigned** |
-| AC-P2-4 freeze skip NULL (classic `/tests` → first start writes) | Yes (`0078`) | **unsigned** |
-| AC-P2-5 addendum Route two-accept **409** | Yes | **unsigned** (`8cfa2a9` §7 not clicked) |
-| AC-P2-seq-1 sequential asked-fors (WGS then WES on DNA tube) | Partial — two WOs coded; dest-cohort params lookup is **not** this AC | **unsigned** |
+**Branch / build tested:** `feat/work-order-p2` at `bf51b19` (`bf51b192b417663f677b80be6d8b9afd790cb78a`). Alembic **`0078`**. Execute joints remain **`1572071`**. UAT numbering SHA `570bbc0` is **not** this click SHA.
 
-**Do not re-score** empty Route 422 / map overlap 409 / first Start `chain[0]` / publish-refuse / AC-P2-9..11. Those stay signed history.
+**QA signature:** Tobias — signed per-AC results below. **Overall P2 Pass remains unsigned and is not claimed.** Hold product merge. Stack **down** after. Not IC50.
+
+**Executor / environment / date:** Tobias · local docker compose (`lims-*`) · 2026-08-31 · compose **down** after run
+
+| AC | Tobias |
+|----|--------|
+| AC-P2-C1 assignment identity | **Pass** |
+| AC-P2-C2 same-type dest-follow | **Pass** |
+| AC-P2-C3 type-changing dest-follow | **Pass** |
+| AC-P2-card-1 two ELISA LimsRuns map-save **422** | **Pass** |
+| AC-P2-card-2 extract process + Qubit + ELISA map-save **201** | **Pass** |
+| AC-P2-card-3 Route asked-for count 0 or 2+ **422** | **Pass** |
+| AC-P2-qc-1 Qubit supporting LimsRun, own Test | **Pass** |
+| AC-P2-4 freeze skip NULL | **Pass** — classic `/tests` **NULL**; first start wrote `{cell_line: A549}`; later start left it |
+| AC-P2-5 addendum Route two-accept **409** | **Pass** |
+| AC-P2-seq-1 sequential asked-fors (two WOs) | **Pass** — dest-cohort params (closeout **1.2**) **not scored** |
+| Overall P2 | **unsigned / not Pass** |
+
+**Do not re-score** empty Route 422 / map overlap 409 / first Start `chain[0]` / publish-refuse / AC-P2-9..11. Those stay signed history. `{}` on `99b692d3` stays `8cfa2a9` history of a **new** Test write, not this freeze-skip Pass.
 
 ### AC-P2-card-1 — map-save two ELISA LimsRuns
 
-**Result:** **unsigned**
+**Result:** **Pass** (Tobias, 2026-08-31, `bf51b19`). Stack down after.
 
 **Setup**
 1. Admin `/admin/routing-map`. No analysis or sample-type picker.
@@ -945,7 +955,7 @@ The preceding dest-follow stamp (`570bbc0` Lab Ops Met; C2/C3 numbered) is retai
 
 ### AC-P2-card-2 — extract process + Qubit + ELISA
 
-**Result:** **unsigned**
+**Result:** **Pass** (Tobias, 2026-08-31, `bf51b19`). Stack down after.
 
 **Setup**
 1. Process 1 = **extract** as an Experiment (aliquot/pool plan). **No** `analysis_id` on extract. Dest type DNA (or same-as-parent if the next process accepts inbound).
@@ -962,7 +972,7 @@ The preceding dest-follow stamp (`570bbc0` Lab Ops Met; C2/C3 numbered) is retai
 
 ### AC-P2-card-3 — Route 422 when asked-for count is 0 or 2+
 
-**Result:** **unsigned**
+**Result:** **Pass** (Tobias, 2026-08-31, `bf51b19`). Stack down after. Do **not** re-score empty Route Pass on `8cfa2a9`.
 
 Do **not** re-score empty Route Pass on `8cfa2a9`.
 
@@ -974,7 +984,7 @@ Do **not** re-score empty Route Pass on `8cfa2a9`.
 
 ### AC-P2-qc-1 — supporting Qubit in the same route
 
-**Result:** **unsigned**
+**Result:** **Pass** (Tobias, 2026-08-31, `bf51b19`). Stack down after.
 
 **Setup:** Use the AC-P2-card-2 map (extract process + Qubit LimsRun + ELISA LimsRun). Route a blood (or inbound-type) tube as **ELISA** asked-for.
 
@@ -990,7 +1000,7 @@ Do **not** re-score empty Route Pass on `8cfa2a9`.
 
 ### AC-P2-4 — freeze skip NULL (live restamp)
 
-**Result:** **unsigned.** Do **not** transfer `8cfa2a9` (`{}` on `99b692d3`) as this Result. That write is history of a **new** Test, not classic skip.
+**Result:** **Pass** (Tobias, 2026-08-31, `bf51b19`). Classic `/tests` **NULL**; first start wrote `{cell_line: A549}`; later start left it. Do **not** transfer `8cfa2a9` (`{}` on `99b692d3`) as this Result. That write is history of a **new** Test, not classic skip. Stack down after.
 
 **Requires `0078`.** If classic `/tests` still stores `{}`, rebuild the backend and stop — that is setup, not a skip Pass.
 
@@ -1011,7 +1021,7 @@ Do **not** re-score empty Route Pass on `8cfa2a9`.
 
 ### AC-P2-5 addendum — Route two-accept 409
 
-**Result:** **unsigned.** Do **not** re-score AC-P2-5 click-save Pass on `8cfa2a9`. This is only step 7 of that AC, which was **not** clicked that SHA.
+**Result:** **Pass** (Tobias, 2026-08-31, `bf51b19`). Do **not** re-score AC-P2-5 click-save Pass on `8cfa2a9`. This is only step 7 of that AC. Stack down after.
 
 **Steps**
 1. Two saved maps that both accept this sample’s current type **and** this asked-for analysis (e.g. widen a Qubit-first first-step list so it also accepts the extract-first type, same assay in both chains).
@@ -1021,7 +1031,7 @@ Do **not** re-score empty Route Pass on `8cfa2a9`.
 
 ### AC-P2-seq-1 — sequential asked-fors (WGS then WES)
 
-**Result:** **unsigned.** **No route branching.** Dest does **not** auto-join a second WO.
+**Result:** **Pass** (Tobias, 2026-08-31, `bf51b19`) — two WOs. Dest-cohort params (closeout **1.2**) **not scored**. **No route branching.** Dest does **not** auto-join a second WO. Stack down after.
 
 **Setup**
 1. WGS route: **blood** inbound. Process 1 = extract (Experiment, dest DNA). Process 2 = WGS sequencing LimsRun (exactly one asked-for LimsRun). WGS asked-for **owns WGS params**.
@@ -1034,6 +1044,14 @@ Do **not** re-score empty Route Pass on `8cfa2a9`.
 
 **Expect:** Do **not** copy WGS params onto WES. Do **not** teach one WO splitting to two assays.
 
-**Not this AC:** WGS params freeze onto a Test whose cohort sample is the **DNA dest** (WO-7 still looks up asked-for by cohort `sample_id` — closeout **1.2**, not coded). Do not Fail seq-1 if dest-cohort params are `{}`. Do Fail seq-1 if dest auto-joins WES or WES is not a new asked-for on the DNA tube.
+**Not this AC:** WGS params freeze onto a Test whose cohort sample is the **DNA dest** (WO-7 still looks up asked-for by cohort `sample_id` — closeout **1.2**, not coded). **Not scored** on this stamp. Do Fail seq-1 if dest auto-joins WES or WES is not a new asked-for on the DNA tube.
 
-**Overall P2 remains unsigned / not Pass.** Hold merge. Not IC50.
+---
+
+## Live `bf51b19` per-AC sign-off
+
+**Signed by Tobias, 2026-08-31; local docker compose, compose down.**
+
+AC-P2-C1 **Pass** · AC-P2-C2 **Pass** · AC-P2-C3 **Pass** · AC-P2-card-1 **Pass** · AC-P2-card-2 **Pass** · AC-P2-card-3 **Pass** · AC-P2-qc-1 **Pass** · AC-P2-4 freeze skip NULL **Pass** (classic NULL; first start `{cell_line: A549}`; later start left it) · AC-P2-5 addendum Route two-accept **409** **Pass** · AC-P2-seq-1 **Pass** (two WOs; dest-cohort 1.2 not scored).
+
+**Overall P2 remains unsigned / not Pass.** Do not write overall P2 Pass, signed Pass, or merge-ready. Hold product merge. Stack down. Not IC50.

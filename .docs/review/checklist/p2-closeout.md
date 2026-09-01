@@ -185,14 +185,14 @@ After clicks: one docs commit that writes Tobias Results into the **live** stamp
 
 | Gate | Owner | Now | Merge needs |
 |------|-------|-----|-------------|
-| Cardinality 1 (count, not set) | Dev | **Not coded** | Code + UAT if we keep the #110 lock |
-| WO-7 params after C3 | Dev | **Misses blood asked-for** | Code + UAT if WGS-then-WES is in-bar |
-| Dest-follow C2/C3 | Tobias | Lab Ops Met; QA unsigned | **QA Pass** |
-| Assignment C1 | Tobias | Deiter Pass; QA unsigned | **QA Pass** |
-| Route two-accept 409 | Tobias | Coded; unsigned | Click |
+| Cardinality 1 (count, not set) | Dev + Tobias | **Pass** on `bf51b19` | Do not re-score |
+| WO-7 params after C3 | Dev | **Not coded** (1.2); **not scored** on seq-1 | Code if dest-cohort params are in-bar |
+| Dest-follow C2/C3 | Tobias | **Pass** on `bf51b19` (Deiter Met stays Lab Ops) | Do not re-score |
+| Assignment C1 | Tobias | **Pass** on `bf51b19` | Do not re-score |
+| Route two-accept 409 | Tobias | **Pass** on `bf51b19` | Do not re-score |
 | Map overlap 409 / empty Route 422 / first Start chain[0] / publish refuse / AC-P2-9..11 | — | **Signed Pass** | Do not re-score |
-| Freeze skip | Dev + Tobias | **OPEN** (`{}` ambiguous) | Defer (bar A) or code NULL/marker (bar B) |
-| Sequential asked-fors | Leadership | Marc lock | Confirm |
+| Freeze skip NULL | Tobias | **Pass** on `bf51b19` (classic NULL; wrote `{cell_line: A549}`; later start left it) | Do not transfer `99b692d3` |
+| Sequential asked-fors | Tobias | **Pass** two WOs on `bf51b19`; Leadership Confirm still pending overwrite | Dest-cohort 1.2 not scored |
 | Route branching / picker / P3–P5 | — | Out of P2 | Do not build |
-| Overall P2 Pass | Tobias + Leadership | Unsigned | After the in-bar items Pass |
-| Merge to `main` | Marc | Held | After UAT Pass on the in-bar set |
+| Overall P2 Pass | Tobias + Leadership | **Unsigned** | Leadership Confirm + leftover 1.2 decision |
+| Merge to `main` | Marc | **Held** | After overall P2 Pass |
