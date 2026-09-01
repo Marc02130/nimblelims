@@ -1072,13 +1072,13 @@ AC-P2-C1 **Pass** · AC-P2-C2 **Pass** · AC-P2-C3 **Pass** · AC-P2-card-1 **Pa
 
 **Living AC** (not a restamp of `bf51b19`). Does **not** rewrite Tobias Results on `bf51b19`, `8cfa2a9`, `9342439`, P1, Deiter `02fe95f`, or Deiter Lab Ops Met on `570bbc0`. Not IC50.
 
-**Result:** **unsigned** until Tobias. Do **not** invent Pass/Fail. Do **not** invent Tobias Pass.
+**Result:** **Pass** (Tobias, 2026-09-01, `80f054b`). Test **`55f9cad9`** `(DNA, WGS)` has `asked_for_params` **`{library_kit: TruSeq}`** from blood work order **`4ea9de0c`**. Leftover **`9f86d14`** is the lookup (WO asked-for same `analysis_id`, else parent lineage, else `{}`). **Was not recoded.** **OQ-WO-7 Closed.** Closeout **1.4** stays later (Extracted DNA zero assay LimsRuns) — still **OPEN**. Overall P2 remains **unsigned**. Does **not** rewrite `bf51b19` / `8cfa2a9` / `9342439` / P1 / `02fe95f`. Not IC50.
 
-**Product SHA:** **`80f054b`** (`80f054b274b02bb48f9dcbba5a05378419ea6b90`). Tobias clicks **this AC** on that SHA. Leftover **`9f86d14`** on that SHA **is** the OQ-WO-7 Grok Build work. **Do not recode.** Pytest for Hans **AC-P2-OQ-WO-7** landed in `9f86d14`. Remaining work is **Tobias**, not a new design.
+**Product SHA:** **`80f054b`** (`80f054b274b02bb48f9dcbba5a05378419ea6b90`). Leftover **`9f86d14`** on that SHA **is** the OQ-WO-7 Grok Build work. **Do not recode.** Pytest for Hans **AC-P2-OQ-WO-7** landed in `9f86d14`.
 
-**CEO Accept (Rolf, 2026-09-01):** Accept of this written what/why **before Tobias**. That Accept’s “Grok Build codes first” is **done** (`9f86d14` on `80f054b`). Tobias clicks next.
+**CEO Accept (Rolf, 2026-09-01):** Accept of this written what/why **before Tobias**. That Accept’s “Grok Build codes first” is **done** (`9f86d14` on `80f054b`).
 
-**OQ:** [OQ-WO-7](../.docs/review/open-questions/post-receive-work-spine.md) stays **OPEN** / **AC unsigned** until Tobias stamps. **In-bar** for method complete / overall P2 Pass honesty. Closeout **1.4** is a different OPEN if still listed.
+**OQ:** [OQ-WO-7](../.docs/review/open-questions/post-receive-work-spine.md) is **Closed.** Closeout **1.4** is a different OPEN if still listed. Overall P2 remains **unsigned**.
 
 **Lookup already on `80f054b`:** (1) WO asked-for **only if** `asked.analysis_id == run.analysis_id` so Qubit/Nanodrop do not steal WGS `{library_kit: TruSeq}`; (2) else walk `parent_sample_id` for a routed asked-for of that analysis; (3) else `{}`; (4) freeze skip: write onto NULL; do not overwrite an already-frozen payload including locked empty `{}`.
 
