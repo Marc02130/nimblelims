@@ -3,7 +3,7 @@
 **Date:** 2026-08-30  
 **Team:** Leadership (Lab Ops, CEO, Security CSO, Scientific CSO)  
 **Ask:** Round 1 remains **Leadership Confirmed** (Rolf, Deiter, Hans, Heidi, Günter; all five asks). Round 2 is **Leadership Confirm** (Rolf, Deiter, Hans, Heidi, Günter; R2-1…R2-4). **Contents grain / `0077` remains a Leadership Confirm** (Rolf, Deiter, Hans, Heidi, Günter) — process assignment is a **sample in a container**. Leadership later **Confirmed Deiter’s click**: C1 **Pass**, C2 **Fail**, dest mint Hold **Pass** on product `4671ba8` / `02fe95f`. C1/C2 are **not** unsigned. Docs Confirm `84d2810` is not a new execute and not the click SHA. Not a Tobias QA Pass and not a merge stamp. Grok Build owns dest-join / source-remove. Overall P2 UAT remains unsigned / not Pass.
-**Implement gate:** P2 is on `main`. Product SHA for **AC-P2-OQ-WO-7** is **`80f054b`**. **OQ-WO-7 Closed.** Per-AC Pass on `bf51b19`. Overall P2 unsigned. Closeout **1.4 / OQ-WO-8** is **Marc lock, pending Leadership Confirm** — Quantified DNA is the asked-for; Qubit is the asked-for LimsRun; other QC supporting. Send: [2026-09-01-p2-closeout-1-4-quantified-dna](2026-09-01-p2-closeout-1-4-quantified-dna.md). Do **not** code extract-only zero LimsRuns. Older “held until signed UAT Pass / hold merge for 1.2 / OPEN until Tobias” copy in walls below is **history**. Do **not** invent overall P2 Pass. Not IC50.  
+**Implement gate:** P2 is on `main`. Product SHA for **AC-P2-OQ-WO-7** is **`80f054b`**. **OQ-WO-7 Closed.** Per-AC Pass on `bf51b19`. Overall P2 unsigned. Closeout **1.4 / OQ-WO-8** is **Leadership Confirm** (2026-09-02; Rolf, Deiter, Hans, Heidi, Günter): Quantified DNA uses the existing Qubit analysis as exactly one asked-for LimsRun; extract stays experiment; zero LimsRuns remains 422. Map / Route must name the asked-for LimsRun slot rather than match any chain containing Qubit. Send: [2026-09-01-p2-closeout-1-4-quantified-dna](2026-09-01-p2-closeout-1-4-quantified-dna.md). No product code in this fold. Older “held until signed UAT Pass / hold merge for 1.2 / OPEN until Tobias” copy in walls below is **history**. Do **not** invent overall P2 Pass. Not IC50.
 **Stem:** [post-receive-work-spine](../review/requirements/post-receive-work-spine.md)
 
 **Code:** `feat/work-order-p2`. Latest **signed** AC-P2 is `8cfa2a9` (per-AC; overall **not Pass**; PR **#92** honesty fold). **This commit** is `9342439` (`93424396ce3d02f01a8a8388abda39ae6ebf8010`): analysis is not a map field; Route matches a LIMS Run in the chain; process *x* → *x+1* emerging-type handoff; create-route UI shows types/analyses/emerging types.
@@ -692,4 +692,21 @@ Does **not** rewrite Round 1, Round 2, Contents-grain Confirm, Deiter `02fe95f`,
 6. WGS / WES / ELISA unchanged: Qubit stays process QC, not the ask.
 
 Older “Extracted DNA = DNA tube; zero assay LimsRuns legal” is **pending overwrite**. Please Confirm the send, or overwrite.
+
+---
+
+## Leadership Confirm — Quantified DNA uses the named Qubit ask slot — 2026-09-02
+
+**Full Leadership Confirm 1–6** (Rolf, Deiter, Hans, Heidi, Günter). This dated living lock supersedes the immediately preceding pending closeout for current guidance; historical walls and signed UAT remain unchanged. Docs-only. Not overall P2 Pass. Not IC50.
+
+1. Quantified DNA is concentration/data, not a tube-only SKU. Do not mint `extracted = true/false`.
+2. The existing catalog **Qubit** analysis is exactly one asked-for LimsRun; Test `(DNA, Qubit)` is the ask. Do not create a second Quantified DNA catalog analysis.
+3. Nanodrop or other QC may sit with its own `analysis_id` and Test, but is not another asked-for.
+4. Extract stays an experiment with no `analysis_id` and no boolean Result; manual versus robot does not change that grain.
+5. Old 1.4 extract-only / zero-LimsRun routing is struck for this closeout. **422** on zero LimsRuns is right for Quantified DNA. Tube-only DNA is a later SKU.
+6. WGS / WES / ELISA are unchanged: Qubit is process QC when one of those is asked for.
+
+**Heidi / Günter punch:** the old containment-only Route rule is insufficient for Qubit because WGS maps may contain Qubit as process QC. Map / Route must name the asked-for LimsRun slot and compare the asked-for analysis to that slot. It must not treat every route containing Qubit as a Quantified DNA route.
+
+**OQ-WO-7 unchanged:** after C3, use WO asked-for only when `asked.analysis_id == run.analysis_id`; otherwise parent lineage; otherwise `{}`. Do not recode or restamp.
 
