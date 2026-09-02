@@ -10,7 +10,7 @@
 - PRD: [`.docs/internal/prd/post-receive-work-spine/PRD.md`](../../internal/prd/post-receive-work-spine/PRD.md)  
 - Spec: [`.docs/internal/specs/post-receive-work-spine/SPEC.md`](../../internal/specs/post-receive-work-spine/SPEC.md)  
 - Open questions: [`.docs/review/open-questions/post-receive-work-spine.md`](../open-questions/post-receive-work-spine.md)  
-**Related Lab Ops:** [lab-ops-review/post-receive-work-spine.md](../lab-ops-review/post-receive-work-spine.md) — ordered-route L2/L4 locked; dest-follow Met; P2 on `main` `5040f2d`. **OQ-WO-7 Closed.** **AC-P2-OQ-WO-7 Pass** (Tobias, 2026-09-01, `80f054b`). Closeout **1.4** stays OPEN. Overall P2 unsigned
+**Related Lab Ops:** [lab-ops-review/post-receive-work-spine.md](../lab-ops-review/post-receive-work-spine.md) — ordered-route L2/L4 locked; dest-follow Met; P2 on `main` `5040f2d`. **OQ-WO-7 Closed.** **AC-P2-OQ-WO-7 Pass** (Tobias, 2026-09-01, `80f054b`). Closeout **1.4 / OQ-WO-8** stays **OPEN** (**CEO Confirm 1–6 Rolf**; named-slot pending). Overall P2 unsigned
 **Related:**  
 - Framework stamps WO-1…WO-7, FW-0/FW-2: [`.docs/decision-logs/framework-stamps-2026-08-26.md`](../../decision-logs/framework-stamps-2026-08-26.md)  
 - Promote-on-publish: [open-questions/run-results.md](../open-questions/run-results.md) (Decision #2 `raw_result`; Decision #7 ensure-on-publish **superseded by WO-7**)  
@@ -222,16 +222,28 @@ TOBIAS: AC-P2-OQ-WO-7 PASS ON 80f054b
 1.4 STILL OPEN; OVERALL P2 UNSIGNED
 ```
 
+
 ---
 
-## 11. Leadership Confirm — Quantified DNA closeout 1.4 — 2026-09-02
+## 11. CEO Confirm 1–6 (Rolf) — Quantified DNA; OQ-WO-8 OPEN — 2026-09-02
 
-**Leadership Confirm 1–6** (Rolf, Deiter, Hans, Heidi, Günter). Docs-only living lock. This does not restamp or rewrite sections 9–10, Tobias results on `bf51b19` / `80f054b` / `9342439`, P1, or Deiter `02fe95f`. Overall P2 remains unsigned. Not IC50.
+**Not a restamp of section 10.** Does **not** rewrite SC1–SC5, OQ-RES-1, Tobias Results, or OQ-WO-7 Closed. Not overall P2 Pass. Not IC50. No product code.
 
-- Quantified DNA is an assay ask for concentration/data, not a tube-only SKU.
-- Reuse existing **Qubit** as exactly one named asked-for LimsRun slot; Test `(DNA, Qubit)` is the ask. Do not create a second Quantified DNA analysis.
-- Other QC has its own `analysis_id` and Test. Extract remains an experiment with no `analysis_id` or boolean Result.
-- Zero LimsRuns → **422** for this SKU. Old tube-only / zero-LimsRun 1.4 is superseded; tube-only DNA is later.
-- WGS/WES/ELISA keep Qubit as process QC.
-- Route containment is scientifically ambiguous: a WGS map may contain Qubit as QC. Map / Route must identify the asked-for LimsRun slot so process QC cannot satisfy the ask.
-- OQ-WO-7 remains Closed and unchanged: WO asked-for only for equal run analysis; otherwise parent lineage; otherwise `{}`.
+**CEO Confirm 1–6 (Rolf)** plus Qubit-reuse punch. Wear existing **Qubit**. Do **not** mint a second catalog analysis named Quantified DNA. Old 1.4 (zero LimsRuns) **struck**. **422 on 0 LimsRuns is right.** Extract stays experiment. WGS/ELISA: Qubit stays process QC. Tube-only DNA later SKU. Quantified DNA is an assay ask (data); Test `(DNA, Qubit)` is the ask.
+
+**Named asked-for LimsRun slot** (Heidi/Günter: Route must name the asked-for LimsRun slot, not any-chain-contains-Qubit) is a **punch pending Leadership Confirm**. It is **not** part of 1–6. It is **not** OQ-WO-8 Closed.
+
+**OQ-WO-8 stays OPEN** until Deiter / Hans / Heidi / Günter stamp. Do **not** write Full Leadership Confirm.
+
+| Field | Value |
+|-------|--------|
+| **Stamp** | **CEO Confirm 1–6 (Rolf)** plus Qubit reuse |
+| **OQ-WO-8** | **OPEN** |
+| **Named-slot** | Punch pending Leadership Confirm |
+| **Overall P2** | Unsigned |
+
+```
+CEO CONFIRM 1-6 (ROLF); WEAR EXISTING QUBIT
+OQ-WO-8 OPEN; NAMED-SLOT PENDING
+NO FULL LEADERSHIP CONFIRM
+```
