@@ -3,7 +3,7 @@
 **Date:** 2026-08-30  
 **Team:** Leadership (Lab Ops, CEO, Security CSO, Scientific CSO)  
 **Ask:** Round 1 remains **Leadership Confirmed** (Rolf, Deiter, Hans, Heidi, Günter; all five asks). Round 2 is **Leadership Confirm** (Rolf, Deiter, Hans, Heidi, Günter; R2-1…R2-4). **Contents grain / `0077` remains a Leadership Confirm** (Rolf, Deiter, Hans, Heidi, Günter) — process assignment is a **sample in a container**. Leadership later **Confirmed Deiter’s click**: C1 **Pass**, C2 **Fail**, dest mint Hold **Pass** on product `4671ba8` / `02fe95f`. C1/C2 are **not** unsigned. Docs Confirm `84d2810` is not a new execute and not the click SHA. Not a Tobias QA Pass and not a merge stamp. Grok Build owns dest-join / source-remove. Overall P2 UAT remains unsigned / not Pass.
-**Implement gate:** P2 is on `main`. Product SHA for **AC-P2-OQ-WO-7** is **`80f054b`** (`80f054b274b02bb48f9dcbba5a05378419ea6b90`). Leftover **`9f86d14` is** the OQ-WO-7 Grok Build work. **Do not recode.** **AC-P2-OQ-WO-7 Pass** (Tobias, 2026-09-01, `80f054b`): Test **`55f9cad9`** `(DNA, WGS)` `{library_kit: TruSeq}` from blood WO **`4ea9de0c`**. Lookup **`9f86d14`** was not recoded. **OQ-WO-7 Closed.** Per-AC Pass on `bf51b19` — do **not** rewrite those Results. Overall P2 unsigned. Closeout **1.4** stays OPEN. Older “held until signed UAT Pass / hold merge for 1.2 / OPEN until Tobias” copy in walls below is **history** — do not restamp those walls. Do **not** pretend `5040f2d` was held for OQ-WO-7. Do **not** invent overall P2 Pass. Not IC50.  
+**Implement gate:** P2 is on `main`. Product SHA for **AC-P2-OQ-WO-7** is **`80f054b`**. **OQ-WO-7 Closed.** Per-AC Pass on `bf51b19`. Overall P2 unsigned. Closeout **1.4 / OQ-WO-8** is **Marc lock, pending Leadership Confirm** — Quantified DNA is the asked-for; Qubit is the asked-for LimsRun; other QC supporting. Send: [2026-09-01-p2-closeout-1-4-quantified-dna](2026-09-01-p2-closeout-1-4-quantified-dna.md). Do **not** code extract-only zero LimsRuns. Older “held until signed UAT Pass / hold merge for 1.2 / OPEN until Tobias” copy in walls below is **history**. Do **not** invent overall P2 Pass. Not IC50.  
 **Stem:** [post-receive-work-spine](../review/requirements/post-receive-work-spine.md)
 
 **Code:** `feat/work-order-p2`. Latest **signed** AC-P2 is `8cfa2a9` (per-AC; overall **not Pass**; PR **#92** honesty fold). **This commit** is `9342439` (`93424396ce3d02f01a8a8388abda39ae6ebf8010`): analysis is not a map field; Route matches a LIMS Run in the chain; process *x* → *x+1* emerging-type handoff; create-route UI shows types/analyses/emerging types.
@@ -670,7 +670,26 @@ Verified holds:
 - Test **`55f9cad9`** `(DNA, WGS)` has `asked_for_params` **`{library_kit: TruSeq}`** from blood work order **`4ea9de0c`**.
 - Leftover **`9f86d14`** is the lookup (WO asked-for same `analysis_id`, else parent lineage, else `{}`). **Was not recoded.**
 
-**OQ-WO-7 Closed.** Pass/Fail/not-a-Fail stay the AC definition in Hans’s brief. Closeout **1.4** (Extracted DNA zero assay LimsRuns) stays **OPEN**. Overall P2 remains **unsigned**. Leadership did not stamp overall Pass.
+**OQ-WO-7 Closed.** Pass/Fail/not-a-Fail stay the AC definition in Hans’s brief. Closeout **1.4** is **OQ-WO-8** (Marc lock, pending Leadership Confirm) — not this Result. Overall P2 remains **unsigned**. Leadership did not stamp overall Pass.
 
 Mirror: [`UAT_Scripts/uat-post-receive-work-spine.md`](../../UAT_Scripts/uat-post-receive-work-spine.md) **AC-P2-OQ-WO-7**.
+
+---
+
+## Marc lock — closeout 1.4 Quantified DNA — 2026-09-01
+
+**Marc lock pending Leadership Confirm.** Docs-only. Not coded. Not a UAT Result. Not overall P2 Pass. Not IC50.
+
+**Send:** [2026-09-01-p2-closeout-1-4-quantified-dna](2026-09-01-p2-closeout-1-4-quantified-dna.md) (asks 1–6).
+
+Does **not** rewrite Round 1, Round 2, Contents-grain Confirm, Deiter `02fe95f`, Tobias `9342439` / `8cfa2a9` / `bf51b19` / **AC-P2-OQ-WO-7 Pass**, ELISA / second-tube Confirm, OQ-WO-6 extract close, or OQ-WO-7 Closed.
+
+1. **Quantified DNA is the asked-for** (data). Not a tube-only SKU.
+2. **Qubit is the asked-for LimsRun.** Analysis_id once. Test `(DNA, Qubit)` is the ask.
+3. **Other process QC** (Nanodrop, …) may sit. Other analyses, own Tests. Not a second asked-for.
+4. Extract stays experiment / equipment. No analysis_id. No boolean `extracted` Result.
+5. Do **not** code extract-only zero-LimsRun routes. 422 on 0 LimsRuns is right for this SKU.
+6. WGS / WES / ELISA unchanged: Qubit stays process QC, not the ask.
+
+Older “Extracted DNA = DNA tube; zero assay LimsRuns legal” is **pending overwrite**. Please Confirm the send, or overwrite.
 
