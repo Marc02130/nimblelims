@@ -1,38 +1,42 @@
-# Leadership Confirm: closeout 1.4 — Quantified DNA is the Qubit ask
+# CEO Confirm: closeout 1.4 — Quantified DNA is the Qubit ask
 
 **Date:** 2026-09-02
-**Team:** Leadership — Rolf, Deiter, Hans, Heidi, Günter
-**Stem:** [post-receive-work-spine](../review/requirements/post-receive-work-spine.md)  
+**Stamp:** **CEO Confirm 1–6 (Rolf)** plus Qubit-reuse punch
+**Stem:** [post-receive-work-spine](../review/requirements/post-receive-work-spine.md)
 **Closeout:** [`.docs/review/checklist/p2-closeout.md`](../review/checklist/p2-closeout.md) **1.4 / OQ-WO-8**
-**Status:** **Leadership Confirm 1–6.** Living lock. Docs-only fold; no product code. Not a UAT Result. Overall P2 remains unsigned / not Pass. Not IC50.
+**Status:** **CEO Confirm 1–6 (Rolf).** Docs-only. No product code. Not a UAT Result. **OQ-WO-8 stays OPEN** until Deiter / Hans / Heidi / Günter stamp. Overall P2 remains unsigned / not Pass. Not IC50.
 
-This Confirm does **not** rewrite signed UAT on `bf51b19`, `80f054b`, `9342439`, P1, or `02fe95f`. OQ-WO-7 remains Closed and its lookup remains unchanged.
+This fold punches PR **117** / `3e1856b` back from a room-wide closeout. It does **not** rewrite signed UAT on `bf51b19`, `80f054b`, `9342439`, P1, or `02fe95f`. OQ-WO-7 remains Closed and its lookup remains unchanged.
 
-## Confirmed 1–6
+## CEO Confirm 1–6 (Rolf)
 
-1. **Quantified DNA is an assay ask.** It is concentration/data, not a tube-only SKU. A Test is data; do **not** mint `extracted = true/false`.
-2. **Qubit is exactly one asked-for LimsRun.** Test `(DNA, Qubit)` is the ask.
-3. **Wear the existing Qubit catalog analysis.** There is one `analysis_id`. Do **not** create a second catalog analysis named Quantified DNA; that would split one concentration into two Tests.
-4. **Other QC may sit in the route.** Nanodrop and other QC use their own `analysis_id`, Test, and params freeze. They are not a second asked-for.
-5. **Extract stays an experiment.** Manual or robot extraction has no `analysis_id` and no boolean Result. It does not become a LimsRun for this SKU.
-6. **Do not code old 1.4.** Extract-only / zero-LimsRun routing is not this closeout. Map-save / Route **422** on zero LimsRuns is right for Quantified DNA. WGS / WES / ELISA are unchanged: Qubit remains process QC when one of those is the ask.
+1. **Quantified DNA is an assay ask.** It is concentration / data, not a tube-only SKU. A Test is data; do **not** mint `extracted = true/false`.
+2. **Qubit is the asked-for LimsRun** (exactly one). Test `(DNA, Qubit)` is the ask.
+3. **Wear the existing Qubit catalog analysis.** One `analysis_id`. Do **not** mint a second catalog analysis named Quantified DNA (that would split the same concentration into two Tests).
+4. **Other QC may sit in the same route.** Nanodrop and other QC use their own `analysis_id`, Test, and params freeze. They are not a second asked-for.
+5. **Extract stays an experiment.** No `analysis_id`. No boolean Result. Manual or robot does not make extract a LimsRun for this SKU.
+6. **Do not code old 1.4.** Extract-only / zero-LimsRun routing is not this closeout. Map-save / Route **422** on 0 LimsRuns is right for Quantified DNA. WGS / WES / ELISA unchanged: Qubit stays process QC when one of those is the ask. Tube-only DNA is a later SKU.
 
-**Quantified DNA route:** extract experiment → Qubit LimsRun in the named asked-for slot → optional other QC LimsRuns.
+## Punch (CEO; same fold)
 
-## Heidi / Günter route-identity punch
+Wear existing **Qubit**. Do **not** mint a second catalog analysis named Quantified DNA.
 
-Containment is insufficient. A WGS route may contain Qubit as process QC; matching “any route containing Qubit” would make both the Quantified DNA route and the WGS route acceptable, causing a two-accept **409** or the wrong process join.
+## Named asked-for LimsRun slot — punch pending Leadership Confirm
 
-The Map / Route contract must therefore **name the asked-for LimsRun slot**. Eligibility compares `asked.analysis_id` with the `analysis_id` of that named slot. It must not infer the asked-for slot from any matching analysis elsewhere in the chain. Supporting LimsRuns remain visible and retain their own Tests, but they are not eligible merely because they contain Qubit.
+**Not** part of CEO Confirm 1–6. **Not** OQ-WO-8 Closed.
 
-## Superseded closeout wording
+Heidi / Günter punch: Qubit-as-ask vs Qubit-as-QC — Route containment of Qubit would also match WGS maps that include Qubit as process QC (two-accept 409 / wrong process join). Map / Route must **name the asked-for LimsRun slot**, not “any chain that contains Qubit.”
 
-The old closeout 1.4 claim — ~~Extracted DNA is a tube-only ask; zero assay LimsRuns are legal; 422 on zero LimsRuns is wrong~~ — is struck for this closeout. A later tube-only DNA SKU requires its own decision and is not Quantified DNA.
+This punch waits Deiter / Hans / Heidi / Günter. Do not code it as closed.
+
+## OQ-WO-8 stays OPEN
+
+CEO Confirm 1–6 does **not** close OQ-WO-8. Leave **OPEN** until Deiter / Hans / Heidi / Günter stamp. Old 1.4 (zero LimsRuns legal for Extracted DNA) is **struck** for this SKU, but the OQ remains OPEN.
 
 ## OQ-WO-7 remains unchanged
 
-After C3, Qubit start on DNA uses the existing frozen-params lookup: WO asked-for only when `asked.analysis_id == run.analysis_id`; otherwise parent lineage; otherwise `{}`. Do **not** recode or restamp it.
+After C3, Qubit start on DNA still freezes from the WO asked-for — same lookup as OQ-WO-7 (WO asked-for only if `asked.analysis_id == run.analysis_id`, else parent lineage, else `{}`). Do **not** recode.
 
 ## Gate
 
-This PR folds the Confirm before product coding. Future implementation must reuse Qubit, persist/name the asked-for LimsRun slot, retain **422** for zero LimsRuns, and avoid containment-only matching. No product code is part of this fold.
+No product code until Deiter / Hans / Heidi / Günter stamp OQ-WO-8. Named-slot is a pending punch, not this CEO Confirm. Not IC50.
