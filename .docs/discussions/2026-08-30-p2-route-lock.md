@@ -3,7 +3,7 @@
 **Date:** 2026-08-30  
 **Team:** Leadership (Lab Ops, CEO, Security CSO, Scientific CSO)  
 **Ask:** Round 1 remains **Leadership Confirmed** (Rolf, Deiter, Hans, Heidi, Günter; all five asks). Round 2 is **Leadership Confirm** (Rolf, Deiter, Hans, Heidi, Günter; R2-1…R2-4). **Contents grain / `0077` remains a Leadership Confirm** (Rolf, Deiter, Hans, Heidi, Günter) — process assignment is a **sample in a container**. Leadership later **Confirmed Deiter’s click**: C1 **Pass**, C2 **Fail**, dest mint Hold **Pass** on product `4671ba8` / `02fe95f`. C1/C2 are **not** unsigned. Docs Confirm `84d2810` is not a new execute and not the click SHA. Not a Tobias QA Pass and not a merge stamp. Grok Build owns dest-join / source-remove. Overall P2 UAT remains unsigned / not Pass.
-**Implement gate:** P2 is on `main`. Product SHA for **AC-P2-OQ-WO-7** is **`80f054b`**. **OQ-WO-7 Closed.** Per-AC Pass on `bf51b19`. Overall P2 unsigned. Closeout **1.4 / OQ-WO-8** is **OPEN.** **CEO Confirm 1–6 (Rolf)** plus Qubit-reuse punch — wear existing Qubit; do **not** mint a second catalog analysis named Quantified DNA. Old 1.4 struck; **422 on 0 LimsRuns is right.** Named asked-for LimsRun slot is a punch pending Leadership Confirm (not part of 1–6; not Closed). Send: [2026-09-01-p2-closeout-1-4-quantified-dna](2026-09-01-p2-closeout-1-4-quantified-dna.md). Do **not** code extract-only zero LimsRuns. Older “held until signed UAT Pass / hold merge for 1.2 / OPEN until Tobias” copy in walls below is **history**. Do **not** invent overall P2 Pass. Not IC50.  
+**Implement gate:** P2 is on `main`. Product SHA for **AC-P2-OQ-WO-7** is **`80f054b`**. **OQ-WO-7 Closed.** Per-AC Pass on `bf51b19`. Overall P2 unsigned. Closeout **1.4 / OQ-WO-8** is **Closed.** **Full Leadership Confirm** (Rolf / Deiter / Hans / Heidi / Günter, 2026-09-02). **CEO Confirm 1–6 stands** (PR **118** / `7612ab4`) — wear existing Qubit; do **not** mint a second catalog analysis named Quantified DNA. Old 1.4 struck; **422 on 0 LimsRuns is right.** Map / Route **names the asked-for LimsRun slot**. Eligibility is `asked.analysis_id` vs **that slot**, not “any chain that contains Qubit.” A WGS map with Qubit as process QC must **not** steal a Quantified DNA ask (409 / wrong join). Named-slot is no longer pending. Same OQ-WO-7 lookup after C3; **do not recode.** Send: [2026-09-01-p2-closeout-1-4-quantified-dna](2026-09-01-p2-closeout-1-4-quantified-dna.md). Do **not** code extract-only zero LimsRuns. No product code in this fold. Product code may start after this fold is on `main`. Older “held until signed UAT Pass / hold merge for 1.2 / OPEN until Tobias / OQ-WO-8 OPEN / named-slot pending” copy in walls below is **history**. Do **not** invent overall P2 Pass. Not IC50.  
 **Stem:** [post-receive-work-spine](../review/requirements/post-receive-work-spine.md)
 
 **Code:** `feat/work-order-p2`. Latest **signed** AC-P2 is `8cfa2a9` (per-AC; overall **not Pass**; PR **#92** honesty fold). **This commit** is `9342439` (`93424396ce3d02f01a8a8388abda39ae6ebf8010`): analysis is not a map field; Route matches a LIMS Run in the chain; process *x* → *x+1* emerging-type handoff; create-route UI shows types/analyses/emerging types.
@@ -696,7 +696,7 @@ Older “Extracted DNA = DNA tube; zero assay LimsRuns legal” is **pending ove
 
 ## CEO Confirm 1–6 (Rolf) — Quantified DNA uses the existing Qubit ask — 2026-09-02
 
-**CEO Confirm 1–6 (Rolf)** plus Qubit-reuse punch. Docs-only. No product code. Not a UAT Result. **OQ-WO-8 stays OPEN** until Deiter / Hans / Heidi / Günter stamp. Overall P2 remains unsigned / not Pass. Not IC50.
+**CEO Confirm 1–6 (Rolf)** plus Qubit-reuse punch. Docs-only. No product code. Not a UAT Result. **OQ-WO-8 stayed OPEN** on this fold until Deiter / Hans / Heidi / Günter stamped. **1–6 stands.** Overall P2 remains unsigned / not Pass. Not IC50.
 
 This fold punches PR **117** / `3e1856b` back from Full Leadership Confirm. It does **not** rewrite Round 1, Round 2, Contents-grain Confirm, Deiter `02fe95f`, Tobias `9342439` / `8cfa2a9` / `bf51b19` / **AC-P2-OQ-WO-7 Pass**, ELISA / second-tube Confirm, OQ-WO-6 extract close, or OQ-WO-7 Closed.
 
@@ -709,6 +709,18 @@ This fold punches PR **117** / `3e1856b` back from Full Leadership Confirm. It d
 5. Extract stays experiment / equipment. No analysis_id. No boolean Result. Manual/robot does not make extract a LimsRun for this SKU.
 6. Do **not** code old 1.4 (zero LimsRuns / extract-only). **422 on 0 LimsRuns is right.** WGS / WES / ELISA unchanged: Qubit stays process QC. Tube-only DNA later SKU.
 
-**Named asked-for LimsRun slot — punch pending Leadership Confirm.** Heidi / Günter: Route must name the asked-for LimsRun slot, not any-chain-contains-Qubit. This is **not** part of 1–6. This is **not** OQ-WO-8 Closed.
+**Named asked-for LimsRun slot — punch pending Leadership Confirm on this fold.** Heidi / Günter: Route must name the asked-for LimsRun slot, not any-chain-contains-Qubit. This was **not** part of 1–6. **Superseded** by Full Leadership Confirm below.
 
 Older “Extracted DNA = DNA tube; zero assay LimsRuns legal” is **struck** for this SKU.
+
+## Full Leadership Confirm — OQ-WO-8 Closed (named asked-for LimsRun slot) — 2026-09-02
+
+**Full Leadership Confirm** (Rolf / Deiter / Hans / Heidi / Günter). Docs-only. No product code. Not a UAT Result. **OQ-WO-8 Closed.** Named-slot is no longer pending. Overall P2 remains unsigned / not Pass. Not IC50.
+
+**CEO Confirm 1–6 stands** (PR **118** / `7612ab4`). Do **not** restamp 1–6.
+
+Map / Route **names the asked-for LimsRun slot**. Eligibility is `asked.analysis_id` vs **that slot**, not “any chain that contains Qubit.” A WGS map with Qubit as process QC must **not** steal a Quantified DNA ask (409 / wrong join). Same OQ-WO-7 lookup after C3; **do not recode.** Product code may start after this fold is on `main`.
+
+**Send:** [2026-09-01-p2-closeout-1-4-quantified-dna](2026-09-01-p2-closeout-1-4-quantified-dna.md).
+
+Does **not** rewrite Round 1, Round 2, Contents-grain Confirm, Deiter `02fe95f`, Tobias `9342439` / `8cfa2a9` / `bf51b19` / **AC-P2-OQ-WO-7 Pass**, ELISA / second-tube Confirm, OQ-WO-6 extract close, OQ-WO-7 Closed, or CEO Confirm 1–6.
