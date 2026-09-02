@@ -1094,14 +1094,24 @@ AC-P2-C1 **Pass** · AC-P2-C2 **Pass** · AC-P2-C3 **Pass** · AC-P2-card-1 **Pa
 
 **Out of this AC / do not fold as this work:** dest-follow, extract-as-LimsRun, freeze skip, cardinality, Route 409, closeout 1.4.
 
-## Docs-only CEO Confirm addendum — Quantified DNA / OQ-WO-8 OPEN — 2026-09-02
+## Docs-only CEO Confirm addendum — Quantified DNA / OQ-WO-8 (1–6 stands; stayed OPEN on this fold) — 2026-09-02
 
 **Not a UAT Result.** Does **not** rewrite any Result / Pass block above (`bf51b19`, OQ-WO-7 Pass on `80f054b`, `9342439`, P1, `02fe95f`). No product code. Not IC50.
 
 **CEO Confirm 1–6 (Rolf)** plus Qubit-reuse punch. Wear existing **Qubit**. Do **not** mint a second catalog analysis named Quantified DNA. Old 1.4 (zero LimsRuns) **struck**. **422 on 0 LimsRuns is right** for this SKU. Extract stays experiment. WGS/ELISA: Qubit stays process QC. Tube-only DNA later SKU. Quantified DNA is an assay ask (data); Test `(DNA, Qubit)` is the ask.
 
-**Named asked-for LimsRun slot** (Heidi/Günter: Route must name the asked-for LimsRun slot, not any-chain-contains-Qubit) is a **punch pending Leadership Confirm**. It is **not** part of 1–6. It is **not** OQ-WO-8 Closed.
+**Named asked-for LimsRun slot** (Heidi/Günter: Route must name the asked-for LimsRun slot, not any-chain-contains-Qubit) was a **punch pending Leadership Confirm** on this fold. It is **not** part of 1–6. **1–6 stands.** **Superseded** by the Full Leadership Confirm addendum below.
 
-**OQ-WO-8 stays OPEN** until Deiter / Hans / Heidi / Günter stamp. Do **not** write Full Leadership Confirm.
+**OQ-WO-8 stayed OPEN** on this CEO Confirm fold until Deiter / Hans / Heidi / Günter stamped.
+
+Send: [`.docs/discussions/2026-09-01-p2-closeout-1-4-quantified-dna.md`](../.docs/discussions/2026-09-01-p2-closeout-1-4-quantified-dna.md).
+
+## Docs-only Full Leadership Confirm addendum — OQ-WO-8 Closed (named asked-for LimsRun slot) — 2026-09-02
+
+**Not a UAT Result.** Does **not** rewrite any Result / Pass block above (`bf51b19`, OQ-WO-7 Pass on `80f054b`, `9342439`, P1, `02fe95f`) or the CEO Confirm 1–6 addendum. No product code. Not IC50.
+
+**Full Leadership Confirm** (Rolf / Deiter / Hans / Heidi / Günter). **OQ-WO-8 Closed.** Named asked-for LimsRun slot is no longer pending. **CEO Confirm 1–6 stands.**
+
+Map / Route **names the asked-for LimsRun slot**. Eligibility is `asked.analysis_id` vs **that slot**, not “any chain that contains Qubit.” A WGS map with Qubit as process QC must **not** steal a Quantified DNA ask (409 / wrong join). Same OQ-WO-7 lookup after C3; **do not recode.** Product code may start after this fold is on `main`.
 
 Send: [`.docs/discussions/2026-09-01-p2-closeout-1-4-quantified-dna.md`](../.docs/discussions/2026-09-01-p2-closeout-1-4-quantified-dna.md).
