@@ -1093,3 +1093,24 @@ AC-P2-C1 **Pass** · AC-P2-C2 **Pass** · AC-P2-C3 **Pass** · AC-P2-card-1 **Pa
 **Not a Fail:** no dest at Route/Start; `source_amount_null`; Qubit empty supporting freeze; 1.4; ELISA on a second blood tube.
 
 **Out of this AC / do not fold as this work:** dest-follow, extract-as-LimsRun, freeze skip, cardinality, Route 409, closeout 1.4.
+
+---
+
+## Docs-only Leadership Confirm addendum — Quantified DNA / closeout 1.4
+
+**Date:** 2026-09-02
+**Status:** Leadership Confirm 1–6 (Rolf, Deiter, Hans, Heidi, Günter). **Not a UAT Result and not a re-score.**
+
+All signed results above remain unchanged, including `bf51b19`, OQ-WO-7 Pass on `80f054b`, `9342439`, P1, and `02fe95f`. Historical statements that Extracted DNA may use zero LimsRuns record the earlier closeout and are superseded for future acceptance by this addendum.
+
+Future Quantified DNA acceptance uses:
+
+1. Existing catalog **Qubit** as exactly one named asked-for LimsRun slot; Test `(DNA, Qubit)` is the ask.
+2. No second catalog analysis named Quantified DNA.
+3. Extract as an experiment with no `analysis_id` and no boolean Result.
+4. Nanodrop/other QC as other analyses and Tests, not another asked-for.
+5. Map-save / Route **422** on zero LimsRuns.
+6. WGS/WES/ELISA retain Qubit as process QC.
+7. Route eligibility by the **named asked-for slot**, not any chain containing Qubit. A WGS map containing Qubit as QC must not qualify as a Quantified DNA route.
+
+Tube-only DNA is a later SKU. Overall P2 remains unsigned / not Pass. OQ-WO-7 lookup remains WO asked-for only when `asked.analysis_id == run.analysis_id`, else parent lineage, else `{}`; do not recode or restamp.
