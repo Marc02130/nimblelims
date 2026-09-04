@@ -1106,6 +1106,64 @@ AC-P2-C1 **Pass** · AC-P2-C2 **Pass** · AC-P2-C3 **Pass** · AC-P2-card-1 **Pa
 
 Send: [`.docs/discussions/2026-09-01-p2-closeout-1-4-quantified-dna.md`](../.docs/discussions/2026-09-01-p2-closeout-1-4-quantified-dna.md).
 
+---
+
+## AC-P2-OQ-WO-8 — named asked-for LimsRun slot and manual route assignment
+
+**Brief date:** 2026-09-03
+**Authority:** Full Leadership Confirm (Rolf / Deiter / Hans / Heidi / Günter)
+**Result:** **Unsigned — Tobias must execute on the named-slot product SHA.** This docs fold is not a Result and not overall P2 Pass.
+
+This addendum does not rewrite any signed Result above, including `bf51b19`, `80f054b`, `9342439`, P1, `02fe95f`, or Deiter Lab Ops Met on `570bbc0`. OQ-WO-8 Closed history from PR 119 remains Closed. OQ-WO-7 remains Closed and is not recoded.
+
+### What and why
+
+Route must compare `asked.analysis_id` with the map’s persisted, author-named asked-for LimsRun slot. Chain containment is insufficient because WGS may include Qubit as process QC; that WGS map must not accept a Quantified DNA ask.
+
+### Fixture
+
+1. Use the existing Qubit catalog analysis for Quantified DNA; do not create a second Quantified DNA analysis.
+2. Author map A for Quantified DNA with Qubit as the named asked-for LimsRun slot.
+3. Author map B for WGS where Qubit is only process QC and WGS is the named asked-for LimsRun slot.
+4. Prepare a Quantified DNA asked-for row whose current sample type and TAT otherwise fit both maps.
+5. Prepare two additional active maps whose named asked-for slot is Qubit and whose TAT and first-step type both accept that same asked-for row.
+
+### Numbered execution
+
+1. Route the Quantified DNA ask with only map A eligible by named slot.
+2. Confirm map A mints one work order and that map B is excluded even though its chain contains Qubit.
+3. Remove or deactivate all acceptable named-slot maps and Route again with a fresh Quantified DNA ask.
+4. Confirm **422**, no work order, and asked-for remains `requested`.
+5. Restore two or more acceptable Qubit-slot maps and Route a fresh Quantified DNA ask.
+6. Confirm the UI shows a route picker with the acceptable candidates and mints no work order before selection.
+7. Select one route and submit its `routing_map_id`.
+8. Confirm exactly one work order is minted from the selected route and the asked-for becomes `routed`.
+
+### Pass
+
+- Quantified DNA routes to the named Qubit slot.
+- WGS+Qubit-as-process-QC does not steal the ask.
+- Zero acceptable maps returns 422 and mints nothing.
+- Two or more acceptable maps show a picker and mint only after the tech selects one.
+
+### Fail
+
+- Eligibility uses containment anywhere in the chain.
+- The WGS map wins through a wrong join.
+- Two or more candidates silently use `first()` or mint before selection.
+- A second catalog analysis named Quantified DNA is required or created.
+
+### Not a Fail
+
+- OQ-WO-7 behavior after C3.
+- Destination follow.
+- Historical zero-LimsRun 1.4 copy.
+- ELISA on a second tube.
+
+### Result
+
+**Unsigned.** Tobias records Pass or Fail only after the named-slot and picker product lands on a specific product SHA. A Pass here would still be per-AC, not overall P2 Pass.
+
 ## Docs-only Full Leadership Confirm addendum — OQ-WO-8 Closed (named asked-for LimsRun slot) — 2026-09-02
 
 **Not a UAT Result.** Does **not** rewrite any Result / Pass block above (`bf51b19`, OQ-WO-7 Pass on `80f054b`, `9342439`, P1, `02fe95f`) or the CEO Confirm 1–6 addendum. No product code. Not IC50.

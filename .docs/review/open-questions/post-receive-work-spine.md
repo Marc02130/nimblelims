@@ -199,6 +199,21 @@ Send: [2026-09-01-p2-closeout-1-4-quantified-dna](../../discussions/2026-09-01-p
 
 Does **not** rewrite OQ-WO-7 Closed / AC-P2-OQ-WO-7 Pass / `bf51b19` / ELISA Confirm / CEO Confirm 1–6.
 
+## Full Leadership Confirm #2 — retained locks and named-slot product — 2026-09-03
+
+**Full Leadership Confirm** (Rolf / Deiter / Hans / Heidi / Günter). Not CEO-only. Not a UAT Result. Not overall P2 Pass.
+
+- Keep **no route branching**: WGS on blood owns WGS params; C3 DNA and a C2 aliquot continue WGS; WES is a new asked-for on the DNA tube. Seq-1 Pass is not this Confirm.
+- Keep **asked-for only** from PR 111.
+- **Strike** all remaining live or pending-overwrite teaching that “Extracted DNA = DNA tube; zero assay LimsRuns legal.” The historical text above remains only to show what was superseded.
+- Preserve **OQ-WO-8 Closed** history from PR 119. Do not reopen, recode, or restamp it.
+- Product honesty: the named-slot decision is Closed, but code is still pending. Current `_acceptable_maps` containment through `_asked_for_lims_run_count(chain, analysis_id) == 1` can let WGS+Qubit-as-QC steal a Quantified DNA ask.
+- Build eligibility against the persisted author-named LimsRun slot. Wear existing Qubit; do not mint a second Quantified DNA analysis. Map-save 422 if the slot analysis occurs 0 or 2+ times.
+- After named-slot filtering: 0 acceptable maps → 422; 1 → mint; 2+ → manual assignment through a tech route picker. No silent `first()`.
+- Same OQ-WO-7 lookup after C3; do not recode.
+
+This replaces older “2+ is 409 only / no picker” product teaching. It does not alter signed Results.
+
 ## Gate rule
 
 - **P1:** Unblocked (OQ-AF-* decided, including AF-6: no conditional required).  

@@ -48,3 +48,40 @@ After C3, Qubit start on DNA still freezes from the WO asked-for — same lookup
 ## Gate
 
 No product code in this fold. Product code may start **after** this fold is on `main`. Not IC50.
+
+## Full Leadership Confirm #2 — 2026-09-03
+
+**Full Leadership Confirm** (Rolf / Deiter / Hans / Heidi / Günter). Not CEO-only. Not a UAT Result. Not overall P2 Pass.
+
+1. Keep **no route branching**. WGS asked-for on blood owns WGS params; C3 DNA still serves WGS; a C2 aliquot continues WGS; WES is a new asked-for on the DNA tube. Tobias Seq-1 Pass of two WOs is not this Confirm.
+2. Keep **asked-for only** from PR 111.
+3. Strike all remaining live or pending-overwrite copy that says “Extracted DNA = DNA tube; zero assay LimsRuns legal.” Quantified DNA wears existing Qubit.
+
+OQ-WO-8 remains Closed as historical decision state from PR 119. This send does not reopen or restamp it. OQ-WO-7 remains Closed and unchanged.
+
+## Named-slot product brief — in-bar for Tobias
+
+**Hole today:** `_acceptable_maps` in `backend/app/services/routing_service.py` uses `_asked_for_lims_run_count(chain, analysis_id) == 1`. That checks containment anywhere in the chain. A WGS map with Qubit only as process QC can therefore steal a Quantified DNA ask.
+
+**Product lock:**
+
+- Persist the map author’s named asked-for LimsRun slot, preferably as a `routing_map` FK to the selected assay `eln_process_definition_steps` LimsRun. An author-named `routing_map.analysis_id` is an acceptable fallback; deriving `analyses[0]` is not.
+- Eligibility is `asked.analysis_id` against that slot’s `analysis_id`, not chain containment.
+- Map-save remains **422** when the named slot analysis appears 0 or 2+ times among route LimsRuns.
+- Wear existing Qubit. Do not mint a second catalog analysis named Quantified DNA.
+- A WGS map with Qubit only as process QC must not accept a Quantified DNA ask.
+- After filtering: **0** acceptable maps → **422**; **1** → Route mints; **2+** → return candidates and require the tech to pick one. Mint only after the chosen `routing_map_id` is posted. No silent `first()`.
+- Keep the OQ-WO-7 lookup after C3 unchanged.
+
+**Heidi file map:** `routing_service.py` create/update/eligibility and chosen assignment; `backend/models/work_order.py` plus Alembic if a new column is used; routing schemas and `work_orders` router; `RoutingMapManagement.tsx`; `AskedFor.tsx` and API service; `test_work_order_p2.py` and a UI test. Do not touch destination follow, freeze skip, unrelated cardinality, or extract-as-LimsRun.
+
+## Closeout honesty
+
+This docs fold supplies the Brief and unsigned UAT AC only. Overall P2 remains blocked in this order:
+
+1. Named-slot and 2+ picker product.
+2. Tobias executes the named-slot AC on that product SHA.
+3. Tobias records overall Pass on the named-slot SHA, or one overall Result folding `bf51b19` + `80f054b` + that SHA.
+4. Leadership records overall Pass.
+
+A per-AC Pass is not overall P2 Pass.
