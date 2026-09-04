@@ -1106,6 +1106,16 @@ AC-P2-C1 **Pass** · AC-P2-C2 **Pass** · AC-P2-C3 **Pass** · AC-P2-card-1 **Pa
 
 Send: [`.docs/discussions/2026-09-01-p2-closeout-1-4-quantified-dna.md`](../.docs/discussions/2026-09-01-p2-closeout-1-4-quantified-dna.md).
 
+## Docs-only Full Leadership Confirm addendum — OQ-WO-8 Closed (named asked-for LimsRun slot) — 2026-09-02
+
+**Not a UAT Result.** Does **not** rewrite any Result / Pass block above (`bf51b19`, OQ-WO-7 Pass on `80f054b`, `9342439`, P1, `02fe95f`) or the CEO Confirm 1–6 addendum. No product code. Not IC50.
+
+**Full Leadership Confirm** (Rolf / Deiter / Hans / Heidi / Günter). **OQ-WO-8 Closed.** Named asked-for LimsRun slot is no longer pending. **CEO Confirm 1–6 stands.**
+
+Map / Route **names the asked-for LimsRun slot**. Eligibility is `asked.analysis_id` vs **that slot**, not “any chain that contains Qubit.” A WGS map with Qubit as process QC must **not** steal a Quantified DNA ask (409 / wrong join). Same OQ-WO-7 lookup after C3; **do not recode.** Product code may start after this fold is on `main`.
+
+Send: [`.docs/discussions/2026-09-01-p2-closeout-1-4-quantified-dna.md`](../.docs/discussions/2026-09-01-p2-closeout-1-4-quantified-dna.md).
+
 ---
 
 ## AC-P2-OQ-WO-8 — named asked-for LimsRun slot and manual route assignment
@@ -1163,13 +1173,3 @@ Route must compare `asked.analysis_id` with the map’s persisted, author-named 
 ### Result
 
 **Unsigned.** Tobias records Pass or Fail only after the named-slot and picker product lands on a specific product SHA. A Pass here would still be per-AC, not overall P2 Pass.
-
-## Docs-only Full Leadership Confirm addendum — OQ-WO-8 Closed (named asked-for LimsRun slot) — 2026-09-02
-
-**Not a UAT Result.** Does **not** rewrite any Result / Pass block above (`bf51b19`, OQ-WO-7 Pass on `80f054b`, `9342439`, P1, `02fe95f`) or the CEO Confirm 1–6 addendum. No product code. Not IC50.
-
-**Full Leadership Confirm** (Rolf / Deiter / Hans / Heidi / Günter). **OQ-WO-8 Closed.** Named asked-for LimsRun slot is no longer pending. **CEO Confirm 1–6 stands.**
-
-Map / Route **names the asked-for LimsRun slot**. Eligibility is `asked.analysis_id` vs **that slot**, not “any chain that contains Qubit.” A WGS map with Qubit as process QC must **not** steal a Quantified DNA ask (409 / wrong join). Same OQ-WO-7 lookup after C3; **do not recode.** Product code may start after this fold is on `main`.
-
-Send: [`.docs/discussions/2026-09-01-p2-closeout-1-4-quantified-dna.md`](../.docs/discussions/2026-09-01-p2-closeout-1-4-quantified-dna.md).
