@@ -8,7 +8,13 @@ from sqlalchemy.orm import Session
 from app.core.rbac import require_sample_read, require_test_assign
 from app.database import get_db
 from app.schemas.asked_for import AskedForCreate, AskedForListResponse, AskedForRead
-from app.schemas.work_order import RouteItem, RouteRequest, RouteResponse, WorkOrderRead
+from app.schemas.work_order import (
+    RouteAssign,
+    RouteItem,
+    RouteRequest,
+    RouteResponse,
+    WorkOrderRead,
+)
 from app.services.asked_for_service import AskedForService
 from app.services.routing_service import RoutingService
 from models.user import User
@@ -84,7 +90,9 @@ def route_asked_for_batch(
     db: Session = Depends(get_db),
 ):
     svc = RoutingService(db, user)
-    results = svc.route_many(body.asked_for_ids)
+    results = svc.route_many(
+        body.asked_for_ids, routing_map_id=body.routing_map_id
+    )
     items = []
     for result in results:
         wo = result["work_order"]
@@ -101,11 +109,15 @@ def route_asked_for_batch(
 @router.post("/{asked_for_id}/route", response_model=RouteResponse)
 def route_asked_for(
     asked_for_id: UUID,
+    body: Optional[RouteAssign] = None,
     user: User = Depends(require_test_assign),
     db: Session = Depends(get_db),
 ):
     svc = RoutingService(db, user)
-    result = svc.route_one(asked_for_id)
+    result = svc.route_one(
+        asked_for_id,
+        routing_map_id=body.routing_map_id if body else None,
+    )
     wo = result["work_order"]
     item = RouteItem(
         asked_for_id=result["asked_for_id"],

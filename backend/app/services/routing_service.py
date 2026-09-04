@@ -126,14 +126,7 @@ class RoutingService:
         rows = q.order_by(RoutingMap.created_at.desc()).all()
         if analysis_id is None:
             return rows
-        return [
-            row
-            for row in rows
-            if self._asked_for_lims_run_count(
-                list(row.process_definition_ids or []), analysis_id
-            )
-            == 1
-        ]
+        return [row for row in rows if self._slot_analysis_id(row) == analysis_id]
 
     def create_map(
         self,
@@ -142,19 +135,23 @@ class RoutingService:
         process_definition_ids: Sequence[UUID],
         active: bool = True,
         analysis_id: Optional[UUID] = None,
+        asked_for_step_id: Optional[UUID] = None,
     ) -> List[RoutingMap]:
-        """A route is an ordered process list. analysis_id is ignored."""
+        """Ordered process list + authored asked-for LimsRun slot."""
         chain = list(process_definition_ids)
         self._require_definitions(chain)
         types = self._require_first_step_types(chain)
-        analyses = self._require_chain_analyses(chain)
+        self._require_chain_analyses(chain)
         self._assert_chain_handoffs(chain)
-        self._refuse_map_overlap(chain, types, analyses, tat_min, tat_max)
-        hint = analyses[0]
+        slot = self._resolve_asked_for_slot(
+            chain, asked_for_step_id=asked_for_step_id, analysis_id=analysis_id
+        )
+        self._refuse_map_overlap(chain, types, tat_min, tat_max)
         created: List[RoutingMap] = []
         for sid in types:
             row = RoutingMap(
-                analysis_id=hint,
+                analysis_id=slot.analysis_id,
+                asked_for_step_id=slot.id,
                 sample_type_id=sid,
                 tat_range=_range(tat_min, tat_max),
                 process_definition_ids=chain,
@@ -172,8 +169,8 @@ class RoutingService:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail=(
-                    "Overlapping TAT, first-step sample types, and LIMS Run "
-                    "analyses"
+                    "Overlapping TAT, first-step sample types, and the same "
+                    "process chain"
                 ),
             ) from e
         for row in created:
@@ -188,6 +185,8 @@ class RoutingService:
         tat_max: Optional[int] = None,
         process_definition_ids: Optional[Sequence[UUID]] = None,
         active: Optional[bool] = None,
+        asked_for_step_id: Optional[UUID] = None,
+        analysis_id: Optional[UUID] = None,
     ) -> RoutingMap:
         row = self.db.query(RoutingMap).filter(RoutingMap.id == map_id).first()
         if not row:
@@ -208,8 +207,13 @@ class RoutingService:
         if process_definition_ids is not None:
             self._require_definitions(chain)
         types = self._require_first_step_types(chain)
-        analyses = self._require_chain_analyses(chain)
+        self._require_chain_analyses(chain)
         self._assert_chain_handoffs(chain)
+        slot = self._resolve_asked_for_slot(
+            chain,
+            asked_for_step_id=asked_for_step_id or row.asked_for_step_id,
+            analysis_id=analysis_id or row.analysis_id,
+        )
         exclude_ids = {
             m.id
             for m in self.db.query(RoutingMap).all()
@@ -217,12 +221,11 @@ class RoutingService:
             == tuple(row.process_definition_ids or [])
             and _range_bounds(m.tat_range) == _range_bounds(row.tat_range)
         }
-        self._refuse_map_overlap(
-            chain, types, analyses, lo, hi, exclude_ids=exclude_ids
-        )
+        self._refuse_map_overlap(chain, types, lo, hi, exclude_ids=exclude_ids)
         row.tat_range = _range(lo, hi)
         row.process_definition_ids = chain
-        row.analysis_id = analyses[0]
+        row.asked_for_step_id = slot.id
+        row.analysis_id = slot.analysis_id
         if active is not None:
             row.active = active
         row.modified_by = self.user.id
@@ -236,8 +239,8 @@ class RoutingService:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail=(
-                    "Overlapping TAT, first-step sample types, and LIMS Run "
-                    "analyses"
+                    "Overlapping TAT, first-step sample types, and the same "
+                    "process chain"
                 ),
             ) from e
         refreshed = self.db.query(RoutingMap).filter(RoutingMap.id == map_id).first()
@@ -499,6 +502,88 @@ class RoutingService:
     ) -> int:
         return self._lims_run_analysis_ids_in_chain(chain).count(analysis_id)
 
+    def _lims_run_steps_in_chain(
+        self, chain: Sequence[UUID]
+    ) -> List[ELNProcessDefinitionStep]:
+        if not chain:
+            return []
+        steps = (
+            self.db.query(ELNProcessDefinitionStep)
+            .filter(ELNProcessDefinitionStep.process_definition_id.in_(list(chain)))
+            .all()
+        )
+        by_def: dict = {}
+        for step in steps:
+            by_def.setdefault(step.process_definition_id, []).append(step)
+        ordered: List[ELNProcessDefinitionStep] = []
+        for def_id in chain:
+            for step in sorted(
+                by_def.get(def_id, []), key=lambda s: s.sort_order or 0
+            ):
+                if (step.step_kind or "") != "lims_run":
+                    continue
+                if getattr(step, "analysis_id", None):
+                    ordered.append(step)
+        return ordered
+
+    def _resolve_asked_for_slot(
+        self,
+        chain: Sequence[UUID],
+        *,
+        asked_for_step_id: Optional[UUID] = None,
+        analysis_id: Optional[UUID] = None,
+    ) -> ELNProcessDefinitionStep:
+        steps = self._lims_run_steps_in_chain(chain)
+        if asked_for_step_id:
+            match = next((s for s in steps if s.id == asked_for_step_id), None)
+            if match is None:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail={
+                        "code": ROUTE_SAMPLE_TYPE,
+                        "message": (
+                            "Asked-for LIMS Run is not a LIMS Run step in this route"
+                        ),
+                    },
+                )
+            return match
+        if len(steps) == 1:
+            return steps[0]
+        if analysis_id:
+            matches = [s for s in steps if s.analysis_id == analysis_id]
+            if len(matches) == 1:
+                return matches[0]
+        if not steps:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail={
+                    "code": ROUTE_SAMPLE_TYPE,
+                    "message": "Route has no LIMS Run analysis",
+                },
+            )
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={
+                "code": ROUTE_SAMPLE_TYPE,
+                "message": "Name the asked-for LIMS Run for this route",
+            },
+        )
+
+    def _slot_analysis_id(self, row: RoutingMap) -> Optional[UUID]:
+        if row.asked_for_step_id:
+            step = (
+                self.db.query(ELNProcessDefinitionStep)
+                .filter(ELNProcessDefinitionStep.id == row.asked_for_step_id)
+                .first()
+            )
+            if step is not None and getattr(step, "analysis_id", None):
+                return step.analysis_id
+        chain = list(row.process_definition_ids or [])
+        steps = self._lims_run_steps_in_chain(chain)
+        if len(steps) == 1:
+            return steps[0].analysis_id
+        return None
+
     def _require_chain_analyses(self, chain: Sequence[UUID]) -> List[UUID]:
         raw = self._lims_run_analysis_ids_in_chain(chain)
         if not raw:
@@ -556,8 +641,6 @@ class RoutingService:
                     self.db.delete(row)
             self.db.flush()
             owner = group[0]
-            analyses = self._chain_lims_analysis_ids(chain)
-            hint = analyses[0] if analyses else owner.analysis_id
             group_ids = {m.id for m in group}
             for sid in desired:
                 if sid in existing:
@@ -565,7 +648,6 @@ class RoutingService:
                 if self._map_conflicts(
                     list(chain),
                     desired,
-                    analyses,
                     lo,
                     hi,
                     exclude_ids=group_ids,
@@ -573,7 +655,8 @@ class RoutingService:
                     continue
                 self.db.add(
                     RoutingMap(
-                        analysis_id=hint,
+                        analysis_id=owner.analysis_id,
+                        asked_for_step_id=owner.asked_for_step_id,
                         sample_type_id=sid,
                         tat_range=_range(lo, hi),
                         process_definition_ids=list(chain),
@@ -620,9 +703,11 @@ class RoutingService:
                 self._require_chain_analyses(chain)
             except HTTPException:
                 continue
+            slot_aid = self._slot_analysis_id(row)
             if (
-                sample_type_id in types
-                and self._asked_for_lims_run_count(chain, analysis_id) == 1
+                slot_aid is not None
+                and sample_type_id in types
+                and slot_aid == analysis_id
             ):
                 acceptable.append(row)
         return acceptable
@@ -631,14 +716,13 @@ class RoutingService:
         self,
         chain: Sequence[UUID],
         types: Sequence[UUID],
-        analyses: Sequence[UUID],
         tat_min: int,
         tat_max: int,
         exclude_ids: Optional[set] = None,
     ) -> bool:
         exclude_ids = exclude_ids or set()
         proposed_types = set(types)
-        proposed_analyses = set(analyses)
+        proposed_chain = tuple(chain)
         unique = self._unique_logical_maps(
             [
                 m
@@ -654,13 +738,14 @@ class RoutingService:
             olo, ohi = _range_bounds(other.tat_range)
             if ohi < tat_min or olo > tat_max:
                 continue
-            other_chain = list(other.process_definition_ids or [])
+            other_chain = tuple(other.process_definition_ids or [])
+            if other_chain != proposed_chain:
+                continue
             try:
-                other_types = set(self._require_first_step_types(other_chain))
-                other_analyses = set(self._chain_lims_analysis_ids(other_chain))
+                other_types = set(self._require_first_step_types(list(other_chain)))
             except HTTPException:
                 continue
-            if proposed_types & other_types and proposed_analyses & other_analyses:
+            if proposed_types & other_types:
                 return True
         return False
 
@@ -668,23 +753,26 @@ class RoutingService:
         self,
         chain: Sequence[UUID],
         types: Sequence[UUID],
-        analyses: Sequence[UUID],
         tat_min: int,
         tat_max: int,
         exclude_ids: Optional[set] = None,
     ) -> None:
         if self._map_conflicts(
-            chain, types, analyses, tat_min, tat_max, exclude_ids=exclude_ids
+            chain, types, tat_min, tat_max, exclude_ids=exclude_ids
         ):
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail=(
-                    "Overlapping TAT, first-step sample types, and LIMS Run "
-                    "analyses"
+                    "Overlapping TAT, first-step sample types, and the same "
+                    "process chain"
                 ),
             )
 
-    def route_one(self, asked_for_id: UUID) -> dict:
+    def route_one(
+        self,
+        asked_for_id: UUID,
+        routing_map_id: Optional[UUID] = None,
+    ) -> dict:
         deny_client_write(self.user)
         row = self.asked_for.get(asked_for_id)
         self.asked_for._require_visible_sample(row.sample_id)
@@ -716,11 +804,25 @@ class RoutingService:
                 "No routing-map row accepts this analysis, TAT, and sample type"
             )
         if len(acceptable) > 1:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Two routing-map rows accept this analysis and sample type",
-            )
-        match = acceptable[0]
+            if routing_map_id is None:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail={
+                        "code": "route_pick_required",
+                        "message": (
+                            "Two or more routing-map rows accept this asked-for; "
+                            "select a route"
+                        ),
+                        "candidates": [
+                            self._route_candidate(m) for m in acceptable
+                        ],
+                    },
+                )
+            match = self._pick_acceptable(acceptable, routing_map_id)
+        else:
+            match = acceptable[0]
+            if routing_map_id is not None:
+                match = self._pick_acceptable(acceptable, routing_map_id)
         chain = list(match.process_definition_ids or [])
         self._assert_sample_matches_first_step(chain, sample.sample_type)
 
@@ -747,8 +849,59 @@ class RoutingService:
         )
         return {"asked_for_id": row.id, "work_order": wo, "no_route": False}
 
-    def route_many(self, asked_for_ids: Sequence[UUID]) -> List[dict]:
-        return [self.route_one(aid) for aid in asked_for_ids]
+    def route_many(
+        self,
+        asked_for_ids: Sequence[UUID],
+        routing_map_id: Optional[UUID] = None,
+    ) -> List[dict]:
+        return [
+            self.route_one(aid, routing_map_id=routing_map_id)
+            for aid in asked_for_ids
+        ]
+
+    def _logical_key(self, row: RoutingMap) -> tuple:
+        lo, hi = _range_bounds(row.tat_range)
+        return (lo, hi, tuple(row.process_definition_ids or []))
+
+    def _pick_acceptable(
+        self, acceptable: Sequence[RoutingMap], routing_map_id: UUID
+    ) -> RoutingMap:
+        by_id = {row.id: row for row in acceptable}
+        if routing_map_id in by_id:
+            return by_id[routing_map_id]
+        chosen = (
+            self.db.query(RoutingMap)
+            .filter(RoutingMap.id == routing_map_id)
+            .first()
+        )
+        if chosen is None:
+            raise _type_error("Routing map row does not accept this asked-for")
+        key = self._logical_key(chosen)
+        for row in acceptable:
+            if self._logical_key(row) == key:
+                return row
+        raise _type_error("Routing map row does not accept this asked-for")
+
+    def _route_candidate(self, row: RoutingMap) -> dict:
+        lo, hi = _range_bounds(row.tat_range)
+        chain = list(row.process_definition_ids or [])
+        names = []
+        if chain:
+            defs = (
+                self.db.query(ELNProcessDefinition)
+                .filter(ELNProcessDefinition.id.in_(chain))
+                .all()
+            )
+            by_id = {d.id: d.name for d in defs}
+            names = [by_id.get(did) or str(did) for did in chain]
+        return {
+            "routing_map_id": str(row.id),
+            "tat_min": lo,
+            "tat_max": hi,
+            "analysis_id": str(self._slot_analysis_id(row) or row.analysis_id or ""),
+            "process_definition_ids": [str(i) for i in chain],
+            "process_names": names,
+        }
 
     def list_work_orders(
         self,
@@ -978,6 +1131,7 @@ def map_to_read(row: RoutingMap, analysis_ids: Optional[Sequence[UUID]] = None) 
     return {
         "id": row.id,
         "analysis_id": row.analysis_id or (ids[0] if ids else None),
+        "asked_for_step_id": row.asked_for_step_id,
         "analysis_ids": ids,
         "sample_type_id": row.sample_type_id,
         "tat_min": lo,

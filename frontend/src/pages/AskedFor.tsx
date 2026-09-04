@@ -49,6 +49,16 @@ const AskedFor: React.FC = () => {
     type: 'include',
     ids: new Set(),
   });
+  const [pickOpen, setPickOpen] = useState(false);
+  const [pickAskedForId, setPickAskedForId] = useState<string | null>(null);
+  const [pickCandidates, setPickCandidates] = useState<
+    Array<{
+      routing_map_id: string;
+      tat_min?: number;
+      tat_max?: number;
+      process_names?: string[];
+    }>
+  >([]);
   const selectedIds = Array.from(selection.ids).map(String);
 
   const loadData = async () => {
@@ -105,13 +115,30 @@ const AskedFor: React.FC = () => {
     return routed ? `${routed} routed` : 'Route complete';
   };
 
-  const handleRouteOne = async (id: string) => {
+  const handleRouteOne = async (id: string, routingMapId?: string) => {
     try {
-      const res = await apiService.routeAskedFor(id);
+      const res = await apiService.routeAskedFor(id, routingMapId);
+      setPickOpen(false);
+      setPickAskedForId(null);
+      setPickCandidates([]);
       setInfo(summarizeRoute(res?.items || []));
       setError(null);
       await loadData();
-    } catch (err) {
+    } catch (err: any) {
+      const detail = err?.response?.data?.detail;
+      if (
+        err?.response?.status === 409 &&
+        detail &&
+        typeof detail === 'object' &&
+        detail.code === 'route_pick_required' &&
+        Array.isArray(detail.candidates)
+      ) {
+        setPickAskedForId(id);
+        setPickCandidates(detail.candidates);
+        setPickOpen(true);
+        setError(null);
+        return;
+      }
       setError(ApiService.formatError(err, 'Could not route asked-for'));
     }
   };
@@ -238,6 +265,36 @@ const AskedFor: React.FC = () => {
         />
       </FillHeightTable>
 
+      <Dialog
+        open={pickOpen}
+        onClose={() => setPickOpen(false)}
+        maxWidth="sm"
+        fullWidth
+        aria-labelledby="route-pick-title"
+      >
+        <DialogTitle id="route-pick-title">Select a route</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            More than one authored route accepts this asked-for. Choose one. This does
+            not start work.
+          </Typography>
+          {pickCandidates.map((c) => (
+            <Button
+              key={c.routing_map_id}
+              fullWidth
+              variant="outlined"
+              sx={{ mb: 1, justifyContent: 'flex-start', textTransform: 'none' }}
+              onClick={() =>
+                pickAskedForId &&
+                void handleRouteOne(pickAskedForId, c.routing_map_id)
+              }
+            >
+              TAT {c.tat_min}–{c.tat_max}d
+              {c.process_names?.length ? ` · ${c.process_names.join(' → ')}` : ''}
+            </Button>
+          ))}
+        </DialogContent>
+      </Dialog>
       <Dialog
         open={showForm}
         onClose={() => setShowForm(false)}
