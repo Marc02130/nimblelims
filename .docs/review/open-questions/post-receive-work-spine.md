@@ -220,9 +220,9 @@ OQ-WO-8 remains **Closed** history from PR 119; this is a product/UAT punch, not
 
 - Product: `feat/p2-named-slot` @ **`6244bf6`** (`6244bf6e742c4ed0f046ff8770e2b8c112446fb3`), Alembic **`0079`**.
 - **AC-P2-OQ-WO-8 Pass** (Tobias): the named slot is `routing_map.asked_for_step_id`; `_acceptable_maps` compares `asked.analysis_id` with that slot, not chain containment. One named Qubit match mints; zero returns **422**; 2+ returns **409** `route_pick_required` and mints only after the selected `routing_map_id` is posted. WGS+Qubit-as-QC does not steal Quantified DNA.
-- **Tobias overall P2 Pass (QA)** on `6244bf6`, folding per-AC Pass on `bf51b19` + OQ-WO-7 Pass on `80f054b` + OQ-WO-8 Pass on `6244bf6`.
-- Heidi Architecture **Accept** and Günter CSO **Accept** support the Tobias click SHA. No Hans Science Accept is claimed.
-- **Leadership overall Pass remains unsigned / not Pass.** That punch remains open.
+- **Tobias overall P2 Pass (QA)** — 2026-09-03 21:26 ET on `6244bf6`, folding `bf51b19` (`0078`: card-1/2/3, qc-1, freeze skip NULL, Route two-accept 409, seq-1 with dest-cohort 1.2 not scored, C1/C2/C3) + OQ-WO-7 Pass on `80f054b` + OQ-WO-8 Pass on `6244bf6`.
+- Heidi Architecture **Accept** and Günter CSO **Accept** support the Tobias click SHA.
+- **Full Leadership Confirm overall P2 Pass** (Rolf / Deiter / Hans / Heidi / Günter, 2026-09-03) on `6244bf6`, folding Tobias overall. Distinct from the QA stamp. Kept: no route branching; asked-for only; named-slot (`asked.analysis_id` vs the LimsRun on a process in the route, not containment); 0→422 / 1→mint / 2+→picker / no silent `first()`; OQ-WO-7 Closed; Quantified DNA wears existing Qubit; ELISA not on DNA; dest-follow stands; Route stays `test:assign`; instantiate uses existing process AuthZ.
 
 Signed Results on `bf51b19` and OQ-WO-7 Pass on `80f054b` remain unchanged. OQ-WO-7 was not recoded.
 

@@ -175,9 +175,9 @@ Product landed on `feat/p2-named-slot` at **`6244bf6`** (`6244bf6e742c4ed0f046ff
 
 Heidi Architecture **Accept** and Günter CSO **Accept** this product SHA for Tobias’s click. Deiter Lab Ops supplied the click boundary. No Hans Science Accept is claimed.
 
-**AC-P2-OQ-WO-8 Pass** (Tobias, 2026-09-03, `6244bf6`). **Tobias overall P2 Pass (QA)** on the same SHA folds per-AC Pass on `bf51b19` + OQ-WO-7 Pass on `80f054b` + OQ-WO-8 Pass on `6244bf6`. Earlier signed Results remain unchanged; OQ-WO-7 was not recoded. **Leadership overall Pass remains unsigned / not Pass.**
+**AC-P2-OQ-WO-8 Pass** (Tobias, 2026-09-03 21:26 ET, `6244bf6`). **Tobias overall P2 Pass (QA)** on the same SHA folds `bf51b19` (`0078`: card-1/2/3, qc-1, freeze skip NULL, Route two-accept 409, seq-1 with dest-cohort 1.2 not scored, C1/C2/C3) + OQ-WO-7 Pass on `80f054b` + OQ-WO-8 Pass on `6244bf6`. Earlier signed Results remain unchanged; OQ-WO-7 was not recoded. **Full Leadership Confirm overall P2 Pass** (Rolf / Deiter / Hans / Heidi / Günter, 2026-09-03) on `6244bf6`, folding that Tobias overall. Distinct stamps. Kept: no route branching; asked-for only; named-slot not containment; 0/1/2+ picker; Route `test:assign`; instantiate uses existing process AuthZ.
 
-WO-7 publish @ `8cfa2a9` is Tobias-signed Pass (carol **422** `test_missing`) and remains history @ `b005cfe`: `_require_wo7_tests` + `plan.errors` 422 the whole run. Status stays complete / unpublished. Zero Results. A write of `{}` onto `99b692d3` is not a freeze-skip Pass (`{}` is ambiguous). This historical paragraph does not rewrite the later freeze-skip Result on `bf51b19`. Leadership overall P2 Pass remains unsigned.
+WO-7 publish @ `8cfa2a9` is Tobias-signed Pass (carol **422** `test_missing`) and remains history @ `b005cfe`: `_require_wo7_tests` + `plan.errors` 422 the whole run. Status stays complete / unpublished. Zero Results. A write of `{}` onto `99b692d3` is not a freeze-skip Pass (`{}` is ambiguous). This historical paragraph does not rewrite the later freeze-skip Result on `bf51b19`. Leadership overall P2 Pass is stamped later in §4.2 on `6244bf6`.
 
 ## 5. P3 design
 

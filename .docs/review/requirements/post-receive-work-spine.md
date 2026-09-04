@@ -61,13 +61,13 @@
 
 **Marc punches:** WGS+Qubit-as-process-QC must not steal a Quantified DNA ask; a second Quantified DNA catalog analysis is forbidden; OQ-WO-7 lookup stays unchanged; historical OQ-WO-8 Closed state from PR 119 stays Closed while product implementation remains outstanding.
 
-**P2 closeout remains blocked:** named-slot + picker product → Tobias runs the unsigned named-slot AC on that product SHA → Tobias overall Pass on that SHA (or one Result folding `bf51b19` + `80f054b` + that SHA) → Leadership overall Pass. A per-AC Result is not overall Pass.
+**P2 closeout after this fold:** named-slot + picker product **done** (`6244bf6`); Tobias **AC-P2-OQ-WO-8 Pass**; **Tobias overall P2 Pass (QA)**; **Full Leadership Confirm overall P2 Pass** on `6244bf6`. A per-AC Result is still not the overall QA stamp; the QA stamp is still not the Leadership stamp. Both overall stamps are now recorded.
 
 ### Named-slot product and Tobias QA stamps — 2026-09-03
 
 Product landed on `feat/p2-named-slot` at **`6244bf6`** (`6244bf6e742c4ed0f046ff8770e2b8c112446fb3`), Alembic **`0079`**. **AC-P2-OQ-WO-8 Pass** (Tobias): `routing_map.asked_for_step_id` is the named slot; eligibility compares `asked.analysis_id` with that slot, not containment; one named Qubit match mints, zero returns 422, and 2+ returns 409 `route_pick_required` then mints only after the pick; WGS+Qubit-as-QC does not steal Quantified DNA.
 
-**Tobias overall P2 Pass (QA)** on `6244bf6` folds per-AC Pass on `bf51b19` + OQ-WO-7 Pass on `80f054b` + OQ-WO-8 Pass on `6244bf6`. **Leadership overall Pass remains unsigned / not Pass.** OQ-WO-8 Closed history from PR 119 and Confirm #2 / Brief from PR 120 remain unchanged. OQ-WO-7 was not recoded.
+**Tobias overall P2 Pass (QA)** — 2026-09-03 21:26 ET on `6244bf6` — folds `bf51b19` (`0078`: card-1/2/3, qc-1, freeze skip NULL, Route two-accept 409, seq-1 with dest-cohort 1.2 not scored, C1/C2/C3) + OQ-WO-7 Pass on `80f054b` + OQ-WO-8 Pass on `6244bf6`. **Full Leadership Confirm overall P2 Pass** (Rolf / Deiter / Hans / Heidi / Günter, 2026-09-03) on the same SHA, folding that Tobias overall. Distinct stamps. OQ-WO-8 Closed history from PR 119 and Confirm #2 / Brief from PR 120 remain unchanged. OQ-WO-7 was not recoded.
 
 ---
 
@@ -245,7 +245,8 @@ North star authors parsers at SOP via MCP. Until that ships, P5 is **review / dr
 | AC-P2-7 | First Start = process[0] only, no Tests for later processes. Later Start following the execute-minted destination is on **`1572071`**; Deiter `570bbc0` execute is Lab Ops Met, Tobias QA restamp unsigned |
 | AC-P2-8 | Classic `/tests` leaves `asked_for_params` NULL, or a freeze marker exists. Until then skip-on-`{}` stays OPEN (not a verified freeze skip). **OQ-WO-6 extract CLOSED:** extract is a process, not a LimsRun. Exactly one asked-for LimsRun is the assay step. |
 | AC-P2-OQ-WO-8 | **Pass** (Tobias, 2026-09-03, `6244bf6`, `0079`). Quantified DNA matches `routing_map.asked_for_step_id` when it names Qubit; WGS+Qubit-as-QC does not match; 0→422; 1→mint; 2+→409 `route_pick_required`, then the selected `routing_map_id` mints exactly one work order. |
-| Overall P2 QA | **Pass** (Tobias, `6244bf6`), folding `bf51b19` + `80f054b` + `6244bf6`. Leadership overall Pass remains unsigned / not Pass. |
+| Overall P2 QA | **Pass** (Tobias, 2026-09-03 21:26 ET, `6244bf6`), folding `bf51b19` + `80f054b` + `6244bf6`. Distinct from Leadership. |
+| Overall P2 Leadership | **Pass** (Full Leadership Confirm, Rolf / Deiter / Hans / Heidi / Günter, 2026-09-03) on `6244bf6`, folding Tobias overall. |
 | AC-P2-C1 | Assign is the tube in hand: `container_id` required. 0 vessels or 2+ without a pick → **422**, lab-readable, no silent pick. Receive tube assign → **201** with `container_id`. **Pass** on `02fe95f` stays history; live `570bbc0` is **Lab Ops Met** (Deiter), not Tobias QA Pass. |
 | AC-P2-C2 | **Fail** on `02fe95f` stays history. On `570bbc0`: **Lab Ops Met** (Deiter), not QA Pass; Tobias restamp **unsigned**. Numbered fair click: set a tracked amount so execute can transfer; same dest type → same sample, new container; destination on process; inbound assignment `removed`; Later Start follows destination. Leftover inbound volume is not a Fail — emptying is not required. Amount 0 is an edge (**422**), not the AC. No destination at Start, DNA execute, and 400 `source_amount_null` fixture gap are not C2 Fail. |
 | AC-P2-C3 | On `570bbc0`: **Lab Ops Met** (Deiter), not QA Pass; Tobias restamp **unsigned**. Numbered fair click: execute DNA → new Sample + container (`parent_sample_id`); parent stays Blood; destination pair only active assignment; Later Start follows DNA. Parent Blood at Start and no destination at Route are not C3 Fail. Same click as extract-hold 1.7. |

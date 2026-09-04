@@ -298,6 +298,6 @@ Product landed on `feat/p2-named-slot` at **`6244bf6`** (`6244bf6e742c4ed0f046ff
 
 **AC-P2-OQ-WO-8 Pass** (Tobias, 2026-09-03, `6244bf6`). Günter CSO **Accept** and Heidi Architecture **Accept** this SHA as supporting context for Tobias’s click. Deiter Lab Ops supplied the Pass/Fail boundary. **Hans did not stamp a Science Accept in this burst; none is claimed.**
 
-**Tobias overall P2 Pass (QA)** on `6244bf6` folds per-AC Pass on `bf51b19`, OQ-WO-7 Pass on `80f054b`, and OQ-WO-8 Pass on `6244bf6`. OQ-WO-7 was not recoded.
+**Tobias overall P2 Pass (QA)** — 2026-09-03 21:26 ET on `6244bf6` — folds `bf51b19` (`0078`: card-1/2/3, qc-1, freeze skip NULL, Route two-accept 409, seq-1 with dest-cohort 1.2 not scored, C1/C2/C3), OQ-WO-7 Pass on `80f054b`, and OQ-WO-8 Pass on `6244bf6`. OQ-WO-7 was not recoded.
 
-**Leadership overall Pass remains unsigned / not Pass.**
+**Full Leadership Confirm overall P2 Pass** (Rolf / Deiter / Hans / Heidi / Günter, 2026-09-03) on `feat/p2-named-slot` tip `6244bf6`, folding Tobias overall. Distinct from the QA stamp. Kept scientific lock: named slot is `asked.analysis_id` vs the LimsRun on a process in the route, not containment; Quantified DNA wears existing Qubit; ELISA is not on DNA.
