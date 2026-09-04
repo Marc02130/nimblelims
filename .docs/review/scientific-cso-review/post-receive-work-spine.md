@@ -269,3 +269,21 @@ FULL LEADERSHIP CONFIRM OQ-WO-8 CLOSED
 NAMED ASKED-FOR LIMSRUN SLOT; NOT CONTAINS-QUBIT
 CEO CONFIRM 1-6 STANDS; NO PRODUCT CODE
 ```
+
+---
+
+## 13. Full Leadership Confirm #2 and scientific named-slot brief — 2026-09-03
+
+**Not a restamp** of sections 10–12. This does not rewrite SC1–SC5, OQ-RES-1, signed UAT Results, OQ-WO-7 Closed, or OQ-WO-8 Closed history. Not overall P2 Pass.
+
+**Full Leadership Confirm** (Rolf / Deiter / Hans / Heidi / Günter):
+
+- Keep no route branching: WGS on blood owns WGS params; C3 DNA and its C2 aliquot continue WGS; WES is a new asked-for on the DNA tube. Seq-1 Pass is not this Confirm.
+- Keep asked-for only from PR 111.
+- Strike the zero-LimsRun Extracted DNA clause. Quantified DNA is concentration data produced through the existing Qubit analysis.
+
+**Scientific lock:** a route’s named asked-for LimsRun slot identifies the assay that owns the request. Qubit in a WGS chain as process QC is scientifically different from Qubit named as the Quantified DNA assay slot. Chain containment cannot distinguish those meanings and can attach the request to the wrong method.
+
+Map-save must verify the named slot analysis appears exactly once among route LimsRuns. Route must compare `asked.analysis_id` to that slot. Zero acceptable maps returns 422; one mints; two or more require a scientist/tech to choose the intended route before mint. No silent `first()`.
+
+The unsigned `AC-P2-OQ-WO-8` tests Quantified DNA → named Qubit, WGS+Qubit-as-QC exclusion, and manual assignment for 2+ candidates. Passing that AC will be per-AC only. Overall P2 remains blocked on product, Tobias overall Result, then Leadership overall Pass.

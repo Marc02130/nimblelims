@@ -5,7 +5,7 @@
 **Status:** Architecture / UI / Spec **C2 Fail** on `02fe95f` is signed history (Deiter click C1 **Pass**, dest mint Hold **Pass**); do not rewrite it. On live SHA **`570bbc0`**, Deiter’s C1/C2/C3 execute click is **Met for Lab Ops identity only**: same-type plate, DNA new Sample, and Later Start following the destination. It is not Tobias QA Pass. Dest-follow execute joints remain **`1572071`** and have no Tobias Result; Tobias’s QA restamp remains unsigned until Results land on the same numbered ACs. **Leadership Confirmed** (Rolf / Deiter / Hans / Heidi / Günter): C2 is same sample + additional container; C3 is new derivative Sample + container with `parent_sample_id`, while parent stays Blood. No destination at Route/Start/map-save is intended. Receive often leaves Contents amount NULL; set a tracked amount so execute can transfer, and treat 400 `source_amount_null` as fixture setup. Emptying is not required. DNA scored as C2 is the wrong AC. `9342439` Hold is Start-extract Blood / 0 DNA history, not a ban on C3. P2 on `main` (`5040f2d`). **OQ-WO-7 Closed.** **AC-P2-OQ-WO-7 Pass** (Tobias, 2026-09-01, `80f054b`). Freeze skip NULL **Pass** on `bf51b19`. Route two-accept 409 **Pass** on `bf51b19`. **OQ-WO-6 for extract CLOSED** (Leadership Confirm 2026-08-31). Closeout **1.4 / OQ-WO-8** is **Closed** (**Full Leadership Confirm**; Quantified DNA; Qubit is the asked-for LimsRun; named asked-for LimsRun slot, not contains-Qubit). No overall P2 Pass. Not IC50.  
 **Leadership Confirm (2026-08-31, Rolf / Deiter / Hans / Heidi / Günter):** extract is a **process** (not a LimsRun; no asked-for `analysis_id`); exactly **one** LimsRun in the route has the asked-for `analysis_id` (assay step); extract (process) and Qubit (supporting LimsRun) may sit in the chain; map-save / Route **422** if asked-for count among LimsRuns is 0 or 2+; two ELISA LimsRuns refused. Hans’s 1-count-on-extract freeze punch is closed. Keep: one asked-for per process instance; **no route branching** — WGS asked-for on blood owns WGS params (extract → seq); C3 DNA then C2 aliquot into WGS; WES is a new asked-for on the DNA tube, which is then aliquoted or used up (own params); freeze skip OPEN. Do not rewrite `9342439`. Tobias C2/C3 unsigned. Hold merge. Not IC50.
 **Leadership Confirm (Rolf, Marc, 2026-08-31):** Qubit / Nanodrop / etc. are supporting LimsRuns in the **same route as whatever the asked-for assay is** (ELISA, NGS, Qubit-as-asked-for, sequencing, …). Sequencing is an example, not the only case. Other `analysis_id`s, own Tests, own params freeze. Asked-for analysis appears **once**, on the assay LimsRun. Extract stays a process. Do not invent a second asked-for for QC. Do not put Nanodrop on extract.
-**Marc lock (2026-09-01, pending Leadership overwrite):** Care about the asked-for only. Extracted DNA ask = DNA tube (zero assay LimsRuns legal — **1.4**). Sequencing ask with blood = sequencing is the ask; extract is route machinery. One assay LimsRun when the ask is an assay. Do not forever-ban extract-as-LimsRun. OQ-WO-6 extract close stays in spirit for the common path. Freeze skip NULL is **Tobias Pass** on `bf51b19` (older freeze skip OPEN in room locks below is superseded — do not restamp those walls). **OQ-WO-7 OPEN / AC unsigned** until Tobias stamps. Leftover **`9f86d14`** on **`80f054b`** **is** this Grok Build work. **Do not recode.** Remaining work is **Tobias**. Overall P2 unsigned. Not IC50. `9342439` / `02fe95f` untouched.
+**Full Leadership Confirm #2 (2026-09-03, Rolf / Deiter / Hans / Heidi / Günter):** Keep no route branching and asked-for only (PR 111). WGS on blood owns WGS params; C3 DNA and a C2 aliquot continue WGS; WES is a new asked-for on the DNA tube. Seq-1 Pass is not this Confirm. The zero-LimsRun Extracted DNA clause is struck. OQ-WO-8 remains Closed history from PR 119; named-slot product code and the 2+ route picker remain outstanding. This Confirm is not overall P2 Pass and does not recode OQ-WO-7.
 **Leadership Confirm (2026-09-01, Rolf / Deiter / Hans / Heidi / Günter):** **ELISA is not on DNA** (wrong matrix) — do not hang ELISA on the DNA dest after C3. Same blood Sample **second tube (Contents)** may carry its **own asked-for and route**; two blood tubes → two process assignments (`container_id`); ELISA route and WGS/extract stay apart. Do **not** teach “extract can never be a LimsRun” as a forever ban (Hans: do not hang asked-for assay `analysis_id` on extract). **Extracted DNA asked-for can have Qubit/Nanodrop**; extract-as-instrument LimsRun is later. **OQ-WO-6 still:** asked-for `analysis_id` once on the assay LimsRun, not extract. **OQ-WO-7 stays OPEN:** blood WGS → C3 DNA → WGS start freezes `{library_kit: …}`, not `{}` / not Qubit params. Standing UAT rule: after two attempts on the same issue, next click needs written “what we are testing and why.” Not IC50. Do not rewrite `bf51b19` / `8cfa2a9` / `9342439` / P1 / `02fe95f` / Deiter `570bbc0` Lab Ops Met.
 **Science (2026-09-01):** Per-AC on `bf51b19` Pass. Overall P2 stayed unsigned. Merged (`5040f2d`) with **OQ-WO-7 OPEN**. Leftover **`9f86d14`** on **`80f054b` is** the Grok Build work. **Do not recode.** Remaining work is **Tobias**. **OQ-WO-7 stays OPEN / AC unsigned** until Tobias stamps. Do not invent Tobias Pass. Not IC50.
 **CEO Accept (Rolf, 2026-09-01):** Accept Hans’s written what/why as **AC-P2-OQ-WO-7** before Tobias. “Grok Build codes first” is **done** (`9f86d14` on `80f054b`). Remaining work is **Tobias**. Result unsigned. OQ-WO-7 stays **OPEN / AC unsigned** until Tobias stamps. Do not rewrite `bf51b19`. Not IC50.
@@ -126,12 +126,12 @@ Pytest: create, 409 dup, **403 dual-belt** (create **and** `list()` / `GET /aske
 
 ## 4. P2 design
 
-`routing_map`: TAT + ordered `process_definition_ids`. No analysis or sample-type picker. Do **not** gist-exclude on analysis+TAT. Save **409**s when overlapping TAT, overlapping first-step allow-lists, **and** overlapping LIMS Run analyses in the chains all hold. (`8cfa2a9` UAT scored analysis+TAT map rows; that SHA remains signed history.)
+`routing_map`: TAT + ordered `process_definition_ids` + a persisted **named asked-for LimsRun slot**. No sample-type picker. Prefer a FK from `routing_map` to the selected `eln_process_definition_steps` LimsRun. If the implementation instead persists `routing_map.analysis_id`, it must be the author-named ask and must stop deriving from `analyses[0]`. Map-save validates that the named slot belongs to the route and that its analysis appears exactly once among route LimsRuns; 0 or 2+ → **422**.
 
 **OQ-WO-1 Decided:** Tech hits **Route**. No auto-route on asked-for save. `POST /api/v1/asked-for/{id}/route` (batch the same call for a selected set). Then:
 
-- Select TAT candidates; keep a row when current type is on the first process / first ordered Experiment-LimsRun list **and** the asked-for analysis appears on **exactly one** LimsRun in that route (that LimsRun is the assay step; extract is a process and is not counted; Qubit may be a supporting LimsRun)
-- Zero acceptable rows → 422; two saved rows that both accept this type and this analysis → 409; asked-for analysis count among LimsRuns of **0 or 2+** → **422** (two ELISA LimsRuns refused); exactly one snapshots its ordered `process_definition[]` and mints **zero Tests**
+- Select TAT candidates; keep a row when current type is on the first process / first ordered Experiment-LimsRun list **and** `asked.analysis_id` equals the persisted named slot’s `analysis_id`. Do not use chain containment. Qubit may be process QC on WGS without making that WGS map eligible for a Quantified DNA ask.
+- Zero acceptable rows → 422; exactly one snapshots its ordered `process_definition[]` and mints **zero Tests**; 2+ returns route candidates for manual assignment and mints nothing until the tech posts one chosen `routing_map_id`.
 - Never silently use `first()`
 - Denorm `sample_type_id` is display/sync only — Route uses the live first-step list
 - Prefer deriving first-process types, chain LIMS Run analyses, and emerging types on read
@@ -146,6 +146,28 @@ Start: `ELNProcessService.instantiate_from_definition` on **process[0] / `chain[
 **L3 / A5 / SC5 / Hans:** Freeze is **per Test** `(sample, analysis)`. First LimsRun start writes `asked_for.params` → `tests.asked_for_params`. Later start does **not** overwrite — including frozen `{}`. NULL = not frozen yet. `{}` after first start = locked empty. `if test: continue` is **not** a freeze. Classic `/tests` default `{}` makes skip-on-`{}` **not** a freeze. Classic `/tests` must leave `asked_for_params` **NULL**, or we need a **freeze marker**. Do **not** close freeze skip. Do **not** teach skip-on-`{}` as shipped. **OQ-WO-6 for extract CLOSED** (Leadership Confirm): extract is a process, not a LimsRun; exactly one asked-for LimsRun is the assay step. P1 does **not** write that Test snapshot. Freeze skip stays unsigned.
 
 A process instance is bound to **one** asked-for row. Qubit / Nanodrop / etc. are supporting LimsRuns in the **same route as whatever the asked-for assay is** (ELISA, NGS, Qubit-as-asked-for, sequencing, …) — other `analysis_id`s, own Tests, own params freeze — not a second asked-for, not on extract. Extract is a **process** and has no asked-for `analysis_id`. Type-changing execute mints the DNA Sample **once**. **No route branching:** C2 aliquot of that DNA continues WGS; **WES is a new asked-for on the DNA tube**, which is then **aliquoted or used up**. Do not teach dest auto-joining a second WO.
+
+### 4.1 Heidi architecture file map — named-slot build (not implemented in this fold)
+
+**Hole today:** `_acceptable_maps` in `backend/app/services/routing_service.py` retains a map when `_asked_for_lims_run_count(chain, analysis_id) == 1`. That is containment anywhere in the chain, so WGS with Qubit as process QC can steal a Quantified DNA ask.
+
+**Build shape:**
+
+- Persist the author-named slot on `routing_map`; prefer the specific assay `eln_process_definition_steps` LimsRun FK, with author-named `routing_map.analysis_id` as the fallback design.
+- Keep map-save 422 when the named slot analysis occurs 0 or 2+ times among route LimsRuns.
+- Match Route eligibility to the named slot’s `analysis_id`.
+- Return 0/1/2+ outcomes explicitly. For 2+, expose candidates and accept a chosen `routing_map_id`; do not silently select the first row.
+
+**Touch in the product slice:**
+
+- `backend/app/services/routing_service.py`: `create_map`, update, `_acceptable_maps`, and chosen-map assignment.
+- `backend/models/work_order.py` plus Alembic only if a new persisted column/FK is selected.
+- Routing schemas and the `work_orders` router.
+- `frontend/src/pages/admin/RoutingMapManagement.tsx`: map author names the asked-for slot.
+- `frontend/src/pages/AskedFor.tsx` and the API service: show the 2+ picker; one candidate remains one-click Route; post the chosen `routing_map_id`.
+- `backend/tests/test_work_order_p2.py` and the matching UI test.
+
+**Do not touch:** `lims_run_service` OQ-WO-7 lookup, destination follow, freeze skip, cardinality beyond named-slot validation, a second Quantified DNA analysis, or extract-as-LimsRun.
 
 WO-7 publish @ `8cfa2a9` is Tobias-signed Pass (carol **422** `test_missing`) and remains history @ `b005cfe`: `_require_wo7_tests` + `plan.errors` 422 the whole run. Status stays complete / unpublished. Zero Results. A write of `{}` onto `99b692d3` is not a freeze-skip Pass (`{}` is ambiguous). Freeze skip **unsigned**. Overall P2 Pass is unsigned.
 
@@ -174,7 +196,7 @@ No new import engine. **Do not build “admin authors parsers” as the product.
 | Hidden sample (create or list) | **403** via dual-belt `has_project_access` (not RLS-only) |
 | Cancelled asked-for re-create | Allowed (unique ignores cancelled) |
 | Route with zero acceptable rows | **422**, no WO |
-| Route with two saved rows that both accept current type | **409**, no silent `first()` |
+| Route with two or more named-slot-matching rows | Return candidates; require manual assignment by chosen `routing_map_id`; mint nothing before selection |
 | Map save, same analysis + overlapping TAT + overlapping first-step allow-lists | **409** |
 | Map save, same analysis + overlapping TAT, disjoint first-step allow-lists | Save succeeds (extract-first vs Qubit-first) |
 | First Start mints later processes or their Tests | Bounce — punch (3). Snapshot is the list only |
@@ -192,7 +214,8 @@ No new import engine. **Do not build “admin authors parsers” as the product.
 | Classic `/tests` default `{}` | Not a freeze — skip-on-`{}` stays OPEN. NULL = not frozen yet. First start must still write. |
 | Later start overwrites frozen `asked_for_params` (including `{}`) | Bounce — freeze is write-once per Test. Skip-on-`{}` is still not shipped. |
 | Skip-on-`{}` treated as a freeze | Bounce — classic default `{}` makes skip-on-`{}` **not** a freeze. OPEN until classic NULL or a freeze marker |
-| Asked-for analysis appears 0 or 2+ times among LimsRuns | **422** map-save and Route. Two ELISA LimsRuns refused (one Test `(sample, ELISA)` — not QC). Extract is not a LimsRun and is not counted |
+| Named slot analysis appears 0 or 2+ times among route LimsRuns | **422** map-save. Two ELISA LimsRuns refused. Extract is not a LimsRun and is not counted |
+| Eligibility checks chain containment instead of named slot | Bounce. WGS+Qubit-as-QC must not accept a Quantified DNA ask |
 | Teaching extract as a LimsRun / extract wearing ELISA (OQ-WO-6 extract) | Bounce — **CLOSED**. Extract is a process; no asked-for `analysis_id`. Hans 1-count-on-extract freeze is closed |
 | One process instance carrying two asked-for assays | Bounce — one asked-for per process instance |
 | QC folded into asked-for `analysis_id` / extract-as-LimsRun | Bounce — Qubit = supporting LimsRun, own Test; extract is a process |
