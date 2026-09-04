@@ -229,6 +229,7 @@ def _create_map(
     token,
     *,
     analysis_id=None,
+    asked_for_step_id=None,
     definition_id=None,
     definition_ids=None,
     tat_min=1,
@@ -243,6 +244,8 @@ def _create_map(
     }
     if analysis_id is not None:
         body["analysis_id"] = str(analysis_id)
+    if asked_for_step_id is not None:
+        body["asked_for_step_id"] = str(asked_for_step_id)
     if sample_type_id is not None:
         body["sample_type_id"] = str(sample_type_id)
     return client.post("/v1/routing-map", json=body, headers=_auth(token))
@@ -1386,7 +1389,20 @@ class TestWorkOrderP2:
         before = db_session.query(WorkOrder).count()
         routed = client.post(f"/v1/asked-for/{af_id}/route", headers=_auth(admin_token))
         assert routed.status_code == 409, routed.text
+        detail = routed.json()["detail"]
+        assert isinstance(detail, dict)
+        assert detail.get("code") == "route_pick_required"
+        candidates = detail.get("candidates") or []
+        assert len(candidates) == 2
         assert db_session.query(WorkOrder).count() == before
+        picked = client.post(
+            f"/v1/asked-for/{af_id}/route",
+            json={"routing_map_id": candidates[0]["routing_map_id"]},
+            headers=_auth(admin_token),
+        )
+        assert picked.status_code == 200, picked.text
+        assert picked.json()["items"][0]["work_order"] is not None
+        assert db_session.query(WorkOrder).count() == before + 1
 
     def test_later_start_advances_and_gates_type(
         self,
@@ -1688,6 +1704,7 @@ class TestWorkOrderP2:
         mapped = _create_map(
             client,
             admin_token,
+            analysis_id=p2_seed["analysis_b"].id,
             definition_ids=[extract["id"], later["id"]],
         )
         assert mapped.status_code == 201, mapped.text
@@ -1698,6 +1715,7 @@ class TestWorkOrderP2:
         }
         assert str(p2_seed["analysis_b"].id) in analysis_ids
         assert str(p2_seed["analysis_a"].id) in analysis_ids
+        assert mapped.json()[0]["analysis_id"] == str(p2_seed["analysis_b"].id)
 
         sample_id = _receive_sample(client, admin_token, p2_seed, "NBIO-P2-LATERAN")
         created = client.post(
@@ -1927,6 +1945,7 @@ class TestWorkOrderP2:
         mapped = _create_map(
             client,
             admin_token,
+            analysis_id=p2_seed["analysis_a"].id,
             definition_ids=[extract["id"], qubit["id"], elisa["id"]],
         )
         assert mapped.status_code == 201, mapped.text
@@ -2031,6 +2050,127 @@ class TestWorkOrderP2:
         )
         assert got.json()["status"] == "requested"
         assert db_session.query(WorkOrder).count() == before
+
+    def test_two_packs_same_analysis_save_then_pick(
+        self,
+        client: TestClient,
+        admin_token: str,
+        p2_seed,
+        db_session: Session,
+    ):
+        pack_a = _create_lims_run_definition(
+            client, admin_token, p2_seed["analysis_a"].id
+        )
+        pack_b = _create_lims_run_definition(
+            client, admin_token, p2_seed["analysis_a"].id
+        )
+        _put_step_types(client, admin_token, pack_a, p2_seed["sample_type"].id)
+        _put_step_types(client, admin_token, pack_b, p2_seed["sample_type"].id)
+        first = _create_map(
+            client, admin_token, definition_id=pack_a["id"], tat_min=1, tat_max=10
+        )
+        second = _create_map(
+            client, admin_token, definition_id=pack_b["id"], tat_min=1, tat_max=10
+        )
+        assert first.status_code == 201, first.text
+        assert second.status_code == 201, second.text
+        sample_id = _receive_sample(client, admin_token, p2_seed, "NBIO-P2-TWOPACK")
+        created = client.post(
+            "/v1/asked-for",
+            json=_asked_for_body([sample_id], p2_seed["analysis_a"].id),
+            headers=_auth(admin_token),
+        )
+        af_id = created.json()["items"][0]["id"]
+        routed = client.post(f"/v1/asked-for/{af_id}/route", headers=_auth(admin_token))
+        assert routed.status_code == 409, routed.text
+        candidates = routed.json()["detail"]["candidates"]
+        chosen = next(
+            c
+            for c in candidates
+            if str(pack_b["id"]) in (c.get("process_definition_ids") or [])
+        )
+        picked = client.post(
+            f"/v1/asked-for/{af_id}/route",
+            json={"routing_map_id": chosen["routing_map_id"]},
+            headers=_auth(admin_token),
+        )
+        assert picked.status_code == 200, picked.text
+        wo = picked.json()["items"][0]["work_order"]
+        assert wo["process_definition_ids"] == [str(pack_b["id"])]
+
+    def test_named_slot_excludes_qc_analysis(
+        self,
+        client: TestClient,
+        admin_token: str,
+        p2_seed,
+    ):
+        ask_only = _create_lims_run_definition(
+            client, admin_token, p2_seed["analysis_b"].id
+        )
+        qc = _create_lims_run_definition(
+            client, admin_token, p2_seed["analysis_b"].id
+        )
+        assay = _create_lims_run_definition(
+            client, admin_token, p2_seed["analysis_a"].id
+        )
+        _put_step_types(client, admin_token, ask_only, p2_seed["sample_type"].id)
+        _put_step_types(client, admin_token, qc, p2_seed["sample_type"].id)
+        _put_step_types(client, admin_token, assay, p2_seed["sample_type"].id)
+        assert (
+            _create_map(
+                client, admin_token, definition_id=ask_only["id"]
+            ).status_code
+            == 201
+        )
+        mapped = _create_map(
+            client,
+            admin_token,
+            analysis_id=p2_seed["analysis_a"].id,
+            definition_ids=[qc["id"], assay["id"]],
+        )
+        assert mapped.status_code == 201, mapped.text
+        sample_id = _receive_sample(client, admin_token, p2_seed, "NBIO-P2-SLOT")
+        created = client.post(
+            "/v1/asked-for",
+            json=_asked_for_body([sample_id], p2_seed["analysis_b"].id),
+            headers=_auth(admin_token),
+        )
+        routed = client.post(
+            f"/v1/asked-for/{created.json()['items'][0]['id']}/route",
+            headers=_auth(admin_token),
+        )
+        assert routed.status_code == 200, routed.text
+        wo = routed.json()["items"][0]["work_order"]
+        assert wo["process_definition_ids"] == [str(ask_only["id"])]
+
+    def test_map_save_names_slot_when_two_lims_runs(
+        self,
+        client: TestClient,
+        admin_token: str,
+        p2_seed,
+    ):
+        first = _create_lims_run_definition(
+            client, admin_token, p2_seed["analysis_a"].id
+        )
+        second = _create_lims_run_definition(
+            client, admin_token, p2_seed["analysis_b"].id
+        )
+        _put_step_types(client, admin_token, first, p2_seed["sample_type"].id)
+        _put_step_types(client, admin_token, second, p2_seed["sample_type"].id)
+        unnamed = _create_map(
+            client,
+            admin_token,
+            definition_ids=[first["id"], second["id"]],
+        )
+        assert unnamed.status_code == 422, unnamed.text
+        named = _create_map(
+            client,
+            admin_token,
+            analysis_id=p2_seed["analysis_b"].id,
+            definition_ids=[first["id"], second["id"]],
+        )
+        assert named.status_code == 201, named.text
+        assert named.json()[0]["analysis_id"] == str(p2_seed["analysis_b"].id)
 
 
 class TestListNameAlias:

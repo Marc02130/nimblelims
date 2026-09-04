@@ -65,6 +65,7 @@ def create_routing_map(
         process_definition_ids=body.process_definition_ids,
         active=body.active,
         analysis_id=body.analysis_id,
+        asked_for_step_id=body.asked_for_step_id,
     )
     return [RoutingMapRead(**payload) for payload in svc.read_maps(rows)]
 
@@ -83,6 +84,8 @@ def update_routing_map(
         tat_max=body.tat_max,
         process_definition_ids=body.process_definition_ids,
         active=body.active,
+        asked_for_step_id=body.asked_for_step_id,
+        analysis_id=body.analysis_id,
     )
     return RoutingMapRead(**svc.read_map(row))
 
