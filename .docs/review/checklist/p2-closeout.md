@@ -34,24 +34,24 @@ This is a working list, not a Leadership Confirm and not a UAT Result stamp. Do 
 | Seq-1 sequential asked-fors (two WOs; WES on DNA tube) | Tobias **Pass** `bf51b19`. Dest-cohort params (**1.2** / **OQ-WO-7**) **not scored** on that SHA |
 | OQ-WO-6 extract punch | **CLOSED** for the common path — extract is an **experiment** (equipment) and does not wear the panel `analysis_id`. **Not** a forever ban on extract-as-LimsRun. After extract on **WGS / WES / ELISA**, Qubit/Nanodrop is **process QC**, not the asked-for. Assay ask: one asked-for LimsRun. **1.4 Quantified DNA:** Qubit **is** the asked-for LimsRun (**CEO Confirm 1–6 stands**; wear existing Qubit). **OQ-WO-8 Closed**. Named-slot Closed (eligibility vs named slot, not contains-Qubit) |
 | Dest mint only at execute | **Leadership Confirm** |
-| No route branching | **Marc lock, pending Leadership overwrite** |
-| Care about the asked-for only | **Marc lock 2026-09-01 (PR 111), pending Leadership overwrite** — still stands |
+| No route branching | **Full Leadership Confirm #2** (2026-09-03): keep the Marc lock; Seq-1 Pass is not this Confirm |
+| Care about the asked-for only | **Full Leadership Confirm #2** (2026-09-03): keep PR 111 |
 | ELISA not on DNA; second tube own asked-for; separate containers = separate assignments | **Leadership Confirm 2026-09-01** (Rolf/Deiter/Hans/Heidi/Günter) |
 | OQ-WO-7 WGS params on DNA Test from WO after C3 | **Closed.** **AC-P2-OQ-WO-7 Pass** (Tobias, 2026-09-01, `80f054b`). Test **`55f9cad9`** `(DNA, WGS)` `{library_kit: TruSeq}` from WO **`4ea9de0c`**. Leftover **`9f86d14`** is the lookup — **was not recoded**. Merged `5040f2d` with OPEN — that history stands |
-| Closeout 1.4 Quantified DNA | **OQ-WO-8 Closed.** **Full Leadership Confirm** (Rolf / Deiter / Hans / Heidi / Günter). **CEO Confirm 1–6 stands.** Wear existing Qubit; no second Quantified DNA analysis. Old 1.4 struck; 422 on 0 LimsRuns. Named asked-for LimsRun slot: Map / Route names it; eligibility is `asked.analysis_id` vs that slot, not contains-Qubit. Send: [2026-09-01-p2-closeout-1-4-quantified-dna](../../discussions/2026-09-01-p2-closeout-1-4-quantified-dna.md) |
+| Closeout 1.4 Quantified DNA | **OQ-WO-8 Closed history preserved** (PR 119). Wear existing Qubit; no second Quantified DNA analysis. Zero-LimsRun Extracted DNA clause struck. Named-slot decision is Closed; product implementation remains blocking: persist the named slot, reject maps where its analysis occurs 0 or 2+ times, and match eligibility to that slot rather than containment. |
 | Overall P2 Pass | **Unsigned / not Pass** |
 | Merge to `main` | **Landed** `5040f2d` with OQ-WO-7 OPEN (history) |
 
-**Out of the merge on purpose:** route branching / dest auto-joining a second WO; 2+ matching routes **picker** (product is **409**); P3–P5; IC50. **OQ-WO-7** stayed known OPEN.
+**Out of the merge on purpose:** route branching / dest auto-joining a second WO; named-slot product and the **2+ matching-route picker**; P3–P5. The older “product is 409 only / no picker” teaching is superseded. **OQ-WO-7** stayed known OPEN.
 
 ---
 
 ## Left after merge (not a merge hold)
 
-1. **Leadership Confirm** of sequential asked-fors (WGS on blood owns WGS params; C3 DNA; C2 aliquot continues WGS; WES = new asked-for on the DNA tube, then aliquoted or used up; own params). Marc lock is pending overwrite. Tobias Pass of two WOs is **not** that Confirm.
+1. **Full Leadership Confirm #2 folded** (Rolf / Deiter / Hans / Heidi / Günter, 2026-09-03): WGS on blood owns WGS params; C3 DNA; C2 aliquot continues WGS; WES = new asked-for on the DNA tube, then aliquoted or used up; own params. Tobias Seq-1 Pass of two WOs is **not** that Confirm.
 2. **OQ-WO-7 / closeout 1.2 — Closed. AC-P2-OQ-WO-7 Pass** (Tobias, 2026-09-01, `80f054b`). After C3 (Blood→DNA) WGS start on the DNA dest froze **WGS params from the work order’s asked-for** onto the **DNA Test**. Test **`55f9cad9`** `(DNA, WGS)` has `{library_kit: TruSeq}` from blood WO **`4ea9de0c`**, **not** `{}`, **not** Qubit params. Seq-1 on `bf51b19` did **not** score this. Merge `5040f2d` did **not** include it — do **not** rewrite that merge as a hold. Leftover **`9f86d14`** on **`80f054b`** (`80f054b274b02bb48f9dcbba5a05378419ea6b90`) **is** this Grok Build work (pytest in that same commit). **Was not recoded.** **Do not** treat leftover as a UAT click. Lookup: (1) WO asked-for **only if** `asked.analysis_id == run.analysis_id`; (2) else walk `parent_sample_id` for a routed asked-for of that analysis; (3) else `{}`; (4) freeze skip: write onto NULL; do not overwrite an already-frozen payload including locked empty `{}`. **Pass / Fail / not-a-Fail** stay the AC definition. It is **not** freeze skip and **not** dest-follow.
-3. **Closeout 1.4 — Quantified DNA (OQ-WO-8 Closed; CEO Confirm 1–6 stands):** The SKU is **data**, not a tube-only product. **Quantified DNA is an assay ask.** **Qubit is the asked-for LimsRun** (exactly one; wear existing Qubit `analysis_id`; Test `(DNA, Qubit)` is the ask). Do **not** mint a second catalog analysis named Quantified DNA. **Other process QC** (Nanodrop, …) may sit — other analyses, own Tests, **not** a second asked-for. Extract stays experiment / equipment; **no** analysis_id; **no** boolean `extracted = True/False` Result. Old 1.4 (zero LimsRuns) **struck**. 422 on 0 LimsRuns is **right** for this SKU. WGS/WES/ELISA unchanged: Qubit stays process QC on those asks. Tube-only DNA later SKU. Map / Route **names the asked-for LimsRun slot**. Eligibility is `asked.analysis_id` vs **that slot**, not “any chain that contains Qubit.” A WGS map with Qubit as process QC must **not** steal a Quantified DNA ask (409 / wrong join). Named-slot is no longer pending. Same OQ-WO-7 lookup after C3; **do not recode.** No product code in this fold. Product code may start after this fold is on `main`. Send: [2026-09-01-p2-closeout-1-4-quantified-dna](../../discussions/2026-09-01-p2-closeout-1-4-quantified-dna.md).
-4. **Overall P2 Pass** — unsigned. Leadership did not stamp overall Pass. Closeout **1.4 / OQ-WO-8** is **Closed** (Full Leadership Confirm). Do not invent overall Pass from this fold.
+3. **Named-slot product (blocking):** OQ-WO-8 Closed history from PR 119 stands, but the product still uses containment through `_asked_for_lims_run_count(chain, analysis_id) == 1`. Build the persisted author-named asked-for LimsRun slot, keep Qubit as the existing analysis, and prevent WGS+Qubit-as-QC from stealing Quantified DNA. Map-save is 422 if the slot’s analysis appears 0 or 2+ times among route LimsRuns. Route outcomes after named-slot filtering: 0 → 422; 1 → mint; 2+ → tech selects a route, then assignment mints. No silent `first()`.
+4. **Overall P2 Pass** — still blocking and unsigned. Required order: named-slot + picker product → Tobias runs the unsigned named-slot AC on that product SHA → Tobias overall Pass on that SHA (or one Result folding `bf51b19` + `80f054b` + that SHA) → Leadership overall Pass. Per-AC is not overall.
 5. **Merge** — **Landed** `5040f2d` with OQ-WO-7 OPEN. Do not invent overall P2 Pass. Freeze skip NULL **Pass** on `bf51b19` is not a hold.
 
 Do **not** recode dest-follow, cardinality, freeze skip NULL, or Route two-accept 409 unless a new Fail lands.
@@ -65,9 +65,22 @@ Do **not** recode dest-follow, cardinality, freeze skip NULL, or Route two-accep
 | **1.1 Cardinality 1** | Two ELISA LimsRuns must 422 | **Done.** Tobias Pass `bf51b19` | Do not re-score |
 | **1.2 / OQ-WO-7** | WGS params on the DNA Test from the WO after C3 | **Closed.** **AC-P2-OQ-WO-7 Pass** (Tobias, 2026-09-01, `80f054b`). Test **`55f9cad9`** `{library_kit: TruSeq}` from WO **`4ea9de0c`**. Code on `main` via leftover **`9f86d14`**. Seq-1 Pass without scoring dest-cohort params | **Do not recode.** Lookup (WO asked-for same `analysis_id`, else parent lineage, else `{}`) **was not recoded** |
 | **1.3 Freeze skip NULL** | Classic `{}` vs frozen `{}` | **Done** (`0078`). Tobias Pass `bf51b19` | Do not transfer `99b692d3` |
-| **1.4 Quantified DNA** | Tube-only zero-LimsRun vs assay ask | **OQ-WO-8 Closed.** **CEO Confirm 1–6 stands.** Wear existing Qubit. Old 1.4 struck. Named-slot Closed (asked.analysis_id vs named slot, not contains-Qubit) | **No product code in this fold.** Product code may start after this fold is on `main`. Do **not** code extract-only / zero LimsRuns / boolean Test / second Quantified DNA analysis |
+| **1.4 Quantified DNA** | Named asked-for LimsRun slot vs containment; ambiguous matching maps | **OQ-WO-8 Closed history preserved.** Wear existing Qubit. Zero-LimsRun Extracted DNA clause struck. Decision Closed; product still pending. | Build persisted named slot + 0/1/2+ route behavior with manual assignment on 2+. Do **not** recode OQ-WO-7 lookup or mint a second Quantified DNA analysis. |
 
-**Do not code:** route branching; dest auto-join second WO; copy WGS params onto WES; second asked-for for Qubit; analysis picker on `/receive`; 2+ routes picker; P3–P5. Do not forever-ban extract-as-LimsRun — later, if equipment is an instrument.
+**Do not code in this docs fold:** any product `.py` / `.ts` / Alembic; route branching; dest auto-join second WO; copy WGS params onto WES; second asked-for for Qubit; analysis picker on `/receive`; P3–P5. The next product slice includes the 2+ route picker; older “409 only / no picker” copy is superseded.
+
+---
+
+## Full Leadership Confirm #2 / current overall P2 punch list — 2026-09-03
+
+**Full Leadership Confirm** (Rolf / Deiter / Hans / Heidi / Günter), not CEO-only and not overall P2 Pass:
+
+1. **Named-slot + 2+ picker product:** Brief → Grok Build → Tobias runs unsigned `AC-P2-OQ-WO-8`.
+2. **Confirm #2 folded:** no route branching and asked-for only remain; zero-LimsRun Extracted DNA clause is struck.
+3. **Tobias overall Pass:** on the named-slot product SHA, or one overall Result folding `bf51b19` + `80f054b` + that SHA. A per-AC Result is not overall.
+4. **Leadership overall Pass:** only after items 1–3.
+
+**Not blocking this closeout:** ELISA/second-tube, destination follow, freeze skip, cardinality, OQ-WO-7, historical 1.4 docs, unsigned `570bbc0` C2/C3, P3–P5.
 
 ---
 
