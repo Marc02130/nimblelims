@@ -85,3 +85,35 @@ This docs fold supplies the Brief and unsigned UAT AC only. Overall P2 remains b
 4. Leadership records overall Pass.
 
 A per-AC Pass is not overall P2 Pass.
+
+## Product and Tobias QA stamps — 2026-09-03
+
+**Product:** `feat/p2-named-slot` @ **`6244bf6`** (`6244bf6e742c4ed0f046ff8770e2b8c112446fb3`), Alembic **`0079`**.
+
+**AC-P2-OQ-WO-8 Result:** **Pass** (Tobias, 2026-09-03, `6244bf6`).
+
+- The persisted named slot is `routing_map.asked_for_step_id`.
+- Eligibility compares `asked.analysis_id` with that slot, not chain containment.
+- One named Qubit match mints; zero acceptable maps returns **422**.
+- Two or more acceptable maps return **409** `route_pick_required`; the picker mints only after the selected `routing_map_id` is posted.
+- WGS+Qubit-as-process-QC does not steal a Quantified DNA ask.
+
+Deiter Lab Ops supplied this Pass/Fail boundary. Heidi Architecture **Accept** and Günter CSO **Accept** `6244bf6` as supporting context for Tobias’s click. Hans did not stamp a Science Accept in this burst; none is claimed.
+
+**Tobias overall P2 Result (QA): Pass** — 2026-09-03 21:26 ET on `6244bf6`. The fold is:
+
+- `bf51b19` (Alembic `0078`) — per-AC Pass: card-1 / card-2 / card-3, qc-1, freeze skip NULL, Route two-accept 409, seq-1 (dest-cohort 1.2 not scored), and C1 / C2 / C3.
+- `80f054b` — AC-P2-OQ-WO-7 Pass: DNA WGS `{library_kit: TruSeq}` from the blood work order.
+- `6244bf6` (Alembic `0079`) — AC-P2-OQ-WO-8 Pass: named Qubit slot, 1 → mint, 0 → 422, 2+ → picker then pick, no silent `first()`.
+
+This does not rewrite those earlier signed Results, OQ-WO-8 Closed history from PR 119, or Confirm #2 / Brief from PR 120. OQ-WO-7 remains Closed and was not recoded.
+
+## Full Leadership overall P2 Pass — 2026-09-03
+
+**Full Leadership Confirm overall P2 Pass** (Rolf / Deiter / Hans / Heidi / Günter, 2026-09-03) on `feat/p2-named-slot` tip **`6244bf6`** (`6244bf6e742c4ed0f046ff8770e2b8c112446fb3`, Alembic `0079`).
+
+This **is** Leadership overall Pass. It folds Tobias overall QA (`bf51b19` + OQ-WO-7 on `80f054b` + OQ-WO-8 on `6244bf6`) and is distinct from that QA stamp. It does not rewrite signed per-AC Result lines.
+
+**Kept:** no route branching; asked-for only; named-slot (`asked.analysis_id` vs the LimsRun on a process in the route — not containment); 0→422 / 1→mint / 2+→picker / no silent `first()`; OQ-WO-7 Closed; Quantified DNA wears existing Qubit; ELISA not on DNA; dest-follow stands; Route stays `test:assign`; instantiate uses existing process AuthZ.
+
+Not IC50.

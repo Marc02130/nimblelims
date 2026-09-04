@@ -1122,13 +1122,16 @@ Send: [`.docs/discussions/2026-09-01-p2-closeout-1-4-quantified-dna.md`](../.doc
 
 **Brief date:** 2026-09-03
 **Authority:** Full Leadership Confirm (Rolf / Deiter / Hans / Heidi / Günter)
-**Result:** **Unsigned — Tobias must execute on the named-slot product SHA.** This docs fold is not a Result and not overall P2 Pass.
+**Product under test:** `feat/p2-named-slot` at **`6244bf6`** (`6244bf6e742c4ed0f046ff8770e2b8c112446fb3`) · Alembic **`0079`**
+**Result:** **Pass** (Tobias, 2026-09-03, `6244bf6`). This per-AC Result is distinct from the overall QA Result below.
 
 This addendum does not rewrite any signed Result above, including `bf51b19`, `80f054b`, `9342439`, P1, `02fe95f`, or Deiter Lab Ops Met on `570bbc0`. OQ-WO-8 Closed history from PR 119 remains Closed. OQ-WO-7 remains Closed and is not recoded.
 
+**Supporting context for this click SHA:** Heidi Architecture **Accept** and Günter CSO **Accept** `6244bf6`; Deiter Lab Ops supplied the Pass/Fail boundary. This is not a Hans Science Accept.
+
 ### What and why
 
-Route must compare `asked.analysis_id` with the map’s persisted, author-named asked-for LimsRun slot. Chain containment is insufficient because WGS may include Qubit as process QC; that WGS map must not accept a Quantified DNA ask.
+Route compares `asked.analysis_id` with the map’s persisted, author-named asked-for LimsRun slot at `routing_map.asked_for_step_id`. Chain containment is insufficient because WGS may include Qubit as process QC; that WGS map must not accept a Quantified DNA ask.
 
 ### Fixture
 
@@ -1151,10 +1154,10 @@ Route must compare `asked.analysis_id` with the map’s persisted, author-named 
 
 ### Pass
 
-- Quantified DNA routes to the named Qubit slot.
+- Quantified DNA routes to the named Qubit slot at `routing_map.asked_for_step_id`.
 - WGS+Qubit-as-process-QC does not steal the ask.
 - Zero acceptable maps returns 422 and mints nothing.
-- Two or more acceptable maps show a picker and mint only after the tech selects one.
+- Two or more acceptable maps return **409** `route_pick_required`; the picker mints only after the tech selects one.
 
 ### Fail
 
@@ -1172,4 +1175,39 @@ Route must compare `asked.analysis_id` with the map’s persisted, author-named 
 
 ### Result
 
-**Unsigned.** Tobias records Pass or Fail only after the named-slot and picker product lands on a specific product SHA. A Pass here would still be per-AC, not overall P2 Pass.
+**Pass** — Tobias, 2026-09-03 21:26 ET, `feat/p2-named-slot` @ **`6244bf6`** (`6244bf6e742c4ed0f046ff8770e2b8c112446fb3`, Alembic `0079`). One named Qubit slot minted; zero acceptable maps returned **422**; two or more returned **409** `route_pick_required` and minted only after the pick, with no silent `first()`; WGS+Qubit-as-process-QC did not steal Quantified DNA. Eligibility used `asked.analysis_id` against `routing_map.asked_for_step_id`, not containment.
+
+---
+
+## Tobias overall P2 Pass — QA
+
+**Result:** **Pass** (Tobias QA, 2026-09-03 21:26 ET, `6244bf6` / `6244bf6e742c4ed0f046ff8770e2b8c112446fb3`, Alembic `0079`).
+
+This is a QA Result, not a Leadership stamp. It folds three signed SHAs and rewrites none of their per-AC Result lines:
+
+| Folded SHA | What it carries |
+|------------|-----------------|
+| **`bf51b19`** (Alembic `0078`) | Per-AC Pass: AC-P2-card-1 / card-2 / card-3, AC-P2-qc-1, AC-P2-4 freeze skip NULL, AC-P2-5 addendum Route two-accept **409**, AC-P2-seq-1 (dest-cohort **1.2** not scored), and AC-P2-C1 / C2 / C3 |
+| **`80f054b`** | **AC-P2-OQ-WO-7 Pass** — DNA WGS Test froze `{library_kit: TruSeq}` from the blood work order |
+| **`6244bf6`** (Alembic `0079`) | **AC-P2-OQ-WO-8 Pass** — named Qubit slot: 1 → mint, 0 → **422**, 2+ → picker then pick; no silent `first()`; WGS+Qubit-as-QC does not steal Quantified DNA |
+
+The folded Results remain on their original SHAs as signed history.
+
+This Tobias QA Result is **not** the Leadership overall stamp. The Leadership stamp is the next section.
+
+---
+
+## Full Leadership overall P2 Pass — 2026-09-03
+
+**Result:** **Pass** (Full Leadership Confirm, Rolf / Deiter / Hans / Heidi / Günter, 2026-09-03).
+
+Product: `feat/p2-named-slot` tip **`6244bf6`** (`6244bf6e742c4ed0f046ff8770e2b8c112446fb3`, Alembic `0079`).
+
+This Leadership overall Pass folds Tobias overall QA on the same SHA (`bf51b19` + OQ-WO-7 Pass on `80f054b` + OQ-WO-8 Pass on `6244bf6`). It is distinct from Tobias’s QA overall. It does **not** rewrite signed per-AC Result lines on `bf51b19` or AC-P2-OQ-WO-7 on `80f054b`. Not IC50.
+
+**Kept locks**
+- No route branching. Asked-for only.
+- Named slot: `asked.analysis_id` vs the LimsRun on a process in the route (`routing_map.asked_for_step_id`), not containment.
+- After filter: 0 → **422**; 1 → mint; 2+ → picker / **409** `route_pick_required`; no silent `first()`.
+- OQ-WO-7 Closed. Quantified DNA wears existing Qubit. ELISA is not on DNA. Dest-follow stands.
+- Route stays `test:assign`. Instantiate uses existing process AuthZ.
