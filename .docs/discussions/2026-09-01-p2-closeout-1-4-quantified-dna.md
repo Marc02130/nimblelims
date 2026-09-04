@@ -85,3 +85,23 @@ This docs fold supplies the Brief and unsigned UAT AC only. Overall P2 remains b
 4. Leadership records overall Pass.
 
 A per-AC Pass is not overall P2 Pass.
+
+## Product and Tobias QA stamps — 2026-09-03
+
+**Product:** `feat/p2-named-slot` @ **`6244bf6`** (`6244bf6e742c4ed0f046ff8770e2b8c112446fb3`), Alembic **`0079`**.
+
+**AC-P2-OQ-WO-8 Result:** **Pass** (Tobias, 2026-09-03, `6244bf6`).
+
+- The persisted named slot is `routing_map.asked_for_step_id`.
+- Eligibility compares `asked.analysis_id` with that slot, not chain containment.
+- One named Qubit match mints; zero acceptable maps returns **422**.
+- Two or more acceptable maps return **409** `route_pick_required`; the picker mints only after the selected `routing_map_id` is posted.
+- WGS+Qubit-as-process-QC does not steal a Quantified DNA ask.
+
+Deiter Lab Ops supplied this Pass/Fail boundary. Heidi Architecture **Accept** and Günter CSO **Accept** `6244bf6` as supporting context for Tobias’s click. Hans did not stamp a Science Accept in this burst; none is claimed.
+
+**Tobias overall P2 Result (QA): Pass** on `6244bf6`, folding per-AC Pass on `bf51b19`, OQ-WO-7 Pass on `80f054b`, and OQ-WO-8 Pass on `6244bf6`.
+
+This does not rewrite those earlier signed Results, OQ-WO-8 Closed history from PR 119, or Confirm #2 / Brief from PR 120. OQ-WO-7 remains Closed and was not recoded.
+
+**Leadership overall Pass remains unsigned / not Pass.** Do not derive a Leadership stamp from Tobias’s QA Result. Not IC50.

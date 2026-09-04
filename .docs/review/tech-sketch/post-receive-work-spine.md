@@ -147,7 +147,7 @@ Start: `ELNProcessService.instantiate_from_definition` on **process[0] / `chain[
 
 A process instance is bound to **one** asked-for row. Qubit / Nanodrop / etc. are supporting LimsRuns in the **same route as whatever the asked-for assay is** (ELISA, NGS, Qubit-as-asked-for, sequencing, …) — other `analysis_id`s, own Tests, own params freeze — not a second asked-for, not on extract. Extract is a **process** and has no asked-for `analysis_id`. Type-changing execute mints the DNA Sample **once**. **No route branching:** C2 aliquot of that DNA continues WGS; **WES is a new asked-for on the DNA tube**, which is then **aliquoted or used up**. Do not teach dest auto-joining a second WO.
 
-### 4.1 Heidi architecture file map — named-slot build (not implemented in this fold)
+### 4.1 Heidi architecture file map — named-slot build brief
 
 **Hole today:** `_acceptable_maps` in `backend/app/services/routing_service.py` retains a map when `_asked_for_lims_run_count(chain, analysis_id) == 1`. That is containment anywhere in the chain, so WGS with Qubit as process QC can steal a Quantified DNA ask.
 
@@ -169,7 +169,15 @@ A process instance is bound to **one** asked-for row. Qubit / Nanodrop / etc. ar
 
 **Do not touch:** `lims_run_service` OQ-WO-7 lookup, destination follow, freeze skip, cardinality beyond named-slot validation, a second Quantified DNA analysis, or extract-as-LimsRun.
 
-WO-7 publish @ `8cfa2a9` is Tobias-signed Pass (carol **422** `test_missing`) and remains history @ `b005cfe`: `_require_wo7_tests` + `plan.errors` 422 the whole run. Status stays complete / unpublished. Zero Results. A write of `{}` onto `99b692d3` is not a freeze-skip Pass (`{}` is ambiguous). Freeze skip **unsigned**. Overall P2 Pass is unsigned.
+### 4.2 Named-slot product and QA stamps — `6244bf6`
+
+Product landed on `feat/p2-named-slot` at **`6244bf6`** (`6244bf6e742c4ed0f046ff8770e2b8c112446fb3`), Alembic **`0079`**. The persisted author-named slot is `routing_map.asked_for_step_id`. `_acceptable_maps` compares `asked.analysis_id` with that slot, not chain containment. Route outcomes are explicit: zero acceptable maps returns 422; one mints; 2+ returns 409 `route_pick_required`, exposes candidates, and mints only after a selected `routing_map_id` is posted. WGS+Qubit-as-process-QC does not accept Quantified DNA.
+
+Heidi Architecture **Accept** and Günter CSO **Accept** this product SHA for Tobias’s click. Deiter Lab Ops supplied the click boundary. No Hans Science Accept is claimed.
+
+**AC-P2-OQ-WO-8 Pass** (Tobias, 2026-09-03, `6244bf6`). **Tobias overall P2 Pass (QA)** on the same SHA folds per-AC Pass on `bf51b19` + OQ-WO-7 Pass on `80f054b` + OQ-WO-8 Pass on `6244bf6`. Earlier signed Results remain unchanged; OQ-WO-7 was not recoded. **Leadership overall Pass remains unsigned / not Pass.**
+
+WO-7 publish @ `8cfa2a9` is Tobias-signed Pass (carol **422** `test_missing`) and remains history @ `b005cfe`: `_require_wo7_tests` + `plan.errors` 422 the whole run. Status stays complete / unpublished. Zero Results. A write of `{}` onto `99b692d3` is not a freeze-skip Pass (`{}` is ambiguous). This historical paragraph does not rewrite the later freeze-skip Result on `bf51b19`. Leadership overall P2 Pass remains unsigned.
 
 ## 5. P3 design
 

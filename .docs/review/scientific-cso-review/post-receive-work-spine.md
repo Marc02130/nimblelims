@@ -287,3 +287,17 @@ CEO CONFIRM 1-6 STANDS; NO PRODUCT CODE
 Map-save must verify the named slot analysis appears exactly once among route LimsRuns. Route must compare `asked.analysis_id` to that slot. Zero acceptable maps returns 422; one mints; two or more require a scientist/tech to choose the intended route before mint. No silent `first()`.
 
 The unsigned `AC-P2-OQ-WO-8` tests Quantified DNA → named Qubit, WGS+Qubit-as-QC exclusion, and manual assignment for 2+ candidates. Passing that AC will be per-AC only. Overall P2 remains blocked on product, Tobias overall Result, then Leadership overall Pass.
+
+---
+
+## 14. Named-slot product and Tobias QA stamps — 2026-09-03
+
+**Not a restamp** of sections 10–13, signed UAT Results, OQ-WO-7 Closed, or OQ-WO-8 Closed history.
+
+Product landed on `feat/p2-named-slot` at **`6244bf6`** (`6244bf6e742c4ed0f046ff8770e2b8c112446fb3`), Alembic **`0079`**. The assay-owning slot is `routing_map.asked_for_step_id`; eligibility compares `asked.analysis_id` with that slot, not chain containment. One named Qubit match mints; zero acceptable maps returns 422; 2+ returns 409 `route_pick_required` and mints only after the selected route is posted. WGS+Qubit-as-process-QC does not steal Quantified DNA.
+
+**AC-P2-OQ-WO-8 Pass** (Tobias, 2026-09-03, `6244bf6`). Günter CSO **Accept** and Heidi Architecture **Accept** this SHA as supporting context for Tobias’s click. Deiter Lab Ops supplied the Pass/Fail boundary. **Hans did not stamp a Science Accept in this burst; none is claimed.**
+
+**Tobias overall P2 Pass (QA)** on `6244bf6` folds per-AC Pass on `bf51b19`, OQ-WO-7 Pass on `80f054b`, and OQ-WO-8 Pass on `6244bf6`. OQ-WO-7 was not recoded.
+
+**Leadership overall Pass remains unsigned / not Pass.**

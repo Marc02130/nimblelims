@@ -1122,13 +1122,16 @@ Send: [`.docs/discussions/2026-09-01-p2-closeout-1-4-quantified-dna.md`](../.doc
 
 **Brief date:** 2026-09-03
 **Authority:** Full Leadership Confirm (Rolf / Deiter / Hans / Heidi / Günter)
-**Result:** **Unsigned — Tobias must execute on the named-slot product SHA.** This docs fold is not a Result and not overall P2 Pass.
+**Product under test:** `feat/p2-named-slot` at **`6244bf6`** (`6244bf6e742c4ed0f046ff8770e2b8c112446fb3`) · Alembic **`0079`**
+**Result:** **Pass** (Tobias, 2026-09-03, `6244bf6`). This per-AC Result is distinct from the overall QA Result below.
 
 This addendum does not rewrite any signed Result above, including `bf51b19`, `80f054b`, `9342439`, P1, `02fe95f`, or Deiter Lab Ops Met on `570bbc0`. OQ-WO-8 Closed history from PR 119 remains Closed. OQ-WO-7 remains Closed and is not recoded.
 
+**Supporting context for this click SHA:** Heidi Architecture **Accept** and Günter CSO **Accept** `6244bf6`; Deiter Lab Ops supplied the Pass/Fail boundary. This is not a Hans Science Accept.
+
 ### What and why
 
-Route must compare `asked.analysis_id` with the map’s persisted, author-named asked-for LimsRun slot. Chain containment is insufficient because WGS may include Qubit as process QC; that WGS map must not accept a Quantified DNA ask.
+Route compares `asked.analysis_id` with the map’s persisted, author-named asked-for LimsRun slot at `routing_map.asked_for_step_id`. Chain containment is insufficient because WGS may include Qubit as process QC; that WGS map must not accept a Quantified DNA ask.
 
 ### Fixture
 
@@ -1151,10 +1154,10 @@ Route must compare `asked.analysis_id` with the map’s persisted, author-named 
 
 ### Pass
 
-- Quantified DNA routes to the named Qubit slot.
+- Quantified DNA routes to the named Qubit slot at `routing_map.asked_for_step_id`.
 - WGS+Qubit-as-process-QC does not steal the ask.
 - Zero acceptable maps returns 422 and mints nothing.
-- Two or more acceptable maps show a picker and mint only after the tech selects one.
+- Two or more acceptable maps return **409** `route_pick_required`; the picker mints only after the tech selects one.
 
 ### Fail
 
@@ -1172,4 +1175,14 @@ Route must compare `asked.analysis_id` with the map’s persisted, author-named 
 
 ### Result
 
-**Unsigned.** Tobias records Pass or Fail only after the named-slot and picker product lands on a specific product SHA. A Pass here would still be per-AC, not overall P2 Pass.
+**Pass** — Tobias, 2026-09-03, `feat/p2-named-slot` @ **`6244bf6`** (Alembic `0079`). One named Qubit slot minted; zero acceptable maps returned **422**; two or more returned **409** `route_pick_required` and minted only after selection; WGS+Qubit-as-process-QC did not steal Quantified DNA. Eligibility used `asked.analysis_id` against `routing_map.asked_for_step_id`, not containment.
+
+---
+
+## Tobias overall P2 Pass — QA
+
+**Result:** **Pass** (Tobias QA, 2026-09-03, `6244bf6`).
+
+This overall QA Result folds the per-AC Pass set on **`bf51b19`**, **AC-P2-OQ-WO-7 Pass** on **`80f054b`**, and **AC-P2-OQ-WO-8 Pass** on **`6244bf6`**. The historical Results remain on their original SHAs and are not rewritten.
+
+**Leadership overall Pass remains unsigned / not Pass.** This Tobias QA Result is not a Leadership overall stamp and does not authorize inventing one.
