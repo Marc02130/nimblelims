@@ -36,6 +36,12 @@ class RoutingMap(Base):
     analysis_id = Column(
         PostgresUUID(as_uuid=True), ForeignKey("analyses.id"), nullable=False
     )
+    asked_for_step_id = Column(
+        PostgresUUID(as_uuid=True),
+        ForeignKey("eln_process_definition_steps.id"),
+        nullable=True,
+        index=True,
+    )
     sample_type_id = Column(
         PostgresUUID(as_uuid=True), ForeignKey("list_entries.id"), nullable=False
     )

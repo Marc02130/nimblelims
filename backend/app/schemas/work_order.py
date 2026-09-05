@@ -19,7 +19,14 @@ class StepAcceptedSampleTypesResponse(BaseModel):
 class RoutingMapCreate(BaseModel):
     analysis_id: Optional[UUID] = Field(
         None,
-        description="Ignored. Analyses come from LIMS Run steps in the process chain.",
+        description=(
+            "Optional hint: unique LIMS Run in the chain with this analysis "
+            "becomes the asked-for slot. Prefer asked_for_step_id."
+        ),
+    )
+    asked_for_step_id: Optional[UUID] = Field(
+        None,
+        description="LIMS Run definition step that is the asked-for assay.",
     )
     sample_type_id: Optional[UUID] = Field(
         None,
@@ -42,11 +49,14 @@ class RoutingMapUpdate(BaseModel):
     tat_max: Optional[int] = Field(None, ge=1)
     process_definition_ids: Optional[List[UUID]] = Field(None, min_length=1)
     active: Optional[bool] = None
+    asked_for_step_id: Optional[UUID] = None
+    analysis_id: Optional[UUID] = None
 
 
 class RoutingMapRead(BaseModel):
     id: UUID
     analysis_id: Optional[UUID] = None
+    asked_for_step_id: Optional[UUID] = None
     analysis_ids: List[UUID] = Field(default_factory=list)
     sample_type_id: UUID
     tat_min: int
@@ -85,6 +95,11 @@ class WorkOrderListResponse(BaseModel):
 
 class RouteRequest(BaseModel):
     asked_for_ids: List[UUID] = Field(default_factory=list)
+    routing_map_id: Optional[UUID] = None
+
+
+class RouteAssign(BaseModel):
+    routing_map_id: Optional[UUID] = None
 
 
 class RouteItem(BaseModel):

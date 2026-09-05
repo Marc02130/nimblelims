@@ -1211,3 +1211,17 @@ This Leadership overall Pass folds Tobias overall QA on the same SHA (`bf51b19` 
 - After filter: 0 → **422**; 1 → mint; 2+ → picker / **409** `route_pick_required`; no silent `first()`.
 - OQ-WO-7 Closed. Quantified DNA wears existing Qubit. ELISA is not on DNA. Dest-follow stands.
 - Route stays `test:assign`. Instantiate uses existing process AuthZ.
+
+---
+
+## Restamp pending — product merge click on `6a67667` (unsigned)
+
+**Not a Result.** Do **not** rewrite the `6244bf6` Pass above. Named-slot **code is not on `main`**. `8887e36` is docs-only.
+
+**Product under test:** `feat/p2-named-slot` containing **`6a67667`** (`6a67667b4d6378877a38e5542077df316a35077f`) · Alembic **`0079`**. Record `git rev-parse HEAD` at click start.  
+**What/why (before click):** [`.docs/discussions/2026-09-04-p2-named-slot-uat-restamp.md`](../.docs/discussions/2026-09-04-p2-named-slot-uat-restamp.md)  
+**AC:** same AC-P2-OQ-WO-8 numbered execution (Ask-1 one slot mint; Ask-2 zero → 422; Ask-3 2+ picker then pick). Row **Route** icon, not **Route selected**. Wear existing Qubit. Map A and map B **must** share first-step type and TAT or the slot proof is invalid.
+
+**Result:** **unsigned.** Tobias click required. Record asked-for ids, map ids, work-order ids, HTTP codes.
+
+**Merge gate:** Pass on `6a67667` → new Result block → merge `feat/p2-named-slot` to `main`. Fail → do not merge.

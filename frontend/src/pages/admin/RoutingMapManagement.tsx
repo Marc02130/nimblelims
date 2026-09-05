@@ -134,6 +134,7 @@ const RoutingMapManagement: React.FC = () => {
   const [tatMin, setTatMin] = useState(1);
   const [tatMax, setTatMax] = useState(10);
   const [chainIds, setChainIds] = useState<string[]>([]);
+  const [askedForStepId, setAskedForStepId] = useState('');
   const [addProcessId, setAddProcessId] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -289,6 +290,33 @@ const RoutingMapManagement: React.FC = () => {
     return ids;
   }, [chainIds, definitionDetails]);
 
+  const askedForSlotOptions = useMemo(() => {
+    const options: { id: string; label: string }[] = [];
+    chainIds.forEach((defId, defIdx) => {
+      const detail = definitionDetails[defId];
+      sortSteps(detail?.steps || []).forEach((step) => {
+        if (step.step_kind !== 'lims_run' || !step.analysis_id || !step.id) return;
+        const stepName = step.name?.trim() || kindLabel(step.step_kind);
+        const analysis = nameOf(step.analysis_id, analyses);
+        options.push({
+          id: step.id,
+          label: `Process ${defIdx + 1} · ${detail?.name || defId} · ${stepName} · ${analysis}`,
+        });
+      });
+    });
+    return options;
+  }, [chainIds, definitionDetails, analyses]);
+
+  useEffect(() => {
+    if (askedForSlotOptions.length === 1) {
+      setAskedForStepId(askedForSlotOptions[0].id);
+      return;
+    }
+    if (!askedForSlotOptions.some((o) => o.id === askedForStepId)) {
+      setAskedForStepId('');
+    }
+  }, [askedForSlotOptions, askedForStepId]);
+
   const handleCreate = async () => {
     if (!chainIds.length) return;
     setSaving(true);
@@ -297,9 +325,11 @@ const RoutingMapManagement: React.FC = () => {
         tat_min: tatMin,
         tat_max: tatMax,
         process_definition_ids: chainIds,
+        asked_for_step_id: askedForStepId || undefined,
       });
       setOpen(false);
       setChainIds([]);
+      setAskedForStepId('');
       setAddProcessId('');
       await load();
     } catch (err) {
@@ -381,6 +411,7 @@ const RoutingMapManagement: React.FC = () => {
     tatMax >= tatMin &&
     firstTypeNames.length > 0 &&
     chainAnalysisIds.length > 0 &&
+    Boolean(askedForStepId) &&
     handoffOk;
   const unusedDefinitions = definitions.filter((d) => !chainIds.includes(d.id));
 
@@ -397,10 +428,10 @@ const RoutingMapManagement: React.FC = () => {
             )}
           </Box>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            A route is an ordered process chain plus TAT. No analysis or sample-type picker.
-            Route assignment requires the sample type on the first process’s first experiment /
-            LIMS Run, and the asked-for analysis on a LIMS Run somewhere in the chain.
-            Overlapping TAT + first-step types + LIMS Run analyses is refused.
+            A route is an ordered process chain plus TAT plus a named asked-for LIMS Run.
+            Many routes may name the same analysis. Assignment uses first-step sample type,
+            TAT, and that named slot — not “analysis anywhere in the chain.” Duplicate packs
+            (same chain + overlapping TAT + overlapping first-step types) are refused.
           </Typography>
           {error && (
             <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
@@ -441,9 +472,8 @@ const RoutingMapManagement: React.FC = () => {
           </Box>
           <Typography variant="subtitle2">Ordered processes</Typography>
           <Typography variant="caption" color="text.secondary">
-            Each process shows its allowed sample types and LIMS Run analyses. Route assignment
-            uses the first process’s first experiment / LIMS Run types, and any LIMS Run
-            analysis in this list.
+            Each process shows its allowed sample types and LIMS Run analyses. Name which
+            LIMS Run is the asked-for assay. Other LIMS Runs are supporting QC.
           </Typography>
           {chainIds.map((id, idx) => {
             const detail = definitionDetails[id];
@@ -540,8 +570,22 @@ const RoutingMapManagement: React.FC = () => {
             Sample types this route accepts at assignment:{' '}
             {firstTypeNames.length ? firstTypeNames.join(', ') : 'none — first process needs types'}
           </Typography>
+          <FormControl fullWidth>
+            <InputLabel>Asked-for LIMS Run</InputLabel>
+            <Select
+              label="Asked-for LIMS Run"
+              value={askedForStepId}
+              onChange={(e) => setAskedForStepId(String(e.target.value))}
+            >
+              {askedForSlotOptions.map((opt) => (
+                <MenuItem key={opt.id} value={opt.id}>
+                  {opt.label}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
           <Typography variant="body2">
-            Asked-for analyses this route can take:{' '}
+            LIMS Run analyses in this chain:{' '}
             {chainAnalysisIds.length
               ? analysisNames(chainAnalysisIds)
               : 'none — add a process with a LIMS Run analysis'}
