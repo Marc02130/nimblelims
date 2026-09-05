@@ -2,9 +2,9 @@
 
 **Date:** 2026-09-04  
 **To:** Tobias (click) · Marc (merge if Pass) · Leadership (witness, do not rewrite prior stamps)  
-**Status:** **Unsigned.** This is the written what/why **before** the click (standing UAT rule).  
+**Status:** Tobias clicked **Pass** on `effd242` (product `6a67667`). Merge-gate restamp recorded as a **new** AC-P2-OQ-WO-8 Result. This is not a rewrite of overall Leadership P2 Pass.  
 **Product code:** `6a67667` (`6a67667b4d6378877a38e5542077df316a35077f`) · Alembic **`0079`**  
-**Click SHA:** `git rev-parse HEAD` on `feat/p2-named-slot` at the start of the click. It **must** be `6a67667` or a descendant (this brief). Do **not** click `main`.  
+**Click SHA:** `effd24215b23e1bf9e73a00467a11bdc02bd6eb2` (`effd242`) on `feat/p2-named-slot`. Product `6a67667` is an ancestor of the click SHA. Do **not** click `main`.  
 **AC:** [AC-P2-OQ-WO-8](../../UAT_Scripts/uat-post-receive-work-spine.md)  
 **Gate:** Tobias Pass on **that recorded SHA** → stamp a **new** Result block → merge `feat/p2-named-slot` to `main`. Fail → **do not merge**.
 

@@ -69,6 +69,12 @@ Product landed on `feat/p2-named-slot` at **`6244bf6`** (`6244bf6e742c4ed0f046ff
 
 **Tobias overall P2 Pass (QA)** — 2026-09-03 21:26 ET on `6244bf6` — folds `bf51b19` (`0078`: card-1/2/3, qc-1, freeze skip NULL, Route two-accept 409, seq-1 with dest-cohort 1.2 not scored, C1/C2/C3) + OQ-WO-7 Pass on `80f054b` + OQ-WO-8 Pass on `6244bf6`. **Full Leadership Confirm overall P2 Pass** (Rolf / Deiter / Hans / Heidi / Günter, 2026-09-03) on the same SHA, folding that Tobias overall. Distinct stamps. OQ-WO-8 Closed history from PR 119 and Confirm #2 / Brief from PR 120 remain unchanged. OQ-WO-7 was not recoded.
 
+### Merge-gate restamp — product `6a67667` — 2026-09-04
+
+`6244bf6` was rebased onto `8887e36`. The named-slot product SHA that must land is **`6a67667`** (`6a67667b4d6378877a38e5542077df316a35077f`), Alembic **`0079`**. **AC-P2-OQ-WO-8 Pass** (Tobias QA merge-gate restamp, 2026-09-04 20:18 ET, click SHA **`effd242`**): one named Qubit slot minted; map B (WGS named, Qubit as process QC) alone returned **422** and did not steal; zero acceptable maps returned **422**; 2+ returned **409** `route_pick_required` and minted only on the posted pick. Map A and map B shared first-step DNA type and overlapping TAT, so the proof is the slot.
+
+This is the merge click for `feat/p2-named-slot` → `main`; the `6244bf6` stamp alone is not merge authority now that the SHA is rebased away. It does not rewrite the `6244bf6` Result or either overall P2 stamp.
+
 ---
 
 ## 1. Problem
@@ -244,7 +250,7 @@ North star authors parsers at SOP via MCP. Until that ships, P5 is **review / dr
 | AC-P2-6 | Map create has no sample-type selector; derives first Exp/LimsRun types of process[0]. Map save 409s only on overlapping TAT **and** overlapping first-step allow-lists |
 | AC-P2-7 | First Start = process[0] only, no Tests for later processes. Later Start following the execute-minted destination is on **`1572071`**; Deiter `570bbc0` execute is Lab Ops Met, Tobias QA restamp unsigned |
 | AC-P2-8 | Classic `/tests` leaves `asked_for_params` NULL, or a freeze marker exists. Until then skip-on-`{}` stays OPEN (not a verified freeze skip). **OQ-WO-6 extract CLOSED:** extract is a process, not a LimsRun. Exactly one asked-for LimsRun is the assay step. |
-| AC-P2-OQ-WO-8 | **Pass** (Tobias, 2026-09-03, `6244bf6`, `0079`). Quantified DNA matches `routing_map.asked_for_step_id` when it names Qubit; WGS+Qubit-as-QC does not match; 0→422; 1→mint; 2+→409 `route_pick_required`, then the selected `routing_map_id` mints exactly one work order. |
+| AC-P2-OQ-WO-8 | **Pass** (Tobias, 2026-09-03, `6244bf6`, `0079`). Quantified DNA matches `routing_map.asked_for_step_id` when it names Qubit; WGS+Qubit-as-QC does not match; 0→422; 1→mint; 2+→409 `route_pick_required`, then the selected `routing_map_id` mints exactly one work order. **Merge-gate restamp Pass** (Tobias, 2026-09-04, click `effd242`, product `6a67667`, `0079`) after the rebase; same outcomes. |
 | Overall P2 QA | **Pass** (Tobias, 2026-09-03 21:26 ET, `6244bf6`), folding `bf51b19` + `80f054b` + `6244bf6`. Distinct from Leadership. |
 | Overall P2 Leadership | **Pass** (Full Leadership Confirm, Rolf / Deiter / Hans / Heidi / Günter, 2026-09-03) on `6244bf6`, folding Tobias overall. |
 | AC-P2-C1 | Assign is the tube in hand: `container_id` required. 0 vessels or 2+ without a pick → **422**, lab-readable, no silent pick. Receive tube assign → **201** with `container_id`. **Pass** on `02fe95f` stays history; live `570bbc0` is **Lab Ops Met** (Deiter), not Tobias QA Pass. |
