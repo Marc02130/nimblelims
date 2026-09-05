@@ -235,6 +235,16 @@ Not a reopen of OQ-WO-8 and not a rewrite of the `6244bf6` Result or the Leaders
 - Probes: one named Qubit slot → 200 mint; map B alone (WGS named, Qubit as QC) → **422**, no steal; zero acceptable maps → **422**; 2+ → **409** `route_pick_required` then mint only on the posted pick. Map A and map B shared first-step DNA and overlapping TAT, so the proof is the slot, not type/TAT exclusion.
 - **Merge honesty:** the merge click is this `6a67667` restamp. The 2026-09-03 `6244bf6` Pass is signed history of a SHA that no longer sits on the branch; it is not by itself authority to merge `feat/p2-named-slot` to `main`.
 
+## Tobias UI dogfood Pass — `be65d1e` — 2026-09-04 21:25 ET
+
+Not a reopen of OQ-WO-8 and not a rewrite of the `6244bf6` Result, the `effd242` API restamp, or the Leadership overall P2 Pass. Markdown only. Not IC50.
+
+- Named-slot product **is on `main`** (merge **`6625490`**, PR **122**, product **`6a67667`**, Alembic **`0079`**). Containment-on-`main` copy from the 2026-09-03 Confirm #2 wall is **superseded** for living product state.
+- **Tobias UI dogfood Pass** (alice-tech picker) on `main` tip **`be65d1e`**. UI dogfood **Met**. The `effd242` API restamp remains history — API-only is not this Pass.
+- Probes: admin maps A–D (Map B named WGS) Pass; Ask-1 one Qubit-slot mint, Map B no steal; Ask-2 zero → UI refuse, stayed requested (redo; first attempt was operator order); Ask-3/4 Select a route then pick C-pack (Map B not in picker).
+- Ops: admin map grid has no Active toggle (Delete only) — **known, not a Fail of named-slot**.
+- Artifacts: `/workspace/uat-oq-wo-8-ui-dogfood-main/`. Live Result in [`UAT_Scripts/uat-post-receive-work-spine.md`](../../../UAT_Scripts/uat-post-receive-work-spine.md).
+
 ## Gate rule
 
 - **P1:** Unblocked (OQ-AF-* decided, including AF-6: no conditional required).  

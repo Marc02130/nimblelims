@@ -117,3 +117,11 @@ This **is** Leadership overall Pass. It folds Tobias overall QA (`bf51b19` + OQ-
 **Kept:** no route branching; asked-for only; named-slot (`asked.analysis_id` vs the LimsRun on a process in the route — not containment); 0→422 / 1→mint / 2+→picker / no silent `first()`; OQ-WO-7 Closed; Quantified DNA wears existing Qubit; ELISA not on DNA; dest-follow stands; Route stays `test:assign`; instantiate uses existing process AuthZ.
 
 Not IC50.
+
+## Tobias UI dogfood Pass — `be65d1e` — 2026-09-04 21:25 ET
+
+Does **not** rewrite the `6244bf6` AC / overall QA / Leadership overall stamps above. Does **not** rewrite the `effd242` API restamp. Product already on `main` (PR **122**, merge `6625490`, product `6a67667`).
+
+**Tobias UI dogfood Pass** on `main` tip **`be65d1e`**. Alice-tech picker. UI dogfood **Met**. API-only is not this Pass. Not IC50.
+
+Ask-1 minted Qubit-A-named; Map B did not steal. Ask-2 redo: UI refuse; stayed requested; wo null. Ask-3/4: Select a route then pick C-pack; Map B not in picker. Ops: no Active toggle (Delete only) — known, not a Fail. Artifacts `/workspace/uat-oq-wo-8-ui-dogfood-main/`.
