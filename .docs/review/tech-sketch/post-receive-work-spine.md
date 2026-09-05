@@ -185,6 +185,14 @@ Heidi Architecture **Accept** and Günter CSO **Accept** this product SHA for To
 
 This restamp is the merge click for `feat/p2-named-slot` → `main`. It does not rewrite the `6244bf6` Result or the Leadership overall P2 Pass in §4.2, and the `6244bf6` stamp alone is not merge authority now that the SHA has been rebased away.
 
+### 4.4 Tobias UI dogfood Pass — `be65d1e`
+
+Named-slot product **is on `main`** (merge **`6625490`**, PR **122**, product **`6a67667`**, Alembic **`0079`**). Containment-as-`main`-behavior in §4.1 is **superseded** for living product state.
+
+**Tobias UI dogfood Pass** (2026-09-04 21:25 ET) on `main` tip **`be65d1e`**. Method: Browser UI (alice-tech row Route; admin maps). Not invented from the §4.3 API restamp. UI dogfood **Met**. API-only is not this Pass. Does not rewrite §4.2 `6244bf6` Results or Leadership overall.
+
+Probes Pass: admin maps A–D (Map B named WGS); Ask-1 one Qubit-slot mint, Map B no steal; Ask-2 zero → UI refuse, stayed requested (redo); Ask-3/4 Select a route then pick C-pack (Map B not in picker). Ops: admin map grid has no Active toggle (Delete only) — known, not a Fail of named-slot. Artifacts `/workspace/uat-oq-wo-8-ui-dogfood-main/`.
+
 WO-7 publish @ `8cfa2a9` is Tobias-signed Pass (carol **422** `test_missing`) and remains history @ `b005cfe`: `_require_wo7_tests` + `plan.errors` 422 the whole run. Status stays complete / unpublished. Zero Results. A write of `{}` onto `99b692d3` is not a freeze-skip Pass (`{}` is ambiguous). This historical paragraph does not rewrite the later freeze-skip Result on `bf51b19`. Leadership overall P2 Pass is stamped later in §4.2 on `6244bf6`.
 
 ## 5. P3 design

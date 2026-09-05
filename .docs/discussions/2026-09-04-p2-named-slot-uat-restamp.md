@@ -174,3 +174,24 @@ Or open a PR from `feat/p2-named-slot` → `main` and merge after the stamp comm
 5. `docker compose down` after the run.
 
 **Do not merge** on dogfood-only, pytest-only, or the old `6244bf6` paper stamp. The merge SHA must contain `backend/db/migrations/versions/0079_asked_for_lims_run_slot.py`.
+
+---
+
+## Addendum — Tobias UI dogfood Pass on `main` tip `be65d1e` — 2026-09-04 21:25 ET
+
+Product already on `main` (PR **122**, merge `6625490`, product `6a67667`, Alembic **0079**). This addendum does **not** rewrite the merge-gate API restamp Pass on `effd242`, the `6244bf6` Pass, or Leadership overall P2 Pass. Those stamps stay history.
+
+**Tobias UI dogfood Pass** (authority Tobias; Rolf UI detail) on `be65d1e`. Method: Browser UI (alice-tech row Route; admin maps). Not invented from the API restamp. UI dogfood is **Met**. API-only is not this Pass. Not IC50.
+
+| Probe | Result |
+|-------|--------|
+| Admin maps A–D (Map B named WGS) | Pass |
+| Ask-1 one Qubit-slot mint; Map B no steal | Pass |
+| Ask-2 zero → UI refuse; stays requested | Pass (redo; first attempt was operator order) |
+| Ask-3/4 Select a route then pick | Pass |
+
+Ops: admin map grid has no Active toggle (Delete only) — **known, not a Fail of named-slot**.
+
+Probe detail: Ask-1 Project Alpha-01 minted Qubit-A-named (`map_B_did_not_steal`). Ask-2 redo only Map B active; toast "No routing-map row accepts this analysis, TAT, and sample type"; stayed requested; wo null. Ask-3/4 replacement Ask-4: dialog "Select a route — More than one authored route accepts this asked-for. Choose one. This does not start work."; candidates Qubit-C-pack, Qubit-D-pack; Map B not in picker; pick C-pack → WO. Map B asked_for is WGS-named-assay (WGS sequencing), not Qubit.
+
+Artifacts: `/workspace/uat-oq-wo-8-ui-dogfood-main/` (stamp.json, RESULT.md, screens/).

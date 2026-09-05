@@ -1120,6 +1120,31 @@ Send: [`.docs/discussions/2026-09-01-p2-closeout-1-4-quantified-dna.md`](../.doc
 
 ## AC-P2-OQ-WO-8 — named asked-for LimsRun slot and manual route assignment
 
+**Result:** **Pass** · Tobias · 2026-09-04 21:25 ET  
+**SHA:** `be65d1e` (main tip) · product `6a67667` / merge `6625490` · Alembic **0079**  
+**Method:** Browser UI (alice-tech row Route; admin maps). Not invented from API restamp. Not IC50.
+
+This is the **UI Pass** (alice-tech picker click). The merge-gate API restamp Pass on `effd242` below stays history. The 2026-09-03 signed Result on `6244bf6` below stays history. This does not rewrite overall Leadership P2 Pass.
+
+| Probe | Result |
+|-------|--------|
+| Admin maps A–D (Map B named WGS) | Pass |
+| Ask-1 one Qubit-slot mint; Map B no steal | Pass |
+| Ask-2 zero → UI refuse; stays requested | Pass (redo; first attempt was operator order) |
+| Ask-3/4 Select a route then pick | Pass |
+
+Ops: admin map grid has no Active toggle (Delete only) — **known, not a Fail of named-slot**.
+
+Probe detail:
+- Ask-1: Project Alpha-01 → minted Qubit-A-named; map_B_did_not_steal
+- Ask-2 redo: only Map B active; toast "No routing-map row accepts this analysis, TAT, and sample type"; status stayed requested; wo null
+- Ask-3/4 (replacement Ask-4): dialog "Select a route — More than one authored route accepts this asked-for. Choose one. This does not start work." Candidates: Qubit-C-pack, Qubit-D-pack; Map B not in picker; pick C-pack → WO
+- Map B asked_for: WGS-named-assay (WGS sequencing) — not Qubit
+
+Artifacts (stamp.json, RESULT.md, screens/): `/workspace/uat-oq-wo-8-ui-dogfood-main/` on the agent box. Binary screenshots are not committed here.
+
+The merge-gate API restamp Pass on `effd242` follows and is kept verbatim.
+
 **Result:** **Pass** (Tobias QA merge-gate restamp)
 - Click SHA: `effd24215b23e1bf9e73a00467a11bdc02bd6eb2` (`effd242`)
 - Product SHA (must land): `6a67667b4d6378877a38e5542077df316a35077f` (`6a67667`) — ancestor of tip; Alembic **0079**
@@ -1249,3 +1274,30 @@ Do **not** rewrite the `6244bf6` Pass above. This restamp is the **merge click**
 **AC:** same AC-P2-OQ-WO-8 numbered execution (Ask-1 one slot mint; Ask-2 zero → 422; Ask-3 2+ picker then pick). Row **Route** icon, not **Route selected**. Wear existing Qubit. Map A and map B **must** share first-step type and TAT or the slot proof is invalid.
 
 **Merge gate:** Pass recorded on `effd242` (product `6a67667`) → merge `feat/p2-named-slot` to `main` remains a Leadership/Marc action. Fail would have blocked merge.
+
+---
+
+## Tobias UI dogfood Pass — alice-tech picker on `be65d1e`
+
+**Result:** **Pass** · Tobias · 2026-09-04 21:25 ET  
+**SHA:** `be65d1e` (main tip) · product `6a67667` / merge `6625490` · Alembic **0079**  
+**Method:** Browser UI (alice-tech row Route; admin maps). Not invented from API restamp. Not IC50.
+
+Product already on `main` (PR **122**, merge `6625490`). This is **not** a rewrite of the `effd242` API restamp Pass above, the `6244bf6` Pass, Tobias overall QA, or Leadership overall P2 Pass. API-only is not this Pass. UI dogfood is **Met**.
+
+| Probe | Result |
+|-------|--------|
+| Admin maps A–D (Map B named WGS) | Pass |
+| Ask-1 one Qubit-slot mint; Map B no steal | Pass |
+| Ask-2 zero → UI refuse; stays requested | Pass (redo; first attempt was operator order) |
+| Ask-3/4 Select a route then pick | Pass |
+
+Ops: admin map grid has no Active toggle (Delete only) — **known, not a Fail of named-slot**.
+
+Probe detail:
+- Ask-1: Project Alpha-01 → minted Qubit-A-named; map_B_did_not_steal
+- Ask-2 redo: only Map B active; toast "No routing-map row accepts this analysis, TAT, and sample type"; status stayed requested; wo null
+- Ask-3/4 (replacement Ask-4): dialog "Select a route — More than one authored route accepts this asked-for. Choose one. This does not start work." Candidates: Qubit-C-pack, Qubit-D-pack; Map B not in picker; pick C-pack → WO
+- Map B asked_for: WGS-named-assay (WGS sequencing) — not Qubit
+
+Artifacts: `/workspace/uat-oq-wo-8-ui-dogfood-main/` (stamp.json, RESULT.md, screens/). Do not treat missing committed screenshots as a Fail of this stamp.
