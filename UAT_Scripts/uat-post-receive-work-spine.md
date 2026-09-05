@@ -1120,6 +1120,31 @@ Send: [`.docs/discussions/2026-09-01-p2-closeout-1-4-quantified-dna.md`](../.doc
 
 ## AC-P2-OQ-WO-8 — named asked-for LimsRun slot and manual route assignment
 
+**Result:** **Pass** (Tobias QA merge-gate restamp)
+- Click SHA: `effd24215b23e1bf9e73a00467a11bdc02bd6eb2` (`effd242`)
+- Product SHA (must land): `6a67667b4d6378877a38e5542077df316a35077f` (`6a67667`) — ancestor of tip; Alembic **0079**
+- Branch: `feat/p2-named-slot`
+- When: 2026-09-04 20:18 ET
+- Method: API alice-tech Route (row); admin catalog/map. Wore `Qubit (dsDNA)` `47822ce9-cc3c-46bb-9b07-f94f9fe2df15` — no Quantified DNA analysis.
+- Fixture: Map A + Map B same first-step DNA + overlapping TAT 1–10 (ask TAT=5). Slot proof, not type/TAT exclusion.
+
+Probes:
+| Probe | HTTP | Evidence |
+|-------|------|----------|
+| Ask-1 one Qubit-slot | 200 | af `b1213d79-4c0a-4c43-889f-649ed2846dad` → WO `b1f30a5d-f54a-4665-8988-bdfd8615ec83` map A `81bad00c-f610-453b-ac65-5dc3732081f4`; map B excluded |
+| Steal-alone map B | 422 | af `d5660641-37a9-4199-a120-bf487affcadf` stays requested; no WO |
+| Ask-2 zero | 422 | af `261e8938-abd0-4051-9679-8ee02a811147` stays requested; wo=null |
+| Ask-3 no pick | 409 route_pick_required | 3 candidates; map B not in list; still requested |
+| Ask-3 pick map C | 200 | chosen `3be80864-ed6e-4c3d-8438-f1996cd80749` → WO `20c451e7-bb65-4d6f-a65c-612ec2cbd482` → routed |
+
+Map B (WGS named / Qubit QC): `03fb1a66-36d3-430a-b74e-9fb6befa4214`
+
+Pass bars: named Qubit mint; 0→422; 2+→409 then pick (no silent first); WGS+Qubit-QC does not steal; existing Qubit only.
+Not a Fail: OQ-WO-7, dest-follow, 1.4, ELISA second tube.
+Not IC50. Do not rewrite 6244bf6 history. This restamp is the **merge click**, not a rewrite of overall Leadership P2 Pass.
+
+The 2026-09-03 signed Result on `6244bf6` below is history of that SHA and is kept verbatim.
+
 **Brief date:** 2026-09-03
 **Authority:** Full Leadership Confirm (Rolf / Deiter / Hans / Heidi / Günter)
 **Product under test:** `feat/p2-named-slot` at **`6244bf6`** (`6244bf6e742c4ed0f046ff8770e2b8c112446fb3`) · Alembic **`0079`**
@@ -1214,14 +1239,13 @@ This Leadership overall Pass folds Tobias overall QA on the same SHA (`bf51b19` 
 
 ---
 
-## Restamp pending — product merge click on `6a67667` (unsigned)
+## Merge-gate restamp — product merge click on `effd242` / `6a67667`
 
-**Not a Result.** Do **not** rewrite the `6244bf6` Pass above. Named-slot **code is not on `main`**. `8887e36` is docs-only.
+**Result:** **Pass** (Tobias QA merge-gate restamp, 2026-09-04 20:18 ET). Click SHA **`effd242`**. Product SHA **`6a67667`** (ancestor of tip; Alembic **`0079`**). Live IDs are in the AC-P2-OQ-WO-8 Result at the top of this section.
 
-**Product under test:** `feat/p2-named-slot` containing **`6a67667`** (`6a67667b4d6378877a38e5542077df316a35077f`) · Alembic **`0079`**. Record `git rev-parse HEAD` at click start.  
+Do **not** rewrite the `6244bf6` Pass above. This restamp is the **merge click**, not a rewrite of overall Leadership P2 Pass. Named-slot **code is not on `main`**. `8887e36` is docs-only.
+
 **What/why (before click):** [`.docs/discussions/2026-09-04-p2-named-slot-uat-restamp.md`](../.docs/discussions/2026-09-04-p2-named-slot-uat-restamp.md)  
 **AC:** same AC-P2-OQ-WO-8 numbered execution (Ask-1 one slot mint; Ask-2 zero → 422; Ask-3 2+ picker then pick). Row **Route** icon, not **Route selected**. Wear existing Qubit. Map A and map B **must** share first-step type and TAT or the slot proof is invalid.
 
-**Result:** **unsigned.** Tobias click required. Record asked-for ids, map ids, work-order ids, HTTP codes.
-
-**Merge gate:** Pass on `6a67667` → new Result block → merge `feat/p2-named-slot` to `main`. Fail → do not merge.
+**Merge gate:** Pass recorded on `effd242` (product `6a67667`) → merge `feat/p2-named-slot` to `main` remains a Leadership/Marc action. Fail would have blocked merge.
