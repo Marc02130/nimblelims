@@ -149,7 +149,7 @@ A process instance is bound to **one** asked-for row. Qubit / Nanodrop / etc. ar
 
 ### 4.1 Heidi architecture file map — named-slot build brief
 
-**Hole today:** `_acceptable_maps` in `backend/app/services/routing_service.py` retains a map when `_asked_for_lims_run_count(chain, analysis_id) == 1`. That is containment anywhere in the chain, so WGS with Qubit as process QC can steal a Quantified DNA ask.
+**Hole as written for the build brief (superseded on the product branch):** `_acceptable_maps` in `backend/app/services/routing_service.py` retained a map when `_asked_for_lims_run_count(chain, analysis_id) == 1`. That is containment anywhere in the chain, so WGS with Qubit as process QC could steal a Quantified DNA ask. That is now only `main` behavior; §4.2 records the named-slot build shipped on `feat/p2-named-slot` (product `6a67667`, Alembic `0079`).
 
 **Build shape:**
 
@@ -176,6 +176,14 @@ Product landed on `feat/p2-named-slot` at **`6244bf6`** (`6244bf6e742c4ed0f046ff
 Heidi Architecture **Accept** and Günter CSO **Accept** this product SHA for Tobias’s click. Deiter Lab Ops supplied the click boundary. No Hans Science Accept is claimed.
 
 **AC-P2-OQ-WO-8 Pass** (Tobias, 2026-09-03 21:26 ET, `6244bf6`). **Tobias overall P2 Pass (QA)** on the same SHA folds `bf51b19` (`0078`: card-1/2/3, qc-1, freeze skip NULL, Route two-accept 409, seq-1 with dest-cohort 1.2 not scored, C1/C2/C3) + OQ-WO-7 Pass on `80f054b` + OQ-WO-8 Pass on `6244bf6`. Earlier signed Results remain unchanged; OQ-WO-7 was not recoded. **Full Leadership Confirm overall P2 Pass** (Rolf / Deiter / Hans / Heidi / Günter, 2026-09-03) on `6244bf6`, folding that Tobias overall. Distinct stamps. Kept: no route branching; asked-for only; named-slot not containment; 0/1/2+ picker; Route `test:assign`; instantiate uses existing process AuthZ.
+
+### 4.3 Merge-gate restamp — `effd242` on product `6a67667`
+
+`6244bf6` was rebased onto `8887e36`; the named-slot product SHA that must land is **`6a67667`** (`6a67667b4d6378877a38e5542077df316a35077f`), Alembic **`0079`**. Same build shape as §4.2, new SHA.
+
+**AC-P2-OQ-WO-8 Pass** (Tobias QA merge-gate restamp, 2026-09-04 20:18 ET) on click SHA **`effd242`** (`effd24215b23e1bf9e73a00467a11bdc02bd6eb2`), with `6a67667` an ancestor. Probed through the API as `alice-tech`: one named Qubit slot → 200 mint; map B (WGS named, Qubit as process QC) alone → **422**, asked-for stays `requested`; zero acceptable maps → **422**; 2+ → **409** `route_pick_required` with map B absent from candidates, then exactly one work order on the posted pick. Map A and map B shared first-step DNA type and overlapping TAT, so the proof is the named slot rather than type or TAT exclusion. Live IDs are in [`UAT_Scripts/uat-post-receive-work-spine.md`](../../../UAT_Scripts/uat-post-receive-work-spine.md).
+
+This restamp is the merge click for `feat/p2-named-slot` → `main`. It does not rewrite the `6244bf6` Result or the Leadership overall P2 Pass in §4.2, and the `6244bf6` stamp alone is not merge authority now that the SHA has been rebased away.
 
 WO-7 publish @ `8cfa2a9` is Tobias-signed Pass (carol **422** `test_missing`) and remains history @ `b005cfe`: `_require_wo7_tests` + `plan.errors` 422 the whole run. Status stays complete / unpublished. Zero Results. A write of `{}` onto `99b692d3` is not a freeze-skip Pass (`{}` is ambiguous). This historical paragraph does not rewrite the later freeze-skip Result on `bf51b19`. Leadership overall P2 Pass is stamped later in §4.2 on `6244bf6`.
 
