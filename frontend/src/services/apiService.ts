@@ -464,14 +464,18 @@ export class ApiService {
     return response.data;
   }
 
-  async routeAskedFor(id: string) {
-    const response: AxiosResponse = await this.api.post(`/v1/asked-for/${id}/route`);
+  async routeAskedFor(id: string, routing_map_id?: string) {
+    const response: AxiosResponse = await this.api.post(
+      `/v1/asked-for/${id}/route`,
+      routing_map_id ? { routing_map_id } : {}
+    );
     return response.data;
   }
 
-  async routeAskedForBatch(asked_for_ids: string[]) {
+  async routeAskedForBatch(asked_for_ids: string[], routing_map_id?: string) {
     const response: AxiosResponse = await this.api.post('/v1/asked-for/route', {
       asked_for_ids,
+      routing_map_id,
     });
     return response.data;
   }
@@ -487,6 +491,7 @@ export class ApiService {
 
   async createRoutingMap(data: {
     analysis_id?: string;
+    asked_for_step_id?: string;
     tat_min: number;
     tat_max: number;
     process_definition_ids: string[];
