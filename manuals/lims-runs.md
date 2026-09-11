@@ -14,9 +14,14 @@ Primary goals:
 
 **Sequencing:** A LimsRun for WES/WGS/hybrid capture records **prep and run metadata** (and optional **metrics**). **Sequence data stays out of NimbleLIMS** (too large). Do not expect FASTQ/BAM/reads on publish. Qubit and other QC assays still promote numeric results as usual.
 
-**Important distinction**: An LIMS Run is **not** the same as a Batch.
-- Batches are operational groupings for processing samples through tests and results entry.
-- LIMS Runs represent execution of a protocol/template with focus on data capture, structure, lifecycle, and derived analysis.
+**Important distinction**: An LIMS Run is **not** the same as a Batch, an ELN Experiment, or an ELN Process.
+- **LimsRun** (sidebar **Runs**, `/v1/lims-runs`): one **analysis** execution — start (WO-7 Test), import, publish. Instrument SoT is JSONB until publish; Results are the projection.
+- **ELN Experiment** (sidebar **All Experiments**): notebook + entries + aliquot/pool dest mint.
+- **ELN Process** (sidebar **Processes**, `/v1/eln-processes`): ordered SOP that may **contain** Experiment steps and/or LimsRun steps.
+- **LimsRun checklist** (`/v1/processes`, `/v1/lims-runs/{id}/processes`, tables `lims_run_checklists`): sub-process **inside a run**. Not an ELN process. Sparse UI.
+- **Batches**: operational groupings for classic Tests/Results entry.
+
+Operator SoT: [HOWTO.md](HOWTO.md) § Later execution. **X-1** (2026-09-11).
 
 ## Core Entities
 
