@@ -73,7 +73,7 @@ Verify the plan and execute flows contain none of the following:
 
 Distinct from dest **sample** type (sections 1–2) and from Method. 1×1 vessels only. E-9 lock 2026-09-10.
 
-**Result: Pass** (Tobias QA) · 2026-09-10 · SHA `008baf2705beb4238e434f893e3a06b53cac1145` (`008baf2`) · `feat/dest-container-type` · Alembic `0079` · Compose down.
+**Result: Pass** (Tobias QA) · **Rolf Confirm** 2026-09-10 · SHA `008baf2705beb4238e434f893e3a06b53cac1145` (`008baf2`) · `feat/dest-container-type` · Alembic `0079` · Compose down.
 
 Combined from two Tobias stamps on the same SHA:
 
@@ -84,7 +84,7 @@ Combined from two Tobias stamps on the same SHA:
 
 | Step | Action | Expected result | Result |
 |------|--------|-----------------|--------|
-| 6.1 | Open the Aliquot / pool plan. | Third control: **Default dest container type**, separate from Method and Default dest sample type. Options: **Same as source.** plus 1×1 container types (tube, vial, well). 96-well / multi-position types are **not** listed. | **Pass** (browser, Tobias, 2026-09-10 21:59 ET, `008baf2`). Also FE unit: `isSinglePositionType` + `AliquotPlanEditor.test.tsx` 4/4. |
+| 6.1 | Open the Aliquot / pool plan. | Third control: **Default dest container type**, separate from Method and Default dest sample type. Options: **Same as source.** plus 1×1 container types (tube, vial, well). 96-well / multi-position types are **not** listed. | **Pass** (browser, Tobias, 2026-09-10 21:59 ET, `008baf2`). FE unit is supporting only — **not** the UI stamp. |
 | 6.2 | Leave default at **Same as source.** Leave the line at **Use entry default**. Save and execute. | Dest container is the **same type** as the source tube. No dest-init prompt for container type. | **Pass** (live API, 2026-09-10, `008baf2`; not re-scored in the 21:59 browser run) |
 | 6.3 | Set entry default to a different 1×1 type (e.g. Cryovial). Leave the line at **Use entry default**. Save and execute. | Dest container uses the **entry default** type. | **Pass** (live API, 2026-09-10, `008baf2`; not re-scored in the 21:59 browser run) |
 | 6.4 | Set the line to **Same as source.** (override) and execute. | Line clear overrides entry default; dest type is the source vessel type. | **Pass** (live API, 2026-09-10, `008baf2`; not re-scored in the 21:59 browser run) |
@@ -113,9 +113,9 @@ Combined from two Tobias stamps on the same SHA:
 
 ### 2026-09-10 · `008baf2` · `feat/dest-container-type` · Tobias
 
-**Result: Pass** (Tobias QA) for section 6. SHA `008baf2705beb4238e434f893e3a06b53cac1145`. Alembic `0079`. Local compose, **down** after the run.
+**Result: Pass** (Tobias QA) for section 6. **Rolf Confirm** 2026-09-10: full fold on tip `008baf2` — API **6.2–6.8** + UI **6.1** browser Pass (three controls; Same as source. + 1×1; no plates) + sections **1–5 smoke**. Do **not** invent 6.1 from FE unit alone. SHA `008baf2705beb4238e434f893e3a06b53cac1145`. Alembic `0079`. Local compose, **down** after the run.
 
-- **6.1 Pass (browser)** — 2026-09-10 21:59 ET. Method, Default dest sample type, and Default dest container type are three separate controls. Dest container dropdown lists **Same as source.** plus 1×1 vessels; **no** 96-well / plates. Did not re-score 6.2–6.8. Supporting FE unit (not the UI stamp): `AliquotPlanEditor.tsx` `isSinglePositionType`; `AliquotPlanEditor.test.tsx` 4/4.
+- **6.1 Pass (browser)** — 2026-09-10 21:59 ET. Method, Default dest sample type, and Default dest container type are three separate controls. Dest container dropdown lists **Same as source.** plus 1×1 vessels; **no** 96-well / plates. Did not re-score 6.2–6.8. FE unit (`isSinglePositionType`; `AliquotPlanEditor.test.tsx` 4/4) is supporting only and is **not** the UI stamp.
 - **6.2–6.8 Pass (live API)** — 2026-09-10 21:53 ET. Same as source; entry default different 1×1; line Same as source overrides entry; line specific 1×1; template default survives experiment create; missing → 422 `dest_container_type_required`; plate → 422 `dest_container_type_not_1x1`.
 - **Sections 1–5 smoke: Pass** — methods, DNA dest execute, catalog refuse, mixed pool, method lock, free-text conc refuse, no execute-time dest-container prompt. Smoke only. It does **not** sign **1.7 / AC-P2-C3**, and it does not touch **AC-P2-C2**. Both stay **unsigned until Tobias**.
 
