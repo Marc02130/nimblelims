@@ -44,7 +44,7 @@ Execute stack **exists**. Missing middle = **order → routing map → work_orde
 
 | ID | Issue | Why | Next |
 |----|-------|-----|------|
-| X-1 | Process / Exp / LimsRun blurred in UI/docs | Wrong SoT | PRD diagram; nav audit |
+| X-1 | Process / Exp / LimsRun blurred in UI/docs | Wrong SoT | **Docs punch 2026-09-11:** HOWTO § Later execution table; processes / experiments / lims-runs / nav / api-endpoints. Sidebar tooltips. `/v1/processes` rename **not** in this fold (P-1 leftover). |
 | X-2 | Extract-then-Qubit E2E + testdata incomplete | No dogfood | After E-9 + seeds |
 | X-3 | SOP+AI Apply ≠ live process | Product lie | Explicit non-goal |
 | X-4 | MVP “processing not release bar” vs real SOPs | Priority fog | Leadership sequencing |

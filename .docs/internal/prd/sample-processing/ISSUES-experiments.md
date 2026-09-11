@@ -29,7 +29,7 @@
 
 | ID | Issue | Why it hurts | Suggested next |
 |----|-------|--------------|----------------|
-| E-9 | **Dual-map kick-back:** dest vol/amount/conc as entry FDs vs Sample/Contents update timing not restamped | Blocks clean implement | Heidi/Mathilda restamp ([decision-logs](../../../decision-logs/extract-hold-dual-map-kickback.md)). Dev: unblock before WO schema |
+| E-9 | **Dual-map kick-back:** dest vol/amount/conc as entry FDs vs Sample/Contents update timing | **Decided** 2026-09-10 ([decision log](../../../decision-logs/extract-hold-dual-map-kickback.md)): plan = working qty; dest init = mint + inventory one txn; dest container type required; attach immediately = entry columns only; type gate on experiment/LimsRun. | Implement against that log. Dest container type is on the plan (entry default + line override). Do not recode dest-follow |
 | E-10 | **Atomic pair** locked (one add → plan + dest entries) but UI still offers separate presets | Operators create half-pairs | Template + ad hoc UI fix |
 | E-11 | METHOD_CATALOG / `METHOD_PROFILES` plan inputs shipped; **dest FieldDefinitions attach** lag | Qty story incomplete | After E-9 |
 | E-12 | Template authoring: method often present; **default dest type** weak/missing | Dest type only at runtime | Template controls per lock |

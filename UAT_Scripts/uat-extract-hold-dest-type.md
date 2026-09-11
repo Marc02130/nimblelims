@@ -60,7 +60,7 @@
 Verify the plan and execute flows contain none of the following:
 
 - receive-time or mid-entry sample-type gate;
-- execute-time destination-type picker;
+- execute-time destination-type picker or dest-container-type picker;
 - free-text destination type;
 - destination sample-ID box;
 - wizard or forced navigation to Sample detail;
@@ -69,15 +69,60 @@ Verify the plan and execute flows contain none of the following:
 - method or destination controls on the post-execute `aliquots_pools` entry;
 - CUT methods, fake equimolar, or one entry that mints both aliquots and pools.
 
+## 6. Dest container type (plan control; dest init does not prompt)
+
+Distinct from dest **sample** type (sections 1–2) and from Method. 1×1 vessels only. E-9 lock 2026-09-10.
+
+**Result: Pass** (Tobias QA) · **Rolf Confirm** 2026-09-10 · SHA `008baf2705beb4238e434f893e3a06b53cac1145` (`008baf2`) · `feat/dest-container-type` · Alembic `0079` · Compose down.
+
+Combined from two Tobias stamps on the same SHA:
+
+1. **Browser 6.1 Pass** — Tobias, 2026-09-10 21:59 ET. Three controls: Method, Default dest sample type, Default dest container type. Dropdown: **Same as source.** plus 1×1 vessels; **no** 96-well / plates. Did **not** re-score 6.2–6.8. Screens (cite; do not commit): `/workspace/uat-dest-container-type-008baf2-ui61/three-controls.png`, `/workspace/uat-dest-container-type-008baf2-ui61/open-dest-container-dropdown.png`.
+2. **API Pass 6.2–6.8** plus sections **1–5 smoke** — Tobias, 2026-09-10 21:53 ET. Live API execute. Evidence (cite; do not commit): `/workspace/uat-dest-container-type-008baf2/{RESULT.md,tobias-stamp.json,acs.md}`.
+
+**Locks held:** dest container type is a **plan** control; dest init does **not** prompt; **1×1 only**; Method ≠ dest sample type ≠ dest container type.
+
+| Step | Action | Expected result | Result |
+|------|--------|-----------------|--------|
+| 6.1 | Open the Aliquot / pool plan. | Third control: **Default dest container type**, separate from Method and Default dest sample type. Options: **Same as source.** plus 1×1 container types (tube, vial, well). 96-well / multi-position types are **not** listed. | **Pass** (browser, Tobias, 2026-09-10 21:59 ET, `008baf2`). FE unit is supporting only — **not** the UI stamp. |
+| 6.2 | Leave default at **Same as source.** Leave the line at **Use entry default**. Save and execute. | Dest container is the **same type** as the source tube. No dest-init prompt for container type. | **Pass** (live API, 2026-09-10, `008baf2`; not re-scored in the 21:59 browser run) |
+| 6.3 | Set entry default to a different 1×1 type (e.g. Cryovial). Leave the line at **Use entry default**. Save and execute. | Dest container uses the **entry default** type. | **Pass** (live API, 2026-09-10, `008baf2`; not re-scored in the 21:59 browser run) |
+| 6.4 | Set the line to **Same as source.** (override) and execute. | Line clear overrides entry default; dest type is the source vessel type. | **Pass** (live API, 2026-09-10, `008baf2`; not re-scored in the 21:59 browser run) |
+| 6.5 | Set the line to a specific 1×1 type and execute. | Dest container uses the **line override**. | **Pass** (live API, 2026-09-10, `008baf2`; not re-scored in the 21:59 browser run) |
+| 6.6 | Template: Aliquot/pool plan entry → Default dest container type. Save template, start an experiment from it. | Runtime plan loads that default. Dest init still does not prompt. | **Pass** (live API, 2026-09-10, `008baf2`; not re-scored in the 21:59 browser run) |
+| 6.7 | API: save/execute with no dest container type, inherit false, and no source container. | **422** `dest_container_type_required`. No dest minted. | **Pass** (live API, 2026-09-10, `008baf2`; not re-scored in the 21:59 browser run) |
+| 6.8 | API: line `dest_container_type_id` = a plate (rows×columns ≠ 1×1). | **422** `dest_container_type_not_1x1`. No dest minted. | **Pass** (live API, 2026-09-10, `008baf2`; not re-scored in the 21:59 browser run) |
+
+**Fail:** dest init asks for container type; method/sample-type/container-type collapsed into one picker; plate offered as dest mint vessel; silent execute fallback that was not a plan choice.
+
 ## Pass criteria
 
-- Steps 1–5 pass.
-- Blank always means **Same as parent.**
+- Steps 1–6 pass.
+- Blank dest **sample** type always means **Same as parent.** Blank dest **container** type always means **Same as source.**
 - Catalog choices are many-to-many and client/source/operation filtered.
 - Mixed-type pools are refused in both UI and API.
-- Execute resolves line override → entry default → parent without re-prompting. Dest type on the plan is catalog intent, **not** a Sample; dest exists **only after execute**. Route / Start / map-save / asked-for mint **zero** daughters. Receive still mints identity + first vessel — that is **not** dest mint.
+- Execute resolves dest **sample** type line override → entry default → parent without re-prompting. Dest **container** type resolves line override → entry default → source vessel without re-prompting. Dest type on the plan is catalog intent, **not** a Sample; dest exists **only after execute**. Route / Start / map-save / asked-for mint **zero** daughters. Receive still mints identity + first vessel — that is **not** dest mint.
 - **1.7 / AC-P2-C3 execute click:** dest type DNA mints a new Sample + container; parent stays Blood; dest pair continues the process. **Fail C3** if dest tube lands on the blood Sample, parent `container_id` is retargeted, or later Start follows blood. Unsigned until Tobias. Numbered on `570bbc0`; execute is `1572071`. Do not score 1.7 as C2. `570bbc0` does **not** inherit `1572071` C2 Pass or Fail.
 - **C2 execute click** (spine): extra container, same sample; dest joins; inbound assignment off; later Start follows dest. Leftover on the inbound tube is whatever was not transferred — emptying is not required. Unsigned until Tobias.
 - Assign to process: no vessel, or two vessels with no pick → **422**. No silent pick.
 - PATCH of process assignment is not a path.
 - Normalization consumes a prior concentration result, never free-typed source concentration.
+- **Section 6 stamp status:** **Pass** (Tobias QA) on `008baf2`. Browser 6.1 (21:59 ET) plus live API 6.2–6.8 (21:53 ET). Not a Pass for 1.7 / AC-P2-C3 / AC-P2-C2.
+
+## Stamp log
+
+### 2026-09-10 · `008baf2` · `feat/dest-container-type` · Tobias
+
+**Result: Pass** (Tobias QA) for section 6. **Rolf Confirm** 2026-09-10: full fold on tip `008baf2` — API **6.2–6.8** + UI **6.1** browser Pass (three controls; Same as source. + 1×1; no plates) + sections **1–5 smoke**. Do **not** invent 6.1 from FE unit alone. SHA `008baf2705beb4238e434f893e3a06b53cac1145`. Alembic `0079`. Local compose, **down** after the run.
+
+- **6.1 Pass (browser)** — 2026-09-10 21:59 ET. Method, Default dest sample type, and Default dest container type are three separate controls. Dest container dropdown lists **Same as source.** plus 1×1 vessels; **no** 96-well / plates. Did not re-score 6.2–6.8. FE unit (`isSinglePositionType`; `AliquotPlanEditor.test.tsx` 4/4) is supporting only and is **not** the UI stamp.
+- **6.2–6.8 Pass (live API)** — 2026-09-10 21:53 ET. Same as source; entry default different 1×1; line Same as source overrides entry; line specific 1×1; template default survives experiment create; missing → 422 `dest_container_type_required`; plate → 422 `dest_container_type_not_1x1`.
+- **Sections 1–5 smoke: Pass** — methods, DNA dest execute, catalog refuse, mixed pool, method lock, free-text conc refuse, no execute-time dest-container prompt. Smoke only. It does **not** sign **1.7 / AC-P2-C3**, and it does not touch **AC-P2-C2**. Both stay **unsigned until Tobias**.
+
+**Locks held:** dest container type is a **plan** control; dest init does **not** prompt; **1×1 only**; Method ≠ dest sample type ≠ dest container type.
+
+**pytest `pytest_dest_container`: Skip** — Docker-in-Docker unavailable in the API run environment. 6.2–6.5 / 6.7 / 6.8 were mirrored live against the API. The skip is **not** a Fail.
+
+**Evidence (cite only; binaries not committed):** `/workspace/uat-dest-container-type-008baf2-ui61/` (6.1 screens) and `/workspace/uat-dest-container-type-008baf2/{RESULT.md,tobias-stamp.json,acs.md}` (API 6.2–6.8 + 1–5 smoke).
+
+**Not touched by this run:** 1.7 / AC-P2-C3, AC-P2-C2, named-slot / OQ-WO-7, Leadership overall P2, receive first vessel. Their existing stamps stand as written. Not IC50.

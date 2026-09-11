@@ -15,6 +15,8 @@ Experiments **can** capture certain instrument-based QC data (e.g. Tapestation, 
 
 It is **not** the primary home for large-scale result data analysis or dose-response curve fitting (see LIMS Runs).
 
+**Not the same as:** an ELN **Process** (ordered SOP; sidebar **Processes**), a **LimsRun** (sidebar **Runs** — every run has an analysis), or a LimsRun **checklist** (`/v1/processes`). Extract on the common path is an **experiment** (equipment / aliquot-pool execute), not the asked-for LimsRun. Operator SoT: [HOWTO.md](HOWTO.md) § Later execution.
+
 ## Core Entities
 
 | Entity                        | Description                                                                 | Key Characteristics |
@@ -84,26 +86,34 @@ There are **two product kinds only**. Built-in behavior is a **predefined wrappe
 
 One **Add aliquot/pool** action creates the `aliquot_pool_plan` (`experiment_data`) and empty `aliquots_pools` (`experiment_sample_data`) entries together. The UI must not offer plan-only or destination-only authoring. Selecting a concrete method immediately attaches both `METHOD_CATALOG` maps: plan columns and destination FieldDefinitions. The destination entry is populated only after execute.
 
-The **Aliquot / pool plan** entry has two separate controls:
+The **Aliquot / pool plan** entry has three separate controls:
 
 - **Method** is one concrete Deiter IN method. It implies exactly one mint
   operation (`aliquot` or `pool`) and controls every line's input columns.
 - **Default dest sample type** is optional. **Same as parent.** is always
   available. Catalog choices are the destinations shared by the selected source
   samples for the entry's mint operation.
+- **Default dest container type** is optional. **Same as source.** is always
+  available. Only **1×1** vessel types (tube, vial, well) are listed; 96-well
+  / multi-position types are not offered. Dest init does **not** prompt for
+  container type. Method ≠ dest sample type ≠ dest container type.
 
 Each plan line can **Use entry default**, explicitly clear to **Same as
-parent.**, or select a catalog-allowed destination override. Type values cannot
-be entered as free text. The concrete method is locked after plan lines are
-saved; changing it requires canceling the experiment, and cancellation does not
-remove already-minted daughters.
+parent.** (sample type) or **Same as source.** (container type), or select a
+catalog-allowed destination override. Type values cannot be entered as free
+text. The concrete method is locked after plan lines are saved; changing it
+requires canceling the experiment, and cancellation does not remove
+already-minted daughters.
 
 All lines in one pool group must have source samples of the same sample type.
 The destination selector remains unavailable and a warning identifies the pool
 when its source types differ. Saving and executing also enforce this rule.
 
-Execute resolves line override → entry default → parent, without prompting
-again. `aliquot_by_target_concentration` requires a prior numeric concentration
+Execute resolves dest **sample** type line override → entry default → parent,
+and dest **container** type line override → entry default → source vessel,
+without prompting again. Missing dest container type after that resolve is
+**422** `dest_container_type_required`. A plate as dest mint is **422**
+`dest_container_type_not_1x1`. `aliquot_by_target_concentration` requires a prior numeric concentration
 result on the source sample plus destination volume or target amount; the plan
 does not accept free-typed source concentration. Execute-minted daughters join
 the current process and populate the read-only **Aliquots / pools** entry after

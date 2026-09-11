@@ -943,3 +943,99 @@ class TestAliquotPlanExecute:
             .one()
         )
         assert removed.status == "removed"
+
+    def test_dest_container_type_entry_default_line_override_and_required(
+        self, client, auth_headers, plan_entry, db_session, test_admin_user, test_org
+    ):
+        from models.container import Container, ContainerType
+
+        exp_id = plan_entry["experiment"]["id"]
+        sample, tube, ctype = self._seed_sample_with_content(
+            db_session, test_admin_user, test_org, experiment_id=exp_id
+        )
+        other = ContainerType(
+            name=f"vial_{uuid4().hex[:6]}",
+            rows=1,
+            columns=1,
+            created_by=test_admin_user.id,
+            modified_by=test_admin_user.id,
+        )
+        plate = ContainerType(
+            name=f"plate_{uuid4().hex[:6]}",
+            rows=8,
+            columns=12,
+            created_by=test_admin_user.id,
+            modified_by=test_admin_user.id,
+        )
+        db_session.add_all([other, plate])
+        db_session.commit()
+        entry_id = plan_entry["entry"]["id"]
+
+        inherited = client.put(
+            f"/v1/entries/{entry_id}/aliquot-plan",
+            json={
+                "method": "aliquot_by_target_amount",
+                "default_dest_sample_type": None,
+                "default_dest_container_type": str(other.id),
+                "lines": [
+                    {
+                        "source_sample_id": str(sample.id),
+                        "source_container_id": str(tube.id),
+                        "target_amount": 5,
+                        "inherit_entry_dest_container_type": True,
+                    }
+                ],
+            },
+            headers=auth_headers,
+        )
+        assert inherited.status_code == 200, inherited.text
+        execute = client.post(
+            f"/v1/entries/{entry_id}/execute",
+            json={},
+            headers=auth_headers,
+        )
+        assert execute.status_code == 200, execute.text
+        dest_id = execute.json()["results"][0]["dest_container_id"]
+        dest = db_session.query(Container).filter(Container.id == dest_id).one()
+        assert dest.type_id == other.id
+
+        missing = client.put(
+            f"/v1/entries/{entry_id}/aliquot-plan",
+            json={
+                "method": "aliquot_by_target_amount",
+                "default_dest_sample_type": None,
+                "default_dest_container_type": None,
+                "lines": [
+                    {
+                        "source_sample_id": str(sample.id),
+                        "target_amount": 5,
+                        "inherit_entry_dest_container_type": False,
+                        "dest_container_type_id": None,
+                    }
+                ],
+            },
+            headers=auth_headers,
+        )
+        assert missing.status_code == 422, missing.text
+        assert missing.json()["detail"]["code"] == "dest_container_type_required"
+
+        not_1x1 = client.put(
+            f"/v1/entries/{entry_id}/aliquot-plan",
+            json={
+                "method": "aliquot_by_target_amount",
+                "default_dest_sample_type": None,
+                "default_dest_container_type": None,
+                "lines": [
+                    {
+                        "source_sample_id": str(sample.id),
+                        "source_container_id": str(tube.id),
+                        "target_amount": 5,
+                        "inherit_entry_dest_container_type": False,
+                        "dest_container_type_id": str(plate.id),
+                    }
+                ],
+            },
+            headers=auth_headers,
+        )
+        assert not_1x1.status_code == 422, not_1x1.text
+        assert not_1x1.json()["detail"]["code"] == "dest_container_type_not_1x1"

@@ -148,14 +148,25 @@ Qubit-first on blood is refused by Route before a work order is minted. If Qubit
 
 ## Later execution: Process / Experiment / LimsRun
 
-The execute substrate is already in the app. Requested analysis does **not** open it.
+The execute substrate is already in the app. Requested analysis does **not** open it. These three are **not** synonyms. **X-1 punch (2026-09-11):** use this table; do not pick APIs or sidebar items by the word “process” or “run” alone.
+
+| Thing | Job | Sidebar | API (do not mix) |
+|-------|-----|---------|------------------|
+| **Work order** | Planner snapshot of a route. Zero Tests. | Experiments → **Work Orders** (`/work-orders`) | `/v1/work-orders` |
+| **Process** (ELN) | Ordered SOP instance: definition → instance; assignment is **tube in hand**. Steps are Experiment **or** LimsRun. | Experiments → **Processes** (`/experiments/processes`) | `/v1/eln-process-definitions`, `/v1/eln-processes` |
+| **Experiment** (ELN) | One notebook unit: entries, aliquot/pool execute, dest mint. Ad hoc **or** template. | Experiments → **All Experiments** (`/experiments`) | `/v1/experiments` |
+| **LimsRun** | One **analysis** execution: start (WO-7 Test), import, publish → Results. Not a Batch. | Experiments → **Runs** (`/runs`) | `/v1/lims-runs` |
+| **LimsRun checklist** | Sub-steps **inside** a LimsRun (prep / bioanalysis). **Not** an ELN process. Sparse UI. | (on a run, when wired) | `/v1/processes`, `/v1/lims-runs/{id}/processes` — tables `lims_run_checklists` |
+| **Batch** | Operational grouping for classic Tests/Results. Not a LimsRun. | Sample Mgmt → **Batches** | `/batches` |
+
+**Do not:** call `/v1/processes` when you mean ELN process; call `/runs` an Experiment; mint a Test at process Start; treat extract (experiment) as the asked-for LimsRun.
 
 | Where | What |
 |-------|------|
 | **Experiments** → All Experiments (`/experiments`) | ELN experiment list/detail. `experiment:manage`. |
 | **Experiments** → Experiment Templates (`/experiments/templates`) | Template authoring. Same permission. |
 | **Experiments** → Processes (`/experiments/processes`) | ELN process **definitions** and **instances**. Assign samples (Samples list → **Assign to process**, or on the process). Start a step (Experiment or lazy LimsRun). |
-| **Experiments** → Runs (`/runs`) | LIMS Runs: create/start/import/review/publish. Every run has an **analysis**. |
+| **Experiments** → Runs (`/runs`) | **LIMS Runs** (not ELN Experiments): create/start/import/review/publish. Every run has an **analysis**. |
 
 Deeper handbooks: [processes.md](processes.md), [experiments.md](experiments.md), [lims-runs.md](lims-runs.md).
 
@@ -203,7 +214,7 @@ UAT (classic): [`UAT_Scripts/uat-results-entry-review.md`](../UAT_Scripts/uat-re
 - Do **not** teach later Start as following the parent/source tube after an equivalent aliquot, or as legal assign of a sample with no container.
 - Do **not** teach later Start as following a dest **type**. The follow is by dest **container**.
 - Do **not** conflate same-type follow with type-changing derivative mint. Same dest type = same sample, additional container. Different dest type = new derivative sample in a new container (`parent_sample_id`); only the parent Sample row stays for lineage. In both paths the destination pair continues on the process and the inbound source assignment is `removed`.
-- Do **not** scan DNA before extract execute. Plan dest type is catalog intent, not a Sample. There is no DNA tube until aliquot/pool execute.
+- Do **not** scan DNA before extract execute. Plan dest **sample** type is catalog intent, not a Sample. Plan dest **container** type is a plan control (Same as source / 1×1 only); dest init does **not** prompt. There is no DNA tube until aliquot/pool execute.
 - Do **not** teach dest existing at Route / Start / map-save / asked-for. Receive still mints identity + first vessel — that is **not** dest mint. Dest type on the plan is catalog intent until execute. Dest exists only after aliquot/pool execute.
 - Do **not** write C2 or C3 Pass. Deiter C2 **Fail** on `02fe95f` stands as signed history. `570bbc0` does **not** inherit `1572071` C2 Pass or Fail. C2 execute on `1572071` is extra container, same sample (`_follow_destination_in_process`; leftover inbound volume is not a Fail) and C3 is the different-dest-type click — numbered on `570bbc0`, neither is QA-clicked, neither is a shipped Pass. **Fail C3 if dest tube is on the blood sample.** Do **not** teach `570bbc0` as a product execute SHA. Type-changing execute must not retarget the parent’s `container_id`. **PATCH is not a path.**
 - Do **not** teach PATCH as a dest-follows path.

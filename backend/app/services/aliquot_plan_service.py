@@ -202,12 +202,22 @@ class AliquotPlanService:
                 validated_line,
                 data.default_dest_sample_type,
             )
-            self.resolve_line(data.method, validated_line, dest_type)
+            self.resolve_line(
+                data.method,
+                validated_line,
+                dest_type,
+                data.default_dest_container_type,
+            )
             lines.append(d)
         cfg["method"] = data.method.value
         cfg["default_dest_sample_type"] = (
             str(data.default_dest_sample_type)
             if data.default_dest_sample_type
+            else None
+        )
+        cfg["default_dest_container_type"] = (
+            str(data.default_dest_container_type)
+            if data.default_dest_container_type
             else None
         )
         cfg["plan_lines"] = lines
@@ -222,6 +232,7 @@ class AliquotPlanService:
             entry_id=entry.id,
             method=data.method,
             default_dest_sample_type=data.default_dest_sample_type,
+            default_dest_container_type=data.default_dest_container_type,
             lines=[AliquotPlanLine.model_validate(x) for x in lines],
             line_count=len(lines),
         )
@@ -232,10 +243,12 @@ class AliquotPlanService:
         raw = cfg.get("plan_lines") or []
         lines = [AliquotPlanLine.model_validate(x) for x in raw]
         default_dest_sample_type = cfg.get("default_dest_sample_type")
+        default_dest_container_type = cfg.get("default_dest_container_type")
         return AliquotPlanSaveResponse(
             entry_id=entry.id,
             method=self._configured_method(entry),
             default_dest_sample_type=default_dest_sample_type,
+            default_dest_container_type=default_dest_container_type,
             lines=lines,
             line_count=len(lines),
         )
@@ -284,6 +297,7 @@ class AliquotPlanService:
         method: AliquotMethod,
         line: AliquotPlanLine,
         dest_sample_type: Optional[UUID],
+        default_dest_container_type: Optional[UUID] = None,
     ) -> ResolvedTransfer:
         """Resolve one transfer using the entry method and tracked source data."""
         warnings: List[str] = []
@@ -387,6 +401,11 @@ class AliquotPlanService:
         if amount is None or amount <= 0:
             raise HTTPException(400, detail="Resolved transfer amount must be positive")
 
+        dest_container_type_id = self._resolved_dest_container_type(
+            line, default_dest_container_type
+        )
+        self._assert_dest_container_type_for_mint(line, dest_container_type_id)
+
         return ResolvedTransfer(
             line_id=line.line_id,
             method=method,
@@ -398,7 +417,7 @@ class AliquotPlanService:
             concentration_unit_id=conc_unit or line.concentration_unit_id,
             pool_group=line.pool_group,
             dest_container_id=line.dest_container_id,
-            dest_container_type_id=line.dest_container_type_id,
+            dest_container_type_id=dest_container_type_id,
             dest_container_name=line.dest_container_name,
             dest_sample_type=dest_sample_type,
             warnings=warnings,
@@ -445,6 +464,72 @@ class AliquotPlanService:
         if line.inherit_entry_dest_sample_type:
             return default_dest_sample_type or source_sample_type
         return line.dest_sample_type or source_sample_type
+
+    def _source_container_type_id(self, line: AliquotPlanLine) -> Optional[UUID]:
+        if not line.source_container_id:
+            return None
+        return self.db.execute(
+            select(Container.type_id).where(Container.id == line.source_container_id)
+        ).scalar_one_or_none()
+
+    def _resolved_dest_container_type(
+        self,
+        line: AliquotPlanLine,
+        default_dest_container_type: Optional[UUID],
+    ) -> Optional[UUID]:
+        """Line override → entry default → source vessel. Not invented at dest init."""
+        if line.dest_container_id:
+            return None
+        source_type = self._source_container_type_id(line)
+        if line.inherit_entry_dest_container_type:
+            return default_dest_container_type or source_type
+        return line.dest_container_type_id or source_type
+
+    def _assert_dest_container_type_for_mint(
+        self,
+        line: AliquotPlanLine,
+        dest_container_type_id: Optional[UUID],
+    ) -> None:
+        if line.dest_container_id:
+            return
+        if not dest_container_type_id:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail={
+                    "code": "dest_container_type_required",
+                    "message": (
+                        "Dest init requires a destination container type. Set the "
+                        "entry default, a line override, or Same as source."
+                    ),
+                    "line_id": line.line_id,
+                },
+            )
+        container_type = (
+            self.db.query(ContainerType)
+            .filter(ContainerType.id == dest_container_type_id)
+            .first()
+        )
+        if not container_type:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail={
+                    "code": "dest_container_type_not_found",
+                    "message": "Destination container type was not found.",
+                    "line_id": line.line_id,
+                },
+            )
+        if not container_type.is_single_position:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail={
+                    "code": "dest_container_type_not_1x1",
+                    "message": (
+                        "Destination container type must be a 1×1 vessel "
+                        "(tube, vial, well). Plates are structure only."
+                    ),
+                    "line_id": line.line_id,
+                },
+            )
 
     def _validate_dest_sample_types(
         self,
@@ -743,6 +828,14 @@ class AliquotPlanService:
             if raw_default_dest_sample_type
             else None
         )
+        raw_default_dest_container_type = (entry.config or {}).get(
+            "default_dest_container_type"
+        )
+        default_dest_container_type = (
+            UUID(str(raw_default_dest_container_type))
+            if raw_default_dest_container_type
+            else None
+        )
         if data.lines is not None:
             plan_lines = data.lines
         else:
@@ -786,7 +879,14 @@ class AliquotPlanService:
                     default_dest_sample_type,
                     source_type,
                 )
-                resolved.append(self.resolve_line(method, line, dest_type))
+                resolved.append(
+                    self.resolve_line(
+                        method,
+                        line,
+                        dest_type,
+                        default_dest_container_type,
+                    )
+                )
             except HTTPException as e:
                 resolve_errors.append(
                     AliquotExecuteLineResult(
@@ -1014,17 +1114,15 @@ class AliquotPlanService:
         else:
             type_id = r.dest_container_type_id
             if not type_id:
-                # default to source container type
-                src_c = (
-                    self.db.query(Container)
-                    .filter(Container.id == content.container_id)
-                    .first()
-                )
-                type_id = src_c.type_id if src_c else None
-            if not type_id:
                 raise HTTPException(
-                    400,
-                    detail="dest_container_type_id required when dest_container_id omitted",
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail={
+                        "code": "dest_container_type_required",
+                        "message": (
+                            "Dest init requires a destination container type. Set "
+                            "the entry default, a line override, or Same as source."
+                        ),
+                    },
                 )
             name = r.dest_container_name or f"ALIQUOT-{uuid4().hex[:8]}"
             dest_c = Container(
