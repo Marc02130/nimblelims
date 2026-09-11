@@ -50,6 +50,7 @@ Product: one mint gate on the aliquot/pool pair. Do not mint from generic Submit
 | Header-pins-to-top | Parked — separate entries docs fold |
 | Not IC50 | Marc |
 | **Mint = aliquot/pool OOB execute** (UI may say submit). Bounce mint from generic entry submit, process Start, routing, Route, LimsRun start | Marc 2026-08-30 |
+| **E-9 dual-map Decided (2026-09-10):** Plan holds working qty. **Dest init** (same gate as mint) writes Contents/Container and mints dest sample (derivative or pool) in **one transaction** with source deplete + dest vol/conc/amount. Dest **container type** must be known or **422**. METHOD_CATALOG attach immediately = entry columns only (no Sample/Contents/Container until dest init). Type gate on **experiment and LimsRun**, not entry. | Marc 2026-09-10 |
 | **Process holds container+sample.** Many containers per sample exist; one container-with-sample is in the process. Every dest continues; every inbound source is removed | Marc 2026-08-30 |
 | **Test on the assayed sample**; lineage to original. Sequencing: prep + run metadata/metrics only — not sequence files | Marc 2026-08-30 |
 
@@ -108,6 +109,9 @@ Dual mint; mid-flight method warn/wipe; un-mint on cancel; method/type on `aliqu
 | AC11 | Equimolar labeled/stored as target-amount method; no size/bp requirement in this packet. |
 | AC12 | L1/S1 join; pool same-type; S3 config:edit; both seeds; start `accepted_sample_types`; C2 key off `sample_type`. |
 | AC13 | No Sample/`material_class` column; no new Sample columns for dest amount/vol/conc. |
+| AC14 | Dest container type is a plan control (entry default + line override / Same as source). Dest init **422** if unknown; **422** if not 1×1. Dest init does not prompt. Method ≠ dest sample type ≠ dest container type. |
+
+**AC14 stamp (2026-09-10, `008baf2`, `feat/dest-container-type`, Tobias; **Rolf Confirm**):** **Pass** — UAT section 6. Browser 6.1 (three separate plan controls; dest container dropdown = Same as source. + 1×1 only; no 96-well / plates) plus live API 6.2–6.8. Do **not** invent 6.1 from FE unit alone. See [`UAT_Scripts/uat-extract-hold-dest-type.md`](../../../UAT_Scripts/uat-extract-hold-dest-type.md) section 6. Evidence (cite only): `/workspace/uat-dest-container-type-008baf2-ui61/` and `/workspace/uat-dest-container-type-008baf2/{RESULT.md,tobias-stamp.json,acs.md}`. Does **not** sign 1.7 / AC-P2-C3 / AC-P2-C2.
 
 ## 7. Path exercised
 

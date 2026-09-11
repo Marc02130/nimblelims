@@ -112,6 +112,13 @@ class AliquotPlanLine(BaseModel):
     # Destination
     dest_container_id: Optional[UUID] = None
     dest_container_type_id: Optional[UUID] = None
+    inherit_entry_dest_container_type: bool = Field(
+        True,
+        description=(
+            "True uses entry default dest container type; false with null "
+            "dest_container_type_id means Same as source vessel"
+        ),
+    )
     dest_container_name: Optional[str] = None
     dest_sample_type: Optional[UUID] = None
     inherit_entry_dest_sample_type: bool = Field(
@@ -131,6 +138,7 @@ class AliquotPlanLine(BaseModel):
 class AliquotPlanSaveRequest(BaseModel):
     method: AliquotMethod
     default_dest_sample_type: Optional[UUID] = None
+    default_dest_container_type: Optional[UUID] = None
     lines: List[AliquotPlanLine] = Field(default_factory=list)
 
 
@@ -138,6 +146,7 @@ class AliquotPlanSaveResponse(BaseModel):
     entry_id: UUID
     method: AliquotMethod
     default_dest_sample_type: Optional[UUID] = None
+    default_dest_container_type: Optional[UUID] = None
     lines: List[AliquotPlanLine]
     line_count: int
 

@@ -9,7 +9,7 @@
 
 | ID | Issue | Why it hurts | Suggested next |
 |----|-------|--------------|----------------|
-| P-1 | ELN `/v1/eln-processes` vs LIMS run **checklists** `/v1/processes` naming collision | Devs/users pick wrong API | Rename or document hard in nav + manuals |
+| P-1 | ELN `/v1/eln-processes` vs LIMS run **checklists** `/v1/processes` naming collision | Devs/users pick wrong API | **Documented hard** 2026-09-11 (X-1 HOWTO table + manuals). API path rename still optional later |
 | P-2 | `experiment_link` detail type coexist vs deprecate (**OQ #10 Open**) | Two ways to “attach” experiments | Decide deprecate vs keep |
 | P-3 | Process-sample status vs `Sample.status` easy to conflate | Wrong eligibility reasoning | UI labels + docs (Decision #24) |
 

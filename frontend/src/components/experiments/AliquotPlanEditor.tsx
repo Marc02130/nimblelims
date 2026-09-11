@@ -2,7 +2,8 @@
  * Entry-configured aliquot/pool plan editor.
  *
  * One concrete method controls the entry's mint operation and columns. Destination
- * sample type is a separate entry default with an optional per-line override.
+ * sample type and destination container type are separate entry defaults with
+ * optional per-line overrides. Dest init does not prompt either.
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
@@ -134,6 +135,26 @@ const METHODS: readonly MethodDefinition[] = [
 
 const ENTRY_DEFAULT = '__entry_default__';
 const SAME_AS_PARENT = '__same_as_parent__';
+const SAME_AS_SOURCE = '__same_as_source__';
+
+type VesselTypeOption = { id: string; name: string; rows?: number; columns?: number };
+
+const isSinglePositionType = (ct: { rows?: number; columns?: number }): boolean =>
+  Number(ct.rows ?? 1) === 1 && Number(ct.columns ?? 1) === 1;
+
+const parseContainerTypes = (raw: unknown): VesselTypeOption[] => {
+  const list = Array.isArray(raw)
+    ? raw
+    : (raw as { container_types?: unknown[] } | null)?.container_types || [];
+  return (list as Array<Record<string, unknown>>)
+    .filter((ct) => ct && ct.id && ct.name && isSinglePositionType(ct))
+    .map((ct) => ({
+      id: String(ct.id),
+      name: String(ct.name),
+      rows: Number(ct.rows) || 1,
+      columns: Number(ct.columns) || 1,
+    }));
+};
 
 interface PlanLine {
   line_id?: string;
@@ -145,6 +166,7 @@ interface PlanLine {
   target_concentration?: number | '';
   split_count?: number | '';
   dest_container_type_id?: string;
+  inherit_entry_dest_container_type: boolean;
   dest_container_name?: string;
   dest_sample_type?: string;
   inherit_entry_dest_sample_type: boolean;
@@ -160,6 +182,7 @@ interface CatalogState {
 interface AliquotPlanResponse {
   method: AliquotMethod;
   default_dest_sample_type?: string | null;
+  default_dest_container_type?: string | null;
   lines?: PlanLine[];
   line_count: number;
 }
@@ -182,6 +205,7 @@ const catalogKey = (sampleId: string, operation: AliquotOperation): string =>
 const blankLine = (operation: AliquotOperation): PlanLine => ({
   source_sample_id: '',
   inherit_entry_dest_sample_type: true,
+  inherit_entry_dest_container_type: true,
   pool_group: operation === 'pool' ? 'pool-1' : '',
 });
 
@@ -198,6 +222,8 @@ const AliquotPlanEditor: React.FC<AliquotPlanEditorProps> = ({
 }) => {
   const [method, setMethod] = useState<AliquotMethod>('aliquot_by_volume');
   const [defaultDestSampleType, setDefaultDestSampleType] = useState('');
+  const [defaultDestContainerType, setDefaultDestContainerType] = useState('');
+  const [vesselTypes, setVesselTypes] = useState<VesselTypeOption[]>([]);
   const [lines, setLines] = useState<PlanLine[]>([blankLine('aliquot')]);
   const [persistedLineCount, setPersistedLineCount] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -219,6 +245,7 @@ const AliquotPlanEditor: React.FC<AliquotPlanEditorProps> = ({
       const raw = response.lines || [];
       setMethod(loadedMethod);
       setDefaultDestSampleType(response.default_dest_sample_type || '');
+      setDefaultDestContainerType(response.default_dest_container_type || '');
       setPersistedLineCount(response.line_count ?? raw.length);
       setLines(
         raw.length > 0
@@ -232,6 +259,8 @@ const AliquotPlanEditor: React.FC<AliquotPlanEditorProps> = ({
               target_concentration: line.target_concentration ?? '',
               split_count: line.split_count ?? '',
               dest_container_type_id: line.dest_container_type_id || '',
+              inherit_entry_dest_container_type:
+                line.inherit_entry_dest_container_type !== false,
               dest_container_name: line.dest_container_name || '',
               dest_sample_type: line.dest_sample_type || '',
               inherit_entry_dest_sample_type:
@@ -250,6 +279,21 @@ const AliquotPlanEditor: React.FC<AliquotPlanEditorProps> = ({
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    let active = true;
+    apiService
+      .getContainerTypes()
+      .then((raw) => {
+        if (active) setVesselTypes(parseContainerTypes(raw));
+      })
+      .catch(() => {
+        if (active) setVesselTypes([]);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const requiredCatalogKey = useMemo(() => {
     const keys = new Set<string>();
@@ -365,7 +409,8 @@ const AliquotPlanEditor: React.FC<AliquotPlanEditorProps> = ({
           target_volume: numberOrUndefined(line.target_volume),
           target_concentration: numberOrUndefined(line.target_concentration),
           split_count: numberOrUndefined(line.split_count),
-          dest_container_type_id: line.dest_container_type_id?.trim() || undefined,
+          dest_container_type_id: line.dest_container_type_id?.trim() || null,
+          inherit_entry_dest_container_type: line.inherit_entry_dest_container_type,
           dest_container_name: line.dest_container_name?.trim() || undefined,
           dest_sample_type: line.dest_sample_type?.trim() || null,
           inherit_entry_dest_sample_type: line.inherit_entry_dest_sample_type,
@@ -377,6 +422,7 @@ const AliquotPlanEditor: React.FC<AliquotPlanEditorProps> = ({
     apiService.saveAliquotPlan(entryId, {
       method,
       default_dest_sample_type: defaultDestSampleType || null,
+      default_dest_container_type: defaultDestContainerType || null,
       lines: toPayload(lines),
     }) as Promise<AliquotPlanSaveResult>;
 
@@ -470,8 +516,9 @@ const AliquotPlanEditor: React.FC<AliquotPlanEditorProps> = ({
         Aliquot / pool plan
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-        The entry method controls one mint operation and all line inputs. Destination type is a
-        separate default that each line may inherit, clear to Same as parent, or override.
+        The entry method controls one mint operation and all line inputs. Destination sample
+        type and destination container type are separate defaults. Each line may inherit, use
+        Same as parent / Same as source, or override. Dest init does not prompt.
       </Typography>
 
       {error && (
@@ -535,6 +582,28 @@ const AliquotPlanEditor: React.FC<AliquotPlanEditorProps> = ({
             <FormHelperText>Select a source sample to load catalog options.</FormHelperText>
           )}
         </FormControl>
+
+        <FormControl size="small" sx={{ minWidth: 250 }} disabled={!canEdit}>
+          <InputLabel>Default dest container type</InputLabel>
+          <Select
+            label="Default dest container type"
+            value={defaultDestContainerType}
+            inputProps={{ 'aria-label': 'Default dest container type' }}
+            onChange={(event) =>
+              setDefaultDestContainerType(event.target.value as string)
+            }
+          >
+            <MenuItem value="">Same as source.</MenuItem>
+            {vesselTypes.map((option) => (
+              <MenuItem key={option.id} value={option.id}>
+                {option.name}
+              </MenuItem>
+            ))}
+          </Select>
+          <FormHelperText>
+            Required at dest init. Empty default is Same as source vessel (1×1 only).
+          </FormHelperText>
+        </FormControl>
       </Box>
 
       {method === 'aliquot_by_target_concentration' && (
@@ -552,6 +621,7 @@ const AliquotPlanEditor: React.FC<AliquotPlanEditorProps> = ({
               <TableCell>Dest sample type override</TableCell>
               <TableCell>Source container</TableCell>
               <TableCell>Method inputs</TableCell>
+              <TableCell>Dest container type</TableCell>
               <TableCell>Destination</TableCell>
               <TableCell width={48} />
             </TableRow>
@@ -577,6 +647,9 @@ const AliquotPlanEditor: React.FC<AliquotPlanEditorProps> = ({
               const destValue = line.inherit_entry_dest_sample_type
                 ? ENTRY_DEFAULT
                 : line.dest_sample_type || SAME_AS_PARENT;
+              const destContainerValue = line.inherit_entry_dest_container_type
+                ? ENTRY_DEFAULT
+                : line.dest_container_type_id || SAME_AS_SOURCE;
               return (
                 <TableRow key={line.line_id || index}>
                   <TableCell>
@@ -701,6 +774,45 @@ const AliquotPlanEditor: React.FC<AliquotPlanEditorProps> = ({
                     </Box>
                   </TableCell>
                   <TableCell>
+                    <FormControl size="small" sx={{ minWidth: 210 }} disabled={!canEdit}>
+                      <InputLabel>Dest container type</InputLabel>
+                      <Select
+                        label="Dest container type"
+                        inputProps={{
+                          'aria-label': `Dest container type, line ${index + 1}`,
+                        }}
+                        value={destContainerValue}
+                        onChange={(event) => {
+                          const value = event.target.value as string;
+                          if (value === ENTRY_DEFAULT) {
+                            updateLine(index, {
+                              inherit_entry_dest_container_type: true,
+                              dest_container_type_id: '',
+                            });
+                          } else if (value === SAME_AS_SOURCE) {
+                            updateLine(index, {
+                              inherit_entry_dest_container_type: false,
+                              dest_container_type_id: '',
+                            });
+                          } else {
+                            updateLine(index, {
+                              inherit_entry_dest_container_type: false,
+                              dest_container_type_id: value,
+                            });
+                          }
+                        }}
+                      >
+                        <MenuItem value={ENTRY_DEFAULT}>Use entry default</MenuItem>
+                        <MenuItem value={SAME_AS_SOURCE}>Same as source.</MenuItem>
+                        {vesselTypes.map((option) => (
+                          <MenuItem key={option.id} value={option.id}>
+                            {option.name}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                  </TableCell>
+                  <TableCell>
                     <Box display="flex" flexDirection="column" gap={0.5}>
                       <TextField
                         size="small"
@@ -727,15 +839,6 @@ const AliquotPlanEditor: React.FC<AliquotPlanEditorProps> = ({
                           }
                         />
                       )}
-                      <TextField
-                        size="small"
-                        placeholder="Dest container type UUID"
-                        value={line.dest_container_type_id || ''}
-                        disabled={!canEdit}
-                        onChange={(event) =>
-                          updateLine(index, { dest_container_type_id: event.target.value })
-                        }
-                      />
                     </Box>
                   </TableCell>
                   <TableCell>

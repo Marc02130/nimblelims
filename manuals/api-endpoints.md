@@ -1803,7 +1803,7 @@ Base path: `/api/v1/experiment-templates`. Requires **`experiment:manage`**.
 
 Base path: `/api/v1/eln-processes`. Requires **`experiment:manage`**.
 
-First-class ordered multi-step workflows on the **ELN** side. Distinct from LIMS run checklists at `/api/v1/processes` and `/api/v1/lims-runs/{id}/processes`.
+First-class ordered multi-step workflows on the **ELN** side. Distinct from LIMS run checklists at `/api/v1/processes` and `/api/v1/lims-runs/{id}/processes` (tables `lims_run_checklists`). **Do not** use `/v1/processes` for ELN process instances. Operator SoT: [HOWTO.md](HOWTO.md) § Later execution (X-1).
 
 Tables (migrations `0047` + `0051`): `eln_process_definitions`, `eln_process_definition_steps`, `eln_processes`, `eln_process_steps`, `eln_process_samples`, `eln_process_step_lims_runs`. Optional list-driven status via `eln_process_status` list → `status_id`.
 

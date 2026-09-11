@@ -8,7 +8,7 @@ NimbleLIMS uses a **unified sidebar navigation** (left drawer) for all authentic
 |--------|------------|----------|
 | **Core Features** | All users | Dashboard, Help |
 | **Sample Mgmt** | Any of: sample:create, sample:read, sample:update, test:update, test:assign, batch:manage, result:enter | Receive, Asked-for, Samples, Tests, Containers, Batches, Results |
-| **Experiments** | experiment:manage | All Experiments, Work Orders (`/work-orders`), Processes, Experiment Templates, Runs |
+| **Experiments** | experiment:manage | All Experiments (ELN), Work Orders (`/work-orders`), Processes (ELN `/v1/eln-processes`), Experiment Templates, Runs (**LimsRun** `/runs` — not ELN Experiments; not `/v1/processes` checklists) |
 | **Lab Mgmt** | Any of: project:manage, analysis:manage | Projects, Clients, Client Proj, Analyses, Analytes |
 | **Admin** | config:edit | Overview, Name Templates, Custom Attributes, Lists, Container Types, Units, Users, Roles, Analyses, Routing map, Analytes, Test Batteries, Custom Fields, Custom Names, Workflow Templates, Help Management |
 
@@ -52,14 +52,14 @@ The sidebar is a persistent left-side drawer (240px expanded, 56px collapsed on 
 │   Batches   │
 │   Results   │
 ├─────────────┤
-│ ▼ Experiments│ ← Accordion (experiment:manage; both sub-items require experiment:manage)
-│   All       │
+│ ▼ Experiments│ ← Accordion (experiment:manage)
+│   All       │  ELN experiments (notebook)
 │   Experiments│
-│   Work Orders│
-│   Processes  │
+│   Work Orders│  Route planner (not Start)
+│   Processes  │  ELN process def + instance — not /v1/processes checklists
 │   Experiment │
 │   Templates  │
-│   Runs       │
+│   Runs       │  LIMS Runs (analysis/instrument) — not ELN Experiments
 ├─────────────┤
 │ ▼ Lab Mgmt  │ ← Accordion (collapsible, requires project:manage | analysis:manage)
 │   Projects  │
@@ -134,11 +134,11 @@ The **Experiments** section is its own top-level accordion, placed immediately a
 
 | Menu Item | Route | Icon | Tooltip | Permission | Description |
 |-----------|-------|------|---------|------------|-------------|
-| **All Experiments** | `/experiments` | Biotech | Experiments & Processes | (section) `experiment:manage` | List and detail of experiments; sample executions, lineage, linked processes |
+| **All Experiments** | `/experiments` | Biotech | Experiments | (section) `experiment:manage` | ELN experiment list/detail (notebook). Not LimsRuns |
 | **Work Orders** | `/work-orders` | AssignmentTurnedIn | Routed work orders | view `sample:read`; Start `experiment:manage` | Planning backlog with ordered process routes. **Start instantiates the first process only**; later starts advance in snapshot order. Route/Start do not start the whole chain. A queued work order is not started work |
-| **Processes** | `/experiments/processes` | AccountTree | ELN multi-step processes | `experiment:manage` | Existing process definitions and instances with typed Experiment/LimsRun steps |
+| **Processes** | `/experiments/processes` | AccountTree | ELN process definitions and instances (not LimsRun checklists) | `experiment:manage` | ELN `/v1/eln-processes`. Not `/v1/processes` checklists |
 | **Experiment Templates** | `/experiments/templates` | ViewList | Experiment template definitions | `experiment:manage` (same as section) | Template CRUD, SOP/AI-assisted creation, sign-off, activation (`ExperimentTemplatesManagement`) |
-| **Runs** | `/runs` | PlayCircleOutline | Experiment Runs | `experiment:manage` | LimsRun list; the WO-7 lock puts Test create/attach and the asked-for parameter freeze at first start. New-Test write Pass on `8cfa2a9`; classic skip OPEN |
+| **Runs** | `/runs` | PlayCircleOutline | LIMS Runs (analysis / instrument) — not ELN Experiments | `experiment:manage` | `/v1/lims-runs`. WO-7 Test at first LimsRun start. Not ELN Experiments; not `/v1/processes` |
 
 **Templates visibility:** The "Experiment Templates" sub-item is shown whenever the user has `experiment:manage` (Administrator, Lab Manager, Lab Technician in default seed roles). It is not restricted to `config:edit`.
 

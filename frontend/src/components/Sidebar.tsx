@@ -259,9 +259,9 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onMobileClose, collapsed 
   const experimentItems: ExperimentsNavItem[] = [
     { text: 'All Experiments', path: '/experiments', icon: <Biotech />, tooltip: 'Experiments' },
     { text: 'Work Orders', path: '/work-orders', icon: <AssignmentTurnedInIcon />, tooltip: 'Routed work orders' },
-    { text: 'Processes', path: '/experiments/processes', icon: <AccountTreeIcon />, tooltip: 'ELN multi-step processes' },
+    { text: 'Processes', path: '/experiments/processes', icon: <AccountTreeIcon />, tooltip: 'ELN process definitions and instances (not LimsRun checklists)' },
     { text: 'Experiment Templates', path: '/experiments/templates', icon: <ViewListIcon />, tooltip: 'Experiment template definitions', templatesOnly: true },
-    { text: 'Runs', path: '/runs', icon: <AssessmentIcon />, tooltip: 'Experiment runs & dose response' },
+    { text: 'Runs', path: '/runs', icon: <AssessmentIcon />, tooltip: 'LIMS Runs (analysis / instrument) — not ELN Experiments' },
   ];
 
   // Admin navigation items from MainNav (Field Management using lists + FieldDefinitions; legacy Custom Attributes and Name Templates sidebar links removed per requirements)

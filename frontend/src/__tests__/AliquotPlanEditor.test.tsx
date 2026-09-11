@@ -8,6 +8,7 @@ jest.mock('../services/apiService', () => ({
   apiService: {
     getAliquotPlan: jest.fn(),
     getDestSampleTypes: jest.fn(),
+    getContainerTypes: jest.fn(),
     saveAliquotPlan: jest.fn(),
     executeAliquotPlan: jest.fn(),
   },
@@ -19,6 +20,7 @@ const PLASMA_ID = '22222222-2222-4222-8222-222222222222';
 const DNA_ID = '33333333-3333-4333-8333-333333333333';
 const SAMPLE_ONE_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const SAMPLE_TWO_ID = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+const TUBE_TYPE_ID = '44444444-4444-4444-8444-444444444444';
 
 describe('<AliquotPlanEditor />', () => {
   beforeEach(() => {
@@ -28,6 +30,10 @@ describe('<AliquotPlanEditor />', () => {
       success_count: 1,
       error_count: 0,
     });
+    mockApiService.getContainerTypes.mockResolvedValue([
+      { id: TUBE_TYPE_ID, name: 'Cryovial', rows: 1, columns: 1 },
+      { id: '55555555-5555-4555-8555-555555555555', name: '96-well plate', rows: 8, columns: 12 },
+    ]);
   });
 
   it('saves a separate entry method, default type, and line override', async () => {
@@ -84,11 +90,13 @@ describe('<AliquotPlanEditor />', () => {
       expect(mockApiService.saveAliquotPlan).toHaveBeenCalledWith('entry-1', {
         method: 'aliquot_by_target_amount',
         default_dest_sample_type: DNA_ID,
+        default_dest_container_type: null,
         lines: [
           expect.objectContaining({
             source_sample_id: SAMPLE_ONE_ID,
             dest_sample_type: DNA_ID,
             inherit_entry_dest_sample_type: false,
+            inherit_entry_dest_container_type: true,
           }),
         ],
       });
@@ -173,5 +181,69 @@ describe('<AliquotPlanEditor />', () => {
     expect(
       screen.getByRole('combobox', { name: 'Dest sample type, line 2' }),
     ).toHaveAttribute('aria-disabled', 'true');
+  });
+
+  it('saves dest container type as entry default with a line override', async () => {
+    const user = userEvent.setup();
+    mockApiService.getAliquotPlan
+      .mockResolvedValueOnce({
+        method: 'aliquot_by_volume',
+        default_dest_sample_type: null,
+        default_dest_container_type: null,
+        line_count: 0,
+        lines: [
+          {
+            source_sample_id: SAMPLE_ONE_ID,
+            volume: 1,
+            inherit_entry_dest_sample_type: true,
+            inherit_entry_dest_container_type: true,
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        method: 'aliquot_by_volume',
+        default_dest_sample_type: null,
+        default_dest_container_type: TUBE_TYPE_ID,
+        line_count: 1,
+        lines: [],
+      });
+    mockApiService.getDestSampleTypes.mockResolvedValue({
+      source_sample_type: { id: BLOOD_ID, name: 'Blood' },
+      operation: 'aliquot',
+      options: [],
+    });
+
+    render(<AliquotPlanEditor entryId="entry-1" sampleIds={[SAMPLE_ONE_ID]} />);
+
+    const defaultVessel = await screen.findByRole('combobox', {
+      name: 'Default dest container type',
+    });
+    await user.click(defaultVessel);
+    await user.click(within(await screen.findByRole('listbox')).getByText('Cryovial'));
+
+    const lineVessel = screen.getByRole('combobox', {
+      name: 'Dest container type, line 1',
+    });
+    await user.click(lineVessel);
+    const vesselOptions = await screen.findByRole('listbox');
+    expect(within(vesselOptions).getByText('Same as source.')).toBeInTheDocument();
+    expect(within(vesselOptions).queryByText('96-well plate')).not.toBeInTheDocument();
+    await user.click(within(vesselOptions).getByText('Cryovial'));
+    await user.click(screen.getByRole('button', { name: 'Save plan' }));
+
+    await waitFor(() => {
+      expect(mockApiService.saveAliquotPlan).toHaveBeenCalledWith('entry-1', {
+        method: 'aliquot_by_volume',
+        default_dest_sample_type: null,
+        default_dest_container_type: TUBE_TYPE_ID,
+        lines: [
+          expect.objectContaining({
+            source_sample_id: SAMPLE_ONE_ID,
+            dest_container_type_id: TUBE_TYPE_ID,
+            inherit_entry_dest_container_type: false,
+          }),
+        ],
+      });
+    });
   });
 });

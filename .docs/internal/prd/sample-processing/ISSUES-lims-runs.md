@@ -9,7 +9,7 @@
 
 | ID | Issue | Why it hurts | Suggested next |
 |----|-------|--------------|----------------|
-| R-1 | LimsRun vs Batch vs Process checklist naming | Wrong tool for the job | Nav + glossary |
+| R-1 | LimsRun vs Batch vs Process checklist naming | Wrong tool for the job | **Docs punch 2026-09-11** (X-1): HOWTO + lims-runs.md + sidebar **Runs** tooltip |
 | R-2 | Entries must not auto-promote to Results — still a teaching problem | Shadow results | Docs + UI copy |
 | R-3 | Instrument SoT = JSONB until publish; Results = projection | Edit fights | Clarify curator vs raw |
 | **R-18** | **Analysis without instrument** | Ambiguous path for visual/manual/calc assays | **WO-4 stamped:** LimsRun + analysis required; manual entry OK; instrument only for parsers. Implement: document + UI empty states; no null-analysis |

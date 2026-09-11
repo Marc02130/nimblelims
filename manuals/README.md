@@ -26,8 +26,8 @@ Review stamps stay under [`.docs/review/`](../.docs/review/). Local scratch copi
 | [lists.md](lists.md) | Lists and list entries |
 | [containers.md](containers.md) | Container types, contents, inventory |
 | [batches.md](batches.md) | Batches |
-| [processes.md](processes.md) | ELN processes (not asked-for) |
-| [experiments.md](experiments.md) | Experiments |
-| [lims-runs.md](lims-runs.md) | LIMS Runs; params freeze at start (later), not on receive |
+| [processes.md](processes.md) | ELN processes (`/v1/eln-processes`) — not LimsRun checklists `/v1/processes`, not asked-for |
+| [experiments.md](experiments.md) | ELN Experiments (notebook) — not sidebar **Runs** |
+| [lims-runs.md](lims-runs.md) | LIMS Runs (`/runs`); params freeze at LimsRun start (WO-7), not on receive |
 | [workflow-accessioning-to-reporting.md](workflow-accessioning-to-reporting.md) | End-to-end workflow |
 | [useful-command-line.md](useful-command-line.md) | CLI notes |
