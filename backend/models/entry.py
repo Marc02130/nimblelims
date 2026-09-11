@@ -146,6 +146,7 @@ PREDEFINED_ENTRY_DEFAULTS = {
         "config": {
             "method": "aliquot_by_volume",
             "default_dest_sample_type": None,
+            "default_dest_container_type": None,
         },
     },
     "aliquots_pools": {

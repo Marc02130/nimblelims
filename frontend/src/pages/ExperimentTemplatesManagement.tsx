@@ -277,6 +277,7 @@ const PREDEFINED_PRESETS: {
       config: {
         method: 'aliquot_by_volume',
         default_dest_sample_type: null,
+        default_dest_container_type: null,
       },
       fields: [],
     },
@@ -344,6 +345,7 @@ const ExperimentTemplatesManagement: React.FC = () => {
   // Form fields — template_definition
   const [formDef, setFormDef] = useState<TemplateDefinition>(blankDefinition());
   const [fieldDefOptions, setFieldDefOptions] = useState<FieldDefOption[]>([]);
+  const [vesselTypes, setVesselTypes] = useState<{ id: string; name: string }[]>([]);
 
   // Create FieldDefinition (entry columns — not Custom Fields for Sample/Test)
   const [createFieldOpen, setCreateFieldOpen] = useState(false);
@@ -397,6 +399,26 @@ const ExperimentTemplatesManagement: React.FC = () => {
 
   useEffect(() => {
     loadTemplates();
+  }, []);
+
+  useEffect(() => {
+    apiService
+      .getContainerTypes()
+      .then((raw) => {
+        const list = Array.isArray(raw) ? raw : raw?.container_types || [];
+        setVesselTypes(
+          (list as Array<{ id?: string; name?: string; rows?: number; columns?: number }>)
+            .filter(
+              (ct) =>
+                ct?.id &&
+                ct?.name &&
+                Number(ct.rows ?? 1) === 1 &&
+                Number(ct.columns ?? 1) === 1,
+            )
+            .map((ct) => ({ id: String(ct.id), name: String(ct.name) })),
+        );
+      })
+      .catch(() => setVesselTypes([]));
   }, []);
 
   const loadFieldDefinitions = async () => {
@@ -1233,6 +1255,8 @@ const ExperimentTemplatesManagement: React.FC = () => {
                                   method: event.target.value,
                                   default_dest_sample_type:
                                     entry.config?.default_dest_sample_type ?? null,
+                                  default_dest_container_type:
+                                    entry.config?.default_dest_container_type ?? null,
                                 },
                               })
                             }
@@ -1250,9 +1274,35 @@ const ExperimentTemplatesManagement: React.FC = () => {
                           display="block"
                           sx={{ mt: 0.5 }}
                         >
-                          One concrete method fixes aliquot or pool for the entry. The catalog-limited
-                          default destination type is selected from source samples in the runtime plan.
+                          One concrete method fixes aliquot or pool for the entry. Dest sample type
+                          is chosen from source samples on the runtime plan. Dest container type may
+                          be defaulted here (1×1 vessels); dest init does not prompt.
                         </Typography>
+                        <FormControl size="small" sx={{ minWidth: 280, mt: 1 }}>
+                          <InputLabel>Default dest container type</InputLabel>
+                          <Select
+                            label="Default dest container type"
+                            value={String(entry.config?.default_dest_container_type || '')}
+                            onChange={(event) =>
+                              updateEntry(ei, {
+                                config: {
+                                  ...(entry.config || {}),
+                                  method: entry.config?.method || 'aliquot_by_volume',
+                                  default_dest_sample_type:
+                                    entry.config?.default_dest_sample_type ?? null,
+                                  default_dest_container_type: event.target.value || null,
+                                },
+                              })
+                            }
+                          >
+                            <MenuItem value="">Same as source.</MenuItem>
+                            {vesselTypes.map((option) => (
+                              <MenuItem key={option.id} value={option.id}>
+                                {option.name}
+                              </MenuItem>
+                            ))}
+                          </Select>
+                        </FormControl>
                       </Box>
                     )}
 
