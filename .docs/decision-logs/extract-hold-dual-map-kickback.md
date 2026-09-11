@@ -97,6 +97,8 @@ Same pattern as dest sample type. Distinct from method and dest sample type. Des
 
 Resolve: line override → entry default → source container type. Missing after that → **422** `dest_container_type_required`. Non-1×1 (plate as dest mint) → **422** `dest_container_type_not_1x1`.
 
+**Tobias UAT section 6 Pass** on `008baf2` (2026-09-10): browser 6.1 + live API 6.2–6.8. See [`UAT_Scripts/uat-extract-hold-dest-type.md`](../../UAT_Scripts/uat-extract-hold-dest-type.md). Does not sign 1.7 / AC-P2-C3 / AC-P2-C2.
+
 ## Left after this stamp (not a reopen of Q1–Q5)
 
 - E-10 atomic-pair UI; E-14 transition admin; E-12 dest **sample** type on template.

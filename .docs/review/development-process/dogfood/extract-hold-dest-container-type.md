@@ -24,7 +24,7 @@ Local compose on **this feature branch**. `experiment:manage`. 1×1 container ty
 
 Fill after a walk:
 
-**Date:**  
-**Who:**  
-**SHA:**  
-**Ready for UAT section 6?** Yes / No — why
+**Date:** 2026-09-10  
+**Who:** Tobias  
+**SHA:** `008baf2705beb4238e434f893e3a06b53cac1145` (`008baf2`), alembic `0079`, local compose (down after the run)  
+**Ready for UAT section 6?** **Yes — UAT section 6 is Pass (Tobias QA).** Path 1 / 8 (three controls; 96-well absent) is **browser Pass** 21:59 ET. Paths 2–7 are **live API Pass** 21:53 ET. Stamp of record: [`UAT_Scripts/uat-extract-hold-dest-type.md`](../../../../UAT_Scripts/uat-extract-hold-dest-type.md) section 6. Evidence (cite only; do not commit screenshots): `/workspace/uat-dest-container-type-008baf2-ui61/` and `/workspace/uat-dest-container-type-008baf2/{RESULT.md,tobias-stamp.json,acs.md}`.
