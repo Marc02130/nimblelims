@@ -148,14 +148,25 @@ Qubit-first on blood is refused by Route before a work order is minted. If Qubit
 
 ## Later execution: Process / Experiment / LimsRun
 
-The execute substrate is already in the app. Requested analysis does **not** open it.
+The execute substrate is already in the app. Requested analysis does **not** open it. These three are **not** synonyms. **X-1 punch (2026-09-11):** use this table; do not pick APIs or sidebar items by the word “process” or “run” alone.
+
+| Thing | Job | Sidebar | API (do not mix) |
+|-------|-----|---------|------------------|
+| **Work order** | Planner snapshot of a route. Zero Tests. | Experiments → **Work Orders** (`/work-orders`) | `/v1/work-orders` |
+| **Process** (ELN) | Ordered SOP instance: definition → instance; assignment is **tube in hand**. Steps are Experiment **or** LimsRun. | Experiments → **Processes** (`/experiments/processes`) | `/v1/eln-process-definitions`, `/v1/eln-processes` |
+| **Experiment** (ELN) | One notebook unit: entries, aliquot/pool execute, dest mint. Ad hoc **or** template. | Experiments → **All Experiments** (`/experiments`) | `/v1/experiments` |
+| **LimsRun** | One **analysis** execution: start (WO-7 Test), import, publish → Results. Not a Batch. | Experiments → **Runs** (`/runs`) | `/v1/lims-runs` |
+| **LimsRun checklist** | Sub-steps **inside** a LimsRun (prep / bioanalysis). **Not** an ELN process. Sparse UI. | (on a run, when wired) | `/v1/processes`, `/v1/lims-runs/{id}/processes` — tables `lims_run_checklists` |
+| **Batch** | Operational grouping for classic Tests/Results. Not a LimsRun. | Sample Mgmt → **Batches** | `/batches` |
+
+**Do not:** call `/v1/processes` when you mean ELN process; call `/runs` an Experiment; mint a Test at process Start; treat extract (experiment) as the asked-for LimsRun.
 
 | Where | What |
 |-------|------|
 | **Experiments** → All Experiments (`/experiments`) | ELN experiment list/detail. `experiment:manage`. |
 | **Experiments** → Experiment Templates (`/experiments/templates`) | Template authoring. Same permission. |
 | **Experiments** → Processes (`/experiments/processes`) | ELN process **definitions** and **instances**. Assign samples (Samples list → **Assign to process**, or on the process). Start a step (Experiment or lazy LimsRun). |
-| **Experiments** → Runs (`/runs`) | LIMS Runs: create/start/import/review/publish. Every run has an **analysis**. |
+| **Experiments** → Runs (`/runs`) | **LIMS Runs** (not ELN Experiments): create/start/import/review/publish. Every run has an **analysis**. |
 
 Deeper handbooks: [processes.md](processes.md), [experiments.md](experiments.md), [lims-runs.md](lims-runs.md).
 

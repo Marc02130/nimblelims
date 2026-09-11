@@ -15,6 +15,8 @@ Experiments **can** capture certain instrument-based QC data (e.g. Tapestation, 
 
 It is **not** the primary home for large-scale result data analysis or dose-response curve fitting (see LIMS Runs).
 
+**Not the same as:** an ELN **Process** (ordered SOP; sidebar **Processes**), a **LimsRun** (sidebar **Runs** — every run has an analysis), or a LimsRun **checklist** (`/v1/processes`). Extract on the common path is an **experiment** (equipment / aliquot-pool execute), not the asked-for LimsRun. Operator SoT: [HOWTO.md](HOWTO.md) § Later execution.
+
 ## Core Entities
 
 | Entity                        | Description                                                                 | Key Characteristics |
