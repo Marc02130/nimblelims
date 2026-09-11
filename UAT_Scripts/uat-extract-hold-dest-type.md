@@ -60,7 +60,7 @@
 Verify the plan and execute flows contain none of the following:
 
 - receive-time or mid-entry sample-type gate;
-- execute-time destination-type picker;
+- execute-time destination-type picker or dest-container-type picker;
 - free-text destination type;
 - destination sample-ID box;
 - wizard or forced navigation to Sample detail;
@@ -69,13 +69,30 @@ Verify the plan and execute flows contain none of the following:
 - method or destination controls on the post-execute `aliquots_pools` entry;
 - CUT methods, fake equimolar, or one entry that mints both aliquots and pools.
 
+## 6. Dest container type (plan control; dest init does not prompt)
+
+**Unsigned.** Distinct from dest **sample** type (sections 1–2) and from Method. 1×1 vessels only. E-9 lock 2026-09-10.
+
+| Step | Action | Expected result |
+|------|--------|-----------------|
+| 6.1 | Open the Aliquot / pool plan. | Third control: **Default dest container type**, separate from Method and Default dest sample type. Options: **Same as source.** plus 1×1 container types (tube, vial, well). 96-well / multi-position types are **not** listed. |
+| 6.2 | Leave default at **Same as source.** Leave the line at **Use entry default**. Save and execute. | Dest container is the **same type** as the source tube. No dest-init prompt for container type. |
+| 6.3 | Set entry default to a different 1×1 type (e.g. Cryovial). Leave the line at **Use entry default**. Save and execute. | Dest container uses the **entry default** type. |
+| 6.4 | Set the line to **Same as source.** (override) and execute. | Line clear overrides entry default; dest type is the source vessel type. |
+| 6.5 | Set the line to a specific 1×1 type and execute. | Dest container uses the **line override**. |
+| 6.6 | Template: Aliquot/pool plan entry → Default dest container type. Save template, start an experiment from it. | Runtime plan loads that default. Dest init still does not prompt. |
+| 6.7 | API: save/execute with no dest container type, inherit false, and no source container. | **422** `dest_container_type_required`. No dest minted. |
+| 6.8 | API: line `dest_container_type_id` = a plate (rows×columns ≠ 1×1). | **422** `dest_container_type_not_1x1`. No dest minted. |
+
+**Fail:** dest init asks for container type; method/sample-type/container-type collapsed into one picker; plate offered as dest mint vessel; silent execute fallback that was not a plan choice.
+
 ## Pass criteria
 
-- Steps 1–5 pass.
-- Blank always means **Same as parent.**
+- Steps 1–6 pass.
+- Blank dest **sample** type always means **Same as parent.** Blank dest **container** type always means **Same as source.**
 - Catalog choices are many-to-many and client/source/operation filtered.
 - Mixed-type pools are refused in both UI and API.
-- Execute resolves line override → entry default → parent without re-prompting. Dest type on the plan is catalog intent, **not** a Sample; dest exists **only after execute**. Route / Start / map-save / asked-for mint **zero** daughters. Receive still mints identity + first vessel — that is **not** dest mint.
+- Execute resolves dest **sample** type line override → entry default → parent without re-prompting. Dest **container** type resolves line override → entry default → source vessel without re-prompting. Dest type on the plan is catalog intent, **not** a Sample; dest exists **only after execute**. Route / Start / map-save / asked-for mint **zero** daughters. Receive still mints identity + first vessel — that is **not** dest mint.
 - **1.7 / AC-P2-C3 execute click:** dest type DNA mints a new Sample + container; parent stays Blood; dest pair continues the process. **Fail C3** if dest tube lands on the blood Sample, parent `container_id` is retargeted, or later Start follows blood. Unsigned until Tobias. Numbered on `570bbc0`; execute is `1572071`. Do not score 1.7 as C2. `570bbc0` does **not** inherit `1572071` C2 Pass or Fail.
 - **C2 execute click** (spine): extra container, same sample; dest joins; inbound assignment off; later Start follows dest. Leftover on the inbound tube is whatever was not transferred — emptying is not required. Unsigned until Tobias.
 - Assign to process: no vessel, or two vessels with no pick → **422**. No silent pick.

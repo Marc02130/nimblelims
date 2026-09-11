@@ -2067,6 +2067,7 @@ export class ApiService {
     data: {
       method: AliquotMethod;
       default_dest_sample_type: string | null;
+      default_dest_container_type: string | null;
       lines: Array<Record<string, unknown>>;
     },
   ) {
