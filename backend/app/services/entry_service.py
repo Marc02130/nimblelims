@@ -41,6 +41,10 @@ from models.entry import (
     SAMPLE_WRITE_BACK_COLUMNS,
     SAMPLE_SYSTEM_FIELDS,
     PREDEFINED_ENTRY_DEFAULTS,
+    ALIQUOT_PAIR_KEYS,
+    aliquot_pair_mate,
+    predefined_entry_declaration,
+    ensure_aliquot_pair_in_entries,
     normalize_entry_type,
     is_sample_scoped_entry,
     is_experiment_scoped_entry,
@@ -139,6 +143,7 @@ class EntryService:
                     f.visible,
                     f.write_back_target,
                 )
+        self._ensure_aliquot_pair_instance(data.experiment_id)
         self._commit_refresh(entry)
         return self.get_entry(entry.id)
 
@@ -233,9 +238,48 @@ class EntryService:
 
     def delete_entry(self, entry_id: UUID) -> None:
         entry = self.get_entry(entry_id)
+        mate_key = aliquot_pair_mate(entry.predefined_entry_key)
+        if mate_key:
+            siblings = self.repo.list_for_experiment(
+                entry.experiment_id, active=True, load_values=False
+            )
+            for sibling in siblings:
+                if (
+                    sibling.id != entry.id
+                    and sibling.predefined_entry_key == mate_key
+                ):
+                    self.repo.soft_delete_entry(sibling)
+                    sibling.modified_by = self._user_id()
         self.repo.soft_delete_entry(entry)
         entry.modified_by = self._user_id()
         self._commit_refresh(entry)
+
+    def _ensure_aliquot_pair_instance(self, experiment_id: UUID) -> None:
+        """Create the missing aliquot/pool mate if only one half exists."""
+        siblings = self.repo.list_for_experiment(
+            experiment_id, active=True, load_values=False
+        )
+        keys = {
+            e.predefined_entry_key for e in siblings if e.predefined_entry_key
+        }
+        max_sort = max((e.sort_order or 0) for e in siblings) if siblings else -1
+        for key in ALIQUOT_PAIR_KEYS:
+            mate = aliquot_pair_mate(key)
+            if key in keys and mate and mate not in keys:
+                decl = predefined_entry_declaration(mate)
+                self.repo.create_entry(
+                    experiment_id=experiment_id,
+                    entry_type=decl["entry_type"],
+                    name=decl["name"],
+                    description=decl.get("description"),
+                    predefined_entry_key=mate,
+                    sort_order=max_sort + 1,
+                    config=dict(decl.get("config") or {}),
+                    created_by=self._user_id(),
+                    modified_by=self._user_id(),
+                )
+                max_sort += 1
+                keys.add(mate)
 
     def instantiate_from_template(
         self,
@@ -251,6 +295,9 @@ class EntryService:
                 detail="Experiment not found",
             )
         if data.skip_if_exists and self.repo.count_for_experiment(experiment_id) > 0:
+            self._ensure_aliquot_pair_instance(experiment_id)
+            if self.auto_commit:
+                self.db.commit()
             return self.repo.list_for_experiment(
                 experiment_id, active=None, load_values=False
             )
@@ -269,6 +316,7 @@ class EntryService:
                 detail="Experiment template not found",
             )
         decls = (template.template_definition or {}).get("entries") or []
+        decls = ensure_aliquot_pair_in_entries(decls)
         if not isinstance(decls, list) or not decls:
             # No declarations — nothing to create
             return []
@@ -365,9 +413,12 @@ class EntryService:
                     )
             created.append(entry)
 
+        self._ensure_aliquot_pair_instance(experiment_id)
         if self.auto_commit:
             self.db.commit()
-        return [self.get_entry(e.id) for e in created]
+        return self.repo.list_for_experiment(
+            experiment_id, active=True, load_values=False
+        )
 
     def delete_row(self, entry_id: UUID, row_key: str) -> int:
         """Remove all cells for one experiment_data table row."""

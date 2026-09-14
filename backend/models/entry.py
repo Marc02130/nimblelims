@@ -17,6 +17,7 @@ Custom columns use FieldDefinitions; values in EntryFieldValue (typed columns).
 """
 
 import uuid
+from typing import Any, Dict, Optional
 from sqlalchemy import (
     Column,
     String,
@@ -160,6 +161,49 @@ PREDEFINED_ENTRY_DEFAULTS = {
         },
     },
 }
+
+# E-10: plan + dest are an atomic pair. One add creates both; half-pairs are completed.
+ALIQUOT_PAIR_KEYS = ("aliquot_pool_plan", "aliquots_pools")
+
+
+def aliquot_pair_mate(key: Optional[str]) -> Optional[str]:
+    if key == "aliquot_pool_plan":
+        return "aliquots_pools"
+    if key == "aliquots_pools":
+        return "aliquot_pool_plan"
+    return None
+
+
+def predefined_entry_declaration(key: str) -> Dict[str, Any]:
+    defaults = PREDEFINED_ENTRY_DEFAULTS[key]
+    return {
+        "predefined_entry_key": key,
+        "entry_type": defaults["entry_type"],
+        "name": defaults["name"],
+        "description": defaults.get("description"),
+        "config": dict(defaults.get("config") or {}),
+        "fields": [],
+    }
+
+
+def ensure_aliquot_pair_in_entries(entries: Any) -> Any:
+    """If either aliquot pair key is present, append the missing mate."""
+    if not isinstance(entries, list):
+        return entries
+    keys = {
+        e.get("predefined_entry_key")
+        for e in entries
+        if isinstance(e, dict)
+    }
+    out = list(entries)
+    for key in ALIQUOT_PAIR_KEYS:
+        mate = aliquot_pair_mate(key)
+        if key in keys and mate and mate not in keys:
+            decl = predefined_entry_declaration(mate)
+            decl["sort_order"] = len(out)
+            out.append(decl)
+            keys.add(mate)
+    return out
 
 
 class Entry(Base):

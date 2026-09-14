@@ -35,6 +35,11 @@ import { DataGrid, GridColDef, GridActionsCellItem, GridRowParams } from '@mui/x
 import { useUser } from '../contexts/UserContext';
 import { apiService } from '../services/apiService';
 import { FillHeightPage, FillHeightTable } from '../components/common/FillHeightPage';
+import {
+  appendAliquotPair,
+  hasAliquotPair,
+  removeAliquotPairAt,
+} from '../components/experiments/aliquotPair';
 
 interface ApiError {
   response?: {
@@ -266,38 +271,6 @@ const PREDEFINED_PRESETS: {
       fields: [],
     },
   },
-  {
-    key: 'aliquot_pool_plan',
-    label: 'Aliquot/pool plan',
-    entry: {
-      entry_type: 'experiment_data',
-      name: 'Aliquot / pool plan',
-      description: 'Plan amounts; execute creates dest samples (methods in v1)',
-      predefined_entry_key: 'aliquot_pool_plan',
-      config: {
-        method: 'aliquot_by_volume',
-        default_dest_sample_type: null,
-        default_dest_container_type: null,
-      },
-      fields: [],
-    },
-  },
-  {
-    key: 'aliquots_pools',
-    label: 'Aliquots/pools results',
-    entry: {
-      entry_type: 'experiment_sample_data',
-      name: 'Aliquots / pools',
-      description: 'Post-execute view of resulting samples',
-      predefined_entry_key: 'aliquots_pools',
-      config: {
-        sample_columns: ['client_sample_id', 'sample_type'],
-        minted_sample_ids: [],
-        populated_after_execute: false,
-      },
-      fields: [],
-    },
-  },
 ];
 
 /** New templates start with Header + Samples so create always yields a reusable entry spine. */
@@ -522,11 +495,20 @@ const ExperimentTemplatesManagement: React.FC = () => {
 
   const updateEntry = (index: number, patch: Partial<TemplateEntryDeclaration>) => {
     const updated = entriesList.map((e, i) => (i === index ? { ...e, ...patch } : e));
+    const nextKey = patch.predefined_entry_key;
+    if (nextKey === 'aliquot_pool_plan' || nextKey === 'aliquots_pools') {
+      setEntries(appendAliquotPair(updated));
+      return;
+    }
     setEntries(updated);
   };
 
   const removeEntry = (index: number) => {
-    setEntries(entriesList.filter((_, i) => i !== index));
+    setEntries(removeAliquotPairAt(entriesList, index));
+  };
+
+  const addAliquotPoolPair = () => {
+    setEntries(appendAliquotPair(entriesList));
   };
 
   const addEntryField = (entryIndex: number, fieldDefinitionId: string) => {
@@ -1510,6 +1492,14 @@ const ExperimentTemplatesManagement: React.FC = () => {
                   </Button>
                 );
               })}
+              <Button
+                size="small"
+                variant="text"
+                disabled={hasAliquotPair(formDef.entries ?? [])}
+                onClick={addAliquotPoolPair}
+              >
+                + Aliquot/pool
+              </Button>
             </Box>
           </TabPanel>
 

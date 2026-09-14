@@ -1,0 +1,27 @@
+# Dogfood: E-10 aliquot/pool atomic pair
+
+**Stem:** `extract-hold-dest-type` (atomic pair)  
+**Branch:** `feat/e10-aliquot-atomic-pair`  
+**When:** After this branch is up, **before** Tobias UAT section 7 in [`UAT_Scripts/uat-extract-hold-dest-type.md`](../../../../UAT_Scripts/uat-extract-hold-dest-type.md).  
+**Not a UAT Result.** Not dest-follow recode. Not IC50.
+
+## Env
+
+Local compose on **this feature branch**. `experiment:manage`.
+
+## Paths to try
+
+1. Template Tables & forms: only **+ Aliquot/pool** (no separate plan / dest presets).
+2. Click it → plan + dest entries. Button disables.
+3. Delete either → both gone.
+4. Save template, start experiment → both instantiate; dest empty before execute.
+5. Ad hoc experiment → **Add aliquot/pool** on Entries → same pair.
+
+## Ready for UAT?
+
+Fill after a walk:
+
+**Date:**  
+**Who:**  
+**SHA:**  
+**Ready for UAT section 7?** Yes / No — why

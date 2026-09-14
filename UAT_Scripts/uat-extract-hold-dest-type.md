@@ -95,6 +95,22 @@ Combined from two Tobias stamps on the same SHA:
 
 **Fail:** dest init asks for container type; method/sample-type/container-type collapsed into one picker; plate offered as dest mint vessel; silent execute fallback that was not a plan choice.
 
+## 7. Atomic pair (E-10) — one Add creates plan + dest
+
+**Unsigned.** One **Add aliquot/pool** creates `aliquot_pool_plan` **and** `aliquots_pools`. Dest stays empty until dest init. Do not offer separate plan-only or dest-only presets.
+
+| Step | Action | Expected result |
+|------|--------|-----------------|
+| 7.1 | New template → Tables & forms. Confirm presets. | **+ Aliquot/pool** is present. **+ Aliquot/pool plan** and **+ Aliquots/pools results** are **absent**. |
+| 7.2 | Click **+ Aliquot/pool**. | Two entries appear: Aliquot / pool plan and Aliquots / pools. The add button disables. |
+| 7.3 | Delete the plan entry. | **Both** disappear. |
+| 7.4 | Save template, create experiment from it. | Experiment has both entries. Dest table empty (no minted rows) before execute. |
+| 7.5 | Ad hoc experiment (no template). Entries → **Add aliquot/pool**. | Same pair created. |
+| 7.6 | API: POST only `aliquot_pool_plan`. | **201**; GET entries includes `aliquots_pools`. |
+| 7.7 | API: DELETE the plan entry. | Both inactive. |
+
+**Fail:** operator can add dest-only or plan-only from presets; delete leaves a half-pair.
+
 ## Pass criteria
 
 - Steps 1–6 pass.
