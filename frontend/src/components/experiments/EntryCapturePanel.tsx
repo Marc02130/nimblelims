@@ -43,6 +43,11 @@ import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { apiService } from '../../services/apiService';
 import AliquotPlanEditor from './AliquotPlanEditor';
+import {
+  ALIQUOT_PLAN_ENTRY,
+  ALIQUOT_PLAN_KEY,
+  hasAliquotPair,
+} from './aliquotPair';
 
 const apiErrorMsg = (err: any, fallback: string): string => {
   const detail = err?.response?.data?.detail;
@@ -515,6 +520,28 @@ const EntryCapturePanel: React.FC<EntryCapturePanelProps> = ({
     }
   };
 
+  const handleAddAliquotPool = async () => {
+    if (hasAliquotPair(entries)) return;
+    setInstantiating(true);
+    setError(null);
+    try {
+      await apiService.createExperimentEntry(experimentId, {
+        entry_type: ALIQUOT_PLAN_ENTRY.entry_type,
+        name: ALIQUOT_PLAN_ENTRY.name,
+        description: ALIQUOT_PLAN_ENTRY.description,
+        predefined_entry_key: ALIQUOT_PLAN_KEY,
+        sort_order: entries.length,
+        config: ALIQUOT_PLAN_ENTRY.config,
+      });
+      setSuccess('Aliquot/pool plan and dest entries added');
+      await load();
+    } catch (err) {
+      setError(apiErrorMsg(err, 'Failed to add aliquot/pool pair'));
+    } finally {
+      setInstantiating(false);
+    }
+  };
+
   const handleInstantiate = async () => {
     setInstantiating(true);
     setError(null);
@@ -631,6 +658,17 @@ const EntryCapturePanel: React.FC<EntryCapturePanelProps> = ({
               {instantiating ? 'Instantiating…' : 'Instantiate from template'}
             </Button>
           )}
+          {canEdit && !hasAliquotPair(entries) && (
+            <Button
+              size="small"
+              variant="outlined"
+              startIcon={<AddIcon />}
+              disabled={instantiating}
+              onClick={() => void handleAddAliquotPool()}
+            >
+              Add aliquot/pool
+            </Button>
+          )}
         </Box>
       </Box>
 
@@ -645,6 +683,7 @@ const EntryCapturePanel: React.FC<EntryCapturePanelProps> = ({
         <Alert severity="info">
           No entries yet. If the experiment template defines{' '}
           <code>template_definition.entries</code>, use <strong>Instantiate from template</strong>.
+          Or <strong>Add aliquot/pool</strong> to create the plan and dest pair together.
         </Alert>
       ) : (
         entries.map((entry) => {

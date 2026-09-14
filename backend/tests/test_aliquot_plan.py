@@ -1039,3 +1039,105 @@ class TestAliquotPlanExecute:
         )
         assert not_1x1.status_code == 422, not_1x1.text
         assert not_1x1.json()["detail"]["code"] == "dest_container_type_not_1x1"
+
+
+class TestAliquotAtomicPair:
+    def test_template_half_plan_completes_dest(
+        self, client: TestClient, auth_headers
+    ):
+        r = client.post(
+            "/v1/experiment-templates",
+            json={
+                "name": f"Tpl pair {uuid4().hex[:8]}",
+                "template_definition": {
+                    "entries": [
+                        {
+                            "predefined_entry_key": "aliquot_pool_plan",
+                            "name": "Aliquot / pool plan",
+                            "sort_order": 0,
+                        }
+                    ]
+                },
+            },
+            headers=auth_headers,
+        )
+        assert r.status_code == 201, r.text
+        keys = {
+            e.get("predefined_entry_key")
+            for e in r.json()["template_definition"]["entries"]
+        }
+        assert keys == {"aliquot_pool_plan", "aliquots_pools"}
+
+    def test_ad_hoc_create_plan_mints_dest_mate(
+        self, client: TestClient, auth_headers
+    ):
+        exp = client.post(
+            "/v1/experiments",
+            json={"name": f"Exp pair {uuid4().hex[:8]}"},
+            headers=auth_headers,
+        )
+        assert exp.status_code == 201, exp.text
+        exp_id = exp.json()["id"]
+        created = client.post(
+            f"/v1/experiments/{exp_id}/entries",
+            json={
+                "experiment_id": exp_id,
+                "entry_type": "experiment_data",
+                "name": "Aliquot / pool plan",
+                "predefined_entry_key": "aliquot_pool_plan",
+                "config": {"method": "aliquot_by_volume"},
+            },
+            headers=auth_headers,
+        )
+        assert created.status_code == 201, created.text
+        listed = client.get(
+            f"/v1/experiments/{exp_id}/entries", headers=auth_headers
+        )
+        assert listed.status_code == 200
+        keys = {
+            e.get("predefined_entry_key")
+            for e in listed.json()["entries"]
+            if e.get("active", True)
+        }
+        assert "aliquot_pool_plan" in keys
+        assert "aliquots_pools" in keys
+
+    def test_delete_plan_removes_dest(
+        self, client: TestClient, auth_headers
+    ):
+        exp = client.post(
+            "/v1/experiments",
+            json={"name": f"Exp del {uuid4().hex[:8]}"},
+            headers=auth_headers,
+        )
+        exp_id = exp.json()["id"]
+        client.post(
+            f"/v1/experiments/{exp_id}/entries",
+            json={
+                "experiment_id": exp_id,
+                "entry_type": "experiment_data",
+                "name": "Aliquot / pool plan",
+                "predefined_entry_key": "aliquot_pool_plan",
+            },
+            headers=auth_headers,
+        )
+        listed = client.get(
+            f"/v1/experiments/{exp_id}/entries", headers=auth_headers
+        ).json()["entries"]
+        plan = next(
+            e for e in listed if e["predefined_entry_key"] == "aliquot_pool_plan"
+        )
+        deleted = client.delete(
+            f"/v1/entries/{plan['id']}", headers=auth_headers
+        )
+        assert deleted.status_code in (200, 204), deleted.text
+        after = client.get(
+            f"/v1/experiments/{exp_id}/entries", headers=auth_headers
+        ).json()["entries"]
+        active_keys = {
+            e.get("predefined_entry_key")
+            for e in after
+            if e.get("active", True)
+        }
+        assert "aliquot_pool_plan" not in active_keys
+        assert "aliquots_pools" not in active_keys
