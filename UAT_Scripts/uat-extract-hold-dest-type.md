@@ -147,3 +147,7 @@ Combined from two Tobias stamps on the same SHA:
 **Evidence (cite only; binaries not committed):** `/workspace/uat-dest-container-type-008baf2-ui61/` (6.1 screens) and `/workspace/uat-dest-container-type-008baf2/{RESULT.md,tobias-stamp.json,acs.md}` (API 6.2–6.8 + 1–5 smoke).
 
 **Not touched by this run:** 1.7 / AC-P2-C3, AC-P2-C2, named-slot / OQ-WO-7, Leadership overall P2, receive first vessel. Their existing stamps stand as written. Not IC50.
+
+### 2026-09-14 · Marc E-10 punch (Rolf) · `feat/e10-aliquot-atomic-pair`
+
+Marc’s rows **7.3b** (delete dest → both gone), **7.6b** (POST dest-only `aliquots_pools` → **201**; GET includes plan), **7.7b** (DELETE dest → both inactive), and **7.8** (Add re-enables after the pair is gone; one pair at a time, not a lifetime lock) are live in §7 for **dogfood first**, then Tobias. **Unsigned.** Do **not** invent Tobias Pass/Fail for §7. Pass criteria this packet = **7.1–7.8**. Steps **1–6** remain the dest-container-type stamp on `008baf2` (Pass). Do **not** restamp §6. Not named-slot / OQ-WO-7 / C2/C3. Not IC50.
