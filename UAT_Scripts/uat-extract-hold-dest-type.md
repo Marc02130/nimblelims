@@ -97,7 +97,7 @@ Combined from two Tobias stamps on the same SHA:
 
 ## 7. Atomic pair (E-10) — one Add creates plan + dest
 
-**Unsigned.** One **Add aliquot/pool** creates `aliquot_pool_plan` **and** `aliquots_pools`. Dest stays empty until dest init. Do not offer separate plan-only or dest-only presets.
+**Unsigned** until Tobias. **Deiter Lab Ops Confirm** of Marc’s fold (2026-09-14). Dogfood first on product SHA **`9312c54`** (`9312c54ddd3999963abd3070c76b0057b62e5d4c`; `feat/e10` tip may have moved). Cite **`9312c54`** for dogfood / unsigned UAT §7 — not the later docs tip. One **Add aliquot/pool** creates `aliquot_pool_plan` **and** `aliquots_pools`. Dest stays empty until dest init. Do not offer separate plan-only or dest-only presets. Do **not** invent Pass. §§1–6 stay `008baf2`.
 
 | Step | Action | Expected result |
 |------|--------|-----------------|
@@ -117,7 +117,7 @@ Combined from two Tobias stamps on the same SHA:
 
 ## Pass criteria
 
-- **This packet (E-10):** Steps **7.1–7.8** (unsigned until Tobias). Do **not** restamp §6.
+- **This packet (E-10):** Steps **7.1–7.8** (unsigned until Tobias). Dogfood on product **`9312c54`**. **Deiter Lab Ops Confirm** of Marc’s fold is not a Tobias Pass. Do **not** restamp §6.
 - Steps 1–6 remain the dest-container-type stamp on `008baf2` (Pass). They are not this packet.
 - Blank dest **sample** type always means **Same as parent.** Blank dest **container** type always means **Same as source.**
 - Catalog choices are many-to-many and client/source/operation filtered.
@@ -151,3 +151,7 @@ Combined from two Tobias stamps on the same SHA:
 ### 2026-09-14 · Marc E-10 punch (Rolf) · `feat/e10-aliquot-atomic-pair`
 
 Marc’s rows **7.3b** (delete dest → both gone), **7.6b** (POST dest-only `aliquots_pools` → **201**; GET includes plan), **7.7b** (DELETE dest → both inactive), and **7.8** (Add re-enables after the pair is gone; one pair at a time, not a lifetime lock) are live in §7 for **dogfood first**, then Tobias. **Unsigned.** Do **not** invent Tobias Pass/Fail for §7. Pass criteria this packet = **7.1–7.8**. Steps **1–6** remain the dest-container-type stamp on `008baf2` (Pass). Do **not** restamp §6. Not named-slot / OQ-WO-7 / C2/C3. Not IC50.
+
+### 2026-09-14 · Deiter Lab Ops Confirm of Marc’s fold · product `9312c54`
+
+**Deiter Lab Ops Confirm** of Marc’s E-10 punch (7.3b / 7.6b / 7.7b / 7.8). **Still unsigned until Tobias.** Do **not** invent Pass. Dogfood first on product SHA **`9312c54`** (`9312c54ddd3999963abd3070c76b0057b62e5d4c`, `feat(processing): E-10 aliquot/pool atomic pair on add`). Cite **`9312c54`** for dogfood / unsigned UAT §7; `feat/e10` tip may have moved (docs commits after this SHA are not the dogfood product). §§1–6 stay `008baf2`. Not named-slot / OQ-WO-7 / C2/C3. Not IC50.

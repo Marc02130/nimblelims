@@ -1,12 +1,15 @@
 # 2026-09-14 — E-10 atomic pair UAT punch (Marc / Rolf)
 
 **Stem:** `extract-hold-dest-type` (atomic pair)  
-**Branch:** `feat/e10-aliquot-atomic-pair` (tip ~`f3c2818` when punched)  
-**Not IC50.** Does **not** restamp dest-container-type §6 (`008baf2` Pass). Does **not** invent Tobias Pass/Fail for §7. Does **not** touch named-slot / OQ-WO-7 / C2/C3 unsigned stamps.
+**Branch:** `feat/e10-aliquot-atomic-pair`  
+**Product SHA for dogfood / unsigned UAT §7:** **`9312c54`** (`9312c54ddd3999963abd3070c76b0057b62e5d4c`). `feat/e10` tip may have moved; do not cite later docs tips as the dogfood product.  
+**Not IC50.** Does **not** restamp dest-container-type §§1–6 (`008baf2` Pass). Does **not** invent Tobias Pass/Fail for §7. Does **not** touch named-slot / OQ-WO-7 / C2/C3 unsigned stamps.
 
 ## Punch
 
-Rolf 2026-09-14: fold Marc’s E-10 UAT rows. **Still unsigned until Tobias. Dogfood first.**
+Rolf 2026-09-14: fold Marc’s E-10 UAT rows. **Still unsigned until Tobias. Dogfood first** on **`9312c54`**.
+
+**Deiter Lab Ops Confirm** of Marc’s fold (2026-09-14). Confirm of the punch, **not** a UAT Pass.
 
 | Row | Lock |
 |-----|------|
