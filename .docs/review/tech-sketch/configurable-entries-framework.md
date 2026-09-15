@@ -106,6 +106,16 @@ Sample **read-only projections** on grids may display identity for the tech (typ
 
 A predefined wrapper is **functionality + catalogs + (when minting) execute**, keyed by `predefined_entry_key`. It is still one of the two kinds.
 
+**Catalog (code):** `WRAPPER_CATALOG` in `backend/models/wrappers.py` and `frontend/src/components/experiments/wrappers.ts`. Add, mate-complete, execute dest lookup, and cardinality **409** `wrapper_at_capacity` read this table — not `if key == aliquot_pool_plan`.
+
+| Wrapper id | Keys | Cardinality | Atomic pair | Mint | `source_from` now |
+|------------|------|-------------|-------------|------|-------------------|
+| `aliquot_pool` | `aliquot_pool_plan`, `aliquots_pools` | **1** | yes | yes | `start_cohort` |
+| `experiment_header` | `experiment_header` | 1 | no | no | — |
+| `samples` | `samples` | 1 | no | no | — |
+
+n-instances and predecessor dest as source are parked: [ideas/aliquot-pool-multiple-pairs.md](../../internal/ideas/aliquot-pool-multiple-pairs.md).
+
 ### 4.1 First proof: aliquot/pool (atomic pair)
 
 | Role | `predefined_entry_key` | Kind | When | Owns |
@@ -113,7 +123,7 @@ A predefined wrapper is **functionality + catalogs + (when minting) execute**, k
 | **Plan** | `aliquot_pool_plan` | `experiment_data` | Before / at execute | Entry config + plan lines (METHOD_CATALOG plan-line columns) |
 | **Dest** | `aliquots_pools` | `experiment_sample_data` | Created at add (**empty**); populated **after execute only** | Lists minted daughters. Dest FieldDefinitions live **on this entry**, not Sample columns. **No** method/type picker. |
 
-**Atomic pair (locked):** one **“Add aliquot/pool”** action (template or ad hoc) creates **both** entries together. UI must **not** offer plan-only or dest-only. Dest stays empty until after execute. **No** new experiment-plan object.
+**Atomic pair (locked):** one **“Add aliquot/pool”** action (template or ad hoc) creates **both** entries together. UI must **not** offer plan-only or dest-only. Dest stays empty until after execute. **No** new experiment-plan object. **Cardinality 1** on this wrapper until n-pairs (ideas).
 
 Flow: Add → both entries exist (dest empty) → operator selects **method** → METHOD_CATALOG attaches **both maps immediately** → Execute reads plan → mints dests → L1 join → dest entry lists them. No dest-type re-prompt at execute.
 
@@ -123,16 +133,14 @@ Flow: Add → both entries exist (dest empty) → operator selects **method** �
 
 Other v1 surfaces (Samples cohort display, generic plating/LH as `experiment_data`, LIMS Run for instrument primary data) remain as in experiment-template-entries §0.9. Instrument primary data is **not** an ELN instrument entry.
 
-### 4.3 Non-mint wrappers (open implementation hole)
+### 4.3 Non-mint wrappers
 
-Header, instrument-used, reagent-used, and review are **non-mint wrappers**. Each is one of the two kinds plus `predefined_entry_key` and kind-scoped FieldDefinitions. They do **not** use `METHOD_CATALOG`, because they do not choose a mint operation or attach plan/destination maps.
+Header and Samples are **in** `WRAPPER_CATALOG` (cardinality 1, no mint, no METHOD_CATALOG). Instrument-used, reagent-used, and review are still a hole: kind + FieldDefinitions only, not catalog rows yet.
 
 - **Header:** `experiment_data`; context fields. Existing pin-to-top UX lock remains.
 - **Instrument-used:** process capture/reference only. Instrument primary files and Results remain on the LIMS Run.
 - **Reagent-used:** process capture/reference only; it does not create a parallel materials inventory.
 - **Review:** review capture/status fields; it does not create a third entry kind.
-
-These wrappers are a framework hole, not part of the implemented mint proof.
 
 ---
 

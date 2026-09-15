@@ -53,3 +53,7 @@ Dest type on the aliquot/pool **plan entry** (beside Method), blank = Same as pa
 ```
 LAB OPS REVIEW: Accept with conditions (L1 Met; L2)
 ```
+
+## 6. Deiter Lab Ops Confirm — Marc E-10 fold (2026-09-14)
+
+**Deiter Lab Ops Confirm** of Marc’s UAT punch (7.3b / 7.6b / 7.7b / 7.8). Formal **§7 Result: Fail** (Tobias QA, 2026-09-14 21:31 ET, `e5a8fdd`). Packet 7.1–7.8 Pass; overall Fail = Deiter double-Add. **Blocking:** API second plan POST while pair/half exists. Do **not** invent overall §7 Pass. **Rolf Confirm: Hold merge** (`feat/e10-aliquot-atomic-pair` → `main`) until server-side single-pair uniqueness lands and Tobias restamps; product owns that fix and no fix is claimed here. **Tobias dogfood Ready=Yes** on `feat/e10-aliquot-atomic-pair` (2026-09-14 21:23 ET; `/workspace/dogfood-e10-e5a8fdd/READY.md`; SHA **`e5a8fdd`**; paths **1–5 Pass**; clean FE Docker/CRA green) is dogfood history, **not** a UAT Pass; the earlier **No Hold** covered starting §7. Prior Ready=No on **`9312c54`** (TS2345) stays history. Evidence: `/workspace/uat-e10-section7-e5a8fdd/RESULT.md`, `/workspace/uat-e10-section7-e5a8fdd/acs.md`, `/workspace/uat-e10-section7-e5a8fdd/stamp.json`. §§1–6 stay `008baf2`. Does **not** rewrite the 2026-08-23 Accept-with-conditions verdict above. Not named-slot / OQ-WO-7 / C2/C3. Not IC50.
