@@ -97,27 +97,39 @@ Combined from two Tobias stamps on the same SHA:
 
 ## 7. Atomic pair (E-10) — one Add creates plan + dest
 
-**Unsigned.** Formal §7 stays unsigned until Tobias stamps Pass/Fail. **Tobias dogfood Ready=Yes** on **`feat/e10-aliquot-atomic-pair`** (2026-09-14 21:23 ET; `/workspace/dogfood-e10-e5a8fdd/READY.md`; SHA **`e5a8fdd`**). Paths **1–5 Pass**. Clean FE **Docker**/CRA build green; no local patch. Ready=Yes is **not** §7 Pass. Do **not** invent §7 Pass. **Rolf Confirm: No Hold.** Ready=Yes stands on **`e5a8fdd`**. Tobias proceeds with formal §7. Prior Ready=No on **`9312c54`** (TS2345) stays history. **Deiter Lab Ops Confirm** of Marc’s fold (2026-09-14) is not a Tobias Pass. One **Add aliquot/pool** creates `aliquot_pool_plan` **and** `aliquots_pools`. Dest stays empty until dest init. Do not offer separate plan-only or dest-only presets. §§1–6 stay `008baf2`.
+**Result: Fail** (Tobias QA) · 2026-09-14 21:31 ET · SHA `e5a8fdd50538e23e67c1425dadb3e505171b987f` (`e5a8fdd`) · `feat/e10-aliquot-atomic-pair` · Compose down.
 
-| Step | Action | Expected result |
-|------|--------|-----------------|
-| 7.1 | New template → Tables & forms. Confirm presets. | **+ Aliquot/pool** is present. **+ Aliquot/pool plan** and **+ Aliquots/pools results** are **absent**. |
-| 7.2 | Click **+ Aliquot/pool**. | Two entries appear: Aliquot / pool plan and Aliquots / pools. Add **disables while the pair exists** (not forever — see 7.8). |
-| 7.3 | Delete the **plan** entry. | **Both** disappear. |
-| 7.3b | Add the pair again. Delete the **dest** entry. | **Both** disappear. Same as 7.3; either half is the pair. |
-| 7.4 | Save template, create experiment from it. | Experiment has both entries. Dest table empty (no minted rows) before execute. |
-| 7.5 | Ad hoc experiment (no template). Entries → **Add aliquot/pool**. | Same pair created. Add hidden/disabled while the pair exists. |
-| 7.6 | API: POST only `aliquot_pool_plan`. | **201**; GET entries includes `aliquots_pools`. |
-| 7.6b | API: POST only `aliquots_pools` on a fresh experiment. | **201**; GET entries includes `aliquot_pool_plan`. |
-| 7.7 | API: DELETE the plan entry. | Both inactive. |
-| 7.7b | API: DELETE the dest entry (fresh pair). | Both inactive. |
-| 7.8 | After 7.3 / 7.3b (pair gone). | **+ Aliquot/pool** / **Add aliquot/pool** is enabled again. One pair at a time per template or experiment — not a lifetime lock. |
+Packet **7.1–7.8 Pass**. Overall **Fail** because of Deiter Lab Ops EXTRA **double-Add** bar (API allows a second plan POST while a pair or half exists). Do **not** invent overall §7 Pass. **Tobias dogfood Ready=Yes** on **`e5a8fdd`** stands (dogfood; `/workspace/dogfood-e10-e5a8fdd/READY.md`) — Ready=Yes is **not** a UAT Pass. **Rolf Confirm: No Hold** stands. Product owns server-side single-pair uniqueness before restamp. Prior Ready=No on **`9312c54`** stays history. **Deiter Lab Ops Confirm** of Marc’s fold (2026-09-14) is not a Tobias Pass. One **Add aliquot/pool** creates `aliquot_pool_plan` **and** `aliquots_pools`. Dest stays empty until dest init. Do not offer separate plan-only or dest-only presets. §§1–6 stay `008baf2`. Not IC50.
 
-**Fail:** operator can add dest-only or plan-only from presets; delete leaves a half-pair; add stays disabled after the pair is gone.
+| Step | Action | Expected result | Result |
+|------|--------|-----------------|--------|
+| 7.1 | New template → Tables & forms. Confirm presets. | **+ Aliquot/pool** is present. **+ Aliquot/pool plan** and **+ Aliquots/pools results** are **absent**. | **Pass** (Tobias, 2026-09-14 21:31 ET, `e5a8fdd`) |
+| 7.2 | Click **+ Aliquot/pool**. | Two entries appear: Aliquot / pool plan and Aliquots / pools. Add **disables while the pair exists** (not forever — see 7.8). | **Pass** |
+| 7.3 | Delete the **plan** entry. | **Both** disappear. | **Pass** |
+| 7.3b | Add the pair again. Delete the **dest** entry. | **Both** disappear. Same as 7.3; either half is the pair. | **Pass** |
+| 7.4 | Save template, create experiment from it. | Experiment has both entries. Dest table empty (no minted rows) before execute. | **Pass** |
+| 7.5 | Ad hoc experiment (no template). Entries → **Add aliquot/pool**. | Same pair created. Add hidden/disabled while the pair exists. | **Pass** |
+| 7.6 | API: POST only `aliquot_pool_plan`. | **201**; GET entries includes `aliquots_pools`. | **Pass** |
+| 7.6b | API: POST only `aliquots_pools` on a fresh experiment. | **201**; GET entries includes `aliquot_pool_plan`. | **Pass** |
+| 7.7 | API: DELETE the plan entry. | Both inactive. | **Pass** |
+| 7.7b | API: DELETE the dest entry (fresh pair). | Both inactive. | **Pass** |
+| 7.8 | After 7.3 / 7.3b (pair gone). | **+ Aliquot/pool** / **Add aliquot/pool** is enabled again. One pair at a time per template or experiment — not a lifetime lock. | **Pass** |
+
+**Deiter Lab Ops EXTRA Fail bars** (same SHA; overall §7 Fail):
+
+| Bar | Result |
+|-----|--------|
+| Double-click Add → two pairs / half | **Fail** — concurrent double POST → 2 plans + 2 dests; sequential 2nd POST → 2 plans + 1 dest. FE hide/disable present; API lacks single-pair uniqueness. |
+| Reload/refresh orphan | Pass |
+| Mint-early before execute | Pass |
+
+**Blocking:** API allows a second plan POST while a pair (or half) exists. Server-side uniqueness needed before Pass.
+
+**Fail:** operator can add dest-only or plan-only from presets; delete leaves a half-pair; add stays disabled after the pair is gone; **second plan POST while a pair (or half) exists** (Deiter double-Add).
 
 ## Pass criteria
 
-- **This packet (E-10):** Steps **7.1–7.8**. Formal **§7 Unsigned**. **Tobias dogfood Ready=Yes** on `feat/e10-aliquot-atomic-pair` (verbatim `/workspace/dogfood-e10-e5a8fdd/READY.md`; SHA **`e5a8fdd`**). Paths **1–5 Pass**. Clean FE Docker/CRA green; no local patch. Ready=Yes is **not** §7 Pass. Do **not** invent §7 Pass/Fail. **Rolf Confirm: No Hold.** Ready=Yes stands on **`e5a8fdd`**. Tobias proceeds with formal §7. Prior Ready=No on **`9312c54`** stays history. **Deiter Lab Ops Confirm** of Marc’s fold is not a Tobias Pass. Do **not** restamp §6.
+- **This packet (E-10):** Steps **7.1–7.8**. Formal **§7 Result: Fail** (Tobias QA, 2026-09-14 21:31 ET, `e5a8fdd`). Packet **7.1–7.8 Pass**. Overall Fail = Deiter Lab Ops EXTRA **double-Add** (API second plan POST while a pair or half exists). Do **not** invent overall §7 Pass. **Tobias dogfood Ready=Yes** stands on `e5a8fdd` (dogfood, not a UAT Pass). **Rolf Confirm: No Hold** stands. Product owns API uniqueness before restamp. Prior Ready=No on **`9312c54`** stays history. **Deiter Lab Ops Confirm** of Marc’s fold is not a Tobias Pass. Do **not** restamp §6. Artifacts: `/workspace/uat-e10-section7-e5a8fdd/`.
 - Steps 1–6 remain the dest-container-type stamp on `008baf2` (Pass). They are not this packet.
 - Blank dest **sample** type always means **Same as parent.** Blank dest **container** type always means **Same as source.**
 - Catalog choices are many-to-many and client/source/operation filtered.
@@ -199,3 +211,16 @@ Artifacts: `/workspace/dogfood-e10-e5a8fdd/`
 ### 2026-09-14 · Rolf Confirm: No Hold · product `e5a8fdd`
 
 **Rolf Confirm: No Hold.** Ready=Yes stands on **`e5a8fdd`**. Tobias proceeds with formal §7. Formal **§7 Unsigned** until Tobias stamps Pass/Fail. Do **not** invent §7 Pass. Evidence: `/workspace/dogfood-e10-e5a8fdd/READY.md`. Prior Ready=No on **`9312c54`** stays history. §§1–6 stay `008baf2`. Not named-slot / OQ-WO-7 / C2/C3. Not IC50.
+
+**History.** Formal §7 later stamped **Fail** (addendum below). This Confirm is not a UAT Pass.
+
+### 2026-09-14 21:31 ET · Tobias formal §7 Fail · product `e5a8fdd`
+
+**Result: Fail** (Tobias QA) · SHA `e5a8fdd50538e23e67c1425dadb3e505171b987f` · `feat/e10-aliquot-atomic-pair` · Compose down. §§1–6 stay `008baf2` (not restamped). Not IC50.
+
+- **7.1–7.8:** all **Pass** (packet rows).
+- **Deiter Lab Ops EXTRA:** Double-click Add → two pairs / half **Fail** — concurrent double POST → 2 plans + 2 dests; sequential 2nd POST → 2 plans + 1 dest. FE hide/disable present; API lacks single-pair uniqueness. Reload/refresh orphan **Pass**. Mint-early before execute **Pass**.
+- **Blocking:** API allows a second plan POST while a pair (or half) exists. Server-side uniqueness needed before Pass.
+- **Honesty:** Do **not** invent Pass for overall §7. Packet 7.1–7.8 Pass is recorded; overall Result is **Fail** because of the Deiter double-Add bar. **Ready=Yes** on `e5a8fdd` stands (dogfood). Product owns the API uniqueness fix before restamp.
+
+Artifacts: `/workspace/uat-e10-section7-e5a8fdd/`.

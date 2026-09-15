@@ -2,10 +2,10 @@
 
 **Stem:** `extract-hold-dest-type` (atomic pair)  
 **Branch:** `feat/e10-aliquot-atomic-pair`  
-**Product SHA:** **`e5a8fdd`** (`e5a8fdd50538e23e67c1425dadb3e505171b987f`) tip of `feat/e10-aliquot-atomic-pair` (includes `hasAliquotPair` nullability fix). Cite this SHA for current dogfood / unsigned UAT §7.  
-**When:** After this branch is up, **before** Tobias UAT section 7 in [`UAT_Scripts/uat-extract-hold-dest-type.md`](../../../../UAT_Scripts/uat-extract-hold-dest-type.md). Tobias is starting formal §7.  
+**Product SHA:** **`e5a8fdd`** (`e5a8fdd50538e23e67c1425dadb3e505171b987f`) tip of `feat/e10-aliquot-atomic-pair` (includes `hasAliquotPair` nullability fix). Cite this SHA for dogfood Ready=Yes and formal UAT §7 **Fail**.  
+**When:** Dogfood **Ready=Yes** (2026-09-14 21:23 ET) then formal §7 (2026-09-14 21:31 ET) in [`UAT_Scripts/uat-extract-hold-dest-type.md`](../../../../UAT_Scripts/uat-extract-hold-dest-type.md).  
 **Deiter Lab Ops Confirm** of Marc’s fold (2026-09-14) — **not** a UAT Pass.  
-**Tobias dogfood Ready=Yes** on **`feat/e10-aliquot-atomic-pair`** (2026-09-14 21:23 ET restamp; evidence `/workspace/dogfood-e10-e5a8fdd/READY.md`). Clean FE **Docker**/CRA build green on **`e5a8fdd`**. Paths **1–5 Pass**. **Rolf Confirm: No Hold.** Ready=Yes stands on **`e5a8fdd`**. Tobias proceeds with formal §7. Formal **§7 stays Unsigned** until Tobias stamps Pass/Fail. Ready=Yes is **not** §7 Pass. Do **not** invent §7 Pass. Prior Ready=No on **`9312c54`** (TS2345) stays history — superseded by this restamp. §§1–6 stay `008baf2`.  
+**Tobias dogfood Ready=Yes** on **`feat/e10-aliquot-atomic-pair`** (2026-09-14 21:23 ET restamp; evidence `/workspace/dogfood-e10-e5a8fdd/READY.md`). Clean FE **Docker**/CRA build green on **`e5a8fdd`**. Paths **1–5 Pass**. **Rolf Confirm: No Hold.** Ready=Yes stands on **`e5a8fdd`** (dogfood). Formal **§7 Result: Fail** (Tobias QA, 2026-09-14 21:31 ET). Packet 7.1–7.8 Pass; overall Fail = Deiter double-Add (API uniqueness). Do **not** invent overall §7 Pass. Product owns API uniqueness before restamp. Prior Ready=No on **`9312c54`** (TS2345) stays history. §§1–6 stay `008baf2`.  
 **Not a UAT Result.** Not dest-follow recode. Not IC50.
 
 ## Env
@@ -42,7 +42,7 @@ Artifacts: `/workspace/dogfood-e10-e5a8fdd/`
 **Who:** Tobias (dogfood restamp)  
 **Branch:** `feat/e10-aliquot-atomic-pair`  
 **SHA:** product / tip `e5a8fdd`  
-**Ready for UAT section 7?** **Yes** (verbatim READY.md). **Rolf Confirm: No Hold.** Tobias proceeds with formal §7. Formal **§7 Unsigned**. Ready=Yes is **not** §7 Pass. Do **not** invent §7 Pass.
+**Ready for UAT section 7?** **Yes** (verbatim READY.md). **Rolf Confirm: No Hold.** Ready=Yes stands (dogfood). Formal **§7 Result: Fail** (Tobias QA, 2026-09-14 21:31 ET). Ready=Yes is **not** a UAT Pass. Do **not** invent overall §7 Pass.
 
 ### History — Ready=No on `9312c54` (superseded)
 
@@ -67,4 +67,5 @@ That Ready=No (TS2345 `hasAliquotPair` on **`9312c54`**; walk patch not landed; 
 | Severity | Issue | Action |
 |----------|--------|--------|
 | History (resolved) | Clean frontend **Docker** image build from product **`9312c54`** failed **TS2345** on `hasAliquotPair` nullability. Walk used a local uncommitted one-line patch. | Landed on tip **`e5a8fdd`**. Ready=No on `9312c54` stays history. |
-| Pass (dogfood paths, not UAT) | Paths **1–5 Pass** on product **`e5a8fdd`** (single **+ Aliquot/pool** preset, pair create, delete-plan and delete-dest both clear both halves, template→experiment instantiate with dest `minted_sample_ids: []` / `populated_after_execute: false`, ad hoc pair). Clean FE Docker/CRA **Yes**. No local patch. | **Rolf Confirm: No Hold.** Tobias proceeds with formal §7. Does **not** sign formal §7. Formal §7 stays **Unsigned**. Do **not** invent Pass from §6 / `008baf2`. |
+| Pass (dogfood paths, not UAT) | Paths **1–5 Pass** on product **`e5a8fdd`** (single **+ Aliquot/pool** preset, pair create, delete-plan and delete-dest both clear both halves, template→experiment instantiate with dest `minted_sample_ids: []` / `populated_after_execute: false`, ad hoc pair). Clean FE Docker/CRA **Yes**. No local patch. | **Rolf Confirm: No Hold.** Ready=Yes stands (dogfood). Does **not** sign formal §7. Formal §7 **Fail** (see UAT stamp). Do **not** invent Pass from §6 / `008baf2`. |
+| Formal UAT (after this dogfood) | Formal §7 **Fail** (Tobias QA, 2026-09-14 21:31 ET, `e5a8fdd`). Packet 7.1–7.8 Pass. Deiter EXTRA double-Add **Fail**: concurrent double POST → 2 plans + 2 dests; sequential 2nd POST → 2 plans + 1 dest. FE hide/disable present; API lacks single-pair uniqueness. | Product owns API uniqueness before restamp. Do **not** invent overall §7 Pass. Artifacts `/workspace/uat-e10-section7-e5a8fdd/`. |
