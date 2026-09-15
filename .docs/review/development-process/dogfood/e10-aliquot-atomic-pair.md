@@ -2,15 +2,15 @@
 
 **Stem:** `extract-hold-dest-type` (atomic pair)  
 **Branch:** `feat/e10-aliquot-atomic-pair`  
-**Product SHA:** **`9312c54`** (`9312c54ddd3999963abd3070c76b0057b62e5d4c`). Cite this SHA for dogfood / unsigned UAT §7. Docs tip **`50b878a`** is not the product.  
-**When:** After this branch is up, **before** Tobias UAT section 7 in [`UAT_Scripts/uat-extract-hold-dest-type.md`](../../../../UAT_Scripts/uat-extract-hold-dest-type.md).  
+**Product SHA:** **`e5a8fdd`** (`e5a8fdd50538e23e67c1425dadb3e505171b987f`) tip of `feat/e10-aliquot-atomic-pair` (includes `hasAliquotPair` nullability fix). Cite this SHA for current dogfood / unsigned UAT §7.  
+**When:** After this branch is up, **before** Tobias UAT section 7 in [`UAT_Scripts/uat-extract-hold-dest-type.md`](../../../../UAT_Scripts/uat-extract-hold-dest-type.md). Tobias is starting formal §7.  
 **Deiter Lab Ops Confirm** of Marc’s fold (2026-09-14) — **not** a UAT Pass.  
-**Tobias dogfood Ready=No** on **`feat/e10-aliquot-atomic-pair`** (2026-09-14 20:26 ET). Paths **1–5 Pass** on product **`9312c54`**. Clean FE **Docker** build fails **TS2345** `hasAliquotPair` nullability. Local one-line patch was used for the walk **only** — **not landed**. **Rolf Hold §7 UAT** until that fix is on the tip (or CRA / Docker FE image green). Formal **§7 stays Unsigned**. Do **not** invent Ready=Yes or §7 Pass. §§1–6 stay `008baf2`.  
+**Tobias dogfood Ready=Yes** on **`feat/e10-aliquot-atomic-pair`** (2026-09-14 21:23 ET restamp). Clean FE **Docker**/CRA build green on **`e5a8fdd`**. Paths **1–5 Pass**. **Rolf Hold §7 UAT lifts** (Tobias starting formal §7 unless Rolf Holds again). Formal **§7 stays Unsigned** until Tobias stamps Pass/Fail. Ready=Yes is **not** §7 Pass. Do **not** invent §7 Pass. Prior Ready=No on **`9312c54`** (TS2345) stays history — superseded by this restamp. §§1–6 stay `008baf2`.  
 **Not a UAT Result.** Not dest-follow recode. Not IC50.
 
 ## Env
 
-Local compose on product **`9312c54`**. `experiment:manage`.
+Local compose on product **`e5a8fdd`**. `experiment:manage`.
 
 ## Paths to try
 
@@ -22,7 +22,31 @@ Local compose on product **`9312c54`**. `experiment:manage`.
 
 ## Ready for UAT?
 
-Tobias stamp of record (verbatim from `/workspace/dogfood-e10-9312c54/READY.md`; artifacts `/workspace/dogfood-e10-9312c54/`):
+Tobias stamp of record (verbatim from `/workspace/dogfood-e10-e5a8fdd/READY.md`; artifacts `/workspace/dogfood-e10-e5a8fdd/`):
+
+```
+# Dogfood Ready — E-10 aliquot/pool atomic pair
+
+**Date:** 2026-09-14 21:23 ET
+**Who:** Tobias (dogfood restamp)
+**SHA:** `e5a8fdd50538e23e67c1425dadb3e505171b987f` (e5a8fdd) tip of `feat/e10-aliquot-atomic-pair` (includes hasAliquotPair nullability fix).
+
+**Clean FE build:** Yes — `docker build --no-cache` frontend from this SHA; CRA Compiled successfully; no local patch; working tree clean.
+
+**Ready for UAT section 7?** Yes — clean FE Docker/CRA build green on tip `e5a8fdd`, and dogfood paths 1–5 Pass (single **+ Aliquot/pool** preset, pair create, delete-plan and delete-dest both clear both halves, template→experiment instantiate with dest `minted_sample_ids: []` / `populated_after_execute: false`, ad hoc pair). Not formal §7. Do **not** invent Pass from §6 / 008baf2. Not IC50.
+
+Artifacts: `/workspace/dogfood-e10-e5a8fdd/`
+```
+
+**Date:** 2026-09-14 21:23 ET  
+**Who:** Tobias (dogfood restamp)  
+**Branch:** `feat/e10-aliquot-atomic-pair`  
+**SHA:** product / tip `e5a8fdd`  
+**Ready for UAT section 7?** **Yes** (verbatim READY.md). Formal **§7 Unsigned**. Ready=Yes is **not** §7 Pass. Do **not** invent §7 Pass.
+
+### History — Ready=No on `9312c54` (superseded)
+
+Prior stamp (2026-09-14 20:26 ET) stays history. Verbatim from `/workspace/dogfood-e10-9312c54/READY.md`; artifacts `/workspace/dogfood-e10-9312c54/`:
 
 ```
 # Dogfood Ready — E-10 aliquot/pool atomic pair
@@ -36,16 +60,11 @@ Tobias stamp of record (verbatim from `/workspace/dogfood-e10-9312c54/READY.md`;
 Artifacts: `/workspace/dogfood-e10-9312c54/`
 ```
 
-**Date:** 2026-09-14 20:26 ET  
-**Who:** Tobias (dogfood)  
-**Branch:** `feat/e10-aliquot-atomic-pair`  
-**SHA:** product `9312c54`; HEAD / docs tip `50b878a`  
-**Ready for UAT section 7?** **No** (verbatim READY.md). Do **not** invent Ready=Yes.
+That Ready=No (TS2345 `hasAliquotPair` on **`9312c54`**; walk patch not landed; **Rolf Hold §7 UAT**) is **superseded** by Ready=Yes on **`e5a8fdd`**.
 
 ## Findings
 
 | Severity | Issue | Action |
 |----------|--------|--------|
-| Blocker | Clean frontend **Docker** image build from product **`9312c54`** fails **TS2345** on `hasAliquotPair` nullability. | Product owns the fix. Land on `feat/e10-aliquot-atomic-pair` (or confirm CRA / Docker FE image green) before formal §7. **Rolf Hold §7 UAT.** |
-| Walk-only | Local uncommitted one-line patch used so the dogfood UI image could walk paths 1–5. | **Not landed.** Do not treat the walk patch as shipped product. |
-| Pass (dogfood paths, not UAT) | Paths **1–5 Pass** on product **`9312c54`** (API + source/bundle: single **+ Aliquot/pool** preset, pair create, delete-plan and delete-dest both clear both halves, template→experiment instantiate with dest `minted_sample_ids: []` / `populated_after_execute: false`, ad hoc pair). | Does **not** sign formal §7. Formal §7 stays **Unsigned**. Do **not** invent Pass from §6 / `008baf2`. |
+| History (resolved) | Clean frontend **Docker** image build from product **`9312c54`** failed **TS2345** on `hasAliquotPair` nullability. Walk used a local uncommitted one-line patch. | Landed on tip **`e5a8fdd`**. Ready=No on `9312c54` stays history. |
+| Pass (dogfood paths, not UAT) | Paths **1–5 Pass** on product **`e5a8fdd`** (single **+ Aliquot/pool** preset, pair create, delete-plan and delete-dest both clear both halves, template→experiment instantiate with dest `minted_sample_ids: []` / `populated_after_execute: false`, ad hoc pair). Clean FE Docker/CRA **Yes**. No local patch. | **Rolf Hold lifts.** Tobias starting formal §7 unless Rolf Holds again. Does **not** sign formal §7. Formal §7 stays **Unsigned**. Do **not** invent Pass from §6 / `008baf2`. |
