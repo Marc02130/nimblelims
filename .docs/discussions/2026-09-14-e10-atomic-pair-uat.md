@@ -1,16 +1,16 @@
 # 2026-09-14 — E-10 atomic pair UAT punch (Marc / Rolf)
 
 **Stem:** `extract-hold-dest-type` (atomic pair)  
-**Branch:** `feat/e10-aliquot-atomic-pair`  
-**Product SHA:** **`e5a8fdd`** (`e5a8fdd50538e23e67c1425dadb3e505171b987f`) tip of `feat/e10-aliquot-atomic-pair` (includes `hasAliquotPair` nullability fix).  
-**Live state:** formal **§7 Result: Fail** (Tobias QA, 2026-09-14 21:31 ET, **`e5a8fdd`**) with **Rolf Confirm: Hold merge** (`feat/e10-aliquot-atomic-pair` → `main`). Packet 7.1–7.8 Pass; overall Fail = Deiter **double-Add**. **Blocking:** API second plan POST while pair/half exists. Do **not** invent overall §7 Pass. **Tobias dogfood Ready=Yes** (2026-09-14 21:23 ET; `/workspace/dogfood-e10-e5a8fdd/READY.md`; paths 1–5 Pass, clean FE Docker/CRA) is **dogfood history**, not a UAT Pass; the earlier **Rolf Confirm: No Hold** covered starting §7 and is history. Prior Ready=No on **`9312c54`** (TS2345) stays history.  
-**Not IC50.** Does **not** restamp dest-container-type §§1–6 (`008baf2` Pass). Does **not** invent overall §7 Pass. Does **not** touch named-slot / OQ-WO-7 / C2/C3 unsigned stamps.
+**Branch:** product on `main` (PR **129**)  
+**Product SHA (overall §7 / uniqueness):** **`dc7ee92`** (`dc7ee92c086558420c16edffe301773975f17234`). Merge tip **`e56a89f`** (`e56a89fe01656b416cfcae885b6ade605e8cf38e`).  
+**Live state:** formal **§7 Result: Pass** (Tobias QA, 2026-09-14 22:28 ET, **`dc7ee92`**) — **7.1–7.8 Pass** on `e5a8fdd` (not rescored) **plus** Deiter **double-Add Pass** on `dc7ee92` (**409** `wrapper_at_capacity`). Prior overall **Fail** on `e5a8fdd` is **history**. **Lab Ops: Deiter Met** on double-Add 2026-09-14. **Rolf Confirm: Hold merge lifted**. **E-10 Met**. Product on `main` @ `e56a89f` (PR **129**). Living uniqueness: **409** `wrapper_at_capacity` (not a blocker). **Tobias dogfood Ready=Yes** on `dc7ee92` (`/workspace/dogfood-e10-dc7ee92/READY.md`). Ready=Yes on **`e5a8fdd`** and Ready=No on **`9312c54`** stay history.  
+**Not IC50.** Does **not** restamp dest-container-type §§1–6 (`008baf2` Pass). Does **not** teach overall §7 Fail or Hold merge as current. Does **not** touch named-slot / OQ-WO-7 / C2/C3 unsigned stamps.
 
 ## Punch
 
-Rolf 2026-09-14: fold Marc’s E-10 UAT rows. The punch was unsigned at that point; Tobias has since stamped §7 **Fail** on **`e5a8fdd`** (see live state above). Dogfood first was on **`9312c54`**; product for §7 is **`e5a8fdd`**.
+Rolf 2026-09-14: fold Marc’s E-10 UAT rows. The punch was unsigned at that point; Tobias stamped §7 **Fail** on **`e5a8fdd`** (21:31 ET), then overall **Pass** on **`dc7ee92`** (22:28 ET). Dogfood first was on **`9312c54`**; living dogfood / uniqueness SHA is **`dc7ee92`**.
 
-**Deiter Lab Ops Confirm** of Marc’s fold (2026-09-14). Confirm of the punch, **not** a UAT Pass.
+**Deiter Lab Ops Confirm** of Marc’s fold (2026-09-14). Confirm of the punch, **not** the double-Add Met.
 
 | Row | Lock |
 |-----|------|
@@ -19,7 +19,7 @@ Rolf 2026-09-14: fold Marc’s E-10 UAT rows. The punch was unsigned at that poi
 | **7.7b** | API DELETE dest → both inactive |
 | **7.8** | After the pair is gone, **+ Aliquot/pool** / Add re-enables (one pair at a time — not a lifetime lock) |
 
-**Pass criteria this packet = 7.1–7.8.** Steps **1–6** stay the `008baf2` dest-container-type stamp (Pass).
+**Pass criteria this packet = 7.1–7.8** (on `e5a8fdd`) **plus** Deiter double-Add (on `dc7ee92`). Steps **1–6** stay the `008baf2` dest-container-type stamp (Pass).
 
 ## Honesty (operator + AC)
 
@@ -27,14 +27,13 @@ Rolf 2026-09-14: fold Marc’s E-10 UAT rows. The punch was unsigned at that poi
 - POST either side creates the pair.
 - DELETE either inactivates both.
 - Add re-enables after the pair is gone.
+- Second instance while the wrapper exists is **409** `wrapper_at_capacity` (no half-pair; concurrent 201+409 → 1+1).
 
-Stamp of record: [`UAT_Scripts/uat-extract-hold-dest-type.md`](../../UAT_Scripts/uat-extract-hold-dest-type.md) section 7 (**Fail** overall; 7.1–7.8 Pass). Requirements AC1b: [`.docs/review/requirements/extract-hold-dest-type.md`](../review/requirements/extract-hold-dest-type.md). Operator: [`manuals/experiments.md`](../../manuals/experiments.md), [`manuals/HOWTO.md`](../../manuals/HOWTO.md).
+Stamp of record: [`UAT_Scripts/uat-extract-hold-dest-type.md`](../../UAT_Scripts/uat-extract-hold-dest-type.md) section 7 (**Pass** overall). Requirements AC1b: [`.docs/review/requirements/extract-hold-dest-type.md`](../review/requirements/extract-hold-dest-type.md). Operator: [`manuals/experiments.md`](../../manuals/experiments.md), [`manuals/HOWTO.md`](../../manuals/HOWTO.md).
 
 ## Addendum — Tobias dogfood Ready=No · 2026-09-14 20:26 ET
 
-**Ready for UAT section 7?** **No** on **`feat/e10-aliquot-atomic-pair`**. Paths **1–5 Pass** on product **`9312c54`**. Clean FE **Docker** build fails **TS2345** `hasAliquotPair` nullability. Local one-line patch was walk-only — **not landed**. Formal **§7 Unsigned**. **Rolf Hold §7 UAT**. Do **not** invent Ready=Yes or Tobias §7 Pass/Fail. Docs tip **`50b878a`**. Product owns TS2345 (this fold is docs only). Does **not** restamp §§1–6 (`008baf2`). Not named-slot / OQ-WO-7 / C2/C3. Not IC50.
-
-**History.** Superseded by Ready=Yes on **`e5a8fdd`** (addendum below). Do not treat this Ready=No as current.
+**Ready for UAT section 7?** **No** on **`feat/e10-aliquot-atomic-pair`**. Paths **1–5 Pass** on product **`9312c54`**. Clean FE **Docker** build fails **TS2345** `hasAliquotPair` nullability. Local one-line patch was walk-only — **not landed**. Formal **§7 Unsigned** at that time. **History.** Superseded by Ready=Yes on **`e5a8fdd`**, then living Ready=Yes on **`dc7ee92`**. Does **not** restamp §§1–6 (`008baf2`). Not named-slot / OQ-WO-7 / C2/C3. Not IC50.
 
 Verbatim Tobias READY.md (`/workspace/dogfood-e10-9312c54/READY.md`; artifacts `/workspace/dogfood-e10-9312c54/`):
 
@@ -52,9 +51,7 @@ Artifacts: `/workspace/dogfood-e10-9312c54/`
 
 ## Addendum — Tobias dogfood Ready=Yes · 2026-09-14 21:23 ET · dogfood history
 
-**Ready for UAT section 7?** **Yes** on **`feat/e10-aliquot-atomic-pair`**. Product **`e5a8fdd`**. Paths **1–5 Pass**. Clean FE **Docker**/CRA build green; no local patch; working tree clean. Ready=Yes is **not** §7 Pass. Do **not** invent §7 Pass from dogfood or from §6 / `008baf2`. Prior Ready=No on **`9312c54`** stays history. Not named-slot / OQ-WO-7 / C2/C3. Not IC50.
-
-**History as of 21:31 ET.** Formal §7 is now stamped **Fail** and the gate is **Hold merge**. Wording about "§7 Unsigned" here records 21:23 ET only.
+**Ready for UAT section 7?** **Yes** on **`e5a8fdd`**. Paths **1–5 Pass**. Clean FE **Docker**/CRA. Living Ready=Yes is on **`dc7ee92`**. This SHA’s Ready=Yes is history. Not named-slot / OQ-WO-7 / C2/C3. Not IC50.
 
 Verbatim Tobias READY.md (`/workspace/dogfood-e10-e5a8fdd/READY.md`; artifacts `/workspace/dogfood-e10-e5a8fdd/`):
 
@@ -76,28 +73,52 @@ Artifacts: `/workspace/dogfood-e10-e5a8fdd/`
 
 **Rolf Confirm: No Hold** lifted the Hold on **starting** formal §7 after Ready=Yes on **`e5a8fdd`**. Evidence: `/workspace/dogfood-e10-e5a8fdd/READY.md`. It was never a UAT Pass.
 
-**History.** Superseded as live state by the 21:31 ET §7 **Fail** and **Rolf Confirm: Hold merge**. Do not cite "No Hold" as the current gate.
+**History.** Later 21:31 ET overall **Fail** brought **Hold merge**. Living gate is **Hold merge lifted** (product on `main` @ `e56a89f`, PR **129**).
 
-## Addendum — Tobias formal §7 Fail · 2026-09-14 21:31 ET · current
+## Addendum — Tobias formal §7 Fail · 2026-09-14 21:31 ET · history
 
-**Result: Fail** (Tobias QA) · SHA `e5a8fdd50538e23e67c1425dadb3e505171b987f` · `feat/e10-aliquot-atomic-pair` · Compose down.
+**Result: Fail** (Tobias QA) · SHA `e5a8fdd50538e23e67c1425dadb3e505171b987f`.
 
-Packet **7.1–7.8 Pass**. Overall **Fail** because of Deiter Lab Ops EXTRA **double-Add** bar: concurrent double POST → 2 plans + 2 dests; sequential 2nd POST → 2 plans + 1 dest. FE guards present; API lacks single-pair uniqueness. Reload/refresh orphan **Pass**. Mint-early before execute **Pass**. **Blocking:** API second plan POST while pair/half exists. Server-side uniqueness needed before Pass.
-
-Do **not** invent Pass for overall §7. **Ready=Yes** on `e5a8fdd` is dogfood history, not a Pass. Product owns the API uniqueness fix before restamp; no fix is claimed here. §§1–6 stay `008baf2` (not restamped). Not IC50.
+Packet **7.1–7.8 Pass**. Overall **Fail** on this SHA because of Deiter Lab Ops EXTRA **double-Add**: concurrent double POST → 2 plans + 2 dests; sequential 2nd POST → 2 plans + 1 dest. **Then-blocking (history):** API second plan POST while pair/half exists. Closed by uniqueness on `dc7ee92`. §§1–6 stay `008baf2`. Not IC50.
 
 Evidence (cite only):
 - `/workspace/uat-e10-section7-e5a8fdd/RESULT.md`
 - `/workspace/uat-e10-section7-e5a8fdd/acs.md`
 - `/workspace/uat-e10-section7-e5a8fdd/stamp.json`
 
-## Addendum — Rolf Confirm of the Fail: Hold merge · 2026-09-14
+## Addendum — Rolf Confirm of the Fail: Hold merge · 2026-09-14 · history
 
-**Rolf Confirm** of Tobias's §7 **Fail** on **`e5a8fdd`**, same honesty: 7.1–7.8 Pass; Deiter reload/mint-early Pass; **double-click Add Fail**. **Blocking:** API second plan POST while pair/half exists. §§1–6 stay `008baf2`.
+**Rolf Confirm** of Tobias's §7 **Fail** on **`e5a8fdd`** was **Hold merge**. Lifted after uniqueness restamp + overall Pass. Product merged to `main` via PR **129** at `e56a89f`. Do **not** teach Hold merge as current. Not IC50.
 
-**Hold merge.** Product `feat/e10-aliquot-atomic-pair` does **not** go to `main` while §7 is Fail. Lift requires server-side single-pair uniqueness plus a Tobias §7 restamp. Docs folds onto `feat/e10-aliquot-atomic-pair` remain fine — the Hold is the product merge gate, not a docs gate. Do **not** invent §7 Pass. Not IC50.
+## Addendum — Tobias dogfood Ready=Yes · `dc7ee92` · current dogfood
 
-Evidence (cite only):
-- `/workspace/uat-e10-section7-e5a8fdd/RESULT.md`
-- `/workspace/uat-e10-section7-e5a8fdd/acs.md`
-- `/workspace/uat-e10-section7-e5a8fdd/stamp.json`
+**Ready for UAT section 7?** **Yes** on **`dc7ee92`**. Clean FE Docker/CRA; paths **1–5 Pass**. Evidence: `/workspace/dogfood-e10-dc7ee92/READY.md`. Formal overall Pass is 22:28 ET (below). §§1–6 stay `008baf2`. Not IC50.
+
+## Addendum — Deiter double-Add Pass · `dc7ee92` · Lab Ops Met
+
+**Deiter Lab Ops EXTRA double-Add: Pass** on `dc7ee92`. Sequential second plan POST → **409** `wrapper_at_capacity`; second dest POST → **409**; GET still **1 plan + 1 dest**. Concurrent double POST → **201 + 409**; after counts **1 plan + 1 dest**. **Lab Ops: Deiter Met** on double-Add 2026-09-14. Prior Fail on `e5a8fdd` is history. **7.9 / 7.9b Pass** from this uniqueness honesty. §§1–6 stay `008baf2`. Not IC50.
+
+Evidence:
+- `/workspace/uat-e10-doubleadd-dc7ee92/RESULT.md`
+- `/workspace/uat-e10-doubleadd-dc7ee92/stamp.json`
+- `/workspace/uat-e10-doubleadd-dc7ee92/tobias-stamp.json`
+- `/workspace/uat-e10-doubleadd-dc7ee92/doubleadd.json`
+
+## Addendum — Tobias overall §7 Pass · 2026-09-14 22:28 ET · current
+
+**Result: Pass** (Tobias QA) · SHA `dc7ee92c086558420c16edffe301773975f17234` (`dc7ee92`).
+
+**7.1–7.8 Pass** on `e5a8fdd` (not rescored) + Deiter **double-Add Pass** on `dc7ee92` (**409** `wrapper_at_capacity`) **closes** prior overall Fail on `e5a8fdd`. **Rolf Confirm: Hold merge lifted**. **E-10 Met**. Product on `main` @ `e56a89f` (PR **129**). §§1–6 stay `008baf2`. Not IC50.
+
+Evidence:
+- `/workspace/uat-e10-section7-overall-dc7ee92/RESULT.md`
+- `/workspace/uat-e10-section7-overall-dc7ee92/stamp.json`
+- `/workspace/uat-e10-doubleadd-dc7ee92/RESULT.md`
+- `/workspace/uat-e10-doubleadd-dc7ee92/stamp.json`
+- `/workspace/uat-e10-doubleadd-dc7ee92/tobias-stamp.json`
+- `/workspace/uat-e10-doubleadd-dc7ee92/doubleadd.json`
+- `/workspace/dogfood-e10-dc7ee92/READY.md`
+
+## Addendum — Rolf Confirm: Hold merge lifted · E-10 Met · `main` `e56a89f` (PR 129)
+
+**Rolf Confirm:** Hold merge **lifted**. E-10 **Met**. Product already on `main` at `e56a89fe01656b416cfcae885b6ade605e8cf38e` (PR **129**). Fold overall §7 **Pass** honesty onto `main`. Do **not** teach Hold merge as current. Not IC50.
