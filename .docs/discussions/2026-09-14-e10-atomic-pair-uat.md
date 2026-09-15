@@ -3,7 +3,7 @@
 **Stem:** `extract-hold-dest-type` (atomic pair)  
 **Branch:** `feat/e10-aliquot-atomic-pair`  
 **Product SHA:** **`9312c54`** (`9312c54ddd3999963abd3070c76b0057b62e5d4c`). Docs tip **`50b878a`** is not the dogfood product.  
-**Tobias dogfood Ready=No** (2026-09-14 20:26 ET; `/workspace/dogfood-e10-9312c54/READY.md`). **Rolf Hold §7** until TS2345 `hasAliquotPair` is on the tip. Formal **§7 Unsigned**. Do **not** invent Ready=Yes.  
+**Tobias dogfood Ready=No** on **`feat/e10-aliquot-atomic-pair`** (2026-09-14 20:26 ET; `/workspace/dogfood-e10-9312c54/READY.md`). Paths **1–5 Pass** on product **`9312c54`**. Clean FE **Docker** build fails **TS2345** `hasAliquotPair` nullability. Walk one-line patch **not landed**. **Rolf Hold §7 UAT**. Formal **§7 Unsigned**. Do **not** invent Ready=Yes.  
 **Not IC50.** Does **not** restamp dest-container-type §§1–6 (`008baf2` Pass). Does **not** invent Tobias Pass/Fail for §7. Does **not** touch named-slot / OQ-WO-7 / C2/C3 unsigned stamps.
 
 ## Punch
@@ -32,7 +32,7 @@ Stamp of record: [`UAT_Scripts/uat-extract-hold-dest-type.md`](../../UAT_Scripts
 
 ## Addendum — Tobias dogfood Ready=No · 2026-09-14 20:26 ET
 
-**Ready for UAT section 7?** **No.** Formal **§7 Unsigned**. **Rolf Hold §7** until the TS2345 `hasAliquotPair` fix is on the tip (or CRA build green). Do **not** invent Ready=Yes or Tobias §7 Pass/Fail. Product **`9312c54`**; docs tip **`50b878a`**. Product owns TS2345 (this fold is docs only). Does **not** restamp §§1–6 (`008baf2`). Not named-slot / OQ-WO-7 / C2/C3. Not IC50.
+**Ready for UAT section 7?** **No** on **`feat/e10-aliquot-atomic-pair`**. Paths **1–5 Pass** on product **`9312c54`**. Clean FE **Docker** build fails **TS2345** `hasAliquotPair` nullability. Local one-line patch was walk-only — **not landed**. Formal **§7 Unsigned**. **Rolf Hold §7 UAT**. Do **not** invent Ready=Yes or Tobias §7 Pass/Fail. Docs tip **`50b878a`**. Product owns TS2345 (this fold is docs only). Does **not** restamp §§1–6 (`008baf2`). Not named-slot / OQ-WO-7 / C2/C3. Not IC50.
 
 Verbatim Tobias READY.md (`/workspace/dogfood-e10-9312c54/READY.md`; artifacts `/workspace/dogfood-e10-9312c54/`):
 

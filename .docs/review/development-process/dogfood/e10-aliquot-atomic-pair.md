@@ -5,7 +5,7 @@
 **Product SHA:** **`9312c54`** (`9312c54ddd3999963abd3070c76b0057b62e5d4c`). Cite this SHA for dogfood / unsigned UAT §7. Docs tip **`50b878a`** is not the product.  
 **When:** After this branch is up, **before** Tobias UAT section 7 in [`UAT_Scripts/uat-extract-hold-dest-type.md`](../../../../UAT_Scripts/uat-extract-hold-dest-type.md).  
 **Deiter Lab Ops Confirm** of Marc’s fold (2026-09-14) — **not** a UAT Pass.  
-**Tobias dogfood Ready=No** (2026-09-14 20:26 ET). **Rolf Hold §7** until the TS2345 `hasAliquotPair` fix is on the tip (or CRA build green). Formal **§7 stays Unsigned**. Do **not** invent Ready=Yes or §7 Pass. §§1–6 stay `008baf2`.  
+**Tobias dogfood Ready=No** on **`feat/e10-aliquot-atomic-pair`** (2026-09-14 20:26 ET). Paths **1–5 Pass** on product **`9312c54`**. Clean FE **Docker** build fails **TS2345** `hasAliquotPair` nullability. Local one-line patch was used for the walk **only** — **not landed**. **Rolf Hold §7 UAT** until that fix is on the tip (or CRA / Docker FE image green). Formal **§7 stays Unsigned**. Do **not** invent Ready=Yes or §7 Pass. §§1–6 stay `008baf2`.  
 **Not a UAT Result.** Not dest-follow recode. Not IC50.
 
 ## Env
@@ -38,5 +38,14 @@ Artifacts: `/workspace/dogfood-e10-9312c54/`
 
 **Date:** 2026-09-14 20:26 ET  
 **Who:** Tobias (dogfood)  
+**Branch:** `feat/e10-aliquot-atomic-pair`  
 **SHA:** product `9312c54`; HEAD / docs tip `50b878a`  
-**Ready for UAT section 7?** **No** (verbatim READY.md). Paths 1–5 Pass; blocker TS2345 `hasAliquotPair` on clean image. **Rolf Hold §7** until that fix is on the tip. Formal §7 unsigned. Product owns TS2345 (this fold is docs only). Do **not** invent Ready=Yes.
+**Ready for UAT section 7?** **No** (verbatim READY.md). Do **not** invent Ready=Yes.
+
+## Findings
+
+| Severity | Issue | Action |
+|----------|--------|--------|
+| Blocker | Clean frontend **Docker** image build from product **`9312c54`** fails **TS2345** on `hasAliquotPair` nullability. | Product owns the fix. Land on `feat/e10-aliquot-atomic-pair` (or confirm CRA / Docker FE image green) before formal §7. **Rolf Hold §7 UAT.** |
+| Walk-only | Local uncommitted one-line patch used so the dogfood UI image could walk paths 1–5. | **Not landed.** Do not treat the walk patch as shipped product. |
+| Pass (dogfood paths, not UAT) | Paths **1–5 Pass** on product **`9312c54`** (API + source/bundle: single **+ Aliquot/pool** preset, pair create, delete-plan and delete-dest both clear both halves, template→experiment instantiate with dest `minted_sample_ids: []` / `populated_after_execute: false`, ad hoc pair). | Does **not** sign formal §7. Formal §7 stays **Unsigned**. Do **not** invent Pass from §6 / `008baf2`. |

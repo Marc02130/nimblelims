@@ -97,7 +97,7 @@ Combined from two Tobias stamps on the same SHA:
 
 ## 7. Atomic pair (E-10) — one Add creates plan + dest
 
-**Unsigned.** Formal §7 stays unsigned. **Tobias dogfood Ready=No** (2026-09-14 20:26 ET; `/workspace/dogfood-e10-9312c54/READY.md`). **Rolf Hold §7** until the TS2345 `hasAliquotPair` fix is on the tip (or CRA build green). Do **not** invent Ready=Yes or Pass/Fail for §7. **Deiter Lab Ops Confirm** of Marc’s fold (2026-09-14) is not a Tobias Pass. Product SHA **`9312c54`**; docs tip **`50b878a`**. One **Add aliquot/pool** creates `aliquot_pool_plan` **and** `aliquots_pools`. Dest stays empty until dest init. Do not offer separate plan-only or dest-only presets. §§1–6 stay `008baf2`.
+**Unsigned.** Formal §7 stays unsigned. **Tobias dogfood Ready=No** on **`feat/e10-aliquot-atomic-pair`** (2026-09-14 20:26 ET; `/workspace/dogfood-e10-9312c54/READY.md`). Paths **1–5 Pass** on product **`9312c54`**. Clean FE **Docker** build fails **TS2345** `hasAliquotPair` nullability. Local one-line patch was walk-only — **not landed**. **Rolf Hold §7 UAT** until the fix is on the tip. Do **not** invent Ready=Yes or Pass/Fail for §7. **Deiter Lab Ops Confirm** of Marc’s fold (2026-09-14) is not a Tobias Pass. Docs tip **`50b878a`**. One **Add aliquot/pool** creates `aliquot_pool_plan` **and** `aliquots_pools`. Dest stays empty until dest init. Do not offer separate plan-only or dest-only presets. §§1–6 stay `008baf2`.
 
 | Step | Action | Expected result |
 |------|--------|-----------------|
@@ -117,7 +117,7 @@ Combined from two Tobias stamps on the same SHA:
 
 ## Pass criteria
 
-- **This packet (E-10):** Steps **7.1–7.8**. Formal **§7 Unsigned**. **Tobias dogfood Ready=No** (verbatim `/workspace/dogfood-e10-9312c54/READY.md`). **Rolf Hold §7** until TS2345 `hasAliquotPair` is on the tip. Do **not** invent Ready=Yes or §7 Pass/Fail. **Deiter Lab Ops Confirm** of Marc’s fold is not a Tobias Pass. Do **not** restamp §6.
+- **This packet (E-10):** Steps **7.1–7.8**. Formal **§7 Unsigned**. **Tobias dogfood Ready=No** on `feat/e10-aliquot-atomic-pair` (verbatim `/workspace/dogfood-e10-9312c54/READY.md`). Paths **1–5 Pass** on **`9312c54`**. Clean FE Docker **TS2345** `hasAliquotPair`; walk patch **not landed**. **Rolf Hold §7 UAT**. Do **not** invent Ready=Yes or §7 Pass/Fail. **Deiter Lab Ops Confirm** of Marc’s fold is not a Tobias Pass. Do **not** restamp §6.
 - Steps 1–6 remain the dest-container-type stamp on `008baf2` (Pass). They are not this packet.
 - Blank dest **sample** type always means **Same as parent.** Blank dest **container** type always means **Same as source.**
 - Catalog choices are many-to-many and client/source/operation filtered.
@@ -158,7 +158,7 @@ Marc’s rows **7.3b** (delete dest → both gone), **7.6b** (POST dest-only `al
 
 ### 2026-09-14 20:26 ET · Tobias dogfood Ready=No · product `9312c54` · docs tip `50b878a`
 
-**Ready for UAT section 7?** **No.** Formal **§7 Unsigned**. **Rolf Hold §7** until the TS2345 `hasAliquotPair` fix is on the tip (or CRA build green). Do **not** invent Ready=Yes or Pass/Fail for §7. Do **not** invent Pass from §6 / `008baf2`. Product owns TS2345 (docs-only fold; no product code fix here). §§1–6 stay `008baf2`. Not named-slot / OQ-WO-7 / C2/C3. Not IC50.
+**Ready for UAT section 7?** **No** on **`feat/e10-aliquot-atomic-pair`**. Paths **1–5 Pass** on product **`9312c54`**. Blocker: clean FE **Docker** build **TS2345** `hasAliquotPair` nullability. Local one-line patch was used for the walk **only** — **not landed**. Formal **§7 Unsigned**. **Rolf Hold §7 UAT** until the fix is on the tip. Do **not** invent Ready=Yes or Pass/Fail for §7. Do **not** invent Pass from §6 / `008baf2`. Product owns TS2345 (docs-only fold; no product code fix here). §§1–6 stay `008baf2`. Not named-slot / OQ-WO-7 / C2/C3. Not IC50.
 
 Verbatim Tobias READY.md (`/workspace/dogfood-e10-9312c54/READY.md`; artifacts `/workspace/dogfood-e10-9312c54/`):
 
