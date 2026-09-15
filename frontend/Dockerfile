@@ -13,11 +13,14 @@ RUN npm ci
 # Copy source code
 COPY . .
 
-# CRA/webpack needs extra heap when bundling large deps (e.g. plotly); default ~2GB OOMs in Docker
-ENV NODE_OPTIONS="--max-old-space-size=4096"
+# CRA + plotly: default ~2GB heap OOMs. 4GB also OOMs Docker Desktop (~8GB)
+# when Bake builds frontend + r-calculator in parallel (terser forks os.cpus()-1).
+# Sourcemaps off is the cheap win; sequential bake is the rest (COMPOSE_PARALLEL_LIMIT=1).
+ENV NODE_OPTIONS="--max-old-space-size=3072"
+ENV GENERATE_SOURCEMAP=false
+ENV DISABLE_ESLINT_PLUGIN=true
 
-# Build the application
-RUN DISABLE_ESLINT_PLUGIN=true npm run build
+RUN npm run build
 
 # Production stage
 FROM nginx:alpine

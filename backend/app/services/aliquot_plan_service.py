@@ -39,6 +39,7 @@ from models.project import Project
 from models.user import User
 from models.list import ListEntry, List as ListModel
 from models.experiment import ExperimentSampleExecution
+from models.wrappers import wrapper_mate_key
 from models.result import Result
 from models.test import Test
 from models.analysis import Analyte
@@ -788,11 +789,12 @@ class AliquotPlanService:
                 )
             )
 
+        dest_key = wrapper_mate_key(entry.predefined_entry_key) or "aliquots_pools"
         destination_entries = (
             self.db.query(Entry)
             .filter(
                 Entry.experiment_id == entry.experiment_id,
-                Entry.predefined_entry_key == "aliquots_pools",
+                Entry.predefined_entry_key == dest_key,
                 Entry.active.is_(True),
             )
             .all()

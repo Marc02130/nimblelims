@@ -41,10 +41,20 @@ from models.entry import (
     SAMPLE_WRITE_BACK_COLUMNS,
     SAMPLE_SYSTEM_FIELDS,
     PREDEFINED_ENTRY_DEFAULTS,
+    predefined_entry_declaration,
+    ensure_aliquot_pair_in_entries,
+    reject_if_wrapper_over_capacity,
     normalize_entry_type,
     is_sample_scoped_entry,
     is_experiment_scoped_entry,
     READ_ONLY_ENTRY_TYPES,
+)
+from models.wrappers import (
+    WRAPPER_CATALOG,
+    wrapper_at_capacity_detail,
+    wrapper_id_for_key,
+    wrapper_mate_key,
+    wrapper_role_taken,
 )
 from models.sample import Sample
 from models.experiment import ExperimentSampleExecution
@@ -116,6 +126,19 @@ class EntryService:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Experiment not found",
             )
+        wrapper_id = wrapper_id_for_key(data.predefined_entry_key)
+        if wrapper_id:
+            siblings = self.repo.list_for_experiment(
+                data.experiment_id, active=True, load_values=False
+            )
+            existing_keys = [
+                e.predefined_entry_key for e in siblings if e.predefined_entry_key
+            ]
+            if wrapper_role_taken(data.predefined_entry_key, existing_keys):
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=wrapper_at_capacity_detail(wrapper_id),
+                )
         config = dict(data.config or {})
         config.setdefault("status", "draft")
         entry = self.repo.create_entry(
@@ -139,6 +162,7 @@ class EntryService:
                     f.visible,
                     f.write_back_target,
                 )
+        self._ensure_aliquot_pair_instance(data.experiment_id)
         self._commit_refresh(entry)
         return self.get_entry(entry.id)
 
@@ -233,9 +257,51 @@ class EntryService:
 
     def delete_entry(self, entry_id: UUID) -> None:
         entry = self.get_entry(entry_id)
+        mate_key = wrapper_mate_key(entry.predefined_entry_key)
+        if mate_key:
+            siblings = self.repo.list_for_experiment(
+                entry.experiment_id, active=True, load_values=False
+            )
+            for sibling in siblings:
+                if (
+                    sibling.id != entry.id
+                    and sibling.predefined_entry_key == mate_key
+                ):
+                    self.repo.soft_delete_entry(sibling)
+                    sibling.modified_by = self._user_id()
         self.repo.soft_delete_entry(entry)
         entry.modified_by = self._user_id()
         self._commit_refresh(entry)
+
+    def _ensure_aliquot_pair_instance(self, experiment_id: UUID) -> None:
+        """Create missing atomic-pair mates from WRAPPER_CATALOG."""
+        siblings = self.repo.list_for_experiment(
+            experiment_id, active=True, load_values=False
+        )
+        keys = {
+            e.predefined_entry_key for e in siblings if e.predefined_entry_key
+        }
+        max_sort = max((e.sort_order or 0) for e in siblings) if siblings else -1
+        for spec in WRAPPER_CATALOG.values():
+            if not spec.get("atomic_pair"):
+                continue
+            for key in spec["keys"]:
+                mate = wrapper_mate_key(key)
+                if key in keys and mate and mate not in keys:
+                    decl = predefined_entry_declaration(mate)
+                    self.repo.create_entry(
+                        experiment_id=experiment_id,
+                        entry_type=decl["entry_type"],
+                        name=decl["name"],
+                        description=decl.get("description"),
+                        predefined_entry_key=mate,
+                        sort_order=max_sort + 1,
+                        config=dict(decl.get("config") or {}),
+                        created_by=self._user_id(),
+                        modified_by=self._user_id(),
+                    )
+                    max_sort += 1
+                    keys.add(mate)
 
     def instantiate_from_template(
         self,
@@ -251,6 +317,9 @@ class EntryService:
                 detail="Experiment not found",
             )
         if data.skip_if_exists and self.repo.count_for_experiment(experiment_id) > 0:
+            self._ensure_aliquot_pair_instance(experiment_id)
+            if self.auto_commit:
+                self.db.commit()
             return self.repo.list_for_experiment(
                 experiment_id, active=None, load_values=False
             )
@@ -269,6 +338,13 @@ class EntryService:
                 detail="Experiment template not found",
             )
         decls = (template.template_definition or {}).get("entries") or []
+        decls = ensure_aliquot_pair_in_entries(decls)
+        over = reject_if_wrapper_over_capacity(decls)
+        if over:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=wrapper_at_capacity_detail(over),
+            )
         if not isinstance(decls, list) or not decls:
             # No declarations — nothing to create
             return []
@@ -365,9 +441,12 @@ class EntryService:
                     )
             created.append(entry)
 
+        self._ensure_aliquot_pair_instance(experiment_id)
         if self.auto_commit:
             self.db.commit()
-        return [self.get_entry(e.id) for e in created]
+        return self.repo.list_for_experiment(
+            experiment_id, active=True, load_values=False
+        )
 
     def delete_row(self, entry_id: UUID, row_key: str) -> int:
         """Remove all cells for one experiment_data table row."""

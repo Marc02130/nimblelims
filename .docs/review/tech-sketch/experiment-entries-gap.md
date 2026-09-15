@@ -86,7 +86,7 @@ The code contains a working **mint proof**: template → cohort → entries → 
 
 1. **Two kinds only:** `experiment_sample_data` and `experiment_data`. Legacy strings normalize to these. A wrapper is not a third kind.
 2. **Predefined wrappers:** functionality is keyed by `predefined_entry_key` on one of the two kinds.
-3. **Aliquot/pool is one atomic pair:** one Add action creates `aliquot_pool_plan` (`experiment_data`) and empty `aliquots_pools` (`experiment_sample_data`). Execute alone populates destinations.
+3. **Aliquot/pool is wrapper `aliquot_pool` (cardinality 1):** one Add action creates `aliquot_pool_plan` (`experiment_data`) and empty `aliquots_pools` (`experiment_sample_data`). Execute alone populates destinations. A second instance is **409** `wrapper_at_capacity`.
 4. **`METHOD_CATALOG` owns both maps:** a concrete method implies exactly one mint operation and immediately attaches plan-line columns plus destination FieldDefinitions.
 5. **Process capture is not Sample:** writable entry fields capture process data. Sample identity, container identity, and inventory may appear only as read-only projections or explicit write-throughs to their owner.
 6. **Four write targets, no fifth ledger:** Sample, Contents, 1×1 Container, and Entry cells. Mass/concentration never write back to Sample.
