@@ -45,7 +45,9 @@ export const aliquotPairMate = (key?: string | null): string | null => {
   return null;
 };
 
-export const hasAliquotPair = (entries: Array<{ predefined_entry_key?: string }>): boolean => {
+export const hasAliquotPair = (
+  entries: Array<{ predefined_entry_key?: string | null }>,
+): boolean => {
   const keys = new Set(entries.map((e) => e.predefined_entry_key));
   return keys.has(ALIQUOT_PLAN_KEY) || keys.has(ALIQUOT_DEST_KEY);
 };
@@ -60,7 +62,7 @@ export const appendAliquotPair = <T extends AliquotPairEntry>(entries: T[]): T[]
   ];
 };
 
-export const removeAliquotPairAt = <T extends { predefined_entry_key?: string }>(
+export const removeAliquotPairAt = <T extends { predefined_entry_key?: string | null }>(
   entries: T[],
   index: number,
 ): T[] => {
