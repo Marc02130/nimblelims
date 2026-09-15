@@ -5,7 +5,7 @@
 **Product SHA:** **`e5a8fdd`** (`e5a8fdd50538e23e67c1425dadb3e505171b987f`) tip of `feat/e10-aliquot-atomic-pair` (includes `hasAliquotPair` nullability fix). Cite this SHA for current dogfood / unsigned UAT §7.  
 **When:** After this branch is up, **before** Tobias UAT section 7 in [`UAT_Scripts/uat-extract-hold-dest-type.md`](../../../../UAT_Scripts/uat-extract-hold-dest-type.md). Tobias is starting formal §7.  
 **Deiter Lab Ops Confirm** of Marc’s fold (2026-09-14) — **not** a UAT Pass.  
-**Tobias dogfood Ready=Yes** on **`feat/e10-aliquot-atomic-pair`** (2026-09-14 21:23 ET restamp). Clean FE **Docker**/CRA build green on **`e5a8fdd`**. Paths **1–5 Pass**. **Rolf Hold §7 UAT lifts** (Tobias starting formal §7 unless Rolf Holds again). Formal **§7 stays Unsigned** until Tobias stamps Pass/Fail. Ready=Yes is **not** §7 Pass. Do **not** invent §7 Pass. Prior Ready=No on **`9312c54`** (TS2345) stays history — superseded by this restamp. §§1–6 stay `008baf2`.  
+**Tobias dogfood Ready=Yes** on **`feat/e10-aliquot-atomic-pair`** (2026-09-14 21:23 ET restamp; evidence `/workspace/dogfood-e10-e5a8fdd/READY.md`). Clean FE **Docker**/CRA build green on **`e5a8fdd`**. Paths **1–5 Pass**. **Rolf Confirm: No Hold.** Ready=Yes stands on **`e5a8fdd`**. Tobias proceeds with formal §7. Formal **§7 stays Unsigned** until Tobias stamps Pass/Fail. Ready=Yes is **not** §7 Pass. Do **not** invent §7 Pass. Prior Ready=No on **`9312c54`** (TS2345) stays history — superseded by this restamp. §§1–6 stay `008baf2`.  
 **Not a UAT Result.** Not dest-follow recode. Not IC50.
 
 ## Env
@@ -42,7 +42,7 @@ Artifacts: `/workspace/dogfood-e10-e5a8fdd/`
 **Who:** Tobias (dogfood restamp)  
 **Branch:** `feat/e10-aliquot-atomic-pair`  
 **SHA:** product / tip `e5a8fdd`  
-**Ready for UAT section 7?** **Yes** (verbatim READY.md). Formal **§7 Unsigned**. Ready=Yes is **not** §7 Pass. Do **not** invent §7 Pass.
+**Ready for UAT section 7?** **Yes** (verbatim READY.md). **Rolf Confirm: No Hold.** Tobias proceeds with formal §7. Formal **§7 Unsigned**. Ready=Yes is **not** §7 Pass. Do **not** invent §7 Pass.
 
 ### History — Ready=No on `9312c54` (superseded)
 
@@ -67,4 +67,4 @@ That Ready=No (TS2345 `hasAliquotPair` on **`9312c54`**; walk patch not landed; 
 | Severity | Issue | Action |
 |----------|--------|--------|
 | History (resolved) | Clean frontend **Docker** image build from product **`9312c54`** failed **TS2345** on `hasAliquotPair` nullability. Walk used a local uncommitted one-line patch. | Landed on tip **`e5a8fdd`**. Ready=No on `9312c54` stays history. |
-| Pass (dogfood paths, not UAT) | Paths **1–5 Pass** on product **`e5a8fdd`** (single **+ Aliquot/pool** preset, pair create, delete-plan and delete-dest both clear both halves, template→experiment instantiate with dest `minted_sample_ids: []` / `populated_after_execute: false`, ad hoc pair). Clean FE Docker/CRA **Yes**. No local patch. | **Rolf Hold lifts.** Tobias starting formal §7 unless Rolf Holds again. Does **not** sign formal §7. Formal §7 stays **Unsigned**. Do **not** invent Pass from §6 / `008baf2`. |
+| Pass (dogfood paths, not UAT) | Paths **1–5 Pass** on product **`e5a8fdd`** (single **+ Aliquot/pool** preset, pair create, delete-plan and delete-dest both clear both halves, template→experiment instantiate with dest `minted_sample_ids: []` / `populated_after_execute: false`, ad hoc pair). Clean FE Docker/CRA **Yes**. No local patch. | **Rolf Confirm: No Hold.** Tobias proceeds with formal §7. Does **not** sign formal §7. Formal §7 stays **Unsigned**. Do **not** invent Pass from §6 / `008baf2`. |
