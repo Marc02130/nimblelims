@@ -30,7 +30,7 @@
 | ID | Issue | Why it hurts | Suggested next |
 |----|-------|--------------|----------------|
 | E-9 | **Dual-map kick-back:** dest vol/amount/conc as entry FDs vs Sample/Contents update timing | **Decided** 2026-09-10 ([decision log](../../../decision-logs/extract-hold-dual-map-kickback.md)): plan = working qty; dest init = mint + inventory one txn; dest container type required; attach immediately = entry columns only; type gate on experiment/LimsRun. | Implement against that log. Dest container type is on the plan (entry default + line override). Do not recode dest-follow |
-| E-10 | **Atomic pair** locked (one add → plan + dest entries) but UI still offers separate presets | Operators create half-pairs | **Coded** `feat/e10-aliquot-atomic-pair`: one **+ Aliquot/pool**; backend completes mate; delete removes both. UAT §7 **Fail** (Tobias QA, 2026-09-14 21:31 ET, `e5a8fdd`; 7.1–7.8 Pass; overall Fail = double-Add — API has no single-pair uniqueness). **Rolf Confirm: Hold merge** to `main`. Product owns server-side uniqueness, then Tobias restamps |
+| E-10 | **Atomic pair** locked (one add → plan + dest entries) but UI still offers separate presets | Operators create half-pairs | **Coded** `feat/e10-aliquot-atomic-pair`: one **+ Aliquot/pool**; backend completes mate; delete removes both. UAT §7 **Fail** (Tobias QA, 2026-09-14 21:31 ET, `e5a8fdd`; 7.1–7.8 Pass; overall Fail = double-Add). **Blocking:** API second plan POST while pair/half exists. **Rolf Confirm: Hold merge** to `main`. Product owns server-side uniqueness, then Tobias restamps |
 | E-11 | METHOD_CATALOG / `METHOD_PROFILES` plan inputs shipped; **dest FieldDefinitions attach** lag | Qty story incomplete | After E-9 |
 | E-12 | Template authoring: method often present; **default dest type** weak/missing | Dest type only at runtime | Template controls per lock |
 | E-13 | Mid-flight method change = cancel experiment (no warn/wipe) — UX may still allow edit attempts | 409 surprise | Lock controls after lines exist |
@@ -49,7 +49,7 @@
 ## Priority sketch
 
 1. **E-9** restamp — **Decided**; dest container type shipped  
-2. **E-10** atomic pair — **coded** (`feat/e10-aliquot-atomic-pair`); UAT §7 **Fail** on `e5a8fdd` (double-Add API uniqueness); **Hold merge** to `main` until uniqueness lands and Tobias restamps  
+2. **E-10** atomic pair — **coded** (`feat/e10-aliquot-atomic-pair`); UAT §7 **Fail** on `e5a8fdd`; **Blocking:** API second plan POST while pair/half exists; **Hold merge** to `main` until uniqueness lands and Tobias restamps  
 3. **E-14 + E-12** (catalog admin, template dest sample type)  
 3. **E-7 + E-6** (gates + intake status)  
 4. Docs **E-17–E-19**  

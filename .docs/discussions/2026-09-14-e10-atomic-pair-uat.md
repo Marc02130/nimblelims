@@ -3,7 +3,7 @@
 **Stem:** `extract-hold-dest-type` (atomic pair)  
 **Branch:** `feat/e10-aliquot-atomic-pair`  
 **Product SHA:** **`e5a8fdd`** (`e5a8fdd50538e23e67c1425dadb3e505171b987f`) tip of `feat/e10-aliquot-atomic-pair` (includes `hasAliquotPair` nullability fix).  
-**Live state:** formal **§7 Result: Fail** (Tobias QA, 2026-09-14 21:31 ET, **`e5a8fdd`**) with **Rolf Confirm: Hold merge** (`feat/e10-aliquot-atomic-pair` → `main`). Packet 7.1–7.8 Pass; overall Fail = Deiter **double-Add** (API has no single-pair uniqueness). Do **not** invent overall §7 Pass. **Tobias dogfood Ready=Yes** (2026-09-14 21:23 ET; `/workspace/dogfood-e10-e5a8fdd/READY.md`; paths 1–5 Pass, clean FE Docker/CRA) is **dogfood history**, not a UAT Pass; the earlier **Rolf Confirm: No Hold** covered starting §7 and is history. Prior Ready=No on **`9312c54`** (TS2345) stays history.  
+**Live state:** formal **§7 Result: Fail** (Tobias QA, 2026-09-14 21:31 ET, **`e5a8fdd`**) with **Rolf Confirm: Hold merge** (`feat/e10-aliquot-atomic-pair` → `main`). Packet 7.1–7.8 Pass; overall Fail = Deiter **double-Add**. **Blocking:** API second plan POST while pair/half exists. Do **not** invent overall §7 Pass. **Tobias dogfood Ready=Yes** (2026-09-14 21:23 ET; `/workspace/dogfood-e10-e5a8fdd/READY.md`; paths 1–5 Pass, clean FE Docker/CRA) is **dogfood history**, not a UAT Pass; the earlier **Rolf Confirm: No Hold** covered starting §7 and is history. Prior Ready=No on **`9312c54`** (TS2345) stays history.  
 **Not IC50.** Does **not** restamp dest-container-type §§1–6 (`008baf2` Pass). Does **not** invent overall §7 Pass. Does **not** touch named-slot / OQ-WO-7 / C2/C3 unsigned stamps.
 
 ## Punch
@@ -82,14 +82,22 @@ Artifacts: `/workspace/dogfood-e10-e5a8fdd/`
 
 **Result: Fail** (Tobias QA) · SHA `e5a8fdd50538e23e67c1425dadb3e505171b987f` · `feat/e10-aliquot-atomic-pair` · Compose down.
 
-Packet **7.1–7.8 Pass**. Overall **Fail** because of Deiter Lab Ops EXTRA **double-Add** bar: concurrent double POST → 2 plans + 2 dests; sequential 2nd POST → 2 plans + 1 dest. FE guards present; API lacks single-pair uniqueness. Reload/refresh orphan **Pass**. Mint-early before execute **Pass**. **Blocking:** API allows a second plan POST while a pair (or half) exists. Server-side uniqueness needed before Pass.
+Packet **7.1–7.8 Pass**. Overall **Fail** because of Deiter Lab Ops EXTRA **double-Add** bar: concurrent double POST → 2 plans + 2 dests; sequential 2nd POST → 2 plans + 1 dest. FE guards present; API lacks single-pair uniqueness. Reload/refresh orphan **Pass**. Mint-early before execute **Pass**. **Blocking:** API second plan POST while pair/half exists. Server-side uniqueness needed before Pass.
 
 Do **not** invent Pass for overall §7. **Ready=Yes** on `e5a8fdd` is dogfood history, not a Pass. Product owns the API uniqueness fix before restamp; no fix is claimed here. §§1–6 stay `008baf2` (not restamped). Not IC50.
 
-Evidence (cite only): `/workspace/uat-e10-section7-e5a8fdd/{RESULT.md,acs.md,stamp.json}`.
+Evidence (cite only):
+- `/workspace/uat-e10-section7-e5a8fdd/RESULT.md`
+- `/workspace/uat-e10-section7-e5a8fdd/acs.md`
+- `/workspace/uat-e10-section7-e5a8fdd/stamp.json`
 
 ## Addendum — Rolf Confirm of the Fail: Hold merge · 2026-09-14
 
-**Rolf Confirm** of Tobias's §7 **Fail** on **`e5a8fdd`**, same honesty: 7.1–7.8 Pass; Deiter reload/mint-early Pass; **double-click Add Fail** (API has no single-pair uniqueness — concurrent 2 plans + 2 dests, sequential 2 plans + 1 dest); §§1–6 stay `008baf2`.
+**Rolf Confirm** of Tobias's §7 **Fail** on **`e5a8fdd`**, same honesty: 7.1–7.8 Pass; Deiter reload/mint-early Pass; **double-click Add Fail**. **Blocking:** API second plan POST while pair/half exists. §§1–6 stay `008baf2`.
 
 **Hold merge.** Product `feat/e10-aliquot-atomic-pair` does **not** go to `main` while §7 is Fail. Lift requires server-side single-pair uniqueness plus a Tobias §7 restamp. Docs folds onto `feat/e10-aliquot-atomic-pair` remain fine — the Hold is the product merge gate, not a docs gate. Do **not** invent §7 Pass. Not IC50.
+
+Evidence (cite only):
+- `/workspace/uat-e10-section7-e5a8fdd/RESULT.md`
+- `/workspace/uat-e10-section7-e5a8fdd/acs.md`
+- `/workspace/uat-e10-section7-e5a8fdd/stamp.json`

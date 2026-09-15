@@ -99,9 +99,12 @@ Combined from two Tobias stamps on the same SHA:
 
 **Result: Fail** (Tobias QA) · 2026-09-14 21:31 ET · SHA `e5a8fdd50538e23e67c1425dadb3e505171b987f` (`e5a8fdd`) · `feat/e10-aliquot-atomic-pair` · Compose down.
 
-Packet **7.1–7.8 Pass**. Overall **Fail** because of Deiter Lab Ops EXTRA **double-Add** bar (API allows a second plan POST while a pair or half exists). Do **not** invent overall §7 Pass. **Rolf Confirm** of this Fail (2026-09-14): **Hold merge** — product `feat/e10-aliquot-atomic-pair` does **not** go to `main` until server-side single-pair uniqueness lands and Tobias restamps. Product owns that fix; it is **not** written here. **Tobias dogfood Ready=Yes** on **`e5a8fdd`** stays **dogfood history** (`/workspace/dogfood-e10-e5a8fdd/READY.md`) — Ready=Yes is **not** a UAT Pass, and the earlier **Rolf Confirm: No Hold** covered starting §7, not merging. Prior Ready=No on **`9312c54`** stays history. **Deiter Lab Ops Confirm** of Marc’s fold (2026-09-14) is not a Tobias Pass. One **Add aliquot/pool** creates `aliquot_pool_plan` **and** `aliquots_pools`. Dest stays empty until dest init. Do not offer separate plan-only or dest-only presets. §§1–6 stay `008baf2` (not restamped). Not IC50.
+Packet **7.1–7.8 Pass**. Overall **Fail** because of Deiter Lab Ops EXTRA **double-Add** bar. **Blocking:** API second plan POST while pair/half exists. Do **not** invent overall §7 Pass. **Rolf Confirm** of this Fail (2026-09-14): **Hold merge** — product `feat/e10-aliquot-atomic-pair` does **not** go to `main` until server-side single-pair uniqueness lands and Tobias restamps. Product owns that fix; it is **not** written here. **Tobias dogfood Ready=Yes** on **`e5a8fdd`** stays **dogfood history** (`/workspace/dogfood-e10-e5a8fdd/READY.md`) — Ready=Yes is **not** a UAT Pass, and the earlier **Rolf Confirm: No Hold** covered starting §7, not merging. Prior Ready=No on **`9312c54`** stays history. **Deiter Lab Ops Confirm** of Marc’s fold (2026-09-14) is not a Tobias Pass. One **Add aliquot/pool** creates `aliquot_pool_plan` **and** `aliquots_pools`. Dest stays empty until dest init. Do not offer separate plan-only or dest-only presets. §§1–6 stay `008baf2` (not restamped). Not IC50.
 
-**Evidence (cite only; binaries not committed):** `/workspace/uat-e10-section7-e5a8fdd/{RESULT.md,acs.md,stamp.json}`.
+**Evidence (cite only; binaries not committed):**
+- `/workspace/uat-e10-section7-e5a8fdd/RESULT.md`
+- `/workspace/uat-e10-section7-e5a8fdd/acs.md`
+- `/workspace/uat-e10-section7-e5a8fdd/stamp.json`
 
 | Step | Action | Expected result | Result |
 |------|--------|-----------------|--------|
@@ -125,13 +128,13 @@ Packet **7.1–7.8 Pass**. Overall **Fail** because of Deiter Lab Ops EXTRA **do
 | Reload/refresh orphan | Pass |
 | Mint-early before execute | Pass |
 
-**Blocking:** API allows a second plan POST while a pair (or half) exists. Server-side uniqueness needed before Pass.
+**Blocking:** API second plan POST while pair/half exists. Server-side uniqueness needed before Pass.
 
-**Fail:** operator can add dest-only or plan-only from presets; delete leaves a half-pair; add stays disabled after the pair is gone; **second plan POST while a pair (or half) exists** (Deiter double-Add).
+**Fail:** operator can add dest-only or plan-only from presets; delete leaves a half-pair; add stays disabled after the pair is gone; **API second plan POST while pair/half exists** (Deiter double-Add).
 
 ## Pass criteria
 
-- **This packet (E-10):** Steps **7.1–7.8**. Formal **§7 Result: Fail** (Tobias QA, 2026-09-14 21:31 ET, `e5a8fdd`). Packet **7.1–7.8 Pass**. Overall Fail = Deiter Lab Ops EXTRA **double-Add** (API second plan POST while a pair or half exists). Do **not** invent overall §7 Pass. **Rolf Confirm: Hold merge** (`feat/e10-aliquot-atomic-pair` → `main`) until uniqueness lands and Tobias restamps. **Tobias dogfood Ready=Yes** on `e5a8fdd` is dogfood history, not a UAT Pass. Product owns API uniqueness before restamp. Prior Ready=No on **`9312c54`** stays history. **Deiter Lab Ops Confirm** of Marc’s fold is not a Tobias Pass. Do **not** restamp §6. Evidence: `/workspace/uat-e10-section7-e5a8fdd/{RESULT.md,acs.md,stamp.json}`.
+- **This packet (E-10):** Steps **7.1–7.8**. Formal **§7 Result: Fail** (Tobias QA, 2026-09-14 21:31 ET, `e5a8fdd`). Packet **7.1–7.8 Pass**. Overall Fail = Deiter Lab Ops EXTRA **double-Add**. **Blocking:** API second plan POST while pair/half exists. Do **not** invent overall §7 Pass. **Rolf Confirm: Hold merge** (`feat/e10-aliquot-atomic-pair` → `main`) until uniqueness lands and Tobias restamps. **Tobias dogfood Ready=Yes** on `e5a8fdd` is dogfood history, not a UAT Pass. Product owns API uniqueness before restamp. Prior Ready=No on **`9312c54`** stays history. **Deiter Lab Ops Confirm** of Marc’s fold is not a Tobias Pass. Do **not** restamp §6. Evidence: `/workspace/uat-e10-section7-e5a8fdd/RESULT.md`, `/workspace/uat-e10-section7-e5a8fdd/acs.md`, `/workspace/uat-e10-section7-e5a8fdd/stamp.json`.
 - Steps 1–6 remain the dest-container-type stamp on `008baf2` (Pass). They are not this packet.
 - Blank dest **sample** type always means **Same as parent.** Blank dest **container** type always means **Same as source.**
 - Catalog choices are many-to-many and client/source/operation filtered.
@@ -224,9 +227,12 @@ Artifacts: `/workspace/dogfood-e10-e5a8fdd/`
 
 - **7.1–7.8:** all **Pass** (packet rows).
 - **Deiter Lab Ops EXTRA:** Double-click Add → two pairs / half **Fail** — concurrent double POST → 2 plans + 2 dests; sequential 2nd POST → 2 plans + 1 dest. FE guards present; API lacks single-pair uniqueness. Reload/refresh orphan **Pass**. Mint-early before execute **Pass**.
-- **Blocking:** API allows a second plan POST while a pair (or half) exists. Server-side uniqueness needed before Pass.
+- **Blocking:** API second plan POST while pair/half exists. Server-side uniqueness needed before Pass.
 - **Honesty:** Do **not** invent Pass for overall §7. Packet 7.1–7.8 Pass is recorded; overall Result is **Fail** because of the Deiter double-Add bar. **Ready=Yes** on `e5a8fdd` is dogfood history, not a Pass. Product owns the API uniqueness fix before restamp; no fix is claimed here.
 
 **Rolf Confirm (2026-09-14) of this Fail: Hold merge.** Product `feat/e10-aliquot-atomic-pair` does **not** merge to `main` until uniqueness lands and Tobias restamps. Docs folds onto `feat/e10-aliquot-atomic-pair` remain fine. Not IC50.
 
-**Evidence (cite only; binaries not committed):** `/workspace/uat-e10-section7-e5a8fdd/{RESULT.md,acs.md,stamp.json}`.
+**Evidence (cite only; binaries not committed):**
+- `/workspace/uat-e10-section7-e5a8fdd/RESULT.md`
+- `/workspace/uat-e10-section7-e5a8fdd/acs.md`
+- `/workspace/uat-e10-section7-e5a8fdd/stamp.json`
