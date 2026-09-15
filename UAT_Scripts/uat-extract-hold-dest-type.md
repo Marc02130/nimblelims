@@ -102,18 +102,23 @@ Combined from two Tobias stamps on the same SHA:
 | Step | Action | Expected result |
 |------|--------|-----------------|
 | 7.1 | New template → Tables & forms. Confirm presets. | **+ Aliquot/pool** is present. **+ Aliquot/pool plan** and **+ Aliquots/pools results** are **absent**. |
-| 7.2 | Click **+ Aliquot/pool**. | Two entries appear: Aliquot / pool plan and Aliquots / pools. The add button disables. |
-| 7.3 | Delete the plan entry. | **Both** disappear. |
+| 7.2 | Click **+ Aliquot/pool**. | Two entries appear: Aliquot / pool plan and Aliquots / pools. Add **disables while the pair exists** (not forever — see 7.8). |
+| 7.3 | Delete the **plan** entry. | **Both** disappear. |
+| 7.3b | Add the pair again. Delete the **dest** entry. | **Both** disappear. Same as 7.3; either half is the pair. |
 | 7.4 | Save template, create experiment from it. | Experiment has both entries. Dest table empty (no minted rows) before execute. |
-| 7.5 | Ad hoc experiment (no template). Entries → **Add aliquot/pool**. | Same pair created. |
+| 7.5 | Ad hoc experiment (no template). Entries → **Add aliquot/pool**. | Same pair created. Add hidden/disabled while the pair exists. |
 | 7.6 | API: POST only `aliquot_pool_plan`. | **201**; GET entries includes `aliquots_pools`. |
+| 7.6b | API: POST only `aliquots_pools` on a fresh experiment. | **201**; GET entries includes `aliquot_pool_plan`. |
 | 7.7 | API: DELETE the plan entry. | Both inactive. |
+| 7.7b | API: DELETE the dest entry (fresh pair). | Both inactive. |
+| 7.8 | After 7.3 / 7.3b (pair gone). | **+ Aliquot/pool** / **Add aliquot/pool** is enabled again. One pair at a time per template or experiment — not a lifetime lock. |
 
-**Fail:** operator can add dest-only or plan-only from presets; delete leaves a half-pair.
+**Fail:** operator can add dest-only or plan-only from presets; delete leaves a half-pair; add stays disabled after the pair is gone.
 
 ## Pass criteria
 
-- Steps 1–6 pass.
+- **This packet (E-10):** Steps **7.1–7.8** (unsigned until Tobias). Do **not** restamp §6.
+- Steps 1–6 remain the dest-container-type stamp on `008baf2` (Pass). They are not this packet.
 - Blank dest **sample** type always means **Same as parent.** Blank dest **container** type always means **Same as source.**
 - Catalog choices are many-to-many and client/source/operation filtered.
 - Mixed-type pools are refused in both UI and API.

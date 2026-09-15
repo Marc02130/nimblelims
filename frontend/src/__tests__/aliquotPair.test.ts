@@ -28,4 +28,10 @@ describe('aliquotPair', () => {
     expect(removeAliquotPairAt(pair, 0)).toHaveLength(0);
     expect(removeAliquotPairAt(pair, 1)).toHaveLength(0);
   });
+
+  it('allows a new pair after the previous pair is gone', () => {
+    const gone = removeAliquotPairAt(appendAliquotPair([]), 0);
+    expect(hasAliquotPair(gone)).toBe(false);
+    expect(appendAliquotPair(gone)).toHaveLength(2);
+  });
 });

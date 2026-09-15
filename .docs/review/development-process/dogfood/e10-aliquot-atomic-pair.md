@@ -12,8 +12,8 @@ Local compose on **this feature branch**. `experiment:manage`.
 ## Paths to try
 
 1. Template Tables & forms: only **+ Aliquot/pool** (no separate plan / dest presets).
-2. Click it → plan + dest entries. Button disables.
-3. Delete either → both gone.
+2. Click it → plan + dest entries. Add **disables while the pair exists** (one pair at a time, not forever).
+3. Delete **plan** → both gone; add enables. Add again; delete **dest** → both gone; add enables.
 4. Save template, start experiment → both instantiate; dest empty before execute.
 5. Ad hoc experiment → **Add aliquot/pool** on Entries → same pair.
 
