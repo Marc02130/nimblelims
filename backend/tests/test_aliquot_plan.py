@@ -1141,3 +1141,75 @@ class TestAliquotAtomicPair:
         }
         assert "aliquot_pool_plan" not in active_keys
         assert "aliquots_pools" not in active_keys
+
+    def test_ad_hoc_create_dest_mints_plan_mate(
+        self, client: TestClient, auth_headers
+    ):
+        exp = client.post(
+            "/v1/experiments",
+            json={"name": f"Exp dest {uuid4().hex[:8]}"},
+            headers=auth_headers,
+        )
+        assert exp.status_code == 201, exp.text
+        exp_id = exp.json()["id"]
+        created = client.post(
+            f"/v1/experiments/{exp_id}/entries",
+            json={
+                "experiment_id": exp_id,
+                "entry_type": "experiment_sample_data",
+                "name": "Aliquots / pools",
+                "predefined_entry_key": "aliquots_pools",
+            },
+            headers=auth_headers,
+        )
+        assert created.status_code == 201, created.text
+        listed = client.get(
+            f"/v1/experiments/{exp_id}/entries", headers=auth_headers
+        )
+        keys = {
+            e.get("predefined_entry_key")
+            for e in listed.json()["entries"]
+            if e.get("active", True)
+        }
+        assert "aliquots_pools" in keys
+        assert "aliquot_pool_plan" in keys
+
+    def test_delete_dest_removes_plan(
+        self, client: TestClient, auth_headers
+    ):
+        exp = client.post(
+            "/v1/experiments",
+            json={"name": f"Exp deld {uuid4().hex[:8]}"},
+            headers=auth_headers,
+        )
+        exp_id = exp.json()["id"]
+        client.post(
+            f"/v1/experiments/{exp_id}/entries",
+            json={
+                "experiment_id": exp_id,
+                "entry_type": "experiment_sample_data",
+                "name": "Aliquots / pools",
+                "predefined_entry_key": "aliquots_pools",
+            },
+            headers=auth_headers,
+        )
+        listed = client.get(
+            f"/v1/experiments/{exp_id}/entries", headers=auth_headers
+        ).json()["entries"]
+        dest = next(
+            e for e in listed if e["predefined_entry_key"] == "aliquots_pools"
+        )
+        deleted = client.delete(
+            f"/v1/entries/{dest['id']}", headers=auth_headers
+        )
+        assert deleted.status_code in (200, 204), deleted.text
+        after = client.get(
+            f"/v1/experiments/{exp_id}/entries", headers=auth_headers
+        ).json()["entries"]
+        active_keys = {
+            e.get("predefined_entry_key")
+            for e in after
+            if e.get("active", True)
+        }
+        assert "aliquot_pool_plan" not in active_keys
+        assert "aliquots_pools" not in active_keys
