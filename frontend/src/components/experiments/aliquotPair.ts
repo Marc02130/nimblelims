@@ -1,7 +1,13 @@
-/** E-10: aliquot/pool plan + dest entries are an atomic pair. */
+/** Aliquot/pool wrapper (WRAPPER_CATALOG.aliquot_pool): atomic pair, cardinality 1. */
 
-export const ALIQUOT_PLAN_KEY = 'aliquot_pool_plan';
-export const ALIQUOT_DEST_KEY = 'aliquots_pools';
+import {
+  WRAPPER_CATALOG,
+  wrapperAtCapacity,
+  wrapperMateKey,
+} from './wrappers';
+
+export const ALIQUOT_PLAN_KEY = WRAPPER_CATALOG.aliquot_pool.keys[0];
+export const ALIQUOT_DEST_KEY = WRAPPER_CATALOG.aliquot_pool.keys[1];
 
 export type AliquotPairEntry = {
   entry_type: string;
@@ -39,21 +45,15 @@ export const ALIQUOT_DEST_ENTRY: Omit<AliquotPairEntry, 'sort_order'> = {
   fields: [],
 };
 
-export const aliquotPairMate = (key?: string | null): string | null => {
-  if (key === ALIQUOT_PLAN_KEY) return ALIQUOT_DEST_KEY;
-  if (key === ALIQUOT_DEST_KEY) return ALIQUOT_PLAN_KEY;
-  return null;
-};
+export const aliquotPairMate = (key?: string | null): string | null =>
+  wrapperMateKey(key);
 
 export const hasAliquotPair = (
   entries: Array<{ predefined_entry_key?: string | null }>,
-): boolean => {
-  const keys = new Set(entries.map((e) => e.predefined_entry_key));
-  return keys.has(ALIQUOT_PLAN_KEY) || keys.has(ALIQUOT_DEST_KEY);
-};
+): boolean => wrapperAtCapacity('aliquot_pool', entries);
 
 export const appendAliquotPair = <T extends AliquotPairEntry>(entries: T[]): T[] => {
-  if (hasAliquotPair(entries)) return entries;
+  if (wrapperAtCapacity('aliquot_pool', entries)) return entries;
   const start = entries.length;
   return [
     ...entries,

@@ -37,9 +37,9 @@ import { apiService } from '../services/apiService';
 import { FillHeightPage, FillHeightTable } from '../components/common/FillHeightPage';
 import {
   appendAliquotPair,
-  hasAliquotPair,
   removeAliquotPairAt,
 } from '../components/experiments/aliquotPair';
+import { wrapperAtCapacity } from '../components/experiments/wrappers';
 
 interface ApiError {
   response?: {
@@ -1495,7 +1495,7 @@ const ExperimentTemplatesManagement: React.FC = () => {
               <Button
                 size="small"
                 variant="text"
-                disabled={hasAliquotPair(formDef.entries ?? [])}
+                disabled={wrapperAtCapacity('aliquot_pool', formDef.entries ?? [])}
                 onClick={addAliquotPoolPair}
               >
                 + Aliquot/pool

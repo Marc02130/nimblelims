@@ -36,6 +36,11 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
 from .base import Base, BaseModel
+from .wrappers import (
+    WRAPPER_CATALOG,
+    wrapper_mate_key,
+    wrapper_over_capacity_id,
+)
 
 # Canonical + legacy aliases (legacy accepted, normalized to canonical on create/instantiate)
 ENTRY_TYPES = frozenset(
@@ -162,16 +167,12 @@ PREDEFINED_ENTRY_DEFAULTS = {
     },
 }
 
-# E-10: plan + dest are an atomic pair. One add creates both; half-pairs are completed.
-ALIQUOT_PAIR_KEYS = ("aliquot_pool_plan", "aliquots_pools")
+# Aliquot/pool pair keys come from WRAPPER_CATALOG["aliquot_pool"] (cardinality 1).
+ALIQUOT_PAIR_KEYS = WRAPPER_CATALOG["aliquot_pool"]["keys"]
 
 
 def aliquot_pair_mate(key: Optional[str]) -> Optional[str]:
-    if key == "aliquot_pool_plan":
-        return "aliquots_pools"
-    if key == "aliquots_pools":
-        return "aliquot_pool_plan"
-    return None
+    return wrapper_mate_key(key)
 
 
 def predefined_entry_declaration(key: str) -> Dict[str, Any]:
@@ -187,7 +188,7 @@ def predefined_entry_declaration(key: str) -> Dict[str, Any]:
 
 
 def ensure_aliquot_pair_in_entries(entries: Any) -> Any:
-    """If either aliquot pair key is present, append the missing mate."""
+    """Complete atomic-pair wrappers (catalog): append the missing mate key."""
     if not isinstance(entries, list):
         return entries
     keys = {
@@ -196,14 +197,30 @@ def ensure_aliquot_pair_in_entries(entries: Any) -> Any:
         if isinstance(e, dict)
     }
     out = list(entries)
-    for key in ALIQUOT_PAIR_KEYS:
-        mate = aliquot_pair_mate(key)
-        if key in keys and mate and mate not in keys:
-            decl = predefined_entry_declaration(mate)
-            decl["sort_order"] = len(out)
-            out.append(decl)
-            keys.add(mate)
+    for spec in WRAPPER_CATALOG.values():
+        if not spec.get("atomic_pair"):
+            continue
+        for key in spec["keys"]:
+            mate = wrapper_mate_key(key)
+            if key in keys and mate and mate not in keys:
+                decl = predefined_entry_declaration(mate)
+                decl["sort_order"] = len(out)
+                out.append(decl)
+                keys.add(mate)
     return out
+
+
+def reject_if_wrapper_over_capacity(entries: Any) -> Optional[str]:
+    """Return over-capacity wrapper_id after mates are completed, else None."""
+    completed = ensure_aliquot_pair_in_entries(entries)
+    if not isinstance(completed, list):
+        return None
+    keys = [
+        e.get("predefined_entry_key")
+        for e in completed
+        if isinstance(e, dict)
+    ]
+    return wrapper_over_capacity_id(keys)
 
 
 class Entry(Base):

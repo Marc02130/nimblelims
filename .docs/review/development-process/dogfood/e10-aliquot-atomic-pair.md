@@ -5,7 +5,7 @@
 **Product SHA:** **`e5a8fdd`** (`e5a8fdd50538e23e67c1425dadb3e505171b987f`) tip of `feat/e10-aliquot-atomic-pair` (includes `hasAliquotPair` nullability fix). Cite this SHA for dogfood Ready=Yes and formal UAT §7 **Fail**.  
 **When:** Dogfood **Ready=Yes** (2026-09-14 21:23 ET) then formal §7 (2026-09-14 21:31 ET) in [`UAT_Scripts/uat-extract-hold-dest-type.md`](../../../../UAT_Scripts/uat-extract-hold-dest-type.md).  
 **Deiter Lab Ops Confirm** of Marc’s fold (2026-09-14) — **not** a UAT Pass.  
-**Live state:** formal **§7 Result: Fail** (Tobias QA, 2026-09-14 21:31 ET, `e5a8fdd`) and **Rolf Confirm: Hold merge** (`feat/e10-aliquot-atomic-pair` → `main`). Packet 7.1–7.8 Pass; overall Fail = Deiter **double-Add**. **Blocking:** API second plan POST while pair/half exists. Do **not** invent overall §7 Pass. Product owns the API uniqueness fix before restamp; no fix is claimed here.  
+**Live state:** formal **§7 Result: Fail** (Tobias QA, 2026-09-14 21:31 ET, `e5a8fdd`) and **Rolf Confirm: Hold merge** (`feat/e10-aliquot-atomic-pair` → `main`). Packet 7.1–7.8 Pass; overall Fail = Deiter **double-Add**. Uniqueness after that SHA is **409** `wrapper_at_capacity` (`WRAPPER_CATALOG` `aliquot_pool`, cardinality 1). Do **not** invent overall §7 Pass. Tobias restamp still required before merge.  
 **Tobias dogfood Ready=Yes** on **`feat/e10-aliquot-atomic-pair`** (2026-09-14 21:23 ET restamp; evidence `/workspace/dogfood-e10-e5a8fdd/READY.md`) is **dogfood history**: clean FE **Docker**/CRA build green on **`e5a8fdd`**, paths **1–5 Pass**. Ready=Yes is **not** a UAT Pass. The earlier **Rolf Confirm: No Hold** covered **starting** §7 and is history — the current gate is **Hold merge**. Prior Ready=No on **`9312c54`** (TS2345) stays history. §§1–6 stay `008baf2` (not restamped).  
 **Not a UAT Result.** Not dest-follow recode. Not IC50.
 
@@ -16,10 +16,11 @@ Local compose on product **`e5a8fdd`**. `experiment:manage`.
 ## Paths to try
 
 1. Template Tables & forms: only **+ Aliquot/pool** (no separate plan / dest presets).
-2. Click it → plan + dest entries. Add **disables while the pair exists** (one pair at a time, not forever).
+2. Click it → plan + dest entries. Add **disables while the wrapper is at capacity** (one `aliquot_pool` instance, not forever).
 3. Delete **plan** → both gone; add enables. Add again; delete **dest** → both gone; add enables.
 4. Save template, start experiment → both instantiate; dest empty before execute.
 5. Ad hoc experiment → **Add aliquot/pool** on Entries → same pair.
+6. With the pair present, API POST another `aliquot_pool_plan` → **409** `wrapper_at_capacity`. After delete, POST succeeds again.
 
 ## Ready for UAT?
 
