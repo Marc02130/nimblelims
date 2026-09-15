@@ -99,7 +99,7 @@ Combined from two Tobias stamps on the same SHA:
 
 **Result: Fail** (Tobias QA) · 2026-09-14 21:31 ET · SHA `e5a8fdd50538e23e67c1425dadb3e505171b987f` (`e5a8fdd`) · `feat/e10-aliquot-atomic-pair` · Compose down.
 
-Packet **7.1–7.8 Pass**. Overall **Fail** because of Deiter Lab Ops EXTRA **double-Add** bar. **Blocking:** API second plan POST while pair/half exists. Do **not** invent overall §7 Pass. **Rolf Confirm** of this Fail (2026-09-14): **Hold merge** — product `feat/e10-aliquot-atomic-pair` does **not** go to `main` until server-side single-pair uniqueness lands and Tobias restamps. Product owns that fix; it is **not** written here. **Tobias dogfood Ready=Yes** on **`e5a8fdd`** stays **dogfood history** (`/workspace/dogfood-e10-e5a8fdd/READY.md`) — Ready=Yes is **not** a UAT Pass, and the earlier **Rolf Confirm: No Hold** covered starting §7, not merging. Prior Ready=No on **`9312c54`** stays history. **Deiter Lab Ops Confirm** of Marc’s fold (2026-09-14) is not a Tobias Pass. One **Add aliquot/pool** creates `aliquot_pool_plan` **and** `aliquots_pools`. Dest stays empty until dest init. Do not offer separate plan-only or dest-only presets. §§1–6 stay `008baf2` (not restamped). Not IC50.
+Packet **7.1–7.8 Pass**. Overall **Fail** because of Deiter Lab Ops EXTRA **double-Add** bar. Formal stamp stays on **`e5a8fdd`**. Do **not** invent overall §7 Pass. **Rolf Confirm** of this Fail (2026-09-14): **Hold merge** — product `feat/e10-aliquot-atomic-pair` does **not** go to `main` until Tobias restamps. **Tobias dogfood Ready=Yes** on **`e5a8fdd`** stays **dogfood history** (`/workspace/dogfood-e10-e5a8fdd/READY.md`) — Ready=Yes is **not** a UAT Pass, and the earlier **Rolf Confirm: No Hold** covered starting §7, not merging. Prior Ready=No on **`9312c54`** stays history. **Deiter Lab Ops Confirm** of Marc’s fold (2026-09-14) is not a Tobias Pass. One **Add aliquot/pool** creates `aliquot_pool_plan` **and** `aliquots_pools` (`WRAPPER_CATALOG` `aliquot_pool`, cardinality **1**). Dest stays empty until dest init. Do not offer separate plan-only or dest-only presets. Second instance while the wrapper exists is **409** `wrapper_at_capacity` (steps **7.9 / 7.9b** — unsigned until Tobias restamps). §§1–6 stay `008baf2` (not restamped). Not IC50.
 
 **Evidence (cite only; binaries not committed):**
 - `/workspace/uat-e10-section7-e5a8fdd/RESULT.md`
@@ -118,23 +118,23 @@ Packet **7.1–7.8 Pass**. Overall **Fail** because of Deiter Lab Ops EXTRA **do
 | 7.6b | API: POST only `aliquots_pools` on a fresh experiment. | **201**; GET entries includes `aliquot_pool_plan`. | **Pass** |
 | 7.7 | API: DELETE the plan entry. | Both inactive. | **Pass** |
 | 7.7b | API: DELETE the dest entry (fresh pair). | Both inactive. | **Pass** |
-| 7.8 | After 7.3 / 7.3b (pair gone). | **+ Aliquot/pool** / **Add aliquot/pool** is enabled again. One pair at a time per template or experiment — not a lifetime lock. | **Pass** |
+| 7.8 | After 7.3 / 7.3b (pair gone). | **+ Aliquot/pool** / **Add aliquot/pool** is enabled again. One wrapper instance at a time per template or experiment — not a lifetime lock. | **Pass** |
+| 7.9 | API: POST `aliquot_pool_plan` again while the pair exists. | **409** `wrapper_at_capacity` (`wrapper_id`: `aliquot_pool`). GET still one plan + one dest. | **Unsigned** (uniqueness after `e5a8fdd`; do not invent Pass) |
+| 7.9b | API: create template with two `aliquot_pool_plan` decls. | **409** `wrapper_at_capacity`. | **Unsigned** (do not invent Pass) |
 
-**Deiter Lab Ops EXTRA Fail bars** (same SHA; overall §7 Fail):
+**Deiter Lab Ops EXTRA Fail bars** (same SHA `e5a8fdd`; overall §7 Fail):
 
 | Bar | Result |
 |-----|--------|
-| Double-click Add → two pairs / half | **Fail** — concurrent double POST → 2 plans + 2 dests; sequential 2nd POST → 2 plans + 1 dest. FE hide/disable present; API lacks single-pair uniqueness. |
+| Double-click Add → two pairs / half | **Fail** on `e5a8fdd` — concurrent double POST → 2 plans + 2 dests; sequential 2nd POST → 2 plans + 1 dest. FE hide/disable present; API lacked single-pair uniqueness **on that SHA**. Product uniqueness after that SHA is **409** `wrapper_at_capacity` — **not** a Tobias restamp. |
 | Reload/refresh orphan | Pass |
 | Mint-early before execute | Pass |
 
-**Blocking:** API second plan POST while pair/half exists. Server-side uniqueness needed before Pass.
-
-**Fail:** operator can add dest-only or plan-only from presets; delete leaves a half-pair; add stays disabled after the pair is gone; **API second plan POST while pair/half exists** (Deiter double-Add).
+**Fail:** operator can add dest-only or plan-only from presets; delete leaves a half-pair; add stays disabled after the pair is gone; **API second plan POST while pair/half exists** (Deiter double-Add on `e5a8fdd`). Expected after uniqueness: 409, not 201.
 
 ## Pass criteria
 
-- **This packet (E-10):** Steps **7.1–7.8**. Formal **§7 Result: Fail** (Tobias QA, 2026-09-14 21:31 ET, `e5a8fdd`). Packet **7.1–7.8 Pass**. Overall Fail = Deiter Lab Ops EXTRA **double-Add**. **Blocking:** API second plan POST while pair/half exists. Do **not** invent overall §7 Pass. **Rolf Confirm: Hold merge** (`feat/e10-aliquot-atomic-pair` → `main`) until uniqueness lands and Tobias restamps. **Tobias dogfood Ready=Yes** on `e5a8fdd` is dogfood history, not a UAT Pass. Product owns API uniqueness before restamp. Prior Ready=No on **`9312c54`** stays history. **Deiter Lab Ops Confirm** of Marc’s fold is not a Tobias Pass. Do **not** restamp §6. Evidence: `/workspace/uat-e10-section7-e5a8fdd/RESULT.md`, `/workspace/uat-e10-section7-e5a8fdd/acs.md`, `/workspace/uat-e10-section7-e5a8fdd/stamp.json`.
+- **This packet (E-10):** Steps **7.1–7.9b**. Formal **§7 Result: Fail** (Tobias QA, 2026-09-14 21:31 ET, `e5a8fdd`). Packet **7.1–7.8 Pass**. Overall Fail = Deiter Lab Ops EXTRA **double-Add**. Uniqueness is **409** `wrapper_at_capacity` — **do not invent overall §7 Pass**. **Rolf Confirm: Hold merge** (`feat/e10-aliquot-atomic-pair` → `main`) until Tobias restamps. **Tobias dogfood Ready=Yes** on `e5a8fdd` is dogfood history, not a UAT Pass. Prior Ready=No on **`9312c54`** stays history. **Deiter Lab Ops Confirm** of Marc’s fold is not a Tobias Pass. Do **not** restamp §6. Evidence of the Fail: `/workspace/uat-e10-section7-e5a8fdd/RESULT.md`, `/workspace/uat-e10-section7-e5a8fdd/acs.md`, `/workspace/uat-e10-section7-e5a8fdd/stamp.json`.
 - Steps 1–6 remain the dest-container-type stamp on `008baf2` (Pass). They are not this packet.
 - Blank dest **sample** type always means **Same as parent.** Blank dest **container** type always means **Same as source.**
 - Catalog choices are many-to-many and client/source/operation filtered.
@@ -164,6 +164,10 @@ Packet **7.1–7.8 Pass**. Overall **Fail** because of Deiter Lab Ops EXTRA **do
 **Evidence (cite only; binaries not committed):** `/workspace/uat-dest-container-type-008baf2-ui61/` (6.1 screens) and `/workspace/uat-dest-container-type-008baf2/{RESULT.md,tobias-stamp.json,acs.md}` (API 6.2–6.8 + 1–5 smoke).
 
 **Not touched by this run:** 1.7 / AC-P2-C3, AC-P2-C2, named-slot / OQ-WO-7, Leadership overall P2, receive first vessel. Their existing stamps stand as written. Not IC50.
+
+### 2026-09-14 · WRAPPER_CATALOG cardinality 1 · `feat/e10-aliquot-atomic-pair`
+
+**Not a UAT Pass.** Aliquot/pool is wrapper id `aliquot_pool` in `WRAPPER_CATALOG` (cardinality **1**). API **409** `wrapper_at_capacity` on a second instance. UAT rows **7.9 / 7.9b** added. Formal **§7 Unsigned**. Do **not** invent Tobias Pass/Fail. Do **not** restamp §6 (`008baf2`). n-pairs remain parked in `.docs/internal/ideas/aliquot-pool-multiple-pairs.md`. Not named-slot / OQ-WO-7 / C2/C3. Not IC50.
 
 ### 2026-09-14 · Marc E-10 punch (Rolf) · `feat/e10-aliquot-atomic-pair`
 

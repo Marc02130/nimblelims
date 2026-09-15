@@ -30,7 +30,13 @@ from models.container import Container, Contents
 from models.sample import Sample
 from models.user import User
 from models.list import List as ListModel, ListEntry
-from models.entry import ELNProcessStep, ELNProcessSample, ensure_aliquot_pair_in_entries
+from models.entry import (
+    ELNProcessStep,
+    ELNProcessSample,
+    ensure_aliquot_pair_in_entries,
+    reject_if_wrapper_over_capacity,
+)
+from models.wrappers import wrapper_at_capacity_detail
 
 # Decision #24 — sample must be Available for Testing (list entry name)
 AVAILABLE_FOR_TESTING_STATUS_NAME = "Available for Testing"
@@ -40,7 +46,14 @@ def _with_aliquot_pair(template_definition: Optional[Dict[str, Any]]) -> Optiona
     if not template_definition:
         return template_definition
     td = dict(template_definition)
-    td["entries"] = ensure_aliquot_pair_in_entries(td.get("entries") or [])
+    entries = ensure_aliquot_pair_in_entries(td.get("entries") or [])
+    over = reject_if_wrapper_over_capacity(entries)
+    if over:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=wrapper_at_capacity_detail(over),
+        )
+    td["entries"] = entries
     return td
 
 

@@ -52,6 +52,9 @@ import {
 const apiErrorMsg = (err: any, fallback: string): string => {
   const detail = err?.response?.data?.detail;
   if (typeof detail === 'string') return detail;
+  if (detail && typeof detail === 'object' && typeof detail.message === 'string') {
+    return detail.message;
+  }
   if (Array.isArray(detail) && detail.length > 0) return detail[0]?.msg || fallback;
   return fallback;
 };

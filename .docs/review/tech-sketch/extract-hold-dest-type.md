@@ -22,7 +22,7 @@ Aliquot/pool execute creates a dest that inherits parent identity and does not j
 | **Plan entry** | `aliquot_pool_plan` | `experiment_data` | Before / at execute | Entry config + plan lines (columns from METHOD_CATALOG) |
 | **Dest sample entry** | `aliquots_pools` | `experiment_sample_data` | Created at add (empty); populated **AFTER execute only** | Lists minted daughters. Dest FieldDefinitions from METHOD_CATALOG live **on this entry** (not Sample columns). No method/type picker. |
 
-**Atomic pair on add (Rolf CEO + Heidi + Mathilda 2026-08-23):** When adding aliquot/pool to a **template** or **ad hoc** experiment, **both** entries are created together. UI must not offer adding only one. One “Add aliquot/pool” action → pair. Dest entry stays **empty until after execute**. No new plan object.
+**Atomic pair on add (Rolf CEO + Heidi + Mathilda 2026-08-23):** When adding aliquot/pool to a **template** or **ad hoc** experiment, **both** entries are created together. UI must not offer adding only one. One “Add aliquot/pool” action → pair. Dest entry stays **empty until after execute**. No new plan object. **Cardinality 1** on `WRAPPER_CATALOG["aliquot_pool"]`: second instance is **409** `wrapper_at_capacity`. n-pairs parked in ideas.
 
 **Flow:** Add → both entries exist (dest empty) → operator selects method → METHOD_CATALOG attaches plan columns + dest FieldDefinitions immediately → **Submit** / execute of the pair mints dest **sample + container** → dest **joins** the process (`in_progress`) and the inbound sample is **`removed`** from the process → `aliquots_pools` lists dests. **No re-prompt.** Mint is **this OOB entry**, not process or routing. Later route Start follows continuing (non-removed) process samples.
 

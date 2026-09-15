@@ -1213,3 +1213,77 @@ class TestAliquotAtomicPair:
         }
         assert "aliquot_pool_plan" not in active_keys
         assert "aliquots_pools" not in active_keys
+
+    def test_second_plan_post_is_wrapper_at_capacity(
+        self, client: TestClient, auth_headers
+    ):
+        exp = client.post(
+            "/v1/experiments",
+            json={"name": f"Exp cap {uuid4().hex[:8]}"},
+            headers=auth_headers,
+        )
+        exp_id = exp.json()["id"]
+        first = client.post(
+            f"/v1/experiments/{exp_id}/entries",
+            json={
+                "experiment_id": exp_id,
+                "entry_type": "experiment_data",
+                "name": "Aliquot / pool plan",
+                "predefined_entry_key": "aliquot_pool_plan",
+            },
+            headers=auth_headers,
+        )
+        assert first.status_code == 201, first.text
+        second = client.post(
+            f"/v1/experiments/{exp_id}/entries",
+            json={
+                "experiment_id": exp_id,
+                "entry_type": "experiment_data",
+                "name": "Aliquot / pool plan 2",
+                "predefined_entry_key": "aliquot_pool_plan",
+            },
+            headers=auth_headers,
+        )
+        assert second.status_code == 409, second.text
+        detail = second.json()["detail"]
+        assert detail["code"] == "wrapper_at_capacity"
+        assert detail["wrapper_id"] == "aliquot_pool"
+        listed = client.get(
+            f"/v1/experiments/{exp_id}/entries", headers=auth_headers
+        ).json()["entries"]
+        plans = [
+            e
+            for e in listed
+            if e.get("active", True)
+            and e.get("predefined_entry_key") == "aliquot_pool_plan"
+        ]
+        assert len(plans) == 1
+
+    def test_template_two_plans_is_wrapper_at_capacity(
+        self, client: TestClient, auth_headers
+    ):
+        r = client.post(
+            "/v1/experiment-templates",
+            json={
+                "name": f"Tpl cap {uuid4().hex[:8]}",
+                "template_definition": {
+                    "entries": [
+                        {
+                            "predefined_entry_key": "aliquot_pool_plan",
+                            "name": "Plan A",
+                            "sort_order": 0,
+                        },
+                        {
+                            "predefined_entry_key": "aliquot_pool_plan",
+                            "name": "Plan B",
+                            "sort_order": 1,
+                        },
+                    ]
+                },
+            },
+            headers=auth_headers,
+        )
+        assert r.status_code == 409, r.text
+        detail = r.json()["detail"]
+        assert detail["code"] == "wrapper_at_capacity"
+        assert detail["wrapper_id"] == "aliquot_pool"
