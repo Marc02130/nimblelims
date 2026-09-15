@@ -38,7 +38,7 @@ Product: one mint gate on the aliquot/pool pair. Do not mint from generic Submit
 | **Concrete methods (Deiter cut list):** entry `method` is concrete id → exactly one `mint_op`; CUT fraction / contribution ratio / plate map / serial dilution | Deiter + Marc 2026-08-23 |
 | **Normalization:** parent concentration required; prefer prior result on that sample (not free type-in); dest vol **or** target amount required | Marc 2026-08-23 |
 | **Equimolar (Hans):** rename equimolar → **by target amount** for this packet (no size/bp path yet); Hans gate if size/bp lands later | Hans + Marc 2026-08-23 |
-| **Atomic pair (add):** adding aliquot/pool to template or ad hoc creates **both** entries together — plan (`aliquot_pool_plan` / `experiment_data`) **and** dest-sample (`aliquots_pools` / `experiment_sample_data`); UI must not offer adding only one; one “Add aliquot/pool” action → pair; dest entry stays empty until after execute; no new plan object | Rolf CEO + Heidi + Mathilda 2026-08-23 |
+| **Atomic pair (add):** adding aliquot/pool to template or ad hoc creates **both** entries together — plan (`aliquot_pool_plan` / `experiment_data`) **and** dest-sample (`aliquots_pools` / `experiment_sample_data`); UI must not offer adding only one; one “Add aliquot/pool” action → pair; dest entry stays empty until after execute; no new plan object. **Marc E-10 punch 2026-09-14:** delete either half removes the pair; POST either side creates the pair; DELETE either inactivates both; Add re-enables after the pair is gone (one pair at a time). **Deiter Lab Ops Confirm** of that fold. E-10 UAT §7 unsigned until Tobias; dogfood on product **`9312c54`**. Do not invent Pass. §§1–6 stay `008baf2` | Rolf CEO + Heidi + Mathilda 2026-08-23; Marc / Rolf 2026-09-14; Deiter Lab Ops Confirm 2026-09-14 |
 | Two keys: `aliquot_pool_plan` / `aliquots_pools`; no new plan object | Prior map |
 | `dest_sample_type` must land on plan line/config (Heidi bounce vs main copy-parent) | Heidi |
 | Seeds Blood×aliquot→DNA, DNA×pool→pooled DNA; S3 config:edit; L1/S1; L2; start allow-list; catalog many-to-many; pool same-type | Prior |
@@ -73,7 +73,7 @@ Each method id has `mint_op`, plan-line columns (required/optional), **and** des
 
 ## 4. Goals
 
-- **Atomic pair on add:** one “Add aliquot/pool” action creates both `aliquot_pool_plan` and `aliquots_pools` together (template or ad hoc); UI never offers plan-only or dest-only add.
+- **Atomic pair on add:** one “Add aliquot/pool” action creates both `aliquot_pool_plan` and `aliquots_pools` together (template or ad hoc); UI never offers plan-only or dest-only add. Delete either half removes the pair; POST either side creates the pair; DELETE either inactivates both; Add re-enables after the pair is gone.
 - Dest-sample entry present from add, **empty until after execute**.
 - **METHOD_CATALOG dual map:** method select attaches plan-line columns + dest FieldDefinitions **immediately** (Heidi + Mathilda); not optional later wiring.
 - Dest amount/volume/concentration (per method) are **entry FieldDefinitions** on `aliquots_pools` — never new Sample columns.
@@ -92,7 +92,7 @@ Dual mint; mid-flight method warn/wipe; un-mint on cancel; method/type on `aliqu
 | ID | Criterion |
 |----|-----------|
 | AC1 | `aliquot_pool_plan` + `aliquots_pools` only; no new plan object. |
-| AC1b | Adding aliquot/pool (template or ad hoc) always creates **both** entries as an atomic pair; UI does not offer plan-only or dest-only; one “Add aliquot/pool” → pair. |
+| AC1b | Adding aliquot/pool (template or ad hoc) always creates **both** entries as an atomic pair; UI does not offer plan-only or dest-only; one “Add aliquot/pool” → pair. **Either half is the pair:** delete dest (UI) or DELETE dest (API) removes/inactivates both, same as delete/DELETE plan. POST dest-only (`aliquots_pools`) or POST plan-only (`aliquot_pool_plan`) → **201** and GET includes the mate. After the pair is gone, **+ Aliquot/pool** / Add re-enables (one pair at a time — not a lifetime lock). **E-10 UAT §7 unsigned** until Tobias; **Deiter Lab Ops Confirm** of Marc’s fold (not a Pass). Dogfood on product **`9312c54`** (`feat/e10` tip may have moved). Do not restamp dest-container-type §§1–6 (`008baf2`). |
 | AC1c | Dest-sample entry (`aliquots_pools`) stays empty until **submit** of experiment sample data (mint sample + container). |
 | AC2 | Entry config has concrete `method` (implies exactly one `mint_op`) + optional default dest type. |
 | AC3 | Method picker and dest-type control are separate (Method ≠ dest type). |

@@ -2,12 +2,14 @@
 
 **Stem:** `extract-hold-dest-type` (atomic pair)  
 **Branch:** `feat/e10-aliquot-atomic-pair`  
+**Product SHA:** **`9312c54`** (`9312c54ddd3999963abd3070c76b0057b62e5d4c`). Cite this SHA for dogfood / unsigned UAT §7. `feat/e10` tip may have moved.  
 **When:** After this branch is up, **before** Tobias UAT section 7 in [`UAT_Scripts/uat-extract-hold-dest-type.md`](../../../../UAT_Scripts/uat-extract-hold-dest-type.md).  
+**Deiter Lab Ops Confirm** of Marc’s fold (2026-09-14) — **not** a UAT Pass. Still unsigned until Tobias. §§1–6 stay `008baf2`.  
 **Not a UAT Result.** Not dest-follow recode. Not IC50.
 
 ## Env
 
-Local compose on **this feature branch**. `experiment:manage`.
+Local compose on product **`9312c54`**. `experiment:manage`.
 
 ## Paths to try
 
