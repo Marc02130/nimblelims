@@ -53,3 +53,7 @@ Dest type on the aliquot/pool **plan entry** (beside Method), blank = Same as pa
 ```
 LAB OPS REVIEW: Accept with conditions (L1 Met; L2)
 ```
+
+## 6. Deiter Lab Ops Confirm — Marc E-10 fold (2026-09-14)
+
+**Deiter Lab Ops Confirm** of Marc’s UAT punch (7.3b / 7.6b / 7.7b / 7.8). **Still unsigned until Tobias.** Do **not** invent Pass. Dogfood first on product SHA **`9312c54`**. Cite **`9312c54`** for dogfood / unsigned UAT §7; `feat/e10` tip may have moved. §§1–6 stay `008baf2`. Does **not** rewrite the 2026-08-23 Accept-with-conditions verdict above. Not named-slot / OQ-WO-7 / C2/C3. Not IC50.
