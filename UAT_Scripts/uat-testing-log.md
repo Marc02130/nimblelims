@@ -13,6 +13,7 @@ The UAT scripts should be run in the following order based on their dependencies
 | 5 | `uat-analysis-analyte-management` | uat-security-rbac | Analyses/Analytes CRUD, expandable linked analytes grid, linking/unlinking |
 | 6 | `uat-container-management` | uat-configurations-custom | Container types, hierarchical containers, pooling |
 | 7 | `uat-atomic-receive` | uat-configurations-custom (lists), 0058/0060 seed | **CORE receive happy path** (`/receive`, 1..N vessels) |
+| 7d | `uat-e6-intake-available` | uat-atomic-receive | **E-6 Met:** leftover accession / bulk-accession → AFT. **Pass** (Tobias, product `a73a51c` / tip `7bd4f84`); **Rolf Confirm**. Do not restamp AR-ST-01 |
 | 7c | `uat-post-receive-work-spine` | uat-atomic-receive, uat-analysis-analyte-management | **P1 asked-for lake** (`/asked-for`, requested analysis; zero Tests; receive still 422 on `analysis_ids`) |
 | 7b | `uat-sample-accessioning` | *(retired)* | Wizard removed 2026-08-28; `/accessioning` redirects to `/receive` |
 | 8 | `uat-test-ordering` | uat-sample-accessioning, uat-analysis-analyte-management | Test assignment, test batteries, status management |
@@ -39,7 +40,8 @@ uat-security-rbac (Foundation)
 └── uat-configurations-custom (Lists, Custom Fields)
     ├── uat-container-management
     │   ├── uat-atomic-receive (CORE receive SoT)
-    │   │   └── uat-post-receive-work-spine (P1 asked-for lake; not Tests at receive)
+    │   │   ├── uat-post-receive-work-spine (P1 asked-for lake; not Tests at receive)
+    │   │   └── uat-e6-intake-available (E-6 Met — accession/bulk → AFT; Pass @ a73a51c/7bd4f84)
     │   └── uat-sample-accessioning (retired — wizard removed)
     │       ├── uat-test-ordering
     │       ├── uat-sample-status-editing
