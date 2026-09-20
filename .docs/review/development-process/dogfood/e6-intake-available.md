@@ -2,9 +2,9 @@
 
 **Stem:** `e6-intake-available`  
 **Branch:** `feat/e6-intake-available-for-testing`  
-**SHA:** `a73a51c` (product; update if the tip moved)  
+**SHA:** product `a73a51c` · tip `7bd4f84` · **Ready=Yes** (Tobias, 2026-09-20 14:33:57 ET)  
 **When:** After this branch is up, **before** Tobias UAT in [`UAT_Scripts/uat-e6-intake-available.md`](../../../../UAT_Scripts/uat-e6-intake-available.md).  
-**Not a UAT Result.** Do not invent Pass. Do **not** restamp AR-ST-01. Not E-7. Not dest-follow. Not IC50.
+**Ready=Yes** stamped. Formal UAT **Pass** + **Rolf Confirm** → **E-6 Met** (see UAT stamp log). Do **not** restamp AR-ST-01. Not E-7. Not dest-follow. Not IC50.
 
 CORE receive already writes Available for Testing (AR-ST-01). This packet is leftover **accession** and **bulk-accession**. `/accessioning` redirects to `/receive`. There is no bulk-accession UI.
 
@@ -89,16 +89,14 @@ pytest `tests/test_e6_intake_status.py` (2 passed on `a73a51c`) is **supporting 
 
 | Severity | Issue | Action |
 |----------|--------|--------|
-| | | Fill after the walk |
+| — | None blocking | Ready=Yes |
 
 ## Ready for UAT?
 
-Fill after a walk. Do **not** invent Ready=Yes.
-
-**Date:**  
-**Who:**  
-**SHA:** `a73a51c` (update if the tip moved)  
+**Date:** 2026-09-20 14:33:57 ET  
+**Who:** Tobias  
+**SHA:** product `a73a51c` · tip `7bd4f84`  
 **Env:** local compose on `feat/e6-intake-available-for-testing`  
-**Ready for UAT?** Unsigned until Tobias.
+**Ready for UAT?** **Yes**
 
-Ready=Yes is dogfood, not a substitute for formal Pass. Do **not** restamp AR-ST-01.
+Ready=Yes is dogfood, not a substitute for formal Pass. Formal UAT **Pass** + **Rolf Confirm** → **E-6 Met**. Do **not** restamp AR-ST-01. Evidence: `/workspace/uat-e6-7bd4f84/dogfood/READY.md`.
