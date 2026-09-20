@@ -39,6 +39,7 @@ NimbleLIMS enables BioTech and Pharma startup labs to manage compound and biolog
 - Version 1.8: Work-order / routing layer; teams (Leadership/Dev/QA/Docs); docs reorg under `.docs/` - August 26, 2026.
 - Version 1.9: **WO-7 fold** — Test row is created at **LimsRun start** (refuse publish if missing), not at accession or bare order. Accessioning assigns identity + first vessel only. Sequencing: AR P0 -> work-order packet -> registration/lots -> intake profiles. August 26, 2026.
 - Version 1.10: Post-receive work spine opened — asked-for (lake) → work_order → results persist → SOP+AI process apply → parser setup. Wizard removed. August 28, 2026.
+- Version 1.11: **Product north star locked** (Leadership Core 2026-09-20): (1) Framework first — DB config not recode per lab; (2) AI configuration from SOPs with human edit. AI for login/reporting/storage parked until sample processing closes. September 20, 2026.
 
 ## 2. Goals and Objectives
 
@@ -54,9 +55,21 @@ NimbleLIMS enables BioTech and Pharma startup labs to manage compound and biolog
 | **Process = sample in a container** | A sample may have many vessels. Only **Contents** (sample + container) is assigned to a process |
 | **AuthZ unchanged** | Configuration never bypasses RLS / sample-create AuthZ |
 
+### 2.0.1 Product north star (Leadership 2026-09-20)
+
+Locked in NimbleLIMS Core. Full stamp: [`.docs/decision-logs/product-north-star-2026-09-20.md`](../../decision-logs/product-north-star-2026-09-20.md).
+
+| # | Goal | Detail |
+|---|------|--------|
+| **1** | **Framework first** | A laboratory adopts NimbleLIMS by **configuration** (rules, design, page layouts stored in the DB) — **not** by re-coding the product for that lab |
+| **2** | **AI configuration from SOPs** | AI proposes that configuration from SOPs; humans edit and refine. Sample-processing catalog is the first surface; framework (goal 1) enables the same pattern later for login, reporting, storage, and other domains |
+
+**Sequencing:** Close **sample processing** (living ISSUES: E-10 Met → E-14/E-12 → E-6/E-7, then remaining spine) before opening AI-assisted config packets outside sample processing. Parked breadth: [open-questions/ai-config-breadth.md](../../review/open-questions/ai-config-breadth.md). Living AI SOP guidance (implement **CLOSED**): [ai-sop-north-star](../../review/requirements/ai-sop-north-star.md).
+
 ### 2.1 Business Goals
 - Provide BioTech and Pharma startups with **basic LIMS capability** to track samples, order tests, and enter results—the foundation for lab operations.
-- Sell a **framework**, not a single hard-coded SOP: labs configure how they run the shared spine.
+- Sell a **framework**, not a single hard-coded SOP: labs configure how they run the shared spine (**north star goal 1**).
+- Use **AI to propose configuration from SOPs** (human-editable) once the framework joints exist (**north star goal 2**); do not open login/reporting/storage AI packets until sample processing is closed.
 - Ensure data security and IP protection with role-based access and CRO-partner isolation.
 - Enable labs to start **immediately** via OOB defaults, then adapt configuration as their SOPs diverge.
 - Extend with customer-driven enhancements (dose-response, ELN depth, instrument integration) on the same framework substrate.
