@@ -1,12 +1,13 @@
 # Guidance PRD: AI SOP → live process (north star)
 
-**Date:** 2026-08-28  
-**Status:** **Guidance only. Implement gate CLOSED.** Placeholder so we do not lose the differentiator.  
+**Date:** 2026-08-28 (fold 2026-09-20)  
+**Status:** **Guidance only. Implement gate CLOSED.** Placeholder so we do not lose the differentiator. Aligns with **product north star goal 2**.  
 **Stem:** `ai-sop-north-star`  
 **Sketch:** [`.docs/review/tech-sketch/ai-sop-north-star.md`](../tech-sketch/ai-sop-north-star.md)  
 **Leadership send:** [`.docs/discussions/2026-08-28-ai-sop-north-star.md`](../../discussions/2026-08-28-ai-sop-north-star.md)  
 **Today’s lie (locked finding):** [`.docs/review/open-questions/sop-ai-to-process.md`](../open-questions/sop-ai-to-process.md)  
 **Not this packet:** [post-receive-work-spine](post-receive-work-spine.md) is how the lab **runs** (asked-for → map → work_order → steps). This document is how the lab **authors** that catalog from an SOP.
+**Product north star:** [product-north-star-2026-09-20](../../decision-logs/product-north-star-2026-09-20.md) — (1) framework / DB config; (2) AI config from SOPs. **Parked:** AI for login, reporting, storage, and other non–sample-processing surfaces until sample processing closes ([ai-config-breadth](../open-questions/ai-config-breadth.md)).
 
 Do **not** treat post-receive P4/P5 as the AI product. P4 “Apply writes a process definition” is a **step on the way**. The north star is: SOP + example execution files → vector store → AI, via MCP, creates the process (experiments + LimsRuns) **and** the parser used to parse later files.
 
@@ -80,6 +81,7 @@ Corrected success line for the spine: **Parser setup is an AI job at SOP time, n
 - Replacing `data_parsers` with generated Python  
 - Closing extract-hold dest type  
 - Materials, lots, multi-tenant  
+- AI-assisted setup of **login, reporting, storage**, or other domains outside sample-processing catalog — **parked** until sample processing closes  
 
 ## 7. Asks for Leadership (to make a better guidance doc)
 
@@ -98,3 +100,5 @@ Full persona notes: [discussion](../../discussions/2026-08-28-ai-sop-north-star.
 ## 8. Implement gate
 
 **CLOSED.** This is a north-star placeholder. Coding the MCP container, vector pipeline, or replacing SopParse Apply is **out** until Leadership restamps and a real review packet runs.
+
+**Breadth park (2026-09-20):** Do not open AI configuration work for login, reporting, storage, or other surfaces until living sample-processing ISSUES are closed enough that Leadership restamps. Framework-first joints (goal 1) are the prerequisite for product-wide AI config (goal 2).
