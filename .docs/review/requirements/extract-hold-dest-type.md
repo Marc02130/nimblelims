@@ -117,7 +117,7 @@ Dual mint; mid-flight method warn/wipe; un-mint on cancel; method/type on `aliqu
 
 **AC15/AC16 stamp (2026-09-20, `c4c899d`, Tobias; **Rolf Confirm**):** **Pass** — UAT §§8–9. Product on `main` (PR **131**, `811e966`). Dogfood Ready=Yes. Evidence (cite only): `/workspace/uat-e12-e14-c4c899d/{RESULT.md,tobias-stamp.json,acs.md,dogfood/READY.md}`. Do **not** restamp §§1–7 / AC14. Not IC50.
 
-**AC12 / E-7 stamp (2026-09-20, `4b3609a`, Tobias; **Rolf Confirm**):** **Pass** — UAT §10 (10.1–10.6). Gate at experiment / LimsRun **Start** only; **422** `route_sample_type`; template/entry `accepted_sample_types` refused. Dogfood Ready=Yes. Evidence (cite only): `/workspace/uat-e7-section10-4b3609a/{RESULT.md,tobias-stamp.json,acs.md,dogfood/READY.md}`. Do **not** restamp §§1–9 / AC14–16. Marc owns merge. **E-7 Met**. Not IC50.
+**AC12 / E-7 stamp (2026-09-20, `4b3609a`, Tobias; **Rolf Confirm**):** **Pass** — UAT §10 (10.1–10.6). Gate at experiment / LimsRun **Start** only; **422** `route_sample_type`; template/entry `accepted_sample_types` refused. Dogfood Ready=Yes. Evidence (cite only): `/workspace/uat-e7-section10-4b3609a/{RESULT.md,tobias-stamp.json,acs.md,dogfood/READY.md}`. Do **not** restamp §§1–9 / AC14–16. Product on `main` (PR **132**, `e59a045`). **E-7 Met**. Not IC50.
 
 ## 7. Path exercised
 Add aliquot/pool → both entries created (dest empty) → plan entry method=`aliquot_by_volume` (catalog attaches volume plan columns + dest volume FieldDefinition) , default DNA → execute → daughters on `aliquots_pools` → separate add for pool creates another atomic pair with method=`pool_equal_volume_each` for DNA→pooled DNA.

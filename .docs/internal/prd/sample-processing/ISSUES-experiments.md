@@ -1,7 +1,7 @@
 # Temporary issues — Experiments & entries
 
 **Parent:** [ISSUES.md](ISSUES.md)  
-**Status:** Synced 2026-09-20 (E-7 Met on `main` PR **132**; E-6 **Met** — Tobias Pass + Rolf Confirm on product `a73a51c` / tip `7bd4f84`; Marc owns merge)  
+**Status:** Synced 2026-09-20 (E-7 Met PR **132**; E-6 **Met** on `main` PR **133**)  
 **Includes:** aliquot/pool + extract-hold (largest complexity knot)  
 **Kick-back log:** [../../../decision-logs/extract-hold-dual-map-kickback.md](../../../decision-logs/extract-hold-dual-map-kickback.md)
 
@@ -21,7 +21,7 @@
 
 | ID | Issue | Why it hurts | Suggested next |
 |----|-------|--------------|----------------|
-| E-6 | Decision #24 (Available for Testing + process membership) vs accessioning still setting **Received** | Can’t start experiments on freshly accessioned samples | **Met** on `feat/e6-intake-available-for-testing` product `a73a51c` / tip `7bd4f84`: accession + bulk write **Available for Testing** (same as CORE receive). Process assign still does **not** change Sample.status (Decision #24). UAT **Pass** (Tobias QA, 2026-09-20 14:33:58 ET, scored 2.1–2.2 / 3.1 / 4.1–4.2); Dogfood Ready=Yes; **Rolf Confirm**. Do **not** restamp AR-ST-01. Evidence: `/workspace/uat-e6-7bd4f84/`. Marc owns merge. |
+| E-6 | Decision #24 (Available for Testing + process membership) vs accessioning still setting **Received** | Can’t start experiments on freshly accessioned samples | **Met** on `main` (PR **133**, `3bc43d2`): accession + bulk write **Available for Testing** (same as CORE receive). Process assign still does **not** change Sample.status (Decision #24). UAT **Pass** (Tobias QA, 2026-09-20 14:33:58 ET, scored 2.1–2.2 / 3.1 / 4.1–4.2, product `a73a51c` / tip `7bd4f84`); Dogfood Ready=Yes; **Rolf Confirm**. Do **not** restamp AR-ST-01. Evidence: `/workspace/uat-e6-7bd4f84/`. |
 | E-7 | Template `accepted_sample_types` vs product stamp: gate on **experiment / LimsRun**, not entry | Spec/AC12 conflict | **Met** on `main` (PR **132**, `e59a045`): start uses process-definition step allow-list; template/entry `accepted_sample_types` **422**. UAT §10 **Pass** (Tobias QA, 2026-09-20 13:58 ET, `4b3609a`); **Rolf Confirm**. |
 | E-8 | Cohort locked after start vs desire to add mid-flight | Support tickets | Hold lock; document |
 
@@ -51,7 +51,7 @@
 1. **E-9** restamp — **Decided**; dest container type shipped  
 2. **E-10** atomic pair — **Met** on `main` (PR **129**, `e56a89f`); UAT §7 **Pass** on `dc7ee92` (7.1–7.8 + **7.9 / 7.9b** uniqueness); **Hold merge lifted**; prior Fail on `e5a8fdd` is history.  
 3. **E-14 + E-12** — **Met** on `main` (PR **131**, `811e966`); UAT §§8–9 Pass on `c4c899d`; **Rolf Confirm**  
-4. **E-7** type gate — **Met** on `main` (PR **132**, `e59a045`). **E-6** intake Available for Testing — **Met** (Tobias Pass + Rolf Confirm, product `a73a51c` / tip `7bd4f84`; Marc owns merge). Critical path E-10/E-12/E-14/E-7/E-6 looks closed pending E-6 merge.  
+4. **E-7** type gate — **Met** on `main` (PR **132**, `e59a045`). **E-6** intake Available for Testing — **Met** on `main` (PR **133**, `3bc43d2`). Critical path E-10/E-12/E-14/E-7/E-6 closed on `main`.  
 5. Docs **E-17–E-19**  
 
 **Product north star:** framework-first DB config, then AI config from SOPs (human-editable). AI for login / reporting / storage waits until sample processing closes — see parent [ISSUES.md](ISSUES.md).
