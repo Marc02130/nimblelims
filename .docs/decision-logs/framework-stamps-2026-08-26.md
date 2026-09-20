@@ -57,3 +57,9 @@ Results persist is **after** asked-for (bench: do not type numbers into nothing)
 - Work_order field list / status model — see `open-questions/post-receive-work-spine.md` (provisional).  
 - TAT overlap: **refuse on save** (OQ-TAT-1, 2026-08-28).  
 - Registration uniqueness strategies (SMILES, sequences, …).
+
+---
+
+## Related Leadership lock (2026-09-20)
+
+Product north star (framework first + AI config from SOPs; sample processing before AI breadth): [product-north-star-2026-09-20.md](product-north-star-2026-09-20.md).
