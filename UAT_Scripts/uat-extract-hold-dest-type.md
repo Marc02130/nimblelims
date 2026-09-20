@@ -99,7 +99,7 @@ Combined from two Tobias stamps on the same SHA:
 
 **Result: Pass** (Tobias QA) · 2026-09-14 22:28 ET · SHA `dc7ee92c086558420c16edffe301773975f17234` (`dc7ee92`) · overall **closed** · **Rolf Confirm: Hold merge lifted** · **E-10 Met** · product on `main` @ `e56a89fe01656b416cfcae885b6ade605e8cf38e` (`e56a89f`, PR **129**).
 
-Living honesty: numbered **7.1–7.8 Pass** on `e5a8fdd` (not rescored) **plus** Deiter Lab Ops EXTRA **double-Add Pass** on `dc7ee92` (**409** `wrapper_at_capacity`). **Lab Ops: Deiter Met** on double-Add 2026-09-14. That split **closes** the prior overall §7 **Fail** on `e5a8fdd`. Do **not** teach overall §7 Fail or **Hold merge** as current. Uniqueness is enforced: second instance while the wrapper exists is **409** `wrapper_at_capacity`. **Tobias dogfood Ready=Yes** on **`dc7ee92`** (`/workspace/dogfood-e10-dc7ee92/READY.md`; clean FE Docker/CRA; paths **1–5 Pass**). Ready=Yes on **`e5a8fdd`** and Ready=No on **`9312c54`** stay dogfood history. **Deiter Lab Ops Confirm** of Marc’s fold (2026-09-14) is not the double-Add Met. One **Add aliquot/pool** creates `aliquot_pool_plan` **and** `aliquots_pools` (`WRAPPER_CATALOG` `aliquot_pool`, cardinality **1**). Dest stays empty until dest init. Do not offer separate plan-only or dest-only presets. Steps **7.9 / 7.9b** stamped **Pass** from uniqueness restamp honesty on `dc7ee92` (sequential second plan POST **409**, second dest POST **409**, GET still 1+1; concurrent double POST statuses **201 + 409**, after counts **1 plan + 1 dest**). §§1–6 stay `008baf2` (not restamped). Not IC50.
+Living honesty: numbered **7.1–7.8 Pass** on `e5a8fdd` (not rescored) **plus** Deiter Lab Ops EXTRA **double-Add Pass** on `dc7ee92` (**409** `wrapper_at_capacity`). Living §7 is **Pass** (2026-09-14 22:28 ET). Do **not** teach overall §7 Fail or **Hold merge** as current. Uniqueness is enforced: second instance while the wrapper exists is **409** `wrapper_at_capacity`. **Tobias dogfood Ready=Yes** on **`dc7ee92`** (`/workspace/dogfood-e10-dc7ee92/READY.md`; clean FE Docker/CRA; paths **1–5 Pass**). Ready=Yes on **`e5a8fdd`** and Ready=No on **`9312c54`** stay dogfood history. **Deiter Lab Ops Confirm** of Marc’s fold (2026-09-14) is not the double-Add Met. One **Add aliquot/pool** creates `aliquot_pool_plan` **and** `aliquots_pools` (`WRAPPER_CATALOG` `aliquot_pool`, cardinality **1**). Dest stays empty until dest init. Do not offer separate plan-only or dest-only presets. Steps **7.9 / 7.9b** stamped **Pass** from uniqueness restamp honesty on `dc7ee92` (sequential second plan POST **409**, second dest POST **409**, GET still 1+1; concurrent double POST statuses **201 + 409**, after counts **1 plan + 1 dest**). §﻿1–6 stay `008baf2` (not restamped). Not IC50.
 
 **Evidence (cite only; binaries not committed):**
 - `/workspace/uat-e10-section7-overall-dc7ee92/RESULT.md`
@@ -140,28 +140,29 @@ Living honesty: numbered **7.1–7.8 Pass** on `e5a8fdd` (not rescored) **plus**
 
 ## 8. Template default dest sample type (E-12)
 
-**Unsigned.** Do not invent Pass. Do not restamp §§1–7. Method ≠ dest sample type ≠ dest container type.
+**Result: Pass** (Tobias QA) · 2026-09-20 11:23 ET · SHA `c4c899d2ab1de97721052f75173376f167e5d854` (`c4c899d`) · `feat/e12-e14-dest-type-transitions` · **Dogfood Ready=Yes** · **Rolf Confirm** · **E-12 Met**. Do **not** restamp §§1–7. Method ≠ dest sample type ≠ dest container type. Evidence (cite; do not commit): `/workspace/uat-e12-e14-c4c899d/{RESULT.md,tobias-stamp.json,acs.md,dogfood/READY.md}`.
 
-| Step | Action | Expected result |
-|------|--------|-----------------|
-| 8.1 | Experiment Templates → aliquot/pool plan entry. | Three plan controls: **Plan method**, **Default dest sample type**, **Default dest container type**. Dest sample type includes **Same as parent.** |
-| 8.2 | Set dest sample type to a catalog dest (e.g. DNA) for an aliquot method. Save template. Start an experiment from it. | Runtime plan loads that `default_dest_sample_type`. Lines inherit **Use entry default** until overridden. |
-| 8.3 | Clear dest sample type to Same as parent. Save. Start. | Runtime default is blank / Same as parent. |
+| Step | Action | Expected result | Result |
+|------|--------|-----------------|--------|
+| 8.1 | Experiment Templates → aliquot/pool plan entry. | Three plan controls: **Plan method**, **Default dest sample type**, **Default dest container type**. Dest sample type includes **Same as parent.** | **Pass** (FE code + unit; Tobias, 2026-09-20, `c4c899d`) |
+| 8.2 | Set dest sample type to a catalog dest (e.g. DNA) for an aliquot method. Save template. Start an experiment from it. | Runtime plan loads that `default_dest_sample_type`. Lines inherit **Use entry default** until overridden. | **Pass** (live API; Blood received for picker/smoke) |
+| 8.3 | Clear dest sample type to Same as parent. Save. Start. | Runtime default is blank / Same as parent. | **Pass** (live API) |
 
 ## 9. Dest-type transition catalog admin (E-14 / S3)
 
-**Unsigned.** Mutate is **config:edit** only. Do not invent Pass. Do not restamp §§1–7.
+**Result: Pass** (Tobias QA) · 2026-09-20 11:23 ET · SHA `c4c899d` · **Dogfood Ready=Yes** · **Rolf Confirm** · **E-14 Met**. Mutate is **config:edit** only. Do **not** restamp §§1–7. Anton `0068` seeds Blood×aliquot→DNA and DNA×pool→Pooled DNA. Evidence: `/workspace/uat-e12-e14-c4c899d/`.
 
-| Step | Action | Expected result |
-|------|--------|-----------------|
-| 9.1 | Admin → Dest-type transitions (`/admin/sample-type-transitions`). | Grid of source × operation × dest. Seeded Blood×aliquot→DNA and DNA×pool→Pooled DNA appear when present. |
-| 9.2 | Add a transition (config:edit). | **201**. Row listed. Execute dest picker offers the new dest for that source × op. |
-| 9.3 | Add the same source × op × dest again. | **409** `transition_exists`. |
-| 9.4 | Lab tech without config:edit POST. | **403**. |
-| 9.5 | Deactivate a row. | Row inactive. Execute dest picker no longer offers it (Same as parent. remains). |
+| Step | Action | Expected result | Result |
+|------|--------|-----------------|--------|
+| 9.1 | Admin → Dest-type transitions (`/admin/sample-type-transitions`). | Grid of source × operation × dest. Seeded Blood×aliquot→DNA and DNA×pool→Pooled DNA appear when present. | **Pass** (FE + GET seeds) |
+| 9.2 | Add a transition (config:edit). | **201**. Row listed. Execute dest picker offers the new dest for that source × op. | **Pass** (POST Plasma; picker offers; same-client Blood under Laboratory QC) |
+| 9.3 | Add the same source × op × dest again. | **409** `transition_exists`. | **Pass** |
+| 9.4 | Lab tech without config:edit POST. | **403**. | **Pass** (alice-tech) |
+| 9.5 | Deactivate a row. | Row inactive. Execute dest picker no longer offers it (Same as parent. remains). | **Pass** (DELETE 204) |
 
 ## Pass criteria
 
+- **This packet (E-12/E-14):** Steps **8.1–8.3** and **9.1–9.5**. Formal **§§8–9 Result: Pass** (Tobias QA, 2026-09-20 11:23 ET, `c4c899d`). **Rolf Confirm** — E-12 / E-14 **Met**. Dogfood Ready=Yes. Evidence: `/workspace/uat-e12-e14-c4c899d/`. Marc owns merge. Do **not** restamp §§1–7.
 - **This packet (E-10):** Steps **7.1–7.9b**. Formal **§7 Result: Pass** (Tobias QA, 2026-09-14 22:28 ET, `dc7ee92`). Packet **7.1–7.8 Pass** on `e5a8fdd` (not rescored). Deiter EXTRA **double-Add Pass** on `dc7ee92` (sequential **409** / concurrent **201 + 409** → **1 plan + 1 dest**). **Lab Ops: Deiter Met** on double-Add 2026-09-14. **7.9 / 7.9b Pass** from uniqueness restamp honesty. Prior overall **Fail** on `e5a8fdd` is **history**. **Rolf Confirm: Hold merge lifted** — E-10 **Met**; product on `main` @ `e56a89f` (PR **129**). **Tobias dogfood Ready=Yes** on `dc7ee92`. Ready=Yes on `e5a8fdd` and Ready=No on **`9312c54`** stay history. Do **not** restamp §6. Evidence: `/workspace/uat-e10-section7-overall-dc7ee92/RESULT.md`, `/workspace/uat-e10-section7-overall-dc7ee92/stamp.json`, `/workspace/uat-e10-doubleadd-dc7ee92/RESULT.md`, `/workspace/uat-e10-doubleadd-dc7ee92/stamp.json`, `/workspace/uat-e10-doubleadd-dc7ee92/tobias-stamp.json`, `/workspace/uat-e10-doubleadd-dc7ee92/doubleadd.json`, `/workspace/dogfood-e10-dc7ee92/READY.md`. Prior Fail evidence: `/workspace/uat-e10-section7-e5a8fdd/`.
 - Steps 1–6 remain the dest-container-type stamp on `008baf2` (Pass). They are not this packet.
 - Blank dest **sample** type always means **Same as parent.** Blank dest **container** type always means **Same as source.**
@@ -203,11 +204,11 @@ Marc’s rows **7.3b** (delete dest → both gone), **7.6b** (POST dest-only `al
 
 ### 2026-09-14 · Deiter Lab Ops Confirm of Marc’s fold · product `9312c54`
 
-**Deiter Lab Ops Confirm** of Marc’s E-10 punch (7.3b / 7.6b / 7.7b / 7.8). **Unsigned at the time of this entry** — later overall §7 **Fail** on `e5a8fdd`, then **Pass** on `dc7ee92`. This Confirm of Marc’s fold is **not** the 2026-09-14 **Deiter Met** on double-Add. Dogfood first on product SHA **`9312c54`** (`9312c54ddd3999963abd3070c76b0057b62e5d4c`). §§1–6 stay `008baf2`. Not named-slot / OQ-WO-7 / C2/C3. Not IC50.
+**Deiter Lab Ops Confirm** of Marc’s E-10 punch (7.3b / 7.6b / 7.7b / 7.8). **Unsigned at the time of this entry** — later overall §7 **Fail** on `e5a8fdd`, then **Pass** on `dc7ee92`. This Confirm of Marc’s fold is **not** the 2026-09-14 **Deiter Met** on double-Add. Dogfood first on product SHA **`9312c54ddd3999963abd3070c76b0057b62e5d4c`** (`9312c54`). §﻿1–6 stay `008baf2`. Not named-slot / OQ-WO-7 / C2/C3. Not IC50.
 
 ### 2026-09-14 20:26 ET · Tobias dogfood Ready=No · product `9312c54` · docs tip `50b878a`
 
-**Ready for UAT section 7?** **No** on **`feat/e10-aliquot-atomic-pair`**. Paths **1–5 Pass** on product **`9312c54`**. Blocker: clean FE **Docker** build **TS2345** `hasAliquotPair` nullability. Local one-line patch was used for the walk **only** — **not landed**. Formal **§7 Unsigned**. **Rolf Hold §7 UAT** until the fix is on the tip. Do **not** invent Ready=Yes or Pass/Fail for §7. Do **not** invent Pass from §6 / `008baf2`. Product owns TS2345 (docs-only fold; no product code fix here). §§1–6 stay `008baf2`. Not named-slot / OQ-WO-7 / C2/C3. Not IC50.
+**Ready for UAT section 7?** **No** on **`feat/e10-aliquot-atomic-pair`**. Paths **1–5 Pass** on product **`9312c54`**. Blocker: clean FE **Docker** build **TS2345** `hasAliquotPair` nullability. Local one-line patch was used for the walk **only** — **not landed**. Formal §7 **Unsigned**. **Rolf Hold §7 UAT** until the fix is on the tip. Do **not** invent Ready=Yes or Pass/Fail for §7. Do **not** invent Pass from §6 / `008baf2`. Product owns TS2345 (docs-only fold; no product code fix here). §§1–6 stay `008baf2`. Not named-slot / OQ-WO-7 / C2/C3. Not IC50.
 
 **History.** Superseded by Ready=Yes on **`e5a8fdd`**. Do not treat this Ready=No as current.
 
@@ -218,7 +219,7 @@ Verbatim Tobias READY.md (`/workspace/dogfood-e10-9312c54/READY.md`; artifacts `
 
 **Date:** 2026-09-14 20:26 ET
 **Who:** Tobias (dogfood)
-**SHA:** product `9312c54ddd3999963abd3070c76b0057b62e5d4c` (9312c54); HEAD `50b878a9f0e182e4ebb84375b87330bf6fd26dfc` (50b878a). 9312c54 is ancestor of 50b878a (docs tip only).
+**SHA:** product `9312c54ddd3999963abd3070c76b0057b62e5d4c` (9312c54); HEAD `50b878a9f0e182e4ebb84375b87330bf6fd26df` (50b878a). 9312c54 is ancestor of 50b878a (docs tip only).
 
 **Ready for UAT section 7?** No — paths 1–5 Pass (API + source/bundle: single **+ Aliquot/pool** preset, pair create, delete-plan and delete-dest both clear both halves, template→experiment instantiate with dest `minted_sample_ids: []` / `populated_after_execute: false`, ad hoc pair). But clean frontend image build from this SHA fails TS2345 on `hasAliquotPair` nullability; dogfood UI image needed a local uncommitted one-line patch. Land that fix on the branch (or confirm CRA build green) before formal §7. Do **not** invent Pass from §6 / 008baf2.
 
@@ -227,7 +228,7 @@ Artifacts: `/workspace/dogfood-e10-9312c54/`
 
 ### 2026-09-14 21:23 ET · Tobias dogfood Ready=Yes · product `e5a8fdd` · dogfood history
 
-**Ready for UAT section 7?** **Yes** on **`feat/e10-aliquot-atomic-pair`**. SHA **`e5a8fdd`** (`e5a8fdd50538e23e67c1425dadb3e505171b987f`; includes `hasAliquotPair` nullability fix). Paths **1–5 Pass**. Clean FE **Docker**/CRA build green; no local patch; working tree clean. Ready=Yes is **not** §7 Pass. Do **not** invent §7 Pass from dogfood or from §6 / `008baf2`. Prior Ready=No on **`9312c54`** stays history. §§1–6 stay `008baf2`. Not named-slot / OQ-WO-7 / C2/C3. Not IC50.
+**Ready for UAT section 7?** **Yes** on **`feat/e10-aliquot-atomic-pair`**. SHA **`e5a8fdd50538e23e67c1425dadb3e505171b987f`** (e5a8fdd) tip of `feat/e10-aliquot-atomic-pair` (includes `hasAliquotPair` nullability fix). Paths **1–5 Pass**. Clean FE **Docker**/CRA build green; no local patch; working tree clean. Ready=Yes is **not** §7 Pass. Do **not** invent §7 Pass from dogfood or from §6 / `008baf2`. Prior Ready=No on **`9312c54`** stays history. §§1–6 stay `008baf2`. Not named-slot / OQ-WO-7 / C2/C3. Not IC50.
 
 **History.** Ready=Yes on `e5a8fdd` is dogfood history. Living Ready=Yes is on **`dc7ee92`**. Formal §7 **Fail** at 21:31 ET (below) is also history; living §7 is **Pass** at 22:28 ET.
 
@@ -255,7 +256,7 @@ Artifacts: `/workspace/dogfood-e10-e5a8fdd/`
 
 ### 2026-09-14 21:31 ET · Tobias formal §7 Fail · product `e5a8fdd` · history
 
-**Result: Fail** (Tobias QA) · SHA `e5a8fdd50538e23e67c1425dadb3e505171b987f` · `feat/e10-aliquot-atomic-pair` · Compose down. §§1–6 stay `008baf2` (not restamped). Not IC50.
+**Result: Fail** (Tobias QA) · SHA `e5a8fdd50538e23e67c1425dadb3e505171b987f` · `feat/e10-aliquot-atomic-pair` · Compose down. §1–6 stay `008baf2` (not restamped). Not IC50.
 
 - **7.1–7.8:** all **Pass** (packet rows; not rescored later).
 - **Deiter Lab Ops EXTRA:** Double-click Add → two pairs / half **Fail** on this SHA — concurrent double POST → 2 plans + 2 dests; sequential 2nd POST → 2 plans + 1 dest. FE guards present; API lacked single-pair uniqueness **on `e5a8fdd`**. Reload/refresh orphan **Pass**. Mint-early before execute **Pass**.
@@ -271,13 +272,13 @@ Artifacts: `/workspace/dogfood-e10-e5a8fdd/`
 
 ### 2026-09-14 ~22:27 ET · Tobias dogfood Ready=Yes · product `dc7ee92` · current dogfood
 
-**Ready for UAT section 7?** **Yes** on **`dc7ee92`**. Clean FE **Docker**/CRA; paths **1–5 Pass**. Ready=Yes is dogfood, not a substitute for the formal overall stamp (22:28 ET Pass below). Prior Ready=Yes on **`e5a8fdd`** and Ready=No on **`9312c54`** stay history. §§1–6 stay `008baf2`. Not IC50.
+**Ready for UAT section 7?** **Yes** on **`dc7ee92`**. Clean FE **Docker**/CRA; paths **1–5 Pass**. Ready=Yes is dogfood, not a substitute for the formal overall stamp (22:28 ET Pass below). Prior Ready=Yes on **`e5a8fdd`** and Ready=No on **`9312c54`** stay history. §﻿1–6 stay `008baf2`. Not named-slot / OQ-WO-7 / C2/C3. Not IC50.
 
 Evidence: `/workspace/dogfood-e10-dc7ee92/READY.md`
 
 ### 2026-09-14 ~22:27 ET · Deiter double-Add Pass · product `dc7ee92`
 
-**Deiter Lab Ops EXTRA double-Add: Pass** on `dc7ee92`. Sequential second plan POST → **409** `wrapper_at_capacity`; second dest POST → **409**; GET still **1 plan + 1 dest** (no half). Concurrent double POST → statuses **201 + 409**; after counts **1 plan + 1 dest**. **Lab Ops: Deiter Met** on double-Add 2026-09-14. Prior Fail on `e5a8fdd` is history. **7.9 / 7.9b Pass** from this uniqueness honesty. §§1–6 stay `008baf2`. Not IC50.
+**Deiter Lab Ops EXTRA double-Add: Pass** on `dc7ee92`. Sequential second plan POST → **409** `wrapper_at_capacity`; second dest POST → **409**; GET still **1 plan + 1 dest** (no half). Concurrent double POST → statuses **201 + 409**; after counts **1 plan + 1 dest**. **Lab Ops: Deiter Met** on double-Add 2026-09-14. Prior Fail on `e5a8fdd` is history. **7.9 / 7.9b Pass** from this uniqueness honesty. §§1–6 stay `008baf2`. Not named-slot / OQ-WO-7 / C2/C3.
 
 Evidence:
 - `/workspace/uat-e10-doubleadd-dc7ee92/RESULT.md`
@@ -287,7 +288,7 @@ Evidence:
 
 ### 2026-09-14 22:28 ET · Tobias overall §7 Pass · product `dc7ee92` · current
 
-**Result: Pass** (Tobias QA) · SHA `dc7ee92c086558420c16edffe301773975f17234` (`dc7ee92`). Packet **7.1–7.8 Pass** on `e5a8fdd` (not rescored) + Deiter **double-Add Pass** on `dc7ee92` (**409** `wrapper_at_capacity`) **closes** prior overall Fail on `e5a8fdd`. **Rolf Confirm: Hold merge lifted**. **E-10 Met**. Product on `main` @ `e56a89f` (PR **129**). Living uniqueness: **409** `wrapper_at_capacity` (not a blocker). §§1–6 stay `008baf2`. Not IC50.
+**Result: Pass** (Tobias QA) · SHA `dc7ee92c086558420c16edffe301773975f17234` (`dc7ee92`). Packet **7.1–7.8 Pass** on `e5a8fdd` (not rescored) + Deiter **double-Add Pass** on `dc7ee92` (**409** `wrapper_at_capacity`) **closes** prior overall Fail on `e5a8fdd`. **Rolf Confirm: Hold merge lifted**. **E-10 Met**. Product on `main` @ `e56a89f` (PR **129**). Living uniqueness: **409** `wrapper_at_capacity` (not a blocker). §﻿1–6 stay `008baf2`. Not IC50.
 
 Evidence:
 - `/workspace/uat-e10-section7-overall-dc7ee92/RESULT.md`
@@ -301,3 +302,8 @@ Evidence:
 ### 2026-09-14 · Rolf Confirm: Hold merge lifted · E-10 Met · `main` `e56a89f` (PR 129)
 
 **Rolf Confirm:** Hold merge **lifted**. E-10 **Met**. Product already on `main` at `e56a89fe01656b416cfcae885b6ade605e8cf38e` (PR **129**). Fold overall §7 **Pass** honesty onto `main`. Do **not** teach Hold merge as current. Not IC50.
+
+### 2026-09-20 · E-12/E-14 §8–9 Pass · `feat/e12-e14-dest-type-transitions` @ `c4c899d`
+
+**Result: Pass** (Tobias QA, 2026-09-20 11:23 ET). Dogfood Ready=Yes. **Rolf Confirm** — E-12 / E-14 **Met**. Marc owns merge. §§1–7 not restamped (`008baf2` / `dc7ee92`). Anton `0068` seeds; Blood received when needed. Evidence: `/workspace/uat-e12-e14-c4c899d/{RESULT.md,tobias-stamp.json,acs.md,dogfood/READY.md}`. Not IC50.
+
