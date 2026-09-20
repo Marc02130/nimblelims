@@ -107,7 +107,7 @@ Dual mint; mid-flight method warn/wipe; un-mint on cancel; method/type on `aliqu
 | AC9 | METHOD_CATALOG IN set only; CUT methods not offered. |
 | AC10 | Normalization: parent conc required from prior result (not free type-in); dest vol or target amount required. |
 | AC11 | Equimolar labeled/stored as target-amount method; no size/bp requirement in this packet. |
-| AC12 | L1/S1 join; pool same-type; S3 config:edit; both seeds; start `accepted_sample_types`; C2 key off `sample_type`. |
+| AC12 | L1/S1 join; pool same-type; S3 config:edit; both seeds; C2 key off `sample_type`. **E-7:** inbound type gate is on the **process-definition step** (`eln_process_definition_step_accepted_sample_types`) at **experiment start** and **LimsRun start**. Not on ExperimentTemplate, not on an entry. Empty allow-list fails closed when the process is work-order linked; standalone (no process) start is not gated by this table. Mismatch → **422** `route_sample_type`. **Pass** UAT §10 (Tobias QA, 2026-09-20 13:58 ET, `4b3609a`); **Rolf Confirm**; **E-7 Met**. |
 | AC13 | No Sample/`material_class` column; no new Sample columns for dest amount/vol/conc. |
 | AC14 | Dest container type is a plan control (entry default + line override / Same as source). Dest init **422** if unknown; **422** if not 1×1. Dest init does not prompt. Method ≠ dest sample type ≠ dest container type. |
 | AC15 | **E-12:** Template aliquot/pool plan has **Default dest sample type** (Same as parent. + catalog dests for the method mint op). Saved on `config.default_dest_sample_type`. Instantiated experiments load it. Execute still catalog-enforces. **Pass** UAT §8 (Tobias QA, 2026-09-20 11:23 ET, `c4c899d`); **Rolf Confirm**; **E-12 Met**. |
@@ -117,8 +117,9 @@ Dual mint; mid-flight method warn/wipe; un-mint on cancel; method/type on `aliqu
 
 **AC15/AC16 stamp (2026-09-20, `c4c899d`, Tobias; **Rolf Confirm**):** **Pass** — UAT §§8–9. Product on `main` (PR **131**, `811e966`). Dogfood Ready=Yes. Evidence (cite only): `/workspace/uat-e12-e14-c4c899d/{RESULT.md,tobias-stamp.json,acs.md,dogfood/READY.md}`. Do **not** restamp §§1–7 / AC14. Not IC50.
 
-## 7. Path exercised
+**AC12 / E-7 stamp (2026-09-20, `4b3609a`, Tobias; **Rolf Confirm**):** **Pass** — UAT §10 (10.1–10.6). Gate at experiment / LimsRun **Start** only; **422** `route_sample_type`; template/entry `accepted_sample_types` refused. Dogfood Ready=Yes. Evidence (cite only): `/workspace/uat-e7-section10-4b3609a/{RESULT.md,tobias-stamp.json,acs.md,dogfood/READY.md}`. Do **not** restamp §§1–9 / AC14–16. Marc owns merge. **E-7 Met**. Not IC50.
 
+## 7. Path exercised
 Add aliquot/pool → both entries created (dest empty) → plan entry method=`aliquot_by_volume` (catalog attaches volume plan columns + dest volume FieldDefinition) , default DNA → execute → daughters on `aliquots_pools` → separate add for pool creates another atomic pair with method=`pool_equal_volume_each` for DNA→pooled DNA.
 
 ## 8. Sign-off
