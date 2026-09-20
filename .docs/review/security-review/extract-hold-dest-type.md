@@ -42,7 +42,7 @@ Folded sketch covers dest type on aliquot/pool, lab-wide many-to-many transition
 |----|----------|--------|-----------|
 | **S1** | High | **Met** (sketch) | After start, `eln_process_samples` insert only for execute-minted dest of this instance. Same client. `experiment:manage`. Append 403/404. |
 | **S2** | High | **Met** | Client cannot insert process-samples. Pool gate labels allowed (aliquot-only retracted). |
-| **S3** | High | **Implement condition** | `sample_type_transitions` mutate is **`config:edit` only**. Not Client, not `experiment:manage` alone. Execute refuse stays integrity. |
+| **S3** | High | **Coded** `feat/e12-e14-dest-type-transitions` | `sample_type_transitions` mutate is **`config:edit` only** (`POST/PATCH/DELETE /v1/sample-type-transitions`). Not Client, not `experiment:manage` alone. GET is authenticated. Execute refuse stays integrity. UAT §9 unsigned. |
 
 ## Not in scope this review
 

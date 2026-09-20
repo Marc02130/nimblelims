@@ -110,6 +110,8 @@ Dual mint; mid-flight method warn/wipe; un-mint on cancel; method/type on `aliqu
 | AC12 | L1/S1 join; pool same-type; S3 config:edit; both seeds; start `accepted_sample_types`; C2 key off `sample_type`. |
 | AC13 | No Sample/`material_class` column; no new Sample columns for dest amount/vol/conc. |
 | AC14 | Dest container type is a plan control (entry default + line override / Same as source). Dest init **422** if unknown; **422** if not 1×1. Dest init does not prompt. Method ≠ dest sample type ≠ dest container type. |
+| AC15 | **E-12:** Template aliquot/pool plan has **Default dest sample type** (Same as parent. + catalog dests for the method mint op). Saved on `config.default_dest_sample_type`. Instantiated experiments load it. Execute still catalog-enforces. UAT §8 unsigned. |
+| AC16 | **E-14 / S3:** `sample_type_transitions` mutate is **config:edit** (`POST/PATCH/DELETE /v1/sample-type-transitions`). Duplicate **409** `transition_exists`. DELETE deactivates. Admin UI `/admin/sample-type-transitions`. UAT §9 unsigned. |
 
 **AC14 stamp (2026-09-10, `008baf2`, `feat/dest-container-type`, Tobias; **Rolf Confirm**):** **Pass** — UAT section 6. Browser 6.1 (three separate plan controls; dest container dropdown = Same as source. + 1×1 only; no 96-well / plates) plus live API 6.2–6.8. Do **not** invent 6.1 from FE unit alone. See [`UAT_Scripts/uat-extract-hold-dest-type.md`](../../../UAT_Scripts/uat-extract-hold-dest-type.md) section 6. Evidence (cite only): `/workspace/uat-dest-container-type-008baf2-ui61/` and `/workspace/uat-dest-container-type-008baf2/{RESULT.md,tobias-stamp.json,acs.md}`. Does **not** sign 1.7 / AC-P2-C3 / AC-P2-C2.
 

@@ -90,9 +90,10 @@ The **Aliquot / pool plan** entry has three separate controls:
 
 - **Method** is one concrete Deiter IN method. It implies exactly one mint
   operation (`aliquot` or `pool`) and controls every line's input columns.
-- **Default dest sample type** is optional. **Same as parent.** is always
-  available. Catalog choices are the destinations shared by the selected source
-  samples for the entry's mint operation.
+- **Default dest sample type** is optional on the **template** and the runtime
+  plan. **Same as parent.** is always available. Template choices are dests in
+  the transition catalog for the method’s mint op. Runtime choices are dests
+  for the selected source × operation. Execute still refuses off-catalog dests.
 - **Default dest container type** is optional. **Same as source.** is always
   available. Only **1×1** vessel types (tube, vial, well) are listed; 96-well
   / multi-position types are not offered. Dest init does **not** prompt for

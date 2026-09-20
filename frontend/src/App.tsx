@@ -6,6 +6,7 @@ import AtomicReceive from './pages/AtomicReceive';
 import AskedFor from './pages/AskedFor';
 import WorkOrders from './pages/WorkOrders';
 import RoutingMapManagement from './pages/admin/RoutingMapManagement';
+import SampleTypeTransitionsManagement from './pages/admin/SampleTypeTransitionsManagement';
 import SamplesManagement from './pages/SamplesManagement';
 import TestsManagement from './pages/TestsManagement';
 import ContainerManagement from './pages/ContainerManagement';
@@ -444,6 +445,16 @@ function AppRoutes() {
           element={
             hasPermission('config:edit') ? (
               <RoutingMapManagement />
+            ) : (
+              <Navigate to="/dashboard" replace />
+            )
+          }
+        />
+        <Route
+          path="/admin/sample-type-transitions"
+          element={
+            hasPermission('config:edit') ? (
+              <SampleTypeTransitionsManagement />
             ) : (
               <Navigate to="/dashboard" replace />
             )

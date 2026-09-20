@@ -2326,6 +2326,23 @@ Set the next value for the global sequence `name_template_seq_{entity_type}`.
 
 ---
 
+## Sample type transitions (E-14)
+
+Client catalog of allowed aliquot/pool destination types. Execute still refuses dests not in this table. Mutate is **`config:edit`** (S3). GET is authenticated; inactive rows only for `config:edit`.
+
+| Method | Path | Auth |
+|--------|------|------|
+| GET | `/v1/sample-type-transitions?operation=aliquot\|pool` | logged in |
+| POST | `/v1/sample-type-transitions` | `config:edit` — **201**; **409** `transition_exists` |
+| PATCH | `/v1/sample-type-transitions/{id}` | `config:edit` |
+| DELETE | `/v1/sample-type-transitions/{id}` | `config:edit` — deactivates (**204**) |
+
+Body: `source_sample_type`, `operation` (`aliquot`\|`pool`), `allowed_dest_sample_type`, optional `active`.
+
+Admin UI: `/admin/sample-type-transitions`. Template default dest sample type (E-12) is `aliquot_pool_plan` `config.default_dest_sample_type`.
+
+---
+
 ## LIMS Runs — promote-on-publish
 
 Full run lifecycle is under `/v1/lims-runs`. See [lims-runs.md](lims-runs.md) for product rules.

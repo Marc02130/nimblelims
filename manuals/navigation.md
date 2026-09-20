@@ -10,7 +10,7 @@ NimbleLIMS uses a **unified sidebar navigation** (left drawer) for all authentic
 | **Sample Mgmt** | Any of: sample:create, sample:read, sample:update, test:update, test:assign, batch:manage, result:enter | Receive, Asked-for, Samples, Tests, Containers, Batches, Results |
 | **Experiments** | experiment:manage | All Experiments (ELN), Work Orders (`/work-orders`), Processes (ELN `/v1/eln-processes`), Experiment Templates, Runs (**LimsRun** `/runs` — not ELN Experiments; not `/v1/processes` checklists) |
 | **Lab Mgmt** | Any of: project:manage, analysis:manage | Projects, Clients, Client Proj, Analyses, Analytes |
-| **Admin** | config:edit | Overview, Name Templates, Custom Attributes, Lists, Container Types, Units, Users, Roles, Analyses, Routing map, Analytes, Test Batteries, Custom Fields, Custom Names, Workflow Templates, Help Management |
+| **Admin** | config:edit | Overview, Lists, Container Types, Units, Users, Roles, Analyses, Routing map, Dest-type transitions, Analytes, Test Batteries, Custom Fields, Workflow Templates, Help Management |
 
 The sidebar is a persistent left-side drawer (240px expanded, 56px collapsed on desktop; temporary overlay on mobile). Navigation is permission-based: menu items and routes are shown or hidden by role/permissions.
 

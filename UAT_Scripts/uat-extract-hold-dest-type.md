@@ -138,6 +138,28 @@ Living honesty: numbered **7.1–7.8 Pass** on `e5a8fdd` (not rescored) **plus**
 
 **Fail (what still fails if broken):** operator can add dest-only or plan-only from presets; delete leaves a half-pair; add stays disabled after the pair is gone; second instance returns **201** instead of **409** `wrapper_at_capacity`. Living uniqueness: **409** `wrapper_at_capacity` (not a current blocker). Prior Fail “API second plan POST while pair/half exists” on `e5a8fdd` is **history**.
 
+## 8. Template default dest sample type (E-12)
+
+**Unsigned.** Do not invent Pass. Do not restamp §§1–7. Method ≠ dest sample type ≠ dest container type.
+
+| Step | Action | Expected result |
+|------|--------|-----------------|
+| 8.1 | Experiment Templates → aliquot/pool plan entry. | Three plan controls: **Plan method**, **Default dest sample type**, **Default dest container type**. Dest sample type includes **Same as parent.** |
+| 8.2 | Set dest sample type to a catalog dest (e.g. DNA) for an aliquot method. Save template. Start an experiment from it. | Runtime plan loads that `default_dest_sample_type`. Lines inherit **Use entry default** until overridden. |
+| 8.3 | Clear dest sample type to Same as parent. Save. Start. | Runtime default is blank / Same as parent. |
+
+## 9. Dest-type transition catalog admin (E-14 / S3)
+
+**Unsigned.** Mutate is **config:edit** only. Do not invent Pass. Do not restamp §§1–7.
+
+| Step | Action | Expected result |
+|------|--------|-----------------|
+| 9.1 | Admin → Dest-type transitions (`/admin/sample-type-transitions`). | Grid of source × operation × dest. Seeded Blood×aliquot→DNA and DNA×pool→Pooled DNA appear when present. |
+| 9.2 | Add a transition (config:edit). | **201**. Row listed. Execute dest picker offers the new dest for that source × op. |
+| 9.3 | Add the same source × op × dest again. | **409** `transition_exists`. |
+| 9.4 | Lab tech without config:edit POST. | **403**. |
+| 9.5 | Deactivate a row. | Row inactive. Execute dest picker no longer offers it (Same as parent. remains). |
+
 ## Pass criteria
 
 - **This packet (E-10):** Steps **7.1–7.9b**. Formal **§7 Result: Pass** (Tobias QA, 2026-09-14 22:28 ET, `dc7ee92`). Packet **7.1–7.8 Pass** on `e5a8fdd` (not rescored). Deiter EXTRA **double-Add Pass** on `dc7ee92` (sequential **409** / concurrent **201 + 409** → **1 plan + 1 dest**). **Lab Ops: Deiter Met** on double-Add 2026-09-14. **7.9 / 7.9b Pass** from uniqueness restamp honesty. Prior overall **Fail** on `e5a8fdd` is **history**. **Rolf Confirm: Hold merge lifted** — E-10 **Met**; product on `main` @ `e56a89f` (PR **129**). **Tobias dogfood Ready=Yes** on `dc7ee92`. Ready=Yes on `e5a8fdd` and Ready=No on **`9312c54`** stay history. Do **not** restamp §6. Evidence: `/workspace/uat-e10-section7-overall-dc7ee92/RESULT.md`, `/workspace/uat-e10-section7-overall-dc7ee92/stamp.json`, `/workspace/uat-e10-doubleadd-dc7ee92/RESULT.md`, `/workspace/uat-e10-doubleadd-dc7ee92/stamp.json`, `/workspace/uat-e10-doubleadd-dc7ee92/tobias-stamp.json`, `/workspace/uat-e10-doubleadd-dc7ee92/doubleadd.json`, `/workspace/dogfood-e10-dc7ee92/READY.md`. Prior Fail evidence: `/workspace/uat-e10-section7-e5a8fdd/`.
