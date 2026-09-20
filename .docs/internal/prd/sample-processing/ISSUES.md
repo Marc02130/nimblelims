@@ -1,6 +1,6 @@
 # Temporary issues — Sample processing (index)
 
-**Status:** Synced 2026-09-20 (E-10 Met; E-12/E-14 Met; E-7 Met @ `4b3609a`; Leadership Core)  
+**Status:** Synced 2026-09-20 (E-10 Met; E-12/E-14 Met; E-7 Met on `main` PR **132**; Leadership Core)  
 **PRD:** [PRD.md](PRD.md) · [Spec](../../specs/sample-processing/SPEC.md)  
 **Stamps:** [../../../decision-logs/framework-stamps-2026-08-26.md](../../../decision-logs/framework-stamps-2026-08-26.md) · [../../../decision-logs/product-north-star-2026-09-20.md](../../../decision-logs/product-north-star-2026-09-20.md)  
 **Team notes:** [../../../discussions/2026-08-26-issues-sync-leadership-ba-dev.md](../../../discussions/2026-08-26-issues-sync-leadership-ba-dev.md)
@@ -68,7 +68,7 @@ Execute stack **exists**. Missing middle = **order → routing map → work_orde
 1. **E-9** dual-map — **Decided** (dest container type shipped)  
 2. **E-10** atomic pair — **Met** on `main` (PR **129**, `e56a89f`); UAT §7 **Pass** on `dc7ee92` (incl. 7.9 / 7.9b uniqueness); **Hold merge lifted**. Tobias honesty-check 7.9 / 7.9b (not a merge).  
 3. **E-14 + E-12** — **Met** on `main` (PR **131**, `811e966`); UAT §§8–9 **Pass** on `c4c899d`; **Rolf Confirm**  
-4. **E-7** type gate — **Met** on `feat/e7-type-gate-experiment-limsrun` @ `4b3609a` (UAT §10 Pass; Rolf Confirm; Marc owns merge). **E-6** intake Available for Testing — **next**  
+4. **E-7** type gate — **Met** on `main` (PR **132**, `e59a045`); UAT §10 **Pass** on `4b3609a`; **Rolf Confirm**. **E-6** intake Available for Testing — **next**  
 5. **X-5** — `post-receive-work-spine` (asked-for / work_order)  
 6. **LimsRuns R-18 / R-11** — manual LimsRun clarity + Qubit testdata  
 7. Processes P-4 / P-1 — truth + naming  
