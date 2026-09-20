@@ -241,6 +241,7 @@ class LimsRunService:
             for sid in sample_ids:
                 # S7: accessible under current session (RLS / project), not mere existence
                 require_accessible_sample(self.db, sid)
+            self._assert_process_step_accepts_types(run, sample_ids)
             run.cohort = {
                 "sample_ids": ids,
                 "locked_at": datetime.now(timezone.utc).isoformat(),
@@ -260,6 +261,11 @@ class LimsRunService:
             )
         elif not locked:
             from datetime import datetime, timezone
+            existing_uuids = [
+                sid if isinstance(sid, uuid.UUID) else uuid.UUID(str(sid))
+                for sid in existing_ids
+            ]
+            self._assert_process_step_accepts_types(run, existing_uuids)
             run.cohort = {
                 "sample_ids": list(existing_ids),
                 "locked_at": datetime.now(timezone.utc).isoformat(),
@@ -369,10 +375,8 @@ class LimsRunService:
             return {}
         return dict(asked.params or {})
 
-    def _asked_for_from_work_order(self, run: LimsRun):
-        from models.asked_for import AskedFor
+    def _process_step_for_run(self, run: LimsRun):
         from models.entry import ELNProcess, ELNProcessStep, ELNProcessStepLimsRun
-        from models.work_order import WorkOrder
 
         step = (
             self.db.query(ELNProcessStep)
@@ -392,11 +396,35 @@ class LimsRunService:
                     .first()
                 )
         if step is None:
-            return None
+            return None, None
         process = (
             self.db.query(ELNProcess).filter(ELNProcess.id == step.process_id).first()
         )
-        if process is None or process.work_order_id is None:
+        return process, step
+
+    def _assert_process_step_accepts_types(
+        self, run: LimsRun, sample_ids: List[uuid.UUID]
+    ) -> None:
+        """E-7: LimsRun start uses the process-step allow-list, not the analysis."""
+        if not sample_ids:
+            return
+        process, step = self._process_step_for_run(run)
+        if process is None or step is None:
+            return
+        from app.services.routing_service import (
+            assert_instance_step_accepts_current_type,
+        )
+
+        assert_instance_step_accepts_current_type(
+            self.db, process, step, extra_sample_ids=sample_ids
+        )
+
+    def _asked_for_from_work_order(self, run: LimsRun):
+        from models.asked_for import AskedFor
+        from models.work_order import WorkOrder
+
+        process, step = self._process_step_for_run(run)
+        if step is None or process is None or process.work_order_id is None:
             return None
         wo = (
             self.db.query(WorkOrder).filter(WorkOrder.id == process.work_order_id).first()

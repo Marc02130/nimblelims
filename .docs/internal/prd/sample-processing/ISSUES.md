@@ -68,7 +68,7 @@ Execute stack **exists**. Missing middle = **order → routing map → work_orde
 1. **E-9** dual-map — **Decided** (dest container type shipped)  
 2. **E-10** atomic pair — **Met** on `main` (PR **129**, `e56a89f`); UAT §7 **Pass** on `dc7ee92` (incl. 7.9 / 7.9b uniqueness); **Hold merge lifted**. Tobias honesty-check 7.9 / 7.9b (not a merge).  
 3. **E-14 + E-12** — **Met** on `main` (PR **131**, `811e966`); UAT §§8–9 **Pass** on `c4c899d`; **Rolf Confirm**  
-4. **E-7 + E-6** — type gate layer + intake Available for Testing — **next**  
+4. **E-7** type gate — **Coded** (`feat/e7-type-gate-experiment-limsrun`); UAT §10 unsigned. **E-6** intake Available for Testing — **next** after E-7 UAT  
 5. **X-5** — `post-receive-work-spine` (asked-for / work_order)  
 6. **LimsRuns R-18 / R-11** — manual LimsRun clarity + Qubit testdata  
 7. Processes P-4 / P-1 — truth + naming  

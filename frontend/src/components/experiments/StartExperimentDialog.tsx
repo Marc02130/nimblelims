@@ -173,11 +173,11 @@ const StartExperimentDialog: React.FC<StartExperimentDialogProps> = ({
     if (blocked.length && !moving.length) {
       setError(
         blocked[0].ineligible_reason ||
-          'Selected sample(s) are not eligible (must be Available for Testing)',
+          'Selected sample(s) are not eligible (Available for Testing / accepted type)',
       );
     } else if (blocked.length) {
       setError(
-        `${blocked.length} sample(s) skipped — not Available for Testing or not ready for this step`,
+        `${blocked.length} sample(s) skipped — not eligible for this step`,
       );
     }
     setSelected((prev) => [...prev, ...moving]);
@@ -209,7 +209,7 @@ const StartExperimentDialog: React.FC<StartExperimentDialogProps> = ({
       if (!eligible.length) {
         const reason =
           ineligible[0]?.ineligible_reason ||
-          'Scanned sample(s) are not eligible (status / process)';
+          'Scanned sample(s) are not eligible (status / process / type)';
         setError(reason);
         return;
       }

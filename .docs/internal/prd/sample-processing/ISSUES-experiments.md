@@ -1,7 +1,7 @@
 # Temporary issues — Experiments & entries
 
 **Parent:** [ISSUES.md](ISSUES.md)  
-**Status:** Synced 2026-09-20 (E-10 Met; E-12/E-14 Met on `main` PR **131**; next E-7/E-6)  
+**Status:** Synced 2026-09-20 (E-10 Met; E-12/E-14 Met on `main` PR **131**; E-7 Coded, UAT §10 unsigned; next E-6)  
 **Includes:** aliquot/pool + extract-hold (largest complexity knot)  
 **Kick-back log:** [../../../decision-logs/extract-hold-dual-map-kickback.md](../../../decision-logs/extract-hold-dual-map-kickback.md)
 
@@ -22,7 +22,7 @@
 | ID | Issue | Why it hurts | Suggested next |
 |----|-------|--------------|----------------|
 | E-6 | Decision #24 (Available for Testing + process membership) vs accessioning still setting **Received** | Can’t start experiments on freshly accessioned samples | Fix intake status (AR) |
-| E-7 | Template `accepted_sample_types` vs product stamp: gate on **experiment / LimsRun**, not entry | Spec/AC12 conflict | Rewrite AC; implement gate at right layer |
+| E-7 | Template `accepted_sample_types` vs product stamp: gate on **experiment / LimsRun**, not entry | Spec/AC12 conflict | **Coded** on `feat/e7-type-gate-experiment-limsrun`: start uses process-definition step allow-list; template/entry `accepted_sample_types` **422**. UAT §10 unsigned. |
 | E-8 | Cohort locked after start vs desire to add mid-flight | Support tickets | Hold lock; document |
 
 ## C. Aliquot / pool + extract-hold (critical)
@@ -51,7 +51,7 @@
 1. **E-9** restamp — **Decided**; dest container type shipped  
 2. **E-10** atomic pair — **Met** on `main` (PR **129**, `e56a89f`); UAT §7 **Pass** on `dc7ee92` (7.1–7.8 + **7.9 / 7.9b** uniqueness); **Hold merge lifted**; prior Fail on `e5a8fdd` is history.  
 3. **E-14 + E-12** — **Met** on `main` (PR **131**, `811e966`); UAT §§8–9 Pass on `c4c899d`; **Rolf Confirm**  
-4. **E-7 + E-6** (gates + intake status) — **next**  
+4. **E-7** type gate — **Coded**; UAT §10 unsigned. **E-6** (intake Available for Testing) — **next** after E-7 UAT  
 5. Docs **E-17–E-19**  
 
 **Product north star:** framework-first DB config, then AI config from SOPs (human-editable). AI for login / reporting / storage waits until sample processing closes — see parent [ISSUES.md](ISSUES.md).
