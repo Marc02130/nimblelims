@@ -755,26 +755,12 @@ async def accession_sample(
         if accession_data.client_project_id and not project.client_project_id:
             project.client_project_id = accession_data.client_project_id
         
-        # Get initial status (e.g., "Received")
-        sample_status_list = db.query(List).filter(List.name == "sample_status").first()
-        if not sample_status_list:
-            logger.error("Sample status list not found")
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Sample status list not found in configuration"
-            )
-        
-        received_status = db.query(ListEntry).filter(
-            ListEntry.list_id == sample_status_list.id,
-            ListEntry.name == "Received"
-        ).first()
-        
-        if not received_status:
-            logger.error("Sample status 'Received' not found")
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Sample status 'Received' not found in configuration"
-            )
+        # E-6: intake writes Available for Testing (Decision #24 start gate).
+        from app.services.atomic_receive_service import (
+            resolve_available_for_testing_status,
+        )
+
+        intake_status = resolve_available_for_testing_status(db)
         
         # Generate sample name if not provided
         sample_name = accession_data.name
@@ -793,7 +779,7 @@ async def accession_sample(
             due_date=accession_data.due_date,
             received_date=accession_data.received_date,
             sample_type=accession_data.sample_type,
-            status=received_status.id,
+            status=intake_status.id,
             matrix=accession_data.matrix,
             temperature=accession_data.temperature,
                 project_id=project_id,
@@ -1002,25 +988,13 @@ async def bulk_accession_samples(
         if bulk_data.client_project_id and not project.client_project_id:
             project.client_project_id = bulk_data.client_project_id
     
-    # Get initial status (e.g., "Received")
+    # E-6: intake writes Available for Testing (Decision #24 start gate).
     from models.list import List, ListEntry
-    sample_status_list = db.query(List).filter(List.name == "sample_status").first()
-    if not sample_status_list:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Sample status list not found in configuration"
-        )
-    
-    received_status = db.query(ListEntry).filter(
-        ListEntry.list_id == sample_status_list.id,
-        ListEntry.name == "Received"
-    ).first()
-    
-    if not received_status:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Sample status 'Received' not found in configuration"
-        )
+    from app.services.atomic_receive_service import (
+        resolve_available_for_testing_status,
+    )
+
+    intake_status = resolve_available_for_testing_status(db)
     
     # Get "In Process" status for tests
     test_status_list = db.query(List).filter(List.name == "test_status").first()
@@ -1137,7 +1111,7 @@ async def bulk_accession_samples(
                 due_date=bulk_data.due_date,
                 received_date=bulk_data.received_date,
                 sample_type=bulk_data.sample_type,
-                status=received_status.id,
+                status=intake_status.id,
                 matrix=bulk_data.matrix,
                 temperature=unique.temperature if unique.temperature is not None else None,
                 project_id=project_id,
