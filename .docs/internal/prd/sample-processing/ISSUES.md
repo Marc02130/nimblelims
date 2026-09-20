@@ -1,7 +1,7 @@
 # Temporary issues — Sample processing (index)
 
-**Status:** Synced 2026-09-20 (product north star + E-10 Met; Leadership Core)  
-**PRD:** [PRD.md](PRD.md) · **Spec:** [../../specs/sample-processing/SPEC.md](../../specs/sample-processing/SPEC.md)  
+**Status:** Synced 2026-09-20 (E-10 Met; E-12/E-14 Met @ `c4c899d`; Leadership Core)  
+**PRD:** [PRD.md](PRD.md) · [Spec](../../specs/sample-processing/SPEC.md)  
 **Stamps:** [../../../decision-logs/framework-stamps-2026-08-26.md](../../../decision-logs/framework-stamps-2026-08-26.md) · [../../../decision-logs/product-north-star-2026-09-20.md](../../../decision-logs/product-north-star-2026-09-20.md)  
 **Team notes:** [../../../discussions/2026-08-26-issues-sync-leadership-ba-dev.md](../../../discussions/2026-08-26-issues-sync-leadership-ba-dev.md)
 
@@ -24,9 +24,7 @@ Two goals define the product. They are not a new packet — they constrain seque
 | **1** | **Framework first** | Flexible LIMS via **configuration in the DB** (rules, design, page layouts) — not re-coding when a laboratory adopts it |
 | **2** | **AI configuration from SOPs** | AI proposes that config from SOPs; humans edit/refine. Starts with sample-processing catalog; broadens later |
 
-**Sequencing lock:** Finish **sample processing** before opening AI-assisted config for login, reporting, storage, or other surfaces. Framework (goal 1) is what makes goal 2 possible across the product. Living guidance: [ai-sop-north-star](../../../review/requirements/ai-sop-north-star.md). Parked breadth: [open-questions/ai-config-breadth.md](../../../review/open-questions/ai-config-breadth.md).
-
----
+**Sequencing lock:** Finish **sample processing** before opening AI-assisted config for login, reporting, storage, or other surfaces. Framework (goal 1) is what makes goal 2 possible across the product. Living guidance: [ai-sop-north-star](../../../review/requirements/ai-sop-north-star.md). Parked breadth: [open-questions/ai-config-breadth](../../../review/open-questions/ai-config-breadth.md).
 
 ## Framework posture (from PRD §0)
 
@@ -48,7 +46,7 @@ Execute stack **exists**. Missing middle = **order → routing map → work_orde
 | Team | Comment |
 |------|---------|
 | **Leadership** | North star locked (framework → AI config). Sample processing first. Tobias honesty-check uniqueness **7.9 / 7.9b** (not a merge). |
-| **BA** | Fold goals into living PRD / OQ; keep ISSUES priority current (E-10 Met → E-14/E-12 → E-6/E-7) |
+| **BA** | Fold goals into living PRD / OQ; keep ISSUES priority current (E-10 Met → E-12/E-14 Met → E-6/E-7) |
 | **QA** | Living UAT §7 Pass on `dc7ee92` with E-10 Met; Tobias re-check 7.9 / 7.9b honesty only |
 
 ---
@@ -58,7 +56,7 @@ Execute stack **exists**. Missing middle = **order → routing map → work_orde
 | ID | Issue | Why | Next |
 |----|-------|-----|------|
 | X-1 | Process / Exp / LimsRun blurred in UI/docs | Wrong SoT | **Docs punch 2026-09-11:** HOWTO § Later execution table; processes / experiments / lims-runs / nav / api-endpoints. Sidebar tooltips. `/v1/processes` rename **not** in this fold (P-1 leftover). |
-| X-2 | Extract-then-Qubit E2E + testdata incomplete | No dogfood | After seeds / dest path |
+| X-2 | Extract-then-Qubit E2E + testdata incomplete | Can’t close | After seeds / dest path |
 | X-3 | SOP+AI Apply ≠ live process | Product lie | Explicit non-goal until north-star packet; see [ai-sop-north-star](../../../review/requirements/ai-sop-north-star.md) |
 | X-4 | MVP “processing not release bar” vs real SOPs | Priority fog | Leadership sequencing (sample processing close → then AI breadth) |
 | **X-5** | Asked-for vs work_order / routing / params | Bench “what’s next?” | **Packet opened 2026-08-28** — [post-receive-work-spine](../../../review/requirements/post-receive-work-spine.md) |
@@ -69,8 +67,8 @@ Execute stack **exists**. Missing middle = **order → routing map → work_orde
 
 1. **E-9** dual-map — **Decided** (dest container type shipped)  
 2. **E-10** atomic pair — **Met** on `main` (PR **129**, `e56a89f`); UAT §7 **Pass** on `dc7ee92` (incl. 7.9 / 7.9b uniqueness); **Hold merge lifted**. Tobias honesty-check 7.9 / 7.9b (not a merge).  
-3. **E-14 + E-12** — transition catalog admin (`config:edit`) + template dest type (**next** after Tobias check)  
-4. **E-7 + E-6** — type gate layer + intake Available for Testing  
+3. **E-14 + E-12** — **Met** on `feat/e12-e14-dest-type-transitions` @ `c4c899d` (UAT §§8–9 Pass; Rolf Confirm; Marc owns merge)  
+4. **E-7 + E-6** — type gate layer + intake Available for Testing — **next** after merge  
 5. **X-5** — `post-receive-work-spine` (asked-for / work_order)  
 6. **LimsRuns R-18 / R-11** — manual LimsRun clarity + Qubit testdata  
 7. Processes P-4 / P-1 — truth + naming  

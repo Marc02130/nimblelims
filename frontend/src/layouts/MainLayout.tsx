@@ -58,6 +58,7 @@ const getRouteTitle = (pathname: string): string => {
     '/admin/roles': 'Roles & Permissions',
     '/admin/analyses': 'Analyses Management',
     '/admin/routing-map': 'Routing Map',
+    '/admin/sample-type-transitions': 'Dest-type transitions',
     '/admin/analytes': 'Analytes Management',
     '/admin/test-batteries': 'Test Batteries',
     '/admin/custom-fields': 'Custom Fields Management',
