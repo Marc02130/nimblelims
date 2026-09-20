@@ -8,6 +8,8 @@
 **Discussions:** [what-is-a-good-framework](../../../discussions/2026-08-25-what-is-a-good-framework.md) · [work-orders](../../../discussions/2026-08-25-work-orders-assay-params-compounds.md)  
 **Team:** Leadership  
 
+**Product north star (2026-09-20):** (1) Framework first — config in DB, not recode per lab. (2) AI proposes that config from SOPs (human-editable). Broader AI (login, reporting, storage, …) **waits** until sample processing closes. Stamp: [product-north-star-2026-09-20](../../../decision-logs/product-north-star-2026-09-20.md).
+
 ---
 
 ## 0. Framework posture (Leadership)
@@ -80,6 +82,7 @@ After intake, labs need a clear **work list** and an execute stack. Blurring Pro
 - CUT aliquot methods; materials module; multi-tenant  
 - Shipping registration/lots in the same packet as AR  
 - Process membership as sample-only (no container) — **bounce**; see §4.1  
+- AI-assisted configuration of login, reporting, storage, or other non–sample-processing surfaces — **parked** until sample processing closes (product north star)  
 
 ## 4. Mental model (execute)
 
@@ -135,8 +138,8 @@ After aliquot/pool **execute**, **every dest** container-with-sample **continues
 | Process / Experiment / LimsRun / parsers | Shipped |
 | sample_type_transitions + dest type | Mostly shipped |
 | Process assignment grain = container-with-sample | **0077** `container_id` on `eln_process_samples`; assign/mint/later-Start use Contents |
-| Atomic pair UI / dual-map FD | Lag / kick-back |
-| S3 transition admin UI | Lag |
+| Atomic pair UI | **E-10 Met** (PR 129 / `e56a89f`; UAT §7 Pass `dc7ee92`) |
+| S3 transition admin UI / template dest type | Lag — **E-14 / E-12** next |
 
 ## 8. References
 
