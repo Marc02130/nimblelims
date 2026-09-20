@@ -160,8 +160,24 @@ Living honesty: numbered **7.1–7.8 Pass** on `e5a8fdd` (not rescored) **plus**
 | 9.4 | Lab tech without config:edit POST. | **403**. | **Pass** (alice-tech) |
 | 9.5 | Deactivate a row. | Row inactive. Execute dest picker no longer offers it (Same as parent. remains). | **Pass** (DELETE 204) |
 
+## 10. Type gate on experiment / LimsRun start (E-7)
+
+**Unsigned.** Do not invent Pass. Do **not** restamp §§1–9. SoT is `eln_process_definition_step_accepted_sample_types`. Not on the template. Not on an entry. Standalone (no process) start is not gated by this table.
+
+| Step | Action | Expected result | Result |
+|------|--------|-----------------|--------|
+| 10.1 | Process definition → experiment step. Set accepted types to DNA only. Instantiate. Start the experiment step (empty cohort). Assign a Blood sample. Start the experiment with that Blood. | **422** `route_sample_type`. Sample is not deleted. | Unsigned |
+| 10.2 | Remove Blood. Assign DNA. Start the experiment with DNA. | Start succeeds. Cohort locks DNA. | Unsigned |
+| 10.3 | LimsRun step (e.g. Qubit). Accepted types DNA only. Instantiate and start the step. PATCH run start with Blood. | **422** `route_sample_type`. | Unsigned |
+| 10.4 | Ad hoc experiment (no process). Start with Blood. | Start succeeds. This table does not gate standalone experiments. | Unsigned |
+| 10.5 | Experiment Templates. Confirm there is no accepted-types control. POST a template with `template_definition.accepted_sample_types`. | **422** `accepted_sample_types_not_on_template`. | Unsigned |
+| 10.6 | Eligible-samples for the DNA-only experiment step with Blood and DNA assigned. | Blood `eligible: false` with type reason. DNA eligible. Dual-list cannot pick Blood. | Unsigned |
+
+**Fail:** start silently accepts the wrong type; gate lives on the template or an entry; ad hoc start 422s from this table; Blood is deleted on 422.
+
 ## Pass criteria
 
+- **This packet (E-7):** Steps **10.1–10.6**. **Unsigned** until Tobias. Do **not** invent Pass. Do **not** restamp §§1–9.
 - **This packet (E-12/E-14):** Steps **8.1–8.3** and **9.1–9.5**. Formal **§§8–9 Result: Pass** (Tobias QA, 2026-09-20 11:23 ET, `c4c899d`). **Rolf Confirm** — E-12 / E-14 **Met**. Product on `main` @ `811e966` (PR **131**). Dogfood Ready=Yes. Evidence: `/workspace/uat-e12-e14-c4c899d/`. Do **not** restamp §§1–7.
 - **This packet (E-10):** Steps **7.1–7.9b**. Formal **§7 Result: Pass** (Tobias QA, 2026-09-14 22:28 ET, `dc7ee92`). Packet **7.1–7.8 Pass** on `e5a8fdd` (not rescored). Deiter EXTRA **double-Add Pass** on `dc7ee92` (sequential **409** / concurrent **201 + 409** → **1 plan + 1 dest**). **Lab Ops: Deiter Met** on double-Add 2026-09-14. **7.9 / 7.9b Pass** from uniqueness restamp honesty. Prior overall **Fail** on `e5a8fdd` is **history**. **Rolf Confirm: Hold merge lifted** — E-10 **Met**; product on `main` @ `e56a89f` (PR **129**). **Tobias dogfood Ready=Yes** on `dc7ee92`. Ready=Yes on `e5a8fdd` and Ready=No on **`9312c54`** stay history. Do **not** restamp §6. Evidence: `/workspace/uat-e10-section7-overall-dc7ee92/RESULT.md`, `/workspace/uat-e10-section7-overall-dc7ee92/stamp.json`, `/workspace/uat-e10-doubleadd-dc7ee92/RESULT.md`, `/workspace/uat-e10-doubleadd-dc7ee92/stamp.json`, `/workspace/uat-e10-doubleadd-dc7ee92/tobias-stamp.json`, `/workspace/uat-e10-doubleadd-dc7ee92/doubleadd.json`, `/workspace/dogfood-e10-dc7ee92/READY.md`. Prior Fail evidence: `/workspace/uat-e10-section7-e5a8fdd/`.
 - Steps 1–6 remain the dest-container-type stamp on `008baf2` (Pass). They are not this packet.

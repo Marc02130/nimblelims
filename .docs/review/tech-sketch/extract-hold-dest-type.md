@@ -175,8 +175,8 @@ METHOD_CATALOG = {
 ```
 samples.sample_type / parent_sample_id / matrix   ← existing (matrix unchanged)
 eln_process_samples                               ← L1/S1 join
-template_definition.accepted_sample_types         ← start entry allow-list
-sample_type_transitions                           ← NEW catalog (many-to-many)
+eln_process_definition_step_accepted_sample_types ← start gate (experiment + LimsRun)
+sample_type_transitions                           ← catalog (many-to-many)
 aliquot_pool_plan entry config:
   method                                          ← concrete METHOD_CATALOG id
   default_dest_sample_type                        ← optional (separate from method)
