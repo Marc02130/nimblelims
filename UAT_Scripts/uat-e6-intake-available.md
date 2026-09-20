@@ -5,7 +5,7 @@
 **SHA:** product `a73a51c` · tip `7bd4f84` (docs tip; product under it)  
 **Scope:** Leftover **accession** and **bulk-accession** write **Available for Testing**, matching CORE receive. Decision #24 start gate can then see a freshly accessioned sample.
 
-**Pass** (Tobias QA) · **Rolf Confirm** · **E-6 Met**. Do **not** restamp atomic-receive **AR-ST-01**. Process assign still does **not** change Sample.status (Decision #24). Not E-7. Not dest-follow. Not IC50. Marc owns merge.
+**Pass** (Tobias QA) · **Rolf Confirm** · **E-6 Met**. Product on `main` @ `3bc43d2` (PR **133**). Do **not** restamp atomic-receive **AR-ST-01**. Process assign still does **not** change Sample.status (Decision #24). Not E-7. Not dest-follow. Not IC50.
 
 Wizard `/accessioning` is retired (redirects to `/receive`). There is **no** bulk-accession UI. Steps 2–3 are **API**. Step 1 is a receive smoke only.
 
@@ -58,4 +58,4 @@ Bulk UI cases in `uat-bulk-enhancements.md` are retired. Score the API only.
 
 ### 2026-09-20 · product `a73a51c` · tip `7bd4f84` · `feat/e6-intake-available-for-testing`
 
-**Result: Pass** (Tobias QA) · 2026-09-20 14:33:58 ET · product `a73a51c` · tip `7bd4f84` · **Dogfood Ready=Yes** · **Rolf Confirm** · **E-6 Met**. Scored **2.1–2.2**, **3.1**, **4.1–4.2**. Step **1.1** smoke only — do **not** restamp AR-ST-01. Decision #24: assign does not promote. Evidence (cite only): `/workspace/uat-e6-7bd4f84/{RESULT.md,tobias-stamp.json,acs.md,dogfood/READY.md}`. Marc owns merge. Critical path E-10/E-12/E-14/E-7/E-6 looks closed after merge. Not IC50.
+**Result: Pass** (Tobias QA) · 2026-09-20 14:33:58 ET · product `a73a51c` · tip `7bd4f84` · **Dogfood Ready=Yes** · **Rolf Confirm** · **E-6 Met**. Product on `main` @ `3bc43d2` (PR **133**). Scored **2.1–2.2**, **3.1**, **4.1–4.2**. Step **1.1** smoke only — do **not** restamp AR-ST-01. Decision #24: assign does not promote. Evidence (cite only): `/workspace/uat-e6-7bd4f84/{RESULT.md,tobias-stamp.json,acs.md,dogfood/READY.md}`. Critical path E-10/E-12/E-14/E-7/E-6 closed on `main`. Not IC50.
