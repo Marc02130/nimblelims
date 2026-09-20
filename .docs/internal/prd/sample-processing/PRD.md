@@ -10,8 +10,6 @@
 
 **Product north star (2026-09-20):** (1) Framework first — config in DB, not recode per lab. (2) AI proposes that config from SOPs (human-editable). Broader AI (login, reporting, storage, …) **waits** until sample processing closes. Stamp: [product-north-star-2026-09-20](../../../decision-logs/product-north-star-2026-09-20.md).
 
----
-
 ## 0. Framework posture (Leadership)
 
 Process / Experiment / LimsRun are the **execution framework** (already largely shipped). The missing configurable middle is **order → routing → work_order → execute**.
@@ -33,7 +31,7 @@ RESULTS (Test created at LimsRun start / ensure-on-publish — WO-7)
 ```
 
 | Stamp | Rule |
-|-------|------|
+|------|------|
 | FW-0 | Fixed execute roles; DB joints for routing/params/METHOD_CATALOG/transitions |
 | FW-2 | Profiles/routing ≠ Workflow Templates |
 | WO-1 | Entity = **work_order** |
@@ -42,8 +40,6 @@ RESULTS (Test created at LimsRun start / ensure-on-publish — WO-7)
 | WO-4 | Non-instrument: **LimsRun + analysis**; manual OK; instrument only for parsers |
 | WO-7 | **Test** at LimsRun start / ensure-on-publish — not at accession |
 | WO-5/6 | Registration / lots deferred (compound = one Sample; prefer lot as child later) |
-
----
 
 ## 1. Problem
 
@@ -139,10 +135,10 @@ After aliquot/pool **execute**, **every dest** container-with-sample **continues
 | sample_type_transitions + dest type | Mostly shipped |
 | Process assignment grain = container-with-sample | **0077** `container_id` on `eln_process_samples`; assign/mint/later-Start use Contents |
 | Atomic pair UI | **E-10 Met** (PR 129 / `e56a89f`; UAT §7 Pass `dc7ee92`) |
-| S3 transition admin UI / template dest type | Lag — **E-14 / E-12** next |
+| S3 transition admin UI / template dest type | **E-14 / E-12 Met** on `c4c899d` (UAT §§8–9 Pass; Rolf Confirm; Marc owns merge) |
 
 ## 8. References
 
 - `.docs/internal/prd/sample-processing/ISSUES*.md`  
 - `.docs/review/tech-sketch/experiment-template-entries.md`  
-- `.docs/review/tech-sketch/extract-hold-dest-type.md`  
+- `.docs/review/requirements/extract-hold-dest-type.md`  
