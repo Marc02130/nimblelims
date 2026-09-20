@@ -69,7 +69,7 @@ Execute stack **exists**. Missing middle = **order → routing map → work_orde
 
 1. **E-9** dual-map — **Decided** (dest container type shipped)  
 2. **E-10** atomic pair — **Met** on `main` (PR **129**, `e56a89f`); UAT §7 **Pass** on `dc7ee92` (incl. 7.9 / 7.9b uniqueness); **Hold merge lifted**. Tobias honesty-check 7.9 / 7.9b (not a merge).  
-3. **E-14 + E-12** — transition catalog admin (`config:edit`) + template dest type (**next** after Tobias check)  
+3. **E-14 + E-12** — transition catalog admin (`config:edit`) + template dest type — **coded** `feat/e12-e14-dest-type-transitions`; UAT unsigned  
 4. **E-7 + E-6** — type gate layer + intake Available for Testing  
 5. **X-5** — `post-receive-work-spine` (asked-for / work_order)  
 6. **LimsRuns R-18 / R-11** — manual LimsRun clarity + Qubit testdata  

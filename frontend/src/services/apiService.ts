@@ -2062,6 +2062,47 @@ export class ApiService {
     return response.data;
   }
 
+  async getSampleTypeTransitions(operation?: 'aliquot' | 'pool') {
+    const response: AxiosResponse = await this.api.get(
+      'v1/sample-type-transitions',
+      { params: operation ? { operation } : undefined },
+    );
+    return response.data;
+  }
+
+  async createSampleTypeTransition(data: {
+    source_sample_type: string;
+    operation: 'aliquot' | 'pool';
+    allowed_dest_sample_type: string;
+    active?: boolean;
+  }) {
+    const response: AxiosResponse = await this.api.post(
+      'v1/sample-type-transitions',
+      data,
+    );
+    return response.data;
+  }
+
+  async updateSampleTypeTransition(
+    id: string,
+    data: {
+      source_sample_type?: string;
+      operation?: 'aliquot' | 'pool';
+      allowed_dest_sample_type?: string;
+      active?: boolean;
+    },
+  ) {
+    const response: AxiosResponse = await this.api.patch(
+      `v1/sample-type-transitions/${id}`,
+      data,
+    );
+    return response.data;
+  }
+
+  async deleteSampleTypeTransition(id: string) {
+    await this.api.delete(`v1/sample-type-transitions/${id}`);
+  }
+
   async saveAliquotPlan(
     entryId: string,
     data: {
