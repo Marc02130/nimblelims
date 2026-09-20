@@ -180,7 +180,7 @@ After completing `uat-configurations-custom`, the recommended next scripts are:
 ## Notes
 
 - Scripts can be run out of order if prerequisites are manually set up in the database
-- Some scripts can be run in parallel if they don't share dependencies (e.g., `uat-navigation-ui` and `uat-help-system`)
+- Some scripts can run in parallel if they don't share dependencies (e.g., `uat-navigation-ui` and `uat-help-system`)
 - Failed tests in foundational scripts (security, configurations) may cause cascading failures in dependent scripts
 
 ---
