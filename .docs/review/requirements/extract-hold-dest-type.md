@@ -115,7 +115,7 @@ Dual mint; mid-flight method warn/wipe; un-mint on cancel; method/type on `aliqu
 
 **AC14 stamp (2026-09-10, `008baf2`, `feat/dest-container-type`, Tobias; **Rolf Confirm**):** **Pass** — UAT section 6. Browser 6.1 (three separate plan controls; dest container dropdown = Same as source. + 1×1 only; no 96-well / plates) plus live API 6.2–6.8. Do **not** invent 6.1 from FE unit alone. See [`UAT_Scripts/uat-extract-hold-dest-type.md`](../../../UAT_Scripts/uat-extract-hold-dest-type.md) section 6. Evidence (cite only): `/workspace/uat-dest-container-type-008baf2-ui61/` and `/workspace/uat-dest-container-type-008baf2/{RESULT.md,tobias-stamp.json,acs.md}`. Does **not** sign 1.7 / AC-P2-C3 / AC-P2-C2.
 
-**AC15/AC16 stamp (2026-09-20, `c4c899d`, `feat/e12-e14-dest-type-transitions`, Tobias; **Rolf Confirm**):** **Pass** — UAT §§8–9. Dogfood Ready=Yes. Evidence (cite only): `/workspace/uat-e12-e14-c4c899d/{RESULT.md,tobias-stamp.json,acs.md,dogfood/READY.md}`. Do **not** restamp §§1–7 / AC14. Marc owns merge. Not IC50.
+**AC15/AC16 stamp (2026-09-20, `c4c899d`, Tobias; **Rolf Confirm**):** **Pass** — UAT §§8–9. Product on `main` (PR **131**, `811e966`). Dogfood Ready=Yes. Evidence (cite only): `/workspace/uat-e12-e14-c4c899d/{RESULT.md,tobias-stamp.json,acs.md,dogfood/READY.md}`. Do **not** restamp §§1–7 / AC14. Not IC50.
 
 ## 7. Path exercised
 

@@ -135,7 +135,7 @@ After aliquot/pool **execute**, **every dest** container-with-sample **continues
 | sample_type_transitions + dest type | Mostly shipped |
 | Process assignment grain = container-with-sample | **0077** `container_id` on `eln_process_samples`; assign/mint/later-Start use Contents |
 | Atomic pair UI | **E-10 Met** (PR 129 / `e56a89f`; UAT §7 Pass `dc7ee92`) |
-| S3 transition admin UI / template dest type | **E-14 / E-12 Met** on `c4c899d` (UAT §§8–9 Pass; Rolf Confirm; Marc owns merge) |
+| S3 transition admin UI / template dest type | **E-14 / E-12 Met** on `main` (PR **131**, `811e966`); UAT §§8–9 Pass on `c4c899d`; **Rolf Confirm** |
 
 ## 8. References
 
