@@ -1,7 +1,7 @@
 # Temporary issues — Experiments & entries
 
 **Parent:** [ISSUES.md](ISSUES.md)  
-**Status:** Synced 2026-08-26 (paths + framework; Leadership/BA/Dev)  
+**Status:** Synced 2026-09-20 (E-10 Met; next E-14/E-12; product north star)  
 **Includes:** aliquot/pool + extract-hold (largest complexity knot)  
 **Kick-back log:** [../../../decision-logs/extract-hold-dual-map-kickback.md](../../../decision-logs/extract-hold-dual-map-kickback.md)
 
@@ -49,7 +49,9 @@
 ## Priority sketch
 
 1. **E-9** restamp — **Decided**; dest container type shipped  
-2. **E-10** atomic pair — **Met** on `main` (PR **129**, `e56a89f`); UAT §7 **Pass** on `dc7ee92`; **Hold merge lifted**; prior Fail on `e5a8fdd` is history  
-3. **E-14 + E-12** (catalog admin, template dest sample type)  
-3. **E-7 + E-6** (gates + intake status)  
-4. Docs **E-17–E-19**  
+2. **E-10** atomic pair — **Met** on `main` (PR **129**, `e56a89f`); UAT §7 **Pass** on `dc7ee92` (7.1–7.8 + **7.9 / 7.9b** uniqueness); **Hold merge lifted**; prior Fail on `e5a8fdd` is history. Tobias honesty **7.9 / 7.9b still Pass** 2026-09-20 (no drift; not a merge).  
+3. **E-14 + E-12** (catalog admin, template dest sample type) — **next**  
+4. **E-7 + E-6** (gates + intake status)  
+5. Docs **E-17–E-19**  
+
+**Product north star:** framework-first DB config, then AI config from SOPs (human-editable). AI for login / reporting / storage waits until sample processing closes — see parent [ISSUES.md](ISSUES.md).
