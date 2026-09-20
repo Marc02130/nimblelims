@@ -470,8 +470,8 @@ const StartExperimentDialog: React.FC<StartExperimentDialogProps> = ({
           available.every((s) => s.eligible === false) && (
             <Alert severity="warning" sx={{ mt: 2 }}>
               Samples are on this process but none are eligible to start. Start requires sample status{' '}
-              <strong>Available for Testing</strong>. Re-assign from the Samples list (assign now
-              promotes Received → Available for Testing), or a manager can update sample status.
+              <strong>Available for Testing</strong> (intake writes that status). A manager can
+              update sample status if a sample is still Received.
             </Alert>
           )}
       </DialogContent>

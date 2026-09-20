@@ -82,6 +82,15 @@ class TestBulkAccessioning:
         )
         db_session.add(received_status)
         db_session.flush()
+        available_status = ListEntry(
+            list_id=sample_status_list.id,
+            name="Available for Testing",
+            description="Ready for testing",
+            created_by=test_admin_user.id,
+            modified_by=test_admin_user.id
+        )
+        db_session.add(available_status)
+        db_session.flush()
         
         # Create test status list and entry
         test_status_list = List(
@@ -119,6 +128,7 @@ class TestBulkAccessioning:
             "sample_type": sample_type,
             "matrix": matrix,
             "received_status": received_status,
+            "available_status": available_status,
             "in_process_status": in_process_status,
             "container_type": container_type
         }
@@ -163,6 +173,8 @@ class TestBulkAccessioning:
         assert len(data) == 2
         assert data[0]["name"] == "BULK-001"
         assert data[1]["name"] == "BULK-002"
+        assert data[0]["status"] == str(test_data["available_status"].id)
+        assert data[1]["status"] == str(test_data["available_status"].id)
     
     def test_bulk_accession_with_auto_naming(self, client: TestClient, test_admin_user, test_data):
         """Test bulk accessioning with auto-generated names"""

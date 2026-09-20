@@ -191,7 +191,7 @@ The three-step `/accessioning` wizard is **removed**. `/accessioning` redirects 
    - **Note**: Bulk accessioning uses a single endpoint that creates everything in one transaction, unlike single sample accessioning which uses separate calls.
 
 **Status Transitions**:
-- All samples: Created with status "Received"
+- All samples: Created with status "Available for Testing" (E-6; CORE receive already did this)
 - All tests: Created with status "In Process"
 
 **Use Cases**:
