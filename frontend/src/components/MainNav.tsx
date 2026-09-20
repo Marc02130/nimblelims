@@ -37,6 +37,7 @@ import {
   Folder as FolderIcon,
   PrecisionManufacturing as PrecisionManufacturingIcon,
   AltRoute as AltRouteIcon,
+  CallSplit as CallSplitIcon,
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useUser } from '../contexts/UserContext';
@@ -86,6 +87,11 @@ export const adminNavItems: AdminNavItem[] = [
   { text: 'Roles & Permissions', path: '/admin/roles', icon: <Security /> },
   { text: 'Analyses Management', path: '/admin/analyses', icon: <ScienceIcon /> },
   { text: 'Routing map', path: '/admin/routing-map', icon: <AltRouteIcon /> },
+  {
+    text: 'Dest-type transitions',
+    path: '/admin/sample-type-transitions',
+    icon: <CallSplitIcon />,
+  },
   { text: 'Analytes Management', path: '/admin/analytes', icon: <Biotech /> },
   { text: 'Test Batteries', path: '/admin/test-batteries', icon: <BatteryChargingFull /> },
   { text: 'Custom Fields', path: '/admin/custom-fields', icon: <TuneIcon /> },

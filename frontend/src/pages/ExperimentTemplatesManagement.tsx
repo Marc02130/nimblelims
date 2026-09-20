@@ -319,6 +319,9 @@ const ExperimentTemplatesManagement: React.FC = () => {
   const [formDef, setFormDef] = useState<TemplateDefinition>(blankDefinition());
   const [fieldDefOptions, setFieldDefOptions] = useState<FieldDefOption[]>([]);
   const [vesselTypes, setVesselTypes] = useState<{ id: string; name: string }[]>([]);
+  const [destTypeOptions, setDestTypeOptions] = useState<
+    Array<{ id: string; name: string; operation: string }>
+  >([]);
 
   // Create FieldDefinition (entry columns — not Custom Fields for Sample/Test)
   const [createFieldOpen, setCreateFieldOpen] = useState(false);
@@ -392,6 +395,33 @@ const ExperimentTemplatesManagement: React.FC = () => {
         );
       })
       .catch(() => setVesselTypes([]));
+    apiService
+      .getSampleTypeTransitions()
+      .then((raw) => {
+        const list = Array.isArray(raw) ? raw : [];
+        setDestTypeOptions(
+          (
+            list as Array<{
+              allowed_dest_sample_type?: string;
+              allowed_dest_sample_type_name?: string;
+              operation?: string;
+              active?: boolean;
+            }>
+          )
+            .filter(
+              (row) =>
+                row?.allowed_dest_sample_type &&
+                row?.allowed_dest_sample_type_name &&
+                row.active !== false,
+            )
+            .map((row) => ({
+              id: String(row.allowed_dest_sample_type),
+              name: String(row.allowed_dest_sample_type_name),
+              operation: String(row.operation || 'aliquot'),
+            })),
+        );
+      })
+      .catch(() => setDestTypeOptions([]));
   }, []);
 
   const loadFieldDefinitions = async () => {
@@ -1256,10 +1286,50 @@ const ExperimentTemplatesManagement: React.FC = () => {
                           display="block"
                           sx={{ mt: 0.5 }}
                         >
-                          One concrete method fixes aliquot or pool for the entry. Dest sample type
-                          is chosen from source samples on the runtime plan. Dest container type may
-                          be defaulted here (1×1 vessels); dest init does not prompt.
+                          One concrete method fixes aliquot or pool for the entry. Default dest
+                          sample type is optional (Same as parent.). Execute still catalog-enforces
+                          against the source × method. Dest container type may be defaulted here
+                          (1×1 vessels); dest init does not prompt.
                         </Typography>
+                        <FormControl size="small" sx={{ minWidth: 280, mt: 1 }}>
+                          <InputLabel>Default dest sample type</InputLabel>
+                          <Select
+                            label="Default dest sample type"
+                            value={String(entry.config?.default_dest_sample_type || '')}
+                            onChange={(event) =>
+                              updateEntry(ei, {
+                                config: {
+                                  ...(entry.config || {}),
+                                  method: entry.config?.method || 'aliquot_by_volume',
+                                  default_dest_sample_type: event.target.value || null,
+                                  default_dest_container_type:
+                                    entry.config?.default_dest_container_type ?? null,
+                                },
+                              })
+                            }
+                          >
+                            <MenuItem value="">Same as parent.</MenuItem>
+                            {Array.from(
+                              new Map(
+                                destTypeOptions
+                                  .filter((opt) => {
+                                    const method = String(
+                                      entry.config?.method || 'aliquot_by_volume',
+                                    );
+                                    const op = method.startsWith('pool')
+                                      ? 'pool'
+                                      : 'aliquot';
+                                    return opt.operation === op;
+                                  })
+                                  .map((opt) => [opt.id, opt]),
+                              ).values(),
+                            ).map((option) => (
+                              <MenuItem key={option.id} value={option.id}>
+                                {option.name}
+                              </MenuItem>
+                            ))}
+                          </Select>
+                        </FormControl>
                         <FormControl size="small" sx={{ minWidth: 280, mt: 1 }}>
                           <InputLabel>Default dest container type</InputLabel>
                           <Select
