@@ -3,7 +3,7 @@
 **Stem:** `extract-hold-dest-type`  
 **Branch:** `feat/e12-e14-dest-type-transitions`  
 **When:** After the stack is up, before Tobias UAT §§8–9.  
-**Not a UAT Result.** Do not invent Pass. Do not restamp §§1–7.
+**Ready for UAT?** **Yes** (Tobias, 2026-09-20, `c4c899d`; evidence `/workspace/uat-e12-e14-c4c899d/dogfood/READY.md`). Product on `main` (PR **131**, `811e966`). Ready=Yes is not a substitute for the formal §§8–9 Pass (already stamped). Do **not** restamp §§1–7.
 
 ## Env
 
@@ -18,4 +18,4 @@ Local compose. `config:edit` (admin) and `experiment:manage`.
 
 ## Ready for UAT?
 
-Unsigned until Tobias. Do not invent Ready=Yes.
+**Yes** on `c4c899d` (Tobias, 2026-09-20). Formal §§8–9 **Pass** on the same SHA. Product on `main` @ `811e966` (PR **131**). Do **not** invent a second Pass from this file.

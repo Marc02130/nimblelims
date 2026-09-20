@@ -162,7 +162,7 @@ Living honesty: numbered **7.1–7.8 Pass** on `e5a8fdd` (not rescored) **plus**
 
 ## Pass criteria
 
-- **This packet (E-12/E-14):** Steps **8.1–8.3** and **9.1–9.5**. Formal **§§8–9 Result: Pass** (Tobias QA, 2026-09-20 11:23 ET, `c4c899d`). **Rolf Confirm** — E-12 / E-14 **Met**. Dogfood Ready=Yes. Evidence: `/workspace/uat-e12-e14-c4c899d/`. Marc owns merge. Do **not** restamp §§1–7.
+- **This packet (E-12/E-14):** Steps **8.1–8.3** and **9.1–9.5**. Formal **§§8–9 Result: Pass** (Tobias QA, 2026-09-20 11:23 ET, `c4c899d`). **Rolf Confirm** — E-12 / E-14 **Met**. Product on `main` @ `811e966` (PR **131**). Dogfood Ready=Yes. Evidence: `/workspace/uat-e12-e14-c4c899d/`. Do **not** restamp §§1–7.
 - **This packet (E-10):** Steps **7.1–7.9b**. Formal **§7 Result: Pass** (Tobias QA, 2026-09-14 22:28 ET, `dc7ee92`). Packet **7.1–7.8 Pass** on `e5a8fdd` (not rescored). Deiter EXTRA **double-Add Pass** on `dc7ee92` (sequential **409** / concurrent **201 + 409** → **1 plan + 1 dest**). **Lab Ops: Deiter Met** on double-Add 2026-09-14. **7.9 / 7.9b Pass** from uniqueness restamp honesty. Prior overall **Fail** on `e5a8fdd` is **history**. **Rolf Confirm: Hold merge lifted** — E-10 **Met**; product on `main` @ `e56a89f` (PR **129**). **Tobias dogfood Ready=Yes** on `dc7ee92`. Ready=Yes on `e5a8fdd` and Ready=No on **`9312c54`** stay history. Do **not** restamp §6. Evidence: `/workspace/uat-e10-section7-overall-dc7ee92/RESULT.md`, `/workspace/uat-e10-section7-overall-dc7ee92/stamp.json`, `/workspace/uat-e10-doubleadd-dc7ee92/RESULT.md`, `/workspace/uat-e10-doubleadd-dc7ee92/stamp.json`, `/workspace/uat-e10-doubleadd-dc7ee92/tobias-stamp.json`, `/workspace/uat-e10-doubleadd-dc7ee92/doubleadd.json`, `/workspace/dogfood-e10-dc7ee92/READY.md`. Prior Fail evidence: `/workspace/uat-e10-section7-e5a8fdd/`.
 - Steps 1–6 remain the dest-container-type stamp on `008baf2` (Pass). They are not this packet.
 - Blank dest **sample** type always means **Same as parent.** Blank dest **container** type always means **Same as source.**
@@ -305,5 +305,5 @@ Evidence:
 
 ### 2026-09-20 · E-12/E-14 §8–9 Pass · `feat/e12-e14-dest-type-transitions` @ `c4c899d`
 
-**Result: Pass** (Tobias QA, 2026-09-20 11:23 ET). Dogfood Ready=Yes. **Rolf Confirm** — E-12 / E-14 **Met**. Marc owns merge. §§1–7 not restamped (`008baf2` / `dc7ee92`). Anton `0068` seeds; Blood received when needed. Evidence: `/workspace/uat-e12-e14-c4c899d/{RESULT.md,tobias-stamp.json,acs.md,dogfood/READY.md}`. Not IC50.
+**Result: Pass** (Tobias QA, 2026-09-20 11:23 ET). Dogfood Ready=Yes. **Rolf Confirm** — E-12 / E-14 **Met**. Product on `main` @ `811e966` (PR **131**). §§1–7 not restamped (`008baf2` / `dc7ee92`). Anton `0068` seeds; Blood received when needed. Evidence: `/workspace/uat-e12-e14-c4c899d/{RESULT.md,tobias-stamp.json,acs.md,dogfood/READY.md}`. Not IC50.
 

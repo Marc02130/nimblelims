@@ -1,7 +1,7 @@
 # Temporary issues — Experiments & entries
 
 **Parent:** [ISSUES.md](ISSUES.md)  
-**Status:** Synced 2026-09-20 (E-10 Met; E-12/E-14 Met on `c4c899d`; next E-7/E-6)  
+**Status:** Synced 2026-09-20 (E-10 Met; E-12/E-14 Met on `main` PR **131**; next E-7/E-6)  
 **Includes:** aliquot/pool + extract-hold (largest complexity knot)  
 **Kick-back log:** [../../../decision-logs/extract-hold-dual-map-kickback.md](../../../decision-logs/extract-hold-dual-map-kickback.md)
 
@@ -32,9 +32,9 @@
 | E-9 | **Dual-map kick-back:** dest vol/amount/conc as entry FDs vs Sample/Contents update timing | **Decided** 2026-09-10 ([decision log](../../../decision-logs/extract-hold-dual-map-kickback.md)): plan = working qty; dest init = mint + inventory one txn; dest container type required; attach immediately = entry columns only; type gate on experiment/LimsRun. | Implement against that log. Dest container type is on the plan (entry default + line override). Do not recode dest-follow |
 | E-10 | **Atomic pair** locked (one add → plan + dest entries) but UI still offers separate presets | Operators create half-pairs | **Met** on `main` (PR **129**, `e56a89f`): `WRAPPER_CATALOG` `aliquot_pool` (cardinality **1**); one **+ Aliquot/pool**; mate complete; delete both; API **409** `wrapper_at_capacity`. UAT §7 **Pass** (Tobias QA, 2026-09-14 22:28 ET, `dc7ee92`; 7.1–7.8 Pass on `e5a8fdd` + Deiter double-Add Pass on `dc7ee92`). Prior Fail on `e5a8fdd` is history. **Hold merge lifted**. n-pairs parked in [ideas/aliquot-pool-multiple-pairs.md](../../ideas/aliquot-pool-multiple-pairs.md) |
 | E-11 | METHOD_CATALOG / `METHOD_PROFILES` plan inputs shipped; **dest FieldDefinitions attach** lag | Qty story incomplete | After E-9 |
-| E-12 | Template authoring: method often present; **default dest type** weak/missing | Dest type only at runtime | **Met** on `feat/e12-e14-dest-type-transitions` (`c4c899d`): template **Default dest sample type** (Same as parent. + catalog dests). UAT §8 **Pass** (Tobias QA, 2026-09-20 11:23 ET); **Rolf Confirm**. Marc owns merge. |
+| E-12 | Template authoring: method often present; **default dest type** weak/missing | Dest type only at runtime | **Met** on `main` (PR **131**, `811e966`): template **Default dest sample type** (Same as parent. + catalog dests). UAT §8 **Pass** (Tobias QA, 2026-09-20 11:23 ET, `c4c899d`); **Rolf Confirm**. |
 | E-13 | Mid-flight method change = cancel experiment (no warn/wipe) — UX may still allow edit attempts | 409 surprise | Lock controls after lines exist |
-| E-14 | S3 transition catalog: read API + seeds; **mutate API + admin UI** lag | Can’t configure without DB | **Met** on `feat/e12-e14-dest-type-transitions` (`c4c899d`): `GET/POST/PATCH/DELETE /v1/sample-type-transitions`; mutate **config:edit**; Admin **Dest-type transitions**. UAT §9 **Pass** (Tobias QA, 2026-09-20 11:23 ET); **Rolf Confirm**. Marc owns merge. |
+| E-14 | S3 transition catalog: read API + seeds; **mutate API + admin UI** lag | Can’t configure without DB | **Met** on `main` (PR **131**, `811e966`): `GET/POST/PATCH/DELETE /v1/sample-type-transitions`; mutate **config:edit**; Admin **Dest-type transitions**. UAT §9 **Pass** (Tobias QA, 2026-09-20 11:23 ET, `c4c899d`); **Rolf Confirm**. |
 | E-15 | Matrix still copies parent on mint (intentional); eligibility keys off `sample_type` — easy to miss | Wrong assay on “blood-looking” DNA | C2 messaging + UAT |
 | E-16 | Normalization requires prior Result conc — not free type-in; failure modes opaque | Bench friction | Clear errors + which analyte |
 
@@ -50,8 +50,8 @@
 
 1. **E-9** restamp — **Decided**; dest container type shipped  
 2. **E-10** atomic pair — **Met** on `main` (PR **129**, `e56a89f`); UAT §7 **Pass** on `dc7ee92` (7.1–7.8 + **7.9 / 7.9b** uniqueness); **Hold merge lifted**; prior Fail on `e5a8fdd` is history.  
-3. **E-14 + E-12** — **Met** on `c4c899d` (UAT §§8–9 Pass; Rolf Confirm; Marc owns merge)  
-4. **E-7 + E-6** (gates + intake status) — **next** after merge  
+3. **E-14 + E-12** — **Met** on `main` (PR **131**, `811e966`); UAT §§8–9 Pass on `c4c899d`; **Rolf Confirm**  
+4. **E-7 + E-6** (gates + intake status) — **next**  
 5. Docs **E-17–E-19**  
 
 **Product north star:** framework-first DB config, then AI config from SOPs (human-editable). AI for login / reporting / storage waits until sample processing closes — see parent [ISSUES.md](ISSUES.md).

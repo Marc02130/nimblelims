@@ -1,6 +1,6 @@
 # Temporary issues — Sample processing (index)
 
-**Status:** Synced 2026-09-20 (E-10 Met; E-12/E-14 Met @ `c4c899d`; Leadership Core)  
+**Status:** Synced 2026-09-20 (E-10 Met; E-12/E-14 Met on `main` PR **131**; Leadership Core)  
 **PRD:** [PRD.md](PRD.md) · [Spec](../../specs/sample-processing/SPEC.md)  
 **Stamps:** [../../../decision-logs/framework-stamps-2026-08-26.md](../../../decision-logs/framework-stamps-2026-08-26.md) · [../../../decision-logs/product-north-star-2026-09-20.md](../../../decision-logs/product-north-star-2026-09-20.md)  
 **Team notes:** [../../../discussions/2026-08-26-issues-sync-leadership-ba-dev.md](../../../discussions/2026-08-26-issues-sync-leadership-ba-dev.md)
@@ -47,7 +47,7 @@ Execute stack **exists**. Missing middle = **order → routing map → work_orde
 |------|---------|
 | **Leadership** | North star locked (framework → AI config). Sample processing first. Tobias honesty-check uniqueness **7.9 / 7.9b** (not a merge). |
 | **BA** | Fold goals into living PRD / OQ; keep ISSUES priority current (E-10 Met → E-12/E-14 Met → E-6/E-7) |
-| **QA** | Living UAT §7 Pass on `dc7ee92` with E-10 Met; Tobias re-check 7.9 / 7.9b honesty only |
+| **QA** | Living UAT §7 Pass on `dc7ee92` (E-10 Met); §§8–9 Pass on `c4c899d` (E-12/E-14 Met on `main` PR **131**). Tobias honesty-check 7.9 / 7.9b (not a merge). |
 
 ---
 
@@ -67,10 +67,10 @@ Execute stack **exists**. Missing middle = **order → routing map → work_orde
 
 1. **E-9** dual-map — **Decided** (dest container type shipped)  
 2. **E-10** atomic pair — **Met** on `main` (PR **129**, `e56a89f`); UAT §7 **Pass** on `dc7ee92` (incl. 7.9 / 7.9b uniqueness); **Hold merge lifted**. Tobias honesty-check 7.9 / 7.9b (not a merge).  
-3. **E-14 + E-12** — **Met** on `feat/e12-e14-dest-type-transitions` @ `c4c899d` (UAT §§8–9 Pass; Rolf Confirm; Marc owns merge)  
-4. **E-7 + E-6** — type gate layer + intake Available for Testing — **next** after merge  
+3. **E-14 + E-12** — **Met** on `main` (PR **131**, `811e966`); UAT §§8–9 **Pass** on `c4c899d`; **Rolf Confirm**  
+4. **E-7 + E-6** — type gate layer + intake Available for Testing — **next**  
 5. **X-5** — `post-receive-work-spine` (asked-for / work_order)  
 6. **LimsRuns R-18 / R-11** — manual LimsRun clarity + Qubit testdata  
 7. Processes P-4 / P-1 — truth + naming  
 
-Do **not** open AI config packets for login / reporting / storage until sample processing is closed. Do **not** prioritize full WO schema ahead of E-14/E-12.
+Do **not** open AI config packets for login / reporting / storage until sample processing is closed. Do **not** prioritize full WO schema ahead of E-7/E-6.
