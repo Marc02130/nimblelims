@@ -52,6 +52,6 @@
 2. **E-10** atomic pair — **Met** on `main` (PR **129**, `e56a89f`); UAT §7 **Pass** on `dc7ee92` (7.1–7.8 + **7.9 / 7.9b** uniqueness); **Hold merge lifted**; prior Fail on `e5a8fdd` is history.  
 3. **E-14 + E-12** — **Met** on `main` (PR **131**, `811e966`); UAT §§8–9 Pass on `c4c899d`; **Rolf Confirm**  
 4. **E-7** type gate — **Met** on `main` (PR **132**, `e59a045`). **E-6** intake Available for Testing — **Met** (Tobias Pass + Rolf Confirm, product `a73a51c` / tip `7bd4f84`; Marc owns merge). Critical path E-10/E-12/E-14/E-7/E-6 looks closed pending E-6 merge.  
-5. Docs **E-17–E-19**
+5. Docs **E-17–E-19**  
 
 **Product north star:** framework-first DB config, then AI config from SOPs (human-editable). AI for login / reporting / storage waits until sample processing closes — see parent [ISSUES.md](ISSUES.md).
