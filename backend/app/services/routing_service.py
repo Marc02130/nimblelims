@@ -29,25 +29,22 @@ def _type_error(message: str) -> HTTPException:
     )
 
 
-def assert_instance_step_accepts_current_type(
+def instance_step_accepted_types(
     db: Session,
     process,
     instance_step,
-    extra_sample_ids: Optional[Sequence[UUID]] = None,
-) -> None:
-    """Gate a process-step start against that step's accepted types.
+) -> Optional[List[UUID]]:
+    """Allow-list for this instance step, or None if the start is ungated.
 
-    Work-order instances fail closed on an empty allow-list. Free-form
-    processes without accepted types stay ungated.
+    Work-order instances fail closed (empty list). Free-form processes
+    without a definition, matching step, or accepted types stay ungated.
     """
-    from models.entry import ELNProcessSample
-
     def_id = getattr(process, "process_definition_id", None)
     wo_linked = getattr(process, "work_order_id", None)
     if not def_id:
         if wo_linked:
             raise _type_error("Process instance has no definition to type-gate")
-        return
+        return None
     def_step = (
         db.query(ELNProcessDefinitionStep)
         .filter(
@@ -59,7 +56,7 @@ def assert_instance_step_accepts_current_type(
     if not def_step:
         if wo_linked:
             raise _type_error("Process step has no matching definition step")
-        return
+        return None
     types = [
         r.sample_type_id
         for r in db.query(StepAcceptedSampleType).filter(
@@ -68,10 +65,49 @@ def assert_instance_step_accepts_current_type(
     ]
     if not types:
         if wo_linked:
-            raise _type_error(
-                "Step has no accepted sample types; empty allow-list fails closed"
-            )
+            return []
+        return None
+    return types
+
+
+def sample_type_not_accepted_reason(
+    db: Session,
+    process,
+    instance_step,
+    sample: Sample,
+) -> Optional[str]:
+    """None if allowed or ungated; lab-readable reason if this start should refuse."""
+    types = instance_step_accepted_types(db, process, instance_step)
+    if types is None:
+        return None
+    if not types:
+        return "Step has no accepted sample types; empty allow-list fails closed"
+    if sample.sample_type not in types:
+        return "Sample type is not accepted on this process step"
+    return None
+
+
+def assert_instance_step_accepts_current_type(
+    db: Session,
+    process,
+    instance_step,
+    extra_sample_ids: Optional[Sequence[UUID]] = None,
+) -> None:
+    """Gate a process-step start against that step's accepted types.
+
+    Work-order instances fail closed on an empty allow-list. Free-form
+    processes without accepted types stay ungated. Same gate is used at
+    experiment start and LimsRun start (E-7) — not on entries.
+    """
+    from models.entry import ELNProcessSample
+
+    types = instance_step_accepted_types(db, process, instance_step)
+    if types is None:
         return
+    if not types:
+        raise _type_error(
+            "Step has no accepted sample types; empty allow-list fails closed"
+        )
     sample_ids = set()
     for assignment in (
         db.query(ELNProcessSample)

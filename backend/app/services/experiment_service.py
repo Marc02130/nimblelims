@@ -31,6 +31,7 @@ from models.sample import Sample
 from models.user import User
 from models.list import List as ListModel, ListEntry
 from models.entry import (
+    ELNProcess,
     ELNProcessStep,
     ELNProcessSample,
     ensure_aliquot_pair_in_entries,
@@ -42,9 +43,45 @@ from models.wrappers import wrapper_at_capacity_detail
 AVAILABLE_FOR_TESTING_STATUS_NAME = "Available for Testing"
 
 
+ACCEPTED_TYPES_NOT_ON_TEMPLATE = "accepted_sample_types_not_on_template"
+
+
+def _reject_template_accepted_sample_types(
+    template_definition: Optional[Dict[str, Any]],
+) -> None:
+    """E-7: inbound types live on the process-definition step, not the template."""
+    if not template_definition:
+        return
+    if template_definition.get("accepted_sample_types") is not None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={
+                "code": ACCEPTED_TYPES_NOT_ON_TEMPLATE,
+                "message": (
+                    "accepted_sample_types does not belong on the experiment "
+                    "template. Set inbound types on the process-definition step."
+                ),
+            },
+        )
+    for entry in template_definition.get("entries") or []:
+        config = entry.get("config") if isinstance(entry, dict) else None
+        if isinstance(config, dict) and config.get("accepted_sample_types") is not None:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail={
+                    "code": ACCEPTED_TYPES_NOT_ON_TEMPLATE,
+                    "message": (
+                        "accepted_sample_types does not belong on an entry. "
+                        "Set inbound types on the process-definition step."
+                    ),
+                },
+            )
+
+
 def _with_aliquot_pair(template_definition: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
     if not template_definition:
         return template_definition
+    _reject_template_accepted_sample_types(template_definition)
     td = dict(template_definition)
     entries = ensure_aliquot_pair_in_entries(td.get("entries") or [])
     over = reject_if_wrapper_over_capacity(entries)
@@ -207,6 +244,14 @@ class ExperimentService:
             )
         )
         rows = q.order_by(ELNProcessSample.assigned_at).all()
+        process = (
+            self.db.query(ELNProcess).filter(ELNProcess.id == process_id).first()
+        )
+        step = (
+            self.db.query(ELNProcessStep).filter(ELNProcessStep.id == step_id).first()
+            if step_id is not None
+            else None
+        )
         out: List[Dict[str, Any]] = []
         for ps, sample in rows:
             ok, reason = self.check_sample_eligibility(sample, process_id=process_id)
@@ -226,6 +271,17 @@ class ExperimentService:
                 if ps.status in ("queued", "assigned"):
                     ok = False
                     reason = "Sample is queued for a different process step"
+            if ok and process is not None and step is not None:
+                from app.services.routing_service import (
+                    sample_type_not_accepted_reason,
+                )
+
+                type_reason = sample_type_not_accepted_reason(
+                    self.db, process, step, sample
+                )
+                if type_reason:
+                    ok = False
+                    reason = type_reason
             out.append({
                 "sample_id": sample.id,
                 "client_sample_id": sample.client_sample_id,
@@ -634,6 +690,23 @@ class ExperimentService:
 
         process_step = self._process_step_for_experiment(experiment_id)
         process_id = process_step.process_id if process_step else None
+        if process_step is not None:
+            process = (
+                self.db.query(ELNProcess)
+                .filter(ELNProcess.id == process_step.process_id)
+                .first()
+            )
+            if process is not None:
+                from app.services.routing_service import (
+                    assert_instance_step_accepts_current_type,
+                )
+
+                assert_instance_step_accepts_current_type(
+                    self.db,
+                    process,
+                    process_step,
+                    extra_sample_ids=sample_ids,
+                )
 
         from app.services.sample_access import require_accessible_sample
 

@@ -105,7 +105,7 @@ Journey: `GET /v1/samples/{id}/journey` (sample-scoped). Process membership for 
 | `aliquot_pool_plan` | experiment_data | Plan + execute |
 | `aliquots_pools` | experiment_sample_data | Post-execute daughters |
 
-Sample-type **gate** for start belongs on **experiment / LimsRun** (product stamp) — not an entry `accepted_sample_types` field as the primary gate.
+Sample-type **gate** for start belongs on the **process-definition step** (`eln_process_definition_step_accepted_sample_types`) at **experiment start** and **LimsRun start** (E-7 / product stamp). Not an entry field. Not on ExperimentTemplate. Standalone (no process) start is not gated by this table.
 
 ## 5. Aliquot / pool plan-execute
 

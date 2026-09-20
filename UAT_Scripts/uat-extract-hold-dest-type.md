@@ -160,8 +160,24 @@ Living honesty: numbered **7.1–7.8 Pass** on `e5a8fdd` (not rescored) **plus**
 | 9.4 | Lab tech without config:edit POST. | **403**. | **Pass** (alice-tech) |
 | 9.5 | Deactivate a row. | Row inactive. Execute dest picker no longer offers it (Same as parent. remains). | **Pass** (DELETE 204) |
 
+## 10. Type gate on experiment / LimsRun start (E-7)
+
+**Result: Pass** (Tobias QA) · 2026-09-20 13:58 ET · SHA `4b3609a87dfe3406ec72369bdd90004745dc5e60` (`4b3609a`) · `feat/e7-type-gate-experiment-limsrun` · **Dogfood Ready=Yes** · **Rolf Confirm** · **E-7 Met**. Do **not** restamp §§1–9. SoT is `eln_process_definition_step_accepted_sample_types`. Not on the template. Not on an entry. Standalone (no process) start is not gated by this table. Evidence (cite; do not commit): `/workspace/uat-e7-section10-4b3609a/{RESULT.md,tobias-stamp.json,acs.md,dogfood/READY.md}`.
+
+| Step | Action | Expected result | Result |
+|------|--------|-----------------|--------|
+| 10.1 | Process definition → experiment step. Set accepted types to DNA only. Instantiate. Start the experiment step (empty cohort). Assign a Blood sample. Start the experiment with that Blood. | **422** `route_sample_type`. Sample is not deleted. | **Pass** (live API; Blood still exists) |
+| 10.2 | Remove Blood. Assign DNA. Start the experiment with DNA. | Start succeeds. Cohort locks DNA. | **Pass** (live API; `cohort_locked` + DNA in executions) |
+| 10.3 | LimsRun step (e.g. Qubit). Accepted types DNA only. Instantiate and start the step. PATCH run start with Blood. | **422** `route_sample_type`. | **Pass** (live API) |
+| 10.4 | Ad hoc experiment (no process). Start with Blood. | Start succeeds. This table does not gate standalone experiments. | **Pass** (live API) |
+| 10.5 | Experiment Templates. Confirm there is no accepted-types control. POST a template with `template_definition.accepted_sample_types`. | **422** `accepted_sample_types_not_on_template`. | **Pass** (FE + API) |
+| 10.6 | Eligible-samples for the DNA-only experiment step with Blood and DNA assigned. | Blood `eligible: false` with type reason. DNA eligible. Dual-list cannot pick Blood. | **Pass** (live API) |
+
+**Fail:** start silently accepts the wrong type; gate lives on the template or an entry; ad hoc start 422s from this table; Blood is deleted on 422.
+
 ## Pass criteria
 
+- **This packet (E-7):** Steps **10.1–10.6**. Formal **§10 Result: Pass** (Tobias QA, 2026-09-20 13:58 ET, `4b3609a`). **Rolf Confirm** — E-7 **Met**. Dogfood Ready=Yes. Mathilda/Katinka: gate at **Start** only. Evidence: `/workspace/uat-e7-section10-4b3609a/`. Marc owns merge. Do **not** restamp §§1–9.
 - **This packet (E-12/E-14):** Steps **8.1–8.3** and **9.1–9.5**. Formal **§§8–9 Result: Pass** (Tobias QA, 2026-09-20 11:23 ET, `c4c899d`). **Rolf Confirm** — E-12 / E-14 **Met**. Product on `main` @ `811e966` (PR **131**). Dogfood Ready=Yes. Evidence: `/workspace/uat-e12-e14-c4c899d/`. Do **not** restamp §§1–7.
 - **This packet (E-10):** Steps **7.1–7.9b**. Formal **§7 Result: Pass** (Tobias QA, 2026-09-14 22:28 ET, `dc7ee92`). Packet **7.1–7.8 Pass** on `e5a8fdd` (not rescored). Deiter EXTRA **double-Add Pass** on `dc7ee92` (sequential **409** / concurrent **201 + 409** → **1 plan + 1 dest**). **Lab Ops: Deiter Met** on double-Add 2026-09-14. **7.9 / 7.9b Pass** from uniqueness restamp honesty. Prior overall **Fail** on `e5a8fdd` is **history**. **Rolf Confirm: Hold merge lifted** — E-10 **Met**; product on `main` @ `e56a89f` (PR **129**). **Tobias dogfood Ready=Yes** on `dc7ee92`. Ready=Yes on `e5a8fdd` and Ready=No on **`9312c54`** stay history. Do **not** restamp §6. Evidence: `/workspace/uat-e10-section7-overall-dc7ee92/RESULT.md`, `/workspace/uat-e10-section7-overall-dc7ee92/stamp.json`, `/workspace/uat-e10-doubleadd-dc7ee92/RESULT.md`, `/workspace/uat-e10-doubleadd-dc7ee92/stamp.json`, `/workspace/uat-e10-doubleadd-dc7ee92/tobias-stamp.json`, `/workspace/uat-e10-doubleadd-dc7ee92/doubleadd.json`, `/workspace/dogfood-e10-dc7ee92/READY.md`. Prior Fail evidence: `/workspace/uat-e10-section7-e5a8fdd/`.
 - Steps 1–6 remain the dest-container-type stamp on `008baf2` (Pass). They are not this packet.
@@ -184,7 +200,7 @@ Living honesty: numbered **7.1–7.8 Pass** on `e5a8fdd` (not rescored) **plus**
 
 - **6.1 Pass (browser)** — 2026-09-10 21:59 ET. Method, Default dest sample type, and Default dest container type are three separate controls. Dest container dropdown lists **Same as source.** plus 1×1 vessels; **no** 96-well / plates. Did not re-score 6.2–6.8. FE unit (`isSinglePositionType`; `AliquotPlanEditor.test.tsx` 4/4) is supporting only and is **not** the UI stamp.
 - **6.2–6.8 Pass (live API)** — 2026-09-10 21:53 ET. Same as source; entry default different 1×1; line Same as source overrides entry; line specific 1×1; template default survives experiment create; missing → 422 `dest_container_type_required`; plate → 422 `dest_container_type_not_1x1`.
-- **Sections 1–5 smoke: Pass** — methods, DNA dest execute, catalog refuse, mixed pool, method lock, free-text conc refuse, no execute-time dest-container prompt. Smoke only. It does **not** sign **1.7 / AC-P2-C3**, and it does not touch **AC-P2-C2**. Both stay **unsigned until Tobias**.
+- **Sections 1–5 smoke: Pass** — 2026-09-10 21:53 ET. Methods, DNA dest execute, catalog refuse, mixed pool, method lock, free-text conc refuse, no execute-time dest-container prompt. Smoke only. It does **not** sign **1.7 / AC-P2-C3**, and it does not touch **AC-P2-C2**. Both stay **unsigned until Tobias**.
 
 **Locks held:** dest container type is a **plan** control; dest init does **not** prompt; **1×1 only**; Method ≠ dest sample type ≠ dest container type.
 
@@ -243,7 +259,7 @@ Verbatim Tobias READY.md (`/workspace/dogfood-e10-e5a8fdd/READY.md`; artifacts `
 
 **Clean FE build:** Yes — `docker build --no-cache` frontend from this SHA; CRA Compiled successfully; no local patch; working tree clean.
 
-**Ready for UAT section 7?** Yes — clean FE Docker/CRA build green on tip `e5a8fdd`, and dogfood paths 1–5 Pass (single **+ Aliquot/pool** preset, pair create, delete-plan and delete-dest both clear both halves, template→experiment instantiate with dest `minted_sample_ids: []` / `populated_after_execute: false`, ad hoc pair). Not formal §7. Do **not** invent Pass from §6 / 008baf2. Not IC50.
+**Ready for UAT section 7?** Yes — clean FE Docker/CRA build green on tip `e5a8fdd`, and dogfood paths 1–5 Pass (single **+ Aliquot/pool** preset, pair create, delete-plan and delete-dest both clear both halves, template→experiment instantiate with dest `minted_sample_ids: []` / `populated_after_execute: false`, ad hoc pair). Not formal §7. Do **not** invent Pass from §6 / `008baf2`. Not IC50.
 
 Artifacts: `/workspace/dogfood-e10-e5a8fdd/`
 ```
@@ -299,11 +315,10 @@ Evidence:
 - `/workspace/uat-e10-doubleadd-dc7ee92/doubleadd.json`
 - `/workspace/dogfood-e10-dc7ee92/READY.md`
 
-### 2026-09-14 · Rolf Confirm: Hold merge lifted · E-10 Met · `main` `e56a89f` (PR 129)
-
-**Rolf Confirm:** Hold merge **lifted**. E-10 **Met**. Product already on `main` at `e56a89fe01656b416cfcae885b6ade605e8cf38e` (PR **129**). Fold overall §7 **Pass** honesty onto `main`. Do **not** teach Hold merge as current. Not IC50.
-
 ### 2026-09-20 · E-12/E-14 §8–9 Pass · `feat/e12-e14-dest-type-transitions` @ `c4c899d`
 
 **Result: Pass** (Tobias QA, 2026-09-20 11:23 ET). Dogfood Ready=Yes. **Rolf Confirm** — E-12 / E-14 **Met**. Product on `main` @ `811e966` (PR **131**). §§1–7 not restamped (`008baf2` / `dc7ee92`). Anton `0068` seeds; Blood received when needed. Evidence: `/workspace/uat-e12-e14-c4c899d/{RESULT.md,tobias-stamp.json,acs.md,dogfood/READY.md}`. Not IC50.
 
+### 2026-09-20 · E-7 §10 Pass · `feat/e7-type-gate-experiment-limsrun` @ `4b3609a`
+
+**Result: Pass** (Tobias QA, 2026-09-20 13:58 ET). Dogfood Ready=Yes. **Rolf Confirm** — E-7 **Met**. Marc owns merge. §§1–9 not restamped. Gate at experiment/LimsRun **Start** only (**422** `route_sample_type`). Evidence: `/workspace/uat-e7-section10-4b3609a/{RESULT.md,tobias-stamp.json,acs.md,dogfood/READY.md`. Next: **E-6**. Not IC50.

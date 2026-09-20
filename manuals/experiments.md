@@ -138,8 +138,9 @@ When adding samples to an experiment:
 
 1. **`Sample.status` = Available for Testing** (list `sample_status`).  
 2. **If the experiment is under a process:** sample must be on that process (`eln_process_samples`, not `removed`).  
-3. Selection is **explicit** (never auto-start entire process).  
-4. After start, cohort is **locked**.
+3. **If the experiment is a process step:** current sample type must be on that step’s accepted list (`eln_process_definition_step_accepted_sample_types`). Mismatch → **422** `route_sample_type`. Standalone experiments are not gated by this table. Inbound types are **not** on the experiment template or an entry.  
+4. Selection is **explicit** (never auto-start entire process).  
+5. After start, cohort is **locked**.
 
 Scan/resolve of a sample that fails these gates must **not** enter the selected cohort (clear error).
 
