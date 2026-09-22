@@ -12,7 +12,7 @@
 
 ## 1. Purpose
 
-Enable lab admins (with elevated schema permission) to **CREATE TABLE** and **ADD COLUMN** through the product UI such that the result is **real PostgreSQL objects** (typed columns, indexes, FKs as locked), **tenant-safe**, **migratable**, and **reversible** — the robust config layer AI config (north star goal 2) needs on top of framework/DB config (goal 1).
+Enable lab admins (with elevated schema permission) to **CREATE TABLE** and **ADD COLUMN** through the product UI such that the result is **real PostgreSQL objects** (typed columns, indexes, FKs as locked), **tenant-safe**, **migratable**, and **reversible**, with a **role-based layout** registry for on-screen presentation — the robust config layer AI config (north star goal 2) needs on top of framework/DB config (goal 1).
 
 This packet is the **AI-config foundation**, not AI itself. It does **not** open AI for login / reporting / storage (those stay parked except where this schema-config is the explicit blocker — see [`ai-config-breadth.md`](../open-questions/ai-config-breadth.md)).
 
@@ -27,6 +27,7 @@ This packet is the **AI-config foundation**, not AI itself. It does **not** open
 | No product code until sketch + Leadership / Heidi Accept | Rolf 2026-09-22 |
 | Unpark AI breadth **only** where this schema-config is the blocker | Rolf 2026-09-22 |
 | **OQ-1 Decided:** catalog minimum = **table registry** + **column registry** (not lab data); physical CREATE/ALTER still real Postgres; `information_schema` alone insufficient; indexes/FKs wait | Marc + **Rolf Confirm** 2026-09-22 |
+| **OQ-2 Decided:** **role-based layout registry** (role × screen × visible columns/sections) — separate from table/column catalogs; schema ≠ layout | Marc + **Rolf Confirm** 2026-09-22 |
 | Not IC50 | Standing |
 
 ## 3. Goals
@@ -56,6 +57,7 @@ This packet is the **AI-config foundation**, not AI itself. It does **not** open
 |----|-----------|
 | AC0 | **Catalog minimum:** product ships (or migrates in) a **table registry** and a **column registry**. UI editing of schema goes through these registries; they store configurable metadata (`information_schema` alone is not enough). |
 | AC0b | Applying create/add updates **both** the physical Postgres object **and** the corresponding registry row(s) in one controlled operation (Heidi locks transaction/apply model). |
+| AC0c | **Layout registry:** product ships a **role-based layout** catalog (role × screen × visible columns/sections). Runtime screens honor layout for the signed-in role; missing layout falls back per Mathilda lock. Layout edits do **not** CREATE/ALTER physical columns by themselves. |
 | AC1 | **ADD COLUMN** via UI on an allow-listed core table creates a real Postgres column of a supported type (text, number/numeric, date/timestamptz, boolean, list/FK-to-`list_entries` as locked) **plus** a column-registry row. |
 | AC2 | **CREATE TABLE** via UI creates a real Postgres table (not a JSONB document store) **plus** a table-registry row. Required platform columns / constraints per Heidi lock. |
 | AC3 | **Not JSONB-as-schema:** UI must not satisfy AC1/AC2 by writing only into `custom_attributes` or equivalent JSONB bags. |
@@ -65,16 +67,17 @@ This packet is the **AI-config foundation**, not AI itself. It does **not** open
 | AC7 | **Permission:** schema mutate uses an elevated permission (not general `config:edit` alone unless Leadership re-locks). Günter stamps. |
 | AC8 | **Audit:** who/when/what (and before/after definition) recorded for every schema mutate. |
 | AC9 | **Allow-list:** which base tables may receive columns, and whether CREATE TABLE is unrestricted within tenant namespace, is Heidi-locked before implement. |
-| AC10 | **UX:** Mathilda Accept — lab-admin flow; bounce DBA-only chrome as default path. |
-| AC11 | **AI-ready metadata:** AI (later) reads the **table + column registries** (and allow-listed system descriptors) — not `information_schema` alone. No AI apply in this packet. Indexes/FKs not required in P1 catalog. |
+| AC10 | **UX:** Mathilda Accept — lab-admin schema + **layout** admin (role × screen); bounce DBA-only chrome as default path. Layout is the UX centerpiece, not a column-registry footnote. |
+| AC11 | **AI-ready metadata:** AI (later) reads **table + column + layout** registries (and allow-listed system descriptors) — not `information_schema` alone. No AI apply in this packet. Indexes/FKs not required in P1 catalog. |
 
 ## 6. Path exercised (happy)
 
 1. Lab admin opens Schema / Fields admin (Mathilda name) backed by **table + column registries**.  
 2. **Add column** on Samples: list-backed or scalar → preview impact → apply → real column **and** column-registry row; visible in forms/search as locked.  
 3. **Create table** for a lab-specific entity (Heidi names the first allowed pattern) → real table **and** table-registry row → basic CRUD scaffold per lock (may be minimal in P1).  
-4. Attempt cross-tenant read → denied.  
-5. Deprecate column → hidden from default UI; data retained until controlled remove.
+4. Admin sets **layout** for Lab tech vs Admin on a screen → same schema, different visible fields/sections.  
+5. Attempt cross-tenant read → denied.  
+6. Deprecate column → layout rows updated/hidden per policy; data retained until controlled remove.
 
 ## 7. Open questions
 
