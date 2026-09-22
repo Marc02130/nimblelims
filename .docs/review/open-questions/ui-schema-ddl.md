@@ -1,52 +1,59 @@
 # Open questions: UI-driven schema DDL (real Postgres)
 
 **Date:** 2026-09-22  
-**Status:** **Open** (OQ-1 + OQ-2 **Decided**) — packet `ui-schema-ddl`  
+**Status:** **Open** (OQ-1 / OQ-2 / OQ-3 **Decided**) — packet `ui-schema-ddl`  
 **Requirements:** [`.docs/review/requirements/ui-schema-ddl.md`](../requirements/ui-schema-ddl.md)  
-**Leadership:** Core pivot 2026-09-22 — CREATE TABLE / ADD COLUMN via UI as real Postgres; tenant-safe, migratable, reversible; role-based layout registry.  
-**Owners:** Heidi (architecture), Mathilda (UX / layout), Günter (authZ), Wilhelmina (docs).  
+**Leadership:** Core pivot 2026-09-22 — CREATE TABLE / ADD COLUMN via UI as real Postgres; tenant-safe, migratable, reversible; role-based layout; role-based table/column access.  
+**Owners:** Heidi (architecture), Mathilda (UX / layout), Günter (authZ), Tobias (UAT Fail bars), Wilhelmina (docs), Katinka (SOP field-name hints).  
 **Not IC50. No product code until sketch + Accept.**
 
 ## Context
 
-Sample-processing critical path is Met on `main`. AI config needs a **robust configuration layer**. Leadership locked: admins add **tables and columns through the UI as real database objects**, not JSONB keys dressed as schema — plus a **role-based layout** layer for what appears on screen.
-
-Prior June `schema-evolution` explicitly deferred add-table. That deferral is **sequencing-superseded** for this foundation packet; historical CEO notes stay on disk.
+Sample-processing critical path is Met on `main`. AI config needs a **robust configuration layer**. Leadership locked: admins add **tables and columns through the UI as real database objects**, not JSONB — plus **layout** (what UI shows) and **access** (what API allows), which are **not** the same.
 
 ## Decided
 
 | ID | Decision | Stamp | Date |
 |----|----------|-------|------|
-| **OQ-1** | **Catalog minimum = two registry tables:** (1) **table registry** — which real relations the UI may create/edit; (2) **column registry** — name, type, nullability, order, display defaults (and tenant rules / AI hints as locked). These catalogs **describe** configurable real Postgres objects; they are **not** the lab data rows. **`information_schema` alone is not enough**. Physical **CREATE TABLE / ALTER TABLE … ADD COLUMN** still hits real DB objects. **Indexes / FKs can wait**. Heidi Architecture Accept still required before implement. | Marc + **Rolf Confirm** (Core 2026-09-22) | 2026-09-22 |
-| **OQ-2** | **Role-based layout registry** (third catalog, separate from table/column): defines **what is shown on screen** — **role × screen × visible columns/sections** (placement/order as Mathilda locks). **Schema = what exists; layout = who sees what and where.** Do **not** bury layout rules only inside the column registry. Mathilda owns the UX centerpiece. Indexes/FKs still wait. Heidi Accept before implement. | Marc + **Rolf Confirm** (Core 2026-09-22) | 2026-09-22 |
+| **OQ-1** | **Catalog minimum = two schema registries:** (1) **table registry**; (2) **column registry** (name, type, nullability, order, display defaults, tenant rules, **AI/SOP field-name hints**). Catalogs **describe** configurable real Postgres objects; they are **not** lab data. **`information_schema` alone is not enough**. Physical **CREATE / ALTER … ADD COLUMN** still hits real DB. **Indexes / FKs wait**. Heidi Accept before implement. | Marc + **Rolf Confirm** | 2026-09-22 |
+| **OQ-2** | **Role-based layout registry** (separate): **role × screen × visible columns/sections**. Schema = what exists; layout = who **sees** what where. Do not bury layout only in the column registry. Mathilda centerpiece. | Marc + **Rolf Confirm** | 2026-09-22 |
+| **OQ-3** | **Role-based access** to tables and columns — **not** the same as layout. Access = what the **API allows** (at least **read vs write** per role on table and column; **schema-admin** privilege separate). A field may be layout-hidden yet still write-forbidden; or visible but **read-only**. Tobias: Fail bars for **privilege refuse** vs **layout hide**. Günter + Heidi on Accept path. | Marc + **Rolf Confirm** | 2026-09-22 |
+
+### OQ-1 AI hints (Katinka)
+
+Keep **public SOP field names** on the column registry (e.g. barcode vs sample ID, vessel vs material, parent link, matrix/type) so AI can map SOPs later. **No house SOP text in git.** Layout (OQ-2) should separate bench tech vs review roles the way public methods already do.
 
 ## Blocking questions (still open)
 
 | ID | Question | Options / notes | Owner |
 |----|----------|-----------------|-------|
-| OQ-3 | **Apply model:** controlled runtime DDL vs generated Alembic vs hybrid (propose → approve → apply)? | Upgrade-safe, auditable trail. | Heidi |
-| OQ-4 | **Tenant isolation:** shared tables + `client_id` RLS vs per-tenant schemas vs hybrid? How do table/column/**layout** registries scope per tenant? | Fail closed across tenants. | Heidi + Günter |
-| OQ-5 | **Allow-list:** which **system** tables may receive UI columns in P1? UI-created tables only if in table registry? | Protect core upgrades. | Heidi + Leadership |
-| OQ-6 | **Platform columns on CREATE TABLE:** required PK, tenant key, timestamps, soft-delete, audit? | Min physical row shape + registry mirror. | Heidi |
-| OQ-7 | **Supported types P1:** text, numeric, boolean, date/timestamptz, list→`list_entries` FK — else? | JSONB-as-cell ≠ JSONB-as-schema. Indexes/FKs wait. | Heidi + Mathilda |
-| OQ-8 | **Reversibility:** deprecate vs DROP vs archive; layout rows when a column is deprecated. | AC6. | Heidi + Leadership |
-| OQ-9 | **Permission:** `schema:edit` vs elevated `config:edit`? Who edits **layout** vs who edits **schema**? | May be same or split — Günter. | Günter |
-| OQ-10 | **Collision with core migrations:** UI-added objects + registry rows vs Grok Build Alembic. | Prefixes; `system` vs `configurable` flags. | Heidi |
-| OQ-11 | **FieldDefinitions / Entries:** promote entry FD → real Sample column (+ column-registry + layout rows) vs stay on entry? | Do not blur mint/extract-hold. | Heidi + Wilhelmina |
-| OQ-12 | **`custom_attributes`:** dual-read? hard cutover P1 or follow-on? | Bounce JSONB keys as ADD COLUMN. | Heidi + Leadership |
-| OQ-13 | **AI metadata:** AI reads table + column + **layout** registries (not `information_schema` alone)? | Authoring later; not login/reporting/storage. | Heidi + Wilhelmina |
-| OQ-14 | **Layout grain (Mathilda):** screen identity model (route/page/entry-kind); section vs field; defaults when no layout row; gloved high-volume constraints. | Centerpiece of admin UX sketch. | Mathilda |
+| OQ-4 | **Apply model:** runtime DDL vs generated Alembic vs hybrid? | Upgrade-safe, auditable. | Heidi |
+| OQ-5 | **Tenant isolation:** shared + RLS vs per-tenant schemas? Registry + privilege scope per tenant? | Fail closed. | Heidi + Günter |
+| OQ-6 | **Allow-list:** which system tables get UI columns in P1? | Protect core upgrades. | Heidi + Leadership |
+| OQ-7 | **Platform columns on CREATE TABLE:** PK, tenant key, timestamps, soft-delete, audit? | Min physical shape. | Heidi |
+| OQ-8 | **Supported types P1:** text, numeric, boolean, date/timestamptz, list→`list_entries`? | Indexes/FKs wait. | Heidi + Mathilda |
+| OQ-9 | **Reversibility:** deprecate vs DROP; layout + privilege rows when column deprecated. | | Heidi + Leadership |
+| OQ-10 | **Privilege store grain:** separate privilege registry vs columns on role/layout tables? Default deny? Inherit table→column? | Must support OQ-3 Fail bars. | Heidi + Günter |
+| OQ-11 | **Collision with core migrations:** UI objects + registries vs Grok Build Alembic. | | Heidi |
+| OQ-12 | **FieldDefinitions / Entries:** promote to real column (+ registries + layout + privileges)? | No mint blur. | Heidi + Wilhelmina |
+| OQ-13 | **`custom_attributes`:** dual-read? hard cutover P1 or follow-on? | Bounce JSONB-as-schema. | Heidi + Leadership |
+| OQ-14 | **AI metadata:** read table + column + layout + privilege descriptors? | Not login/reporting/storage AI. | Heidi + Wilhelmina |
+| OQ-15 | **Layout grain (Mathilda):** screen identity; section vs field; default when no layout row; gloved use. | Three admin surfaces: Tables, Columns, Layouts. | Mathilda |
 
 ## Non-blocking / park
 
 | ID | Note |
 |----|------|
-| AI apply DDL | Parked — after foundation Met. |
-| AI login / reporting / storage | Parked — [`ai-config-breadth.md`](ai-config-breadth.md). |
-| Indexes / FKs in catalog P1 | **Wait** (OQ-1). |
-| Full low-code builder | Out of scope. |
+| AI apply DDL | Parked |
+| AI login / reporting / storage | Parked — [`ai-config-breadth.md`](ai-config-breadth.md) |
+| Indexes / FKs P1 | **Wait** |
+| DBA-style DDL editor | **Bounce** (Mathilda) |
+| Full low-code builder | Out of scope |
+
+## UAT note (Tobias)
+
+When ACs land: Fail bars that prove CREATE/ALTER hits **real Postgres** (not JSONB); catalog uniqueness / tenant isolation; **role×layout** visibility; and **privilege refuse vs layout hide** (OQ-3). Formal UAT after Heidi Accept + Ready path.
 
 ## Unpark / decide rule
 
-- **Heidi + Mathilda sketches** land; Leadership + Heidi Accept → Spec folds locks → Günter before implement gate.  
-- Product code only after implement gate OPEN.
+Heidi + Mathilda sketches → Leadership + Heidi Accept → Spec fold → Günter → implement gate. No product code before Accept.
