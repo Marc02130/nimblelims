@@ -1,7 +1,7 @@
 # Requirements: UI-driven schema DDL (real Postgres)
 
 **Date:** 2026-09-22  
-**Status:** **Draft — packet OPEN** (docs only). **Heidi Architecture Accept with conditions** (2026-09-22). Implement gate **CLOSED** until Design UX stamp + OQ-4–11 close enough for a Brief. Mathilda landing admin UX sketch (Tables/Columns/Layouts). Coding stays Grok Build unless Marc/Rolf asks.  
+**Status:** **Draft — packet OPEN** (docs only). **Heidi Architecture Accept with conditions** (OQ-4–11). **Mathilda UI sketch** @ `e12b0c2` — [ui-review/ui-schema-ddl.md](../ui-review/ui-schema-ddl.md) (Sketch Accept; OQ-15 locked). Implement gate **CLOSED** until Design UX stamp + OQ-4–11 close enough for a Brief. Coding stays Grok Build unless Marc/Rolf asks.  
 **Stem:** `ui-schema-ddl`  
 **Leadership lock:** Core pivot 2026-09-22 — AI-config foundation needs **add tables and columns through the UI as real Postgres objects**, not JSONB pretending to be schema. Sample-processing critical path Met on `main` (E-10 → E-6).  
 **Open questions:** [`.docs/review/open-questions/ui-schema-ddl.md`](../open-questions/ui-schema-ddl.md)  
@@ -30,9 +30,6 @@ This packet is the **AI-config foundation**, not AI itself. It does **not** open
 | **OQ-2 Decided:** **role-based layout registry** (role × screen × visible columns/sections) — separate from table/column catalogs; schema ≠ layout | Marc + **Rolf Confirm** 2026-09-22 |
 | **OQ-3 Decided:** **role × table/column privileges** (read vs write; schema-admin separate) — **not** layout; API allow vs UI show | Marc + **Rolf Confirm** 2026-09-22 |
 | Column registry carries **public SOP field-name hints** for later AI mapping — no house SOP text in git | Katinka + Core 2026-09-22 |
-| **Three admin screens:** **Schema** (tables/columns → real DDL), **Layout** (role × screen × visible), **Privileges** (role × table/column read/write — not hide) | Mathilda UI lock 2026-09-22 |
-| **Tobias Fail bars (UAT):** (1) privilege refuse → **403/422**, not silent drop; layout-hide ≠ API allow (2) privilege-denied read → refuse, not empty-as-layout (3) **schema-admin** only for CREATE/ALTER; lab role cannot DDL (4) CREATE/ALTER proves real Postgres (`information_schema` / query), not JSONB | Tobias 2026-09-22 |
-| **Architecture Accept with conditions** (Heidi) — implement stays CLOSED until Design UX stamp + OQ-4–11 close enough for a Brief | Heidi via Mathilda; Rolf Confirm 2026-09-22 |
 | Not IC50 | Standing |
 
 ## 3. Goals
@@ -64,7 +61,7 @@ This packet is the **AI-config foundation**, not AI itself. It does **not** open
 | AC0 | **Catalog minimum:** product ships (or migrates in) a **table registry** and a **column registry**. UI editing of schema goes through these registries; they store configurable metadata (`information_schema` alone is not enough). |
 | AC0b | Applying create/add updates **both** the physical Postgres object **and** the corresponding registry row(s) in one controlled operation (Heidi locks transaction/apply model). |
 | AC0c | **Layout registry:** product ships a **role-based layout** catalog (role × screen × visible columns/sections). Runtime screens honor layout for the signed-in role; missing layout falls back per Mathilda lock. Layout edits do **not** CREATE/ALTER physical columns by themselves. |
-| AC0d | **Privileges:** role × table and role × column privileges enforce API **read/write** (and schema-admin for DDL). **422/403** (Heidi/Günter lock) on privilege refuse even if layout would show the field. Layout hide must not be the only access control. |
+| AC0d | **Privileges:** role × table/column **read/write**; schema-admin for DDL. **Tobias Fail bars:** no-privilege write → **403/422** (not silent drop); privilege-denied read → refuse (not empty-as-layout); layout-hide ≠ API allow. |
 | AC0e | **AI hints:** column registry stores public SOP-oriented field-name hints (barcode vs sample ID, vessel vs material, parent link, matrix/type). No proprietary house SOP text required in git. |
 | AC1 | **ADD COLUMN** via UI on an allow-listed core table creates a real Postgres column of a supported type (text, number/numeric, date/timestamptz, boolean, list/FK-to-`list_entries` as locked) **plus** a column-registry row. |
 | AC2 | **CREATE TABLE** via UI creates a real Postgres table (not a JSONB document store) **plus** a table-registry row. Required platform columns / constraints per Heidi lock. |
@@ -77,8 +74,9 @@ This packet is the **AI-config foundation**, not AI itself. It does **not** open
 | AC9 | **Allow-list:** which base tables may receive columns, and whether CREATE TABLE is unrestricted within tenant namespace, is Heidi-locked before implement. |
 | AC10 | **UX:** Mathilda Accept — lab-admin schema + **layout** admin (role × screen); bounce DBA-only chrome as default path. Layout is the UX centerpiece, not a column-registry footnote. |
 | AC11 | **AI-ready metadata:** AI (later) reads **table + column + layout** registries (and allow-listed system descriptors) — not `information_schema` alone. No AI apply in this packet. Indexes/FKs not required in P1 catalog. |
-| AC12 | **Three screens:** admin UX exposes **Schema**, **Layout**, and **Privileges** as distinct surfaces (Mathilda). Bounce burying privileges or layout on the column row alone. |
-| AC13 | **DDL proof:** after CREATE/ALTER, UAT proves a real Postgres relation/column via `information_schema` (or equivalent query) — not a JSONB key. Lab roles cannot DDL; **schema-admin** only. |
+| AC12 | **Four screens:** Admin→Schema exposes **Tables**, **Columns**, **Layouts**, **Privileges** as distinct surfaces ([ui-review](../ui-review/ui-schema-ddl.md)). Bounce burying privileges/layout on the column row alone. |
+| AC13 | **DDL proof:** after CREATE/ALTER, UAT proves real Postgres relation/column via `information_schema` (or equivalent). Lab roles cannot DDL; **schema-admin** only. |
+| AC14 | **OQ-15 layout defaults:** no layout row → show all columns the role may **read**, in column-registry order; never show write-denied as editable; known screen keys first (`receive`, `asked-for`, `samples.detail`, `samples.list`). |
 
 ## 6. Path exercised (happy)
 
@@ -106,11 +104,11 @@ All blocking OQs live in [`ui-schema-ddl.md` (open-questions)](../open-questions
 | Review | Verdict |
 |--------|---------|
 | Leadership / CEO | **Packet OPEN** (pivot locked). Accept pending sketch. |
-| Architecture (Heidi) | **Accept with conditions** (2026-09-22). Conditions punch list to fold when Mathilda/Heidi publish it; OQ-4–11 remain open. |
-| UI (Mathilda) | **Sketch landing** — Schema / Layout / Privileges. Design Group woken for UX Accept (Mathilda is UX SoT from Core). |
+| Architecture (Heidi) | **Accept with conditions** (2026-09-22) — OQ-4–11 remain open. |
+| UI (Mathilda) | **Sketch Accept** @ `e12b0c2` — Tables/Columns/Layouts/Privileges; OQ-15 locked. Design Group re-pinged for UX Accept. |
 | Security (Günter) | **Needed** before implement gate. |
 | Lab Ops / CSO | Consult if new tables become lab workflow entities. |
 | Spec (Wilhelmina) | Draft requirements + OQs (this doc). |
 | QA (Tobias) | UAT after Accept — Fail bars: real Postgres not JSONB; catalog uniqueness/tenant; layout visibility; privilege refuse vs layout hide. |
 
-**Implement gate:** **CLOSED**. Heidi Architecture Accept stands with conditions. Remains CLOSED until Design UX stamp + open OQs (OQ-4–11) close enough for a Brief (Rolf 2026-09-22).
+**Implement gate:** **CLOSED**. Heidi Architecture Accept stands with conditions. Remains CLOSED until Design UX stamp + OQ-4–11 close enough for a Brief (Rolf 2026-09-22).
