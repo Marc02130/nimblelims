@@ -1,7 +1,7 @@
 # UI review: UI-driven schema DDL (admin UX sketch)
 
 **Date:** 2026-09-22  
-**Status:** **Sketch — UI Accept pending Leadership re-stamp.** Architecture Accept with conditions (Heidi 2026-09-22). Implement gate **CLOSED**.  
+**Status:** **Sketch Accept** (Mathilda @ `e12b0c2`). [Brief](../requirements/ui-schema-ddl-brief.md) 2026-09-22 Decides OQ-4–13. **Design Group UX Accept pending** (this sketch is not that stamp). Implement gate **CLOSED**.  
 **Stem:** `ui-schema-ddl`  
 **Requirements:** [`.docs/review/requirements/ui-schema-ddl.md`](../requirements/ui-schema-ddl.md)  
 **Open questions:** [`.docs/review/open-questions/ui-schema-ddl.md`](../open-questions/ui-schema-ddl.md)  
@@ -37,7 +37,7 @@ Layout hide ≠ privilege deny. Schema edit ≠ layout edit. No SQL console as d
 **Add table:**
 - Display name (required)
 - Physical name: auto from display (editable only before apply; slug rules Heidi)
-- Platform columns: shown as a fixed checklist (PK, tenant, timestamps, …) — not free-add until OQ-7 locks
+- Platform columns: shown as a fixed checklist (**Brief OQ-7**: `id`, `client_id`, created/modified at/by, `active`) — not free-add
 - Confirm → toast with table name; stay on Columns for that table
 
 **Bounce:** CREATE without platform columns; creating core system tables outside allow-list (OQ-6); JSONB “document table” option.
@@ -48,7 +48,7 @@ Layout hide ≠ privilege deny. Schema edit ≠ layout edit. No SQL console as d
 
 **Add field:**
 - Display name
-- Type from **P1 allow-list only** (OQ-8 — Mathilda proposes: Text, Number, Whole number, Yes/No, Date, Date and time, List)
+- Type from **P1 allow-list only** (**Brief OQ-8**: Text, Number, Whole number, Yes/No, Date, Date and time, List)
 - Required toggle
 - List source (when type = List) → existing `lists` / `list_entries`
 - SOP field-name hint (optional select)
@@ -128,18 +128,18 @@ Receive, Asked-for, Samples, etc. load: column registry ∩ layout(role, screen)
 - Per-user layouts
 - Dropping data-bearing fields without impact confirm
 
-## 10. Open for Heidi (do not invent in UX)
+## 10. Brief lock (do not invent in UX)
 
-OQ-4 apply model · OQ-5 tenant/RLS chrome · OQ-6 allow-list contents · OQ-7 platform column checklist · OQ-8 final type enum · OQ-9 deprecate vs DROP · OQ-10 privilege store · OQ-11 Alembic collision · OQ-12/13 FieldDefinitions / custom_attributes dual-read.
+OQ-4–13 are **Decided** in the [Brief](../requirements/ui-schema-ddl-brief.md) (Hybrid apply, shared+FORCE RLS, allow-list, platform columns, P1 types, deprecate-first, privilege registry, `ui_schema` head, leave Entries, `custom_attributes` follow-on). Sketch chrome must follow those locks. Remaining gate: **Design Group UX Accept** on Tables / Columns / Layouts / Privileges — this sketch is not that stamp.
 
 ## 11. Sign-off
 
 | Review | Verdict |
 |--------|---------|
 | UI (Mathilda) | **Sketch Accept** — Tables / Columns / Layouts / Privileges; OQ-15 locked as above |
-| Architecture (Heidi) | **Accept with conditions** (OQ-4–11) — 2026-09-22 |
-| Leadership | Re-stamp when sketch reviewed |
-| Security (Günter) | Needed before implement |
-| Design Group | Wake pending (Mathilda not a member) |
+| Architecture (Heidi) | **Accept with conditions** (OQ-4–13 now Decided in Brief) — 2026-09-22 |
+| Security (Günter) | **Accept with conditions** (S-UI-1…6) — restamp pending under Brief |
+| Lab Ops (Deiter) | **Accept with conditions** — Brief written |
+| Design Group | **UX Accept pending** (Mathilda Sketch Accept is not this stamp) |
 
-**Implement gate:** **CLOSED**.
+**Implement gate:** **CLOSED** until Design Group UX Accept + Günter restamp.

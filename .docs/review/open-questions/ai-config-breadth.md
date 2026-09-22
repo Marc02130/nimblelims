@@ -28,5 +28,5 @@ When may we open AI-assisted configuration for surfaces **outside** sample-proce
 
 ## Unpark rule
 
-- **Schema-config / `ui-schema-ddl`:** OPEN for Spec + sketches (implement gate still CLOSED until Heidi/Leadership Accept).  
+- **Schema-config / `ui-schema-ddl`:** Brief 2026-09-22 Decides OQ-4–13 ([brief](../requirements/ui-schema-ddl-brief.md)); implement gate still **CLOSED** until Design Group UX Accept + Günter restamp.  
 - **Login / reporting / storage AI:** stay parked until Leadership restamps after schema-config foundation Met (or an explicit narrower unblock).

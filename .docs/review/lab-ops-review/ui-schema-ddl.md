@@ -27,4 +27,6 @@
 
 ## Gate
 
-Still waiting **Günter**. Design UX stamp + Brief still required before implement.
+Implement remains **CLOSED**. Original conditions stand (this note is not a Lab Ops restamp).
+
+**Fold note 2026-09-22:** [Brief](../requirements/ui-schema-ddl-brief.md) written — OQ-4–13 **Decided** (incl. OQ-4–11). Günter **Accept with conditions** (S-UI-1…6) already on packet (`50141c5`). Still waiting **Design Group UX Accept** and **Günter restamp** that S-UI-1…6 hold under the Brief. Layout vs receive/asked-for, Hide vs Read-only vs Deny, and Lab Ops consult before a new-table runtime screen are baked into the Brief.
