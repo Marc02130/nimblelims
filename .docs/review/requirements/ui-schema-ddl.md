@@ -28,6 +28,8 @@ This packet is the **AI-config foundation**, not AI itself. It does **not** open
 | Unpark AI breadth **only** where this schema-config is the blocker | Rolf 2026-09-22 |
 | **OQ-1 Decided:** catalog minimum = **table registry** + **column registry** (not lab data); physical CREATE/ALTER still real Postgres; `information_schema` alone insufficient; indexes/FKs wait | Marc + **Rolf Confirm** 2026-09-22 |
 | **OQ-2 Decided:** **role-based layout registry** (role × screen × visible columns/sections) — separate from table/column catalogs; schema ≠ layout | Marc + **Rolf Confirm** 2026-09-22 |
+| **OQ-3 Decided:** **role × table/column privileges** (read vs write; schema-admin separate) — **not** layout; API allow vs UI show | Marc + **Rolf Confirm** 2026-09-22 |
+| Column registry carries **public SOP field-name hints** for later AI mapping — no house SOP text in git | Katinka + Core 2026-09-22 |
 | Not IC50 | Standing |
 
 ## 3. Goals
@@ -48,7 +50,8 @@ This packet is the **AI-config foundation**, not AI itself. It does **not** open
 - Arbitrary low-code app builder, triggers, stored procedures, arbitrary PG types.
 - Replacing FieldDefinitions on **Entries** (`experiment_data` / `experiment_sample_data`) — those stay entry FieldDefinitions unless a later lock says promote-to-column.
 - Silent rewrite of `custom_attributes` JSONB (hard cutover may be a **follow-on**; this packet must not pretend JSONB keys are columns).
-- DROP DATABASE, cross-tenant DDL, or raw SQL paste as the primary path.
+- DROP DATABASE, cross-tenant DDL, or raw SQL paste / DBA-style DDL editor as the primary path (Mathilda bounce).
+- Treating layout hide as the only access control (OQ-3).
 - Product coding before Accept.
 
 ## 5. Acceptance criteria (draft — Heidi may punch)
@@ -58,13 +61,15 @@ This packet is the **AI-config foundation**, not AI itself. It does **not** open
 | AC0 | **Catalog minimum:** product ships (or migrates in) a **table registry** and a **column registry**. UI editing of schema goes through these registries; they store configurable metadata (`information_schema` alone is not enough). |
 | AC0b | Applying create/add updates **both** the physical Postgres object **and** the corresponding registry row(s) in one controlled operation (Heidi locks transaction/apply model). |
 | AC0c | **Layout registry:** product ships a **role-based layout** catalog (role × screen × visible columns/sections). Runtime screens honor layout for the signed-in role; missing layout falls back per Mathilda lock. Layout edits do **not** CREATE/ALTER physical columns by themselves. |
+| AC0d | **Privileges:** role × table and role × column privileges enforce API **read/write** (and schema-admin for DDL). **422/403** (Heidi/Günter lock) on privilege refuse even if layout would show the field. Layout hide must not be the only access control. |
+| AC0e | **AI hints:** column registry stores public SOP-oriented field-name hints (barcode vs sample ID, vessel vs material, parent link, matrix/type). No proprietary house SOP text required in git. |
 | AC1 | **ADD COLUMN** via UI on an allow-listed core table creates a real Postgres column of a supported type (text, number/numeric, date/timestamptz, boolean, list/FK-to-`list_entries` as locked) **plus** a column-registry row. |
 | AC2 | **CREATE TABLE** via UI creates a real Postgres table (not a JSONB document store) **plus** a table-registry row. Required platform columns / constraints per Heidi lock. |
 | AC3 | **Not JSONB-as-schema:** UI must not satisfy AC1/AC2 by writing only into `custom_attributes` or equivalent JSONB bags. |
 | AC4 | **Tenant-safe:** new tables/columns enforce RLS (or Heidi-approved isolation) so Client A never reads Client B. |
 | AC5 | **Migratable:** every applied change leaves an auditable, re-playable trail compatible with upgrades (exact mechanism = Heidi OQ). |
 | AC6 | **Reversible:** deprecate/hide and controlled remove/archive paths exist; destructive remove requires confirmation + impact surface; no silent DROP of data-bearing objects. |
-| AC7 | **Permission:** schema mutate uses an elevated permission (not general `config:edit` alone unless Leadership re-locks). Günter stamps. |
+| AC7 | **Permission:** schema mutate uses **schema-admin** (elevated; not general `config:edit` alone unless re-locked). Data read/write uses OQ-3 table/column privileges. Günter stamps. |
 | AC8 | **Audit:** who/when/what (and before/after definition) recorded for every schema mutate. |
 | AC9 | **Allow-list:** which base tables may receive columns, and whether CREATE TABLE is unrestricted within tenant namespace, is Heidi-locked before implement. |
 | AC10 | **UX:** Mathilda Accept — lab-admin schema + **layout** admin (role × screen); bounce DBA-only chrome as default path. Layout is the UX centerpiece, not a column-registry footnote. |
@@ -101,5 +106,6 @@ All blocking OQs live in [`ui-schema-ddl.md` (open-questions)](../open-questions
 | Security (Günter) | **Needed** before implement gate. |
 | Lab Ops / CSO | Consult if new tables become lab workflow entities. |
 | Spec (Wilhelmina) | Draft requirements + OQs (this doc). |
+| QA (Tobias) | UAT after Accept — Fail bars: real Postgres not JSONB; catalog uniqueness/tenant; layout visibility; privilege refuse vs layout hide. |
 
 **Implement gate:** **CLOSED**. Docs + sketch first.
