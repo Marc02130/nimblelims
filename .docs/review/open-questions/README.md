@@ -41,3 +41,8 @@ Two different trees. Do not merge them.
 ## Docs layout
 
 Project documentation is organized under [`.docs/review/README.md`](../README.md) (parent index: [`.docs/README.md`](../../README.md)). Checklists track *tasks*; this folder owns *cycle/feature questions*. Leadership stamps live in [`.docs/decision-logs/`](../../decision-logs/).
+
+## Active (2026-09-22)
+
+- [`ui-schema-ddl.md`](ui-schema-ddl.md) — UI CREATE TABLE / ADD COLUMN; **OQ-1 Decided** (table + column registries). AI-config foundation.
+- [`ai-config-breadth.md`](ai-config-breadth.md) — partially unparked (schema-config only).
