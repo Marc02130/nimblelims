@@ -1,7 +1,7 @@
 # Requirements: UI-driven schema DDL (real Postgres)
 
 **Date:** 2026-09-22  
-**Status:** **Draft — packet OPEN** (docs only). Implement gate **CLOSED** until tech sketch + Leadership Accept + Heidi Architecture Accept. Coding stays Grok Build unless Marc/Rolf asks.  
+**Status:** **Draft — packet OPEN** (docs only). **Heidi Architecture Accept with conditions** (2026-09-22). Implement gate **CLOSED** until Design UX stamp + OQ-4–11 close enough for a Brief. Mathilda landing admin UX sketch (Tables/Columns/Layouts). Coding stays Grok Build unless Marc/Rolf asks.  
 **Stem:** `ui-schema-ddl`  
 **Leadership lock:** Core pivot 2026-09-22 — AI-config foundation needs **add tables and columns through the UI as real Postgres objects**, not JSONB pretending to be schema. Sample-processing critical path Met on `main` (E-10 → E-6).  
 **Open questions:** [`.docs/review/open-questions/ui-schema-ddl.md`](../open-questions/ui-schema-ddl.md)  
@@ -30,6 +30,9 @@ This packet is the **AI-config foundation**, not AI itself. It does **not** open
 | **OQ-2 Decided:** **role-based layout registry** (role × screen × visible columns/sections) — separate from table/column catalogs; schema ≠ layout | Marc + **Rolf Confirm** 2026-09-22 |
 | **OQ-3 Decided:** **role × table/column privileges** (read vs write; schema-admin separate) — **not** layout; API allow vs UI show | Marc + **Rolf Confirm** 2026-09-22 |
 | Column registry carries **public SOP field-name hints** for later AI mapping — no house SOP text in git | Katinka + Core 2026-09-22 |
+| **Three admin screens:** **Schema** (tables/columns → real DDL), **Layout** (role × screen × visible), **Privileges** (role × table/column read/write — not hide) | Mathilda UI lock 2026-09-22 |
+| **Tobias Fail bars (UAT):** (1) privilege refuse → **403/422**, not silent drop; layout-hide ≠ API allow (2) privilege-denied read → refuse, not empty-as-layout (3) **schema-admin** only for CREATE/ALTER; lab role cannot DDL (4) CREATE/ALTER proves real Postgres (`information_schema` / query), not JSONB | Tobias 2026-09-22 |
+| **Architecture Accept with conditions** (Heidi) — implement stays CLOSED until Design UX stamp + OQ-4–11 close enough for a Brief | Heidi via Mathilda; Rolf Confirm 2026-09-22 |
 | Not IC50 | Standing |
 
 ## 3. Goals
@@ -74,6 +77,8 @@ This packet is the **AI-config foundation**, not AI itself. It does **not** open
 | AC9 | **Allow-list:** which base tables may receive columns, and whether CREATE TABLE is unrestricted within tenant namespace, is Heidi-locked before implement. |
 | AC10 | **UX:** Mathilda Accept — lab-admin schema + **layout** admin (role × screen); bounce DBA-only chrome as default path. Layout is the UX centerpiece, not a column-registry footnote. |
 | AC11 | **AI-ready metadata:** AI (later) reads **table + column + layout** registries (and allow-listed system descriptors) — not `information_schema` alone. No AI apply in this packet. Indexes/FKs not required in P1 catalog. |
+| AC12 | **Three screens:** admin UX exposes **Schema**, **Layout**, and **Privileges** as distinct surfaces (Mathilda). Bounce burying privileges or layout on the column row alone. |
+| AC13 | **DDL proof:** after CREATE/ALTER, UAT proves a real Postgres relation/column via `information_schema` (or equivalent query) — not a JSONB key. Lab roles cannot DDL; **schema-admin** only. |
 
 ## 6. Path exercised (happy)
 
@@ -101,11 +106,11 @@ All blocking OQs live in [`ui-schema-ddl.md` (open-questions)](../open-questions
 | Review | Verdict |
 |--------|---------|
 | Leadership / CEO | **Packet OPEN** (pivot locked). Accept pending sketch. |
-| Architecture (Heidi) | **Needed** — DDL apply model, tenant/RLS, allow-list, reversibility. |
-| UI (Mathilda) | **Needed** — admin UX sketch. |
+| Architecture (Heidi) | **Accept with conditions** (2026-09-22). Conditions punch list to fold when Mathilda/Heidi publish it; OQ-4–11 remain open. |
+| UI (Mathilda) | **Sketch landing** — Schema / Layout / Privileges. Design Group woken for UX Accept (Mathilda is UX SoT from Core). |
 | Security (Günter) | **Needed** before implement gate. |
 | Lab Ops / CSO | Consult if new tables become lab workflow entities. |
 | Spec (Wilhelmina) | Draft requirements + OQs (this doc). |
 | QA (Tobias) | UAT after Accept — Fail bars: real Postgres not JSONB; catalog uniqueness/tenant; layout visibility; privilege refuse vs layout hide. |
 
-**Implement gate:** **CLOSED**. Docs + sketch first.
+**Implement gate:** **CLOSED**. Heidi Architecture Accept stands with conditions. Remains CLOSED until Design UX stamp + open OQs (OQ-4–11) close enough for a Brief (Rolf 2026-09-22).
