@@ -1,6 +1,6 @@
 # Temporary issues — Sample processing (index)
 
-**Status:** Synced 2026-09-20 (E-7 Met PR **132**; E-6 **Met** on `main` PR **133**; Leadership Core)  
+**Status:** Synced 2026-09-22 (E-10→E-6 Met on `main`; next **ui-schema-ddl** AI-config foundation; Leadership Core)  
 **PRD:** [PRD.md](PRD.md) · [Spec](../../specs/sample-processing/SPEC.md)  
 **Stamps:** [../../../decision-logs/framework-stamps-2026-08-26.md](../../../decision-logs/framework-stamps-2026-08-26.md) · [../../../decision-logs/product-north-star-2026-09-20.md](../../../decision-logs/product-north-star-2026-09-20.md)  
 **Team notes:** [../../../discussions/2026-08-26-issues-sync-leadership-ba-dev.md](../../../discussions/2026-08-26-issues-sync-leadership-ba-dev.md)
@@ -61,7 +61,7 @@ Execute stack **exists**. Missing middle = **order → routing map → work_orde
 | X-4 | MVP “processing not release bar” vs real SOPs | Priority fog | Leadership sequencing (sample processing close → then AI breadth) |
 | **X-5** | Asked-for vs work_order / routing / params | Bench “what’s next?” | **Packet opened 2026-08-28** — [post-receive-work-spine](../../../review/requirements/post-receive-work-spine.md) |
 | **X-6** | Docs path drift | Agents miss files | Sweep links |
-| **X-7** | AI config beyond sample processing (login, reporting, storage, …) | Scope creep | **Parked** until sample processing closed — [ai-config-breadth](../../../review/open-questions/ai-config-breadth.md) |
+| **X-7** | AI config beyond sample processing (login, reporting, storage, …) | Scope creep | **Parked** until sample processing closed — [ai-config-breadth](../../../../review/open-questions/ai-config-breadth.md) |
 
 ## Priority across layers
 
@@ -70,8 +70,9 @@ Execute stack **exists**. Missing middle = **order → routing map → work_orde
 3. **E-14 + E-12** — **Met** on `main` (PR **131**, `811e966`); UAT §§8–9 **Pass** on `c4c899d`; **Rolf Confirm**  
 4. **E-7** type gate — **Met** on `main` (PR **132**, `e59a045`); UAT §10 **Pass** on `4b3609a`; **Rolf Confirm**  
 5. **E-6** intake Available for Testing — **Met** on `main` (PR **133**, `3bc43d2`); UAT Pass on `a73a51c`/`7bd4f84`; **Rolf Confirm**. Do **not** restamp AR-ST-01. Evidence: `/workspace/uat-e6-7bd4f84/`.  
-6. **X-5** — `post-receive-work-spine` (asked-for / work_order) — **next**  
-7. **LimsRuns R-18 / R-11** — manual LimsRun clarity + Qubit testdata  
-8. Processes P-4 / P-1 — truth + naming  
+6. **ui-schema-ddl** — UI CREATE TABLE / ADD COLUMN (real Postgres) + table/column registries (**OQ-1**) + **layout** registry (**OQ-2**) — AI-config foundation; implement gate CLOSED — **next**  
+7. **X-5** — `post-receive-work-spine` (asked-for / work_order)  
+8. **LimsRuns R-18 / R-11** — manual LimsRun clarity + Qubit testdata  
+9. Processes P-4 / P-1 — truth + naming  
 
-**Critical path E-10 / E-12 / E-14 / E-7 / E-6 closed** on `main`. Do **not** open AI config packets for login / reporting / storage until sample processing is closed.
+**Critical path E-10 / E-12 / E-14 / E-7 / E-6 closed** on `main`. **Next:** AI-config foundation — [`ui-schema-ddl`](../../../../review/requirements/ui-schema-ddl.md) (UI CREATE TABLE / ADD COLUMN as real Postgres; **OQ-1** table+column registries; **OQ-2** role-based layout registry). Do **not** open AI packets for login / reporting / storage yet ([ai-config-breadth](../../../../review/open-questions/ai-config-breadth.md)).
