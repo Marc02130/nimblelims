@@ -1,7 +1,8 @@
 # Requirements: Schema Evolution and Management
 
 **Date:** 2026-06-30  
-**Status:** Draft for review  
+**Status:** Draft for review — **sequencing note (2026-09-22):** Leadership opened [`ui-schema-ddl`](ui-schema-ddl.md) to deliver UI **CREATE TABLE / ADD COLUMN** as real Postgres (catalog = table + column registries, **OQ-1**). This older doc’s “defer add table” MVP deferral is **superseded for sequencing**; keep FieldDefinition cutover ideas here as related history.  
+**Status (original):** Draft for review  
 **Related:** User Stories for schema modification, JSONB usage analysis, design docs for Experiments/Processes.
 
 ## 1. Introduction
