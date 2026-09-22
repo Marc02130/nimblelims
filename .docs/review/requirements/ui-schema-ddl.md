@@ -1,7 +1,7 @@
 # Requirements: UI-driven schema DDL (real Postgres)
 
 **Date:** 2026-09-22  
-**Status:** **Draft — packet OPEN** (docs only). **Heidi Architecture Accept with conditions** (OQ-4–11). **Mathilda UI sketch** @ `e12b0c2` — [ui-review/ui-schema-ddl.md](../ui-review/ui-schema-ddl.md) (Sketch Accept; OQ-15 locked). Implement gate **CLOSED** until Design UX stamp + OQ-4–11 close enough for a Brief. Coding stays Grok Build unless Marc/Rolf asks.  
+**Status:** **Draft — packet OPEN** (docs only). **Heidi Architecture Accept with conditions** (OQ-4–13 + **OQ-16 Confirm**, restamp @ `c6f0854`). **Hans Science Accept with conditions** (5 punches). **Mathilda UI sketch** @ `e12b0c2`. **Deiter Lab Ops Accept with conditions**. Still waiting **Günter**. Implement gate **CLOSED** until Design UX stamp + open conditions close enough for a Brief. Coding stays Grok Build unless Marc/Rolf asks.  
 **Stem:** `ui-schema-ddl`  
 **Leadership lock:** Core pivot 2026-09-22 — AI-config foundation needs **add tables and columns through the UI as real Postgres objects**, not JSONB pretending to be schema. Sample-processing critical path Met on `main` (E-10 → E-6).  
 **Open questions:** [`.docs/review/open-questions/ui-schema-ddl.md`](../open-questions/ui-schema-ddl.md)  
@@ -106,11 +106,12 @@ All blocking OQs live in [`ui-schema-ddl.md` (open-questions)](../open-questions
 | Review | Verdict |
 |--------|---------|
 | Leadership / CEO | **Packet OPEN** (pivot locked). Accept pending sketch. |
-| Architecture (Heidi) | **Accept with conditions** (2026-09-22) — OQ-4–11 remain open. |
-| UI (Mathilda) | **Sketch Accept** @ `e12b0c2` — Tables/Columns/Layouts/Privileges; OQ-15 locked. Design Group re-pinged for UX Accept. |
-| Security (Günter) | **Needed** before implement gate. |
-| Lab Ops / CSO | Consult if new tables become lab workflow entities. |
-| Spec (Wilhelmina) | Draft requirements + OQs (this doc). |
-| QA (Tobias) | UAT after Accept — Fail bars: real Postgres not JSONB; catalog uniqueness/tenant; layout visibility; privilege refuse vs layout hide. |
+| Architecture (Heidi) | **Accept with conditions** (2026-09-22, restamp @ `c6f0854`) — open **OQ-4–13**; **OQ-16 Confirm**. |
+| Science / CSO (Hans) | **Accept with conditions** (2026-09-22) — punches: SOP hint grains; OQ-9 deprecate; OQ-6 identity protect; classic Results first-class; no quantity+unit. |
+| UI (Mathilda) | **Sketch Accept** @ `e12b0c2` — Tables/Columns/Layouts/Privileges; OQ-15 locked. Design UX stamp pending. |
+| Security (Günter) | **Needed** — still waiting. |
+| Lab Ops (Deiter) | **Accept with conditions** (2026-09-22) @ `c6f0854` — CLOSED until OQ-4–11+Günter+Brief; layout vs receive/asked-for; Hide/Read-only/Deny copy; consult before new runtime screen. |
+| Spec (Wilhelmina) | Living fold (this doc). |
+| QA (Tobias) | UAT after Brief — Fail bars (1)–(5) incl. OQ-16 JSONB-as-config. |
 
-**Implement gate:** **CLOSED**. Heidi Architecture Accept stands with conditions. Remains CLOSED until Design UX stamp + OQ-4–11 close enough for a Brief (Rolf 2026-09-22).
+**Implement gate:** **CLOSED**. Heidi + Hans + Deiter Accept-with-conditions stand. Still waiting **Günter**. Remains CLOSED until Design UX stamp + Günter + conditions/OQs close enough for a Brief (Rolf / Deiter condition 1).
