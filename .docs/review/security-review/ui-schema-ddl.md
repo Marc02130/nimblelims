@@ -31,4 +31,6 @@
 
 ## Gate
 
-Implement remains **CLOSED**. Full Leadership Accept-with-conditions set (Heidi + Hans + Deiter + Günter). Design UX stamp + Brief still required.
+Implement remains **CLOSED**. Original S-UI-1…6 stand (this note is not a CSO restamp).
+
+**Fold note 2026-09-22:** [Brief](../requirements/ui-schema-ddl-brief.md) written — S-UI-1…6 baked in (schema-admin only; FORCE RLS; default-deny API; layout-admin ≠ DDL; revoke `lims_app` CREATE on `public`; DROP confirm+audit). Still waiting **Design Group UX Accept** and **Günter restamp** that S-UI-1…6 still hold under the Brief.

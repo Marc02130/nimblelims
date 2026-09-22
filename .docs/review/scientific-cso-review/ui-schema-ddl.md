@@ -32,4 +32,6 @@
 
 ## Gate
 
-Implement remains **CLOSED**. Waiting Lab Ops (Deiter) + Security (Günter) + Design UX stamp + Brief.
+Implement remains **CLOSED**. Original punches stand (this note is not a Science restamp).
+
+**Fold note 2026-09-22:** [Brief](../requirements/ui-schema-ddl-brief.md) written — punches baked (SOP hint grains; OQ-9 deprecate; OQ-6 identity protect; classic Results first-class; no quantity+unit). Lab Ops + Günter Accept-with-conditions already on packet. Still waiting **Design Group UX Accept** and **Günter restamp**.

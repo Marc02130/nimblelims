@@ -1,7 +1,7 @@
 # Requirements: UI-driven schema DDL (real Postgres)
 
 **Date:** 2026-09-22  
-**Status:** **Draft — packet OPEN** (docs only). **Heidi Architecture Accept with conditions** (OQ-4–13 + **OQ-16 Confirm**, restamp @ `c6f0854`). **Hans Science Accept with conditions** (5 punches). **Mathilda UI sketch** @ `e12b0c2`. **Deiter Lab Ops Accept with conditions**. **Günter CSO Accept with conditions** (S-UI-1…6). Full Leadership set: Heidi + Hans + Deiter + Günter. Implement gate **CLOSED** until Design UX stamp + open conditions close enough for a Brief. Coding stays Grok Build unless Marc/Rolf asks.  
+**Status:** **Brief written** ([ui-schema-ddl-brief.md](ui-schema-ddl-brief.md) 2026-09-22) — OQ-4–13 **Decided**. Heidi / Hans / Deiter / Günter Accept-with-conditions stand. Implement gate **CLOSED** until Design Group UX Accept + Günter restamp. Coding stays Grok Build unless Marc/Rolf asks.  
 **Stem:** `ui-schema-ddl`  
 **Leadership lock:** Core pivot 2026-09-22 — AI-config foundation needs **add tables and columns through the UI as real Postgres objects**, not JSONB pretending to be schema. Sample-processing critical path Met on `main` (E-10 → E-6).  
 **Open questions:** [`.docs/review/open-questions/ui-schema-ddl.md`](../open-questions/ui-schema-ddl.md)  
@@ -37,7 +37,7 @@ This packet is the **AI-config foundation**, not AI itself. It does **not** open
 - Maintain **at least two catalog tables**: a **table registry** and a **column registry** that describe which real relations/columns the UI may create or edit (labels, order, nullability, tenant rules, AI hints). Catalogs are **not** the lab data.
 - Admin can **add a column** to an allow-listed existing entity/table via UI → real `ALTER TABLE … ADD COLUMN` (typed), not a JSONB key — and a matching **column-registry** row.
 - Admin can **create a new table** via UI → real `CREATE TABLE` with required platform columns (identity, tenant/RLS hooks, audit as locked by Heidi) — and a matching **table-registry** row.
-- Changes are **reviewable**, **audited**, and leave a **durable migration trail** (Heidi locks the apply model: runtime DDL vs generated Alembic — see OQ).
+- Changes are **reviewable**, **audited**, and leave a **durable migration trail** (**Brief OQ-4 Hybrid**: `lims_app` no DDL; schema-apply role / allow-listed function; `ui_schema` Alembic head or DDL log).
 - Changes are **reversible** within policy (deprecate / soft-drop / migrate-out) without silent data loss.
 - New objects participate in **RLS / tenant isolation** from first apply.
 - New columns/tables are **discoverable** to config surfaces AI will later propose against (catalog metadata), without shipping AI in this packet.
@@ -55,24 +55,26 @@ This packet is the **AI-config foundation**, not AI itself. It does **not** open
 - Treating layout hide as the only access control (OQ-3).
 - Product coding before Accept.
 
-## 5. Acceptance criteria (draft — Heidi may punch)
+## 5. Acceptance criteria
+
+Cite the [Brief](ui-schema-ddl-brief.md) for apply / tenant / allow-list / types / deprecate / privileges / Alembic / Entries / custom_attributes.
 
 | ID | Criterion |
 |----|-----------|
 | AC0 | **Catalog minimum:** product ships (or migrates in) a **table registry** and a **column registry**. UI editing of schema goes through these registries; they store configurable metadata (`information_schema` alone is not enough). |
-| AC0b | Applying create/add updates **both** the physical Postgres object **and** the corresponding registry row(s) in one controlled operation (Heidi locks transaction/apply model). |
+| AC0b | Applying create/add updates **both** the physical Postgres object **and** the corresponding registry row(s) in one controlled operation (**Brief OQ-4 Hybrid**: `lims_app` no DDL; schema-apply role / allow-listed function; audit + replay). |
 | AC0c | **Layout registry:** product ships a **role-based layout** catalog (role × screen × visible columns/sections). Runtime screens honor layout for the signed-in role; missing layout falls back per Mathilda lock. Layout edits do **not** CREATE/ALTER physical columns by themselves. |
-| AC0d | **Privileges:** role × table/column **read/write**; schema-admin for DDL. **Tobias Fail bars:** no-privilege write → **403/422** (not silent drop); privilege-denied read → refuse (not empty-as-layout); layout-hide ≠ API allow. |
+| AC0d | **Privileges (Brief OQ-10):** dedicated privilege registry; role × table/column **read/write**; default-deny; schema-admin for DDL. **Tobias Fail bars:** no-privilege write → **403/422** (not silent drop); privilege-denied read → refuse (not empty-as-layout); layout-hide ≠ API allow. |
 | AC0e | **AI hints:** column registry stores public SOP-oriented field-name hints (barcode vs sample ID, vessel vs material, parent link, matrix/type). No proprietary house SOP text required in git. |
-| AC1 | **ADD COLUMN** via UI on an allow-listed core table creates a real Postgres column of a supported type (text, number/numeric, date/timestamptz, boolean, list/FK-to-`list_entries` as locked) **plus** a column-registry row. |
-| AC2 | **CREATE TABLE** via UI creates a real Postgres table (not a JSONB document store) **plus** a table-registry row. Required platform columns / constraints per Heidi lock. |
+| AC1 | **ADD COLUMN** via UI on an allow-listed table (**Brief OQ-6**: `samples` non-identity + UI-created tables; OQ-8 types) creates a real Postgres column **plus** a column-registry row. |
+| AC2 | **CREATE TABLE** via UI creates a real Postgres table (not a JSONB document store) **plus** a table-registry row. Platform columns **Brief OQ-7** (`id`, `client_id`, timestamps, `active`) then FORCE RLS. Slug `x_*` / `lab_*`. |
 | AC3 | **Not JSONB-as-config (OQ-16):** UI must not satisfy AC1/AC2 (or layout/privilege/catalog writes) via `custom_attributes` or other JSONB bags. JSONB **is** allowed as a **data** column type for instrument/payload blobs — that is not configuration. |
-| AC4 | **Tenant-safe:** new tables/columns enforce RLS (or Heidi-approved isolation) so Client A never reads Client B. |
-| AC5 | **Migratable:** every applied change leaves an auditable, re-playable trail compatible with upgrades (exact mechanism = Heidi OQ). |
-| AC6 | **Reversible:** deprecate/hide and controlled remove/archive paths exist; destructive remove requires confirmation + impact surface; no silent DROP of data-bearing objects. |
+| AC4 | **Tenant-safe:** shared schema + **FORCE RLS** on `client_id` (**Brief OQ-5**). Registries tenant-scoped in P1. |
+| AC5 | **Migratable:** Hybrid apply + `ui_schema` Alembic head / DDL log replay (**Brief OQ-4 / OQ-11**). Core Alembic does not DROP UI objects. |
+| AC6 | **Reversible:** deprecate first (retain data); DROP = schema-admin + confirm + impact + audit (**Brief OQ-9**, S-UI-6). |
 | AC7 | **Permission (S-UI-1…6):** DDL/schema mutate = **schema-admin** only; **FORCE RLS**; privileges **default-deny** in API; **layout-admin ≠ DDL**; no **`lims_app` bypass**; DROP confirm+audit. Data read/write uses OQ-3. |
 | AC8 | **Audit:** who/when/what (and before/after definition) recorded for every schema mutate. |
-| AC9 | **Allow-list:** which base tables may receive columns, and whether CREATE TABLE is unrestricted within tenant namespace, is Heidi-locked before implement. |
+| AC9 | **Allow-list (Brief OQ-6):** ADD COLUMN on `samples` (non-identity) + UI-created tables. Identity/lineage fields (incl. freeze params, container type) never UI-droppable. CREATE TABLE = new lab entities only. |
 | AC10 | **UX:** Mathilda Accept — lab-admin schema + **layout** admin (role × screen); bounce DBA-only chrome as default path. Layout is the UX centerpiece, not a column-registry footnote. |
 | AC11 | **AI-ready metadata:** AI (later) reads **table + column + layout** registries (and allow-listed system descriptors) — not `information_schema` alone. No AI apply in this packet. Indexes/FKs not required in P1 catalog. |
 | AC12 | **Four screens:** Admin→Schema exposes **Tables**, **Columns**, **Layouts**, **Privileges** as distinct surfaces ([ui-review](../ui-review/ui-schema-ddl.md)). Bounce burying privileges/layout on the column row alone. |
@@ -91,7 +93,7 @@ This packet is the **AI-config foundation**, not AI itself. It does **not** open
 
 ## 7. Open questions
 
-All blocking OQs live in [`ui-schema-ddl.md` (open-questions)](../open-questions/ui-schema-ddl.md). Do not invent DDL apply mechanics in requirements beyond AC5–AC6.
+OQ-4–13 **Decided** in the [Brief](ui-schema-ddl-brief.md). Living OQ doc: [`ui-schema-ddl.md` (open-questions)](../open-questions/ui-schema-ddl.md). OQ-14 parked. Design Group UX Accept + Günter restamp still wait.
 
 ## 8. Relationship to prior schema-evolution docs
 
@@ -106,12 +108,12 @@ All blocking OQs live in [`ui-schema-ddl.md` (open-questions)](../open-questions
 | Review | Verdict |
 |--------|---------|
 | Leadership / CEO | **Packet OPEN** (pivot locked). Accept pending sketch. |
-| Architecture (Heidi) | **Accept with conditions** (2026-09-22, restamp @ `c6f0854`) — open **OQ-4–13**; **OQ-16 Confirm**. |
-| Science / CSO (Hans) | **Accept with conditions** (2026-09-22) — punches: SOP hint grains; OQ-9 deprecate; OQ-6 identity protect; classic Results first-class; no quantity+unit. |
-| UI (Mathilda) | **Sketch Accept** @ `e12b0c2` — Tables/Columns/Layouts/Privileges; OQ-15 locked. Design UX stamp pending. |
-| Security (Günter) | **Accept with conditions** (2026-09-22) @ `c6f0854` — **S-UI-1…6** (schema-admin only; FORCE RLS; default-deny API; layout-admin ≠ DDL; no lims_app bypass; DROP confirm+audit). |
-| Lab Ops (Deiter) | **Accept with conditions** (2026-09-22) @ `c6f0854` — CLOSED until OQ-4–11+Günter+Brief; layout vs receive/asked-for; Hide/Read-only/Deny copy; consult before new runtime screen. |
-| Spec (Wilhelmina) | Living fold (this doc). |
-| QA (Tobias) | UAT after Brief — Fail bars (1)–(5) incl. OQ-16 JSONB-as-config. |
+| Architecture (Heidi) | **Accept with conditions** (2026-09-22, restamp @ `c6f0854`) — conditions **OQ-4–13** now **Decided** in [Brief](ui-schema-ddl-brief.md); **OQ-16 Confirm**. |
+| Science / CSO (Hans) | **Accept with conditions** (2026-09-22) — punches baked into Brief: SOP hint grains; OQ-9 deprecate; OQ-6 identity protect; classic Results first-class; no quantity+unit. |
+| UI (Mathilda) | **Sketch Accept** @ `e12b0c2` — Tables/Columns/Layouts/Privileges; OQ-15 locked. **Design Group UX Accept pending.** |
+| Security (Günter) | **Accept with conditions** (2026-09-22) @ `c6f0854` — **S-UI-1…6** baked into Brief. **Restamp pending** that they still hold. |
+| Lab Ops (Deiter) | **Accept with conditions** (2026-09-22) @ `c6f0854` — Brief written (OQ-4–11). Still CLOSED until Design UX + Günter restamp. Layout vs receive/asked-for; Hide/Read-only/Deny copy; consult before new runtime screen. |
+| Spec (Wilhelmina) | Living fold (this doc + Brief). |
+| QA (Tobias) | UAT after implement gate opens — Fail bars (1)–(5) incl. OQ-16 JSONB-as-config. |
 
-**Implement gate:** **CLOSED**. Full Leadership Accept-with-conditions: Heidi + Hans + Deiter + Günter. Remains CLOSED until Design UX stamp + OQs/conditions close enough for a Brief (Rolf / Deiter condition 1).
+**Implement gate:** **CLOSED**. Brief written. Remains CLOSED until **Design Group UX Accept** and **Günter restamp**.
