@@ -49,7 +49,8 @@ This packet is the **AI-config foundation**, not AI itself. It does **not** open
 - AI config for login, reporting, storage (still parked — breadth OQ).
 - Arbitrary low-code app builder, triggers, stored procedures, arbitrary PG types.
 - Replacing FieldDefinitions on **Entries** (`experiment_data` / `experiment_sample_data`) — those stay entry FieldDefinitions unless a later lock says promote-to-column.
-- Silent rewrite of `custom_attributes` JSONB (hard cutover may be a **follow-on**; this packet must not pretend JSONB keys are columns).
+- Silent rewrite of `custom_attributes` JSONB as config (hard cutover may be a **follow-on**; this packet must not pretend JSONB keys are columns).
+- **JSONB-as-config** for schema, layout, privileges, or catalogs (**OQ-16**). JSONB **payload/instrument data** is explicitly allowed.
 - DROP DATABASE, cross-tenant DDL, or raw SQL paste / DBA-style DDL editor as the primary path (Mathilda bounce).
 - Treating layout hide as the only access control (OQ-3).
 - Product coding before Accept.
@@ -65,7 +66,7 @@ This packet is the **AI-config foundation**, not AI itself. It does **not** open
 | AC0e | **AI hints:** column registry stores public SOP-oriented field-name hints (barcode vs sample ID, vessel vs material, parent link, matrix/type). No proprietary house SOP text required in git. |
 | AC1 | **ADD COLUMN** via UI on an allow-listed core table creates a real Postgres column of a supported type (text, number/numeric, date/timestamptz, boolean, list/FK-to-`list_entries` as locked) **plus** a column-registry row. |
 | AC2 | **CREATE TABLE** via UI creates a real Postgres table (not a JSONB document store) **plus** a table-registry row. Required platform columns / constraints per Heidi lock. |
-| AC3 | **Not JSONB-as-schema:** UI must not satisfy AC1/AC2 by writing only into `custom_attributes` or equivalent JSONB bags. |
+| AC3 | **Not JSONB-as-config (OQ-16):** UI must not satisfy AC1/AC2 (or layout/privilege/catalog writes) via `custom_attributes` or other JSONB bags. JSONB **is** allowed as a **data** column type for instrument/payload blobs — that is not configuration. |
 | AC4 | **Tenant-safe:** new tables/columns enforce RLS (or Heidi-approved isolation) so Client A never reads Client B. |
 | AC5 | **Migratable:** every applied change leaves an auditable, re-playable trail compatible with upgrades (exact mechanism = Heidi OQ). |
 | AC6 | **Reversible:** deprecate/hide and controlled remove/archive paths exist; destructive remove requires confirmation + impact surface; no silent DROP of data-bearing objects. |
@@ -77,6 +78,7 @@ This packet is the **AI-config foundation**, not AI itself. It does **not** open
 | AC12 | **Four screens:** Admin→Schema exposes **Tables**, **Columns**, **Layouts**, **Privileges** as distinct surfaces ([ui-review](../ui-review/ui-schema-ddl.md)). Bounce burying privileges/layout on the column row alone. |
 | AC13 | **DDL proof:** after CREATE/ALTER, UAT proves real Postgres relation/column via `information_schema` (or equivalent). Lab roles cannot DDL; **schema-admin** only. |
 | AC14 | **OQ-15 layout defaults:** no layout row → show all columns the role may **read**, in column-registry order; never show write-denied as editable; known screen keys first (`receive`, `asked-for`, `samples.detail`, `samples.list`). |
+| AC15 | **OQ-16:** config mutations (table/column registry, layout, privileges, DDL apply) never persist configuration in JSONB. Fail bar (Tobias/Mathilda): config path writing JSONB instead of real relations/DDL → **Fail**. Instrument/payload JSONB data columns remain in scope as data. |
 
 ## 6. Path exercised (happy)
 
@@ -94,7 +96,7 @@ All blocking OQs live in [`ui-schema-ddl.md` (open-questions)](../open-questions
 ## 8. Relationship to prior schema-evolution docs
 
 | Doc | Relationship |
-|-----|----------------|
+|-----|--------------|
 | [`requirements/schema-evolution.md`](schema-evolution.md) (2026-06-30) | Prior MVP deferred **add table**; prioritized FieldDefinitions on existing entities. **This packet re-opens CREATE TABLE + real ADD COLUMN** as AI-config foundation per 2026-09-22 Leadership lock. |
 | [`ceo-review/schema-evolution.md`](../ceo-review/schema-evolution.md) | Historical CEO “defer add table” — **superseded for sequencing** by 2026-09-22 pivot; keep for history. |
 | Entry FieldDefinitions / extract-hold | Unchanged: process data on entries is not this packet. |

@@ -1,7 +1,7 @@
 # Open questions: UI-driven schema DDL (real Postgres)
 
 **Date:** 2026-09-22  
-**Status:** **Open** (OQ-1 / OQ-2 / OQ-3 **Decided**; **OQ-15 Decided** via Mathilda sketch; Heidi **Architecture Accept with conditions**) — packet `ui-schema-ddl`  
+**Status:** **Open** (OQ-1 / OQ-2 / OQ-3 **Decided**; **OQ-15** + **OQ-16 Decided**; Heidi **Architecture Accept with conditions**) — packet `ui-schema-ddl`  
 **Requirements:** [`.docs/review/requirements/ui-schema-ddl.md`](../requirements/ui-schema-ddl.md)  
 **Leadership:** Core pivot 2026-09-22 — CREATE TABLE / ADD COLUMN via UI as real Postgres; tenant-safe, migratable, reversible; role-based layout; role-based table/column access.  
 **Owners:** Heidi (architecture), Mathilda (UX / layout), Günter (authZ), Tobias (UAT Fail bars), Wilhelmina (docs), Katinka (SOP field-name hints).  
@@ -19,6 +19,7 @@ Sample-processing critical path is Met on `main`. AI config needs a **robust con
 | **OQ-2** | **Role-based layout registry** (separate): **role × screen × visible columns/sections**. Schema = what exists; layout = who **sees** what where. Do not bury layout only in the column registry. Mathilda centerpiece. | Marc + **Rolf Confirm** | 2026-09-22 |
 | **OQ-3** | **Role-based access** to tables and columns — **not** the same as layout. Access = what the **API allows** (at least **read vs write** per role on table and column; **schema-admin** privilege separate). A field may be layout-hidden yet still write-forbidden; or visible but **read-only**. Tobias: Fail bars for **privilege refuse** vs **layout hide**. Günter + Heidi on Accept path. | Marc + **Rolf Confirm** | 2026-09-22 |
 | **OQ-15** | **Layout grain:** known product screen keys first; section → fields; default when no layout = all **read**-privileged columns in registry order; bench vs review separate layouts; layout read-only chrome ≠ API write. Four surfaces: Tables / Columns / Layouts / Privileges. | Mathilda Sketch Accept @ `e12b0c2` | 2026-09-22 |
+| **OQ-16** | **JSONB = payload data only** (instrument results / similar blobs). **Not** for system configuration — schema, layout, privileges, and other config live in **real tables/columns** (registries + DDL). Bounce JSONB-as-config. | Marc + **Rolf Confirm** | 2026-09-22 |
 
 ### OQ-1 AI hints (Katinka)
 
@@ -46,6 +47,8 @@ Keep **public SOP field names** on the column registry (e.g. barcode vs sample I
 | ID | Note |
 |----|------|
 | AI apply DDL | Parked |
+| JSONB for instrument/payload **data** | **Allowed** (OQ-16) — not a config store |
+| JSONB-as-config | **Bounce** (OQ-16) |
 | AI login / reporting / storage | Parked — [`ai-config-breadth.md`](ai-config-breadth.md) |
 | Indexes / FKs P1 | **Wait** |
 | DBA-style DDL editor | **Bounce** (Mathilda) |
@@ -56,7 +59,8 @@ Keep **public SOP field names** on the column registry (e.g. barcode vs sample I
 1. No-privilege write → **403/422**, not silent drop; layout-hide ≠ API allow.  
 2. Privilege-denied read → **refuse**, not empty-as-layout.  
 3. **schema-admin** only for CREATE/ALTER; lab role cannot DDL.  
-4. CREATE/ALTER proves real Postgres (`information_schema` / query), not JSONB.
+4. CREATE/ALTER proves real Postgres (`information_schema` / query), not JSONB-as-config.  
+5. **OQ-16:** any **config** path (schema / layout / privileges / catalog) that writes **JSONB instead of** DDL or catalog rows → **Fail**. JSONB remains OK for instrument/payload **data** columns.
 
 Plus catalog uniqueness / tenant isolation; role×layout visibility. UAT packet after Design UX stamp + Heidi conditions addressed.
 

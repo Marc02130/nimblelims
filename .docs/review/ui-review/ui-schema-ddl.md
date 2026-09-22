@@ -28,7 +28,7 @@ Layout hide ≠ privilege deny. Schema edit ≠ layout edit. No SQL console as d
 3. **Registries behind the glass.** Admin never edits `information_schema`. They edit registry rows; apply hits real Postgres + registry in one controlled op (Heidi OQ-4).
 4. **Three layers stay separate.** Schema (exists) · Layout (sees) · Privileges (may). Never one mega-grid that confuses hide with deny.
 5. **SOP field-name hints** (Katinka) live on the column row as an optional “SOP name” chip/select (barcode, vessel, parent, matrix/type) — for later AI mapping. No house SOP paste box.
-6. **Bounce DBA chrome** as default: raw SQL, unrestricted type picker, DROP as primary action, Indexes/FKs UI (parked).
+6. **Bounce DBA chrome** as default: raw SQL, unrestricted type picker, DROP as primary action, Indexes/FKs UI (parked). **OQ-16:** never offer JSONB as the way to configure schema/layout/privileges; JSONB type for payload/instrument **data** fields is OK when Heidi locks types.
 
 ## 3. Tables (OQ-1)
 
@@ -120,7 +120,7 @@ Receive, Asked-for, Samples, etc. load: column registry ∩ layout(role, screen)
 ## 9. Bounce bars (UI)
 
 - DBA SQL console as default path
-- JSONB / `custom_attributes` as “add field”
+- JSONB / `custom_attributes` as “add field” or any **config** store (**OQ-16** — JSONB OK only for instrument/payload **data**)
 - Layout hide as sole access control
 - Privileges buried on column row only
 - Indexes / FKs UI this packet
@@ -135,11 +135,11 @@ OQ-4 apply model · OQ-5 tenant/RLS chrome · OQ-6 allow-list contents · OQ-7 p
 ## 11. Sign-off
 
 | Review | Verdict |
-|--------|--------|
+|--------|---------|
 | UI (Mathilda) | **Sketch Accept** — Tables / Columns / Layouts / Privileges; OQ-15 locked as above |
 | Architecture (Heidi) | **Accept with conditions** (OQ-4–11) — 2026-09-22 |
 | Leadership | Re-stamp when sketch reviewed |
 | Security (Günter) | Needed before implement |
 | Design Group | Wake pending (Mathilda not a member) |
 
-**Implement gate:** **CLOSED.**
+**Implement gate:** **CLOSED**.
