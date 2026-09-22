@@ -14,7 +14,7 @@ When may we open AI-assisted configuration for surfaces **outside** sample-proce
 | Item | Lock |
 |------|------|
 | **Sample processing** | Critical path **Met** on `main` (E-10 → E-6) |
-| **Unpark (blocker only)** | Open **UI schema DDL** foundation — real CREATE TABLE / ADD COLUMN + **table/column registries** + **role-based layout** registry ([`ui-schema-ddl` requirements](../requirements/ui-schema-ddl.md), [OQs](ui-schema-ddl.md)). This is goal-1 robust config so goal-2 AI has something honest to configure. |
+| **Unpark (blocker only)** | Open **UI schema DDL** foundation — real CREATE TABLE / ADD COLUMN + **table/column registries** + **role-based layout** + **table/column privileges** ([`ui-schema-ddl` requirements](../requirements/ui-schema-ddl.md), [OQs](ui-schema-ddl.md)). This is goal-1 robust config so goal-2 AI has something honest to configure. |
 | **Still parked** | AI config packets for **login**, **reporting**, **storage**, and similar admin domains |
 | **Why** | Leadership: AI needs real schema-config first; do not fan out AI breadth until that layer exists |
 | **Still in scope as guidance** | SOP → process + parser north star for **sample processing** authoring — separate from login/reporting/storage |
