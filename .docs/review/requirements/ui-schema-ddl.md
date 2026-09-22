@@ -1,7 +1,7 @@
 # Requirements: UI-driven schema DDL (real Postgres)
 
 **Date:** 2026-09-22  
-**Status:** **Draft — packet OPEN** (docs only). **Heidi Architecture Accept with conditions** (OQ-4–13 + **OQ-16 Confirm**, restamp @ `c6f0854`). **Hans Science Accept with conditions** (5 punches). **Mathilda UI sketch** @ `e12b0c2`. **Deiter Lab Ops Accept with conditions**. Still waiting **Günter**. Implement gate **CLOSED** until Design UX stamp + open conditions close enough for a Brief. Coding stays Grok Build unless Marc/Rolf asks.  
+**Status:** **Draft — packet OPEN** (docs only). **Heidi Architecture Accept with conditions** (OQ-4–13 + **OQ-16 Confirm**, restamp @ `c6f0854`). **Hans Science Accept with conditions** (5 punches). **Mathilda UI sketch** @ `e12b0c2`. **Deiter Lab Ops Accept with conditions**. **Günter CSO Accept with conditions** (S-UI-1…6). Full Leadership set: Heidi + Hans + Deiter + Günter. Implement gate **CLOSED** until Design UX stamp + open conditions close enough for a Brief. Coding stays Grok Build unless Marc/Rolf asks.  
 **Stem:** `ui-schema-ddl`  
 **Leadership lock:** Core pivot 2026-09-22 — AI-config foundation needs **add tables and columns through the UI as real Postgres objects**, not JSONB pretending to be schema. Sample-processing critical path Met on `main` (E-10 → E-6).  
 **Open questions:** [`.docs/review/open-questions/ui-schema-ddl.md`](../open-questions/ui-schema-ddl.md)  
@@ -70,7 +70,7 @@ This packet is the **AI-config foundation**, not AI itself. It does **not** open
 | AC4 | **Tenant-safe:** new tables/columns enforce RLS (or Heidi-approved isolation) so Client A never reads Client B. |
 | AC5 | **Migratable:** every applied change leaves an auditable, re-playable trail compatible with upgrades (exact mechanism = Heidi OQ). |
 | AC6 | **Reversible:** deprecate/hide and controlled remove/archive paths exist; destructive remove requires confirmation + impact surface; no silent DROP of data-bearing objects. |
-| AC7 | **Permission:** schema mutate uses **schema-admin** (elevated; not general `config:edit` alone unless re-locked). Data read/write uses OQ-3 table/column privileges. Günter stamps. |
+| AC7 | **Permission (S-UI-1…6):** DDL/schema mutate = **schema-admin** only; **FORCE RLS**; privileges **default-deny** in API; **layout-admin ≠ DDL**; no **`lims_app` bypass**; DROP confirm+audit. Data read/write uses OQ-3. |
 | AC8 | **Audit:** who/when/what (and before/after definition) recorded for every schema mutate. |
 | AC9 | **Allow-list:** which base tables may receive columns, and whether CREATE TABLE is unrestricted within tenant namespace, is Heidi-locked before implement. |
 | AC10 | **UX:** Mathilda Accept — lab-admin schema + **layout** admin (role × screen); bounce DBA-only chrome as default path. Layout is the UX centerpiece, not a column-registry footnote. |
@@ -109,9 +109,9 @@ All blocking OQs live in [`ui-schema-ddl.md` (open-questions)](../open-questions
 | Architecture (Heidi) | **Accept with conditions** (2026-09-22, restamp @ `c6f0854`) — open **OQ-4–13**; **OQ-16 Confirm**. |
 | Science / CSO (Hans) | **Accept with conditions** (2026-09-22) — punches: SOP hint grains; OQ-9 deprecate; OQ-6 identity protect; classic Results first-class; no quantity+unit. |
 | UI (Mathilda) | **Sketch Accept** @ `e12b0c2` — Tables/Columns/Layouts/Privileges; OQ-15 locked. Design UX stamp pending. |
-| Security (Günter) | **Needed** — still waiting. |
+| Security (Günter) | **Accept with conditions** (2026-09-22) @ `c6f0854` — **S-UI-1…6** (schema-admin only; FORCE RLS; default-deny API; layout-admin ≠ DDL; no lims_app bypass; DROP confirm+audit). |
 | Lab Ops (Deiter) | **Accept with conditions** (2026-09-22) @ `c6f0854` — CLOSED until OQ-4–11+Günter+Brief; layout vs receive/asked-for; Hide/Read-only/Deny copy; consult before new runtime screen. |
 | Spec (Wilhelmina) | Living fold (this doc). |
 | QA (Tobias) | UAT after Brief — Fail bars (1)–(5) incl. OQ-16 JSONB-as-config. |
 
-**Implement gate:** **CLOSED**. Heidi + Hans + Deiter Accept-with-conditions stand. Still waiting **Günter**. Remains CLOSED until Design UX stamp + Günter + conditions/OQs close enough for a Brief (Rolf / Deiter condition 1).
+**Implement gate:** **CLOSED**. Full Leadership Accept-with-conditions: Heidi + Hans + Deiter + Günter. Remains CLOSED until Design UX stamp + OQs/conditions close enough for a Brief (Rolf / Deiter condition 1).
