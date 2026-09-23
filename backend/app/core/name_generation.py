@@ -68,14 +68,18 @@ def _ensure_sequence_exists(db: Session, entity_type: str, sequence_key: Optiona
     safe_key = _sanitize_sequence_key(sequence_key) if sequence_key else None
     sequence_name = _sequence_name(entity_type, safe_key)
     # Sequence name is safe: entity_type from allowed list, safe_key is sanitized alphanumeric + underscore
-    db.execute(text(f"""
-        CREATE SEQUENCE IF NOT EXISTS {sequence_name}
-        START WITH 1
-        INCREMENT BY 1
-        NO MINVALUE
-        NO MAXVALUE
-        CACHE 1
-    """))
+    # Brief S-UI-5: lims_app has no CREATE on public; use schema_apply SECURITY DEFINER.
+    try:
+        db.execute(text("SELECT ui_schema_ensure_sequence(:n)"), {"n": sequence_name})
+    except Exception:
+        db.execute(text(f"""
+            CREATE SEQUENCE IF NOT EXISTS {sequence_name}
+            START WITH 1
+            INCREMENT BY 1
+            NO MINVALUE
+            NO MAXVALUE
+            CACHE 1
+        """))
 
 
 def get_next_sequence(db: Session, entity_type: str, sequence_key: Optional[str] = None) -> int:

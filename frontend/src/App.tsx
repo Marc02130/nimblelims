@@ -7,6 +7,10 @@ import AskedFor from './pages/AskedFor';
 import WorkOrders from './pages/WorkOrders';
 import RoutingMapManagement from './pages/admin/RoutingMapManagement';
 import SampleTypeTransitionsManagement from './pages/admin/SampleTypeTransitionsManagement';
+import SchemaTables from './pages/admin/schema/SchemaTables';
+import SchemaColumns from './pages/admin/schema/SchemaColumns';
+import SchemaLayouts from './pages/admin/schema/SchemaLayouts';
+import SchemaPrivileges from './pages/admin/schema/SchemaPrivileges';
 import SamplesManagement from './pages/SamplesManagement';
 import TestsManagement from './pages/TestsManagement';
 import ContainerManagement from './pages/ContainerManagement';
@@ -445,6 +449,46 @@ function AppRoutes() {
           element={
             hasPermission('config:edit') ? (
               <RoutingMapManagement />
+            ) : (
+              <Navigate to="/dashboard" replace />
+            )
+          }
+        />
+        <Route
+          path="/admin/schema/tables"
+          element={
+            hasPermission('schema:edit') || hasPermission('layout:edit') ? (
+              <SchemaTables />
+            ) : (
+              <Navigate to="/dashboard" replace />
+            )
+          }
+        />
+        <Route
+          path="/admin/schema/columns"
+          element={
+            hasPermission('schema:edit') || hasPermission('layout:edit') ? (
+              <SchemaColumns />
+            ) : (
+              <Navigate to="/dashboard" replace />
+            )
+          }
+        />
+        <Route
+          path="/admin/schema/layouts"
+          element={
+            hasPermission('schema:edit') || hasPermission('layout:edit') ? (
+              <SchemaLayouts />
+            ) : (
+              <Navigate to="/dashboard" replace />
+            )
+          }
+        />
+        <Route
+          path="/admin/schema/privileges"
+          element={
+            hasPermission('schema:edit') ? (
+              <SchemaPrivileges />
             ) : (
               <Navigate to="/dashboard" replace />
             )
