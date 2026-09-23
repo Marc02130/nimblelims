@@ -1,7 +1,7 @@
 # Requirements: UI-driven schema DDL (real Postgres)
 
 **Date:** 2026-09-22  
-**Status:** **Brief written** ([ui-schema-ddl-brief.md](ui-schema-ddl-brief.md) 2026-09-22) — OQ-4–13 **Decided**. Heidi / Hans / Deiter / Günter Accept-with-conditions stand. Implement gate **CLOSED** until Design Group UX Accept + Günter restamp. Coding stays Grok Build unless Marc/Rolf asks.  
+**Status:** **Brief written** ([ui-schema-ddl-brief.md](ui-schema-ddl-brief.md) 2026-09-22) — OQ-4–13 **Decided**. Heidi / Hans / Deiter / Günter Accept-with-conditions stand. Implement gate **CLOSED** until Design Group UX Accept (Günter Brief restamp Met). Coding stays Grok Build unless Marc/Rolf asks.  
 **Stem:** `ui-schema-ddl`  
 **Leadership lock:** Core pivot 2026-09-22 — AI-config foundation needs **add tables and columns through the UI as real Postgres objects**, not JSONB pretending to be schema. Sample-processing critical path Met on `main` (E-10 → E-6).  
 **Open questions:** [`.docs/review/open-questions/ui-schema-ddl.md`](../open-questions/ui-schema-ddl.md)  
@@ -112,12 +112,26 @@ OQ-4–13 **Decided** in the [Brief](ui-schema-ddl-brief.md). Living OQ doc: [`u
 | Science / CSO (Hans) | **Accept with conditions** (2026-09-22) — punches baked into Brief. **Confirm 2026-09-23** Marc overwrite (SOP hints + Results). |
 | UI (Mathilda) | **Sketch Accept** @ `e12b0c2` — Tables/Columns/Layouts/Privileges; OQ-15 locked. **Design Group UX Accept pending.** |
 | Security (Günter) | **Accept with conditions** @ `c6f0854` — S-UI-1…6; overwrite S-UI-1=`schema:edit`, S-UI-4=`layout:edit`. **Confirm 2026-09-23** Marc overwrite + **Admin defaults** to `schema:edit` + privilege admin — **Admin only** (not lab manager / lab-tech / client); **Marc Confirm closed**; optional re-assign later (optional separate role later; S-UI-2/3/5/6 unchanged). **Brief restamp pending**. |
-| Lab Ops (Deiter) | **Accept with conditions** (2026-09-22) @ `c6f0854` — Brief written (OQ-4–11). **Confirm 2026-09-23** Marc overwrite; **retract** Hide/Read-only/Deny three-mode copy. Still CLOSED until Design UX + Günter Brief restamp. |
+| Lab Ops (Deiter) | **Accept with conditions** (2026-09-22) @ `c6f0854` — Brief written (OQ-4–11). **Confirm 2026-09-23** Marc overwrite; **retract** Hide/Read-only/Deny three-mode copy. Still CLOSED until Design UX Accept (Günter Brief restamp Met). |
 | Spec (Wilhelmina) | Living fold (this doc + Brief). |
 | QA (Tobias) | UAT after implement gate opens — Fail bars (1)–(5) incl. OQ-16 JSONB-as-config. |
 
-**Implement gate:** **CLOSED**. Brief written. Remains CLOSED until **Design Group UX Accept** and **Günter restamp**.
+**Implement gate:** **CLOSED**. Brief written. Remains CLOSED until **Design Group UX Accept** (Günter Brief restamp Met).
 
 **Marc overwrite Confirms (2026-09-23; Rolf):** Günter + Hans + Deiter Confirmed. Deiter retracts three-mode Hide/Read-only/Deny copy. **Günter follow-on:** Admin defaults to `schema:edit` + privilege admin — **Admin only** (not lab manager / lab-tech / client); **Marc Confirm closed**; optional re-assign later; optional separate role later; `layout:edit` still no DDL; S-UI-2/3/5/6 unchanged. Implement **CLOSED**.
 
 **Marc Confirm (2026-09-23; Rolf):** Default **`schema:edit`** + privilege admin = **Admin only** (not lab manager). **Closed.** Optional re-assign later. Implement CLOSED.
+
+## Marc Leadership overwrite — layout visibility (2026-09-23; Rolf Confirm)
+
+**No “hidden” on layout.** Visibility = **membership** on the layout only. Do **not** add a hide / Visible toggle that keeps the field on the layout as hidden.
+
+| Case | Rule |
+|------|------|
+| **Show** | Field is on the role × screen layout. |
+| **Not shown** | Field is **not added** to the layout (absent = not shown — Deiter stands). |
+| Neither read nor write | Not displayed; layout editor **must not offer** that field. |
+| Read yes / Write no | May appear on layout as **read-only** — from **privileges**, not a layout hide. |
+
+Retract any remaining copy that implies a hide mode or three-mode Hide / Read-only / Deny. Implement still **CLOSED** pending Design Group UX Accept (Günter Brief restamp **Met**).
+

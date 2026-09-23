@@ -18,8 +18,8 @@ This Brief closes the pre-implement blockers named by Leadership / Grok Bot: OQ-
 | ID | Lock |
 |----|------|
 | **OQ-1** | Table registry + column registry. Physical CREATE/ALTER is real Postgres. `information_schema` alone is not enough. Indexes/FKs wait. |
-| **OQ-2** | Role-based layout registry (role × screen × visible columns/sections). Schema ≠ layout. |
-| **OQ-3** | Role × table/column privileges (read vs write). Permission **`schema:edit`** separate (not a new role). Layout hide ≠ API allow. |
+| **OQ-2** | Role-based layout registry (role × screen × **membership**). Schema ≠ layout. **No layout hide** — not on layout = not shown. |
+| **OQ-3** | Role × table/column privileges (read vs write). Permission **`schema:edit`** separate (not a new role). Not on layout ≠ API allow. |
 | **OQ-15** | Known screen keys first; section → fields; default = all **read**-privileged columns; bench vs review separate. |
 | **OQ-16** | JSONB = payload **data** only. Never config. |
 | Surfaces | Admin → Schema: **Tables**, **Columns**, **Layouts**, **Privileges**. |
@@ -189,7 +189,7 @@ Boot: apply core Alembic, then replay the UI trail. Collision → **fail closed*
 | **Hans Results** | **Confirm stands** — typed Result on a Test stays first-class; do not require a LimsRun for every Result field |
 | **Deiter** | **receive / asked-for** = select samples then enter (simple). Must not fight standing Lab Ops locks |
 | **Deiter** | **List pages** show role layout columns; on-the-fly add/remove columns is **ephemeral** (not stored in layout) |
-| **Deiter** | Layout defines **displayed** columns (absent = not shown); **read/write** = role privileges. **Three-mode Hide/Read-only/Deny copy retracted** (Confirm 2026-09-23) |
+| **Deiter** | Layout defines **displayed** columns (absent = not shown); **read/write** = role privileges. **No layout hide** — visibility = membership only (**Marc overwrite 2026-09-23**). Three-mode Hide/Read-only/Deny **retracted**. |
 | **Deiter** | **Multi-row** = table with role data-type layout; **single record** = form |
 | **Deiter** | Lab Ops consult before a UI-created table gets a **bench runtime screen**. P1 CREATE TABLE may exist without a bench screen. |
 
@@ -201,9 +201,9 @@ Boot: apply core Alembic, then replay the UI trail. Collision → **fail closed*
 |------|--------|
 | This Brief (OQ-4–13) | **Written** this fold |
 | Design Group UX Accept on Tables / Columns / Layouts / Privileges | **Pending** — Mathilda Sketch Accept is not this stamp |
-| Günter restamp that S-UI-1…6 still hold under this Brief | **Pending** |
+| Günter restamp that S-UI-1…6 still hold under this Brief | **Met** (2026-09-23) |
 
-After both stamps: implement gate **OPEN**. Coding stays Grok Build unless Marc/Rolf asks. Tobias UAT uses Fail bars (1)–(5). Signed reviews (Lab Ops / Science / CSO / UI sketch) got **fold notes** only — this Brief does **not** invent Design UX Accept or a Günter restamp.
+After Design Group UX Accept: implement gate **OPEN** (Günter Brief restamp Met). Coding stays Grok Build unless Marc/Rolf asks. Tobias UAT uses Fail bars (1)–(5). Signed reviews (Lab Ops / Science / CSO / UI sketch) got **fold notes** only — this Brief does **not** invent Design UX Accept or a Günter restamp.
 
 ---
 
@@ -216,6 +216,20 @@ After both stamps: implement gate **OPEN**. Coding stays Grok Build unless Marc/
 | **Deiter** | Marc overwrite Confirmed; **retracts** three-mode Hide/Read-only/Deny bench copy. |
 | **Marc** | **Confirm closed:** default `schema:edit` + privilege admin = **Admin only** (not lab manager). |
 
-**Rolf Confirm.** Implement still **CLOSED** until Design Group UX Accept + Günter Brief restamp.
+**Rolf Confirm.** Implement still **CLOSED** until Design Group UX Accept (Günter Brief restamp Met).
 
 **Marc Confirm (2026-09-23; Rolf):** Default **`schema:edit`** + privilege admin = **Admin only** (not lab manager). **Closed.** Optional re-assign later. Implement CLOSED.
+
+## Marc Leadership overwrite — layout visibility (2026-09-23; Rolf Confirm)
+
+**No “hidden” on layout.** Visibility = **membership** on the layout only. Do **not** add a hide / Visible toggle that keeps the field on the layout as hidden.
+
+| Case | Rule |
+|------|------|
+| **Show** | Field is on the role × screen layout. |
+| **Not shown** | Field is **not added** to the layout (absent = not shown — Deiter stands). |
+| Neither read nor write | Not displayed; layout editor **must not offer** that field. |
+| Read yes / Write no | May appear on layout as **read-only** — from **privileges**, not a layout hide. |
+
+Retract any remaining copy that implies a hide mode or three-mode Hide / Read-only / Deny. Implement still **CLOSED** pending Design Group UX Accept (Günter Brief restamp **Met**).
+

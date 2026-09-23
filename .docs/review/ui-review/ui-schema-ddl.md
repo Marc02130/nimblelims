@@ -19,14 +19,14 @@
 | **Layouts** | Role × screen × visible fields/sections (OQ-2) | `schema:edit` or `layout:edit` (Heidi/Günter) |
 | **Privileges** | Role × table/column read vs write (OQ-3) | `schema:edit` |
 
-Layout hide ≠ privilege deny. Schema edit ≠ layout edit. No SQL console as default.
+Not on layout ≠ privilege deny. Schema edit ≠ layout edit. No SQL console as default. **No layout hide toggle.**
 
 ## 2. Principles
 
 1. **Lab words first.** Labels: Table, Field, Type, Required, List source, Screen, Role, Show, Read, Write. Never lead with CREATE TABLE / ALTER / GRANT.
 2. **Preview before apply.** Every CREATE/ADD shows: physical name (auto-slugged), type, nullability, impact list (forms/search that will gain the field), confirm CTA.
 3. **Registries behind the glass.** Admin never edits `information_schema`. They edit registry rows; apply hits real Postgres + registry in one controlled op (Heidi OQ-4).
-4. **Three layers stay separate.** Schema (exists) · Layout (sees) · Privileges (may). Never one mega-grid that confuses hide with deny.
+4. **Three layers stay separate.** Schema (exists) · Layout (sees) · Privileges (may). Never one mega-grid that confuses layout membership with deny.
 5. **SOP field-name hints** (Katinka) live on the column row as an optional “SOP name” chip/select (barcode, container (vessel), parent, sample type) — for later AI mapping. No house SOP paste box.
 6. **Bounce DBA chrome** as default: raw SQL, unrestricted type picker, DROP as primary action, Indexes/FKs UI (parked). **OQ-16:** never offer JSONB as the way to configure schema/layout/privileges; JSONB type for payload/instrument **data** fields is OK when Heidi locks types.
 
@@ -78,7 +78,7 @@ Layout hide ≠ privilege deny. Schema edit ≠ layout edit. No SQL console as d
 1. Pick Role + Screen
 2. Left: available fields (privilege-filtered: only columns this role can read)
 3. Right: visible stack (drag order); optional section headers
-4. Per field: Visible / Read-only display (read-only here is **layout** chrome only — API write still OQ-3)
+4. Per field: **on layout or not** (membership only — **no hide / Visible toggle**). Read-only comes from privileges (Read yes / Write no), not layout hide. API write still OQ-3.
 5. Save layout — **no DDL**
 
 **Empty state:** “No layout for this role/screen — using default (all readable fields).” CTA: Create layout.
@@ -96,7 +96,7 @@ Layout hide ≠ privilege deny. Schema edit ≠ layout edit. No SQL console as d
 - Privilege refuse surfaces as **403/422** with lab-readable text (“You can’t change this field”), never a silent no-op and never “empty because hidden.”
 - Layout-hidden + Write granted: field not shown; do not invent a back door in the layout editor.
 
-**Bounce:** merging privilege toggles into the layout drag list; treating hide as deny.
+**Bounce:** merging privilege toggles into the layout drag list; treating “not on layout” as deny; any Visible/hide toggle that keeps a field on the layout as hidden.
 
 ## 7. Runtime consumption (non-admin)
 
@@ -121,6 +121,7 @@ Receive, Asked-for, Samples, etc. load: column registry ∩ layout(role, screen)
 
 - DBA SQL console as default path
 - JSONB / `custom_attributes` as “add field” or any **config** store (**OQ-16** — JSONB OK only for instrument/payload **data**)
+- Layout hide / Visible-as-hidden toggle (visibility = membership only)
 - Layout hide as sole access control
 - Privileges buried on column row only
 - Indexes / FKs UI this packet
@@ -149,3 +150,17 @@ OQ-4–13 are **Decided** in the [Brief](../requirements/ui-schema-ddl-brief.md)
 **Fold note 2026-09-23 (Confirms; Rolf):** Günter + Hans + Deiter Confirmed Marc overwrite. Deiter Confirm retracts three-mode Hide/Read-only/Deny copy — layout = display; privileges = R/W. Implement CLOSED.
 
 **Marc Confirm (2026-09-23; Rolf):** Default **`schema:edit`** + privilege admin = **Admin only** (not lab manager). **Closed.** Optional re-assign later. Implement CLOSED.
+
+## Marc Leadership overwrite — layout visibility (2026-09-23; Rolf Confirm)
+
+**No “hidden” on layout.** Visibility = **membership** on the layout only. Do **not** add a hide / Visible toggle that keeps the field on the layout as hidden.
+
+| Case | Rule |
+|------|------|
+| **Show** | Field is on the role × screen layout. |
+| **Not shown** | Field is **not added** to the layout (absent = not shown — Deiter stands). |
+| Neither read nor write | Not displayed; layout editor **must not offer** that field. |
+| Read yes / Write no | May appear on layout as **read-only** — from **privileges**, not a layout hide. |
+
+Retract any remaining copy that implies a hide mode or three-mode Hide / Read-only / Deny. Implement still **CLOSED** pending Design Group UX Accept (Günter Brief restamp **Met**).
+
