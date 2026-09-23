@@ -48,5 +48,9 @@ Implement remains **CLOSED**. Original conditions stand (this note is not a Lab 
 | Neither read nor write | Not displayed; layout editor **must not offer** that field. |
 | Read yes / Write no | May appear on layout as **read-only** — from **privileges**, not a layout hide. |
 
-Retract any remaining copy that implies a hide mode or three-mode Hide / Read-only / Deny. Implement still **CLOSED** pending Design Group UX Accept (Günter Brief restamp **Met**).
+Retract any remaining copy that implies a hide mode or three-mode Hide / Read-only / Deny. Dated Confirm lines above that say CLOSED are history.
+
+## Implement gate OPEN (2026-09-23; Rolf)
+
+Design Group UX Accept **Met** @ `f79e2a0`. Günter Brief restamp **Met**. Implement **OPEN**. Next: Marc green-light. This note is not a Lab Ops restamp of the original Accept.
 

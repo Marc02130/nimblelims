@@ -28,5 +28,5 @@ When may we open AI-assisted configuration for surfaces **outside** sample-proce
 
 ## Unpark rule
 
-- **Schema-config / `ui-schema-ddl`:** Brief 2026-09-22 Decides OQ-4–13 ([brief](../requirements/ui-schema-ddl-brief.md)); implement gate still **CLOSED** until Design Group UX Accept + Günter restamp.  
+- **Schema-config / `ui-schema-ddl`:** Brief Decides OQ-4–13 ([brief](../requirements/ui-schema-ddl-brief.md)); Design UX + Günter restamp **Met**; implement gate **OPEN**. Next: Marc green-light for Grok Build.  
 - **Login / reporting / storage AI:** stay parked until Leadership restamps after schema-config foundation Met (or an explicit narrower unblock).

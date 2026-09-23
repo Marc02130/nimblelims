@@ -6,7 +6,7 @@
 **Status:** **Brief written** — OQ-4–13 **Decided** (this fold). Implement gate **OPEN** (Design Group UX Accept Met @ `f79e2a0`; Günter Brief restamp Met). Next: Marc green-light for Grok Build.  
 **Requirements:** [ui-schema-ddl.md](ui-schema-ddl.md)  
 **Open questions:** [../open-questions/ui-schema-ddl.md](../open-questions/ui-schema-ddl.md)  
-**UI sketch:** [../ui-review/ui-schema-ddl.md](../ui-review/ui-schema-ddl.md) (Mathilda Sketch Accept @ `e12b0c2` — not Design Group UX Accept)  
+**UI sketch:** [../ui-review/ui-schema-ddl.md](../ui-review/ui-schema-ddl.md) (Mathilda Sketch Accept @ `e12b0c2`; Design Group UX Accept **Met** @ `f79e2a0`)  
 **Not IC50. No product code in this fold.**
 
 This Brief closes the pre-implement blockers named by Leadership / Grok Bot: OQ-4–13 plus Günter S-UI-1…6, Hans punches, and Deiter conditions. Method stays **Brief → (Design UX + Günter restamp) → code → UAT → stamp → merge**.
