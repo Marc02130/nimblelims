@@ -131,6 +131,9 @@ class SampleUpdate(BaseModel):
     project_id: Optional[UUID] = None
     qc_type: Optional[UUID] = None
     custom_attributes: Optional[Dict[str, Any]] = Field(None, description="Custom attributes as JSON")
+    extra_fields: Optional[Dict[str, Any]] = Field(
+        None, description="UI-schema extra columns (not custom_attributes JSONB)"
+    )
 
     # Removed future date validation for due_date - due dates can be in the future (scheduled) or past (late samples)
     # received_date and report_date still cannot be in the future
@@ -225,6 +228,7 @@ class SampleResponse(SampleBase):
     created_by: UUID
     modified_at: datetime
     modified_by: UUID
+    extra_fields: Dict[str, Any] = Field(default_factory=dict)
 
     class Config:
         from_attributes = True

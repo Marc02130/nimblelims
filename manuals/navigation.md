@@ -10,7 +10,7 @@ NimbleLIMS uses a **unified sidebar navigation** (left drawer) for all authentic
 | **Sample Mgmt** | Any of: sample:create, sample:read, sample:update, test:update, test:assign, batch:manage, result:enter | Receive, Asked-for, Samples, Tests, Containers, Batches, Results |
 | **Experiments** | experiment:manage | All Experiments (ELN), Work Orders (`/work-orders`), Processes (ELN `/v1/eln-processes`), Experiment Templates, Runs (**LimsRun** `/runs` — not ELN Experiments; not `/v1/processes` checklists) |
 | **Lab Mgmt** | Any of: project:manage, analysis:manage | Projects, Clients, Client Proj, Analyses, Analytes |
-| **Admin** | config:edit | Overview, Lists, Container Types, Units, Users, Roles, Analyses, Routing map, Dest-type transitions, Analytes, Test Batteries, Custom Fields, Workflow Templates, Help Management |
+| **Admin** | config:edit | Overview, Lists, Container Types, Units, Users, Roles, Analyses, Routing map, Dest-type transitions, Analytes, Test Batteries, Schema, Custom Fields, Workflow Templates, Help Management |
 
 The sidebar is a persistent left-side drawer (240px expanded, 56px collapsed on desktop; temporary overlay on mobile). Navigation is permission-based: menu items and routes are shown or hidden by role/permissions.
 
@@ -197,6 +197,7 @@ The Admin section uses a Material-UI Accordion component for collapsible submenu
 | **Routing map** | `/admin/routing-map` | AltRoute | Configure TAT + ordered `process_definition[]`. No analysis or sample-type picker. A route may have multiple LimsRun analyses. Show route order, first-process first-step types, and LIMS Run analyses in the chain. Asked-for matches any route that **contains** that analysis. Map save 409s on overlapping TAT **and** first-step types **and** LIMS Run analysis sets. Route 409s when two saved rows both accept current type and asked-for analysis |
 | **Analytes Management** | `/admin/analytes` | Biotech | Analyte definitions |
 | **Test Batteries** | `/admin/test-batteries` | BatteryChargingFull | Test battery configuration |
+| **Schema** | `/admin/schema/tables` | Tune | UI CREATE TABLE / ADD COLUMN as real Postgres. Four surfaces: Tables, Columns, Layouts, Privileges. Mutate needs `schema:edit` (Admin default). Layouts also `layout:edit`. Asked-for / routing leave as is. See [ui-schema.md](ui-schema.md). |
 | **Custom Fields** | `/admin/custom-fields` | Tune | Manage custom attribute configurations (EAV) |
 | **Custom Names** | `/admin/custom-names` | Tune | Manage name template configurations (alternate) |
 | **Workflow Templates** | `/admin/workflow-templates` | Tune | Define and manage workflow templates (steps, actions) |
@@ -292,6 +293,10 @@ The AppBar title is automatically determined from the current route:
 | `/admin/analytes` | Analytes Management |
 | `/admin/test-batteries` | Test Batteries |
 | `/admin/units` | Units Management |
+| `/admin/schema/tables` | Schema Tables |
+| `/admin/schema/columns` | Schema Columns |
+| `/admin/schema/layouts` | Schema Layouts |
+| `/admin/schema/privileges` | Schema Privileges |
 | `/admin/custom-fields` | Custom Fields Management |
 | `/admin/custom-names` | Custom Names Management |
 | `/admin/workflow-templates` | Workflow Templates |

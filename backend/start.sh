@@ -17,5 +17,8 @@ DATABASE_URL="${MIGRATE_DATABASE_URL}" python run_migrations.py
 echo "Ensuring lims_app role (Option C)..."
 python ensure_lims_app_role.py
 
+echo "Replaying UI schema DDL log..."
+DATABASE_URL="${MIGRATE_DATABASE_URL}" python -c "from app.services.ui_schema_replay import replay_ui_schema; replay_ui_schema()"
+
 echo "Starting server (DATABASE_URL should be lims_app)..."
 exec uvicorn app.main:app --host 0.0.0.0 --port 8000

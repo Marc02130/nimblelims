@@ -493,8 +493,16 @@ async def get_samples(
     # Calculate pages
     pages = (total + size - 1) // size if total else 0
     
+    from app.services.ui_schema_service import UiSchemaService
+
+    extras = UiSchemaService(db, current_user).attach_extra_fields(samples)
+    payload = []
+    for sample, extra in zip(samples, extras):
+        item = SampleResponse.model_validate(sample)
+        item.extra_fields = extra
+        payload.append(item)
     return SampleListResponse(
-        samples=[SampleResponse.model_validate(sample) for sample in samples],
+        samples=payload,
         total=total,
         page=page,
         size=size,
@@ -523,7 +531,12 @@ async def get_sample(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Sample not found"
         )
-    return SampleResponse.model_validate(sample)
+    from app.services.ui_schema_service import UiSchemaService
+
+    resp = SampleResponse.model_validate(sample)
+    extras = UiSchemaService(db, current_user).attach_extra_fields([sample])
+    resp.extra_fields = extras[0] if extras else {}
+    return resp
 
 
 @router.post("/", response_model=SampleResponse)
@@ -1243,18 +1256,26 @@ async def update_sample(
         )
         sample.custom_attributes = validated_custom_attributes
     
-    # Update fields (excluding custom_attributes which is handled above)
-    update_data = sample_data.dict(exclude_unset=True, exclude={'custom_attributes'})
+    # Update fields (excluding custom_attributes / extra_fields handled separately)
+    update_data = sample_data.dict(exclude_unset=True, exclude={'custom_attributes', 'extra_fields'})
     for field, value in update_data.items():
         setattr(sample, field, value)
+
+    if sample_data.extra_fields:
+        from app.services.ui_schema_service import UiSchemaService
+        UiSchemaService(db, current_user).write_extra_fields(sample, sample_data.extra_fields)
     
     sample.modified_by = current_user.id
     sample.modified_at = datetime.utcnow()
     
     db.commit()
     db.refresh(sample)
-    
-    return SampleResponse.model_validate(sample)
+
+    from app.services.ui_schema_service import UiSchemaService
+    resp = SampleResponse.model_validate(sample)
+    extras = UiSchemaService(db, current_user).attach_extra_fields([sample])
+    resp.extra_fields = extras[0] if extras else {}
+    return resp
 
 
 @router.delete("/{sample_id}")
