@@ -5,7 +5,7 @@
 **Stem:** `ui-schema-ddl`  
 **Requirements:** [`.docs/review/requirements/ui-schema-ddl.md`](../requirements/ui-schema-ddl.md)  
 **Open questions:** [`.docs/review/open-questions/ui-schema-ddl.md`](../open-questions/ui-schema-ddl.md)  
-**Persona:** lab admin / `schema:edit` — scientist vocabulary, not DBA. **Günter follow-on:** Admin role defaults to `schema:edit` + privilege admin (small-startup) — **Admin only** (not lab manager / lab-tech / client); optional re-assign later; optional separate role later.  
+**Persona:** lab admin / `schema:edit` — scientist vocabulary, not DBA. **Günter follow-on:** Admin role defaults to `schema:edit` + privilege admin (small-startup) — **Admin only** (not lab manager / lab-tech / client); **Marc Confirm closed**; optional re-assign later; optional separate role later.  
 **Not IC50. No product code.**
 
 ## 1. Verdict shape
@@ -147,3 +147,5 @@ OQ-4–13 are **Decided** in the [Brief](../requirements/ui-schema-ddl-brief.md)
 **Fold note 2026-09-23 (Marc Leadership overwrite; Rolf Confirm):** mutate Schema with permission `schema:edit` (not a new role); Layouts with `layout:edit` (no DDL). List ephemeral columns; layout = display; privileges = R/W; multi-row table / single-record form; receive/asked-for = select then enter.
 
 **Fold note 2026-09-23 (Confirms; Rolf):** Günter + Hans + Deiter Confirmed Marc overwrite. Deiter Confirm retracts three-mode Hide/Read-only/Deny copy — layout = display; privileges = R/W. Implement CLOSED.
+
+**Marc Confirm (2026-09-23; Rolf):** Default **`schema:edit`** + privilege admin = **Admin only** (not lab manager). **Closed.** Optional re-assign later. Implement CLOSED.

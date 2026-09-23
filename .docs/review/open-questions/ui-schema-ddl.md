@@ -96,7 +96,7 @@ Plus catalog uniqueness / tenant isolation; role×layout visibility. UAT packet 
 
 | ID | Condition |
 |----|-----------|
-| **S-UI-1** | Permission **`schema:edit`** only for CREATE/ALTER (and schema registry mutate) — not a new role; admin-assignable. **Günter follow-on:** Admin defaults to `schema:edit` + privilege admin — **Admin only** (not lab manager / lab-tech / client); optional re-assign later; optional separate role later |
+| **S-UI-1** | Permission **`schema:edit`** only for CREATE/ALTER (and schema registry mutate) — not a new role; admin-assignable. **Günter follow-on:** Admin defaults to `schema:edit` + privilege admin — **Admin only** (not lab manager / lab-tech / client); **Marc Confirm closed**; optional re-assign later; optional separate role later |
 | **S-UI-2** | **FORCE RLS** on UI-created / UI-extended relations |
 | **S-UI-3** | Privileges **default-deny** in the API (not UI-only) |
 | **S-UI-4** | Permission **`layout:edit`** ≠ DDL; privilege Write never mints **`schema:edit`** |
@@ -119,3 +119,5 @@ Brief written. Implement gate opens after Design Group UX Accept **and** Günter
 **Rolf Confirm.** S-UI-1=`schema:edit`; S-UI-4=`layout:edit`; Hans SOP hints + Results Confirm; Deiter layout display locks (5)–(7). Implement CLOSED.
 
 **Confirms 2026-09-23 (Rolf):** Günter + Hans + Deiter Confirmed Marc overwrite. Deiter **retracts** three-mode Hide/Read-only/Deny copy. Implement CLOSED.
+
+**Marc Confirm (2026-09-23; Rolf):** Default **`schema:edit`** + privilege admin = **Admin only** (not lab manager). **Closed.** Optional re-assign later. Implement CLOSED.
