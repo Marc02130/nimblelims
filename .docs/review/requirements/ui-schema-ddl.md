@@ -28,7 +28,7 @@ This packet is the **AI-config foundation**, not AI itself. It does **not** open
 | Unpark AI breadth **only** where this schema-config is the blocker | Rolf 2026-09-22 |
 | **OQ-1 Decided:** catalog minimum = **table registry** + **column registry** (not lab data); physical CREATE/ALTER still real Postgres; `information_schema` alone insufficient; indexes/FKs wait | Marc + **Rolf Confirm** 2026-09-22 |
 | **OQ-2 Decided:** **role-based layout registry** (role × screen × visible columns/sections) — separate from table/column catalogs; schema ≠ layout | Marc + **Rolf Confirm** 2026-09-22 |
-| **OQ-3 Decided:** **role × table/column privileges** (read vs write; schema-admin separate) — **not** layout; API allow vs UI show | Marc + **Rolf Confirm** 2026-09-22 |
+| **OQ-3 Decided:** **role × table/column privileges** (read vs write; permission **`schema:edit`** separate — not a new role) — **not** layout; API allow vs UI show | Marc + **Rolf Confirm**; overwrite 2026-09-23 |
 | Column registry carries **public SOP field-name hints** for later AI mapping — no house SOP text in git | Katinka + Core 2026-09-22 |
 | Not IC50 | Standing |
 
@@ -64,22 +64,22 @@ Cite the [Brief](ui-schema-ddl-brief.md) for apply / tenant / allow-list / types
 | AC0 | **Catalog minimum:** product ships (or migrates in) a **table registry** and a **column registry**. UI editing of schema goes through these registries; they store configurable metadata (`information_schema` alone is not enough). |
 | AC0b | Applying create/add updates **both** the physical Postgres object **and** the corresponding registry row(s) in one controlled operation (**Brief OQ-4 Hybrid**: `lims_app` no DDL; schema-apply role / allow-listed function; audit + replay). |
 | AC0c | **Layout registry:** product ships a **role-based layout** catalog (role × screen × visible columns/sections). Runtime screens honor layout for the signed-in role; missing layout falls back per Mathilda lock. Layout edits do **not** CREATE/ALTER physical columns by themselves. |
-| AC0d | **Privileges (Brief OQ-10):** dedicated privilege registry; role × table/column **read/write**; default-deny; schema-admin for DDL. **Tobias Fail bars:** no-privilege write → **403/422** (not silent drop); privilege-denied read → refuse (not empty-as-layout); layout-hide ≠ API allow. |
-| AC0e | **AI hints:** column registry stores public SOP-oriented field-name hints (barcode vs sample ID, vessel vs material, parent link, matrix/type). No proprietary house SOP text required in git. |
+| AC0d | **Privileges (Brief OQ-10):** dedicated privilege registry; role × table/column **read/write**; default-deny; DDL needs **`schema:edit`**. **Tobias Fail bars:** no-privilege write → **403/422** (not silent drop); privilege-denied read → refuse (not empty-as-layout); layout-hide ≠ API allow. |
+| AC0e | **AI hints:** column registry SOP field-name hints — **sample type** (not matrix); **vessel = container**; barcode ≠ sample ID; container ≠ sample type; parent = `parent_sample_id`. No house SOP text in git. |
 | AC1 | **ADD COLUMN** via UI on an allow-listed table (**Brief OQ-6**: `samples` non-identity + UI-created tables; OQ-8 types) creates a real Postgres column **plus** a column-registry row. |
 | AC2 | **CREATE TABLE** via UI creates a real Postgres table (not a JSONB document store) **plus** a table-registry row. Platform columns **Brief OQ-7** (`id`, `client_id`, timestamps, `active`) then FORCE RLS. Slug `x_*` / `lab_*`. |
 | AC3 | **Not JSONB-as-config (OQ-16):** UI must not satisfy AC1/AC2 (or layout/privilege/catalog writes) via `custom_attributes` or other JSONB bags. JSONB **is** allowed as a **data** column type for instrument/payload blobs — that is not configuration. |
 | AC4 | **Tenant-safe:** shared schema + **FORCE RLS** on `client_id` (**Brief OQ-5**). Registries tenant-scoped in P1. |
 | AC5 | **Migratable:** Hybrid apply + `ui_schema` Alembic head / DDL log replay (**Brief OQ-4 / OQ-11**). Core Alembic does not DROP UI objects. |
-| AC6 | **Reversible:** deprecate first (retain data); DROP = schema-admin + confirm + impact + audit (**Brief OQ-9**, S-UI-6). |
-| AC7 | **Permission (S-UI-1…6):** DDL/schema mutate = **schema-admin** only; **FORCE RLS**; privileges **default-deny** in API; **layout-admin ≠ DDL**; no **`lims_app` bypass**; DROP confirm+audit. Data read/write uses OQ-3. |
+| AC6 | **Reversible:** deprecate first (retain data); DROP = permission **`schema:edit`** + confirm + impact + audit (**Brief OQ-9**, S-UI-6). |
+| AC7 | **Permission (S-UI-1…6):** DDL/schema mutate = permission **`schema:edit`** only (not a new role); **FORCE RLS**; privileges **default-deny** in API; permission **`layout:edit`** ≠ DDL and privilege Write never mints **`schema:edit`**; no **`lims_app` bypass**; DROP confirm+audit. Data read/write uses OQ-3. |
 | AC8 | **Audit:** who/when/what (and before/after definition) recorded for every schema mutate. |
 | AC9 | **Allow-list (Brief OQ-6):** ADD COLUMN on `samples` (non-identity) + UI-created tables. Identity/lineage fields (incl. freeze params, container type) never UI-droppable. CREATE TABLE = new lab entities only. |
 | AC10 | **UX:** Mathilda Accept — lab-admin schema + **layout** admin (role × screen); bounce DBA-only chrome as default path. Layout is the UX centerpiece, not a column-registry footnote. |
 | AC11 | **AI-ready metadata:** AI (later) reads **table + column + layout** registries (and allow-listed system descriptors) — not `information_schema` alone. No AI apply in this packet. Indexes/FKs not required in P1 catalog. |
 | AC12 | **Four screens:** Admin→Schema exposes **Tables**, **Columns**, **Layouts**, **Privileges** as distinct surfaces ([ui-review](../ui-review/ui-schema-ddl.md)). Bounce burying privileges/layout on the column row alone. |
-| AC13 | **DDL proof:** after CREATE/ALTER, UAT proves real Postgres relation/column via `information_schema` (or equivalent). Lab roles cannot DDL; **schema-admin** only. |
-| AC14 | **OQ-15 layout defaults:** no layout row → show all columns the role may **read**, in column-registry order; never show write-denied as editable; known screen keys first (`receive`, `asked-for`, `samples.detail`, `samples.list`). |
+| AC13 | **DDL proof:** after CREATE/ALTER, UAT proves real Postgres relation/column via `information_schema` (or equivalent). Without **`schema:edit`**, lab roles cannot DDL. |
+| AC14 | **OQ-15 + Deiter layout:** layout defines **displayed** columns (absent = not shown); R/W = privileges. List pages use role layout; on-the-fly column add/remove is **ephemeral**. Multi-row = table; single record = form. `receive`/`asked-for` = select then enter. Known screen keys first. |
 | AC15 | **OQ-16:** config mutations (table/column registry, layout, privileges, DDL apply) never persist configuration in JSONB. Fail bar (Tobias/Mathilda): config path writing JSONB instead of real relations/DDL → **Fail**. Instrument/payload JSONB data columns remain in scope as data. |
 
 ## 6. Path exercised (happy)
@@ -109,11 +109,13 @@ OQ-4–13 **Decided** in the [Brief](ui-schema-ddl-brief.md). Living OQ doc: [`u
 |--------|---------|
 | Leadership / CEO | **Packet OPEN** (pivot locked). Accept pending sketch. |
 | Architecture (Heidi) | **Accept with conditions** (2026-09-22, restamp @ `c6f0854`) — conditions **OQ-4–13** now **Decided** in [Brief](ui-schema-ddl-brief.md); **OQ-16 Confirm**. |
-| Science / CSO (Hans) | **Accept with conditions** (2026-09-22) — punches baked into Brief: SOP hint grains; OQ-9 deprecate; OQ-6 identity protect; classic Results first-class; no quantity+unit. |
+| Science / CSO (Hans) | **Accept with conditions** (2026-09-22) — punches baked into Brief. **Confirm 2026-09-23** Marc overwrite (SOP hints + Results). |
 | UI (Mathilda) | **Sketch Accept** @ `e12b0c2` — Tables/Columns/Layouts/Privileges; OQ-15 locked. **Design Group UX Accept pending.** |
-| Security (Günter) | **Accept with conditions** (2026-09-22) @ `c6f0854` — **S-UI-1…6** baked into Brief. **Restamp pending** that they still hold. |
-| Lab Ops (Deiter) | **Accept with conditions** (2026-09-22) @ `c6f0854` — Brief written (OQ-4–11). Still CLOSED until Design UX + Günter restamp. Layout vs receive/asked-for; Hide/Read-only/Deny copy; consult before new runtime screen. |
+| Security (Günter) | **Accept with conditions** @ `c6f0854` — S-UI-1…6; overwrite S-UI-1=`schema:edit`, S-UI-4=`layout:edit`. **Confirm 2026-09-23** Marc overwrite + **Admin defaults** to `schema:edit` + privilege admin — **Admin only** (not lab manager / lab-tech / client); optional re-assign later (optional separate role later; S-UI-2/3/5/6 unchanged). **Brief restamp pending**. |
+| Lab Ops (Deiter) | **Accept with conditions** (2026-09-22) @ `c6f0854` — Brief written (OQ-4–11). **Confirm 2026-09-23** Marc overwrite; **retract** Hide/Read-only/Deny three-mode copy. Still CLOSED until Design UX + Günter Brief restamp. |
 | Spec (Wilhelmina) | Living fold (this doc + Brief). |
 | QA (Tobias) | UAT after implement gate opens — Fail bars (1)–(5) incl. OQ-16 JSONB-as-config. |
 
 **Implement gate:** **CLOSED**. Brief written. Remains CLOSED until **Design Group UX Accept** and **Günter restamp**.
+
+**Marc overwrite Confirms (2026-09-23; Rolf):** Günter + Hans + Deiter Confirmed. Deiter retracts three-mode Hide/Read-only/Deny copy. **Günter follow-on:** Admin defaults to `schema:edit` + privilege admin — **Admin only** (not lab manager / lab-tech / client); optional re-assign later; optional separate role later; `layout:edit` still no DDL; S-UI-2/3/5/6 unchanged. Implement **CLOSED**.

@@ -19,7 +19,7 @@ This Brief closes the pre-implement blockers named by Leadership / Grok Bot: OQ-
 |----|------|
 | **OQ-1** | Table registry + column registry. Physical CREATE/ALTER is real Postgres. `information_schema` alone is not enough. Indexes/FKs wait. |
 | **OQ-2** | Role-based layout registry (role × screen × visible columns/sections). Schema ≠ layout. |
-| **OQ-3** | Role × table/column privileges (read vs write). schema-admin separate. Layout hide ≠ API allow. |
+| **OQ-3** | Role × table/column privileges (read vs write). Permission **`schema:edit`** separate (not a new role). Layout hide ≠ API allow. |
 | **OQ-15** | Known screen keys first; section → fields; default = all **read**-privileged columns; bench vs review separate. |
 | **OQ-16** | JSONB = payload **data** only. Never config. |
 | Surfaces | Admin → Schema: **Tables**, **Columns**, **Layouts**, **Privileges**. |
@@ -43,7 +43,7 @@ That role **must not** `SELECT` lab rows, **must not** `DROP DATABASE`, **must n
 
 **One controlled operation:**
 
-1. Privilege check: **schema-admin** only (S-UI-1).  
+1. Privilege check: permission **`schema:edit`** only (S-UI-1) — admin-assignable; not a new role.  
 2. Write registry row(s) + `schema_changes` audit (who / when / what / before / after).  
 3. Call schema-apply for the physical DDL.  
 4. Persist a **replayable upgrade artifact** (generated Alembic revision on a **second head** `ui_schema`, or an equivalent versioned DDL log that migrate-on-boot replays).  
@@ -86,7 +86,7 @@ Table / column / layout / privilege **registry rows** are tenant-scoped (`client
 - `samples.name`, `parent_sample_id`, `sample_type`, `status`, `matrix`, `project_id`, `client_sample_id`
 - Container `name`, `type_id`
 - Asked-for **freeze params** / freeze payload (identity of what was ordered — not UI-droppable even though ADD COLUMN on `asked_for` is already out of P1)
-- Barcode ≠ sample ID (Katinka). Vessel type ≠ matrix / sample type.
+- Barcode ≠ sample ID. Container (vessel synonym) ≠ sample type. Parent = `parent_sample_id`. SOP hints use **sample type** (not matrix).
 
 **CREATE TABLE:** new lab entities only. Display name → physical slug `x_<slug>` (or `lab_<slug>`). Never a second Samples table.
 
@@ -129,7 +129,7 @@ JSONB is allowed **only** as a **data** column type for instrument/payload blobs
 ## 6. OQ-9 — Deprecate vs DROP
 
 1. **Deprecate:** registry `status=deprecated`; hide from new layouts; data retained; existing queries still work. Default science-safe path.  
-2. **DROP:** **schema-admin** only; confirm + impact (row count, layout/privilege refs) + audit (**S-UI-6**). No silent DROP of data-bearing objects.
+2. **DROP:** permission **`schema:edit`** only; confirm + impact (row count, layout/privilege refs) + audit (**S-UI-6**). No silent DROP of data-bearing objects.
 
 **AC6** cites this section.
 
@@ -146,7 +146,7 @@ Dedicated **privilege registry** — not columns on the layout table.
 
 **Default deny:** missing table row = no access. Column inherit = table privilege; a column row can only **narrow**. Enforced in **API/service** (tenant RLS still applies). UI hide is never the gate (**S-UI-3**).
 
-**schema-admin** is a separate permission, not “Write on Samples” (**S-UI-1**). **layout-admin** cannot CREATE/ALTER and cannot mint schema-admin by writing privileges (**S-UI-4**).
+Permission **`schema:edit`** is separate from data Write on Samples (**S-UI-1**) — admin-assignable; small-lab friendly; **not** a new role. Permission **`layout:edit`** cannot CREATE/ALTER and privilege Write must **never** mint **`schema:edit`** (**S-UI-4**).
 
 **AC0d / AC7** cite this section.
 
@@ -179,16 +179,18 @@ Boot: apply core Alembic, then replay the UI trail. Collision → **fail closed*
 
 | Source | Lock |
 |--------|------|
-| **S-UI-1** | Only **schema-admin** CREATE/ALTER + schema-registry mutate |
+| **S-UI-1** | Permission **`schema:edit`** only for CREATE/ALTER + schema-registry mutate — **not** a new role; admin-assignable; small-lab friendly (**Marc Leadership overwrite 2026-09-23**). **Günter follow-on:** Admin role **defaults** to `schema:edit` + privilege admin (small-startup / no full-time IT) — **Admin only** (not lab manager / lab-tech / client); optional re-assign later; optional separate role later. |
 | **S-UI-2** | FORCE RLS on UI-created / UI-extended relations (OQ-5) |
 | **S-UI-3** | Privileges default-deny in the API (OQ-10) |
-| **S-UI-4** | layout-admin ≠ DDL; privilege write must not mint schema-admin |
+| **S-UI-4** | Permission **`layout:edit`** ≠ DDL; privilege Write must **never** mint **`schema:edit`** (**Marc overwrite 2026-09-23**) |
 | **S-UI-5** | No `lims_app` bypass; revoke schema CREATE from `lims_app` |
 | **S-UI-6** | DROP / destructive remove: confirm + impact + audit (OQ-9) |
-| **Hans SOP hints** | barcode ≠ sample ID; vessel ≠ matrix/sample type; parent = `parent_sample_id` |
-| **Hans Results** | Typed Result on a Test stays first-class; do not require a LimsRun for every Result field |
-| **Deiter** | Layout Apply on receive / asked-for / `samples.*` must not reintroduce one-hop or fight standing Lab Ops locks |
-| **Deiter** | Hide vs Read-only vs Deny copy — layout hide ≠ privilege deny |
+| **Hans SOP hints** | **matrix removed** from hints — use **sample type**; **vessel = container** synonym; keep barcode ≠ sample ID; container ≠ sample type; parent = `parent_sample_id` (**Marc overwrite**) |
+| **Hans Results** | **Confirm stands** — typed Result on a Test stays first-class; do not require a LimsRun for every Result field |
+| **Deiter** | **receive / asked-for** = select samples then enter (simple). Must not fight standing Lab Ops locks |
+| **Deiter** | **List pages** show role layout columns; on-the-fly add/remove columns is **ephemeral** (not stored in layout) |
+| **Deiter** | Layout defines **displayed** columns (absent = not shown); **read/write** = role privileges. **Three-mode Hide/Read-only/Deny copy retracted** (Confirm 2026-09-23) |
+| **Deiter** | **Multi-row** = table with role data-type layout; **single record** = form |
 | **Deiter** | Lab Ops consult before a UI-created table gets a **bench runtime screen**. P1 CREATE TABLE may exist without a bench screen. |
 
 ---
@@ -202,3 +204,15 @@ Boot: apply core Alembic, then replay the UI trail. Collision → **fail closed*
 | Günter restamp that S-UI-1…6 still hold under this Brief | **Pending** |
 
 After both stamps: implement gate **OPEN**. Coding stays Grok Build unless Marc/Rolf asks. Tobias UAT uses Fail bars (1)–(5). Signed reviews (Lab Ops / Science / CSO / UI sketch) got **fold notes** only — this Brief does **not** invent Design UX Accept or a Günter restamp.
+
+---
+
+## 13. Confirms on Marc overwrite (2026-09-23)
+
+| Reviewer | Confirm |
+|----------|---------|
+| **Günter** | Marc overwrite Confirmed (S-UI-1=`schema:edit`; S-UI-4=`layout:edit`). **Follow-on:** Admin defaults to `schema:edit` + privilege admin — **Admin only** (not lab manager / lab-tech / client); optional re-assign later; optional separate role later; `layout:edit` still no DDL; S-UI-2/3/5/6 unchanged. Brief-level restamp still pending. |
+| **Hans** | Marc overwrite Confirmed (SOP hints + Results Confirm). |
+| **Deiter** | Marc overwrite Confirmed; **retracts** three-mode Hide/Read-only/Deny bench copy. |
+
+**Rolf Confirm.** Implement still **CLOSED** until Design Group UX Accept + Günter Brief restamp.
