@@ -1,7 +1,7 @@
 # Requirements: UI-driven schema DDL (real Postgres)
 
 **Date:** 2026-09-22  
-**Status:** **Brief written** ([ui-schema-ddl-brief.md](ui-schema-ddl-brief.md) 2026-09-22) — OQ-4–13 **Decided**. Heidi / Hans / Deiter / Günter Accept-with-conditions stand. Implement gate **CLOSED** until Design Group UX Accept (Günter Brief restamp Met). Coding stays Grok Build unless Marc/Rolf asks.  
+**Status:** **Brief written** ([ui-schema-ddl-brief.md](ui-schema-ddl-brief.md) 2026-09-22) — OQ-4–13 **Decided**. Heidi / Hans / Deiter / Günter Accept-with-conditions stand. Implement gate **OPEN** (Design Group UX Accept Met @ `f79e2a0`; Günter Brief restamp Met). Next: Marc green-light for Grok Build — no code until Marc asks. Coding stays Grok Build unless Marc/Rolf asks.  
 **Stem:** `ui-schema-ddl`  
 **Leadership lock:** Core pivot 2026-09-22 — AI-config foundation needs **add tables and columns through the UI as real Postgres objects**, not JSONB pretending to be schema. Sample-processing critical path Met on `main` (E-10 → E-6).  
 **Open questions:** [`.docs/review/open-questions/ui-schema-ddl.md`](../open-questions/ui-schema-ddl.md)  
@@ -110,13 +110,14 @@ OQ-4–13 **Decided** in the [Brief](ui-schema-ddl-brief.md). Living OQ doc: [`u
 | Leadership / CEO | **Packet OPEN** (pivot locked). Accept pending sketch. |
 | Architecture (Heidi) | **Accept with conditions** (2026-09-22, restamp @ `c6f0854`) — conditions **OQ-4–13** now **Decided** in [Brief](ui-schema-ddl-brief.md); **OQ-16 Confirm**. |
 | Science / CSO (Hans) | **Accept with conditions** (2026-09-22) — punches baked into Brief. **Confirm 2026-09-23** Marc overwrite (SOP hints + Results). |
-| UI (Mathilda) | **Sketch Accept** @ `e12b0c2` — Tables/Columns/Layouts/Privileges; OQ-15 locked. **Design Group UX Accept pending.** |
+| UI (Mathilda) | **Sketch Accept** @ `e12b0c2`; **re-stamped** @ `f79e2a0`. |
+| Design Group | **UX Accept Met** @ `f79e2a0` (Heidi / Hans / Deiter). |
 | Security (Günter) | **Accept with conditions** @ `c6f0854` — S-UI-1…6; overwrite S-UI-1=`schema:edit`, S-UI-4=`layout:edit`. **Confirm 2026-09-23** Marc overwrite + **Admin defaults** to `schema:edit` + privilege admin — **Admin only** (not lab manager / lab-tech / client); **Marc Confirm closed**; optional re-assign later (optional separate role later; S-UI-2/3/5/6 unchanged). **Brief restamp Met**. |
-| Lab Ops (Deiter) | **Accept with conditions** (2026-09-22) @ `c6f0854` — Brief written (OQ-4–11). **Confirm 2026-09-23** Marc overwrite; **retract** Hide/Read-only/Deny three-mode copy. Still CLOSED until Design UX Accept (Günter Brief restamp Met). |
+| Lab Ops (Deiter) | **Accept with conditions** (2026-09-22) @ `c6f0854` — Brief written (OQ-4–11). **Confirm 2026-09-23** Marc overwrite; **retract** Hide/Read-only/Deny three-mode copy. Implement **OPEN** (Design UX Accept Met @ `f79e2a0`). |
 | Spec (Wilhelmina) | Living fold (this doc + Brief). |
 | QA (Tobias) | UAT after implement gate opens — Fail bars (1)–(5) incl. OQ-16 JSONB-as-config. |
 
-**Implement gate:** **CLOSED**. Brief written. Remains CLOSED until **Design Group UX Accept** (Günter Brief restamp Met).
+**Implement gate:** **OPEN**. Design Group UX Accept **Met** @ `f79e2a0` (Heidi/Hans/Deiter). Günter Brief restamp **Met**. Next: Marc green-light for Grok Build — no code until Marc asks.
 
 **Marc overwrite Confirms (2026-09-23; Rolf):** Günter + Hans + Deiter Confirmed. Deiter retracts three-mode Hide/Read-only/Deny copy. **Günter follow-on:** Admin defaults to `schema:edit` + privilege admin — **Admin only** (not lab manager / lab-tech / client); **Marc Confirm closed**; optional re-assign later; optional separate role later; `layout:edit` still no DDL; S-UI-2/3/5/6 unchanged. Implement **CLOSED**.
 
@@ -135,3 +136,15 @@ OQ-4–13 **Decided** in the [Brief](ui-schema-ddl-brief.md). Living OQ doc: [`u
 
 Retract any remaining copy that implies a hide mode or three-mode Hide / Read-only / Deny. Implement still **CLOSED** pending Design Group UX Accept (Günter Brief restamp **Met**).
 **Design Group punch fold 2026-09-23 (Rolf; tip after fold):** UX sketch §6 `schema:edit` (Admin-only); §5/§7 body has list ephemeral + receive/asked-for select-then-enter + multi-row table/single form; §6 “not on layout” (not Layout-hidden). Heidi/Hans/Deiter punches 1 and 4 Met. Awaiting Design Group UX re-stamp. Implement CLOSED.
+**UI Sketch Accept re-stamp (Mathilda; 2026-09-23):** Verified on tip `f79e2a0` — `schema:edit` Admin-only (no Schema-admin role); asked-for/routing leave as is; ephemeral list cols; multi-row table / single form; not on layout (membership only). Design Group UX Accept still pending on that tip. Implement CLOSED.
+
+## Implement gate OPEN (2026-09-23; Rolf)
+
+| Gate | Status |
+|------|--------|
+| Design Group UX Accept | **Met** on tip `f79e2a0` (Heidi / Hans / Deiter) |
+| Günter Brief restamp | **Met** |
+| Implement gate | **OPEN** |
+
+Next: **Marc green-light** for Grok Build. No product code until Marc asks. Coding stays Grok Build unless Marc/Rolf asks otherwise.
+
