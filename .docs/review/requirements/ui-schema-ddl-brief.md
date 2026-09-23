@@ -179,7 +179,7 @@ Boot: apply core Alembic, then replay the UI trail. Collision → **fail closed*
 
 | Source | Lock |
 |--------|------|
-| **S-UI-1** | Permission **`schema:edit`** only for CREATE/ALTER + schema-registry mutate — **not** a new role; admin-assignable; small-lab friendly (**Marc Leadership overwrite 2026-09-23**). **Günter follow-on:** Admin role **defaults** to `schema:edit` + privilege admin (small-startup / no full-time IT) — **Admin only** (not lab manager / lab-tech / client); optional re-assign later; optional separate role later. |
+| **S-UI-1** | Permission **`schema:edit`** only for CREATE/ALTER + schema-registry mutate — **not** a new role; admin-assignable; small-lab friendly (**Marc Leadership overwrite 2026-09-23**). **Günter follow-on:** Admin role **defaults** to `schema:edit` + privilege admin (small-startup / no full-time IT) — **Admin only** (not lab manager / lab-tech / client); **Marc Confirm closed**; optional re-assign later; optional separate role later. |
 | **S-UI-2** | FORCE RLS on UI-created / UI-extended relations (OQ-5) |
 | **S-UI-3** | Privileges default-deny in the API (OQ-10) |
 | **S-UI-4** | Permission **`layout:edit`** ≠ DDL; privilege Write must **never** mint **`schema:edit`** (**Marc overwrite 2026-09-23**) |
@@ -211,8 +211,11 @@ After both stamps: implement gate **OPEN**. Coding stays Grok Build unless Marc/
 
 | Reviewer | Confirm |
 |----------|---------|
-| **Günter** | Marc overwrite Confirmed (S-UI-1=`schema:edit`; S-UI-4=`layout:edit`). **Follow-on:** Admin defaults to `schema:edit` + privilege admin — **Admin only** (not lab manager / lab-tech / client); optional re-assign later; optional separate role later; `layout:edit` still no DDL; S-UI-2/3/5/6 unchanged. Brief-level restamp still pending. |
+| **Günter** | Marc overwrite Confirmed (S-UI-1=`schema:edit`; S-UI-4=`layout:edit`). **Follow-on:** Admin defaults to `schema:edit` + privilege admin — **Admin only** (not lab manager / lab-tech / client); **Marc Confirm closed**; optional re-assign later; optional separate role later; `layout:edit` still no DDL; S-UI-2/3/5/6 unchanged. Brief-level restamp still pending. |
 | **Hans** | Marc overwrite Confirmed (SOP hints + Results Confirm). |
 | **Deiter** | Marc overwrite Confirmed; **retracts** three-mode Hide/Read-only/Deny bench copy. |
+| **Marc** | **Confirm closed:** default `schema:edit` + privilege admin = **Admin only** (not lab manager). |
 
 **Rolf Confirm.** Implement still **CLOSED** until Design Group UX Accept + Günter Brief restamp.
+
+**Marc Confirm (2026-09-23; Rolf):** Default **`schema:edit`** + privilege admin = **Admin only** (not lab manager). **Closed.** Optional re-assign later. Implement CLOSED.

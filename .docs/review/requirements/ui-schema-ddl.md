@@ -111,11 +111,13 @@ OQ-4–13 **Decided** in the [Brief](ui-schema-ddl-brief.md). Living OQ doc: [`u
 | Architecture (Heidi) | **Accept with conditions** (2026-09-22, restamp @ `c6f0854`) — conditions **OQ-4–13** now **Decided** in [Brief](ui-schema-ddl-brief.md); **OQ-16 Confirm**. |
 | Science / CSO (Hans) | **Accept with conditions** (2026-09-22) — punches baked into Brief. **Confirm 2026-09-23** Marc overwrite (SOP hints + Results). |
 | UI (Mathilda) | **Sketch Accept** @ `e12b0c2` — Tables/Columns/Layouts/Privileges; OQ-15 locked. **Design Group UX Accept pending.** |
-| Security (Günter) | **Accept with conditions** @ `c6f0854` — S-UI-1…6; overwrite S-UI-1=`schema:edit`, S-UI-4=`layout:edit`. **Confirm 2026-09-23** Marc overwrite + **Admin defaults** to `schema:edit` + privilege admin — **Admin only** (not lab manager / lab-tech / client); optional re-assign later (optional separate role later; S-UI-2/3/5/6 unchanged). **Brief restamp pending**. |
+| Security (Günter) | **Accept with conditions** @ `c6f0854` — S-UI-1…6; overwrite S-UI-1=`schema:edit`, S-UI-4=`layout:edit`. **Confirm 2026-09-23** Marc overwrite + **Admin defaults** to `schema:edit` + privilege admin — **Admin only** (not lab manager / lab-tech / client); **Marc Confirm closed**; optional re-assign later (optional separate role later; S-UI-2/3/5/6 unchanged). **Brief restamp pending**. |
 | Lab Ops (Deiter) | **Accept with conditions** (2026-09-22) @ `c6f0854` — Brief written (OQ-4–11). **Confirm 2026-09-23** Marc overwrite; **retract** Hide/Read-only/Deny three-mode copy. Still CLOSED until Design UX + Günter Brief restamp. |
 | Spec (Wilhelmina) | Living fold (this doc + Brief). |
 | QA (Tobias) | UAT after implement gate opens — Fail bars (1)–(5) incl. OQ-16 JSONB-as-config. |
 
 **Implement gate:** **CLOSED**. Brief written. Remains CLOSED until **Design Group UX Accept** and **Günter restamp**.
 
-**Marc overwrite Confirms (2026-09-23; Rolf):** Günter + Hans + Deiter Confirmed. Deiter retracts three-mode Hide/Read-only/Deny copy. **Günter follow-on:** Admin defaults to `schema:edit` + privilege admin — **Admin only** (not lab manager / lab-tech / client); optional re-assign later; optional separate role later; `layout:edit` still no DDL; S-UI-2/3/5/6 unchanged. Implement **CLOSED**.
+**Marc overwrite Confirms (2026-09-23; Rolf):** Günter + Hans + Deiter Confirmed. Deiter retracts three-mode Hide/Read-only/Deny copy. **Günter follow-on:** Admin defaults to `schema:edit` + privilege admin — **Admin only** (not lab manager / lab-tech / client); **Marc Confirm closed**; optional re-assign later; optional separate role later; `layout:edit` still no DDL; S-UI-2/3/5/6 unchanged. Implement **CLOSED**.
+
+**Marc Confirm (2026-09-23; Rolf):** Default **`schema:edit`** + privilege admin = **Admin only** (not lab manager). **Closed.** Optional re-assign later. Implement CLOSED.

@@ -39,4 +39,6 @@ Implement remains **CLOSED**. Original S-UI-1…6 stand (this note is not a CSO 
 
 **Confirm 2026-09-23 (Günter; Rolf):** Marc Leadership overwrite Confirmed — S-UI-1=`schema:edit`; S-UI-4=`layout:edit`. Implement CLOSED. Brief-level Günter restamp still separate / pending.
 
-**Günter Confirm follow-on (2026-09-23; Rolf):** Admin role **defaults** to permission **`schema:edit`** + privilege admin (small-startup / no full-time IT) — **Admin only** (not lab manager / lab-tech / client); optional re-assign later. Optional separate schema role later. Permission **`layout:edit`** still no DDL. **S-UI-2 / S-UI-3 / S-UI-5 / S-UI-6** unchanged.
+**Günter Confirm follow-on (2026-09-23; Rolf):** Admin role **defaults** to permission **`schema:edit`** + privilege admin (small-startup / no full-time IT) — **Admin only** (not lab manager / lab-tech / client); **Marc Confirm closed**; optional re-assign later. Optional separate schema role later. Permission **`layout:edit`** still no DDL. **S-UI-2 / S-UI-3 / S-UI-5 / S-UI-6** unchanged.
+
+**Marc Confirm (2026-09-23; Rolf):** Default **`schema:edit`** + privilege admin = **Admin only** (not lab manager). **Closed.** Optional re-assign later. Implement CLOSED.
