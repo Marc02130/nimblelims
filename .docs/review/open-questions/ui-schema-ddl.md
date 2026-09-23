@@ -16,8 +16,8 @@ Sample-processing critical path is Met on `main`. AI config needs a **robust con
 | ID | Decision | Stamp | Date |
 |----|----------|-------|------|
 | **OQ-1** | **Catalog minimum = two schema registries:** (1) **table registry**; (2) **column registry** (name, type, nullability, order, display defaults, tenant rules, **AI/SOP field-name hints**). Catalogs **describe** configurable real Postgres objects; they are **not** lab data. **`information_schema` alone is not enough**. Physical **CREATE / ALTER … ADD COLUMN** still hits real DB. **Indexes / FKs wait**. Heidi Accept before implement. | Marc + **Rolf Confirm** | 2026-09-22 |
-| **OQ-2** | **Role-based layout registry** (separate): **role × screen × visible columns/sections**. Schema = what exists; layout = who **sees** what where. Do not bury layout only in the column registry. Mathilda centerpiece. | Marc + **Rolf Confirm** | 2026-09-22 |
-| **OQ-3** | **Role-based access** to tables and columns — **not** the same as layout. Access = what the **API allows** (at least **read vs write** per role on table and column; permission **`schema:edit`** separate — not a new role). A field may be layout-hidden yet still write-forbidden; or visible but **read-only**. Tobias: Fail bars for **privilege refuse** vs **layout hide**. | Marc + **Rolf Confirm**; overwrite 2026-09-23 |
+| **OQ-2** | **Role-based layout registry** (separate): **role × screen × membership**. Schema = what exists; layout = who **sees** what where (**on layout** = show; **not on layout** = not shown — **no hide toggle**). Do not bury layout only in the column registry. Mathilda centerpiece. | Marc + **Rolf Confirm**; overwrite 2026-09-23 | 2026-09-23 |
+| **OQ-3** | **Role-based access** to tables and columns — **not** the same as layout. Access = what the **API allows** (at least **read vs write** per role on table and column; permission **`schema:edit`** separate — not a new role). A field may be **off the layout** yet still write-forbidden; or on the layout as **read-only** (from privileges). Tobias: Fail bars for **privilege refuse** vs **not on layout**. **No layout hide.** | Marc + **Rolf Confirm**; overwrite 2026-09-23 |
 | **OQ-15** | **Layout grain:** known product screen keys first; section → fields; default when no layout = all **read**-privileged columns in registry order; bench vs review separate layouts; layout read-only chrome ≠ API write. Four surfaces: Tables / Columns / Layouts / Privileges. | Mathilda Sketch Accept @ `e12b0c2` | 2026-09-22 |
 | **OQ-16** | **JSONB = payload data only** (instrument results / similar blobs). **Not** for system configuration — schema, layout, privileges, and other config live in **real tables/columns** (registries + DDL). Bounce JSONB-as-config. | Marc + **Rolf Confirm** | 2026-09-22 |
 | **OQ-4** | **Apply model = Hybrid.** Lab HTTP on `lims_app` (no DDL). Physical DDL via schema-apply role / allow-listed function. Registry + audit + DDL one op. Replay via `ui_schema` Alembic head (or DDL log). Revoke `CREATE` on `public` from `lims_app` (S-UI-5). | Brief 2026-09-22 | 2026-09-22 |
@@ -85,7 +85,7 @@ Plus catalog uniqueness / tenant isolation; role×layout visibility. UAT packet 
 
 1. Implement stays **CLOSED** until **OQ-4–11** addressed + **Günter** Accept + **Brief**.  
 2. **Layout Apply** must not fight living **receive / asked-for** locks — **select samples then enter** (simple).  
-3. Layout = **displayed** columns (absent = not shown); R/W = role privileges. **Three-mode Hide/Read-only/Deny copy retracted** (Deiter Confirm 2026-09-23).  
+3. Layout = **membership** only (absent = not shown); **no layout hide**. R/W = privileges (read-only from Write=no). Three-mode Hide/Read-only/Deny **retracted**. **Marc overwrite 2026-09-23**.  
 4. **Lab Ops consult** before a new UI-created table gets a **runtime** screen.  
 5. **List pages:** role layout columns; on-the-fly add/remove is **ephemeral** (not stored).  
 6. **Multi-row** = table + role data-type layout; **single record** = form.
@@ -107,12 +107,12 @@ Plus catalog uniqueness / tenant isolation; role×layout visibility. UAT packet 
 
 - **Brief** — **written** 2026-09-22 ([ui-schema-ddl-brief.md](../requirements/ui-schema-ddl-brief.md)); OQ-4–13 Decided  
 - **Design Group UX Accept** on Tables / Columns / Layouts / Privileges — pending (Mathilda Sketch Accept is not this stamp)  
-- **Günter restamp** that S-UI-1…6 still hold under the Brief — pending  
-- Implement still **CLOSED** until those two stamps  
+- **Günter restamp** that S-UI-1…6 still hold under the Brief — **Met**  
+- Implement still **CLOSED** until **Design Group UX Accept**  
 
 ## Unpark / decide rule
 
-Brief written. Implement gate opens after Design Group UX Accept **and** Günter restamp. Heidi + Hans + Deiter + Günter Accept-with-conditions stand. No product code before those stamps.
+Brief written. Implement gate opens after Design Group UX Accept (Günter Brief restamp Met). Heidi + Hans + Deiter + Günter Accept-with-conditions stand. No product code before those stamps.
 
 ## Marc Leadership overwrite (2026-09-23)
 
@@ -121,3 +121,17 @@ Brief written. Implement gate opens after Design Group UX Accept **and** Günter
 **Confirms 2026-09-23 (Rolf):** Günter + Hans + Deiter Confirmed Marc overwrite. Deiter **retracts** three-mode Hide/Read-only/Deny copy. Implement CLOSED.
 
 **Marc Confirm (2026-09-23; Rolf):** Default **`schema:edit`** + privilege admin = **Admin only** (not lab manager). **Closed.** Optional re-assign later. Implement CLOSED.
+
+## Marc Leadership overwrite — layout visibility (2026-09-23; Rolf Confirm)
+
+**No “hidden” on layout.** Visibility = **membership** on the layout only. Do **not** add a hide / Visible toggle that keeps the field on the layout as hidden.
+
+| Case | Rule |
+|------|------|
+| **Show** | Field is on the role × screen layout. |
+| **Not shown** | Field is **not added** to the layout (absent = not shown — Deiter stands). |
+| Neither read nor write | Not displayed; layout editor **must not offer** that field. |
+| Read yes / Write no | May appear on layout as **read-only** — from **privileges**, not a layout hide. |
+
+Retract any remaining copy that implies a hide mode or three-mode Hide / Read-only / Deny. Implement still **CLOSED** pending Design Group UX Accept (Günter Brief restamp **Met**).
+

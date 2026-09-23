@@ -39,3 +39,17 @@ Implement remains **CLOSED**. Original punches stand (this note is not a Science
 **Fold note 2026-09-23 (Marc Leadership overwrite; Rolf Confirm):** SOP hints — matrix out / sample type in; vessel=container; classic Results Confirm stands.
 
 **Confirm 2026-09-23 (Hans; Rolf):** Marc Leadership overwrite Confirmed — SOP hints (matrix→sample type; vessel=container) + classic Results Confirm stands. Implement CLOSED.
+
+## Marc Leadership overwrite — layout visibility (2026-09-23; Rolf Confirm)
+
+**No “hidden” on layout.** Visibility = **membership** on the layout only. Do **not** add a hide / Visible toggle that keeps the field on the layout as hidden.
+
+| Case | Rule |
+|------|------|
+| **Show** | Field is on the role × screen layout. |
+| **Not shown** | Field is **not added** to the layout (absent = not shown — Deiter stands). |
+| Neither read nor write | Not displayed; layout editor **must not offer** that field. |
+| Read yes / Write no | May appear on layout as **read-only** — from **privileges**, not a layout hide. |
+
+Retract any remaining copy that implies a hide mode or three-mode Hide / Read-only / Deny. Implement still **CLOSED** pending Design Group UX Accept (Günter Brief restamp **Met**).
+
