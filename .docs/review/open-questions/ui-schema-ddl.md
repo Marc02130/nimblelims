@@ -1,7 +1,7 @@
 # Open questions: UI-driven schema DDL (real Postgres)
 
 **Date:** 2026-09-22  
-**Status:** OQ-1/2/3/15/16 **Decided**; **OQ-4–13 Decided** in [Brief](../requirements/ui-schema-ddl-brief.md) 2026-09-22. Heidi / Hans / Deiter / Günter Accept-with-conditions stand. Implement still **CLOSED** until Design Group UX Accept + Günter restamp. Packet `ui-schema-ddl`  
+**Status:** OQ-1/2/3/15/16 **Decided**; **OQ-4–13 Decided** in [Brief](../requirements/ui-schema-ddl-brief.md). Design Group UX Accept **Met** @ `f79e2a0`. Günter Brief restamp **Met**. Implement gate **OPEN**. Next: Marc green-light for Grok Build. Packet `ui-schema-ddl`  
 **Requirements:** [`.docs/review/requirements/ui-schema-ddl.md`](../requirements/ui-schema-ddl.md)  
 **Leadership:** Core pivot 2026-09-22 — CREATE TABLE / ADD COLUMN via UI as real Postgres; tenant-safe, migratable, reversible; role-based layout; role-based table/column access.  
 **Owners:** Heidi (architecture), Mathilda (UX / layout), Günter (authZ), Tobias (UAT Fail bars), Wilhelmina (docs), Katinka (SOP field-name hints).  
@@ -108,11 +108,11 @@ Plus catalog uniqueness / tenant isolation; role×layout visibility. UAT packet 
 - **Brief** — **written** 2026-09-22 ([ui-schema-ddl-brief.md](../requirements/ui-schema-ddl-brief.md)); OQ-4–13 Decided  
 - **Design Group UX Accept** on Tables / Columns / Layouts / Privileges — pending (Mathilda Sketch Accept is not this stamp)  
 - **Günter restamp** that S-UI-1…6 still hold under the Brief — **Met**  
-- Implement still **CLOSED** until **Design Group UX Accept**  
+- Implement gate **OPEN** (Design Group UX Accept Met @ `f79e2a0`)  
 
 ## Unpark / decide rule
 
-Brief written. Implement gate opens after Design Group UX Accept (Günter Brief restamp Met). Heidi + Hans + Deiter + Günter Accept-with-conditions stand. No product code before those stamps.
+Brief written. Design Group UX Accept **Met** @ `f79e2a0`. Günter Brief restamp **Met**. Implement **OPEN**. No product code until **Marc green-light** for Grok Build.
 
 ## Marc Leadership overwrite (2026-09-23)
 
@@ -142,4 +142,14 @@ Retract any remaining copy that implies a hide mode or three-mode Hide / Read-on
 3. Still required: ephemeral list columns; multi-row = table / single = form; “not on layout” (never layout-hidden); `schema:edit` Admin-only.
 
 Implement **CLOSED**. Design Group re-stamps after tip.
+
+## Implement gate OPEN (2026-09-23; Rolf)
+
+| Gate | Status |
+|------|--------|
+| Design Group UX Accept | **Met** on tip `f79e2a0` (Heidi / Hans / Deiter) |
+| Günter Brief restamp | **Met** |
+| Implement gate | **OPEN** |
+
+Next: **Marc green-light** for Grok Build. No product code until Marc asks. Coding stays Grok Build unless Marc/Rolf asks otherwise.
 

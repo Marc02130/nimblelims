@@ -1,7 +1,7 @@
 # UI review: UI-driven schema DDL (admin UX sketch)
 
 **Date:** 2026-09-22  
-**Status:** **Sketch Accept** (Mathilda @ `e12b0c2`). [Brief](../requirements/ui-schema-ddl-brief.md) 2026-09-22 Decides OQ-4–13. **Design Group UX Accept pending** — punched tip `19f538f` (not Accept); Spec fold this doc for re-stamp. Implement gate **CLOSED**. Günter Brief restamp **Met**.  
+**Status:** **Sketch Accept** (Mathilda @ `e12b0c2`; **re-stamped** on Spec tip `f79e2a0` 2026-09-23). [Brief](../requirements/ui-schema-ddl-brief.md) 2026-09-22 Decides OQ-4–13. **Design Group UX Accept Met** on tip `f79e2a0` (Heidi/Hans/Deiter). Günter Brief restamp **Met**. Implement gate **OPEN**. Next: Marc green-light for Grok Build.  
 **Stem:** `ui-schema-ddl`  
 **Requirements:** [`.docs/review/requirements/ui-schema-ddl.md`](../requirements/ui-schema-ddl.md)  
 **Open questions:** [`.docs/review/open-questions/ui-schema-ddl.md`](../open-questions/ui-schema-ddl.md)  
@@ -140,20 +140,20 @@ Receive, Asked-for, Samples, etc. load: column registry ∩ layout(role, screen)
 
 ## 10. Brief lock (do not invent in UX)
 
-OQ-4–13 are **Decided** in the [Brief](../requirements/ui-schema-ddl-brief.md) (Hybrid apply, shared+FORCE RLS, allow-list, platform columns, P1 types, deprecate-first, privilege registry, `ui_schema` head, leave Entries, `custom_attributes` follow-on). Sketch chrome must follow those locks. Remaining gate: **Design Group UX Accept** on Tables / Columns / Layouts / Privileges — this sketch is not that stamp. Günter Brief restamp **Met**.
+OQ-4–13 are **Decided** in the [Brief](../requirements/ui-schema-ddl-brief.md) (Hybrid apply, shared+FORCE RLS, allow-list, platform columns, P1 types, deprecate-first, privilege registry, `ui_schema` head, leave Entries, `custom_attributes` follow-on). Sketch chrome must follow those locks. Design Group UX Accept **Met** @ `f79e2a0`. Günter Brief restamp **Met**. Implement **OPEN**; Marc green-light next.
 
 ## 11. Sign-off
 
 | Review | Verdict |
 |--------|---------|
-| UI (Mathilda) | **Sketch Accept** — Tables / Columns / Layouts / Privileges; OQ-15 locked as above |
+| UI (Mathilda) | **Sketch Accept** — Tables / Columns / Layouts / Privileges; OQ-15 locked; **re-stamped** @ `f79e2a0` |
 | Architecture (Heidi) | **Accept with conditions** (OQ-4–13 now Decided in Brief) — 2026-09-22; punches 1 and 4 **Met** (Design Group 2026-09-23) |
 | Security (Günter) | **Accept with conditions** (S-UI-1…6) — Brief restamp **Met** |
 | Lab Ops (Deiter) | **Accept with conditions** — Brief written; punches 1 and 4 **Met** |
 | Science (Hans) | **Accept with conditions** — punches 1 and 4 **Met** |
-| Design Group | **Punched tip `19f538f`** — UX Accept pending re-stamp after this fold |
+| Design Group | **UX Accept Met** on tip `f79e2a0` (Heidi / Hans / Deiter) |
 
-**Implement gate:** **CLOSED** until Design Group UX Accept (Günter Brief restamp Met).
+**Implement gate:** **OPEN** (Design Group UX Accept Met @ `f79e2a0`; Günter Brief restamp Met). Next: Marc green-light for Grok Build — no code until Marc asks.
 
 **Fold note 2026-09-23 (Marc Leadership overwrite; Rolf Confirm):** mutate Schema with permission `schema:edit` (not a new role); Layouts with `layout:edit` (no DDL). List ephemeral columns; layout = membership; privileges = R/W; multi-row table / single-record form; receive/asked-for = select then enter.
 
@@ -183,4 +183,15 @@ Retract any remaining copy that implies a hide mode or three-mode Hide / Read-on
 3. Still required: ephemeral list columns; multi-row = table / single = form; “not on layout” (never layout-hidden); `schema:edit` Admin-only.
 
 Implement **CLOSED**. Design Group re-stamps after tip.
+**UI Sketch Accept re-stamp (Mathilda; 2026-09-23):** Verified on tip `f79e2a0` — `schema:edit` Admin-only (no Schema-admin role); asked-for/routing leave as is; ephemeral list cols; multi-row table / single form; not on layout (membership only). Design Group UX Accept still pending on that tip. Implement CLOSED.
+
+## Implement gate OPEN (2026-09-23; Rolf)
+
+| Gate | Status |
+|------|--------|
+| Design Group UX Accept | **Met** on tip `f79e2a0` (Heidi / Hans / Deiter) |
+| Günter Brief restamp | **Met** |
+| Implement gate | **OPEN** |
+
+Next: **Marc green-light** for Grok Build. No product code until Marc asks. Coding stays Grok Build unless Marc/Rolf asks otherwise.
 

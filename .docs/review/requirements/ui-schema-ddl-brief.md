@@ -3,7 +3,7 @@
 **Date:** 2026-09-22  
 **Stem:** `ui-schema-ddl`  
 **Branch:** `docs/ui-schema-ddl`  
-**Status:** **Brief written** — OQ-4–13 **Decided** (this fold). Implement gate still **CLOSED** until Design Group UX Accept + Günter restamp.  
+**Status:** **Brief written** — OQ-4–13 **Decided** (this fold). Implement gate **OPEN** (Design Group UX Accept Met @ `f79e2a0`; Günter Brief restamp Met). Next: Marc green-light for Grok Build.  
 **Requirements:** [ui-schema-ddl.md](ui-schema-ddl.md)  
 **Open questions:** [../open-questions/ui-schema-ddl.md](../open-questions/ui-schema-ddl.md)  
 **UI sketch:** [../ui-review/ui-schema-ddl.md](../ui-review/ui-schema-ddl.md) (Mathilda Sketch Accept @ `e12b0c2` — not Design Group UX Accept)  
@@ -195,15 +195,15 @@ Boot: apply core Alembic, then replay the UI trail. Collision → **fail closed*
 
 ---
 
-## 12. Still waiting (implement stays CLOSED)
+## 12. Gate status (implement OPEN)
 
 | Gate | Status |
 |------|--------|
 | This Brief (OQ-4–13) | **Written** this fold |
-| Design Group UX Accept on Tables / Columns / Layouts / Privileges | **Pending** — Mathilda Sketch Accept is not this stamp |
-| Günter restamp that S-UI-1…6 still hold under this Brief | **Met** (2026-09-23) |
+| Design Group UX Accept on Tables / Columns / Layouts / Privileges | **Met** @ `f79e2a0` (Heidi / Hans / Deiter) |
+| Günter restamp that S-UI-1…6 still hold under this Brief | **Met** |
 
-After Design Group UX Accept: implement gate **OPEN** (Günter Brief restamp Met). Coding stays Grok Build unless Marc/Rolf asks. Tobias UAT uses Fail bars (1)–(5). Signed reviews (Lab Ops / Science / CSO / UI sketch) got **fold notes** only — this Brief does **not** invent Design UX Accept or a Günter restamp.
+Implement gate **OPEN**. Coding stays Grok Build unless Marc/Rolf asks; wait for **Marc green-light** before code. Tobias UAT uses Fail bars (1)–(5).
 
 ---
 
@@ -216,7 +216,7 @@ After Design Group UX Accept: implement gate **OPEN** (Günter Brief restamp Met
 | **Deiter** | Marc overwrite Confirmed; **retracts** three-mode Hide/Read-only/Deny bench copy. |
 | **Marc** | **Confirm closed:** default `schema:edit` + privilege admin = **Admin only** (not lab manager). |
 
-**Rolf Confirm.** Implement still **CLOSED** until Design Group UX Accept (Günter Brief restamp Met).
+**Rolf Confirm.** Implement gate **OPEN** (Design UX Accept Met @ `f79e2a0`). Next: Marc green-light for Grok Build.
 
 **Marc Confirm (2026-09-23; Rolf):** Default **`schema:edit`** + privilege admin = **Admin only** (not lab manager). **Closed.** Optional re-assign later. Implement CLOSED.
 
@@ -241,4 +241,15 @@ Retract any remaining copy that implies a hide mode or three-mode Hide / Read-on
 3. Still required: ephemeral list columns; multi-row = table / single = form; “not on layout” (never layout-hidden); `schema:edit` Admin-only.
 
 Implement **CLOSED**. Design Group re-stamps after tip.
+**UI Sketch Accept re-stamp (Mathilda; 2026-09-23):** Verified on tip `f79e2a0` — `schema:edit` Admin-only (no Schema-admin role); asked-for/routing leave as is; ephemeral list cols; multi-row table / single form; not on layout (membership only). Design Group UX Accept still pending on that tip. Implement CLOSED.
+
+## Implement gate OPEN (2026-09-23; Rolf)
+
+| Gate | Status |
+|------|--------|
+| Design Group UX Accept | **Met** on tip `f79e2a0` (Heidi / Hans / Deiter) |
+| Günter Brief restamp | **Met** |
+| Implement gate | **OPEN** |
+
+Next: **Marc green-light** for Grok Build. No product code until Marc asks. Coding stays Grok Build unless Marc/Rolf asks otherwise.
 
