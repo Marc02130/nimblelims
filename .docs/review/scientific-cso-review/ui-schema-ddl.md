@@ -14,10 +14,10 @@
 
 ## Conditions (punches)
 
-1. **SOP hint grains** — public SOP field-name hints on the column registry only; no house SOP text in git.  
+1. **SOP hint grains** — public SOP field-name hints on the column registry only; no house SOP text in git. **Marc overwrite:** **matrix removed** — use **sample type**; **vessel = container** synonym; keep barcode ≠ sample ID; container ≠ sample type; parent = `parent_sample_id`.  
 2. **OQ-9 deprecate** — deprecate/archive path before destructive DROP of data-bearing scientific fields.  
 3. **OQ-6 identity protect** — UI allow-list must not casually overwrite identity / lineage fields.  
-4. **Classic Results first-class** — structured Results remain first-class; JSONB payloads are **data** (OQ-16), not a config or Results substitute.  
+4. **Classic Results first-class** — **Confirm stands** (Marc overwrite): structured Results remain first-class; JSONB payloads are **data** (OQ-16), not a config or Results substitute.  
 5. **No quantity+unit** compound column type in this packet.
 
 ## Aligns
@@ -35,3 +35,7 @@
 Implement remains **CLOSED**. Original punches stand (this note is not a Science restamp).
 
 **Fold note 2026-09-22:** [Brief](../requirements/ui-schema-ddl-brief.md) written — punches baked (SOP hint grains; OQ-9 deprecate; OQ-6 identity protect; classic Results first-class; no quantity+unit). Lab Ops + Günter Accept-with-conditions already on packet. Still waiting **Design Group UX Accept** and **Günter restamp**.
+
+**Fold note 2026-09-23 (Marc Leadership overwrite; Rolf Confirm):** SOP hints — matrix out / sample type in; vessel=container; classic Results Confirm stands.
+
+**Confirm 2026-09-23 (Hans; Rolf):** Marc Leadership overwrite Confirmed — SOP hints (matrix→sample type; vessel=container) + classic Results Confirm stands. Implement CLOSED.
