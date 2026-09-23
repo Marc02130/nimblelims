@@ -18,7 +18,7 @@ Sample-processing critical path is Met on `main`. AI config needs a **robust con
 | **OQ-1** | **Catalog minimum = two schema registries:** (1) **table registry**; (2) **column registry** (name, type, nullability, order, display defaults, tenant rules, **AI/SOP field-name hints**). Catalogs **describe** configurable real Postgres objects; they are **not** lab data. **`information_schema` alone is not enough**. Physical **CREATE / ALTER … ADD COLUMN** still hits real DB. **Indexes / FKs wait**. Heidi Accept before implement. | Marc + **Rolf Confirm** | 2026-09-22 |
 | **OQ-2** | **Role-based layout registry** (separate): **role × screen × membership**. Schema = what exists; layout = who **sees** what where (**on layout** = show; **not on layout** = not shown — **no hide toggle**). Do not bury layout only in the column registry. Mathilda centerpiece. | Marc + **Rolf Confirm**; overwrite 2026-09-23 | 2026-09-23 |
 | **OQ-3** | **Role-based access** to tables and columns — **not** the same as layout. Access = what the **API allows** (at least **read vs write** per role on table and column; permission **`schema:edit`** separate — not a new role). A field may be **off the layout** yet still write-forbidden; or on the layout as **read-only** (from privileges). Tobias: Fail bars for **privilege refuse** vs **not on layout**. **No layout hide.** | Marc + **Rolf Confirm**; overwrite 2026-09-23 |
-| **OQ-15** | **Layout grain:** known product screen keys first; section → fields; default when no layout = all **read**-privileged columns in registry order; bench vs review separate layouts; layout read-only chrome ≠ API write. Four surfaces: Tables / Columns / Layouts / Privileges. | Mathilda Sketch Accept @ `e12b0c2` | 2026-09-22 |
+| **OQ-15** | **Layout grain:** known product screen keys first (`receive`, `samples.detail`, `samples.list`); section → fields; default when no layout = all **read**-privileged columns in registry order; bench vs review separate layouts; layout read-only chrome ≠ API write. **Asked-for and routing leave as is** — not layout/schema-config this packet. Four surfaces: Tables / Columns / Layouts / Privileges. | Mathilda Sketch Accept @ `e12b0c2`; Marc overwrite 2026-09-23 | 2026-09-23 |
 | **OQ-16** | **JSONB = payload data only** (instrument results / similar blobs). **Not** for system configuration — schema, layout, privileges, and other config live in **real tables/columns** (registries + DDL). Bounce JSONB-as-config. | Marc + **Rolf Confirm** | 2026-09-22 |
 | **OQ-4** | **Apply model = Hybrid.** Lab HTTP on `lims_app` (no DDL). Physical DDL via schema-apply role / allow-listed function. Registry + audit + DDL one op. Replay via `ui_schema` Alembic head (or DDL log). Revoke `CREATE` on `public` from `lims_app` (S-UI-5). | Brief 2026-09-22 | 2026-09-22 |
 | **OQ-5** | **Shared schema + FORCE RLS.** No per-tenant schemas. UI-created/extended tables ENABLE+FORCE RLS on `client_id`. Registries tenant-scoped in P1. | Brief 2026-09-22 | 2026-09-22 |
@@ -57,13 +57,13 @@ OQ-4–13 are **Decided** in the [Brief](../requirements/ui-schema-ddl-brief.md)
 
 ## UAT note (Tobias) — Fail bars locked 2026-09-22
 
-1. No-privilege write → **403/422**, not silent drop; layout-hide ≠ API allow.  
+1. No-privilege write → **403/422**, not silent drop; not-on-layout ≠ API allow.  
 2. Privilege-denied read → **refuse**, not empty-as-layout.  
 3. Permission **`schema:edit`** only for CREATE/ALTER; lab role without it cannot DDL.  
 4. CREATE/ALTER proves real Postgres (`information_schema` / query), not JSONB-as-config.  
 5. **OQ-16:** any **config** path (schema / layout / privileges / catalog) that writes **JSONB instead of** DDL or catalog rows → **Fail**. JSONB remains OK for instrument/payload **data** columns.
 
-Plus catalog uniqueness / tenant isolation; role×layout visibility. UAT packet after Design UX stamp + Heidi conditions addressed.
+Plus catalog uniqueness / tenant isolation; role×layout membership. UAT after Marc green-light + implement.
 
 ## Architecture Accept (Heidi)
 
@@ -106,9 +106,9 @@ Plus catalog uniqueness / tenant isolation; role×layout visibility. UAT packet 
 ## Waiting
 
 - **Brief** — **written** 2026-09-22 ([ui-schema-ddl-brief.md](../requirements/ui-schema-ddl-brief.md)); OQ-4–13 Decided  
-- **Design Group UX Accept** on Tables / Columns / Layouts / Privileges — pending (Mathilda Sketch Accept is not this stamp)  
+- **Design Group UX Accept** — **Met** @ `f79e2a0` (Heidi / Hans / Deiter). Mathilda Sketch Accept is not this stamp.  
 - **Günter restamp** that S-UI-1…6 still hold under the Brief — **Met**  
-- Implement gate **OPEN** (Design Group UX Accept Met @ `f79e2a0`)  
+- Implement gate **OPEN**. Next: **Marc green-light** for Grok Build. No product code until Marc asks. Dated Confirm lines below that say CLOSED are history; this section is SoT.  
 
 ## Unpark / decide rule
 

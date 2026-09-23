@@ -17,8 +17,8 @@ Cycle/feature **gates** for workstreams that must not proceed until product/arch
 | [blood-dnatruseq-testdata-gap.md](blood-dnatruseq-testdata-gap.md) | Blood→DNA→TruSeq Nano UAT path — 0058/0059 catalog map (findings only; not an SOP pack; capture parked) | **No** — Hold; testdata will not invent blood/DNA/TruSeq IDs until dest DNA lands; Compose stays down |
 | [post-receive-work-spine.md](post-receive-work-spine.md) | Asked-for · work_order · results persist · SOP Apply · parser setup | **Partially** — P1 asked-for is the MVP test-ordering hole after CORE receive; P2–P5 do not all block release |
 | *(guidance, not a gate)* [ai-sop-north-star](../requirements/ai-sop-north-star.md) | SOP + example files → vectors → MCP drafts process + parser | **No** — north star goal 2; implement CLOSED until Leadership restamp |
-| [ai-config-breadth.md](ai-config-breadth.md) | AI config for login, reporting, storage, etc. beyond sample processing | **No** — schema-config foundation OPEN (implement CLOSED); login/reporting/storage AI still parked |
-| [ui-schema-ddl.md](ui-schema-ddl.md) | UI CREATE TABLE / ADD COLUMN as real Postgres + registries + layout + privileges | **No** — Brief 2026-09-22 Decides OQ-4–13; implement CLOSED until Design UX + Günter restamp |
+| [ai-config-breadth.md](ai-config-breadth.md) | AI config for login, reporting, storage, etc. beyond sample processing | **No** — schema-config foundation implement OPEN (Marc green-light next); login/reporting/storage AI still parked |
+| [ui-schema-ddl.md](ui-schema-ddl.md) | UI CREATE TABLE / ADD COLUMN as real Postgres + registries + layout + privileges | **No** — Brief Decides OQ-4–13; Design UX + Günter restamp **Met**; implement **OPEN**; Marc green-light next |
 
 ## Gate rule
 
@@ -45,5 +45,5 @@ Project documentation is organized under [`.docs/review/README.md`](../README.md
 
 ## Active (2026-09-22)
 
-- [`ui-schema-ddl.md`](ui-schema-ddl.md) — UI CREATE TABLE / ADD COLUMN; **OQ-1/2/3/15/16 Decided**; **OQ-4–13 Decided** in [Brief](../requirements/ui-schema-ddl-brief.md) 2026-09-22. Implement CLOSED until Design UX + Günter restamp.
+- [`ui-schema-ddl.md`](ui-schema-ddl.md) — UI CREATE TABLE / ADD COLUMN; **OQ-1/2/3/15/16 Decided**; **OQ-4–13 Decided** in [Brief](../requirements/ui-schema-ddl-brief.md). Design UX + Günter restamp **Met**. Implement **OPEN**. Next: Marc green-light.
 - [`ai-config-breadth.md`](ai-config-breadth.md) — partially unparked (schema-config only).

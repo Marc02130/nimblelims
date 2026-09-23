@@ -102,7 +102,7 @@ Not on layout ≠ privilege deny. Schema edit ≠ layout edit. No SQL console as
 
 ## 7. Runtime consumption (non-admin)
 
-Receive, Asked-for, Samples, etc. load: column registry ∩ layout(role, screen) ∩ privileges(role).
+Receive and Samples (and other layout-consuming screens) load: column registry ∩ layout(role, screen) ∩ privileges(role). **Asked-for and routing leave as is** — not layout consumers this packet.
 
 - Missing layout → default (§5)
 - No read privilege → omit field (and API refuse if forced); layout editor must not offer that field

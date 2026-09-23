@@ -70,9 +70,9 @@ Execute stack **exists**. Missing middle = **order → routing map → work_orde
 3. **E-14 + E-12** — **Met** on `main` (PR **131**, `811e966`); UAT §§8–9 **Pass** on `c4c899d`; **Rolf Confirm**  
 4. **E-7** type gate — **Met** on `main` (PR **132**, `e59a045`); UAT §10 **Pass** on `4b3609a`; **Rolf Confirm**  
 5. **E-6** intake Available for Testing — **Met** on `main` (PR **133**, `3bc43d2`); UAT Pass on `a73a51c`/`7bd4f84`; **Rolf Confirm**. Do **not** restamp AR-ST-01. Evidence: `/workspace/uat-e6-7bd4f84/`.  
-6. **ui-schema-ddl** — UI CREATE TABLE / ADD COLUMN (real Postgres) + registries + layout + privileges — AI-config foundation; [Brief](../../../../review/requirements/ui-schema-ddl-brief.md) 2026-09-22 Decides OQ-4–13; implement CLOSED until Design UX + Günter restamp — **next**  
+6. **ui-schema-ddl** — UI CREATE TABLE / ADD COLUMN (real Postgres) + registries + layout + privileges — AI-config foundation; [Brief](../../../../review/requirements/ui-schema-ddl-brief.md) Decides OQ-4–13; Design UX + Günter restamp **Met**; implement **OPEN**; Marc green-light next — **next**  
 7. **X-5** — `post-receive-work-spine` (asked-for / work_order)  
 8. **LimsRuns R-18 / R-11** — manual LimsRun clarity + Qubit testdata  
 9. Processes P-4 / P-1 — truth + naming  
 
-**Critical path E-10 / E-12 / E-14 / E-7 / E-6 closed** on `main`. **Next:** AI-config foundation — [`ui-schema-ddl`](../../../../review/requirements/ui-schema-ddl.md) ([Brief](../../../../review/requirements/ui-schema-ddl-brief.md) Decides OQ-4–13; implement CLOSED until Design Group UX Accept + Günter restamp). Do **not** open AI packets for login / reporting / storage yet ([ai-config-breadth](../../../../review/open-questions/ai-config-breadth.md)).
+**Critical path E-10 / E-12 / E-14 / E-7 / E-6 closed** on `main`. **Next:** AI-config foundation — [`ui-schema-ddl`](../../../../review/requirements/ui-schema-ddl.md) ([Brief](../../../../review/requirements/ui-schema-ddl-brief.md) Decides OQ-4–13; implement **OPEN**; Marc green-light next). Do **not** open AI packets for login / reporting / storage yet ([ai-config-breadth](../../../../review/open-questions/ai-config-breadth.md)).

@@ -27,7 +27,7 @@ This packet is the **AI-config foundation**, not AI itself. It does **not** open
 | No product code until sketch + Leadership / Heidi Accept | Rolf 2026-09-22 |
 | Unpark AI breadth **only** where this schema-config is the blocker | Rolf 2026-09-22 |
 | **OQ-1 Decided:** catalog minimum = **table registry** + **column registry** (not lab data); physical CREATE/ALTER still real Postgres; `information_schema` alone insufficient; indexes/FKs wait | Marc + **Rolf Confirm** 2026-09-22 |
-| **OQ-2 Decided:** **role-based layout registry** (role × screen × visible columns/sections) — separate from table/column catalogs; schema ≠ layout | Marc + **Rolf Confirm** 2026-09-22 |
+| **OQ-2 Decided:** **role-based layout registry** (role × screen × **membership**; absent = not shown; **no hide toggle**) — separate from table/column catalogs; schema ≠ layout | Marc + **Rolf Confirm**; overwrite 2026-09-23 |
 | **OQ-3 Decided:** **role × table/column privileges** (read vs write; permission **`schema:edit`** separate — not a new role) — **not** layout; API allow vs UI show | Marc + **Rolf Confirm**; overwrite 2026-09-23 |
 | Column registry carries **public SOP field-name hints** for later AI mapping — no house SOP text in git | Katinka + Core 2026-09-22 |
 | Not IC50 | Standing |
@@ -63,7 +63,7 @@ Cite the [Brief](ui-schema-ddl-brief.md) for apply / tenant / allow-list / types
 |----|-----------|
 | AC0 | **Catalog minimum:** product ships (or migrates in) a **table registry** and a **column registry**. UI editing of schema goes through these registries; they store configurable metadata (`information_schema` alone is not enough). |
 | AC0b | Applying create/add updates **both** the physical Postgres object **and** the corresponding registry row(s) in one controlled operation (**Brief OQ-4 Hybrid**: `lims_app` no DDL; schema-apply role / allow-listed function; audit + replay). |
-| AC0c | **Layout registry:** product ships a **role-based layout** catalog (role × screen × visible columns/sections). Runtime screens honor layout for the signed-in role; missing layout falls back per Mathilda lock. Layout edits do **not** CREATE/ALTER physical columns by themselves. |
+| AC0c | **Layout registry:** product ships a **role-based layout** catalog (role × screen × **membership** — absent = not shown; **no hide toggle**). Runtime screens honor layout for the signed-in role; missing layout falls back per Mathilda lock. Layout edits do **not** CREATE/ALTER physical columns by themselves. **Asked-for and routing leave as is.** |
 | AC0d | **Privileges (Brief OQ-10):** dedicated privilege registry; role × table/column **read/write**; default-deny; DDL needs **`schema:edit`**. **Tobias Fail bars:** no-privilege write → **403/422** (not silent drop); privilege-denied read → refuse (not empty-as-layout); not-on-layout ≠ API allow. |
 | AC0e | **AI hints:** column registry SOP field-name hints — **sample type** (not matrix); **vessel = container**; barcode ≠ sample ID; container ≠ sample type; parent = `parent_sample_id`. No house SOP text in git. |
 | AC1 | **ADD COLUMN** via UI on an allow-listed table (**Brief OQ-6**: `samples` non-identity + UI-created tables; OQ-8 types) creates a real Postgres column **plus** a column-registry row. |
@@ -89,11 +89,11 @@ Cite the [Brief](ui-schema-ddl-brief.md) for apply / tenant / allow-list / types
 3. **Create table** for a lab-specific entity (Heidi names the first allowed pattern) → real table **and** table-registry row → basic CRUD scaffold per lock (may be minimal in P1).  
 4. Admin sets **layout** for Lab tech vs Admin on a screen → same schema, different visible fields/sections.  
 5. Attempt cross-tenant read → denied.  
-6. Deprecate column → layout rows updated/hidden per policy; data retained until controlled remove.
+6. Deprecate column → omitted from new layouts; data retained until controlled remove.
 
 ## 7. Open questions
 
-OQ-4–13 **Decided** in the [Brief](ui-schema-ddl-brief.md). Living OQ doc: [`ui-schema-ddl.md` (open-questions)](../open-questions/ui-schema-ddl.md). OQ-14 parked. Design Group UX Accept + Günter restamp still wait.
+OQ-4–13 **Decided** in the [Brief](ui-schema-ddl-brief.md). Living OQ doc: [`ui-schema-ddl.md` (open-questions)](../open-questions/ui-schema-ddl.md). OQ-14 parked. Design Group UX Accept **Met** @ `f79e2a0`. Günter restamp **Met**. Implement **OPEN**. Next: Marc green-light. Dated Confirm lines below that say CLOSED are history; header + this section are SoT.
 
 ## 8. Relationship to prior schema-evolution docs
 
