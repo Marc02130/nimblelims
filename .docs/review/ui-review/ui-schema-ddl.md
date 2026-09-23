@@ -1,7 +1,7 @@
 # UI review: UI-driven schema DDL (admin UX sketch)
 
 **Date:** 2026-09-22  
-**Status:** **Sketch Accept** (Mathilda @ `e12b0c2`). [Brief](../requirements/ui-schema-ddl-brief.md) 2026-09-22 Decides OQ-4–13. **Design Group UX Accept pending** (this sketch is not that stamp). Implement gate **CLOSED**.  
+**Status:** **Sketch Accept** (Mathilda @ `e12b0c2`). [Brief](../requirements/ui-schema-ddl-brief.md) 2026-09-22 Decides OQ-4–13. **Design Group UX Accept pending** — punched tip `19f538f` (not Accept); Spec fold this doc for re-stamp. Implement gate **CLOSED**. Günter Brief restamp **Met**.  
 **Stem:** `ui-schema-ddl`  
 **Requirements:** [`.docs/review/requirements/ui-schema-ddl.md`](../requirements/ui-schema-ddl.md)  
 **Open questions:** [`.docs/review/open-questions/ui-schema-ddl.md`](../open-questions/ui-schema-ddl.md)  
@@ -16,7 +16,7 @@
 |---------|------|-------------|
 | **Tables** | Table registry + CREATE TABLE | `schema:edit` |
 | **Columns** | Column registry + ADD COLUMN on allow-listed / UI-created tables | `schema:edit` |
-| **Layouts** | Role × screen × visible fields/sections (OQ-2) | `schema:edit` or `layout:edit` (Heidi/Günter) |
+| **Layouts** | Role × screen × **membership** (OQ-2) | `schema:edit` or `layout:edit` (Heidi/Günter) |
 | **Privileges** | Role × table/column read vs write (OQ-3) | `schema:edit` |
 
 Not on layout ≠ privilege deny. Schema edit ≠ layout edit. No SQL console as default. **No layout hide toggle.**
@@ -56,34 +56,36 @@ Not on layout ≠ privilege deny. Schema edit ≠ layout edit. No SQL console as
 - Preview: “Adds a real field on {Table}. Not a custom-attribute JSON key.”
 - Apply → column-registry row + real ADD COLUMN
 
-**Deprecate:** hide from new layouts by default; data retained; destructive remove is a separate confirm with impact (OQ-9).
+**Deprecate:** omit from new layouts by default; data retained; destructive remove is a separate confirm with impact (OQ-9).
 
 **Bounce:** free-text PG type; writing only `custom_attributes`; burying layout/privilege toggles on this form (use Layouts / Privileges screens).
 
 ## 5. Layouts — centerpiece (OQ-2 / OQ-15)
 
-**Mental model:** Schema says what exists. Layout says what this **role** sees on this **screen**.
+**Mental model:** Schema says what exists. Layout says what this **role** sees on this **screen**. Visibility = **membership** only (**no hide / Visible toggle**).
 
 ### OQ-15 decisions (UI lock for sketch)
 
 | Item | Decision |
 |------|----------|
-| Screen identity | Stable keys for known product screens first (e.g. `receive`, `asked-for`, `samples.detail`, `samples.list`). Free-text screen IDs wait. |
+| Screen identity | Stable keys for known product screens first (e.g. `receive`, `samples.detail`, `samples.list`). Free-text screen IDs wait. **Asked-for and routing leave as is** — not OQ-2 layout/schema-config surfaces this packet (**Marc overwrite**). |
 | Grain | **Section** (optional group) → **fields** (column-registry refs) ordered. |
 | Default when no layout row | Show all columns the role may **read** (privilege), in column-registry order. Never show write-denied as editable. |
 | Bench vs review | Separate layout rows for Lab tech vs Review/Manager (Katinka) — do not overload one role layout. |
 | Gloved use | Large targets on Apply/Confirm; Layout editor itself is desk/admin (mouse OK). Runtime screens that consume layout stay barcode/glove-friendly. |
+| **List pages** | Show **role layout** columns. On-the-fly add/remove columns is **ephemeral** (session only — **not** stored in the layout registry). |
+| **Receive (Lab Ops note)** | Select samples, then enter (simple) where receive already applies. **Asked-for / routing:** leave as is — not redesigned for layouts this packet. |
 
 **Editor UX:**
 1. Pick Role + Screen
-2. Left: available fields (privilege-filtered: only columns this role can read)
-3. Right: visible stack (drag order); optional section headers
-4. Per field: **on layout or not** (membership only — **no hide / Visible toggle**). Read-only comes from privileges (Read yes / Write no), not layout hide. API write still OQ-3.
+2. Left: available fields (privilege-filtered: only columns this role can read — neither read nor write → **do not offer**)
+3. Right: on-layout stack (drag order); optional section headers — **membership only**
+4. Per field: **on layout or not**. Read-only comes from privileges (Read yes / Write no), not layout hide. API write still OQ-3.
 5. Save layout — **no DDL**
 
 **Empty state:** “No layout for this role/screen — using default (all readable fields).” CTA: Create layout.
 
-**Bounce:** editing layout that silently ADD COLUMNs; layout as the only access control; per-user layouts (role only in P1).
+**Bounce:** editing layout that silently ADD COLUMNs; layout as the only access control; per-user layouts (role only in P1); hide/Visible toggle that keeps a field on the layout as hidden.
 
 ## 6. Privileges (OQ-3)
 
@@ -92,9 +94,9 @@ Not on layout ≠ privilege deny. Schema edit ≠ layout edit. No SQL console as
 **Grid:** Role × Table: Read / Write / none. Drill-in: Role × Column overrides (Read / Write / inherit table).
 
 **Rules (UX copy):**
-- Schema-admin is a separate capability for Tables/Columns Apply — not granted by Write on Samples.
-- Privilege refuse surfaces as **403/422** with lab-readable text (“You can’t change this field”), never a silent no-op and never “empty because hidden.”
-- Layout-hidden + Write granted: field not shown; do not invent a back door in the layout editor.
+- Permission **`schema:edit`** (Admin-only default) is a separate capability for Tables/Columns Apply — **not** granted by Write on Samples. Not a new role.
+- Privilege refuse surfaces as **403/422** with lab-readable text (“You can’t change this field”), never a silent no-op and never “empty because not on layout.”
+- Field **not on layout** + Write granted: field not shown; do not invent a back door in the layout editor.
 
 **Bounce:** merging privilege toggles into the layout drag list; treating “not on layout” as deny; any Visible/hide toggle that keeps a field on the layout as hidden.
 
@@ -103,8 +105,13 @@ Not on layout ≠ privilege deny. Schema edit ≠ layout edit. No SQL console as
 Receive, Asked-for, Samples, etc. load: column registry ∩ layout(role, screen) ∩ privileges(role).
 
 - Missing layout → default (§5)
-- No read privilege → omit field (and API refuse if forced)
-- Read yes / Write no → visible read-only
+- No read privilege → omit field (and API refuse if forced); layout editor must not offer that field
+- Read yes / Write no → visible read-only (from privileges)
+- Field not on layout → not shown (membership only)
+- **Receive:** select samples, then enter (simple) where it already applies — Lab Ops runtime note only
+- **Asked-for / routing:** **leave as is** — not layout or schema-config surfaces this packet (**Marc overwrite**)
+- **List pages:** role layout columns; on-the-fly add/remove is **ephemeral** (not stored)
+- **Multi-row** screens → **table** with role data-type layout; **single record** → **form**
 - SOP hint is metadata for AI later — not shown to bench unless a later packet asks
 
 ## 8. Error / confirm copy (lab-readable)
@@ -122,34 +129,39 @@ Receive, Asked-for, Samples, etc. load: column registry ∩ layout(role, screen)
 - DBA SQL console as default path
 - JSONB / `custom_attributes` as “add field” or any **config** store (**OQ-16** — JSONB OK only for instrument/payload **data**)
 - Layout hide / Visible-as-hidden toggle (visibility = membership only)
-- Layout hide as sole access control
+- Not on layout as sole access control
 - Privileges buried on column row only
 - Indexes / FKs UI this packet
 - AI apply DDL / AI login-reporting-storage
 - Per-user layouts
+- Asked-for or routing as OQ-2 layout / schema-config surfaces this packet
+- Inventing a Schema-admin role (use permission `schema:edit` on Admin only)
 - Dropping data-bearing fields without impact confirm
 
 ## 10. Brief lock (do not invent in UX)
 
-OQ-4–13 are **Decided** in the [Brief](../requirements/ui-schema-ddl-brief.md) (Hybrid apply, shared+FORCE RLS, allow-list, platform columns, P1 types, deprecate-first, privilege registry, `ui_schema` head, leave Entries, `custom_attributes` follow-on). Sketch chrome must follow those locks. Remaining gate: **Design Group UX Accept** on Tables / Columns / Layouts / Privileges — this sketch is not that stamp.
+OQ-4–13 are **Decided** in the [Brief](../requirements/ui-schema-ddl-brief.md) (Hybrid apply, shared+FORCE RLS, allow-list, platform columns, P1 types, deprecate-first, privilege registry, `ui_schema` head, leave Entries, `custom_attributes` follow-on). Sketch chrome must follow those locks. Remaining gate: **Design Group UX Accept** on Tables / Columns / Layouts / Privileges — this sketch is not that stamp. Günter Brief restamp **Met**.
 
 ## 11. Sign-off
 
 | Review | Verdict |
 |--------|---------|
 | UI (Mathilda) | **Sketch Accept** — Tables / Columns / Layouts / Privileges; OQ-15 locked as above |
-| Architecture (Heidi) | **Accept with conditions** (OQ-4–13 now Decided in Brief) — 2026-09-22 |
-| Security (Günter) | **Accept with conditions** (S-UI-1…6) — restamp pending under Brief |
-| Lab Ops (Deiter) | **Accept with conditions** — Brief written |
-| Design Group | **UX Accept pending** (Mathilda Sketch Accept is not this stamp) |
+| Architecture (Heidi) | **Accept with conditions** (OQ-4–13 now Decided in Brief) — 2026-09-22; punches 1 and 4 **Met** (Design Group 2026-09-23) |
+| Security (Günter) | **Accept with conditions** (S-UI-1…6) — Brief restamp **Met** |
+| Lab Ops (Deiter) | **Accept with conditions** — Brief written; punches 1 and 4 **Met** |
+| Science (Hans) | **Accept with conditions** — punches 1 and 4 **Met** |
+| Design Group | **Punched tip `19f538f`** — UX Accept pending re-stamp after this fold |
 
-**Implement gate:** **CLOSED** until Design Group UX Accept + Günter restamp.
+**Implement gate:** **CLOSED** until Design Group UX Accept (Günter Brief restamp Met).
 
-**Fold note 2026-09-23 (Marc Leadership overwrite; Rolf Confirm):** mutate Schema with permission `schema:edit` (not a new role); Layouts with `layout:edit` (no DDL). List ephemeral columns; layout = display; privileges = R/W; multi-row table / single-record form; receive/asked-for = select then enter.
+**Fold note 2026-09-23 (Marc Leadership overwrite; Rolf Confirm):** mutate Schema with permission `schema:edit` (not a new role); Layouts with `layout:edit` (no DDL). List ephemeral columns; layout = membership; privileges = R/W; multi-row table / single-record form; receive/asked-for = select then enter.
 
-**Fold note 2026-09-23 (Confirms; Rolf):** Günter + Hans + Deiter Confirmed Marc overwrite. Deiter Confirm retracts three-mode Hide/Read-only/Deny copy — layout = display; privileges = R/W. Implement CLOSED.
+**Fold note 2026-09-23 (Confirms; Rolf):** Günter + Hans + Deiter Confirmed Marc overwrite. Deiter Confirm retracts three-mode Hide/Read-only/Deny copy. Implement CLOSED.
 
 **Marc Confirm (2026-09-23; Rolf):** Default **`schema:edit`** + privilege admin = **Admin only** (not lab manager). **Closed.** Optional re-assign later. Implement CLOSED.
+
+**Design Group punch fold 2026-09-23 (Rolf):** (1) §6 uses permission `schema:edit` (Admin-only default) — not a separate schema-admin role label. (2) §5 / §7 body: list ephemeral columns; receive/asked-for select-then-enter; multi-row table / single form. (3) §6 says “not on layout” (never “layout-hidden”). Heidi/Hans/Deiter: punches 1 and 4 already Met. Awaiting Design Group re-stamp.
 
 ## Marc Leadership overwrite — layout visibility (2026-09-23; Rolf Confirm)
 
@@ -163,4 +175,12 @@ OQ-4–13 are **Decided** in the [Brief](../requirements/ui-schema-ddl-brief.md)
 | Read yes / Write no | May appear on layout as **read-only** — from **privileges**, not a layout hide. |
 
 Retract any remaining copy that implies a hide mode or three-mode Hide / Read-only / Deny. Implement still **CLOSED** pending Design Group UX Accept (Günter Brief restamp **Met**).
+
+## Marc Leadership overwrite — no Schema-admin role; asked-for/routing leave as is (2026-09-23; Rolf Confirm)
+
+1. **No Schema-admin role.** Copy must say permission **`schema:edit`** on **Admin only** (small-startup; no large IT). Never invent a Schema-admin role. (Design punch 2 / Marc.)
+2. **Asked-for and routing leave as is** — not designed for configuration. Do **not** make asked-for or routing layout/schema-config surfaces this packet. Deiter “select then enter” for **receive** may stay as a Lab Ops runtime note where it already applies; do **not** redesign asked-for/routing for OQ-2 layouts.
+3. Still required: ephemeral list columns; multi-row = table / single = form; “not on layout” (never layout-hidden); `schema:edit` Admin-only.
+
+Implement **CLOSED**. Design Group re-stamps after tip.
 

@@ -20,7 +20,7 @@ This Brief closes the pre-implement blockers named by Leadership / Grok Bot: OQ-
 | **OQ-1** | Table registry + column registry. Physical CREATE/ALTER is real Postgres. `information_schema` alone is not enough. Indexes/FKs wait. |
 | **OQ-2** | Role-based layout registry (role × screen × **membership**). Schema ≠ layout. **No layout hide** — not on layout = not shown. |
 | **OQ-3** | Role × table/column privileges (read vs write). Permission **`schema:edit`** separate (not a new role). Not on layout ≠ API allow. |
-| **OQ-15** | Known screen keys first; section → fields; default = all **read**-privileged columns; bench vs review separate. |
+| **OQ-15** | Known screen keys first; section → fields; default = all **read**-privileged columns; bench vs review separate. **Asked-for and routing leave as is** — not layout/schema-config this packet. |
 | **OQ-16** | JSONB = payload **data** only. Never config. |
 | Surfaces | Admin → Schema: **Tables**, **Columns**, **Layouts**, **Privileges**. |
 | Tobias Fail bars | (1)–(5) locked 2026-09-22. |
@@ -211,7 +211,7 @@ After Design Group UX Accept: implement gate **OPEN** (Günter Brief restamp Met
 
 | Reviewer | Confirm |
 |----------|---------|
-| **Günter** | Marc overwrite Confirmed (S-UI-1=`schema:edit`; S-UI-4=`layout:edit`). **Follow-on:** Admin defaults to `schema:edit` + privilege admin — **Admin only** (not lab manager / lab-tech / client); **Marc Confirm closed**; optional re-assign later; optional separate role later; `layout:edit` still no DDL; S-UI-2/3/5/6 unchanged. Brief-level restamp still pending. |
+| **Günter** | Marc overwrite Confirmed (S-UI-1=`schema:edit`; S-UI-4=`layout:edit`). **Follow-on:** Admin defaults to `schema:edit` + privilege admin — **Admin only** (not lab manager / lab-tech / client); **Marc Confirm closed**; optional re-assign later; optional separate role later; `layout:edit` still no DDL; S-UI-2/3/5/6 unchanged. Brief-level restamp **Met**. |
 | **Hans** | Marc overwrite Confirmed (SOP hints + Results Confirm). |
 | **Deiter** | Marc overwrite Confirmed; **retracts** three-mode Hide/Read-only/Deny bench copy. |
 | **Marc** | **Confirm closed:** default `schema:edit` + privilege admin = **Admin only** (not lab manager). |
@@ -232,4 +232,13 @@ After Design Group UX Accept: implement gate **OPEN** (Günter Brief restamp Met
 | Read yes / Write no | May appear on layout as **read-only** — from **privileges**, not a layout hide. |
 
 Retract any remaining copy that implies a hide mode or three-mode Hide / Read-only / Deny. Implement still **CLOSED** pending Design Group UX Accept (Günter Brief restamp **Met**).
+**Design Group punch fold 2026-09-23 (Rolf; tip after fold):** UX sketch §6 `schema:edit` (Admin-only); §5/§7 body has list ephemeral + receive/asked-for select-then-enter + multi-row table/single form; §6 “not on layout” (not Layout-hidden). Heidi/Hans/Deiter punches 1 and 4 Met. Awaiting Design Group UX re-stamp. Implement CLOSED.
+
+## Marc Leadership overwrite — no Schema-admin role; asked-for/routing leave as is (2026-09-23; Rolf Confirm)
+
+1. **No Schema-admin role.** Copy must say permission **`schema:edit`** on **Admin only** (small-startup; no large IT). Never invent a Schema-admin role. (Design punch 2 / Marc.)
+2. **Asked-for and routing leave as is** — not designed for configuration. Do **not** make asked-for or routing layout/schema-config surfaces this packet. Deiter “select then enter” for **receive** may stay as a Lab Ops runtime note where it already applies; do **not** redesign asked-for/routing for OQ-2 layouts.
+3. Still required: ephemeral list columns; multi-row = table / single = form; “not on layout” (never layout-hidden); `schema:edit` Admin-only.
+
+Implement **CLOSED**. Design Group re-stamps after tip.
 
