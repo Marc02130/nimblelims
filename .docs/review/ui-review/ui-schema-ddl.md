@@ -1,7 +1,7 @@
 # UI review: UI-driven schema DDL (admin UX sketch)
 
 **Date:** 2026-09-22  
-**Status:** **Sketch Accept** (Mathilda @ `e12b0c2`; **re-stamped** on Spec tip `f79e2a0` 2026-09-23). [Brief](../requirements/ui-schema-ddl-brief.md) 2026-09-22 Decides OQ-4–13. **Design Group UX Accept Met** on tip `f79e2a0` (Heidi/Hans/Deiter). Günter Brief restamp **Met**. Implement gate **OPEN**. Next: Marc green-light for Grok Build.  
+**Status:** **Sketch Accept** (Mathilda @ `e12b0c2`; **re-stamped** on Spec tip `f79e2a0` 2026-09-23). [Brief](../requirements/ui-schema-ddl-brief.md) 2026-09-22 Decides OQ-4–13. **Design Group UX Accept Met** on tip `f79e2a0` (Heidi/Hans/Deiter). Günter Brief restamp **Met**. Implement gate **OPEN**. Tobias **re-UAT Pass** on `b6d1920`. Rolf Confirm **Met**. Merge = Marc’s call.  
 **Stem:** `ui-schema-ddl`  
 **Requirements:** [`.docs/review/requirements/ui-schema-ddl.md`](../requirements/ui-schema-ddl.md)  
 **Open questions:** [`.docs/review/open-questions/ui-schema-ddl.md`](../open-questions/ui-schema-ddl.md)  
@@ -140,7 +140,7 @@ Receive and Samples (and other layout-consuming screens) load: column registry �
 
 ## 10. Brief lock (do not invent in UX)
 
-OQ-4–13 are **Decided** in the [Brief](../requirements/ui-schema-ddl-brief.md) (Hybrid apply, shared+FORCE RLS, allow-list, platform columns, P1 types, deprecate-first, privilege registry, `ui_schema` head, leave Entries, `custom_attributes` follow-on). Sketch chrome must follow those locks. Design Group UX Accept **Met** @ `f79e2a0`. Günter Brief restamp **Met**. Implement **OPEN**; Marc green-light next.
+OQ-4–13 are **Decided** in the [Brief](../requirements/ui-schema-ddl-brief.md) (Hybrid apply, shared+FORCE RLS, allow-list, platform columns, P1 types, deprecate-first, privilege registry, `ui_schema` head, leave Entries, `custom_attributes` follow-on). Sketch chrome must follow those locks. Design Group UX Accept **Met** @ `f79e2a0`. Günter Brief restamp **Met**. Implement **OPEN**. Tobias **re-UAT Pass** on `b6d1920`.
 
 ## 11. Sign-off
 
@@ -152,16 +152,17 @@ OQ-4–13 are **Decided** in the [Brief](../requirements/ui-schema-ddl-brief.md)
 | Lab Ops (Deiter) | **Accept with conditions** — Brief written; punches 1 and 4 **Met** |
 | Science (Hans) | **Accept with conditions** — punches 1 and 4 **Met** |
 | Design Group | **UX Accept Met** on tip `f79e2a0` (Heidi / Hans / Deiter) |
+| QA (Tobias) | **re-UAT Pass** on `b6d1920` (0081). Rolf Confirm **Met**. Merge = Marc’s call. |
 
-**Implement gate:** **OPEN** (Design Group UX Accept Met @ `f79e2a0`; Günter Brief restamp Met). Next: Marc green-light for Grok Build — no code until Marc asks.
+**Implement gate:** **OPEN**. Design UX Accept **Met**. Günter Brief restamp **Met**. Tobias **re-UAT Pass** on `b6d1920`. Rolf Confirm **Met**. Merge = Marc’s call.
 
 **Fold note 2026-09-23 (Marc Leadership overwrite; Rolf Confirm):** mutate Schema with permission `schema:edit` (not a new role); Layouts with `layout:edit` (no DDL). List ephemeral columns; layout = membership; privileges = R/W; multi-row table / single-record form; receive/asked-for = select then enter.
 
-**Fold note 2026-09-23 (Confirms; Rolf):** Günter + Hans + Deiter Confirmed Marc overwrite. Deiter Confirm retracts three-mode Hide/Read-only/Deny copy. Implement CLOSED.
+**Fold note 2026-09-23 (Confirms; Rolf):** Günter + Hans + Deiter Confirmed Marc overwrite. Deiter Confirm retracts three-mode Hide/Read-only/Deny copy. Implement CLOSED (at the time; now OPEN).
 
-**Marc Confirm (2026-09-23; Rolf):** Default **`schema:edit`** + privilege admin = **Admin only** (not lab manager). **Closed.** Optional re-assign later. Implement CLOSED.
+**Marc Confirm (2026-09-23; Rolf):** Default **`schema:edit`** + privilege admin = **Admin only** (not lab manager). **Closed.** Optional re-assign later. Implement CLOSED (at the time; now OPEN).
 
-**Design Group punch fold 2026-09-23 (Rolf):** (1) §6 uses permission `schema:edit` (Admin-only default) — not a separate schema-admin role label. (2) §5 / §7 body: list ephemeral columns; receive/asked-for select-then-enter; multi-row table / single form. (3) §6 says “not on layout” (never “layout-hidden”). Heidi/Hans/Deiter: punches 1 and 4 already Met. Awaiting Design Group re-stamp.
+**Design Group punch fold 2026-09-23 (Rolf):** (1) §6 uses permission `schema:edit` (Admin-only default) — not a separate schema-admin role label. (2) §5 / §7 body: list ephemeral columns; receive/asked-for select-then-enter; multi-row table / single form. (3) §6 says “not on layout” (never “layout-hidden”). Heidi/Hans/Deiter: punches 1 and 4 already Met. Awaiting Design Group re-stamp (at the time; now OPEN).
 
 ## Marc Leadership overwrite — layout visibility (2026-09-23; Rolf Confirm)
 
@@ -174,7 +175,7 @@ OQ-4–13 are **Decided** in the [Brief](../requirements/ui-schema-ddl-brief.md)
 | Neither read nor write | Not displayed; layout editor **must not offer** that field. |
 | Read yes / Write no | May appear on layout as **read-only** — from **privileges**, not a layout hide. |
 
-Retract any remaining copy that implies a hide mode or three-mode Hide / Read-only / Deny. Implement still **CLOSED** pending Design Group UX Accept (Günter Brief restamp **Met**).
+Retract any remaining copy that implies a hide mode or three-mode Hide / Read-only / Deny. Implement still **CLOSED** pending Design Group UX Accept (Günter Brief restamp **Met**) (at the time; now OPEN).
 
 ## Marc Leadership overwrite — no Schema-admin role; asked-for/routing leave as is (2026-09-23; Rolf Confirm)
 
@@ -182,8 +183,8 @@ Retract any remaining copy that implies a hide mode or three-mode Hide / Read-on
 2. **Asked-for and routing leave as is** — not designed for configuration. Do **not** make asked-for or routing layout/schema-config surfaces this packet. Deiter “select then enter” for **receive** may stay as a Lab Ops runtime note where it already applies; do **not** redesign asked-for/routing for OQ-2 layouts.
 3. Still required: ephemeral list columns; multi-row = table / single = form; “not on layout” (never layout-hidden); `schema:edit` Admin-only.
 
-Implement **CLOSED**. Design Group re-stamps after tip.
-**UI Sketch Accept re-stamp (Mathilda; 2026-09-23):** Verified on tip `f79e2a0` — `schema:edit` Admin-only (no Schema-admin role); asked-for/routing leave as is; ephemeral list cols; multi-row table / single form; not on layout (membership only). Design Group UX Accept still pending on that tip. Implement CLOSED.
+Implement **CLOSED** (at the time; now OPEN). Design Group re-stamps after tip (at the time; now OPEN).
+**UI Sketch Accept re-stamp (Mathilda; 2026-09-23):** Verified on tip `f79e2a0` — `schema:edit` Admin-only (no Schema-admin role); asked-for/routing leave as is; ephemeral list cols; multi-row table / single form; not on layout (membership only). Design Group UX Accept still pending on that tip (at the time; now OPEN). Implement CLOSED (at the time; now OPEN).
 
 ## Implement gate OPEN (2026-09-23; Rolf)
 
@@ -192,6 +193,7 @@ Implement **CLOSED**. Design Group re-stamps after tip.
 | Design Group UX Accept | **Met** on tip `f79e2a0` (Heidi / Hans / Deiter) |
 | Günter Brief restamp | **Met** |
 | Implement gate | **OPEN** |
+| Tobias re-UAT | **Pass** on `b6d1920` (0081) |
 
-Next: **Marc green-light** for Grok Build. No product code until Marc asks. Coding stays Grok Build unless Marc/Rolf asks otherwise.
+Tobias **re-UAT Pass** on `b6d1920`. Rolf Confirm **Met**. Merge = Marc’s call — no merge until Marc says.
 
