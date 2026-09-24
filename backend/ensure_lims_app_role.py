@@ -84,7 +84,10 @@ def ensure_lims_app_role() -> None:
         conn.execute(text(f"GRANT CONNECT ON DATABASE {dbname} TO {APP_ROLE}"))
 
         # Schema + objects
-        conn.execute(text(f"GRANT USAGE, CREATE ON SCHEMA public TO {APP_ROLE}"))
+        # Brief S-UI-5: lims_app must not CREATE/ALTER. Sequence mint goes through
+        # ui_schema_ensure_sequence (SECURITY DEFINER). GRANT USAGE only.
+        conn.execute(text(f"GRANT USAGE ON SCHEMA public TO {APP_ROLE}"))
+        conn.execute(text(f"REVOKE CREATE ON SCHEMA public FROM {APP_ROLE}"))
         conn.execute(
             text(
                 f"GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO {APP_ROLE}"
@@ -125,6 +128,18 @@ def ensure_lims_app_role() -> None:
             except Exception as exc:
                 # lims_user may not exist outside Docker; CURRENT_USER path still applies
                 print(f"Note: default privileges ({grantor}): {exc}", flush=True)
+
+        for fn in (
+            "ui_schema_ensure_sequence(text)",
+            "ui_schema_create_table(text)",
+            "ui_schema_add_column(text,text,text,boolean,boolean)",
+            "ui_schema_drop_column(text,text)",
+            "ui_schema_drop_table(text)",
+        ):
+            try:
+                conn.execute(text(f"GRANT EXECUTE ON FUNCTION {fn} TO {APP_ROLE}"))
+            except Exception as exc:
+                print(f"Note: GRANT EXECUTE {fn}: {exc}", flush=True)
 
     engine.dispose()
     print(f"Role {APP_ROLE} grants ensured.", flush=True)
