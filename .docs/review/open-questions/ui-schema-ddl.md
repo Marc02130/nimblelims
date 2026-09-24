@@ -1,7 +1,7 @@
 # Open questions: UI-driven schema DDL (real Postgres)
 
 **Date:** 2026-09-22  
-**Status:** OQ-1/2/3/15/16 **Decided**; **OQ-4–13 Decided** in [Brief](../requirements/ui-schema-ddl-brief.md). Design Group UX Accept **Met** @ `f79e2a0`. Günter Brief restamp **Met**. Implement gate **OPEN**. Next: Marc green-light for Grok Build. Packet `ui-schema-ddl`  
+**Status:** **Merged to main** @ `180f0c1` (feat `f05430c` incl. UAT Pass `b6d1920` + docs `9279ec6`). OQ-1/2/3/15/16 **Decided**; **OQ-4–13 Decided** in [Brief](../requirements/ui-schema-ddl-brief.md). Design Group UX Accept **Met** @ `f79e2a0`. Günter Brief restamp **Met**. Tobias Pass + Rolf Confirm Met stand. Packet **closed** unless Marc opens follow-ups. Packet `ui-schema-ddl`  
 **Requirements:** [`.docs/review/requirements/ui-schema-ddl.md`](../requirements/ui-schema-ddl.md)  
 **Leadership:** Core pivot 2026-09-22 — CREATE TABLE / ADD COLUMN via UI as real Postgres; tenant-safe, migratable, reversible; role-based layout; role-based table/column access.  
 **Owners:** Heidi (architecture), Mathilda (UX / layout), Günter (authZ), Tobias (UAT Fail bars), Wilhelmina (docs), Katinka (SOP field-name hints).  
@@ -108,11 +108,12 @@ Plus catalog uniqueness / tenant isolation; role×layout visibility. UAT packet 
 - **Brief** — **written** 2026-09-22 ([ui-schema-ddl-brief.md](../requirements/ui-schema-ddl-brief.md)); OQ-4–13 Decided  
 - **Design Group UX Accept** on Tables / Columns / Layouts / Privileges — **Met** (Mathilda Sketch Accept is not this stamp)  
 - **Günter restamp** that S-UI-1…6 still hold under the Brief — **Met**  
-- Implement gate **OPEN** (Design Group UX Accept Met @ `f79e2a0`)  
+- Implement gate **CLOSED** (shipped; Design Group UX Accept Met @ `f79e2a0`)  
+- **Merged to main** @ `180f0c1` (feat `f05430c` incl. UAT Pass `b6d1920` + docs `9279ec6`). Packet **closed** unless Marc opens follow-ups.
 
 ## Unpark / decide rule
 
-Brief written. Design Group UX Accept **Met** @ `f79e2a0`. Günter Brief restamp **Met**. Implement **OPEN**. No product code until **Marc green-light** for Grok Build.
+Brief written. Design Group UX Accept **Met** @ `f79e2a0`. Günter Brief restamp **Met**. Implement **CLOSED** (shipped). **Merged to main** @ `180f0c1`. Packet **closed** unless Marc opens follow-ups. OQ-14 stays **Parked**. Do not reopen Decided OQs.
 
 ## Marc Leadership overwrite (2026-09-23)
 
@@ -151,7 +152,7 @@ Implement **CLOSED** (at the time; now OPEN). Design Group re-stamps after tip (
 | Günter Brief restamp | **Met** |
 | Implement gate | **OPEN** |
 
-Tobias **re-UAT Pass** on `b6d1920` (0081). Rolf Confirm **Met**. Merge = Marc’s call — no merge until Marc says.
+Tobias **re-UAT Pass** on `b6d1920` (0081). Rolf Confirm **Met**. **Merged to main** @ `180f0c1` (feat `f05430c` incl. UAT Pass `b6d1920` + docs `9279ec6`). Packet **closed** unless Marc opens follow-ups.
 
 ## Product branch + UAT (2026-09-23; Rolf / Marc)
 
@@ -162,8 +163,9 @@ Tobias **re-UAT Pass** on `b6d1920` (0081). Rolf Confirm **Met**. Merge = Marc�
 | Product tip passed | `b6d1920` |
 | UAT script | `UAT_Scripts/uat-ui-schema-ddl.md` on that branch |
 | Docs living tip (implement OPEN) | `912c1a2` on `docs/ui-schema-ddl` |
+| Merged to main | `180f0c1` (feat `f05430c` incl. UAT Pass `b6d1920` + docs `9279ec6`) |
 
-Tobias owns UAT Pass/Fail against Fail bars (1)–(5). **No invent Pass.** No merge until Rolf Confirm + Marc.
+Tobias owns UAT Pass/Fail against Fail bars (1)–(5). **No invent Pass.** Tobias Pass + Rolf Confirm Met stand. Packet **closed** unless Marc opens follow-ups.
 
 ## Tobias UAT Fail on 8c14a84 (history — superseded by re-UAT Pass on b6d1920)
 
@@ -216,7 +218,7 @@ Tobias owns UAT Pass/Fail against Fail bars (1)–(5). **No invent Pass.** No me
 | Evidence | `/workspace/uat-ui-schema-ddl-b6d1920/` |
 | Overall | **Pass** |
 | Rolf Confirm | **Met** |
-| Merge | **Marc’s call** — no merge until Marc says |
+| Merge | **Merged to main** @ `180f0c1` (feat `f05430c` incl. UAT Pass `b6d1920` + docs `9279ec6`). Packet **closed** unless Marc opens follow-ups. |
 
 ### Section stamps
 

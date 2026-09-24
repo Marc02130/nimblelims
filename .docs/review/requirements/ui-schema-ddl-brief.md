@@ -3,7 +3,7 @@
 **Date:** 2026-09-22  
 **Stem:** `ui-schema-ddl`  
 **Branch:** `docs/ui-schema-ddl`  
-**Status:** **Brief written** — OQ-4–13 **Decided** (this fold). Implement gate **OPEN** (Design Group UX Accept Met @ `f79e2a0`; Günter Brief restamp Met). Next: Marc green-light for Grok Build.  
+**Status:** **Merged to main** @ `180f0c1` (feat `f05430c` incl. UAT Pass `b6d1920` + docs `9279ec6`). OQ-4–13 **Decided**. Design Group UX Accept Met @ `f79e2a0`; Günter Brief restamp Met. Tobias Pass + Rolf Confirm Met stand. Packet **closed** unless Marc opens follow-ups.  
 **Requirements:** [ui-schema-ddl.md](ui-schema-ddl.md)  
 **Open questions:** [../open-questions/ui-schema-ddl.md](../open-questions/ui-schema-ddl.md)  
 **UI sketch:** [../ui-review/ui-schema-ddl.md](../ui-review/ui-schema-ddl.md) (Mathilda Sketch Accept @ `e12b0c2` — not Design Group UX Accept)  
@@ -203,7 +203,7 @@ Boot: apply core Alembic, then replay the UI trail. Collision → **fail closed*
 | Design Group UX Accept on Tables / Columns / Layouts / Privileges | **Met** @ `f79e2a0` (Heidi / Hans / Deiter) |
 | Günter restamp that S-UI-1…6 still hold under this Brief | **Met** |
 
-Implement gate **OPEN**. Coding stays Grok Build unless Marc/Rolf asks; wait for **Marc green-light** before code. Tobias UAT uses Fail bars (1)–(5).
+Implement gate **CLOSED** (shipped). Coding was Grok Build. Tobias UAT uses Fail bars (1)–(5). **Merged to main** @ `180f0c1`. Packet **closed** unless Marc opens follow-ups.
 
 ---
 
@@ -216,7 +216,7 @@ Implement gate **OPEN**. Coding stays Grok Build unless Marc/Rolf asks; wait for
 | **Deiter** | Marc overwrite Confirmed; **retracts** three-mode Hide/Read-only/Deny bench copy. |
 | **Marc** | **Confirm closed:** default `schema:edit` + privilege admin = **Admin only** (not lab manager). |
 
-**Rolf Confirm.** Implement gate **OPEN** (Design UX Accept Met @ `f79e2a0`). Next: Marc green-light for Grok Build.
+**Rolf Confirm.** Implement gate **CLOSED** (shipped; Design UX Accept Met @ `f79e2a0`). **Merged to main** @ `180f0c1`. Packet **closed** unless Marc opens follow-ups.
 
 **Marc Confirm (2026-09-23; Rolf):** Default **`schema:edit`** + privilege admin = **Admin only** (not lab manager). **Closed.** Optional re-assign later. Implement CLOSED (at the time; now OPEN).
 
@@ -251,7 +251,7 @@ Implement **CLOSED** (at the time; now OPEN). Design Group re-stamps after tip (
 | Günter Brief restamp | **Met** |
 | Implement gate | **OPEN** |
 
-Tobias **re-UAT Pass** on `b6d1920` (0081). Rolf Confirm **Met**. Merge = Marc’s call — no merge until Marc says.
+Tobias **re-UAT Pass** on `b6d1920` (0081). Rolf Confirm **Met**. **Merged to main** @ `180f0c1` (feat `f05430c` incl. UAT Pass `b6d1920` + docs `9279ec6`). Packet **closed** unless Marc opens follow-ups.
 
 ## Product branch + UAT (2026-09-23; Rolf / Marc)
 
@@ -262,8 +262,9 @@ Tobias **re-UAT Pass** on `b6d1920` (0081). Rolf Confirm **Met**. Merge = Marc�
 | Product tip passed | `b6d1920` |
 | UAT script | `UAT_Scripts/uat-ui-schema-ddl.md` on that branch |
 | Docs living tip (implement OPEN) | `912c1a2` on `docs/ui-schema-ddl` |
+| Merged to main | `180f0c1` (feat `f05430c` incl. UAT Pass `b6d1920` + docs `9279ec6`) |
 
-Tobias owns UAT Pass/Fail against Fail bars (1)–(5). **No invent Pass.** No merge until Rolf Confirm + Marc.
+Tobias owns UAT Pass/Fail against Fail bars (1)–(5). **No invent Pass.** Tobias Pass + Rolf Confirm Met stand. Packet **closed** unless Marc opens follow-ups.
 
 ## Tobias UAT Fail on 8c14a84 (history — superseded by re-UAT Pass on b6d1920)
 
@@ -316,7 +317,7 @@ Tobias owns UAT Pass/Fail against Fail bars (1)–(5). **No invent Pass.** No me
 | Evidence | `/workspace/uat-ui-schema-ddl-b6d1920/` |
 | Overall | **Pass** |
 | Rolf Confirm | **Met** |
-| Merge | **Marc’s call** — no merge until Marc says |
+| Merge | **Merged to main** @ `180f0c1` (feat `f05430c` incl. UAT Pass `b6d1920` + docs `9279ec6`). Packet **closed** unless Marc opens follow-ups. |
 
 ### Section stamps
 

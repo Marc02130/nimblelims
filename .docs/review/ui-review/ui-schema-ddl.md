@@ -1,7 +1,7 @@
 # UI review: UI-driven schema DDL (admin UX sketch)
 
 **Date:** 2026-09-22  
-**Status:** **Sketch Accept** (Mathilda @ `e12b0c2`; **re-stamped** on Spec tip `f79e2a0` 2026-09-23). [Brief](../requirements/ui-schema-ddl-brief.md) 2026-09-22 Decides OQ-4–13. **Design Group UX Accept Met** on tip `f79e2a0` (Heidi/Hans/Deiter). Günter Brief restamp **Met**. Implement gate **OPEN**. Tobias **re-UAT Pass** on `b6d1920`. Rolf Confirm **Met**. Merge = Marc’s call.  
+**Status:** **Merged to main** @ `180f0c1` (feat `f05430c` incl. UAT Pass `b6d1920` + docs `9279ec6`). **Sketch Accept** (Mathilda @ `e12b0c2`; **re-stamped** on Spec tip `f79e2a0` 2026-09-23). [Brief](../requirements/ui-schema-ddl-brief.md) 2026-09-22 Decides OQ-4–13. **Design Group UX Accept Met** on tip `f79e2a0` (Heidi/Hans/Deiter). Günter Brief restamp **Met**. Tobias Pass + Rolf Confirm Met stand. Packet **closed** unless Marc opens follow-ups.  
 **Stem:** `ui-schema-ddl`  
 **Requirements:** [`.docs/review/requirements/ui-schema-ddl.md`](../requirements/ui-schema-ddl.md)  
 **Open questions:** [`.docs/review/open-questions/ui-schema-ddl.md`](../open-questions/ui-schema-ddl.md)  
@@ -140,7 +140,7 @@ Receive and Samples (and other layout-consuming screens) load: column registry �
 
 ## 10. Brief lock (do not invent in UX)
 
-OQ-4–13 are **Decided** in the [Brief](../requirements/ui-schema-ddl-brief.md) (Hybrid apply, shared+FORCE RLS, allow-list, platform columns, P1 types, deprecate-first, privilege registry, `ui_schema` head, leave Entries, `custom_attributes` follow-on). Sketch chrome must follow those locks. Design Group UX Accept **Met** @ `f79e2a0`. Günter Brief restamp **Met**. Implement **OPEN**. Tobias **re-UAT Pass** on `b6d1920`.
+OQ-4–13 are **Decided** in the [Brief](../requirements/ui-schema-ddl-brief.md) (Hybrid apply, shared+FORCE RLS, allow-list, platform columns, P1 types, deprecate-first, privilege registry, `ui_schema` head, leave Entries, `custom_attributes` follow-on). Sketch chrome must follow those locks. Design Group UX Accept **Met** @ `f79e2a0`. Günter Brief restamp **Met**. Implement **CLOSED** (shipped). Tobias **re-UAT Pass** on `b6d1920`. **Merged to main** @ `180f0c1`.
 
 ## 11. Sign-off
 
@@ -152,9 +152,9 @@ OQ-4–13 are **Decided** in the [Brief](../requirements/ui-schema-ddl-brief.md)
 | Lab Ops (Deiter) | **Accept with conditions** — Brief written; punches 1 and 4 **Met** |
 | Science (Hans) | **Accept with conditions** — punches 1 and 4 **Met** |
 | Design Group | **UX Accept Met** on tip `f79e2a0` (Heidi / Hans / Deiter) |
-| QA (Tobias) | **re-UAT Pass** on `b6d1920` (0081). Rolf Confirm **Met**. Merge = Marc’s call. |
+| QA (Tobias) | **re-UAT Pass** on `b6d1920` (0081). Rolf Confirm **Met**. **Merged to main** @ `180f0c1`. |
 
-**Implement gate:** **OPEN**. Design UX Accept **Met**. Günter Brief restamp **Met**. Tobias **re-UAT Pass** on `b6d1920`. Rolf Confirm **Met**. Merge = Marc’s call.
+**Implement gate:** **CLOSED** (shipped). Design UX Accept **Met**. Günter Brief restamp **Met**. Tobias Pass + Rolf Confirm Met stand. **Merged to main** @ `180f0c1` (feat `f05430c` incl. UAT Pass `b6d1920` + docs `9279ec6`). Packet **closed** unless Marc opens follow-ups.
 
 **Fold note 2026-09-23 (Marc Leadership overwrite; Rolf Confirm):** mutate Schema with permission `schema:edit` (not a new role); Layouts with `layout:edit` (no DDL). List ephemeral columns; layout = membership; privileges = R/W; multi-row table / single-record form; receive/asked-for = select then enter.
 
@@ -195,5 +195,5 @@ Implement **CLOSED** (at the time; now OPEN). Design Group re-stamps after tip (
 | Implement gate | **OPEN** |
 | Tobias re-UAT | **Pass** on `b6d1920` (0081) |
 
-Tobias **re-UAT Pass** on `b6d1920`. Rolf Confirm **Met**. Merge = Marc’s call — no merge until Marc says.
+Tobias **re-UAT Pass** on `b6d1920`. Rolf Confirm **Met**. **Merged to main** @ `180f0c1` (feat `f05430c` incl. UAT Pass `b6d1920` + docs `9279ec6`). Packet **closed** unless Marc opens follow-ups.
 
