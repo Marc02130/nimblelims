@@ -303,5 +303,5 @@ Tobias owns UAT Pass/Fail against Fail bars (1)–(5). **No invent Pass.** No me
 | **A** | `UiSchemaDdlLog.seq` ORM NULL → CREATE TABLE **500** |
 | **B** | `schema_apply` cannot ALTER `samples` → ADD COLUMN **422** |
 
-**Status:** Grok Build fix A+B **in flight** on `feat/ui-schema-ddl`. Tobias **re-UAT** §§2/3/6/7 (and unscored bars) after new product tip. No merge until UAT Pass + Rolf Confirm + Marc.
+**Status:** A+B **landed** on `feat/ui-schema-ddl` this tip (`0081` + `seq` Identity). Tobias **re-UAT** §§2/3/6/7 (and unscored bars) against this tip. No invent Pass. No merge until UAT Pass + Rolf Confirm + Marc.
 

@@ -230,3 +230,50 @@ def test_add_column_rejects_asked_for_physical():
 
     assert "asked_for" in ADD_COLUMN_OUT
     assert "routing_map" in ADD_COLUMN_OUT
+
+
+def test_ddl_log_seq_not_null(db_session: Session, test_admin_user: User):
+    """A: ORM must not INSERT NULL seq (UAT Fail 500 NotNullViolation)."""
+    from models.ui_schema import SchemaChange, UiSchemaDdlLog
+
+    change = SchemaChange(
+        client_id=test_admin_user.client_id,
+        actor_id=test_admin_user.id,
+        op="create_table",
+        table_physical="x_lot_notes",
+        after_status="active",
+    )
+    db_session.add(change)
+    db_session.flush()
+    log = UiSchemaDdlLog(
+        client_id=test_admin_user.client_id,
+        change_id=change.id,
+        op="create_table",
+        table_physical="x_lot_notes",
+    )
+    db_session.add(log)
+    db_session.flush()
+    assert log.seq is not None
+
+
+def test_add_column_on_samples_real_postgres(migrated_engine):
+    """B: ADD COLUMN on samples must succeed (schema_apply was not owner)."""
+    conn = migrated_engine.connect()
+    trans = conn.begin()
+    col = f"lab_note_{uuid4().hex[:8]}"
+    try:
+        conn.execute(
+            text("SELECT ui_schema_add_column(:t,:c,:ty,:n,:fk)"),
+            {"t": "samples", "c": col, "ty": "text", "n": True, "fk": False},
+        )
+        present = conn.execute(
+            text(
+                "SELECT 1 FROM information_schema.columns "
+                "WHERE table_schema='public' AND table_name='samples' AND column_name=:c"
+            ),
+            {"c": col},
+        ).scalar()
+        assert present
+    finally:
+        trans.rollback()
+        conn.close()

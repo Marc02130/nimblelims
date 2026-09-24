@@ -1,7 +1,7 @@
 """UI schema registries (not lab data). Physical CREATE/ALTER is real Postgres."""
 from __future__ import annotations
 
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import BigInteger, Boolean, Column, DateTime, ForeignKey, Identity, Integer, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID as PostgresUUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -128,7 +128,7 @@ class UiSchemaDdlLog(Base):
     __tablename__ = "ui_schema_ddl_log"
 
     id = Column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    seq = Column(Integer)
+    seq = Column(BigInteger, Identity(always=False), nullable=False)
     client_id = Column(PostgresUUID(as_uuid=True), ForeignKey("clients.id"), nullable=False)
     change_id = Column(PostgresUUID(as_uuid=True), ForeignKey("schema_changes.id"), nullable=True)
     op = Column(String(32), nullable=False)
