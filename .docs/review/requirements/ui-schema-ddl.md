@@ -1,7 +1,7 @@
 # Requirements: UI-driven schema DDL (real Postgres)
 
 **Date:** 2026-09-22  
-**Status:** **Brief written** ([ui-schema-ddl-brief.md](ui-schema-ddl-brief.md) 2026-09-22) — OQ-4–13 **Decided**. Heidi / Hans / Deiter / Günter Accept-with-conditions stand. Implement gate **OPEN** (Design Group UX Accept Met @ `f79e2a0`; Günter Brief restamp Met). Tobias **re-UAT Pass** on `b6d1920`. Rolf Confirm **Met**. Merge = Marc’s call. Coding stays Grok Build unless Marc/Rolf asks.  
+**Status:** **Merged to main** @ `180f0c1` (feat `f05430c` incl. UAT Pass `b6d1920` + docs `9279ec6`). OQ-4–13 **Decided**. Heidi / Hans / Deiter / Günter Accept-with-conditions stand. Design Group UX Accept Met @ `f79e2a0`; Günter Brief restamp Met. Tobias Pass + Rolf Confirm Met stand. Packet **closed** unless Marc opens follow-ups.  
 **Stem:** `ui-schema-ddl`  
 **Leadership lock:** Core pivot 2026-09-22 — AI-config foundation needs **add tables and columns through the UI as real Postgres objects**, not JSONB pretending to be schema. Sample-processing critical path Met on `main` (E-10 → E-6).  
 **Open questions:** [`.docs/review/open-questions/ui-schema-ddl.md`](../open-questions/ui-schema-ddl.md)  
@@ -115,9 +115,9 @@ OQ-4–13 **Decided** in the [Brief](ui-schema-ddl-brief.md). Living OQ doc: [`u
 | Security (Günter) | **Accept with conditions** @ `c6f0854` — S-UI-1…6; overwrite S-UI-1=`schema:edit`, S-UI-4=`layout:edit`. **Confirm 2026-09-23** Marc overwrite + **Admin defaults** to `schema:edit` + privilege admin — **Admin only** (not lab manager / lab-tech / client); **Marc Confirm closed**; optional re-assign later (optional separate role later; S-UI-2/3/5/6 unchanged). **Brief restamp Met**. |
 | Lab Ops (Deiter) | **Accept with conditions** (2026-09-22) @ `c6f0854` — Brief written (OQ-4–11). **Confirm 2026-09-23** Marc overwrite; **retract** Hide/Read-only/Deny three-mode copy. Implement **OPEN** (Design UX Accept Met @ `f79e2a0`). |
 | Spec (Wilhelmina) | Living fold (this doc + Brief). |
-| QA (Tobias) | **re-UAT Pass** on `b6d1920` (0081). §§2/3/6/7 Pass; Fail bars 1/2/4 Met; §§1/4/5/8 stand from `8c14a84`. Rolf Confirm **Met**. Merge = Marc’s call. |
+| QA (Tobias) | **re-UAT Pass** on `b6d1920` (0081). §§2/3/6/7 Pass; Fail bars 1/2/4 Met; §§1/4/5/8 stand from `8c14a84`. Rolf Confirm **Met**. **Merged to main** @ `180f0c1`. |
 
-**Implement gate:** **OPEN**. Design Group UX Accept **Met** @ `f79e2a0` (Heidi/Hans/Deiter). Günter Brief restamp **Met**. Tobias **re-UAT Pass** on `b6d1920`. Rolf Confirm **Met**. Merge = Marc’s call.
+**Implement gate:** **CLOSED** (shipped). Design Group UX Accept **Met** @ `f79e2a0` (Heidi/Hans/Deiter). Günter Brief restamp **Met**. Tobias Pass + Rolf Confirm Met stand. **Merged to main** @ `180f0c1` (feat `f05430c` incl. UAT Pass `b6d1920` + docs `9279ec6`). Packet **closed** unless Marc opens follow-ups.
 
 **Marc overwrite Confirms (2026-09-23; Rolf):** Günter + Hans + Deiter Confirmed. Deiter retracts three-mode Hide/Read-only/Deny copy. **Günter follow-on:** Admin defaults to `schema:edit` + privilege admin — **Admin only** (not lab manager / lab-tech / client); **Marc Confirm closed**; optional re-assign later; optional separate role later; `layout:edit` still no DDL; S-UI-2/3/5/6 unchanged. Implement **CLOSED** (at the time; now OPEN).
 
@@ -146,7 +146,7 @@ Retract any remaining copy that implies a hide mode or three-mode Hide / Read-on
 | Günter Brief restamp | **Met** |
 | Implement gate | **OPEN** |
 
-Tobias **re-UAT Pass** on `b6d1920` (0081). Rolf Confirm **Met**. Merge = Marc’s call — no merge until Marc says.
+Tobias **re-UAT Pass** on `b6d1920` (0081). Rolf Confirm **Met**. **Merged to main** @ `180f0c1` (feat `f05430c` incl. UAT Pass `b6d1920` + docs `9279ec6`). Packet **closed** unless Marc opens follow-ups.
 
 ## Product branch + UAT (2026-09-23; Rolf / Marc)
 
@@ -157,8 +157,9 @@ Tobias **re-UAT Pass** on `b6d1920` (0081). Rolf Confirm **Met**. Merge = Marc�
 | Product tip passed | `b6d1920` |
 | UAT script | `UAT_Scripts/uat-ui-schema-ddl.md` on that branch |
 | Docs living tip (implement OPEN) | `912c1a2` on `docs/ui-schema-ddl` |
+| Merged to main | `180f0c1` (feat `f05430c` incl. UAT Pass `b6d1920` + docs `9279ec6`) |
 
-Tobias owns UAT Pass/Fail against Fail bars (1)–(5). **No invent Pass.** No merge until Rolf Confirm + Marc.
+Tobias owns UAT Pass/Fail against Fail bars (1)–(5). **No invent Pass.** Tobias Pass + Rolf Confirm Met stand. Packet **closed** unless Marc opens follow-ups.
 
 ## Tobias UAT Fail on 8c14a84 (history — superseded by re-UAT Pass on b6d1920)
 
@@ -211,7 +212,7 @@ Tobias owns UAT Pass/Fail against Fail bars (1)–(5). **No invent Pass.** No me
 | Evidence | `/workspace/uat-ui-schema-ddl-b6d1920/` |
 | Overall | **Pass** |
 | Rolf Confirm | **Met** |
-| Merge | **Marc’s call** — no merge until Marc says |
+| Merge | **Merged to main** @ `180f0c1` (feat `f05430c` incl. UAT Pass `b6d1920` + docs `9279ec6`). Packet **closed** unless Marc opens follow-ups. |
 
 ### Section stamps
 
