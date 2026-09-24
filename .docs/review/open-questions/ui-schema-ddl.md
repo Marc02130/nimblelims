@@ -106,7 +106,7 @@ Plus catalog uniqueness / tenant isolation; role×layout visibility. UAT packet 
 ## Waiting
 
 - **Brief** — **written** 2026-09-22 ([ui-schema-ddl-brief.md](../requirements/ui-schema-ddl-brief.md)); OQ-4–13 Decided  
-- **Design Group UX Accept** on Tables / Columns / Layouts / Privileges — pending (Mathilda Sketch Accept is not this stamp)  
+- **Design Group UX Accept** on Tables / Columns / Layouts / Privileges — **Met** (Mathilda Sketch Accept is not this stamp)  
 - **Günter restamp** that S-UI-1…6 still hold under the Brief — **Met**  
 - Implement gate **OPEN** (Design Group UX Accept Met @ `f79e2a0`)  
 
@@ -116,11 +116,11 @@ Brief written. Design Group UX Accept **Met** @ `f79e2a0`. Günter Brief restamp
 
 ## Marc Leadership overwrite (2026-09-23)
 
-**Rolf Confirm.** S-UI-1=`schema:edit`; S-UI-4=`layout:edit`; Hans SOP hints + Results Confirm; Deiter layout display locks (5)–(7). Implement CLOSED.
+**Rolf Confirm.** S-UI-1=`schema:edit`; S-UI-4=`layout:edit`; Hans SOP hints + Results Confirm; Deiter layout display locks (5)–(7). Implement CLOSED (at the time; now OPEN).
 
-**Confirms 2026-09-23 (Rolf):** Günter + Hans + Deiter Confirmed Marc overwrite. Deiter **retracts** three-mode Hide/Read-only/Deny copy. Implement CLOSED.
+**Confirms 2026-09-23 (Rolf):** Günter + Hans + Deiter Confirmed Marc overwrite. Deiter **retracts** three-mode Hide/Read-only/Deny copy. Implement CLOSED (at the time; now OPEN).
 
-**Marc Confirm (2026-09-23; Rolf):** Default **`schema:edit`** + privilege admin = **Admin only** (not lab manager). **Closed.** Optional re-assign later. Implement CLOSED.
+**Marc Confirm (2026-09-23; Rolf):** Default **`schema:edit`** + privilege admin = **Admin only** (not lab manager). **Closed.** Optional re-assign later. Implement CLOSED (at the time; now OPEN).
 
 ## Marc Leadership overwrite — layout visibility (2026-09-23; Rolf Confirm)
 
@@ -133,7 +133,7 @@ Brief written. Design Group UX Accept **Met** @ `f79e2a0`. Günter Brief restamp
 | Neither read nor write | Not displayed; layout editor **must not offer** that field. |
 | Read yes / Write no | May appear on layout as **read-only** — from **privileges**, not a layout hide. |
 
-Retract any remaining copy that implies a hide mode or three-mode Hide / Read-only / Deny. Implement still **CLOSED** pending Design Group UX Accept (Günter Brief restamp **Met**).
+Retract any remaining copy that implies a hide mode or three-mode Hide / Read-only / Deny. Implement still **CLOSED** pending Design Group UX Accept (Günter Brief restamp **Met**) (at the time; now OPEN).
 
 ## Marc Leadership overwrite — no Schema-admin role; asked-for/routing leave as is (2026-09-23; Rolf Confirm)
 
@@ -141,7 +141,7 @@ Retract any remaining copy that implies a hide mode or three-mode Hide / Read-on
 2. **Asked-for and routing leave as is** — not designed for configuration. Do **not** make asked-for or routing layout/schema-config surfaces this packet. Deiter “select then enter” for **receive** may stay as a Lab Ops runtime note where it already applies; do **not** redesign asked-for/routing for OQ-2 layouts.
 3. Still required: ephemeral list columns; multi-row = table / single = form; “not on layout” (never layout-hidden); `schema:edit` Admin-only.
 
-Implement **CLOSED**. Design Group re-stamps after tip.
+Implement **CLOSED** (at the time; now OPEN). Design Group re-stamps after tip (at the time; now OPEN).
 
 ## Implement gate OPEN (2026-09-23; Rolf)
 
@@ -151,7 +151,7 @@ Implement **CLOSED**. Design Group re-stamps after tip.
 | Günter Brief restamp | **Met** |
 | Implement gate | **OPEN** |
 
-Tobias **UAT Fail** on `8c14a84`. Marc green-lit Grok Build fix for blockers A+B. Re-UAT after new tip. No invent Pass; no merge until Pass + Rolf Confirm + Marc.
+Tobias **re-UAT Pass** on `b6d1920` (0081). Rolf Confirm **Met**. Merge = Marc’s call — no merge until Marc says.
 
 ## Product branch + UAT (2026-09-23; Rolf / Marc)
 
@@ -159,12 +159,13 @@ Tobias **UAT Fail** on `8c14a84`. Marc green-lit Grok Build fix for blockers A+B
 |------|------|
 | Product / dogfood / UAT branch | `feat/ui-schema-ddl` |
 | Product tip (Grok Build landed) | `8c14a84` |
+| Product tip passed | `b6d1920` |
 | UAT script | `UAT_Scripts/uat-ui-schema-ddl.md` on that branch |
 | Docs living tip (implement OPEN) | `912c1a2` on `docs/ui-schema-ddl` |
 
 Tobias owns UAT Pass/Fail against Fail bars (1)–(5). **No invent Pass.** No merge until Rolf Confirm + Marc.
 
-## Tobias UAT Fail + fix in flight (2026-09-23; Rolf / Marc)
+## Tobias UAT Fail on 8c14a84 (history — superseded by re-UAT Pass on b6d1920)
 
 | Item | Cite |
 |------|------|
@@ -203,5 +204,42 @@ Tobias owns UAT Pass/Fail against Fail bars (1)–(5). **No invent Pass.** No me
 | **A** | `UiSchemaDdlLog.seq` ORM NULL → CREATE TABLE **500** |
 | **B** | `schema_apply` cannot ALTER `samples` → ADD COLUMN **422** |
 
-**Status:** A+B **landed** on `feat/ui-schema-ddl` this tip (`0081` + `seq` Identity). Tobias **re-UAT** §§2/3/6/7 (and unscored bars) against this tip. No invent Pass. No merge until UAT Pass + Rolf Confirm + Marc.
+**Status:** Grok Build fixed A+B on `b6d1920`; re-UAT Pass — see next section.
+
+## Tobias re-UAT Pass + Rolf Confirm (2026-09-23)
+
+| Item | Cite |
+|------|------|
+| Product tip | `b6d1920` on `feat/ui-schema-ddl` (alembic **0081**) |
+| Prior Fail tip | `8c14a84` — Fail history stands; A+B fixed |
+| UAT script | `UAT_Scripts/uat-ui-schema-ddl.md` |
+| Evidence | `/workspace/uat-ui-schema-ddl-b6d1920/` |
+| Overall | **Pass** |
+| Rolf Confirm | **Met** |
+| Merge | **Marc’s call** — no merge until Marc says |
+
+### Section stamps
+
+| § | Result | Tip |
+|---|--------|-----|
+| 1 Surfaces | **Pass** | `8c14a84` (stands) |
+| 2 CREATE TABLE | **Pass** | `b6d1920` |
+| 3 ADD COLUMN | **Pass** | `b6d1920` |
+| 4 schema:edit | **Pass** | `8c14a84` (stands) |
+| 5 Layout membership | **Pass** | `8c14a84` (stands) |
+| 6 Privileges | **Pass** | `b6d1920` |
+| 7 Deprecate/DROP | **Pass** | `b6d1920` |
+| 8 JSONB-as-config | **Pass** | `8c14a84` (stands) |
+
+### Fail bars
+
+| Bar | Result |
+|-----|--------|
+| (1) privilege refuse write | **Met** (`b6d1920`) |
+| (2) privilege refuse read | **Met** (`b6d1920`) |
+| (3) schema:edit only for DDL | **Met** (`8c14a84`) |
+| (4) real Postgres proof | **Met** (`b6d1920`) |
+| (5) JSONB-as-config | **Met** (`8c14a84`) |
+
+Blockers A (`UiSchemaDdlLog.seq`) and B (`schema_apply` ALTER `samples`) **cleared** on `b6d1920`. Compose down. Not IC50.
 
