@@ -3,13 +3,11 @@
 **Date:** 2026-09-22  
 **Stem:** `ui-schema-ddl`  
 **Branch:** `docs/ui-schema-ddl`  
-**Status:** **Brief written** — OQ-4–13 **Decided** (this fold). Implement gate **OPEN** (Design Group UX Accept Met @ `f79e2a0`; Günter Brief restamp Met). Product / dogfood / UAT is on `feat/ui-schema-ddl` tip `8c14a84` (`8c14a848a7439d458b3aa395f958b7e79e26a11f`). Formal UAT: [`UAT_Scripts/uat-ui-schema-ddl.md`](../../../UAT_Scripts/uat-ui-schema-ddl.md). **Tobias owns Pass/Fail.** Do **not** invent Pass. **No merge** until **Rolf Confirm** + **Marc**.  
+**Status:** **Brief written** — OQ-4–13 **Decided** (this fold). Implement gate **OPEN** (Design Group UX Accept Met @ `f79e2a0`; Günter Brief restamp Met). Next: Marc green-light for Grok Build.  
 **Requirements:** [ui-schema-ddl.md](ui-schema-ddl.md)  
 **Open questions:** [../open-questions/ui-schema-ddl.md](../open-questions/ui-schema-ddl.md)  
 **UI sketch:** [../ui-review/ui-schema-ddl.md](../ui-review/ui-schema-ddl.md) (Mathilda Sketch Accept @ `e12b0c2` — not Design Group UX Accept)  
 **Not IC50. No product code in this fold.**
-
-**Product / dogfood / UAT (cite):** branch `feat/ui-schema-ddl` tip **`8c14a84`** (full `8c14a848a7439d458b3aa395f958b7e79e26a11f`). Script [`UAT_Scripts/uat-ui-schema-ddl.md`](../../../UAT_Scripts/uat-ui-schema-ddl.md). **Tobias owns Pass/Fail.** Do **not** invent Pass. **No merge** until **Rolf Confirm** + **Marc**.
 
 This Brief closes the pre-implement blockers named by Leadership / Grok Bot: OQ-4–13 plus Günter S-UI-1…6, Hans punches, and Deiter conditions. Method stays **Brief → (Design UX + Günter restamp) → code → UAT → stamp → merge**.
 
@@ -25,7 +23,7 @@ This Brief closes the pre-implement blockers named by Leadership / Grok Bot: OQ-
 | **OQ-15** | Known screen keys first; section → fields; default = all **read**-privileged columns; bench vs review separate. **Asked-for and routing leave as is** — not layout/schema-config this packet. |
 | **OQ-16** | JSONB = payload **data** only. Never config. |
 | Surfaces | Admin → Schema: **Tables**, **Columns**, **Layouts**, **Privileges**. |
-| Tobias Fail bars | (1)–(5) locked 2026-09-22. **Tobias owns Pass/Fail** on [`UAT_Scripts/uat-ui-schema-ddl.md`](../../../UAT_Scripts/uat-ui-schema-ddl.md) vs `feat/ui-schema-ddl` @ `8c14a84`. Do **not** invent Pass. |
+| Tobias Fail bars | (1)–(5) locked 2026-09-22. |
 
 **Parked:** AI apply DDL; AI login/reporting/storage; Indexes/FKs UI; DBA SQL console; OQ-14 AI metadata.
 
@@ -204,12 +202,8 @@ Boot: apply core Alembic, then replay the UI trail. Collision → **fail closed*
 | This Brief (OQ-4–13) | **Written** this fold |
 | Design Group UX Accept on Tables / Columns / Layouts / Privileges | **Met** @ `f79e2a0` (Heidi / Hans / Deiter) |
 | Günter restamp that S-UI-1…6 still hold under this Brief | **Met** |
-| Product / dogfood / UAT | `feat/ui-schema-ddl` tip **`8c14a84`** (`8c14a848a7439d458b3aa395f958b7e79e26a11f`) |
-| UAT script | [`UAT_Scripts/uat-ui-schema-ddl.md`](../../../UAT_Scripts/uat-ui-schema-ddl.md) — **Tobias owns Pass/Fail** |
-| Pass | Do **not** invent Pass |
-| Merge | **No merge** until **Rolf Confirm** + **Marc** |
 
-Implement gate **OPEN**. Coding stays Grok Build unless Marc/Rolf asks. Tobias UAT uses Fail bars (1)–(5) on the product tip above. Do **not** invent Pass.
+Implement gate **OPEN**. Coding stays Grok Build unless Marc/Rolf asks; wait for **Marc green-light** before code. Tobias UAT uses Fail bars (1)–(5).
 
 ---
 
@@ -222,7 +216,7 @@ Implement gate **OPEN**. Coding stays Grok Build unless Marc/Rolf asks. Tobias U
 | **Deiter** | Marc overwrite Confirmed; **retracts** three-mode Hide/Read-only/Deny bench copy. |
 | **Marc** | **Confirm closed:** default `schema:edit` + privilege admin = **Admin only** (not lab manager). |
 
-**Rolf Confirm.** Implement gate **OPEN** (Design UX Accept Met @ `f79e2a0`). Product / dogfood / UAT on `feat/ui-schema-ddl` @ `8c14a84`. **Tobias owns Pass/Fail.** Do **not** invent Pass. **No merge** until **Rolf Confirm** + **Marc**.
+**Rolf Confirm.** Implement gate **OPEN** (Design UX Accept Met @ `f79e2a0`). Next: Marc green-light for Grok Build.
 
 **Marc Confirm (2026-09-23; Rolf):** Default **`schema:edit`** + privilege admin = **Admin only** (not lab manager). **Closed.** Optional re-assign later. Implement CLOSED.
 
@@ -256,7 +250,58 @@ Implement **CLOSED**. Design Group re-stamps after tip.
 | Design Group UX Accept | **Met** on tip `f79e2a0` (Heidi / Hans / Deiter) |
 | Günter Brief restamp | **Met** |
 | Implement gate | **OPEN** |
-| Product / dogfood / UAT | `feat/ui-schema-ddl` tip **`8c14a84`** (`8c14a848a7439d458b3aa395f958b7e79e26a11f`) |
-| UAT script | [`UAT_Scripts/uat-ui-schema-ddl.md`](../../../UAT_Scripts/uat-ui-schema-ddl.md) — **Tobias owns Pass/Fail** |
-| Pass | Do **not** invent Pass |
-| Merge | **No merge** until **Rolf Confirm** + **Marc** |
+
+Tobias **UAT Fail** on `8c14a84`. Marc green-lit Grok Build fix for blockers A+B. Re-UAT after new tip. No invent Pass; no merge until Pass + Rolf Confirm + Marc.
+
+## Product branch + UAT (2026-09-23; Rolf / Marc)
+
+| Item | Cite |
+|------|------|
+| Product / dogfood / UAT branch | `feat/ui-schema-ddl` |
+| Product tip (Grok Build landed) | `8c14a84` |
+| UAT script | `UAT_Scripts/uat-ui-schema-ddl.md` on that branch |
+| Docs living tip (implement OPEN) | `912c1a2` on `docs/ui-schema-ddl` |
+
+Tobias owns UAT Pass/Fail against Fail bars (1)–(5). **No invent Pass.** No merge until Rolf Confirm + Marc.
+
+## Tobias UAT Fail + fix in flight (2026-09-23; Rolf / Marc)
+
+| Item | Cite |
+|------|------|
+| Product tip UAT’d | `8c14a84` on `feat/ui-schema-ddl` |
+| UAT script | `UAT_Scripts/uat-ui-schema-ddl.md` |
+| Evidence | `/workspace/uat-ui-schema-ddl-8c14a84/` |
+| Overall | **Fail** — no invent Pass; **no merge** |
+
+### Section stamps (Tobias)
+
+| § | Result |
+|---|--------|
+| 1 Surfaces | **Pass** |
+| 2 CREATE TABLE | **Fail** — 500 `UiSchemaDdlLog.seq` NotNullViolation |
+| 3 ADD COLUMN | **Fail** — 422 `schema_apply` ≠ samples owner |
+| 4 schema:edit | **Pass** (lab-tech 403) |
+| 5 Layout membership | **Pass** |
+| 6 Privileges | **Fail** (403 not proven; blocked by §3) |
+| 7 Deprecate/DROP | **Fail** |
+| 8 JSONB-as-config | **Pass** |
+
+### Fail bars
+
+| Bar | Result |
+|-----|--------|
+| (1) privilege refuse write | **not scored** |
+| (2) privilege refuse read | **not scored** |
+| (3) schema:edit only for DDL | **Met** |
+| (4) real Postgres proof | **Fail** on API |
+| (5) JSONB-as-config | **Met** |
+
+### Blockers (Marc green-lit Grok Build fix)
+
+| ID | Blocker |
+|----|---------|
+| **A** | `UiSchemaDdlLog.seq` ORM NULL → CREATE TABLE **500** |
+| **B** | `schema_apply` cannot ALTER `samples` → ADD COLUMN **422** |
+
+**Status:** Grok Build fix A+B **in flight** on `feat/ui-schema-ddl`. Tobias **re-UAT** §§2/3/6/7 (and unscored bars) after new product tip. No merge until UAT Pass + Rolf Confirm + Marc.
+
