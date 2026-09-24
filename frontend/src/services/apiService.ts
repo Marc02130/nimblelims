@@ -518,6 +518,96 @@ export class ApiService {
     await this.api.delete(`/v1/routing-map/${id}`);
   }
 
+  async getSchemaTables() {
+    const response: AxiosResponse = await this.api.get('/v1/schema/tables');
+    return response.data;
+  }
+
+  async createSchemaTable(data: { display_name: string; physical_name?: string }) {
+    const response: AxiosResponse = await this.api.post('/v1/schema/tables', data);
+    return response.data;
+  }
+
+  async deprecateSchemaTable(id: string) {
+    const response: AxiosResponse = await this.api.post(`/v1/schema/tables/${id}/deprecate`);
+    return response.data;
+  }
+
+  async dropSchemaTable(id: string) {
+    await this.api.post(`/v1/schema/tables/${id}/drop`, { confirm: true });
+  }
+
+  async getSchemaColumns(table_id: string) {
+    const response: AxiosResponse = await this.api.get('/v1/schema/columns', {
+      params: { table_id },
+    });
+    return response.data;
+  }
+
+  async createSchemaColumn(data: {
+    table_id: string;
+    display_name: string;
+    data_type: string;
+    nullable?: boolean;
+    list_id?: string;
+    sop_hint?: string;
+    sort_order?: number;
+  }) {
+    const response: AxiosResponse = await this.api.post('/v1/schema/columns', data);
+    return response.data;
+  }
+
+  async deprecateSchemaColumn(id: string) {
+    const response: AxiosResponse = await this.api.post(`/v1/schema/columns/${id}/deprecate`);
+    return response.data;
+  }
+
+  async dropSchemaColumn(id: string) {
+    await this.api.post(`/v1/schema/columns/${id}/drop`, { confirm: true });
+  }
+
+  async getSchemaLayout(role_id: string, screen_key: string) {
+    const response: AxiosResponse = await this.api.get('/v1/schema/layouts', {
+      params: { role_id, screen_key },
+    });
+    return response.data;
+  }
+
+  async putSchemaLayout(data: {
+    role_id: string;
+    screen_key: string;
+    fields: Array<{ column_id: string; section?: string; sort_order: number }>;
+  }) {
+    const response: AxiosResponse = await this.api.put('/v1/schema/layouts', data);
+    return response.data;
+  }
+
+  async getSchemaPrivileges(filters?: { role_id?: string; table_id?: string }) {
+    const response: AxiosResponse = await this.api.get('/v1/schema/privileges', {
+      params: filters,
+    });
+    return response.data;
+  }
+
+  async putSchemaPrivileges(
+    items: Array<{
+      role_id: string;
+      table_id: string;
+      column_id?: string | null;
+      access: string;
+    }>
+  ) {
+    const response: AxiosResponse = await this.api.put('/v1/schema/privileges', items);
+    return response.data;
+  }
+
+  async getSchemaRuntime(screen_key: string) {
+    const response: AxiosResponse = await this.api.get('/v1/schema/runtime', {
+      params: { screen_key },
+    });
+    return response.data;
+  }
+
   async getWorkOrders(filters?: { status?: string; sample_id?: string }) {
     const response: AxiosResponse = await this.api.get('/v1/work-orders', { params: filters });
     return response.data;

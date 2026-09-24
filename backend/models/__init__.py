@@ -78,3 +78,12 @@ from .entry import (
 # Additional models referenced via relationships or used in the app
 from .dose_response import DoseResponseResult, LimsRunDataExclusion
 from .template_well import TemplateWellDefinition
+from .ui_schema import (
+    SchemaTable,
+    SchemaColumn,
+    SchemaLayout,
+    SchemaLayoutField,
+    SchemaPrivilege,
+    SchemaChange,
+    UiSchemaDdlLog,
+)

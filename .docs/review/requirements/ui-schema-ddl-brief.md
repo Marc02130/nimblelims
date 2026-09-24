@@ -6,7 +6,7 @@
 **Status:** **Brief written** — OQ-4–13 **Decided** (this fold). Implement gate **OPEN** (Design Group UX Accept Met @ `f79e2a0`; Günter Brief restamp Met). Next: Marc green-light for Grok Build.  
 **Requirements:** [ui-schema-ddl.md](ui-schema-ddl.md)  
 **Open questions:** [../open-questions/ui-schema-ddl.md](../open-questions/ui-schema-ddl.md)  
-**UI sketch:** [../ui-review/ui-schema-ddl.md](../ui-review/ui-schema-ddl.md) (Mathilda Sketch Accept @ `e12b0c2`; Design Group UX Accept **Met** @ `f79e2a0`)  
+**UI sketch:** [../ui-review/ui-schema-ddl.md](../ui-review/ui-schema-ddl.md) (Mathilda Sketch Accept @ `e12b0c2` — not Design Group UX Accept)  
 **Not IC50. No product code in this fold.**
 
 This Brief closes the pre-implement blockers named by Leadership / Grok Bot: OQ-4–13 plus Günter S-UI-1…6, Hans punches, and Deiter conditions. Method stays **Brief → (Design UX + Günter restamp) → code → UAT → stamp → merge**.
@@ -251,5 +251,57 @@ Implement **CLOSED**. Design Group re-stamps after tip.
 | Günter Brief restamp | **Met** |
 | Implement gate | **OPEN** |
 
-Next: **Marc green-light** for Grok Build. No product code until Marc asks. Coding stays Grok Build unless Marc/Rolf asks otherwise.
+Tobias **UAT Fail** on `8c14a84`. Marc green-lit Grok Build fix for blockers A+B. Re-UAT after new tip. No invent Pass; no merge until Pass + Rolf Confirm + Marc.
+
+## Product branch + UAT (2026-09-23; Rolf / Marc)
+
+| Item | Cite |
+|------|------|
+| Product / dogfood / UAT branch | `feat/ui-schema-ddl` |
+| Product tip (Grok Build landed) | `8c14a84` |
+| UAT script | `UAT_Scripts/uat-ui-schema-ddl.md` on that branch |
+| Docs living tip (implement OPEN) | `912c1a2` on `docs/ui-schema-ddl` |
+
+Tobias owns UAT Pass/Fail against Fail bars (1)–(5). **No invent Pass.** No merge until Rolf Confirm + Marc.
+
+## Tobias UAT Fail + fix in flight (2026-09-23; Rolf / Marc)
+
+| Item | Cite |
+|------|------|
+| Product tip UAT’d | `8c14a84` on `feat/ui-schema-ddl` |
+| UAT script | `UAT_Scripts/uat-ui-schema-ddl.md` |
+| Evidence | `/workspace/uat-ui-schema-ddl-8c14a84/` |
+| Overall | **Fail** — no invent Pass; **no merge** |
+
+### Section stamps (Tobias)
+
+| § | Result |
+|---|--------|
+| 1 Surfaces | **Pass** |
+| 2 CREATE TABLE | **Fail** — 500 `UiSchemaDdlLog.seq` NotNullViolation |
+| 3 ADD COLUMN | **Fail** — 422 `schema_apply` ≠ samples owner |
+| 4 schema:edit | **Pass** (lab-tech 403) |
+| 5 Layout membership | **Pass** |
+| 6 Privileges | **Fail** (403 not proven; blocked by §3) |
+| 7 Deprecate/DROP | **Fail** |
+| 8 JSONB-as-config | **Pass** |
+
+### Fail bars
+
+| Bar | Result |
+|-----|--------|
+| (1) privilege refuse write | **not scored** |
+| (2) privilege refuse read | **not scored** |
+| (3) schema:edit only for DDL | **Met** |
+| (4) real Postgres proof | **Fail** on API |
+| (5) JSONB-as-config | **Met** |
+
+### Blockers (Marc green-lit Grok Build fix)
+
+| ID | Blocker |
+|----|---------|
+| **A** | `UiSchemaDdlLog.seq` ORM NULL → CREATE TABLE **500** |
+| **B** | `schema_apply` cannot ALTER `samples` → ADD COLUMN **422** |
+
+**Status:** A+B **landed** on `feat/ui-schema-ddl` this tip (`0081` + `seq` Identity). Tobias **re-UAT** §§2/3/6/7 (and unscored bars) against this tip. No invent Pass. No merge until UAT Pass + Rolf Confirm + Marc.
 

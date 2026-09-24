@@ -94,6 +94,7 @@ export const adminNavItems: AdminNavItem[] = [
   },
   { text: 'Analytes Management', path: '/admin/analytes', icon: <Biotech /> },
   { text: 'Test Batteries', path: '/admin/test-batteries', icon: <BatteryChargingFull /> },
+  { text: 'Schema', path: '/admin/schema/tables', icon: <TuneIcon /> },
   { text: 'Custom Fields', path: '/admin/custom-fields', icon: <TuneIcon /> },
   { text: 'Workflow Templates', path: '/admin/workflow-templates', icon: <TuneIcon /> },
   { text: 'Help Management', path: '/admin/help', icon: <HelpIcon /> },

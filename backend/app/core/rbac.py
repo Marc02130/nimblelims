@@ -239,6 +239,9 @@ require_project_read = require_permission("project:read")
 
 require_user_manage = require_permission("user:manage")
 require_config_edit = require_permission("config:edit")
+require_schema_edit = require_permission("schema:edit")
+require_layout_edit = require_permission("layout:edit")
+require_schema_or_layout = require_any_permission(["schema:edit", "layout:edit"])
 require_workflow_execute = require_permission("workflow:execute")
 
 require_analysis_manage = require_permission("analysis:manage")

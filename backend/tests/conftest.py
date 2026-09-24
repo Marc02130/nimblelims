@@ -210,7 +210,8 @@ def test_admin_user(db_session, test_org):
         "sample:create", "sample:read", "sample:update", "sample:delete",
         "test:assign", "test:update", "result:enter", "result:review", "result:read",
         "batch:manage", "batch:read", "project:manage", "project:read",
-        "user:manage", "config:edit", "workflow:execute", "experiment:manage",
+        "user:manage", "config:edit", "schema:edit", "layout:edit",
+        "workflow:execute", "experiment:manage",
         "experiment:publish",
     ]
     permissions = []
