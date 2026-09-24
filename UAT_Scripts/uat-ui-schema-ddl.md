@@ -2,7 +2,7 @@
 
 **Stem:** `ui-schema-ddl`  
 **Brief:** `.docs/review/requirements/ui-schema-ddl-brief.md`  
-**Status:** Draft — run after product is on `feat/ui-schema-ddl`  
+**Status:** Tobias **Fail** on product `8c14a84` (evidence `/workspace/uat-ui-schema-ddl-8c14a84/`). Blockers A+B fixed this tip — **re-UAT** §§2/3/6/7. No invent Pass.  
 **Not IC50.**
 
 ## Fail bars (Tobias, locked)
