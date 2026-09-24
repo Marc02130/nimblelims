@@ -1,7 +1,7 @@
 # Requirements: UI-driven schema DDL (real Postgres)
 
 **Date:** 2026-09-22  
-**Status:** **Brief written** ([ui-schema-ddl-brief.md](ui-schema-ddl-brief.md) 2026-09-22) — OQ-4–13 **Decided**. Heidi / Hans / Deiter / Günter Accept-with-conditions stand. Implement gate **OPEN** (Design Group UX Accept Met @ `f79e2a0`; Günter Brief restamp Met). Next: Marc green-light for Grok Build — no code until Marc asks. Coding stays Grok Build unless Marc/Rolf asks.  
+**Status:** **Brief written** ([ui-schema-ddl-brief.md](ui-schema-ddl-brief.md) 2026-09-22) — OQ-4–13 **Decided**. Heidi / Hans / Deiter / Günter Accept-with-conditions stand. Implement gate **OPEN** (Design Group UX Accept Met @ `f79e2a0`; Günter Brief restamp Met). Tobias **UAT Fail** on `8c14a84`. Grok Build fix A+B in flight; re-UAT after new tip. Coding stays Grok Build unless Marc/Rolf asks.  
 **Stem:** `ui-schema-ddl`  
 **Leadership lock:** Core pivot 2026-09-22 — AI-config foundation needs **add tables and columns through the UI as real Postgres objects**, not JSONB pretending to be schema. Sample-processing critical path Met on `main` (E-10 → E-6).  
 **Open questions:** [`.docs/review/open-questions/ui-schema-ddl.md`](../open-questions/ui-schema-ddl.md)  
@@ -27,7 +27,7 @@ This packet is the **AI-config foundation**, not AI itself. It does **not** open
 | No product code until sketch + Leadership / Heidi Accept | Rolf 2026-09-22 |
 | Unpark AI breadth **only** where this schema-config is the blocker | Rolf 2026-09-22 |
 | **OQ-1 Decided:** catalog minimum = **table registry** + **column registry** (not lab data); physical CREATE/ALTER still real Postgres; `information_schema` alone insufficient; indexes/FKs wait | Marc + **Rolf Confirm** 2026-09-22 |
-| **OQ-2 Decided:** **role-based layout registry** (role × screen × **membership**; absent = not shown; **no hide toggle**) — separate from table/column catalogs; schema ≠ layout | Marc + **Rolf Confirm**; overwrite 2026-09-23 |
+| **OQ-2 Decided:** **role-based layout registry** (role × screen × visible columns/sections) — separate from table/column catalogs; schema ≠ layout | Marc + **Rolf Confirm** 2026-09-22 |
 | **OQ-3 Decided:** **role × table/column privileges** (read vs write; permission **`schema:edit`** separate — not a new role) — **not** layout; API allow vs UI show | Marc + **Rolf Confirm**; overwrite 2026-09-23 |
 | Column registry carries **public SOP field-name hints** for later AI mapping — no house SOP text in git | Katinka + Core 2026-09-22 |
 | Not IC50 | Standing |
@@ -63,7 +63,7 @@ Cite the [Brief](ui-schema-ddl-brief.md) for apply / tenant / allow-list / types
 |----|-----------|
 | AC0 | **Catalog minimum:** product ships (or migrates in) a **table registry** and a **column registry**. UI editing of schema goes through these registries; they store configurable metadata (`information_schema` alone is not enough). |
 | AC0b | Applying create/add updates **both** the physical Postgres object **and** the corresponding registry row(s) in one controlled operation (**Brief OQ-4 Hybrid**: `lims_app` no DDL; schema-apply role / allow-listed function; audit + replay). |
-| AC0c | **Layout registry:** product ships a **role-based layout** catalog (role × screen × **membership** — absent = not shown; **no hide toggle**). Runtime screens honor layout for the signed-in role; missing layout falls back per Mathilda lock. Layout edits do **not** CREATE/ALTER physical columns by themselves. **Asked-for and routing leave as is.** |
+| AC0c | **Layout registry:** product ships a **role-based layout** catalog (role × screen × visible columns/sections). Runtime screens honor layout for the signed-in role; missing layout falls back per Mathilda lock. Layout edits do **not** CREATE/ALTER physical columns by themselves. |
 | AC0d | **Privileges (Brief OQ-10):** dedicated privilege registry; role × table/column **read/write**; default-deny; DDL needs **`schema:edit`**. **Tobias Fail bars:** no-privilege write → **403/422** (not silent drop); privilege-denied read → refuse (not empty-as-layout); not-on-layout ≠ API allow. |
 | AC0e | **AI hints:** column registry SOP field-name hints — **sample type** (not matrix); **vessel = container**; barcode ≠ sample ID; container ≠ sample type; parent = `parent_sample_id`. No house SOP text in git. |
 | AC1 | **ADD COLUMN** via UI on an allow-listed table (**Brief OQ-6**: `samples` non-identity + UI-created tables; OQ-8 types) creates a real Postgres column **plus** a column-registry row. |
@@ -89,11 +89,11 @@ Cite the [Brief](ui-schema-ddl-brief.md) for apply / tenant / allow-list / types
 3. **Create table** for a lab-specific entity (Heidi names the first allowed pattern) → real table **and** table-registry row → basic CRUD scaffold per lock (may be minimal in P1).  
 4. Admin sets **layout** for Lab tech vs Admin on a screen → same schema, different visible fields/sections.  
 5. Attempt cross-tenant read → denied.  
-6. Deprecate column → omitted from new layouts; data retained until controlled remove.
+6. Deprecate column → layout rows updated/hidden per policy; data retained until controlled remove.
 
 ## 7. Open questions
 
-OQ-4–13 **Decided** in the [Brief](ui-schema-ddl-brief.md). Living OQ doc: [`ui-schema-ddl.md` (open-questions)](../open-questions/ui-schema-ddl.md). OQ-14 parked. Design Group UX Accept **Met** @ `f79e2a0`. Günter restamp **Met**. Implement **OPEN**. Next: Marc green-light. Dated Confirm lines below that say CLOSED are history; header + this section are SoT.
+OQ-4–13 **Decided** in the [Brief](ui-schema-ddl-brief.md). Living OQ doc: [`ui-schema-ddl.md` (open-questions)](../open-questions/ui-schema-ddl.md). OQ-14 parked. Design Group UX Accept + Günter restamp still wait.
 
 ## 8. Relationship to prior schema-evolution docs
 
@@ -115,9 +115,9 @@ OQ-4–13 **Decided** in the [Brief](ui-schema-ddl-brief.md). Living OQ doc: [`u
 | Security (Günter) | **Accept with conditions** @ `c6f0854` — S-UI-1…6; overwrite S-UI-1=`schema:edit`, S-UI-4=`layout:edit`. **Confirm 2026-09-23** Marc overwrite + **Admin defaults** to `schema:edit` + privilege admin — **Admin only** (not lab manager / lab-tech / client); **Marc Confirm closed**; optional re-assign later (optional separate role later; S-UI-2/3/5/6 unchanged). **Brief restamp Met**. |
 | Lab Ops (Deiter) | **Accept with conditions** (2026-09-22) @ `c6f0854` — Brief written (OQ-4–11). **Confirm 2026-09-23** Marc overwrite; **retract** Hide/Read-only/Deny three-mode copy. Implement **OPEN** (Design UX Accept Met @ `f79e2a0`). |
 | Spec (Wilhelmina) | Living fold (this doc + Brief). |
-| QA (Tobias) | UAT after implement gate opens — Fail bars (1)–(5) incl. OQ-16 JSONB-as-config. |
+| QA (Tobias) | **UAT Fail** on `8c14a84` — §§1/4/5/8 Pass; §§2/3/6/7 Fail. Blockers A+B; Grok Build fix in flight. Re-UAT after new tip. No invent Pass; no merge. |
 
-**Implement gate:** **OPEN**. Design Group UX Accept **Met** @ `f79e2a0` (Heidi/Hans/Deiter). Günter Brief restamp **Met**. Next: Marc green-light for Grok Build — no code until Marc asks.
+**Implement gate:** **OPEN**. Design Group UX Accept **Met** @ `f79e2a0` (Heidi/Hans/Deiter). Günter Brief restamp **Met**. Tobias **UAT Fail** on `8c14a84`. Grok Build fix A+B in flight; re-UAT after new tip.
 
 **Marc overwrite Confirms (2026-09-23; Rolf):** Günter + Hans + Deiter Confirmed. Deiter retracts three-mode Hide/Read-only/Deny copy. **Günter follow-on:** Admin defaults to `schema:edit` + privilege admin — **Admin only** (not lab manager / lab-tech / client); **Marc Confirm closed**; optional re-assign later; optional separate role later; `layout:edit` still no DDL; S-UI-2/3/5/6 unchanged. Implement **CLOSED**.
 
@@ -146,5 +146,57 @@ Retract any remaining copy that implies a hide mode or three-mode Hide / Read-on
 | Günter Brief restamp | **Met** |
 | Implement gate | **OPEN** |
 
-Next: **Marc green-light** for Grok Build. No product code until Marc asks. Coding stays Grok Build unless Marc/Rolf asks otherwise.
+Tobias **UAT Fail** on `8c14a84`. Marc green-lit Grok Build fix for blockers A+B. Re-UAT after new tip. No invent Pass; no merge until Pass + Rolf Confirm + Marc.
+
+## Product branch + UAT (2026-09-23; Rolf / Marc)
+
+| Item | Cite |
+|------|------|
+| Product / dogfood / UAT branch | `feat/ui-schema-ddl` |
+| Product tip (Grok Build landed) | `8c14a84` |
+| UAT script | `UAT_Scripts/uat-ui-schema-ddl.md` on that branch |
+| Docs living tip (implement OPEN) | `912c1a2` on `docs/ui-schema-ddl` |
+
+Tobias owns UAT Pass/Fail against Fail bars (1)–(5). **No invent Pass.** No merge until Rolf Confirm + Marc.
+
+## Tobias UAT Fail + fix in flight (2026-09-23; Rolf / Marc)
+
+| Item | Cite |
+|------|------|
+| Product tip UAT’d | `8c14a84` on `feat/ui-schema-ddl` |
+| UAT script | `UAT_Scripts/uat-ui-schema-ddl.md` |
+| Evidence | `/workspace/uat-ui-schema-ddl-8c14a84/` |
+| Overall | **Fail** — no invent Pass; **no merge** |
+
+### Section stamps (Tobias)
+
+| § | Result |
+|---|--------|
+| 1 Surfaces | **Pass** |
+| 2 CREATE TABLE | **Fail** — 500 `UiSchemaDdlLog.seq` NotNullViolation |
+| 3 ADD COLUMN | **Fail** — 422 `schema_apply` ≠ samples owner |
+| 4 schema:edit | **Pass** (lab-tech 403) |
+| 5 Layout membership | **Pass** |
+| 6 Privileges | **Fail** (403 not proven; blocked by §3) |
+| 7 Deprecate/DROP | **Fail** |
+| 8 JSONB-as-config | **Pass** |
+
+### Fail bars
+
+| Bar | Result |
+|-----|--------|
+| (1) privilege refuse write | **not scored** |
+| (2) privilege refuse read | **not scored** |
+| (3) schema:edit only for DDL | **Met** |
+| (4) real Postgres proof | **Fail** on API |
+| (5) JSONB-as-config | **Met** |
+
+### Blockers (Marc green-lit Grok Build fix)
+
+| ID | Blocker |
+|----|---------|
+| **A** | `UiSchemaDdlLog.seq` ORM NULL → CREATE TABLE **500** |
+| **B** | `schema_apply` cannot ALTER `samples` → ADD COLUMN **422** |
+
+**Status:** Grok Build fix A+B **in flight** on `feat/ui-schema-ddl`. Tobias **re-UAT** §§2/3/6/7 (and unscored bars) after new product tip. No merge until UAT Pass + Rolf Confirm + Marc.
 
