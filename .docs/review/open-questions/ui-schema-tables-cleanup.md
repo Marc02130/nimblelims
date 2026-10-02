@@ -2,7 +2,7 @@
 
 **Stem:** `ui-schema-tables-cleanup`  
 **Date:** 2026-10-01  
-**Status:** Packet OPEN; implement CLOSED. Prior `ui-schema-ddl` locks stand.
+**Status:** Packet OPEN; implement CLOSED. UX sketch tip **`564fe6f`** pending Accept. Prior `ui-schema-ddl` locks stand.
 
 ## OQ-1 — P1 Schema Tables allow-list (OPEN — Marc)
 
@@ -67,6 +67,11 @@ Industry / LIMSbase aligns with Leadership locks — **no Spec reopen**.
 
 **Leadership takeaway:** keep current locks (behind-the-scenes M:N; link/unlink; schema:edit metadata default).
 
+
+## UX sketch (cite only — 2026-10-01)
+
+Mathilda sketch tip **`564fe6f`** — [ui-schema-tables-cleanup.md](../ui-review/ui-schema-tables-cleanup.md) on [PR 139](https://github.com/Marc02130/nimblelims/pull/139). Spec base **`07ccd59`**. Sketch **pending Accept**. Encoded: Custom Fields chrome kill; Tables = Samples + Project + UI-created; Relations tab; operators link/unlink; junction metadata `schema:edit` only. OQ-1 / OQ-5b **not** frozen by sketch. Implement **CLOSED**. Rolf Confirm Met on land.
+
 ## Decided (from prior packet — do not reopen)
 
 - OQ-16: JSONB-as-**config** Fail; JSONB payload/instrument **data** OK.
@@ -75,6 +80,7 @@ Industry / LIMSbase aligns with Leadership locks — **no Spec reopen**.
 - Relations: 1:N / 1:1 / M:N = real FK / unique FK / junction (Leadership 2026-10-01); JSONB related-ids Fail.
 - M:N junctions **behind the scenes**; operators link/unlink only; default visibility = `schema:edit` only, never operator layouts (OQ-5e; Marc may overwrite).
 - Tobias Fail bar **(6):** operator opens junction as lab data-entry / spreadsheet of link rows / non–`schema:edit` layout → **Fail**.
+- Tobias Fail bar **(7)** (provisional until OQ-5b freezes): CASCADE or silent wipe on identity links (sample/barcode vessel) where Spec says RESTRICT → **Fail**.
 - Katinka: vessel/container and parent→aliquot/derivative = **1:N FKs on the child** (SOP confirm).
 
 ## OQ-5 — Relations cardinality + UI + on-delete (OPEN — Spec / Mathilda / Heidi)
@@ -99,4 +105,3 @@ Operators **link records**; Admin with **`schema:edit`** defines the FK/junction
 | OQ-5d | Which allow-listed pairs may relate in P1 (blocked until OQ-1) |
 
 **Tobias:** any relation stored only in JSONB/`custom_attributes` → **Fail**. CASCADE or silent wipe on identity links (sample/barcode vessel) where Spec says RESTRICT → **Fail** (bar 7; provisional until OQ-5b freezes).
-
