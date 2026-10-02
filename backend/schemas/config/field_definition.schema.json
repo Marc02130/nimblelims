@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:nimblelims:config:v1:field_definition",
+  "title": "FieldDefinition",
+  "description": "FieldDefinition create contract (config v1). Closed shape of the modeled field. The validate API does not persist this document. jsonb is not a data_type (OQ-16).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["entity_type", "name", "data_type"],
+  "properties": {
+    "entity_type": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "description": "Entity the field belongs to, e.g. sample or experiment."
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 255,
+      "pattern": "^[A-Za-z0-9_-]+$",
+      "description": "Internal name. Letters, digits, underscore, and hyphen only."
+    },
+    "display_name": {
+      "type": ["string", "null"],
+      "maxLength": 255
+    },
+    "data_type": {
+      "type": "string",
+      "enum": ["text", "number", "date", "boolean", "list", "lookup"]
+    },
+    "source_list_id": {
+      "type": ["string", "null"],
+      "format": "uuid"
+    },
+    "is_required": {
+      "type": "boolean",
+      "default": false
+    },
+    "is_unique": {
+      "type": "boolean",
+      "default": false
+    },
+    "default_value": {
+      "type": ["object", "null"]
+    },
+    "validation_rules": {
+      "type": "object",
+      "description": "Scalar rules (min/max and similar). Not a list of options and not a JSONB config blob."
+    },
+    "ui_hints": {
+      "type": "object"
+    },
+    "description": {
+      "type": ["string", "null"],
+      "maxLength": 500
+    },
+    "active": {
+      "type": "boolean",
+      "default": true
+    },
+    "is_materialized_column": {
+      "type": "boolean",
+      "default": true
+    },
+    "column_name": {
+      "type": ["string", "null"],
+      "maxLength": 255
+    }
+  }
+}
