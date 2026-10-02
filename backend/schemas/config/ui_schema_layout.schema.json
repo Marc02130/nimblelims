@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:nimblelims:config:v1:ui_schema_layout",
+  "title": "UiSchemaLayout",
+  "description": "Role x screen layout membership. A field is on the layout or absent. No hide flag. Not a JSONB config store (OQ-16).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["role_id", "screen_key"],
+  "properties": {
+    "role_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "screen_key": {
+      "type": "string",
+      "enum": ["receive", "samples.detail", "samples.list"]
+    },
+    "fields": {
+      "type": "array",
+      "default": [],
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["column_id"],
+        "properties": {
+          "column_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "section": {
+            "type": ["string", "null"],
+            "maxLength": 128
+          },
+          "sort_order": {
+            "type": "integer",
+            "default": 0
+          }
+        }
+      }
+    }
+  }
+}

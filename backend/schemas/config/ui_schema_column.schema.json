@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:nimblelims:config:v1:ui_schema_column",
+  "title": "UiSchemaColumn",
+  "description": "UI schema column create contract. data_type is the P1 allow-list. jsonb is rejected: JSONB is payload data, not config (OQ-16). list requires list_id.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["table_id", "display_name", "data_type"],
+  "properties": {
+    "table_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "display_name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 255
+    },
+    "physical_name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 63,
+      "pattern": "^[a-z][a-z0-9_]{0,47}$"
+    },
+    "data_type": {
+      "type": "string",
+      "enum": ["text", "numeric", "integer", "boolean", "date", "timestamptz", "list"]
+    },
+    "nullable": {
+      "type": "boolean",
+      "default": true
+    },
+    "list_id": {
+      "type": ["string", "null"],
+      "format": "uuid"
+    },
+    "sop_hint": {
+      "type": ["string", "null"],
+      "enum": ["barcode", "container", "parent", "sample_type", null]
+    },
+    "sort_order": {
+      "type": "integer",
+      "default": 0
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "data_type": { "const": "list" }
+        },
+        "required": ["data_type"]
+      },
+      "then": {
+        "required": ["list_id"],
+        "properties": {
+          "list_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      }
+    }
+  ]
+}
