@@ -23,7 +23,9 @@ After `ui-schema-ddl`, Schema Tables only shows **samples** plus UI-created tabl
 | Kill custom fields completely — no Custom Fields UI; no JSONB/`custom_attributes` as schema substitute | Marc + **Rolf Confirm** 2026-10-01 |
 | Schema Tables list = real allow-listed tables — not just samples + Lot Notes | Marc + **Rolf Confirm** 2026-10-01 |
 | **`project` is in** for P1 Schema Tables list | Rolf 2026-10-01 |
-| **Relations in scope:** 1:N = FK on many; 1:1 = unique FK on dependent; M:N = junction table (two FKs + row identity); junction is a Schema Tables row | Marc + **Rolf Confirm** 2026-10-01 |
+| **Relations in scope:** 1:N = FK on many; 1:1 = unique FK on dependent; M:N = junction (two FKs + row identity) | Marc + **Rolf Confirm** 2026-10-01 |
+| **M:N junctions behind the scenes** — product creates/maintains junction; operators **link/unlink** only; no junction as lab data-entry table | Marc + **Rolf Confirm** 2026-10-01 |
+| Junction visibility default: **`schema:edit` only**, never operator layouts (Marc may overwrite — OQ-5e) | Rolf 2026-10-01 |
 | No fake M:N arrays / JSONB related-ids | Rolf 2026-10-01 |
 | No product code until Brief + Design path + Marc green-light | Rolf 2026-10-01 |
 | Prior OQ-16: JSONB-as-**config** forbidden; JSONB payload/instrument **data** still allowed | `ui-schema-ddl` |
@@ -86,4 +88,12 @@ See living OQ doc. **OQ-1** (allow-list) waits on Marc. **OQ-5** (relations card
 | Fail (relations) | Relation only in JSONB/`custom_attributes` → **Fail** |
 | Relations lock | 1:N FK on many; 1:1 unique FK on dependent; M:N junction (two FKs + identity); junction is a Schema Tables row; operators link; Admin `schema:edit` defines |
 | Restamp | Tobias restamps when OQ-1 closes |
+
+## M:N behind-the-scenes fold (2026-10-01; Rolf)
+
+| Item | Cite |
+|------|------|
+| Lock | M:N junctions **behind the scenes**; Admin defines relation; product maintains junction table/rows |
+| Operators | **Link / unlink** only — no junction lab data-entry / spreadsheet of link rows |
+| Visibility default | Visible to **`schema:edit` only** (read-only metadata in Schema Tables); **never** in operator layouts — Marc may overwrite (OQ-5e) |
 
