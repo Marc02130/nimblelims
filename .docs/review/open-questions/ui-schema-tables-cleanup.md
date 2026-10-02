@@ -54,6 +54,19 @@ Any residual “custom attribute” labels on receive / results / list filters m
 | **B** | Fully hidden even from Schema Tables (Admin only sees the named M:N relation, not the junction table row) |
 | **C** | Marc overwrite — other |
 
+
+## OQ-5 research cite (2026-10-01; Rolf digest — not a freeze)
+
+Industry / LIMSbase aligns with Leadership locks — **no Spec reopen**.
+
+| Source | Pattern |
+|--------|---------|
+| **Odoo** | 1:N = FK on child + inverse Related list; M:N = ORM auto-junction; operators pick/link — never edit junction table. [Odoo relations](https://www.odoo.com/documentation/19.0/developer/tutorials/server_framework_101/07_relations.html) |
+| **SAP** (ABAP Dictionary / CDS) | Real junction + FKs; UI navigates associations; junction is composition under parent, not a lab spreadsheet. [SAP table relationships](https://learning.sap.com/learning-journeys/acquire-core-abap-skills/defining-relationships-between-database-tables_e55dbd61-6083-4747-bb5d-905ba29ab662) |
+| **LIMSbase** (`/Users/marcbreneiser/Code/LIMSbase` / iggybase) | `table_object_children` (1:N link field) vs `table_object_many` (M:N via named link table); engine maintains link rows — `analysis.md` §4.3.2 |
+
+**Leadership takeaway:** keep current locks (behind-the-scenes M:N; link/unlink; schema:edit metadata default).
+
 ## Decided (from prior packet — do not reopen)
 
 - OQ-16: JSONB-as-**config** Fail; JSONB payload/instrument **data** OK.
@@ -61,6 +74,8 @@ Any residual “custom attribute” labels on receive / results / list filters m
 - CREATE TABLE / ADD COLUMN Hybrid apply stands.
 - Relations: 1:N / 1:1 / M:N = real FK / unique FK / junction (Leadership 2026-10-01); JSONB related-ids Fail.
 - M:N junctions **behind the scenes**; operators link/unlink only; default visibility = `schema:edit` only, never operator layouts (OQ-5e; Marc may overwrite).
+- Tobias Fail bar **(6):** operator opens junction as lab data-entry / spreadsheet of link rows / non–`schema:edit` layout → **Fail**.
+- Katinka: vessel/container and parent→aliquot/derivative = **1:N FKs on the child** (SOP confirm).
 
 ## OQ-5 — Relations cardinality + UI + on-delete (OPEN — Spec / Mathilda / Heidi)
 
@@ -79,9 +94,9 @@ Operators **link records**; Admin with **`schema:edit`** defines the FK/junction
 | Sub | Question |
 |-----|----------|
 | OQ-5a | Schema UI: how Admin creates FK / 1:1 unique / M:N junction (wizard vs column type “Reference”) |
-| OQ-5b | On-delete policy defaults: **RESTRICT** vs **SET NULL** vs **CASCADE** (per relation? global default?) |
-| OQ-5c | Operator UX: **Related list** on the parent vs FK field only vs both |
+| OQ-5b | On-delete policy defaults: **RESTRICT** vs **SET NULL** vs **CASCADE** (per relation? global default?). **Katinka SOP lean (not freeze):** RESTRICT on identity links (sample, barcode vessel); SET NULL only where link is optional. **Tobias Fail bar (7):** CASCADE or silent wipe on identity links (sample/barcode vessel) where Spec says RESTRICT → **Fail** (provisional until OQ-5b freezes) |
+| OQ-5c | Operator UX: **Related list / pickers** on parent or child (Mathilda) — never junction spreadsheet; FK field and/or Related list |
 | OQ-5d | Which allow-listed pairs may relate in P1 (blocked until OQ-1) |
 
-**Tobias:** any relation stored only in JSONB/`custom_attributes` → **Fail**.
+**Tobias:** any relation stored only in JSONB/`custom_attributes` → **Fail**. CASCADE or silent wipe on identity links (sample/barcode vessel) where Spec says RESTRICT → **Fail** (bar 7; provisional until OQ-5b freezes).
 

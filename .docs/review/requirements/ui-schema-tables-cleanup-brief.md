@@ -7,3 +7,7 @@
 **Blocked on:** OQ-1 Marc; OQ-2 cutover; OQ-3 registry seed; OQ-5a–e (relation UI / on-delete / Related-list / junction visibility — default schema:edit only).
 
 **M:N:** junctions behind the scenes; operators link/unlink only.
+
+**Fail bars:** Tobias (1)–(6) provisional until OQ-1 freeze. **(7)** CASCADE or silent wipe on identity links (sample/barcode vessel) where Spec says RESTRICT → Fail (provisional until OQ-5b freezes).
+
+**Research cite:** Odoo / SAP / LIMSbase under OQ-5 — locks stand.

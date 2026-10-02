@@ -56,10 +56,11 @@ After `ui-schema-ddl`, Schema Tables only shows **samples** plus UI-created tabl
 | AC2 | No API that creates/updates schema-like config via `custom_attributes` JSONB for allow-listed entities; such writes **403/422** (not silent accept). |
 | AC3 | Schema Tables list includes **`samples`**, **`project`**, and UI-created tables; display names lab-admin friendly (Mathilda). |
 | AC4 | Selecting `project` (and other P1 allow-listed tables once Decided) exercises Columns / Layout / Privileges per existing packet locks. |
-| AC5 | **Tobias Fail bars (provisional until OQ-1 freezes allow-list):** (1) any Custom Fields chrome or create/edit path still reachable → **Fail**; (2) write/read still via `custom_attributes` / JSONB-as-fields instead of real columns → **Fail** (extends prior bar 5 / OQ-16); (3) Schema Tables missing `project` (or any other P1 allow-listed table once Marc answers) while the table exists in Postgres → **Fail**; (4) UI-created table exists in Postgres but absent from Schema Tables → **Fail**. Prior privilege / `schema:edit` / real-DDL bars from `ui-schema-ddl` still hold. |
-| AC6 | Relation stored only in JSONB / `custom_attributes` (no real FK or junction) → **Fail** (Tobias provisional). |
+| AC5 | **Tobias Fail bars (provisional until OQ-1 freezes allow-list):** (1) Custom Fields chrome/path → Fail; (2) `custom_attributes`/JSONB-as-fields → Fail; (3) Tables missing `project` (or other P1 once Decided) while in Postgres → Fail; (4) UI-created in Postgres but absent from Tables → Fail; (5) relation only in JSONB/`custom_attributes` → Fail; (6) operator junction data-entry / spreadsheet / non–`schema:edit` layout → Fail (link/unlink only). Prior privilege/`schema:edit`/DDL bars hold. |
+| AC6 | Relation stored only in JSONB / `custom_attributes` (no real FK or junction) → **Fail** (Tobias bar 5). |
 | AC7 | Cutover for existing Custom Fields data per Brief (no invented silent migrate). |
 | AC8 | Admin can define 1:N / 1:1 / M:N per Leadership lock; operators link records; Brief decides cascade/delete + Related-list UX (OQ-5). |
+| AC9 | CASCADE or silent wipe on identity links (sample/barcode vessel) where Spec says RESTRICT → **Fail** (Tobias bar 7; provisional until OQ-5b freezes). |
 
 ## 6. Open questions
 
@@ -85,7 +86,10 @@ See living OQ doc. **OQ-1** (allow-list) waits on Marc. **OQ-5** (relations card
 | Fail (2) | Write/read via `custom_attributes` / JSONB-as-fields → **Fail** |
 | Fail (3) | Schema Tables missing `project` (or other P1 once Marc answers) while in Postgres → **Fail** |
 | Fail (4) | UI-created table in Postgres but absent from Schema Tables → **Fail** |
-| Fail (relations) | Relation only in JSONB/`custom_attributes` → **Fail** |
+| Fail (relations / 5) | Relation only in JSONB/`custom_attributes` → **Fail** |
+| Fail (6) | Operator opens junction as lab data-entry table, creates/edits link rows as spreadsheet, or puts junction on non–`schema:edit` layout → **Fail**; link/unlink only; junction rows still real Postgres |
+| Fail (7) | CASCADE or silent wipe on identity links (sample/barcode vessel) where Spec says RESTRICT → **Fail** (provisional until OQ-5b freezes) |
+| Research | Odoo / SAP / LIMSbase cite under OQ-5 — locks match; no reopen |
 | Relations lock | 1:N FK on many; 1:1 unique FK on dependent; M:N junction (two FKs + identity); junction is a Schema Tables row; operators link; Admin `schema:edit` defines |
 | Restamp | Tobias restamps when OQ-1 closes |
 
@@ -96,4 +100,19 @@ See living OQ doc. **OQ-1** (allow-list) waits on Marc. **OQ-5** (relations card
 | Lock | M:N junctions **behind the scenes**; Admin defines relation; product maintains junction table/rows |
 | Operators | **Link / unlink** only — no junction lab data-entry / spreadsheet of link rows |
 | Visibility default | Visible to **`schema:edit` only** (read-only metadata in Schema Tables); **never** in operator layouts — Marc may overwrite (OQ-5e) |
+
+## Fail bar (6) + research cite fold (2026-10-01)
+
+| Item | Cite |
+|------|------|
+| Fail (6) | Operator junction as lab data-entry / link-row spreadsheet / non–`schema:edit` layout → **Fail** |
+| Mathilda UX | Operators link/unlink via Related list/pickers; Admin defines FK/1:1/M:N; junction metadata `schema:edit` only |
+| Katinka SOP | Container/vessel + parent→aliquot = 1:N FK on child; OQ-5b lean RESTRICT on identity links |
+| Research | Odoo / SAP / LIMSbase — same pattern; Leadership: keep locks; no Spec reopen |
+
+## Fail bar (7) RESTRICT-on-identity (2026-10-01)
+
+| Item | Cite |
+|------|------|
+| Fail (7) | CASCADE or silent wipe on identity links (sample/barcode vessel) where Spec says RESTRICT → **Fail** (provisional until OQ-5b freezes) |
 
