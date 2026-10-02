@@ -14,6 +14,7 @@ After `ui-schema-ddl`, Schema Tables only shows **samples** plus UI-created tabl
 
 1. **Removes Custom Fields completely** — no Custom Fields UI; no JSONB / `custom_attributes` path as a substitute for real schema columns.
 2. **Expands the Schema Tables list** to real **allow-listed** Postgres tables (not only samples + UI-created). **`project` is in for P1.**
+3. **Relations in scope** — real Postgres FKs / junction tables (CRM/ERP/MES pattern), **not** JSONB “related ids.”
 
 ## 2. Leadership locks (cite)
 
@@ -22,6 +23,8 @@ After `ui-schema-ddl`, Schema Tables only shows **samples** plus UI-created tabl
 | Kill custom fields completely — no Custom Fields UI; no JSONB/`custom_attributes` as schema substitute | Marc + **Rolf Confirm** 2026-10-01 |
 | Schema Tables list = real allow-listed tables — not just samples + Lot Notes | Marc + **Rolf Confirm** 2026-10-01 |
 | **`project` is in** for P1 Schema Tables list | Rolf 2026-10-01 |
+| **Relations in scope:** 1:N = FK on many; 1:1 = unique FK on dependent; M:N = junction table (two FKs + row identity); junction is a Schema Tables row | Marc + **Rolf Confirm** 2026-10-01 |
+| No fake M:N arrays / JSONB related-ids | Rolf 2026-10-01 |
 | No product code until Brief + Design path + Marc green-light | Rolf 2026-10-01 |
 | Prior OQ-16: JSONB-as-**config** forbidden; JSONB payload/instrument **data** still allowed | `ui-schema-ddl` |
 | Not IC50 | Standing |
@@ -32,6 +35,7 @@ After `ui-schema-ddl`, Schema Tables only shows **samples** plus UI-created tabl
 - Stop treating `custom_attributes` / Custom Fields as a configuration path for samples or other entities (Fail if UI still offers it).
 - Schema → **Tables** lists **allow-listed** real tables, including at minimum: **`samples`**, **`project`**, and **any UI-created** tables (existing CREATE TABLE path).
 - Columns / Layouts / Privileges for newly listed tables follow existing `ui-schema-ddl` rules (`schema:edit`, membership layout, privilege R/W).
+- Admin with **`schema:edit`** defines FK / 1:1 unique FK / M:N junction; operators **link records** (not redefine schema).
 - Migration / cutover path for any existing Custom Fields / `custom_attributes` data is **decided in Brief** (park, migrate-to-column, or refuse) — do not invent silent JSONB-as-schema.
 
 ## 4. Non-goals (this packet)
@@ -50,12 +54,14 @@ After `ui-schema-ddl`, Schema Tables only shows **samples** plus UI-created tabl
 | AC2 | No API that creates/updates schema-like config via `custom_attributes` JSONB for allow-listed entities; such writes **403/422** (not silent accept). |
 | AC3 | Schema Tables list includes **`samples`**, **`project`**, and UI-created tables; display names lab-admin friendly (Mathilda). |
 | AC4 | Selecting `project` (and other P1 allow-listed tables once Decided) exercises Columns / Layout / Privileges per existing packet locks. |
-| AC5 | Tobias Fail bars: Custom Fields still present → **Fail**; Tables list missing `project` → **Fail**; JSONB-as-config path → **Fail** (OQ-16 stands). |
-| AC6 | Cutover for existing Custom Fields data per Brief (no invented silent migrate). |
+| AC5 | **Tobias Fail bars (provisional until OQ-1 freezes allow-list):** (1) any Custom Fields chrome or create/edit path still reachable → **Fail**; (2) write/read still via `custom_attributes` / JSONB-as-fields instead of real columns → **Fail** (extends prior bar 5 / OQ-16); (3) Schema Tables missing `project` (or any other P1 allow-listed table once Marc answers) while the table exists in Postgres → **Fail**; (4) UI-created table exists in Postgres but absent from Schema Tables → **Fail**. Prior privilege / `schema:edit` / real-DDL bars from `ui-schema-ddl` still hold. |
+| AC6 | Relation stored only in JSONB / `custom_attributes` (no real FK or junction) → **Fail** (Tobias provisional). |
+| AC7 | Cutover for existing Custom Fields data per Brief (no invented silent migrate). |
+| AC8 | Admin can define 1:N / 1:1 / M:N per Leadership lock; operators link records; Brief decides cascade/delete + Related-list UX (OQ-5). |
 
 ## 6. Open questions
 
-See living OQ doc. **OQ-1 (allow-list beyond project/samples/UI-created)** waits on Marc’s answer to Rolf.
+See living OQ doc. **OQ-1** (allow-list) waits on Marc. **OQ-5** (relations cardinality + UI + on-delete) open. Tobias will restamp Fail bars when OQ-1 closes.
 
 ## 7. Sign-off
 
@@ -68,3 +74,16 @@ See living OQ doc. **OQ-1 (allow-list beyond project/samples/UI-created)** waits
 | Architecture / Lab Ops / Security / Science | Await Brief + punches. |
 
 **Implement gate:** **CLOSED** until Brief + Design UX + Marc green-light.
+
+## Tobias Fail bars + relations fold (2026-10-01)
+
+| Item | Cite |
+|------|------|
+| Fail (1) | Custom Fields chrome or create/edit path still reachable → **Fail** |
+| Fail (2) | Write/read via `custom_attributes` / JSONB-as-fields → **Fail** |
+| Fail (3) | Schema Tables missing `project` (or other P1 once Marc answers) while in Postgres → **Fail** |
+| Fail (4) | UI-created table in Postgres but absent from Schema Tables → **Fail** |
+| Fail (relations) | Relation only in JSONB/`custom_attributes` → **Fail** |
+| Relations lock | 1:N FK on many; 1:1 unique FK on dependent; M:N junction (two FKs + identity); junction is a Schema Tables row; operators link; Admin `schema:edit` defines |
+| Restamp | Tobias restamps when OQ-1 closes |
+
