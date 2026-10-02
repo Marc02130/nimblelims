@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:nimblelims:config:v1:ui_schema_privilege",
+  "title": "UiSchemaPrivilege",
+  "description": "Role x table or role x column access. Table access is read, write, or none. inherit is column-only. Not stored as JSONB config (OQ-16).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["role_id", "table_id", "access"],
+  "properties": {
+    "role_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "table_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "column_id": {
+      "type": ["string", "null"],
+      "format": "uuid"
+    },
+    "access": {
+      "type": "string",
+      "enum": ["read", "write", "none", "inherit"]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "anyOf": [
+          {
+            "not": { "required": ["column_id"] }
+          },
+          {
+            "properties": { "column_id": { "type": "null" } },
+            "required": ["column_id"]
+          }
+        ]
+      },
+      "then": {
+        "properties": {
+          "access": { "enum": ["read", "write", "none"] }
+        }
+      }
+    }
+  ]
+}

@@ -4,7 +4,7 @@ FastAPI application for NimbleLims
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import validate_security_config
-from app.routers import auth, samples, tests, containers, batches, results, aliquots, lists, projects, analyses, analytes, units, users, roles, permissions, clients, test_batteries, client_projects, custom_attributes, help, admin, sequences, workflows, experiments, lims_runs, sop_parse, lims_run_checklists, dose_response, field_definitions, eln_processes, eln_process_definitions, entries, sample_journey, instrument_catalog, data_parsers, asked_for, work_orders, sample_type_transitions, ui_schema
+from app.routers import auth, samples, tests, containers, batches, results, aliquots, lists, projects, analyses, analytes, units, users, roles, permissions, clients, test_batteries, client_projects, custom_attributes, help, admin, sequences, workflows, experiments, lims_runs, sop_parse, lims_run_checklists, dose_response, field_definitions, eln_processes, eln_process_definitions, entries, sample_journey, instrument_catalog, data_parsers, asked_for, work_orders, sample_type_transitions, ui_schema, config_schema
 import logging
 
 # S3: refuse missing/default JWT secret unless explicit local insecure flags
@@ -87,6 +87,7 @@ app.include_router(custom_attributes.router, tags=["custom-attributes"])
 app.include_router(field_definitions.router, tags=["field-definitions"])
 app.include_router(help.router, prefix="/help", tags=["help"])
 app.include_router(admin.router, tags=["admin"])
+app.include_router(config_schema.router)
 app.include_router(workflows.workflow_templates_router, prefix="/admin")
 app.include_router(workflows.workflows_router, prefix="/workflows")
 app.include_router(sequences.router, tags=["admin"])

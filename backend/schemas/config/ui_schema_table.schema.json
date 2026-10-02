@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:nimblelims:config:v1:ui_schema_table",
+  "title": "UiSchemaTable",
+  "description": "UI schema table create contract. Physical name is a real Postgres identifier (x_ or lab_), not a JSONB config document (OQ-16).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["display_name"],
+  "properties": {
+    "display_name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 255
+    },
+    "physical_name": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 63,
+      "pattern": "^(x|lab)_[a-z][a-z0-9_]{0,47}$",
+      "description": "Optional. When set, must be x_<slug> or lab_<slug>."
+    }
+  }
+}

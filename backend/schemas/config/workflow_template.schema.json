@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:nimblelims:config:v1:workflow_template",
+  "title": "WorkflowTemplate",
+  "description": "Workflow template contract. steps[].action is VALID_WORKFLOW_ACTIONS. Validating this document does not write template_definition JSONB (OQ-16).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["name", "template_definition"],
+  "properties": {
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 255
+    },
+    "description": {
+      "type": ["string", "null"]
+    },
+    "active": {
+      "type": "boolean",
+      "default": true
+    },
+    "template_definition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["steps"],
+      "properties": {
+        "steps": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["action"],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "update_status",
+                  "validate_custom",
+                  "create_qc",
+                  "assign_tests",
+                  "create_batch",
+                  "enter_results",
+                  "send_notification",
+                  "accession_sample",
+                  "link_container",
+                  "review_result",
+                  "create_experiment",
+                  "create_experiment_from_template",
+                  "link_sample_to_experiment",
+                  "add_experiment_detail_step",
+                  "link_experiments",
+                  "update_experiment_status",
+                  "create_process",
+                  "add_step_to_process",
+                  "assign_samples_to_process",
+                  "instantiate_process_step"
+                ]
+              },
+              "params": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
