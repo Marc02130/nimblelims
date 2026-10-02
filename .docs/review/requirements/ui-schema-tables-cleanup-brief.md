@@ -11,3 +11,5 @@
 **Fail bars:** Tobias (1)–(6) provisional until OQ-1 freeze. **(7)** CASCADE or silent wipe on identity links (sample/barcode vessel) where Spec says RESTRICT → Fail (provisional until OQ-5b freezes).
 
 **Research cite:** Odoo / SAP / LIMSbase under OQ-5 — locks stand.
+
+**UX sketch:** tip `564fe6f` pending Accept (PR 139). Spec base `07ccd59`. Encoded: Custom Fields kill; Tables = Samples + Project + UI-created; Relations tab; link/unlink; junction `schema:edit` only. OQ-1 / OQ-5b still open. Implement **CLOSED**.

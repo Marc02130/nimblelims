@@ -1,7 +1,7 @@
 # Requirements: Schema Tables cleanup + kill Custom Fields
 
 **Date:** 2026-10-01  
-**Status:** Packet **OPEN** — Leadership locks below. Implement gate **CLOSED** until Brief + Design UX path + Marc green-light. No product code until then (Grok Build).  
+**Status:** Packet **OPEN** — Leadership locks below. UX sketch tip **`564fe6f`** (pending Accept). Implement gate **CLOSED** until Brief + Design UX Accept + Marc green-light. No product code until then (Grok Build).  
 **Stem:** `ui-schema-tables-cleanup`  
 **Prior packet:** `ui-schema-ddl` merged main @ `180f0c1` / cite `2074f9e` — CREATE TABLE / ADD COLUMN / layout / privileges stand.  
 **Open questions:** [`.docs/review/open-questions/ui-schema-tables-cleanup.md`](../open-questions/ui-schema-tables-cleanup.md)  
@@ -72,7 +72,7 @@ See living OQ doc. **OQ-1** (allow-list) waits on Marc. **OQ-5** (relations card
 |--------|---------|
 | Leadership / CEO | Packet **OPEN** — locks above. Allow-list P1 beyond project pending Marc. |
 | Spec (Wilhelmina) | Living fold (this doc). Implement **CLOSED**. |
-| UI (Mathilda) | Custom Fields removal + Tables list expansion — sketch pending. |
+| UI (Mathilda) | UX sketch tip **`564fe6f`** — **pending Accept**. Custom Fields kill + Tables (project P1) + Relations tab. |
 | QA (Tobias) | Fail bars draft AC5 — script after Brief. |
 | Architecture / Lab Ops / Security / Science | Await Brief + punches. |
 
@@ -115,4 +115,16 @@ See living OQ doc. **OQ-1** (allow-list) waits on Marc. **OQ-5** (relations card
 | Item | Cite |
 |------|------|
 | Fail (7) | CASCADE or silent wipe on identity links (sample/barcode vessel) where Spec says RESTRICT → **Fail** (provisional until OQ-5b freezes) |
+| Anton | Relation fixtures = real FK / real junction rows when Brief opens; seed hold until OQ-1/OQ-5 freeze |
 
+## UX sketch cite (2026-10-01; Mathilda / Rolf Confirm Met)
+
+| Item | Cite |
+|------|------|
+| UX sketch tip | `564fe6f` on `docs/ui-schema-tables-cleanup` ([PR 139](https://github.com/Marc02130/nimblelims/pull/139)) |
+| Spec base | `07ccd59` (PR 138 merged) |
+| File | [`.docs/review/ui-review/ui-schema-tables-cleanup.md`](../ui-review/ui-schema-tables-cleanup.md) |
+| Sketch status | **Pending Accept** — no invent |
+| Encoded | Custom Fields chrome kill (nav + `/admin/custom-fields` redirect; Custom Attributes blocks; results custom cols; experiment JSON dump; `custom.*` filters); Tables = Samples + Project + UI-created (OQ-1 open); Relations tab under Schema (`schema:edit`); operators Related list / link-unlink; junction metadata `schema:edit` only (OQ-5e A) |
+| Still open | OQ-1 (Marc allow-list); OQ-5b (on-delete freeze) |
+| Implement | **CLOSED** |
