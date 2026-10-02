@@ -46,3 +46,28 @@ Any residual “custom attribute” labels on receive / results / list filters m
 - OQ-16: JSONB-as-**config** Fail; JSONB payload/instrument **data** OK.
 - `schema:edit` Admin-only; layout = membership; privileges ≠ layout.
 - CREATE TABLE / ADD COLUMN Hybrid apply stands.
+- Relations: 1:N / 1:1 / M:N = real FK / unique FK / junction (Leadership 2026-10-01); JSONB related-ids Fail.
+
+## OQ-5 — Relations cardinality + UI + on-delete (OPEN — Spec / Mathilda / Heidi)
+
+**Leadership lock (Decided pattern; UI details open):** real Postgres only.
+
+| Cardinality | Pattern |
+|-------------|---------|
+| **1:N** | FK on the many side (default; most LIMS links) |
+| **1:1** | Unique FK on the dependent side (no shared-PK ceremony for Admin-created tables) |
+| **M:N** | Junction table with two FKs + its own row identity; junction appears on Schema Tables like any other table |
+
+Operators **link records**; Admin with **`schema:edit`** defines the FK/junction. **No** fake M:N arrays / JSONB related-ids.
+
+### Still open (Brief)
+
+| Sub | Question |
+|-----|----------|
+| OQ-5a | Schema UI: how Admin creates FK / 1:1 unique / M:N junction (wizard vs column type “Reference”) |
+| OQ-5b | On-delete policy defaults: **RESTRICT** vs **SET NULL** vs **CASCADE** (per relation? global default?) |
+| OQ-5c | Operator UX: **Related list** on the parent vs FK field only vs both |
+| OQ-5d | Which allow-listed pairs may relate in P1 (blocked until OQ-1) |
+
+**Tobias:** any relation stored only in JSONB/`custom_attributes` → **Fail**.
+
