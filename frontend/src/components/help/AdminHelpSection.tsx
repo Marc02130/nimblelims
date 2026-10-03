@@ -173,8 +173,9 @@ const AdminHelpSection: React.FC = () => {
               {entry.section === 'EAV Configuration' && (
                 <Box sx={{ mt: 2, p: 2, bgcolor: 'info.light', borderRadius: 1 }}>
                   <Typography variant="body2" color="info.dark">
-                    <strong>Tip:</strong> Use Field Management (Custom Fields) for extensible fields via FieldDefinitions. 
-                    Use the Custom Fields Management page to configure EAV attributes.
+                    <strong>Tip:</strong> A field is a column on a table. Add real fields under
+                    Admin → Schema → Columns; declare one-to-many / one-to-one links under
+                    Schema → Relations. Custom Fields and EAV attributes are not a configuration path.
                   </Typography>
                 </Box>
               )}
