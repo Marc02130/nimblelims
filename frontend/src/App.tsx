@@ -11,6 +11,7 @@ import SchemaTables from './pages/admin/schema/SchemaTables';
 import SchemaColumns from './pages/admin/schema/SchemaColumns';
 import SchemaLayouts from './pages/admin/schema/SchemaLayouts';
 import SchemaPrivileges from './pages/admin/schema/SchemaPrivileges';
+import SchemaRelations from './pages/admin/schema/SchemaRelations';
 import SamplesManagement from './pages/SamplesManagement';
 import TestsManagement from './pages/TestsManagement';
 import ContainerManagement from './pages/ContainerManagement';
@@ -30,7 +31,6 @@ import AdminAnalysesManagement from './pages/admin/AnalysesManagement';
 import TestBatteriesManagement from './pages/admin/TestBatteriesManagement';
 import AdminAnalytesManagement from './pages/admin/AnalytesManagement';
 import AnalysisAnalytesConfig from './pages/admin/AnalysisAnalytesConfig';
-import CustomFieldsManagement from './pages/admin/CustomFieldsManagement';
 import HelpManagement from './pages/admin/HelpManagement';
 import WorkflowTemplatesManagement from './pages/admin/WorkflowTemplatesManagement';
 import ClientProjects from './pages/ClientProjects';
@@ -424,15 +424,10 @@ function AppRoutes() {
             )
           }
         />
+        {/* Custom Fields is gone: a field is a column on a table. Old bookmarks land on Schema. */}
         <Route
           path="/admin/custom-fields"
-          element={
-            hasPermission('config:edit') ? (
-              <CustomFieldsManagement />
-            ) : (
-              <Navigate to="/dashboard" replace />
-            )
-          }
+          element={<Navigate to="/admin/schema/tables?from=custom-fields" replace />}
         />
         <Route
           path="/admin/help"
@@ -489,6 +484,16 @@ function AppRoutes() {
           element={
             hasPermission('schema:edit') ? (
               <SchemaPrivileges />
+            ) : (
+              <Navigate to="/dashboard" replace />
+            )
+          }
+        />
+        <Route
+          path="/admin/schema/relations"
+          element={
+            hasPermission('schema:edit') ? (
+              <SchemaRelations />
             ) : (
               <Navigate to="/dashboard" replace />
             )

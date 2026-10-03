@@ -1,7 +1,8 @@
 /**
  * MainNav – central navigation structure for the app.
  * Used by the sidebar/navigation bar. Admin section includes sub-links
- * to Lists and other admin routes (Name Templates, Custom Attributes, and Custom Names sidebar links removed; replaced by unified Custom Fields / Field Management using FieldDefinitions + lists).
+ * to Lists and other admin routes (Name Templates, Custom Attributes, Custom Names and Custom Fields
+ * sidebar links removed; a field is a column on a table — see Admin → Schema).
  * Admin routes are protected by config:edit (or other) permission in App routes.
  */
 
@@ -95,7 +96,6 @@ export const adminNavItems: AdminNavItem[] = [
   { text: 'Analytes Management', path: '/admin/analytes', icon: <Biotech /> },
   { text: 'Test Batteries', path: '/admin/test-batteries', icon: <BatteryChargingFull /> },
   { text: 'Schema', path: '/admin/schema/tables', icon: <TuneIcon /> },
-  { text: 'Custom Fields', path: '/admin/custom-fields', icon: <TuneIcon /> },
   { text: 'Workflow Templates', path: '/admin/workflow-templates', icon: <TuneIcon /> },
   { text: 'Help Management', path: '/admin/help', icon: <HelpIcon /> },
 ];
