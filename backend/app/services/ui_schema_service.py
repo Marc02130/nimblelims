@@ -210,7 +210,9 @@ class UiSchemaService:
         to_sync = [
             t
             for t in registered.values()
-            if (only is None or t.physical_name in set(only)) and t.physical_name in present
+            if catalog.shown_in_schema(t.physical_name, t.kind)
+            and (only is None or t.physical_name in set(only))
+            and t.physical_name in present
         ]
         if to_sync:
             changed = self._sync_columns(to_sync) or changed
@@ -316,12 +318,13 @@ class UiSchemaService:
 
     def list_tables(self) -> List[SchemaTable]:
         self.ensure_catalog()
-        return (
+        rows = (
             self.db.query(SchemaTable)
             .filter(SchemaTable.client_id == self.client_id)
             .order_by(SchemaTable.kind == "system", SchemaTable.display_name)
             .all()
         )
+        return [row for row in rows if catalog.shown_in_schema(row.physical_name, row.kind)]
 
     def _can_add_columns(self, row: SchemaTable) -> bool:
         if row.kind == "system" or row.physical_name in ADD_COLUMN_OUT:
@@ -414,7 +417,7 @@ class UiSchemaService:
             .filter(SchemaTable.id == table_id, SchemaTable.client_id == self.client_id)
             .first()
         )
-        if not row:
+        if not row or not catalog.shown_in_schema(row.physical_name, row.kind):
             raise HTTPException(status.HTTP_404_NOT_FOUND, "Table not found")
         return row
 

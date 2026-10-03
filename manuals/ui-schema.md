@@ -12,7 +12,7 @@ The Schema screen is a **browser over real Postgres tables**. A field is a colum
 
 A table appears on Schema only when a change can be made **and** the application uses that change through configuration. If a new column would sit unused until application code is refactored, the table stays off Schema. Do not treat it as a schema table.
 
-**Lists and list items are off Schema.** `lists` and `list_entries` store the values edited at Admin → Lists. Application code reads those rows to fill dropdowns, so a column added on either table is unused until code changes. They are not schema tables. Edit list values at `/admin/lists`.
+**Lists, list items, and units are off Schema.** `lists` and `list_entries` store the values edited at Admin → Lists. `units` stores a multiplier the conversion code reads: the lab picks one base unit per type (multiplier 1) and other units convert to it. Application code reads those rows by fixed columns, so a column added on any of them is unused until code changes. They are not schema tables. The Postgres tables stay. Edit lists at `/admin/lists` and units at `/admin/units`.
 
 | Surface | Does |
 |---------|------|
@@ -29,13 +29,11 @@ Membership is an allow-list in `backend/app/services/ui_schema_catalog.py`, then
 | Badge | Tables |
 |-------|--------|
 | **Lab** | samples, containers, contents, tests, results, batches, projects, client_projects, experiments, lims_runs, work_orders, asked_for, routing_map, analyses, analytes, test_batteries, instruments, locations, eln_processes, plus every table created from the Tables tab |
-| **System** (still registered in the shipped catalog) | units, container_types, instrument_types, sample_type_transitions, clients, users, roles |
-| **Not schema tables** | `lists`, `list_entries` (list items). Off the Schema screen. |
+| **System** | container_types, instrument_types, sample_type_transitions, clients, users, roles |
+| **Not schema tables** | `lists`, `list_entries` (list items), and `units`. Off the Schema screen. Edit lists under **Lists** (`/admin/lists`) and units under **Units** (`/admin/units`). |
 | Hidden | Engine internals: `alembic_version`, `revoked_tokens`, `login_throttle`, permission plumbing, the `schema_*` registry, `ui_schema_ddl_log`, legacy field/attribute config tables (`custom_attributes_config`, `field_definitions`, `name_templates`) |
 
-The shipped catalog still lists `lists` and `list_entries` in `SYSTEM_TABLES`. That registration contradicts the display rule. Until the catalog drops them, the screen can still show **Lists** and **List entries**; those rows are a product mismatch, not schema tables.
-
-The same rule also questions the other System rows (`units`, `container_types`, `instrument_types`, `sample_type_transitions`, `clients`, `users`, `roles`): Add field is already off, and application code reads fixed columns, so a new column would be ignored until a refactor. They are still registered and can still appear. This docs pass does not drop them; that appearance is a remaining conflict. Lab tables other than Samples stay on the browser so side links can be declared over real FKs. A new column on those tables is not offered (`can_add_columns` is true only for `samples` and tables created here) and would not be read back except on Samples.
+`lists`, `list_entries`, and `units` are in `NOT_SCHEMA_TABLES`, not `SYSTEM_TABLES`. Lab tables other than Samples stay on the browser so side links can be declared over real FKs. A new column on those tables is not offered (`can_add_columns` is true only for `samples` and tables created here) and would not be read back except on Samples.
 
 Add field is enabled only for `samples` and for tables created here (`kind='ui'`). Other built-in Lab tables are browsed and can carry a side link; they do not take a new column from this screen. A column added on Samples is read and written through sample `extra_fields`. Layouts apply to `receive`, `samples.list`, and `samples.detail`.
 
@@ -48,7 +46,7 @@ Lock icon + **System** chip, no edit, no action menu. The lock set:
 | Platform | `id`, `client_id`, `created_at`, `created_by`, `modified_at`, `modified_by`, `active` |
 | Identity | Sample identity columns (name/barcode) |
 | Relationship key | Any FK column that is **not** a list binding (e.g. `tests.sample_id`, `samples.project_id`). Type shows **Key**; *Points at* links to the parent table. |
-| System table | Every column of a System table that is still on the screen. *Add field* is disabled on these tables. `lists` and `list_entries` are not on this screen. |
+| System table | Every column of a System table (`container_types`, `clients`, …). *Add field* is disabled on these tables. `lists`, `list_entries`, and `units` are not on this screen. |
 
 A uuid FK to `list_entries` on a lab table is a **list binding** (type **List**), not a relationship-key lock, and not a reason to put `lists` or `list_entries` on Schema. Built-in columns owned by migrations are not editable here. A column **added on Samples** (origin `ui`) keeps Deprecate / Drop. There is **no** drop-column or DDL-apply button on reflected columns.
 

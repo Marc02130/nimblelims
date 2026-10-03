@@ -496,6 +496,8 @@ Lists are used extensively in sample management:
 
 **Example**: Categorizing units for filtering (concentration, mass, volume, molar).
 
+The `units` table itself is not a Schema table. Edit unit rows, including which one is the base, at Admin → Units. See [containers.md](containers.md).
+
 ### Analysis Analytes
 
 - **list_id**: Optional FK to lists.id for categorical analytes

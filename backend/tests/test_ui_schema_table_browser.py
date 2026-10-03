@@ -1,8 +1,8 @@
 """Schema table browser + side-link relations (stem ``ui-schema-tables-cleanup``).
 
 Covers the product locks:
-* Tables list = every allow-listed lab table + system reference tables (``lists``
-  first); engine internals hidden; Lab vs System badge.
+* Tables list = every allow-listed lab table + system reference tables.
+  ``lists``, ``list_entries``, and ``units`` are not Schema tables. Engine internals hidden.
 * System columns (id, timestamps, created-by, relationship FKs, ``list_id``)
   are not editable and not removable. Reflected built-ins are described only.
 * One-to-many / one-to-one are registry entries over a *real* FK column on the
@@ -82,8 +82,17 @@ def _user_with_perms(
 def test_allow_list_classifies_lab_system_and_hides_internals():
     assert catalog.kind_for("samples") == "core"
     assert catalog.kind_for("projects") == "core"
-    assert catalog.kind_for("lists") == "system"
-    assert catalog.kind_for("list_entries") == "system"
+    assert catalog.kind_for("container_types") == "system"
+    assert catalog.kind_for("units") is None
+    assert catalog.kind_for("lists") is None
+    assert catalog.kind_for("list_entries") is None
+    assert "units" not in catalog.SYSTEM_TABLES
+    assert "lists" not in catalog.SYSTEM_TABLES
+    assert "list_entries" not in catalog.SYSTEM_TABLES
+    assert catalog.shown_in_schema("units", "system") is False
+    assert catalog.shown_in_schema("lists", "system") is False
+    assert catalog.shown_in_schema("list_entries", "system") is False
+    assert catalog.shown_in_schema("samples", "core") is True
     for internal in catalog.ENGINE_INTERNAL:
         assert catalog.kind_for(internal) is None, internal
     assert "alembic_version" in catalog.ENGINE_INTERNAL
@@ -136,12 +145,10 @@ def test_tables_list_shows_lab_tables_and_system_reference_tables(client: TestCl
         assert lab in tables, f"{lab} missing from Schema tables"
         assert tables[lab]["category"] == "lab"
         assert tables[lab]["kind"] == "core"
-    assert "lists" in tables
-    assert tables["lists"]["category"] == "system"
-    assert tables["lists"]["kind"] == "system"
-    assert tables["lists"]["display_name"] == "Lists"
-    assert tables["list_entries"]["category"] == "system"
-    assert tables["units"]["category"] == "system"
+    assert "lists" not in tables
+    assert "list_entries" not in tables
+    assert "units" not in tables
+    assert tables["container_types"]["category"] == "system"
     assert tables["samples"]["display_name"] == "Samples"
     assert tables["samples"]["column_count"] > 13, "Samples should describe every real column"
 
@@ -177,21 +184,48 @@ def test_tables_list_only_registers_tables_that_exist(client: TestClient, admin_
         assert name in present, f"{name} registered but not in Postgres"
 
 
+def test_schema_table_list_excludes_lists_and_keeps_samples(
+    client: TestClient, admin_token: str, db_session: Session
+):
+    """Lists, list items, and units stay in Postgres and off the Schema table list."""
+    tables = _tables(client, admin_token)
+    assert "lists" not in tables
+    assert "list_entries" not in tables
+    assert "units" not in tables
+    assert "samples" in tables
+    assert tables["samples"]["category"] == "lab"
+    assert tables["samples"]["can_add_columns"] is True
+    present = {
+        r[0]
+        for r in db_session.execute(
+            text(
+                "SELECT table_name FROM information_schema.tables "
+                "WHERE table_schema = 'public' AND table_name IN ('lists', 'list_entries', 'units')"
+            )
+        ).all()
+    }
+    assert present == {"lists", "list_entries", "units"}
+    listed = client.get("/lists", headers=_auth(admin_token))
+    assert listed.status_code == 200, listed.text
+    units = client.get("/units", headers=_auth(admin_token))
+    assert units.status_code == 200, units.text
+
+
 def test_system_tables_cannot_take_new_fields_or_be_removed(client: TestClient, admin_token: str):
     tables = _tables(client, admin_token)
-    lists = tables["lists"]
-    assert lists["can_add_columns"] is False
-    assert lists["can_remove"] is False
+    reference = tables["container_types"]
+    assert reference["can_add_columns"] is False
+    assert reference["can_remove"] is False
     r = client.post(
         "/v1/schema/columns",
-        json={"table_id": lists["id"], "display_name": "Nope", "data_type": "text"},
+        json={"table_id": reference["id"], "display_name": "Nope", "data_type": "text"},
         headers=_auth(admin_token),
     )
     assert r.status_code == 422, r.text
-    r = client.post(f"/v1/schema/tables/{lists['id']}/deprecate", headers=_auth(admin_token))
+    r = client.post(f"/v1/schema/tables/{reference['id']}/deprecate", headers=_auth(admin_token))
     assert r.status_code == 422, r.text
     r = client.post(
-        f"/v1/schema/tables/{lists['id']}/drop",
+        f"/v1/schema/tables/{reference['id']}/drop",
         json={"confirm": True},
         headers=_auth(admin_token),
     )
@@ -210,9 +244,12 @@ def test_layout_edit_can_browse_tables_and_columns(client: TestClient, db_sessio
         perm_names=["layout:edit", "sample:read"],
     )
     tables = _tables(client, token)
-    assert "lists" in tables and "samples" in tables
-    cols = _columns(client, token, tables["lists"]["id"])
-    assert "name" in cols
+    assert "samples" in tables
+    assert "lists" not in tables
+    assert "list_entries" not in tables
+    assert "units" not in tables
+    cols = _columns(client, token, tables["samples"]["id"])
+    assert "name" in cols or "description" in cols
 
 
 # ------------------------------------------------------- read-only system columns
@@ -254,17 +291,15 @@ def test_platform_and_fk_columns_are_locked_in_api(client: TestClient, admin_tok
         assert r.status_code == 422, f"{name}: {r.text}"
 
 
-def test_list_id_on_list_entries_is_system(client: TestClient, admin_token: str):
+def test_system_reference_table_columns_stay_locked(client: TestClient, admin_token: str):
     tables = _tables(client, admin_token)
-    cols = _columns(client, admin_token, tables["list_entries"]["id"])
-    list_id = cols["list_id"]
-    assert list_id["is_fk"] is True and list_id["fk_table"] == "lists"
-    assert list_id["is_system"] is True
-    assert list_id["editable"] is False
+    cols = _columns(client, admin_token, tables["container_types"]["id"])
+    assert cols
     for col in cols.values():
         assert col["is_system"] is True, col["physical_name"]
         assert col["editable"] is False, col["physical_name"]
-    r = client.post(f"/v1/schema/columns/{list_id['id']}/deprecate", headers=_auth(admin_token))
+    one = next(iter(cols.values()))
+    r = client.post(f"/v1/schema/columns/{one['id']}/deprecate", headers=_auth(admin_token))
     assert r.status_code == 422, r.text
 
 

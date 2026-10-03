@@ -150,8 +150,8 @@ const SchemaTables: React.FC = () => {
           <Box display="flex" justifyContent="space-between" alignItems="center" mb={1} gap={2}>
             <Box color="text.secondary" fontSize={14}>
               <strong>Lab</strong> tables hold sample-centric data. <strong>System</strong> tables are
-              reference data (lists, units, types) and are read-only here. Engine internals are not
-              listed.
+              reference data (types) and are read-only here. Lists, list items, and units are not
+              Schema tables — edit lists under Lists and units under Units. Engine internals are not listed.
             </Box>
             {canEdit && (
               <Button variant="contained" onClick={() => setOpen(true)}>

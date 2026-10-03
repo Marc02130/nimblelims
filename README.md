@@ -242,11 +242,11 @@ nimblelims/
 - **Analysis-Analyte Linking**: Link/unlink analytes to analyses via expandable detail panels with inline autocomplete search
 - **Analysis-Analyte Configuration**: Configure validation rules (data types, ranges, significant figures, required flags)
 - **Test Batteries Management**: Group multiple analyses into reusable assay panels (e.g., "ADME Panel", "Kinase Selectivity Panel") with sequence ordering and optional flags (CRUD)
-- **Schema**: Table browser over real Postgres tables (Lab / System badges, locked system columns), CREATE TABLE / ADD COLUMN on Samples and on tables created here, and 1:N / 1:1 side-link relations over real FK columns in `schema_relations`. Many-to-many is deferred. There is no universal join table. The Custom Fields UI is removed (`/admin/custom-fields` redirects). Lists and list items (`lists`, `list_entries`) are not schema tables. `projects` remains on the Lab list. See `manuals/ui-schema.md`.
+- **Schema**: Table browser over real Postgres tables (Lab / System badges, locked system columns), CREATE TABLE / ADD COLUMN on Samples and on tables created here, and 1:N / 1:1 side-link relations over real FK columns in `schema_relations`. Many-to-many is deferred. There is no universal join table. The Custom Fields UI is removed (`/admin/custom-fields` redirects). Lists, list items, and units (`lists`, `list_entries`, `units`) are not schema tables. `projects` remains on the Lab list. See `manuals/ui-schema.md`.
 - **Client Projects Management**: Group multiple LIMS projects under client projects for holistic tracking (CRUD)
 - **Users Management**: Create and manage users with role assignments (CRUD)
 - **Roles & Permissions**: Manage roles and assign permissions (CRUD)
-- **Units Management**: Unit definitions with multipliers for conversions
+- **Units Management**: Unit definitions at Admin → Units (`/admin/units`). One base unit per type has multiplier 1; other units store how many of that base are in one of them (`value_in_base = value * multiplier`). **Use as base** rescales the other units of that type. `units` is not a schema table.
 - **Workflow Templates Management** **(Shipped, Not MVP)**: Create, edit, and deactivate workflow templates (JSON steps with actions). Execute templates from the admin list with optional context, or use "Apply Template" on Accessioning (context empty), Batch details (context batch_id), and Results Entry (context batch_id, test_id). Visible only with config:edit (admin) and workflow:execute (apply).
 
 ### Security & Access **(MVP)**

@@ -19,6 +19,12 @@ from app.core.rbac import (
     require_project_access
 )
 from app.core.security import get_current_user
+from app.core.conversions import (
+    ConversionError,
+    convert_to_base_unit,
+    require_base_unit,
+    require_base_unit_named,
+)
 from datetime import datetime
 from uuid import UUID
 from decimal import Decimal
@@ -268,53 +274,50 @@ async def pool_samples(
                     detail="Access denied: insufficient project permissions"
                 )
     
-    # Calculate pooled values using units multipliers
+    # Convert each amount and concentration to the lab's base (multiplier 1),
+    # then combine. Contents keep the unit the lab recorded.
     total_volume = 0.0
     total_concentration = 0.0
-    concentration_units_id = None
-    
-    # Get base units for calculations
-    base_volume_unit = db.query(Unit).filter(
-        Unit.type == "volume",  # Assuming this list entry exists
-        Unit.multiplier == 1.0  # Base unit
-    ).first()
-    
-    base_concentration_unit = db.query(Unit).filter(
-        Unit.type == "concentration",  # Assuming this list entry exists
-        Unit.multiplier == 1.0  # Base unit
-    ).first()
-    
-    if not base_volume_unit or not base_concentration_unit:
+    amount_rows = []
+    concentration_rows = []
+
+    try:
+        for i, sample_id in enumerate(pooling_data.samples):
+            amount_unit = db.query(Unit).filter(Unit.id == pooling_data.amount_units[i]).first()
+            concentration_unit = db.query(Unit).filter(
+                Unit.id == pooling_data.concentration_units[i]
+            ).first()
+            if not amount_unit or not concentration_unit:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Invalid units for sample {sample_id}",
+                )
+            amount_rows.append(amount_unit)
+            concentration_rows.append(concentration_unit)
+            amount_base = convert_to_base_unit(
+                float(pooling_data.amounts[i]), str(amount_unit.id), db
+            )
+            concentration_base = convert_to_base_unit(
+                float(pooling_data.concentrations[i]), str(concentration_unit.id), db
+            )
+            volume = amount_base / concentration_base if concentration_base > 0 else 0
+            total_volume += volume
+            total_concentration += concentration_base * volume
+    except ConversionError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+    if len({unit.type for unit in amount_rows}) != 1 or len({unit.type for unit in concentration_rows}) != 1:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Base units not configured"
+            detail="Cannot pool units of different types",
         )
-    
-    # Process each sample
+    try:
+        base_concentration_unit = require_base_unit(db, concentration_rows[0].type)
+        base_volume_unit = require_base_unit_named(db, "volume")
+    except ConversionError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
     for i, sample_id in enumerate(pooling_data.samples):
-        sample = next(s for s in samples if s.id == sample_id)
-        
-        # Get units
-        amount_unit = db.query(Unit).filter(Unit.id == pooling_data.amount_units[i]).first()
-        concentration_unit = db.query(Unit).filter(Unit.id == pooling_data.concentration_units[i]).first()
-        
-        if not amount_unit or not concentration_unit:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Invalid units for sample {sample_id}"
-            )
-        
-        # Convert to base units
-        amount_base = float(pooling_data.amounts[i]) * float(amount_unit.multiplier)
-        concentration_base = float(pooling_data.concentrations[i]) * float(concentration_unit.multiplier)
-        
-        # Calculate volume from concentration and amount
-        volume = amount_base / concentration_base if concentration_base > 0 else 0
-        
-        total_volume += volume
-        total_concentration += concentration_base * volume
-        
-        # Create contents entry
         contents = Contents(
             container_id=pooling_data.container_id,
             sample_id=sample_id,

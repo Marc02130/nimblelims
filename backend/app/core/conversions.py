@@ -1,8 +1,13 @@
 """
-Unit conversion utilities for NimbleLims
+Unit conversion utilities for NimbleLims.
+
+A lab picks one base unit per type. That unit's multiplier is 1.
+Every other unit of the type stores how many base units are in one of it.
+``value_in_base = value * multiplier``.
 """
-from decimal import Decimal
-from typing import Optional, Tuple
+from decimal import Decimal, ROUND_HALF_UP
+from typing import Optional, Sequence, Tuple
+from uuid import UUID
 from sqlalchemy.orm import Session
 from models.unit import Unit
 
@@ -10,6 +15,174 @@ from models.unit import Unit
 class ConversionError(Exception):
     """Raised when unit conversion fails"""
     pass
+
+
+_MULTIPLIER_SCALE = Decimal("0.0000000001")  # units.multiplier is numeric(20, 10)
+
+
+def multiplier_decimal(value) -> Optional[Decimal]:
+    """Multiplier as a Decimal, or None when the unit has none."""
+    if value is None:
+        return None
+    return Decimal(str(value))
+
+
+def is_base_multiplier(value) -> bool:
+    """True when this multiplier is the base (exactly 1)."""
+    dec = multiplier_decimal(value)
+    return dec is not None and dec == Decimal("1")
+
+
+def _quantize(value: Decimal) -> Decimal:
+    return value.quantize(_MULTIPLIER_SCALE, rounding=ROUND_HALF_UP)
+
+
+def require_positive_multiplier(value) -> Decimal:
+    """Multiplier used to convert into the base. Missing or non-positive is an error."""
+    dec = multiplier_decimal(value)
+    if dec is None:
+        raise ConversionError("Multiplier is required")
+    if dec <= 0:
+        raise ConversionError("Multiplier must be greater than zero")
+    return dec
+
+
+def active_base_units(db: Session, type_id) -> list[Unit]:
+    """Active units of this type whose multiplier is 1. There should be one."""
+    units = (
+        db.query(Unit)
+        .filter(Unit.type == type_id, Unit.active == True)  # noqa: E712
+        .all()
+    )
+    return [unit for unit in units if is_base_multiplier(unit.multiplier)]
+
+
+def require_base_unit_named(db: Session, type_name: str) -> Unit:
+    """Base unit for a unit-type list entry, looked up by its name (``volume``)."""
+    from models.list import ListEntry
+
+    entry = (
+        db.query(ListEntry)
+        .filter(ListEntry.name == type_name, ListEntry.active == True)  # noqa: E712
+        .first()
+    )
+    if not entry:
+        raise ConversionError(f"Unit type {type_name} is not configured")
+    return require_base_unit(db, entry.id)
+
+
+def require_base_unit(db: Session, type_id) -> Unit:
+    """The lab's base unit for a type: the one active unit with multiplier 1."""
+    bases = active_base_units(db, type_id)
+    if len(bases) == 1:
+        return bases[0]
+    if not bases:
+        raise ConversionError(
+            "No base unit for this type. Pick one under Units. Its multiplier is 1."
+        )
+    names = ", ".join(sorted(unit.name for unit in bases))
+    raise ConversionError(
+        f"This type has more than one base unit ({names}). "
+        "Pick one under Units and set the others relative to it."
+    )
+
+
+def designate_base_unit(db: Session, unit: Unit) -> None:
+    """Make ``unit`` the base for its type and rescale the others.
+
+    ``new_multiplier = old_multiplier / chosen_multiplier``, so a quantity
+    still lands on the same base amount. The chosen unit becomes 1.
+    Does not commit.
+    """
+    if not unit.active:
+        raise ConversionError("An inactive unit cannot be the base")
+    factor = require_positive_multiplier(unit.multiplier)
+    siblings = db.query(Unit).filter(Unit.type == unit.type).all()
+    same = [
+        sibling
+        for sibling in siblings
+        if sibling.id != unit.id and multiplier_decimal(sibling.multiplier) == factor
+    ]
+    if same:
+        names = ", ".join(sorted(sibling.name for sibling in same))
+        raise ConversionError(
+            f"{names} has the same multiplier as {unit.name}. "
+            "Set that multiplier relative to this unit before using it as the base."
+        )
+    updates = []
+    for sibling in siblings:
+        current = require_positive_multiplier(sibling.multiplier)
+        updates.append((sibling, _quantize(current / factor)))
+    for sibling, new_value in updates:
+        sibling.multiplier = new_value
+    unit.multiplier = Decimal("1")
+
+
+def assert_multiplier_for_save(
+    db: Session,
+    *,
+    type_id,
+    multiplier,
+    current: Optional[Unit] = None,
+) -> Decimal:
+    """Check a create/update multiplier against the type's base.
+
+    Switching which unit is the base is ``designate_base_unit``, not a raw 1
+    typed over another unit. The only base unit stays at 1.
+    """
+    dec = require_positive_multiplier(multiplier)
+    bases = active_base_units(db, type_id)
+    current_id = current.id if current is not None else None
+    others = [base for base in bases if base.id != current_id]
+    current_is_base = current is not None and is_base_multiplier(current.multiplier)
+    if not others and not current_is_base and dec != Decimal("1"):
+        raise ConversionError("The first unit of a type is the base. Its multiplier is 1.")
+    if dec == Decimal("1") and others:
+        staying_base = (
+            current is not None and current.type == type_id and current_is_base
+        )
+        if not staying_base:
+            names = ", ".join(sorted(base.name for base in others))
+            raise ConversionError(
+                f"This type already has a base ({names}). "
+                "Enter how many of that base are in one of this unit, "
+                "or use this unit as the base."
+            )
+        return dec
+    if dec == Decimal("1"):
+        return dec
+    if current_is_base and not others:
+        raise ConversionError(
+            "The base unit multiplier stays 1. Pick another unit as the base first."
+        )
+    return dec
+
+
+def _unit_uuid(unit_id: str) -> UUID:
+    try:
+        return UUID(str(unit_id))
+    except (ValueError, TypeError, AttributeError):
+        raise ConversionError(f"Unit {unit_id} not found") from None
+
+
+def _units_for_ids(db: Session, unit_ids: Sequence[str]) -> list[Unit]:
+    rows = []
+    for unit_id in unit_ids:
+        unit = (
+            db.query(Unit)
+            .filter(Unit.id == _unit_uuid(unit_id), Unit.active == True)  # noqa: E712
+            .first()
+        )
+        if not unit:
+            raise ConversionError(f"Unit {unit_id} not found")
+        rows.append(unit)
+    return rows
+
+
+def _require_one_type(units: Sequence[Unit], label: str) -> None:
+    types = {unit.type for unit in units}
+    if len(types) != 1:
+        raise ConversionError(f"Cannot convert {label} units of different types")
 
 
 def convert_to_base_unit(value: float, unit_id: str, db: Session) -> float:
@@ -27,14 +200,14 @@ def convert_to_base_unit(value: float, unit_id: str, db: Session) -> float:
     Raises:
         ConversionError: If unit not found or conversion fails
     """
-    unit = db.query(Unit).filter(Unit.id == unit_id, Unit.active == True).first()
-    
+    unit = db.query(Unit).filter(Unit.id == _unit_uuid(unit_id), Unit.active == True).first()  # noqa: E712
+
     if not unit:
         raise ConversionError(f"Unit {unit_id} not found")
-    
+
     if unit.multiplier is None:
         raise ConversionError(f"Unit {unit_id} has no multiplier defined")
-    
+
     return float(Decimal(str(value)) * Decimal(str(unit.multiplier)))
 
 
@@ -53,14 +226,14 @@ def convert_from_base_unit(value: float, unit_id: str, db: Session) -> float:
     Raises:
         ConversionError: If unit not found or conversion fails
     """
-    unit = db.query(Unit).filter(Unit.id == unit_id, Unit.active == True).first()
-    
+    unit = db.query(Unit).filter(Unit.id == _unit_uuid(unit_id), Unit.active == True).first()  # noqa: E712
+
     if not unit:
         raise ConversionError(f"Unit {unit_id} not found")
-    
+
     if unit.multiplier is None:
         raise ConversionError(f"Unit {unit_id} has no multiplier defined")
-    
+
     return float(Decimal(str(value)) / Decimal(str(unit.multiplier)))
 
 
@@ -127,15 +300,10 @@ def calculate_pooled_concentration(
     
     if len(concentrations) == 0:
         raise ConversionError("Cannot calculate pooled concentration: no samples provided")
-    
-    # Get base concentration unit
-    base_concentration_unit = db.query(Unit).filter(
-        Unit.type == "concentration",  # Assuming this list entry exists
-        Unit.multiplier == 1.0  # Base unit
-    ).first()
-    
-    if not base_concentration_unit:
-        raise ConversionError("Base concentration unit not found")
+
+    concentration_rows = _units_for_ids(db, concentration_units)
+    _require_one_type(concentration_rows, "concentration")
+    base_concentration_unit = require_base_unit(db, concentration_rows[0].type)
     
     total_weighted_concentration = 0.0
     total_volume = 0.0
@@ -183,15 +351,12 @@ def calculate_pooled_volume(
     
     if len(amounts) == 0:
         raise ConversionError("Cannot calculate pooled volume: no samples provided")
-    
-    # Get base volume unit
-    base_volume_unit = db.query(Unit).filter(
-        Unit.type == "volume",  # Assuming this list entry exists
-        Unit.multiplier == 1.0  # Base unit
-    ).first()
-    
-    if not base_volume_unit:
-        raise ConversionError("Base volume unit not found")
+
+    # Sum amounts in the base unit of their type. The name is historical;
+    # the base is whichever unit of that type the lab set to multiplier 1.
+    amount_rows = _units_for_ids(db, amount_units)
+    _require_one_type(amount_rows, "amount")
+    base_volume_unit = require_base_unit(db, amount_rows[0].type)
     
     total_volume = 0.0
     

@@ -45,13 +45,13 @@ describe('schemaBrowser table badges', () => {
 
   it('lists lab tables first, then system reference tables, each alphabetically', () => {
     const sorted = sortTables([
-      { kind: 'system', display_name: 'Units' },
+      { kind: 'system', display_name: 'Clients' },
       { kind: 'core', display_name: 'Tests' },
-      { kind: 'system', display_name: 'Lists' },
+      { kind: 'system', display_name: 'Roles' },
       { kind: 'ui', display_name: 'Lot Notes' },
       { kind: 'core', display_name: 'Samples' },
     ]);
-    expect(sorted.map((t) => t.display_name)).toEqual(['Lot Notes', 'Samples', 'Tests', 'Lists', 'Units']);
+    expect(sorted.map((t) => t.display_name)).toEqual(['Lot Notes', 'Samples', 'Tests', 'Clients', 'Roles']);
   });
 });
 

@@ -24,8 +24,8 @@ Review stamps stay under [`.docs/review/`](../.docs/review/). Local scratch copi
 | [backend-auth.md](backend-auth.md) | JWT, RBAC, CSRF |
 | [ids-and-configuration.md](ids-and-configuration.md) | Name templates, sequences, lists |
 | [lists.md](lists.md) | Lists and list entries (Admin → Lists). Not Schema tables |
-| [ui-schema.md](ui-schema.md) | Schema table browser. Lists and list items stay off Schema |
-| [containers.md](containers.md) | Container types, contents, inventory |
+| [ui-schema.md](ui-schema.md) | Schema table browser. Lists, list items, and units stay off Schema |
+| [containers.md](containers.md) | Container types, contents, inventory, and the lab's base unit |
 | [batches.md](batches.md) | Batches |
 | [processes.md](processes.md) | ELN processes (`/v1/eln-processes`) — not LimsRun checklists `/v1/processes`, not asked-for |
 | [experiments.md](experiments.md) | ELN Experiments (notebook) — not sidebar **Runs** |

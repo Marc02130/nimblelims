@@ -21,21 +21,24 @@ import {
   Delete,
   Search,
   Clear,
+  Star,
 } from '@mui/icons-material';
 import { DataGrid, GridColDef, GridActionsCellItem, GridRowParams } from '@mui/x-data-grid';
 import { useUser } from '../../contexts/UserContext';
 import { apiService } from '../../services/apiService';
 import { FillHeightPage, FillHeightTable } from '../../components/common/FillHeightPage';
 import UnitFormDialog from './UnitFormDialog';
+import { isBaseUnit } from './unitBase';
 
 interface Unit {
   id: string;
   name: string;
   description?: string;
-  multiplier?: number;
+  multiplier?: number | string | null;
   type: string;
   type_name?: string;
   active: boolean;
+  is_base?: boolean;
   created_at: string;
   modified_at: string;
 }
@@ -50,6 +53,8 @@ const UnitsManagement: React.FC = () => {
   const [selectedUnit, setSelectedUnit] = useState<Unit | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Unit | null>(null);
+  const [baseTarget, setBaseTarget] = useState<Unit | null>(null);
+  const [baseSaving, setBaseSaving] = useState(false);
 
   const canEdit = hasPermission('config:edit');
 
@@ -89,7 +94,7 @@ const UnitsManagement: React.FC = () => {
   const handleCreate = async (data: {
     name: string;
     description?: string;
-    multiplier?: number;
+    multiplier?: number | string | null;
     type: string;
     active?: boolean;
   }) => {
@@ -100,7 +105,7 @@ const UnitsManagement: React.FC = () => {
   const handleUpdate = async (data: {
     name: string;
     description?: string;
-    multiplier?: number;
+    multiplier?: number | string | null;
     type: string;
     active?: boolean;
   }) => {
@@ -124,6 +129,35 @@ const UnitsManagement: React.FC = () => {
         setError(err.response?.data?.detail || 'Failed to delete unit');
       }
       setDeleteDialogOpen(false);
+    }
+  };
+
+  const duplicateBases = useMemo(() => {
+    const byType = new Map<string, Unit[]>();
+    units.filter((unit) => unit.active && isBaseUnit(unit)).forEach((unit) => {
+      const key = unit.type_name || unit.type;
+      const group = byType.get(key) || [];
+      group.push(unit);
+      byType.set(key, group);
+    });
+    return Array.from(byType.entries())
+      .filter(([, group]) => group.length > 1)
+      .map(([typeName, group]) => `${typeName} (${group.map((unit) => unit.name).join(', ')})`);
+  }, [units]);
+
+  const handleSetBase = async () => {
+    if (!baseTarget) return;
+    try {
+      setBaseSaving(true);
+      setError(null);
+      await apiService.setBaseUnit(baseTarget.id);
+      setBaseTarget(null);
+      await loadUnits();
+    } catch (err: any) {
+      setError(err.response?.data?.detail || 'Failed to set the base unit');
+      setBaseTarget(null);
+    } finally {
+      setBaseSaving(false);
     }
   };
 
@@ -161,9 +195,17 @@ const UnitsManagement: React.FC = () => {
     {
       field: 'multiplier',
       headerName: 'Multiplier',
-      width: 120,
-      valueGetter: (value) => value ?? 'N/A',
-      type: 'number',
+      width: 160,
+      valueGetter: (_value, row) => (row as Unit).multiplier ?? 'N/A',
+      renderCell: (params) => {
+        const unit = params.row as Unit;
+        return (
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <span>{unit.multiplier ?? 'N/A'}</span>
+            {isBaseUnit(unit) && <Chip label="Base" size="small" color="primary" />}
+          </Box>
+        );
+      },
     },
     {
       field: 'active',
@@ -188,6 +230,16 @@ const UnitsManagement: React.FC = () => {
         const actions = [];
 
         if (canEdit) {
+          if (!isBaseUnit(unit) && unit.active) {
+            actions.push(
+              <GridActionsCellItem
+                icon={<Star />}
+                label="Use as base"
+                showInMenu
+                onClick={() => setBaseTarget(unit)}
+              />
+            );
+          }
           actions.push(
             <GridActionsCellItem
               icon={<Edit />}
@@ -228,7 +280,13 @@ const UnitsManagement: React.FC = () => {
       header={
         <>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-            <Typography variant="h4">Units Management</Typography>
+            <Box>
+              <Typography variant="h4">Units Management</Typography>
+              <Typography variant="body2" color="text.secondary">
+                Pick one base unit per type. Its multiplier is 1. Other units store how many of
+                that base are in one of them. Calculations convert to the base.
+              </Typography>
+            </Box>
             {canEdit && (
               <Button
                 variant="contained"
@@ -246,6 +304,14 @@ const UnitsManagement: React.FC = () => {
           {error && (
             <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
               {error}
+            </Alert>
+          )}
+
+          {duplicateBases.length > 0 && (
+            <Alert severity="warning" sx={{ mb: 2 }}>
+              More than one base (multiplier 1) in {duplicateBases.join('; ')}. Pick one base.
+              Set the others relative to it, or use one of them as the base after their
+              multipliers differ.
             </Alert>
           )}
 
@@ -305,12 +371,30 @@ const UnitsManagement: React.FC = () => {
         open={formOpen}
         unit={selectedUnit}
         existingNames={units.map((u) => u.name)}
+        units={units}
         onClose={() => {
           setFormOpen(false);
           setSelectedUnit(null);
         }}
         onSubmit={selectedUnit ? handleUpdate : handleCreate}
       />
+
+      <Dialog open={!!baseTarget} onClose={() => !baseSaving && setBaseTarget(null)}>
+        <DialogTitle>Use as base</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Use <strong>{baseTarget?.name}</strong> as the base for {baseTarget?.type_name || 'this type'}?
+            Its multiplier becomes 1. Every other unit of that type is rescaled so amounts still
+            convert to the same base.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setBaseTarget(null)} disabled={baseSaving}>Cancel</Button>
+          <Button onClick={handleSetBase} variant="contained" disabled={baseSaving}>
+            {baseSaving ? 'Saving...' : 'Use as base'}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)}>
         <DialogTitle>Confirm Delete</DialogTitle>
