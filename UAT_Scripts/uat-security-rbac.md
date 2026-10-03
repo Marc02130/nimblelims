@@ -562,7 +562,7 @@ batch:manage, batch:read
 | `sample:create` | Creating samples | Receive (`/receive`) |
 | `sample:read` | Viewing samples | All sample views |
 | `sample:update` | Editing samples | Sample editing workflow |
-| `config:edit` | Lists, custom fields, analyses | Admin configuration |
+| `config:edit` | Lists (`/admin/lists`), analyses. Custom Fields is not a configuration path; Schema mutate is `schema:edit` | Admin configuration |
 | `result:enter` | Entering test results | Results entry workflow |
 | `result:review` | Reviewing/approving results | Lab Manager review |
 | `batch:manage` | Creating/managing batches | Batch workflow |
