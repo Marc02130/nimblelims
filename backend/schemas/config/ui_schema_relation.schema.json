@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:nimblelims:config:v1:ui_schema_relation",
+  "title": "UiSchemaRelation",
+  "description": "Side-link relation create contract. from_table_id is the one side (parent); to_table_id is the child that holds fk_column_id, a real FOREIGN KEY column already in Postgres. Registry only: declaring a relation never issues DDL and never creates a junction table. Many-to-many is out of scope until ids are globally unique.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["display_name", "from_table_id", "to_table_id", "fk_column_id"],
+  "properties": {
+    "display_name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 255
+    },
+    "from_table_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Parent (one side) schema_tables.id"
+    },
+    "to_table_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Child schema_tables.id; the table that holds the key column"
+    },
+    "fk_column_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "schema_columns.id of the child FK column; must reference the parent table"
+    },
+    "cardinality": {
+      "type": "string",
+      "enum": ["one_to_many", "one_to_one"],
+      "default": "one_to_many",
+      "description": "one_to_one requires the key column to be UNIQUE in Postgres"
+    }
+  }
+}
