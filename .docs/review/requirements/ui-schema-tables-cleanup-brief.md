@@ -1,6 +1,8 @@
 # Brief stub: ui-schema-tables-cleanup
 
-**Status:** P1 **implemented** 2026-10-03 under Marc's product locks (OQ-1 = B allow-list, OQ-2 = A park, OQ-3 = B lazy register; M:N deferred until ids are globally unique). Delta: `.docs/review/schema-changes/ui-schema-tables-cleanup.md` (alembic 0082). UAT: `UAT_Scripts/uat-ui-schema-tables-cleanup.md` (pass pending). Manual: `manuals/ui-schema.md`. The stub text below is history.
+**Status:** P1 **implemented** 2026-10-03 under Marc's product locks (OQ-1 = B allow-list, OQ-2 = A park, OQ-3 = B lazy register; M:N deferred until ids are globally unique). Delta: `.docs/review/schema-changes/ui-schema-tables-cleanup.md` (alembic 0082). UAT: `UAT_Scripts/uat-ui-schema-tables-cleanup.md` (pass pending — do not invent a Pass). Manual: `manuals/ui-schema.md`. The stub text below is history.
+
+**Current truth (display rule, after that PR):** Custom Fields is not a place to work. Side links that shipped are 1:N / 1:1 over a real FK in `schema_relations`. Many-to-many is deferred. There is no universal join table. **`lists` and `list_entries` are not schema tables.** `projects` stays. The “M:N as junctions” sentence in the stub is history, not this phase.
 
 **Locks in:** Kill Custom Fields completely; Schema Tables allow-list includes **`project`** + **`samples`** + UI-created; **relations** 1:N/1:1/M:N as real FKs/junctions; implement CLOSED until Brief + Design + Marc green-light.
 

@@ -6,27 +6,38 @@
 **UAT:** `UAT_Scripts/uat-ui-schema-ddl.md` (CREATE/ALTER), `UAT_Scripts/uat-ui-schema-tables-cleanup.md` (browser + relations)  
 **Briefs:** `.docs/review/requirements/ui-schema-ddl-brief.md`, `.docs/review/requirements/ui-schema-tables-cleanup-brief.md`
 
-The Schema screen is a **browser over real Postgres tables**. A field is a column on a table. There is no Custom Fields area any more (`/admin/custom-fields` redirects here). Not JSONB-as-schema (OQ-16). `custom_attributes` is not this path.
+The Schema screen is a **browser over real Postgres tables**. A field is a column on a table. There is no Custom Fields area (`/admin/custom-fields` redirects here). Not JSONB-as-schema (OQ-16). `custom_attributes` is not this path. Many-to-many is not in this phase. There is no universal join table.
+
+## Display rule (current — Marc, after the table-browser PR)
+
+A table appears on Schema only when a change can be made **and** the application uses that change through configuration. If a new column would sit unused until application code is refactored, the table stays off Schema. Do not treat it as a schema table.
+
+**Lists and list items are off Schema.** `lists` and `list_entries` store the values edited at Admin → Lists. Application code reads those rows to fill dropdowns, so a column added on either table is unused until code changes. They are not schema tables. Edit list values at `/admin/lists`.
 
 | Surface | Does |
 |---------|------|
-| Tables | Lists every allow-listed table with a **Lab** / **System** badge, source (Built-in / Created here), field count and link count. CREATE TABLE (`x_*` / `lab_*`) with platform columns + FORCE RLS. Deprecate / Drop only for tables created here. |
-| Columns | Browses the columns of one table (`?table=<physical>`). ADD COLUMN on Lab tables (P1 types: Text, Number, Whole number, Yes/No, Date, Date and time, List). System columns are locked. Shows a read-only **Links** row. |
+| Tables | Lists allow-listed tables that meet the display rule, with a **Lab** / **System** badge, source (Built-in / Created here), field count and link count. CREATE TABLE (`x_*` / `lab_*`) with platform columns + FORCE RLS. Deprecate / Drop only for tables created here. |
+| Columns | Browses the columns of one table (`?table=<physical>`). ADD COLUMN on **Samples** and on tables created here (P1 types: Text, Number, Whole number, Yes/No, Date, Date and time, List). Add field is off on other built-in Lab tables and on System tables. System columns are locked. Shows a read-only **Links** row. |
 | Relations | Declares one-to-many / one-to-one **side links** over an existing FK column on the child. Registry only; no DDL. |
 | Layouts | Role × screen **membership**. Absent = not shown. No hide toggle. Screens: `receive`, `samples.list`, `samples.detail`. **Asked-for and routing leave as is.** |
 | Privileges | Role × table Read/Write/none. Default deny. Does **not** mint `schema:edit`. |
 
 ## What is in the table list
 
-Membership is an allow-list in `backend/app/services/ui_schema_catalog.py`, not a filter on the registry query. The registry is filled lazily on first view (`ensure_catalog`) and columns are **reflected** from `information_schema` / `pg_constraint` / `pg_index`.
+Membership is an allow-list in `backend/app/services/ui_schema_catalog.py`, then the display rule. The registry is filled lazily on first view (`ensure_catalog`) and columns are **reflected** from `information_schema` / `pg_constraint` / `pg_index`. **`projects` stays** (the table-browser PR did not drop it). This is not “every Postgres table.”
 
 | Badge | Tables |
 |-------|--------|
 | **Lab** | samples, containers, contents, tests, results, batches, projects, client_projects, experiments, lims_runs, work_orders, asked_for, routing_map, analyses, analytes, test_batteries, instruments, locations, eln_processes, plus every table created from the Tables tab |
-| **System** | lists, list_entries, units, container_types, instrument_types, sample_type_transitions, clients, users, roles |
-| Hidden | Engine internals: `alembic_version`, `revoked_tokens`, `login_throttle`, permission plumbing, the `schema_*` registry, `ui_schema_ddl_log`, legacy field/attribute config tables |
+| **System** (still registered in the shipped catalog) | units, container_types, instrument_types, sample_type_transitions, clients, users, roles |
+| **Not schema tables** | `lists`, `list_entries` (list items). Off the Schema screen. |
+| Hidden | Engine internals: `alembic_version`, `revoked_tokens`, `login_throttle`, permission plumbing, the `schema_*` registry, `ui_schema_ddl_log`, legacy field/attribute config tables (`custom_attributes_config`, `field_definitions`, `name_templates`) |
 
-To add a table to the browser, add it to `LAB_TABLES` or `SYSTEM_TABLES`. Lab tables sort first.
+The shipped catalog still lists `lists` and `list_entries` in `SYSTEM_TABLES`. That registration contradicts the display rule. Until the catalog drops them, the screen can still show **Lists** and **List entries**; those rows are a product mismatch, not schema tables.
+
+The same rule also questions the other System rows (`units`, `container_types`, `instrument_types`, `sample_type_transitions`, `clients`, `users`, `roles`): Add field is already off, and application code reads fixed columns, so a new column would be ignored until a refactor. They are still registered and can still appear. This docs pass does not drop them; that appearance is a remaining conflict. Lab tables other than Samples stay on the browser so side links can be declared over real FKs. A new column on those tables is not offered (`can_add_columns` is true only for `samples` and tables created here) and would not be read back except on Samples.
+
+Add field is enabled only for `samples` and for tables created here (`kind='ui'`). Other built-in Lab tables are browsed and can carry a side link; they do not take a new column from this screen. A column added on Samples is read and written through sample `extra_fields`. Layouts apply to `receive`, `samples.list`, and `samples.detail`.
 
 ## System columns (locked)
 
@@ -37,9 +48,9 @@ Lock icon + **System** chip, no edit, no action menu. The lock set:
 | Platform | `id`, `client_id`, `created_at`, `created_by`, `modified_at`, `modified_by`, `active` |
 | Identity | Sample identity columns (name/barcode) |
 | Relationship key | Any FK column that is **not** a list binding (e.g. `tests.sample_id`, `samples.project_id`). Type shows **Key**; *Points at* links to the parent table. |
-| System table | Every column of a System table (`lists`, `list_entries.list_id`, …). *Add field* is disabled on these tables. |
+| System table | Every column of a System table that is still on the screen. *Add field* is disabled on these tables. `lists` and `list_entries` are not on this screen. |
 
-Lab columns (including a uuid FK to `list_entries`, shown as type **List**) stay editable to the extent the UI already edited them. There is **no** drop-column or DDL-apply button on reflected columns.
+A uuid FK to `list_entries` on a lab table is a **list binding** (type **List**), not a relationship-key lock, and not a reason to put `lists` or `list_entries` on Schema. Built-in columns owned by migrations are not editable here. A column **added on Samples** (origin `ui`) keeps Deprecate / Drop. There is **no** drop-column or DDL-apply button on reflected columns.
 
 ## Relations (1:N / 1:1)
 

@@ -1,5 +1,7 @@
 # UI review: Schema Tables cleanup + kill Custom Fields (admin UX sketch)
 
+**Current truth (after the table-browser PR):** This sketch is history (pending Accept). Shipped behavior: Custom Fields chrome is gone; Schema is a table browser; system columns are locked; side links are 1:N / 1:1 real FKs in `schema_relations`; many-to-many is deferred; there is no universal join table. **Lists and list items are not schema tables.** `projects` stays on the Lab list. Do not read the sketch’s “Tables = Samples + Project + UI-created” or its M:N rows as the current display list.
+
 **Date:** 2026-10-01  
 **Status:** **Sketch pending Accept** (draft). Written against Spec/OQ tip `07ccd59` on `docs/ui-schema-tables-cleanup`. Not Accept.  
 **Stem:** `ui-schema-tables-cleanup`  
