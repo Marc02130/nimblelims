@@ -2,47 +2,44 @@
 
 **Stem:** `ui-schema-tables-cleanup`  
 **Date:** 2026-10-01  
-**Status:** Packet OPEN; implement CLOSED. UX sketch tip **`564fe6f`** pending Accept. Prior `ui-schema-ddl` locks stand.
+**Status:** P1 **implemented** 2026-10-03 (table browser + 1:N / 1:1 side links; alembic 0082). OQ-1 / OQ-2 / OQ-3 **Decided** by Marc's product locks (2026-10-03). OQ-5 M:N **Deferred** (ids not globally unique). Prior `ui-schema-ddl` locks stand. UAT pass pending: `UAT_Scripts/uat-ui-schema-tables-cleanup.md`.
 
-## OQ-1 — P1 Schema Tables allow-list (OPEN — Marc)
+## Marc product locks (2026-10-03 — do not reopen)
 
-Besides **`project`** and **`samples`**, which other tables are P1 for the Schema Tables list?
+- Drop the Custom Fields area of the schema UI. A field is a column on a table.
+- Table list shows **every lab table** registered in `ui_schema` plus **system reference tables** starting with `lists`. Hide engine internals (migrations, sessions, audit plumbing). Badge **Lab** vs **System**.
+- **System columns are not editable and not removable** in the UI: id, timestamps, created-by, relationship FKs, and `list_id` when the column is a list. Lab columns stay editable to the extent the UI already edits columns. No drop-column / DDL-apply button.
+- ORM is SQLAlchemy 2 + Alembic on Postgres. **No `relationship()` generated from config.**
+- 1:N and 1:1 = a **registry entry** (from table, to table, cardinality, child FK column). Key is a real FK on the child. Parent UI may show a read-only link to the child.
+- **No universal join table, no systemwide unique ids, no fat junction tables** this phase. M:N with no payload waits until ids are globally unique. If a fact needs its own columns, it is its own table.
+- Config bundles still update `ui_schema` registries. No separate agent UI file. OQ-16 stands. Do not mutate the database from the schema screen.
 
-| Option | Meaning |
-|--------|---------|
-| **A** | `project` + `samples` + **any UI-created tables only** |
-| **B** | Also include named system tables (e.g. containers, tests, clients, …) — Marc names the set |
+## OQ-1 — P1 Schema Tables allow-list (DECIDED — Marc, 2026-10-03)
 
-**Rolf gate question (2026-10-01):** awaiting Marc. Spec will not freeze allow-list until Decided.
+**Decision: B.** Allow-list in `backend/app/services/ui_schema_catalog.py`:
 
-## OQ-2 — Custom Fields / `custom_attributes` cutover (OPEN)
+| Badge | Set |
+|-------|-----|
+| **Lab** (`kind='core'`) | samples, containers, contents, tests, results, batches, projects, client_projects, experiments, lims_runs, work_orders, asked_for, routing_map, analyses, analytes, test_batteries, instruments, locations, eln_processes + UI-created (`kind='ui'`) |
+| **System** (`kind='system'`) | lists, list_entries, units, container_types, instrument_types, sample_type_transitions, clients, users, roles |
+| Hidden | `alembic_version`, `revoked_tokens`, `login_throttle`, permission plumbing, `schema_*` registry, `ui_schema_ddl_log`, `custom_attributes_config`, `field_definitions`, `name_templates`, anything not allow-listed |
 
-Existing Custom Fields data / JSONB keys on samples (or elsewhere):
+**Finding:** the short list was **not** a frontend filter — `ensure_core_catalog()` only ever registered `samples`. Replaced by `ensure_catalog()` (allow-list + Postgres reflection).
 
-| Option | Meaning |
-|--------|---------|
-| **A** | Park: hide UI; leave data unread by new schema path; migrate later |
-| **B** | One-shot migrate named keys → real columns (allow-listed) then drop Custom Fields path |
-| **C** | Refuse: wipe / ignore with confirm (destructive — needs Marc Confirm) |
+## OQ-2 — Custom Fields / `custom_attributes` cutover (DECIDED — A, park)
 
-Brief must Decide before implement.
+UI removed (`/admin/custom-fields` → redirect to Schema Tables with banner). `custom_attributes` JSONB data and `custom_attributes_config` / `field_definitions` tables are **left in place, hidden from the browser, unread by the schema path**. Migration of named keys → real columns is a later, separate slice.
 
-## OQ-3 — Registry rows for system tables (OPEN — Heidi)
+## OQ-3 — Registry rows for system tables (DECIDED — B, lazy)
 
-For `project` (and other system tables once in allow-list): seed **table + column registry** rows how?
+`ensure_catalog()` registers allow-listed tables that exist in Postgres on first Schema view and reflects their columns (`origin='reflected'`). Idempotent; FK/UNIQUE facts re-synced each view. No Alembic seed, no admin "Register" step. Alembic 0082 only widens checks and adds the reflection columns + `schema_relations`.
 
-| Option | Meaning |
-|--------|---------|
-| **A** | Alembic seed on deploy for allow-listed system tables |
-| **B** | Lazy register on first Schema Tables view |
-| **C** | Admin “Register” action before Columns editable |
+## OQ-4 — Which surfaces still show “custom” language (DECIDED for schema chrome; residual map Mathilda)
 
-## OQ-4 — Which surfaces still show “custom” language (OPEN — Mathilda)
-
-Any residual “custom attribute” labels on receive / results / list filters must be removed or renamed. Mathilda maps screens in sketch.
+Schema chrome, sidebar, Help tip and route are clean. Residual “Custom Fields” wording in Experiment Templates helper copy (“not Custom Fields on Sample/Test”) is historical context for entry columns, not a navigable surface; rename when that screen is next touched.
 
 
-## OQ-5e — M:N junction visibility (OPEN unless Marc overwrites)
+## OQ-5e — M:N junction visibility (DEFERRED with OQ-5 M:N)
 
 **Leadership lock (Decided 2026-10-01):** M:N junctions stay **behind the scenes**. Admin with `schema:edit` defines the relation; the product **creates/maintains** the junction table and its rows. Operators only **link / unlink** — no junction as a lab data-entry table or spreadsheet of link rows.
 
@@ -83,7 +80,11 @@ Mathilda sketch tip **`564fe6f`** — [ui-schema-tables-cleanup.md](../ui-review
 - Tobias Fail bar **(7)** (provisional until OQ-5b freezes): CASCADE or silent wipe on identity links (sample/barcode vessel) where Spec says RESTRICT → **Fail**.
 - Katinka: vessel/container and parent→aliquot/derivative = **1:N FKs on the child** (SOP confirm).
 
-## OQ-5 — Relations cardinality + UI + on-delete (OPEN — Spec / Mathilda / Heidi)
+## OQ-5 — Relations cardinality + UI + on-delete (1:N / 1:1 SHIPPED; M:N + on-delete DEFERRED)
+
+**Shipped 2026-10-03 (P1):** Relations tab (`schema:edit`). A relation = `schema_relations` row: parent, child, cardinality, **existing FK column on the child**. UI offers only FK columns pointing at the chosen parent; 1:1 enabled only when Postgres has a single-column UNIQUE index on the key. Declaring writes the registry only — no DDL, no `relationship()`, no junction. `POST /v1/schema/relations` and config contract `ui_schema_relation` refuse `many_to_many`. Parent Columns view shows `Name → Child`, child shows `Name ← Parent` (read-only links). Resolves **OQ-5a** (declare over existing FK; new FK columns are a later ADD COLUMN type), **OQ-5c** (read-only link chips in schema chrome; operator Related lists still Mathilda), **OQ-5d** (any allow-listed pair with a real FK).
+
+**Deferred:** M:N (ids not globally unique — Marc lock), OQ-5b on-delete defaults (registry does not change FK actions; Postgres actions stay as migrated).
 
 **Leadership lock (Decided pattern; UI details open):** real Postgres only.
 

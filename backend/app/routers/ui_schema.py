@@ -17,8 +17,11 @@ from app.schemas.ui_schema import (
     SchemaLayoutPut,
     SchemaLayoutRead,
     SchemaPrivilegeRead,
+    SchemaRelationCreate,
+    SchemaRelationRead,
     SchemaTableCreate,
     SchemaTableRead,
+    TableLinksRead,
 )
 from app.services.ui_schema_service import UiSchemaService
 from models.user import User
@@ -69,6 +72,50 @@ def drop_table(
     db: Session = Depends(get_db),
 ):
     _svc(db, user).drop_table(table_id, body.confirm)
+    return None
+
+
+@router.get("/tables/{table_id}/links", response_model=TableLinksRead)
+def table_links(
+    table_id: UUID,
+    user: User = Depends(require_schema_or_layout),
+    db: Session = Depends(get_db),
+):
+    """Read-only: FK columns on this table plus declared relations either side."""
+    return _svc(db, user).table_links(table_id)
+
+
+@router.get("/relations", response_model=List[SchemaRelationRead])
+def list_relations(
+    table_id: Optional[UUID] = Query(None),
+    user: User = Depends(require_schema_or_layout),
+    db: Session = Depends(get_db),
+):
+    return _svc(db, user).list_relations(table_id)
+
+
+@router.post("/relations", response_model=SchemaRelationRead, status_code=status.HTTP_201_CREATED)
+def create_relation(
+    body: SchemaRelationCreate,
+    user: User = Depends(require_schema_edit),
+    db: Session = Depends(get_db),
+):
+    return _svc(db, user).create_relation(
+        display_name=body.display_name,
+        from_table_id=body.from_table_id,
+        to_table_id=body.to_table_id,
+        fk_column_id=body.fk_column_id,
+        cardinality=body.cardinality,
+    )
+
+
+@router.delete("/relations/{relation_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_relation(
+    relation_id: UUID,
+    user: User = Depends(require_schema_edit),
+    db: Session = Depends(get_db),
+):
+    _svc(db, user).delete_relation(relation_id)
     return None
 
 

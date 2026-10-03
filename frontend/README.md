@@ -32,7 +32,7 @@ Copyright (c) 2025 Marc Breneiser
 - **Analytes Management**: CRUD operations for analytes
 - **Analysis-Analyte Configuration**: Configure validation rules (data types, ranges, significant figures)
 - **Test Batteries Management**: Create and manage test batteries (grouped analyses with sequence and optional flags)
-- **Field Management** (aka Custom Fields): Unified view of OOB + Custom fields per entity type (lists preferred for select options; validation rules for text/number/date/etc.). Context panel, entity-first add flow. OOB denoted. Lists integration with inline create popup. Legacy custom attrs UI separate.
+- **Schema** (`/admin/schema/*`): Table browser (Lab / System badges, Browse fields), Columns with locked system columns and read-only Links row, Relations tab (1:N / 1:1 over real FK columns), Layouts, Privileges. The Custom Fields page was removed; `/admin/custom-fields` redirects to Schema Tables.
 - **Users Management**: CRUD operations for users
 - **Roles & Permissions Management**: CRUD operations for roles and permission assignments
 - Restricted to users with `config:edit`, `test:configure`, or `user:manage` permissions

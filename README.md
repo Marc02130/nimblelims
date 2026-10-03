@@ -242,7 +242,7 @@ nimblelims/
 - **Analysis-Analyte Linking**: Link/unlink analytes to analyses via expandable detail panels with inline autocomplete search
 - **Analysis-Analyte Configuration**: Configure validation rules (data types, ranges, significant figures, required flags)
 - **Test Batteries Management**: Group multiple analyses into reusable assay panels (e.g., "ADME Panel", "Kinase Selectivity Panel") with sequence ordering and optional flags (CRUD)
-- **Field Management** (Custom Fields UI): See above for OOB+Custom with list-backed preference.
+- **Schema**: Table browser over real Postgres tables (Lab / System badges, locked system columns), CREATE TABLE / ADD COLUMN, and 1:N / 1:1 side-link relations over real FK columns. Replaces the Custom Fields UI (`/admin/custom-fields` redirects). See `manuals/ui-schema.md`.
 - **Client Projects Management**: Group multiple LIMS projects under client projects for holistic tracking (CRUD)
 - **Users Management**: Create and manage users with role assignments (CRUD)
 - **Roles & Permissions**: Manage roles and assign permissions (CRUD)

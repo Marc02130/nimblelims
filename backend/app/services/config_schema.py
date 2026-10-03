@@ -16,7 +16,7 @@ from jsonschema import Draft202012Validator
 from jsonschema.exceptions import SchemaError
 
 from app.schemas.field_definition import DataType
-from app.schemas.ui_schema import P1_TYPES, SCREEN_KEYS, SOP_HINTS
+from app.schemas.ui_schema import CARDINALITIES, P1_TYPES, SCREEN_KEYS, SOP_HINTS
 from app.schemas.workflow import VALID_WORKFLOW_ACTIONS
 
 _BACKEND_ROOT = Path(__file__).resolve().parents[2]
@@ -31,6 +31,7 @@ _REQUIRED_NAMES = (
     "ui_schema_column",
     "ui_schema_layout",
     "ui_schema_privilege",
+    "ui_schema_relation",
     "workflow_template",
 )
 
@@ -103,6 +104,16 @@ def _assert_fits(schemas: Mapping[str, dict]) -> None:
     ]
     if hints != list(SOP_HINTS):
         raise ConfigSchemaCatalogError("sop_hint enum does not match SOP_HINTS")
+
+    cardinalities = schemas["ui_schema_relation"]["properties"]["cardinality"]["enum"]
+    if list(cardinalities) != list(CARDINALITIES):
+        raise ConfigSchemaCatalogError(
+            "ui_schema_relation cardinality enum does not match CARDINALITIES"
+        )
+    if "many_to_many" in cardinalities:
+        raise ConfigSchemaCatalogError(
+            "ui_schema_relation must not allow many_to_many (no junction tables this phase)"
+        )
 
     actions = schemas["workflow_template"]["properties"]["template_definition"][
         "properties"

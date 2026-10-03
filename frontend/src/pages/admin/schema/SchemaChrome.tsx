@@ -1,18 +1,29 @@
 import React from 'react';
 import { Box, Tab, Tabs, Typography } from '@mui/material';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { useUser } from '../../../contexts/UserContext';
 
-const TABS = [
+interface SchemaTab {
+  label: string;
+  path: string;
+  /** When set, the tab is only offered to users holding this permission. */
+  permission?: string;
+}
+
+const TABS: SchemaTab[] = [
   { label: 'Tables', path: '/admin/schema/tables' },
   { label: 'Columns', path: '/admin/schema/columns' },
+  { label: 'Relations', path: '/admin/schema/relations', permission: 'schema:edit' },
   { label: 'Layouts', path: '/admin/schema/layouts' },
-  { label: 'Privileges', path: '/admin/schema/privileges' },
+  { label: 'Privileges', path: '/admin/schema/privileges', permission: 'schema:edit' },
 ];
 
 const SchemaChrome: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const location = useLocation();
   const navigate = useNavigate();
-  const current = TABS.findIndex((t) => location.pathname.startsWith(t.path));
+  const { hasPermission } = useUser();
+  const tabs = TABS.filter((t) => !t.permission || hasPermission(t.permission));
+  const current = tabs.findIndex((t) => location.pathname.startsWith(t.path));
 
   return (
     <Box>
@@ -20,15 +31,16 @@ const SchemaChrome: React.FC<{ children: React.ReactNode }> = ({ children }) => 
         Schema
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-        Real database tables and fields. Layout is what a role sees. Privileges are
-        what the API allows. Not on a layout is not shown — there is no hide toggle.
+        A browser over the real database tables. A field is a column on a table; a link is a
+        real foreign key. Layout is what a role sees. Privileges are what the API allows. Not on
+        a layout is not shown — there is no hide toggle.
       </Typography>
       <Tabs
         value={current < 0 ? 0 : current}
-        onChange={(_, i) => navigate(TABS[i].path)}
+        onChange={(_, i) => navigate(tabs[i].path)}
         sx={{ mb: 2 }}
       >
-        {TABS.map((t) => (
+        {tabs.map((t) => (
           <Tab key={t.path} label={t.label} />
         ))}
       </Tabs>
