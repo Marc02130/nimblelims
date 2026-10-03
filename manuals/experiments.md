@@ -66,7 +66,7 @@ There are **two product kinds only**. Built-in behavior is a **predefined wrappe
 | **Entry field definitions** | experiment_sample_data, experiment_data | `field_definitions` with `entity_type` = `experiment_sample_data` \| `experiment_data`, `is_materialized_column = false`; linked via `entry_field_definitions`; values in `entry_field_values` (typed cells) |
 | **Aliquot plan** | aliquot_pool_plan | Plan lines plus kind-scoped fields attached from `METHOD_CATALOG`; current runtime still stores plan lines in entry `config` |
 
-**Custom Fields** (`/admin/custom-fields`) = extend **DB entities** (Sample, Test, …).  
+**Schema → Columns** (`/admin/schema/columns`) = extend **DB entities** (Sample, Test, …) with real columns. The old Custom Fields page is gone; `/admin/custom-fields` redirects to Schema.  
 **Not** for defining entry table columns. Entry columns are created from the **template** dialog: **Create field** (scoped entity type) or **Add existing field**.
 
 ### Values
