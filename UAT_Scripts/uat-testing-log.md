@@ -8,7 +8,7 @@ The UAT scripts should be run in the following order based on their dependencies
 |-------|--------|--------------|-------------|
 | 1 | `uat-security-rbac` | None | Foundation - authentication, permissions, RLS policies |
 | 2 | `uat-navigation-ui` | uat-security-rbac | Sidebar navigation, permission gating, responsive design |
-| 3 | `uat-configurations-custom` | uat-security-rbac | Lists management (full CRUD), custom fields configuration |
+| 3 | `uat-configurations-custom` | uat-security-rbac | Lists management (full CRUD) at Admin → Lists. Custom fields configuration in that script is history — Custom Fields is not a place to work |
 | 4 | `uat-help-system` | uat-security-rbac | Help system, role-based help content |
 | 5 | `uat-analysis-analyte-management` | uat-security-rbac | Analyses/Analytes CRUD, expandable linked analytes grid, linking/unlinking |
 | 6 | `uat-container-management` | uat-configurations-custom | Container types, hierarchical containers, pooling |
@@ -37,7 +37,7 @@ uat-security-rbac (Foundation)
 ├── uat-workflow-templates (Workflow template CRUD, execute, RBAC)
 ├── uat-analysis-analyte-management (Analyses/Analytes CRUD, linking)
 │   └── uat-test-ordering (uses analyses for test assignment)
-└── uat-configurations-custom (Lists, Custom Fields)
+└── uat-configurations-custom (Lists at /admin/lists; Custom Fields sections are history)
     ├── uat-container-management
     │   ├── uat-atomic-receive (CORE receive SoT)
     │   │   ├── uat-post-receive-work-spine (P1 asked-for lake; not Tests at receive)

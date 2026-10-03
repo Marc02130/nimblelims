@@ -1,7 +1,9 @@
 # Requirements: Schema Tables cleanup + kill Custom Fields
 
+**Current truth (Marc, after the table-browser PR, 2026-10-03):** Custom Fields is not a place to work. Schema is a table browser; system columns are locked; side links are real FK rows in `schema_relations`; many-to-many is deferred; there is no universal join table. A table appears on Schema only when a change can be made and used through configuration. **`lists` and `list_entries` (list items) are not schema tables.** `projects` stays on the Lab list. UAT pass is **not** claimed. The sections below are the 2026-10-01 packet (history), including M:N-as-junction language that this phase did not ship.
+
 **Date:** 2026-10-01  
-**Status:** Packet **OPEN** — Leadership locks below. UX sketch tip **`564fe6f`** (pending Accept). Implement gate **CLOSED** until Brief + Design UX Accept + Marc green-light. No product code until then (Grok Build).  
+**Status:** History below. P1 browser shipped 2026-10-03; display rule above wins for what appears on Schema. UX sketch tip **`564fe6f`** (pending Accept).  
 **Stem:** `ui-schema-tables-cleanup`  
 **Prior packet:** `ui-schema-ddl` merged main @ `180f0c1` / cite `2074f9e` — CREATE TABLE / ADD COLUMN / layout / privileges stand.  
 **Open questions:** [`.docs/review/open-questions/ui-schema-tables-cleanup.md`](../open-questions/ui-schema-tables-cleanup.md)  

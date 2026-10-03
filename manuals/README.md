@@ -23,7 +23,8 @@ Review stamps stay under [`.docs/review/`](../.docs/review/). Local scratch copi
 | [admin-setup.md](admin-setup.md) | First login, password, admin |
 | [backend-auth.md](backend-auth.md) | JWT, RBAC, CSRF |
 | [ids-and-configuration.md](ids-and-configuration.md) | Name templates, sequences, lists |
-| [lists.md](lists.md) | Lists and list entries |
+| [lists.md](lists.md) | Lists and list entries (Admin → Lists). Not Schema tables |
+| [ui-schema.md](ui-schema.md) | Schema table browser. Lists and list items stay off Schema |
 | [containers.md](containers.md) | Container types, contents, inventory |
 | [batches.md](batches.md) | Batches |
 | [processes.md](processes.md) | ELN processes (`/v1/eln-processes`) — not LimsRun checklists `/v1/processes`, not asked-for |
