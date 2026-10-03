@@ -1,6 +1,6 @@
 # UAT Scripts: Configurations and Custom Fields
 
-**Current truth (2026-10-03):** Custom Fields is not a place to work. `/admin/custom-fields` redirects to Schema → Tables. A sample field is a column under Schema → Columns. List values are Admin → Lists (`/admin/lists`). **`lists` and `list_entries` are not schema tables.** Sections below that open Custom Fields Management or `/admin/custom-fields` as the editor are **history**. They are not the acceptance script for the current UI. UAT pass is not claimed here. Current Schema acceptance is `UAT_Scripts/uat-ui-schema-tables-cleanup.md` (pass still pending).
+**Current truth (2026-10-03):** Custom Fields is not a place to work. `/admin/custom-fields` redirects to Schema → Tables. A sample field is a column under Schema → Columns. List values are Admin → Lists (`/admin/lists`). **`lists`, `list_entries`, and `units` are not schema tables.** Units are Admin → Units (`/admin/units`). Sections below that open Custom Fields Management or `/admin/custom-fields` as the editor are **history**. They are not the acceptance script for the current UI. UAT pass is not claimed here. Current Schema acceptance is `UAT_Scripts/uat-ui-schema-tables-cleanup.md` (pass still pending).
 
 ## Overview
 

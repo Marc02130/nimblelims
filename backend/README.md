@@ -23,7 +23,8 @@ Copyright (c) 2025 Marc Breneiser
 - **Analytes Management**: CRUD operations for analytes (admin-only)
 - **Analysis-Analyte Configuration**: Configure validation rules for analytes in analyses (admin-only)
 - **Test Batteries Management**: Group analyses into reusable batteries with sequence and optional flags (admin-only)
-- **Schema (`/v1/schema/*`)**: Allow-listed table browser (Lab tables plus System reference tables the display rule still allows; engine internals hidden) reflected from Postgres catalogs, locked system columns, CREATE TABLE / ADD COLUMN via `schema_apply` (Add field on Samples and UI-created tables), and a `schema_relations` registry for 1:N / 1:1 side links over existing FK columns (no junctions, no universal join, no DDL). Many-to-many is refused. The Custom Fields UI is removed. `lists` and `list_entries` are not schema tables (display rule); the catalog in `ui_schema_catalog.py` still registers them, which is a product mismatch. Legacy `custom_attributes` endpoints remain for payload data only.
+- **Schema (`/v1/schema/*`)**: Allow-listed table browser (Lab tables plus System reference tables the display rule still allows; engine internals hidden) reflected from Postgres catalogs, locked system columns, CREATE TABLE / ADD COLUMN via `schema_apply` (Add field on Samples and UI-created tables), and a `schema_relations` registry for 1:N / 1:1 side links over existing FK columns (no junctions, no universal join, no DDL). Many-to-many is refused. The Custom Fields UI is removed. `lists`, `list_entries`, and `units` are not schema tables: `kind_for` returns none for them (`NOT_SCHEMA_TABLES` in `ui_schema_catalog.py`). The Postgres tables stay. Legacy `custom_attributes` endpoints remain for payload data only.
+- **Units**: One base unit per type (multiplier exactly 1). Other units store how many of that base are in one of them. `POST /units/{id}/base` rescales siblings. A type with more than one active multiplier-1 unit is refused by conversion until the lab picks one. See [`manuals/containers.md`](../manuals/containers.md).
 - **Users Management**: CRUD operations for users (admin-only)
 - **Roles & Permissions Management**: CRUD operations for roles and permission assignments (admin-only)
 - **Authentication**: JWT-based authentication with RBAC
@@ -190,8 +191,14 @@ Copyright (c) 2025 Marc Breneiser
 - `GET /v1/sop-parse/{job_id}` - Job status and result when complete
 - `POST /v1/sop-parse/{job_id}/apply` - Persist template + parser/worklist (201; 409 if already applied)
 
+#### Units (`config:edit` to change; `GET` for any signed-in user)
+- `GET /units` - List units. `config:edit` includes inactive rows. Each row has `is_base` (multiplier is exactly 1) and `type_name`.
+- `POST /units` - Create a unit. `multiplier` is required and greater than zero. The first unit of a type must be 1.
+- `PATCH /units/{id}` - Update a unit. A second multiplier of 1 is refused while another base exists. The only base stays at 1.
+- `DELETE /units/{id}` - Soft-deactivate. Refused while this is the only base and other active units of the type remain.
+- `POST /units/{id}/base` - Make this unit the base (multiplier 1) and rescale the others (`new = old / chosen`).
+
 #### Other
-- `GET /units` - List units
 - `GET /projects` - List accessible projects
 
 ## Technical Implementation

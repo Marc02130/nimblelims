@@ -1304,20 +1304,52 @@ Soft-delete an analyte (sets active=false).
 
 ## Units
 
+`units` is not a Schema table. Edit units at Admin → Units (`/admin/units`). The Postgres table stays.
+
+One active unit per type is the base. Its multiplier is exactly 1. Every other unit of that type stores how many of that base are in one of it. Conversion is `value_in_base = value * multiplier`. Switching the base rescales the others so a quantity still converts to the same amount. A type with more than one active multiplier-1 unit is not converted until the lab picks one base; the error names those units. Result unit mismatch is still refused without silent conversion (see [containers.md](containers.md)).
+
 ### GET /units
-List all active units.
+List units. Signed-in users see active units. `config:edit` also sees inactive units.
 
 **Response:**
 ```json
 [
   {
     "id": "...",
-    "name": "g/L",
-    "multiplier": 1.0,
-    "type": "..."
+    "name": "mg",
+    "description": null,
+    "active": true,
+    "multiplier": "0.0010000000",
+    "type": "...",
+    "type_name": "mass",
+    "is_base": false
   }
 ]
 ```
+
+`is_base` is true when `multiplier` is exactly 1.
+
+### POST /units
+Create a unit. Requires `config:edit`.
+
+**Request:** `name`, `multiplier` (required, greater than zero), `type` (unit-type list entry id). `description` is optional.
+
+The first unit of a type must have multiplier 1. A later unit cannot also be 1 while a base already exists — enter how many of that base are in one of the new unit, or use **Use as base**.
+
+**Errors:** `400` duplicate name, invalid type, or a multiplier the base rule rejects.
+
+### PATCH /units/{id}
+Update name, description, multiplier, type, or `active`. Requires `config:edit`.
+
+The only base stays at 1. Typing 1 on another unit of a type that already has a base is refused. An existing duplicate base may stay at 1; pick one with `POST /units/{id}/base` instead of editing the number.
+
+### DELETE /units/{id}
+Soft-deactivate (`active` false). Requires `config:edit`. Returns 204.
+
+**Error:** `400` when this is the only base and other active units of the type remain. Pick another base first.
+
+### POST /units/{id}/base
+Make this unit the base for its type. Requires `config:edit`. Its multiplier becomes 1. Every other unit of the type is rescaled: `new = old / chosen`. An inactive unit cannot be the base. If another unit already has the same multiplier, nothing changes and the error names it.
 
 ## Containers
 

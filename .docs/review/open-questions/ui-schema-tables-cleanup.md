@@ -8,16 +8,16 @@
 
 A table appears on Schema only when a change can be made **and** used through configuration. If the application would ignore the change until code is refactored, leave the table off Schema. Do not document it as a schema table.
 
-**`lists` and `list_entries` (list items) are not schema tables.** They store values edited at Admin → Lists. Application code reads those rows to populate lists, so an added column is unused until code changes. They stay off the Schema screen.
+**`lists`, `list_entries` (list items), and `units` are not schema tables.** Lists store values edited at Admin → Lists. Units store a multiplier the conversion code reads: one base unit per type has multiplier 1, and other units convert to that base. Application code reads those rows by fixed columns, so an added column is unused until code changes. They stay off the Schema screen. Do not drop the Postgres tables. Edit lists at `/admin/lists` and units at `/admin/units`.
 
-This supersedes, for **display membership only**, the 2026-10-03 sentence that put “system reference tables starting with `lists`” on the table list, and the OQ-1 System cell that names `lists`, `list_entries`. Those sentences stay below as history of what the catalog registered. Do not reopen: Custom Fields removal, system-column locks, side links as real FKs in `schema_relations`, M:N deferred, no universal join table, no `relationship()` from config.
+This supersedes, for **display membership only**, the 2026-10-03 sentence that put “system reference tables starting with `lists`” on the table list, and the OQ-1 System cell that names `lists`, `list_entries`, and `units`. Those sentences stay below as history of what the catalog registered. Do not reopen: Custom Fields removal, system-column locks, side links as real FKs in `schema_relations`, M:N deferred, no universal join table, no `relationship()` from config.
 
 **`projects` stays** on the Lab list. The table-browser PR did not drop it. The list is not “every table.”
 
 ## Marc product locks (2026-10-03 — do not reopen, except the display sentence marked history)
 
 - Drop the Custom Fields area of the schema UI. A field is a column on a table. Custom Fields is not a place to work.
-- **History (superseded for lists / list items by the display rule above):** Table list shows **every lab table** registered in `ui_schema` plus **system reference tables** starting with `lists`. Hide engine internals (migrations, sessions, audit plumbing). Badge **Lab** vs **System**. **Current truth:** Lab allow-list including `projects`, plus UI-created tables; System rows the catalog still registers other than `lists` and `list_entries`; engine internals hidden. `lists` and `list_entries` are off Schema.
+- **History (superseded for lists / list items / units by the display rule above):** Table list shows **every lab table** registered in `ui_schema` plus **system reference tables** starting with `lists`. Hide engine internals (migrations, sessions, audit plumbing). Badge **Lab** vs **System**. **Current truth:** Lab allow-list including `projects`, plus UI-created tables; System rows are types and people (`container_types`, `instrument_types`, `sample_type_transitions`, `clients`, `users`, `roles`); engine internals hidden. `lists`, `list_entries`, and `units` are off Schema (`NOT_SCHEMA_TABLES`).
 - **System columns are not editable and not removable** in the UI: id, timestamps, created-by, relationship FKs, and `list_id` when the column is a list. Lab columns stay editable to the extent the UI already edits columns. No drop-column / DDL-apply button.
 - ORM is SQLAlchemy 2 + Alembic on Postgres. **No `relationship()` generated from config.**
 - 1:N and 1:1 = a **registry entry** (from table, to table, cardinality, child FK column). Key is a real FK on the child. Parent UI may show a read-only link to the child.
@@ -31,7 +31,8 @@ This supersedes, for **display membership only**, the 2026-10-03 sentence that p
 | Badge | Set |
 |-------|-----|
 | **Lab** (`kind='core'`) | samples, containers, contents, tests, results, batches, projects, client_projects, experiments, lims_runs, work_orders, asked_for, routing_map, analyses, analytes, test_batteries, instruments, locations, eln_processes + UI-created (`kind='ui'`) |
-| **System** (`kind='system'`) | **History of the shipped catalog:** lists, list_entries, units, container_types, instrument_types, sample_type_transitions, clients, users, roles. **Current display truth:** `lists` and `list_entries` are **not** schema tables. The other names are still what `SYSTEM_TABLES` registers. |
+| **System** (`kind='system'`) | container_types, instrument_types, sample_type_transitions, clients, users, roles. **History of the earlier catalog** also named `lists`, `list_entries`, and `units` here. |
+| Not Schema | `lists`, `list_entries` — list configuration, edited at `/admin/lists`. `units` — multiplier configuration, edited at `/admin/units`. A column added on Schema would not be used until application code changed. Tables stay. |
 | Hidden | `alembic_version`, `revoked_tokens`, `login_throttle`, permission plumbing, `schema_*` registry, `ui_schema_ddl_log`, `custom_attributes_config`, `field_definitions`, `name_templates`, anything not allow-listed |
 
 **Finding:** the short list was **not** a frontend filter — `ensure_core_catalog()` only ever registered `samples`. Replaced by `ensure_catalog()` (allow-list + Postgres reflection).

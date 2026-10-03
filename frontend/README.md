@@ -32,7 +32,7 @@ Copyright (c) 2025 Marc Breneiser
 - **Analytes Management**: CRUD operations for analytes
 - **Analysis-Analyte Configuration**: Configure validation rules (data types, ranges, significant figures)
 - **Test Batteries Management**: Create and manage test batteries (grouped analyses with sequence and optional flags)
-- **Schema** (`/admin/schema/*`): Table browser (Lab / System badges, Browse fields), Columns with locked system columns and read-only Links row, Relations tab (1:N / 1:1 over real FK columns; many-to-many deferred; no universal join table), Layouts, Privileges. The Custom Fields page is removed; `/admin/custom-fields` redirects to Schema Tables. Lists and list items are not schema tables — use Lists (`/admin/lists`).
+- **Schema** (`/admin/schema/*`): Table browser (Lab / System badges, Browse fields), Columns with locked system columns and read-only Links row, Relations tab (1:N / 1:1 over real FK columns; many-to-many deferred; no universal join table), Layouts, Privileges. The Custom Fields page is removed; `/admin/custom-fields` redirects to Schema Tables. Lists, list items, and units are not schema tables — use Lists (`/admin/lists`) and Units (`/admin/units`). On Units, one unit per type is the base (multiplier 1); **Use as base** rescales the others.
 - **Users Management**: CRUD operations for users
 - **Roles & Permissions Management**: CRUD operations for roles and permission assignments
 - Restricted to users with `config:edit`, `test:configure`, or `user:manage` permissions
@@ -165,7 +165,9 @@ Copyright (c) 2025 Marc Breneiser
 - `GET /lists/{name}/entries` - Get lookup data
 - `POST /lists` - Create list (admin)
 - `POST /lists/{name}/entries` - Add entry to list (admin)
-- `GET /units` - Get measurement units
+- `GET /units` - Get measurement units (`is_base` when multiplier is 1)
+- `POST /units`, `PATCH /units/{id}`, `DELETE /units/{id}` - Unit CRUD (`config:edit`; delete soft-deactivates)
+- `POST /units/{id}/base` - Make this unit the base and rescale the others (`config:edit`)
 - `GET /projects` - Get user projects
 - `GET /batches` - List batches
 - `POST /batches` - Create batch (with cross-project and QC support)

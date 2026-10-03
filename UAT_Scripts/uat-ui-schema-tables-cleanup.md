@@ -8,12 +8,12 @@
 **Status:** Script ready. UAT pass **pending** (Tobias). Do **not** invent a Pass. Do **not** merge an empty Pass/Fail table.  
 **Prior packet:** `uat-ui-schema-ddl.md` (CREATE TABLE / ADD COLUMN) — those sections still stand and are **not** repeated here.
 
-**Display rule (current):** A table appears on Schema only when a change can be made and used through configuration. **Lists and list items (`Lists`, `List entries`) must not appear.** Their presence is a Fail, even though `ui_schema_catalog.py` still registers `lists` and `list_entries`. `projects` must still appear. Many-to-many stays refused. No universal join table.
+**Display rule (current):** A table appears on Schema only when a change can be made and used through configuration. **Lists, list items (`Lists`, `List entries`), and `Units` must not appear.** Their presence is a Fail. `projects` must still appear. Many-to-many stays refused. No universal join table.
 
 ## Fail bars (locked)
 
 1. Any Custom Fields chrome (nav item, route page, dialog) still reachable → **Fail**. The route must redirect to Schema. Custom Fields is not a place to work.
-2. Table list shows only samples (+ UI-created), **or** shows engine internals (`alembic_version`, `schema_*`, `revoked_tokens`, `ui_schema_ddl_log`), **or** shows **Lists** or **List entries** → **Fail**.
+2. Table list shows only samples (+ UI-created), **or** shows engine internals (`alembic_version`, `schema_*`, `revoked_tokens`, `ui_schema_ddl_log`), **or** shows **Lists**, **List entries**, or **Units** → **Fail**.
 3. A System column (id, timestamps, created-by, relationship FK, `list_id`, any column of a System table) can be edited, deprecated or dropped from the UI or via `POST /v1/schema/columns/{id}/deprecate|drop` → **Fail**.
 4. Declaring a relation creates a table, a column, a junction, or any DDL → **Fail**. Only a `schema_relations` row may appear.
 5. API accepts `many_to_many`, a non-FK key, or a 1:1 over a non-UNIQUE key → **Fail**.
@@ -34,18 +34,18 @@
 ## 2. Table list = Lab browser, lists and list items absent (Fail bar 2)
 
 1. Schema → Tables. Tab bar reads **Tables, Columns, Relations, Layouts, Privileges**.
-2. Set page size to 50. `Samples`, `Tests`, `Projects`, `Containers`, `Results`, `Batches` carry a **Lab** chip. `Projects` is present. Lab rows sort before any System rows. `Units`, `Container types`, `Clients`, `Users`, `Roles` may still carry a **System** chip (shipped catalog). **`Lists` and `List entries` must be absent.** If either row is on the screen, **Fail** — they are not schema tables.
-3. No row named `schema_tables`, `schema_columns`, `alembic_version`, `revoked_tokens`, `ui_schema_ddl_log`, `permissions`, `field_definitions`.
-4. `Samples` row: action menu has **Browse fields** only (built-in Lab tables cannot be dropped). A System row that is still listed (for example `Units`): **Browse fields** only. A table created from *Add table* keeps Deprecate / Drop.
-5. API: `GET /v1/schema/tables` returns `category` (`lab`/`system`), `relation_count`, `can_add_columns`, `can_remove` on every row. `lists` and `list_entries` in that payload are a **Fail** against the display rule (the catalog still registers them today; that is the mismatch, not a pass).
+2. Set page size to 50. Count ≥ 25 rows. `Samples`, `Tests`, `Projects`, `Containers`, `Results`, `Batches` carry a **Lab** chip. `Projects` is present. `Container types`, `Clients`, `Users`, `Roles` carry a **System** chip. There is **no** row named `Lists`, `List entries`, or `Units` — lists stay under Admin → Lists, units under Admin → Units. Lab rows sort before System rows.
+3. No row named `schema_tables`, `schema_columns`, `alembic_version`, `revoked_tokens`, `ui_schema_ddl_log`, `permissions`, `field_definitions`, `lists`, `list_entries`, `units`.
+4. `Container types` row: action menu has **Browse fields** only (no Deprecate / Drop). `Samples` row: same (built-in Lab tables cannot be dropped). A table created from *Add table* keeps Deprecate / Drop.
+5. API: `GET /v1/schema/tables` returns `category` (`lab`/`system`), `relation_count`, `can_add_columns`, `can_remove` on every row. `lists`, `list_entries`, or `units` in that payload is a **Fail**. `GET /lists` still returns list configuration. `GET /units` still returns units.
 **Pass / Fail:**
 
 ## 3. System columns are locked (Fail bar 3, 6)
 
-1. Browse fields on a System row the catalog still shows, for example `Units`. **Add field** is disabled. Every row shows a lock icon and a **System** chip; no row has a three-dots action menu. Do not open `Lists` or `List entries`; those tables are not on Schema.
-2. Columns → table `Tests`. Row `Sample` (`sample_id`): lock icon, System chip, Type **Key**, *Points at* **Samples** (link). Lock tooltip names the reason. Rows `id`, `created_at`, `created_by`, `modified_at` are locked. Row `status`: Type **List**, *Points at* **List** (a list binding on the lab table, not a link that puts list items on Schema).
-3. The table picker has no `Lists` and no `List entries`.
-4. API as Admin: `POST /v1/schema/columns/{id}/deprecate` and `POST /v1/schema/columns/{id}/drop` (with confirm) on a locked column → **422** with readable copy. `POST /v1/schema/tables/{id}/deprecate|drop` on Samples → **422**. If `lists` is still returned by the API, `POST /v1/schema/columns` and deprecate/drop on that id also → **422**, and section 2 is already a Fail.
+1. Browse fields on `Container types`. **Add field** is disabled. Every row shows a lock icon and a **System** chip; no row has a three-dots action menu. Do not open `Lists`, `List entries`, or `Units`; those tables are not on Schema.
+2. Columns → table `Tests`. Row `Sample` (`sample_id`): lock icon, System chip, Type **Key**, *Points at* **Samples** (link). Lock tooltip names the reason. Rows `id`, `created_at`, `created_by`, `modified_at` are locked. Row `status`: Type **List**, *Points at* **List** (a list binding on the lab table, not a Schema table named Lists).
+3. The Columns table picker has no `Lists`, `List entries`, or `Units`.
+4. API as Admin: `POST /v1/schema/columns/{id}/deprecate` and `POST /v1/schema/columns/{id}/drop` (with confirm) on a locked column → **422** with readable copy. `POST /v1/schema/columns` with `table_id` = Container types → **422**. `POST /v1/schema/tables/{id}/deprecate|drop` on Container types or Samples → **422**. `GET /v1/schema/tables` does not include `lists`, `list_entries`, or `units`. `GET /lists` still returns list configuration. `GET /units` still returns units.
 5. No drop-column / apply-DDL button on any reflected column.
 **Pass / Fail:**
 
@@ -80,7 +80,7 @@ Use `POST /v1/schema/relations` as Admin:
 
 ## 7. Lazy registry, no DDL from reflection (OQ-3 / OQ-16)
 
-1. Fresh DB: first `GET /v1/schema/tables` registers Lab tables (including `projects`) and reflects their columns. `lists` and `list_entries` must not be treated as a pass if they come back. `ui_schema_ddl_log` gains **no** rows from browsing.
+1. Fresh DB: first `GET /v1/schema/tables` registers Lab tables (including `projects`) and reflects their columns. `lists`, `list_entries`, and `units` must not come back. `ui_schema_ddl_log` gains **no** rows from browsing.
 2. Add a column to `samples` by migration or `schema_apply`; reload Columns → it appears with `origin = reflected`.
 **Pass / Fail:**
 
@@ -117,5 +117,5 @@ Use `POST /v1/schema/relations` as Admin:
 
 ## Automated evidence (Cursor, pre-UAT)
 
-- `backend/tests/test_ui_schema_table_browser.py` — list filter (Lab + System, internals hidden), system-column locks (UI + API 422), 1:N / 1:1 create + delete, non-FK / non-unique / M:N rejection, idempotent catalog. Those tests still **expect** `lists` and `list_entries` in the payload. That expectation matches the catalog and **fails** the display rule above. It is not a UAT Pass.
+- `backend/tests/test_ui_schema_table_browser.py` — list filter (Lab + System, `lists` / `list_entries` / `units` excluded, samples kept, internals hidden), system-column locks (UI + API 422), 1:N / 1:1 create + delete, non-FK / non-unique / M:N rejection, idempotent catalog. That evidence is pre-UAT. It is not a UAT Pass.
 - `frontend/src/__tests__/schemaBrowser.test.ts` — badge, sort, lock, key-filter and sentence helpers.

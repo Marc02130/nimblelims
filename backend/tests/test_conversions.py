@@ -3,11 +3,15 @@ Tests for unit conversion utilities
 """
 import pytest
 from decimal import Decimal
+from uuid import uuid4
+
 from app.core.conversions import (
+    ConversionError,
     convert_to_base_unit, convert_from_base_unit,
+    designate_base_unit, require_base_unit,
     calculate_volume_from_concentration_and_amount,
     calculate_pooled_concentration, calculate_pooled_volume,
-    validate_result_value, ConversionError
+    validate_result_value,
 )
 
 
@@ -47,17 +51,11 @@ class TestUnitConversions:
         """Test converting with unit that has no multiplier"""
         # Create a unit without multiplier
         from models.unit import Unit
-        from models.list import ListEntry
-        
-        # Get a list entry for unit type
-        unit_type = db_session.query(ListEntry).filter(
-            ListEntry.name == "mass"
-        ).first()
-        
+
         unit = Unit(
             name="test_unit_no_multiplier",
             description="Test unit without multiplier",
-            type=unit_type.id,
+            type=sample_units["g"].type,
             multiplier=None,  # No multiplier
             created_by=sample_units['g'].created_by,
             modified_by=sample_units['g'].modified_by
@@ -86,8 +84,9 @@ class TestVolumeCalculations:
             db_session
         )
         
-        # Expected: 5 mg / 10 mg/mL = 0.5 mL
-        assert abs(volume - 0.5) < 0.001
+        # 5 mg is 0.005 of the mass base (g). 10 mg/mL is already the
+        # concentration base. 0.005 / 10 = 0.0005 in those bases.
+        assert abs(volume - 0.0005) < 0.0000001
     
     def test_calculate_volume_zero_concentration(self, db_session, sample_units):
         """Test calculating volume with zero concentration"""
@@ -120,7 +119,7 @@ class TestPooledCalculations:
         # Sample 2: 20 mg/mL, 0.5 mL volume
         # Pooled: (10*0.5 + 20*0.5) / (0.5 + 0.5) = 15 mg/mL
         assert abs(pooled_conc - 15.0) < 0.001
-        assert base_unit_id is not None
+        assert base_unit_id == str(sample_units['mg_ml'].id)
     
     def test_calculate_pooled_concentration_empty_list(self, db_session):
         """Test calculating pooled concentration with empty list"""
@@ -136,9 +135,10 @@ class TestPooledCalculations:
             amounts, amount_units, db_session
         )
         
-        # Expected: 5 mg + 10 mg = 15 mg (in base units)
-        assert abs(total_volume - 15.0) < 0.001
-        assert base_unit_id is not None
+        # 5 mg + 10 mg = 0.015 g when grams are the base (multiplier 1)
+        # and milligrams are 0.001.
+        assert abs(total_volume - 0.015) < 0.0000001
+        assert base_unit_id == str(sample_units['g'].id)
     
     def test_calculate_pooled_volume_empty_list(self, db_session):
         """Test calculating pooled volume with empty list"""
@@ -190,36 +190,40 @@ class TestResultValidation:
 
 @pytest.fixture
 def sample_units(db_session):
-    """Create sample units for testing"""
+    """Units on their own types, so seed data with several multiplier-1 rows cannot collide."""
     from models.unit import Unit
-    from models.list import ListEntry
-    
-    # Get list entries for unit types
-    mass_type = db_session.query(ListEntry).filter(
-        ListEntry.name == "mass"
-    ).first()
-    
-    volume_type = db_session.query(ListEntry).filter(
-        ListEntry.name == "volume"
-    ).first()
-    
-    concentration_type = db_session.query(ListEntry).filter(
-        ListEntry.name == "concentration"
-    ).first()
-    
-    # Create base units
+    from models.list import List, ListEntry
+
+    unit_list = db_session.query(List).filter(List.name == "Unit Types").first()
+    if unit_list is None:
+        unit_list = List(name="Unit Types", description="unit types")
+        db_session.add(unit_list)
+        db_session.flush()
+
+    suffix = uuid4().hex[:8]
+
+    def entry(label: str) -> ListEntry:
+        row = ListEntry(name=f"{label}-{suffix}", description=label, list_id=unit_list.id)
+        db_session.add(row)
+        db_session.flush()
+        return row
+
+    mass_type = entry("mass")
+    volume_type = entry("volume")
+    concentration_type = entry("concentration")
+
     g_unit = Unit(
-        name="g",
+        name=f"g-{suffix}",
         description="Gram (base mass unit)",
         type=mass_type.id,
         multiplier=1.0,
-        created_by=None,  # Will be set by database
-        modified_by=None
+        created_by=None,
+        modified_by=None,
     )
     db_session.add(g_unit)
     
     ml_unit = Unit(
-        name="mL",
+        name=f"mL-{suffix}",
         description="Milliliter (base volume unit)",
         type=volume_type.id,
         multiplier=1.0,
@@ -229,7 +233,7 @@ def sample_units(db_session):
     db_session.add(ml_unit)
     
     mg_ml_unit = Unit(
-        name="mg/mL",
+        name=f"mg/mL-{suffix}",
         description="Milligram per milliliter (base concentration unit)",
         type=concentration_type.id,
         multiplier=1.0,
@@ -240,7 +244,7 @@ def sample_units(db_session):
     
     # Create derived units
     mg_unit = Unit(
-        name="mg",
+        name=f"mg-{suffix}",
         description="Milligram",
         type=mass_type.id,
         multiplier=0.001,  # 1 mg = 0.001 g
@@ -250,7 +254,7 @@ def sample_units(db_session):
     db_session.add(mg_unit)
     
     ug_unit = Unit(
-        name="µg",
+        name=f"ug-{suffix}",
         description="Microgram",
         type=mass_type.id,
         multiplier=0.000001,  # 1 µg = 0.000001 g
@@ -268,3 +272,39 @@ def sample_units(db_session):
         'ml': ml_unit,
         'mg_ml': mg_ml_unit
     }
+
+
+def test_require_base_unit_is_the_multiplier_one(db_session, sample_units):
+    base = require_base_unit(db_session, sample_units['g'].type)
+    assert base.id == sample_units['g'].id
+
+
+def test_designate_base_rescales_other_units(db_session, sample_units):
+    """Picking milligrams as the base keeps 1 g == 1000 mg."""
+    designate_base_unit(db_session, sample_units['mg'])
+    db_session.flush()
+    db_session.refresh(sample_units['g'])
+    db_session.refresh(sample_units['mg'])
+    db_session.refresh(sample_units['ug'])
+    assert sample_units['mg'].multiplier == Decimal("1.0000000000")
+    assert sample_units['g'].multiplier == Decimal("1000.0000000000")
+    assert sample_units['ug'].multiplier == Decimal("0.0010000000")
+    # 2 old-grams are 2000 of the new base (mg).
+    assert convert_to_base_unit(2, str(sample_units['g'].id), db_session) == 2000
+
+
+def test_designate_base_refuses_a_duplicate_multiplier(db_session, sample_units):
+    from models.unit import Unit
+
+    twin = Unit(
+        name=f"g-twin-{uuid4().hex[:8]}",
+        description="Same factor as the gram",
+        type=sample_units['g'].type,
+        multiplier=1,
+        created_by=None,
+        modified_by=None,
+    )
+    db_session.add(twin)
+    db_session.flush()
+    with pytest.raises(ConversionError, match="same multiplier"):
+        designate_base_unit(db_session, sample_units['g'])

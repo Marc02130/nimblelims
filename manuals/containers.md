@@ -149,7 +149,7 @@ Pooling = multiple content rows on one **tube/well (1×1)**:
 
 ### Unit Structure
 
-- **multiplier**: Relative to base unit (e.g., 0.001 for mg relative to g)
+- **multiplier**: How many of the base unit are in one of this unit (e.g., 0.001 for mg when g is the base). The lab picks one base per type under **Units**; that unit's multiplier is 1. Calculations multiply by this factor to convert into the base. Units are not on the Schema screen.
 - **type**: FK to list_entries (concentration, mass, volume, molar)
 
 **Implementation**: `backend/models/unit.py::Unit`

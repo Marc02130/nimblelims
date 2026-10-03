@@ -4,8 +4,12 @@ The Schema screen is a browser over *real* Postgres tables. What appears is
 decided here, not by a hardcoded filter on the registry query:
 
 * **Lab** tables (``kind='core'``) — the sample-centric data spine.
-* **System** reference tables (``kind='system'``) — ``lists`` and peers.
+* **System** reference tables (``kind='system'``) — types and people.
 * **UI-created** tables (``kind='ui'``) — whatever CREATE TABLE made (``x_`` / ``lab_``).
+* **Not Schema tables:** ``lists``, ``list_entries``, and ``units``. Lists fill
+  dropdowns by fixed columns. Units store a multiplier the conversion code
+  reads; a new column would be ignored until that code changed. The Postgres
+  tables stay. Edit lists under Lists and units under Units.
 * **Engine internals** are never registered: migrations, sessions, audit and
   registry plumbing.
 
@@ -43,9 +47,6 @@ LAB_TABLES: tuple[str, ...] = (
 )
 
 SYSTEM_TABLES: tuple[str, ...] = (
-    "lists",
-    "list_entries",
-    "units",
     "container_types",
     "instrument_types",
     "sample_type_transitions",
@@ -53,6 +54,11 @@ SYSTEM_TABLES: tuple[str, ...] = (
     "users",
     "roles",
 )
+
+# Configuration the app reads by fixed columns. Adding a column does nothing
+# until that code changes, so these are not Schema tables. Do not drop them.
+# ``units.multiplier`` is the factor to the lab's base unit (base = 1).
+NOT_SCHEMA_TABLES: frozenset[str] = frozenset({"lists", "list_entries", "units"})
 
 # Never shown. Documented so the list filter is testable, not exhaustive —
 # anything not allow-listed above is hidden regardless.
@@ -101,9 +107,6 @@ DISPLAY_NAMES: Mapping[str, str] = {
     "instruments": "Instruments",
     "locations": "Locations",
     "eln_processes": "Processes",
-    "lists": "Lists",
-    "list_entries": "List entries",
-    "units": "Units",
     "container_types": "Container types",
     "instrument_types": "Instrument types",
     "sample_type_transitions": "Sample type transitions",
@@ -115,11 +118,28 @@ DISPLAY_NAMES: Mapping[str, str] = {
 
 def kind_for(physical_name: str) -> Optional[str]:
     """``core`` / ``system`` for allow-listed tables, ``None`` when hidden."""
+    if physical_name in NOT_SCHEMA_TABLES:
+        return None
     if physical_name in LAB_TABLES:
         return "core"
     if physical_name in SYSTEM_TABLES:
         return "system"
     return None
+
+
+def shown_in_schema(physical_name: str, kind: Optional[str] = None) -> bool:
+    """True when Schema may list this table.
+
+    A table belongs here only when a column change is used through
+    configuration. ``lists``, ``list_entries``, and ``units`` fail that test
+    even if an older registry row still exists. UI-created tables
+    (``kind='ui'``) do.
+    """
+    if physical_name in NOT_SCHEMA_TABLES:
+        return False
+    if kind == "ui":
+        return True
+    return kind_for(physical_name) is not None
 
 
 def category_for_kind(kind: str) -> str:
@@ -178,9 +198,10 @@ def is_system_column(
     """Reason a column is locked in the UI, or ``None`` when it is a lab column.
 
     Lock set (product lock): id, timestamps, created-by/modified-by, relationship
-    foreign keys (including ``list_id`` on list entries), and every column of a
-    System reference table. A ``list_entries`` FK is a list binding, not a
-    relationship key, so it stays a lab column.
+    foreign keys, and every column of a System reference table. A
+    ``list_entries`` FK on a lab table is a list binding, not a relationship
+    key, so it stays a lab column. ``lists`` and ``list_entries`` themselves
+    are not Schema tables.
     """
     if table_kind == "system":
         return "system_table"

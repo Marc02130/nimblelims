@@ -823,6 +823,11 @@ export class ApiService {
     return response.data;
   }
 
+  async setBaseUnit(id: string) {
+    const response: AxiosResponse = await this.api.post(`/units/${id}/base`);
+    return response.data;
+  }
+
   // Instrument types / instruments / CRO sources (data-parsers P0)
   async getInstrumentTypes(params?: { search?: string; active?: boolean }) {
     const response: AxiosResponse = await this.api.get('/v1/instrument-types', { params });

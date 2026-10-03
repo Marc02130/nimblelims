@@ -17,6 +17,7 @@ import {
 import { Formik, Form, Field } from 'formik';
 import * as Yup from 'yup';
 import { apiService } from '../../services/apiService';
+import { isBaseUnit } from './unitBase';
 
 interface UnitFormDialogProps {
   open: boolean;
@@ -24,17 +25,27 @@ interface UnitFormDialogProps {
     id: string;
     name: string;
     description?: string;
-    multiplier?: number;
+    multiplier?: number | string | null;
     type: string;
     type_name?: string;
     active: boolean;
+    is_base?: boolean;
   } | null;
   existingNames: string[];
+  units?: Array<{
+    id: string;
+    name: string;
+    type: string;
+    type_name?: string;
+    multiplier?: number | string | null;
+    is_base?: boolean;
+    active: boolean;
+  }>;
   onClose: () => void;
   onSubmit: (data: {
     name: string;
     description?: string;
-    multiplier?: number;
+    multiplier?: number | string | null;
     type: string;
     active?: boolean;
   }) => Promise<void>;
@@ -47,9 +58,10 @@ const validationSchema = Yup.object({
     .max(255, 'Name must be less than 255 characters'),
   description: Yup.string().max(500, 'Description must be less than 500 characters'),
   multiplier: Yup.number()
-    .nullable()
-    .transform((value, originalValue) => (originalValue === '' ? null : value))
-    .min(0, 'Multiplier must be positive or zero'),
+    .transform((value, originalValue) => (originalValue === '' || originalValue === null ? undefined : value))
+    .typeError('Multiplier is required')
+    .required('Multiplier is required')
+    .moreThan(0, 'Multiplier must be greater than zero'),
   type: Yup.string().required('Unit type is required'),
 });
 
@@ -57,6 +69,7 @@ const UnitFormDialog: React.FC<UnitFormDialogProps> = ({
   open,
   unit,
   existingNames,
+  units = [],
   onClose,
   onSubmit,
 }) => {
@@ -92,7 +105,7 @@ const UnitFormDialog: React.FC<UnitFormDialogProps> = ({
   const handleSubmit = async (values: {
     name: string;
     description?: string;
-    multiplier?: number | null;
+    multiplier?: number | string | null;
     type: string;
     active?: boolean;
   }) => {
@@ -130,7 +143,23 @@ const UnitFormDialog: React.FC<UnitFormDialogProps> = ({
         onSubmit={handleSubmit}
         enableReinitialize
       >
-        {({ errors, touched, isValid, values, setFieldValue }) => (
+        {({ errors, touched, isValid, values, setFieldValue }) => {
+          const otherBases = units.filter(
+            (row) =>
+              row.active &&
+              row.type === values.type &&
+              row.id !== unit?.id &&
+              isBaseUnit(row)
+          );
+          const thisIsBase = !!unit && isBaseUnit(unit);
+          const lockAtOne = !!values.type && otherBases.length === 0 && (!isEdit || thisIsBase || units.filter((row) => row.type === values.type && row.id !== unit?.id).length === 0);
+          const baseName = otherBases[0]?.name;
+          const multiplierHelp = lockAtOne
+            ? 'This is the base unit for the type. Its multiplier is 1.'
+            : baseName
+              ? `How many ${baseName} are in one of this unit. The base multiplier is 1.`
+              : 'How many of the base unit are in one of this unit. The base multiplier is 1.';
+          return (
           <Form>
             <DialogTitle>{isEdit ? 'Edit Unit' : 'Create New Unit'}</DialogTitle>
             <DialogContent>
@@ -163,7 +192,17 @@ const UnitFormDialog: React.FC<UnitFormDialogProps> = ({
                       <InputLabel>Unit Type</InputLabel>
                       <Select
                         value={values.type}
-                        onChange={(e) => setFieldValue('type', e.target.value)}
+                        onChange={(e) => {
+                          const typeId = e.target.value;
+                          setFieldValue('type', typeId);
+                          const bases = units.filter(
+                            (row) => row.active && row.type === typeId && row.id !== unit?.id && isBaseUnit(row)
+                          );
+                          const others = units.filter((row) => row.type === typeId && row.id !== unit?.id);
+                          if (bases.length === 0 && (others.length === 0 || (unit && isBaseUnit(unit)))) {
+                            setFieldValue('multiplier', 1);
+                          }
+                        }}
                         error={touched.type && !!errors.type}
                         label="Unit Type"
                       >
@@ -184,11 +223,13 @@ const UnitFormDialog: React.FC<UnitFormDialogProps> = ({
                           label="Multiplier"
                           type="number"
                           fullWidth
+                          required
                           margin="normal"
+                          disabled={lockAtOne}
                           inputProps={{ min: 0, step: 0.000000001 }}
-                          helperText={meta.touched && meta.error ? meta.error : 'Multiplier relative to base unit (e.g., 0.001 for mg relative to g)'}
+                          helperText={meta.touched && meta.error ? meta.error : multiplierHelp}
                           error={meta.touched && !!meta.error}
-                          value={field.value ?? ''}
+                          value={lockAtOne ? 1 : (field.value ?? '')}
                           onChange={(e) => {
                             const value = e.target.value === '' ? null : parseFloat(e.target.value);
                             field.onChange({ target: { value } });
@@ -226,7 +267,8 @@ const UnitFormDialog: React.FC<UnitFormDialogProps> = ({
               </Button>
             </DialogActions>
           </Form>
-        )}
+          );
+        }}
       </Formik>
     </Dialog>
   );
