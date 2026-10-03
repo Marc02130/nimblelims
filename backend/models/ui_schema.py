@@ -50,6 +50,15 @@ class SchemaColumn(Base):
     status = Column(String(16), nullable=False, default="active")
     is_platform = Column(Boolean, default=False, nullable=False)
     is_identity = Column(Boolean, default=False, nullable=False)
+    # Reflected from Postgres: a real FOREIGN KEY to another table (not a list binding).
+    is_fk = Column(Boolean, default=False, nullable=False)
+    fk_table = Column(String(63), nullable=True)
+    # Reflected: sole column of a UNIQUE constraint/index (needed for one-to-one).
+    is_unique = Column(Boolean, default=False, nullable=False)
+    pg_type = Column(String(64), nullable=True)
+    # "ui" = added from the Schema screen (Hybrid apply); "reflected" = owned by
+    # Alembic/ORM and only described here. Reflected columns never get UI DDL.
+    origin = Column(String(16), nullable=False, default="ui")
     active = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime, default=func.now(), nullable=False)
     created_by = Column(PostgresUUID(as_uuid=True), ForeignKey("users.id"))
@@ -57,6 +66,37 @@ class SchemaColumn(Base):
     modified_by = Column(PostgresUUID(as_uuid=True), ForeignKey("users.id"))
 
     table = relationship("SchemaTable", back_populates="columns")
+
+
+class SchemaRelation(Base):
+    """One-to-many / one-to-one side link. The key is a real FK column on the child.
+
+    Registry only: declaring a relation never issues DDL. ``from_table`` is the
+    one side (parent); ``to_table`` is the child that holds ``fk_column``.
+    """
+
+    __tablename__ = "schema_relations"
+    __table_args__ = (
+        UniqueConstraint("client_id", "fk_column_id", name="uq_schema_relations_fk_column"),
+    )
+
+    id = Column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    client_id = Column(PostgresUUID(as_uuid=True), ForeignKey("clients.id"), nullable=False)
+    display_name = Column(String(255), nullable=False)
+    from_table_id = Column(PostgresUUID(as_uuid=True), ForeignKey("schema_tables.id"), nullable=False)
+    to_table_id = Column(PostgresUUID(as_uuid=True), ForeignKey("schema_tables.id"), nullable=False)
+    fk_column_id = Column(PostgresUUID(as_uuid=True), ForeignKey("schema_columns.id"), nullable=False)
+    cardinality = Column(String(16), nullable=False)
+    status = Column(String(16), nullable=False, default="active")
+    active = Column(Boolean, default=True, nullable=False)
+    created_at = Column(DateTime, default=func.now(), nullable=False)
+    created_by = Column(PostgresUUID(as_uuid=True), ForeignKey("users.id"))
+    modified_at = Column(DateTime, default=func.now(), onupdate=func.now(), nullable=False)
+    modified_by = Column(PostgresUUID(as_uuid=True), ForeignKey("users.id"))
+
+    from_table = relationship("SchemaTable", foreign_keys=[from_table_id])
+    to_table = relationship("SchemaTable", foreign_keys=[to_table_id])
+    fk_column = relationship("SchemaColumn", foreign_keys=[fk_column_id])
 
 
 class SchemaLayout(Base):

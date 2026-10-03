@@ -11,6 +11,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import bindparam, text
 from sqlalchemy.orm import Session
 
+from app.services import ui_schema_catalog as catalog
 from models.sample import Sample
 from models.ui_schema import (
     SchemaChange,
@@ -18,12 +19,22 @@ from models.ui_schema import (
     SchemaLayout,
     SchemaLayoutField,
     SchemaPrivilege,
+    SchemaRelation,
     SchemaTable,
     UiSchemaDdlLog,
 )
 from models.user import Role, User
 
 logger = logging.getLogger(__name__)
+
+CARDINALITIES = ("one_to_many", "one_to_one")
+SYSTEM_COLUMN_COPY = {
+    "system_table": "System reference tables are read-only in the Schema screen.",
+    "platform": "Platform fields (id, timestamps, created-by, active) are managed by the engine.",
+    "identity": "Identity/lineage fields cannot be removed from the UI.",
+    "relationship_key": "Relationship keys are real foreign keys. Change them with a migration, not here.",
+}
+REFLECTED_COLUMN_COPY = "Built-in fields are owned by migrations. The Schema screen only describes them."
 
 TABLE_SLUG_RE = re.compile(r"^(x|lab)_[a-z][a-z0-9_]{0,47}$")
 COL_SLUG_RE = re.compile(r"^[a-z][a-z0-9_]{0,47}$")
@@ -132,6 +143,7 @@ class UiSchemaService:
         )
 
     def ensure_core_catalog(self) -> SchemaTable:
+        """Cheap path used by runtime screens: Samples must be registered."""
         row = (
             self.db.query(SchemaTable)
             .filter(
@@ -142,67 +154,128 @@ class UiSchemaService:
         )
         if row:
             return row
-        created = False
-        row = SchemaTable(
-            id=uuid.uuid4(),
-            client_id=self.client_id,
-            display_name="Samples",
-            physical_name="samples",
-            kind="core",
-            status="active",
-            created_by=self.user.id,
-            modified_by=self.user.id,
-        )
-        self.db.add(row)
-        self.db.flush()
-        created = True
-        for i, name in enumerate(
-            [
-                "id",
-                "name",
-                "parent_sample_id",
-                "sample_type",
-                "status",
-                "matrix",
-                "project_id",
-                "client_sample_id",
-                "created_at",
-                "created_by",
-                "modified_at",
-                "modified_by",
-                "active",
-            ]
-        ):
-            ident = name in IDENTITY_SAMPLE_COLS or name in {
-                "id",
-                "created_at",
-                "created_by",
-                "modified_at",
-                "modified_by",
-                "active",
-            }
-            self.db.add(
-                SchemaColumn(
-                    id=uuid.uuid4(),
-                    client_id=self.client_id,
-                    table_id=row.id,
-                    display_name=name.replace("_", " ").title(),
-                    physical_name=name,
-                    data_type="text",
-                    nullable=name not in {"name", "sample_type", "status", "project_id", "id"},
-                    sort_order=i,
-                    is_platform=name in {"id", "created_at", "created_by", "modified_at", "modified_by", "active"},
-                    is_identity=ident,
-                    created_by=self.user.id,
-                    modified_by=self.user.id,
-                )
+        self.ensure_catalog(only=("samples",))
+        return (
+            self.db.query(SchemaTable)
+            .filter(
+                SchemaTable.client_id == self.client_id,
+                SchemaTable.physical_name == "samples",
             )
-        self.db.flush()
-        self._seed_default_table_privileges(row.id)
-        if created:
+            .one()
+        )
+
+    def ensure_catalog(self, only: Optional[Sequence[str]] = None) -> None:
+        """Register allow-listed tables and describe their columns from Postgres.
+
+        Lazy registration on view (OQ-3 B). Only tables that really exist are
+        registered; engine internals are never allow-listed. Reflection fills
+        type / nullability / FK / UNIQUE facts. Nothing here issues DDL.
+        """
+        wanted = list(catalog.LAB_TABLES) + list(catalog.SYSTEM_TABLES)
+        if only is not None:
+            wanted = [n for n in wanted if n in set(only)]
+        registered = {
+            t.physical_name: t
+            for t in self.db.query(SchemaTable)
+            .filter(SchemaTable.client_id == self.client_id)
+            .all()
+        }
+        # UI-created tables are registered already; they still get reflection facts.
+        present = catalog.existing_tables(
+            self.db,
+            wanted + [n for n in registered if only is None or n in set(only)],
+        )
+        changed = False
+        for name in wanted:
+            if name not in present or name in registered:
+                continue
+            kind = catalog.kind_for(name)
+            if not kind:
+                continue
+            row = SchemaTable(
+                id=uuid.uuid4(),
+                client_id=self.client_id,
+                display_name=catalog.display_name_for(name),
+                physical_name=name,
+                kind=kind,
+                status="active",
+                created_by=self.user.id,
+                modified_by=self.user.id,
+            )
+            self.db.add(row)
+            self.db.flush()
+            registered[name] = row
+            self._seed_default_table_privileges(row.id)
+            changed = True
+        to_sync = [
+            t
+            for t in registered.values()
+            if (only is None or t.physical_name in set(only)) and t.physical_name in present
+        ]
+        if to_sync:
+            changed = self._sync_columns(to_sync) or changed
+        if changed:
             self.db.commit()
-            self.db.refresh(row)
-        return row
+
+    def _sync_columns(self, tables: Sequence[SchemaTable]) -> bool:
+        """Describe real columns in the registry. Admin-chosen facts on UI
+        columns (display name, type, list binding) are left alone; reflection
+        facts (FK / UNIQUE / pg type / nullability) are refreshed everywhere."""
+        reflected = catalog.reflect_columns(self.db, [t.physical_name for t in tables])
+        existing = (
+            self.db.query(SchemaColumn)
+            .filter(SchemaColumn.table_id.in_([t.id for t in tables]))
+            .all()
+        )
+        by_key = {(c.table_id, c.physical_name): c for c in existing}
+        changed = False
+        for table in tables:
+            for col in reflected.get(table.physical_name, []):
+                row = by_key.get((table.id, col.name))
+                is_platform = col.name in catalog.PLATFORM_COLUMN_NAMES
+                is_identity = table.physical_name == "samples" and col.name in IDENTITY_SAMPLE_COLS
+                mapped = catalog.map_pg_type(col.udt_name, col.is_fk, col.fk_table)
+                if row is None:
+                    self.db.add(
+                        SchemaColumn(
+                            id=uuid.uuid4(),
+                            client_id=self.client_id,
+                            table_id=table.id,
+                            display_name=catalog.column_display_name(col.name, col.is_fk),
+                            physical_name=col.name,
+                            data_type=mapped,
+                            nullable=col.nullable,
+                            sort_order=col.ordinal,
+                            is_platform=is_platform,
+                            is_identity=is_identity,
+                            is_fk=col.is_fk,
+                            fk_table=col.fk_table,
+                            is_unique=col.is_unique,
+                            pg_type=col.udt_name,
+                            origin="reflected",
+                            created_by=self.user.id,
+                            modified_by=self.user.id,
+                        )
+                    )
+                    changed = True
+                    continue
+                updates = {
+                    "is_fk": col.is_fk,
+                    "fk_table": col.fk_table,
+                    "is_unique": col.is_unique,
+                    "pg_type": col.udt_name,
+                    "nullable": col.nullable,
+                }
+                if row.origin == "reflected":
+                    updates["data_type"] = mapped
+                    updates["is_platform"] = is_platform or row.is_platform
+                for attr, value in updates.items():
+                    if getattr(row, attr) != value:
+                        setattr(row, attr, value)
+                        changed = True
+        if changed:
+            self.db.flush()
+        return changed
 
     def _seed_default_table_privileges(self, table_id: UUID) -> None:
         mapping = {
@@ -242,18 +315,33 @@ class UiSchemaService:
         self.db.flush()
 
     def list_tables(self) -> List[SchemaTable]:
-        self.ensure_core_catalog()
+        self.ensure_catalog()
         return (
             self.db.query(SchemaTable)
             .filter(SchemaTable.client_id == self.client_id)
-            .order_by(SchemaTable.display_name)
+            .order_by(SchemaTable.kind == "system", SchemaTable.display_name)
             .all()
         )
+
+    def _can_add_columns(self, row: SchemaTable) -> bool:
+        if row.kind == "system" or row.physical_name in ADD_COLUMN_OUT:
+            return False
+        if row.kind == "core":
+            return row.physical_name == "samples"
+        return True
 
     def table_read(self, row: SchemaTable) -> Dict[str, Any]:
         count = (
             self.db.query(SchemaColumn)
             .filter(SchemaColumn.table_id == row.id)
+            .count()
+        )
+        relation_count = (
+            self.db.query(SchemaRelation)
+            .filter(
+                SchemaRelation.client_id == self.client_id,
+                (SchemaRelation.from_table_id == row.id) | (SchemaRelation.to_table_id == row.id),
+            )
             .count()
         )
         return {
@@ -262,10 +350,63 @@ class UiSchemaService:
             "display_name": row.display_name,
             "physical_name": row.physical_name,
             "kind": row.kind,
+            "category": catalog.category_for_kind(row.kind),
             "status": row.status,
             "column_count": count,
+            "relation_count": relation_count,
+            "can_add_columns": self._can_add_columns(row),
+            "can_remove": row.kind == "ui",
             "created_at": row.created_at,
         }
+
+    def column_read(self, col: SchemaColumn, table: Optional[SchemaTable] = None) -> Dict[str, Any]:
+        table = table or col.table
+        reason = catalog.is_system_column(
+            col.physical_name,
+            is_platform=col.is_platform,
+            is_identity=col.is_identity,
+            is_fk=col.is_fk,
+            fk_table=col.fk_table,
+            table_kind=table.kind if table else "core",
+        )
+        editable = reason is None and col.origin == "ui"
+        return {
+            "id": col.id,
+            "table_id": col.table_id,
+            "display_name": col.display_name,
+            "physical_name": col.physical_name,
+            "data_type": col.data_type,
+            "pg_type": col.pg_type,
+            "nullable": col.nullable,
+            "list_id": col.list_id,
+            "sop_hint": col.sop_hint,
+            "sort_order": col.sort_order,
+            "status": col.status,
+            "is_platform": col.is_platform,
+            "is_identity": col.is_identity,
+            "is_fk": col.is_fk,
+            "fk_table": col.fk_table,
+            "is_unique": col.is_unique,
+            "origin": col.origin,
+            "is_system": reason is not None,
+            "system_reason": reason,
+            "editable": editable,
+        }
+
+    def _refuse_if_locked(self, col: SchemaColumn, verb: str) -> None:
+        table = col.table
+        reason = catalog.is_system_column(
+            col.physical_name,
+            is_platform=col.is_platform,
+            is_identity=col.is_identity,
+            is_fk=col.is_fk,
+            fk_table=col.fk_table,
+            table_kind=table.kind if table else "core",
+        )
+        if reason:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, SYSTEM_COLUMN_COPY[reason])
+        if col.origin != "ui":
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, REFLECTED_COLUMN_COPY)
 
     def _get_table(self, table_id: UUID) -> SchemaTable:
         row = (
@@ -319,6 +460,7 @@ class UiSchemaService:
                     sort_order=i,
                     is_platform=True,
                     is_identity=pname == "id",
+                    origin="reflected",
                     created_by=self.user.id,
                     modified_by=self.user.id,
                 )
@@ -345,8 +487,11 @@ class UiSchemaService:
 
     def deprecate_table(self, table_id: UUID) -> SchemaTable:
         row = self._get_table(table_id)
-        if row.kind == "core":
-            raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Cannot deprecate a core table")
+        if row.kind != "ui":
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_ENTITY,
+                "Only tables created from the Schema screen can be deprecated.",
+            )
         row.status = "deprecated"
         row.modified_by = self.user.id
         self._audit("deprecate_table", row.physical_name, before="active", after="deprecated")
@@ -356,8 +501,11 @@ class UiSchemaService:
 
     def drop_table(self, table_id: UUID, confirm: bool) -> None:
         row = self._get_table(table_id)
-        if row.kind == "core":
-            raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Cannot drop a core table")
+        if row.kind != "ui":
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_ENTITY,
+                "Only tables created from the Schema screen can be dropped.",
+            )
         if not confirm:
             raise HTTPException(
                 status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -388,6 +536,9 @@ class UiSchemaService:
             definition=f"rows={count} layout_refs={layout_refs}",
         )
         self._log_ddl(change, "drop_table", row.physical_name)
+        self.db.query(SchemaRelation).filter(
+            (SchemaRelation.from_table_id == row.id) | (SchemaRelation.to_table_id == row.id)
+        ).delete(synchronize_session=False)
         self.db.query(SchemaLayoutField).filter(
             SchemaLayoutField.column_id.in_(
                 self.db.query(SchemaColumn.id).filter(SchemaColumn.table_id == row.id)
@@ -402,14 +553,16 @@ class UiSchemaService:
         self.db.delete(row)
         self.db.commit()
 
-    def list_columns(self, table_id: UUID) -> List[SchemaColumn]:
-        self._get_table(table_id)
-        return (
+    def list_columns(self, table_id: UUID) -> List[Dict[str, Any]]:
+        table = self._get_table(table_id)
+        self.ensure_catalog(only=(table.physical_name,))
+        rows = (
             self.db.query(SchemaColumn)
             .filter(SchemaColumn.table_id == table_id)
             .order_by(SchemaColumn.sort_order, SchemaColumn.physical_name)
             .all()
         )
+        return [self.column_read(c, table) for c in rows]
 
     def add_column(
         self,
@@ -423,12 +576,7 @@ class UiSchemaService:
         physical_name: Optional[str],
     ) -> SchemaColumn:
         table = self._get_table(table_id)
-        if table.physical_name in ADD_COLUMN_OUT:
-            raise HTTPException(
-                status.HTTP_422_UNPROCESSABLE_ENTITY,
-                "This table can't get new fields from the UI.",
-            )
-        if table.kind == "core" and table.physical_name != "samples":
+        if not self._can_add_columns(table):
             raise HTTPException(
                 status.HTTP_422_UNPROCESSABLE_ENTITY,
                 "This table can't get new fields from the UI.",
@@ -466,6 +614,10 @@ class UiSchemaService:
             list_id=list_id if data_type == "list" else None,
             sop_hint=sop_hint,
             sort_order=sort_order,
+            is_fk=data_type == "list",
+            fk_table=catalog.LIST_ENTRIES_TABLE if data_type == "list" else None,
+            pg_type=P1_TYPES[data_type],
+            origin="ui",
             created_by=self.user.id,
             modified_by=self.user.id,
         )
@@ -508,9 +660,9 @@ class UiSchemaService:
         )
         self.db.commit()
         self.db.refresh(col)
-        return col
+        return self.column_read(col, table)
 
-    def deprecate_column(self, column_id: UUID) -> SchemaColumn:
+    def _get_column(self, column_id: UUID) -> SchemaColumn:
         col = (
             self.db.query(SchemaColumn)
             .filter(SchemaColumn.id == column_id, SchemaColumn.client_id == self.client_id)
@@ -518,11 +670,11 @@ class UiSchemaService:
         )
         if not col:
             raise HTTPException(status.HTTP_404_NOT_FOUND, "Column not found")
-        if col.is_identity or col.is_platform:
-            raise HTTPException(
-                status.HTTP_422_UNPROCESSABLE_ENTITY,
-                "Identity/lineage fields cannot be removed from the UI.",
-            )
+        return col
+
+    def deprecate_column(self, column_id: UUID) -> Dict[str, Any]:
+        col = self._get_column(column_id)
+        self._refuse_if_locked(col, "deprecate")
         col.status = "deprecated"
         col.modified_by = self.user.id
         self._audit(
@@ -534,21 +686,11 @@ class UiSchemaService:
         )
         self.db.commit()
         self.db.refresh(col)
-        return col
+        return self.column_read(col)
 
     def drop_column(self, column_id: UUID, confirm: bool) -> None:
-        col = (
-            self.db.query(SchemaColumn)
-            .filter(SchemaColumn.id == column_id, SchemaColumn.client_id == self.client_id)
-            .first()
-        )
-        if not col:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, "Column not found")
-        if col.is_identity or col.is_platform:
-            raise HTTPException(
-                status.HTTP_422_UNPROCESSABLE_ENTITY,
-                "Identity/lineage fields cannot be dropped.",
-            )
+        col = self._get_column(column_id)
+        self._refuse_if_locked(col, "drop")
         if col.physical_name in IDENTITY_SAMPLE_COLS:
             raise HTTPException(
                 status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -581,6 +723,9 @@ class UiSchemaService:
             definition=f"layout_refs={layout_refs}",
         )
         self._log_ddl(change, "drop_column", table.physical_name, col.physical_name)
+        self.db.query(SchemaRelation).filter(SchemaRelation.fk_column_id == col.id).delete(
+            synchronize_session=False
+        )
         self.db.query(SchemaLayoutField).filter(SchemaLayoutField.column_id == col.id).delete(
             synchronize_session=False
         )
@@ -827,12 +972,177 @@ class UiSchemaService:
             .filter(
                 SchemaColumn.table_id == table.id,
                 SchemaColumn.status == "active",
+                SchemaColumn.origin == "ui",
                 SchemaColumn.is_identity.is_(False),
                 SchemaColumn.is_platform.is_(False),
                 SchemaColumn.physical_name.notin_(list(IDENTITY_SAMPLE_COLS)),
             )
             .all()
         )
+
+    # ------------------------------------------------------------------ relations
+
+    def _relation_read(self, rel: SchemaRelation) -> Dict[str, Any]:
+        col = rel.fk_column
+        return {
+            "id": rel.id,
+            "display_name": rel.display_name,
+            "from_table_id": rel.from_table_id,
+            "from_table_name": rel.from_table.display_name if rel.from_table else None,
+            "from_physical_name": rel.from_table.physical_name if rel.from_table else None,
+            "to_table_id": rel.to_table_id,
+            "to_table_name": rel.to_table.display_name if rel.to_table else None,
+            "to_physical_name": rel.to_table.physical_name if rel.to_table else None,
+            "fk_column_id": rel.fk_column_id,
+            "fk_column_name": col.display_name if col else None,
+            "fk_physical_name": col.physical_name if col else None,
+            "cardinality": rel.cardinality,
+            "status": rel.status,
+            "created_at": rel.created_at,
+        }
+
+    def list_relations(self, table_id: Optional[UUID] = None) -> List[Dict[str, Any]]:
+        q = self.db.query(SchemaRelation).filter(SchemaRelation.client_id == self.client_id)
+        if table_id:
+            q = q.filter(
+                (SchemaRelation.from_table_id == table_id) | (SchemaRelation.to_table_id == table_id)
+            )
+        return [self._relation_read(r) for r in q.order_by(SchemaRelation.display_name).all()]
+
+    def create_relation(
+        self,
+        display_name: str,
+        from_table_id: UUID,
+        to_table_id: UUID,
+        fk_column_id: UUID,
+        cardinality: str,
+    ) -> Dict[str, Any]:
+        """Declare a side link over an existing real FK column on the child.
+
+        Registry only. Refuses when the column is not a FOREIGN KEY to the
+        parent, or when one-to-one is asked of a key that Postgres does not
+        hold UNIQUE. Never mutates the database.
+        """
+        if cardinality not in CARDINALITIES:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Cardinality must be one-to-many or one-to-one")
+        parent = self._get_table(from_table_id)
+        child = self._get_table(to_table_id)
+        col = self._get_column(fk_column_id)
+        if col.table_id != child.id:
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_ENTITY,
+                "The key column must belong to the child table.",
+            )
+        if not col.is_fk or col.fk_table != parent.physical_name:
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_ENTITY,
+                f"{col.display_name} is not a foreign key to {parent.display_name}. "
+                "The key must be a real FK column on the child.",
+            )
+        if cardinality == "one_to_one" and not col.is_unique:
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_ENTITY,
+                f"One-to-one needs a UNIQUE key. {col.display_name} is not unique in Postgres.",
+            )
+        dup = (
+            self.db.query(SchemaRelation)
+            .filter(
+                SchemaRelation.client_id == self.client_id,
+                SchemaRelation.fk_column_id == col.id,
+            )
+            .first()
+        )
+        if dup:
+            raise HTTPException(status.HTTP_409_CONFLICT, "That key already carries a relation.")
+        rel = SchemaRelation(
+            id=uuid.uuid4(),
+            client_id=self.client_id,
+            display_name=display_name.strip(),
+            from_table_id=parent.id,
+            to_table_id=child.id,
+            fk_column_id=col.id,
+            cardinality=cardinality,
+            created_by=self.user.id,
+            modified_by=self.user.id,
+        )
+        self.db.add(rel)
+        self._audit(
+            "create_relation",
+            child.physical_name,
+            col.physical_name,
+            after="active",
+            definition=f"{cardinality} {parent.physical_name} -> {child.physical_name}.{col.physical_name}",
+        )
+        self.db.commit()
+        self.db.refresh(rel)
+        return self._relation_read(rel)
+
+    def delete_relation(self, relation_id: UUID) -> None:
+        rel = (
+            self.db.query(SchemaRelation)
+            .filter(SchemaRelation.id == relation_id, SchemaRelation.client_id == self.client_id)
+            .first()
+        )
+        if not rel:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Relation not found")
+        self._audit(
+            "delete_relation",
+            rel.to_table.physical_name if rel.to_table else "",
+            rel.fk_column.physical_name if rel.fk_column else None,
+            before="active",
+            after="removed",
+        )
+        self.db.delete(rel)
+        self.db.commit()
+
+    def table_links(self, table_id: UUID) -> Dict[str, Any]:
+        """Read-only link summary for the table browser.
+
+        ``keys``: FK columns on this table (this table is the child).
+        ``children``: declared relations where this table is the parent.
+        ``parents``: declared relations where this table is the child.
+        """
+        table = self._get_table(table_id)
+        self.ensure_catalog(only=(table.physical_name,))
+        registry = {
+            t.physical_name: t
+            for t in self.db.query(SchemaTable).filter(SchemaTable.client_id == self.client_id).all()
+        }
+        keys = []
+        for col in (
+            self.db.query(SchemaColumn)
+            .filter(SchemaColumn.table_id == table.id, SchemaColumn.is_fk.is_(True))
+            .order_by(SchemaColumn.sort_order)
+            .all()
+        ):
+            if col.fk_table == catalog.LIST_ENTRIES_TABLE:
+                continue
+            target = registry.get(col.fk_table or "")
+            keys.append(
+                {
+                    "column_id": col.id,
+                    "column_name": col.display_name,
+                    "physical_name": col.physical_name,
+                    "fk_table": col.fk_table,
+                    "fk_table_id": target.id if target else None,
+                    "fk_table_name": target.display_name if target else None,
+                    "is_unique": col.is_unique,
+                }
+            )
+        rels = (
+            self.db.query(SchemaRelation)
+            .filter(
+                SchemaRelation.client_id == self.client_id,
+                (SchemaRelation.from_table_id == table.id) | (SchemaRelation.to_table_id == table.id),
+            )
+            .all()
+        )
+        return {
+            "table_id": table.id,
+            "keys": keys,
+            "children": [self._relation_read(r) for r in rels if r.from_table_id == table.id],
+            "parents": [self._relation_read(r) for r in rels if r.to_table_id == table.id],
+        }
 
     def attach_extra_fields(self, samples: Sequence[Sample]) -> List[Dict[str, Any]]:
         cols = self.extra_sample_columns()

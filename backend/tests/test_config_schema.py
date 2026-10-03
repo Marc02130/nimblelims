@@ -37,6 +37,7 @@ def test_catalog_fits_live_contracts():
         "ui_schema_column",
         "ui_schema_layout",
         "ui_schema_privilege",
+        "ui_schema_relation",
         "ui_schema_table",
         "workflow_template",
     ]
@@ -158,6 +159,39 @@ def test_ui_schema_documents():
             "access": "inherit",
         },
     ) == []
+
+    assert svc.validation_errors(
+        "ui_schema_relation",
+        {
+            "display_name": "Project samples",
+            "from_table_id": TABLE_ID,
+            "to_table_id": ROLE_ID,
+            "fk_column_id": COLUMN_ID,
+            "cardinality": "one_to_many",
+        },
+    ) == []
+    many = svc.validation_errors(
+        "ui_schema_relation",
+        {
+            "display_name": "Tags",
+            "from_table_id": TABLE_ID,
+            "to_table_id": ROLE_ID,
+            "fk_column_id": COLUMN_ID,
+            "cardinality": "many_to_many",
+        },
+    )
+    assert any(err["path"] == "/cardinality" and err["keyword"] == "enum" for err in many)
+    junction = svc.validation_errors(
+        "ui_schema_relation",
+        {
+            "display_name": "Tags",
+            "from_table_id": TABLE_ID,
+            "to_table_id": ROLE_ID,
+            "fk_column_id": COLUMN_ID,
+            "junction_table": "x_sample_tags",
+        },
+    )
+    assert any(err["path"] == "/junction_table" and err["keyword"] == "additionalProperties" for err in junction)
 
 
 def test_workflow_actions():

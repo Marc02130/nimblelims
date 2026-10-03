@@ -601,6 +601,33 @@ export class ApiService {
     return response.data;
   }
 
+  async getSchemaTableLinks(table_id: string) {
+    const response: AxiosResponse = await this.api.get(`/v1/schema/tables/${table_id}/links`);
+    return response.data;
+  }
+
+  async getSchemaRelations(filters?: { table_id?: string }) {
+    const response: AxiosResponse = await this.api.get('/v1/schema/relations', {
+      params: filters,
+    });
+    return response.data;
+  }
+
+  async createSchemaRelation(data: {
+    display_name: string;
+    from_table_id: string;
+    to_table_id: string;
+    fk_column_id: string;
+    cardinality: 'one_to_many' | 'one_to_one';
+  }) {
+    const response: AxiosResponse = await this.api.post('/v1/schema/relations', data);
+    return response.data;
+  }
+
+  async deleteSchemaRelation(id: string) {
+    await this.api.delete(`/v1/schema/relations/${id}`);
+  }
+
   async getSchemaRuntime(screen_key: string) {
     const response: AxiosResponse = await this.api.get('/v1/schema/runtime', {
       params: { screen_key },
