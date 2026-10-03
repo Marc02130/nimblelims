@@ -84,6 +84,7 @@ from .ui_schema import (
     SchemaLayout,
     SchemaLayoutField,
     SchemaPrivilege,
+    SchemaRelation,
     SchemaChange,
     UiSchemaDdlLog,
 )
