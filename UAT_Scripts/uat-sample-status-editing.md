@@ -87,6 +87,8 @@ Update sample status from "Received" to "Available for Testing" using the status
 
 ## Test Case 2: Edit with Custom Attributes - Validation Success and Failure
 
+**History.** Custom Fields is not a place to work. There is no “Custom Fields” section on the sample form from the old custom-attribute configs. A sample field added under Schema → Columns is a real column (`extra_fields`), not this case. Do not run the steps below as current acceptance. UAT pass is not claimed.
+
 ### Test Case ID
 TC-SAMPLE-EDIT-002
 

@@ -296,7 +296,7 @@ Verify Row-Level Security (RLS) prevents sample accessioning when user lacks pro
 
 ### Workflow Document (Stage 1)
 - **Variation A: Single Sample Accessioning**
-  - Sample Details Entry (name, dates, type, matrix, temperature, project, QC type, anomalies, custom fields)
+  - Sample Details Entry (name, dates, type, matrix, temperature, project, QC type, anomalies). Custom fields are not a place to work; a Schema column on Samples is `extra_fields`, not this list |
   - Container Assignment (type, name/barcode, position, concentration/amount with units)
   - Test Assignment (individual analyses or test battery)
   - Double Entry Validation (optional toggle)

@@ -1,8 +1,10 @@
 # UAT Scripts: Configurations and Custom Fields
 
+**Current truth (2026-10-03):** Custom Fields is not a place to work. `/admin/custom-fields` redirects to Schema → Tables. A sample field is a column under Schema → Columns. List values are Admin → Lists (`/admin/lists`). **`lists` and `list_entries` are not schema tables.** Sections below that open Custom Fields Management or `/admin/custom-fields` as the editor are **history**. They are not the acceptance script for the current UI. UAT pass is not claimed here. Current Schema acceptance is `UAT_Scripts/uat-ui-schema-tables-cleanup.md` (pass still pending).
+
 ## Overview
 
-This document contains User Acceptance Testing (UAT) scripts for configurations and custom fields in NimbleLIMS. These scripts validate list management, custom field creation, and dynamic form rendering as defined in:
+**History.** This document contains User Acceptance Testing (UAT) scripts written when custom field creation was a place to work. They are not current acceptance for Schema. List management at Admin → Lists still applies. Custom field creation and dynamic Custom Fields sections do not.
 
 - **User Stories**: US-15 (Configurable Lists), US-16 to US-23 (Configurations), Post-MVP Custom Fields
 - **PRD**: Section 4.5 (Custom Fields)

@@ -23,7 +23,7 @@ Copyright (c) 2025 Marc Breneiser
 - **Analytes Management**: CRUD operations for analytes (admin-only)
 - **Analysis-Analyte Configuration**: Configure validation rules for analytes in analyses (admin-only)
 - **Test Batteries Management**: Group analyses into reusable batteries with sequence and optional flags (admin-only)
-- **Schema (`/v1/schema/*`)**: Allow-listed table catalog (Lab + System reference tables; engine internals hidden) reflected from Postgres catalogs, locked system columns, CREATE TABLE / ADD COLUMN via `schema_apply`, and a `schema_relations` registry for 1:N / 1:1 side links over existing FK columns (no junctions, no DDL). The Custom Fields UI is removed; legacy `custom_attributes` endpoints remain for payload data only.
+- **Schema (`/v1/schema/*`)**: Allow-listed table browser (Lab tables plus System reference tables the display rule still allows; engine internals hidden) reflected from Postgres catalogs, locked system columns, CREATE TABLE / ADD COLUMN via `schema_apply` (Add field on Samples and UI-created tables), and a `schema_relations` registry for 1:N / 1:1 side links over existing FK columns (no junctions, no universal join, no DDL). Many-to-many is refused. The Custom Fields UI is removed. `lists` and `list_entries` are not schema tables (display rule); the catalog in `ui_schema_catalog.py` still registers them, which is a product mismatch. Legacy `custom_attributes` endpoints remain for payload data only.
 - **Users Management**: CRUD operations for users (admin-only)
 - **Roles & Permissions Management**: CRUD operations for roles and permission assignments (admin-only)
 - **Authentication**: JWT-based authentication with RBAC

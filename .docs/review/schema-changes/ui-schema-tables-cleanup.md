@@ -11,7 +11,9 @@
 
 ## 1. Summary
 
-The registry must **describe tables it did not create**. `schema_tables.kind` gains `system` for reference tables (`lists` and peers); `schema_columns` gains reflection facts (FK target, UNIQUE, Postgres type, origin) so the UI can lock system columns and offer only real FK columns as relation keys. A new `schema_relations` table records one-to-many / one-to-one side links over an existing FK column on the child. Nothing in this delta issues DDL on lab tables; reflection reads `information_schema.columns`, `pg_constraint`, `pg_index` only.
+The registry must **describe tables it did not create**. `schema_tables.kind` gains `system` for reference tables; `schema_columns` gains reflection facts (FK target, UNIQUE, Postgres type, origin) so the UI can lock system columns and offer only real FK columns as relation keys. A new `schema_relations` table records one-to-many / one-to-one side links over an existing FK column on the child. Nothing in this delta issues DDL on lab tables; reflection reads `information_schema.columns`, `pg_constraint`, `pg_index` only.
+
+**Display membership (current, after this delta):** `lists` and `list_entries` (list items) are **not** schema tables. A column added there is unused until application code changes, so they stay off the Schema screen. The migration still allows `kind='system'`, and the shipped catalog still registers those two names — that registration is a product mismatch, not this delta’s display rule. `projects` remains a Lab table. No universal join table. Many-to-many is out of scope (section 6).
 
 ## 2. Delta (authoritative list)
 
@@ -57,7 +59,7 @@ None (string + check constraints, matching the 0081 registry).
 ## 4. Data migration / backfill
 
 - [x] Backfill: `schema_columns.origin = 'reflected'` where `is_platform OR is_identity`.
-- [x] Lazy registration (OQ-3 = B): first `GET /v1/schema/tables` inserts `schema_tables` rows for allow-listed Lab (`kind='core'`) and System (`kind='system'`) tables that exist in Postgres, and `schema_columns` rows (`origin='reflected'`) for their columns. Idempotent; re-syncs FK/UNIQUE facts on each view.
+- [x] Lazy registration (OQ-3 = B): first `GET /v1/schema/tables` inserts `schema_tables` rows for allow-listed Lab (`kind='core'`) and System (`kind='system'`) tables that exist in Postgres, and `schema_columns` rows (`origin='reflected'`) for their columns. Idempotent; re-syncs FK/UNIQUE facts on each view. **Display rule after this delta:** that insert still includes `lists` and `list_entries`; those two are not schema tables and must not be documented as ones.
 - [ ] Dual-write period: none.
 
 ## 5. Rollback
