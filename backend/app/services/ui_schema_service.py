@@ -319,7 +319,7 @@ class UiSchemaService:
         return (
             self.db.query(SchemaTable)
             .filter(SchemaTable.client_id == self.client_id)
-            .order_by(SchemaTable.kind != "system", SchemaTable.display_name)
+            .order_by(SchemaTable.kind == "system", SchemaTable.display_name)
             .all()
         )
 
