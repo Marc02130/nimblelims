@@ -6,7 +6,7 @@
 **Design:** `.docs/internal/design/configuring-agent.md`  
 **Manual:** `manuals/configuring-agent.md`  
 **Migration:** `0083_configuring_agent`  
-**Status:** Script ready. UAT pass **pending**. Do **not** invent a Pass.
+**Status:** UAT **failed**. Sections 1, 3, and 6 passed. Sections 2, 4, and 5 are **blocked**. Do not treat this as a UAT Pass.
 
 ## Fail bars
 
@@ -30,7 +30,7 @@ Do not treat a failed documented password as a product failure of this script. R
 
 1. As lab technician, open `/admin/settings/configuring-agent` and `/admin/configuring-agent`. Both redirect away.
 2. `GET /api/v1/configuring-agent/settings` as the technician returns **403** and the body says `You can't change configuring-agent settings.`
-**Pass / Fail:**
+**Pass / Fail:** Pass. As lab-tech, both `/admin/settings/configuring-agent` and `/admin/configuring-agent` redirected to `/dashboard`. `GET /api/v1/configuring-agent/settings` returned 403 with `You can't change configuring-agent settings.`
 
 ## 2. Provider, model, key
 
@@ -39,7 +39,7 @@ Do not treat a failed documented password as a product failure of this script. R
 3. Change the provider to xAI. The previous model is cleared and the OpenAI key, if one was stored, is not reused. The error or the list is xAI’s, not OpenAI’s.
 4. Set a key. The field empties. The chip says **Key set**. Reload the page. The key is not in the page, the address bar, or a toast.
 5. Clear the key and confirm. The chip says **No key** and the model is cleared. With no env fallback, starting a run names `XAI_API_KEY` (or whichever provider is selected) and does not mention another vendor.
-**Pass / Fail:**
+**Pass / Fail:** Blocked. No env provider key was present, and the live list never loaded: OpenAI showed “Loading models…” then `No key for openai... OPENAI_API_KEY` with zero models, and switching to xAI cleared the model, did not reuse the previous key, and named only `XAI_API_KEY`. Setting a key emptied the field and showed Key set with the key absent from the page, address bar, and toast after reload; Clear key showed No key and cleared the model; a ready-file run returned 400 naming `XAI_API_KEY` only and wrote no run row. A previously stored xAI model `grok-4.3` (key already set) was cleared by that provider switch before a live list could be fetched, so no model was saved from a provider list.
 
 ## 3. Named configuration and files
 
@@ -47,24 +47,24 @@ Do not treat a failed documented password as a product failure of this script. R
 2. Start a run before adding a file. The error says to add a lab file and does not call the model. A goal note without a file still refuses.
 3. Upload a small text file that states one concrete change the lab files actually ask for (for example a list value). It becomes ready and shows a chunk count. The page does not show the file body.
 4. Confirm in the database that `configuration_chunks` rows for that file have `configuration_id` of `Acme intake` and no user-owner column. `created_by` on the document may be the admin.
-**Pass / Fail:**
+**Pass / Fail:** Pass. `POST /configurations` created Acme intake `309f0f8b-12be-4f7b-a8e9-6a4ea4673bed` (name and id on the page); `POST .../runs` before a file, with and without a goal note, returned 400 `Add a lab file before starting a run. Empty input does not call the model.` Upload returned 201 ready, `chunk_count` 1, the page showed `acme-intake.txt · ready · 1 chunks` and not the file body; `configuration_chunks` has no user-owner column, `configuration_id` is that id, and document `created_by` is admin `00000000-0000-0000-0000-000000000001`.
 
 ## 4. Proposal uses the Schema list
 
 1. Start a run. Steps show target, action, and why.
 2. List and unit steps, if any, are under **Other configuration**, not Schema tables or Schema columns.
 3. A many-to-many proposal is **Stopped**, with banner `Can't apply this change through configuration APIs`, and it is not Accept. Nothing new is in Schema.
-**Pass / Fail:**
+**Pass / Fail:** Blocked. With a ready file and no provider key, `POST .../runs` returned 400 naming `XAI_API_KEY` and `configuration_runs` stayed empty, so target/action/why, Other configuration grouping, and a many-to-many Stopped banner were not observed. Schema table count stayed 29; no apply ran.
 
 ## 5. Apply is all or nothing
 
 1. Accept two steps that the APIs can express, and Skip the rest. Apply. Status becomes done. The configuration ledger lists each stored object with a name and an id, including an experiment template when one was accepted. Schema, Lists, or Roles shows the same records.
 2. Repeat with a second configuration. Accept one valid step and one step the signed-in user cannot perform (schema mutate without `schema:edit`, or a step the API rejects). Apply. The run is failed or stopped. The first step’s table, column, list, or template is **not** present. Ledger rows from this apply are absent.
 3. Accept a step whose only action is granting a role `schema:edit` it does not already have. Apply stops, writes nothing, and does not add that permission.
-**Pass / Fail:**
+**Pass / Fail:** Blocked. No proposal steps were produced, so accept/apply, rollback, and a schema:edit grant were not observed. `schema:edit` is still only on Administrator; that is the pre-test grant, not an apply result.
 
 ## 6. Out of scope
 
 1. There is no chat transcript, no prompt playground, and no SQL entry on either page.
 2. The agent does not offer Custom Fields, asked-for, routing, parsers, or ELN process definitions as places it will write.
-**Pass / Fail:**
+**Pass / Fail:** Pass. Main content of both pages has no chat transcript, prompt playground, or SQL entry, and does not offer Custom Fields, asked-for, routing, parsers, or ELN process definitions as write targets. No proposal steps were returned, so this check is the screens, not a model step list.
