@@ -6,7 +6,7 @@
 **Design:** `.docs/internal/design/configuring-agent.md`  
 **Manual:** `manuals/configuring-agent.md`  
 **Migration:** `0083_configuring_agent`  
-**Status:** UAT **failed**. Sections 1, 3, and 6 passed. Sections 2, 4, and 5 are **blocked**. Do not treat this as a UAT Pass.
+**Status:** UAT **failed**. Sections 1, 2, 3, 4, and 6 passed. Section 5 is **blocked** (schema:edit grant was not proposed). Do not treat this as a UAT Pass.
 
 ## Fail bars
 
@@ -39,7 +39,7 @@ Do not treat a failed documented password as a product failure of this script. R
 3. Change the provider to xAI. The previous model is cleared and the OpenAI key, if one was stored, is not reused. The error or the list is xAI’s, not OpenAI’s.
 4. Set a key. The field empties. The chip says **Key set**. Reload the page. The key is not in the page, the address bar, or a toast.
 5. Clear the key and confirm. The chip says **No key** and the model is cleared. With no env fallback, starting a run names `XAI_API_KEY` (or whichever provider is selected) and does not mention another vendor.
-**Pass / Fail:** Blocked. No env provider key was present, and the live list never loaded: OpenAI showed “Loading models…” then `No key for openai... OPENAI_API_KEY` with zero models, and switching to xAI cleared the model, did not reuse the previous key, and named only `XAI_API_KEY`. Setting a key emptied the field and showed Key set with the key absent from the page, address bar, and toast after reload; Clear key showed No key and cleared the model; a ready-file run returned 400 naming `XAI_API_KEY` only and wrote no run row. A previously stored xAI model `grok-4.3` (key already set) was cleared by that provider switch before a live list could be fetched, so no model was saved from a provider list.
+**Pass / Fail:** Pass. Settings id `c0a16ae0-0000-4000-8000-000000000001`, provider xAI, chip Key set, saved model `grok-4.3`. The model control listed 14 models from `GET /models?provider=xai` (all `grok-*`, including `grok-4.3`; no `gpt-` or `claude` ids). Provider was not switched, because that clears the stored xAI key; the earlier run already saw clear-on-switch, the key field emptying with chip Key set, reload without the key, and Clear key showing No key.
 
 ## 3. Named configuration and files
 
@@ -54,14 +54,14 @@ Do not treat a failed documented password as a product failure of this script. R
 1. Start a run. Steps show target, action, and why.
 2. List and unit steps, if any, are under **Other configuration**, not Schema tables or Schema columns.
 3. A many-to-many proposal is **Stopped**, with banner `Can't apply this change through configuration APIs`, and it is not Accept. Nothing new is in Schema.
-**Pass / Fail:** Blocked. With a ready file and no provider key, `POST .../runs` returned 400 naming `XAI_API_KEY` and `configuration_runs` stayed empty, so target/action/why, Other configuration grouping, and a many-to-many Stopped banner were not observed. Schema table count stayed 29; no apply ran.
+**Pass / Fail:** Pass. On UAT ledger pass the xAI run showed target, action, and why, and the list step’s group was `other` (screen heading Other configuration), not Schema tables. On UAT many to many the run status was stopped with banner `Can't apply this change through configuration APIs`; Accept returned 400 `This step cannot be accepted. Skip it or send feedback.` Schema table count stayed 29.
 
 ## 5. Apply is all or nothing
 
 1. Accept two steps that the APIs can express, and Skip the rest. Apply. Status becomes done. The configuration ledger lists each stored object with a name and an id, including an experiment template when one was accepted. Schema, Lists, or Roles shows the same records.
 2. Repeat with a second configuration. Accept one valid step and one step the signed-in user cannot perform (schema mutate without `schema:edit`, or a step the API rejects). Apply. The run is failed or stopped. The first step’s table, column, list, or template is **not** present. Ledger rows from this apply are absent.
 3. Accept a step whose only action is granting a role `schema:edit` it does not already have. Apply stops, writes nothing, and does not add that permission.
-**Pass / Fail:** Blocked. No proposal steps were produced, so accept/apply, rollback, and a schema:edit grant were not observed. `schema:edit` is still only on Administrator; that is the pre-test grant, not an apply result.
+**Pass / Fail:** Blocked. Two accepted steps on UAT ledger pass applied HTTP 200 status done (list `UAT intake source` `aaf58812-a35d-4bf0-b2ae-49ed3269f088` and experiment template `UAT intake plate` `69dd4d8c-ff8c-482a-ba93-198d63062b36` on the ledger and on Lists and experiment templates). A second run accepted a valid list plus `POST /v1/schema/columns` for a missing table; Apply returned status failed `Table not found`, applied 0, and neither the list nor a ledger row remained. A schema:edit-only grant was not proposed on two runs (400 `The model did not return any configuration steps.`), so Accept/Apply of that grant was not observed. `schema:edit` is still only on Administrator.
 
 ## 6. Out of scope
 
