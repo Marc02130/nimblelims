@@ -11,6 +11,8 @@ jest.mock('./services/apiService', () => ({
     getCurrentUser: jest.fn(),
     setAuthToken: jest.fn(),
     logout: jest.fn().mockResolvedValue(undefined),
+    requestPasswordReset: jest.fn(),
+    confirmPasswordReset: jest.fn(),
   },
 }));
 

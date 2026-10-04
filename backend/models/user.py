@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, DateTime, ForeignKey, Boolean, Table
+from sqlalchemy import Column, String, DateTime, ForeignKey, Boolean, Integer, Table
 from sqlalchemy.dialects.postgresql import UUID as PostgresUUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -25,6 +25,8 @@ class User(BaseModel):
     last_login = Column(DateTime)
     # Q7: seeded/bootstrap users must change password before using the app
     must_change_password = Column(Boolean, nullable=False, default=False, server_default='false')
+    # Incremented whenever the password changes so older JWTs stop working.
+    password_epoch = Column(Integer, nullable=False, default=0, server_default="0")
     
     # Relationships - explicitly specify foreign keys
     role = relationship("Role", foreign_keys=[role_id], back_populates="users")
