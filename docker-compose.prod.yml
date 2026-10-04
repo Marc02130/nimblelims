@@ -5,6 +5,10 @@
 # Local dogfood continues to use docker-compose.yml alone (5432 published).
 
 services:
+  # Local compose starts Mailpit. Production does not.
+  mail:
+    profiles: ["local-mail"]
+
   db:
     # Compose merges ports by key; empty list does NOT clear base. !reset drops host 5432.
     ports: !reset []
@@ -23,3 +27,14 @@ services:
       MIGRATE_DATABASE_URL: postgresql://lims_user:${POSTGRES_PASSWORD}@db:5432/lims_db
       DB_PASSWORD: ${LIMS_APP_PASSWORD}
       DEBUG: "False"
+      # Password reset. Empty SMTP_HOST keeps the API up and reports mail unavailable.
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      SMTP_TLS: ${SMTP_TLS:-true}
+      SMTP_SSL: ${SMTP_SSL:-false}
+      PUBLIC_APP_URL: ${PUBLIC_APP_URL:-}
+      PASSWORD_RESET_TTL_MINUTES: ${PASSWORD_RESET_TTL_MINUTES:-60}
+      PASSWORD_RESET_MAX_PER_HOUR: ${PASSWORD_RESET_MAX_PER_HOUR:-3}

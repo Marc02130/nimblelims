@@ -8,7 +8,9 @@ import {
   Typography,
   Alert,
   CircularProgress,
+  Link,
 } from '@mui/material';
+import { Link as RouterLink } from 'react-router-dom';
 import { Formik, Form, Field } from 'formik';
 import * as Yup from 'yup';
 import { useUser } from '../contexts/UserContext';
@@ -69,7 +71,6 @@ const Login: React.FC = () => {
               <strong>Login Failed:</strong> {error}
             </Alert>
           )}
-
           <Formik
             initialValues={{ username: '', password: '' }}
             validationSchema={validationSchema}
@@ -108,13 +109,18 @@ const Login: React.FC = () => {
                   )}
                 </Field>
 
+                <Typography variant="body2" align="center" sx={{ mt: 1 }}>
+                  <Link component={RouterLink} to="/forgot-password">
+                    Forgot password?
+                  </Link>
+                </Typography>
                 <Button
                   type="submit"
                   fullWidth
                   variant="contained"
                   size="large"
                   disabled={!isValid || loading}
-                  sx={{ mt: 3 }}
+                  sx={{ mt: 2 }}
                 >
                   {loading ? (
                     <CircularProgress size={24} />

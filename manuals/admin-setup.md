@@ -10,9 +10,25 @@ After starting the application with `docker-compose up -d --build`, Alembic migr
 
 ## ⚠️ SECURITY WARNING
 
-**You MUST change the default admin password immediately after first login!**
+**You MUST change the default admin password immediately after first login in production.**
 
 The default password is only for initial setup and should never be used in production.
+
+## Reset a forgotten password
+
+Sign-in always shows **Forgot password?**. The person enters the email on their account. If mail is configured, and that email belongs to an active account, NimbleLIMS sends a one-time link. The screen does not say whether the account exists.
+
+Local Compose starts Mailpit with the app. Open the mailbox at http://localhost:8025. The backend sends to the `mail` service on port 1025, with no login and no TLS. That SMTP port is not published on the host. The admin address is `admin@lims.example.com`.
+
+Set these on the backend when you are not using that local mailbox (see `.env.example`):
+
+- `SMTP_HOST`, `SMTP_FROM`, `PUBLIC_APP_URL` (required)
+- `SMTP_PORT` (default 587), `SMTP_TLS` (default true), `SMTP_USER` and `SMTP_PASSWORD` when the server requires a login
+- `SMTP_SSL=true` only for implicit TLS (usually port 465)
+
+`PUBLIC_APP_URL` is the address people use in the browser, such as `https://lims.example.com`, with no path on the end. The link looks like `https://lims.example.com/reset-password#token=...`. It expires in 60 minutes and works once. They choose a new password on that page and then sign in. They are not signed in by the link.
+
+If those SMTP settings are missing, every request gets the same message: password reset email is not available, and an administrator needs to set a new password. An administrator who can still sign in can set another person's password under Users. That person must change it on next login.
 
 ## How to Change Admin Password
 
