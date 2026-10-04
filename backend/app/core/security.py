@@ -101,6 +101,11 @@ def validate_password_complexity(
     return errors
 
 
+def bump_password_epoch(user) -> None:
+    """Retire every JWT issued before this password change."""
+    user.password_epoch = int(getattr(user, "password_epoch", 0) or 0) + 1
+
+
 # JWT Bearer optional — cookie AuthN is preferred for SPA (P4 / S10)
 security = HTTPBearer(auto_error=False)
 
@@ -151,6 +156,15 @@ def verify_token(token: str, db: Optional[Session] = None) -> TokenData:
         role: str = payload.get("role")
         permissions: List[str] = payload.get("permissions", [])
         must_change = bool(payload.get("pwd_change") or payload.get("must_change_password"))
+        raw_epoch = payload.get("pwd_epoch")
+        try:
+            password_epoch = int(raw_epoch) if raw_epoch is not None else 0
+        except (TypeError, ValueError):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid token payload",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
         jti = payload.get("jti")
         exp_raw = payload.get("exp")
         exp_dt = None
@@ -182,6 +196,7 @@ def verify_token(token: str, db: Optional[Session] = None) -> TokenData:
             role=role,
             permissions=permissions,
             must_change_password=must_change,
+            password_epoch=password_epoch,
             jti=str(jti) if jti else None,
             exp=exp_dt,
         )
@@ -283,6 +298,14 @@ def get_current_user(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="User not found",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    user_epoch = int(getattr(user, "password_epoch", 0) or 0)
+    if token_data.password_epoch != user_epoch:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token has been revoked",
             headers={"WWW-Authenticate": "Bearer"},
         )
 

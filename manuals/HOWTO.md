@@ -31,7 +31,7 @@ Stamps: [`.docs/decision-logs/framework-stamps-2026-08-26.md`](../.docs/decision
 Bring the stack up and log in. Do not duplicate setup here.
 
 - Dev / compose: [dev-setup.md](dev-setup.md) and root [`README.md`](../README.md) Quick Start.
-- Admin password: [admin-setup.md](admin-setup.md).
+- Admin password and email reset: [admin-setup.md](admin-setup.md). **Forgot password?** is on the sign-in page.
 - Frontend: http://localhost:3000 · API: http://localhost:8000 · docs: http://localhost:8000/docs.
 - Lab path accounts: `admin` / `***REMOVED***` · `lab-tech` / `***REMOVED***` · `alice-tech` / `***REMOVED***`. Change the default admin password.
 

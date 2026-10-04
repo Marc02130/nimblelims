@@ -38,6 +38,21 @@ class ChangePasswordResponse(BaseModel):
     message: str = "Password updated"
 
 
+class PasswordResetRequest(BaseModel):
+    """Ask for a reset link. The response does not say whether the email exists."""
+    email: EmailStr
+
+
+class PasswordResetResponse(BaseModel):
+    message: str
+
+
+class PasswordResetConfirmRequest(BaseModel):
+    """Choose a new password with the token from the email. Does not sign in."""
+    token: str = Field(..., min_length=1, max_length=512)
+    new_password: str = Field(..., min_length=1, max_length=256)
+
+
 class VerifyEmailRequest(BaseModel):
     """Request schema for email verification"""
     email: EmailStr
@@ -57,5 +72,6 @@ class TokenData(BaseModel):
     role: str
     permissions: List[str]
     must_change_password: bool = False
+    password_epoch: int = 0
     jti: Optional[str] = None
     exp: Optional[datetime] = None

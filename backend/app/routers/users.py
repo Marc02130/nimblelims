@@ -13,7 +13,12 @@ from app.schemas.user import (
     UserCreate,
     UserUpdate,
 )
-from app.core.security import get_current_user, get_password_hash, validate_password_complexity
+from app.core.security import (
+    get_current_user,
+    get_password_hash,
+    validate_password_complexity,
+    bump_password_epoch,
+)
 from app.core.rbac import require_any_permission
 from uuid import UUID
 
@@ -220,6 +225,7 @@ async def update_user(
             )
         user.password_hash = get_password_hash(user_data.password)
         user.must_change_password = True
+        bump_password_epoch(user)
     
     # Update role if provided
     if user_data.role_id:

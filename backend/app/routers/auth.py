@@ -14,12 +14,16 @@ from app.schemas.auth import (
     VerifyEmailResponse,
     ChangePasswordRequest,
     ChangePasswordResponse,
+    PasswordResetRequest,
+    PasswordResetResponse,
+    PasswordResetConfirmRequest,
 )
 from app.core.security import (
     verify_password,
     get_password_hash,
     needs_rehash,
     validate_password_complexity,
+    bump_password_epoch,
     create_access_token,
     get_user_permissions,
     set_current_user_id,
@@ -44,6 +48,7 @@ def _issue_token(user: User, permissions: list, *, must_change: bool) -> str:
             "role": user.role.name,
             "permissions": permissions,
             "pwd_change": must_change,
+            "pwd_epoch": int(getattr(user, "password_epoch", 0) or 0),
         },
         expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
     )
@@ -189,6 +194,7 @@ async def change_password(
 
     current_user.password_hash = get_password_hash(body.new_password)
     current_user.must_change_password = False
+    bump_password_epoch(current_user)
     db.add(current_user)
     db.commit()
     db.refresh(current_user)
@@ -280,3 +286,38 @@ async def verify_email(
         message="If an account exists for that email, verification instructions apply",
         verified=True,
     )
+
+
+@router.post("/password-reset", response_model=PasswordResetResponse)
+def password_reset_request(
+    body: PasswordResetRequest,
+    db: Session = Depends(get_db),
+):
+    """
+    Email a one-time reset link. No login required.
+
+    The response is the same whether or not an account exists. When mail is not
+    configured, every caller gets the same unavailable response and no lookup.
+    """
+    from app.services import password_reset as reset_service
+
+    if not reset_service.email_reset_configured():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=reset_service.NOT_CONFIGURED_MESSAGE,
+        )
+    reset_service.request_password_reset(db, str(body.email))
+    return PasswordResetResponse(message=reset_service.generic_message())
+
+
+@router.post("/password-reset/confirm", response_model=PasswordResetResponse)
+def password_reset_confirm(
+    body: PasswordResetConfirmRequest,
+    db: Session = Depends(get_db),
+):
+    """Set a new password from the emailed token. Does not start a session."""
+    from app.services import password_reset as reset_service
+
+    reset_service.confirm_password_reset(db, body.token, body.new_password)
+    db.commit()
+    return PasswordResetResponse(message=reset_service.CONFIRM_MESSAGE)
