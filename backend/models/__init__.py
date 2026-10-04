@@ -89,3 +89,13 @@ from .ui_schema import (
     SchemaChange,
     UiSchemaDdlLog,
 )
+from .configuring_agent import (
+    SETTINGS_ID,
+    Configuration,
+    ConfigurationChunk,
+    ConfigurationDocument,
+    ConfigurationItem,
+    ConfigurationRun,
+    ConfigurationStep,
+    ConfiguringAgentSettings,
+)

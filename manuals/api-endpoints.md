@@ -2393,6 +2393,41 @@ Admin UI: `/admin/sample-type-transitions`. Template default dest sample type (E
 
 ---
 
+## Configuring agent
+
+Gate: `config:edit`. Missing permission: **403** `You can't change configuring-agent settings.`
+
+Settings row name `Configuring agent`, fixed id. Key ciphertext is never returned. `key_set` is a boolean. Changing `provider` clears the stored key and, unless `model` is sent in that same save, the model. `DELETE` of the key also clears `agent_model`.
+
+`GET /v1/configuring-agent/models?provider=openai|xai|anthropic` calls that provider only. A missing key names `OPENAI_API_KEY`, `XAI_API_KEY`, or `ANTHROPIC_API_KEY`. No other vendor is tried.
+
+Configurations are unique per client by name. Each has an id. Documents and chunks belong to the configuration. Chunks are `vector(384)` from local MiniLM (ragged). The document response does not include file text.
+
+`POST .../runs` requires a ready document and a provider, model, and key. Empty input does not call the model.
+
+`POST /v1/configuring-agent/runs/{id}/apply` applies accepted steps in one transaction. Success is **200** and status `done`, and the configuration ledger gains a name and id per stored object. If a step cannot be expressed, the transaction rolls back, then the run is saved as `stopped` with banner `Can't apply this change through configuration APIs` (**200**). A permission failure rolls back and returns **403** with the run. Nothing from that apply remains.
+
+The proposal uses the Schema catalog (`ui_schema_catalog.py`). `lists`, `list_entries`, and `units` are not Schema tables.
+
+| Method | Path |
+|--------|------|
+| GET, PUT | `/v1/configuring-agent/settings` |
+| PUT, DELETE | `/v1/configuring-agent/settings/key` |
+| GET | `/v1/configuring-agent/models` |
+| GET, POST | `/v1/configuring-agent/configurations` |
+| GET | `/v1/configuring-agent/configurations/{id}` |
+| POST | `/v1/configuring-agent/configurations/{id}/documents` |
+| POST | `/v1/configuring-agent/configurations/{id}/runs` |
+| GET | `/v1/configuring-agent/runs/{id}` |
+| POST | `/v1/configuring-agent/runs/{id}/steps/{step_id}/accept` |
+| POST | `/v1/configuring-agent/runs/{id}/steps/{step_id}/skip` |
+| POST | `/v1/configuring-agent/runs/{id}/steps/{step_id}/redo` |
+| POST | `/v1/configuring-agent/runs/{id}/apply` |
+
+Operator steps: [configuring-agent.md](configuring-agent.md).
+
+---
+
 ## LIMS Runs — promote-on-publish
 
 Full run lifecycle is under `/v1/lims-runs`. See [lims-runs.md](lims-runs.md) for product rules.

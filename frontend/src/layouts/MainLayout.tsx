@@ -66,6 +66,8 @@ const getRouteTitle = (pathname: string): string => {
     '/admin/schema/layouts': 'Schema Layouts',
     '/admin/schema/privileges': 'Schema Privileges',
     '/admin/schema/relations': 'Schema Relations',
+    '/admin/configuring-agent': 'Configuring agent',
+    '/admin/settings/configuring-agent': 'Configuring agent settings',
     '/admin/workflow-templates': 'Workflow Templates',
     '/admin/help': 'Help Management',
   };

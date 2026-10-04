@@ -34,6 +34,8 @@ import {
   BatteryChargingFull,
   Tune as TuneIcon,
   Help as HelpIcon,
+  Settings as SettingsIcon,
+  Assignment as AssignmentIcon,
   Straighten as StraightenIcon,
   Folder as FolderIcon,
   PrecisionManufacturing as PrecisionManufacturingIcon,
@@ -96,6 +98,8 @@ export const adminNavItems: AdminNavItem[] = [
   { text: 'Analytes Management', path: '/admin/analytes', icon: <Biotech /> },
   { text: 'Test Batteries', path: '/admin/test-batteries', icon: <BatteryChargingFull /> },
   { text: 'Schema', path: '/admin/schema/tables', icon: <TuneIcon /> },
+  { text: 'Configuring agent', path: '/admin/configuring-agent', icon: <AssignmentIcon />, exact: true },
+  { text: 'Configuring agent settings', path: '/admin/settings/configuring-agent', icon: <SettingsIcon /> },
   { text: 'Workflow Templates', path: '/admin/workflow-templates', icon: <TuneIcon /> },
   { text: 'Help Management', path: '/admin/help', icon: <HelpIcon /> },
 ];

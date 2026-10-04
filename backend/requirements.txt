@@ -16,3 +16,8 @@ pytest-asyncio==0.24.0
 httpx==0.28.1
 anthropic==0.47.2
 testcontainers[postgresql]==4.9.2
+cryptography>=43,<46
+pgvector==0.3.6
+fastembed>=0.4,<0.8
+pypdf>=5,<6
+python-docx>=1.1,<2
