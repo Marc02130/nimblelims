@@ -51,11 +51,13 @@ This project uses a four-container Docker setup:
    - Backend API: http://localhost:8000
    - API Documentation: http://localhost:8000/docs
    - Database: localhost:5432 (local compose only — **S12:** production uses `docker-compose.prod.yml` which does **not** publish Postgres)
+   - Local mailbox (Mailpit): http://localhost:8025
 
 4. **Login with admin credentials**
    - Username: `admin`
    - Password: `admin123`
-   - **⚠️ IMPORTANT**: Change the default password immediately after first login!
+   - **⚠️ IMPORTANT**: Change the default password immediately after first login in production.
+   - **Forgot password?** on the sign-in page emails a one-time link. Local Compose sends it to Mailpit at http://localhost:8025. See [manuals/admin-setup.md](manuals/admin-setup.md).
    - See [manuals/admin-setup.md](manuals/admin-setup.md) for detailed security instructions
 
 5. **Run migrations (if needed)**

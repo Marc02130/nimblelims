@@ -13,6 +13,8 @@ jest.mock('../services/apiService', () => ({
     changePassword: jest.fn(),
     logout: jest.fn().mockResolvedValue(undefined),
     setAuthToken: jest.fn(),
+    requestPasswordReset: jest.fn(),
+    confirmPasswordReset: jest.fn(),
   },
 }));
 
@@ -58,9 +60,10 @@ describe('Login', () => {
     
     expect(screen.getByText('LIMS Login')).toBeInTheDocument();
     expect(screen.getByText('Laboratory Information Management System')).toBeInTheDocument();
-    expect(screen.getByLabelText('Username')).toBeInTheDocument();
-    expect(screen.getByLabelText('Password')).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: /username/i })).toBeInTheDocument();
+    expect(screen.getByLabelText(/^Password/i)).toBeInTheDocument();
     expect(screen.getByText('Sign In')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Forgot password?' })).toHaveAttribute('href', '/forgot-password');
   });
 
   test('validates required fields', async () => {
@@ -78,8 +81,8 @@ describe('Login', () => {
   test('submits form with valid credentials', async () => {
     renderWithProviders(<Login />);
     
-    fireEvent.change(screen.getByLabelText('Username'), { target: { value: 'testuser' } });
-    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'password' } });
+    fireEvent.change(screen.getByRole('textbox', { name: /username/i }), { target: { value: 'testuser' } });
+    fireEvent.change(screen.getByLabelText(/^Password/i), { target: { value: 'password' } });
     
     const submitButton = screen.getByText('Sign In');
     fireEvent.click(submitButton);
@@ -96,14 +99,14 @@ describe('Login', () => {
     
     renderWithProviders(<Login />);
     
-    fireEvent.change(screen.getByLabelText('Username'), { target: { value: 'testuser' } });
-    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'wrongpassword' } });
+    fireEvent.change(screen.getByRole('textbox', { name: /username/i }), { target: { value: 'testuser' } });
+    fireEvent.change(screen.getByLabelText(/^Password/i), { target: { value: 'wrongpassword' } });
     
     const submitButton = screen.getByText('Sign In');
     fireEvent.click(submitButton);
     
     await waitFor(() => {
-      expect(screen.getByText('Login failed')).toBeInTheDocument();
+      expect(screen.getByText(/login failed/i)).toBeInTheDocument();
     });
   });
 
@@ -113,8 +116,8 @@ describe('Login', () => {
     
     renderWithProviders(<Login />);
     
-    fireEvent.change(screen.getByLabelText('Username'), { target: { value: 'testuser' } });
-    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'password' } });
+    fireEvent.change(screen.getByRole('textbox', { name: /username/i }), { target: { value: 'testuser' } });
+    fireEvent.change(screen.getByLabelText(/^Password/i), { target: { value: 'password' } });
     
     const submitButton = screen.getByText('Sign In');
     fireEvent.click(submitButton);

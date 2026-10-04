@@ -97,6 +97,19 @@ LOGIN_MAX_FAILURES = int(os.getenv("LOGIN_MAX_FAILURES") or "5")
 LOGIN_LOCKOUT_MINUTES = int(os.getenv("LOGIN_LOCKOUT_MINUTES") or "15")
 LOGIN_FAILURE_WINDOW_MINUTES = int(os.getenv("LOGIN_FAILURE_WINDOW_MINUTES") or "15")
 
+# Password reset email. Empty host means the feature tells every caller it is
+# unavailable (no account lookup). PUBLIC_APP_URL is required outside local/test.
+SMTP_HOST = (os.getenv("SMTP_HOST") or "").strip()
+SMTP_PORT = int(os.getenv("SMTP_PORT") or "587")
+SMTP_USER = (os.getenv("SMTP_USER") or "").strip()
+SMTP_PASSWORD = os.getenv("SMTP_PASSWORD") or ""
+SMTP_FROM = (os.getenv("SMTP_FROM") or "").strip()
+SMTP_TLS = (os.getenv("SMTP_TLS") or "true").strip().lower() in ("1", "true", "yes", "on")
+SMTP_SSL = _env_flag("SMTP_SSL")
+PUBLIC_APP_URL = (os.getenv("PUBLIC_APP_URL") or "").strip()
+PASSWORD_RESET_TTL_MINUTES = int(os.getenv("PASSWORD_RESET_TTL_MINUTES") or "60")
+PASSWORD_RESET_MAX_PER_HOUR = int(os.getenv("PASSWORD_RESET_MAX_PER_HOUR") or "3")
+
 # P4 / S10 cookie AuthN
 AUTH_COOKIE_NAME = os.getenv("AUTH_COOKIE_NAME") or "nimble_access"
 CSRF_COOKIE_NAME = os.getenv("CSRF_COOKIE_NAME") or "nimble_csrf"

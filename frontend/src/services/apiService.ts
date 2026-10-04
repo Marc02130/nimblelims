@@ -1,4 +1,5 @@
 import axios, { AxiosInstance, AxiosResponse } from 'axios';
+import { isPublicAuthPath } from './publicAuthPath';
 
 // Use nginx proxy at /api/ which forwards to backend:8000
 // This avoids CORS issues and works in Docker
@@ -228,7 +229,7 @@ export class ApiService {
           } catch {
             /* ignore */
           }
-          if (window.location.pathname !== '/login') {
+          if (!isPublicAuthPath(window.location.pathname)) {
             window.location.href = '/login';
           }
         }
@@ -252,6 +253,19 @@ export class ApiService {
   }
 
   // Auth endpoints
+  async requestPasswordReset(email: string) {
+    const response: AxiosResponse = await this.api.post('/auth/password-reset', { email });
+    return response.data;
+  }
+
+  async confirmPasswordReset(token: string, newPassword: string) {
+    const response: AxiosResponse = await this.api.post('/auth/password-reset/confirm', {
+      token,
+      new_password: newPassword,
+    });
+    return response.data;
+  }
+
   async login(username: string, password: string) {
     const response: AxiosResponse = await this.api.post('/auth/login', {
       username,
