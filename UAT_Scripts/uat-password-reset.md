@@ -1,7 +1,7 @@
 # UAT: Password reset email
 
 **Stem:** `password-reset`  
-**Status:** Ready for a tester. Dogfood is logged. This is not a UAT pass.  
+**Status:** UAT pass. Tester Tobias, 2026-10-04. Not a stamp beyond what was run.
 **Branch:** `dev-seed-password-reset`  
 **Dogfood:** [`.docs/review/development-process/dogfood/password-reset.md`](../.docs/review/development-process/dogfood/password-reset.md)
 
@@ -58,8 +58,10 @@ Completing section 2 retires `labtech123` for that user. There is no button to p
 
 | Section | Result | Tester | Date | Notes |
 |---------|--------|--------|------|-------|
-| 1 | | | | |
-| 2 | | | | |
-| 3 | | | | |
+| 1 | Pass | Tobias | 2026-10-04 | Steps 1–4 on pwreset-uat. |
+| 2 | Pass | Tobias | 2026-10-04 | Steps 1–7 on pwreset-uat. Step 4: old password rejected (401). Step 7: prior session got 401 on GET /auth/me. |
+| 3 | Pass | Tobias | 2026-10-04 | Steps 1–3. Step 4 skipped because mail stayed on (script says skip on the default local stack). |
 
-**UAT pass:** no
+The first mail in the second run hit the 3-per-hour cap, so only pwreset-uat’s password-reset rows from the last hour were deleted (3 rows), then mail arrived. No token, no password.
+
+**UAT pass:** yes
