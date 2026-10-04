@@ -6,7 +6,7 @@
 **Design:** `.docs/internal/design/configuring-agent.md`  
 **Manual:** `manuals/configuring-agent.md`  
 **Migration:** `0083_configuring_agent`  
-**Status:** UAT **failed**. Sections 1, 2, 3, 4, and 6 passed. Section 5 is **blocked** (schema:edit grant was not proposed). Do not treat this as a UAT Pass.
+**Status:** UAT **passed**. Sections 1, 2, 3, 4, 5, and 6 passed.
 
 ## Fail bars
 
@@ -61,7 +61,7 @@ Do not treat a failed documented password as a product failure of this script. R
 1. Accept two steps that the APIs can express, and Skip the rest. Apply. Status becomes done. The configuration ledger lists each stored object with a name and an id, including an experiment template when one was accepted. Schema, Lists, or Roles shows the same records.
 2. Repeat with a second configuration. Accept one valid step and one step the signed-in user cannot perform (schema mutate without `schema:edit`, or a step the API rejects). Apply. The run is failed or stopped. The first step’s table, column, list, or template is **not** present. Ledger rows from this apply are absent.
 3. Accept a step whose only action is granting a role `schema:edit` it does not already have. Apply stops, writes nothing, and does not add that permission.
-**Pass / Fail:** Blocked. Two accepted steps on UAT ledger pass applied HTTP 200 status done (list `UAT intake source` `aaf58812-a35d-4bf0-b2ae-49ed3269f088` and experiment template `UAT intake plate` `69dd4d8c-ff8c-482a-ba93-198d63062b36` on the ledger and on Lists and experiment templates). A second run accepted a valid list plus `POST /v1/schema/columns` for a missing table; Apply returned status failed `Table not found`, applied 0, and neither the list nor a ledger row remained. A schema:edit-only grant was not proposed on two runs (400 `The model did not return any configuration steps.`), so Accept/Apply of that grant was not observed. `schema:edit` is still only on Administrator.
+**Pass / Fail:** Pass. Two accepted steps on UAT ledger pass applied HTTP 200 status done (list `UAT intake source` `aaf58812-a35d-4bf0-b2ae-49ed3269f088` and experiment template `UAT intake plate` `69dd4d8c-ff8c-482a-ba93-198d63062b36` on the ledger and on Lists and experiment templates). A second run accepted a valid list plus `POST /v1/schema/columns` for a missing table; Apply returned status failed `Table not found`, applied 0, and neither the list nor a ledger row remained. The model does not invent a schema:edit grant (earlier runs returned 400 `The model did not return any configuration steps.`), so the step was stored as `configuration_steps` the way a run step is stored: configuration `UAT schema edit refusal` `c8c50a66-4ad7-4a64-921c-9b55120f2a11`, run `8f08c3d8-91bd-4449-8532-b82ac3e97bcf`, step `943ed296-a448-474c-8042-b4d0361bd5c9`, action `Grant schema:edit`, `PUT /roles/cccccccc-cccc-cccc-cccc-cccccccccccc/permissions` (Lab Technician) with that role's existing 11 permission ids plus `schema:edit`. Accept returned 200, decision accepted. Apply returned HTTP 200, status stopped, banner `Can't apply this change through configuration APIs`, step gap `Lab personnel input does not grant schema:edit.`, applied_count 0, and no ledger row for the run (`configuration_items` stayed 2). `role_permissions` was unchanged. Lab Technician still has 11 permissions and does not have `schema:edit`. `schema:edit` is still only on Administrator.
 
 ## 6. Out of scope
 
