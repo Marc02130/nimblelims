@@ -3,14 +3,14 @@
 **PRD:** [../../prd/configuring-agent/PRD.md](../../prd/configuring-agent/PRD.md)  
 **Design:** [../../design/configuring-agent.md](../../design/configuring-agent.md)  
 **Date:** 2026-10-03  
-**Status:** Working draft. Contracts a later build would have to meet. **Not an implement packet.**  
-**Implement gate:** **CLOSED.**
+**Status:** Working draft. The `configuring-agent` branch implements the contracts below plus Marc’s 2026-10-03 locks in the PRD.  
+**Implement gate:** Those locks. This spec still has **no** UAT Pass.
 
-No Accept, Confirm, or UAT Pass. Tobias’s earlier AC-1 through AC-6 are replaced. Cite only **FB-1 through FB-10** below. They are fail bars for a later product tip. This docs packet does not get a UAT stamp.
+No Accept, Confirm, or UAT Pass. Tobias’s earlier AC-1 through AC-6 are replaced. Cite only **FB-1 through FB-10** below.
 
-Paths below are FastAPI routes as mounted in `backend/app/main.py`. The UI calls them under `/api` because nginx strips that prefix. A route not listed here was not verified. Do not invent one.
+Paths below are FastAPI routes as mounted in `backend/app/main.py` under `/v1/configuring-agent`. The UI calls them under `/api` because nginx strips that prefix.
 
-`agent_provider`, `agent_model`, and an encrypted key store do not exist in the repo today. No configuring-agent settings route and no run route exist in `frontend/src/App.tsx`.
+Settings and runs are in `App.tsx`: `/admin/settings/configuring-agent` and `/admin/configuring-agent`. The gate is `config:edit`. Chunks and the ledger belong to a named configuration. Embeddings match ragged (local MiniLM, 384-d). Apply is one transaction: a failure rolls back every write from that apply, then records the failure. The agent uses `ui_schema_catalog.py` and no second Schema list.
 
 ---
 
@@ -139,6 +139,7 @@ When no existing API can express the change:
 - Banner text, exact: `Can't apply this change through configuration APIs`
 - Show the blocked step and the gap in plain words.
 - Write nothing for that step. No workaround. No silent drop. No continue into later steps.
+- If apply already wrote earlier accepted steps in the same transaction, roll those back too. Do not leave a partial configuration. Record Stopped or Failed only after that rollback.
 
 An HTTP error from an API the agent did call stays on that row with the API error (Mathilda). That is not a license to retry through SQL, JSONB, or `custom_attributes`.
 
@@ -148,7 +149,7 @@ An HTTP error from an API the agent did call stays on that row with the API erro
 
 FB-7. A caller without `schema:edit` who reaches a schema mutate gets **403** and no writes.
 
-Settings are a different gate. The copy for a caller who lacks it is “You can't change configuring-agent settings.” The permission name is **open**.
+Settings use the same `config:edit` gate. The copy for a caller who lacks it is “You can't change configuring-agent settings.”
 
 Lab personnel input does not grant `schema:edit`. The agent does not grant it to itself.
 

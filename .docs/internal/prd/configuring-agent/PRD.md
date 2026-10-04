@@ -2,14 +2,24 @@
 
 **Domain:** How an admin turns lab inputs into NimbleLIMS configuration  
 **Date:** 2026-10-03  
-**Status:** Working draft. **Not an implement packet.**  
-**Implement gate:** **CLOSED.** Stays closed until these docs are locked and Marc green-lights code (Rolf). This file is not that green light.  
+**Status:** Working draft. Marc locked the open build questions on 2026-10-03 (below). The branch `configuring-agent` implements those locks.  
+**Implement gate:** Those locks are the green light for this branch. This file still has **no** review Accept and **no** UAT Pass.  
 **Spec:** [../../specs/configuring-agent/SPEC.md](../../specs/configuring-agent/SPEC.md)  
 **Design:** [../../design/configuring-agent.md](../../design/configuring-agent.md)  
 **History (leave standing):** [configuration PRD](../configuration/PRD.md) · [configuration spec](../../specs/configuration/SPEC.md) · [AI SOP north star](../ai-sop-north-star/PRD.md)  
 **Team:** Marc locks below. Rolf product locks. Mathilda surfaces (preference labeled). Tobias fail bars live in the spec. Katinka names public SOPs. Anton names dataset shapes. No fixtures in this packet.
 
 No Accept, Confirm, or UAT Pass is recorded here. August 2026 files stay history. This packet does not reopen them and does not open their implement gates.
+
+## Decisions locked 2026-10-03
+
+- The gate is existing `config:edit`, not a new `agent:configure`. Anyone with `config:edit` may open settings and start a run. The agent calls existing APIs as that user and does not grant itself `schema:edit`.
+- Chunks stay on the named configuration (name and id), not on the person who uploaded them. `created_by` still records who did it. A new process is one such configuration. The same name-and-id rule applies to settings, documents, runs, and each ledger row.
+- The ledger stores configuration that was actually applied: tables, columns, relationships, experiment templates, and the other allowed kinds. Each row has a name and an id.
+- Vectorization matches ragged: local `sentence-transformers/all-MiniLM-L6-v2`, 384 dimensions, `fastembed`, batch 32. Tests use `EMBEDDING_PROVIDER=stub` (`[[0.01] * 384]`). Chunking is heading-aware, 1000 characters, 200 overlap.
+- Apply is one transaction. If any accepted step cannot be expressed or the API errors, every write from that apply is rolled back, including earlier steps in the same apply. The failure is recorded after the rollback. A partial configuration is not left behind.
+- The agent uses the Schema screen’s allow-list (`ui_schema_catalog.py`). It does not keep a second list. OQ-1 is not restamped here. OQ-5b stays open; the agent does not choose CASCADE.
+- Changing provider clears the stored key and the model, then models are loaded from that provider only. Clearing the key also clears the model. Models are fetched on the server. Accept, feedback-and-redo, or Skip, then Apply only the accepted steps.
 
 ---
 
@@ -23,9 +33,9 @@ One chosen LLM proposes. The product applies by calling APIs that already exist.
 
 ## 1. Who it is for
 
-Startup biotech/pharma LIMS only (Rolf). The person who sets the provider and starts a run is an admin. Mathilda’s default is Admin only for both Settings and New run. Whether a lab manager may start a run is **open** (her default stands until someone decides).
+Startup biotech/pharma LIMS only (Rolf). Anyone with `config:edit` may set the provider and start a run. Today the Administrator seed role has that permission. Lab Manager does not, unless it is granted.
 
-Lab techs do not see API keys. A caller without the settings gate sees: “You can't change configuring-agent settings.” The exact permission name is **open** (Mathilda suggests `agent:configure` or the existing admin settings gate).
+Lab techs do not see API keys. A caller without `config:edit` sees: “You can't change configuring-agent settings.”
 
 `schema:edit` stays Admin-only (Rolf). The agent does not mint that permission, does not add a Schema-admin role, and lab personnel input does not grant `schema:edit`.
 
@@ -211,9 +221,9 @@ Asked-for, routing, parsers, and ELN authoring stay on the older packets. Rolf k
 
 ## 11. Mathilda
 
-Two surfaces. Detail is in the [design](../../design/configuring-agent.md). Settings: Admin → Settings → Configuring agent. Run: Admin → Configuring agent → New run. Neither route exists in `App.tsx` today.
+Two surfaces. Detail is in the [design](../../design/configuring-agent.md). Settings: Admin → Configuring agent settings (`/admin/settings/configuring-agent`). Run: Admin → Configuring agent (`/admin/configuring-agent`).
 
-Confirm-before-apply is her preference, not a Marc lock.
+Accept, feedback-and-redo, or Skip, then Apply. Apply does not leave a partial configuration.
 
 ---
 
@@ -237,11 +247,14 @@ This draft does not claim that behavior ships.
 |------|-----|--------|
 | OQ-1 Schema Tables allow-list | Marc | Open for him. Not frozen by this packet. |
 | OQ-5b on-delete | Marc | Open for him. Katinka’s RESTRICT on identity links is her position only. |
-| Settings permission name | Mathilda | Open. She suggests `agent:configure` or the existing admin settings gate. |
-| Clearing the key also clears `agent_model` | Mathilda | Open. |
-| Models fetched server-side or in the browser | Mathilda | Open. She recommends server-proxied. |
-| Auto-apply vs always-confirm | Mathilda | Open. Accept-or-Skip then Apply is her preference. |
-| Lab managers starting runs | Mathilda | Open. Her default is Admin only. |
-| Input retention and PHI on uploads | Mathilda | Open. |
+| Settings permission name | Marc | **Decided.** `config:edit`. |
+| Clearing the key also clears `agent_model` | Marc | **Decided.** Yes. Changing provider clears the key and the model. |
+| Models fetched server-side or in the browser | Marc | **Decided.** Server-side, chosen provider only. |
+| Auto-apply vs always-confirm | Marc | **Decided.** Accept, feedback-and-redo, or Skip. Apply accepted steps as one transaction. |
+| Who may start a run | Marc | **Decided.** Anyone with `config:edit`, not a new permission. |
+| Where chunks live | Marc | **Decided.** On the named configuration, with a ledger of what was stored. |
+| Failed apply | Marc | **Decided.** Roll back the whole apply. No partial configuration. |
+| Which Schema list | Marc | **Decided.** The Schema screen list. No second list. |
+| Input retention and PHI on uploads | Mathilda | Open. No retention control in this build. |
 | What else a startup LIMS must refuse | Rolf | His locks in §4 and §7 are in this draft. He did not add a further list. |
 | Dataset fixtures | Anton | Out. No Brief, no seed. |

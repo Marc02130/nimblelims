@@ -33,6 +33,8 @@ import AdminAnalytesManagement from './pages/admin/AnalytesManagement';
 import AnalysisAnalytesConfig from './pages/admin/AnalysisAnalytesConfig';
 import HelpManagement from './pages/admin/HelpManagement';
 import WorkflowTemplatesManagement from './pages/admin/WorkflowTemplatesManagement';
+import ConfiguringAgentSettings from './pages/admin/ConfiguringAgentSettings';
+import ConfiguringAgentRun from './pages/admin/ConfiguringAgentRun';
 import ClientProjects from './pages/ClientProjects';
 import ClientsManagement from './pages/ClientsManagement';
 import ProjectsManagement from './pages/ProjectsManagement';
@@ -504,6 +506,26 @@ function AppRoutes() {
           element={
             hasPermission('config:edit') ? (
               <SampleTypeTransitionsManagement />
+            ) : (
+              <Navigate to="/dashboard" replace />
+            )
+          }
+        />
+        <Route
+          path="/admin/settings/configuring-agent"
+          element={
+            hasPermission('config:edit') ? (
+              <ConfiguringAgentSettings />
+            ) : (
+              <Navigate to="/dashboard" replace />
+            )
+          }
+        />
+        <Route
+          path="/admin/configuring-agent"
+          element={
+            hasPermission('config:edit') ? (
+              <ConfiguringAgentRun />
             ) : (
               <Navigate to="/dashboard" replace />
             )

@@ -70,6 +70,12 @@ services:
       ALLOW_INSECURE_DEFAULTS: "true"
       ALLOW_DEV_SEED_USERS: "true"
       R_CALCULATOR_URL: http://r-calculator:8000
+      # Local MiniLM (384-d), same as ragged. Tests set EMBEDDING_PROVIDER=stub.
+      EMBEDDING_PROVIDER: local
+      # Optional fallbacks when Configuring agent has no stored key. Never a fake key.
+      # OPENAI_API_KEY:
+      # XAI_API_KEY:
+      # ANTHROPIC_API_KEY:
     ports:
       - "8000:8000"
     networks:

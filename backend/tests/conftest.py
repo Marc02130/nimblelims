@@ -8,6 +8,7 @@ import os
 os.environ.setdefault("ENVIRONMENT", "test")
 os.environ.setdefault("ALLOW_INSECURE_DEFAULTS", "true")
 os.environ.setdefault("SECRET_KEY", "pytest-secret-key-not-for-production")
+os.environ.setdefault("EMBEDDING_PROVIDER", "stub")
 
 import pytest
 from fastapi.testclient import TestClient
@@ -26,7 +27,7 @@ from app.core.security import get_password_hash
 import models  # noqa: F401
 
 
-POSTGRES_IMAGE = "postgres:15"
+POSTGRES_IMAGE = "pgvector/pgvector:pg15"
 
 
 @pytest.fixture(scope="session")
@@ -40,6 +41,9 @@ def pg_container():
 def db_engine(pg_container):
     """Create engine and schema once per test session."""
     engine = create_engine(pg_container.get_connection_url())
+    with engine.connect() as conn:
+        conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
+        conn.commit()
     Base.metadata.create_all(bind=engine)
     yield engine
     # Drop via raw SQL to avoid CircularDependencyError from clients↔roles↔users FKs

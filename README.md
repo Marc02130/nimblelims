@@ -14,7 +14,7 @@ Copyright (c) 2025 Marc Breneiser
 
 This project uses a four-container Docker setup:
 
-- **Database (PostgreSQL 15+)**: Data persistence with Row-Level Security
+- **Database (PostgreSQL 15+ with pgvector)**: Data persistence with Row-Level Security. Configuring agent stores 384-d MiniLM embeddings (same model as ragged).
 - **Backend (FastAPI + Python 3.10+)**: RESTful API with JWT authentication and RBAC
 - **Frontend (React 18+)**: Modern web interface with TypeScript
 - **R Calculator (Plumber API)**: Optional microservice for dose-response curve fitting (4PL model, IC50, SVG generation) — shipped enhancement, not MVP
