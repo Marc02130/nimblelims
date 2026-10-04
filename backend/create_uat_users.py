@@ -36,7 +36,7 @@ from sqlalchemy.orm import sessionmaker
 
 from models.user import User, Role
 from models.client import Client
-from app.core.security import get_password_hash
+from app.core.security import bump_password_epoch, get_password_hash
 
 TEMP_PASSWORD = "***REMOVED***"
 SYSTEM_CLIENT_ID = UUID("00000000-0000-0000-0000-000000000001")
@@ -105,6 +105,7 @@ def _upsert_user(
     user = db.query(User).filter(User.username == username).first()
     if user:
         user.password_hash = get_password_hash(TEMP_PASSWORD)
+        bump_password_epoch(user)
         user.role_id = role.id
         user.client_id = client.id
         user.must_change_password = must_change

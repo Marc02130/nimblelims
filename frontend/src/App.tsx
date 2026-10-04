@@ -1,5 +1,5 @@
 import React from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import MainLayout from './layouts/MainLayout';
 import Dashboard from './pages/Dashboard';
 import AtomicReceive from './pages/AtomicReceive';
@@ -18,6 +18,8 @@ import ContainerManagement from './pages/ContainerManagement';
 import BatchManagement from './pages/BatchManagement';
 import ResultsManagement from './pages/ResultsManagement';
 import Login from './pages/Login';
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
 import ChangePassword from './pages/ChangePassword';
 import AdminOverview from './pages/admin/AdminOverview';
 import ListsAdmin from './pages/admin/ListsAdmin';
@@ -548,6 +550,15 @@ function AppRoutes() {
 
 function App() {
   const { user, loading, mustChangePassword } = useUser();
+  const location = useLocation();
+
+  // These pages stay reachable with no session. A reset link must not bounce to login.
+  if (location.pathname === '/forgot-password') {
+    return <ForgotPassword />;
+  }
+  if (location.pathname === '/reset-password') {
+    return <ResetPassword />;
+  }
 
   if (loading) {
     return <div>Loading...</div>;

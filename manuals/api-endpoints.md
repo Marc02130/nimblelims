@@ -59,6 +59,24 @@ Get current user information.
 
 **Headers:** `Authorization: Bearer <token>`
 
+### POST /auth/password-reset
+Ask for a one-time reset email. No login. The JSON body is the same whether or not the email belongs to an account.
+
+**Request:** `{ "email": "person@example.com" }`
+
+**Response (mail configured):** `{ "message": "If an account exists for that email, we sent a reset link. ..." }`
+
+**Response (mail not configured):** **503** `{ "detail": "Password reset email is not available. Ask an administrator to set a new password." }`
+
+### POST /auth/password-reset/confirm
+Set a new password. No login, and the response does not include a token.
+
+**Request:** `{ "token": "<from the email fragment>", "new_password": "..." }`
+
+**Response:** `{ "message": "Password updated. Sign in with your new password." }`
+
+A used, expired, or unknown token is **400** `This reset link is invalid or has expired.` A password that fails the usual complexity rules is **400** `password_complexity` and does not use up the link.
+
 ## Samples
 
 ### GET /samples
@@ -1397,7 +1415,7 @@ Get all container types.
 
 ## Authentication
 
-All endpoints (except `/auth/login`) require a JWT token in the Authorization header:
+Most endpoints require a JWT token in the Authorization header. These do not: `/auth/login`, `/auth/password-reset`, `/auth/password-reset/confirm`, and `/auth/verify-email`.
 
 ```
 Authorization: Bearer <token>

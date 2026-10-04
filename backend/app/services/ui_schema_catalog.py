@@ -66,6 +66,7 @@ ENGINE_INTERNAL: tuple[str, ...] = (
     "alembic_version",
     "revoked_tokens",
     "login_throttle",
+    "password_reset_tokens",
     "permissions",
     "role_permissions",
     "schema_tables",
