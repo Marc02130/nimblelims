@@ -5,6 +5,7 @@ from .base import Base
 from .user import User, Role, Permission
 from .login_throttle import LoginThrottle
 from .revoked_token import RevokedToken
+from .password_reset_token import PasswordResetToken
 from .client import (
     Client,
     Location,

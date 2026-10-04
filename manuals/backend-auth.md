@@ -17,18 +17,21 @@ This implementation provides a complete authentication system for the NimbleLIMS
 - **POST /auth/logout**: Clears auth cookies (CSRF required when cookie session present)
 - **GET /auth/me**: Current user (cookie **or** `Authorization: Bearer`; includes `must_change_password`)
 - **POST /auth/verify-email**: Email verification (stub implementation; disabled in production)
+- **POST /auth/password-reset**: Email a one-time reset link. No login. The response does not say whether the email exists. **503** with the same message for every caller when SMTP is not configured (no account lookup).
+- **POST /auth/password-reset/confirm**: Set a new password from that link. Does not sign in. Clears `must_change_password` and login lockout. Older sessions for that user stop working.
 
 ### 3. Security Features
 - **Password Hashing**: bcrypt (legacy unsalted SHA256 verified once, then upgraded on login)
 - **Must change password**: `users.must_change_password` — while true, only change-password / me / logout; other routes **403** `password_change_required`
 - **Complexity**: min 12 chars; upper, lower, digit, symbol; ≠ username; ≠ current password
-- **JWT Tokens**: PyJWT; claim `pwd_change` when change required. `SECRET_KEY` (alias `JWT_SECRET_KEY`); refuse defaults unless `ALLOW_INSECURE_DEFAULTS` in development/test
+- **JWT Tokens**: PyJWT; claim `pwd_change` when change required; claim `pwd_epoch` matches `users.password_epoch`. A password change increments the epoch, so older tokens are **401**. `SECRET_KEY` (alias `JWT_SECRET_KEY`); refuse defaults unless `ALLOW_INSECURE_DEFAULTS` in development/test
 - **Cookie AuthN (P4 / S10)**: SPA uses `nimble_access` (httpOnly, SameSite=Lax, Secure in prod) — **not** `localStorage`. Double-submit CSRF: `nimble_csrf` cookie + `X-CSRF-Token` header on mutating requests when authenticated via cookie. Bearer still accepted for scripts/API (CSRF skipped).
 - **JWT denylist**: each token has a `jti`; logout (and password change) inserts into `revoked_tokens`. Resent Bearer after logout → **401**.
 - **Project access (S7)**: Lab Technician / Lab Manager on a tenant client need a `project_users` row (no same-client short-circuit). Client role keeps same-client isolation. System-client lab users and admins unchanged.
 - **RBAC**: 17 core permissions for granular access control (with additional permissions added in migrations). **Frontend `hasPermission` is UX only** — server RBAC + Postgres RLS are AuthZ.
 - **Token Validation**: Secure token verification with expiration
 - **Bootstrap**: `BOOTSTRAP_ADMIN_PASSWORD` for production admin create; `ALLOW_DEV_SEED_USERS` for local/demo temporary seeds
+- **Password reset email** (production): sign-in shows **Forgot password?**. `SMTP_HOST`, `SMTP_FROM`, and `PUBLIC_APP_URL` must be set (`SMTP_PORT` default 587, `SMTP_TLS` default true, `SMTP_USER` / `SMTP_PASSWORD` when the server requires them, `SMTP_SSL=true` for implicit TLS). The link is `{PUBLIC_APP_URL}/reset-password#token=...` (the token is in the fragment, so it is not in the request line). Only the SHA-256 of the token is stored. Default life is 60 minutes (`PASSWORD_RESET_TTL_MINUTES`). A new link retires the previous one. More than 3 sends in an hour for one account (`PASSWORD_RESET_MAX_PER_HOUR`) stay quiet and do not send another message. The email never contains a password. Inactive accounts are not mailed. A failed send does not leave a usable token.
 - **DB roles (P0d)**: runtime `DATABASE_URL` → **`lims_app`** (non-superuser); migrations/ensure → **`MIGRATE_DATABASE_URL`** (owner `lims_user`). `start.sh` runs Alembic then `ensure_lims_app_role.py` (create-once password from `LIMS_APP_PASSWORD`; grants idempotent; rotate only with `ENSURE_LIMS_APP_PASSWORD_ROTATE=true`). RLS GUCs: `app.current_user_id` / `app.client_id` via `set_config(..., true)`
 
 ### 4. Core Permissions (17 total)
