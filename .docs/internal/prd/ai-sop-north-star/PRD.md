@@ -7,3 +7,5 @@ Working copy. Formal guidance SoT is committed:
 - [`.docs/discussions/2026-08-28-ai-sop-north-star.md`](../../../discussions/2026-08-28-ai-sop-north-star.md)
 
 **Implement gate CLOSED.** Differentiator: SOP + example execution files → vector store → MCP → draft process + parser framework config.
+
+**Configuring agent (2026-10-03, working draft, implement gate CLOSED):** [PRD](../configuring-agent/PRD.md) · [spec](../../specs/configuring-agent/SPEC.md) · [design](../../design/configuring-agent.md). That packet configures through existing APIs and stops when an API cannot express the change. It does not open this gate.
