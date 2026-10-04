@@ -1,12 +1,12 @@
 # Design: Configuring agent
 
 **Date:** 2026-10-03  
-**Status:** Working draft. **Not an implement packet.**  
-**Implement gate:** **CLOSED.**  
+**Status:** Working draft. Marc locked the screen questions on 2026-10-03. See the PRD decisions. No review Accept. No UAT Pass.  
+**Implement gate:** Open for the `configuring-agent` branch under those locks.  
 **PRD:** [../prd/configuring-agent/PRD.md](../prd/configuring-agent/PRD.md)  
 **Spec:** [../specs/configuring-agent/SPEC.md](../specs/configuring-agent/SPEC.md)
 
-Operator-facing shape of provider setup and of a configuration run. No chat transcript as the product. Routes below are proposed. They are not in `App.tsx` today.
+Operator-facing shape of provider setup and of a configuration run. No chat transcript as the product. Routes are in `App.tsx`.
 
 Marc, explicit: an admin picks the provider (`openai`, `xai`, or `anthropic`) and picks the model from that provider’s live models endpoint. Store both as `agent_provider` and `agent_model`. No fixed catalog.
 
@@ -20,7 +20,7 @@ Mathilda’s confirm-before-apply flow is a **proposal and her preference**. It 
 
 Not lab-tech. No chat, no conversation UI, no prompt playground, no test message, no streaming panel.
 
-A caller without the settings gate sees: “You can't change configuring-agent settings.” The permission name is open (`agent:configure` or the existing admin settings gate).
+A caller without `config:edit` sees: “You can't change configuring-agent settings.”
 
 ### Fields
 
@@ -49,7 +49,7 @@ Separate save for provider and model. Separate key actions:
 - Set or update key.
 - Clear key. Confirm: “Clear the {provider} key? Configuring agent can't call that provider until a key is set again.”
 
-Whether Clear also clears the model is open.
+Clear also clears the model. The provider stays.
 
 The key never appears in a URL, log, or toast. Mathilda recommends the models endpoint be server-proxied. Browser-direct is open. Either way the key stays off the wire the browser can read back, and off the URL.
 
@@ -67,9 +67,9 @@ Chat pane. Hard-coded model dropdown. Raw key after save. Lab-tech access to key
 
 ## 2. Run (proposal — Mathilda, not a lock)
 
-**Place:** Admin → Configuring agent → New run.
+**Place:** Admin → Configuring agent (`/admin/configuring-agent`).
 
-Her default is Admin only. Whether a lab manager can start a run is open.
+Anyone with `config:edit` may start a run. Lab Manager does not have that permission unless it is granted.
 
 ### Start
 
@@ -95,7 +95,7 @@ Each step shows:
 
 Group by Schema tables/columns, Layouts, Privileges, Relations, and other existing config APIs. Do not invent Schema chrome for lists. `lists` and `list_entries` do not appear in the Schema group. A list-entry write, if the list API is how a dropdown value is set, sits under other existing config APIs.
 
-**Her preference, not a lock:** the admin Accepts or Skips each change, then Apply posts only the accepted ones through existing APIs. Auto-apply versus always-confirm is open. If auto-apply is later allowed, still show an Applied log.
+Accept, send feedback and redo that step, or Skip. Apply posts only the accepted steps, in order, as one transaction. If a later step cannot be done, every write from that apply is rolled back. The ledger updates only when the apply finishes.
 
 Failures stay on the row with the API error. The run does not continue into later steps after a gap.
 
@@ -130,9 +130,10 @@ A conversation. A dose-response plot. A parser editor. An ELN author. A SQL box.
 
 | Question | Note |
 |----------|------|
-| Permission that gates Settings | Open. |
-| Clear key clears `agent_model`? | Open. |
-| Server-proxied models vs browser-direct | Open. Recommendation: server-proxied. |
-| Always confirm vs auto-apply | Open. Accept or Skip is the proposal on the page. |
-| Lab manager may open New run? | Open. Default drawn here: Admin only. |
+| Permission that gates Settings | **Decided.** `config:edit`. |
+| Clear key clears `agent_model`? | **Decided.** Yes. |
+| Server-proxied models vs browser-direct | **Decided.** Server-proxied. |
+| Always confirm vs auto-apply | **Decided.** Accept, redo, or Skip, then Apply. One transaction. |
+| Who may open New run? | **Decided.** Anyone with `config:edit`. |
+| Where files live | **Decided.** On the named configuration, not the uploader. |
 | How long uploads are kept, and PHI | Open. Do not draw a retention control until that is decided. |

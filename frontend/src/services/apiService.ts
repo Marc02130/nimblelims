@@ -2474,6 +2474,106 @@ export class ApiService {
     );
     return response.data;
   }
+
+  async getConfiguringAgentSettings() {
+    const response: AxiosResponse = await this.api.get('/v1/configuring-agent/settings');
+    return response.data;
+  }
+
+  async saveConfiguringAgentSettings(provider: string, model: string | null) {
+    const response: AxiosResponse = await this.api.put('/v1/configuring-agent/settings', {
+      provider,
+      model,
+    });
+    return response.data;
+  }
+
+  async setConfiguringAgentKey(apiKey: string) {
+    const response: AxiosResponse = await this.api.put('/v1/configuring-agent/settings/key', {
+      api_key: apiKey,
+    });
+    return response.data;
+  }
+
+  async clearConfiguringAgentKey() {
+    const response: AxiosResponse = await this.api.delete('/v1/configuring-agent/settings/key');
+    return response.data;
+  }
+
+  async getConfiguringAgentModels(provider: string) {
+    const response: AxiosResponse = await this.api.get('/v1/configuring-agent/models', {
+      params: { provider },
+    });
+    return response.data;
+  }
+
+  async getConfigurations() {
+    const response: AxiosResponse = await this.api.get('/v1/configuring-agent/configurations');
+    return response.data;
+  }
+
+  async createConfiguration(name: string, description?: string) {
+    const response: AxiosResponse = await this.api.post('/v1/configuring-agent/configurations', {
+      name,
+      description: description || null,
+    });
+    return response.data;
+  }
+
+  async getConfiguration(id: string) {
+    const response: AxiosResponse = await this.api.get(`/v1/configuring-agent/configurations/${id}`);
+    return response.data;
+  }
+
+  async uploadConfigurationDocument(configurationId: string, file: File) {
+    const form = new FormData();
+    form.append('file', file);
+    const response: AxiosResponse = await this.api.post(
+      `/v1/configuring-agent/configurations/${configurationId}/documents`,
+      form
+    );
+    return response.data;
+  }
+
+  async startConfigurationRun(configurationId: string, goalNote?: string) {
+    const response: AxiosResponse = await this.api.post(
+      `/v1/configuring-agent/configurations/${configurationId}/runs`,
+      { goal_note: goalNote || null }
+    );
+    return response.data;
+  }
+
+  async getConfigurationRun(runId: string) {
+    const response: AxiosResponse = await this.api.get(`/v1/configuring-agent/runs/${runId}`);
+    return response.data;
+  }
+
+  async acceptConfigurationStep(runId: string, stepId: string) {
+    const response: AxiosResponse = await this.api.post(
+      `/v1/configuring-agent/runs/${runId}/steps/${stepId}/accept`
+    );
+    return response.data;
+  }
+
+  async skipConfigurationStep(runId: string, stepId: string) {
+    const response: AxiosResponse = await this.api.post(
+      `/v1/configuring-agent/runs/${runId}/steps/${stepId}/skip`
+    );
+    return response.data;
+  }
+
+  async redoConfigurationStep(runId: string, stepId: string, feedback: string) {
+    const response: AxiosResponse = await this.api.post(
+      `/v1/configuring-agent/runs/${runId}/steps/${stepId}/redo`,
+      { feedback }
+    );
+    return response.data;
+  }
+
+  async applyConfigurationRun(runId: string) {
+    const response: AxiosResponse = await this.api.post(`/v1/configuring-agent/runs/${runId}/apply`);
+    return response.data;
+  }
 }
 
 export const apiService = new ApiService();

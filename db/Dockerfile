@@ -1,4 +1,5 @@
-FROM postgres:15-alpine
+# pgvector image so configuring-agent chunks can store vector(384).
+FROM pgvector/pgvector:pg15
 
 # Copy initialization scripts
 COPY init.sql /docker-entrypoint-initdb.d/
