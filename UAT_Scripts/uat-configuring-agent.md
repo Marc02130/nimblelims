@@ -1,0 +1,70 @@
+# UAT: Configuring agent
+
+**Stem:** `configuring-agent`  
+**PRD:** `.docs/internal/prd/configuring-agent/PRD.md`  
+**Spec:** `.docs/internal/specs/configuring-agent/SPEC.md`  
+**Design:** `.docs/internal/design/configuring-agent.md`  
+**Manual:** `manuals/configuring-agent.md`  
+**Migration:** `0083_configuring_agent`  
+**Status:** Script ready. UAT pass **pending**. Do **not** invent a Pass.
+
+## Fail bars
+
+1. A second provider is used in one run, or a missing key names a different vendor’s variable, or the key is shown again after save.
+2. The model list is a fixed catalog, or it includes models from a provider other than the one selected.
+3. Apply leaves any accepted step’s write in place after a later step fails or cannot be expressed.
+4. A schema change is stored for a user who lacks `schema:edit`, or personnel input grants `schema:edit`.
+5. `lists`, `list_entries`, or `units` are proposed as Schema tables, or many-to-many is applied.
+6. A run calls the model with no ready lab file. A goal note alone counts as empty input.
+7. Chunks are stored on the uploading user instead of the named configuration, or an applied table, column, relationship, or experiment template is missing from that configuration’s ledger.
+8. The screen is a chat, a prompt box that runs without a proposal, or a SQL box.
+
+## Logins
+
+- Administrator seed has `config:edit`: `admin` / `admin123`
+- Lab technician does not: `lab-tech` / `labtech123`
+
+Do not treat a failed documented password as a product failure of this script. Reset the local password if login is locked out, then continue. Do not grant `schema:edit` to the technician to make a step pass.
+
+## 1. Gate
+
+1. As lab technician, open `/admin/settings/configuring-agent` and `/admin/configuring-agent`. Both redirect away.
+2. `GET /api/v1/configuring-agent/settings` as the technician returns **403** and the body says `You can't change configuring-agent settings.`
+**Pass / Fail:**
+
+## 2. Provider, model, key
+
+1. As admin, open Configuring agent settings. The row name is Configuring agent and an id is shown.
+2. Choose OpenAI. The model control says it is loading, then lists models from OpenAI only. Save a model.
+3. Change the provider to xAI. The previous model is cleared and the OpenAI key, if one was stored, is not reused. The error or the list is xAI’s, not OpenAI’s.
+4. Set a key. The field empties. The chip says **Key set**. Reload the page. The key is not in the page, the address bar, or a toast.
+5. Clear the key and confirm. The chip says **No key** and the model is cleared. With no env fallback, starting a run names `XAI_API_KEY` (or whichever provider is selected) and does not mention another vendor.
+**Pass / Fail:**
+
+## 3. Named configuration and files
+
+1. Create a configuration named `Acme intake`. The page shows that name and an id.
+2. Start a run before adding a file. The error says to add a lab file and does not call the model. A goal note without a file still refuses.
+3. Upload a small text file that states one concrete change the lab files actually ask for (for example a list value). It becomes ready and shows a chunk count. The page does not show the file body.
+4. Confirm in the database that `configuration_chunks` rows for that file have `configuration_id` of `Acme intake` and no user-owner column. `created_by` on the document may be the admin.
+**Pass / Fail:**
+
+## 4. Proposal uses the Schema list
+
+1. Start a run. Steps show target, action, and why.
+2. List and unit steps, if any, are under **Other configuration**, not Schema tables or Schema columns.
+3. A many-to-many proposal is **Stopped**, with banner `Can't apply this change through configuration APIs`, and it is not Accept. Nothing new is in Schema.
+**Pass / Fail:**
+
+## 5. Apply is all or nothing
+
+1. Accept two steps that the APIs can express, and Skip the rest. Apply. Status becomes done. The configuration ledger lists each stored object with a name and an id, including an experiment template when one was accepted. Schema, Lists, or Roles shows the same records.
+2. Repeat with a second configuration. Accept one valid step and one step the signed-in user cannot perform (schema mutate without `schema:edit`, or a step the API rejects). Apply. The run is failed or stopped. The first step’s table, column, list, or template is **not** present. Ledger rows from this apply are absent.
+3. Accept a step whose only action is granting a role `schema:edit` it does not already have. Apply stops, writes nothing, and does not add that permission.
+**Pass / Fail:**
+
+## 6. Out of scope
+
+1. There is no chat transcript, no prompt playground, and no SQL entry on either page.
+2. The agent does not offer Custom Fields, asked-for, routing, parsers, or ELN process definitions as places it will write.
+**Pass / Fail:**

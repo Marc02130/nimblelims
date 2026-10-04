@@ -10,7 +10,7 @@ NimbleLIMS uses a **unified sidebar navigation** (left drawer) for all authentic
 | **Sample Mgmt** | Any of: sample:create, sample:read, sample:update, test:update, test:assign, batch:manage, result:enter | Receive, Asked-for, Samples, Tests, Containers, Batches, Results |
 | **Experiments** | experiment:manage | All Experiments (ELN), Work Orders (`/work-orders`), Processes (ELN `/v1/eln-processes`), Experiment Templates, Runs (**LimsRun** `/runs` — not ELN Experiments; not `/v1/processes` checklists) |
 | **Lab Mgmt** | Any of: project:manage, analysis:manage | Projects, Clients, Client Proj, Analyses, Analytes |
-| **Admin** | config:edit | Overview, Lists, Container Types, Units, Users, Roles, Analyses, Routing map, Dest-type transitions, Analytes, Test Batteries, Schema, Workflow Templates, Help Management |
+| **Admin** | config:edit | Overview, Lists, Container Types, Units, Users, Roles, Analyses, Routing map, Dest-type transitions, Analytes, Test Batteries, Schema, Configuring agent, Configuring agent settings, Workflow Templates, Help Management |
 
 The sidebar is a persistent left-side drawer (240px expanded, 56px collapsed on desktop; temporary overlay on mobile). Navigation is permission-based: menu items and routes are shown or hidden by role/permissions.
 
@@ -198,6 +198,8 @@ The Admin section uses a Material-UI Accordion component for collapsible submenu
 | **Analytes Management** | `/admin/analytes` | Biotech | Analyte definitions |
 | **Test Batteries** | `/admin/test-batteries` | BatteryChargingFull | Test battery configuration |
 | **Schema** | `/admin/schema/tables` | Tune | Table browser over real Postgres (Lab / System badges, locked system columns) plus UI CREATE TABLE / ADD COLUMN and 1:N / 1:1 side-link relations. Five surfaces: Tables, Columns, Relations, Layouts, Privileges. Mutate needs `schema:edit` (Admin default). Layouts also `layout:edit`. Asked-for / routing leave as is. `/admin/custom-fields` redirects here. Lists, list items, and units are not on this screen — use **Lists** and **Units**. Many-to-many is deferred; there is no universal join table. See [ui-schema.md](ui-schema.md). |
+| **Configuring agent** | `/admin/configuring-agent` | Assignment | Named configuration, lab files, proposal, and apply. Files and the ledger stay on the configuration. Apply is one transaction. See [configuring-agent.md](configuring-agent.md). |
+| **Configuring agent settings** | `/admin/settings/configuring-agent` | Settings | Provider, live model list, encrypted key. `config:edit`. |
 | **Custom Names** | `/admin/custom-names` | Tune | Manage name template configurations (alternate) |
 | **Workflow Templates** | `/admin/workflow-templates` | Tune | Define and manage workflow templates (steps, actions) |
 | **Help Management** | `/admin/help` | Help | Manage help entries (CRUD) - requires `config:edit` permission |
@@ -297,6 +299,8 @@ The AppBar title is automatically determined from the current route:
 | `/admin/schema/layouts` | Schema Layouts |
 | `/admin/schema/privileges` | Schema Privileges |
 | `/admin/schema/relations` | Schema Relations |
+| `/admin/configuring-agent` | Configuring agent |
+| `/admin/settings/configuring-agent` | Configuring agent settings |
 | `/admin/custom-fields` | Redirect → `/admin/schema/tables?from=custom-fields` |
 | `/admin/custom-names` | Custom Names Management |
 | `/admin/workflow-templates` | Workflow Templates |

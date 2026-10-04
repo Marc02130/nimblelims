@@ -291,6 +291,7 @@ Optional environment variables:
 - `REQUIRE_QC_FOR_BATCH_TYPES` - Comma-separated list of batch type UUIDs that require QC samples
 - `FAIL_QC_BLOCKS_BATCH` - Set to `true` to block batch completion on QC failures (default: `false`)
 - `ANTHROPIC_API_KEY` - API key for Claude; required for SOP parse extraction (`/v1/sop-parse`) to succeed. If empty, jobs fail with a configuration error.
+- `EMBEDDING_PROVIDER` - `local` (default, `all-MiniLM-L6-v2`, 384-d) or `stub` for tests. Used by the configuring agent. Optional provider fallbacks, only for the chosen provider: `OPENAI_API_KEY`, `XAI_API_KEY`, `ANTHROPIC_API_KEY`.
 
 ### Database Migrations
 
