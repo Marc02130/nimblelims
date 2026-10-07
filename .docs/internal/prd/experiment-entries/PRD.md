@@ -2,21 +2,30 @@
 
 **Domain:** Sapio-style experiment entries and event rules inside a startup biotech/pharma LIMS  
 **Date:** 2026-10-07  
-**Status:** **Provisional** Spec fold. Spec freeze waits on Marc. **Implement CLOSED.**  
+**Status:** **Provisional.** Spec freeze waits on Marc (model track, plates, priority versus schema-cleanup and configuring-agent). **Implement CLOSED.** Not IC50.  
 **Spec:** [../../specs/experiment-entries/SPEC.md](../../specs/experiment-entries/SPEC.md)  
 **Design:** [../../design/experiment-entries.md](../../design/experiment-entries.md)  
 **Separate packet:** [configuring agent](../configuring-agent/PRD.md) — not this work. This fold does not open it.  
 **History (leave standing):** [experiment processes and entries requirements](../../../review/requirements/experiment-processes-entries.md) · [experiments open questions](../../../review/open-questions/experiments.md) · [experiment entries gap](../../../review/tech-sketch/experiment-entries-gap.md) · [E-10 aliquot/pool dogfood](../../../review/development-process/dogfood/e10-aliquot-atomic-pair.md)
 
-No Accept, Confirm, or UAT Pass is recorded in this packet. Aliquot/Pool **E-10 Met** is an earlier stamp cited below. This packet does not re-ceremony it and does not invent a new Pass.
+## Status / stamps
+
+Core stamps below cite provisional Spec tip `4612e60` ([PR 146](https://github.com/Marc02130/nimblelims/pull/146)). They leave the Spec provisional. They do not open Implement. They do not record a UAT Pass.
+
+- **Rolf Confirm Met** on provisional Spec tip `4612e60` (PR 146): P1 entry catalog and Tobias bars as folded.
+- **Tobias:** bars as folded on `4612e60` stand. No UAT stamp on the docs packet. UAT waits Marc freeze and a product tip.
+- **Mathilda UI Confirm Met** on `4612e60` for the P1 picker/drawer and the built-in rules gallery. Sketch waits Marc freeze.
+- **Katinka SOP Confirm Met** on `4612e60`: receive stays out of the entry drawer; refuse hard-delete and on-receive→create-Tests.
+
+No review Accept. No UAT Pass. Aliquot/Pool **E-10 Met** is an earlier stamp cited below. This packet does not re-ceremony it and does not invent a new Pass.
 
 ## 0. Gate
 
 | Field | Value |
 |-------|--------|
-| Packet | Provisional Spec. Freeze waits on Marc. |
-| Implement | **CLOSED** until Marc green-lights. |
-| UAT | None. Tobias bars below are review bars for a later tip. |
+| Packet | Provisional Spec. Freeze waits on Marc (model track, plates, priority versus schema-cleanup and configuring-agent). |
+| Implement | **CLOSED.** |
+| UAT | No UAT stamp on this docs packet. Tobias bars as folded on `4612e60` stand. UAT waits Marc freeze and a product tip. |
 | Not in this packet | IC50. Chat. Lab-analysis assistant. CRM. ERP. A second workflow engine. |
 
 Startup biotech/pharma LIMS only (Rolf). Execute stays on Process / Experiment / LimsRun ([framework stamps](../../../decision-logs/framework-stamps-2026-08-26.md), FW-0). Event rules are a built-in action catalog on a named trigger. They are not a workflow engine beside that substrate.
@@ -39,7 +48,7 @@ Lab personnel who run an experiment. Clients do not edit lab entry data (experim
 
 ## 3. Rolf P1 overwrite (2026-10-07)
 
-Authoritative product list for this provisional fold. NimbleLIMS Core.
+**Rolf Confirm Met** on provisional Spec tip `4612e60` (PR 146): this P1 entry catalog, and the Tobias bars as folded in the [Spec](../../specs/experiment-entries/SPEC.md) §8. NimbleLIMS Core. The Confirm does not freeze the Spec.
 
 ### P1 entries in
 
@@ -73,7 +82,7 @@ Rolf’s lean is built-ins only for P1. Whether scripts are ever in scope remain
 
 ## 4. Mathilda (UI)
 
-Provisional. Sketch waits on Spec freeze. She does not Accept this packet.
+**Mathilda UI Confirm Met** on `4612e60` for the P1 picker/drawer and the built-in rules gallery. Sketch waits Marc freeze. She does not Accept this packet.
 
 P1 picker shows only:
 
@@ -97,7 +106,7 @@ Detail: [design note](../../design/experiment-entries.md).
 
 ## 5. Katinka (SOP)
 
-Provisional. Folded into the Spec bars. Not a UAT stamp.
+**Katinka SOP Confirm Met** on `4612e60`: receive stays out of the entry drawer; refuse hard-delete and on-receive→create-Tests. Folded into the Spec bars. Not a UAT stamp.
 
 | Bench meaning | Types |
 |---------------|--------|

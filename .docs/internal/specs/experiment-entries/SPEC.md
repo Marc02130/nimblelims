@@ -3,12 +3,19 @@
 **PRD:** [../../prd/experiment-entries/PRD.md](../../prd/experiment-entries/PRD.md)  
 **Design:** [../../design/experiment-entries.md](../../design/experiment-entries.md)  
 **Date:** 2026-10-07  
-**Status:** **Provisional.** Spec freeze waits on Marc. **Implement CLOSED.**  
+**Status:** **Provisional.** Spec freeze waits on Marc (model track, plates, priority versus schema-cleanup and configuring-agent). **Implement CLOSED.** Not IC50.  
 **Separate packet:** [configuring agent spec](../configuring-agent/SPEC.md). This spec does not open that work.
 
-No Accept, Confirm, or UAT Pass. Tobias bars in §8 are provisional review bars. They are not a UAT stamp. Aliquot/Pool E-10 Met is cited, not restamped.
+## Status / stamps
 
-Not IC50. No chat. No lab-analysis assistant.
+Core stamps below cite provisional Spec tip `4612e60` ([PR 146](https://github.com/Marc02130/nimblelims/pull/146)). They leave this Spec provisional. They do not open Implement. They do not record a UAT Pass.
+
+- **Rolf Confirm Met** on provisional Spec tip `4612e60` (PR 146): P1 entry catalog (§1) and Tobias bars as folded (§8).
+- **Tobias:** bars as folded on `4612e60` stand (§8). No UAT stamp on the docs packet. UAT waits Marc freeze and a product tip.
+- **Mathilda UI Confirm Met** on `4612e60` for the P1 picker/drawer (§1) and the built-in rules gallery (§5). Sketch waits Marc freeze.
+- **Katinka SOP Confirm Met** on `4612e60`: receive stays out of the entry drawer (§4); refuse hard-delete and on-receive→create-Tests (§5, FB-E7, FB-R3, FB-R6).
+
+No review Accept. No UAT Pass. Aliquot/Pool E-10 Met is cited, not restamped. No chat. No lab-analysis assistant.
 
 ---
 
@@ -136,7 +143,7 @@ FB-E4. An attachment saved on an entry is the same bytes after reload (FB-E2). A
 
 ## 8. Fail bars (Tobias, 2026-10-07)
 
-Provisional review bars. Not a UAT. Not a Pass. Implement CLOSED, so these bars are not executed by this fold.
+Bars as folded on `4612e60` stand. **Rolf Confirm Met** on that tip covers this fold of the bars with the P1 entry catalog. No UAT stamp on the docs packet. Not a Pass. UAT waits Marc freeze and a product tip. Implement stays **CLOSED**, so these bars are not executed by this fold.
 
 ### Entries
 
@@ -193,4 +200,4 @@ FB-R4, FB-R5, and FB-R6 stay. Katinka’s hard-delete refuse stays on FB-E7 and 
 
 ## 10. Out of this spec
 
-Link Experiments as P1 work. Receive Samples entry. DNA/RNA/cloning builders. Gold+ loaders. OnlyOffice entries. Script IDE. Code actions. IC50 and dose-response. Chat and lab-analysis assistant. CRM. ERP. A workflow engine beside Process / Experiment / LimsRun. Second sample store. Materials lot schema. JSONB-as-config. Lists on Schema. Freezing OQ-1 or OQ-5b. Reopening asked-for or routing. A new Aliquot/Pool UAT. Any Accept, Confirm, or UAT Pass.
+Link Experiments as P1 work. Receive Samples entry. DNA/RNA/cloning builders. Gold+ loaders. OnlyOffice entries. Script IDE. Code actions. IC50 and dose-response. Chat and lab-analysis assistant. CRM. ERP. A workflow engine beside Process / Experiment / LimsRun. Second sample store. Materials lot schema. JSONB-as-config. Lists on Schema. Freezing OQ-1 or OQ-5b. Reopening asked-for or routing. A new Aliquot/Pool UAT. A review Accept. A UAT stamp or UAT Pass on this docs packet. Opening Implement before Marc freezes the Spec.
