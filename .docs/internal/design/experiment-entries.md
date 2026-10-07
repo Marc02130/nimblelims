@@ -1,13 +1,22 @@
 # Design: Experiment entries and event rules
 
 **Date:** 2026-10-07  
-**Status:** **Provisional.** Spec freeze waits on Marc. **Implement CLOSED.** Sketch waits on that freeze. No review Accept. No UAT Pass.  
+**Status:** **Provisional.** Spec freeze waits on Marc (model track, plates, priority versus schema-cleanup and configuring-agent). **Implement CLOSED.** Sketch waits on that freeze. No review Accept. No UAT Pass. Not IC50.  
 **PRD:** [../prd/experiment-entries/PRD.md](../prd/experiment-entries/PRD.md)  
 **Spec:** [../specs/experiment-entries/SPEC.md](../specs/experiment-entries/SPEC.md)
 
-Mathilda’s UI stamp for this fold. She does not Accept the packet. The screen below is the contract a later sketch must follow after Marc freezes the Spec. This note does not draw that sketch.
+## Status / stamps
 
-Not IC50. No chat. No lab-analysis assistant. No script IDE.
+Core stamps below cite provisional Spec tip `4612e60` ([PR 146](https://github.com/Marc02130/nimblelims/pull/146)). They leave the Spec provisional. They do not open Implement. They do not record a UAT Pass.
+
+- **Rolf Confirm Met** on provisional Spec tip `4612e60` (PR 146): P1 entry catalog and Tobias bars as folded.
+- **Tobias:** bars as folded on `4612e60` stand. No UAT stamp on the docs packet. UAT waits Marc freeze and a product tip.
+- **Mathilda UI Confirm Met** on `4612e60` for the P1 picker/drawer (§1) and the built-in rules gallery (§3). Sketch waits Marc freeze.
+- **Katinka SOP Confirm Met** on `4612e60`: receive stays out of the entry drawer; refuse hard-delete and on-receive→create-Tests.
+
+**Mathilda UI Confirm Met** covers the screen below. She does not Accept the packet. The screen is the contract a later sketch must follow after Marc freezes the Spec. This note does not draw that sketch.
+
+No chat. No lab-analysis assistant. No script IDE.
 
 ---
 
@@ -101,4 +110,4 @@ Configuring agent screens stay on the [configuring-agent design](configuring-age
 
 ## 6. Sketch
 
-Sketch waits on Spec freeze. Implement stays **CLOSED** until Marc green-lights. No Accept is claimed by this layout.
+Sketch waits on Marc freeze. Implement stays **CLOSED**. No Accept is claimed by this layout. No UAT Pass.
