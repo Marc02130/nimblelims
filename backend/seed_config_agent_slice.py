@@ -23,8 +23,11 @@ What it adds
   ``config:edit``). Neither is Administrator. ``admin``, ``lab-tech``, and
   ``alice-tech`` are not modified.
 
-Passwords follow the 0058 seed pattern (bcrypt via ``get_password_hash``,
-short dev password, ``must_change_password`` false). They are not printed.
+Passwords are bcrypt hashes (``get_password_hash``), ``must_change_password``
+false. ``SLICE_REVIEWER_PASSWORD`` and ``SLICE_SCHEMA_EDITOR_PASSWORD`` supply
+them. If a variable is unset, ``--apply`` generates a strong random password
+for that user and prints it once on stdout. ``--check`` never prints a
+password. The value is not written to a file.
 
 Usage
 -----
@@ -43,6 +46,8 @@ import argparse
 import csv
 import json
 import os
+import secrets
+import string
 import sys
 import warnings
 from decimal import Decimal
@@ -77,12 +82,9 @@ from models.sample import Sample, SampleTypeTransition
 from models.unit import Unit
 from models.user import Permission, Role, User
 
-# 0058 pattern: short dev password, hashed with get_password_hash.
-# Not logged. Not on the 0061 must_change persona list.
-_REVIEWER_PASSWORD = "reviewer123"
-_SCHEMA_PASSWORD = "schema123"
-
 REVIEWER_USERNAME = "results-reviewer"
+REVIEWER_PASSWORD_ENV = "SLICE_REVIEWER_PASSWORD"
+SCHEMA_PASSWORD_ENV = "SLICE_SCHEMA_EDITOR_PASSWORD"
 SCHEMA_USERNAME = "schema-editor"
 SCHEMA_ROLE_NAME = "Schema Editor"
 REVIEWER_ROLE_NAME = "Lab Manager"
@@ -107,6 +109,50 @@ SLICE_ERROR = 2
 
 class SliceError(RuntimeError):
     """Refused or failed slice load. The database is left unchanged when possible."""
+
+
+def _generate_slice_password() -> str:
+    """Strong random password. Meets the app complexity rules. Not logged."""
+    required = [
+        secrets.choice(string.ascii_uppercase),
+        secrets.choice(string.ascii_lowercase),
+        secrets.choice(string.digits),
+        secrets.choice("!@#$%^&*-_"),
+    ]
+    pool = string.ascii_letters + string.digits + "!@#$%^&*-_"
+    chars = required + [secrets.choice(pool) for _ in range(20)]
+    for index in range(len(chars) - 1, 0, -1):
+        swap = secrets.randbelow(index + 1)
+        chars[index], chars[swap] = chars[swap], chars[index]
+    return "".join(chars)
+
+
+def _slice_passwords() -> tuple[dict[str, str], list[tuple[str, str, str]]]:
+    """Resolve slice passwords. Generated triples are (username, env name, password)."""
+    generated: list[tuple[str, str, str]] = []
+    passwords: dict[str, str] = {}
+    for username, env_name in (
+        (REVIEWER_USERNAME, REVIEWER_PASSWORD_ENV),
+        (SCHEMA_USERNAME, SCHEMA_PASSWORD_ENV),
+    ):
+        raw = os.getenv(env_name)
+        if raw:
+            passwords[username] = raw
+            continue
+        password = _generate_slice_password()
+        passwords[username] = password
+        generated.append((username, env_name, password))
+    return passwords, generated
+
+
+def _print_generated_passwords(generated: list[tuple[str, str, str]]) -> None:
+    """Stdout once, and only after a successful --apply. Never written to a file."""
+    for username, env_name, password in generated:
+        print(
+            f"Generated password for {username} "
+            f"({env_name} was unset; printed once):"
+        )
+        print(password)
 
 
 def _owner_url() -> str:
@@ -471,7 +517,7 @@ def _grant(db: Session, role: Role, permission_name: str) -> None:
     )
 
 
-def _apply(db: Session) -> None:
+def _apply(db: Session, passwords: dict[str, str]) -> None:
     marker = _slice_present(db)
     if marker:
         raise SliceError(
@@ -516,7 +562,7 @@ def _apply(db: Session) -> None:
         name="Results Reviewer",
         username=REVIEWER_USERNAME,
         email="results-reviewer@lims.example.com",
-        password_hash=get_password_hash(_REVIEWER_PASSWORD),
+        password_hash=get_password_hash(passwords[REVIEWER_USERNAME]),
         role_id=lab_manager.id,
         client_id=client.id,
         active=True,
@@ -528,7 +574,7 @@ def _apply(db: Session) -> None:
         name="Schema Editor",
         username=SCHEMA_USERNAME,
         email="schema-editor@lims.example.com",
-        password_hash=get_password_hash(_SCHEMA_PASSWORD),
+        password_hash=get_password_hash(passwords[SCHEMA_USERNAME]),
         role_id=schema_role.id,
         client_id=client.id,
         active=True,
@@ -716,7 +762,7 @@ def _apply(db: Session) -> None:
     print(f"  execute product name (renamed): {product_name}")
     print(f"  blood contents after execute debit, before restore: {debited}")
     print(f"  users: {REVIEWER_USERNAME} ({REVIEWER_ROLE_NAME}), {SCHEMA_USERNAME} ({SCHEMA_ROLE_NAME})")
-    print("  passwords: bcrypt, 0058 pattern, not printed")
+    print("  passwords: bcrypt hashes stored; values are not repeated here")
     print("  alice-tech, admin, and lab-tech were not modified")
     _print_state(db)
 
@@ -1028,7 +1074,9 @@ def main(argv: list[str]) -> int:
             "  python seed_config_agent_slice.py --apply\n"
             "  python seed_config_agent_slice.py --check\n"
             "Uses MIGRATE_DATABASE_URL (migrator owner), not an Alembic revision.\n"
-            "A second --apply refuses if the slice is already present."
+            "A second --apply refuses if the slice is already present.\n"
+            "Passwords: SLICE_REVIEWER_PASSWORD and SLICE_SCHEMA_EDITOR_PASSWORD.\n"
+            "Unset variables are generated and printed once on a successful --apply."
         )
         return 0
     if args.check:
@@ -1052,7 +1100,9 @@ def main(argv: list[str]) -> int:
                 f"Refusing second run: {marker}. No rows were changed."
             )
         started = True
-        _apply(db)
+        passwords, generated = _slice_passwords()
+        _apply(db, passwords)
+        _print_generated_passwords(generated)
     except SliceError as exc:
         print(f"ERROR: {exc}")
         db.rollback()

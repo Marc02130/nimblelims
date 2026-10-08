@@ -14,7 +14,7 @@
 3. From `backend`: `python seed_config_agent_slice.py` writes nothing.
    Expected: exit 0, usage text, no new users, samples, or vessels. **L-1** fails any agent write before confirm. This command is the loader with no `--apply`. It is not the agent confirm.
 4. `python seed_config_agent_slice.py --apply`
-   Expected: the rows in Acceptance. This is the lab input **D-1** will run against (CMDL-SOP2310, then SOP 22975). Loading the seed is not the agent apply in **D-4**.
+   Expected: the rows in Acceptance. This is the lab input **D-1** will run against (CMDL-SOP2310, then SOP 22975). Loading the seed is not the agent apply in **D-4**. Set `SLICE_REVIEWER_PASSWORD` and `SLICE_SCHEMA_EDITOR_PASSWORD` first. If either is unset, that password is generated and printed once on this command's stdout. Do not copy it into this script's results. `--check` does not print a password.
 5. `python seed_config_agent_slice.py --check`
    Expected: manifest names resolve as in Acceptance 6, and all 10 kinetic LAL CSVs parse (8 valid, 2 edge). LAL rows are JSON payload, not a config write (**FB-5**, PRD §9, SPEC §7).
 6. Run `--apply` again.

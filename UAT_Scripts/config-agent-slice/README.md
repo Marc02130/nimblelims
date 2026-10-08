@@ -16,7 +16,7 @@ python seed_config_agent_slice.py --apply    # one fresh database
 python seed_config_agent_slice.py --check    # re-read rows and parse the LAL CSVs
 ```
 
-A second `--apply` refuses and writes nothing. Passwords follow the 0058 pattern (bcrypt, short dev password, `must_change_password` false). They are not printed here.
+A second `--apply` refuses and writes nothing. Passwords are bcrypt hashes and `must_change_password` is false. Set `SLICE_REVIEWER_PASSWORD` for `results-reviewer` and `SLICE_SCHEMA_EDITOR_PASSWORD` for `schema-editor` before `--apply`. If either variable is unset, that user's password is generated for the run and printed once to stdout. `--check` does not print a password. The value is not written to a file.
 
 | Username | Role | Why |
 |----------|------|-----|
