@@ -5,16 +5,15 @@ skips it unless MCP_SMOKE=1. The skip is intentional: unit tests mock the
 API and must stay green when Docker is down. Do not remove the skip marker
 without replacing it with another written reason.
 
-To run it locally:
+To run it locally, export a local user's username and password in the shell.
+Credentials are env-only so no password is committed. If MCP_SMOKE=1 and
+either variable is missing or empty, this file skips with a written reason.
+Do not point MCP_SMOKE_BACKEND at production. A failed login counts toward
+lockout, so use an account you mean to use.
 
-    MCP_SMOKE=1 pytest tests/test_smoke.py
+    MCP_SMOKE=1 MCP_SMOKE_USERNAME=lab-tech MCP_SMOKE_PASSWORD=... pytest tests/test_smoke.py
 
 Requires backend health at MCP_SMOKE_BACKEND (default http://localhost:8000).
-Default user is the lab-tech development seed from Agents.md. Override with
-MCP_SMOKE_USERNAME and MCP_SMOKE_PASSWORD. Those accounts exist only for
-local development and UAT. Do not point MCP_SMOKE_BACKEND at production.
-This file does not try the admin seed: a local volume may have changed that
-password, and a failed login counts toward lockout.
 
 Optional: MCP_SMOKE_MCP_URL (default http://localhost:8100) is checked when
 that process is up. A down MCP port does not fail this file; the tools are
@@ -51,9 +50,15 @@ def _backend() -> str:
 
 
 def _credentials() -> tuple[str, str]:
-    # Agents.md development/UAT lab technician. Override for any other local user.
-    username = os.environ.get("MCP_SMOKE_USERNAME", "lab-tech")
-    password = os.environ.get("MCP_SMOKE_PASSWORD", "***REMOVED***")
+    username = os.environ.get("MCP_SMOKE_USERNAME", "").strip()
+    password = os.environ.get("MCP_SMOKE_PASSWORD", "").strip()
+    if not username or not password:
+        pytest.skip(
+            "MCP_SMOKE=1 but MCP_SMOKE_USERNAME / MCP_SMOKE_PASSWORD are not set. "
+            "Credentials are env-only so no password is committed. "
+            "Export a local dev user's username and password "
+            "(see services/mcp/README.md) and re-run."
+        )
     return username, password
 
 
@@ -64,6 +69,7 @@ async def _call(server, name: str, arguments: dict):
 
 
 async def test_login_whoami_and_list_samples():
+    username, password = _credentials()
     backend = _backend()
     try:
         health = httpx.get(f"{backend}/health", timeout=5.0)
@@ -74,7 +80,6 @@ async def test_login_whoami_and_list_samples():
         )
     assert health.status_code == 200, health.text
 
-    username, password = _credentials()
     server = build_server(
         Settings(backend_base_url=backend, read_only=True, access_token=None)
     )

@@ -132,13 +132,21 @@ pytest
 
 Unit tests mock the API. They do not need Docker.
 
-The Compose smoke test is opt-in so a normal `pytest` run stays green without a stack:
+The Compose smoke test is opt-in so a normal `pytest` run stays green without a stack. Credentials are environment-only. Nothing in this repo is a smoke password.
+
+| Variable | Required when | Notes |
+|---|---|---|
+| `MCP_SMOKE` | to run smoke | `1` opts in |
+| `MCP_SMOKE_BACKEND` | optional | default `http://localhost:8000` |
+| `MCP_SMOKE_MCP_URL` | optional | default `http://localhost:8100` |
+| `MCP_SMOKE_USERNAME` | `MCP_SMOKE=1` | a local dev/UAT user, for example `lab-tech` |
+| `MCP_SMOKE_PASSWORD` | `MCP_SMOKE=1` | that user's password, from your shell or a local untracked file. Never commit it. |
+
+If `MCP_SMOKE=1` and either credential is missing, pytest skips with a written reason. It does not fall back to a seed user. Do not point this at production.
 
 ```bash
-MCP_SMOKE=1 pytest tests/test_smoke.py
+MCP_SMOKE=1 MCP_SMOKE_USERNAME=lab-tech MCP_SMOKE_PASSWORD=... pytest tests/test_smoke.py
 ```
-
-It logs in as the `lab-tech` development user from `Agents.md`, calls `whoami`, and lists samples against a real backend. Override with `MCP_SMOKE_USERNAME` and `MCP_SMOKE_PASSWORD`. Do not point this at production. The skip reason is written in `tests/test_smoke.py`.
 
 ## Security notes
 

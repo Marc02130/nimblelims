@@ -1,5 +1,6 @@
 """Tool registration and the paths those tools call. Backend is mocked."""
 
+import secrets
 from pathlib import Path
 
 import json
@@ -141,15 +142,16 @@ async def test_login_stores_token_and_does_not_return_it():
         return_value=httpx.Response(200, json={"username": "lab-tech"})
     )
     server = _server(read_only=True)
+    password = secrets.token_urlsafe(16)
     logged_in = await _call(
         server,
         "login",
-        {"username": "lab-tech", "password": "***REMOVED***"},
+        {"username": "lab-tech", "password": password},
         headers={},
     )
     assert logged_in["token_stored"] is True
     assert "access_token" not in logged_in
-    assert "***REMOVED***" not in str(logged_in)
+    assert password not in str(logged_in)
     await _call(server, "whoami", {}, headers={})
     assert me.calls[0].request.headers["authorization"] == "Bearer session-token"
 
@@ -169,7 +171,14 @@ async def test_request_authorization_overrides_the_stored_token():
     )
     me = respx.get(f"{BASE}/auth/me").mock(return_value=httpx.Response(200, json={"username": "other"}))
     server = _server(read_only=True)
-    await _call(server, "login", {"username": "admin", "password": "x"}, headers={})
+    password = secrets.token_urlsafe(16)
+    logged_in = await _call(
+        server,
+        "login",
+        {"username": "admin", "password": password},
+        headers={},
+    )
+    assert password not in str(logged_in)
     await _call(
         server,
         "whoami",
