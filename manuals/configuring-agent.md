@@ -48,3 +48,7 @@ Review those records on the existing Admin screens (Schema, Lists, Roles). This 
 ## What this is not
 
 Not a chat. Not a parser editor. Not dose-response. Not ELN process definitions, asked-for, or routing. Not Custom Fields. A goal note is not a transcript.
+
+## Slice input
+
+The first lab packet for a real run is `UAT_Scripts/config-agent-slice/`. Load the matching database rows only with `backend/seed_config_agent_slice.py --apply` on a fresh database. That loader is not a migration.

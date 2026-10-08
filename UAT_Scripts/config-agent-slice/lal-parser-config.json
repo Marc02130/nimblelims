@@ -1,0 +1,28 @@
+{
+  "schema_version": "1",
+  "delimiter": ",",
+  "encoding": "utf-8",
+  "skip_rows": 0,
+  "header_row": 0,
+  "well_col": "well",
+  "sample_col": "lims_sample",
+  "columns": [
+    {"source_col": "example_id", "field_name": "example_id", "data_type": "string"},
+    {"source_col": "example_class", "field_name": "example_class", "data_type": "string"},
+    {"source_col": "example_note", "field_name": "example_note", "data_type": "string"},
+    {"source_col": "instrument", "field_name": "instrument", "data_type": "string"},
+    {"source_col": "method", "field_name": "method", "data_type": "string"},
+    {"source_col": "plate_id", "field_name": "plate_id", "data_type": "string"},
+    {"source_col": "well", "field_name": "well", "data_type": "string"},
+    {"source_col": "sample_id", "field_name": "sample_id", "data_type": "string"},
+    {"source_col": "lims_sample", "field_name": "lims_sample", "data_type": "string"},
+    {"source_col": "project", "field_name": "project", "data_type": "string"},
+    {"source_col": "role", "field_name": "role", "data_type": "string"},
+    {"source_col": "nominal_eu_ml", "field_name": "nominal_eu_ml", "data_type": "float", "unit": "EU/mL"},
+    {"source_col": "dilution", "field_name": "dilution", "data_type": "string"},
+    {"source_col": "onset_sec", "field_name": "onset_sec", "data_type": "float", "unit": "s"},
+    {"source_col": "result_eu_ml", "field_name": "result_eu_ml", "data_type": "float", "unit": "EU/mL"},
+    {"source_col": "units", "field_name": "units", "data_type": "string"},
+    {"source_col": "ppc_recovery_pct", "field_name": "ppc_recovery_pct", "data_type": "float", "unit": "%"}
+  ]
+}
