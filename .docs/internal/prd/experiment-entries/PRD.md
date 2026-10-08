@@ -175,7 +175,7 @@ This draft does not claim that behavior ships.
 
 ### Explicitly not frozen here
 
-- **OQ-1** (Schema Tables allow-list) and **OQ-5b** (on-delete) in [ui-schema-tables-cleanup](../../../review/open-questions/ui-schema-tables-cleanup.md). This packet does not restamp them. Lists stay off Schema. The packet does not choose CASCADE.
+- **OQ-1** and **OQ-5b** are **Decided** in [ui-schema-tables-cleanup](../../../review/open-questions/ui-schema-tables-cleanup.md). OQ-1 (Marc 2026-10-04): the agent may change any table the signed-in user can change; the user is responsible. The Schema display rule still governs the screen (Marc 2026-10-07). Lists stay off Schema. OQ-5b (Marc 2026-10-04): no delete. Retire with a status flag or deprecate, or set a container's amount to 0. RESTRICT / NO ACTION on identity foreign keys is the database backstop (Marc 2026-10-07). FB-E7 and FB-R6 (no hard delete) already match L-B.
 - Asked-for and routing locks. They stay as built.
 - Experiments open question 20 (submit / lock / unlock reason). Mathilda keeps that as the lab path after the track freeze. The question stays open.
 - JSONB-as-config. New configuration for entries or rules is not a JSONB bag. Existing `template_definition` declaration is shipped history. Whether new entry types live in that declaration is question 1, still open.
