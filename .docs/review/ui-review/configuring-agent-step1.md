@@ -4,7 +4,7 @@
 **Status:** Sketch for Accept. Implement follows the packet gates (Brief + Design + Marc green-light).  
 **Stem:** `configuring-agent-step1`  
 **Spec base:** Wilhelmina — [PRD](../../internal/prd/configuring-agent/PRD.md), [spec](../../internal/specs/configuring-agent/SPEC.md), [design](../../internal/design/configuring-agent.md). Shipped operator steps: [manuals/configuring-agent.md](../../../manuals/configuring-agent.md).  
-**Step 0 fold:** Wilhelmina [PR #148](https://github.com/Marc02130/nimblelims/pull/148) (tip `686f926`). QA bars are [SPEC §6](https://github.com/Marc02130/nimblelims/blob/686f926/.docs/internal/specs/configuring-agent/SPEC.md#6-fail-bars-tobias) (D-1–D-9, L-1–L-4, FB-11). The needs-build list, including the L-A catalog-scope gap, is [SPEC §10](https://github.com/Marc02130/nimblelims/blob/686f926/.docs/internal/specs/configuring-agent/SPEC.md#10-needs-build-where-shipped-pr-145-differs-from-the-locks-mathilda-2026-10-07). Those two sections are on that PR tip. The spec file in this tree is [SPEC.md](../../internal/specs/configuring-agent/SPEC.md). §6 and §10 land with PR #148.  
+**Step 0 fold:** Wilhelmina [PR #148](https://github.com/Marc02130/nimblelims/pull/148) (tip `47b3a52`). QA bars are [SPEC §6](https://github.com/Marc02130/nimblelims/blob/47b3a52fdbb43ef00bd01f1c31d358648611e460/.docs/internal/specs/configuring-agent/SPEC.md#6-fail-bars-tobias) (D-1–D-9, L-1–L-4, FB-11). The needs-build list, including the L-A catalog-scope gap, is [SPEC §10](https://github.com/Marc02130/nimblelims/blob/47b3a52fdbb43ef00bd01f1c31d358648611e460/.docs/internal/specs/configuring-agent/SPEC.md#10-needs-build-where-shipped-pr-145-differs-from-the-locks-mathilda-2026-10-07). Those two sections are on that PR tip. The spec file in this tree is [SPEC.md](../../internal/specs/configuring-agent/SPEC.md). §6 and §10 land with PR #148.  
 **Author:** Mathilda (NimbleLIMS UI review seat)  
 **Gates:** Brief + Design + Marc green-light. This file is the UI sketch only. It does not Accept the packet and it does not open implement.  
 **Persona:** Lab admin with existing permission `config:edit`. Scientist and admin words, not a chat product.  
@@ -12,7 +12,7 @@
 
 Step 1 of the forward plan Marc approved on 2026-10-07: a lab admin can run the configuring agent for real. The agent reads lab inputs and proposes configuration. A person confirms. NimbleLIMS changes only through APIs that already exist.
 
-The 2026-10-03 design called confirm-before-apply a preference. Marc locked it on 2026-10-07. This sketch follows that lock. It does not reopen it.
+The 2026-10-03 design called confirm-before-apply a preference. L-C was locked on 2026-10-04. The details came on 2026-10-07. This sketch follows that lock. It does not reopen it.
 
 ---
 
@@ -24,8 +24,8 @@ Do not reopen these.
 2. Confirm-before-apply is a lock. Confirm happens **once per change set**, with a **per-row include/exclude** checkbox.
 3. A **second confirm** is required when the included rows contain any of: roles/privileges changes, schema changes, Set inactive, container Amount → 0.
 4. Apply is **one transaction** and applies **only the confirmed (included) rows**. All or nothing: if it fails, nothing is applied and the screen says why.
-5. The agent may change any table the user can; the person who confirms is responsible. The agent acts with the permissions of the person who started the run. Rows they lack permission for stay visible, greyed out and excluded, labelled with the missing permission. Never hidden or silently dropped.
-6. **Self-escalation is always a stop**: any change that would grant the run's starter (or their role) new privileges becomes a Stop card, never a proposal row.
+5. The agent may change any table the confirming user can. The person who confirms is responsible. The agent acts with that person's permissions (Tobias L-2, Marc-approved). Rows they lack permission for stay visible, greyed out and excluded, labelled with the missing permission. Never hidden or silently dropped. A row the confirmer lacks permission for can never be applied. When the starter and the confirmer are different people, re-evaluate the greyed rows when the confirm screen opens, for the person confirming. The starter is recorded only as the person who started the run.
+6. **Self-escalation is always a stop**: any change that would grant the confirming user (or their role) new privileges becomes a Stop card, never a proposal row.
 7. **No delete anywhere in the UI.** Removal shows as **Set inactive** (status flag); for containers, **Amount → 0**. A delete the agent wants becomes a Stop card.
 8. Permission to use the configuring agent (Settings, start runs, confirm) stays **`config:edit`**. No new permission.
 9. If no existing API can express a change, the agent stops and says so (Stop card). Schema shows a table only when it is usable through configuration. Lists and list items stay off Schema.
@@ -268,7 +268,7 @@ The admin attaches lab inputs, optionally types one line about the goal, and sta
 
 ### Who
 
-`config:edit` only. The starter is `created_by` on the run. Later permission checks use that person (lock 5). Today `start_run` and `apply_run` use the signed-in caller. Recording the starter is already `created_by`. Applying as that starter when a different admin confirms is **Needs build.**
+`config:edit` only. The starter is `created_by` on the run. That record is only who started it. Permission checks, the greyed rows, and the audit actor are the confirming user (Tobias L-2, Marc-approved; D-8). Today `start_run` and `apply_run` use the signed-in caller. Re-evaluating the greyed rows for the confirmer, when that person is not the starter, is **Needs build.**
 
 ### Layout
 
@@ -337,9 +337,11 @@ One change set. The admin includes or excludes each row, then confirms once. App
 
 ### Who
 
-The person who confirms has `config:edit` and is responsible for the included rows. The agent’s permission check is the **starter**, not whoever happens to be looking. A row the starter cannot perform stays on screen, greyed, checkbox off and disabled, label `Needs {permission}`. Example: `Needs schema:edit`. It is not hidden and not dropped.
+The person who confirms has `config:edit` and is responsible for the included rows. Permission checks use that person, not the starter (Tobias L-2, Marc-approved). A row the confirmer cannot perform stays on screen, greyed, checkbox off and disabled, label `Needs {permission}`. Example: `Needs schema:edit`. It is not hidden and not dropped. It can never be applied.
 
-Today a missing permission is discovered at apply time, the transaction rolls back, and the HTTP status is 403. Greying rows before Apply is **Needs build.**
+When the starter and the confirmer are different people, the confirm screen re-evaluates those greyed rows for the person confirming. **Needs build.**
+
+Today a missing permission is discovered at apply time, the transaction rolls back, and the HTTP status is 403. Greying rows for the confirmer before Apply is **Needs build.**
 
 ### Layout
 
@@ -352,16 +354,18 @@ One change set. Groups follow Admin areas. Shipped `group` codes stay the storag
 | Schema | Admin → Schema (`/admin/schema/tables` and its columns, layouts, privileges, relations) | `schema_tables`, `schema_columns`, `layouts`, `privileges`, `relations` |
 | Lists | Admin → Lists (`/admin/lists`) | Data rows only: **Create**, **Update**, **Set inactive** on lists and list items. Not schema tables. Not column adds. Forced to `other` today. |
 | Analyses / Units | Admin → Analyses, Analytes, Units, Test Batteries | Unit records live on the Units screen. The `units` table is not a schema table here. Not in the allow-list. A call with no matching API is a stop in place, not a dropped row. |
-| Other tables you can change | Tables the signed-in user can change that Schema does not show | **Needs build.** Not a shipped `group`. See the L-A rule below. |
+| Other tables you can change | Tables the confirming user can change that Schema does not show | **Needs build.** Not a shipped `group`. See the L-A rule below. Routing is not in this group. |
 | Users / Roles | Admin → Users, Roles & Permissions | `other` (`PATCH /users/{id}` role, `PUT /roles/{id}/permissions`) |
-| Routing | Admin → Routing map | Allow-list returns a stop: “Routing stays as built.” Under locks 5 and 9, an existing routing API the starter may call is a row in this group. That change is **Needs build.** |
+| Routing | Not a proposal group | A routing change is a stop in place. SPEC §3.4: asked-for and routing stay as built. The allow-list already says “Routing stays as built.” |
 | Templates | Experiment templates (`/experiments/templates`, `/v1/experiment-templates`) | `other` today. Workflow templates (`/admin/workflow-templates`) stay a Stop card while the allow-list rejects them. |
 | Container types | Admin → Container Types | `other` (`POST /containers/types`) |
 | Dest-type transitions | Admin → Dest-type transitions | `other` |
 
+**Routing stays a stop (CEO, Rolf).** Asked-for and routing stay as built (SPEC §3.4). Marc took them out of config on 2026-09-23. His 2026-10-07 answer narrowed L-A to the agent's permission scope. It did not reopen what config may touch. This is not pending build. Only Marc can reopen it.
+
 Inside Schema, keep the five shipped labels so a table change is not mixed with a privilege change. Privilege rows are still Schema, and they are high-impact (lock 3).
 
-**Other tables you can change** (L-A). Wilhelmina SPEC §10 on [PR #148](https://github.com/Marc02130/nimblelims/pull/148) tip `686f926`. The agent's scope is any table the signed-in user can change, even when the Schema screen's display rule hides it. Those rows still appear, under the heading **Other tables you can change**. Same verbs, before → after values, and citations as every other row. **Needs build.** `schema_table_names` in `backend/app/services/configuring_agent_allow.py` still returns the Schema catalog (`LAB_TABLES`, `SYSTEM_TABLES`, `NOT_SCHEMA_TABLES` from `backend/app/services/ui_schema_catalog.py`).
+**Other tables you can change** (L-A). Wilhelmina SPEC §10 on [PR #148](https://github.com/Marc02130/nimblelims/pull/148) tip `47b3a52`. The agent's scope is any table the confirming user can change, even when the Schema screen's display rule hides it. Those rows still appear, under the heading **Other tables you can change**. Same verbs, before → after values, and citations as every other row. **Needs build.** `schema_table_names` in `backend/app/services/configuring_agent_allow.py` still returns the Schema catalog (`LAB_TABLES`, `SYSTEM_TABLES`, `NOT_SCHEMA_TABLES` from `backend/app/services/ui_schema_catalog.py`). Routing is not one of these rows.
 
 If the API refuses with a **422** (a system table, or a column it will not add), that row becomes a stop in place, with the API's reason. The schema API already says “This table can't get new fields from the UI.” The row is never dropped silently. Showing that 422 as an in-place stop, while the rest of the proposal stays, is **Needs build.**
 
@@ -371,7 +375,7 @@ Each proposal row:
 
 | Piece | On screen | Shipped? |
 |-------|-----------|----------|
-| Include | Checkbox, default on when the starter may apply it. Off and disabled when they may not. | **Needs build.** Shipped control is Accept / Skip. |
+| Include | Checkbox, default on when the confirmer may apply it. Off and disabled when they may not. | **Needs build.** Shipped control is Accept / Skip. |
 | Verb | **Create**, **Update**, **Set inactive**, or **Amount → 0** only. | **Needs build.** `action` is free text. |
 | Table + record | Lab name, then the table. | Target string exists. Record label as a link to the admin screen is **Needs build.** |
 | Before → after | Old value, then new value. | **Needs build.** |
@@ -444,7 +448,7 @@ Second confirm checkbox: “I am responsible for these changes”.
 |------|---------------------|
 | Apply rolled back | “Nothing was applied.” plus the reason. Status Failed (apply rolled back). |
 | Stale row | Apply blocked. The row is flagged. |
-| Included row the starter cannot do | The row is greyed before Apply. It is not sent. |
+| Included row the confirmer cannot do | The row is greyed before Apply. It is not sent. It can never be applied. |
 | No API | That row is a stop in place, with the reason. It is not dropped. |
 | API 422 | The row is a stop in place. The reason is the API's text. It is not dropped. |
 | Included stop | “Nothing was applied.” Apply does not run. |
@@ -458,6 +462,8 @@ Second confirm checkbox: “I am responsible for these changes”.
 - Apply of high-impact included rows with no second confirm.
 - A Delete, Drop, or Remove button, or those words as the verb.
 - A permission failure that hides the row or omits it with no label.
+- Apply of a row the confirmer lacks permission for.
+- Greyed rows judged by the starter when the confirmer is a different person.
 - Self-escalation drawn as a row (that is a Stop card).
 - The run halts at the first stop, so later rows are missing.
 - Apply writes anything while an included row is stopped.
@@ -498,7 +504,7 @@ The stop sits on that row. The include checkbox stays so the admin can exclude t
 On the row:
 
 1. What the input asked for.
-2. Why it is a stop. One of: no existing API can express it; the API returned 422; this would grant the starter or their role a new privilege; a delete was requested; a column was proposed on `lists`, `list_entries`, or `units`.
+2. Why it is a stop. One of: no existing API can express it; the API returned 422; this would grant the confirming user (or their role) a new privilege; a delete was requested; a column was proposed on `lists`, `list_entries`, or `units`; the change is routing or asked-for, which stay as built.
 3. Source: file name plus page, line, or row. **Needs build** (same citation gap as proposal rows).
 4. Primary button: **Copy as backlog item**. **Needs build.** Copies plain text to the clipboard. It does not post to GitHub, email, or any other system.
 
@@ -515,7 +521,8 @@ The stop stays on the row. Apply writes nothing while it is included. After the 
 | No API | “Can't apply this change through configuration APIs.” Then one plain sentence naming the gap. The allow-list already has sentences such as “There is no junction API.” and “No existing API grants a user access to a project. This run will not invent one.” Use those sentences. Do not invent a workaround. |
 | API 422 | The API's own reason. Example: “This table can't get new fields from the UI.” The row stays. |
 | Column on lists, list items, or units | “{name} is not a Schema table. Edit lists under Lists and units under Units. Do not add columns on them.” That sentence is already returned when the body names `lists`, `list_entries`, or `units`. The row is a stop. It is not a schema row under **Other tables you can change**. |
-| Self-escalation | “This would give you, or your role, a permission you do not have. That stays stopped.” Never a proposal row that can be applied. **Needs build.** The allow-list can still send `PUT /roles/{id}/permissions`. |
+| Self-escalation | “This would give the confirming user, or their role, a permission they do not have. That stays stopped.” Never a proposal row that can be applied. **Needs build.** The allow-list can still send `PUT /roles/{id}/permissions`. |
+| Routing or asked-for | “Routing stays as built.” Asked-for uses the same rule (SPEC §3.4). The row is a stop. It is not a proposal row. |
 | Delete | “This input asks to delete a record. This screen does not delete. Removal is Set inactive, or Amount → 0 on a container.” If that status change is not what was asked, the row stays a stop. **Needs build** for the five drop/delete routes still in `_ALLOWED`. Removing those five is the first build item. `DELETE /roles/{role_id}` and `DELETE /v1/sample-type-transitions/{row_id}` are already absent, so a proposal that names them already stops. |
 
 Clipboard text, plain:
@@ -561,11 +568,11 @@ A read-only record of the run. This is the audit view. It is not a second editor
 
 Show:
 
-- Starter, started time, configuration name, goal line.
+- Starter and started time. The starter is only the person who started the run. Configuration name and goal line.
 - Inputs: file name, lab kind, status.
 - The proposal as it was shown, including excluded rows and greyed rows with `Needs {permission}`.
 - Which rows were included.
-- Who confirmed, and whether the second confirm was checked, with the time. The confirming user is recorded as the actor. Each applied change is flagged agent-assisted. **Needs build.**
+- Who confirmed, and whether the second confirm was checked, with the time. The confirmer is the audit actor (D-8). Each applied change is flagged agent-assisted. The starter is not the actor. **Needs build.**
 - What the one transaction applied, each line linking to the changed record on the existing admin screen.
 - Stop cards, including the backlog text.
 - If apply failed: “Nothing was applied.” plus the reason. No applied links.
@@ -592,6 +599,7 @@ Missing run: “Run not found.” The API already returns that for a run outside
 - Editing a past run from this screen.
 - History that omits excluded rows, greyed rows, or stops.
 - History that does not record the confirming user, or that does not flag the change as agent-assisted.
+- History that names the starter as the actor.
 - History that lists applied records when the transaction rolled back.
 - A delete control.
 
@@ -622,11 +630,13 @@ Fail UI review of this step-1 screen if any of these are true. The PR 145 page i
 9. The run halts at the first stop, so later rows are missing.
 10. Apply writes anything while an included row is stopped.
 11. A stopped row is excludable while a dependent included row remains.
-12. A table the signed-in user can change is missing because the Schema screen does not show it. Those rows belong under **Other tables you can change**, with the same verbs, before → after values, and citations.
+12. A table the confirming user can change is missing because the Schema screen does not show it. Those rows belong under **Other tables you can change**, with the same verbs, before → after values, and citations. Routing is not in that group.
 13. A 422 (a system table, or a column the API will not add) is dropped instead of shown in place as a stop with the API's reason.
 14. Lists, list items, or units shown as schema tables or column additions, including under **Other tables you can change**. Dropdown values belong in the Lists group as data rows (Create / Update / Set inactive). A column add on `lists`, `list_entries`, or `units` is a stop with the reason.
 15. A new permission. The gate stays `config:edit`.
-16. Apply that uses a different person’s powers than the starter and still presents greyed rows as if they were the starter’s.
+16. Apply of a row the confirmer lacks permission for.
+17. The audit names the starter as the actor.
+18. A routing change shown as a proposal row. Routing stays a stop. Only Marc can reopen that.
 
 ---
 
@@ -644,8 +654,8 @@ Index of what this sketch asks for that the PR 145 screens do not do.
 | One confirm per change set, include checkbox, “Apply N changes” | Page uses Accept, Skip, Redo, and “Apply accepted steps”. |
 | Before → after, and source citation | Step has target, action, why, gap. No citation field. |
 | Verbs limited to Create, Update, Set inactive, Amount → 0 | `action` is free text. The five drop/delete routes above are still callable. |
-| Greyed `Needs {permission}` rows before Apply | 403 happens during apply and rolls back. |
-| Apply using the starter’s permissions | Apply uses the signed-in caller. |
+| Greyed `Needs {permission}` rows for the confirming user, re-checked when the confirmer is not the starter | 403 happens during apply and rolls back. The screen does not re-evaluate for a different confirmer. |
+| Apply using the confirming user's permissions | Apply uses the signed-in caller and does not block a row that person cannot perform before the call. |
 | Second confirm dialog | Not on the page. No confirmed-by field on the run. |
 | Stale-row check that blocks Apply | Not in `apply_run`. |
 | Success links to admin records | Ledger prints name and id. |
@@ -657,6 +667,6 @@ Index of what this sketch asks for that the PR 145 screens do not do.
 | Self-escalation Stop card | Role permission PUT is an allowed call. |
 | Delete requested → stop in place, not a row verb | The five drop/delete routes are still callable. Role delete and sample-type-transition DELETE are already absent. |
 | **Copy as backlog item** | No clipboard action. |
-| Run history read-only audit, confirming user recorded, change flagged agent-assisted | “Earlier runs” reopens the editable page. No confirmed-by field and no agent-assisted flag. |
-| Group headings Lists, Analyses / Units, Users / Roles, Routing, Templates, Container types, Dest-type transitions, Other tables you can change | Stored groups are the six Schema-and-other codes. Routing and workflow templates are stops in the allow-list. |
+| Run history read-only audit: confirmer is the actor, change flagged agent-assisted, starter is only who started the run | “Earlier runs” reopens the editable page. No confirmed-by field and no agent-assisted flag. |
+| Group headings Lists, Analyses / Units, Users / Roles, Templates, Container types, Dest-type transitions, Other tables you can change | Stored groups are the six Schema-and-other codes. Workflow templates are a stop in the allow-list. Routing is a stop, not a heading to build. |
 | Amount → 0 through the contents API | `PATCH /containers/{id}/contents/{sample_id}` exists and is not in the allow-list. |
