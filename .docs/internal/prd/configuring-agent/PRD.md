@@ -38,7 +38,7 @@ Answer 1 is in §7. Answer 4 is in §8. Answer 8 is the [spec Step 1 slice](../.
 
 ## Step 1 slice
 
-The slice note is in the spec (Marc 2026-10-07, Katinka 2026-10-07). UI sketch (Mathilda 2026-10-07): [configuring-agent step 1](../../../review/ui-review/configuring-agent-step1.md) (lands with [PR #147](https://github.com/Marc02130/nimblelims/pull/147), tip `c2f2b46`). This file does not copy the sketch.
+The slice note is in the spec (Marc 2026-10-07, Katinka 2026-10-07). UI sketch (Mathilda 2026-10-07): [configuring-agent step 1](../../../review/ui-review/configuring-agent-step1.md) (on main from [PR #147](https://github.com/Marc02130/nimblelims/pull/147); the halt and L-A folds land with [PR #149](https://github.com/Marc02130/nimblelims/pull/149), tip `b7796c6`). This file does not copy the sketch.
 
 ---
 

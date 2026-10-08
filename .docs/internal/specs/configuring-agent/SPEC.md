@@ -147,7 +147,7 @@ When no existing API can express the change:
 - Status **Stopped**.
 - Banner text, exact: `Can't apply this change through configuration APIs`
 - Show the blocked step and the gap in plain words.
-- Write nothing for that step. No workaround. No silent drop. No continue into later steps.
+- The proposal keeps every row and shows each stop in place with its reason (D-6). Apply writes nothing while any included row is stopped. A stopped row may be excluded only if no remaining included row depends on it. **Rolf 2026-10-07, CEO call, Marc may overrule.** This is not a Marc lock.
 - Apply is one transaction with full rollback (Marc 2026-10-07). If apply already wrote earlier confirmed steps in that transaction, roll those back too. Do not leave a partial configuration. Record Stopped or Failed only after that rollback.
 
 Confirm-before-apply is a lock (Marc 2026-10-04). One change set per run. Each row has an include/exclude choice. A second confirm is required before roles and privileges, schema changes, set-inactive, and amount → 0. Apply only what was confirmed (Marc 2026-10-07).
@@ -264,7 +264,7 @@ Chat. Lab-analysis assistant. Parser authoring. ELN authoring. Dose-response. Se
 
 ## 9. Step 1 slice
 
-UI sketch (Mathilda 2026-10-07): [configuring-agent step 1](../../../review/ui-review/configuring-agent-step1.md) (lands with [PR #147](https://github.com/Marc02130/nimblelims/pull/147), tip `c2f2b46`). This spec does not copy the sketch.
+UI sketch (Mathilda 2026-10-07): [configuring-agent step 1](../../../review/ui-review/configuring-agent-step1.md) (on main from [PR #147](https://github.com/Marc02130/nimblelims/pull/147); the halt and L-A folds land with [PR #149](https://github.com/Marc02130/nimblelims/pull/149), tip `b7796c6`). This spec does not copy the sketch.
 
 Marc 2026-10-07: CMDL-SOP2310, then Qubit SOP 22975, on a fresh seed DB with a live provider key. TruSeq Nano is the second run.
 
