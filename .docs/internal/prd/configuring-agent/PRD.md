@@ -2,12 +2,12 @@
 
 **Domain:** How an admin turns lab inputs into NimbleLIMS configuration  
 **Date:** 2026-10-03  
-**Status:** Working draft. Marc locked the open build questions on 2026-10-03 (below). The branch `configuring-agent` implements those locks.  
-**Implement gate:** Those locks are the green light for this branch. This file still has **no** review Accept and **no** UAT Pass.  
+**Status:** Working draft. Marc locked the open build questions on 2026-10-03 (below). The branch `configuring-agent` implements those 2026-10-03 locks. Marc 2026-10-04 locks (L-A, L-B, L-C) and Marc 2026-10-07 answers are folded in this file. That fold is not a claim that the branch already implements them. This file still has **no** review Accept and **no** UAT Pass.  
+**Implement gate:** The 2026-10-03 locks are the green light for this branch. This file still has **no** review Accept and **no** UAT Pass.  
 **Spec:** [../../specs/configuring-agent/SPEC.md](../../specs/configuring-agent/SPEC.md)  
 **Design:** [../../design/configuring-agent.md](../../design/configuring-agent.md)  
 **History (leave standing):** [configuration PRD](../configuration/PRD.md) · [configuration spec](../../specs/configuration/SPEC.md) · [AI SOP north star](../ai-sop-north-star/PRD.md)  
-**Team:** Marc locks below. Rolf product locks. Mathilda surfaces (preference labeled). Tobias fail bars live in the spec. Katinka names public SOPs. Anton names dataset shapes. No fixtures in this packet.
+**Team:** Marc locks below. Rolf product locks. Mathilda surfaces. Tobias fail bars live in the spec. Katinka names public SOPs. Anton names dataset shapes. No fixtures in this packet.
 
 No Accept, Confirm, or UAT Pass is recorded here. August 2026 files stay history. This packet does not reopen them and does not open their implement gates.
 
@@ -17,9 +17,24 @@ No Accept, Confirm, or UAT Pass is recorded here. August 2026 files stay history
 - Chunks stay on the named configuration (name and id), not on the person who uploaded them. `created_by` still records who did it. A new process is one such configuration. The same name-and-id rule applies to settings, documents, runs, and each ledger row.
 - The ledger stores configuration that was actually applied: tables, columns, relationships, experiment templates, and the other allowed kinds. Each row has a name and an id.
 - Vectorization matches ragged: local `sentence-transformers/all-MiniLM-L6-v2`, 384 dimensions, `fastembed`, batch 32. Tests use `EMBEDDING_PROVIDER=stub` (`[[0.01] * 384]`). Chunking is heading-aware, 1000 characters, 200 overlap.
-- Apply is one transaction. If any accepted step cannot be expressed or the API errors, every write from that apply is rolled back, including earlier steps in the same apply. The failure is recorded after the rollback. A partial configuration is not left behind.
-- The agent uses the Schema screen’s allow-list (`ui_schema_catalog.py`). It does not keep a second list. OQ-1 is not restamped here. OQ-5b stays open; the agent does not choose CASCADE.
-- Changing provider clears the stored key and the model, then models are loaded from that provider only. Clearing the key also clears the model. Models are fetched on the server. Accept, feedback-and-redo, or Skip, then Apply only the accepted steps.
+- Apply is one transaction. If any step cannot be expressed or the API errors, every write from that apply is rolled back, including earlier steps in the same apply. The failure is recorded after the rollback. A partial configuration is not left behind.
+- Changing provider clears the stored key and the model, then models are loaded from that provider only. Clearing the key also clears the model. Models are fetched on the server.
+
+## Decisions locked 2026-10-04 (Marc)
+
+- **L-A.** The agent may change any table the signed-in user can change. The user is responsible for the change, not the agent. This answers OQ-1 and replaces the Schema-screen allow-list (`ui_schema_catalog.py`) as the agent's scope limit.
+- **L-B.** No delete. Retire with a status flag or deprecate, or set a container's amount to 0. Delete is not allowed in a regulated system. This answers OQ-5b.
+- **L-C.** Confirm-before-apply is a lock.
+
+## Answers 2026-10-07 (Marc)
+
+- **2.** "Any table the user can change" is a permission scope only. The agent acts as the signed-in user, within that user's privileges. It does not lift the API's add-column refusals (`_can_add_columns`, system tables, `ADD_COLUMN_OUT`). Those 422s still stop the run with the existing stop message.
+- **3.** Drop is banned outright, even for a table the user just created in the same session. Deprecate is allowed as the status flag. Remove these from the agent's callable API list: `POST /v1/schema/tables/{id}/drop`, `POST /v1/schema/columns/{id}/drop`, `DELETE /v1/schema/relations/{relation_id}`, `DELETE /lists/{list_id}`, `DELETE /lists/{list_name}/entries/{entry_id}`, DELETE on sample-type transitions, and role delete. Lists and entries are retired by PATCH to inactive when that route supports it; otherwise the run stops.
+- **5.** Confirm-before-apply means one change set per run, an include/exclude choice on each row, and a second confirm for: roles and privileges, schema changes, set-inactive, and amount → 0. Apply only what was confirmed, as one transaction with full rollback.
+- **6.** The agent never grants the user new privileges. A request that would need one is a stop.
+- **7.** The audit actor is the confirming user, flagged agent-assisted, and recorded with run id, provider, and model.
+
+Answer 1 is in §7. Answer 4 is in §8. Answer 8 is the spec's Step 1 slice.
 
 ---
 
@@ -88,18 +103,11 @@ Empty or missing lab input means no LLM call and a clear error (Tobias FB-10). S
 
 ## 5. Stop when the API cannot express the change
 
-If an existing API cannot express the change, the agent stops and says so in plain language (Marc). It does not invent a workaround. It does not silently drop the step. It does not partially apply and continue (Rolf). Tobias FB-6: write nothing for that blocked change.
+If an existing API cannot express the change, the agent stops and says so in plain language (Marc). It does not invent a workaround. It does not silently drop the step. It does not partially apply and continue (Rolf). Tobias FB-6: write nothing for that blocked change. The API's own 422 refusals (`_can_add_columns`, system tables, `ADD_COLUMN_OUT`) still stop the run with that stop message (Marc 2026-10-07).
 
 Mathilda’s stop chrome: status **Stopped**, banner “Can't apply this change through configuration APIs,” plus the blocked step and the gap in plain words.
 
-Her confirm-before-apply flow is a **preference, not a Marc lock**: propose, then human Accept or Skip per change, then Apply accepted changes. Auto-apply versus always-confirm stays **open**. If a later lock allows auto-apply, the run still shows an Applied log (Mathilda).
-
-Two sentences sit side by side and are **not frozen** into one rule:
-
-- Rolf / FB-6: cannot-express stops the run and writes nothing for that change.
-- Mathilda: an API error during Apply stays on that row; Done can show applied / skipped / stopped counts.
-
-Reading that keeps them apart: a gap found while proposing writes nothing. An error returned by an API during Apply stays on the row and the run does not continue into later steps. The stricter reading (roll back rows already posted) is not decided here.
+Confirm-before-apply is a lock (Marc 2026-10-04). It means one change set per run, an include/exclude choice on each row, and a second confirm for roles and privileges, schema changes, set-inactive, and amount → 0. Apply only what was confirmed, as one transaction with full rollback (Marc 2026-10-07). A gap found while proposing writes nothing. An error during apply rolls that transaction back in full.
 
 ---
 
@@ -123,7 +131,7 @@ Nothing in the repo today stores `agent_provider`, `agent_model`, or an encrypte
 
 Marc, 2026-10-03:
 
-A table appears on Schema only when a change can be made and then used through configuration. If the app would ignore the change until code is refactored, the table stays off Schema.
+A table appears on Schema only when a change can be made and then used through configuration. If the app would ignore the change until code is refactored, the table stays off Schema. This rule is about display, not agent scope (Marc 2026-10-07).
 
 `lists` and `list_entries` stay off Schema. Do not document them as schema tables. The agent may still call the list-editor APIs when those APIs are how dropdown values are set. It must not treat lists as Schema tables and must not add columns on them.
 
@@ -131,9 +139,9 @@ Custom Fields is not a place to work. Many-to-many is deferred. There is no univ
 
 Current catalog code (`ui_schema_catalog.py`) also keeps `units` off Schema: a new column there is unused until conversion code changes. That matches the display rule. This packet does not document `units` as a schema table.
 
-**OQ-1 (Schema Tables allow-list) is not frozen here.** The tables-cleanup open-questions file already carries a Decided label on an allow-list. Rolf: that question stays Marc’s until he answers. This packet does not restamp it and does not treat the label as a new Accept.
+**OQ-1 is Decided (Marc 2026-10-04).** The agent may change any table the signed-in user can change. The user is responsible for the change, not the agent. This replaces the Schema-screen allow-list (`ui_schema_catalog.py`) as the agent's scope limit. The 2026-10-03 allow-list in the tables-cleanup file stays as history of what the catalog registered for the screen. This sentence is not an Accept.
 
-**OQ-5b (on-delete) is not frozen here.** Katinka’s position is RESTRICT on identity links (sample, barcode vessel). Rolf: OQ-5b stays open until Marc answers. Both sentences stay. This packet does not pick one.
+**OQ-5b is Decided (Marc 2026-10-04).** No delete. Retire with a status flag or deprecate, or set a container's amount to 0. Delete is not allowed in a regulated system. RESTRICT / NO ACTION on identity foreign keys is the documented database backstop (Marc 2026-10-07).
 
 ---
 
@@ -174,7 +182,7 @@ Param families only, not full SOPs: AGM, ICH, OECD, NCI — for safety, DMPK/ADM
 
 ### Refuse
 
-JSONB or `custom_attributes` as fields, tables, or related ids. Custom Fields chrome. Dropdown lists on Schema. CASCADE or silent wipe of a sample or barcode vessel (her position; OQ-5b is not frozen — §7). A junction table as an operator data-entry sheet. Tests or an analysis queue at receive. Treating IC50 or any fitted number as configuration. Inventing a DMPK SOP or a third sample-ID scheme. Granting itself `schema:edit`. Any change the current API cannot make.
+JSONB or `custom_attributes` as fields, tables, or related ids. Custom Fields chrome. Dropdown lists on Schema. Delete, drop, CASCADE, or a silent wipe of a sample or barcode vessel. No delete (Marc 2026-10-04). RESTRICT / NO ACTION on identity foreign keys is the documented database backstop (Marc 2026-10-07). A junction table as an operator data-entry sheet. Tests or an analysis queue at receive. Treating IC50 or any fitted number as configuration. Inventing a DMPK SOP or a third sample-ID scheme. Granting the user a privilege the user does not already have, including granting itself `schema:edit` (Marc 2026-10-07). Any change the current API cannot make.
 
 ---
 
@@ -201,7 +209,7 @@ Gap he names, do not mint it: no whole-blood intake and no DNA daughter with `pa
 
 **Personnel.** Existing user only. Alice is the 0058 seed user (mAb PK and Alpha only; same-client deny on `CAR-T-Batch-001`). Shape is user × role × project. `schema:edit` defines an FK and a junction; an operator links and unlinks only. Enterer versus reviewer is US-10, no new columns. No new staff names.
 
-**Config the agent may emit,** only through an API that already exists: allow-listed table or column (real DDL), role layout, role privileges, 1:N FK, 1:1 unique FK, and an M:N junction only if that API already exists. Many-to-many is still deferred and `POST /v1/schema/relations` refuses `many_to_many`. The run stops and says so. It does not invent the junction.
+**Config the agent may emit,** only through an API that already exists: any table the user can change via existing APIs (real DDL where that API already does it), role layout, role privileges, 1:N FK, 1:1 unique FK, and an M:N junction only if that API already exists (Marc 2026-10-04). Many-to-many is still deferred and `POST /v1/schema/relations` refuses `many_to_many`. The run stops and says so. It does not invent the junction.
 
 ---
 
@@ -223,7 +231,7 @@ Asked-for, routing, parsers, and ELN authoring stay on the older packets. Rolf k
 
 Two surfaces. Detail is in the [design](../../design/configuring-agent.md). Settings: Admin → Configuring agent settings (`/admin/settings/configuring-agent`). Run: Admin → Configuring agent (`/admin/configuring-agent`).
 
-Accept, feedback-and-redo, or Skip, then Apply. Apply does not leave a partial configuration.
+Confirm-before-apply is a lock (Marc 2026-10-04, Marc 2026-10-07). One change set per run. Include or exclude each row. A second confirm covers roles and privileges, schema changes, set-inactive, and amount → 0. Apply only what was confirmed, as one transaction with full rollback.
 
 ---
 
@@ -245,16 +253,16 @@ This draft does not claim that behavior ships.
 
 | Item | Who | State |
 |------|-----|--------|
-| OQ-1 Schema Tables allow-list | Marc | Open for him. Not frozen by this packet. |
-| OQ-5b on-delete | Marc | Open for him. Katinka’s RESTRICT on identity links is her position only. |
+| OQ-1 Schema Tables allow-list | Marc | **Decided** (Marc 2026-10-04). The agent may change any table the signed-in user can change. The user is responsible for the change. This replaces `ui_schema_catalog.py` as the agent's scope limit. |
+| OQ-5b on-delete | Marc | **Decided** (Marc 2026-10-04). No delete. Retire with a status flag or deprecate, or set a container's amount to 0. RESTRICT / NO ACTION on identity foreign keys is the database backstop (Marc 2026-10-07). |
 | Settings permission name | Marc | **Decided.** `config:edit`. |
 | Clearing the key also clears `agent_model` | Marc | **Decided.** Yes. Changing provider clears the key and the model. |
 | Models fetched server-side or in the browser | Marc | **Decided.** Server-side, chosen provider only. |
-| Auto-apply vs always-confirm | Marc | **Decided.** Accept, feedback-and-redo, or Skip. Apply accepted steps as one transaction. |
+| Confirm-before-apply | Marc | **Decided** (Marc 2026-10-04). One change set per run, an include/exclude choice on each row, and a second confirm for roles and privileges, schema changes, set-inactive, and amount → 0. Apply only what was confirmed, as one transaction with full rollback (Marc 2026-10-07). |
 | Who may start a run | Marc | **Decided.** Anyone with `config:edit`, not a new permission. |
 | Where chunks live | Marc | **Decided.** On the named configuration, with a ledger of what was stored. |
-| Failed apply | Marc | **Decided.** Roll back the whole apply. No partial configuration. |
-| Which Schema list | Marc | **Decided.** The Schema screen list. No second list. |
+| Failed apply | Marc | **Decided.** One transaction, full rollback. No partial configuration. |
+| Which Schema list | Marc | **Decided.** The display rule governs the Schema screen. `lists`, `list_entries`, and `units` stay off that screen. Agent scope is the signed-in user's permissions (Marc 2026-10-04, Marc 2026-10-07). |
 | Input retention and PHI on uploads | Mathilda | Open. No retention control in this build. |
 | What else a startup LIMS must refuse | Rolf | His locks in §4 and §7 are in this draft. He did not add a further list. |
 | Dataset fixtures | Anton | Out. No Brief, no seed. |
