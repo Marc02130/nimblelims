@@ -50,7 +50,7 @@ Two entry kinds remain the shipped substrate (`experiment_sample_data`, `experim
 
 ## 2. Existing APIs a sample-touching entry may call
 
-Samples and Material Tracking use these routes or they stop. No second sample store. No second material store. No JSONB-as-config field. Lists stay off Schema. OQ-1 and OQ-5b are not frozen.
+Samples and Material Tracking use these routes or they stop. No second sample store. No second material store. No JSONB-as-config field. Lists stay off Schema. OQ-1 is Decided (Marc 2026-10-04): agent scope is any table the signed-in user can change, and the Schema display rule still governs the screen (Marc 2026-10-07). OQ-5b is Decided (Marc 2026-10-04): no delete.
 
 Mounted in `backend/app/main.py`.
 
@@ -191,8 +191,8 @@ FB-R4, FB-R5, and FB-R6 stay. Katinka’s hard-delete refuse stays on FB-E7 and 
 | Priority versus schema-cleanup and configuring-agent | Marc | Open |
 | Sync versus async execution with a guaranteed log | BA | Open. FB-R5 still requires the log |
 | Audit actor is user or system | BA | Open. FB-E9 still requires an actor |
-| OQ-1 Schema allow-list | Marc (other packet) | Not frozen here |
-| OQ-5b on-delete | Marc (other packet) | Not frozen here |
+| OQ-1 Schema allow-list | Marc | **Decided** (Marc 2026-10-04). Agent scope is any table the signed-in user can change. The Schema display rule still governs the screen (Marc 2026-10-07). |
+| OQ-5b on-delete | Marc | **Decided** (Marc 2026-10-04). No delete. FB-E7 and FB-R6 (no hard delete) already match L-B. RESTRICT / NO ACTION on identity foreign keys (Marc 2026-10-07). |
 | Submit / lock / unlock reason (experiments Q20) | Lab Ops + Security | Open. Lab path after track freeze (Mathilda). Not closed here |
 | Permission that gates rule create/edit | — | Not named. FB-R7 still requires a privilege |
 
@@ -200,4 +200,4 @@ FB-R4, FB-R5, and FB-R6 stay. Katinka’s hard-delete refuse stays on FB-E7 and 
 
 ## 10. Out of this spec
 
-Link Experiments as P1 work. Receive Samples entry. DNA/RNA/cloning builders. Gold+ loaders. OnlyOffice entries. Script IDE. Code actions. IC50 and dose-response. Chat and lab-analysis assistant. CRM. ERP. A workflow engine beside Process / Experiment / LimsRun. Second sample store. Materials lot schema. JSONB-as-config. Lists on Schema. Freezing OQ-1 or OQ-5b. Reopening asked-for or routing. A new Aliquot/Pool UAT. A review Accept. A UAT stamp or UAT Pass on this docs packet. Opening Implement before Marc freezes the Spec.
+Link Experiments as P1 work. Receive Samples entry. DNA/RNA/cloning builders. Gold+ loaders. OnlyOffice entries. Script IDE. Code actions. IC50 and dose-response. Chat and lab-analysis assistant. CRM. ERP. A workflow engine beside Process / Experiment / LimsRun. Second sample store. Materials lot schema. JSONB-as-config. Lists on Schema. Reopening OQ-1 or OQ-5b. Reopening asked-for or routing. A new Aliquot/Pool UAT. A review Accept. A UAT stamp or UAT Pass on this docs packet. Opening Implement before Marc freezes the Spec.

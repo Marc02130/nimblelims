@@ -2,7 +2,7 @@
 
 **Stem:** `ui-schema-tables-cleanup`  
 **Date:** 2026-10-01  
-**Status:** P1 **implemented** 2026-10-03 (table browser + 1:N / 1:1 side links; alembic 0082). OQ-1 / OQ-2 / OQ-3 **Decided** by Marc's product locks (2026-10-03), then **narrowed for display** by the rule below. OQ-5 M:N **Deferred** (ids not globally unique). Prior `ui-schema-ddl` locks stand. UAT pass pending: `UAT_Scripts/uat-ui-schema-tables-cleanup.md`. Do not invent a UAT Pass.
+**Status:** P1 **implemented** 2026-10-03 (table browser + 1:N / 1:1 side links; alembic 0082). OQ-1 / OQ-2 / OQ-3 **Decided** by Marc's product locks (2026-10-03), then **narrowed for display** by the rule below. **OQ-1 restated (Marc 2026-10-04):** the agent may change any table the signed-in user can change; the user is responsible; `ui_schema_catalog.py` is not the agent's scope limit. The display rule still governs the Schema screen (Marc 2026-10-07). **OQ-5b Decided (Marc 2026-10-04):** no delete; retire with a status flag or deprecate, or set a container's amount to 0. RESTRICT / NO ACTION on identity foreign keys is the database backstop (Marc 2026-10-07). OQ-5 M:N **Deferred** (ids not globally unique). Prior `ui-schema-ddl` locks stand. UAT pass pending: `UAT_Scripts/uat-ui-schema-tables-cleanup.md`. Do not invent a UAT Pass.
 
 ## Display rule (current — Marc, after the table-browser PR)
 
@@ -24,7 +24,15 @@ This supersedes, for **display membership only**, the 2026-10-03 sentence that p
 - **No universal join table, no systemwide unique ids, no fat junction tables** this phase. M:N with no payload waits until ids are globally unique. If a fact needs its own columns, it is its own table.
 - Config bundles still update `ui_schema` registries. No separate agent UI file. OQ-16 stands. Do not mutate the database from the schema screen.
 
-## OQ-1 — P1 Schema Tables allow-list (DECIDED — Marc, 2026-10-03)
+## OQ-1 — Agent scope and Schema display (DECIDED — Marc 2026-10-04)
+
+**Decided (Marc 2026-10-04).** The agent may change any table the signed-in user can change. The user is responsible for the change, not the agent. This answers OQ-1 and replaces the Schema-screen allow-list (`ui_schema_catalog.py`) as the agent's scope limit.
+
+**Display, not agent scope (Marc 2026-10-07).** The Schema display rule still governs what the Schema screen shows. `lists`, `list_entries`, and `units` stay off the Schema screen.
+
+The 2026-10-03 allow-list below is history of what the catalog registered for the screen. It is not the agent's scope limit. It is not an Accept.
+
+### History — P1 Schema Tables allow-list (Marc, 2026-10-03)
 
 **Decision: B.** Allow-list in `backend/app/services/ui_schema_catalog.py`:
 
@@ -78,7 +86,7 @@ Industry / LIMSbase aligns with Leadership locks — **no Spec reopen**.
 
 ## UX sketch (cite only — 2026-10-01)
 
-Mathilda sketch tip **`564fe6f`** — [ui-schema-tables-cleanup.md](../ui-review/ui-schema-tables-cleanup.md) on [PR 139](https://github.com/Marc02130/nimblelims/pull/139). Spec base **`07ccd59`**. Sketch **pending Accept**. Encoded: Custom Fields chrome kill; Tables = Samples + Project + UI-created; Relations tab; operators link/unlink; junction metadata `schema:edit` only. OQ-1 / OQ-5b **not** frozen by sketch. Implement **CLOSED**. Rolf Confirm Met on land.
+Mathilda sketch tip **`564fe6f`** — [ui-schema-tables-cleanup.md](../ui-review/ui-schema-tables-cleanup.md) on [PR 139](https://github.com/Marc02130/nimblelims/pull/139). Spec base **`07ccd59`**. Sketch **pending Accept**. Encoded: Custom Fields chrome kill; Tables = Samples + Project + UI-created; Relations tab; operators link/unlink; junction metadata `schema:edit` only. This sketch did not freeze OQ-1 or OQ-5b. Both are Decided (Marc 2026-10-04); see the decisions in this file. Sketch Accept stays pending. No UAT Pass. Implement **CLOSED**. Rolf Confirm Met on land.
 
 ## Decided (from prior packet — do not reopen)
 
@@ -88,14 +96,14 @@ Mathilda sketch tip **`564fe6f`** — [ui-schema-tables-cleanup.md](../ui-review
 - Relations: 1:N / 1:1 / M:N = real FK / unique FK / junction (Leadership 2026-10-01); JSONB related-ids Fail.
 - M:N junctions **behind the scenes**; operators link/unlink only; default visibility = `schema:edit` only, never operator layouts (OQ-5e; Marc may overwrite).
 - Tobias Fail bar **(6):** operator opens junction as lab data-entry / spreadsheet of link rows / non–`schema:edit` layout → **Fail**.
-- Tobias Fail bar **(7)** (provisional until OQ-5b freezes): CASCADE or silent wipe on identity links (sample/barcode vessel) where Spec says RESTRICT → **Fail**.
+- Tobias Fail bar **(7)** was provisional in the 2026-10-01 fold: CASCADE or silent wipe on identity links (sample/barcode vessel) where Spec says RESTRICT → **Fail**. OQ-5b is now Decided (Marc 2026-10-04, Marc 2026-10-07). This line is not a Tobias restamp.
 - Katinka: vessel/container and parent→aliquot/derivative = **1:N FKs on the child** (SOP confirm).
 
-## OQ-5 — Relations cardinality + UI + on-delete (1:N / 1:1 SHIPPED; M:N + on-delete DEFERRED)
+## OQ-5 — Relations cardinality + UI + on-delete (1:N / 1:1 SHIPPED; M:N DEFERRED; OQ-5b DECIDED)
 
 **Shipped 2026-10-03 (P1):** Relations tab (`schema:edit`). A relation = `schema_relations` row: parent, child, cardinality, **existing FK column on the child**. UI offers only FK columns pointing at the chosen parent; 1:1 enabled only when Postgres has a single-column UNIQUE index on the key. Declaring writes the registry only — no DDL, no `relationship()`, no junction. `POST /v1/schema/relations` and config contract `ui_schema_relation` refuse `many_to_many`. Parent Columns view shows `Name → Child`, child shows `Name ← Parent` (read-only links). Resolves **OQ-5a** (declare over existing FK; new FK columns are a later ADD COLUMN type), **OQ-5c** (read-only link chips in schema chrome; operator Related lists still Mathilda), **OQ-5d** (any allow-listed pair with a real FK).
 
-**Deferred:** M:N (ids not globally unique — Marc lock), OQ-5b on-delete defaults (registry does not change FK actions; Postgres actions stay as migrated).
+**Deferred:** M:N (ids not globally unique — Marc lock). OQ-5b is Decided (Marc 2026-10-04), not deferred. The relations registry still does not change FK actions; Postgres actions stay as migrated. RESTRICT / NO ACTION on identity foreign keys is the documented database backstop (Marc 2026-10-07).
 
 **Leadership lock (Decided pattern; UI details open):** real Postgres only.
 
@@ -112,8 +120,15 @@ Operators **link records**; Admin with **`schema:edit`** defines the FK/junction
 | Sub | Question |
 |-----|----------|
 | OQ-5a | Schema UI: how Admin creates FK / 1:1 unique / M:N junction (wizard vs column type “Reference”) |
-| OQ-5b | On-delete policy defaults: **RESTRICT** vs **SET NULL** vs **CASCADE** (per relation? global default?). **Katinka SOP lean (not freeze):** RESTRICT on identity links (sample, barcode vessel); SET NULL only where link is optional. **Tobias Fail bar (7):** CASCADE or silent wipe on identity links (sample/barcode vessel) where Spec says RESTRICT → **Fail** (provisional until OQ-5b freezes) |
 | OQ-5c | Operator UX: **Related list / pickers** on parent or child (Mathilda) — never junction spreadsheet; FK field and/or Related list |
-| OQ-5d | Which allow-listed pairs may relate in P1 (blocked until OQ-1) |
+| OQ-5d | Which pairs may relate in P1. OQ-1 is Decided (Marc 2026-10-04). This pair question is not closed by that decision. |
 
-**Tobias:** any relation stored only in JSONB/`custom_attributes` → **Fail**. CASCADE or silent wipe on identity links (sample/barcode vessel) where Spec says RESTRICT → **Fail** (bar 7; provisional until OQ-5b freezes).
+### OQ-5b — On-delete (DECIDED — Marc 2026-10-04)
+
+**Decided (Marc 2026-10-04).** No delete. Retire with a status flag or deprecate, or set a container's amount to 0. Delete is not allowed in a regulated system.
+
+**Database backstop (Marc 2026-10-07).** RESTRICT / NO ACTION on identity foreign keys.
+
+The earlier question (RESTRICT vs SET NULL vs CASCADE, and Katinka's lean) is closed by those two sentences. This is not an Accept and not a UAT Pass.
+
+**Tobias:** any relation stored only in JSONB/`custom_attributes` → **Fail**. CASCADE or silent wipe on identity links (sample/barcode vessel) where Spec says RESTRICT → **Fail** (bar 7 from the 2026-10-01 fold). OQ-5b is Decided. This sentence is not a Tobias restamp.
