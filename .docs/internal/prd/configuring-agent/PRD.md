@@ -127,7 +127,7 @@ Marc, 2026-10-03, explicit:
 - Env fallback names, and only these: `OPENAI_API_KEY`, `XAI_API_KEY`, `ANTHROPIC_API_KEY`.
 - No key for the chosen provider is a clear error. The error names that provider’s key. No silent fallback to another vendor. No config writes before the key check (FB-4).
 
-Nothing in the repo today stores `agent_provider`, `agent_model`, or an encrypted provider key. Those are contracts for a later build. This packet does not name a new table.
+Migration `0083` stores these on `configuring_agent_settings`: `agent_provider` varchar(32), null or one of `openai`, `xai`, `anthropic`; `agent_model` varchar(255); `key_ciphertext` text for the encrypted provider key. The same migration creates `configurations`, `configuration_documents`, `configuration_chunks`, `configuration_runs`, `configuration_steps`, and `configuration_items`.
 
 ---
 

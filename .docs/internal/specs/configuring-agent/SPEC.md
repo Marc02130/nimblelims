@@ -38,7 +38,7 @@ Stored encrypted. Env fallback names, and only these, for the matching provider:
 
 No key for the chosen provider is a clear error that names that provider and that env name. No config writes. No LLM call. No fallback to another vendor.
 
-The key is masked. After save it is not echoed. Set/update and Clear are separate from saving provider and model (Mathilda). Clear confirms: “Clear the {provider} key? Configuring agent can't call that provider until a key is set again.” Whether Clear also clears `agent_model` is **open**.
+The key is masked. After save it is not echoed. Set/update and Clear are separate from saving provider and model (Mathilda). Clear confirms: “Clear the {provider} key? Configuring agent can't call that provider until a key is set again.” Clear also clears `agent_model`. **Decided** in the [PRD](../../prd/configuring-agent/PRD.md) (Decisions locked 2026-10-03, and the §13 row “Clearing the key also clears `agent_model`”).
 
 ---
 
@@ -292,11 +292,16 @@ Refuse: Tests at receive; JSONB or Custom Fields as config; deletes or CASCADE; 
 
 ## 10. Needs build: where shipped PR #145 differs from the locks (Mathilda 2026-10-07)
 
-Docs list only. Checked on `main` in `frontend/src/pages/admin/ConfiguringAgentRun.tsx`, `backend/app/services/configuring_agent_allow.py` (`_ALLOWED`), `backend/app/services/configuring_agent_apply.py`, and `start_run` in `backend/app/services/configuring_agent_service.py`. No code change in this fold.
+Docs list only. Checked on `main` in `frontend/src/pages/admin/ConfiguringAgentRun.tsx`, `backend/app/services/configuring_agent_allow.py` (`_ALLOWED` and `schema_table_names`), `backend/app/services/configuring_agent_apply.py`, `start_run` and `clear_key` in `backend/app/services/configuring_agent_service.py`, and `clear_stored_key` in `backend/app/services/configuring_agent_crypto.py`. No code change in this fold.
+
+Build order starts here:
+
+1. **Drop and DELETE off `_ALLOWED` (first build item; L-B, answer 3, L-3, FB-11).** Remove these five from the agent's callable list. They are still in `_ALLOWED`, and `execute_step` still performs them: `POST /v1/schema/tables/{id}/drop`, `POST /v1/schema/columns/{id}/drop`, `DELETE /v1/schema/relations/{relation_id}`, `DELETE /lists/{list_id}`, `DELETE /lists/{list_name}/entries/{entry_id}`. `DELETE /roles/{role_id}` and `DELETE /v1/sample-type-transitions/{row_id}` are already absent from `_ALLOWED`, so only those five drop and delete routes remain callable.
 
 - **Confirm (L-C, answer 5, L-1).** The run UI uses Accept, Skip, and Redo on each step, then “Apply accepted steps.” It does not show one change set with an include control on each row, and it has no second confirm. The claim matches the code.
-- **Drop and DELETE (L-B, answer 3, L-3, FB-11).** These paths are still in `_ALLOWED`, and `execute_step` still performs them: `POST /v1/schema/tables/{id}/drop`, `POST /v1/schema/columns/{id}/drop`, `DELETE /v1/schema/relations/{relation_id}`, `DELETE /lists/{list_id}`, `DELETE /lists/{list_name}/entries/{entry_id}`. The claim matches for those five. It does not match for role delete or sample-type-transition delete: `DELETE /roles/{role_id}` and `DELETE /v1/sample-type-transitions/{row_id}` are not in `_ALLOWED`, so a proposal that names them already stops.
 - **Amount → 0 (L-B).** No contents-amount path is in `_ALLOWED`. `PATCH /containers/{container_id}/contents/{sample_id}` is not on the agent's callable list. The claim matches the code.
-- **Halt at the first stop.** `start_run` stores steps until the first stopped step, then breaks, so later proposal rows are not kept. Apply also refuses the whole set before any write when an accepted step is already stopped. **Reconcile with answer 2 and D-6 (Marc/Tobias), not a defect.** Answer 2 already says the API's 422 refusals stop the run with the existing stop message. D-6 asks that a stop be logged with a reason.
+- **Agent scope (L-A).** `configuring_agent_allow.py` still limits schema names through `ui_schema_catalog.py` (`schema_table_names` returns `LAB_TABLES`, `SYSTEM_TABLES`, and `NOT_SCHEMA_TABLES`). Agent scope is the signed-in user's permissions, bounded by the API's own 422s (`_can_add_columns`, system tables, `ADD_COLUMN_OUT`). `manuals/api-endpoints.md` still says the proposal uses the Schema catalog. That wording updates when the L-A code lands. This fold does not edit the manual.
+- **Clear key.** The PRD decision is that Clear also clears `agent_model` (§2). `clear_key()` calls `clear_stored_key`, which sets both `key_ciphertext` and `agent_model` to null. The code matches that decision. This is not a needs-build gap.
+- **Halt at the first stop.** `start_run` breaks on the first stopped step, so later proposal rows are not kept. **Rolf 2026-10-07, CEO call, Marc may overrule.** This is not a Marc lock. The proposal keeps every row and shows each stop with its reason, so the user sees the full gap list in one run (D-6). Apply writes nothing while any included row is stopped. The user may exclude a stopped row only if no remaining included row depends on it. The first-stop `break` in `start_run` is therefore a needs-build item.
 
 **Deferred, not in step 1:** confirm expiry, ordering of schema changes versus data changes, and undo.
