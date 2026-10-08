@@ -10,7 +10,7 @@ Operator-facing shape of provider setup and of a configuration run. No chat tran
 
 Marc, explicit: an admin picks the provider (`openai`, `xai`, or `anthropic`) and picks the model from that provider’s live models endpoint. Store both as `agent_provider` and `agent_model`. No fixed catalog.
 
-Mathilda’s confirm-before-apply flow is a **proposal and her preference**. It is not a Marc lock.
+Confirm-before-apply is a lock (Marc 2026-10-04). One change set per run, an include/exclude choice on each row, and a second confirm for roles and privileges, schema changes, set-inactive, and amount → 0. Apply only what was confirmed, as one transaction with full rollback (Marc 2026-10-07).
 
 ---
 
@@ -95,7 +95,7 @@ Each step shows:
 
 Group by Schema tables/columns, Layouts, Privileges, Relations, and other existing config APIs. Do not invent Schema chrome for lists. `lists` and `list_entries` do not appear in the Schema group. A list-entry write, if the list API is how a dropdown value is set, sits under other existing config APIs.
 
-Accept, send feedback and redo that step, or Skip. Apply posts only the accepted steps, in order, as one transaction. If a later step cannot be done, every write from that apply is rolled back. The ledger updates only when the apply finishes.
+Confirm-before-apply is a lock (Marc 2026-10-04, Marc 2026-10-07). One change set per run. Include or exclude each row. A second confirm covers roles and privileges, schema changes, set-inactive, and amount → 0. Apply posts only what was confirmed, as one transaction with full rollback. If a later step cannot be done, every write from that apply is rolled back. The ledger updates only when the apply finishes.
 
 Failures stay on the row with the API error. The run does not continue into later steps after a gap.
 
@@ -133,7 +133,7 @@ A conversation. A dose-response plot. A parser editor. An ELN author. A SQL box.
 | Permission that gates Settings | **Decided.** `config:edit`. |
 | Clear key clears `agent_model`? | **Decided.** Yes. |
 | Server-proxied models vs browser-direct | **Decided.** Server-proxied. |
-| Always confirm vs auto-apply | **Decided.** Accept, redo, or Skip, then Apply. One transaction. |
+| Confirm-before-apply | **Decided** (Marc 2026-10-04). One change set per run, include/exclude on each row, and a second confirm for roles and privileges, schema changes, set-inactive, and amount → 0. Apply only what was confirmed, as one transaction with full rollback (Marc 2026-10-07). |
 | Who may open New run? | **Decided.** Anyone with `config:edit`. |
 | Where files live | **Decided.** On the named configuration, not the uploader. |
 | How long uploads are kept, and PHI | Open. Do not draw a retention control until that is decided. |
