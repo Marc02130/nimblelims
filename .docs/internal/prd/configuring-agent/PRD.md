@@ -34,7 +34,11 @@ No Accept, Confirm, or UAT Pass is recorded here. August 2026 files stay history
 - **6.** The agent never grants the user new privileges. A request that would need one is a stop.
 - **7.** The audit actor is the confirming user, flagged agent-assisted, and recorded with run id, provider, and model.
 
-Answer 1 is in §7. Answer 4 is in §8. Answer 8 is the spec's Step 1 slice.
+Answer 1 is in §7. Answer 4 is in §8. Answer 8 is the [spec Step 1 slice](../../specs/configuring-agent/SPEC.md).
+
+## Step 1 slice
+
+The slice note is in the spec (Marc 2026-10-07, Katinka 2026-10-07). UI sketch (Mathilda 2026-10-07): [configuring-agent step 1](../../../review/ui-review/configuring-agent-step1.md) (lands with [PR #147](https://github.com/Marc02130/nimblelims/pull/147), tip `c2f2b46`). This file does not copy the sketch.
 
 ---
 
