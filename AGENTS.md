@@ -48,7 +48,7 @@ Summary:
 
 ### Architecture Overview
 
-NimbleLIMS is a four-container Docker application (PostgreSQL, FastAPI backend, React frontend, R Calculator microservice) orchestrated by `docker-compose.yml`. See `README.md` for full setup instructions.
+NimbleLIMS is a five-container Docker application (PostgreSQL, FastAPI backend, React frontend, R Calculator microservice, and an MCP server) orchestrated by `docker-compose.yml`. See `README.md` for full setup instructions. The MCP service (`lims-mcp`) is an HTTP client to the backend only, read-only by default, on host port 8100. See `services/mcp/README.md`. Production Compose does not start it unless the `mcp` profile is set.
 
 ### Running the Application
 
@@ -57,6 +57,7 @@ Start all services: `sudo docker compose up -d --build` from the repo root. Serv
 - **Backend** (lims-backend): FastAPI + Uvicorn, port 8000. API docs at `http://localhost:8000/docs`.
 - **Frontend** (lims-frontend): React 18 built via `react-scripts`, served by Nginx, port 3000.
 - **R Calculator** (lims-r-calculator): Plumber R service for dose-response curve fitting, port 8001 (internal).
+- **MCP** (lims-mcp): Read-only HTTP tools for AI clients. Host port 8100. No database. See `services/mcp/README.md`.
 
 Default logins (development/UAT):
 - **Admin**: `admin` / `***REMOVED***`
