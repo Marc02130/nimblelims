@@ -32,9 +32,11 @@ def _sanitize_sequence_key(key: str) -> Optional[str]:
     """
     if not key or not key.strip():
         return None
-    # Replace non-alphanumeric with underscore, collapse multiple underscores
+    # Replace non-alphanumeric with underscore, collapse multiple underscores.
+    # ui_schema_ensure_sequence accepts only [a-z0-9_], so the key is lowercase.
+    # The visible sample name still uses the project name as written.
     safe = re.sub(r'[^a-zA-Z0-9_]', '_', key.strip())
-    safe = re.sub(r'_+', '_', safe).strip('_')
+    safe = re.sub(r'_+', '_', safe).strip('_').lower()
     return safe[:SEQ_KEY_MAX_LEN] if safe else None
 
 
