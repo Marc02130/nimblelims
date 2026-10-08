@@ -1,0 +1,6 @@
+username,role,project,access,notes
+alice-tech,Lab Technician,mAb-2301 PK Study,grant,Existing 0058 user. Not modified. result:enter. No result:review. No schema:edit. Same client as CAR-T and still not granted that project.
+alice-tech,Lab Technician,Project Alpha,grant,Existing 0058 user. Not modified. The blood and DNA pair is on this project, which she can already see.
+alice-tech,Lab Technician,CAR-T In-Process Testing,deny,Same-client deny. No project_users row. CAR-T-Batch-001 stays invisible to her. Not modified.
+schema-editor,Schema Editor,Project Alpha,grant,Slice user. Role Schema Editor holds schema:edit and config:edit. Not the Administrator role. No existing non-admin seed user held schema:edit.
+results-reviewer,Lab Manager,Project Alpha,grant,Slice user. Existing Lab Manager role, which holds result:review and also result:enter. Not the Administrator role. No existing role is review-only.
