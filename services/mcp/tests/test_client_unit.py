@@ -1,6 +1,7 @@
 """Backend client: headers, refusals, and what must never be logged."""
 
 import logging
+import secrets
 
 import httpx
 import pytest
@@ -21,7 +22,7 @@ async def test_forwards_bearer_client_and_user_agent(caplog):
     route = respx.get(f"{BASE}/auth/me").mock(
         return_value=httpx.Response(200, json={"username": "lab-tech"})
     )
-    token = "sekret-token-do-not-log"
+    token = secrets.token_urlsafe(24)
     with caplog.at_level(logging.INFO, logger="nimblelims_mcp.client"):
         body = await _client().request("GET", "/auth/me", token=token)
 
@@ -51,17 +52,20 @@ async def test_401_says_token_missing():
 
 
 @respx.mock
-async def test_login_401_is_not_the_expired_token_message():
+async def test_login_401_is_not_the_expired_token_message(caplog):
     respx.post(f"{BASE}/auth/login").mock(return_value=httpx.Response(401, text="bad credentials"))
-    with pytest.raises(BackendError, match="login failed") as exc:
-        await _client().request(
-            "POST",
-            "/auth/login",
-            token=None,
-            json_body={"username": "admin", "password": "wrong-password-do-not-log"},
-        )
+    bad = secrets.token_urlsafe(16)
+    with caplog.at_level(logging.INFO, logger="nimblelims_mcp.client"):
+        with pytest.raises(BackendError, match="login failed") as exc:
+            await _client().request(
+                "POST",
+                "/auth/login",
+                token=None,
+                json_body={"username": "admin", "password": bad},
+            )
     assert "token missing/expired" not in str(exc.value)
-    assert "wrong-password" not in str(exc.value)
+    assert bad not in str(exc.value)
+    assert bad not in caplog.text
 
 
 @respx.mock

@@ -141,7 +141,7 @@ Not in v1, even with writes on: batches, aliquots, analyses, analytes, units, cl
 
 Unit tests in `services/mcp/tests/` mock the API (respx). They check header forwarding, read paths, write tools absent in the default mode, `DELETE` never sent, and schema drop refused.
 
-`tests/test_smoke.py` is skipped unless `MCP_SMOKE=1`. The reason is in that file: the default run must not need Docker. With the flag, it logs in as `lab-tech` (the development seed in `Agents.md`, unless `MCP_SMOKE_USERNAME` / `MCP_SMOKE_PASSWORD` override it), then calls `whoami` and `list_samples` with that token. It checks `sample:read` is in the returned permissions. It does not seed a second tenant, so it does not prove a cross-client RLS diff by itself. The backend applies RLS on `GET /samples`. Do not point the smoke test at production. It does not try the admin seed, because a failed login counts toward lockout and a local volume may no longer use the published admin password.
+`tests/test_smoke.py` is skipped unless `MCP_SMOKE=1`. The reason is in that file: the default run must not need Docker. With the flag, login uses only `MCP_SMOKE_USERNAME` and `MCP_SMOKE_PASSWORD`. If either is missing or empty, the test skips with a written reason and does not fall back to a seed user. No password is stored in the repo. It then calls `whoami` and `list_samples` with that token and checks `sample:read` is in the returned permissions. It does not seed a second tenant, so it does not prove a cross-client RLS diff by itself. The backend applies RLS on `GET /samples`. Do not point the smoke test at production. A failed login counts toward lockout.
 
 ## 10. Open questions
 
