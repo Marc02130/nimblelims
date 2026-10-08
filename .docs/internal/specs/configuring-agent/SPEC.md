@@ -3,7 +3,7 @@
 **PRD:** [../../prd/configuring-agent/PRD.md](../../prd/configuring-agent/PRD.md)  
 **Design:** [../../design/configuring-agent.md](../../design/configuring-agent.md)  
 **Date:** 2026-10-03  
-**Status:** Working draft. The `configuring-agent` branch implements the 2026-10-03 contracts below. Marc 2026-10-04 locks (L-A, L-B, L-C) and Marc 2026-10-07 answers are folded here. That fold is not a claim that the branch already implements them. This spec still has **no** UAT Pass.  
+**Status:** Working draft. The `configuring-agent` branch implements the 2026-10-03 contracts below. Marc 2026-10-04 locks (L-A, L-B, L-C) and Marc 2026-10-07 answers are folded here ([PR #148](https://github.com/Marc02130/nimblelims/pull/148), merged to main at `adad0cb`). That fold is not a claim that the branch already implements them. This spec still has **no** UAT Pass.  
 **Implement gate:** The 2026-10-03 locks. This spec still has **no** UAT Pass.
 
 No Accept, Confirm, or UAT Pass. Tobias’s earlier AC-1 through AC-6 are replaced. Cite **FB-1 through FB-10**, plus the Step 1 bars in §6 (D-1 through D-9, L-1 through L-4, and FB-11). Those Step 1 bars are Tobias 2026-10-07, Marc-approved. Spec only, no UAT stamp until there is a product tip.
@@ -264,7 +264,7 @@ Chat. Lab-analysis assistant. Parser authoring. ELN authoring. Dose-response. Se
 
 ## 9. Step 1 slice
 
-UI sketch (Mathilda 2026-10-07): [configuring-agent step 1](../../../review/ui-review/configuring-agent-step1.md) (on main from [PR #147](https://github.com/Marc02130/nimblelims/pull/147); the halt and L-A folds land with [PR #149](https://github.com/Marc02130/nimblelims/pull/149), tip `b7796c6`). This spec does not copy the sketch.
+UI sketch (Mathilda 2026-10-07): [configuring-agent step 1](../../../review/ui-review/configuring-agent-step1.md) (on main from [PR #147](https://github.com/Marc02130/nimblelims/pull/147); Mathilda's halt and L-A sketch folds are in [PR #149](https://github.com/Marc02130/nimblelims/pull/149)). This spec does not copy the sketch.
 
 Marc 2026-10-07: CMDL-SOP2310, then Qubit SOP 22975, on a fresh seed DB with a live provider key. TruSeq Nano is the second run.
 
@@ -278,10 +278,10 @@ TruSeq Nano is held for run 2, and SureSelect stays parked.
 Configure-first order, each step through existing APIs with confirm-before-apply:
 
 1. Client/project and roles. Bench users can receive, run, and enter results. Review is a separate role. `schema:edit` stays with an admin, and the agent never grants it to itself.
-2. Sample types and matrices: Whole Blood (parent) and Genomic DNA (derivative). The allowed pair is Whole Blood to Genomic DNA, recorded through `parent_sample_id`.
+2. Sample types and matrices: sample type Blood (parent) with matrix Whole Blood, and sample type DNA (derivative) with matrix Genomic DNA. The allowed pair is Blood to DNA, recorded through `parent_sample_id`.
 3. Container types: an EDTA blood tube for intake and a sample-numbered DNA tube for the eluate. Barcode identifies the vessel and Sample ID identifies the material. Each vessel holds an amount (volume).
 4. Accession template: client/project, matrix (Whole Blood), barcode, volume, and first vessel. Receive ends at Available for Testing or Quarantine. No Tests are created at receive (WO-7).
-5. Analyses. Extraction is a process step whose result is a new Genomic DNA material on a new tube. The SOP gives 600 µL of blood input per well, up to 24 samples per KingFisher run, and about 400 µL of eluate per sample. Qubit is a test on the DNA sample with the result as concentration in ng/µL. Its hints are the assay kit (HS or BR), the sample volume read, a dilution factor, and a standards check (pass/fail). The acceptance range is set per lab: the SOP only says to re-extract manually below the downstream requirement, so any minimum used in seed or UAT must be marked as example data, not attributed to the SOP. Params freeze at LimsRun start.
+5. Analyses. Extraction is a process step whose result is a new DNA material (sample type DNA, matrix Genomic DNA) on a new tube. The SOP gives 600 µL of blood input per well, up to 24 samples per KingFisher run, and about 400 µL of eluate per sample. Qubit is a test on the DNA sample with the result as concentration in ng/µL. Its hints are the assay kit (HS or BR), the sample volume read, a dilution factor, and a standards check (pass/fail). The acceptance range is set per lab: the SOP only says to re-extract manually below the downstream requirement, so any minimum used in seed or UAT must be marked as example data, not attributed to the SOP. Params freeze at LimsRun start.
 6. Statuses: Received, Available for Testing, Quarantine, and Spent when the amount reaches 0. Nothing is deleted, and RESTRICT stays on identity FKs.
 
 Respect: identity plus first vessel at receive; DNA as a new material with `parent_sample_id`; the Qubit number on the DNA sample's test; links only.
