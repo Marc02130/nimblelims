@@ -264,6 +264,8 @@ Chat. Lab-analysis assistant. Parser authoring. ELN authoring. Dose-response. Se
 
 ## 9. Step 1 slice
 
+UI sketch (Mathilda 2026-10-07): [configuring-agent step 1](../../../review/ui-review/configuring-agent-step1.md) (lands with [PR #147](https://github.com/Marc02130/nimblelims/pull/147), tip `c2f2b46`). This spec does not copy the sketch.
+
 Marc 2026-10-07: CMDL-SOP2310, then Qubit SOP 22975, on a fresh seed DB with a live provider key. TruSeq Nano is the second run.
 
 Katinka 2026-10-07. Links only. No SOP body in this repo.
@@ -285,3 +287,16 @@ Configure-first order, each step through existing APIs with confirm-before-apply
 Respect: identity plus first vessel at receive; DNA as a new material with `parent_sample_id`; the Qubit number on the DNA sample's test; links only.
 
 Refuse: Tests at receive; JSONB or Custom Fields as config; deletes or CASCADE; an invented concentration cutoff presented as if it came from the SOP; a third ID scheme.
+
+---
+
+## 10. Needs build: where shipped PR #145 differs from the locks (Mathilda 2026-10-07)
+
+Docs list only. Checked on `main` in `frontend/src/pages/admin/ConfiguringAgentRun.tsx`, `backend/app/services/configuring_agent_allow.py` (`_ALLOWED`), `backend/app/services/configuring_agent_apply.py`, and `start_run` in `backend/app/services/configuring_agent_service.py`. No code change in this fold.
+
+- **Confirm (L-C, answer 5, L-1).** The run UI uses Accept, Skip, and Redo on each step, then “Apply accepted steps.” It does not show one change set with an include control on each row, and it has no second confirm. The claim matches the code.
+- **Drop and DELETE (L-B, answer 3, L-3, FB-11).** These paths are still in `_ALLOWED`, and `execute_step` still performs them: `POST /v1/schema/tables/{id}/drop`, `POST /v1/schema/columns/{id}/drop`, `DELETE /v1/schema/relations/{relation_id}`, `DELETE /lists/{list_id}`, `DELETE /lists/{list_name}/entries/{entry_id}`. The claim matches for those five. It does not match for role delete or sample-type-transition delete: `DELETE /roles/{role_id}` and `DELETE /v1/sample-type-transitions/{row_id}` are not in `_ALLOWED`, so a proposal that names them already stops.
+- **Amount → 0 (L-B).** No contents-amount path is in `_ALLOWED`. `PATCH /containers/{container_id}/contents/{sample_id}` is not on the agent's callable list. The claim matches the code.
+- **Halt at the first stop.** `start_run` stores steps until the first stopped step, then breaks, so later proposal rows are not kept. Apply also refuses the whole set before any write when an accepted step is already stopped. **Reconcile with answer 2 and D-6 (Marc/Tobias), not a defect.** Answer 2 already says the API's 422 refusals stop the run with the existing stop message. D-6 asks that a stop be logged with a reason.
+
+**Deferred, not in step 1:** confirm expiry, ordering of schema changes versus data changes, and undo.
