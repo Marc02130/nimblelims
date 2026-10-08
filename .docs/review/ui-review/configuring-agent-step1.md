@@ -4,6 +4,7 @@
 **Status:** Sketch for Accept. Implement follows the packet gates (Brief + Design + Marc green-light).  
 **Stem:** `configuring-agent-step1`  
 **Spec base:** Wilhelmina — [PRD](../../internal/prd/configuring-agent/PRD.md), [spec](../../internal/specs/configuring-agent/SPEC.md), [design](../../internal/design/configuring-agent.md). Shipped operator steps: [manuals/configuring-agent.md](../../../manuals/configuring-agent.md).  
+**Step 0 fold:** Wilhelmina [PR #148](https://github.com/Marc02130/nimblelims/pull/148) (tip `686f926`). QA bars are [SPEC §6](https://github.com/Marc02130/nimblelims/blob/686f926/.docs/internal/specs/configuring-agent/SPEC.md#6-fail-bars-tobias) (D-1–D-9, L-1–L-4, FB-11). The needs-build list, including the L-A catalog-scope gap, is [SPEC §10](https://github.com/Marc02130/nimblelims/blob/686f926/.docs/internal/specs/configuring-agent/SPEC.md#10-needs-build-where-shipped-pr-145-differs-from-the-locks-mathilda-2026-10-07). Those two sections are on that PR tip. The spec file in this tree is [SPEC.md](../../internal/specs/configuring-agent/SPEC.md). §6 and §10 land with PR #148.  
 **Author:** Mathilda (NimbleLIMS UI review seat)  
 **Gates:** Brief + Design + Marc green-light. This file is the UI sketch only. It does not Accept the packet and it does not open implement.  
 **Persona:** Lab admin with existing permission `config:edit`. Scientist and admin words, not a chat product.  
@@ -65,9 +66,19 @@ There is no Test connection route. There is no runs-list route. Run rows nested 
 
 Step groups stored today are only `schema_tables`, `schema_columns`, `layouts`, `privileges`, `relations`, and `other` (`backend/app/services/configuring_agent_allow.py`). A step stores `target`, `action`, `why`, `decision`, `status`, `gap`, and `error_message`. It does not store a verb from the locked set, a before → after pair, or a source citation.
 
-`start_run` stops at the first blocked step and does not keep later proposal rows. Apply posts steps whose `decision` is `accepted`, as the signed-in caller. A permission failure rolls the transaction back and returns **403**. It does not leave the other rows applied, and it does not grey the row out ahead of time.
+`start_run` stops at the first blocked step and does not keep later proposal rows. That halt is what the code does today. It is a CEO call (Rolf). Marc may overrule it. It is not a Marc lock. This sketch does not keep it: the proposal keeps every row, and each stop is shown in place. Keeping the later rows is **Needs build.** Apply posts steps whose `decision` is `accepted`, as the signed-in caller. A permission failure rolls the transaction back and returns **403**. It does not leave the other rows applied, and it does not grey the row out ahead of time.
 
-Allowed calls today include real drops and deletes: `POST /v1/schema/tables/{id}/drop`, `POST /v1/schema/columns/{id}/drop`, `DELETE /v1/schema/relations/{id}`, and `DELETE` on lists and list entries. List `DELETE` in `backend/app/routers/lists.py` sets `active=False`, but the method is still delete. Those must not be buttons or row verbs in this sketch.
+Checked on `main` in `backend/app/services/configuring_agent_allow.py` (`_ALLOWED`). Five drop/delete routes are still callable. Removing them from `_ALLOWED` is the first build item:
+
+- `POST /v1/schema/tables/{id}/drop`
+- `POST /v1/schema/columns/{id}/drop`
+- `DELETE /v1/schema/relations/{id}`
+- `DELETE /lists/{list_id}`
+- `DELETE /lists/{list_name}/entries/{entry_id}`
+
+List `DELETE` in `backend/app/routers/lists.py` sets `active=False`, but the method is still delete. Those five must not be buttons or row verbs in this sketch.
+
+Role delete and sample-type-transition DELETE are already absent from `_ALLOWED`. `DELETE /roles/{role_id}` and `DELETE /v1/sample-type-transitions/{row_id}` are not in the tuple, so a proposal that names them already stops. The tuple does include `POST /v1/sample-type-transitions` and `PUT /roles/{role_id}/permissions`.
 
 `PATCH /containers/{container_id}/contents/{sample_id}` can set `amount` to 0 (`ContentsUpdate.amount` is `ge=0` in `backend/app/schemas/container.py`). That path is not in the agent allow-list. Schema deprecate sets status `deprecated` (`backend/app/services/ui_schema_service.py`). The admin-facing verb in this sketch is still **Set inactive**.
 
@@ -82,7 +93,9 @@ flowchart LR
   settings[Settings]
   runs[Runs list]
   newRun[New run]
-  review[Proposal review and Stop cards]
+  review[Proposal review with every row and stops in place]
+  stopped{Any included row stopped?}
+  depend[Refuse Apply and name the dependency]
   second{Included rows are high-impact?}
   confirm2[Second confirm]
   apply[Apply one transaction]
@@ -91,7 +104,10 @@ flowchart LR
   settings --> runs
   runs --> newRun
   newRun --> review
-  review --> second
+  review --> stopped
+  stopped -->|Yes| depend
+  depend --> review
+  stopped -->|No| second
   second -->|Yes| confirm2
   second -->|No| apply
   confirm2 --> apply
@@ -202,7 +218,7 @@ Columns:
 | Inputs | Documents live on the configuration, not as a count on the run | Count of files on that run’s configuration. **Needs build.** |
 | Status | See the map below | Lab labels. **Needs build** for the labels that the code does not use. |
 
-Row click opens Proposal review while the run is waiting, and Run history after it is finished. Stopped runs still open. A stopped run can also have proposal rows (lock 5’s sibling on Stop cards). The current starter loop does not keep both. **Needs build.**
+Row click opens Proposal review while the run is waiting, and Run history after it is finished. The proposal keeps every row. Each stop is shown in place with its reason, so one run shows the whole gap list. `start_run` still breaks at the first stop and drops the later rows. That break is **Needs build.** Halt-at-first-stop is a CEO call (Rolf), not a Marc lock.
 
 ### States
 
@@ -334,8 +350,9 @@ One change set. Groups follow Admin areas. Shipped `group` codes stay the storag
 | Group on screen | Admin area already in the product | Shipped `group` |
 |-----------------|------------------------------------|-----------------|
 | Schema | Admin → Schema (`/admin/schema/tables` and its columns, layouts, privileges, relations) | `schema_tables`, `schema_columns`, `layouts`, `privileges`, `relations` |
-| Lists | Admin → Lists (`/admin/lists`) | Forced to `other` today. Lists and list items are not Schema rows. |
-| Analyses / Units | Admin → Analyses, Analytes, Units, Test Batteries | Not in the allow-list. A call with no matching API is a Stop card, not a fake row. |
+| Lists | Admin → Lists (`/admin/lists`) | Data rows only: **Create**, **Update**, **Set inactive** on lists and list items. Not schema tables. Not column adds. Forced to `other` today. |
+| Analyses / Units | Admin → Analyses, Analytes, Units, Test Batteries | Unit records live on the Units screen. The `units` table is not a schema table here. Not in the allow-list. A call with no matching API is a stop in place, not a dropped row. |
+| Other tables you can change | Tables the signed-in user can change that Schema does not show | **Needs build.** Not a shipped `group`. See the L-A rule below. |
 | Users / Roles | Admin → Users, Roles & Permissions | `other` (`PATCH /users/{id}` role, `PUT /roles/{id}/permissions`) |
 | Routing | Admin → Routing map | Allow-list returns a stop: “Routing stays as built.” Under locks 5 and 9, an existing routing API the starter may call is a row in this group. That change is **Needs build.** |
 | Templates | Experiment templates (`/experiments/templates`, `/v1/experiment-templates`) | `other` today. Workflow templates (`/admin/workflow-templates`) stay a Stop card while the allow-list rejects them. |
@@ -343,6 +360,12 @@ One change set. Groups follow Admin areas. Shipped `group` codes stay the storag
 | Dest-type transitions | Admin → Dest-type transitions | `other` |
 
 Inside Schema, keep the five shipped labels so a table change is not mixed with a privilege change. Privilege rows are still Schema, and they are high-impact (lock 3).
+
+**Other tables you can change** (L-A). Wilhelmina SPEC §10 on [PR #148](https://github.com/Marc02130/nimblelims/pull/148) tip `686f926`. The agent's scope is any table the signed-in user can change, even when the Schema screen's display rule hides it. Those rows still appear, under the heading **Other tables you can change**. Same verbs, before → after values, and citations as every other row. **Needs build.** `schema_table_names` in `backend/app/services/configuring_agent_allow.py` still returns the Schema catalog (`LAB_TABLES`, `SYSTEM_TABLES`, `NOT_SCHEMA_TABLES` from `backend/app/services/ui_schema_catalog.py`).
+
+If the API refuses with a **422** (a system table, or a column it will not add), that row becomes a stop in place, with the API's reason. The schema API already says “This table can't get new fields from the UI.” The row is never dropped silently. Showing that 422 as an in-place stop, while the rest of the proposal stays, is **Needs build.**
+
+**Guard (CEO, Rolf).** `lists`, `list_entries`, and `units` must never appear in **Other tables you can change** as schema-table changes. `NOT_SCHEMA_TABLES` is already those three names. Dropdown values still go through list-editor rows, in the **Lists** group, as data rows: **Create**, **Update**, **Set inactive**. If the agent tries to add a column to `lists`, `list_entries`, or `units`, that row becomes a stop with the reason. The allow-list already returns “{name} is not a Schema table. Edit lists under Lists and units under Units. Do not add columns on them.” Keeping those three out of this group, and showing that column add as a stop, is **Needs build.**
 
 Each proposal row:
 
@@ -358,7 +381,13 @@ Each proposal row:
 
 **Amount → 0** is the only container removal. The contents patch can store amount 0. The agent allow-list does not call it yet. Wiring that call is **Needs build.** A container delete stays a Stop card.
 
-Footer: **Apply N changes**. N is the included count. Excluded rows, greyed rows, and Stop cards are not in N. If N is 0, the button is disabled and the helper is “Include at least one change.”
+Footer: **Apply N changes**. N is the count of included rows. Greyed rows are not in N. A stopped row stays in N while it is included.
+
+Apply writes nothing while any included row is stopped. The button stays. The screen says why. A stopped row can be excluded only if no remaining included row depends on it. If one does, Apply is refused and the screen names that dependency: “Row 7 depends on row 3, which is stopped. Exclude row 7 too, or fix row 3.” The dependency line and this exclude rule are **Needs build.**
+
+If N is 0, the button is disabled and the helper is “Include at least one change.”
+
+The second confirm opens only when Apply is not already refused for an included stop.
 
 High-impact rows, only when **included**:
 
@@ -367,7 +396,7 @@ High-impact rows, only when **included**:
 - Set inactive
 - Amount → 0
 
-If any included row is high-impact, **Apply N changes** opens the second confirm. It does not apply yet.
+If any included row is high-impact, and no included row is stopped, **Apply N changes** opens the second confirm. It does not apply yet.
 
 Second confirm dialog:
 
@@ -386,15 +415,17 @@ Apply result:
 - Success: status **Applied**. “Applied N changes.” Each row links to the existing admin screen for that record (Schema, Lists, Roles, Units, and the other screens above). The ledger already stores a name and a target id on `configuration_items`. The page prints the id and does not link. Links are **Needs build.**
 - Failure: status **Failed (apply rolled back)**. “Nothing was applied. {reason}.” The reason is the API error in lab words. The generic server sentence “Apply failed and every change from this apply was undone.” may be that reason. The screen must say that nothing remains. Do not list a partial set as applied.
 
-Stop cards sit on the same run, above or beside the groups. They are not rows in the change set. See §5.
+Each stop is shown in place on its row, with its reason. The rest of the proposal stays, so one run shows the whole gap list. See §5.
 
 ### States
 
 | State | Screen |
 |-------|--------|
 | Proposing | “Reading the files and preparing a proposal.” No Apply yet. |
-| Waiting for you | The set, the checkboxes, and **Apply N changes**. |
-| Second confirm open | Dialog on top. Apply has not started. |
+| Waiting for you | The set, the checkboxes, and **Apply N changes**. Every row is on screen, including stops. |
+| Included stop | Apply writes nothing. The stop stays in place with its reason. |
+| Dependent row still included | Apply refused. “Row 7 depends on row 3, which is stopped. Exclude row 7 too, or fix row 3.” **Needs build.** |
+| Second confirm open | Dialog on top. Apply has not started. No included row is stopped. |
 | Stale | Flagged rows. Apply disabled. |
 | Applying | “Applying N changes.” Buttons disabled. |
 | Applied | Result list with links. |
@@ -414,7 +445,10 @@ Second confirm checkbox: “I am responsible for these changes”.
 | Apply rolled back | “Nothing was applied.” plus the reason. Status Failed (apply rolled back). |
 | Stale row | Apply blocked. The row is flagged. |
 | Included row the starter cannot do | The row is greyed before Apply. It is not sent. |
-| No API | That item is a Stop card, not an error toast that drops it. |
+| No API | That row is a stop in place, with the reason. It is not dropped. |
+| API 422 | The row is a stop in place. The reason is the API's text. It is not dropped. |
+| Included stop | “Nothing was applied.” Apply does not run. |
+| Dependent row | The dependency sentence above. Apply does not run. |
 
 ### Bounce list
 
@@ -425,8 +459,12 @@ Second confirm checkbox: “I am responsible for these changes”.
 - A Delete, Drop, or Remove button, or those words as the verb.
 - A permission failure that hides the row or omits it with no label.
 - Self-escalation drawn as a row (that is a Stop card).
-- Lists or list items under the Schema heading.
-- A Schema table the product cannot use through configuration (`lists`, `list_entries`, and `units` stay off Schema, as the catalog already does).
+- The run halts at the first stop, so later rows are missing.
+- Apply writes anything while an included row is stopped.
+- A stopped row is excludable while a dependent included row remains.
+- A table the user can change is missing because Schema does not show it.
+- A 422 dropped instead of an in-place stop with the API's reason.
+- `lists`, `list_entries`, or `units` shown as schema tables or column additions, including under **Other tables you can change**.
 - Stale rows applied anyway.
 
 ### Gloved / high volume
@@ -441,7 +479,11 @@ Keyboard: Tab through rows, Space toggles include, Tab to **Apply N changes**, E
 
 ### Purpose
 
-Say what the input asked for, and why this run will not do it. A run may show Stop cards and proposal rows together. Stops do not block Apply of the other included rows.
+Say what the input asked for, and why this run will not do it. The proposal keeps every row. Each stop is shown in place with its reason, so the admin sees the whole gap list in one run.
+
+Halt-at-first-stop is a CEO call (Rolf). Marc may overrule it. It is not a Marc lock. This sketch does not halt at the first stop.
+
+Apply writes nothing while any included row is stopped. A stopped row can be excluded only if no remaining included row depends on it. If one does, Apply is refused and the screen names that dependency: “Row 7 depends on row 3, which is stopped. Exclude row 7 too, or fix row 3.”
 
 ### Who
 
@@ -449,28 +491,32 @@ Same admin as the review (`config:edit`). The card is part of the run, not a sep
 
 ### Layout
 
-**Needs build.** Today a blocked step is a warning on that step (`gap`) plus a banner, and `start_run` stops the loop at the first one so later rows are not kept. The banner text `Can't apply this change through configuration APIs` stays for the “no API” case (`STOP_BANNER` in `backend/app/services/configuring_agent_allow.py`).
+**Needs build.** Today a blocked step is a warning on that step (`gap`) plus a banner, and `start_run` stops the loop at the first one so later rows are not kept. Keeping those later rows is **Needs build.** The dependency line and the exclude rule are **Needs build.** The banner text `Can't apply this change through configuration APIs` stays for the “no API” case (`STOP_BANNER` in `backend/app/services/configuring_agent_allow.py`).
 
-One card per stop:
+The stop sits on that row. The include checkbox stays so the admin can exclude the row when the dependency rule allows it.
+
+On the row:
 
 1. What the input asked for.
-2. Why it is a stop. One of: no existing API can express it; this would grant the starter or their role a new privilege; a delete was requested.
+2. Why it is a stop. One of: no existing API can express it; the API returned 422; this would grant the starter or their role a new privilege; a delete was requested; a column was proposed on `lists`, `list_entries`, or `units`.
 3. Source: file name plus page, line, or row. **Needs build** (same citation gap as proposal rows).
 4. Primary button: **Copy as backlog item**. **Needs build.** Copies plain text to the clipboard. It does not post to GitHub, email, or any other system.
 
-The card has no Apply and no Include.
+The row has no Apply of its own. Apply of the set writes nothing while this row is included.
 
 ### States
 
-The card stays after a successful apply of the other rows. Run history shows it. Copy success: “Copied.” Copy failure: “Couldn't copy. Select the text and copy it.” The text remains on the card either way.
+The stop stays on the row. Apply writes nothing while it is included. After the admin excludes it, and no included row depends on it, Apply can proceed for the other included rows. Run history still shows the stop. Copy success: “Copied.” Copy failure: “Couldn't copy. Select the text and copy it.” The text remains on the row either way.
 
 ### Copy
 
 | Why | Card text |
 |-----|-----------|
 | No API | “Can't apply this change through configuration APIs.” Then one plain sentence naming the gap. The allow-list already has sentences such as “There is no junction API.” and “No existing API grants a user access to a project. This run will not invent one.” Use those sentences. Do not invent a workaround. |
-| Self-escalation | “This would give you, or your role, a permission you do not have. That stays stopped.” Never a proposal row. **Needs build.** The allow-list can still send `PUT /roles/{id}/permissions`. |
-| Delete | “This input asks to delete a record. This screen does not delete. Removal is Set inactive, or Amount → 0 on a container.” If that status change is not what was asked, the card stays a stop. **Needs build.** Drop and DELETE paths are still allowed calls. |
+| API 422 | The API's own reason. Example: “This table can't get new fields from the UI.” The row stays. |
+| Column on lists, list items, or units | “{name} is not a Schema table. Edit lists under Lists and units under Units. Do not add columns on them.” That sentence is already returned when the body names `lists`, `list_entries`, or `units`. The row is a stop. It is not a schema row under **Other tables you can change**. |
+| Self-escalation | “This would give you, or your role, a permission you do not have. That stays stopped.” Never a proposal row that can be applied. **Needs build.** The allow-list can still send `PUT /roles/{id}/permissions`. |
+| Delete | “This input asks to delete a record. This screen does not delete. Removal is Set inactive, or Amount → 0 on a container.” If that status change is not what was asked, the row stays a stop. **Needs build** for the five drop/delete routes still in `_ALLOWED`. Removing those five is the first build item. `DELETE /roles/{role_id}` and `DELETE /v1/sample-type-transitions/{row_id}` are already absent, so a proposal that names them already stops. |
 
 Clipboard text, plain:
 
@@ -484,16 +530,18 @@ Source: {file}, {page or line or row}
 
 ### Errors
 
-Clipboard denied stays on the card. The stop is still visible. Applying other rows does not clear the card.
+Clipboard denied stays on the row. The stop is still visible. Excluding it does not erase it from the proposal or from history.
 
 ### Bounce list
 
-- A stop that hides the rest of the proposal or disables **Apply N changes** for included rows.
+- The run halts at the first stop, so later rows are missing.
+- Apply writes anything while an included row is stopped.
+- A stopped row is excludable while a dependent included row remains.
 - A stop that writes a partial configuration.
-- Self-escalation as an included row.
-- A delete shown as a row or a button.
+- Self-escalation as a row that can be applied.
+- A delete shown as a row verb or a button.
 - **Copy as backlog item** that posts outside the lab (issue tracker, mail, chat).
-- Silent drop of a change that has no API.
+- A silent drop: no API, a 422, or a column add on `lists`, `list_entries`, or `units`.
 
 ---
 
@@ -517,12 +565,12 @@ Show:
 - Inputs: file name, lab kind, status.
 - The proposal as it was shown, including excluded rows and greyed rows with `Needs {permission}`.
 - Which rows were included.
-- Who confirmed, and whether the second confirm was checked, with the time.
+- Who confirmed, and whether the second confirm was checked, with the time. The confirming user is recorded as the actor. Each applied change is flagged agent-assisted. **Needs build.**
 - What the one transaction applied, each line linking to the changed record on the existing admin screen.
 - Stop cards, including the backlog text.
 - If apply failed: “Nothing was applied.” plus the reason. No applied links.
 
-The run model has no confirmed-by field and no second-confirm flag. Those are **Needs build.** `configuration_items` can list what a successful apply stored. Showing them as links is **Needs build.**
+The run model has no confirmed-by field, no agent-assisted flag, and no second-confirm flag. Those are **Needs build.** `configuration_items` can list what a successful apply stored. Showing them as links is **Needs build.**
 
 ### States
 
@@ -543,6 +591,7 @@ Missing run: “Run not found.” The API already returns that for a run outside
 
 - Editing a past run from this screen.
 - History that omits excluded rows, greyed rows, or stops.
+- History that does not record the confirming user, or that does not flag the change as agent-assisted.
 - History that lists applied records when the transaction rolled back.
 - A delete control.
 
@@ -570,10 +619,14 @@ Fail UI review of this step-1 screen if any of these are true. The PR 145 page i
 6. Self-escalation shown as a proposal row. It is a Stop card.
 7. Test connection, a toast, a model error, or a URL that shows the API key.
 8. Confirm split into per-step Accept, Skip, and Redo. The shipped page has those. This step’s review does not.
-9. Stops that block Apply of the other included rows, or a first stop that discards the rest of the proposal.
-10. Lists or list items drawn as Schema tables.
-11. A new permission. The gate stays `config:edit`.
-12. Apply that uses a different person’s powers than the starter and still presents greyed rows as if they were the starter’s.
+9. The run halts at the first stop, so later rows are missing.
+10. Apply writes anything while an included row is stopped.
+11. A stopped row is excludable while a dependent included row remains.
+12. A table the signed-in user can change is missing because the Schema screen does not show it. Those rows belong under **Other tables you can change**, with the same verbs, before → after values, and citations.
+13. A 422 (a system table, or a column the API will not add) is dropped instead of shown in place as a stop with the API's reason.
+14. Lists, list items, or units shown as schema tables or column additions, including under **Other tables you can change**. Dropdown values belong in the Lists group as data rows (Create / Update / Set inactive). A column add on `lists`, `list_entries`, or `units` is a stop with the reason.
+15. A new permission. The gate stays `config:edit`.
+16. Apply that uses a different person’s powers than the starter and still presents greyed rows as if they were the starter’s.
 
 ---
 
@@ -583,23 +636,27 @@ Index of what this sketch asks for that the PR 145 screens do not do.
 
 | Item | Why it is not shipped |
 |------|------------------------|
+| Remove the five drop/delete routes from `_ALLOWED` (first build item) | Still callable: table drop, column drop, relation DELETE, list DELETE, list-entry DELETE. `DELETE /roles/{role_id}` and `DELETE /v1/sample-type-transitions/{row_id}` are already absent. |
 | **Test connection** button and lab pass/fail | No route. Settings otherwise exist. |
 | Runs list columns: starter name, started time, input count | Run summary is name, status, banner, `created_by` id. |
 | Status labels Waiting for you and Applied | Code uses `proposing` and `done`. |
 | New run as its own step, with a drop area and lab file kinds | One page. File input is “Add lab file”. `file_type` is pdf/docx/text. Name, goal note, and on-page file errors exist. |
 | One confirm per change set, include checkbox, “Apply N changes” | Page uses Accept, Skip, Redo, and “Apply accepted steps”. |
 | Before → after, and source citation | Step has target, action, why, gap. No citation field. |
-| Verbs limited to Create, Update, Set inactive, Amount → 0 | `action` is free text. Drop and DELETE paths are still allowed. |
+| Verbs limited to Create, Update, Set inactive, Amount → 0 | `action` is free text. The five drop/delete routes above are still callable. |
 | Greyed `Needs {permission}` rows before Apply | 403 happens during apply and rolls back. |
 | Apply using the starter’s permissions | Apply uses the signed-in caller. |
 | Second confirm dialog | Not on the page. No confirmed-by field on the run. |
 | Stale-row check that blocks Apply | Not in `apply_run`. |
 | Success links to admin records | Ledger prints name and id. |
 | Failed state copy “Nothing was applied.” as the review result | Rollback exists. The review screen for it does not. |
-| Stop cards beside live proposal rows | `start_run` breaks at the first blocked step. |
+| Keep every proposal row; show each stop in place | `start_run` breaks at the first blocked step and drops later rows. |
+| Dependency line and the exclude rule | No dependency check. A stopped row is not excludable under that rule. |
+| **Other tables you can change**, including a 422 shown in place | Schema names still come from `ui_schema_catalog.py`. A hidden table is not its own group. A 422 is not drawn as an in-place stop beside the other rows. |
+| Guard on `lists`, `list_entries`, and `units` | Those names are in `NOT_SCHEMA_TABLES`, and a column add can already return the “not a Schema table” sentence. The review heading that keeps them out of **Other tables you can change**, and shows the column add as a stop, is not on the page. List values are not a Lists data-row group. |
 | Self-escalation Stop card | Role permission PUT is an allowed call. |
-| Delete requested → Stop card, not a row | Drop and DELETE are allowed calls. |
+| Delete requested → stop in place, not a row verb | The five drop/delete routes are still callable. Role delete and sample-type-transition DELETE are already absent. |
 | **Copy as backlog item** | No clipboard action. |
-| Run history read-only audit | “Earlier runs” reopens the editable page. |
-| Group headings Lists, Analyses / Units, Users / Roles, Routing, Templates, Container types, Dest-type transitions | Stored groups are the six Schema-and-other codes. Routing and workflow templates are stops in the allow-list. |
+| Run history read-only audit, confirming user recorded, change flagged agent-assisted | “Earlier runs” reopens the editable page. No confirmed-by field and no agent-assisted flag. |
+| Group headings Lists, Analyses / Units, Users / Roles, Routing, Templates, Container types, Dest-type transitions, Other tables you can change | Stored groups are the six Schema-and-other codes. Routing and workflow templates are stops in the allow-list. |
 | Amount → 0 through the contents API | `PATCH /containers/{id}/contents/{sample_id}` exists and is not in the allow-list. |
