@@ -29,7 +29,7 @@
 NimbleLIMS claims client isolation (RLS) and controlled lab write paths (entries, aliquot execute). On HEAD:
 
 1. **S1** — App connects as PostgreSQL owner/superuser-equivalent (`lims_user`); RLS and `FORCE ROW LEVEL SECURITY` are not enforced for FastAPI.  
-2. **S2** — Passwords hashed with unsalted SHA256; migrations seed well-known credentials (`admin`/`admin123`, etc.).  
+2. **S2** — Passwords hashed with unsalted SHA256; migrations seed well-known credentials (`admin` / the admin dev password, redacted; see `DEV_SEED_*` env vars).  
 3. **S3** — Compose sets `JWT_SECRET_KEY`; app reads `SECRET_KEY` with hardcoded default → forgeable JWTs.  
 4. **S4** — Middleware logs request bodies (login passwords appear in logs).  
 5. **S5** — Aliquot execute can partial-commit; source need not be on experiment; null source amount still creates destinations.  

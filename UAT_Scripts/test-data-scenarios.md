@@ -56,18 +56,18 @@ cd backend && alembic upgrade head
 ### Existing Users (from earlier migrations)
 | Username | Password | Role | Client | Notes |
 |----------|----------|------|--------|-------|
-| `admin` | `admin123` | Administrator | System | Global access, no RLS restrictions |
-| `lab-tech` | `labtech123` | Lab Technician | NovaBio | Access to Project Alpha and mAb PK |
-| `lab-manager` | `labmanager123` | Lab Manager | NovaBio | Access to all NovaBio projects |
-| `client` | `client123` | Client | UAT Test Client | Legacy test client (from earlier migrations) |
+| `admin` | `DEV_SEED_ADMIN_PASSWORD` | Administrator | System | Global access, no RLS restrictions |
+| `lab-tech` | `DEV_SEED_LAB_TECH_PASSWORD` | Lab Technician | NovaBio | Access to Project Alpha and mAb PK |
+| `lab-manager` | `DEV_SEED_LAB_MANAGER_PASSWORD` | Lab Manager | NovaBio | Access to all NovaBio projects |
+| `client` | `DEV_SEED_CLIENT_PASSWORD` | Client | UAT Test Client | Legacy test client (from earlier migrations) |
 
 ### New Users (from migration 0058)
 | Username | Password | Role | Client | Projects | Notes |
 |----------|----------|------|--------|----------|-------|
-| `alice-tech` | `alice123` | Lab Technician | NovaBio | mAb PK, Project Alpha | Can accession, aliquot, order tests |
-| `bob-tech` | `bob123` | Lab Technician | NovaBio | CAR-T, Project Beta | Cannot see Alice's projects (RLS) |
-| `carol-manager` | `carol123` | Lab Manager | NovaBio | All NovaBio projects | Can review results across all projects |
-| `david-cro` | `david123` | Client | PharmaTest CRO | CRO Sponsor project only | Read-only access to CRO samples |
+| `alice-tech` | `DEV_SEED_ALICE_TECH_PASSWORD` | Lab Technician | NovaBio | mAb PK, Project Alpha | Can accession, aliquot, order tests |
+| `bob-tech` | `DEV_SEED_BOB_TECH_PASSWORD` | Lab Technician | NovaBio | CAR-T, Project Beta | Cannot see Alice's projects (RLS) |
+| `carol-manager` | `DEV_SEED_CAROL_MANAGER_PASSWORD` | Lab Manager | NovaBio | All NovaBio projects | Can review results across all projects |
+| `david-cro` | `DEV_SEED_DAVID_CRO_PASSWORD` | Client | PharmaTest CRO | CRO Sponsor project only | Read-only access to CRO samples |
 
 **Key Permissions**:
 - **Lab Technician**: `sample:create`, `sample:read`, `test:assign`, `test:update`, `result:enter`, `batch:read`
@@ -594,7 +594,7 @@ The seed data maintains backward compatibility with existing UAT scripts by:
    - Description notes to use BioTech matrices instead
 
 4. **Existing Users**: Default users (`lab-tech`, `lab-manager`, `client`) still exist
-   - Passwords unchanged: `labtech123`, `labmanager123`, `client123`
+   - Passwords unchanged: `DEV_SEED_LAB_TECH_PASSWORD`, `DEV_SEED_LAB_MANAGER_PASSWORD`, `DEV_SEED_CLIENT_PASSWORD`
    - Project access wired to both legacy and new projects
 
 ### UAT Script Data Mapping

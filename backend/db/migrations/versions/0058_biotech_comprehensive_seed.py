@@ -266,9 +266,11 @@ def upgrade() -> None:
     manager_role_id = str(manager_role[0]) if manager_role else 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'
     client_role_id = str(client_role[0]) if client_role else 'dddddddd-dddd-dddd-dddd-dddddddddddd'
     
-    # Import password hashing (assume bcrypt)
-    from app.core.security import get_password_hash
-    
+    # Locked until python seed_dev_passwords.py --apply. Not a password hash.
+    # These four are not flagged must_change_password (0061 only flags the
+    # original four personas). The marker itself cannot log in.
+    seed_locked = "!seed-locked"
+
     users_data = [
         # Existing users: admin, lab-tech, lab-manager, client (from earlier migrations)
         # Add new users for multi-user scenarios
@@ -277,7 +279,6 @@ def upgrade() -> None:
             'name': 'Alice Chen',
             'username': 'alice-tech',
             'email': 'alice.chen@novabio.example.com',
-            'password': 'alice123',
             'role_id': tech_role_id,
             'client_id': 'client-biotech-001',
         },
@@ -286,7 +287,6 @@ def upgrade() -> None:
             'name': 'Bob Martinez',
             'username': 'bob-tech',
             'email': 'bob.martinez@novabio.example.com',
-            'password': 'bob123',
             'role_id': tech_role_id,
             'client_id': 'client-biotech-001',
         },
@@ -295,7 +295,6 @@ def upgrade() -> None:
             'name': 'Carol Davidson',
             'username': 'carol-manager',
             'email': 'carol.davidson@novabio.example.com',
-            'password': 'carol123',
             'role_id': manager_role_id,
             'client_id': 'client-biotech-001',
         },
@@ -304,14 +303,12 @@ def upgrade() -> None:
             'name': 'David Lee',
             'username': 'david-cro',
             'email': 'david.lee@pharmatest.example.com',
-            'password': 'david123',
             'role_id': client_role_id,
             'client_id': 'client-cro-002',
         },
     ]
     
     for user_data in users_data:
-        password_hash = get_password_hash(user_data['password'])
         connection.execute(
             sa.text("""
                 INSERT INTO users (id, name, username, email, password_hash, active, created_at, modified_at, role_id, client_id)
@@ -323,7 +320,7 @@ def upgrade() -> None:
                 'name': user_data['name'],
                 'username': user_data['username'],
                 'email': user_data['email'],
-                'password_hash': password_hash,
+                'password_hash': seed_locked,
                 'role_id': user_data['role_id'],
                 'client_id': user_data['client_id'],
             })

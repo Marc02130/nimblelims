@@ -11,8 +11,8 @@ Local compose on this branch. Frontend `http://localhost:3000`. API `http://loca
 
 | Account | Email | What happened |
 |---------|--------|----------------|
-| admin | `admin@lims.example.com` | Reset was completed. `password_epoch` is 1. `admin123` no longer signs in on this database. The new password is not written here. |
-| lab-tech | `lab-tech@lims.example.com` | Not reset. Published `labtech123` should still work (`password_epoch` 0). Use this for the scripted run unless you create a throwaway user. |
+| admin | `admin@lims.example.com` | Reset was completed. `password_epoch` is 1. The old published admin password (redacted; see `DEV_SEED_ADMIN_PASSWORD`) no longer signs in on this database. The new password is not written here. |
+| lab-tech | `lab-tech@lims.example.com` | Not reset. The published lab-tech password (redacted; see `DEV_SEED_LAB_TECH_PASSWORD`) was still expected to work (`password_epoch` 0). Use this for the scripted run unless you create a throwaway user. |
 
 There is no **Reset demo passwords** control. After a successful reset, the old published password for that person is gone.
 
@@ -32,7 +32,7 @@ Unknown address, inactive account, a second link retiring the first, the 3-per-h
 | Severity | Issue | Action |
 |----------|--------|--------|
 | Blocker | Reset link opened the login page and lost the token | Fixed. Rechecked: the page stays on **Choose a new password**. |
-| Minor | `admin123` is dead on this database | Accepted. Tester uses `lab-tech` or a throwaway user. Do not write the new admin password into the UAT results. |
+| Minor | The old published admin password (redacted; see `DEV_SEED_ADMIN_PASSWORD`) is dead on this database | Accepted. Tester uses `lab-tech` or a throwaway user. Do not write the new admin password into the UAT results. |
 | Minor | Compose sometimes errors on the first `up` after `down` | Accepted. Run `docker compose up -d` again. Do not rebuild. |
 
 ## Ready for UAT?

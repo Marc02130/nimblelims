@@ -11,8 +11,9 @@ Users created (idempotent upsert by username):
   uat-client-a  — Client role, Client A org (created if missing)
   uat-client-b  — Client role, Client B org (created if missing)
 
-Temporary password (all): UatTemp1!xxxx
-  - Meets complexity; uat-admin still has must_change=true for TC-S2-001
+Temporary password (all four): UAT_TEMP_PASSWORD if set, otherwise one
+generated value printed once after commit. uat-admin still has
+must_change=true for TC-S2-001.
 
 Usage:
   docker compose exec backend python create_uat_users.py
@@ -36,10 +37,28 @@ from sqlalchemy.orm import sessionmaker
 
 from models.user import User, Role
 from models.client import Client
-from app.core.security import bump_password_epoch, get_password_hash
+from app.core.dev_passwords import generate_dev_password
+from app.core.security import (
+    bump_password_epoch,
+    get_password_hash,
+    validate_password_complexity,
+)
 
-TEMP_PASSWORD = "UatTemp1!xxxx"
 SYSTEM_CLIENT_ID = UUID("00000000-0000-0000-0000-000000000001")
+
+
+def _uat_password() -> tuple[str, bool]:
+    """Return (password, generated). Generated values are printed by main."""
+    raw = os.getenv("UAT_TEMP_PASSWORD", "").strip()
+    if raw:
+        errors = validate_password_complexity(raw, username="uat-admin")
+        if errors:
+            print("ERROR: UAT_TEMP_PASSWORD fails complexity:")
+            for err in errors:
+                print(f"  - {err}")
+            sys.exit(1)
+        return raw, False
+    return generate_dev_password(), True
 
 
 def _owner_url() -> str:
@@ -101,10 +120,11 @@ def _upsert_user(
     role: Role,
     client: Client,
     must_change: bool,
+    password: str,
 ) -> User:
     user = db.query(User).filter(User.username == username).first()
     if user:
-        user.password_hash = get_password_hash(TEMP_PASSWORD)
+        user.password_hash = get_password_hash(password)
         bump_password_epoch(user)
         user.role_id = role.id
         user.client_id = client.id
@@ -116,7 +136,7 @@ def _upsert_user(
         name=name,
         username=username,
         email=email,
-        password_hash=get_password_hash(TEMP_PASSWORD),
+        password_hash=get_password_hash(password),
         role_id=role.id,
         client_id=client.id,
         active=True,
@@ -128,6 +148,7 @@ def _upsert_user(
 
 
 def main() -> None:
+    password, generated = _uat_password()
     db, engine = _session()
     try:
         # Sanity: can we see anything at all?
@@ -158,6 +179,7 @@ def main() -> None:
             role=admin_role,
             client=system,
             must_change=True,
+            password=password,
         )
         _upsert_user(
             db,
@@ -167,6 +189,7 @@ def main() -> None:
             role=tech_role,
             client=system,
             must_change=False,
+            password=password,
         )
 
         if client_role:
@@ -180,6 +203,7 @@ def main() -> None:
                 role=client_role,
                 client=client_a,
                 must_change=False,
+                password=password,
             )
             _upsert_user(
                 db,
@@ -189,13 +213,18 @@ def main() -> None:
                 role=client_role,
                 client=client_b,
                 must_change=False,
+                password=password,
             )
 
         db.commit()
         print("=" * 56)
         print("UAT throwaway users ready")
         print("=" * 56)
-        print(f"Password (all): {TEMP_PASSWORD}")
+        if generated:
+            print("UAT_TEMP_PASSWORD was unset; printed once:")
+            print(password)
+        else:
+            print("Password (all): from UAT_TEMP_PASSWORD")
         print("  uat-admin     — must_change_password=true  (TC-S2-001)")
         print("  uat-labtech   — lab tech, System client   (S5/S6 live)")
         if client_role:

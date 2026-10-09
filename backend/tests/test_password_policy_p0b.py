@@ -1,5 +1,6 @@
 """P0b: bcrypt, must_change_password gate, complexity (Q7)."""
 import hashlib
+import secrets
 
 import pytest
 from fastapi.testclient import TestClient
@@ -22,7 +23,7 @@ class TestBcryptAndLegacy:
         assert not verify_password("wrong", h)
 
     def test_legacy_sha256_verify_and_needs_rehash(self):
-        plain = "admin123"
+        plain = secrets.token_urlsafe(16)
         legacy = hashlib.sha256(plain.encode()).hexdigest()
         assert verify_password(plain, legacy)
         assert needs_rehash(legacy)

@@ -21,8 +21,8 @@
 
 ## Logins
 
-- Administrator seed has `config:edit`: `admin` / `admin123`
-- Lab technician does not: `lab-tech` / `labtech123`
+- Administrator seed has `config:edit`: `admin` / `DEV_SEED_ADMIN_PASSWORD`
+- Lab technician does not: `lab-tech` / `DEV_SEED_LAB_TECH_PASSWORD`
 
 Do not treat a failed documented password as a product failure of this script. Reset the local password if login is locked out, then continue. Do not grant `schema:edit` to the technician to make a step pass.
 

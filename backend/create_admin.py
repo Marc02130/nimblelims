@@ -15,6 +15,7 @@ sys.path.insert(0, str(backend_dir))
 
 from app.database import SessionLocal
 from models.user import User, Role, Client
+from app.core.dev_passwords import generate_dev_password
 from app.core.security import get_password_hash, validate_password_complexity
 from app.core.config import ALLOW_DEV_SEED_USERS, ENVIRONMENT
 
@@ -51,6 +52,7 @@ def create_admin():
                 sys.exit(1)
 
         bootstrap_password = os.getenv("BOOTSTRAP_ADMIN_PASSWORD", "").strip()
+        generated_password = False
         if bootstrap_password:
             errors = validate_password_complexity(
                 bootstrap_password, username="admin", current_password=None
@@ -62,9 +64,10 @@ def create_admin():
                 sys.exit(1)
             password = bootstrap_password
         elif ALLOW_DEV_SEED_USERS:
-            # Temporary weak password — must_change_password forces upgrade (Q7)
-            password = "admin123"
-            print("ALLOW_DEV_SEED_USERS: creating admin with temporary password (must change on login)")
+            # No password is stored in this file. Print the generated value once.
+            password = generate_dev_password()
+            generated_password = True
+            print("ALLOW_DEV_SEED_USERS: creating admin (must change on login)")
         else:
             print("ERROR: No admin user and BOOTSTRAP_ADMIN_PASSWORD is not set.")
             print("For production: set BOOTSTRAP_ADMIN_PASSWORD to a complex secret.")
@@ -103,8 +106,9 @@ def create_admin():
         print("Username: admin")
         if bootstrap_password:
             print("Password: (from BOOTSTRAP_ADMIN_PASSWORD)")
-        else:
-            print("Password: admin123 (temporary — change on first login)")
+        elif generated_password:
+            print("BOOTSTRAP_ADMIN_PASSWORD was unset; printed once:")
+            print(password)
         print("must_change_password: true")
         print("=" * 50)
 

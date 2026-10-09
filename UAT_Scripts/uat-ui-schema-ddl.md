@@ -17,8 +17,8 @@
 
 ## Logins
 
-- Admin: `admin` / `admin123` (has `schema:edit` + `layout:edit`)
-- Lab tech: `lab-tech` / `labtech123` (no `schema:edit`)
+- Admin: `admin` / `DEV_SEED_ADMIN_PASSWORD` (has `schema:edit` + `layout:edit`)
+- Lab tech: `lab-tech` / `DEV_SEED_LAB_TECH_PASSWORD` (no `schema:edit`)
 
 ## 1. Surfaces
 

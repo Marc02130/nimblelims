@@ -12,7 +12,7 @@ Wizard `/accessioning` is retired (redirects to `/receive`). There is **no** bul
 ## Prerequisites
 
 1. Local compose on **this feature branch**. Frontend `http://localhost:3000`. API `http://localhost:8000`.
-2. Log in as Admin (`admin` / `admin123`) with `sample:create` and `experiment:manage`.
+2. Log in as Admin (`admin` / `DEV_SEED_ADMIN_PASSWORD`) with `sample:create` and `experiment:manage`.
 3. Sample status list includes **Received** and **Available for Testing**.
 4. At least one Blood sample type, matrix, project, and 1×1 container type.
 

@@ -64,8 +64,8 @@ docker compose logs backend --tail 30
 
 | Role | Login | Use for |
 |------|-------|---------|
-| Admin | `admin` / `admin123` | `/admin/routing-map` maps |
-| Tech | `alice-tech` / `alice123` | `/receive` then `/asked-for` Route (needs `test:assign`) |
+| Admin | `admin` / `DEV_SEED_ADMIN_PASSWORD` | `/admin/routing-map` maps |
+| Tech | `alice-tech` / `DEV_SEED_ALICE_TECH_PASSWORD` | `/receive` then `/asked-for` Route (needs `test:assign`) |
 
 Compose **down** after the run.
 

@@ -33,7 +33,7 @@ Bring the stack up and log in. Do not duplicate setup here.
 - Dev / compose: [dev-setup.md](dev-setup.md) and root [`README.md`](../README.md) Quick Start.
 - Admin password and email reset: [admin-setup.md](admin-setup.md). **Forgot password?** is on the sign-in page.
 - Frontend: http://localhost:3000 · API: http://localhost:8000 · docs: http://localhost:8000/docs.
-- Lab path accounts: `admin` / `admin123` · `lab-tech` / `labtech123` · `alice-tech` / `alice123`. Change the default admin password.
+- Lab path accounts: `admin`, `lab-tech`, `alice-tech`. Passwords come from `DEV_SEED_ADMIN_PASSWORD`, `DEV_SEED_LAB_TECH_PASSWORD`, and `DEV_SEED_ALICE_TECH_PASSWORD` after `python backend/seed_dev_passwords.py --apply` ([dev-setup.md](dev-setup.md)). A fresh database leaves those accounts locked until that command runs.
 
 Need `sample:create` for Receive. Need `test:assign` plus project access for requested analysis and the later Route action. Client role cannot receive, write asked-for, or Route; those writes return **403**, not 404. Route does **not** require `experiment:manage`.
 

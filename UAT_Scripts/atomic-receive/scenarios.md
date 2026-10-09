@@ -41,7 +41,7 @@ Default tube: Cryovial (2mL). Receive UI does not preselect a tube and does not 
 
 | | |
 |--|--|
-| **Actor** | `alice-tech` / `alice123` |
+| **Actor** | `alice-tech` / `DEV_SEED_ALICE_TECH_PASSWORD` |
 | **Project** | `mAb-2301 PK Study` only (not CAR-T, not Bob's `project_id`) |
 | **Sticky fields** | `sample_type` = Plasma; `matrix` = Plasma (K2EDTA); `project_id` = mAb-2301 PK Study |
 | **Barcodes** | `NBIO-AR-0001` … `NBIO-AR-0024` (24 unique). Payload refs: `payloads.json` → `scenarios.AR-HV-01.requests` (combined wave including HV-03/04 overlays). **Omit `analysis_ids`.** |
@@ -106,7 +106,7 @@ Default tube: Cryovial (2mL). Receive UI does not preselect a tube and does not 
 
 | | |
 |--|--|
-| **Actor** | `alice-tech` / `alice123` |
+| **Actor** | `alice-tech` / `DEV_SEED_ALICE_TECH_PASSWORD` |
 | **Project** | mAb-2301 PK Study |
 | **Sticky fields** | Same as AR-HV-01 (Plasma / Plasma (K2EDTA) / mAb-2301 PK Study) |
 | **Barcodes / payload refs** | `NBIO-AR-KB-0001` — typed into `container_barcode`. Same POST as a scan. Must not collide with `NBIO-AR-0001`…`0024`. Omit `analysis_ids`. |
@@ -268,7 +268,7 @@ Default tube: Cryovial (2mL). Receive UI does not preselect a tube and does not 
 
 | | |
 |--|--|
-| **Actor** | `david-cro` / `david123` (Client, PharmaTest CRO) |
+| **Actor** | `david-cro` / `DEV_SEED_DAVID_CRO_PASSWORD` (Client, PharmaTest CRO) |
 | **Project** | n/a — client must not reach receive |
 | **Sticky fields** | Body uses alice sticky fields only to prove the POST is refused |
 | **Barcodes / payload refs** | `NBIO-AR-CLIENT-0001` in `AR-RBAC-01` |
@@ -300,7 +300,7 @@ Default tube: Cryovial (2mL). Receive UI does not preselect a tube and does not 
 
 | | |
 |--|--|
-| **Actor** | Enterer: `alice-tech`. Reviewer: `carol-manager` / `carol123`. |
+| **Actor** | Enterer: `alice-tech`. Reviewer: `carol-manager` / `DEV_SEED_CAROL_MANAGER_PASSWORD`. |
 | **Project** | mAb-2301 PK Study (Carol has all NovaBio projects) |
 | **Sticky fields** | Result on `NBIO-AR-0001` ELISA / IgG from AR-RES-01 (or AR-TST-03 setup). |
 | **Barcodes / payload refs** | PATCH `/tests/{id}/review` as carol (existing review endpoint). `payloads.json` → `AR-MU-02`. |

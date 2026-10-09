@@ -108,9 +108,8 @@ def upgrade() -> None:
     else:
         client_id = client_result[0]
     
-    # Create sample client user with SHA256 password hash (matches backend security.py)
-    # Password: client123
-    # SHA256 hash: 186474c1f2c2f735a54c2cf82ee8e87f2a5cd30940e280029363fecedfc5328c
+    # Locked until python seed_dev_passwords.py --apply. Not a password hash.
+    seed_locked = "!seed-locked"
     connection.execute(
         sa.text("""
             INSERT INTO users (id, name, username, email, password_hash, role_id, client_id, active, created_at, modified_at)
@@ -119,7 +118,7 @@ def upgrade() -> None:
                 'Client User',
                 'client',
                 'client@example.com',
-                '186474c1f2c2f735a54c2cf82ee8e87f2a5cd30940e280029363fecedfc5328c',
+                :seed_locked,
                 :role_id,
                 :client_id,
                 true,
@@ -128,7 +127,7 @@ def upgrade() -> None:
             )
             ON CONFLICT (username) DO NOTHING
         """),
-        {'role_id': client_role_id, 'client_id': client_id}
+        {'role_id': client_role_id, 'client_id': client_id, 'seed_locked': seed_locked}
     )
     
     # Update projects_access RLS policy to include client_id filtering for Client role users
