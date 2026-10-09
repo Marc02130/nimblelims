@@ -7,7 +7,8 @@ P0d / Q1 Option C: idempotent ensure of runtime DB role `lims_app`.
 - If role exists: ensure grants only — does NOT alter password (unless
   ENSURE_LIMS_APP_PASSWORD_ROTATE=true).
 
-Run after Alembic migrations, before uvicorn (see start.sh).
+start.sh runs this before Alembic, so a fresh database already has the role
+when 0083 GRANTs to it, and again after Alembic so grants cover new tables.
 """
 from __future__ import annotations
 

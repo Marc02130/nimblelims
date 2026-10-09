@@ -10,11 +10,16 @@ until python -c "import os, psycopg2; psycopg2.connect(os.environ['MIGRATE_DATAB
   sleep 1
 done
 
-echo "Database is ready - running migrations (owner)..."
+echo "Database is ready - ensuring lims_app role before migrations..."
+# 0083 GRANTs to lims_app with no IF EXISTS. The role has to exist first.
+# The second call below grants on tables the migrations have just created.
+python ensure_lims_app_role.py
+
+echo "Running migrations (owner)..."
 # Alembic must use owner credentials, not lims_app
 DATABASE_URL="${MIGRATE_DATABASE_URL}" python run_migrations.py
 
-echo "Ensuring lims_app role (Option C)..."
+echo "Ensuring lims_app grants after migrations..."
 python ensure_lims_app_role.py
 
 echo "Replaying UI schema DDL log..."
