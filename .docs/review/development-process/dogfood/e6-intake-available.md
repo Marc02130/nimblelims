@@ -16,8 +16,8 @@ Local compose on **this feature branch**. Frontend `http://localhost:3000`. API 
 
 | Role | Login | Use for |
 |------|--------|---------|
-| Admin | `admin` / `***REMOVED***` | Receive, accession API, sample edit, process assign, start |
-| Lab tech | `lab-tech` / `***REMOVED***` | Start dialog (`experiment:manage`) |
+| Admin | `admin` / `DEV_SEED_ADMIN_PASSWORD` | Receive, accession API, sample edit, process assign, start |
+| Lab tech | `lab-tech` / `DEV_SEED_LAB_TECH_PASSWORD` | Start dialog (`experiment:manage`) |
 
 Need a project, Blood sample type, matrix, and 1×1 container type. Sample status list includes **Received** and **Available for Testing**.
 

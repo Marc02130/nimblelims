@@ -97,7 +97,7 @@ After completing `uat-configurations-custom`, the recommended next scripts are:
 
 ## UAT Script: Sidebar Navigation — Experiments Section Visibility & Experiment Templates
 
-**Prerequisites:** uat-security-rbac (roles and permissions). Default logins: admin/***REMOVED***, lab-tech/***REMOVED***, lab-manager/***REMOVED***, client/***REMOVED***.
+**Prerequisites:** uat-security-rbac (roles and permissions). Default logins: `admin` / `DEV_SEED_ADMIN_PASSWORD`, `lab-tech` / `DEV_SEED_LAB_TECH_PASSWORD`, `lab-manager` / `DEV_SEED_LAB_MANAGER_PASSWORD`, `client` / `DEV_SEED_CLIENT_PASSWORD`. (redacted; values are not in git.)
 
 **Objective:** Verify the Experiments accordion appears for the correct roles and that **Experiment Templates** is visible to every role that has **`experiment:manage`** (Administrator, Lab Manager, Lab Technician in default seed).
 

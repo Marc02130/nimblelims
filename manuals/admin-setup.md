@@ -2,17 +2,15 @@
 
 ## Initial Admin Credentials
 
-After starting the application with `docker-compose up -d --build`, Alembic migrations automatically create an initial admin user with the following credentials:
+After starting the application with `docker-compose up -d --build`, Alembic migrations create the initial admin user locked. The stored marker is not a password, so sign-in fails until you set one.
 
 - **Username**: `admin`
-- **Password**: `***REMOVED***`
 - **Email**: `admin@lims.example.com`
+- **Password**: not in git. On a fresh database run `docker compose exec backend python seed_dev_passwords.py --apply`. That uses `DEV_SEED_ADMIN_PASSWORD` if set, or prints a password once. Production bootstrap still requires `BOOTSTRAP_ADMIN_PASSWORD` (`create_admin.py`).
 
 ## ⚠️ SECURITY WARNING
 
-**You MUST change the default admin password immediately after first login in production.**
-
-The default password is only for initial setup and should never be used in production.
+**Do not ship a shared default.** Production must set `BOOTSTRAP_ADMIN_PASSWORD`. Local and UAT passwords belong in the team password manager, not in this repo.
 
 ## Reset a forgotten password
 

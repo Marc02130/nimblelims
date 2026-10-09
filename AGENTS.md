@@ -59,11 +59,13 @@ Start all services: `sudo docker compose up -d --build` from the repo root. Serv
 - **R Calculator** (lims-r-calculator): Plumber R service for dose-response curve fitting, port 8001 (internal).
 - **MCP** (lims-mcp): Read-only HTTP tools for AI clients. Host port 8100. No database. See `services/mcp/README.md`.
 
-Default logins (development/UAT):
-- **Admin**: `admin` / `***REMOVED***`
-- **Lab Technician**: `lab-tech` / `***REMOVED***`
-- **Lab Manager**: `lab-manager` / `***REMOVED***`
-- **CRO Partner**: `client` / `***REMOVED***`
+Default logins (development/UAT). Passwords are not stored in git:
+- **Admin**: `admin` / `DEV_SEED_ADMIN_PASSWORD`
+- **Lab Technician**: `lab-tech` / `DEV_SEED_LAB_TECH_PASSWORD`
+- **Lab Manager**: `lab-manager` / `DEV_SEED_LAB_MANAGER_PASSWORD`
+- **CRO Partner**: `client` / `DEV_SEED_CLIENT_PASSWORD`
+
+A fresh database locks these accounts, plus `alice-tech`, `bob-tech`, `carol-manager`, and `david-cro`, until `python backend/seed_dev_passwords.py --apply`. That prints each password once when its variable is unset. Do not write the value into this file.
 
 ### Important Gotchas
 

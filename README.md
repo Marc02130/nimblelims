@@ -55,10 +55,12 @@ This project uses a five-container Docker setup:
    - Local mailbox (Mailpit): http://localhost:8025
    - MCP server (read-only): http://localhost:8100/mcp — see [services/mcp/README.md](services/mcp/README.md)
 
-4. **Login with admin credentials**
+4. **Login**
    - Username: `admin`
-   - Password: `***REMOVED***`
-   - **⚠️ IMPORTANT**: Change the default password immediately after first login in production.
+   - A fresh database locks `admin`, `lab-manager`, `lab-tech`, `client`, `alice-tech`, `bob-tech`, `carol-manager`, and `david-cro`. None of them can sign in until you run `docker compose exec backend python seed_dev_passwords.py --apply`.
+   - If the matching `DEV_SEED_*` variable is unset, that command prints the password once. To choose it yourself, set the variable from `.env.example` before `--apply`. Do not commit the value.
+   - An existing database keeps its current passwords. Run `--check` before `--apply` on a shared, UAT, or demo database. Pass `--defaults-file` on both when you need to detect an old bcrypt hash of a published default (the four biotech users are not flagged must-change).
+   - **⚠️ IMPORTANT**: Production bootstrap uses `BOOTSTRAP_ADMIN_PASSWORD`, not a password stored in git.
    - **Forgot password?** on the sign-in page emails a one-time link. Local Compose sends it to Mailpit at http://localhost:8025. See [manuals/admin-setup.md](manuals/admin-setup.md).
    - See [manuals/admin-setup.md](manuals/admin-setup.md) for detailed security instructions
 
@@ -87,7 +89,7 @@ sudo docker compose up -d --build
 
 - **2 clients** (NovaBio Therapeutics, PharmaTest CRO) with RLS isolation
 - **8 users** across 4 roles: admin, lab techs, managers, client
-  - Default logins: `admin/***REMOVED***`, `lab-tech/***REMOVED***`, `alice-tech/***REMOVED***`, `bob-tech/***REMOVED***`, etc.
+  - Logins: `admin` / `DEV_SEED_ADMIN_PASSWORD`, `lab-tech` / `DEV_SEED_LAB_TECH_PASSWORD`, `alice-tech` / `DEV_SEED_ALICE_TECH_PASSWORD`, `bob-tech` / `DEV_SEED_BOB_TECH_PASSWORD`, and the other `DEV_SEED_*` variables. Fresh databases stay locked until `seed_dev_passwords.py --apply`.
 - **6 projects** (mAb PK study, CAR-T in-process, plasmid lot release, CRO services)
 - **7 samples** spanning full lifecycle (Received → Available → Testing Complete → Reviewed)
 - **Parent/aliquot chains**, **QC samples**, **batches**, **tests**, **results**
@@ -97,9 +99,9 @@ sudo docker compose up -d --build
 
 **For UAT**: Login with any test user and explore realistic lab data:
 ```
-alice-tech / ***REMOVED***    → Lab Technician (mAb PK project)
-bob-tech / ***REMOVED***        → Lab Technician (CAR-T project)
-carol-manager / ***REMOVED*** → Lab Manager (all NovaBio projects)
+alice-tech / `DEV_SEED_ALICE_TECH_PASSWORD`    → Lab Technician (mAb PK project)
+bob-tech / `DEV_SEED_BOB_TECH_PASSWORD`        → Lab Technician (CAR-T project)
+carol-manager / `DEV_SEED_CAROL_MANAGER_PASSWORD` → Lab Manager (all NovaBio projects)
 ```
 
 **For Automated Tests**: Import fixtures from `tests/fixtures/seed_data_fixtures.py`:
@@ -302,7 +304,7 @@ Alembic migrations run automatically when the backend container starts. The star
 - All database tables and indexes
 - Initial roles (Administrator, Lab Manager, Lab Technician, CRO Partner / Client)
 - Initial permissions (~15 core permissions including `batch:read`, `batch:manage`, `config:edit`, `test:configure`, etc.)
-- Default admin user (username: `admin`, password: `***REMOVED***`)
+- Default admin user (username: `admin`). The password is `DEV_SEED_ADMIN_PASSWORD` after `python backend/seed_dev_passwords.py --apply`. Until then the account is locked.
 - Initial lists and list entries for statuses, types, etc. (normalized to lowercase slug format)
 - Seed data: BioTech/Pharma assays (Cell Viability, Dose-Response Screening, Target Binding, Kinase Selectivity Panel, ADME Profiling), analytes (IC50, Emax, Kd, Ki, clearance, permeability, solubility), and assay panels (e.g., 'ADME Panel' battery)
 

@@ -39,10 +39,10 @@
       "test_status_on_receive": "Assigned/Pending"
     },
     "users": {
-      "alice-tech": "***REMOVED***",
-      "bob-tech": "***REMOVED***",
-      "carol-manager": "***REMOVED***",
-      "david-cro": "***REMOVED***"
+      "alice-tech": "env:DEV_SEED_ALICE_TECH_PASSWORD",
+      "bob-tech": "env:DEV_SEED_BOB_TECH_PASSWORD",
+      "carol-manager": "env:DEV_SEED_CAROL_MANAGER_PASSWORD",
+      "david-cro": "env:DEV_SEED_DAVID_CRO_PASSWORD"
     },
     "tobias_binding": "Scenario keys match UAT_Scripts/uat-atomic-receive.md. AR-HV-01 requests are the 24-tube wave (HV-03/04 overlays). AR-HV-02 is a 422 refuse probe (NBIO-AR-REFUSE-0001), not an overlay. AR-MU-02 is catalog-only, not P0 must-pass. CORE receive mints zero Tests.",
     "excluded_0059_sample_names": [

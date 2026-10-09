@@ -15,14 +15,14 @@ A person who cannot sign in can request a one-time link to the email on their ac
 |------|--------|
 | App | `docker compose up -d --build` from this branch. Frontend `http://localhost:3000`. API `http://localhost:8000`. |
 | Mail | Open `http://localhost:8025` (Mailpit). Every message sent by local compose lands there. |
-| Account | `lab-tech` / `***REMOVED***` / `lab-tech@lims.example.com`, unless that password was already changed. |
-| Do not use | `admin` / `***REMOVED***` on the dogfood database. That reset already happened. `***REMOVED***` does not sign in there. |
+| Account | `lab-tech` / `DEV_SEED_LAB_TECH_PASSWORD` / `lab-tech@lims.example.com`, unless that password was already changed. |
+| Do not use | `admin` on the dogfood database. That reset already happened. The old published admin password (redacted; see `DEV_SEED_ADMIN_PASSWORD`) does not sign in there. |
 
 If the first `up` after `down` says `No such container`, run `docker compose up -d` again. Do not rebuild.
 
 Do not put the reset token, the new password, or any SMTP password in the results. Say only pass or fail.
 
-Completing section 2 retires `***REMOVED***` for that user. There is no button to put it back. Prefer a throwaway user with any email if you can still sign in as an administrator. Mailpit will catch that address too.
+Completing section 2 retires the password that user had before the reset. There is no button to put it back. Prefer a throwaway user with any email if you can still sign in as an administrator. Mailpit will catch that address too.
 
 ## 1. Request a link
 
@@ -40,7 +40,7 @@ Completing section 2 retires `***REMOVED***` for that user. There is no button t
 | 1 | Open the link from Mailpit | The address stays on `/reset-password#token=...`. The page is **Choose a new password**. It does not jump to the login page. |
 | 2 | Enter a password shorter than 12 characters and leave the field | The field says at least 12 characters. The link still works. |
 | 3 | Enter a password of at least 12 characters with upper, lower, digit, and symbol, and confirm it | "Password updated. Sign in with your new password." You are not signed in by the link. |
-| 4 | Sign in with `***REMOVED***` | Rejected. |
+| 4 | Sign in with the lab-tech password you used before the reset | Rejected. |
 | 5 | Sign in with the new password | Signed in. You are not forced to change it again. |
 | 6 | Open the same link and try another password | "This reset link is invalid or has expired." |
 | 7 | If a browser was already signed in as that user before the reset, use that session | The next request is signed out (401). |

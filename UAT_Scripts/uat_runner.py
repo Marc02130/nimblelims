@@ -8,6 +8,16 @@ import requests
 import json
 import sys
 from datetime import datetime, date
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "backend"))
+from app.core.dev_passwords import require_seed_passwords, seed_password
+
+RUNNER_USERS = ("admin", "lab-tech", "lab-manager", "client")
+
+
+def creds(username: str) -> str:
+    return seed_password(username)
 
 BASE_URL = "http://localhost:8000"
 RESULTS = []
@@ -54,7 +64,7 @@ def run_uat_security_rbac():
     log(f"Running: {script}", "SECTION")
 
     # TC-AUTH-LOGIN-001: Login/Logout
-    token, data = login("admin", "***REMOVED***")
+    token, data = login("admin", creds("admin"))
     if token:
         record(script, "TC-AUTH-LOGIN-001.1", "Admin login succeeds", "PASS")
         if "access_token" in data and "user_id" in data and "permissions" in data:
@@ -90,8 +100,8 @@ def run_uat_security_rbac():
         record(script, "TC-AUTH-LOGIN-001.5", "Invalid password returns 401", "FAIL")
 
     # TC-AUTH-LOGIN: Login other users
-    for uname, pwd, role in [("lab-tech", "***REMOVED***", "Lab Technician"),
-                              ("lab-manager", "***REMOVED***", "Lab Manager")]:
+    for uname, pwd, role in [("lab-tech", creds("lab-tech"), "Lab Technician"),
+                              ("lab-manager", creds("lab-manager"), "Lab Manager")]:
         tok, d = login(uname, pwd)
         if tok:
             record(script, f"TC-AUTH-LOGIN-{uname}", f"{role} login succeeds", "PASS")
@@ -134,7 +144,7 @@ def run_uat_security_rbac():
     # TC-RLS-CLIENT-ISOLATION-003: Client user tests
     # Try to create a client user for testing
     try:
-        tok, d = login("client", "***REMOVED***")
+        tok, d = login("client", creds("client"))
         if tok:
             STATE["client_token"] = tok
             record(script, "TC-RLS-003.1", "Client user login succeeds", "PASS")
@@ -1050,6 +1060,7 @@ def generate_report():
 
 
 def main():
+    require_seed_passwords(list(RUNNER_USERS))
     log("Starting NimbleLIMS UAT Test Suite")
     log(f"Target: {BASE_URL}")
 

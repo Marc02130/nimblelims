@@ -4,6 +4,7 @@ Do not insert receive samples here. parent_sample_id stays out of P0.
 """
 from pathlib import Path
 import json
+import os
 
 from models.user import User
 from models.project import Project, ProjectUser
@@ -38,6 +39,30 @@ CART_BARCODES = [f"CART-AR-{i:04d}" for i in range(1, 9)]
 
 def load_payloads() -> dict:
     return json.loads(PAYLOADS_PATH.read_text())
+
+
+def persona_password(username: str, payloads: dict | None = None) -> str:
+    """Resolve ``meta.users`` values shaped as ``env:DEV_SEED_*``.
+
+    No code path logs in with these today. Callers that need a password
+    must set the named variable. A raw password in the file is refused.
+    """
+    data = payloads if payloads is not None else load_payloads()
+    raw = data["meta"]["users"][username]
+    if not isinstance(raw, str) or not raw.startswith("env:"):
+        raise RuntimeError(
+            f"payloads.json meta.users[{username}] must be an env:DEV_SEED_* "
+            "reference, not a password."
+        )
+    env_name = raw[4:]
+    value = os.environ.get(env_name, "").strip()
+    if not value:
+        raise RuntimeError(
+            f"Missing {env_name} for {username}. "
+            "Run python backend/seed_dev_passwords.py --apply or set the variable. "
+            "See .env.example."
+        )
+    return value
 
 
 def user_by_username(session, username: str) -> User:

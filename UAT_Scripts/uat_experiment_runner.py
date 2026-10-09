@@ -6,7 +6,17 @@ UAT runner for experiment-related tests:
 """
 import requests, json, sys
 from datetime import datetime
+from pathlib import Path
 from uuid import uuid4
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "backend"))
+from app.core.dev_passwords import require_seed_passwords, seed_password
+
+RUNNER_USERS = ("admin", "lab-tech", "lab-manager", "client")
+
+
+def creds(username: str) -> str:
+    return seed_password(username)
 
 BASE = "http://localhost:8000"
 V1 = f"{BASE}/v1"
@@ -45,7 +55,7 @@ def run_navigation_api():
     log(f"Running: {script}", "SECTION")
 
     # Admin should access both experiments and templates
-    tok, _ = login("admin", "***REMOVED***")
+    tok, _ = login("admin", creds("admin"))
     r = requests.get(f"{V1}/experiments", headers=h(tok))
     record("NAV-01", "Admin can list experiments", "PASS" if r.status_code == 200 else "FAIL",
            f"HTTP {r.status_code}")
@@ -55,7 +65,7 @@ def run_navigation_api():
            f"HTTP {r.status_code}")
 
     # Lab Tech — has experiment:manage? Should be able to list experiments
-    tok_lt, d_lt = login("lab-tech", "***REMOVED***")
+    tok_lt, d_lt = login("lab-tech", creds("lab-tech"))
     perms_lt = d_lt.get("permissions", []) if isinstance(d_lt, dict) else []
     has_exp = "experiment:manage" in perms_lt
     r = requests.get(f"{V1}/experiments", headers=h(tok_lt))
@@ -77,7 +87,7 @@ def run_navigation_api():
                "PASS" if r2.status_code in [200, 403] else "FAIL", f"HTTP {r2.status_code}")
 
     # Lab Manager
-    tok_lm, d_lm = login("lab-manager", "***REMOVED***")
+    tok_lm, d_lm = login("lab-manager", creds("lab-manager"))
     perms_lm = d_lm.get("permissions", []) if isinstance(d_lm, dict) else []
     r = requests.get(f"{V1}/experiments", headers=h(tok_lm))
     has_exp_lm = "experiment:manage" in perms_lm
@@ -89,7 +99,7 @@ def run_navigation_api():
                "PASS" if r.status_code == 403 else "FAIL", f"HTTP {r.status_code}")
 
     # Client should NOT have experiment:manage
-    tok_cl, d_cl = login("client", "***REMOVED***")
+    tok_cl, d_cl = login("client", creds("client"))
     perms_cl = d_cl.get("permissions", []) if isinstance(d_cl, dict) else []
     r = requests.get(f"{V1}/experiments", headers=h(tok_cl))
     if "experiment:manage" not in perms_cl:
@@ -114,7 +124,7 @@ def run_experiment_crud():
     log("=" * 60, "SECTION")
     log(f"Running: {script}", "SECTION")
 
-    tok, _ = login("admin", "***REMOVED***")
+    tok, _ = login("admin", creds("admin"))
 
     # --- Experiment Template CRUD ---
 
@@ -377,6 +387,7 @@ def run_experiment_crud():
 # ======================= Main =======================
 
 def main():
+    require_seed_passwords(list(RUNNER_USERS))
     log("=" * 60)
     log("UAT: Experiments (navigation + management)")
     log("=" * 60)

@@ -55,7 +55,7 @@ LIMS_APP_PASSWORD=…
 
 | Profile | Users |
 |---------|--------|
-| Local compose with `ALLOW_DEV_SEED_USERS` | `admin` / temporary password (e.g. `***REMOVED***`) — **must change on first login** |
+| Local compose with `ALLOW_DEV_SEED_USERS` | `admin` / temporary password (e.g. `DEV_SEED_ADMIN_PASSWORD`) — **must change on first login** |
 | After first login | Complex password (≥12, upper, lower, digit, symbol) |
 
 ### Throwaway UAT users (recommended — does not reset admin)
@@ -69,10 +69,10 @@ docker compose exec backend python create_uat_users.py
 
 | Username | Role / org | Password | Use for |
 |----------|------------|----------|---------|
-| `uat-admin` | Administrator / System | `***REMOVED***` | **TC-S2-001** (`must_change_password=true`) |
-| `uat-labtech` | Lab Technician / System | `***REMOVED***` | **TC-S5 / S6** live |
-| `uat-client-a` | Client / UAT Client A | `***REMOVED***` | **TC-S1-002** |
-| `uat-client-b` | Client / UAT Client B | `***REMOVED***` | **TC-S1-002** |
+| `uat-admin` | Administrator / System | `UAT_TEMP_PASSWORD` | **TC-S2-001** (`must_change_password=true`) |
+| `uat-labtech` | Lab Technician / System | `UAT_TEMP_PASSWORD` | **TC-S5 / S6** live |
+| `uat-client-a` | Client / UAT Client A | `UAT_TEMP_PASSWORD` | **TC-S1-002** |
+| `uat-client-b` | Client / UAT Client B | `UAT_TEMP_PASSWORD` | **TC-S1-002** |
 
 Script is idempotent (resets those four usernames’ passwords only).
 
