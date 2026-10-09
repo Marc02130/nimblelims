@@ -2,7 +2,7 @@
 
 **Domain:** How an admin turns lab inputs into NimbleLIMS configuration  
 **Date:** 2026-10-03  
-**Status:** Working draft. Marc locked the open build questions on 2026-10-03 (below). The branch `configuring-agent` implements those 2026-10-03 locks. Marc 2026-10-04 locks (L-A, L-B, L-C) and Marc 2026-10-07 answers are folded in this file. That fold is not a claim that the branch already implements them. This file still has **no** review Accept and **no** UAT Pass.  
+**Status:** Working draft. Marc locked the open build questions on 2026-10-03 (below). The branch `configuring-agent` implements those 2026-10-03 locks. Marc 2026-10-04 locks (L-A, L-B, L-C) and Marc 2026-10-07 answers are folded in this file ([PR #148](https://github.com/Marc02130/nimblelims/pull/148), merged to main at `adad0cb`). That fold is not a claim that the branch already implements them. This file still has **no** review Accept and **no** UAT Pass.  
 **Implement gate:** The 2026-10-03 locks are the green light for this branch. This file still has **no** review Accept and **no** UAT Pass.  
 **Spec:** [../../specs/configuring-agent/SPEC.md](../../specs/configuring-agent/SPEC.md)  
 **Design:** [../../design/configuring-agent.md](../../design/configuring-agent.md)  
@@ -38,7 +38,7 @@ Answer 1 is in §7. Answer 4 is in §8. Answer 8 is the [spec Step 1 slice](../.
 
 ## Step 1 slice
 
-The slice note is in the spec (Marc 2026-10-07, Katinka 2026-10-07). UI sketch (Mathilda 2026-10-07): [configuring-agent step 1](../../../review/ui-review/configuring-agent-step1.md) (on main from [PR #147](https://github.com/Marc02130/nimblelims/pull/147); the halt and L-A folds land with [PR #149](https://github.com/Marc02130/nimblelims/pull/149), tip `b7796c6`). This file does not copy the sketch.
+The slice note is in the spec (Marc 2026-10-07, Katinka 2026-10-07). UI sketch (Mathilda 2026-10-07): [configuring-agent step 1](../../../review/ui-review/configuring-agent-step1.md) (on main from [PR #147](https://github.com/Marc02130/nimblelims/pull/147); Mathilda's halt and L-A sketch folds are in [PR #149](https://github.com/Marc02130/nimblelims/pull/149)). This file does not copy the sketch.
 
 ---
 
@@ -57,6 +57,8 @@ Startup biotech/pharma LIMS only (Rolf). Anyone with `config:edit` may set the p
 Lab techs do not see API keys. A caller without `config:edit` sees: “You can't change configuring-agent settings.”
 
 `schema:edit` stays Admin-only (Rolf). The agent does not mint that permission, does not add a Schema-admin role, and lab personnel input does not grant `schema:edit`.
+
+`schema-editor` is a seeded L-2 test user. The agent may not create it.
 
 ---
 
@@ -205,7 +207,7 @@ He is not seeding until a Brief opens. No new IDs, no SOP prose, no fixtures in 
 | `mAb-2301-PK-T0` → `T0-Aliq` | Plasma PK. |
 | `NBIO-CMPD-001` / A549 | NCI-60 CellTiter-Glo. `EX_CTG` / `EX_NCI60`. |
 
-Gap he names, do not mint it: no whole-blood intake and no DNA daughter with `parent_sample_id`. Blood × aliquot → DNA already exists (0068).
+The step 1 slice requires the pair (SPEC §9 and Anton's Brief): a whole-blood intake (sample type Blood, matrix Whole Blood) and a DNA daughter (sample type DNA, matrix Genomic DNA) linked by `parent_sample_id`. Blood × aliquot → DNA already exists (0068).
 
 **Instrument export.** Payload, not config. One importable result per row: `example_id`, `example_class` valid or edge, `plate_id`, existing sample or compound name, assay columns. The three CSVs are the bind (NCI-60, HCP ELISA on `CAR-T-Batch-001`, kinetic LAL on CAR-T and plasmid), including SOP edge rows (NCI-60 C ≤ Tz and missing dose; HCP percent CV over 25 and above ULOQ; LAL PPC inhibition and contaminated blank). Lands as JSONB payload through the results API. Never a schema or config write. This packet does not add a results importer. Classic results stay as they are (Rolf).
 
