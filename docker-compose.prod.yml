@@ -38,3 +38,8 @@ services:
       PUBLIC_APP_URL: ${PUBLIC_APP_URL:-}
       PASSWORD_RESET_TTL_MINUTES: ${PASSWORD_RESET_TTL_MINUTES:-60}
       PASSWORD_RESET_MAX_PER_HOUR: ${PASSWORD_RESET_MAX_PER_HOUR:-3}
+
+  # Off until Marc says otherwise. `docker compose -f docker-compose.yml -f docker-compose.prod.yml up`
+  # does not start mcp. Opt in with `--profile mcp`.
+  mcp:
+    profiles: ["mcp"]

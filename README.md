@@ -12,12 +12,13 @@ Copyright (c) 2025 Marc Breneiser
 
 ## Architecture
 
-This project uses a four-container Docker setup:
+This project uses a five-container Docker setup:
 
 - **Database (PostgreSQL 15+ with pgvector)**: Data persistence with Row-Level Security. Configuring agent stores 384-d MiniLM embeddings (same model as ragged).
 - **Backend (FastAPI + Python 3.10+)**: RESTful API with JWT authentication and RBAC
 - **Frontend (React 18+)**: Modern web interface with TypeScript
 - **R Calculator (Plumber API)**: Optional microservice for dose-response curve fitting (4PL model, IC50, SVG generation) — shipped enhancement, not MVP
+- **MCP server**: Optional sidecar that calls the HTTP API with the caller's own JWT. Read-only by default. Host port 8100. No database access. See [services/mcp/README.md](services/mcp/README.md). Production Compose leaves it off (`profiles: ["mcp"]`) until explicitly enabled.
 
 ## Quick Start
 
@@ -52,6 +53,7 @@ This project uses a four-container Docker setup:
    - API Documentation: http://localhost:8000/docs
    - Database: localhost:5432 (local compose only — **S12:** production uses `docker-compose.prod.yml` which does **not** publish Postgres)
    - Local mailbox (Mailpit): http://localhost:8025
+   - MCP server (read-only): http://localhost:8100/mcp — see [services/mcp/README.md](services/mcp/README.md)
 
 4. **Login with admin credentials**
    - Username: `admin`
@@ -175,7 +177,8 @@ nimblelims/
 │   ├── discussions/        # Multi-persona Leadership discussions
 │   └── decision-logs/      # Leadership stamps (FW/WO, reorg)
 ├── services/               # Auxiliary microservices
-│   └── r-calculator/       # Plumber R API for curve fitting
+│   ├── r-calculator/       # Plumber R API for curve fitting
+│   └── mcp/                # MCP sidecar over the HTTP API (read-only default)
 │       ├── R/              # Curve fitting, categorization, SVG generation
 │       ├── plumber.R       # API routes
 │       └── tests/          # R unit tests

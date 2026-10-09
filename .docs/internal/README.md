@@ -9,3 +9,5 @@ This is **not** the published operator how-to tree. Operator how-tos are git-tra
 **Do not** write new artifacts under the old `.docs-internal/` or `.docs-review/` names.
 
 Parent map: [`.docs/README.md`](../README.md).
+
+MCP server (owner Wilhelmina): [`specs/mcp-server/SPEC.md`](specs/mcp-server/SPEC.md). The service is `services/mcp/`. It is not the configuring agent.
