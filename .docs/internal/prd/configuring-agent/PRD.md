@@ -2,7 +2,7 @@
 
 **Domain:** How an admin turns lab inputs into NimbleLIMS configuration  
 **Date:** 2026-10-03  
-**Status:** Working draft. Marc locked the open build questions on 2026-10-03 (below). The branch `configuring-agent` implements those 2026-10-03 locks. Marc 2026-10-04 locks (L-A, L-B, L-C) and Marc 2026-10-07 answers are folded in this file ([PR #148](https://github.com/Marc02130/nimblelims/pull/148), merged to main at `adad0cb`). That fold is not a claim that the branch already implements them. This file still has **no** review Accept and **no** UAT Pass.  
+**Status:** Working draft. Marc locked the open build questions on 2026-10-03 (below). The branch `configuring-agent` implements those 2026-10-03 locks. Marc 2026-10-04 locks (L-A, L-B, L-C) and Marc 2026-10-07 answers are folded in this file ([PR #148](https://github.com/Marc02130/nimblelims/pull/148), merged to main at `4eae6f9`). That fold is not a claim that the branch already implements them. This file still has **no** review Accept and **no** UAT Pass.  
 **Implement gate:** The 2026-10-03 locks are the green light for this branch. This file still has **no** review Accept and **no** UAT Pass.  
 **Spec:** [../../specs/configuring-agent/SPEC.md](../../specs/configuring-agent/SPEC.md)  
 **Design:** [../../design/configuring-agent.md](../../design/configuring-agent.md)  

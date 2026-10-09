@@ -3,7 +3,7 @@
 **PRD:** [../../prd/configuring-agent/PRD.md](../../prd/configuring-agent/PRD.md)  
 **Design:** [../../design/configuring-agent.md](../../design/configuring-agent.md)  
 **Date:** 2026-10-03  
-**Status:** Working draft. The `configuring-agent` branch implements the 2026-10-03 contracts below. Marc 2026-10-04 locks (L-A, L-B, L-C) and Marc 2026-10-07 answers are folded here ([PR #148](https://github.com/Marc02130/nimblelims/pull/148), merged to main at `adad0cb`). That fold is not a claim that the branch already implements them. This spec still has **no** UAT Pass.  
+**Status:** Working draft. The `configuring-agent` branch implements the 2026-10-03 contracts below. Marc 2026-10-04 locks (L-A, L-B, L-C) and Marc 2026-10-07 answers are folded here ([PR #148](https://github.com/Marc02130/nimblelims/pull/148), merged to main at `4eae6f9`). That fold is not a claim that the branch already implements them. This spec still has **no** UAT Pass.  
 **Implement gate:** The 2026-10-03 locks. This spec still has **no** UAT Pass.
 
 No Accept, Confirm, or UAT Pass. Tobias’s earlier AC-1 through AC-6 are replaced. Cite **FB-1 through FB-10**, plus the Step 1 bars in §6 (D-1 through D-9, L-1 through L-4, and FB-11). Those Step 1 bars are Tobias 2026-10-07, Marc-approved. Spec only, no UAT stamp until there is a product tip.
