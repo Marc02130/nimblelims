@@ -1,0 +1,32 @@
+[project]
+name = "nimblelims-mcp"
+version = "0.1.0"
+description = "MCP server that calls the NimbleLIMS HTTP API with the caller's own token."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "httpx==0.28.1",
+    "mcp==2.3.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest==8.3.4",
+    "pytest-asyncio==0.24.0",
+    "respx==0.22.0",
+]
+
+[project.scripts]
+nimblelims-mcp = "nimblelims_mcp.__main__:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
