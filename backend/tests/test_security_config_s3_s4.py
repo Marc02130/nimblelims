@@ -1,5 +1,6 @@
 """P0a tests: S3 JWT secret resolution; S4 no body logging."""
 import logging
+import secrets
 
 import pytest
 
@@ -70,15 +71,16 @@ async def test_logging_middleware_does_not_log_body(caplog, monkeypatch):
     app.add_middleware(LoggingMiddleware)
     app.add_route("/auth/login", homepage, methods=["POST"])
 
+    probe = secrets.token_urlsafe(16)
     with caplog.at_level(logging.INFO):
         client = TestClient(app)
         r = client.post(
             "/auth/login",
-            json={"username": "admin", "password": "***REMOVED***-should-never-appear"},
+            json={"username": "admin", "password": probe},
         )
         assert r.status_code == 200
 
     joined = " ".join(r.message for r in caplog.records)
-    assert "***REMOVED***-should-never-appear" not in joined
+    assert probe not in joined
     assert "Body:" not in joined
     assert '{"username"' not in joined

@@ -49,7 +49,7 @@ This script is the **receive happy path** sign-off. The `/accessioning` wizard i
 
 | Need | Seed |
 |------|------|
-| Actors | `alice-tech` / `***REMOVED***` (mAb-2301 PK); `bob-tech` / `***REMOVED***` (CAR-T); `david-cro` / `***REMOVED***` (AR-RBAC-01) |
+| Actors | `alice-tech` / `DEV_SEED_ALICE_TECH_PASSWORD` (mAb-2301 PK); `bob-tech` / `DEV_SEED_BOB_TECH_PASSWORD` (CAR-T); `david-cro` / `DEV_SEED_DAVID_CRO_PASSWORD` (AR-RBAC-01) |
 | Name template | Assigns `samples.name` with no typed sample ID |
 | Container type (sticky, required) | **1×1 only** (`rows=1` and `columns=1`, e.g. Cryovial 2mL). Plates (`8×12`, etc.) refused. Same type for all vessels on the commit. |
 | Sample status | Available for Testing |

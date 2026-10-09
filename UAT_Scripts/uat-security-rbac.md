@@ -536,9 +536,9 @@ batch:manage, batch:read
 ## Appendix: Sample Test Data
 
 ### Seeded Users (from migration 0004)
-- `admin` (Administrator, password: `***REMOVED***`, all permissions)
-- `lab-manager` (Lab Manager, password: `***REMOVED***`, review/manage permissions)
-- `lab-tech` (Lab Technician, password: `***REMOVED***`, create/enter/manage permissions)
+- `admin` (Administrator, password: `DEV_SEED_ADMIN_PASSWORD`, all permissions)
+- `lab-manager` (Lab Manager, password: `DEV_SEED_LAB_MANAGER_PASSWORD`, review/manage permissions)
+- `lab-tech` (Lab Technician, password: `DEV_SEED_LAB_TECH_PASSWORD`, create/enter/manage permissions)
 
 ### Roles and Permissions Summary
 | Role | Permissions |

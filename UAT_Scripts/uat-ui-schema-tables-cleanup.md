@@ -21,8 +21,8 @@
 
 ## Logins
 
-- Admin: `admin` / `***REMOVED***` (has `schema:edit` + `layout:edit`)
-- Lab tech: `lab-tech` / `***REMOVED***` (no `schema:edit`)
+- Admin: `admin` / `DEV_SEED_ADMIN_PASSWORD` (has `schema:edit` + `layout:edit`)
+- Lab tech: `lab-tech` / `DEV_SEED_LAB_TECH_PASSWORD` (no `schema:edit`)
 
 ## 1. Custom Fields is gone (Fail bar 1)
 

@@ -14,8 +14,8 @@ Local compose on **this feature branch**. Frontend `http://localhost:3000`. API 
 
 | Role | Login | Use for |
 |------|--------|---------|
-| Admin | `admin` / `***REMOVED***` | Process definitions, templates, start, API |
-| Lab tech | `lab-tech` / `***REMOVED***` | Start dialog (experiment:manage) |
+| Admin | `admin` / `DEV_SEED_ADMIN_PASSWORD` | Process definitions, templates, start, API |
+| Lab tech | `lab-tech` / `DEV_SEED_LAB_TECH_PASSWORD` | Start dialog (experiment:manage) |
 
 Need at least one **Blood** sample and one **DNA** sample, each in a container, status **Available for Testing**. Accessioning still sets **Received** (E-6, not this packet) — set status in sample edit if needed. Do not score Received as an E-7 Fail.
 

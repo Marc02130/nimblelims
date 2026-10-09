@@ -1,12 +1,19 @@
-"""P0b security: must_change_password + rehash known seed passwords to bcrypt.
+"""P0b security: must_change_password on the original persona seeds.
 
 Revision ID: 0061
 Revises: 0060
 Create Date: 2026-08-20
 
 - ADD users.must_change_password
-- Mark known persona seed usernames must_change_password=true
-- Rehash legacy SHA256 hashes for well-known UAT passwords to bcrypt when matched
+- Mark admin, lab-manager, lab-tech, and client must_change_password=true
+
+The legacy SHA256 → bcrypt rehash loop was removed. Fresh databases insert
+``!seed-locked`` (see 0004, 0013, and 0058), which is neither bcrypt nor
+64-hex, so there is no published digest left to match. Databases that
+already applied an older 0061 keep their bcrypt hashes; this file does not
+re-run. A leftover 64-hex hash still upgrades on the next successful login
+in ``verify_password`` / ``needs_rehash``. Set a real password with
+``python seed_dev_passwords.py --apply`` (env var, or printed once).
 """
 from alembic import op
 import sqlalchemy as sa
@@ -16,23 +23,13 @@ down_revision = "0060"
 branch_labels = None
 depends_on = None
 
-# Well-known persona seeds (dev/demo/UAT)
+# Well-known persona seeds (dev/demo/UAT). Passwords are not stored here.
 SEED_USERNAMES = (
     "admin",
     "lab-manager",
     "lab-tech",
     "client",
 )
-
-# Plaintext → legacy SHA256 (from early migrations) for upgrade detection
-KNOWN_SHA256 = {
-    # ***REMOVED***
-    "***REMOVED***": "***REMOVED***",
-    # ***REMOVED***
-    "***REMOVED***": "***REMOVED***",
-    # ***REMOVED***
-    "***REMOVED***": "***REMOVED***",
-}
 
 
 def upgrade() -> None:
@@ -48,7 +45,9 @@ def upgrade() -> None:
 
     connection = op.get_bind()
 
-    # Persona seeds must change password on first login (Q2/Q7)
+    # Persona seeds must change password on first login (Q2/Q7).
+    # A fresh database still cannot log in: the hash is the locked marker
+    # until seed_dev_passwords.py --apply replaces it.
     connection.execute(
         sa.text(
             """
@@ -58,29 +57,6 @@ def upgrade() -> None:
             """
         ),
     )
-
-    # Rehash known legacy SHA256 seed passwords to bcrypt
-    import bcrypt
-
-    rows = connection.execute(
-        sa.text("SELECT id, username, password_hash FROM users")
-    ).fetchall()
-    for row in rows:
-        user_id, username, password_hash = row[0], row[1], row[2]
-        plain = KNOWN_SHA256.get(password_hash)
-        if not plain:
-            continue
-        new_hash = bcrypt.hashpw(plain.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
-        connection.execute(
-            sa.text(
-                """
-                UPDATE users
-                SET password_hash = :h, must_change_password = true
-                WHERE id = :id
-                """
-            ),
-            {"h": new_hash, "id": user_id},
-        )
 
 
 def downgrade() -> None:

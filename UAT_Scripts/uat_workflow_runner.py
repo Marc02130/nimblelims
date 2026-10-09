@@ -7,7 +7,17 @@ import requests
 import json
 import sys
 from datetime import datetime
+from pathlib import Path
 from uuid import uuid4
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "backend"))
+from app.core.dev_passwords import require_seed_passwords, seed_password
+
+RUNNER_USERS = ("admin", "lab-tech", "client")
+
+
+def creds(username: str) -> str:
+    return seed_password(username)
 
 BASE_URL = "http://localhost:8000"
 RESULTS = []
@@ -263,7 +273,7 @@ def tc_wf_10(token):
 def tc_wf_11(token):
     """TC-WF-11: Permission denial"""
     # Lab Tech should NOT have config:edit → can't list templates
-    lt_tok, _ = login("lab-tech", "***REMOVED***")
+    lt_tok, _ = login("lab-tech", creds("lab-tech"))
     if lt_tok:
         r = requests.get(f"{BASE_URL}/admin/workflow-templates", headers=h(lt_tok))
         if r.status_code == 403:
@@ -286,7 +296,7 @@ def tc_wf_11(token):
         record("TC-WF-11a", "Lab Tech login", "FAIL", "Could not login as lab-tech")
 
     # Client should NOT have workflow:execute
-    cl_tok, _ = login("client", "***REMOVED***")
+    cl_tok, _ = login("client", creds("client"))
     if cl_tok:
         tid = STATE.get("template_id")
         if tid:
@@ -343,6 +353,7 @@ def tc_wf_12(token):
 # ---- Main ----
 
 def main():
+    require_seed_passwords(list(RUNNER_USERS))
     log("=" * 60)
     log("UAT: uat-workflow-templates (12 test cases)")
     log("=" * 60)
@@ -356,7 +367,7 @@ def main():
         sys.exit(1)
 
     # Login as admin
-    token, data = login("admin", "***REMOVED***")
+    token, data = login("admin", creds("admin"))
     if not token:
         log("Admin login failed!", "ERROR")
         sys.exit(1)

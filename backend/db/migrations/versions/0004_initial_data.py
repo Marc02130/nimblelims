@@ -268,32 +268,39 @@ def upgrade() -> None:
         """)
     )
     
+    # Locked marker: not bcrypt and not 64-hex, so login fails until
+    # python seed_dev_passwords.py --apply. See app.core.dev_passwords.SEED_LOCKED.
+    seed_locked = "!seed-locked"
+
     # Create initial admin user
     # Use ON CONFLICT on username to handle re-runs
     connection.execute(
         sa.text("""
             INSERT INTO users (id, name, username, email, password_hash, role_id, client_id, active, created_at, modified_at) 
-            VALUES ('00000000-0000-0000-0000-000000000001', 'System Administrator', 'admin', 'admin@lims.example.com', '***REMOVED***', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '00000000-0000-0000-0000-000000000001', true, NOW(), NOW())
+            VALUES ('00000000-0000-0000-0000-000000000001', 'System Administrator', 'admin', 'admin@lims.example.com', :seed_locked, 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '00000000-0000-0000-0000-000000000001', true, NOW(), NOW())
             ON CONFLICT (username) DO NOTHING
-        """)
+        """),
+        {"seed_locked": seed_locked},
     )
     
     # Create lab-manager user
     connection.execute(
         sa.text("""
             INSERT INTO users (id, name, username, email, password_hash, role_id, client_id, active, created_at, modified_at) 
-            VALUES ('00000000-0000-0000-0000-000000000002', 'Lab Manager', 'lab-manager', 'lab-manager@lims.example.com', '***REMOVED***', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', '00000000-0000-0000-0000-000000000001', true, NOW(), NOW())
+            VALUES ('00000000-0000-0000-0000-000000000002', 'Lab Manager', 'lab-manager', 'lab-manager@lims.example.com', :seed_locked, 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', '00000000-0000-0000-0000-000000000001', true, NOW(), NOW())
             ON CONFLICT (username) DO NOTHING
-        """)
+        """),
+        {"seed_locked": seed_locked},
     )
     
     # Create lab-tech user
     connection.execute(
         sa.text("""
             INSERT INTO users (id, name, username, email, password_hash, role_id, client_id, active, created_at, modified_at) 
-            VALUES ('00000000-0000-0000-0000-000000000003', 'Lab Technician', 'lab-tech', 'lab-tech@lims.example.com', '***REMOVED***', 'cccccccc-cccc-cccc-cccc-cccccccccccc', '00000000-0000-0000-0000-000000000001', true, NOW(), NOW())
+            VALUES ('00000000-0000-0000-0000-000000000003', 'Lab Technician', 'lab-tech', 'lab-tech@lims.example.com', :seed_locked, 'cccccccc-cccc-cccc-cccc-cccccccccccc', '00000000-0000-0000-0000-000000000001', true, NOW(), NOW())
             ON CONFLICT (username) DO NOTHING
-        """)
+        """),
+        {"seed_locked": seed_locked},
     )
 
 

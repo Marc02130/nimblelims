@@ -42,7 +42,7 @@ Login and receive JWT token.
 ```json
 {
   "username": "admin",
-  "password": "***REMOVED***"
+  "password": "<password>"
 }
 ```
 

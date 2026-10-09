@@ -46,8 +46,6 @@ import argparse
 import csv
 import json
 import os
-import secrets
-import string
 import sys
 import warnings
 from decimal import Decimal
@@ -65,6 +63,7 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.orm import Session, sessionmaker
 
 import models  # noqa: F401  (register mappers)
+from app.core.dev_passwords import generate_dev_password
 from app.core.name_generation import generate_name_for_sample
 from app.core.security import get_password_hash
 from app.database import set_rls_context
@@ -113,18 +112,7 @@ class SliceError(RuntimeError):
 
 def _generate_slice_password() -> str:
     """Strong random password. Meets the app complexity rules. Not logged."""
-    required = [
-        secrets.choice(string.ascii_uppercase),
-        secrets.choice(string.ascii_lowercase),
-        secrets.choice(string.digits),
-        secrets.choice("!@#$%^&*-_"),
-    ]
-    pool = string.ascii_letters + string.digits + "!@#$%^&*-_"
-    chars = required + [secrets.choice(pool) for _ in range(20)]
-    for index in range(len(chars) - 1, 0, -1):
-        swap = secrets.randbelow(index + 1)
-        chars[index], chars[swap] = chars[swap], chars[index]
-    return "".join(chars)
+    return generate_dev_password()
 
 
 def _slice_passwords() -> tuple[dict[str, str], list[tuple[str, str, str]]]:

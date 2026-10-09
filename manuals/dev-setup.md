@@ -129,7 +129,7 @@ This step implements the Docker configuration from the Technical Document (Secti
   - **Alembic migrations run automatically** when the backend starts:
     - Creates all database tables
     - Creates initial roles and permissions (17 total: `sample:create`, `sample:read`, `sample:update`, `test:assign`, `test:update`, `result:enter`, `result:review`, `result:update`, `result:delete`, `batch:manage`, `batch:read`, `batch:update`, `batch:delete`, `project:manage`, `user:manage`, `role:manage`, `config:edit`)
-    - Creates admin user (username: `admin`, password: `***REMOVED***`)
+    - Creates admin user (username: `admin`). The account is locked until `python backend/seed_dev_passwords.py --apply`
     - Populates initial lists and list entries (normalized to lowercase slug format like `sample_status`)
     - Migration `0006` adds additional permissions: `result:update`, `result:delete`, `batch:update`, `batch:delete`
     - Migration `0008` adds `batch:read` permission if needed
@@ -144,7 +144,7 @@ This step implements the Docker configuration from the Technical Document (Secti
   - Verify seed data: `docker exec lims-db psql -U lims_user -d lims_db -c "SELECT name FROM analyses WHERE active = true;"`
   - Backend: Open browser to `http://localhost:8000/docs` (FastAPI Swagger UI).
   - Frontend: `http://localhost:3000` (React app).
-  - Login: Use `admin` / `***REMOVED***` at http://localhost:3000
+  - Login: at http://localhost:3000 the seed users are locked. From the backend container run `python seed_dev_passwords.py --apply`. It reads `DEV_SEED_ADMIN_PASSWORD` (and the other `DEV_SEED_*` names in `.env.example`) or prints each password once. `must_change_password` is cleared by that command, matching the configuring-agent slice loader. Existing databases are unchanged until you run it; pass `--defaults-file` to see old published hashes that are already bcrypt.
 - Logs: `docker-compose logs -f` to monitor all services.
 - Stop: `docker-compose down` (add `-v` to remove volumes if you want a fresh start).
 

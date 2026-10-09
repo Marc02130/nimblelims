@@ -90,6 +90,10 @@ def migrated_engine(migrated_pg_container):
         conn.execute(text(
             "CREATE ROLE lims_user NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT LOGIN PASSWORD 'lims_password'"
         ))
+        # start.sh creates this before Alembic. 0083 GRANTs to it with no IF EXISTS.
+        conn.execute(text(
+            "CREATE ROLE lims_app NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT LOGIN PASSWORD 'lims_app_password'"
+        ))
         conn.commit()
 
     # env.py reads DATABASE_URL env var instead of config.get_main_option("sqlalchemy.url").
