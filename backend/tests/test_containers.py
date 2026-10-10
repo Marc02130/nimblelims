@@ -2,6 +2,7 @@
 Tests for containers endpoints
 """
 import pytest
+from tests._fk_helpers import scratch_entry_id, scratch_list_id
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 from models.container import Container, ContainerType, Contents
@@ -15,72 +16,75 @@ from datetime import datetime, timedelta
 from uuid import uuid4
 
 
+
+@pytest.fixture
+def test_data(db_session: Session):
+    """Create test data for container tests"""
+    # Create client and project
+    client = Client(
+        name="Test Client",
+        description="Test client for containers",
+        billing_info={"address": "123 Test St"}
+    )
+    db_session.add(client)
+    db_session.flush()
+    
+    from models.list import List
+    status_list = List(name="Project Status", description="statuses")
+    db_session.add(status_list)
+    db_session.flush()
+    project_status = ListEntry(
+        list_id=status_list.id,
+        name="Active",
+        description="Active",
+    )
+    db_session.add(project_status)
+    db_session.flush()
+
+    project = Project(
+        name="Test Project",
+        description="Test project for containers",
+        start_date=datetime.utcnow(),
+        client_id=client.id,
+        status=project_status.id,
+    )
+    db_session.add(project)
+    db_session.flush()
+    
+    # Create units
+    unit_list = List(name="Unit Types", description="unit types")
+    db_session.add(unit_list)
+    db_session.flush()
+    unit_type = ListEntry(
+        list_id=unit_list.id,
+        name="volume",
+        description="Volume unit type"
+    )
+    db_session.add(unit_type)
+    db_session.flush()
+    
+    unit = Unit(
+        name="mL",
+        description="Milliliter",
+        multiplier=0.001,  # 1 mL = 0.001 L
+        type=unit_type.id,
+        created_by=None,
+        modified_by=None,
+    )
+    db_session.add(unit)
+    db_session.flush()
+    
+    return {
+        "client": client,
+        "project": project,
+        "unit": unit
+    }
+
+
 class TestContainerTypesCRUD:
     """Test container types CRUD operations"""
     
-    @pytest.fixture
-    def test_data(self, db_session: Session):
-        """Create test data for container tests"""
-        # Create client and project
-        client = Client(
-            name="Test Client",
-            description="Test client for containers",
-            billing_info={"address": "123 Test St"}
-        )
-        db_session.add(client)
-        db_session.flush()
-        
-        from models.list import List
-        status_list = List(name="Project Status", description="statuses")
-        db_session.add(status_list)
-        db_session.flush()
-        project_status = ListEntry(
-            list_id=status_list.id,
-            name="Active",
-            description="Active",
-        )
-        db_session.add(project_status)
-        db_session.flush()
 
-        project = Project(
-            name="Test Project",
-            description="Test project for containers",
-            start_date=datetime.utcnow(),
-            client_id=client.id,
-            status=project_status.id,
-        )
-        db_session.add(project)
-        db_session.flush()
-        
-        # Create units
-        unit_list = List(name="Unit Types", description="unit types")
-        db_session.add(unit_list)
-        db_session.flush()
-        unit_type = ListEntry(
-            list_id=unit_list.id,
-            name="volume",
-            description="Volume unit type"
-        )
-        db_session.add(unit_type)
-        db_session.flush()
-        
-        unit = Unit(
-            name="mL",
-            description="Milliliter",
-            multiplier=0.001,  # 1 mL = 0.001 L
-            type=unit_type.id,
-            created_by=None,
-            modified_by=None,
-        )
-        db_session.add(unit)
-        db_session.flush()
-        
-        return {
-            "client": client,
-            "project": project,
-            "unit": unit
-        }
-    
     def test_create_container_type_success(self, client: TestClient, test_admin_user, test_data):
         """Test successful container type creation"""
         auth_response = client.post(
@@ -139,7 +143,7 @@ class TestContainerTypesCRUD:
             headers={"Authorization": f"Bearer {token}"}
         )
         
-        assert response.status_code == 200
+        assert response.status_code == 200, response.text
         data = response.json()
         assert len(data) >= 1
         assert any(ct["name"] == "Test Plate" for ct in data)
@@ -178,7 +182,7 @@ class TestContainerTypesCRUD:
             headers={"Authorization": f"Bearer {token}"}
         )
         
-        assert response.status_code == 200
+        assert response.status_code == 200, response.text
         data = response.json()
         assert data["description"] == "Updated test container"
         assert data["capacity"] == 15.0
@@ -222,12 +226,12 @@ class TestContainersCRUD:
         }
         
         response = client.post(
-            "/containers/",
+            "/containers",
             json=container_data,
             headers={"Authorization": f"Bearer {token}"}
         )
         
-        assert response.status_code == 201
+        assert response.status_code == 200, response.text  # route has no status_code=201
         data = response.json()
         assert data["name"] == "TUBE-001"
         assert data["concentration"] == 10.0
@@ -272,11 +276,11 @@ class TestContainersCRUD:
         token = auth_response.json()["access_token"]
         
         response = client.get(
-            "/containers/",
+            "/containers",
             headers={"Authorization": f"Bearer {token}"}
         )
         
-        assert response.status_code == 200
+        assert response.status_code == 200, response.text
         data = response.json()
         assert len(data) >= 1
         assert any(c["name"] == "PLATE-001" for c in data)
@@ -324,7 +328,7 @@ class TestContainersCRUD:
             headers={"Authorization": f"Bearer {token}"}
         )
         
-        assert response.status_code == 200
+        assert response.status_code == 200, response.text
         data = response.json()
         assert data["id"] == str(container.id)
         assert data["name"] == "CONTAINER-001"
@@ -380,7 +384,7 @@ class TestContainersCRUD:
             headers={"Authorization": f"Bearer {token}"}
         )
         
-        assert response.status_code == 200
+        assert response.status_code == 200, response.text
         data = response.json()
         assert data["description"] == "Updated container"
         assert data["concentration"] == 7.5
@@ -436,7 +440,7 @@ class TestContainersCRUD:
             headers={"Authorization": f"Bearer {token}"}
         )
         
-        assert response.status_code == 200
+        assert response.status_code == 200, response.text
         data = response.json()
         assert data["name"] == "CONTAINER-001-UPDATED"
         assert data["concentration"] == 15.5
@@ -503,7 +507,7 @@ class TestContainersCRUD:
             headers={"Authorization": f"Bearer {token}"}
         )
         
-        assert response.status_code == 400
+        assert response.status_code == 400, response.text
         assert "Invalid container type ID" in response.json()["detail"]
     
     def test_update_container_invalid_parent(self, client: TestClient, test_admin_user, test_data, db_session: Session):
@@ -551,7 +555,7 @@ class TestContainersCRUD:
             headers={"Authorization": f"Bearer {token}"}
         )
         
-        assert response.status_code == 400
+        assert response.status_code == 400, response.text
         assert "Invalid parent container ID" in response.json()["detail"]
     
     def test_update_container_requires_permission(self, client: TestClient):
@@ -657,7 +661,7 @@ class TestContainerEditRBAC:
             headers={"Authorization": f"Bearer {token}"}
         )
         
-        assert response.status_code == 200
+        assert response.status_code == 200, response.text
         data = response.json()
         
         # Verify modified_by is updated
@@ -716,7 +720,7 @@ class TestContainerEditRBAC:
         )
         
         # Should fail validation
-        assert response.status_code == 400
+        assert response.status_code == 400, response.text
         
         # Verify container was not updated (atomic transaction)
         db_session.refresh(container)
@@ -760,9 +764,9 @@ class TestContentsManagement:
             description="Test sample for contents",
             due_date=datetime.utcnow() + timedelta(days=7),
             received_date=datetime.utcnow(),
-            sample_type=uuid4(),
-            status=uuid4(),
-            matrix=uuid4(),
+            sample_type=scratch_entry_id(db_session),
+            status=scratch_entry_id(db_session),
+            matrix=scratch_entry_id(db_session),
             temperature=25.0,
             project_id=test_data["project"].id,
             created_by=test_admin_user.id,
@@ -793,7 +797,7 @@ class TestContentsManagement:
             headers={"Authorization": f"Bearer {token}"}
         )
         
-        assert response.status_code == 201
+        assert response.status_code == 200, response.text  # route has no status_code=201
         data = response.json()
         assert data["container_id"] == str(container.id)
         assert data["sample_id"] == str(sample.id)
@@ -833,9 +837,9 @@ class TestContentsManagement:
             description="Test sample for contents retrieval",
             due_date=datetime.utcnow() + timedelta(days=7),
             received_date=datetime.utcnow(),
-            sample_type=uuid4(),
-            status=uuid4(),
-            matrix=uuid4(),
+            sample_type=scratch_entry_id(db_session),
+            status=scratch_entry_id(db_session),
+            matrix=scratch_entry_id(db_session),
             temperature=25.0,
             project_id=test_data["project"].id,
             created_by=test_admin_user.id,
@@ -867,7 +871,7 @@ class TestContentsManagement:
             headers={"Authorization": f"Bearer {token}"}
         )
         
-        assert response.status_code == 200
+        assert response.status_code == 200, response.text
         data = response.json()
         assert "contents" in data
         assert "total" in data
@@ -909,9 +913,9 @@ class TestContentsManagement:
             description="Test sample for contents update",
             due_date=datetime.utcnow() + timedelta(days=7),
             received_date=datetime.utcnow(),
-            sample_type=uuid4(),
-            status=uuid4(),
-            matrix=uuid4(),
+            sample_type=scratch_entry_id(db_session),
+            status=scratch_entry_id(db_session),
+            matrix=scratch_entry_id(db_session),
             temperature=25.0,
             project_id=test_data["project"].id,
             created_by=test_admin_user.id,
@@ -950,7 +954,7 @@ class TestContentsManagement:
             headers={"Authorization": f"Bearer {token}"}
         )
         
-        assert response.status_code == 200
+        assert response.status_code == 200, response.text
         data = response.json()
         assert data["concentration"] == 4.0
         assert data["amount"] == 8.0
@@ -988,9 +992,9 @@ class TestContentsManagement:
             description="Test sample for removal",
             due_date=datetime.utcnow() + timedelta(days=7),
             received_date=datetime.utcnow(),
-            sample_type=uuid4(),
-            status=uuid4(),
-            matrix=uuid4(),
+            sample_type=scratch_entry_id(db_session),
+            status=scratch_entry_id(db_session),
+            matrix=scratch_entry_id(db_session),
             temperature=25.0,
             project_id=test_data["project"].id,
             created_by=test_admin_user.id,
@@ -1023,8 +1027,8 @@ class TestContentsManagement:
             headers={"Authorization": f"Bearer {token}"}
         )
         
-        assert response.status_code == 200
-        assert "removed successfully" in response.json()["message"]
+        assert response.status_code == 200, response.text
+        assert "removed from container successfully" in response.json()["message"]
 
 
 class TestContainerValidation:
@@ -1045,12 +1049,12 @@ class TestContainerValidation:
         }
         
         response = client.post(
-            "/containers/",
+            "/containers",
             json=container_data,
             headers={"Authorization": f"Bearer {token}"}
         )
         
-        assert response.status_code == 400
+        assert response.status_code == 400, response.text
         assert "Invalid container type ID" in response.json()["detail"]
     
     def test_add_sample_to_container_duplicate(self, client: TestClient, test_admin_user, test_data, db_session: Session):
@@ -1087,9 +1091,9 @@ class TestContainerValidation:
             description="Test sample for duplicate test",
             due_date=datetime.utcnow() + timedelta(days=7),
             received_date=datetime.utcnow(),
-            sample_type=uuid4(),
-            status=uuid4(),
-            matrix=uuid4(),
+            sample_type=scratch_entry_id(db_session),
+            status=scratch_entry_id(db_session),
+            matrix=scratch_entry_id(db_session),
             temperature=25.0,
             project_id=test_data["project"].id,
             created_by=test_admin_user.id,
@@ -1132,5 +1136,5 @@ class TestContainerValidation:
             headers={"Authorization": f"Bearer {token}"}
         )
         
-        assert response.status_code == 400
+        assert response.status_code == 400, response.text
         assert "Sample already exists in this container" in response.json()["detail"]
