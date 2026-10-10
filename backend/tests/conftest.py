@@ -188,7 +188,12 @@ def db_session(db_engine):
     """Wrap each test in a transaction that is rolled back on teardown."""
     connection = db_engine.connect()
     transaction = connection.begin()
-    TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=connection)
+    # create_savepoint: app/fixture session.commit() only releases a SAVEPOINT,
+    # so nothing a test does can escape the outer transaction rolled back below.
+    TestingSessionLocal = sessionmaker(
+        autocommit=False, autoflush=False, bind=connection,
+        join_transaction_mode="create_savepoint",
+    )
     session = TestingSessionLocal()
 
     yield session

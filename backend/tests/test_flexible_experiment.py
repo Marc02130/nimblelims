@@ -642,16 +642,25 @@ class TestSopParseJobs:
 class TestSopApplyJob:
     """Tests for POST /v1/sop-parse/{id}/apply."""
 
-    def _make_session_factory(self, db_engine):
-        from sqlalchemy.orm import sessionmaker
-        return sessionmaker(autocommit=False, autoflush=False, bind=db_engine)
+    def _make_session_factory(self, db_session):
+        """Seed through the test's own transactional session (close() is a
+        no-op) instead of committing on a separate pooled connection, which
+        made these tests depend on pool state left by earlier modules."""
+        class _NoClose:
+            def __init__(self, s):
+                self._s = s
+            def close(self):
+                pass
+            def __getattr__(self, name):
+                return getattr(self._s, name)
+        return lambda: _NoClose(db_session)
 
-    def _seed_complete_job(self, db_engine, result: dict = None) -> "uuid.UUID":
+    def _seed_complete_job(self, db_session, result: dict = None) -> "uuid.UUID":
         """Seed a complete SopParseJob with a given result dict."""
         from app.repositories.flexible_experiment_repository import SopParseJobRepository
         from models.flexible_experiment import SopParseJobStatus
 
-        Session = self._make_session_factory(db_engine)
+        Session = self._make_session_factory(db_session)
         db = Session()
         try:
             repo = SopParseJobRepository(db)
@@ -671,9 +680,9 @@ class TestSopApplyJob:
             db.close()
         return job_id
 
-    def test_apply_creates_template_parser_worklist(self, client, auth_headers, db_engine):
+    def test_apply_creates_template_parser_worklist(self, client, auth_headers, db_session):
         """Happy path: complete job → 201, creates template + parser + worklist."""
-        job_id = self._seed_complete_job(db_engine)
+        job_id = self._seed_complete_job(db_session)
 
         r = client.post(f"/v1/sop-parse/{job_id}/apply", headers=auth_headers)
         assert r.status_code == 201, r.text
@@ -685,22 +694,22 @@ class TestSopApplyJob:
         assert data["instrument_parser_id"] is None
         assert data["robot_worklist_config_id"] is not None
 
-    def test_apply_no_worklist_steps_skips_worklist_record(self, client, auth_headers, db_engine):
+    def test_apply_no_worklist_steps_skips_worklist_record(self, client, auth_headers, db_session):
         """When worklist_config has no steps, robot_worklist_config_id is null."""
         result_no_worklist = {
             "template_definition": VALID_TEMPLATE_DEF,
             "parser_config": VALID_PARSER_CONFIG,
             "worklist_config": {"steps": []},
         }
-        job_id = self._seed_complete_job(db_engine, result=result_no_worklist)
+        job_id = self._seed_complete_job(db_session, result=result_no_worklist)
 
         r = client.post(f"/v1/sop-parse/{job_id}/apply", headers=auth_headers)
         assert r.status_code == 201, r.text
         assert r.json()["robot_worklist_config_id"] is None
 
-    def test_apply_links_job_to_template(self, client, auth_headers, db_engine):
+    def test_apply_links_job_to_template(self, client, auth_headers, db_session):
         """After apply, the job's experiment_template_id FK is set."""
-        job_id = self._seed_complete_job(db_engine)
+        job_id = self._seed_complete_job(db_session)
         r = client.post(f"/v1/sop-parse/{job_id}/apply", headers=auth_headers)
         assert r.status_code == 201
         template_id = r.json()["experiment_template_id"]
@@ -710,9 +719,9 @@ class TestSopApplyJob:
         assert r2.status_code == 200
         assert r2.json()["experiment_template_id"] == template_id
 
-    def test_apply_idempotency_returns_409(self, client, auth_headers, db_engine):
+    def test_apply_idempotency_returns_409(self, client, auth_headers, db_session):
         """Applying same job twice → 409 Conflict on second call."""
-        job_id = self._seed_complete_job(db_engine)
+        job_id = self._seed_complete_job(db_session)
         r1 = client.post(f"/v1/sop-parse/{job_id}/apply", headers=auth_headers)
         assert r1.status_code == 201
 
@@ -720,10 +729,10 @@ class TestSopApplyJob:
         assert r2.status_code == 409
         assert "already been applied" in r2.json()["detail"].lower()
 
-    def test_apply_pending_job_returns_422(self, client, auth_headers, db_engine):
+    def test_apply_pending_job_returns_422(self, client, auth_headers, db_session):
         """Applying a job that's still pending → 422."""
         from app.repositories.flexible_experiment_repository import SopParseJobRepository
-        Session = self._make_session_factory(db_engine)
+        Session = self._make_session_factory(db_session)
         db = Session()
         try:
             repo = SopParseJobRepository(db)
@@ -739,10 +748,10 @@ class TestSopApplyJob:
         assert r.status_code == 422
         assert "complete" in r.json()["detail"].lower()
 
-    def test_apply_failed_job_returns_422(self, client, auth_headers, db_engine):
+    def test_apply_failed_job_returns_422(self, client, auth_headers, db_session):
         """Applying a failed job → 422."""
         from app.repositories.flexible_experiment_repository import SopParseJobRepository
-        Session = self._make_session_factory(db_engine)
+        Session = self._make_session_factory(db_session)
         db = Session()
         try:
             repo = SopParseJobRepository(db)
