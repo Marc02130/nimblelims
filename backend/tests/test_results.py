@@ -2,7 +2,16 @@
 Tests for results API endpoints
 """
 import pytest
-from tests._fk_helpers import scratch_entry_id, scratch_list_id
+from uuid import uuid4
+from tests._fk_helpers import scratch_entry_id, scratch_list_id, get_or_create_list_entry
+
+
+@pytest.fixture(autouse=True)
+def _seed_complete_test_status(db_session):
+    """US-28 batch entry requires test_status/'Complete' (seeded by migrations;
+    the create_all test DB starts empty)."""
+    get_or_create_list_entry(db_session, "test_status", "Complete")
+    db_session.commit()
 from fastapi.testclient import TestClient
 from app.main import app
 from models.result import Result
@@ -232,15 +241,37 @@ class TestResultsAPI:
         )
         db_session.add(batch)
         db_session.flush()
-        
+
+        # US-28 entry resolves tests through the batch's containers, and only
+        # accepts analytes configured on the analysis.
+        from models.container import Container, ContainerType, Contents
+        from models.batch import BatchContainer
+        from models.analysis import AnalysisAnalyte
+        ctype = ContainerType(name=f"tube_{uuid4().hex[:6]}")
+        db_session.add(ctype)
+        db_session.flush()
+        tube = Container(name=f"TUBE-{uuid4().hex[:6]}", type_id=ctype.id)
+        db_session.add(tube)
+        db_session.flush()
+        db_session.add(Contents(container_id=tube.id, sample_id=sample.id))
+        db_session.add(BatchContainer(batch_id=batch.id, container_id=tube.id))
+        db_session.add(AnalysisAnalyte(analysis_id=analysis.id, analyte_id=analyte.id, data_type="numeric"))
+        db_session.flush()
+
+        # POST /results/batch now takes the US-28 shape: results grouped per
+        # test, each with analyte_results.
         batch_results_data = {
             "batch_id": str(batch.id),
-            "test_id": str(test.id),
             "results": [
                 {
-                    "analyte_id": str(analyte.id),
-                    "raw_result": "123.45",
-                    "reported_result": "123.5"
+                    "test_id": str(test.id),
+                    "analyte_results": [
+                        {
+                            "analyte_id": str(analyte.id),
+                            "raw_result": "123.45",
+                            "reported_result": "123.5"
+                        }
+                    ]
                 }
             ]
         }
@@ -248,12 +279,15 @@ class TestResultsAPI:
         response = client.post("/results/batch", json=batch_results_data, headers=auth_headers)
         assert response.status_code == 200, response.text
         
+        # US-28 returns the batch (with containers); check the stored result
         data = response.json()
-        assert isinstance(data, list)
-        assert len(data) == 1
-        assert data[0]["test_id"] == str(test.id)
-        assert data[0]["analyte_id"] == str(analyte.id)
-        assert data[0]["raw_result"] == "123.45"
+        assert data["id"] == str(batch.id)
+        from models.result import Result
+        stored = db_session.query(Result).filter(Result.test_id == test.id).all()
+        assert len(stored) == 1
+        assert stored[0].analyte_id == analyte.id
+        assert stored[0].raw_result == "123.45"
+        assert stored[0].reported_result == "123.5"
     
     def test_validate_result(self, db_session, auth_headers, sample_user):
         """Test validating a result"""
@@ -859,15 +893,7 @@ class TestResultsAPI:
         db_session.add(in_process_status)
         db_session.flush()
         
-        complete_status = ListEntry(
-            list_id=test_status_list.id,
-            name="Complete",
-            description="Test complete",
-            created_by=sample_user.id,
-            modified_by=sample_user.id
-        )
-        db_session.add(complete_status)
-        db_session.flush()
+        complete_status = get_or_create_list_entry(db_session, "test_status", "Complete")
         
         sample_status_list = db_session.query(List).filter(List.name == "sample_status").first()
         if not sample_status_list:
@@ -1157,7 +1183,7 @@ class TestResultsAPI:
         db_session.add(sample_type)
         db_session.flush()
         
-        matrix = ListEntry(list_id=scratch_list_id(db_session), name="Water", created_by=sample_user.id, modified_by=sample_user.id)
+        matrix = ListEntry(list_id=scratch_list_id(db_session), name="Water Matrix", created_by=sample_user.id, modified_by=sample_user.id)
         db_session.add(matrix)
         db_session.flush()
         
@@ -1193,7 +1219,7 @@ class TestResultsAPI:
         db_session.add(analysis_analyte)
         db_session.flush()
         
-        test = Test(sample_id=sample.id, analysis_id=analysis.id, status=in_process_status.id, created_by=sample_user.id, modified_by=sample_user.id)
+        test = Test(name=f"T-{uuid4().hex[:8]}", sample_id=sample.id, analysis_id=analysis.id, status=in_process_status.id, created_by=sample_user.id, modified_by=sample_user.id)
         db_session.add(test)
         db_session.flush()
         
@@ -1298,7 +1324,7 @@ class TestResultsAPI:
         db_session.add(sample_type)
         db_session.flush()
         
-        matrix = ListEntry(list_id=scratch_list_id(db_session), name="Water", created_by=sample_user.id, modified_by=sample_user.id)
+        matrix = ListEntry(list_id=scratch_list_id(db_session), name="Water Matrix", created_by=sample_user.id, modified_by=sample_user.id)
         db_session.add(matrix)
         db_session.flush()
         
@@ -1348,12 +1374,12 @@ class TestResultsAPI:
         db_session.add(analysis_analyte)
         db_session.flush()
         
-        test1 = Test(sample_id=sample1.id, analysis_id=analysis.id, status=in_process_status.id, created_by=sample_user.id, modified_by=sample_user.id)
+        test1 = Test(name=f"T-{uuid4().hex[:8]}", sample_id=sample1.id, analysis_id=analysis.id, status=in_process_status.id, created_by=sample_user.id, modified_by=sample_user.id)
         db_session.add(test1)
         db_session.flush()
         
         # QC test with no results (will trigger QC failure)
-        qc_test = Test(sample_id=qc_sample.id, analysis_id=analysis.id, status=in_process_status.id, created_by=sample_user.id, modified_by=sample_user.id)
+        qc_test = Test(name=f"T-{uuid4().hex[:8]}", sample_id=qc_sample.id, analysis_id=analysis.id, status=in_process_status.id, created_by=sample_user.id, modified_by=sample_user.id)
         db_session.add(qc_test)
         db_session.flush()
         
@@ -1451,9 +1477,7 @@ class TestResultsAPI:
         db_session.add(in_process_status)
         db_session.flush()
         
-        complete_status = ListEntry(list_id=test_status_list.id, name="Complete", created_by=sample_user.id, modified_by=sample_user.id)
-        db_session.add(complete_status)
-        db_session.flush()
+        complete_status = get_or_create_list_entry(db_session, "test_status", "Complete")
         
         sample_status_list = db_session.query(List).filter(List.name == "sample_status").first()
         if not sample_status_list:
@@ -1479,7 +1503,7 @@ class TestResultsAPI:
         db_session.add(sample_type)
         db_session.flush()
         
-        matrix = ListEntry(list_id=scratch_list_id(db_session), name="Water", created_by=sample_user.id, modified_by=sample_user.id)
+        matrix = ListEntry(list_id=scratch_list_id(db_session), name="Water Matrix", created_by=sample_user.id, modified_by=sample_user.id)
         db_session.add(matrix)
         db_session.flush()
         
@@ -1543,11 +1567,11 @@ class TestResultsAPI:
         db_session.flush()
         
         # Create tests
-        test1 = Test(sample_id=sample1.id, analysis_id=analysis.id, status=in_process_status.id, created_by=sample_user.id, modified_by=sample_user.id)
+        test1 = Test(name=f"T-{uuid4().hex[:8]}", sample_id=sample1.id, analysis_id=analysis.id, status=in_process_status.id, created_by=sample_user.id, modified_by=sample_user.id)
         db_session.add(test1)
         db_session.flush()
         
-        qc_test = Test(sample_id=qc_sample.id, analysis_id=analysis.id, status=in_process_status.id, created_by=sample_user.id, modified_by=sample_user.id)
+        qc_test = Test(name=f"T-{uuid4().hex[:8]}", sample_id=qc_sample.id, analysis_id=analysis.id, status=in_process_status.id, created_by=sample_user.id, modified_by=sample_user.id)
         db_session.add(qc_test)
         db_session.flush()
         
@@ -1583,11 +1607,19 @@ class TestResultsAPI:
                 },
                 {
                     "test_id": str(qc_test.id),
+                    # A test is only Complete once every analyte on its
+                    # analysis has a result, and the batch only completes when
+                    # all its tests (QC included) are Complete.
                     "analyte_results": [
                         {
                             "analyte_id": str(analyte1.id),
                             "raw_result": "7.0",
                             "reported_result": "7.0"
+                        },
+                        {
+                            "analyte_id": str(analyte2.id),
+                            "raw_result": "24.0",
+                            "reported_result": "24"
                         }
                     ]
                 }

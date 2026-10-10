@@ -128,18 +128,9 @@ class TestResultPromotion:
         db_session,
         test_admin_user,
     ):
-        from models.flexible_experiment import InstrumentParser
 
-        # Parser with empty expected columns so arbitrary row_data is allowed
-        db_session.add(
-            InstrumentParser(
-                name=f"parser-{uuid4().hex[:6]}",
-                experiment_template_id=template_id,
-                parser_config={"columns": [], "skip_rows": 0},
-                created_by=test_admin_user.id,
-                modified_by=test_admin_user.id,
-            )
-        )
+        # JSON /import takes pre-parsed rows; no parser is needed (parsers are
+        # resolved only for /import-file by analysis + instrument/CRO).
         db_session.commit()
 
         # Create run with analysis
@@ -217,6 +208,9 @@ class TestResultPromotion:
     def test_publish_without_analysis_no_promote(
         self, client: TestClient, auth_headers, template_id
     ):
+        """A run without an analysis can no longer exist: analysis_id is required
+        at create (import + promote target), so the old "publish without
+        analysis, nothing promoted" path is rejected up front."""
         r = client.post(
             "/v1/lims-runs",
             json={
@@ -225,18 +219,8 @@ class TestResultPromotion:
             },
             headers=auth_headers,
         )
-        run_id = r.json()["id"]
-        r = client.patch(
-            f"/v1/lims-runs/{run_id}/start",
-            json={"acknowledge_no_analysis": True},
-            headers=auth_headers,
-        )
-        assert r.status_code == 200, r.text
-        r = client.patch(f"/v1/lims-runs/{run_id}/review", headers=auth_headers)
-        assert r.status_code == 200
-        r = client.patch(f"/v1/lims-runs/{run_id}/complete", headers=auth_headers)
-        assert r.status_code == 200
-        assert r.json()["status"] == "published"
+        assert r.status_code == 422, r.text
+        assert any(e["loc"][-1] == "analysis_id" for e in r.json()["detail"])
 
     def test_conflict_blocks_publish(
         self,
@@ -249,7 +233,6 @@ class TestResultPromotion:
         test_admin_user,
     ):
         """Manual/other-run result for same (test, analyte, rep) → 409 on publish."""
-        from models.flexible_experiment import InstrumentParser
         from models.test import Test
         from models.result import Result
         from models.list import List, ListEntry
@@ -257,15 +240,8 @@ class TestResultPromotion:
         from models.analysis import Analysis
         from uuid import UUID
 
-        db_session.add(
-            InstrumentParser(
-                name=f"parser-{uuid4().hex[:6]}",
-                experiment_template_id=template_id,
-                parser_config={"columns": [], "skip_rows": 0},
-                created_by=test_admin_user.id,
-                modified_by=test_admin_user.id,
-            )
-        )
+        # JSON /import takes pre-parsed rows; no parser is needed (parsers are
+        # resolved only for /import-file by analysis + instrument/CRO).
         # Pre-existing test + result (manual, lims_run_id null)
         lst = db_session.query(List).filter(List.name == "test_status").first()
         status_id = (
