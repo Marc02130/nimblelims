@@ -2,7 +2,7 @@
 Tests for aliquots and derivatives API endpoints
 """
 import pytest
-from tests._fk_helpers import scratch_entry_id, scratch_list_id
+from tests._fk_helpers import scratch_entry_id, scratch_list_id, get_or_create_list_entry
 from uuid import uuid4
 from fastapi.testclient import TestClient
 from app.main import app
@@ -76,20 +76,14 @@ class TestAliquotsAPI:
         sample_type = ListEntry(
             name="Blood",
             description="Blood sample",
-            list_id=None,  # Will be set later
+            list_id=scratch_list_id(db_session),
             created_by=sample_user.id,
             modified_by=sample_user.id
         )
         db_session.add(sample_type)
         db_session.flush()
         
-        sample_status = ListEntry(
-            name="Available for Testing",
-            description="Sample available for testing",
-            list_id=None,  # Will be set later
-            created_by=sample_user.id,
-            modified_by=sample_user.id
-        )
+        sample_status = get_or_create_list_entry(db_session, "sample_status", "Available for Testing")
         db_session.add(sample_status)
         db_session.flush()
         
@@ -185,7 +179,7 @@ class TestAliquotsAPI:
         blood_type = ListEntry(
             name="Blood",
             description="Blood sample",
-            list_id=None,
+            list_id=scratch_list_id(db_session),
             created_by=sample_user.id,
             modified_by=sample_user.id
         )
@@ -195,20 +189,14 @@ class TestAliquotsAPI:
         dna_type = ListEntry(
             name="DNA",
             description="DNA sample",
-            list_id=None,
+            list_id=scratch_list_id(db_session),
             created_by=sample_user.id,
             modified_by=sample_user.id
         )
         db_session.add(dna_type)
         db_session.flush()
         
-        sample_status = ListEntry(
-            name="Available for Testing",
-            description="Sample available for testing",
-            list_id=None,
-            created_by=sample_user.id,
-            modified_by=sample_user.id
-        )
+        sample_status = get_or_create_list_entry(db_session, "sample_status", "Available for Testing")
         db_session.add(sample_status)
         db_session.flush()
         
@@ -307,20 +295,14 @@ class TestAliquotsAPI:
         sample_type = ListEntry(
             name="Blood",
             description="Blood sample",
-            list_id=None,
+            list_id=scratch_list_id(db_session),
             created_by=sample_user.id,
             modified_by=sample_user.id
         )
         db_session.add(sample_type)
         db_session.flush()
         
-        sample_status = ListEntry(
-            name="Available for Testing",
-            description="Sample available for testing",
-            list_id=None,
-            created_by=sample_user.id,
-            modified_by=sample_user.id
-        )
+        sample_status = get_or_create_list_entry(db_session, "sample_status", "Available for Testing")
         db_session.add(sample_status)
         db_session.flush()
         
@@ -375,29 +357,41 @@ class TestAliquotsAPI:
         db_session.add(container)
         db_session.flush()
         
-        # Create units
-        mg_unit = Unit(
-            name="mg",
-            description="Milligram",
-            type=None,  # Will be set later
+        # Units: pooling sums amounts in the lab's base *volume* unit (list
+        # entry named "volume") and averages concentration in that type's base.
+        volume_type = get_or_create_list_entry(db_session, "unit_type", "volume")
+        conc_type = scratch_entry_id(db_session)
+        base_ml = (
+            db_session.query(Unit)
+            .filter(Unit.type == volume_type.id, Unit.multiplier == 1, Unit.active == True)  # noqa: E712
+            .first()
+        )
+        if base_ml is None:
+            base_ml = Unit(name=f"mL_{uuid4().hex[:4]}", description="Milliliter",
+                           type=volume_type.id, multiplier=1.0)
+            db_session.add(base_ml)
+        mg_unit = Unit(  # volume unit: microliter
+            name=f"uL_{uuid4().hex[:4]}",
+            description="Microliter",
+            type=volume_type.id,
             multiplier=0.001,
             created_by=sample_user.id,
             modified_by=sample_user.id
         )
         db_session.add(mg_unit)
         db_session.flush()
-        
+
         mg_ml_unit = Unit(
-            name="mg/mL",
+            name=f"mg/mL_{uuid4().hex[:4]}",
             description="Milligram per milliliter",
-            type=None,  # Will be set later
+            type=conc_type,
             multiplier=1.0,
             created_by=sample_user.id,
             modified_by=sample_user.id
         )
         db_session.add(mg_ml_unit)
         db_session.flush()
-        
+
         pooling_data = {
             "container_id": str(container.id),
             "samples": [str(sample1.id), str(sample2.id)],
@@ -452,20 +446,14 @@ class TestAliquotsAPI:
         sample_type = ListEntry(
             name="Blood",
             description="Blood sample",
-            list_id=None,
+            list_id=scratch_list_id(db_session),
             created_by=sample_user.id,
             modified_by=sample_user.id
         )
         db_session.add(sample_type)
         db_session.flush()
         
-        sample_status = ListEntry(
-            name="Available for Testing",
-            description="Sample available for testing",
-            list_id=None,
-            created_by=sample_user.id,
-            modified_by=sample_user.id
-        )
+        sample_status = get_or_create_list_entry(db_session, "sample_status", "Available for Testing")
         db_session.add(sample_status)
         db_session.flush()
         
@@ -549,17 +537,13 @@ class TestAliquotsAPI:
         # Create contents entries
         contents1 = Contents(
             container_id=container1.id,
-            sample_id=aliquot1.id,
-            created_by=sample_user.id,
-            modified_by=sample_user.id
+            sample_id=aliquot1.id
         )
         db_session.add(contents1)
         
         contents2 = Contents(
             container_id=container2.id,
-            sample_id=aliquot2.id,
-            created_by=sample_user.id,
-            modified_by=sample_user.id
+            sample_id=aliquot2.id
         )
         db_session.add(contents2)
         db_session.commit()
@@ -606,7 +590,7 @@ class TestAliquotsAPI:
         blood_type = ListEntry(
             name="Blood",
             description="Blood sample",
-            list_id=None,
+            list_id=scratch_list_id(db_session),
             created_by=sample_user.id,
             modified_by=sample_user.id
         )
@@ -616,20 +600,14 @@ class TestAliquotsAPI:
         dna_type = ListEntry(
             name="DNA",
             description="DNA sample",
-            list_id=None,
+            list_id=scratch_list_id(db_session),
             created_by=sample_user.id,
             modified_by=sample_user.id
         )
         db_session.add(dna_type)
         db_session.flush()
         
-        sample_status = ListEntry(
-            name="Available for Testing",
-            description="Sample available for testing",
-            list_id=None,
-            created_by=sample_user.id,
-            modified_by=sample_user.id
-        )
+        sample_status = get_or_create_list_entry(db_session, "sample_status", "Available for Testing")
         db_session.add(sample_status)
         db_session.flush()
         
@@ -713,17 +691,13 @@ class TestAliquotsAPI:
         # Create contents entries
         contents1 = Contents(
             container_id=container1.id,
-            sample_id=derivative1.id,
-            created_by=sample_user.id,
-            modified_by=sample_user.id
+            sample_id=derivative1.id
         )
         db_session.add(contents1)
         
         contents2 = Contents(
             container_id=container2.id,
-            sample_id=derivative2.id,
-            created_by=sample_user.id,
-            modified_by=sample_user.id
+            sample_id=derivative2.id
         )
         db_session.add(contents2)
         db_session.commit()
