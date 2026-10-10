@@ -1,6 +1,7 @@
 """
 Pydantic schemas for results
 """
+from app.schemas._dates import is_future
 from pydantic import BaseModel, Field, validator
 from typing import Optional, List, Dict, Any
 from datetime import datetime
@@ -26,7 +27,7 @@ class ResultBase(BaseModel):
 
     @validator('entry_date')
     def validate_entry_date(cls, v):
-        if v > datetime.now():
+        if is_future(v):
             raise ValueError('Entry date cannot be in the future')
         return v
 
@@ -49,7 +50,7 @@ class ResultUpdate(BaseModel):
 
     @validator('entry_date')
     def validate_entry_date(cls, v):
-        if v and v > datetime.now():
+        if v and is_future(v):
             raise ValueError('Entry date cannot be in the future')
         return v
 
