@@ -519,7 +519,9 @@ async def create_batch(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail={
                         "error": "Incompatible samples: no shared analyses found",
-                        "projects": list(project_ids),
+                        # str(): UUIDs in an HTTPException detail are not
+                        # JSON-serializable (this 400 used to surface as a 500)
+                        "projects": [str(p) for p in project_ids],
                         "analyses": list(analysis_names),
                         "suggestion": "Samples must share at least one common analysis (e.g., prep method) for cross-project batching"
                     }
@@ -603,6 +605,20 @@ async def create_batch(
                 detail=f"Invalid batch status ID: {batch_data.status}"
             )
     
+    # Validate custom_attributes (previously accepted by the schema but dropped)
+    validated_custom_attributes = {}
+    if batch_data.custom_attributes:
+        from app.core.custom_attributes import validate_custom_attributes
+        try:
+            validated_custom_attributes = validate_custom_attributes(
+                db, "batches", batch_data.custom_attributes
+            )
+        except ValueError as e:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=str(e)
+            )
+
     # Create batch
     batch = Batch(
         name=batch_name,
@@ -611,6 +627,7 @@ async def create_batch(
         status=batch_data.status,
         start_date=batch_data.start_date,
         end_date=batch_data.end_date,
+        custom_attributes=validated_custom_attributes,
         created_by=current_user.id,
         modified_by=current_user.id
     )

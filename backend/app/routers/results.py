@@ -320,8 +320,9 @@ async def enter_batch_results_us28(
             
             # Get analysis_analytes for this test
             analysis_analytes = db.query(AnalysisAnalyte).filter(
+                # analysis_analytes is a pure junction table (no `active`
+                # column); filtering on it raised AttributeError -> 500.
                 AnalysisAnalyte.analysis_id == test.analysis_id,
-                AnalysisAnalyte.active == True
             ).all()
             
             analyte_lookup = {aa.analyte_id: aa for aa in analysis_analytes}
@@ -631,9 +632,10 @@ async def validate_result(
     if analysis_analyte.significant_figures:
         try:
             if validation_data.reported_result:
-                reported_val = float(validation_data.reported_result)
-                # This is a simplified check - in practice, you'd count actual significant figures
-                if len(str(reported_val).replace('.', '').lstrip('0')) > analysis_analyte.significant_figures:
+                from app.core.conversions import count_significant_figures
+                float(validation_data.reported_result)
+                sig = count_significant_figures(str(validation_data.reported_result))
+                if sig is not None and sig > analysis_analyte.significant_figures:
                     warnings.append(f"Reported result may have more than {analysis_analyte.significant_figures} significant figures")
         except ValueError:
             pass

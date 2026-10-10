@@ -409,14 +409,31 @@ def validate_result_value(
         except ValueError:
             pass  # Already caught by data type validation
     
-    # Check significant figures (simplified check)
-    if data_type == "numeric" and significant_figures is not None:
-        try:
-            num_value = float(value)
-            # This is a simplified check - in practice, you'd count actual significant figures
-            if len(str(num_value).replace('.', '').lstrip('0')) > significant_figures:
-                errors.append(f"Value may have more than {significant_figures} significant figures")
-        except ValueError:
-            pass  # Already caught by data type validation
-    
+    # Significant figures are a reporting/rounding rule, not an entry rule: raw
+    # values routinely carry more digits than are reported. POST /results/validate
+    # surfaces excess digits as a *warning*; this validator used to turn them into
+    # a hard error (with a count based on str(float), which drops trailing zeros
+    # and miscounts e.g. "1200" or "0.0012"). It no longer fails validation.
     return len(errors) == 0, errors
+
+
+def count_significant_figures(value: str) -> Optional[int]:
+    """Count significant figures in a numeric string as entered.
+
+    Leading zeros never count; trailing zeros count only when a decimal point is
+    present ("1200" -> 2, "1200." -> 4, "0.00120" -> 3). Scientific notation
+    counts the mantissa. Returns None for non-numeric input.
+    """
+    s = (value or "").strip().lstrip("+-")
+    mantissa = s.split("e")[0].split("E")[0]
+    try:
+        float(mantissa)
+    except ValueError:
+        return None
+    has_point = "." in mantissa
+    digits = mantissa.replace(".", "").lstrip("0")
+    if not digits:
+        return 1  # zero
+    if not has_point:
+        digits = digits.rstrip("0") or "0"
+    return len(digits)
