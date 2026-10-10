@@ -57,11 +57,12 @@ def experiment_template(client: TestClient, auth_headers):
 
 
 @pytest.fixture
-def draft_run(client: TestClient, auth_headers, experiment_template):
+def draft_run(client: TestClient, auth_headers, experiment_template, run_analysis_id):
     """Create a run in draft status."""
     payload = {
         "name": f"Run {uuid4().hex[:8]}",
         "experiment_template_id": experiment_template,
+        "analysis_id": run_analysis_id,
         "description": "process test run",
     }
     r = client.post("/v1/lims-runs", json=payload, headers=auth_headers)
@@ -103,7 +104,7 @@ class TestRunNameRegression:
     """Global unique LIMS run names (aligned with experiments/templates)."""
 
     def test_create_run_cross_client_same_name_rejected(
-        self, client: TestClient, auth_headers, experiment_template, db_session
+        self, client: TestClient, auth_headers, experiment_template, db_session, run_analysis_id
     ):
         """
         Run names are globally unique. A second client cannot reuse an existing run name.
@@ -174,6 +175,7 @@ class TestRunNameRegression:
             json={
                 "name": shared_name,
                 "experiment_template_id": experiment_template,
+                "analysis_id": run_analysis_id,
             },
             headers=auth_headers,
         )
@@ -185,6 +187,7 @@ class TestRunNameRegression:
             json={
                 "name": shared_name,
                 "experiment_template_id": template2_id,
+                "analysis_id": run_analysis_id,
             },
             headers=headers2,
         )

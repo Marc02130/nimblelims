@@ -2,6 +2,7 @@
 Tests for name templates endpoints and name generation
 """
 import pytest
+from tests._fk_helpers import scratch_entry_id, scratch_list_id
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 from models.name_template import NameTemplate
@@ -355,7 +356,7 @@ class TestNameGeneration:
         
         status_entry = ListEntry(
             id=uuid4(),
-            list_id=uuid4(),
+            list_id=scratch_list_id(db_session),
             name="Active"
         )
         db_session.add(status_entry)
@@ -394,7 +395,7 @@ class TestNameGeneration:
         # Create a sample with a name
         status_entry = ListEntry(
             id=uuid4(),
-            list_id=uuid4(),
+            list_id=scratch_list_id(db_session),
             name="Received"
         )
         db_session.add(status_entry)
@@ -402,7 +403,7 @@ class TestNameGeneration:
         
         sample_type = ListEntry(
             id=uuid4(),
-            list_id=uuid4(),
+            list_id=scratch_list_id(db_session),
             name="Blood"
         )
         db_session.add(sample_type)
@@ -410,7 +411,7 @@ class TestNameGeneration:
         
         matrix = ListEntry(
             id=uuid4(),
-            list_id=uuid4(),
+            list_id=scratch_list_id(db_session),
             name="Water"
         )
         db_session.add(matrix)
@@ -551,7 +552,7 @@ class TestNameGenerationIntegration:
         
         status_entry = ListEntry(
             id=uuid4(),
-            list_id=uuid4(),
+            list_id=scratch_list_id(db_session),
             name="Received"
         )
         db_session.add(status_entry)
@@ -559,7 +560,7 @@ class TestNameGenerationIntegration:
         
         sample_type = ListEntry(
             id=uuid4(),
-            list_id=uuid4(),
+            list_id=scratch_list_id(db_session),
             name="Blood"
         )
         db_session.add(sample_type)
@@ -567,7 +568,7 @@ class TestNameGenerationIntegration:
         
         matrix = ListEntry(
             id=uuid4(),
-            list_id=uuid4(),
+            list_id=scratch_list_id(db_session),
             name="Water"
         )
         db_session.add(matrix)
@@ -613,7 +614,7 @@ class TestNameGenerationIntegration:
         }
         
         response = client.post(
-            "/samples",
+            "/samples/",  # create route is POST /samples/ (GET /samples is the list)
             json=sample_data,
             headers={"Authorization": f"Bearer {token}"}
         )
@@ -628,7 +629,7 @@ class TestNameGenerationIntegration:
         # Setup: Create necessary data
         status_entry = ListEntry(
             id=uuid4(),
-            list_id=uuid4(),
+            list_id=scratch_list_id(db_session),
             name="Created"
         )
         db_session.add(status_entry)
@@ -665,7 +666,7 @@ class TestNameGenerationIntegration:
             headers={"Authorization": f"Bearer {token}"}
         )
         
-        assert response.status_code == 200
+        assert response.status_code == 201  # POST /batches returns 201 Created
         data = response.json()
         assert "name" in data
         assert data["name"].startswith("BATCH-")

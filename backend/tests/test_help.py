@@ -6,6 +6,33 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 from models.help_entry import HelpEntry
 from models.user import User, Role
+from tests.conftest import _get_or_create
+from models.client import Client
+
+
+def _seed_help(db, section, role_filter):
+    entry = HelpEntry(name=section, section=section, content=f"{section} content", role_filter=role_filter)
+    db.add(entry)
+    db.flush()
+    return entry
+
+
+def _test_org_id(db):
+    """users.client_id is NOT NULL; reuse the org created by the auth fixtures."""
+    return db.query(Client).filter(Client.name == "Test Lab").first().id
+
+
+@pytest.fixture(autouse=True)
+def _seed_standard_roles(db_session):
+    """Seed the standard roles that migrations create in a real database.
+
+    The test DB is built with Base.metadata.create_all(), so the roles that
+    help role_filter validation checks against (validate_role_filter) do not
+    exist unless a test creates them.
+    """
+    for name in ("Administrator", "Lab Manager", "Lab Technician", "Client"):
+        _get_or_create(db_session, Role, name, f"{name} role")
+    db_session.flush()
 
 
 def test_get_help_entries_as_client_user(client: TestClient, db: Session, client_user_token: str):
@@ -24,12 +51,14 @@ def test_get_help_entries_as_client_user(client: TestClient, db: Session, client
     
     # Verify all entries are either Client role or public (role_filter is None)
     for entry in data["help_entries"]:
-        assert entry["role_filter"] in [None, "Client"]
+        assert entry["role_filter"] in [None, "client"]
 
 
 def test_get_help_entries_as_admin(client: TestClient, db: Session, admin_token: str):
     """Test that admins can see all help entries"""
     headers = {"Authorization": f"Bearer {admin_token}"}
+    # Help content is seeded by migrations in a real DB; create one here.
+    _seed_help(db, "Administrator Overview", "administrator")
     
     response = client.get("/help", headers=headers)
     assert response.status_code == 200
@@ -48,7 +77,7 @@ def test_get_help_entries_with_role_filter_as_admin(client: TestClient, db: Sess
     
     data = response.json()
     for entry in data["help_entries"]:
-        assert entry["role_filter"] in [None, "Client"]
+        assert entry["role_filter"] in [None, "client"]
 
 
 def test_get_help_entries_role_filter_as_non_admin(client: TestClient, db: Session, client_user_token: str):
@@ -57,7 +86,7 @@ def test_get_help_entries_role_filter_as_non_admin(client: TestClient, db: Sessi
     
     response = client.get("/help?role=Administrator", headers=headers)
     assert response.status_code == 403
-    assert "Only administrators can filter by role" in response.json()["detail"]
+    assert "Only users with config:edit permission can filter by role" in response.json()["detail"]
 
 
 def test_get_help_entries_with_section_filter(client: TestClient, db: Session, client_user_token: str):
@@ -75,6 +104,8 @@ def test_get_help_entries_with_section_filter(client: TestClient, db: Session, c
 def test_get_contextual_help(client: TestClient, db: Session, client_user_token: str):
     """Test getting contextual help for a specific section"""
     headers = {"Authorization": f"Bearer {client_user_token}"}
+    # Help content is seeded by migrations in a real DB; create one here.
+    _seed_help(db, "Viewing Projects", "client")
     
     response = client.get("/help/contextual?section=Viewing Projects", headers=headers)
     assert response.status_code == 200
@@ -82,7 +113,7 @@ def test_get_contextual_help(client: TestClient, db: Session, client_user_token:
     data = response.json()
     assert data["section"] == "Viewing Projects"
     assert "content" in data
-    assert data["role_filter"] in [None, "Client"]
+    assert data["role_filter"] in [None, "client"]
 
 
 def test_get_contextual_help_not_found(client: TestClient, db: Session, client_user_token: str):
@@ -110,7 +141,7 @@ def test_create_help_entry_as_admin(client: TestClient, db: Session, admin_token
     data = response.json()
     assert data["section"] == "Test Section"
     assert data["content"] == "This is test help content for testing purposes."
-    assert data["role_filter"] == "Client"
+    assert data["role_filter"] == "client"
     assert data["active"] is True
 
 
@@ -270,7 +301,8 @@ def test_client_user_sees_only_filtered_help(client: TestClient, db: Session, ad
 def test_non_client_sees_general_help(client: TestClient, db_session: Session, admin_token: str, test_user):
     """Integration test: Non-client users see help entries filtered by their role or public"""
     from app.core.security import create_access_token
-    from models.user import Permission, RolePermission, Role
+    from models.user import Permission, Role
+    from tests._legacy_models import RolePermission
     
     headers_admin = {"Authorization": f"Bearer {admin_token}"}
     
@@ -330,7 +362,7 @@ def test_unauthorized_access_denied(client: TestClient):
     """Integration test: Unauthorized requests to help endpoints are denied"""
     # Try to access help without token
     response = client.get("/help")
-    assert response.status_code == 403  # FastAPI returns 403 for missing auth
+    assert response.status_code == 401  # HTTPBearer returns 401 for missing credentials (FastAPI >= 0.115)
     
     # Try to create help entry without token
     help_data = {
@@ -339,15 +371,15 @@ def test_unauthorized_access_denied(client: TestClient):
         "role_filter": "Client"
     }
     response = client.post("/help/admin/help", json=help_data)
-    assert response.status_code == 403
+    assert response.status_code == 401
     
     # Try to update help entry without token
     response = client.patch("/help/admin/help/00000000-0000-0000-0000-000000000001", json={"content": "Updated"})
-    assert response.status_code == 403
+    assert response.status_code == 401
     
     # Try to delete help entry without token
     response = client.delete("/help/admin/help/00000000-0000-0000-0000-000000000001")
-    assert response.status_code == 403
+    assert response.status_code == 401
 
 
 def test_client_cannot_access_admin_endpoints(client: TestClient, db: Session, client_user_token: str):
@@ -377,7 +409,8 @@ def test_client_cannot_access_admin_endpoints(client: TestClient, db: Session, c
 def test_get_help_entries_as_lab_technician(client: TestClient, db: Session, admin_token: str):
     """Test that lab technicians see their role-filtered help entries"""
     from app.core.security import create_access_token
-    from models.user import Role, Permission, RolePermission
+    from models.user import Role, Permission
+    from tests._legacy_models import RolePermission
     
     headers_admin = {"Authorization": f"Bearer {admin_token}"}
     
@@ -420,7 +453,8 @@ def test_get_help_entries_as_lab_technician(client: TestClient, db: Session, adm
         username="labtech",
         email="labtech@example.com",
         password_hash="hashed_password",
-        role_id=lab_tech_role.id
+        role_id=lab_tech_role.id,
+        client_id=_test_org_id(db)
     )
     db.add(lab_tech_user)
     db.commit()
@@ -540,7 +574,8 @@ def test_get_help_entries_role_filter_case_insensitive(client: TestClient, db: S
 def test_get_contextual_help_for_lab_technician(client: TestClient, db: Session, admin_token: str):
     """Test getting contextual help for lab technician"""
     from app.core.security import create_access_token
-    from models.user import Role, Permission, RolePermission
+    from models.user import Role, Permission
+    from tests._legacy_models import RolePermission
     
     headers_admin = {"Authorization": f"Bearer {admin_token}"}
     
@@ -566,7 +601,8 @@ def test_get_contextual_help_for_lab_technician(client: TestClient, db: Session,
         username="labtech2",
         email="labtech2@example.com",
         password_hash="hashed_password",
-        role_id=lab_tech_role.id
+        role_id=lab_tech_role.id,
+        client_id=_test_org_id(db)
     )
     db.add(lab_tech_user)
     db.commit()
@@ -725,14 +761,15 @@ def test_lab_technician_rls_denied_access(client: TestClient, db: Session, admin
     
     # Verify all entries visible to client are Client-filtered or public
     for entry in data["help_entries"]:
-        assert entry["role_filter"] in [None, "Client"], \
+        assert entry["role_filter"] in [None, "client"], \
             f"Client should only see Client or public help, got {entry['role_filter']}"
 
 
 def test_lab_technician_help_rls_policy_enforcement(client: TestClient, db: Session, admin_token: str):
     """Test that RLS policy correctly filters help entries by role"""
     from app.core.security import create_access_token
-    from models.user import Role, Permission, RolePermission
+    from models.user import Role, Permission
+    from tests._legacy_models import RolePermission
     
     headers_admin = {"Authorization": f"Bearer {admin_token}"}
     
@@ -771,7 +808,8 @@ def test_lab_technician_help_rls_policy_enforcement(client: TestClient, db: Sess
         username="labtech_rls_test",
         email="labtech_rls@example.com",
         password_hash="hashed_password",
-        role_id=lab_tech_role.id
+        role_id=lab_tech_role.id,
+        client_id=_test_org_id(db)
     )
     db.add(lab_tech_user)
     db.commit()
@@ -812,7 +850,8 @@ def test_lab_technician_help_rls_policy_enforcement(client: TestClient, db: Sess
 def test_get_help_entries_as_lab_manager(client: TestClient, db: Session, admin_token: str):
     """Test that lab managers see their role-filtered help entries"""
     from app.core.security import create_access_token
-    from models.user import Role, Permission, RolePermission
+    from models.user import Role, Permission
+    from tests._legacy_models import RolePermission
     
     headers_admin = {"Authorization": f"Bearer {admin_token}"}
     
@@ -855,7 +894,8 @@ def test_get_help_entries_as_lab_manager(client: TestClient, db: Session, admin_
         username="labmanager",
         email="labmanager@example.com",
         password_hash="hashed_password",
-        role_id=lab_manager_role.id
+        role_id=lab_manager_role.id,
+        client_id=_test_org_id(db)
     )
     db.add(lab_manager_user)
     db.commit()
@@ -975,7 +1015,8 @@ def test_get_help_entries_lab_manager_role_filter_case_insensitive(client: TestC
 def test_get_contextual_help_for_lab_manager(client: TestClient, db: Session, admin_token: str):
     """Test getting contextual help for lab manager"""
     from app.core.security import create_access_token
-    from models.user import Role, Permission, RolePermission
+    from models.user import Role, Permission
+    from tests._legacy_models import RolePermission
     
     headers_admin = {"Authorization": f"Bearer {admin_token}"}
     
@@ -1001,7 +1042,8 @@ def test_get_contextual_help_for_lab_manager(client: TestClient, db: Session, ad
         username="labmanager2",
         email="labmanager2@example.com",
         password_hash="hashed_password",
-        role_id=lab_manager_role.id
+        role_id=lab_manager_role.id,
+        client_id=_test_org_id(db)
     )
     db.add(lab_manager_user)
     db.commit()
@@ -1112,14 +1154,15 @@ def test_lab_manager_rls_denied_access(client: TestClient, db: Session, admin_to
     
     # Verify all entries visible to client are Client-filtered or public
     for entry in data["help_entries"]:
-        assert entry["role_filter"] in [None, "Client"], \
+        assert entry["role_filter"] in [None, "client"], \
             f"Client should only see Client or public help, got {entry['role_filter']}"
 
 
 def test_lab_manager_help_rls_policy_enforcement(client: TestClient, db: Session, admin_token: str):
     """Test that RLS policy correctly filters help entries by role for Lab Manager"""
     from app.core.security import create_access_token
-    from models.user import Role, Permission, RolePermission
+    from models.user import Role, Permission
+    from tests._legacy_models import RolePermission
     
     headers_admin = {"Authorization": f"Bearer {admin_token}"}
     
@@ -1158,7 +1201,8 @@ def test_lab_manager_help_rls_policy_enforcement(client: TestClient, db: Session
         username="labmanager_rls_test",
         email="labmanager_rls@example.com",
         password_hash="hashed_password",
-        role_id=lab_manager_role.id
+        role_id=lab_manager_role.id,
+        client_id=_test_org_id(db)
     )
     db.add(lab_manager_user)
     db.commit()
@@ -1198,7 +1242,8 @@ def test_lab_manager_help_rls_policy_enforcement(client: TestClient, db: Session
 def test_lab_manager_and_lab_technician_help_isolation(client: TestClient, db: Session, admin_token: str):
     """Test that Lab Manager and Lab Technician help entries are properly isolated"""
     from app.core.security import create_access_token
-    from models.user import Role, Permission, RolePermission
+    from models.user import Role, Permission
+    from tests._legacy_models import RolePermission
     
     headers_admin = {"Authorization": f"Bearer {admin_token}"}
     
@@ -1236,7 +1281,8 @@ def test_lab_manager_and_lab_technician_help_isolation(client: TestClient, db: S
         username="labmanager_isolation",
         email="labmanager_iso@example.com",
         password_hash="hashed_password",
-        role_id=lab_manager_role.id
+        role_id=lab_manager_role.id,
+        client_id=_test_org_id(db)
     )
     db.add(lab_manager_user)
     
@@ -1246,7 +1292,8 @@ def test_lab_manager_and_lab_technician_help_isolation(client: TestClient, db: S
         username="labtech_isolation",
         email="labtech_iso@example.com",
         password_hash="hashed_password",
-        role_id=lab_tech_role.id
+        role_id=lab_tech_role.id,
+        client_id=_test_org_id(db)
     )
     db.add(lab_tech_user)
     db.commit()
@@ -1296,7 +1343,8 @@ def test_lab_manager_and_lab_technician_help_isolation(client: TestClient, db: S
 def test_lab_manager_help_aria_accessibility(client: TestClient, db: Session, admin_token: str):
     """Test that Lab Manager help entries support ARIA accessibility requirements"""
     from app.core.security import create_access_token
-    from models.user import Role, Permission, RolePermission
+    from models.user import Role, Permission
+    from tests._legacy_models import RolePermission
     
     headers_admin = {"Authorization": f"Bearer {admin_token}"}
     
@@ -1322,7 +1370,8 @@ def test_lab_manager_help_aria_accessibility(client: TestClient, db: Session, ad
         username="labmanager_aria",
         email="labmanager_aria@example.com",
         password_hash="hashed_password",
-        role_id=lab_manager_role.id
+        role_id=lab_manager_role.id,
+        client_id=_test_org_id(db)
     )
     db.add(lab_manager_user)
     db.commit()
@@ -1384,14 +1433,15 @@ def test_lab_manager_help_rls_denied_to_client(client: TestClient, db: Session, 
     
     # Verify all entries visible to client are Client-filtered or public
     for entry in data["help_entries"]:
-        assert entry["role_filter"] in [None, "Client"], \
+        assert entry["role_filter"] in [None, "client"], \
             f"Client should only see Client or public help, got {entry['role_filter']}"
 
 
 def test_lab_manager_help_rls_denied_to_lab_technician(client: TestClient, db: Session, admin_token: str):
     """Test that RLS prevents Lab Manager help from being visible to Lab Technician users"""
     from app.core.security import create_access_token
-    from models.user import Role, Permission, RolePermission
+    from models.user import Role, Permission
+    from tests._legacy_models import RolePermission
     
     headers_admin = {"Authorization": f"Bearer {admin_token}"}
     
@@ -1418,7 +1468,8 @@ def test_lab_manager_help_rls_denied_to_lab_technician(client: TestClient, db: S
         username="labtech_rls_denied",
         email="labtech_rls_denied@example.com",
         password_hash="hashed_password",
-        role_id=lab_tech_role.id
+        role_id=lab_tech_role.id,
+        client_id=_test_org_id(db)
     )
     db.add(lab_tech_user)
     db.commit()
@@ -1456,7 +1507,8 @@ def test_lab_manager_help_rls_denied_to_lab_technician(client: TestClient, db: S
 def test_lab_manager_contextual_help_filtering(client: TestClient, db: Session, admin_token: str):
     """Test that contextual help for Lab Manager is properly filtered by role"""
     from app.core.security import create_access_token
-    from models.user import Role, Permission, RolePermission
+    from models.user import Role, Permission
+    from tests._legacy_models import RolePermission
     
     headers_admin = {"Authorization": f"Bearer {admin_token}"}
     
@@ -1482,7 +1534,8 @@ def test_lab_manager_contextual_help_filtering(client: TestClient, db: Session, 
         username="labmanager_contextual",
         email="labmanager_contextual@example.com",
         password_hash="hashed_password",
-        role_id=lab_manager_role.id
+        role_id=lab_manager_role.id,
+        client_id=_test_org_id(db)
     )
     db.add(lab_manager_user)
     db.commit()
@@ -1860,7 +1913,7 @@ def test_administrator_rls_denied_access(client: TestClient, db: Session, admin_
     
     # Verify all entries visible to client are Client-filtered or public
     for entry in data["help_entries"]:
-        assert entry["role_filter"] in [None, "Client"], \
+        assert entry["role_filter"] in [None, "client"], \
             f"Client should only see Client or public help, got {entry['role_filter']}"
 
 

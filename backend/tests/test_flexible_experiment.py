@@ -115,11 +115,12 @@ def experiment_template(client: TestClient, auth_headers):
 
 
 @pytest.fixture
-def draft_run(client: TestClient, auth_headers, experiment_template):
+def draft_run(client: TestClient, auth_headers, experiment_template, run_analysis_id):
     """Create a run in draft status and return its full JSON."""
     payload = {
         "name": f"Run {uuid4().hex[:8]}",
         "experiment_template_id": experiment_template,
+        "analysis_id": run_analysis_id,
         "description": "test run",
     }
     r = client.post("/v1/lims-runs", json=payload, headers=auth_headers)
@@ -128,26 +129,53 @@ def draft_run(client: TestClient, auth_headers, experiment_template):
 
 
 @pytest.fixture
-def running_run(client: TestClient, auth_headers, draft_run):
-    """Advance a draft run to running status."""
+def running_run(client: TestClient, auth_headers, draft_run, cohort_sample_id):
+    """Advance a draft run to running status (a sample cohort is required)."""
     run_id = draft_run["id"]
-    r = client.patch(f"/v1/lims-runs/{run_id}/start", headers=auth_headers)
+    r = client.patch(
+        f"/v1/lims-runs/{run_id}/start",
+        json={"sample_ids": [cohort_sample_id]},
+        headers=auth_headers,
+    )
     assert r.status_code == 200, r.text
     return r.json()
 
 
 @pytest.fixture
-def template_with_parser(db_session: Session, experiment_template, auth_headers, client):
-    """Attach an InstrumentParser to the template and return the template id."""
-    from models.flexible_experiment import InstrumentParser as IP
-    parser = IP(
-        experiment_template_id=experiment_template,
+def run_instrument_id(db_session: Session):
+    """An instrument with no data parser attached."""
+    from models.instrument import Instrument, InstrumentType
+
+    itype = InstrumentType(name=f"Plate Reader {uuid4().hex[:6]}")
+    db_session.add(itype)
+    db_session.flush()
+    inst = Instrument(name=f"PR-{uuid4().hex[:6]}", instrument_type_id=itype.id)
+    db_session.add(inst)
+    db_session.flush()
+    return str(inst.id)
+
+
+@pytest.fixture
+def template_with_parser(db_session: Session, experiment_template, run_analysis_id, run_instrument_id):
+    """Attach an active DataParser (formerly InstrumentParser) for the run's
+    analysis + instrument and return the template id.
+
+    Parsers are no longer keyed by experiment_template_id; import resolves the
+    active parser by (analysis_id, instrument_id|cro_source_id).
+    """
+    from models.flexible_experiment import DataParser, ParserAnalysis
+
+    parser = DataParser(
         name="Plate Reader Parser",
         parser_config=VALID_PARSER_CONFIG,
-        created_by=None,
-        modified_by=None,
+        instrument_id=run_instrument_id,
+        version_group_id=uuid4(),
+        version=1,
+        active=True,
     )
     db_session.add(parser)
+    db_session.flush()
+    db_session.add(ParserAnalysis(parser_id=parser.id, analysis_id=run_analysis_id, is_default=True))
     db_session.flush()
     return experiment_template
 
@@ -173,10 +201,11 @@ def template_with_parser_and_worklist(db_session: Session, template_with_parser)
 # ──────────────────────────────────────────────────────────────────────────────
 
 class TestLimsRunCreate:
-    def test_create_run_returns_draft(self, client, auth_headers, experiment_template):
+    def test_create_run_returns_draft(self, client, auth_headers, experiment_template, run_analysis_id):
         payload = {
             "name": f"Run {uuid4().hex[:8]}",
             "experiment_template_id": experiment_template,
+            "analysis_id": run_analysis_id,
         }
         r = client.post("/v1/lims-runs", json=payload, headers=auth_headers)
         assert r.status_code == 201
@@ -188,6 +217,7 @@ class TestLimsRunCreate:
         payload = {
             "name": draft_run["name"],
             "experiment_template_id": draft_run["experiment_template_id"],
+            "analysis_id": draft_run["analysis_id"],
         }
         r = client.post("/v1/lims-runs", json=payload, headers=auth_headers)
         assert r.status_code == 400
@@ -227,8 +257,12 @@ class TestLimsRunCreate:
 # ──────────────────────────────────────────────────────────────────────────────
 
 class TestStatusTransitions:
-    def test_draft_to_running_sets_started_at(self, client, auth_headers, draft_run):
-        r = client.patch(f"/v1/lims-runs/{draft_run['id']}/start", headers=auth_headers)
+    def test_draft_to_running_sets_started_at(self, client, auth_headers, draft_run, cohort_sample_id):
+        r = client.patch(
+            f"/v1/lims-runs/{draft_run['id']}/start",
+            json={"sample_ids": [cohort_sample_id]},
+            headers=auth_headers,
+        )
         assert r.status_code == 200
         data = r.json()
         assert data["status"] == "running"
@@ -244,7 +278,7 @@ class TestStatusTransitions:
         r = client.patch(f"/v1/lims-runs/{run_id}/review", headers=auth_headers)
         assert r.status_code == 200
         r = client.patch(f"/v1/lims-runs/{run_id}/complete", headers=auth_headers)
-        assert r.status_code == 200
+        assert r.status_code == 200, r.text
         assert r.json()["status"] == "published"
 
     def test_invalid_transition_draft_to_complete(self, client, auth_headers, draft_run):
@@ -304,26 +338,32 @@ class TestInstrumentImport:
         assert r.status_code == 400
         assert "running" in r.json()["detail"]
 
-    def test_import_without_parser_config_returns_400(self, client, auth_headers, running_run):
-        """Template with no InstrumentParser → import is rejected."""
+    def test_import_without_parser_config_returns_400(self, client, auth_headers, running_run,
+                                                      run_instrument_id):
+        """No active data parser for the run's analysis + instrument → import is rejected.
+
+        Parser validation only runs when a source is given, so this goes through
+        multipart /import-file (JSON /import takes no instrument/CRO source).
+        """
         run_id = running_run["id"]
-        rows = [{"well_position": "A1", "row_data": {"foo": "bar"}}]
         r = client.post(
-            f"/v1/lims-runs/{run_id}/import",
-            json={"rows": rows},
+            f"/v1/lims-runs/{run_id}/import-file",
+            files={"file": ("plate.csv", INSTRUMENT_CSV.encode(), "text/csv")},
+            data={"instrument_id": run_instrument_id},
             headers=auth_headers,
         )
         assert r.status_code == 400
-        assert "no instrument parser" in r.json()["detail"].lower()
+        assert "no active data parser" in r.json()["detail"].lower()
 
     def test_import_missing_expected_columns_returns_422(self, client, auth_headers,
-                                                          running_run, template_with_parser):
-        """Row data missing a parser_config field_name → 422."""
+                                                          running_run, template_with_parser,
+                                                          run_instrument_id):
+        """File missing the parser's source columns → 422."""
         run_id = running_run["id"]
-        rows = [{"well_position": "A1", "row_data": {"wrong_field": 1.0}}]
         r = client.post(
-            f"/v1/lims-runs/{run_id}/import",
-            json={"rows": rows},
+            f"/v1/lims-runs/{run_id}/import-file",
+            files={"file": ("plate.csv", b"OtherCol\nfoo\n", "text/csv")},
+            data={"instrument_id": run_instrument_id},
             headers=auth_headers,
         )
         assert r.status_code == 422
@@ -641,7 +681,8 @@ class TestSopApplyJob:
 
         assert data["job_id"] == str(job_id)
         assert data["experiment_template_id"] is not None
-        assert data["instrument_parser_id"] is not None
+        # P1: apply no longer creates a parser (configure via /v1/data-parsers).
+        assert data["instrument_parser_id"] is None
         assert data["robot_worklist_config_id"] is not None
 
     def test_apply_no_worklist_steps_skips_worklist_record(self, client, auth_headers, db_engine):
@@ -736,7 +777,7 @@ class TestInstrumentDataService:
     def test_parse_happy_path(self):
         svc = self._make_service()
         csv_bytes = INSTRUMENT_CSV.encode()
-        rows, warnings = svc.parse(csv_bytes)
+        rows, warnings, _hard = svc.parse(csv_bytes)
         assert len(rows) == 3
         assert rows[0].row_data["viability_pct"] == 92.3
         assert rows[0].well_position == "A1"
@@ -744,7 +785,7 @@ class TestInstrumentDataService:
 
     def test_parse_with_max_rows(self):
         svc = self._make_service()
-        rows, _ = svc.parse(INSTRUMENT_CSV.encode(), max_rows=1)
+        rows, _warnings, _hard = svc.parse(INSTRUMENT_CSV.encode(), max_rows=1)
         assert len(rows) == 1
 
     def test_parse_missing_column_raises_422(self):
@@ -754,7 +795,7 @@ class TestInstrumentDataService:
         with pytest.raises(HTTPException) as exc:
             svc.parse(bad_csv.encode())
         assert exc.value.status_code == 422
-        assert "missing expected columns" in exc.value.detail.lower()
+        assert "missing expected column" in exc.value.detail.lower()
 
     def test_parse_empty_after_skip_raises_422(self):
         from fastapi import HTTPException
@@ -764,25 +805,30 @@ class TestInstrumentDataService:
         assert exc.value.status_code == 422
 
     def test_parse_coercion_warning_on_bad_float(self):
+        """A non-numeric value in a float column is now a hard error (import
+        raises 422); with raise_on_hard=False it is reported in hard_errors."""
+        from fastapi import HTTPException
         svc = self._make_service()
         bad_csv = "Well,Viability\nA1,not_a_number\n"
-        rows, warnings = svc.parse(bad_csv.encode())
-        assert len(rows) == 1
-        assert rows[0].row_data["viability_pct"] == "not_a_number"
-        assert len(warnings) == 1
-        assert "not_a_number" in warnings[0]
+        with pytest.raises(HTTPException) as exc:
+            svc.parse(bad_csv.encode())
+        assert exc.value.status_code == 422
+        assert "not_a_number" in exc.value.detail
+        _rows, _warnings, hard = svc.parse(bad_csv.encode(), raise_on_hard=False)
+        assert len(hard) == 1
+        assert "not_a_number" in hard[0]
 
     def test_parse_skips_blank_rows(self):
         svc = self._make_service()
         csv_with_blanks = "Well,Viability\nA1,90.0\n\n\nA2,80.0\n"
-        rows, _ = svc.parse(csv_with_blanks.encode())
+        rows, _warnings, _hard = svc.parse(csv_with_blanks.encode())
         assert len(rows) == 2
 
     def test_parse_utf8_bom(self):
         """UTF-8 BOM prefix should be silently stripped."""
         svc = self._make_service()
         bom_csv = "\ufeffWell,Viability\nA1,92.3\n"
-        rows, _ = svc.parse(bom_csv.encode("utf-8"))
+        rows, _warnings, _hard = svc.parse(bom_csv.encode("utf-8"))
         assert rows[0].well_position == "A1"
 
     def test_parse_skip_rows_greater_than_zero(self):
@@ -812,7 +858,7 @@ class TestInstrumentDataService:
             "A1,88.5\n"
             "A2,91.0\n"
         )
-        rows, warnings = svc.parse(csv_with_preamble.encode())
+        rows, warnings, _hard = svc.parse(csv_with_preamble.encode())
         assert len(rows) == 2, f"Expected 2 data rows, got {len(rows)}"
         assert rows[0].well_position == "A1"
         assert rows[0].row_data["viability_pct"] == 88.5
