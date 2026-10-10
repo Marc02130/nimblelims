@@ -139,6 +139,11 @@ class InstrumentDataService:
         encoding = self._config.encoding or "utf-8"
         try:
             text = file_bytes.decode(encoding, errors="strict")
+            # Excel and many instrument exports prepend a UTF-8 BOM; without
+            # stripping it the first header becomes "\ufeffWell" and never
+            # matches the parser's source_col.
+            if text.startswith("\ufeff"):
+                text = text[1:]
         except LookupError:
             hard_errors.append(_err(None, None, f"unknown encoding '{encoding}'"))
             return [], warnings, hard_errors

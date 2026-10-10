@@ -11,6 +11,10 @@ from .base import BaseModel
 class CustomAttributeConfig(BaseModel):
     """Model for custom attribute configuration"""
     __tablename__ = 'custom_attributes_config'
+    # The real table (migrations) has no `name` column. exclude_properties only
+    # unmaps it, so Base.metadata.create_all() still built a NOT NULL `name`
+    # column and every insert failed in the test DB. Drop the inherited column.
+    name = None
     
     # Custom attribute configuration fields
     entity_type = Column(String(255), nullable=False, index=True)

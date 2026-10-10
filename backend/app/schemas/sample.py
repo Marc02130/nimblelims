@@ -1,6 +1,7 @@
 """
 Pydantic schemas for samples
 """
+from app.schemas._dates import is_future
 from pydantic import BaseModel, ConfigDict, Field, validator, model_validator
 from typing import Optional, List, Dict, Any
 from datetime import datetime
@@ -29,7 +30,7 @@ class SampleBase(BaseModel):
 
     @validator('received_date', 'report_date')
     def validate_dates(cls, v):
-        if v and v > datetime.now():
+        if v and is_future(v):
             raise ValueError('Date cannot be in the future')
         return v
 
@@ -76,25 +77,28 @@ class BulkSampleAccessioningRequest(BaseModel):
     auto_name_prefix: Optional[str] = Field(None, max_length=200, description="Prefix for auto-generated names (e.g., 'SAMPLE-')")
     auto_name_start: Optional[int] = Field(None, ge=1, description="Starting number for auto-generated names")
 
-    @validator('due_date', 'received_date')
+    # due_date is a deadline and may be in the future (matches SampleAccessioningRequest);
+    # only received_date is checked.
+    @validator('received_date')
     def validate_dates(cls, v):
-        if v > datetime.now():
+        if is_future(v):
             raise ValueError('Date cannot be in the future')
         return v
 
-    @validator('uniques')
-    def validate_uniques_have_names_or_auto_naming(cls, v, values):
-        """Ensure either names are provided or auto-naming is configured"""
-        if not v:
-            return v
-        
-        has_names = any(unique.name for unique in v)
-        has_auto_naming = values.get('auto_name_prefix') is not None
-        
-        if not has_names and not has_auto_naming:
+    @model_validator(mode='after')
+    def validate_uniques_have_names_or_auto_naming(self):
+        """Ensure either names are provided or auto-naming is configured.
+
+        Runs after field validation: auto_name_prefix is declared after uniques,
+        so a field validator on uniques never saw it and auto-naming was always
+        rejected with 422.
+        """
+        if not self.uniques:
+            return self
+        has_names = any(unique.name for unique in self.uniques)
+        if not has_names and self.auto_name_prefix is None:
             raise ValueError('Either provide names in uniques or configure auto_name_prefix')
-        
-        return v
+        return self
     
     @model_validator(mode='before')
     @classmethod
@@ -139,7 +143,7 @@ class SampleUpdate(BaseModel):
     # received_date and report_date still cannot be in the future
     @validator('received_date', 'report_date')
     def validate_dates(cls, v):
-        if v and v > datetime.now():
+        if v and is_future(v):
             raise ValueError('Date cannot be in the future')
         return v
 
@@ -186,25 +190,28 @@ class BulkSampleAccessioningRequest(BaseModel):
     auto_name_prefix: Optional[str] = Field(None, max_length=200, description="Prefix for auto-generated names (e.g., 'SAMPLE-')")
     auto_name_start: Optional[int] = Field(None, ge=1, description="Starting number for auto-generated names")
 
-    @validator('due_date', 'received_date')
+    # due_date is a deadline and may be in the future (matches SampleAccessioningRequest);
+    # only received_date is checked.
+    @validator('received_date')
     def validate_dates(cls, v):
-        if v > datetime.now():
+        if is_future(v):
             raise ValueError('Date cannot be in the future')
         return v
 
-    @validator('uniques')
-    def validate_uniques_have_names_or_auto_naming(cls, v, values):
-        """Ensure either names are provided or auto-naming is configured"""
-        if not v:
-            return v
-        
-        has_names = any(unique.name for unique in v)
-        has_auto_naming = values.get('auto_name_prefix') is not None
-        
-        if not has_names and not has_auto_naming:
+    @model_validator(mode='after')
+    def validate_uniques_have_names_or_auto_naming(self):
+        """Ensure either names are provided or auto-naming is configured.
+
+        Runs after field validation: auto_name_prefix is declared after uniques,
+        so a field validator on uniques never saw it and auto-naming was always
+        rejected with 422.
+        """
+        if not self.uniques:
+            return self
+        has_names = any(unique.name for unique in self.uniques)
+        if not has_names and self.auto_name_prefix is None:
             raise ValueError('Either provide names in uniques or configure auto_name_prefix')
-        
-        return v
+        return self
     
     @model_validator(mode='before')
     @classmethod
@@ -320,7 +327,7 @@ class SampleAccessioningRequest(BaseModel):
 
     @validator('received_date')
     def validate_received_date(cls, v):
-        if v > datetime.now():
+        if is_future(v):
             raise ValueError('Received date cannot be in the future')
         return v
 
@@ -380,25 +387,28 @@ class BulkSampleAccessioningRequest(BaseModel):
     auto_name_prefix: Optional[str] = Field(None, max_length=200, description="Prefix for auto-generated names (e.g., 'SAMPLE-')")
     auto_name_start: Optional[int] = Field(None, ge=1, description="Starting number for auto-generated names")
 
-    @validator('due_date', 'received_date')
+    # due_date is a deadline and may be in the future (matches SampleAccessioningRequest);
+    # only received_date is checked.
+    @validator('received_date')
     def validate_dates(cls, v):
-        if v > datetime.now():
+        if is_future(v):
             raise ValueError('Date cannot be in the future')
         return v
 
-    @validator('uniques')
-    def validate_uniques_have_names_or_auto_naming(cls, v, values):
-        """Ensure either names are provided or auto-naming is configured"""
-        if not v:
-            return v
-        
-        has_names = any(unique.name for unique in v)
-        has_auto_naming = values.get('auto_name_prefix') is not None
-        
-        if not has_names and not has_auto_naming:
+    @model_validator(mode='after')
+    def validate_uniques_have_names_or_auto_naming(self):
+        """Ensure either names are provided or auto-naming is configured.
+
+        Runs after field validation: auto_name_prefix is declared after uniques,
+        so a field validator on uniques never saw it and auto-naming was always
+        rejected with 422.
+        """
+        if not self.uniques:
+            return self
+        has_names = any(unique.name for unique in self.uniques)
+        if not has_names and self.auto_name_prefix is None:
             raise ValueError('Either provide names in uniques or configure auto_name_prefix')
-        
-        return v
+        return self
     
     @model_validator(mode='before')
     @classmethod
