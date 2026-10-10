@@ -37,6 +37,53 @@ def pg_container():
         yield pg
 
 
+def _install_access_functions(engine):
+    """Install the SQL access helpers that routers call directly.
+
+    create_all() builds tables only; batches/samples routers run
+    ``SELECT has_project_access(...)`` and fail with UndefinedFunction without
+    it. current_user_id()/is_admin() match migration 0003 and
+    has_project_access() is loaded from migration 0065 (current definition),
+    so the test DB uses the same logic as production. RLS policies themselves
+    are NOT installed here; RLS tests use migrated_engine.
+    """
+    import importlib.util
+    from pathlib import Path
+
+    mig = Path(__file__).resolve().parents[1] / "db" / "migrations" / "versions" / "0065_has_project_access_project_users.py"
+    spec = importlib.util.spec_from_file_location("_mig_0065", mig)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    with engine.connect() as conn:
+        conn.execute(text("""
+            CREATE OR REPLACE FUNCTION current_user_id()
+            RETURNS UUID AS $$
+            BEGIN
+                RETURN COALESCE(
+                    NULLIF(current_setting('app.current_user_id', true), '')::UUID,
+                    '00000000-0000-0000-0000-000000000000'::UUID
+                );
+            END;
+            $$ LANGUAGE plpgsql SECURITY DEFINER;
+        """))
+        conn.execute(text("""
+            CREATE OR REPLACE FUNCTION is_admin()
+            RETURNS BOOLEAN AS $$
+            DECLARE
+                user_role_name TEXT;
+            BEGIN
+                SELECT r.name INTO user_role_name
+                FROM users u
+                JOIN roles r ON u.role_id = r.id
+                WHERE u.id = current_user_id();
+                RETURN user_role_name = 'Administrator';
+            END;
+            $$ LANGUAGE plpgsql SECURITY DEFINER;
+        """))
+        conn.execute(text(mod.NEW_FUNCTION))
+        conn.commit()
+
+
 @pytest.fixture(scope="session")
 def db_engine(pg_container):
     """Create engine and schema once per test session."""
@@ -45,6 +92,7 @@ def db_engine(pg_container):
         conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
         conn.commit()
     Base.metadata.create_all(bind=engine)
+    _install_access_functions(engine)
     yield engine
     # Drop via raw SQL to avoid CircularDependencyError from clients↔roles↔users FKs
     with engine.connect() as conn:
@@ -165,6 +213,33 @@ def client(db_session):
     app.dependency_overrides.clear()
 
 
+def _get_or_create(session, model, name, description):
+    """Fetch a Role/Permission by unique name or create it.
+
+    Several fixtures (test_user, test_admin_user, client_user_token) share
+    permission names; requesting more than one in a test used to raise
+    UniqueViolation on permissions_name_key.
+    """
+    obj = session.query(model).filter(model.name == name).one_or_none()
+    if obj is None:
+        obj = model(name=name, description=description)
+        session.add(obj)
+        session.flush()
+    return obj
+
+
+def _grant(session, role, perms):
+    for perm in perms:
+        exists = session.execute(
+            role_permissions.select().where(
+                role_permissions.c.role_id == role.id,
+                role_permissions.c.permission_id == perm.id,
+            )
+        ).first()
+        if not exists:
+            session.execute(role_permissions.insert().values(role_id=role.id, permission_id=perm.id))
+
+
 @pytest.fixture(scope="function")
 def test_org(db_session):
     """Create a test client org (required FK on User.client_id)."""
@@ -177,21 +252,13 @@ def test_org(db_session):
 @pytest.fixture(scope="function")
 def test_user(db_session, test_org):
     """Create a test user with role and permissions."""
-    test_role = Role(name="test_role", description="Test role for authentication")
-    db_session.add(test_role)
-    db_session.flush()
-
+    test_role = _get_or_create(db_session, Role, "test_role", "Test role for authentication")
     permissions = [
-        Permission(name="sample:create", description="Create samples"),
-        Permission(name="sample:read", description="Read samples"),
-        Permission(name="result:enter", description="Enter results"),
+        _get_or_create(db_session, Permission, "sample:create", "Create samples"),
+        _get_or_create(db_session, Permission, "sample:read", "Read samples"),
+        _get_or_create(db_session, Permission, "result:enter", "Enter results"),
     ]
-    for perm in permissions:
-        db_session.add(perm)
-    db_session.flush()
-
-    for perm in permissions:
-        db_session.execute(role_permissions.insert().values(role_id=test_role.id, permission_id=perm.id))
+    _grant(db_session, test_role, permissions)
 
     user = User(
         name="Test User",
@@ -210,27 +277,23 @@ def test_user(db_session, test_org):
 @pytest.fixture(scope="function")
 def test_admin_user(db_session, test_org):
     """Create a test admin user with all permissions."""
-    admin_role = Role(name="Administrator", description="Administrator role")
-    db_session.add(admin_role)
-    db_session.flush()
+    admin_role = _get_or_create(db_session, Role, "Administrator", "Administrator role")
 
     all_permissions = [
         "sample:create", "sample:read", "sample:update", "sample:delete",
         "test:assign", "test:update", "result:enter", "result:review", "result:read",
-        "batch:manage", "batch:read", "project:manage", "project:read",
+        "batch:manage", "batch:read", "batch:update", "batch:delete",
+        "result:update", "result:delete",
+        "project:manage", "project:read",
         "user:manage", "config:edit", "schema:edit", "layout:edit",
         "workflow:execute", "experiment:manage",
         "experiment:publish",
     ]
-    permissions = []
-    for perm_name in all_permissions:
-        perm = Permission(name=perm_name, description=f"Permission: {perm_name}")
-        db_session.add(perm)
-        permissions.append(perm)
-    db_session.flush()
-
-    for perm in permissions:
-        db_session.execute(role_permissions.insert().values(role_id=admin_role.id, permission_id=perm.id))
+    permissions = [
+        _get_or_create(db_session, Permission, perm_name, f"Permission: {perm_name}")
+        for perm_name in all_permissions
+    ]
+    _grant(db_session, admin_role, permissions)
 
     admin_user = User(
         name="Admin User",
@@ -272,21 +335,13 @@ def client_user_token(db_session, test_org):
     """Create a JWT token for a client user."""
     from app.core.security import create_access_token
 
-    client_role = Role(name="Client", description="Client user role")
-    db_session.add(client_role)
-    db_session.flush()
-
+    client_role = _get_or_create(db_session, Role, "Client", "Client user role")
     client_permissions = [
-        Permission(name="sample:read", description="Read samples"),
-        Permission(name="result:read", description="Read results"),
-        Permission(name="project:read", description="Read projects"),
+        _get_or_create(db_session, Permission, "sample:read", "Read samples"),
+        _get_or_create(db_session, Permission, "result:read", "Read results"),
+        _get_or_create(db_session, Permission, "project:read", "Read projects"),
     ]
-    for perm in client_permissions:
-        db_session.add(perm)
-    db_session.flush()
-
-    for perm in client_permissions:
-        db_session.execute(role_permissions.insert().values(role_id=client_role.id, permission_id=perm.id))
+    _grant(db_session, client_role, client_permissions)
 
     client_user = User(
         name="Client User",
@@ -307,3 +362,95 @@ def client_user_token(db_session, test_org):
         "permissions": perm_names,
     }
     return create_access_token(token_data)
+
+
+@pytest.fixture(scope="function")
+def db(db_session):
+    """Alias for ``db_session`` used by older test modules (e.g. test_help)."""
+    return db_session
+
+
+# ── Shared LimsRun fixtures (LimsRunCreate requires analysis_id; start requires a cohort) ──
+
+@pytest.fixture
+def run_analysis_id(db_session, test_admin_user):
+    """LimsRunCreate requires analysis_id (import + promote target)."""
+    from uuid import uuid4
+    from models.analysis import Analysis, Analyte, AnalysisAnalyte
+
+    a = Analysis(
+        name=f"An {uuid4().hex[:6]}",
+        created_by=test_admin_user.id,
+        modified_by=test_admin_user.id,
+    )
+    # Publish promotes data -> results and refuses an analysis with no active analytes.
+    an = Analyte(
+        name=f"viability_pct_{uuid4().hex[:4]}",
+        created_by=test_admin_user.id,
+        modified_by=test_admin_user.id,
+    )
+    db_session.add_all([a, an])
+    db_session.flush()
+    db_session.add(AnalysisAnalyte(analysis_id=a.id, analyte_id=an.id))
+    db_session.flush()
+    return str(a.id)
+
+
+@pytest.fixture
+def cohort_sample_id(db_session, test_admin_user, test_org):
+    """Starting a run requires a sample cohort; create one available sample."""
+    from datetime import datetime, timedelta
+    from uuid import uuid4
+    from models.list import List, ListEntry
+    from models.project import Project
+    from models.sample import Sample
+
+    lst = List(name=f"fx_{uuid4().hex[:6]}")
+    db_session.add(lst)
+    db_session.flush()
+    avail = ListEntry(list_id=lst.id, name=f"Available {uuid4().hex[:4]}")
+    st = ListEntry(list_id=lst.id, name=f"t_{uuid4().hex[:4]}")
+    mx = ListEntry(list_id=lst.id, name=f"m_{uuid4().hex[:4]}")
+    db_session.add_all([avail, st, mx])
+    # Starting a run creates tests for the cohort with an "Assigned/Pending" status.
+    if not db_session.query(ListEntry).filter(ListEntry.name == "Assigned/Pending").first():
+        ts = List(name=f"Test Status {uuid4().hex[:4]}")
+        db_session.add(ts)
+        db_session.flush()
+        db_session.add(ListEntry(list_id=ts.id, name="Assigned/Pending"))
+    db_session.flush()
+    project = Project(
+        name=f"P {uuid4().hex[:6]}",
+        client_id=test_org.id,
+        status=avail.id,
+        start_date=datetime.utcnow(),
+        due_date=datetime.utcnow() + timedelta(days=7),
+    )
+    db_session.add(project)
+    db_session.flush()
+    sample = Sample(
+        name=f"S {uuid4().hex[:6]}",
+        sample_type=st.id,
+        status=avail.id,
+        matrix=mx.id,
+        project_id=project.id,
+        created_by=test_admin_user.id,
+        modified_by=test_admin_user.id,
+    )
+    db_session.add(sample)
+    db_session.commit()
+    return str(sample.id)
+
+
+@pytest.fixture(scope="function")
+def system_org(db_session):
+    """The System client (lab employees). Users on it get org-wide project access
+    (app.core.rbac.SYSTEM_CLIENT_ID); migrations seed it in a real DB."""
+    from app.core.rbac import SYSTEM_CLIENT_ID
+
+    org = db_session.get(Client, SYSTEM_CLIENT_ID)
+    if org is None:
+        org = Client(id=SYSTEM_CLIENT_ID, name="System")
+        db_session.add(org)
+        db_session.flush()
+    return org

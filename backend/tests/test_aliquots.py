@@ -2,17 +2,41 @@
 Tests for aliquots and derivatives API endpoints
 """
 import pytest
+from tests._fk_helpers import scratch_entry_id, scratch_list_id
+from uuid import uuid4
 from fastapi.testclient import TestClient
 from app.main import app
 from models.sample import Sample
 from models.container import Container, Contents
-from models.container_type import ContainerType
+from models.container import ContainerType
 from models.user import User
-from models.role import Role
-from models.permission import Permission
-from models.role_permission import RolePermission
+from models.user import Role
+from models.user import Permission
+from tests._legacy_models import RolePermission
 
 client = TestClient(app)
+
+
+# These tests were written against a since-removed conftest that provided
+# `sample_user` and `auth_headers`. Recreate them on top of the shared fixtures:
+# an Administrator (all permissions, passes client/project access checks).
+@pytest.fixture(autouse=True)
+def _route_through_test_db(client):
+    """Install the conftest get_db override on the shared app for the
+    module-level TestClient above."""
+    yield
+
+
+@pytest.fixture
+def sample_user(test_admin_user):
+    return test_admin_user
+
+
+@pytest.fixture
+def auth_headers(client, test_admin_user):
+    r = client.post("/auth/login", json={"username": "admin", "password": "adminpassword"})
+    assert r.status_code == 200, r.text
+    return {"Authorization": f"Bearer {r.json()['access_token']}"}
 
 
 class TestAliquotsAPI:
@@ -41,7 +65,7 @@ class TestAliquotsAPI:
             description="Test project for aliquot",
             start_date="2024-01-01",
             client_id=client_entity.id,
-            status=None,
+            status=scratch_entry_id(db_session),  # projects.status is NOT NULL (FK to list_entries)
             created_by=sample_user.id,
             modified_by=sample_user.id
         )
@@ -75,7 +99,7 @@ class TestAliquotsAPI:
             description="Parent sample for aliquot",
             sample_type=sample_type.id,
             status=sample_status.id,
-            matrix=None,
+            matrix=scratch_entry_id(db_session),  # NOT NULL FK to list_entries
             project_id=project.id,
             created_by=sample_user.id,
             modified_by=sample_user.id
@@ -118,7 +142,7 @@ class TestAliquotsAPI:
         }
         
         response = client.post("/aliquots/aliquot", json=aliquot_data, headers=auth_headers)
-        assert response.status_code == 200
+        assert response.status_code == 200, response.text
         
         data = response.json()
         assert data["name"] == "Aliquot 1"
@@ -150,7 +174,7 @@ class TestAliquotsAPI:
             description="Test project for derivative",
             start_date="2024-01-01",
             client_id=client_entity.id,
-            status=None,
+            status=scratch_entry_id(db_session),  # projects.status is NOT NULL (FK to list_entries)
             created_by=sample_user.id,
             modified_by=sample_user.id
         )
@@ -194,7 +218,7 @@ class TestAliquotsAPI:
             description="Parent blood sample for derivative",
             sample_type=blood_type.id,
             status=sample_status.id,
-            matrix=None,
+            matrix=scratch_entry_id(db_session),  # NOT NULL FK to list_entries
             project_id=project.id,
             created_by=sample_user.id,
             modified_by=sample_user.id
@@ -238,7 +262,7 @@ class TestAliquotsAPI:
         }
         
         response = client.post("/aliquots/derivative", json=derivative_data, headers=auth_headers)
-        assert response.status_code == 200
+        assert response.status_code == 200, response.text
         
         data = response.json()
         assert data["name"] == "DNA Extract"
@@ -272,7 +296,7 @@ class TestAliquotsAPI:
             description="Test project for pooling",
             start_date="2024-01-01",
             client_id=client_entity.id,
-            status=None,
+            status=scratch_entry_id(db_session),  # projects.status is NOT NULL (FK to list_entries)
             created_by=sample_user.id,
             modified_by=sample_user.id
         )
@@ -306,7 +330,7 @@ class TestAliquotsAPI:
             description="First sample for pooling",
             sample_type=sample_type.id,
             status=sample_status.id,
-            matrix=None,
+            matrix=scratch_entry_id(db_session),  # NOT NULL FK to list_entries
             project_id=project.id,
             created_by=sample_user.id,
             modified_by=sample_user.id
@@ -319,7 +343,7 @@ class TestAliquotsAPI:
             description="Second sample for pooling",
             sample_type=sample_type.id,
             status=sample_status.id,
-            matrix=None,
+            matrix=scratch_entry_id(db_session),  # NOT NULL FK to list_entries
             project_id=project.id,
             created_by=sample_user.id,
             modified_by=sample_user.id
@@ -385,7 +409,7 @@ class TestAliquotsAPI:
         }
         
         response = client.post("/aliquots/pool", json=pooling_data, headers=auth_headers)
-        assert response.status_code == 200
+        assert response.status_code == 200, response.text
         
         data = response.json()
         assert data["container_id"] == str(container.id)
@@ -417,7 +441,7 @@ class TestAliquotsAPI:
             description="Test project for getting aliquots",
             start_date="2024-01-01",
             client_id=client_entity.id,
-            status=None,
+            status=scratch_entry_id(db_session),  # projects.status is NOT NULL (FK to list_entries)
             created_by=sample_user.id,
             modified_by=sample_user.id
         )
@@ -451,7 +475,7 @@ class TestAliquotsAPI:
             description="Parent sample for getting aliquots",
             sample_type=sample_type.id,
             status=sample_status.id,
-            matrix=None,
+            matrix=scratch_entry_id(db_session),  # NOT NULL FK to list_entries
             project_id=project.id,
             created_by=sample_user.id,
             modified_by=sample_user.id
@@ -499,7 +523,7 @@ class TestAliquotsAPI:
             description="First aliquot",
             sample_type=sample_type.id,
             status=sample_status.id,
-            matrix=None,
+            matrix=scratch_entry_id(db_session),  # NOT NULL FK to list_entries
             parent_sample_id=parent_sample.id,
             project_id=project.id,
             created_by=sample_user.id,
@@ -513,7 +537,7 @@ class TestAliquotsAPI:
             description="Second aliquot",
             sample_type=sample_type.id,
             status=sample_status.id,
-            matrix=None,
+            matrix=scratch_entry_id(db_session),  # NOT NULL FK to list_entries
             parent_sample_id=parent_sample.id,
             project_id=project.id,
             created_by=sample_user.id,
@@ -541,7 +565,7 @@ class TestAliquotsAPI:
         db_session.commit()
         
         response = client.get(f"/aliquots/parent/{parent_sample.id}", headers=auth_headers)
-        assert response.status_code == 200
+        assert response.status_code == 200, response.text
         
         data = response.json()
         assert len(data) == 2
@@ -571,7 +595,7 @@ class TestAliquotsAPI:
             description="Test project for getting derivatives",
             start_date="2024-01-01",
             client_id=client_entity.id,
-            status=None,
+            status=scratch_entry_id(db_session),  # projects.status is NOT NULL (FK to list_entries)
             created_by=sample_user.id,
             modified_by=sample_user.id
         )
@@ -615,7 +639,7 @@ class TestAliquotsAPI:
             description="Parent blood sample for getting derivatives",
             sample_type=blood_type.id,
             status=sample_status.id,
-            matrix=None,
+            matrix=scratch_entry_id(db_session),  # NOT NULL FK to list_entries
             project_id=project.id,
             created_by=sample_user.id,
             modified_by=sample_user.id
@@ -663,7 +687,7 @@ class TestAliquotsAPI:
             description="First DNA extract",
             sample_type=dna_type.id,
             status=sample_status.id,
-            matrix=None,
+            matrix=scratch_entry_id(db_session),  # NOT NULL FK to list_entries
             parent_sample_id=parent_sample.id,
             project_id=project.id,
             created_by=sample_user.id,
@@ -677,7 +701,7 @@ class TestAliquotsAPI:
             description="Second DNA extract",
             sample_type=dna_type.id,
             status=sample_status.id,
-            matrix=None,
+            matrix=scratch_entry_id(db_session),  # NOT NULL FK to list_entries
             parent_sample_id=parent_sample.id,
             project_id=project.id,
             created_by=sample_user.id,
@@ -705,7 +729,7 @@ class TestAliquotsAPI:
         db_session.commit()
         
         response = client.get(f"/aliquots/derivatives/{parent_sample.id}", headers=auth_headers)
-        assert response.status_code == 200
+        assert response.status_code == 200, response.text
         
         data = response.json()
         assert len(data) == 2

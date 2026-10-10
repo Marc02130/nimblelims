@@ -2,18 +2,41 @@
 Tests for batches API endpoints
 """
 import pytest
+from tests._fk_helpers import scratch_entry_id, scratch_list_id
 from fastapi.testclient import TestClient
 from app.main import app
 from models.batch import Batch
 from models.container import Container
 from models.user import User
-from models.role import Role
-from models.permission import Permission
-from models.role_permission import RolePermission
+from models.user import Role
+from models.user import Permission
+from tests._legacy_models import RolePermission
 from datetime import datetime
 from uuid import uuid4
 
 client = TestClient(app)
+
+
+# These tests were written against a since-removed conftest that provided
+# `sample_user` and `auth_headers`. Recreate them on top of the shared fixtures:
+# an Administrator (all permissions, passes client/project access checks).
+@pytest.fixture(autouse=True)
+def _route_through_test_db(client):
+    """Install the conftest get_db override on the shared app for the
+    module-level TestClient above."""
+    yield
+
+
+@pytest.fixture
+def sample_user(test_admin_user):
+    return test_admin_user
+
+
+@pytest.fixture
+def auth_headers(client, test_admin_user):
+    r = client.post("/auth/login", json={"username": "admin", "password": "adminpassword"})
+    assert r.status_code == 200, r.text
+    return {"Authorization": f"Bearer {r.json()['access_token']}"}
 
 
 class TestBatchesAPI:
@@ -63,8 +86,8 @@ class TestBatchesAPI:
             "end_date": "2024-01-02T00:00:00Z"
         }
         
-        response = client.post("/batches/", json=batch_data, headers=auth_headers)
-        assert response.status_code == 200
+        response = client.post("/batches", json=batch_data, headers=auth_headers)
+        assert response.status_code == 200, response.text
         
         data = response.json()
         assert data["name"] == "Test Batch 1"
@@ -74,7 +97,7 @@ class TestBatchesAPI:
     def test_create_batch_with_containers(self, db_session, auth_headers, sample_user):
         """Test creating a batch with containers"""
         from models.list import ListEntry
-        from models.container_type import ContainerType
+        from models.container import ContainerType
         
         # Get a status for the batch
         status = db_session.query(ListEntry).filter(
@@ -160,7 +183,7 @@ class TestBatchesAPI:
         }
         
         response = client.post("/batches/with-containers", json=batch_data, headers=auth_headers)
-        assert response.status_code == 200
+        assert response.status_code == 200, response.text
         
         data = response.json()
         assert data["name"] == "Test Batch with Containers"
@@ -212,8 +235,8 @@ class TestBatchesAPI:
         db_session.add(batch)
         db_session.commit()
         
-        response = client.get("/batches/", headers=auth_headers)
-        assert response.status_code == 200
+        response = client.get("/batches", headers=auth_headers)
+        assert response.status_code == 200, response.text
         
         data = response.json()
         assert "batches" in data
@@ -269,7 +292,7 @@ class TestBatchesAPI:
         db_session.commit()
         
         response = client.get(f"/batches/{batch.id}", headers=auth_headers)
-        assert response.status_code == 200
+        assert response.status_code == 200, response.text
         
         data = response.json()
         assert data["id"] == str(batch.id)
@@ -326,7 +349,7 @@ class TestBatchesAPI:
         }
         
         response = client.patch(f"/batches/{batch.id}", json=update_data, headers=auth_headers)
-        assert response.status_code == 200
+        assert response.status_code == 200, response.text
         
         data = response.json()
         assert data["name"] == "Updated Batch Name"
@@ -378,7 +401,7 @@ class TestBatchesAPI:
         db_session.commit()
         
         response = client.delete(f"/batches/{batch.id}", headers=auth_headers)
-        assert response.status_code == 200
+        assert response.status_code == 200, response.text
         
         data = response.json()
         assert data["message"] == "Batch deleted successfully"
@@ -390,7 +413,7 @@ class TestBatchesAPI:
     def test_create_cross_project_batch_success(self, db_session, auth_headers, sample_user):
         """Test creating a cross-project batch with compatible samples"""
         from models.list import ListEntry, List
-        from models.container_type import ContainerType
+        from models.container import ContainerType
         from models.container import Container, Contents
         from models.sample import Sample
         from models.project import Project
@@ -421,7 +444,7 @@ class TestBatchesAPI:
             description="Test project 1",
             start_date=datetime.utcnow(),
             client_id=client1.id,
-            status=uuid4()
+            status=scratch_entry_id(db_session)
         )
         db_session.add(project1)
         db_session.flush()
@@ -431,7 +454,7 @@ class TestBatchesAPI:
             description="Test project 2",
             start_date=datetime.utcnow(),
             client_id=client2.id,
-            status=uuid4()
+            status=scratch_entry_id(db_session)
         )
         db_session.add(project2)
         db_session.flush()
@@ -490,7 +513,7 @@ class TestBatchesAPI:
         
         # Create sample type and matrix
         sample_type = ListEntry(
-            list_id=uuid4(),
+            list_id=scratch_list_id(db_session),
             name="Water Sample",
             created_by=sample_user.id,
             modified_by=sample_user.id
@@ -499,7 +522,7 @@ class TestBatchesAPI:
         db_session.flush()
         
         matrix = ListEntry(
-            list_id=uuid4(),
+            list_id=scratch_list_id(db_session),
             name="Water",
             created_by=sample_user.id,
             modified_by=sample_user.id
@@ -547,7 +570,7 @@ class TestBatchesAPI:
             description="Sample from project 1",
             project_id=project1.id,
             sample_type=sample_type.id,
-            status=uuid4(),
+            status=scratch_entry_id(db_session),
             matrix=matrix.id,
             created_by=sample_user.id,
             modified_by=sample_user.id
@@ -560,7 +583,7 @@ class TestBatchesAPI:
             description="Sample from project 2",
             project_id=project2.id,
             sample_type=sample_type.id,
-            status=uuid4(),
+            status=scratch_entry_id(db_session),
             matrix=matrix.id,
             created_by=sample_user.id,
             modified_by=sample_user.id
@@ -584,18 +607,20 @@ class TestBatchesAPI:
         
         # Create tests with shared analysis
         test1 = Test(
+            name=f"T-{uuid4().hex[:8]}",  # tests.name is NOT NULL
             sample_id=sample1.id,
             analysis_id=prep_analysis.id,
-            status=uuid4(),
+            status=scratch_entry_id(db_session),
             created_by=sample_user.id,
             modified_by=sample_user.id
         )
         db_session.add(test1)
         
         test2 = Test(
+            name=f"T-{uuid4().hex[:8]}",  # tests.name is NOT NULL
             sample_id=sample2.id,
             analysis_id=prep_analysis.id,
-            status=uuid4(),
+            status=scratch_entry_id(db_session),
             created_by=sample_user.id,
             modified_by=sample_user.id
         )
@@ -611,8 +636,8 @@ class TestBatchesAPI:
             "cross_project": True
         }
         
-        response = client.post("/batches/", json=batch_data, headers=auth_headers)
-        assert response.status_code == 200
+        response = client.post("/batches", json=batch_data, headers=auth_headers)
+        assert response.status_code == 200, response.text
         
         data = response.json()
         assert data["name"] == "Cross-Project Batch"
@@ -622,7 +647,7 @@ class TestBatchesAPI:
     def test_create_cross_project_batch_incompatible(self, db_session, auth_headers, sample_user):
         """Test creating a cross-project batch with incompatible samples (no shared analysis)"""
         from models.list import ListEntry, List
-        from models.container_type import ContainerType
+        from models.container import ContainerType
         from models.container import Container, Contents
         from models.sample import Sample
         from models.project import Project
@@ -653,7 +678,7 @@ class TestBatchesAPI:
             description="Test project 1",
             start_date=datetime.utcnow(),
             client_id=client1.id,
-            status=uuid4()
+            status=scratch_entry_id(db_session)
         )
         db_session.add(project1)
         db_session.flush()
@@ -663,7 +688,7 @@ class TestBatchesAPI:
             description="Test project 2",
             start_date=datetime.utcnow(),
             client_id=client2.id,
-            status=uuid4()
+            status=scratch_entry_id(db_session)
         )
         db_session.add(project2)
         db_session.flush()
@@ -732,7 +757,7 @@ class TestBatchesAPI:
         
         # Create sample type and matrix
         sample_type = ListEntry(
-            list_id=uuid4(),
+            list_id=scratch_list_id(db_session),
             name="Water Sample",
             created_by=sample_user.id,
             modified_by=sample_user.id
@@ -741,7 +766,7 @@ class TestBatchesAPI:
         db_session.flush()
         
         matrix = ListEntry(
-            list_id=uuid4(),
+            list_id=scratch_list_id(db_session),
             name="Water",
             created_by=sample_user.id,
             modified_by=sample_user.id
@@ -789,7 +814,7 @@ class TestBatchesAPI:
             description="Sample from project 1",
             project_id=project1.id,
             sample_type=sample_type.id,
-            status=uuid4(),
+            status=scratch_entry_id(db_session),
             matrix=matrix.id,
             created_by=sample_user.id,
             modified_by=sample_user.id
@@ -802,7 +827,7 @@ class TestBatchesAPI:
             description="Sample from project 2",
             project_id=project2.id,
             sample_type=sample_type.id,
-            status=uuid4(),
+            status=scratch_entry_id(db_session),
             matrix=matrix.id,
             created_by=sample_user.id,
             modified_by=sample_user.id
@@ -826,18 +851,20 @@ class TestBatchesAPI:
         
         # Create tests with different analyses (no shared analysis)
         test1 = Test(
+            name=f"T-{uuid4().hex[:8]}",  # tests.name is NOT NULL
             sample_id=sample1.id,
             analysis_id=analysis1.id,
-            status=uuid4(),
+            status=scratch_entry_id(db_session),
             created_by=sample_user.id,
             modified_by=sample_user.id
         )
         db_session.add(test1)
         
         test2 = Test(
+            name=f"T-{uuid4().hex[:8]}",  # tests.name is NOT NULL
             sample_id=sample2.id,
             analysis_id=analysis2.id,
-            status=uuid4(),
+            status=scratch_entry_id(db_session),
             created_by=sample_user.id,
             modified_by=sample_user.id
         )
@@ -853,14 +880,14 @@ class TestBatchesAPI:
             "cross_project": True
         }
         
-        response = client.post("/batches/", json=batch_data, headers=auth_headers)
-        assert response.status_code == 400
+        response = client.post("/batches", json=batch_data, headers=auth_headers)
+        assert response.status_code == 400, response.text
         assert "incompatible" in response.json()["detail"].lower() or "shared" in response.json()["detail"].lower()
     
     def test_create_cross_project_batch_rls_denial(self, db_session, auth_headers, sample_user):
         """Test creating a cross-project batch with RLS denial (user lacks access to one project)"""
         from models.list import ListEntry, List
-        from models.container_type import ContainerType
+        from models.container import ContainerType
         from models.container import Container, Contents
         from models.sample import Sample
         from models.project import Project
@@ -890,7 +917,7 @@ class TestBatchesAPI:
             description="Test project 1",
             start_date=datetime.utcnow(),
             client_id=client1.id,
-            status=uuid4()
+            status=scratch_entry_id(db_session)
         )
         db_session.add(project1)
         db_session.flush()
@@ -900,7 +927,7 @@ class TestBatchesAPI:
             description="Test project 2",
             start_date=datetime.utcnow(),
             client_id=client2.id,
-            status=uuid4()
+            status=scratch_entry_id(db_session)
         )
         db_session.add(project2)
         db_session.flush()
@@ -952,7 +979,7 @@ class TestBatchesAPI:
         
         # Create sample type and matrix
         sample_type = ListEntry(
-            list_id=uuid4(),
+            list_id=scratch_list_id(db_session),
             name="Water Sample",
             created_by=sample_user.id,
             modified_by=sample_user.id
@@ -961,7 +988,7 @@ class TestBatchesAPI:
         db_session.flush()
         
         matrix = ListEntry(
-            list_id=uuid4(),
+            list_id=scratch_list_id(db_session),
             name="Water",
             created_by=sample_user.id,
             modified_by=sample_user.id
@@ -1009,7 +1036,7 @@ class TestBatchesAPI:
             description="Sample from project 1",
             project_id=project1.id,
             sample_type=sample_type.id,
-            status=uuid4(),
+            status=scratch_entry_id(db_session),
             matrix=matrix.id,
             created_by=sample_user.id,
             modified_by=sample_user.id
@@ -1022,7 +1049,7 @@ class TestBatchesAPI:
             description="Sample from project 2",
             project_id=project2.id,
             sample_type=sample_type.id,
-            status=uuid4(),
+            status=scratch_entry_id(db_session),
             matrix=matrix.id,
             created_by=sample_user.id,
             modified_by=sample_user.id
@@ -1046,18 +1073,20 @@ class TestBatchesAPI:
         
         # Create tests with shared analysis
         test1 = Test(
+            name=f"T-{uuid4().hex[:8]}",  # tests.name is NOT NULL
             sample_id=sample1.id,
             analysis_id=prep_analysis.id,
-            status=uuid4(),
+            status=scratch_entry_id(db_session),
             created_by=sample_user.id,
             modified_by=sample_user.id
         )
         db_session.add(test1)
         
         test2 = Test(
+            name=f"T-{uuid4().hex[:8]}",  # tests.name is NOT NULL
             sample_id=sample2.id,
             analysis_id=prep_analysis.id,
-            status=uuid4(),
+            status=scratch_entry_id(db_session),
             created_by=sample_user.id,
             modified_by=sample_user.id
         )
@@ -1073,14 +1102,14 @@ class TestBatchesAPI:
             "cross_project": True
         }
         
-        response = client.post("/batches/", json=batch_data, headers=auth_headers)
+        response = client.post("/batches", json=batch_data, headers=auth_headers)
         assert response.status_code == 403
         assert "access denied" in response.json()["detail"].lower() or "permissions" in response.json()["detail"].lower()
     
     def test_create_batch_with_qc_samples(self, db_session, auth_headers, sample_user):
         """Test creating a batch with QC samples (US-27)"""
         from models.list import ListEntry, List
-        from models.container_type import ContainerType
+        from models.container import ContainerType
         from models.container import Container, Contents
         from models.sample import Sample
         from models.project import Project
@@ -1089,20 +1118,20 @@ class TestBatchesAPI:
         from models.analysis import Analysis
         
         # Create client and project
-        client = Client(
+        client_org = Client(
             name="Test Client",
             description="Test client",
             billing_info={}
         )
-        db_session.add(client)
+        db_session.add(client_org)
         db_session.flush()
         
         project = Project(
             name="Test Project",
             description="Test project",
             start_date=datetime.utcnow(),
-            client_id=client.id,
-            status=uuid4()
+            client_id=client_org.id,
+            status=scratch_entry_id(db_session)
         )
         db_session.add(project)
         db_session.flush()
@@ -1184,7 +1213,7 @@ class TestBatchesAPI:
         
         # Create sample type and matrix
         sample_type = ListEntry(
-            list_id=uuid4(),
+            list_id=scratch_list_id(db_session),
             name="Water Sample",
             created_by=sample_user.id,
             modified_by=sample_user.id
@@ -1193,7 +1222,7 @@ class TestBatchesAPI:
         db_session.flush()
         
         matrix = ListEntry(
-            list_id=uuid4(),
+            list_id=scratch_list_id(db_session),
             name="Water",
             created_by=sample_user.id,
             modified_by=sample_user.id
@@ -1261,8 +1290,8 @@ class TestBatchesAPI:
             ]
         }
         
-        response = client.post("/batches/", json=batch_data, headers=auth_headers)
-        assert response.status_code == 200
+        response = client.post("/batches", json=batch_data, headers=auth_headers)
+        assert response.status_code == 200, response.text
         
         data = response.json()
         assert data["name"] == "Batch with QC"
@@ -1283,7 +1312,7 @@ class TestBatchesAPI:
     def test_create_batch_qc_requirement_enforcement(self, db_session, auth_headers, sample_user, monkeypatch):
         """Test QC requirement enforcement for specific batch types (US-27)"""
         from models.list import ListEntry, List
-        from models.container_type import ContainerType
+        from models.container import ContainerType
         from models.container import Container, Contents
         from models.sample import Sample
         from models.project import Project
@@ -1294,20 +1323,20 @@ class TestBatchesAPI:
         monkeypatch.setenv("REQUIRE_QC_FOR_BATCH_TYPES", str(batch_type_id))
         
         # Create client and project
-        client = Client(
+        client_org = Client(
             name="Test Client",
             description="Test client",
             billing_info={}
         )
-        db_session.add(client)
+        db_session.add(client_org)
         db_session.flush()
         
         project = Project(
             name="Test Project",
             description="Test project",
             start_date=datetime.utcnow(),
-            client_id=client.id,
-            status=uuid4()
+            client_id=client_org.id,
+            status=scratch_entry_id(db_session)
         )
         db_session.add(project)
         db_session.flush()
@@ -1364,7 +1393,7 @@ class TestBatchesAPI:
         
         # Create sample type and matrix
         sample_type = ListEntry(
-            list_id=uuid4(),
+            list_id=scratch_list_id(db_session),
             name="Water Sample",
             created_by=sample_user.id,
             modified_by=sample_user.id
@@ -1373,7 +1402,7 @@ class TestBatchesAPI:
         db_session.flush()
         
         matrix = ListEntry(
-            list_id=uuid4(),
+            list_id=scratch_list_id(db_session),
             name="Water",
             created_by=sample_user.id,
             modified_by=sample_user.id
@@ -1435,8 +1464,8 @@ class TestBatchesAPI:
             "container_ids": [str(container.id)]
         }
         
-        response = client.post("/batches/", json=batch_data, headers=auth_headers)
-        assert response.status_code == 400
+        response = client.post("/batches", json=batch_data, headers=auth_headers)
+        assert response.status_code == 400, response.text
         assert "qc" in response.json()["detail"].lower() or "required" in response.json()["detail"].lower()
         
         # Create batch with QC (should succeed)
@@ -1477,13 +1506,13 @@ class TestBatchesAPI:
             ]
         }
         
-        response = client.post("/batches/", json=batch_data_with_qc, headers=auth_headers)
-        assert response.status_code == 200
+        response = client.post("/batches", json=batch_data_with_qc, headers=auth_headers)
+        assert response.status_code == 200, response.text
     
     def test_create_cross_project_batch_with_qc_end_to_end(self, db_session, auth_headers, sample_user):
         """End-to-end test: Create cross-project batch with QC samples (Sprint 6 integration)"""
         from models.list import ListEntry, List
-        from models.container_type import ContainerType
+        from models.container import ContainerType
         from models.container import Container, Contents
         from models.sample import Sample
         from models.project import Project
@@ -1515,7 +1544,7 @@ class TestBatchesAPI:
             description="Test project 1",
             start_date=datetime.utcnow(),
             client_id=client1.id,
-            status=uuid4()
+            status=scratch_entry_id(db_session)
         )
         db_session.add(project1)
         db_session.flush()
@@ -1525,7 +1554,7 @@ class TestBatchesAPI:
             description="Test project 2",
             start_date=datetime.utcnow(),
             client_id=client2.id,
-            status=uuid4()
+            status=scratch_entry_id(db_session)
         )
         db_session.add(project2)
         db_session.flush()
@@ -1643,7 +1672,7 @@ class TestBatchesAPI:
         
         # Create sample type and matrix
         sample_type = ListEntry(
-            list_id=uuid4(),
+            list_id=scratch_list_id(db_session),
             name="Water Sample",
             created_by=sample_user.id,
             modified_by=sample_user.id
@@ -1652,7 +1681,7 @@ class TestBatchesAPI:
         db_session.flush()
         
         matrix = ListEntry(
-            list_id=uuid4(),
+            list_id=scratch_list_id(db_session),
             name="Water",
             created_by=sample_user.id,
             modified_by=sample_user.id
@@ -1739,18 +1768,20 @@ class TestBatchesAPI:
         
         # Create tests with shared analysis
         test1 = Test(
+            name=f"T-{uuid4().hex[:8]}",  # tests.name is NOT NULL
             sample_id=sample1.id,
             analysis_id=prep_analysis.id,
-            status=uuid4(),
+            status=scratch_entry_id(db_session),
             created_by=sample_user.id,
             modified_by=sample_user.id
         )
         db_session.add(test1)
         
         test2 = Test(
+            name=f"T-{uuid4().hex[:8]}",  # tests.name is NOT NULL
             sample_id=sample2.id,
             analysis_id=prep_analysis.id,
-            status=uuid4(),
+            status=scratch_entry_id(db_session),
             created_by=sample_user.id,
             modified_by=sample_user.id
         )
@@ -1776,8 +1807,8 @@ class TestBatchesAPI:
             ]
         }
         
-        response = client.post("/batches/", json=batch_data, headers=auth_headers)
-        assert response.status_code == 200
+        response = client.post("/batches", json=batch_data, headers=auth_headers)
+        assert response.status_code == 200, response.text
         
         data = response.json()
         assert data["name"] == "Cross-Project Batch with QC"
