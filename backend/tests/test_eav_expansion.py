@@ -16,12 +16,63 @@ from uuid import uuid4
 import json
 
 
+@pytest.fixture
+def test_data(db_session: Session, test_admin_user, test_org):
+    """Minimal graph these tests need (they used to rely on pre-seeded rows and
+    skip when absent): project, sample, analysis/analyte, test, batch_status."""
+    from datetime import timedelta
+    from models.analysis import Analysis, Analyte, AnalysisAnalyte
+    from models.sample import Sample
+    from models.test import Test
+    from tests._fk_helpers import get_or_create_list_entry, scratch_entry_id
+
+    project = Project(
+        name=f"EAV Project {uuid4().hex[:6]}",
+        client_id=test_org.id,
+        status=get_or_create_list_entry(db_session, "project_status", "Active").id,
+        start_date=datetime.utcnow(),
+    )
+    db_session.add(project)
+    db_session.flush()
+    sample = Sample(
+        name=f"EAV-S-{uuid4().hex[:6]}",
+        sample_type=scratch_entry_id(db_session),
+        status=scratch_entry_id(db_session),
+        matrix=scratch_entry_id(db_session),
+        project_id=project.id,
+        due_date=datetime.utcnow() + timedelta(days=7),
+        created_by=test_admin_user.id,
+        modified_by=test_admin_user.id,
+    )
+    analysis = Analysis(name=f"EAV-A-{uuid4().hex[:6]}", created_by=test_admin_user.id, modified_by=test_admin_user.id)
+    analyte = Analyte(name=f"EAV-An-{uuid4().hex[:6]}", created_by=test_admin_user.id, modified_by=test_admin_user.id)
+    db_session.add_all([sample, analysis, analyte])
+    db_session.flush()
+    db_session.add(AnalysisAnalyte(analysis_id=analysis.id, analyte_id=analyte.id))
+    test = Test(
+        name=f"EAV-T-{uuid4().hex[:6]}",
+        sample_id=sample.id,
+        analysis_id=analysis.id,
+        status=get_or_create_list_entry(db_session, "test_status", "In Process").id,
+        created_by=test_admin_user.id,
+        modified_by=test_admin_user.id,
+    )
+    db_session.add(test)
+    get_or_create_list_entry(db_session, "batch_status", "Created")
+    db_session.commit()
+    return {"analyte_id": analyte.id, "user_id": test_admin_user.id, "test_id": test.id}
+
+
 class TestEAVExpansion:
     """Test EAV support for results, projects, client_projects, and batches"""
 
     @pytest.fixture
-    def admin_token(self, test_admin_user: User):
-        return create_access_token(data={"sub": test_admin_user.username})
+    def admin_token(self, client: TestClient, test_admin_user: User):
+        # sub must be the user id (not username) and tokens carry password_epoch;
+        # log in through the API instead of minting a token by hand.
+        r = client.post("/auth/login", json={"username": "admin", "password": "adminpassword"})
+        assert r.status_code == 200, r.text
+        return r.json()["access_token"]
 
     @pytest.fixture
     def setup_custom_attributes(self, client: TestClient, db_session: Session, admin_token: str):
@@ -40,7 +91,7 @@ class TestEAVExpansion:
                 "description": "Reviewer notes for result"
             }
         )
-        assert response.status_code == 201
+        assert response.status_code == 201, response.text
         configs['results'] = response.json()
         
         # Projects config
@@ -55,7 +106,7 @@ class TestEAVExpansion:
                 "description": "Budget code for project"
             }
         )
-        assert response.status_code == 201
+        assert response.status_code == 201, response.text
         configs['projects'] = response.json()
         
         # Client projects config
@@ -70,7 +121,7 @@ class TestEAVExpansion:
                 "description": "Contract number for client project"
             }
         )
-        assert response.status_code == 201
+        assert response.status_code == 201, response.text
         configs['client_projects'] = response.json()
         
         # Batches config
@@ -85,7 +136,7 @@ class TestEAVExpansion:
                 "description": "Instrument serial number used for batch"
             }
         )
-        assert response.status_code == 201
+        assert response.status_code == 201, response.text
         configs['batches'] = response.json()
         
         db_session.commit()
@@ -122,7 +173,7 @@ class TestEAVExpansion:
                 }
             }
         )
-        assert response.status_code == 200
+        assert response.status_code == 200, response.text
         data = response.json()
         assert data["custom_attributes"]["reviewer_notes"] == "Looks good"
         
@@ -141,7 +192,7 @@ class TestEAVExpansion:
                 }
             }
         )
-        assert response.status_code == 400
+        assert response.status_code == 400, response.text
 
     def test_project_custom_attributes(self, client: TestClient, db_session: Session,
                                        admin_token: str, setup_custom_attributes, test_data):
@@ -180,7 +231,7 @@ class TestEAVExpansion:
                 }
             }
         )
-        assert response.status_code == 201
+        assert response.status_code == 201, response.text
         data = response.json()
         assert data["custom_attributes"]["contract_number"] == "CONTRACT-123"
         
@@ -194,7 +245,7 @@ class TestEAVExpansion:
                 }
             }
         )
-        assert response.status_code == 400
+        assert response.status_code == 400, response.text
 
     def test_batch_custom_attributes(self, client: TestClient, db_session: Session,
                                      admin_token: str, setup_custom_attributes, test_data):
@@ -210,7 +261,7 @@ class TestEAVExpansion:
         
         # Create batch with custom_attributes
         response = client.post(
-            "/batches/",
+            "/batches",
             headers={"Authorization": f"Bearer {admin_token}"},
             json={
                 "name": f"Test Batch {uuid4()}",
@@ -221,7 +272,7 @@ class TestEAVExpansion:
                 }
             }
         )
-        assert response.status_code == 200
+        assert response.status_code == 201, response.text
         data = response.json()
         assert data["custom_attributes"]["instrument_serial"] == "INST-12345"
         
@@ -235,7 +286,7 @@ class TestEAVExpansion:
                 }
             }
         )
-        assert response.status_code == 200
+        assert response.status_code == 200, response.text
         updated_data = response.json()
         assert updated_data["custom_attributes"]["instrument_serial"] == "INST-67890"
 
@@ -270,7 +321,7 @@ class TestEAVExpansion:
                     }
                 }
             )
-            assert response.status_code == 200
+            assert response.status_code == 200, response.text
         
         # Query results by custom attribute
         response = client.get(
@@ -278,7 +329,7 @@ class TestEAVExpansion:
             headers={"Authorization": f"Bearer {admin_token}"},
             params={"custom.reviewer_notes": "Note 1"}
         )
-        assert response.status_code == 200
+        assert response.status_code == 200, response.text
         data = response.json()
         assert len(data["results"]) >= 1
         assert all(r["custom_attributes"]["reviewer_notes"] == "Note 1" for r in data["results"])
@@ -296,7 +347,7 @@ class TestEAVExpansion:
             headers={"Authorization": f"Bearer {admin_token}"},
             json={"active": False}
         )
-        assert response.status_code == 200
+        assert response.status_code == 200, response.text
         
         # Try to use the inactive config
         sample = db_session.query(Sample).first()
@@ -321,6 +372,7 @@ class TestEAVExpansion:
                 }
             }
         )
-        assert response.status_code == 400
-        assert "Unknown custom attribute" in response.json()["detail"]
+        assert response.status_code == 400, response.text
+        # detail is now structured: {"message": ..., "errors": [...]}
+        assert "Unknown custom attribute" in str(response.json()["detail"])
 

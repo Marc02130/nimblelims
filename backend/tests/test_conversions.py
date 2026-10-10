@@ -308,3 +308,16 @@ def test_designate_base_refuses_a_duplicate_multiplier(db_session, sample_units)
     db_session.flush()
     with pytest.raises(ConversionError, match="same multiplier"):
         designate_base_unit(db_session, sample_units['g'])
+
+
+class TestCountSignificantFigures:
+    """count_significant_figures backs the POST /results/validate sig-fig warning."""
+
+    @pytest.mark.parametrize(
+        "value,expected",
+        [("123.456", 6), ("1200", 2), ("1200.", 4), ("0.00120", 3), ("0.0012", 2),
+         ("1.20e3", 3), ("-45.0", 3), ("0", 1), ("abc", None)],
+    )
+    def test_counts(self, value, expected):
+        from app.core.conversions import count_significant_figures
+        assert count_significant_figures(value) == expected
