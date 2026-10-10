@@ -8,7 +8,8 @@ from sqlalchemy.orm import Session
 from uuid import uuid4
 
 from app.core.security import get_password_hash, create_access_token
-from models.user import User, Role, Permission, RolePermission
+from models.user import User, Role, Permission
+from tests._legacy_models import RolePermission
 from models.workflow import WorkflowTemplate, WorkflowInstance
 
 
@@ -32,7 +33,7 @@ def workflow_template_payload():
 
 
 @pytest.fixture
-def auth_headers_admin(client: TestClient):
+def auth_headers_admin(client: TestClient, test_admin_user):
     """Auth headers for admin user (config:edit + workflow:execute)."""
     login = client.post("/auth/login", json={"username": "admin", "password": "adminpassword"})
     assert login.status_code == 200
@@ -41,7 +42,7 @@ def auth_headers_admin(client: TestClient):
 
 
 @pytest.fixture
-def user_config_edit_only(db_session: Session):
+def user_config_edit_only(db_session: Session, test_org):
     """User with config:edit only (no workflow:execute)."""
     role = Role(name=f"ConfigOnly_{uuid4().hex[:6]}", description="Config edit only")
     db_session.add(role)
@@ -58,6 +59,7 @@ def user_config_edit_only(db_session: Session):
         email="config@test.com",
         password_hash=get_password_hash("pass"),
         role_id=role.id,
+        client_id=test_org.id,  # users.client_id is NOT NULL
     )
     db_session.add(user)
     db_session.commit()
@@ -66,7 +68,7 @@ def user_config_edit_only(db_session: Session):
 
 
 @pytest.fixture
-def user_execute_only(db_session: Session):
+def user_execute_only(db_session: Session, test_org):
     """User with workflow:execute only (no config:edit)."""
     role = Role(name=f"ExecuteOnly_{uuid4().hex[:6]}", description="Execute only")
     db_session.add(role)
@@ -83,6 +85,7 @@ def user_execute_only(db_session: Session):
         email="execute@test.com",
         password_hash=get_password_hash("pass"),
         role_id=role.id,
+        client_id=test_org.id,  # users.client_id is NOT NULL
     )
     db_session.add(user)
     db_session.commit()
@@ -91,7 +94,7 @@ def user_execute_only(db_session: Session):
 
 
 @pytest.fixture
-def user_no_workflow_perms(db_session: Session):
+def user_no_workflow_perms(db_session: Session, test_org):
     """User with no config:edit and no workflow:execute."""
     role = Role(name=f"NoWorkflow_{uuid4().hex[:6]}", description="No workflow perms")
     db_session.add(role)
@@ -108,6 +111,7 @@ def user_no_workflow_perms(db_session: Session):
         email="noperm@test.com",
         password_hash=get_password_hash("pass"),
         role_id=role.id,
+        client_id=test_org.id,  # users.client_id is NOT NULL
     )
     db_session.add(user)
     db_session.commit()
@@ -442,7 +446,7 @@ class TestWorkflowRBAC:
 
     def test_unauthenticated_template_list(self, client: TestClient):
         r = client.get("/admin/workflow-templates")
-        assert r.status_code == 403  # no auth
+        assert r.status_code == 401  # no credentials -> 401 (FastAPI >= 0.115 HTTPBearer)
 
     def test_unauthenticated_execute(self, client: TestClient, db_session: Session):
         t = WorkflowTemplate(
@@ -455,4 +459,4 @@ class TestWorkflowRBAC:
         db_session.commit()
         db_session.refresh(t)
         r = client.post(f"/workflows/execute/{t.id}", json={"context": {}})
-        assert r.status_code == 403
+        assert r.status_code == 401  # no credentials -> 401 (FastAPI >= 0.115 HTTPBearer)
