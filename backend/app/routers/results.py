@@ -213,9 +213,11 @@ async def enter_batch_results_us28(
     """
     from app.core.rbac import require_batch_read
     
-    # Check batch access (batch:read permission)
-    batch_read_check = require_batch_read()
-    await batch_read_check(current_user=current_user, db=db)
+    # Check batch access (batch:read permission). require_batch_read is already
+    # the (sync) permission checker; it used to be called with no args and
+    # awaited, which raised AttributeError ('Depends' object has no attribute
+    # 'query') and made every POST /results/batch a 500.
+    require_batch_read(current_user=current_user, db=db)
     
     # Fetch batch
     batch = db.query(Batch).filter(

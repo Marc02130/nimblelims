@@ -556,7 +556,9 @@ async def create_batch(
     
     if batch_data.qc_additions:
         # Verify the Laboratory QC project exists
-        from models.project import Project
+        # (Project is imported at module level; a local import here made
+        # `Project` function-local and raised UnboundLocalError earlier in
+        # create_batch for container-based requests.)
         lab_qc_project = db.query(Project).filter(
             Project.id == LAB_QC_PROJECT_ID,
             Project.active == True
