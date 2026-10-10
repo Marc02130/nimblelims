@@ -6,6 +6,10 @@ from .base import BaseModel
 
 class NameTemplate(BaseModel):
     __tablename__ = 'name_templates'
+    # The real table (migrations) has no `name` column. exclude_properties only
+    # unmaps it, so Base.metadata.create_all() still built a NOT NULL `name`
+    # column and every insert failed in the test DB. Drop the inherited column.
+    name = None
     
     # Name template-specific fields
     entity_type = Column(String(50), nullable=False)
