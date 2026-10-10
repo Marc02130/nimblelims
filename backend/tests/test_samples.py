@@ -2,6 +2,7 @@
 Tests for samples endpoints
 """
 import pytest
+from tests._fk_helpers import custom_attr, get_or_create_list_entry, scratch_entry_id, scratch_list_id
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 from models.sample import Sample
@@ -13,65 +14,74 @@ from datetime import datetime, timedelta
 from uuid import uuid4
 
 
+
+@pytest.fixture
+def test_data(db_session: Session):
+    """Create test data for samples tests"""
+    # Create client
+    client = Client(
+        name="Test Client",
+        description="Test client for samples",
+        billing_info={"address": "123 Test St"}
+    )
+    db_session.add(client)
+    db_session.flush()
+    
+    # Create project
+    project = Project(
+        name="Test Project",
+        description="Test project for samples",
+        start_date=datetime.utcnow(),
+        client_id=client.id,
+        status=scratch_entry_id(db_session)  # Mock status ID
+    )
+    db_session.add(project)
+    db_session.flush()
+    
+    # Create list entries for sample types, statuses, matrices
+    sample_type = ListEntry(
+        list_id=scratch_list_id(db_session),
+        name="Blood Sample",
+        description="Blood sample type"
+    )
+    db_session.add(sample_type)
+    db_session.flush()
+    
+    status = ListEntry(
+        list_id=scratch_list_id(db_session),
+        name="Received",
+        description="Sample received status"
+    )
+    db_session.add(status)
+    db_session.flush()
+    
+    matrix = ListEntry(
+        list_id=scratch_list_id(db_session),
+        name="Blood",
+        description="Blood matrix"
+    )
+    db_session.add(matrix)
+    db_session.flush()
+    
+    # Accession/intake writes "Available for Testing" from the sample_status list (E-6).
+    get_or_create_list_entry(db_session, "sample_status", "Available for Testing")
+    # Accession assigns tests "In Process" and may auto-create a project ("Active").
+    get_or_create_list_entry(db_session, "test_status", "In Process")
+    get_or_create_list_entry(db_session, "project_status", "Active")
+
+    return {
+        "client": client,
+        "project": project,
+        "sample_type": sample_type,
+        "status": status,
+        "matrix": matrix
+    }
+
+
 class TestSamplesCRUD:
     """Test samples CRUD operations"""
     
-    @pytest.fixture
-    def test_data(self, db_session: Session):
-        """Create test data for samples tests"""
-        # Create client
-        client = Client(
-            name="Test Client",
-            description="Test client for samples",
-            billing_info={"address": "123 Test St"}
-        )
-        db_session.add(client)
-        db_session.flush()
-        
-        # Create project
-        project = Project(
-            name="Test Project",
-            description="Test project for samples",
-            start_date=datetime.utcnow(),
-            client_id=client.id,
-            status=uuid4()  # Mock status ID
-        )
-        db_session.add(project)
-        db_session.flush()
-        
-        # Create list entries for sample types, statuses, matrices
-        sample_type = ListEntry(
-            list_id=uuid4(),
-            name="Blood Sample",
-            description="Blood sample type"
-        )
-        db_session.add(sample_type)
-        db_session.flush()
-        
-        status = ListEntry(
-            list_id=uuid4(),
-            name="Received",
-            description="Sample received status"
-        )
-        db_session.add(status)
-        db_session.flush()
-        
-        matrix = ListEntry(
-            list_id=uuid4(),
-            name="Blood",
-            description="Blood matrix"
-        )
-        db_session.add(matrix)
-        db_session.flush()
-        
-        return {
-            "client": client,
-            "project": project,
-            "sample_type": sample_type,
-            "status": status,
-            "matrix": matrix
-        }
-    
+
     def test_create_sample_success(self, client: TestClient, test_admin_user, test_data):
         """Test successful sample creation"""
         # Get auth token
@@ -100,7 +110,7 @@ class TestSamplesCRUD:
             headers={"Authorization": f"Bearer {token}"}
         )
         
-        assert response.status_code == 201
+        assert response.status_code == 200, response.text  # create/accession endpoints return 200 (no status_code=201 on the route)
         data = response.json()
         assert data["name"] == "SAMPLE-001"
         assert data["description"] == "Test sample"
@@ -158,11 +168,11 @@ class TestSamplesCRUD:
         
         # Get samples
         response = client.get(
-            "/samples/",
+            "/samples",
             headers={"Authorization": f"Bearer {token}"}
         )
         
-        assert response.status_code == 200
+        assert response.status_code == 200, response.text
         data = response.json()
         assert "samples" in data
         assert "total" in data
@@ -203,7 +213,7 @@ class TestSamplesCRUD:
             headers={"Authorization": f"Bearer {token}"}
         )
         
-        assert response.status_code == 200
+        assert response.status_code == 200, response.text
         data = response.json()
         assert data["id"] == str(sample.id)
         assert data["name"] == "SAMPLE-004"
@@ -263,7 +273,7 @@ class TestSamplesCRUD:
             headers={"Authorization": f"Bearer {token}"}
         )
         
-        assert response.status_code == 200
+        assert response.status_code == 200, response.text
         data = response.json()
         assert data["description"] == "Updated description"
         assert data["temperature"] == 30.0
@@ -300,7 +310,7 @@ class TestSamplesCRUD:
             headers={"Authorization": f"Bearer {token}"}
         )
         
-        assert response.status_code == 200
+        assert response.status_code == 200, response.text
         assert "deleted successfully" in response.json()["message"]
         
         # Verify sample is soft deleted
@@ -341,7 +351,7 @@ class TestSampleAccessioning:
             headers={"Authorization": f"Bearer {token}"}
         )
         
-        assert response.status_code == 201
+        assert response.status_code == 200, response.text  # create/accession endpoints return 200 (no status_code=201 on the route)
         data = response.json()
         assert data["name"] == "SAMPLE-007"
         assert data["description"] == "Test accession sample"
@@ -390,7 +400,7 @@ class TestSampleAccessioning:
             headers={"Authorization": f"Bearer {token}"}
         )
         
-        assert response.status_code == 201
+        assert response.status_code == 200, response.text  # create/accession endpoints return 200 (no status_code=201 on the route)
         data = response.json()
         assert data["name"] == "SAMPLE-008"
     
@@ -421,7 +431,7 @@ class TestSampleAccessioning:
             headers={"Authorization": f"Bearer {token}"}
         )
         
-        assert response.status_code == 201
+        assert response.status_code == 200, response.text  # create/accession endpoints return 200 (no status_code=201 on the route)
         data = response.json()
         assert data["name"] == "SAMPLE-AUTO-001"
         # Verify project was created
@@ -477,7 +487,7 @@ class TestSampleAccessioning:
             headers={"Authorization": f"Bearer {token}"}
         )
         
-        assert response.status_code == 201
+        assert response.status_code == 200, response.text  # create/accession endpoints return 200 (no status_code=201 on the route)
         data = response.json()
         assert data["name"] == "SAMPLE-CP-001"
         
@@ -600,12 +610,8 @@ class TestSampleStatusManagement:
         db_session.commit()
         
         # Create new status
-        new_status = ListEntry(
-            list_id=uuid4(),
-            name="Available for Testing",
-            description="Sample available for testing"
-        )
-        db_session.add(new_status)
+        # test_data already seeds "Available for Testing" (list_entries.name is unique).
+        new_status = get_or_create_list_entry(db_session, "sample_status", "Available for Testing")
         db_session.commit()
         
         auth_response = client.post(
@@ -621,7 +627,7 @@ class TestSampleStatusManagement:
             headers={"Authorization": f"Bearer {token}"}
         )
         
-        assert response.status_code == 200
+        assert response.status_code == 200, response.text
         data = response.json()
         assert data["status"] == str(new_status.id)
 
@@ -658,7 +664,7 @@ class TestSamplePermissions:
     
     def test_get_samples_requires_permission(self, client: TestClient):
         """Test that getting samples requires authentication"""
-        response = client.get("/samples/")
+        response = client.get("/samples")
         assert response.status_code == 401  # Unauthorized
     
     def test_update_sample_requires_permission(self, client: TestClient):
@@ -695,6 +701,9 @@ class TestSamplePermissions:
         token = auth_response.json()["access_token"]
         
         # Update sample with custom attributes
+        custom_attr(db_session, "samples", "ph_level", "number")
+        custom_attr(db_session, "samples", "notes", "text")
+        db_session.commit()
         update_data = {
             "custom_attributes": {
                 "ph_level": 7.2,
@@ -708,7 +717,7 @@ class TestSamplePermissions:
             headers={"Authorization": f"Bearer {token}"}
         )
         
-        assert response.status_code == 200
+        assert response.status_code == 200, response.text
         data = response.json()
         assert "custom_attributes" in data
         assert data["custom_attributes"]["ph_level"] == 7.2
@@ -824,7 +833,7 @@ class TestSamplePermissions:
             headers={"Authorization": f"Bearer {token}"}
         )
         
-        assert response.status_code == 200
+        assert response.status_code == 200, response.text
         data = response.json()
         assert data["status"] == str(reviewed_status.id)
 
@@ -905,7 +914,7 @@ class TestSampleEditRBAC:
             headers={"Authorization": f"Bearer {token}"}
         )
         
-        assert response.status_code == 200
+        assert response.status_code == 200, response.text
         data = response.json()
         
         # Verify modified_by is updated
@@ -1005,8 +1014,8 @@ class TestSampleEditRBAC:
             matrix=test_data["matrix"].id,
             temperature=25.0,
             project_id=test_data["project"].id,
-            created_by=test_data["project"].client_id,  # Use project's client
-            modified_by=test_data["project"].client_id
+            created_by=None,  # was project.client_id: a client id is not a users.id (FK violation)
+            modified_by=None
         )
         db_session.add(sample)
         db_session.commit()

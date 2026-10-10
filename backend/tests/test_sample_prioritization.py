@@ -11,6 +11,7 @@ Tests cover:
 - POST /batches/validate-compatibility expiration warnings
 """
 import pytest
+from tests._fk_helpers import scratch_entry_id, scratch_list_id
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
@@ -48,7 +49,7 @@ class TestEligibleSamplesEndpoint:
             start_date=datetime.utcnow(),
             due_date=datetime.utcnow() + timedelta(days=10),  # Project due in 10 days
             client_id=client.id,
-            status=uuid4(),
+            status=scratch_entry_id(db_session),
             created_by=test_admin_user.id,
             modified_by=test_admin_user.id
         )
@@ -57,7 +58,7 @@ class TestEligibleSamplesEndpoint:
         
         # Create list entries
         sample_type = ListEntry(
-            list_id=uuid4(),
+            list_id=scratch_list_id(db_session),
             name="Water Sample",
             description="Water sample type"
         )
@@ -65,7 +66,7 @@ class TestEligibleSamplesEndpoint:
         db_session.flush()
         
         status = ListEntry(
-            list_id=uuid4(),
+            list_id=scratch_list_id(db_session),
             name="Received",
             description="Sample received status"
         )
@@ -73,7 +74,7 @@ class TestEligibleSamplesEndpoint:
         db_session.flush()
         
         matrix = ListEntry(
-            list_id=uuid4(),
+            list_id=scratch_list_id(db_session),
             name="Water",
             description="Water matrix"
         )
@@ -143,6 +144,7 @@ class TestEligibleSamplesEndpoint:
         # Create test assignment if analysis provided
         if analysis:
             test = Test(
+                name=f"T-{uuid4().hex[:8]}",  # tests.name is NOT NULL
                 sample_id=sample.id,
                 analysis_id=analysis.id,
                 status=test_data["status"].id,
@@ -559,7 +561,7 @@ class TestBatchValidationExpirationWarnings:
             description="Project for batch validation tests",
             start_date=datetime.utcnow(),
             client_id=client.id,
-            status=uuid4(),
+            status=scratch_entry_id(db_session),
             created_by=test_admin_user.id,
             modified_by=test_admin_user.id
         )
@@ -567,9 +569,9 @@ class TestBatchValidationExpirationWarnings:
         db_session.flush()
         
         # Create list entries
-        sample_type = ListEntry(list_id=uuid4(), name="Water Sample", description="Water")
-        status = ListEntry(list_id=uuid4(), name="Received", description="Received")
-        matrix = ListEntry(list_id=uuid4(), name="Water", description="Water")
+        sample_type = ListEntry(list_id=scratch_list_id(db_session), name="Water Sample", description="Water")
+        status = ListEntry(list_id=scratch_list_id(db_session), name="Received", description="Received")
+        matrix = ListEntry(list_id=scratch_list_id(db_session), name="Water", description="Water")
         db_session.add_all([sample_type, status, matrix])
         db_session.flush()
         
@@ -577,8 +579,7 @@ class TestBatchValidationExpirationWarnings:
         container_type = ContainerType(
             name="Test Vial",
             description="Test vial for batch validation",
-            capacity=50,
-            capacity_unit="mL",
+            capacity=50,  # ContainerType has no capacity_unit column
             created_by=test_admin_user.id,
             modified_by=test_admin_user.id
         )
@@ -637,6 +638,7 @@ class TestBatchValidationExpirationWarnings:
         
         # Create test assignment
         test = Test(
+            name=f"T-{uuid4().hex[:8]}",  # tests.name is NOT NULL
             sample_id=sample.id,
             analysis_id=test_data["analysis"].id,
             status=test_data["status"].id,
@@ -650,8 +652,7 @@ class TestBatchValidationExpirationWarnings:
         container = Container(
             name=container_name,
             description=f"Container {container_name}",
-            type_id=test_data["container_type"].id,
-            project_id=test_data["project"].id,
+            type_id=test_data["container_type"].id,  # Container has no project_id column
             created_by=test_data["admin_user"].id,
             modified_by=test_data["admin_user"].id
         )
@@ -661,9 +662,7 @@ class TestBatchValidationExpirationWarnings:
         # Link sample to container
         contents = Contents(
             container_id=container.id,
-            sample_id=sample.id,
-            created_by=test_data["admin_user"].id,
-            modified_by=test_data["admin_user"].id
+            sample_id=sample.id,  # Contents is a plain join row (no audit columns)
         )
         db_session.add(contents)
         db_session.flush()
@@ -798,16 +797,16 @@ class TestOverdueSamples:
             start_date=datetime.utcnow() - timedelta(days=30),
             due_date=datetime.utcnow() - timedelta(days=5),  # Project was due 5 days ago
             client_id=client.id,
-            status=uuid4(),
+            status=scratch_entry_id(db_session),
             created_by=test_admin_user.id,
             modified_by=test_admin_user.id
         )
         db_session.add(project)
         db_session.flush()
         
-        sample_type = ListEntry(list_id=uuid4(), name="Overdue Sample", description="Overdue")
-        status = ListEntry(list_id=uuid4(), name="Received", description="Received")
-        matrix = ListEntry(list_id=uuid4(), name="Water", description="Water")
+        sample_type = ListEntry(list_id=scratch_list_id(db_session), name="Overdue Sample", description="Overdue")
+        status = ListEntry(list_id=scratch_list_id(db_session), name="Received", description="Received")
+        matrix = ListEntry(list_id=scratch_list_id(db_session), name="Water", description="Water")
         db_session.add_all([sample_type, status, matrix])
         db_session.flush()
         
@@ -862,6 +861,7 @@ class TestOverdueSamples:
         
         # Add test assignment
         test = Test(
+            name=f"T-{uuid4().hex[:8]}",  # tests.name is NOT NULL
             sample_id=sample.id,
             analysis_id=test_data["analysis"].id,
             status=test_data["status"].id,

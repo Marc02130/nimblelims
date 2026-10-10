@@ -2,14 +2,16 @@
 Tests for projects API endpoints
 """
 import pytest
+from tests.conftest import _get_or_create
+from tests._fk_helpers import get_or_create_list_entry
 from fastapi.testclient import TestClient
 from app.main import app
 from models.project import Project, ProjectUser
 from models.client import Client, ClientProject
 from models.user import User
-from models.role import Role
-from models.permission import Permission
-from models.role_permission import RolePermission
+from models.user import Role
+from models.user import Permission
+from tests._legacy_models import RolePermission
 from models.list import ListEntry
 from app.core.security import get_password_hash
 from datetime import datetime
@@ -18,8 +20,18 @@ from uuid import uuid4
 client = TestClient(app)
 
 
+
+@pytest.fixture(autouse=True)
+def _route_through_test_db(client):
+    """The module-level TestClient(app) above has no DB override of its own;
+    requesting the conftest `client` fixture installs the get_db override on the
+    shared app so every request uses the per-test transaction."""
+    yield
+
+
 @pytest.fixture
-def sample_user(db_session):
+def sample_user(db_session, system_org):
+    """Lab-staff user on the System client (project create/update for any client)."""
     """Create a sample user with project:manage permission"""
     # Create test role
     test_role = Role(
@@ -30,12 +42,8 @@ def sample_user(db_session):
     db_session.flush()
     
     # Create project:manage permission
-    project_manage_perm = Permission(
-        name="project:manage",
-        description="Manage projects"
-    )
-    db_session.add(project_manage_perm)
-    db_session.flush()
+    # get-or-create: other fixtures (test_admin_user) also create project:manage
+    project_manage_perm = _get_or_create(db_session, Permission, "project:manage", "Manage projects")
     
     # Assign permission to role
     role_perm = RolePermission(role_id=test_role.id, permission_id=project_manage_perm.id)
@@ -47,7 +55,8 @@ def sample_user(db_session):
         username="sampleuser",
         email="sample@example.com",
         password_hash=get_password_hash("samplepassword"),
-        role_id=test_role.id
+        role_id=test_role.id,
+        client_id=system_org.id,  # users.client_id is NOT NULL; System = lab staff
     )
     db_session.add(test_user)
     db_session.commit()
@@ -85,14 +94,8 @@ def test_client(db_session, sample_user):
 @pytest.fixture
 def test_status(db_session):
     """Create a test status list entry"""
-    test_status_obj = ListEntry(
-        id=uuid4(),
-        list_name="project_status",
-        entry_name="Active",
-        entry_value="active",
-        active=True
-    )
-    db_session.add(test_status_obj)
+    # ListEntry has list_id/name (no list_name/entry_name/entry_value).
+    test_status_obj = get_or_create_list_entry(db_session, "project_status", "Active")
     db_session.commit()
     return test_status_obj
 
@@ -125,8 +128,8 @@ class TestProjectsAPI:
             "status": str(test_status.id)
         }
         
-        response = client.post("/projects/", json=project_data, headers=auth_headers)
-        assert response.status_code == 201
+        response = client.post("/projects", json=project_data, headers=auth_headers)
+        assert response.status_code == 201, response.text
         
         data = response.json()
         assert data["name"] == "Test Project"
@@ -147,8 +150,8 @@ class TestProjectsAPI:
             "status": str(test_status.id)
         }
         
-        response = client.post("/projects/", json=project_data, headers=auth_headers)
-        assert response.status_code == 201
+        response = client.post("/projects", json=project_data, headers=auth_headers)
+        assert response.status_code == 201, response.text
         
         data = response.json()
         assert data["name"] == "Test Project with Client Project"
@@ -165,8 +168,8 @@ class TestProjectsAPI:
             "status": str(test_status.id)
         }
         
-        response = client.post("/projects/", json=project_data, headers=auth_headers)
-        assert response.status_code == 201
+        response = client.post("/projects", json=project_data, headers=auth_headers)
+        assert response.status_code == 201, response.text
         
         data = response.json()
         assert data["name"] is not None
@@ -197,8 +200,8 @@ class TestProjectsAPI:
             "status": str(test_status.id)
         }
         
-        response = client.post("/projects/", json=project_data, headers=auth_headers)
-        assert response.status_code == 400
+        response = client.post("/projects", json=project_data, headers=auth_headers)
+        assert response.status_code == 400, response.text
         assert "already exists" in response.json()["detail"]
     
     def test_create_project_invalid_client(self, db_session, auth_headers, test_status):
@@ -211,8 +214,8 @@ class TestProjectsAPI:
             "status": str(test_status.id)
         }
         
-        response = client.post("/projects/", json=project_data, headers=auth_headers)
-        assert response.status_code == 400
+        response = client.post("/projects", json=project_data, headers=auth_headers)
+        assert response.status_code == 400, response.text
         assert "Client not found" in response.json()["detail"]
     
     def test_create_project_invalid_client_project(self, db_session, auth_headers, sample_user, test_client, test_status):
@@ -226,8 +229,8 @@ class TestProjectsAPI:
             "status": str(test_status.id)
         }
         
-        response = client.post("/projects/", json=project_data, headers=auth_headers)
-        assert response.status_code == 400
+        response = client.post("/projects", json=project_data, headers=auth_headers)
+        assert response.status_code == 400, response.text
         assert "Client project not found" in response.json()["detail"]
     
     def test_create_project_client_project_mismatch(self, db_session, auth_headers, sample_user, test_client, test_status, test_client_project):
@@ -251,8 +254,8 @@ class TestProjectsAPI:
             "status": str(test_status.id)
         }
         
-        response = client.post("/projects/", json=project_data, headers=auth_headers)
-        assert response.status_code == 400
+        response = client.post("/projects", json=project_data, headers=auth_headers)
+        assert response.status_code == 400, response.text
         assert "does not belong" in response.json()["detail"]
     
     def test_get_projects(self, db_session, auth_headers, sample_user, test_client, test_status):
@@ -270,8 +273,8 @@ class TestProjectsAPI:
         db_session.add(project)
         db_session.commit()
         
-        response = client.get("/projects/", headers=auth_headers)
-        assert response.status_code == 200
+        response = client.get("/projects", headers=auth_headers)
+        assert response.status_code == 200, response.text
         
         data = response.json()
         assert "projects" in data
@@ -298,19 +301,19 @@ class TestProjectsAPI:
         
         # Filter by client_id
         response = client.get(
-            f"/projects/?client_id={test_client.id}",
+            f"/projects?client_id={test_client.id}",
             headers=auth_headers
         )
-        assert response.status_code == 200
+        assert response.status_code == 200, response.text
         data = response.json()
         assert all(p["client_id"] == str(test_client.id) for p in data["projects"])
         
         # Filter by status
         response = client.get(
-            f"/projects/?status={test_status.id}",
+            f"/projects?status={test_status.id}",
             headers=auth_headers
         )
-        assert response.status_code == 200
+        assert response.status_code == 200, response.text
         data = response.json()
         assert all(p["status"] == str(test_status.id) for p in data["projects"])
     
@@ -331,16 +334,16 @@ class TestProjectsAPI:
         db_session.commit()
         
         # Get first page
-        response = client.get("/projects/?page=1&size=2", headers=auth_headers)
-        assert response.status_code == 200
+        response = client.get("/projects?page=1&size=2", headers=auth_headers)
+        assert response.status_code == 200, response.text
         data = response.json()
         assert len(data["projects"]) <= 2
         assert data["page"] == 1
         assert data["size"] == 2
         
         # Get second page
-        response = client.get("/projects/?page=2&size=2", headers=auth_headers)
-        assert response.status_code == 200
+        response = client.get("/projects?page=2&size=2", headers=auth_headers)
+        assert response.status_code == 200, response.text
         data = response.json()
         assert data["page"] == 2
     
@@ -360,7 +363,7 @@ class TestProjectsAPI:
         db_session.commit()
         
         response = client.get(f"/projects/{project.id}", headers=auth_headers)
-        assert response.status_code == 200
+        assert response.status_code == 200, response.text
         
         data = response.json()
         assert data["id"] == str(project.id)
@@ -396,7 +399,7 @@ class TestProjectsAPI:
         }
         
         response = client.patch(f"/projects/{project.id}", json=update_data, headers=auth_headers)
-        assert response.status_code == 200
+        assert response.status_code == 200, response.text
         
         data = response.json()
         assert data["name"] == "Updated Project Name"
@@ -424,7 +427,7 @@ class TestProjectsAPI:
         }
         
         response = client.patch(f"/projects/{project.id}", json=update_data, headers=auth_headers)
-        assert response.status_code == 200
+        assert response.status_code == 200, response.text
         
         data = response.json()
         assert data["client_project_id"] == str(test_client_project.id)
@@ -465,8 +468,8 @@ class TestProjectsAPI:
         assert project.active == False
         
         # Verify project is not returned in list
-        response = client.get("/projects/", headers=auth_headers)
-        assert response.status_code == 200
+        response = client.get("/projects", headers=auth_headers)
+        assert response.status_code == 200, response.text
         data = response.json()
         project_ids = [p["id"] for p in data["projects"]]
         assert str(project.id) not in project_ids
@@ -492,7 +495,8 @@ class TestProjectsAPI:
             username="nopermuser",
             email="noperm@example.com",
             password_hash=get_password_hash("nopermpassword"),
-            role_id=test_role.id
+            role_id=test_role.id,
+            client_id=test_client.id,  # users.client_id is NOT NULL
         )
         db_session.add(test_user)
         db_session.commit()
@@ -515,6 +519,6 @@ class TestProjectsAPI:
             "status": str(test_status.id)
         }
         
-        response = client.post("/projects/", json=project_data, headers=headers)
+        response = client.post("/projects", json=project_data, headers=headers)
         assert response.status_code == 403
         assert "project:manage" in response.json()["detail"]

@@ -2,18 +2,42 @@
 Tests for results API endpoints
 """
 import pytest
+from tests._fk_helpers import scratch_entry_id, scratch_list_id
 from fastapi.testclient import TestClient
 from app.main import app
 from models.result import Result
+from models.container import Container, ContainerType
 from models.test import Test
 from models.sample import Sample
 from models.analysis import Analysis, Analyte, AnalysisAnalyte
 from models.user import User
-from models.role import Role
-from models.permission import Permission
-from models.role_permission import RolePermission
+from models.user import Role
+from models.user import Permission
+from tests._legacy_models import RolePermission
 
 client = TestClient(app)
+
+
+# These tests were written against a since-removed conftest that provided
+# `sample_user` and `auth_headers`. Recreate them on top of the shared fixtures:
+# an Administrator (all permissions, passes client/project access checks).
+@pytest.fixture(autouse=True)
+def _route_through_test_db(client):
+    """Install the conftest get_db override on the shared app for the
+    module-level TestClient above."""
+    yield
+
+
+@pytest.fixture
+def sample_user(test_admin_user):
+    return test_admin_user
+
+
+@pytest.fixture
+def auth_headers(client, test_admin_user):
+    r = client.post("/auth/login", json={"username": "admin", "password": "adminpassword"})
+    assert r.status_code == 200, r.text
+    return {"Authorization": f"Bearer {r.json()['access_token']}"}
 
 
 class TestResultsAPI:
@@ -42,7 +66,7 @@ class TestResultsAPI:
             description="Test project for results",
             start_date="2024-01-01",
             client_id=client_entity.id,
-            status=None,  # Will be set later
+            status=scratch_entry_id(db_session),  # projects.status is NOT NULL (FK to list_entries)
             created_by=sample_user.id,
             modified_by=sample_user.id
         )
@@ -53,9 +77,9 @@ class TestResultsAPI:
         sample = Sample(
             name="Test Sample",
             description="Test sample for results",
-            sample_type=None,  # Will be set later
-            status=None,  # Will be set later
-            matrix=None,  # Will be set later
+            sample_type=scratch_entry_id(db_session),  # NOT NULL FK to list_entries
+            status=scratch_entry_id(db_session),  # projects.status is NOT NULL (FK to list_entries)
+            matrix=scratch_entry_id(db_session),  # NOT NULL FK to list_entries
             project_id=project.id,
             created_by=sample_user.id,
             modified_by=sample_user.id
@@ -92,7 +116,7 @@ class TestResultsAPI:
             description="Test test for results",
             sample_id=sample.id,
             analysis_id=analysis.id,
-            status=None,  # Will be set later
+            status=scratch_entry_id(db_session),  # projects.status is NOT NULL (FK to list_entries)
             created_by=sample_user.id,
             modified_by=sample_user.id
         )
@@ -109,7 +133,7 @@ class TestResultsAPI:
         }
         
         response = client.post("/results/", json=result_data, headers=auth_headers)
-        assert response.status_code == 200
+        assert response.status_code == 200, response.text
         
         data = response.json()
         assert data["test_id"] == str(test.id)
@@ -141,7 +165,7 @@ class TestResultsAPI:
             description="Test project for batch results",
             start_date="2024-01-01",
             client_id=client_entity.id,
-            status=None,
+            status=scratch_entry_id(db_session),  # projects.status is NOT NULL (FK to list_entries)
             created_by=sample_user.id,
             modified_by=sample_user.id
         )
@@ -152,9 +176,9 @@ class TestResultsAPI:
         sample = Sample(
             name="Test Sample for Batch",
             description="Test sample for batch results",
-            sample_type=None,
-            status=None,
-            matrix=None,
+            sample_type=scratch_entry_id(db_session),  # NOT NULL FK to list_entries
+            status=scratch_entry_id(db_session),  # projects.status is NOT NULL (FK to list_entries)
+            matrix=scratch_entry_id(db_session),  # NOT NULL FK to list_entries
             project_id=project.id,
             created_by=sample_user.id,
             modified_by=sample_user.id
@@ -191,7 +215,7 @@ class TestResultsAPI:
             description="Test test for batch results",
             sample_id=sample.id,
             analysis_id=analysis.id,
-            status=None,
+            status=scratch_entry_id(db_session),  # projects.status is NOT NULL (FK to list_entries)
             created_by=sample_user.id,
             modified_by=sample_user.id
         )
@@ -202,7 +226,7 @@ class TestResultsAPI:
         batch = Batch(
             name="Test Batch for Results",
             description="Test batch for results",
-            status=None,
+            status=scratch_entry_id(db_session),  # projects.status is NOT NULL (FK to list_entries)
             created_by=sample_user.id,
             modified_by=sample_user.id
         )
@@ -222,7 +246,7 @@ class TestResultsAPI:
         }
         
         response = client.post("/results/batch", json=batch_results_data, headers=auth_headers)
-        assert response.status_code == 200
+        assert response.status_code == 200, response.text
         
         data = response.json()
         assert isinstance(data, list)
@@ -254,7 +278,7 @@ class TestResultsAPI:
             description="Test project for validation",
             start_date="2024-01-01",
             client_id=client_entity.id,
-            status=None,
+            status=scratch_entry_id(db_session),  # projects.status is NOT NULL (FK to list_entries)
             created_by=sample_user.id,
             modified_by=sample_user.id
         )
@@ -265,9 +289,9 @@ class TestResultsAPI:
         sample = Sample(
             name="Test Sample for Validation",
             description="Test sample for validation",
-            sample_type=None,
-            status=None,
-            matrix=None,
+            sample_type=scratch_entry_id(db_session),  # NOT NULL FK to list_entries
+            status=scratch_entry_id(db_session),  # projects.status is NOT NULL (FK to list_entries)
+            matrix=scratch_entry_id(db_session),  # NOT NULL FK to list_entries
             project_id=project.id,
             created_by=sample_user.id,
             modified_by=sample_user.id
@@ -304,7 +328,7 @@ class TestResultsAPI:
             description="Test test for validation",
             sample_id=sample.id,
             analysis_id=analysis.id,
-            status=None,
+            status=scratch_entry_id(db_session),  # projects.status is NOT NULL (FK to list_entries)
             created_by=sample_user.id,
             modified_by=sample_user.id
         )
@@ -319,9 +343,7 @@ class TestResultsAPI:
             high_value=1000.0,
             low_value=0.0,
             significant_figures=3,
-            is_required=True,
-            created_by=sample_user.id,
-            modified_by=sample_user.id
+            is_required=True
         )
         db_session.add(analysis_analyte)
         db_session.commit()
@@ -334,7 +356,7 @@ class TestResultsAPI:
         }
         
         response = client.post("/results/validate", json=validation_data, headers=auth_headers)
-        assert response.status_code == 200
+        assert response.status_code == 200, response.text
         
         data = response.json()
         assert "is_valid" in data
@@ -366,7 +388,7 @@ class TestResultsAPI:
             description="Test project for results list",
             start_date="2024-01-01",
             client_id=client_entity.id,
-            status=None,
+            status=scratch_entry_id(db_session),  # projects.status is NOT NULL (FK to list_entries)
             created_by=sample_user.id,
             modified_by=sample_user.id
         )
@@ -377,9 +399,9 @@ class TestResultsAPI:
         sample = Sample(
             name="Test Sample for List",
             description="Test sample for results list",
-            sample_type=None,
-            status=None,
-            matrix=None,
+            sample_type=scratch_entry_id(db_session),  # NOT NULL FK to list_entries
+            status=scratch_entry_id(db_session),  # projects.status is NOT NULL (FK to list_entries)
+            matrix=scratch_entry_id(db_session),  # NOT NULL FK to list_entries
             project_id=project.id,
             created_by=sample_user.id,
             modified_by=sample_user.id
@@ -416,7 +438,7 @@ class TestResultsAPI:
             description="Test test for results list",
             sample_id=sample.id,
             analysis_id=analysis.id,
-            status=None,
+            status=scratch_entry_id(db_session),  # projects.status is NOT NULL (FK to list_entries)
             created_by=sample_user.id,
             modified_by=sample_user.id
         )
@@ -437,7 +459,7 @@ class TestResultsAPI:
         db_session.commit()
         
         response = client.get("/results/", headers=auth_headers)
-        assert response.status_code == 200
+        assert response.status_code == 200, response.text
         
         data = response.json()
         assert "results" in data
@@ -470,7 +492,7 @@ class TestResultsAPI:
             description="Test project for getting result",
             start_date="2024-01-01",
             client_id=client_entity.id,
-            status=None,
+            status=scratch_entry_id(db_session),  # projects.status is NOT NULL (FK to list_entries)
             created_by=sample_user.id,
             modified_by=sample_user.id
         )
@@ -481,9 +503,9 @@ class TestResultsAPI:
         sample = Sample(
             name="Test Sample for Get",
             description="Test sample for getting result",
-            sample_type=None,
-            status=None,
-            matrix=None,
+            sample_type=scratch_entry_id(db_session),  # NOT NULL FK to list_entries
+            status=scratch_entry_id(db_session),  # projects.status is NOT NULL (FK to list_entries)
+            matrix=scratch_entry_id(db_session),  # NOT NULL FK to list_entries
             project_id=project.id,
             created_by=sample_user.id,
             modified_by=sample_user.id
@@ -520,7 +542,7 @@ class TestResultsAPI:
             description="Test test for getting result",
             sample_id=sample.id,
             analysis_id=analysis.id,
-            status=None,
+            status=scratch_entry_id(db_session),  # projects.status is NOT NULL (FK to list_entries)
             created_by=sample_user.id,
             modified_by=sample_user.id
         )
@@ -541,7 +563,7 @@ class TestResultsAPI:
         db_session.commit()
         
         response = client.get(f"/results/{result.id}", headers=auth_headers)
-        assert response.status_code == 200
+        assert response.status_code == 200, response.text
         
         data = response.json()
         assert data["id"] == str(result.id)
@@ -573,7 +595,7 @@ class TestResultsAPI:
             description="Test project for updating result",
             start_date="2024-01-01",
             client_id=client_entity.id,
-            status=None,
+            status=scratch_entry_id(db_session),  # projects.status is NOT NULL (FK to list_entries)
             created_by=sample_user.id,
             modified_by=sample_user.id
         )
@@ -584,9 +606,9 @@ class TestResultsAPI:
         sample = Sample(
             name="Test Sample for Update",
             description="Test sample for updating result",
-            sample_type=None,
-            status=None,
-            matrix=None,
+            sample_type=scratch_entry_id(db_session),  # NOT NULL FK to list_entries
+            status=scratch_entry_id(db_session),  # projects.status is NOT NULL (FK to list_entries)
+            matrix=scratch_entry_id(db_session),  # NOT NULL FK to list_entries
             project_id=project.id,
             created_by=sample_user.id,
             modified_by=sample_user.id
@@ -623,7 +645,7 @@ class TestResultsAPI:
             description="Test test for updating result",
             sample_id=sample.id,
             analysis_id=analysis.id,
-            status=None,
+            status=scratch_entry_id(db_session),  # projects.status is NOT NULL (FK to list_entries)
             created_by=sample_user.id,
             modified_by=sample_user.id
         )
@@ -649,7 +671,7 @@ class TestResultsAPI:
         }
         
         response = client.patch(f"/results/{result.id}", json=update_data, headers=auth_headers)
-        assert response.status_code == 200
+        assert response.status_code == 200, response.text
         
         data = response.json()
         assert data["raw_result"] == "456.78"
@@ -678,7 +700,7 @@ class TestResultsAPI:
             description="Test project for deleting result",
             start_date="2024-01-01",
             client_id=client_entity.id,
-            status=None,
+            status=scratch_entry_id(db_session),  # projects.status is NOT NULL (FK to list_entries)
             created_by=sample_user.id,
             modified_by=sample_user.id
         )
@@ -689,9 +711,9 @@ class TestResultsAPI:
         sample = Sample(
             name="Test Sample for Delete",
             description="Test sample for deleting result",
-            sample_type=None,
-            status=None,
-            matrix=None,
+            sample_type=scratch_entry_id(db_session),  # NOT NULL FK to list_entries
+            status=scratch_entry_id(db_session),  # projects.status is NOT NULL (FK to list_entries)
+            matrix=scratch_entry_id(db_session),  # NOT NULL FK to list_entries
             project_id=project.id,
             created_by=sample_user.id,
             modified_by=sample_user.id
@@ -728,7 +750,7 @@ class TestResultsAPI:
             description="Test test for deleting result",
             sample_id=sample.id,
             analysis_id=analysis.id,
-            status=None,
+            status=scratch_entry_id(db_session),  # projects.status is NOT NULL (FK to list_entries)
             created_by=sample_user.id,
             modified_by=sample_user.id
         )
@@ -749,7 +771,7 @@ class TestResultsAPI:
         db_session.commit()
         
         response = client.delete(f"/results/{result.id}", headers=auth_headers)
-        assert response.status_code == 200
+        assert response.status_code == 200, response.text
         
         data = response.json()
         assert data["message"] == "Result deleted successfully"
@@ -787,7 +809,7 @@ class TestResultsAPI:
             description="Test project",
             start_date=datetime.utcnow(),
             client_id=client_entity.id,
-            status=uuid4(),
+            status=scratch_entry_id(db_session),
             created_by=sample_user.id,
             modified_by=sample_user.id
         )
@@ -869,7 +891,7 @@ class TestResultsAPI:
         db_session.flush()
         
         sample_type = ListEntry(
-            list_id=uuid4(),
+            list_id=scratch_list_id(db_session),
             name="Water Sample",
             description="Water sample type",
             created_by=sample_user.id,
@@ -879,7 +901,7 @@ class TestResultsAPI:
         db_session.flush()
         
         matrix = ListEntry(
-            list_id=uuid4(),
+            list_id=scratch_list_id(db_session),
             name="Water",
             description="Water matrix",
             created_by=sample_user.id,
@@ -974,9 +996,7 @@ class TestResultsAPI:
             significant_figures=2,
             is_required=True,
             reported_name="pH",
-            display_order=1,
-            created_by=sample_user.id,
-            modified_by=sample_user.id
+            display_order=1
         )
         db_session.add(analysis_analyte1)
         db_session.flush()
@@ -990,15 +1010,14 @@ class TestResultsAPI:
             significant_figures=1,
             is_required=False,
             reported_name="Temperature",
-            display_order=2,
-            created_by=sample_user.id,
-            modified_by=sample_user.id
+            display_order=2
         )
         db_session.add(analysis_analyte2)
         db_session.flush()
         
         # Create test
         test1 = Test(
+            name=f"T-{uuid4().hex[:8]}",  # tests.name is NOT NULL
             sample_id=sample1.id,
             analysis_id=analysis.id,
             status=in_process_status.id,
@@ -1050,7 +1069,7 @@ class TestResultsAPI:
         }
         
         response = client.post("/results/batch", json=batch_results_data, headers=auth_headers)
-        assert response.status_code == 200
+        assert response.status_code == 200, response.text
         
         data = response.json()
         assert data["name"] == "Test Batch"
@@ -1096,7 +1115,7 @@ class TestResultsAPI:
             description="Test project",
             start_date=datetime.utcnow(),
             client_id=client_entity.id,
-            status=uuid4(),
+            status=scratch_entry_id(db_session),
             created_by=sample_user.id,
             modified_by=sample_user.id
         )
@@ -1134,11 +1153,11 @@ class TestResultsAPI:
         db_session.add(received_status)
         db_session.flush()
         
-        sample_type = ListEntry(list_id=uuid4(), name="Water", created_by=sample_user.id, modified_by=sample_user.id)
+        sample_type = ListEntry(list_id=scratch_list_id(db_session), name="Water", created_by=sample_user.id, modified_by=sample_user.id)
         db_session.add(sample_type)
         db_session.flush()
         
-        matrix = ListEntry(list_id=uuid4(), name="Water", created_by=sample_user.id, modified_by=sample_user.id)
+        matrix = ListEntry(list_id=scratch_list_id(db_session), name="Water", created_by=sample_user.id, modified_by=sample_user.id)
         db_session.add(matrix)
         db_session.flush()
         
@@ -1169,7 +1188,7 @@ class TestResultsAPI:
         analysis_analyte = AnalysisAnalyte(
             analysis_id=analysis.id, analyte_id=analyte.id, data_type="numeric",
             low_value=0.0, high_value=14.0, is_required=True, reported_name="pH",
-            display_order=1, created_by=sample_user.id, modified_by=sample_user.id
+            display_order=1
         )
         db_session.add(analysis_analyte)
         db_session.flush()
@@ -1204,7 +1223,7 @@ class TestResultsAPI:
         }
         
         response = client.post("/results/batch", json=batch_results_data, headers=auth_headers)
-        assert response.status_code == 400
+        assert response.status_code == 400, response.text
         
         data = response.json()
         assert "errors" in data["detail"]
@@ -1230,7 +1249,7 @@ class TestResultsAPI:
         db_session.add(client_entity)
         db_session.flush()
         
-        project = Project(name="Test Project", start_date=datetime.utcnow(), client_id=client_entity.id, status=uuid4(), created_by=sample_user.id, modified_by=sample_user.id)
+        project = Project(name="Test Project", start_date=datetime.utcnow(), client_id=client_entity.id, status=scratch_entry_id(db_session), created_by=sample_user.id, modified_by=sample_user.id)
         db_session.add(project)
         db_session.flush()
         
@@ -1275,11 +1294,11 @@ class TestResultsAPI:
         db_session.add(received_status)
         db_session.flush()
         
-        sample_type = ListEntry(list_id=uuid4(), name="Water", created_by=sample_user.id, modified_by=sample_user.id)
+        sample_type = ListEntry(list_id=scratch_list_id(db_session), name="Water", created_by=sample_user.id, modified_by=sample_user.id)
         db_session.add(sample_type)
         db_session.flush()
         
-        matrix = ListEntry(list_id=uuid4(), name="Water", created_by=sample_user.id, modified_by=sample_user.id)
+        matrix = ListEntry(list_id=scratch_list_id(db_session), name="Water", created_by=sample_user.id, modified_by=sample_user.id)
         db_session.add(matrix)
         db_session.flush()
         
@@ -1324,7 +1343,7 @@ class TestResultsAPI:
         analysis_analyte = AnalysisAnalyte(
             analysis_id=analysis.id, analyte_id=analyte.id, data_type="numeric",
             low_value=0.0, high_value=14.0, is_required=True, reported_name="pH",
-            display_order=1, created_by=sample_user.id, modified_by=sample_user.id
+            display_order=1
         )
         db_session.add(analysis_analyte)
         db_session.flush()
@@ -1366,7 +1385,7 @@ class TestResultsAPI:
         }
         
         response = client.post("/results/batch", json=batch_results_data, headers=auth_headers)
-        assert response.status_code == 400
+        assert response.status_code == 400, response.text
         
         data = response.json()
         assert "qc_failures" in data["detail"]
@@ -1400,7 +1419,7 @@ class TestResultsAPI:
             description="Test project for E2E",
             start_date=datetime.utcnow(),
             client_id=client_entity.id,
-            status=uuid4(),
+            status=scratch_entry_id(db_session),
             created_by=sample_user.id,
             modified_by=sample_user.id
         )
@@ -1456,11 +1475,11 @@ class TestResultsAPI:
         db_session.add(blank_qc_type)
         db_session.flush()
         
-        sample_type = ListEntry(list_id=uuid4(), name="Water", created_by=sample_user.id, modified_by=sample_user.id)
+        sample_type = ListEntry(list_id=scratch_list_id(db_session), name="Water", created_by=sample_user.id, modified_by=sample_user.id)
         db_session.add(sample_type)
         db_session.flush()
         
-        matrix = ListEntry(list_id=uuid4(), name="Water", created_by=sample_user.id, modified_by=sample_user.id)
+        matrix = ListEntry(list_id=scratch_list_id(db_session), name="Water", created_by=sample_user.id, modified_by=sample_user.id)
         db_session.add(matrix)
         db_session.flush()
         
@@ -1510,7 +1529,7 @@ class TestResultsAPI:
         analysis_analyte1 = AnalysisAnalyte(
             analysis_id=analysis.id, analyte_id=analyte1.id, data_type="numeric",
             low_value=0.0, high_value=14.0, is_required=True, reported_name="pH",
-            display_order=1, created_by=sample_user.id, modified_by=sample_user.id
+            display_order=1
         )
         db_session.add(analysis_analyte1)
         db_session.flush()
@@ -1518,7 +1537,7 @@ class TestResultsAPI:
         analysis_analyte2 = AnalysisAnalyte(
             analysis_id=analysis.id, analyte_id=analyte2.id, data_type="numeric",
             low_value=-10.0, high_value=100.0, is_required=False, reported_name="Temperature",
-            display_order=2, created_by=sample_user.id, modified_by=sample_user.id
+            display_order=2
         )
         db_session.add(analysis_analyte2)
         db_session.flush()
@@ -1576,7 +1595,7 @@ class TestResultsAPI:
         }
         
         response = client.post("/results/batch", json=batch_results_data, headers=auth_headers)
-        assert response.status_code == 200
+        assert response.status_code == 200, response.text
         
         data = response.json()
         assert data["name"] == "E2E Test Batch"
