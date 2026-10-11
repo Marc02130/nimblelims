@@ -21,3 +21,21 @@ Notes for anyone adding tests:
   or be created by the test.
 - The suite has only been verified against the testcontainers DB, not the
   docker-compose stack.
+
+## Configuring agent Step 1 bars that CI can't run
+
+`tests/test_configuring_agent_locks.py` covers the build items (no drop/delete,
+amount -> 0, confirming-user scope and escalation stops, every stop kept,
+include + second confirm, one-transaction rollback, audit fields, safe rerun,
+RESTRICT on identity FKs) against a real database and the real list/role/
+container routes. The LLM call and key lookup are monkeypatched there.
+
+These Done-bar items need a person, a live key, or the compose stack, so no
+automated test asserts them:
+- **D-1 Real lab input** and **D-5 Usable on the bench**: Katinka/Marc sign-off
+  with CMDL-SOP2310 then Qubit 22975, then accession and process a sample.
+- **D-2 Live call**: a live provider key and the stored provider/model. CI has
+  no key and must not call a vendor.
+- **D-9 Survives restart**: compose down/up. The tests prove the rows are
+  committed, not that the volume survives.
+- **L-3 Postgres statement log**: scored from the server's statement log in UAT.

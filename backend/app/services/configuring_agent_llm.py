@@ -7,8 +7,7 @@ from typing import Any
 
 import httpx
 
-from app.services.configuring_agent_allow import PROVIDERS, schema_table_names
-from app.services.ui_schema_catalog import NOT_SCHEMA_TABLES
+from app.services.configuring_agent_allow import PROVIDERS, not_schema_tables
 
 OPENAI_MODELS = "https://api.openai.com/v1/models"
 XAI_MODELS = "https://api.x.ai/v1/models"
@@ -55,13 +54,13 @@ def list_models(provider: str, api_key: str) -> list[dict[str, str]]:
     return rows
 
 
-def propose(provider: str, model: str, api_key: str, *, chunks: list[str], goal_note: str | None, feedback: str | None = None) -> dict[str, Any]:
+def propose(provider: str, model: str, api_key: str, *, chunks: list[str], goal_note: str | None, feedback: str | None = None, permissions: list[str] | None = None) -> dict[str, Any]:
     """Ask the stored provider and model for configuration steps. Returns parsed JSON."""
     if provider not in PROVIDERS:
         raise ProviderError(f"Provider must be one of: {', '.join(PROVIDERS)}.")
     if not model:
         raise ProviderError("No model is selected.")
-    system = _system_prompt()
+    system = _system_prompt(permissions)
     user = _user_prompt(chunks, goal_note, feedback)
     if provider == "anthropic":
         text = _anthropic(model, api_key, system, user)
@@ -71,25 +70,34 @@ def propose(provider: str, model: str, api_key: str, *, chunks: list[str], goal_
     return _parse_json(text)
 
 
-def _system_prompt() -> str:
-    names = schema_table_names()
-    hidden = ", ".join(names["not_schema"])
+def _system_prompt(permissions: list[str] | None = None) -> str:
+    """Scope is the confirming user's permissions, not the Schema catalog (L-2)."""
+    hidden = ", ".join(not_schema_tables())
+    held = ", ".join(sorted(permissions or [])) or "none listed"
     return (
         "You propose NimbleLIMS configuration. Reply with JSON only, no markdown. "
         "Shape: {\"steps\":[{\"group\":\"schema_tables|schema_columns|layouts|privileges|relations|other\","
-        "\"target\":\"...\",\"action\":\"...\",\"why\":\"one line\","
+        "\"target\":\"...\",\"action\":\"...\",\"why\":\"one line\",\"depends_on\":[0],"
         "\"call\":{\"method\":\"POST\",\"path\":\"/v1/schema/columns\",\"body\":{}}}]} "
+        "depends_on lists the zero-based positions of earlier steps this step needs; omit it when none. "
         "If no existing API can express a step, that step has \"gap\" (plain words) and no call. "
-        "Do not invent a workaround. Do not continue past a gap. "
+        "Do not invent a workaround. List every step, including the ones with a gap. "
         "Follow the lab process in the file excerpts. Do not assume every lab uses the same method. "
         "Do not invent needs the excerpts do not state. "
-        f"Schema lab tables: {', '.join(names['lab'])}. "
-        f"Schema system tables (browse only, no new columns): {', '.join(names['system'])}. "
-        f"Not schema tables: {hidden}. Do not add columns on {', '.join(sorted(NOT_SCHEMA_TABLES))}. "
+        "You act with the confirming user's own permissions and nothing more. "
+        f"That user holds: {held}. Any table the user can change through an existing API is in scope. "
+        "The APIs still refuse new columns on system tables and on asked_for, tests, results, containers, "
+        "contents, routing_map, and work_orders; such a change is a gap. "
+        f"Not schema tables: {hidden}. Do not add columns on them. "
         "List values use POST /lists and POST /lists/{name}/entries, group other. "
+        "Never drop and never delete. To retire a list, entry, role, or transition, PATCH active false. "
+        "To retire a table or column, POST its /deprecate route. To retire a container, "
+        "PATCH /containers/{container_id}/contents/{sample_id} with {\"amount\": 0}. "
         "Relations are one_to_many or one_to_one on an existing foreign key. Never many_to_many. "
         "Do not call asked-for, routing, ELN process definitions, parsers, results, custom fields, "
-        "workflow templates, or receive. Do not grant schema:edit. Do not create users. "
+        "workflow templates, or receive. Never grant privileges: do not grant schema:edit, do not give "
+        "any role a permission the user does not hold, and do not change the user's own role. "
+        "Do not create users. "
         "Experiment templates may be created with POST /v1/experiment-templates when the excerpts ask for one. "
         "Add-column data_type is text, numeric, integer, boolean, date, timestamptz, or list."
     )

@@ -1,4 +1,11 @@
-"""Apply accepted steps through existing APIs, as one transaction.
+"""Apply included steps through existing APIs, as one transaction.
+
+Never a drop or a delete: ``execute_step`` refuses them before dispatch, and the
+dispatcher has no code path for them (L-B, L-3, FB-11).
+
+The agent acts as the confirming user (L-2): every call is checked against that
+user's own permissions, and a call that would give anyone (including that user)
+a permission the user does not already hold is a stop, never an apply.
 
 Services commit on the session they are given. AtomicSession turns those commits
 into flushes. The caller commits once at the end, or rolls back so nothing remains.
@@ -15,7 +22,7 @@ from fastapi import HTTPException
 from pydantic import ValidationError
 
 from app.core.security import get_user_permissions
-from app.services.configuring_agent_allow import Classified, classify_call
+from app.services.configuring_agent_allow import Classified, classify_call, is_drop_or_delete
 from models.user import Permission, Role, User, role_permissions
 
 
@@ -86,12 +93,103 @@ def _require(user: User, db, classified: Classified) -> None:
         raise PermissionDenied(f"Permission '{needed}' required")
 
 
+def missing_permission(user: User, db, classified: Classified) -> Optional[str]:
+    """The permission this user lacks for the call, or None."""
+    try:
+        _require(user, db, classified)
+    except PermissionDenied:
+        return classified.permission
+    return None
+
+
+def _role_permission_names(db, role_id) -> set[str]:
+    return _permission_names(db, role_id) if role_id else set()
+
+
+def escalation_gap(db, user: User, method: str, path: str, body: Any) -> Optional[str]:
+    """A stop reason when the call would grant a privilege the user lacks.
+
+    The agent never grants privileges (Marc 2026-10-07). Self-escalation is a
+    stop: changing your own role, adding permissions to your own role, or
+    granting anyone a permission you don't hold yourself.
+    """
+    method = (method or "").upper()
+    path = (path or "").split("?", 1)[0].rstrip("/")
+    data = body if isinstance(body, dict) else {}
+    held = set(get_user_permissions(user, db))
+    role_match = re.match(r"^/roles/([^/]+)/permissions$", path)
+    if method == "PUT" and role_match:
+        try:
+            role_id = UUID(role_match.group(1))
+            ids = [UUID(str(item)) for item in data.get("permission_ids") or []]
+        except ValueError:
+            return None
+        proposed = {
+            row[0]
+            for row in db.query(Permission.name)
+            .filter(Permission.id.in_(ids), Permission.active == True)  # noqa: E712
+            .all()
+        } if ids else set()
+        current = _role_permission_names(db, role_id)
+        added = proposed - current
+        if "schema:edit" in added:
+            return "Lab personnel input does not grant schema:edit."
+        if role_id == getattr(user, "role_id", None) and added:
+            return (
+                "This would add permissions to your own role ("
+                + ", ".join(sorted(added))
+                + "). The agent never grants you new privileges."
+            )
+        beyond = added - held
+        if beyond:
+            return (
+                "This would grant permissions you don't hold ("
+                + ", ".join(sorted(beyond))
+                + "). The agent never grants privileges beyond yours."
+            )
+        return None
+    user_match = re.match(r"^/users/([^/]+)$", path)
+    if method == "PATCH" and user_match and "role_id" in data:
+        try:
+            target_user = UUID(user_match.group(1))
+            new_role = UUID(str(data.get("role_id")))
+        except ValueError:
+            return None
+        if target_user == getattr(user, "id", None):
+            return "This would change your own role. The agent never changes its confirming user's privileges."
+        beyond = _role_permission_names(db, new_role) - held
+        if beyond:
+            return (
+                "That role has permissions you don't hold ("
+                + ", ".join(sorted(beyond))
+                + "). The agent never grants privileges beyond yours."
+            )
+        return None
+    if method == "PUT" and path == "/v1/schema/privileges":
+        rows = body if isinstance(body, list) else data.get("privileges") or data.get("items") or []
+        own = str(getattr(user, "role_id", "") or "")
+        if own and any(isinstance(row, dict) and str(row.get("role_id")) == own for row in rows):
+            return "This would change your own role's table privileges. The agent never grants you new privileges."
+    return None
+
+
 async def execute_step(db, user: User, method: str, path: str, body: Any) -> list[AppliedChange]:
+    if is_drop_or_delete(method, path):
+        raise CannotExpress("Drop and delete are never applied by the configuring agent.")
     payload = body if isinstance(body, dict) else {}
     classified = classify_call(method, path, payload)
     if not classified.ok:
         raise CannotExpress(classified.gap or "This change cannot be applied through configuration APIs.")
     _require(user, db, classified)
+    gap = escalation_gap(db, user, method, path, body)
+    if gap:
+        raise CannotExpress(gap)
+    from app.services.configuring_agent_rerun import existing_change
+
+    present = existing_change(db, user, method, path, body)
+    if present is not None:
+        # Safe rerun (D-7): the object is already there, so this is a no-op.
+        return [present]
     try:
         return await _dispatch(db, user, method.upper(), path, body, classified.kind or "other")
     except ValidationError as exc:
@@ -113,12 +211,13 @@ async def _dispatch(db, user: User, method: str, path: str, body: dict, kind: st
         return _transition(db, user, body)
     if path.startswith("/users/"):
         return await _user_role(db, user, path, body)
+    if re.match(r"^/containers/[^/]+/contents/[^/]+$", path):
+        return await _contents_amount_zero(db, user, path, body)
     raise CannotExpress(f"No configuration API matches {method} {path}.")
 
 
 def _schema(db, user: User, method: str, path: str, body: dict, kind: str) -> list[AppliedChange]:
     from app.schemas.ui_schema import (
-        ConfirmBody,
         PrivilegeIn,
         SchemaColumnCreate,
         SchemaLayoutPut,
@@ -137,9 +236,6 @@ def _schema(db, user: User, method: str, path: str, body: dict, kind: str) -> li
         row = svc.deprecate_table(_uuid_from_path(path.replace("/deprecate", "")))
         read = svc.table_read(row)
         return [AppliedChange("table", read["display_name"], read["id"])]
-    if path.endswith("/drop") and "/tables/" in path:
-        svc.drop_table(_uuid_from_path(path.replace("/drop", "")), ConfirmBody.model_validate(body).confirm)
-        return [AppliedChange("table", path, _uuid_from_path(path.replace("/drop", "")))]
     if method == "POST" and path == "/v1/schema/columns":
         data = SchemaColumnCreate.model_validate(body)
         column = svc.add_column(
@@ -156,10 +252,6 @@ def _schema(db, user: User, method: str, path: str, body: dict, kind: str) -> li
     if path.endswith("/deprecate") and "/columns/" in path:
         read = svc.deprecate_column(_uuid_from_path(path.replace("/deprecate", "")))
         return [AppliedChange("column", read["display_name"], read["id"])]
-    if path.endswith("/drop") and "/columns/" in path:
-        column_id = _uuid_from_path(path.replace("/drop", ""))
-        svc.drop_column(column_id, ConfirmBody.model_validate(body).confirm)
-        return [AppliedChange("column", str(column_id), column_id)]
     if method == "PUT" and path == "/v1/schema/layouts":
         data = SchemaLayoutPut.model_validate(body)
         layout = svc.put_layout(data.role_id, data.screen_key, [field.model_dump() for field in data.fields])
@@ -181,15 +273,11 @@ def _schema(db, user: User, method: str, path: str, body: dict, kind: str) -> li
             cardinality=data.cardinality,
         )
         return [AppliedChange("relationship", read["display_name"], read["id"])]
-    if method == "DELETE" and path.startswith("/v1/schema/relations/"):
-        relation_id = _uuid_from_path(path)
-        svc.delete_relation(relation_id)
-        return [AppliedChange("relationship", str(relation_id), relation_id)]
     raise CannotExpress(f"No configuration API matches {method} {path}.")
 
 
 async def _lists(db, user, method: str, path: str, body: dict, kind: str) -> list[AppliedChange]:
-    from app.routers.lists import create_list, create_list_entry, delete_list, delete_list_entry, update_list, update_list_entry
+    from app.routers.lists import create_list, create_list_entry, update_list, update_list_entry
     from app.schemas.list import ListCreate, ListEntryCreate, ListEntryUpdate, ListUpdate
 
     if method == "POST" and path == "/lists":
@@ -202,20 +290,12 @@ async def _lists(db, user, method: str, path: str, body: dict, kind: str) -> lis
     if method == "PATCH" and re.match(r"^/lists/[^/]+$", path):
         updated = await update_list(_uuid_from_path(path), ListUpdate.model_validate(body), user, db)
         return [AppliedChange("list", updated.name, updated.id)]
-    if method == "DELETE" and re.match(r"^/lists/[^/]+$", path):
-        list_id = _uuid_from_path(path)
-        await delete_list(list_id, user, db)
-        return [AppliedChange("list", str(list_id), list_id)]
     entry_one = re.match(r"^/lists/([^/]+)/entries/([^/]+)$", path)
     if entry_one and method == "PATCH":
         updated = await update_list_entry(
             entry_one.group(1), UUID(entry_one.group(2)), ListEntryUpdate.model_validate(body), user, db
         )
         return [AppliedChange("list_entry", updated.name, updated.id)]
-    if entry_one and method == "DELETE":
-        entry_id = UUID(entry_one.group(2))
-        await delete_list_entry(entry_one.group(1), entry_id, user, db)
-        return [AppliedChange("list_entry", str(entry_id), entry_id)]
     raise CannotExpress(f"No configuration API matches {method} {path}.")
 
 
@@ -254,6 +334,19 @@ async def _user_role(db, user, path: str, body: dict) -> list[AppliedChange]:
 
     updated = await update_user(_uuid_from_path(path), UserUpdate.model_validate(body), user, db)
     return [AppliedChange("user_role", updated.name, updated.id)]
+
+
+async def _contents_amount_zero(db, user, path: str, body: dict) -> list[AppliedChange]:
+    """Container retire: PATCH contents amount to 0. Nothing is deleted."""
+    from app.routers.containers import update_container_contents
+    from app.schemas.container import ContentsUpdate
+
+    parts = path.strip("/").split("/")
+    container_id, sample_id = UUID(parts[1]), UUID(parts[3])
+    if (body or {}).get("amount") not in (0, 0.0) or set(body or {}) != {"amount"}:
+        raise CannotExpress("The only container change this run makes is Amount \u2192 0.")
+    await update_container_contents(container_id, sample_id, ContentsUpdate(amount=0), user, db)
+    return [AppliedChange("contents_amount", f"{container_id}/{sample_id}", container_id)]
 
 
 async def _roles(db, user, method: str, path: str, body: dict) -> list[AppliedChange]:

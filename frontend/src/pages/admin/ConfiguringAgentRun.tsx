@@ -3,9 +3,15 @@ import {
   Alert,
   Box,
   Button,
+  Checkbox,
   Chip,
   CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   Divider,
+  FormControlLabel,
   List,
   ListItem,
   ListItemText,
@@ -66,9 +72,14 @@ interface StepRow {
   action: string;
   why: string;
   decision: string;
+  included: boolean;
   status: string;
   gap: string | null;
   error_message: string | null;
+  depends_on: number[];
+  verb: string | null;
+  second_confirm: boolean;
+  needs_permission: string | null;
 }
 
 interface RunRow {
@@ -82,12 +93,38 @@ interface RunRow {
   applied_count: number;
   skipped_count: number;
   stopped_count: number;
+  confirmed_by?: string | null;
+  agent_provider?: string | null;
+  agent_model?: string | null;
   steps: StepRow[];
+}
+
+export function includedRows(run: RunRow | null): StepRow[] {
+  return (run?.steps || []).filter((step) => step.included && !step.needs_permission);
+}
+
+export function stoppedIncluded(run: RunRow | null): StepRow[] {
+  return includedRows(run).filter((step) => step.status === 'stopped' || Boolean(step.gap));
+}
+
+export function dependencyProblem(run: RunRow | null): string | null {
+  const steps = run?.steps || [];
+  const byPosition = new Map(steps.map((step) => [step.position, step]));
+  for (const step of includedRows(run)) {
+    for (const dep of step.depends_on || []) {
+      const parent = byPosition.get(dep);
+      if (parent && parent.status === 'stopped' && !parent.included) {
+        return `Row ${step.position + 1} depends on row ${dep + 1}, which is stopped. Exclude row ${step.position + 1} too, or fix row ${dep + 1}.`;
+      }
+    }
+  }
+  return null;
 }
 
 function errorText(err: unknown): string {
   const detail = (err as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail;
   if (typeof detail === 'string') return detail;
+  if (detail && typeof detail === 'object' && 'message' in detail) return String((detail as { message: unknown }).message);
   if (Array.isArray(detail)) {
     return detail.map((item) => (item && typeof item === 'object' && 'msg' in item ? String(item.msg) : '')).filter(Boolean).join(' ')
       || 'Request failed';
@@ -106,6 +143,9 @@ const ConfiguringAgentRun: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [secondOpen, setSecondOpen] = useState(false);
+  const [responsible, setResponsible] = useState(false);
 
   const selected = configurations.find((row) => row.id === selectedId) || null;
 
@@ -219,7 +259,7 @@ const ConfiguringAgentRun: React.FC = () => {
       <Typography variant="h4" gutterBottom>Configuring agent</Typography>
       <Typography variant="body1" color="text.secondary" sx={{ mb: 2 }}>
         A configuration has a name and an id. Lab files and the list of what was configured stay on that configuration.
-        Apply writes accepted steps together. If one step cannot be done, every change from that apply is undone.
+        Apply writes the included rows together. If one step cannot be done, every change from that apply is undone.
       </Typography>
       <Button component={RouterLink} to="/admin/settings/configuring-agent" sx={{ mb: 2 }}>
         Provider settings
@@ -327,41 +367,56 @@ const ConfiguringAgentRun: React.FC = () => {
           <Divider sx={{ mb: 2 }} />
           <Typography variant="h6">{run.name}</Typography>
           <Typography variant="body2" sx={{ mb: 1 }}>
-            Run id {run.id} · {run.status} · applied {run.applied_count} · skipped {run.skipped_count} · stopped {run.stopped_count}
+            Run id {run.id} · {run.status} · applied {run.applied_count} · excluded {run.skipped_count} · stopped {run.stopped_count}
           </Typography>
           {run.banner && <Alert severity="warning" sx={{ mb: 2 }}>{run.banner}</Alert>}
-          {run.error_message && <Alert severity="error" sx={{ mb: 2 }}>{run.error_message}</Alert>}
+          {run.error_message && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {run.status === 'failed' ? `Nothing was applied. ${run.error_message}` : run.error_message}
+            </Alert>
+          )}
           {grouped.map((group) => (
             <Box key={group.group} sx={{ mb: 2 }}>
               <Typography variant="subtitle1">{group.label}</Typography>
               {group.steps.map((step) => (
-                <Box key={step.id} sx={{ border: 1, borderColor: 'divider', borderRadius: 1, p: 1.5, mb: 1 }}>
+                <Box
+                  key={step.id}
+                  sx={{
+                    border: 1,
+                    borderColor: step.status === 'stopped' ? 'warning.main' : 'divider',
+                    borderRadius: 1,
+                    p: 1.5,
+                    mb: 1,
+                    opacity: step.needs_permission ? 0.5 : 1,
+                  }}
+                >
+                  <FormControlLabel
+                    control={(
+                      <Checkbox
+                        checked={step.included && !step.needs_permission}
+                        disabled={busy || Boolean(step.needs_permission) || run.status === 'done'}
+                        inputProps={{ 'aria-label': `Include ${step.verb || 'change'} ${step.target}` }}
+                        onChange={(event) => mutate(() => apiService.includeConfigurationStep(run.id, step.id, event.target.checked))}
+                      />
+                    )}
+                    label={`Row ${step.position + 1}${step.verb ? ` · ${step.verb}` : ''}`}
+                  />
                   <Typography variant="subtitle2">{step.target}</Typography>
                   <Typography>{step.action}</Typography>
                   <Typography variant="body2" color="text.secondary">{step.why}</Typography>
                   <Typography variant="caption" display="block" sx={{ mt: 0.5 }}>
-                    {step.decision} · {step.status}
+                    {step.status === 'unchanged' ? 'Already there, nothing to change' : step.status}
+                    {step.depends_on && step.depends_on.length > 0
+                      ? ` · depends on row ${step.depends_on.map((dep) => dep + 1).join(', ')}`
+                      : ''}
                   </Typography>
                   {step.gap && <Alert severity="warning" sx={{ mt: 1 }}>{step.gap}</Alert>}
                   {step.error_message && <Alert severity="error" sx={{ mt: 1 }}>{step.error_message}</Alert>}
-                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1 }}>
-                    <Button
-                      size="small"
-                      variant="contained"
-                      disabled={busy || Boolean(step.gap) || step.status === 'stopped' || step.status === 'applied'}
-                      onClick={() => mutate(() => apiService.acceptConfigurationStep(run.id, step.id))}
-                    >
-                      Accept
-                    </Button>
-                    <Button
-                      size="small"
-                      variant="outlined"
-                      disabled={busy || step.status === 'applied'}
-                      onClick={() => mutate(() => apiService.skipConfigurationStep(run.id, step.id))}
-                    >
-                      Skip
-                    </Button>
-                  </Box>
+                  {step.needs_permission && (
+                    <Typography variant="body2" color="text.disabled" sx={{ mt: 0.5 }}>
+                      Needs {step.needs_permission}
+                    </Typography>
+                  )}
                   <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: 1, mt: 1 }}>
                     <TextField
                       size="small"
@@ -382,13 +437,78 @@ const ConfiguringAgentRun: React.FC = () => {
               ))}
             </Box>
           ))}
+          {stoppedIncluded(run).length > 0 && (
+            <Alert severity="warning" sx={{ mb: 1 }}>
+              Apply writes nothing while an included row is stopped (row{' '}
+              {stoppedIncluded(run).map((step) => step.position + 1).join(', ')}). Exclude it or fix it.
+            </Alert>
+          )}
+          {dependencyProblem(run) && <Alert severity="warning" sx={{ mb: 1 }}>{dependencyProblem(run)}</Alert>}
           <Button
             variant="contained"
-            disabled={busy || !run.steps.some((step) => step.decision === 'accepted') || run.status === 'done'}
-            onClick={() => mutate(() => apiService.applyConfigurationRun(run.id))}
+            disabled={busy || includedRows(run).length === 0 || run.status === 'done'}
+            onClick={() => setConfirmOpen(true)}
           >
-            Apply accepted steps
+            Apply {includedRows(run).length} changes
           </Button>
+          {includedRows(run).length === 0 && run.status !== 'done' && (
+            <Typography variant="body2" sx={{ mt: 1 }}>Include at least one change.</Typography>
+          )}
+          <Dialog open={confirmOpen} onClose={() => setConfirmOpen(false)}>
+            <DialogTitle>Apply {includedRows(run).length} changes?</DialogTitle>
+            <DialogContent>
+              <Typography>
+                Only the included rows are applied, together. If one fails, nothing is applied.
+              </Typography>
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={() => setConfirmOpen(false)}>Cancel</Button>
+              <Button
+                variant="contained"
+                onClick={() => {
+                  setConfirmOpen(false);
+                  const blocked = stoppedIncluded(run).length > 0 || Boolean(dependencyProblem(run));
+                  if (!blocked && includedRows(run).some((step) => step.second_confirm)) {
+                    setResponsible(false);
+                    setSecondOpen(true);
+                  } else {
+                    mutate(() => apiService.applyConfigurationRun(run.id, false));
+                  }
+                }}
+              >
+                Confirm
+              </Button>
+            </DialogActions>
+          </Dialog>
+          <Dialog open={secondOpen} onClose={() => setSecondOpen(false)}>
+            <DialogTitle>You are responsible for these changes</DialogTitle>
+            <DialogContent>
+              <List dense>
+                {includedRows(run).filter((step) => step.second_confirm).map((step) => (
+                  <ListItem key={step.id} disablePadding>
+                    <ListItemText primary={`Row ${step.position + 1} · ${step.verb} · ${step.target}`} secondary={step.action} />
+                  </ListItem>
+                ))}
+              </List>
+              <FormControlLabel
+                control={<Checkbox checked={responsible} onChange={(event) => setResponsible(event.target.checked)} />}
+                label="I am responsible for these changes"
+              />
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={() => setSecondOpen(false)}>Cancel</Button>
+              <Button
+                variant="contained"
+                disabled={!responsible}
+                onClick={() => {
+                  setSecondOpen(false);
+                  mutate(() => apiService.applyConfigurationRun(run.id, true));
+                }}
+              >
+                Confirm
+              </Button>
+            </DialogActions>
+          </Dialog>
           {run.status === 'done' && (
             <Typography sx={{ mt: 2 }}>
               Applied changes are on the configuration ledger. Open Schema, Lists, or Roles to review them. This screen does not edit those records.
