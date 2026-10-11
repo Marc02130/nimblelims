@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from typing import Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
@@ -24,6 +25,7 @@ from app.services.configuring_agent_service import (
     models_for,
     redo_step,
     run_payload,
+    set_included,
     save_provider_and_model,
     set_key,
     settings_payload,
@@ -52,6 +54,16 @@ class ConfigurationBody(BaseModel):
 
 class RunBody(BaseModel):
     goal_note: str | None = None
+
+
+class IncludeBody(BaseModel):
+    include: bool
+
+
+class ApplyBody(BaseModel):
+    """Apply is the first confirm. second_confirm is the "I am responsible" box (L-1)."""
+
+    second_confirm: bool = False
 
 
 class FeedbackBody(BaseModel):
@@ -180,7 +192,7 @@ def post_run(
     db: Session = Depends(get_db),
 ):
     run = start_run(db, user, configuration_id, body.goal_note)
-    return _json(run_payload(run), 201)
+    return _json(run_payload(run, db, user), 201)
 
 
 @router.get("/runs/{run_id}")
@@ -191,7 +203,7 @@ def get_run(
 ):
     from app.services.configuring_agent_service import _run
 
-    return _json(run_payload(_run(db, user, run_id)))
+    return _json(run_payload(_run(db, user, run_id), db, user))
 
 
 @router.post("/runs/{run_id}/steps/{step_id}/accept")
@@ -201,7 +213,7 @@ def post_accept(
     user: User = Depends(require_configuring_agent),
     db: Session = Depends(get_db),
 ):
-    return _json(run_payload(accept_step(db, user, run_id, step_id)))
+    return _json(run_payload(accept_step(db, user, run_id, step_id), db, user))
 
 
 @router.post("/runs/{run_id}/steps/{step_id}/skip")
@@ -211,7 +223,7 @@ def post_skip(
     user: User = Depends(require_configuring_agent),
     db: Session = Depends(get_db),
 ):
-    return _json(run_payload(skip_step(db, user, run_id, step_id)))
+    return _json(run_payload(skip_step(db, user, run_id, step_id), db, user))
 
 
 @router.post("/runs/{run_id}/steps/{step_id}/redo")
@@ -222,14 +234,26 @@ def post_redo(
     user: User = Depends(require_configuring_agent),
     db: Session = Depends(get_db),
 ):
-    return _json(run_payload(redo_step(db, user, run_id, step_id, body.feedback)))
+    return _json(run_payload(redo_step(db, user, run_id, step_id, body.feedback), db, user))
+
+
+@router.post("/runs/{run_id}/steps/{step_id}/include")
+def post_include(
+    run_id: UUID,
+    step_id: UUID,
+    body: IncludeBody,
+    user: User = Depends(require_configuring_agent),
+    db: Session = Depends(get_db),
+):
+    return _json(run_payload(set_included(db, user, run_id, step_id, body.include), db, user))
 
 
 @router.post("/runs/{run_id}/apply")
 async def post_apply(
     run_id: UUID,
+    body: Optional[ApplyBody] = None,
     user: User = Depends(require_configuring_agent),
     db: Session = Depends(get_db),
 ):
-    run, code = await apply_run(db, user, run_id)
-    return _json(run_payload(run), code)
+    run, code = await apply_run(db, user, run_id, second_confirm=bool(body and body.second_confirm))
+    return _json(run_payload(run, db, user), code)

@@ -1,7 +1,15 @@
 """Which existing APIs a configuring-agent step may call.
 
-The schema names are the Schema screen's allow-list. Lists, list items, and units
-are not schema tables. A path this module does not allow stops the run.
+Scope is the confirming user's own permissions (Marc 2026-10-07, L-2): the agent
+may call an allowed route only when that user holds the permission the route
+already requires. The Schema screen's catalog is a display rule, not the agent's
+scope; the only catalog fact kept here is that lists, list items, and units are
+not Schema tables (FB-9). The API's own 422s (system tables, ADD_COLUMN_OUT)
+still stop a row.
+
+No drop and no delete, ever (L-B, L-3, FB-11). Removal is a status flag
+(deprecate / ``active`` false) or, for a container, contents amount -> 0.
+A path this module does not allow stops the run.
 """
 
 from __future__ import annotations
@@ -10,7 +18,7 @@ import re
 from dataclasses import dataclass
 from typing import Any, Optional
 
-from app.services.ui_schema_catalog import LAB_TABLES, NOT_SCHEMA_TABLES, SYSTEM_TABLES
+from app.services.ui_schema_catalog import NOT_SCHEMA_TABLES
 
 STOP_BANNER = "Can't apply this change through configuration APIs"
 P1_TYPES = ("text", "numeric", "integer", "boolean", "date", "timestamptz", "list")
@@ -33,27 +41,65 @@ _OUT_OF_SCOPE = (
 _ALLOWED: tuple[tuple[str, re.Pattern[str], str, str, str], ...] = (
     ("POST", re.compile(r"^/v1/schema/tables$"), "schema_tables", "schema:edit", "table"),
     ("POST", re.compile(r"^/v1/schema/tables/[^/]+/deprecate$"), "schema_tables", "schema:edit", "table"),
-    ("POST", re.compile(r"^/v1/schema/tables/[^/]+/drop$"), "schema_tables", "schema:edit", "table"),
     ("POST", re.compile(r"^/v1/schema/columns$"), "schema_columns", "schema:edit", "column"),
     ("POST", re.compile(r"^/v1/schema/columns/[^/]+/deprecate$"), "schema_columns", "schema:edit", "column"),
-    ("POST", re.compile(r"^/v1/schema/columns/[^/]+/drop$"), "schema_columns", "schema:edit", "column"),
     ("PUT", re.compile(r"^/v1/schema/layouts$"), "layouts", "layout:edit", "layout"),
     ("PUT", re.compile(r"^/v1/schema/privileges$"), "privileges", "schema:edit", "privilege"),
     ("POST", re.compile(r"^/v1/schema/relations$"), "relations", "schema:edit", "relationship"),
-    ("DELETE", re.compile(r"^/v1/schema/relations/[^/]+$"), "relations", "schema:edit", "relationship"),
     ("POST", re.compile(r"^/lists$"), "other", "config:edit", "list"),
     ("PATCH", re.compile(r"^/lists/[^/]+$"), "other", "config:edit", "list"),
     ("POST", re.compile(r"^/lists/[^/]+/entries$"), "other", "config:edit", "list_entry"),
     ("PATCH", re.compile(r"^/lists/[^/]+/entries/[^/]+$"), "other", "config:edit", "list_entry"),
-    ("DELETE", re.compile(r"^/lists/[^/]+$"), "other", "config:edit", "list"),
-    ("DELETE", re.compile(r"^/lists/[^/]+/entries/[^/]+$"), "other", "config:edit", "list_entry"),
     ("POST", re.compile(r"^/v1/experiment-templates$"), "other", "experiment:manage", "experiment_template"),
     ("PATCH", re.compile(r"^/v1/experiment-templates/[^/]+$"), "other", "experiment:manage", "experiment_template"),
     ("POST", re.compile(r"^/containers/types$"), "other", "config:edit", "container_type"),
     ("POST", re.compile(r"^/v1/sample-type-transitions$"), "other", "config:edit", "sample_type_transition"),
     ("PATCH", re.compile(r"^/users/[^/]+$"), "other", "config:edit", "user_role"),
     ("PUT", re.compile(r"^/roles/[^/]+/permissions$"), "other", "config:edit", "role_permissions"),
+    # Container retire: contents amount -> 0 is the only container removal (L-B).
+    ("PATCH", re.compile(r"^/containers/[^/]+/contents/[^/]+$"), "other", "sample:update", "contents_amount"),
 )
+
+DROP_DELETE_GAP = (
+    "Drop and delete are never applied by the configuring agent. "
+    "Retire a record with its status flag (Set inactive), or a container with Amount \u2192 0."
+)
+RELATION_REMOVE_GAP = (
+    "A relation has no status flag, and the agent never deletes. "
+    "Removing a relation can't be done through configuration APIs."
+)
+
+
+def is_drop_or_delete(method: str, path: str) -> bool:
+    """True for any DELETE and for the Schema drop routes. Never callable."""
+    method = (method or "").upper()
+    path = _norm_path(path)
+    return method == "DELETE" or bool(re.search(r"/drop$", path)) or path.endswith("/truncate")
+
+
+# Rows that need the second confirm (L-1): roles and privileges, schema changes,
+# set-inactive, and amount -> 0.
+HIGH_IMPACT_KINDS = {"role_permissions", "user_role", "privilege", "layout", "table", "column", "relationship"}
+
+
+def verb_for(method: str, path: str, body: Any) -> str:
+    """Admin verb for a row: Create, Update, Set inactive, or Amount \u2192 0."""
+    method = (method or "").upper()
+    path = _norm_path(path)
+    data = body if isinstance(body, dict) else {}
+    if re.match(r"^/containers/[^/]+/contents/[^/]+$", path):
+        return "Amount \u2192 0"
+    if path.endswith("/deprecate") or (method == "PATCH" and data.get("active") is False):
+        return "Set inactive"
+    if method == "POST":
+        return "Create"
+    return "Update"
+
+
+def needs_second_confirm(method: str, path: str, body: Any, kind: Optional[str]) -> bool:
+    if (kind or "") in HIGH_IMPACT_KINDS:
+        return True
+    return verb_for(method, path, body) in ("Set inactive", "Amount \u2192 0")
 
 
 @dataclass
@@ -65,13 +111,9 @@ class Classified:
     gap: Optional[str]
 
 
-def schema_table_names() -> dict[str, tuple[str, ...]]:
-    """The Schema screen's list. The agent does not keep a second one."""
-    return {
-        "lab": LAB_TABLES,
-        "system": SYSTEM_TABLES,
-        "not_schema": tuple(sorted(NOT_SCHEMA_TABLES)),
-    }
+def not_schema_tables() -> tuple[str, ...]:
+    """Lists, list items, and units: never Schema tables, never a column add (FB-9)."""
+    return tuple(sorted(NOT_SCHEMA_TABLES))
 
 
 def _norm_path(path: str) -> str:
@@ -116,12 +158,21 @@ def _body_gap(method: str, path: str, body: Any) -> Optional[str]:
             return "An existing user's role is the only user change this run can make."
     if re.search(r"/projects/[^/]+/users", path):
         return "No existing API grants a user access to a project. This run will not invent one."
+    if re.match(r"^/containers/[^/]+/contents/[^/]+$", path):
+        if set(body) != {"amount"} or body.get("amount") not in (0, 0.0):
+            return (
+                "The only container change this run makes is Amount \u2192 0 (retire). "
+                "Send amount 0 and nothing else."
+            )
     return None
 
 
 def classify_call(method: str, path: str, body: Any = None) -> Classified:
     method = (method or "").upper()
     path = _norm_path(path)
+    if is_drop_or_delete(method, path):
+        gap = RELATION_REMOVE_GAP if "/v1/schema/relations/" in path else DROP_DELETE_GAP
+        return Classified(False, "other", None, None, gap)
     if method == "POST" and path == "/users":
         return Classified(False, "other", None, None, "Personnel input uses existing users. This run does not create users.")
     if re.search(r"/projects/[^/]+/users", path):
@@ -138,6 +189,7 @@ def classify_call(method: str, path: str, body: Any = None) -> Classified:
         or gap.startswith("custom_attributes")
         or "not a Schema table" in gap
         or path.startswith("/users/")
+        or path.startswith("/containers/")
     ):
         return Classified(False, "relations" if "junction" in gap else "other", None, None, gap)
     for allowed_method, pattern, group, permission, kind in _ALLOWED:
