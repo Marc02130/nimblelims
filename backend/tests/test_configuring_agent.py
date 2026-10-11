@@ -11,7 +11,7 @@ os.environ["EMBEDDING_PROVIDER"] = "stub"
 from app.services.configuring_agent_allow import (
     STOP_BANNER,
     classify_call,
-    schema_table_names,
+    not_schema_tables,
 )
 from app.services.configuring_agent_apply import (
     AppliedChange,
@@ -24,26 +24,30 @@ from app.services.configuring_agent_chunk import CHUNK_OVERLAP, CHUNK_SIZE, DEFA
 from app.services.configuring_agent_crypto import MissingProviderKey, clear_stored_key, decrypt_secret, encrypt_secret, resolve_provider_key
 from app.services.configuring_agent_embeddings import EMBEDDING_DIM, EMBEDDING_MODEL, embed_texts
 from app.services.configuring_agent_llm import _system_prompt
-from app.services.ui_schema_catalog import LAB_TABLES, NOT_SCHEMA_TABLES, SYSTEM_TABLES
+from app.services.ui_schema_catalog import LAB_TABLES, NOT_SCHEMA_TABLES
 from app.services import configuring_agent_service as agent_service
 from models.configuring_agent import Configuration, ConfigurationChunk, ConfigurationItem, ConfiguringAgentSettings
 
 
-def test_schema_list_is_the_screen_list():
-    names = schema_table_names()
-    assert names["lab"] is LAB_TABLES
-    assert names["system"] is SYSTEM_TABLES
-    assert set(names["not_schema"]) == set(NOT_SCHEMA_TABLES)
-    assert {"lists", "list_entries", "units"} <= set(names["not_schema"])
+def test_only_the_not_schema_guard_comes_from_the_catalog():
+    # L-A: the Schema catalog is a display rule, not the agent's scope. Only the
+    # FB-9 guard (lists, list_entries, units are never Schema tables) is kept.
+    assert set(not_schema_tables()) == set(NOT_SCHEMA_TABLES)
+    assert {"lists", "list_entries", "units"} <= set(not_schema_tables())
 
 
-def test_prompt_uses_that_list():
-    prompt = _system_prompt()
-    for name in schema_table_names()["not_schema"]:
+def test_prompt_scopes_to_the_users_permissions_not_the_catalog():
+    prompt = _system_prompt(["config:edit", "sample:update"])
+    for name in not_schema_tables():
         assert name in prompt
-    assert "samples" in prompt
+    assert "config:edit, sample:update" in prompt
+    assert "confirming user's own permissions" in prompt
     assert "many_to_many" in prompt
-    assert "Do not grant schema:edit" in prompt
+    assert "do not grant schema:edit" in prompt
+    assert "Never drop and never delete" in prompt
+    # The lab-table catalog is no longer handed to the model as the scope.
+    assert "Schema lab tables:" not in prompt
+    assert not all(name in prompt for name in LAB_TABLES)
 
 
 def test_lists_and_units_are_not_schema_calls():
@@ -173,10 +177,12 @@ class _Db:
 
 def _accepted_run():
     steps = []
-    for target in ("A", "B"):
+    for position, target in enumerate(("A", "B")):
         steps.append(
             SimpleNamespace(
                 id=uuid.uuid4(),
+                position=position,
+                depends_on=None,
                 decision="accepted",
                 gap=None,
                 status="proposed",
@@ -198,6 +204,10 @@ def _accepted_run():
         skipped_count=0,
         stopped_count=0,
         modified_by=None,
+        agent_provider="xai",
+        agent_model="grok-test",
+        confirmed_by=None,
+        confirmed_at=None,
     )
 
 
@@ -214,7 +224,8 @@ async def test_apply_rolls_back_every_write(monkeypatch):
         return [AppliedChange("list", "Intake", uuid.uuid4())]
 
     monkeypatch.setattr(agent_service, "_run", lambda *_a, **_k: run)
-    monkeypatch.setattr(agent_service, "_key_for_run", lambda _db: (SimpleNamespace(), "k"))
+    monkeypatch.setattr(agent_service, "_gate", lambda *_a, **_k: None)
+    monkeypatch.setattr(agent_service, "_key_for_run", lambda _db: (SimpleNamespace(agent_provider="xai", agent_model="m"), "k"))
     monkeypatch.setattr(agent_service, "execute_step", execute_step)
     result, code = await agent_service.apply_run(db, SimpleNamespace(id=uuid.uuid4()), run.id)
     assert code == 200
@@ -236,7 +247,8 @@ async def test_permission_failure_rolls_back_and_returns_403(monkeypatch):
         raise PermissionDenied("Permission 'schema:edit' required")
 
     monkeypatch.setattr(agent_service, "_run", lambda *_a, **_k: run)
-    monkeypatch.setattr(agent_service, "_key_for_run", lambda _db: (SimpleNamespace(), "k"))
+    monkeypatch.setattr(agent_service, "_gate", lambda *_a, **_k: None)
+    monkeypatch.setattr(agent_service, "_key_for_run", lambda _db: (SimpleNamespace(agent_provider="xai", agent_model="m"), "k"))
     monkeypatch.setattr(agent_service, "execute_step", execute_step)
     result, code = await agent_service.apply_run(db, SimpleNamespace(id=uuid.uuid4()), run.id)
     assert code == 403
