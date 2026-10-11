@@ -2,7 +2,7 @@
 
 import uuid
 
-from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, text
 from sqlalchemy.dialects.postgresql import JSONB, UUID as PostgresUUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -106,6 +106,11 @@ class ConfigurationRun(Base):
     applied_count = Column(Integer, nullable=False, default=0)
     skipped_count = Column(Integer, nullable=False, default=0)
     stopped_count = Column(Integer, nullable=False, default=0)
+    # Audit (D-8): who confirmed the apply, and which provider/model proposed it.
+    confirmed_by = Column(PostgresUUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"))
+    confirmed_at = Column(DateTime(timezone=True))
+    agent_provider = Column(String(32))
+    agent_model = Column(String(255))
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     created_by = Column(PostgresUUID(as_uuid=True), ForeignKey("users.id"))
     modified_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
@@ -138,6 +143,7 @@ class ConfigurationStep(Base):
     call_body = Column(JSONB)
     gap = Column(Text)
     error_message = Column(Text)
+    depends_on = Column(JSONB)
 
     run = relationship("ConfigurationRun", back_populates="steps")
 
@@ -156,6 +162,10 @@ class ConfigurationItem(Base):
     name = Column(String(255), nullable=False)
     target_id = Column(PostgresUUID(as_uuid=True))
     detail = Column(Text)
+    # Audit (D-8): created_by is the confirming user; run_id the run.
+    agent_assisted = Column(Boolean, nullable=False, default=True, server_default=text("true"))
+    agent_provider = Column(String(32))
+    agent_model = Column(String(255))
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     created_by = Column(PostgresUUID(as_uuid=True), ForeignKey("users.id"))
 
