@@ -2405,9 +2405,13 @@ Configurations are unique per client by name. Each has an id. Documents and chun
 
 `POST .../runs` requires a ready document and a provider, model, and key. Empty input does not call the model.
 
-`POST /v1/configuring-agent/runs/{id}/apply` applies accepted steps in one transaction. Success is **200** and status `done`, and the configuration ledger gains a name and id per stored object. If a step cannot be expressed, the transaction rolls back, then the run is saved as `stopped` with banner `Can't apply this change through configuration APIs` (**200**). A permission failure rolls back and returns **403** with the run. Nothing from that apply remains.
+`POST .../runs` keeps every proposal row. A row no configuration API can express, a drop or delete, or a self-escalation is kept in place as `stopped` with its reason; `stopped_count` counts them all. A create whose object already exists is `unchanged` and starts excluded (safe rerun).
 
-The proposal uses the Schema catalog (`ui_schema_catalog.py`). `lists`, `list_entries`, and `units` are not Schema tables.
+Each row has an include control: `POST /v1/configuring-agent/runs/{id}/steps/{step_id}/include` with `{"include": true|false}` (`accept` and `skip` remain as aliases). Each step in the run payload carries `included`, `verb` (`Create`, `Update`, `Set inactive`, `Amount → 0`), `second_confirm`, `depends_on`, and `needs_permission` (evaluated for the caller, i.e. the confirmer).
+
+`POST /v1/configuring-agent/runs/{id}/apply` body `{"second_confirm": false}` is the first confirm. It applies only the included rows, in one transaction, as the caller. Before any write it refuses with a `detail` of `{message, reason, rows}`: **400** `empty` (“Include at least one change.”), **409** `stopped` (an included row is stopped), **409** `dependency` (an included row depends on an excluded stopped row), **403** `permission` (the caller lacks a row's permission), **409** `escalation`, and **409** `second_confirm` when included rows are roles/privileges, schema changes, Set inactive, or Amount → 0 and `second_confirm` is not true. Success is **200** and status `done`; the run records `confirmed_by`, `confirmed_at`, `agent_provider`, `agent_model`, and each ledger item records the confirming user (`created_by`), `run_id`, `agent_assisted`, provider, and model. If a call fails mid-apply the transaction rolls back in full, then the run is saved `stopped` (banner `Can't apply this change through configuration APIs`) or `failed` (**403** for a permission failure). Nothing from that apply remains.
+
+Scope is the confirming user's own permissions, not the Schema catalog. The API's own 422s (system tables, `ADD_COLUMN_OUT`) still stop a row. `lists`, `list_entries`, and `units` are not Schema tables. The agent never calls a drop or DELETE route; removal is Set inactive (status flag) or, for a container, `PATCH /containers/{container_id}/contents/{sample_id}` with `{"amount": 0}`.
 
 | Method | Path |
 |--------|------|
@@ -2421,6 +2425,7 @@ The proposal uses the Schema catalog (`ui_schema_catalog.py`). `lists`, `list_en
 | GET | `/v1/configuring-agent/runs/{id}` |
 | POST | `/v1/configuring-agent/runs/{id}/steps/{step_id}/accept` |
 | POST | `/v1/configuring-agent/runs/{id}/steps/{step_id}/skip` |
+| POST | `/v1/configuring-agent/runs/{id}/steps/{step_id}/include` |
 | POST | `/v1/configuring-agent/runs/{id}/steps/{step_id}/redo` |
 | POST | `/v1/configuring-agent/runs/{id}/apply` |
 

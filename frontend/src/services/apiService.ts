@@ -2570,8 +2570,19 @@ export class ApiService {
     return response.data;
   }
 
-  async applyConfigurationRun(runId: string) {
-    const response: AxiosResponse = await this.api.post(`/v1/configuring-agent/runs/${runId}/apply`);
+  async includeConfigurationStep(runId: string, stepId: string, include: boolean) {
+    const response: AxiosResponse = await this.api.post(
+      `/v1/configuring-agent/runs/${runId}/steps/${stepId}/include`,
+      { include }
+    );
+    return response.data;
+  }
+
+  async applyConfigurationRun(runId: string, secondConfirm = false) {
+    const response: AxiosResponse = await this.api.post(
+      `/v1/configuring-agent/runs/${runId}/apply`,
+      { second_confirm: secondConfirm }
+    );
     return response.data;
   }
 }
