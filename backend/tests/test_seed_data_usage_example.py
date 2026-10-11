@@ -7,11 +7,25 @@ to test various LIMS workflows with realistic data.
 Run with: pytest backend/tests/test_seed_data_usage_example.py -v
 """
 import pytest
+from tests.fixtures.seed_data_fixtures import *  # noqa: F401,F403  (composite fixtures depend on the others)
 from tests.fixtures.seed_data_fixtures import (
     alice_user, bob_user, carol_manager,
     mab_pk_project, mab_pk_t0_sample, mab_pk_t0_elisa_test,
     mab_pk_full_scenario, cart_qc_scenario, multi_user_rbac_scenario
 )
+
+
+
+@pytest.fixture
+def db_session(migrated_engine):
+    """Seed rows only exist in the Alembic-migrated DB, not the create_all one."""
+    from sqlalchemy.orm import sessionmaker
+    session = sessionmaker(bind=migrated_engine)()
+    try:
+        yield session
+    finally:
+        session.rollback()
+        session.close()
 
 
 def test_sample_access_with_results(db_session, alice_user, mab_pk_t0_sample, mab_pk_t0_elisa_test):
@@ -65,10 +79,11 @@ def test_qc_sample_identification(db_session, cart_qc_scenario):
     blank_test = cart_qc_scenario['blank_test']
     
     # Verify QC type is Blank
-    qc_type_entry = db_session.query(db_session.query(blank_sample.qc_type).first())
-    # Note: qc_type is a UUID FK to list_entries, need to query the list_entry
-    # For simplicity in example, just check it's not NULL
+    # qc_type is a UUID FK to list_entries; resolve it to the entry name
+    from models.list import ListEntry
     assert blank_sample.qc_type is not None
+    qc_type_entry = db_session.query(ListEntry).filter(ListEntry.id == blank_sample.qc_type).one()
+    assert "blank" in qc_type_entry.name.lower()
     
     # Verify test is complete with zero results
     assert blank_test.status is not None  # Should be "Complete" status
@@ -90,9 +105,18 @@ def test_multi_user_project_isolation(db_session, multi_user_rbac_scenario):
     assert alice.client_id == bob.client_id  # Same client (NovaBio)
     
     # Alice can access mAb PK project
-    alice_projects = [pu.project_id for pu in db_session.query(
-        db_session.query(alice.id).join('project_users').all()
-    )]
+    from models.project import ProjectUser
+    alice_projects = {
+        pu.project_id
+        for pu in db_session.query(ProjectUser).filter(ProjectUser.user_id == alice.id)
+    }
+    bob_projects = {
+        pu.project_id
+        for pu in db_session.query(ProjectUser).filter(ProjectUser.user_id == bob.id)
+    }
+    assert mab_pk_proj.id in alice_projects
+    assert cart_proj.id in bob_projects
+    assert cart_proj.id not in alice_projects
     # Note: This is a simplified check; actual RLS enforcement is at API/policy level
     # Full RLS testing requires integration tests with actual user context
 

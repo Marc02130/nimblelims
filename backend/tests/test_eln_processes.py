@@ -371,7 +371,8 @@ class TestELNProcessSamples:
         adv = r.json()
         assert adv["advanced"] is True
         assert adv["sample"]["current_step_id"] == steps[1]["id"]
-        assert adv["sample"]["status"] == "in_progress"
+        # Next step is "queued" until that step's experiment is started
+        assert adv["sample"]["status"] == "queued"
 
         # Advance past last → completed
         r = client.post(

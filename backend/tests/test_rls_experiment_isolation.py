@@ -651,15 +651,38 @@ def rls_seed_0047(migrated_engine, rls_seed_0042):
         "ua": str(ua), "ub": str(ub),
     })
 
+    # ELN process samples are container-scoped (container_id NOT NULL): seed
+    # one tube per sample, with the sample in it.
+    ctype_id = uuid.uuid4()
+    cont_a_id = uuid.uuid4()
+    cont_b_id = uuid.uuid4()
+    conn.execute(text("""
+        INSERT INTO container_types (id, name, rows, columns, active)
+        VALUES (:ct, :ctn, 1, 1, TRUE)
+    """), {"ct": str(ctype_id), "ctn": f"RLS0047 tube {ctype_id.hex[:6]}"})
+    conn.execute(text("""
+        INSERT INTO containers (id, name, type_id, "row", "column", active, created_by, modified_by)
+        VALUES (:ca, :can, :ct, 1, 1, TRUE, :ua, :ua), (:cb, :cbn, :ct, 1, 1, TRUE, :ub, :ub)
+    """), {
+        "ca": str(cont_a_id), "cb": str(cont_b_id), "ct": str(ctype_id),
+        "can": f"RLS0047-A-{cont_a_id.hex[:6]}", "cbn": f"RLS0047-B-{cont_b_id.hex[:6]}",
+        "ua": str(ua), "ub": str(ub),
+    })
+    conn.execute(text("""
+        INSERT INTO contents (container_id, sample_id) VALUES (:ca, :sa), (:cb, :sb)
+    """), {"ca": str(cont_a_id), "cb": str(cont_b_id),
+           "sa": str(sample_a_id), "sb": str(sample_b_id)})
+
     ps_a_id = uuid.uuid4()
     ps_b_id = uuid.uuid4()
     conn.execute(text("""
         INSERT INTO eln_process_samples (
-            id, process_id, sample_id, status, created_by, modified_by
+            id, process_id, sample_id, container_id, status, created_by, modified_by
         ) VALUES
-            (:psa, :pa, :smpla, 'assigned', :ua, :ua),
-            (:psb, :pb, :smplb, 'assigned', :ub, :ub)
+            (:psa, :pa, :smpla, :ca, 'assigned', :ua, :ua),
+            (:psb, :pb, :smplb, :cb, 'assigned', :ub, :ub)
     """), {
+        "ca": str(cont_a_id), "cb": str(cont_b_id),
         "psa": str(ps_a_id), "psb": str(ps_b_id),
         "pa": str(proc_a_id), "pb": str(proc_b_id),
         "smpla": str(sample_a_id), "smplb": str(sample_b_id),
@@ -678,6 +701,20 @@ def rls_seed_0047(migrated_engine, rls_seed_0042):
         "eln_ps_a_id": ps_a_id,
         "eln_ps_b_id": ps_b_id,
     }
+
+    # Teardown (superuser) so rls_seed_0042 can delete its samples afterwards.
+    conn = migrated_engine.connect()
+    conn.execute(text("BEGIN"))
+    ids = {"pa": str(proc_a_id), "pb": str(proc_b_id),
+           "ca": str(cont_a_id), "cb": str(cont_b_id), "ct": str(ctype_id)}
+    conn.execute(text("DELETE FROM eln_process_samples WHERE process_id IN (:pa, :pb)"), ids)
+    conn.execute(text("DELETE FROM eln_process_steps WHERE process_id IN (:pa, :pb)"), ids)
+    conn.execute(text("DELETE FROM eln_processes WHERE id IN (:pa, :pb)"), ids)
+    conn.execute(text("DELETE FROM contents WHERE container_id IN (:ca, :cb)"), ids)
+    conn.execute(text("DELETE FROM containers WHERE id IN (:ca, :cb)"), ids)
+    conn.execute(text("DELETE FROM container_types WHERE id = :ct"), ids)
+    conn.execute(text("COMMIT"))
+    conn.close()
 
     conn = migrated_engine.connect()
     conn.execute(text("BEGIN"))

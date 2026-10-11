@@ -300,5 +300,7 @@ class SopApplyResponse(BaseModel):
     """Response from POST /sop-parse/{id}/apply — IDs of the newly created records."""
     job_id: uuid.UUID
     experiment_template_id: uuid.UUID
-    instrument_parser_id: uuid.UUID
+    # P1: apply no longer creates an InstrumentParser (use /v1/data-parsers);
+    # SOPParseService.apply_job always returns None here.
+    instrument_parser_id: Optional[uuid.UUID] = None
     robot_worklist_config_id: Optional[uuid.UUID]

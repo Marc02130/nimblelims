@@ -2,6 +2,7 @@
 Tests for custom attributes endpoints and validation
 """
 import pytest
+from tests._fk_helpers import scratch_entry_id, scratch_list_id
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 from models.custom_attributes_config import CustomAttributeConfig
@@ -228,24 +229,24 @@ class TestCustomAttributesValidation:
             description="Test project",
             start_date=datetime.utcnow(),
             client_id=client.id,
-            status=uuid4()
+            status=scratch_entry_id(db_session)
         )
         db_session.add(project)
         db_session.flush()
         
         # Create list entries
         sample_type = ListEntry(
-            list_id=uuid4(),
+            list_id=scratch_list_id(db_session),
             name="Blood Sample",
             active=True
         )
         status = ListEntry(
-            list_id=uuid4(),
+            list_id=scratch_list_id(db_session),
             name="Received",
             active=True
         )
         matrix = ListEntry(
-            list_id=uuid4(),
+            list_id=scratch_list_id(db_session),
             name="Blood",
             active=True
         )

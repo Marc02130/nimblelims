@@ -32,6 +32,15 @@ from models.test import Test
 from models.analysis import Analysis, Analyte
 from models.batch import Batch
 from models.result import Result
+import uuid as _uuid
+
+# Migrations 0058/0059 store slug ids ("sample-mab-pk-t0") as uuid5 values
+# (see as_id() there); id columns are UUID, so look them up the same way.
+_SEED_NS = _uuid.UUID("6ba7b810-9dad-11d1-80b4-00c04fd430c8")
+
+
+def seed_id(slug: str) -> _uuid.UUID:
+    return _uuid.uuid5(_SEED_NS, f"nimblelims.seed.{slug}")
 
 
 # ============================================================================
@@ -42,7 +51,7 @@ from models.result import Result
 def novabio_client(db_session: Session) -> Client:
     """NovaBio Therapeutics client (internal biotech company)."""
     return db_session.query(Client).filter(
-        Client.id == "client-biotech-001"
+        Client.id == seed_id("client-biotech-001")
     ).first()
 
 
@@ -50,7 +59,7 @@ def novabio_client(db_session: Session) -> Client:
 def pharmatest_cro_client(db_session: Session) -> Client:
     """PharmaTest CRO client (contract research organization)."""
     return db_session.query(Client).filter(
-        Client.id == "client-cro-002"
+        Client.id == seed_id("client-cro-002")
     ).first()
 
 
@@ -90,7 +99,7 @@ def david_cro_client(db_session: Session) -> User:
 def mab_pk_project(db_session: Session) -> Project:
     """mAb-2301 PK Study project (NovaBio)."""
     return db_session.query(Project).filter(
-        Project.id == "proj-mab-pk-001"
+        Project.id == seed_id("proj-mab-pk-001")
     ).first()
 
 
@@ -98,7 +107,7 @@ def mab_pk_project(db_session: Session) -> Project:
 def cart_project(db_session: Session) -> Project:
     """CAR-T In-Process Testing project (NovaBio)."""
     return db_session.query(Project).filter(
-        Project.id == "proj-cell-therapy-002"
+        Project.id == seed_id("proj-cell-therapy-002")
     ).first()
 
 
@@ -106,7 +115,7 @@ def cart_project(db_session: Session) -> Project:
 def plasmid_project(db_session: Session) -> Project:
     """Plasmid Lot Release Testing project (NovaBio)."""
     return db_session.query(Project).filter(
-        Project.id == "proj-plasmid-003"
+        Project.id == seed_id("proj-plasmid-003")
     ).first()
 
 
@@ -114,7 +123,7 @@ def plasmid_project(db_session: Session) -> Project:
 def cro_sponsor_project(db_session: Session) -> Project:
     """Sponsor XYZ - Bioanalytical Services project (PharmaTest CRO)."""
     return db_session.query(Project).filter(
-        Project.id == "proj-cro-sponsor-004"
+        Project.id == seed_id("proj-cro-sponsor-004")
     ).first()
 
 
@@ -122,7 +131,7 @@ def cro_sponsor_project(db_session: Session) -> Project:
 def project_alpha_legacy(db_session: Session) -> Project:
     """Project Alpha (legacy backward-compat alias for mAb PK)."""
     return db_session.query(Project).filter(
-        Project.id == "proj-alpha-legacy"
+        Project.id == seed_id("proj-alpha-legacy")
     ).first()
 
 
@@ -130,7 +139,7 @@ def project_alpha_legacy(db_session: Session) -> Project:
 def project_beta_legacy(db_session: Session) -> Project:
     """Project Beta (legacy backward-compat alias for CAR-T, used for RLS tests)."""
     return db_session.query(Project).filter(
-        Project.id == "proj-beta-legacy"
+        Project.id == seed_id("proj-beta-legacy")
     ).first()
 
 
@@ -142,7 +151,7 @@ def project_beta_legacy(db_session: Session) -> Project:
 def mab_pk_t0_sample(db_session: Session) -> Sample:
     """mAb PK T0 sample (Testing Complete status, has ELISA results, depleted parent)."""
     return db_session.query(Sample).filter(
-        Sample.id == "sample-mab-pk-t0"
+        Sample.id == seed_id("sample-mab-pk-t0")
     ).first()
 
 
@@ -150,7 +159,7 @@ def mab_pk_t0_sample(db_session: Session) -> Sample:
 def mab_pk_t1_sample(db_session: Session) -> Sample:
     """mAb PK T1 sample (Available for Testing status, test in analysis)."""
     return db_session.query(Sample).filter(
-        Sample.id == "sample-mab-pk-t1"
+        Sample.id == seed_id("sample-mab-pk-t1")
     ).first()
 
 
@@ -158,7 +167,7 @@ def mab_pk_t1_sample(db_session: Session) -> Sample:
 def mab_pk_t2_sample(db_session: Session) -> Sample:
     """mAb PK T2 sample (Received status, test just ordered)."""
     return db_session.query(Sample).filter(
-        Sample.id == "sample-mab-pk-t2"
+        Sample.id == seed_id("sample-mab-pk-t2")
     ).first()
 
 
@@ -166,7 +175,7 @@ def mab_pk_t2_sample(db_session: Session) -> Sample:
 def mab_pk_t0_aliquot(db_session: Session) -> Sample:
     """Aliquot from mAb PK T0 (child sample, parent_sample_id set)."""
     return db_session.query(Sample).filter(
-        Sample.id == "sample-mab-pk-t0-aliquot"
+        Sample.id == seed_id("sample-mab-pk-t0-aliquot")
     ).first()
 
 
@@ -174,7 +183,7 @@ def mab_pk_t0_aliquot(db_session: Session) -> Sample:
 def cart_batch_sample(db_session: Session) -> Sample:
     """CAR-T Batch 001 sample (Available for Testing, viability test in analysis)."""
     return db_session.query(Sample).filter(
-        Sample.id == "sample-cart-batch1"
+        Sample.id == seed_id("sample-cart-batch1")
     ).first()
 
 
@@ -182,7 +191,7 @@ def cart_batch_sample(db_session: Session) -> Sample:
 def cart_blank_qc_sample(db_session: Session) -> Sample:
     """CAR-T Blank QC sample (QC type: Blank, viability test complete with zero results)."""
     return db_session.query(Sample).filter(
-        Sample.id == "sample-cart-blank"
+        Sample.id == seed_id("sample-cart-blank")
     ).first()
 
 
@@ -190,7 +199,7 @@ def cart_blank_qc_sample(db_session: Session) -> Sample:
 def plasmid_lot_sample(db_session: Session) -> Sample:
     """Plasmid Lot 2025-001 sample (Reviewed status, qPCR test complete and reviewed)."""
     return db_session.query(Sample).filter(
-        Sample.id == "sample-plasmid-lot1"
+        Sample.id == seed_id("sample-plasmid-lot1")
     ).first()
 
 
@@ -210,7 +219,7 @@ def xyz_ba_other_client_sample(db_session: Session) -> Sample:
 def cryovial_container_type(db_session: Session) -> ContainerType:
     """Cryovial (2mL) container type."""
     return db_session.query(ContainerType).filter(
-        ContainerType.id == "ctype-001-cryovial"
+        ContainerType.id == seed_id("ctype-001-cryovial")
     ).first()
 
 
@@ -218,7 +227,7 @@ def cryovial_container_type(db_session: Session) -> ContainerType:
 def plate96_container_type(db_session: Session) -> ContainerType:
     """96-Well Plate container type."""
     return db_session.query(ContainerType).filter(
-        ContainerType.id == "ctype-004-plate96"
+        ContainerType.id == seed_id("ctype-004-plate96")
     ).first()
 
 
@@ -226,7 +235,7 @@ def plate96_container_type(db_session: Session) -> ContainerType:
 def mab_pk_t0_container(db_session: Session) -> Container:
     """Container for mAb PK T0 sample (cryovial with depleted volume: 50 µL)."""
     return db_session.query(Container).filter(
-        Container.id == "cont-mab-pk-t0"
+        Container.id == seed_id("cont-mab-pk-t0")
     ).first()
 
 
@@ -238,7 +247,7 @@ def mab_pk_t0_container(db_session: Session) -> Container:
 def elisa_analysis(db_session: Session) -> Analysis:
     """ELISA (Human IgG) analysis."""
     return db_session.query(Analysis).filter(
-        Analysis.id == "analysis-elisa-001"
+        Analysis.id == seed_id("analysis-elisa-001")
     ).first()
 
 
@@ -246,7 +255,7 @@ def elisa_analysis(db_session: Session) -> Analysis:
 def qpcr_analysis(db_session: Session) -> Analysis:
     """qPCR (Plasmid Copy Number) analysis."""
     return db_session.query(Analysis).filter(
-        Analysis.id == "analysis-qpcr-001"
+        Analysis.id == seed_id("analysis-qpcr-001")
     ).first()
 
 
@@ -254,7 +263,7 @@ def qpcr_analysis(db_session: Session) -> Analysis:
 def viability_analysis(db_session: Session) -> Analysis:
     """Cell Viability (Trypan Blue) analysis."""
     return db_session.query(Analysis).filter(
-        Analysis.id == "analysis-viability-001"
+        Analysis.id == seed_id("analysis-viability-001")
     ).first()
 
 
@@ -266,7 +275,7 @@ def viability_analysis(db_session: Session) -> Analysis:
 def igg_concentration_analyte(db_session: Session) -> Analyte:
     """IgG Concentration analyte (for ELISA)."""
     return db_session.query(Analyte).filter(
-        Analyte.id == "analyte-igg-conc"
+        Analyte.id == seed_id("analyte-igg-conc")
     ).first()
 
 
@@ -274,7 +283,7 @@ def igg_concentration_analyte(db_session: Session) -> Analyte:
 def viability_percent_analyte(db_session: Session) -> Analyte:
     """Viability (%) analyte (for cell viability assay)."""
     return db_session.query(Analyte).filter(
-        Analyte.id == "analyte-viability"
+        Analyte.id == seed_id("analyte-viability")
     ).first()
 
 
@@ -286,7 +295,7 @@ def viability_percent_analyte(db_session: Session) -> Analyte:
 def mab_pk_t0_elisa_test(db_session: Session) -> Test:
     """ELISA test for mAb PK T0 sample (Complete status, has results)."""
     return db_session.query(Test).filter(
-        Test.id == "test-mab-pk-t0-elisa"
+        Test.id == seed_id("test-mab-pk-t0-elisa")
     ).first()
 
 
@@ -294,7 +303,7 @@ def mab_pk_t0_elisa_test(db_session: Session) -> Test:
 def mab_pk_t1_elisa_test(db_session: Session) -> Test:
     """ELISA test for mAb PK T1 sample (In Analysis status, no results yet)."""
     return db_session.query(Test).filter(
-        Test.id == "test-mab-pk-t1-elisa"
+        Test.id == seed_id("test-mab-pk-t1-elisa")
     ).first()
 
 
@@ -302,7 +311,7 @@ def mab_pk_t1_elisa_test(db_session: Session) -> Test:
 def cart_viability_test(db_session: Session) -> Test:
     """Viability test for CAR-T Batch 001 (In Analysis status)."""
     return db_session.query(Test).filter(
-        Test.id == "test-cart-viability"
+        Test.id == seed_id("test-cart-viability")
     ).first()
 
 
@@ -310,7 +319,7 @@ def cart_viability_test(db_session: Session) -> Test:
 def cart_blank_viability_test(db_session: Session) -> Test:
     """Viability test for CAR-T Blank QC (Complete status, zero results)."""
     return db_session.query(Test).filter(
-        Test.id == "test-cart-blank-viability"
+        Test.id == seed_id("test-cart-blank-viability")
     ).first()
 
 
@@ -322,8 +331,8 @@ def cart_blank_viability_test(db_session: Session) -> Test:
 def mab_pk_t0_igg_result(db_session: Session) -> Result:
     """IgG concentration result for mAb PK T0 ELISA test (5.2 µg/mL)."""
     return db_session.query(Result).filter(
-        Result.test_id == "test-mab-pk-t0-elisa",
-        Result.analyte_id == "analyte-igg-conc"
+        Result.test_id == seed_id("test-mab-pk-t0-elisa"),
+        Result.analyte_id == seed_id("analyte-igg-conc")
     ).first()
 
 
@@ -335,7 +344,7 @@ def mab_pk_t0_igg_result(db_session: Session) -> Result:
 def mab_elisa_batch(db_session: Session) -> Batch:
     """mAb ELISA Batch (In Process status, 3 samples: T0, T1, T2)."""
     return db_session.query(Batch).filter(
-        Batch.id == "batch-mab-elisa-001"
+        Batch.id == seed_id("batch-mab-elisa-001")
     ).first()
 
 
@@ -343,7 +352,7 @@ def mab_elisa_batch(db_session: Session) -> Batch:
 def cart_qc_batch(db_session: Session) -> Batch:
     """CAR-T QC Batch (Completed status, 2 samples: Batch-001 + Blank QC)."""
     return db_session.query(Batch).filter(
-        Batch.id == "batch-cart-qc-001"
+        Batch.id == seed_id("batch-cart-qc-001")
     ).first()
 
 

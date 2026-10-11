@@ -323,8 +323,9 @@ async def update_help_entry(
         help_entry.content = help_data.content
         help_entry.description = help_data.content[:255] if len(help_data.content) > 255 else help_data.content
     
-    if help_data.role_filter is not None:
-        # Validate and normalize role_filter
+    if "role_filter" in help_data.model_fields_set:
+        # Validate and normalize role_filter. An explicit null makes the entry
+        # public; omitting the field leaves it unchanged.
         help_entry.role_filter = validate_role_filter(help_data.role_filter, db)
     
     if help_data.active is not None:

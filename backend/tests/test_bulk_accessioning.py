@@ -2,6 +2,7 @@
 Tests for bulk sample accessioning endpoint (US-24)
 """
 import pytest
+from tests._fk_helpers import scratch_entry_id, scratch_list_id
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 from models.sample import Sample
@@ -37,14 +38,14 @@ class TestBulkAccessioning:
             description="Test project for bulk accessioning",
             start_date=datetime.utcnow(),
             client_id=client.id,
-            status=uuid4()  # Mock status ID
+            status=scratch_entry_id(db_session)  # Mock status ID
         )
         db_session.add(project)
         db_session.flush()
         
         # Create list entries for sample types, statuses, matrices
         sample_type = ListEntry(
-            list_id=uuid4(),
+            list_id=scratch_list_id(db_session),
             name="Blood Sample",
             description="Blood sample type",
             created_by=test_admin_user.id,
@@ -54,7 +55,7 @@ class TestBulkAccessioning:
         db_session.flush()
         
         matrix = ListEntry(
-            list_id=uuid4(),
+            list_id=scratch_list_id(db_session),
             name="Blood",
             description="Blood matrix",
             created_by=test_admin_user.id,
@@ -146,6 +147,7 @@ class TestBulkAccessioning:
             "received_date": datetime.utcnow().isoformat(),
             "sample_type": str(test_data["sample_type"].id),
             "matrix": str(test_data["matrix"].id),
+            "client_id": str(test_data["client"].id),  # required by BulkSampleAccessioningRequest
             "project_id": str(test_data["project"].id),
             "container_type_id": str(test_data["container_type"].id),
             "uniques": [
@@ -168,7 +170,7 @@ class TestBulkAccessioning:
             headers={"Authorization": f"Bearer {token}"}
         )
         
-        assert response.status_code == 200
+        assert response.status_code == 200, response.text
         data = response.json()
         assert len(data) == 2
         assert data[0]["name"] == "BULK-001"
@@ -189,6 +191,7 @@ class TestBulkAccessioning:
             "received_date": datetime.utcnow().isoformat(),
             "sample_type": str(test_data["sample_type"].id),
             "matrix": str(test_data["matrix"].id),
+            "client_id": str(test_data["client"].id),  # required by BulkSampleAccessioningRequest
             "project_id": str(test_data["project"].id),
             "container_type_id": str(test_data["container_type"].id),
             "auto_name_prefix": "AUTO-",
@@ -209,7 +212,7 @@ class TestBulkAccessioning:
             headers={"Authorization": f"Bearer {token}"}
         )
         
-        assert response.status_code == 200
+        assert response.status_code == 200, response.text
         data = response.json()
         assert len(data) == 2
         assert data[0]["name"] == "AUTO-100"
@@ -244,6 +247,7 @@ class TestBulkAccessioning:
             "received_date": datetime.utcnow().isoformat(),
             "sample_type": str(test_data["sample_type"].id),
             "matrix": str(test_data["matrix"].id),
+            "client_id": str(test_data["client"].id),  # required by BulkSampleAccessioningRequest
             "project_id": str(test_data["project"].id),
             "container_type_id": str(test_data["container_type"].id),
             "uniques": [
@@ -260,7 +264,7 @@ class TestBulkAccessioning:
             headers={"Authorization": f"Bearer {token}"}
         )
         
-        assert response.status_code == 400
+        assert response.status_code == 400, response.text
         assert "Duplicate sample names" in response.json()["detail"]
     
     def test_bulk_accession_duplicate_containers(self, client: TestClient, test_admin_user, test_data, db_session: Session):
@@ -286,6 +290,7 @@ class TestBulkAccessioning:
             "received_date": datetime.utcnow().isoformat(),
             "sample_type": str(test_data["sample_type"].id),
             "matrix": str(test_data["matrix"].id),
+            "client_id": str(test_data["client"].id),  # required by BulkSampleAccessioningRequest
             "project_id": str(test_data["project"].id),
             "container_type_id": str(test_data["container_type"].id),
             "uniques": [
@@ -302,7 +307,7 @@ class TestBulkAccessioning:
             headers={"Authorization": f"Bearer {token}"}
         )
         
-        assert response.status_code == 400
+        assert response.status_code == 400, response.text
         assert "Duplicate container names" in response.json()["detail"]
     
     def test_bulk_accession_with_tests(self, client: TestClient, test_admin_user, test_data, db_session: Session):
@@ -330,6 +335,7 @@ class TestBulkAccessioning:
             "received_date": datetime.utcnow().isoformat(),
             "sample_type": str(test_data["sample_type"].id),
             "matrix": str(test_data["matrix"].id),
+            "client_id": str(test_data["client"].id),  # required by BulkSampleAccessioningRequest
             "project_id": str(test_data["project"].id),
             "container_type_id": str(test_data["container_type"].id),
             "assigned_tests": [str(analysis.id)],
@@ -347,7 +353,7 @@ class TestBulkAccessioning:
             headers={"Authorization": f"Bearer {token}"}
         )
         
-        assert response.status_code == 200
+        assert response.status_code == 200, response.text
         data = response.json()
         assert len(data) == 1
         assert data[0]["name"] == "TEST-BULK-001"
@@ -373,6 +379,7 @@ class TestBulkAccessioning:
             "received_date": datetime.utcnow().isoformat(),
             "sample_type": str(test_data["sample_type"].id),
             "matrix": str(test_data["matrix"].id),
+            "client_id": str(test_data["client"].id),  # required by BulkSampleAccessioningRequest
             "project_id": str(test_data["project"].id),
             "container_type_id": str(test_data["container_type"].id),
             "uniques": [
@@ -389,7 +396,7 @@ class TestBulkAccessioning:
             headers={"Authorization": f"Bearer {token}"}
         )
         
-        assert response.status_code == 200
+        assert response.status_code == 200, response.text
         data = response.json()
         sample_id = UUID(data[0]["id"])
         

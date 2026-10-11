@@ -113,6 +113,9 @@ class TestLimsRunCohort:
             modified_by=test_admin_user.id,
         )
         db_session.add(sample)
+        # Start mints Tests for the cohort with status "Assigned/Pending" (WO-7).
+        from tests._fk_helpers import get_or_create_list_entry
+        get_or_create_list_entry(db_session, "test_status", "Assigned/Pending")
         db_session.commit()
 
         r = client.post(

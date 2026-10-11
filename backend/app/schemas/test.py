@@ -1,6 +1,7 @@
 """
 Pydantic schemas for tests
 """
+from app.schemas._dates import is_future
 from pydantic import BaseModel, Field, validator
 from typing import Optional, List, Dict, Any
 from datetime import datetime
@@ -21,7 +22,7 @@ class TestBase(BaseModel):
 
     @validator('review_date', 'test_date')
     def validate_dates(cls, v):
-        if v and v > datetime.now():
+        if v and is_future(v):
             raise ValueError('Date cannot be in the future')
         return v
 
@@ -45,7 +46,7 @@ class TestUpdate(BaseModel):
 
     @validator('review_date', 'test_date')
     def validate_dates(cls, v):
-        if v and v > datetime.now():
+        if v and is_future(v):
             raise ValueError('Date cannot be in the future')
         return v
 
@@ -82,7 +83,7 @@ class TestAssignmentRequest(BaseModel):
 
     @validator('test_date')
     def validate_test_date(cls, v):
-        if v and v > datetime.now():
+        if v and is_future(v):
             raise ValueError('Test date cannot be in the future')
         return v
 
@@ -96,7 +97,7 @@ class TestStatusUpdateRequest(BaseModel):
 
     @validator('review_date', 'test_date')
     def validate_dates(cls, v):
-        if v and v > datetime.now():
+        if v and is_future(v):
             raise ValueError('Date cannot be in the future')
         return v
 
@@ -108,6 +109,6 @@ class TestReviewRequest(BaseModel):
 
     @validator('review_date')
     def validate_review_date(cls, v):
-        if v > datetime.now():
+        if is_future(v):
             raise ValueError('Review date cannot be in the future')
         return v

@@ -239,9 +239,10 @@ async def assign_test_to_sample(
         )
     
     # Get "In Process" status
-    from models.list import ListEntry
-    in_process_status = db.query(ListEntry).filter(
-        ListEntry.list_id == "test_status",  # Assuming this list exists
+    from models.list import ListEntry, List as ListModel
+    in_process_status = db.query(ListEntry).join(ListModel, ListEntry.list_id == ListModel.id).filter(
+        # list_id is a UUID FK; match the list by name (was compared to a string -> DataError)
+        ListModel.name.in_(("Test Status", "test_status")),
         ListEntry.name == "In Process"
     ).first()
     
@@ -381,7 +382,7 @@ async def update_test_status(
             )
     
     # Validate status exists
-    from models.list import ListEntry
+    from models.list import ListEntry, List as ListModel
     status_entry = db.query(ListEntry).filter(
         ListEntry.id == status_data.status,
         ListEntry.active == True
@@ -442,9 +443,10 @@ async def review_test(
             )
     
     # Get "Complete" status
-    from models.list import ListEntry
-    complete_status = db.query(ListEntry).filter(
-        ListEntry.list_id == "test_status",  # Assuming this list exists
+    from models.list import ListEntry, List as ListModel
+    complete_status = db.query(ListEntry).join(ListModel, ListEntry.list_id == ListModel.id).filter(
+        # list_id is a UUID FK; match the list by name (was compared to a string -> DataError)
+        ListModel.name.in_(("Test Status", "test_status")),
         ListEntry.name == "Complete"
     ).first()
     
@@ -461,9 +463,10 @@ async def review_test(
     test.modified_at = datetime.utcnow()
     
     # Update sample status to "Reviewed" if all tests are complete
-    from models.list import ListEntry
-    reviewed_status = db.query(ListEntry).filter(
-        ListEntry.list_id == "sample_status",  # Assuming this list exists
+    from models.list import ListEntry, List as ListModel
+    reviewed_status = db.query(ListEntry).join(ListModel, ListEntry.list_id == ListModel.id).filter(
+        # list_id is a UUID FK; match the list by name (was compared to a string -> DataError)
+        ListModel.name.in_(("Sample Status", "sample_status")),
         ListEntry.name == "Reviewed"
     ).first()
     

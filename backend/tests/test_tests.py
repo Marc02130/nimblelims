@@ -2,6 +2,7 @@
 Tests for tests endpoints
 """
 import pytest
+from tests._fk_helpers import custom_attr, scratch_entry_id, scratch_list_id
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 from models.test import Test
@@ -15,78 +16,88 @@ from datetime import datetime, timedelta
 from uuid import uuid4
 
 
+
+@pytest.fixture
+def test_data(db_session: Session):
+    """Create test data for tests"""
+    # Create client and project
+    client = Client(
+        name="Test Client",
+        description="Test client for tests",
+        billing_info={"address": "123 Test St"}
+    )
+    db_session.add(client)
+    db_session.flush()
+    
+    project = Project(
+        name="Test Project",
+        description="Test project for tests",
+        start_date=datetime.utcnow(),
+        client_id=client.id,
+        status=scratch_entry_id(db_session)
+    )
+    db_session.add(project)
+    db_session.flush()
+    
+    # Create sample
+    sample = Sample(
+        name="SAMPLE-TEST-001",
+        description="Test sample for tests",
+        due_date=datetime.utcnow() + timedelta(days=7),
+        received_date=datetime.utcnow(),
+        sample_type=scratch_entry_id(db_session),
+        status=scratch_entry_id(db_session),
+        matrix=scratch_entry_id(db_session),
+        temperature=25.0,
+        project_id=project.id,
+        created_by=None,
+        modified_by=None
+    )
+    db_session.add(sample)
+    db_session.flush()
+    
+    # Create analysis
+    analysis = Analysis(
+        name="Test Analysis",
+        description="Test analysis for tests",
+        method="Test Method",
+        turnaround_time=24,
+        cost=100.0,
+        created_by=None,
+        modified_by=None
+    )
+    db_session.add(analysis)
+    db_session.flush()
+    
+    # Create test status
+    # /tests/assign and /tests/{id}/review look statuses up in the "test_status" list.
+    from models.list import List
+    status_list = db_session.query(List).filter(List.name == "test_status").first()
+    if not status_list:
+        status_list = List(name="test_status", description="Test status")
+        db_session.add(status_list)
+        db_session.flush()
+    test_status = ListEntry(
+        list_id=status_list.id,
+        name="In Process",
+        description="Test in process status"
+    )
+    db_session.add(test_status)
+    db_session.flush()
+    
+    return {
+        "client": client,
+        "project": project,
+        "sample": sample,
+        "analysis": analysis,
+        "test_status": test_status
+    }
+
+
 class TestTestsCRUD:
     """Test tests CRUD operations"""
     
-    @pytest.fixture
-    def test_data(self, db_session: Session):
-        """Create test data for tests"""
-        # Create client and project
-        client = Client(
-            name="Test Client",
-            description="Test client for tests",
-            billing_info={"address": "123 Test St"}
-        )
-        db_session.add(client)
-        db_session.flush()
-        
-        project = Project(
-            name="Test Project",
-            description="Test project for tests",
-            start_date=datetime.utcnow(),
-            client_id=client.id,
-            status=uuid4()
-        )
-        db_session.add(project)
-        db_session.flush()
-        
-        # Create sample
-        sample = Sample(
-            name="SAMPLE-TEST-001",
-            description="Test sample for tests",
-            due_date=datetime.utcnow() + timedelta(days=7),
-            received_date=datetime.utcnow(),
-            sample_type=uuid4(),
-            status=uuid4(),
-            matrix=uuid4(),
-            temperature=25.0,
-            project_id=project.id,
-            created_by=uuid4(),
-            modified_by=uuid4()
-        )
-        db_session.add(sample)
-        db_session.flush()
-        
-        # Create analysis
-        analysis = Analysis(
-            name="Test Analysis",
-            description="Test analysis for tests",
-            method="Test Method",
-            turnaround_time=24,
-            cost=100.0,
-            created_by=uuid4(),
-            modified_by=uuid4()
-        )
-        db_session.add(analysis)
-        db_session.flush()
-        
-        # Create test status
-        test_status = ListEntry(
-            list_id=uuid4(),
-            name="In Process",
-            description="Test in process status"
-        )
-        db_session.add(test_status)
-        db_session.flush()
-        
-        return {
-            "client": client,
-            "project": project,
-            "sample": sample,
-            "analysis": analysis,
-            "test_status": test_status
-        }
-    
+
     def test_create_test_success(self, client: TestClient, test_admin_user, test_data):
         """Test successful test creation"""
         auth_response = client.post(
@@ -110,7 +121,7 @@ class TestTestsCRUD:
             headers={"Authorization": f"Bearer {token}"}
         )
         
-        assert response.status_code == 201
+        assert response.status_code == 200, response.text  # create/assign endpoints return 200 (no status_code=201 on the route)
         data = response.json()
         assert data["name"] == "TEST-001"
         assert data["description"] == "Test test"
@@ -140,11 +151,11 @@ class TestTestsCRUD:
         token = auth_response.json()["access_token"]
         
         response = client.get(
-            "/tests/",
+            "/tests",
             headers={"Authorization": f"Bearer {token}"}
         )
         
-        assert response.status_code == 200
+        assert response.status_code == 200, response.text
         data = response.json()
         assert "tests" in data
         assert "total" in data
@@ -180,7 +191,7 @@ class TestTestsCRUD:
             headers={"Authorization": f"Bearer {token}"}
         )
         
-        assert response.status_code == 200
+        assert response.status_code == 200, response.text
         data = response.json()
         assert data["id"] == str(test.id)
         assert data["name"] == "TEST-003"
@@ -219,7 +230,7 @@ class TestTestsCRUD:
             headers={"Authorization": f"Bearer {token}"}
         )
         
-        assert response.status_code == 200
+        assert response.status_code == 200, response.text
         data = response.json()
         assert data["description"] == "Updated test description"
     
@@ -251,7 +262,7 @@ class TestTestsCRUD:
             headers={"Authorization": f"Bearer {token}"}
         )
         
-        assert response.status_code == 200
+        assert response.status_code == 200, response.text
         assert "deleted successfully" in response.json()["message"]
         
         # Verify test is soft deleted
@@ -283,7 +294,7 @@ class TestTestAssignment:
             headers={"Authorization": f"Bearer {token}"}
         )
         
-        assert response.status_code == 201
+        assert response.status_code == 200, response.text  # create/assign endpoints return 200 (no status_code=201 on the route)
         data = response.json()
         assert data["sample_id"] == str(test_data["sample"].id)
         assert data["analysis_id"] == str(test_data["analysis"].id)
@@ -357,7 +368,7 @@ class TestTestStatusManagement:
         
         # Create new status
         new_status = ListEntry(
-            list_id=uuid4(),
+            list_id=scratch_list_id(db_session),
             name="In Analysis",
             description="Test in analysis status"
         )
@@ -382,7 +393,7 @@ class TestTestStatusManagement:
             headers={"Authorization": f"Bearer {token}"}
         )
         
-        assert response.status_code == 200
+        assert response.status_code == 200, response.text
         data = response.json()
         assert data["status"] == str(new_status.id)
     
@@ -442,6 +453,9 @@ class TestTestReview:
         )
         db_session.add(test)
         db_session.commit()
+        # Review sets the test to "Complete" in the test_status list.
+        db_session.add(ListEntry(list_id=test_data["test_status"].list_id, name="Complete", description="Test complete"))
+        db_session.commit()
         
         auth_response = client.post(
             "/auth/login",
@@ -461,7 +475,7 @@ class TestTestReview:
             headers={"Authorization": f"Bearer {token}"}
         )
         
-        assert response.status_code == 200
+        assert response.status_code == 200, response.text
         data = response.json()
         assert data["review_date"] is not None
     
@@ -519,7 +533,7 @@ class TestTestPermissions:
     
     def test_get_tests_requires_permission(self, client: TestClient):
         """Test that getting tests requires authentication"""
-        response = client.get("/tests/")
+        response = client.get("/tests")
         assert response.status_code == 401  # Unauthorized
     
     def test_update_test_requires_permission(self, client: TestClient):
@@ -553,6 +567,9 @@ class TestTestPermissions:
         token = auth_response.json()["access_token"]
         
         # Update test with custom attributes
+        custom_attr(db_session, "tests", "instrument", "text")
+        custom_attr(db_session, "tests", "run_number", "text")
+        db_session.commit()
         update_data = {
             "custom_attributes": {
                 "instrument": "GC-MS-001",
@@ -566,7 +583,7 @@ class TestTestPermissions:
             headers={"Authorization": f"Bearer {token}"}
         )
         
-        assert response.status_code == 200
+        assert response.status_code == 200, response.text
         data = response.json()
         assert "custom_attributes" in data
         assert data["custom_attributes"]["instrument"] == "GC-MS-001"
@@ -641,7 +658,7 @@ class TestTestPermissions:
             headers={"Authorization": f"Bearer {token}"}
         )
         
-        assert response.status_code == 200
+        assert response.status_code == 200, response.text
         data = response.json()
         assert data["status"] == str(complete_status.id)
     
@@ -679,7 +696,7 @@ class TestTestPermissions:
             headers={"Authorization": f"Bearer {token}"}
         )
         
-        assert response.status_code == 200
+        assert response.status_code == 200, response.text
         data = response.json()
         assert data["technician_id"] == str(test_admin_user.id)
         assert data["test_date"] is not None
@@ -755,7 +772,7 @@ class TestTestEditRBAC:
             headers={"Authorization": f"Bearer {token}"}
         )
         
-        assert response.status_code == 200
+        assert response.status_code == 200, response.text
         data = response.json()
         
         # Verify modified_by is updated
@@ -853,7 +870,7 @@ class TestTestValidation:
         
         # Create new status
         new_status = ListEntry(
-            list_id=uuid4(),
+            list_id=scratch_list_id(db_session),
             name="Complete",
             description="Test complete status"
         )
@@ -879,4 +896,4 @@ class TestTestValidation:
         )
         
         assert response.status_code == 422  # Validation error
-        assert "Date cannot be in the future" in response.json()["detail"]
+        assert any("Date cannot be in the future" in e["msg"] for e in response.json()["detail"])

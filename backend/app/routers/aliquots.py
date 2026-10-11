@@ -32,6 +32,34 @@ from decimal import Decimal
 router = APIRouter()
 
 
+
+def _with_contents(sample: Sample, db: Session, schema):
+    """Build an Aliquot/DerivativeResponse including container/amount/client.
+
+    ``schema.from_orm(sample)`` left container_id, concentration, amount (and
+    their units) and client_id null on every response: those live on the
+    ``contents`` row and the project, not on Sample.
+    """
+    data = schema.model_validate(sample, from_attributes=True).model_dump()
+    contents = (
+        db.query(Contents)
+        .filter(Contents.sample_id == sample.id)
+        .order_by(Contents.container_id)
+        .first()
+    )
+    if contents is not None:
+        data.update(
+            container_id=contents.container_id,
+            concentration=float(contents.concentration) if contents.concentration is not None else None,
+            concentration_units=contents.concentration_units,
+            amount=float(contents.amount) if contents.amount is not None else None,
+            amount_units=contents.amount_units,
+        )
+    project = getattr(sample, "project", None)
+    if project is not None and data.get("client_id") is None:
+        data["client_id"] = getattr(project, "client_id", None)
+    return schema(**data)
+
 @router.post("", response_model=AliquotResponse)
 async def create_aliquot(
     aliquot_data: AliquotCreateRequest,
@@ -123,7 +151,7 @@ async def create_aliquot(
     db.commit()
     db.refresh(aliquot)
     
-    return AliquotResponse.from_orm(aliquot)
+    return _with_contents(aliquot, db, AliquotResponse)
 
 
 @router.post("/aliquot", response_model=AliquotResponse, include_in_schema=False)
@@ -228,7 +256,7 @@ async def create_derivative(
     db.commit()
     db.refresh(derivative)
     
-    return DerivativeResponse.from_orm(derivative)
+    return _with_contents(derivative, db, DerivativeResponse)
 
 
 @router.post("/pool", response_model=PoolingResponse)
@@ -380,7 +408,7 @@ async def get_aliquots_for_parent(
         Sample.active == True
     ).all()
     
-    return [AliquotResponse.from_orm(aliquot) for aliquot in aliquots]
+    return [_with_contents(aliquot, db, AliquotResponse) for aliquot in aliquots]
 
 
 @router.get("/derivatives/{parent_sample_id}", response_model=List[DerivativeResponse])
@@ -419,4 +447,4 @@ async def get_derivatives_for_parent(
         Sample.active == True
     ).all()
     
-    return [DerivativeResponse.from_orm(derivative) for derivative in derivatives]
+    return [_with_contents(derivative, db, DerivativeResponse) for derivative in derivatives]

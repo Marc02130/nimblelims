@@ -939,7 +939,15 @@ class TestWorkOrderP2:
         wgs = _create_lims_run_definition(
             client, admin_token, p2_seed["analysis_a"].id
         )
-        _put_step_types(client, admin_token, wgs, p2_seed["sample_type"].id)
+        # The WO hands the routed (blood) sample to the WGS step, while the run
+        # cohort below is a parentless DNA sample; LimsRun start now enforces
+        # accepted sample types (route_sample_type), so accept both.
+        r = client.put(
+            f"/v1/eln-process-definitions/{wgs['id']}/steps/{wgs['steps'][0]['id']}/accepted-sample-types",
+            json={"sample_type_ids": [str(p2_seed["sample_type"].id), str(p2_seed["dna_type"].id)]},
+            headers=_auth(admin_token),
+        )
+        assert r.status_code == 200, r.text
         mapped = _create_map(
             client,
             admin_token,

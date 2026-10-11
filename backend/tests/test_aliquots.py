@@ -2,17 +2,41 @@
 Tests for aliquots and derivatives API endpoints
 """
 import pytest
+from tests._fk_helpers import scratch_entry_id, scratch_list_id, get_or_create_list_entry
+from uuid import uuid4
 from fastapi.testclient import TestClient
 from app.main import app
 from models.sample import Sample
 from models.container import Container, Contents
-from models.container_type import ContainerType
+from models.container import ContainerType
 from models.user import User
-from models.role import Role
-from models.permission import Permission
-from models.role_permission import RolePermission
+from models.user import Role
+from models.user import Permission
+from tests._legacy_models import RolePermission
 
 client = TestClient(app)
+
+
+# These tests were written against a since-removed conftest that provided
+# `sample_user` and `auth_headers`. Recreate them on top of the shared fixtures:
+# an Administrator (all permissions, passes client/project access checks).
+@pytest.fixture(autouse=True)
+def _route_through_test_db(client):
+    """Install the conftest get_db override on the shared app for the
+    module-level TestClient above."""
+    yield
+
+
+@pytest.fixture
+def sample_user(test_admin_user):
+    return test_admin_user
+
+
+@pytest.fixture
+def auth_headers(client, test_admin_user):
+    r = client.post("/auth/login", json={"username": "admin", "password": "adminpassword"})
+    assert r.status_code == 200, r.text
+    return {"Authorization": f"Bearer {r.json()['access_token']}"}
 
 
 class TestAliquotsAPI:
@@ -41,7 +65,7 @@ class TestAliquotsAPI:
             description="Test project for aliquot",
             start_date="2024-01-01",
             client_id=client_entity.id,
-            status=None,
+            status=scratch_entry_id(db_session),  # projects.status is NOT NULL (FK to list_entries)
             created_by=sample_user.id,
             modified_by=sample_user.id
         )
@@ -52,20 +76,14 @@ class TestAliquotsAPI:
         sample_type = ListEntry(
             name="Blood",
             description="Blood sample",
-            list_id=None,  # Will be set later
+            list_id=scratch_list_id(db_session),
             created_by=sample_user.id,
             modified_by=sample_user.id
         )
         db_session.add(sample_type)
         db_session.flush()
         
-        sample_status = ListEntry(
-            name="Available for Testing",
-            description="Sample available for testing",
-            list_id=None,  # Will be set later
-            created_by=sample_user.id,
-            modified_by=sample_user.id
-        )
+        sample_status = get_or_create_list_entry(db_session, "sample_status", "Available for Testing")
         db_session.add(sample_status)
         db_session.flush()
         
@@ -75,7 +93,7 @@ class TestAliquotsAPI:
             description="Parent sample for aliquot",
             sample_type=sample_type.id,
             status=sample_status.id,
-            matrix=None,
+            matrix=scratch_entry_id(db_session),  # NOT NULL FK to list_entries
             project_id=project.id,
             created_by=sample_user.id,
             modified_by=sample_user.id
@@ -118,7 +136,7 @@ class TestAliquotsAPI:
         }
         
         response = client.post("/aliquots/aliquot", json=aliquot_data, headers=auth_headers)
-        assert response.status_code == 200
+        assert response.status_code == 200, response.text
         
         data = response.json()
         assert data["name"] == "Aliquot 1"
@@ -150,7 +168,7 @@ class TestAliquotsAPI:
             description="Test project for derivative",
             start_date="2024-01-01",
             client_id=client_entity.id,
-            status=None,
+            status=scratch_entry_id(db_session),  # projects.status is NOT NULL (FK to list_entries)
             created_by=sample_user.id,
             modified_by=sample_user.id
         )
@@ -161,7 +179,7 @@ class TestAliquotsAPI:
         blood_type = ListEntry(
             name="Blood",
             description="Blood sample",
-            list_id=None,
+            list_id=scratch_list_id(db_session),
             created_by=sample_user.id,
             modified_by=sample_user.id
         )
@@ -171,20 +189,14 @@ class TestAliquotsAPI:
         dna_type = ListEntry(
             name="DNA",
             description="DNA sample",
-            list_id=None,
+            list_id=scratch_list_id(db_session),
             created_by=sample_user.id,
             modified_by=sample_user.id
         )
         db_session.add(dna_type)
         db_session.flush()
         
-        sample_status = ListEntry(
-            name="Available for Testing",
-            description="Sample available for testing",
-            list_id=None,
-            created_by=sample_user.id,
-            modified_by=sample_user.id
-        )
+        sample_status = get_or_create_list_entry(db_session, "sample_status", "Available for Testing")
         db_session.add(sample_status)
         db_session.flush()
         
@@ -194,7 +206,7 @@ class TestAliquotsAPI:
             description="Parent blood sample for derivative",
             sample_type=blood_type.id,
             status=sample_status.id,
-            matrix=None,
+            matrix=scratch_entry_id(db_session),  # NOT NULL FK to list_entries
             project_id=project.id,
             created_by=sample_user.id,
             modified_by=sample_user.id
@@ -238,7 +250,7 @@ class TestAliquotsAPI:
         }
         
         response = client.post("/aliquots/derivative", json=derivative_data, headers=auth_headers)
-        assert response.status_code == 200
+        assert response.status_code == 200, response.text
         
         data = response.json()
         assert data["name"] == "DNA Extract"
@@ -272,7 +284,7 @@ class TestAliquotsAPI:
             description="Test project for pooling",
             start_date="2024-01-01",
             client_id=client_entity.id,
-            status=None,
+            status=scratch_entry_id(db_session),  # projects.status is NOT NULL (FK to list_entries)
             created_by=sample_user.id,
             modified_by=sample_user.id
         )
@@ -283,20 +295,14 @@ class TestAliquotsAPI:
         sample_type = ListEntry(
             name="Blood",
             description="Blood sample",
-            list_id=None,
+            list_id=scratch_list_id(db_session),
             created_by=sample_user.id,
             modified_by=sample_user.id
         )
         db_session.add(sample_type)
         db_session.flush()
         
-        sample_status = ListEntry(
-            name="Available for Testing",
-            description="Sample available for testing",
-            list_id=None,
-            created_by=sample_user.id,
-            modified_by=sample_user.id
-        )
+        sample_status = get_or_create_list_entry(db_session, "sample_status", "Available for Testing")
         db_session.add(sample_status)
         db_session.flush()
         
@@ -306,7 +312,7 @@ class TestAliquotsAPI:
             description="First sample for pooling",
             sample_type=sample_type.id,
             status=sample_status.id,
-            matrix=None,
+            matrix=scratch_entry_id(db_session),  # NOT NULL FK to list_entries
             project_id=project.id,
             created_by=sample_user.id,
             modified_by=sample_user.id
@@ -319,7 +325,7 @@ class TestAliquotsAPI:
             description="Second sample for pooling",
             sample_type=sample_type.id,
             status=sample_status.id,
-            matrix=None,
+            matrix=scratch_entry_id(db_session),  # NOT NULL FK to list_entries
             project_id=project.id,
             created_by=sample_user.id,
             modified_by=sample_user.id
@@ -351,29 +357,41 @@ class TestAliquotsAPI:
         db_session.add(container)
         db_session.flush()
         
-        # Create units
-        mg_unit = Unit(
-            name="mg",
-            description="Milligram",
-            type=None,  # Will be set later
+        # Units: pooling sums amounts in the lab's base *volume* unit (list
+        # entry named "volume") and averages concentration in that type's base.
+        volume_type = get_or_create_list_entry(db_session, "unit_type", "volume")
+        conc_type = scratch_entry_id(db_session)
+        base_ml = (
+            db_session.query(Unit)
+            .filter(Unit.type == volume_type.id, Unit.multiplier == 1, Unit.active == True)  # noqa: E712
+            .first()
+        )
+        if base_ml is None:
+            base_ml = Unit(name=f"mL_{uuid4().hex[:4]}", description="Milliliter",
+                           type=volume_type.id, multiplier=1.0)
+            db_session.add(base_ml)
+        mg_unit = Unit(  # volume unit: microliter
+            name=f"uL_{uuid4().hex[:4]}",
+            description="Microliter",
+            type=volume_type.id,
             multiplier=0.001,
             created_by=sample_user.id,
             modified_by=sample_user.id
         )
         db_session.add(mg_unit)
         db_session.flush()
-        
+
         mg_ml_unit = Unit(
-            name="mg/mL",
+            name=f"mg/mL_{uuid4().hex[:4]}",
             description="Milligram per milliliter",
-            type=None,  # Will be set later
+            type=conc_type,
             multiplier=1.0,
             created_by=sample_user.id,
             modified_by=sample_user.id
         )
         db_session.add(mg_ml_unit)
         db_session.flush()
-        
+
         pooling_data = {
             "container_id": str(container.id),
             "samples": [str(sample1.id), str(sample2.id)],
@@ -385,7 +403,7 @@ class TestAliquotsAPI:
         }
         
         response = client.post("/aliquots/pool", json=pooling_data, headers=auth_headers)
-        assert response.status_code == 200
+        assert response.status_code == 200, response.text
         
         data = response.json()
         assert data["container_id"] == str(container.id)
@@ -417,7 +435,7 @@ class TestAliquotsAPI:
             description="Test project for getting aliquots",
             start_date="2024-01-01",
             client_id=client_entity.id,
-            status=None,
+            status=scratch_entry_id(db_session),  # projects.status is NOT NULL (FK to list_entries)
             created_by=sample_user.id,
             modified_by=sample_user.id
         )
@@ -428,20 +446,14 @@ class TestAliquotsAPI:
         sample_type = ListEntry(
             name="Blood",
             description="Blood sample",
-            list_id=None,
+            list_id=scratch_list_id(db_session),
             created_by=sample_user.id,
             modified_by=sample_user.id
         )
         db_session.add(sample_type)
         db_session.flush()
         
-        sample_status = ListEntry(
-            name="Available for Testing",
-            description="Sample available for testing",
-            list_id=None,
-            created_by=sample_user.id,
-            modified_by=sample_user.id
-        )
+        sample_status = get_or_create_list_entry(db_session, "sample_status", "Available for Testing")
         db_session.add(sample_status)
         db_session.flush()
         
@@ -451,7 +463,7 @@ class TestAliquotsAPI:
             description="Parent sample for getting aliquots",
             sample_type=sample_type.id,
             status=sample_status.id,
-            matrix=None,
+            matrix=scratch_entry_id(db_session),  # NOT NULL FK to list_entries
             project_id=project.id,
             created_by=sample_user.id,
             modified_by=sample_user.id
@@ -499,7 +511,7 @@ class TestAliquotsAPI:
             description="First aliquot",
             sample_type=sample_type.id,
             status=sample_status.id,
-            matrix=None,
+            matrix=scratch_entry_id(db_session),  # NOT NULL FK to list_entries
             parent_sample_id=parent_sample.id,
             project_id=project.id,
             created_by=sample_user.id,
@@ -513,7 +525,7 @@ class TestAliquotsAPI:
             description="Second aliquot",
             sample_type=sample_type.id,
             status=sample_status.id,
-            matrix=None,
+            matrix=scratch_entry_id(db_session),  # NOT NULL FK to list_entries
             parent_sample_id=parent_sample.id,
             project_id=project.id,
             created_by=sample_user.id,
@@ -525,23 +537,19 @@ class TestAliquotsAPI:
         # Create contents entries
         contents1 = Contents(
             container_id=container1.id,
-            sample_id=aliquot1.id,
-            created_by=sample_user.id,
-            modified_by=sample_user.id
+            sample_id=aliquot1.id
         )
         db_session.add(contents1)
         
         contents2 = Contents(
             container_id=container2.id,
-            sample_id=aliquot2.id,
-            created_by=sample_user.id,
-            modified_by=sample_user.id
+            sample_id=aliquot2.id
         )
         db_session.add(contents2)
         db_session.commit()
         
         response = client.get(f"/aliquots/parent/{parent_sample.id}", headers=auth_headers)
-        assert response.status_code == 200
+        assert response.status_code == 200, response.text
         
         data = response.json()
         assert len(data) == 2
@@ -571,7 +579,7 @@ class TestAliquotsAPI:
             description="Test project for getting derivatives",
             start_date="2024-01-01",
             client_id=client_entity.id,
-            status=None,
+            status=scratch_entry_id(db_session),  # projects.status is NOT NULL (FK to list_entries)
             created_by=sample_user.id,
             modified_by=sample_user.id
         )
@@ -582,7 +590,7 @@ class TestAliquotsAPI:
         blood_type = ListEntry(
             name="Blood",
             description="Blood sample",
-            list_id=None,
+            list_id=scratch_list_id(db_session),
             created_by=sample_user.id,
             modified_by=sample_user.id
         )
@@ -592,20 +600,14 @@ class TestAliquotsAPI:
         dna_type = ListEntry(
             name="DNA",
             description="DNA sample",
-            list_id=None,
+            list_id=scratch_list_id(db_session),
             created_by=sample_user.id,
             modified_by=sample_user.id
         )
         db_session.add(dna_type)
         db_session.flush()
         
-        sample_status = ListEntry(
-            name="Available for Testing",
-            description="Sample available for testing",
-            list_id=None,
-            created_by=sample_user.id,
-            modified_by=sample_user.id
-        )
+        sample_status = get_or_create_list_entry(db_session, "sample_status", "Available for Testing")
         db_session.add(sample_status)
         db_session.flush()
         
@@ -615,7 +617,7 @@ class TestAliquotsAPI:
             description="Parent blood sample for getting derivatives",
             sample_type=blood_type.id,
             status=sample_status.id,
-            matrix=None,
+            matrix=scratch_entry_id(db_session),  # NOT NULL FK to list_entries
             project_id=project.id,
             created_by=sample_user.id,
             modified_by=sample_user.id
@@ -663,7 +665,7 @@ class TestAliquotsAPI:
             description="First DNA extract",
             sample_type=dna_type.id,
             status=sample_status.id,
-            matrix=None,
+            matrix=scratch_entry_id(db_session),  # NOT NULL FK to list_entries
             parent_sample_id=parent_sample.id,
             project_id=project.id,
             created_by=sample_user.id,
@@ -677,7 +679,7 @@ class TestAliquotsAPI:
             description="Second DNA extract",
             sample_type=dna_type.id,
             status=sample_status.id,
-            matrix=None,
+            matrix=scratch_entry_id(db_session),  # NOT NULL FK to list_entries
             parent_sample_id=parent_sample.id,
             project_id=project.id,
             created_by=sample_user.id,
@@ -689,23 +691,19 @@ class TestAliquotsAPI:
         # Create contents entries
         contents1 = Contents(
             container_id=container1.id,
-            sample_id=derivative1.id,
-            created_by=sample_user.id,
-            modified_by=sample_user.id
+            sample_id=derivative1.id
         )
         db_session.add(contents1)
         
         contents2 = Contents(
             container_id=container2.id,
-            sample_id=derivative2.id,
-            created_by=sample_user.id,
-            modified_by=sample_user.id
+            sample_id=derivative2.id
         )
         db_session.add(contents2)
         db_session.commit()
         
         response = client.get(f"/aliquots/derivatives/{parent_sample.id}", headers=auth_headers)
-        assert response.status_code == 200
+        assert response.status_code == 200, response.text
         
         data = response.json()
         assert len(data) == 2

@@ -71,8 +71,12 @@ def _ensure_sequence_exists(db: Session, entity_type: str, sequence_key: Optiona
     sequence_name = _sequence_name(entity_type, safe_key)
     # Sequence name is safe: entity_type from allowed list, safe_key is sanitized alphanumeric + underscore
     # Brief S-UI-5: lims_app has no CREATE on public; use schema_apply SECURITY DEFINER.
+    # Run the SECURITY DEFINER call inside a SAVEPOINT: if the function is missing
+    # (DB not migrated past 0080) the failed statement would otherwise abort the
+    # whole transaction and the CREATE SEQUENCE fallback below could never run.
     try:
-        db.execute(text("SELECT ui_schema_ensure_sequence(:n)"), {"n": sequence_name})
+        with db.begin_nested():
+            db.execute(text("SELECT ui_schema_ensure_sequence(:n)"), {"n": sequence_name})
     except Exception:
         db.execute(text(f"""
             CREATE SEQUENCE IF NOT EXISTS {sequence_name}

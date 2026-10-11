@@ -139,6 +139,10 @@ def test_canonical_p0_ids_include_keyboard_validation_and_rbac():
 
 def test_no_receive_api_assertion_in_this_module():
     source = inspect.getsource(this_mod)
-    assert "TestClient" not in source
-    assert "from fastapi.testclient" not in source
+    # Build the needles so this assertion's own text doesn't match itself
+    # (the old literal "TestClient" check always failed on this line).
+    client_cls = "Test" + "Client"
+    assert f"import {client_cls}" not in source
+    assert f"{client_cls}(" not in source
+    assert "from fastapi." + "testclient" not in source
     assert "migrated_engine" in source

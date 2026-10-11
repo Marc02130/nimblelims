@@ -200,6 +200,17 @@ class TestProcessDefinitions:
             modified_by=test_admin_user.id,
         )
         db_session.add(s)
+        db_session.flush()
+        # Process assignment requires the sample to sit in a container
+        # (process_container_required), so give it a tube.
+        from models.container import Container, ContainerType, Contents
+        ctype = ContainerType(name=f"jtube_{uuid4().hex[:6]}")
+        db_session.add(ctype)
+        db_session.flush()
+        tube = Container(name=f"JTUBE-{uuid4().hex[:6]}", type_id=ctype.id)
+        db_session.add(tube)
+        db_session.flush()
+        db_session.add(Contents(container_id=tube.id, sample_id=s.id, amount=None))
         db_session.commit()
         sample_id = str(s.id)
 
