@@ -144,6 +144,9 @@ class ConfigurationStep(Base):
     gap = Column(Text)
     error_message = Column(Text)
     depends_on = Column(JSONB)
+    # 'api' only when the called API refused this row during Apply (set in
+    # _record_failure). Never inferred from gap text.
+    stop_source = Column(String(16))
 
     run = relationship("ConfigurationRun", back_populates="steps")
 

@@ -85,7 +85,9 @@ def _system_prompt(permissions: list[str] | None = None) -> str:
         "Follow the lab process in the file excerpts. Do not assume every lab uses the same method. "
         "Do not invent needs the excerpts do not state. "
         "You act with the confirming user's own permissions and nothing more. "
-        f"That user holds: {held}. Any table the user can change through an existing API is in scope. "
+        + (f"That user holds: {held}. " if permissions else
+           "Permissions are checked for the person who confirms, at confirm time; do not assume any. ")
+        + "Any table the user can change through an existing API is in scope. "
         "The APIs still refuse new columns on system tables and on asked_for, tests, results, containers, "
         "contents, routing_map, and work_orders; such a change is a gap. "
         f"Not schema tables: {hidden}. Do not add columns on them. "

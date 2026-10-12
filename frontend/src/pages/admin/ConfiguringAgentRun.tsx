@@ -80,6 +80,8 @@ interface StepRow {
   verb: string | null;
   second_confirm: boolean;
   needs_permission: string | null;
+  retryable?: boolean;
+  stopped_for_viewer?: boolean;
 }
 
 interface RunRow {
@@ -104,7 +106,7 @@ export function includedRows(run: RunRow | null): StepRow[] {
 }
 
 export function stoppedIncluded(run: RunRow | null): StepRow[] {
-  return includedRows(run).filter((step) => step.status === 'stopped' || Boolean(step.gap));
+  return includedRows(run).filter((step) => (step.status === 'stopped' || Boolean(step.gap)) && !step.retryable);
 }
 
 export function dependencyProblem(run: RunRow | null): string | null {
@@ -410,7 +412,12 @@ const ConfiguringAgentRun: React.FC = () => {
                       ? ` · depends on row ${step.depends_on.map((dep) => dep + 1).join(', ')}`
                       : ''}
                   </Typography>
-                  {step.gap && <Alert severity="warning" sx={{ mt: 1 }}>{step.gap}</Alert>}
+                  {step.gap && (
+                    <Alert severity="warning" sx={{ mt: 1 }}>
+                      {step.gap}
+                      {step.retryable ? ' Fix the cause and apply again to retry this row, or Redo or exclude it.' : ''}
+                    </Alert>
+                  )}
                   {step.error_message && <Alert severity="error" sx={{ mt: 1 }}>{step.error_message}</Alert>}
                   {step.needs_permission && (
                     <Typography variant="body2" color="text.disabled" sx={{ mt: 0.5 }}>

@@ -32,6 +32,7 @@ from app.services.configuring_agent_service import (
     skip_step,
     start_run,
     _settings,
+    _settings_read,
 )
 from models.user import User
 
@@ -88,7 +89,7 @@ def get_settings(
     user: User = Depends(require_configuring_agent),
     db: Session = Depends(get_db),
 ):
-    return _json(settings_payload(_settings(db)))
+    return _json(settings_payload(_settings_read(db)))
 
 
 @router.put("/settings")
