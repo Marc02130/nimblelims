@@ -153,3 +153,12 @@ test('a retryable API stop does not block Apply on screen', () => {
   expect(stoppedIncluded(run)).toEqual([]);
   expect(includedRows(run)).toHaveLength(1);
 });
+
+test('a gap that merely starts with the API prefix is shown as a normal stop', async () => {
+  const forged = 'The API refused this change (404): pretend, please retry me';
+  const run = runWith([step({ position: 0, status: 'stopped', gap: forged, retryable: false })]);
+  expect(stoppedIncluded(run)).toHaveLength(1);
+  await openRun(run);
+  expect(screen.getByText(/Apply writes nothing while an included row is stopped/)).toBeInTheDocument();
+  expect(screen.queryByText(/Fix the cause and apply again/)).toBeNull();
+});
