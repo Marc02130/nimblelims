@@ -170,7 +170,38 @@ def escalation_gap(db, user: User, method: str, path: str, body: Any) -> Optiona
         own = str(getattr(user, "role_id", "") or "")
         if own and any(isinstance(row, dict) and str(row.get("role_id")) == own for row in rows):
             return "This would change your own role's table privileges. The agent never grants you new privileges."
+        # G7: granting another role more access than your own role has on that
+        # table/column is granting a privilege you don't hold.
+        if own:
+            from app.services.ui_schema_service import UiSchemaService
+
+            svc = UiSchemaService(db, user)
+            rank = {"none": 0, "inherit": 0, "read": 1, "write": 2}
+            for row in rows:
+                if not isinstance(row, dict) or row.get("access") not in ("read", "write"):
+                    continue
+                table_id = _safe_uuid(row.get("table_id"))
+                if table_id is None:
+                    continue
+                column_id = _safe_uuid(row.get("column_id"))
+                mine = (
+                    svc._column_access(UUID(own), table_id, column_id)
+                    if column_id
+                    else svc._table_access(UUID(own), table_id)
+                )
+                if rank[row["access"]] > rank.get(mine, 0):
+                    return (
+                        f"This would grant {row['access']} access where your own role has {mine}. "
+                        "The agent never grants privileges beyond yours."
+                    )
     return None
+
+
+def _safe_uuid(value) -> Optional[UUID]:
+    try:
+        return UUID(str(value)) if value else None
+    except ValueError:
+        return None
 
 
 async def execute_step(db, user: User, method: str, path: str, body: Any) -> list[AppliedChange]:

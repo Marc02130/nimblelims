@@ -53,6 +53,13 @@ def _settings(db: Session) -> ConfiguringAgentSettings:
     return row
 
 
+def _settings_read(db: Session) -> ConfiguringAgentSettings:
+    """Read-only settings lookup. Never adds or flushes a row (G8: no writes
+    before or on a missing-key error)."""
+    row = db.query(ConfiguringAgentSettings).filter(ConfiguringAgentSettings.id == SETTINGS_ID).first()
+    return row if row is not None else ConfiguringAgentSettings(id=SETTINGS_ID, name="Configuring agent")
+
+
 def settings_payload(row: ConfiguringAgentSettings) -> dict[str, Any]:
     return {
         "id": row.id,
@@ -112,7 +119,7 @@ def provider_key(row: ConfiguringAgentSettings, provider: str) -> str:
 
 
 def models_for(db: Session, provider: str) -> list[dict[str, str]]:
-    row = _settings(db)
+    row = _settings_read(db)
     key = provider_key(row, provider)
     try:
         return list_models(provider, key)
@@ -310,7 +317,7 @@ def _excerpt(db: Session, configuration_id, text: str) -> list[str]:
 
 
 def _key_for_run(db: Session) -> tuple[ConfiguringAgentSettings, str]:
-    row = _settings(db)
+    row = _settings_read(db)
     if not row.agent_provider or not row.agent_model:
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST,
@@ -479,15 +486,19 @@ def _run(db: Session, user: User, run_id) -> ConfigurationRun:
 
 def _step_facts(step: ConfigurationStep, db: Optional[Session] = None, viewer: Optional[User] = None) -> dict[str, Any]:
     from app.services.configuring_agent_allow import needs_second_confirm, verb_for
-    from app.services.configuring_agent_apply import missing_permission
+    from app.services.configuring_agent_apply import escalation_gap, missing_permission
 
     if not (step.call_method and step.call_path):
-        return {"verb": None, "second_confirm": False, "needs_permission": None}
+        return {"verb": None, "second_confirm": False, "needs_permission": None, "escalation": None}
     classified = classify_call(step.call_method, step.call_path, step.call_body if isinstance(step.call_body, dict) else {})
     needs = None
+    escalation = None
     if viewer is not None and db is not None and classified.ok:
         needs = missing_permission(viewer, db, classified)
+        # G1: escalation is re-checked for the viewer (the confirmer), not only the starter.
+        escalation = escalation_gap(db, viewer, step.call_method, step.call_path, step.call_body)
     return {
+        "escalation": escalation,
         "verb": verb_for(step.call_method, step.call_path, step.call_body),
         "second_confirm": bool(classified.ok and needs_second_confirm(
             step.call_method, step.call_path, step.call_body, classified.kind
@@ -507,8 +518,10 @@ def step_payload(step: ConfigurationStep, db: Optional[Session] = None, viewer: 
         "why": step.why,
         "decision": step.decision,
         "included": step.decision in (INCLUDED, "accepted"),
-        "status": step.status,
-        "gap": step.gap,
+        # A row that is an escalation for this viewer is shown as a stop in place.
+        "status": "stopped" if facts["escalation"] and step.status != "applied" else step.status,
+        "gap": step.gap or facts["escalation"],
+        "stopped_for_viewer": bool(facts["escalation"] and not step.gap),
         "error_message": step.error_message,
         "depends_on": step.depends_on or [],
         "verb": facts["verb"],
@@ -561,6 +574,20 @@ def set_included(db: Session, user: User, run_id, step_id, include: bool) -> Con
     if run.status in ("done", "applying"):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "This run was already applied.")
     step = _step(run, step_id)
+    if not include:
+        dependents = [
+            other.position + 1
+            for other in run.steps
+            if _is_included(other) and other.id != step.id and step.position in (other.depends_on or [])
+        ]
+        if dependents:
+            raise ApplyRefused(
+                status.HTTP_409_CONFLICT,
+                f"Row {', '.join(map(str, dependents))} depends on row {step.position + 1}. "
+                f"Exclude row {', '.join(map(str, dependents))} first.",
+                dependents + [step.position + 1],
+                reason="dependency",
+            )
     step.decision = INCLUDED if include else EXCLUDED
     run.modified_by = user.id
     db.commit()
@@ -657,14 +684,21 @@ def _gate(db: Session, user: User, run: ConfigurationRun, included: list[Configu
     for step in included:
         for dep in step.depends_on or []:
             parent = by_position.get(dep)
-            if parent is not None and parent.status == "stopped" and not _is_included(parent):
-                raise ApplyRefused(
-                    status.HTTP_409_CONFLICT,
+            if parent is None or _is_included(parent) or parent.status == "unchanged":
+                continue
+            if parent.status == "stopped":
+                message = (
                     f"Row {step.position + 1} depends on row {dep + 1}, which is stopped. "
-                    f"Exclude row {step.position + 1} too, or fix row {dep + 1}.",
-                    [step.position + 1, dep + 1],
-                    reason="dependency",
+                    f"Exclude row {step.position + 1} too, or fix row {dep + 1}."
                 )
+            else:
+                message = (
+                    f"Row {step.position + 1} depends on row {dep + 1}, which is excluded. "
+                    f"Include row {dep + 1}, or exclude row {step.position + 1} too."
+                )
+            raise ApplyRefused(
+                status.HTTP_409_CONFLICT, message, [step.position + 1, dep + 1], reason="dependency"
+            )
     # 3. Scope is the confirming user's own permissions (L-2), checked before any write.
     for step in included:
         classified = classify_call(step.call_method, step.call_path, step.call_body if isinstance(step.call_body, dict) else {})
@@ -790,7 +824,6 @@ def _record_failure(db, user, run_id, step_id, message: str, permission: bool = 
     run.banner = STOP_BANNER if stopped else None
     run.error_message = None if stopped else message
     run.applied_count = 0
-    run.stopped_count = 1 if stopped else 0
     run.modified_by = user.id
     for step in run.steps:
         if step.status == "applied":
@@ -802,6 +835,8 @@ def _record_failure(db, user, run_id, step_id, message: str, permission: bool = 
                 step.gap = message
             else:
                 step.error_message = message
+    # G6: recount every stop on the run, not 1/0.
+    run.stopped_count = sum(1 for step in run.steps if step.status == "stopped")
     db.commit()
     db.refresh(run)
     code = status.HTTP_403_FORBIDDEN if permission else status.HTTP_200_OK
