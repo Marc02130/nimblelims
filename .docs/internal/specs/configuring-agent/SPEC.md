@@ -152,11 +152,18 @@ When no existing API can express the change:
 
 Confirm-before-apply is a lock (Marc 2026-10-04). One change set per run. Each row has an include/exclude choice. A second confirm is required before roles and privileges, schema changes, set-inactive, and amount → 0. Apply only what was confirmed (Marc 2026-10-07).
 
-The agent never grants the user new privileges. A request that would need one is a stop (Marc 2026-10-07).
+The agent never grants the user new privileges. A request that would need one is a stop (Marc 2026-10-07). Escalation is judged for the confirming user, not the starter. It is evaluated when the run is viewed and again at Apply, and shown as a stop in place. It is not frozen into the proposal at run start. The model is not sent anyone's permission list.
 
 The audit actor is the confirming user, flagged agent-assisted, and recorded with run id, provider, and model (Marc 2026-10-07).
 
 An HTTP error from an API the agent did call stays on that row with the API error (Mathilda). That is not a license to retry through SQL, JSONB, `custom_attributes`, drop, or delete. The transaction still rolls back in full.
+
+**API 422 or 404 during Apply is a stop (Marc 2026-10-11, G2; Mathilda's [#149](https://github.com/Marc02130/nimblelims/pull/149) sketch).** When an API the agent called returns **422** or **404** during Apply, the API can't express that row:
+
+- The whole apply rolls back first. No write from that apply remains, including real DDL.
+- Then the run is recorded as **Stopped** with the banner above. The row is marked stopped, with the API's reason as its gap: `The API refused this change ({status}): {detail}`. Earlier rows return to proposed. `stopped_count` is recounted over every stopped row on the run.
+- The stopped row stays included and is marked retryable. Fix the cause outside the run (for example, create the missing record) and Apply again: the next Apply retries that row in the same single transaction. Or exclude the row (subject to the dependency rule) or replace it with Redo.
+- A **403** is still a permission failure: status **Failed**, HTTP 403. Any other API error (for example 400, 409, or 5xx) is still **Failed (apply rolled back)**, with the API error on that row.
 
 ---
 
