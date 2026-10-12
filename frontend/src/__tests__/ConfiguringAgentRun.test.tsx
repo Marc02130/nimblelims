@@ -147,3 +147,9 @@ test('every stop is shown in place and an included stop is called out', async ()
   expect(screen.getByText(/Apply writes nothing while an included row is stopped/)).toBeInTheDocument();
   expect(screen.getByText('Apply 3 changes')).toBeInTheDocument();
 });
+
+test('a retryable API stop does not block Apply on screen', () => {
+  const run = runWith([step({ position: 0, status: 'stopped', gap: 'The API refused this change (404): Not found', retryable: true })]);
+  expect(stoppedIncluded(run)).toEqual([]);
+  expect(includedRows(run)).toHaveLength(1);
+});
