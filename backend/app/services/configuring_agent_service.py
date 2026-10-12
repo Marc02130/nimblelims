@@ -399,6 +399,7 @@ def _add_step(
         call_body=body if isinstance(body, (dict, list)) else None,
         gap=gap,
         depends_on=_depends_on(raw, position),
+        stop_source=None,
     )
     db.add(step)
     return step
@@ -640,6 +641,7 @@ def redo_step(db: Session, user: User, run_id, step_id, feedback: str) -> Config
     step.call_body = replacement.call_body
     step.gap = replacement.gap
     step.depends_on = replacement.depends_on
+    step.stop_source = None
     step.error_message = None
     db.expunge(replacement)
     _sync_stop_banner(run)
@@ -759,7 +761,7 @@ async def apply_run(
         for step in sorted(included, key=lambda item: item.position):
             failing_step_id = step.id
             if _retryable(step):
-                step.status, step.gap = "proposed", None
+                step.status, step.gap, step.stop_source = "proposed", None, None
             changes = await execute_step(atomic, user, step.call_method, step.call_path, step.call_body or {})
             step.status = "applied"
             applied += 1
@@ -805,7 +807,7 @@ async def apply_run(
             # G2 (Marc 2026-10-11): the API can't express this row. Show it as a stop
             # in place with the API's reason. The whole apply has already rolled back.
             return _record_failure(
-                db, user, run_id_value, failing_step_id, api_stop_reason(exc), stopped=True
+                db, user, run_id_value, failing_step_id, api_stop_reason(exc), stopped=True, api=True
             )
         return _record_failure(
             db,
@@ -836,10 +838,13 @@ def api_stop_reason(exc: HTTPException) -> str:
 def _retryable(step: ConfigurationStep) -> bool:
     """A stop the API raised at apply time (422/404). The cause may be fixed outside
     the run (e.g. the missing record created), so the next Apply retries it."""
-    return step.status == "stopped" and bool(step.gap) and step.gap.startswith(API_STOP_PREFIX) and bool(step.call_path)
+    # Only the explicit flag counts. Gap text is never trusted: the model writes gaps.
+    return step.status == "stopped" and step.stop_source == "api" and bool(step.call_path)
 
 
-def _record_failure(db, user, run_id, step_id, message: str, permission: bool = False, stopped: bool = False):
+def _record_failure(
+    db, user, run_id, step_id, message: str, permission: bool = False, stopped: bool = False, api: bool = False
+):
     run = db.query(ConfigurationRun).filter(ConfigurationRun.id == run_id).first()
     if run is None:
         raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "Run disappeared during rollback")
@@ -854,6 +859,8 @@ def _record_failure(db, user, run_id, step_id, message: str, permission: bool = 
             step.status = "proposed"
         if step.id == step_id:
             step.status = "stopped" if stopped else "failed"
+            # The only place a stop is marked as raised by the API (retryable).
+            step.stop_source = "api" if (stopped and api) else None
             if stopped:
                 step.gap = message
             else:

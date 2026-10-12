@@ -8,6 +8,9 @@ CHECKs still only allow decision pending/accepted/skipped and status
 proposed/stopped/applied/failed/skipped. On a migrated database every new run
 failed with configuration_steps_decision_chk. This widens them:
 decision adds 'included'/'excluded'; status adds 'unchanged'.
+Also adds configuration_steps.stop_source: 'api' only when the called API
+refused the row during Apply (422/404). Only that marks a stop retryable; gap
+text is never trusted (a model can write any gap).
 Downgrade maps the new values back to the old ones before narrowing.
 """
 
@@ -22,6 +25,10 @@ depends_on = None
 def upgrade() -> None:
     op.execute(
         """
+        ALTER TABLE configuration_steps ADD COLUMN IF NOT EXISTS stop_source varchar(16);
+        ALTER TABLE configuration_steps DROP CONSTRAINT IF EXISTS configuration_steps_stop_source_chk;
+        ALTER TABLE configuration_steps ADD CONSTRAINT configuration_steps_stop_source_chk
+            CHECK (stop_source IS NULL OR stop_source = 'api');
         ALTER TABLE configuration_steps DROP CONSTRAINT IF EXISTS configuration_steps_decision_chk;
         ALTER TABLE configuration_steps ADD CONSTRAINT configuration_steps_decision_chk
             CHECK (decision IN ('pending', 'accepted', 'skipped', 'included', 'excluded'));
@@ -44,5 +51,7 @@ def downgrade() -> None:
         ALTER TABLE configuration_steps DROP CONSTRAINT IF EXISTS configuration_steps_status_chk;
         ALTER TABLE configuration_steps ADD CONSTRAINT configuration_steps_status_chk
             CHECK (status IN ('proposed', 'stopped', 'applied', 'failed', 'skipped'));
+        ALTER TABLE configuration_steps DROP CONSTRAINT IF EXISTS configuration_steps_stop_source_chk;
+        ALTER TABLE configuration_steps DROP COLUMN IF EXISTS stop_source;
         """
     )
