@@ -158,6 +158,13 @@ The audit actor is the confirming user, flagged agent-assisted, and recorded wit
 
 An HTTP error from an API the agent did call stays on that row with the API error (Mathilda). That is not a license to retry through SQL, JSONB, `custom_attributes`, drop, or delete. The transaction still rolls back in full.
 
+**API 422 or 404 during Apply is a stop (Marc 2026-10-11, G2; Mathilda's [#149](https://github.com/Marc02130/nimblelims/pull/149) sketch).** When an API the agent called returns **422** or **404** during Apply, the API can't express that row:
+
+- The whole apply rolls back first. No write from that apply remains, including real DDL.
+- Then the run is recorded as **Stopped** with the banner above. The row is marked stopped, with the API's reason as its gap: `The API refused this change ({status}): {detail}`. Earlier rows return to proposed. `stopped_count` is recounted over every stopped row on the run.
+- The stopped row stays included, so the next Apply writes nothing until the row is excluded (subject to the dependency rule) or fixed with Redo.
+- A **403** is still a permission failure: status **Failed**, HTTP 403. Any other API error (for example 400, 409, or 5xx) is still **Failed (apply rolled back)**, with the API error on that row.
+
 ---
 
 ## 5. Privilege

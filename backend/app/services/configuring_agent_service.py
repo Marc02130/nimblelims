@@ -797,6 +797,12 @@ async def apply_run(
         return _record_failure(db, user, run_id_value, failing_step_id, exc.gap, stopped=True)
     except HTTPException as exc:
         db.rollback()
+        if exc.status_code in (status.HTTP_404_NOT_FOUND, status.HTTP_422_UNPROCESSABLE_ENTITY):
+            # G2 (Marc 2026-10-11): the API can't express this row. Show it as a stop
+            # in place with the API's reason. The whole apply has already rolled back.
+            return _record_failure(
+                db, user, run_id_value, failing_step_id, api_stop_reason(exc), stopped=True
+            )
         return _record_failure(
             db,
             user,
@@ -814,6 +820,10 @@ async def apply_run(
             failing_step_id,
             "Apply failed and every change from this apply was undone.",
         )
+
+
+def api_stop_reason(exc: HTTPException) -> str:
+    return f"The API refused this change ({exc.status_code}): {error_text(exc)}"
 
 
 def _record_failure(db, user, run_id, step_id, message: str, permission: bool = False, stopped: bool = False):

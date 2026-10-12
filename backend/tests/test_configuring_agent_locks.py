@@ -452,13 +452,18 @@ async def test_failure_rolls_back_every_write_from_the_apply(db_session, admin, 
         _entry_step(f"missing_{uuid.uuid4().hex[:6]}", "Nope"),  # 404 from the lists route
     ])
     result, code = await svc.apply_run(db_session, admin, run.id)
-    assert result.status == "failed"
+    # G2: a 404 from the API is a stop in place with the API's reason, and the
+    # whole apply still rolls back.
+    assert code == 200
+    assert result.status == "stopped" and result.banner == allow.STOP_BANNER
     assert result.applied_count == 0
+    assert result.stopped_count == 1
     assert _lists_named(db_session, first) == 0
     assert db_session.query(ListEntry).filter(ListEntry.name == "Whole Blood").count() == 0
     assert db_session.query(ConfigurationItem).filter_by(run_id=run.id).count() == 0
-    assert [s.status for s in result.steps] == ["proposed", "proposed", "failed"]
-    assert result.steps[2].error_message
+    assert [s.status for s in result.steps] == ["proposed", "proposed", "stopped"]
+    assert "(404)" in result.steps[2].gap
+    assert result.error_message is None
 
 
 # ---------------------------------------------------------------- 7. audit
@@ -634,8 +639,8 @@ async def test_g3_schema_ddl_rolls_back_inside_the_apply_transaction(mig, monkey
         _entry_step(f"missing_{slug}", "Nope"),  # 404 -> whole apply rolls back
     ])
     result, _ = await svc.apply_run(db_session, admin, run.id, second_confirm=True)
-    assert result.status == "failed"
-    assert result.steps[0].status == "proposed" and result.steps[1].status == "failed"
+    assert result.status == "stopped"
+    assert result.steps[0].status == "proposed" and result.steps[1].status == "stopped"
     exists = db_session.execute(
         text("SELECT 1 FROM information_schema.tables WHERE table_name = :t"), {"t": physical}
     ).first()
@@ -706,8 +711,9 @@ async def test_g6_failure_recounts_every_stop(db_session, admin, configuration, 
     for step in run.steps[:2]:
         svc.set_included(db_session, admin, run.id, step.id, False)
     result, _ = await svc.apply_run(db_session, admin, run.id)
-    assert result.status == "failed"
-    assert result.stopped_count == 2
+    # The 404 row is now a stop too (G2): two proposal stops + one apply stop.
+    assert result.status == "stopped"
+    assert result.stopped_count == 3
 
 
 # ---------------------------------------------------------------- G8 no writes on missing key
@@ -833,3 +839,57 @@ async def test_new_step_states_fit_the_migrated_check_constraints(mig, monkeypat
     assert result.status == "done"
     second = _start(db_session, admin, configuration, monkeypatch, [_list_step(name)])
     assert second.steps[0].status == "unchanged" and second.steps[0].decision == "excluded"
+
+
+
+# ---------------------------------------------------------------- G2 API 422/404 during Apply = stop
+
+@pytest.mark.asyncio
+async def test_g2_api_422_during_apply_is_a_stop_with_the_api_reason(db_session, admin, configuration, monkeypatch):
+    name = f"G2_{uuid.uuid4().hex[:6]}"
+    run = _start(db_session, admin, configuration, monkeypatch, [
+        _list_step(name),
+        # ListCreate needs a name: the body fails validation -> 422 from the API layer.
+        {"group": "other", "target": "bad", "action": "Create", "why": "x",
+         "call": {"method": "POST", "path": "/lists", "body": {"description": "no name"}}},
+    ])
+    result, code = await svc.apply_run(db_session, admin, run.id)
+    assert code == 200
+    assert result.status == "stopped" and result.banner == allow.STOP_BANNER
+    assert [s.status for s in result.steps] == ["proposed", "stopped"]
+    assert "(422)" in result.steps[1].gap
+    assert result.stopped_count == 1 and result.applied_count == 0
+    assert _lists_named(db_session, name) == 0  # earlier row rolled back
+    # The stopped row stays included, so Apply now refuses until it is excluded or fixed.
+    with pytest.raises(svc.ApplyRefused) as exc:
+        await svc.apply_run(db_session, admin, run.id)
+    assert exc.value.detail["reason"] == "stopped" and exc.value.detail["rows"] == [2]
+    svc.set_included(db_session, admin, run.id, result.steps[1].id, False)
+    result, code = await svc.apply_run(db_session, admin, run.id)
+    assert result.status == "done" and _lists_named(db_session, name) == 1
+
+
+@pytest.mark.asyncio
+async def test_g2_other_api_errors_still_fail(db_session, admin, configuration, monkeypatch):
+    from fastapi import HTTPException
+
+    async def boom(*_a, **_k):
+        raise HTTPException(409, "Conflict from the API")
+
+    run = _start(db_session, admin, configuration, monkeypatch, [_list_step(f"G2b_{uuid.uuid4().hex[:6]}")])
+    monkeypatch.setattr(svc, "execute_step", boom)
+    result, code = await svc.apply_run(db_session, admin, run.id)
+    assert result.status == "failed" and code == 200
+    assert result.steps[0].status == "failed" and "Conflict" in result.steps[0].error_message
+    assert result.stopped_count == 0
+
+
+@pytest.mark.asyncio
+async def test_g2_permission_403_during_apply_still_fails_with_403(db_session, admin, configuration, monkeypatch):
+    async def denied(*_a, **_k):
+        raise apply_mod.PermissionDenied("Permission 'config:edit' required")
+
+    run = _start(db_session, admin, configuration, monkeypatch, [_list_step(f"G2c_{uuid.uuid4().hex[:6]}")])
+    monkeypatch.setattr(svc, "execute_step", denied)
+    result, code = await svc.apply_run(db_session, admin, run.id)
+    assert code == 403 and result.status == "failed"
