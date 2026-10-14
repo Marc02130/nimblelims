@@ -393,3 +393,12 @@ def test_lot_can_be_received_unreleased(client, admin_h, lot):
     assert r.status_code == 201 and r.json()["released"] is False and r.json()["qc_status"] == "pending"
     kept = client.patch(f"/v1/reagent-lots/{r.json()['id']}", headers=admin_h, json={"qc_status": "released", "released": False})
     assert kept.json()["released"] is False
+
+
+@pytest.mark.parametrize("qty", [0, "0.000", -1])
+def test_zero_or_negative_use_is_refused(client, admin_h, lot, run, qty):
+    r = client.post("/v1/reagent-uses", headers=admin_h, json={
+        "reagent_lot_id": lot["id"], "lims_run_id": str(run.id), "quantity_used": qty})
+    assert r.status_code == 422, r.text
+    after = client.get("/v1/reagent-lots", headers=admin_h).json()
+    assert float(next(x for x in after if x["id"] == lot["id"])["quantity_remaining"]) == 100
