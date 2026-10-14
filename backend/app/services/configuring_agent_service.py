@@ -351,7 +351,7 @@ def _add_step(
     db: Session, run: ConfigurationRun, position: int, raw: dict, user: Optional[User] = None
 ) -> ConfigurationStep:
     """One proposal row. A row the APIs can't express is kept, stopped, with its reason (D-6)."""
-    from app.services.configuring_agent_rerun import existing_change
+    from app.services.configuring_agent_catalog import describe_change, resolve_body, reuse_gap
 
     call = raw.get("call") if isinstance(raw.get("call"), dict) else {}
     method = ((call.get("method") or "") if call else "").upper()
@@ -363,10 +363,19 @@ def _add_step(
         classified = classify_call(method, path, body if isinstance(body, dict) else {})
         if not classified.ok:
             gap = classified.gap
-        elif user is not None and not gap:
+        elif not gap:
+            # UAT 145f6b3: a new table for a seed list, or per-run values as config.
+            gap = reuse_gap(method, path, body)
+        if classified.ok and not gap and user is not None:
+            # Names -> ids and the model's key mistakes -> real field names. Stored
+            # resolved so the row shows the real request; apply resolves again.
+            body = resolve_body(db, user, method, path, body)
+            again = classify_call(method, path, body if isinstance(body, dict) else {})
+            if not again.ok:
+                gap = again.gap
             # Escalation is not frozen here: it is judged for the confirmer at view
             # and at apply (G1). Only API-expressibility stops are stored.
-            if existing_change(db, user, method, path, body) is not None:
+            elif not describe_change(db, user, method, path, body)["changed"]:
                 unchanged = True
         group = classified.group
     else:
@@ -414,6 +423,13 @@ def _sync_stop_banner(run: ConfigurationRun) -> None:
         run.banner = None
 
 
+def _catalog_for_prompt(db: Session, user: User) -> str:
+    """Tables, lists, roles, container types with ids, for the model (UAT D-4/D-7)."""
+    from app.services.configuring_agent_catalog import catalog_snapshot, catalog_text
+
+    return catalog_text(catalog_snapshot(db, user))
+
+
 def start_run(db: Session, user: User, configuration_id, goal_note: Optional[str]) -> ConfigurationRun:
     configuration = _configuration(db, user, configuration_id)
     if _ready_documents(db, configuration.id) < 1:
@@ -445,6 +461,7 @@ def start_run(db: Session, user: User, configuration_id, goal_note: Optional[str
             goal_note=run.goal_note,
             # The confirmer isn't known yet; send no one's permissions (G1).
             permissions=None,
+            catalog=_catalog_for_prompt(db, user),
         )
     except ProviderError as exc:
         run.status = "failed"
@@ -507,9 +524,22 @@ def _step_facts(step: ConfigurationStep, db: Optional[Session] = None, viewer: O
     }
 
 
+def _diff(step: ConfigurationStep, db: Optional[Session], viewer: Optional[User]) -> Optional[dict[str, Any]]:
+    """Before/after against the live configuration (G5). None once applied."""
+    from app.services.configuring_agent_catalog import describe_change
+
+    if db is None or viewer is None or not (step.call_method and step.call_path) or step.status == "applied":
+        return None
+    try:
+        return describe_change(db, viewer, step.call_method, step.call_path, step.call_body)
+    except Exception:  # noqa: BLE001 - advisory only
+        return None
+
+
 def step_payload(step: ConfigurationStep, db: Optional[Session] = None, viewer: Optional[User] = None) -> dict[str, Any]:
     facts = _step_facts(step, db, viewer)
     return {
+        "diff": _diff(step, db, viewer),
         "id": step.id,
         "position": step.position,
         "group": step.group_name,
@@ -538,23 +568,32 @@ def step_payload(step: ConfigurationStep, db: Optional[Session] = None, viewer: 
 
 
 def run_payload(run: ConfigurationRun, db: Optional[Session] = None, viewer: Optional[User] = None) -> dict[str, Any]:
+    steps = [step_payload(step, db, viewer) for step in run.steps]
+    # Stops as this viewer sees them, including escalations that are stops only
+    # for this viewer (UAT: the banner and count missed them).
+    stopped = sum(1 for row in steps if row["status"] == "stopped")
+    banner = run.banner
+    if stopped and run.status != "done" and not banner:
+        banner = STOP_BANNER
+    elif not stopped and banner == STOP_BANNER:
+        banner = None
     return {
         "id": run.id,
         "name": run.name,
         "configuration_id": run.configuration_id,
         "status": run.status,
         "goal_note": run.goal_note,
-        "banner": run.banner,
+        "banner": banner,
         "error_message": run.error_message,
         "applied_count": run.applied_count,
         "skipped_count": run.skipped_count,
-        "stopped_count": run.stopped_count,
+        "stopped_count": stopped,
         "created_by": run.created_by,
         "confirmed_by": run.confirmed_by,
         "confirmed_at": run.confirmed_at.isoformat() if run.confirmed_at else None,
         "agent_provider": run.agent_provider,
         "agent_model": run.agent_model,
-        "steps": [step_payload(step, db, viewer) for step in run.steps],
+        "steps": steps,
     }
 
 
@@ -624,6 +663,7 @@ def redo_step(db: Session, user: User, run_id, step_id, feedback: str) -> Config
             feedback=note,
             # The confirmer isn't known yet; send no one's permissions (G1).
             permissions=None,
+            catalog=_catalog_for_prompt(db, user),
         )
     except ProviderError as exc:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, exc.message) from exc
@@ -763,9 +803,15 @@ async def apply_run(
             if _retryable(step):
                 step.status, step.gap, step.stop_source = "proposed", None, None
             changes = await execute_step(atomic, user, step.call_method, step.call_path, step.call_body or {})
+            if changes and all(change.noop for change in changes):
+                # Rerun no-op (G5): already in place. Nothing written, no ledger row.
+                step.status = "unchanged"
+                continue
             step.status = "applied"
             applied += 1
             for change in changes:
+                if change.noop:
+                    continue
                 db.add(
                     ConfigurationItem(
                         id=uuid.uuid4(),

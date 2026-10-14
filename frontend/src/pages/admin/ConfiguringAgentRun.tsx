@@ -82,6 +82,21 @@ interface StepRow {
   needs_permission: string | null;
   retryable?: boolean;
   stopped_for_viewer?: boolean;
+  diff?: StepDiff | null;
+}
+
+export interface StepDiff {
+  before: unknown;
+  after: unknown;
+  changed: boolean;
+}
+
+/** Before → after text for a row (G5). "No change" when a rerun row is already in place. */
+export function diffText(diff: StepDiff | null | undefined): string | null {
+  if (!diff) return null;
+  const show = (value: unknown) => (value === null || value === undefined ? 'not there yet' : JSON.stringify(value));
+  if (!diff.changed) return `No change: already ${show(diff.before)}`;
+  return `Before: ${show(diff.before)} → After: ${show(diff.after)}`;
 }
 
 interface RunRow {
@@ -412,6 +427,15 @@ const ConfiguringAgentRun: React.FC = () => {
                       ? ` · depends on row ${step.depends_on.map((dep) => dep + 1).join(', ')}`
                       : ''}
                   </Typography>
+                  {diffText(step.diff) && (
+                    <Typography
+                      variant="body2"
+                      data-testid={`diff-${step.position}`}
+                      sx={{ mt: 0.5, fontFamily: 'monospace', wordBreak: 'break-word' }}
+                    >
+                      {diffText(step.diff)}
+                    </Typography>
+                  )}
                   {step.gap && (
                     <Alert severity="warning" sx={{ mt: 1 }}>
                       {step.gap}

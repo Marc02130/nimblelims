@@ -43,6 +43,8 @@ class AppliedChange:
     kind: str
     name: str
     target_id: Optional[UUID]
+    # True when the object is already exactly as proposed: nothing was written.
+    noop: bool = False
 
 
 class AtomicSession:
@@ -222,6 +224,18 @@ def _safe_uuid(value) -> Optional[UUID]:
 async def execute_step(db, user: User, method: str, path: str, body: Any) -> list[AppliedChange]:
     if is_drop_or_delete(method, path):
         raise CannotExpress("Drop and delete are never applied by the configuring agent.")
+    from app.services.configuring_agent_catalog import describe_change, resolve_body, reuse_gap
+
+    original = body if isinstance(body, dict) else {}
+    early = classify_call(method, path, original)
+    if not early.ok:
+        raise CannotExpress(early.gap or "This change cannot be applied through configuration APIs.")
+    reuse = reuse_gap(method, path, body)
+    if reuse:
+        raise CannotExpress(reuse)
+    # Names -> ids again at apply: a table created by an earlier row in this same
+    # apply (flushed) now resolves.
+    body = resolve_body(db, user, method, path, body)
     payload = body if isinstance(body, dict) else {}
     classified = classify_call(method, path, payload)
     if not classified.ok:
@@ -235,7 +249,13 @@ async def execute_step(db, user: User, method: str, path: str, body: Any) -> lis
     present = existing_change(db, user, method, path, body)
     if present is not None:
         # Safe rerun (D-7): the object is already there, so this is a no-op.
+        present.noop = True
         return [present]
+    if (method or "").upper() in ("PUT", "PATCH") or path.endswith("/deprecate"):
+        diff = describe_change(db, user, method, path, body)
+        if not diff["changed"]:
+            # G5: the target already has these values. No call, no write.
+            return [AppliedChange(classified.kind or "other", str(path), None, noop=True)]
     try:
         return await _dispatch(db, user, method.upper(), path, body, classified.kind or "other")
     except ValidationError as exc:
@@ -294,6 +314,9 @@ def _schema(db, user: User, method: str, path: str, body: dict, kind: str) -> li
             sort_order=data.sort_order,
             physical_name=data.physical_name,
         )
+        # add_column returns the read dict (UAT: this raised, so no column ever applied).
+        if isinstance(column, dict):
+            return [AppliedChange("column", column["display_name"], column["id"])]
         return [AppliedChange("column", column.display_name, column.id)]
     if path.endswith("/deprecate") and "/columns/" in path:
         read = svc.deprecate_column(_uuid_from_path(path.replace("/deprecate", "")))

@@ -778,12 +778,18 @@ async def test_rerun_with_put_and_patch_rows_writes_no_duplicates(db_session, ad
             db_session.execute(role_permissions.select().where(role_permissions.c.role_id == bench.id)).all(),
         )
 
-    for _ in range(2):
-        run = _start(db_session, admin, configuration, monkeypatch, steps)
-        result, code = await svc.apply_run(db_session, admin, run.id, second_confirm=True)
-        assert code == 200 and result.status == "done", [s.error_message or s.gap for s in result.steps]
-        count, perms = snapshot()
-        assert count == 1 and len(perms) == 1
+    run = _start(db_session, admin, configuration, monkeypatch, steps)
+    result, code = await svc.apply_run(db_session, admin, run.id, second_confirm=True)
+    assert code == 200 and result.status == "done", [s.error_message or s.gap for s in result.steps]
+    count, perms = snapshot()
+    assert count == 1 and len(perms) == 1
+    # G5 (UAT 145f6b3): the rerun is a no-op. Both rows are already in place, so
+    # they come back unchanged and excluded, and Apply has nothing to write.
+    rerun = _start(db_session, admin, configuration, monkeypatch, steps)
+    assert [s.status for s in rerun.steps] == ["unchanged", "unchanged"]
+    with pytest.raises(svc.ApplyRefused):
+        await svc.apply_run(db_session, admin, rerun.id, second_confirm=True)
+    assert snapshot() == (count, perms)
     db_session.refresh(entry)
     assert entry.active is False
 
