@@ -571,14 +571,14 @@ def finish_run(db: Session, user: User, pending: PendingRun, raise_errors: bool 
         raw_steps = _steps_from_proposal(parsed)
     except ProviderError as exc:
         run.status = "failed"
-        run.error_message = exc.message
+        run.error_message = exc.message or "The model call failed with no detail. Start a new run."
         db.commit()
         if raise_errors:
             raise HTTPException(status.HTTP_400_BAD_REQUEST, exc.message) from exc
         return run
     except HTTPException as exc:
         run.status = "failed"
-        run.error_message = str(exc.detail)
+        run.error_message = str(exc.detail or "") or f"The run failed (HTTP {exc.status_code}). Start a new run."
         db.commit()
         if raise_errors:
             raise
@@ -698,13 +698,15 @@ def run_in_background(pending: PendingRun, session_factory=None) -> None:
         user = db.query(User).filter(User.id == pending.user_id).one()
         try:
             finish_run(db, user, pending, raise_errors=False)
-        except Exception:  # noqa: BLE001 - a run must never stay reading_inputs
+        except Exception as exc:  # noqa: BLE001 - a run must never stay reading_inputs
             logger.exception("configuring agent background run failed")
             db.rollback()
             run = db.query(ConfigurationRun).filter(ConfigurationRun.id == pending.run_id).first()
-            if run is not None and run.status == "reading_inputs":
+            if run is not None and (run.status == "reading_inputs" or (run.status == "failed" and not run.error_message)):
                 run.status = "failed"
-                run.error_message = "The run failed while reading the model's proposal. Start a new run."
+                run.error_message = (
+                    f"The run failed while reading the model's proposal ({type(exc).__name__}). Start a new run."
+                )
                 db.commit()
     finally:
         if owned:
@@ -1151,7 +1153,7 @@ def _record_failure(
         raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "Run disappeared during rollback")
     run.status = "stopped" if stopped else "failed"
     run.banner = STOP_BANNER if stopped else None
-    run.error_message = None if stopped else message
+    run.error_message = None if stopped else (message or "Apply failed with no detail; nothing was changed.")
     run.applied_count = 0
     run.modified_by = user.id
     for step in run.steps:
