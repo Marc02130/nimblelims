@@ -240,6 +240,7 @@ async def execute_step(db, user: User, method: str, path: str, body: Any) -> lis
         raise CannotExpress("Drop and delete are never applied by the configuring agent.")
     from app.services.configuring_agent_catalog import (
         column_home_gap,
+        transition_gap,
         describe_change,
         resolve_body,
         resolve_path,
@@ -274,7 +275,7 @@ async def execute_step(db, user: User, method: str, path: str, body: Any) -> lis
         # Safe rerun (D-7): the object is already there, so this is a no-op.
         present.noop = True
         return [present]
-    home = column_home_gap(db, user, method, path, body)
+    home = column_home_gap(db, user, method, path, body) or transition_gap(method, path, body)
     if home:
         raise CannotExpress(home)
     if (method or "").upper() in ("PUT", "PATCH") or path.endswith("/deprecate"):

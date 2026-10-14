@@ -562,8 +562,7 @@ def resolve_body(db, user: User, method: str, path: str, body: Any) -> Any:
             for alias in aliases:
                 if alias != key:
                     out.pop(alias, None)
-        if out.get("operation"):
-            out["operation"] = str(out["operation"]).lower()
+        out["operation"] = transition_operation(db, user, out)
         return out
 
     return data
@@ -872,7 +871,14 @@ def _candidates(db, user: User, method: str, path: str, body: dict) -> list[tupl
         return [("table", t["display_name"]) for t in configurable_tables(db, user)]
     if path == "/v1/schema/columns":
         table = table_facts(db, user, body.get("table_id"))
-        return [("column", c["display_name"]) for c in (table or {}).get("columns", [])]
+        # Platform columns (id, created_at, ...) are never a user's field, so
+        # 'Request ID' is not a near-match for 'Id' (D-7 rerun, e217b58).
+        from app.services.ui_schema_catalog import PLATFORM_COLUMN_NAMES
+
+        return [
+            ("column", c["display_name"]) for c in (table or {}).get("columns", [])
+            if not c.get("is_platform") and c.get("physical_name") not in PLATFORM_COLUMN_NAMES
+        ]
     return []
 
 
@@ -914,10 +920,80 @@ def table_facts(db, user: User, ref) -> Optional[dict[str, Any]]:
     return None
 
 
+REAGENT_TRACKING_GAP = (
+    "Kit and reagent lot, part number, expiry and serial details are recorded per run by reagent "
+    "tracking, a future feature (a reagent/vendor table, a lot table with expiry, and the run or "
+    "experiment detail recording which lot was used). They are not configured as columns."
+)
+
+_REAGENT_PHRASES = (
+    ("lot",), ("lots",), ("expiry",), ("expiration",), ("expires",), ("exp", "date"),
+    ("serial",), ("sn",), ("part", "number"), ("part", "no"), ("part", "num"), ("pn",),
+    ("catalog", "number"), ("cat", "no"), ("catalogue", "number"),
+)
+
+
+def reagent_tracking_column(body: Any) -> bool:
+    """A proposed column for per-run kit/reagent lot, part, expiry or serial data."""
+    if not isinstance(body, dict):
+        return False
+    for key in ("display_name", "physical_name", "name"):
+        words = [w for w in re.split(r"[^a-z0-9]+", str(body.get(key) or "").lower()) if w]
+        for phrase in _REAGENT_PHRASES:
+            n = len(phrase)
+            if any(tuple(words[i:i + n]) == phrase for i in range(len(words) - n + 1)):
+                return True
+    return False
+
+
+TRANSITION_OPERATIONS = ("aliquot", "pool")
+
+
+def transition_operation(db, user: User, body: dict) -> Any:
+    """D-7: the model wrote 'dna extraction'. Operations are aliquot or pool
+    only. A pooling word maps to pool; any other invalid operation takes the
+    operation of the existing transition for the same source and destination,
+    so a rerun is No change. Otherwise it stays as written and stops."""
+    raw = body.get("operation")
+    op = str(raw or "").strip().lower()
+    if op in TRANSITION_OPERATIONS:
+        return op
+    if any(word in op for word in ("pool", "combin", "merg")):
+        return "pool"
+    from models.sample import SampleTypeTransition
+
+    try:
+        source, dest = UUID(str(body.get("source_sample_type"))), UUID(str(body.get("allowed_dest_sample_type")))
+    except (TypeError, ValueError):
+        return raw
+    ops = {
+        r.operation for r in db.query(SampleTypeTransition).filter(
+            SampleTypeTransition.client_id == user.client_id,
+            SampleTypeTransition.source_sample_type == source,
+            SampleTypeTransition.allowed_dest_sample_type == dest,
+        ).all()
+    }
+    return ops.pop() if len(ops) == 1 else raw
+
+
+def transition_gap(method: str, path: str, body: Any) -> Optional[str]:
+    if (method or "").upper() != "POST" or path != "/v1/sample-type-transitions" or not isinstance(body, dict):
+        return None
+    if body.get("operation") in TRANSITION_OPERATIONS:
+        return None
+    return (
+        f"A sample-type transition's operation is aliquot or pool, not '{body.get('operation')}'. "
+        "A derivation such as DNA extraction from blood uses aliquot."
+    )
+
+
 def column_home_gap(db, user: User, method: str, path: str, body: Any) -> Optional[str]:
-    """D-5: a new column on a table that can't take one, with where it belongs."""
+    """D-5: a new column on a table that can't take one, with where it belongs.
+    Kit lot/part/expiry/serial columns always stop: reagent tracking (future)."""
     if (method or "").upper() != "POST" or path != "/v1/schema/columns" or not isinstance(body, dict):
         return None
+    if reagent_tracking_column(body):
+        return REAGENT_TRACKING_GAP
     table = table_facts(db, user, body.get("table_id"))
     if table is None or table.get("can_add_columns"):
         return None

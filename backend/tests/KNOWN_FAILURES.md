@@ -70,3 +70,7 @@ registers exactly the Schema display set). Not automated:
   inline; the 300 s ceiling and the stale-run cutoff are checked by value only.
 - **D-5 on the bench** (entering a Qubit concentration on the DNA sample's
   test after Apply): Katinka/Marc sign-off, as before.
+
+## Configuring agent: live 'no JSON' reply (UAT e217b58, Qubit R2 first start)
+
+Not reproducible in CI. The raw model reply (xai grok-4.7, ~130 s) was not logged, so the exact shape is unknown. Likely causes covered by tests in `test_configuring_agent_round3.py`: prose or a fence around the JSON (the old parser only stripped a fence at the very start), a reply cut off at the output limit (`finish_reason: length`, never checked before), and empty/null content. The parser now finds the first top-level object with `steps` anywhere in the reply, a cut-off or empty reply is a `BadReply`, and `propose` retries once with a JSON-only reminder. Each unusable reply is logged (reason and length, no content or key). Live confirmation needs a UAT rerun with the provider.

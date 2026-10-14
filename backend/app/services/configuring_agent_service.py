@@ -357,6 +357,7 @@ def _add_step(
     """One proposal row. A row the APIs can't express is kept, stopped, with its reason (D-6)."""
     from app.services.configuring_agent_catalog import (
         column_home_gap,
+        transition_gap,
         describe_change,
         existing_named,
         near_matches,
@@ -390,9 +391,9 @@ def _add_step(
                 # G5: already there. A no-op, never a stop, even on a table
                 # that can't take new fields.
                 unchanged = True
-            elif column_home_gap(db, user, method, path, body):
+            elif column_home_gap(db, user, method, path, body) or transition_gap(method, path, body):
                 # D-5: say where the field belongs instead of a 422 at apply.
-                gap = column_home_gap(db, user, method, path, body)
+                gap = column_home_gap(db, user, method, path, body) or transition_gap(method, path, body)
             # Escalation is not frozen here: it is judged for the confirmer at view
             # and at apply (G1). Only API-expressibility stops are stored.
         group = classified.group
