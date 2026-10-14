@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -330,6 +331,15 @@ def _key_for_run(db: Session) -> tuple[ConfiguringAgentSettings, str]:
     return row, provider_key(row, row.agent_provider)
 
 
+_INSIDE_WORDS = re.compile(r"\b(field|column|attribute|entry|entries|value|values|option|row)s?\b", re.I)
+
+
+def _adds_inside(present: str, raw: dict) -> bool:
+    """The row adds something to an existing table ('add working solution volume
+    field' on experiments): the table existing is not that field existing."""
+    return present.startswith("table ") and bool(_INSIDE_WORDS.search(str(raw.get("action") or "")))
+
+
 NO_STEPS_GAP = "The model proposed no configuration change for this request, so nothing can be applied."
 
 
@@ -426,7 +436,7 @@ def _add_step(
         present = existing_named(db, user, raw.get("target")) if user is not None and not area else None
         if area:
             gap = area if not gap else f"{area} {gap}"
-        elif present and not asks_for_a_change(raw):
+        elif present and not asks_for_a_change(raw) and not _adds_inside(present, raw):
             # G5 (UAT 06c630b): the model wrote a gap for something that already
             # exists. The database (not the gap text) confirms it: No change.
             unchanged, gap = True, None
@@ -512,6 +522,9 @@ def begin_run(db: Session, user: User, configuration_id, goal_note: Optional[str
     settings, key = _key_for_run(db)
     excerpts = _excerpt(db, configuration.id, goal_note or configuration.name)
     catalog = _catalog_for_prompt(db, user)
+    prior = _prior_text(_prior_calls(db, configuration.id))
+    if prior:
+        catalog = f"{catalog}\n\n{prior}" if catalog else prior
     run = ConfigurationRun(
         id=uuid.uuid4(),
         configuration_id=configuration.id,
@@ -572,8 +585,36 @@ def finish_run(db: Session, user: User, pending: PendingRun, raise_errors: bool 
         return run
     # Keep every row. Each stop stays in place with its reason (D-6); no first-stop break.
     stopped = 0
+    seen = set()
+    index = -1
     for index, raw in enumerate(raw_steps):
         step = _add_step(db, run, index, raw, user)
+        seen.add(_call_key(step.call_method, step.call_path, step.call_body))
+        if step.status == "stopped":
+            stopped += 1
+    # Rerun coverage (UAT 7d84e07): the model dropped Request ID and Sample Log
+    # Number on the CMDL rerun. Calls an earlier run of this source proposed or
+    # applied, and this reply left out, are kept: No change when the database
+    # has them (G5), proposed otherwise.
+    for prior in _prior_calls(db, run.configuration_id, exclude_run=run.id):
+        key = _call_key(prior.call_method, prior.call_path, prior.call_body)
+        if key in seen:
+            continue
+        index += 1
+        step = _add_step(db, run, index, {
+            "group": prior.group_name,
+            "target": prior.target,
+            "action": prior.action,
+            "why": f"Kept from an earlier run of this source. {prior.why or ''}".strip(),
+            "call": {"method": prior.call_method, "path": prior.call_path, "body": prior.call_body},
+        }, user)
+        resolved = _call_key(step.call_method, step.call_path, step.call_body)
+        if resolved in seen:
+            # Same call once names resolve to ids: the model kept it after all.
+            db.expunge(step)
+            index -= 1
+            continue
+        seen.add(resolved)
         if step.status == "stopped":
             stopped += 1
     run.stopped_count = stopped
@@ -582,6 +623,56 @@ def finish_run(db: Session, user: User, pending: PendingRun, raise_errors: bool 
     db.commit()
     db.refresh(run)
     return run
+
+
+CARRIED_STATUSES = ("applied", "proposed", "unchanged")
+
+
+def _call_key(method, path, body) -> tuple:
+    data = body if isinstance(body, dict) else {}
+    name = str(data.get("display_name") or data.get("name") or data.get("physical_name") or "").strip().lower()
+    return (
+        (method or "").upper(), (path or "").rstrip("/"), name,
+        str(data.get("table_id") or data.get("table") or "").lower(),
+        str(data.get("source_sample_type") or "").lower(), str(data.get("allowed_dest_sample_type") or "").lower(),
+    )
+
+
+def _prior_calls(db: Session, configuration_id, exclude_run=None) -> list:
+    """Calls earlier runs of this configuration proposed or applied, newest first,
+    one per call key. Stops and refused rows are not carried."""
+    query = (
+        db.query(ConfigurationStep)
+        .join(ConfigurationRun, ConfigurationRun.id == ConfigurationStep.run_id)
+        .filter(
+            ConfigurationRun.configuration_id == configuration_id,
+            ConfigurationStep.status.in_(CARRIED_STATUSES),
+            ConfigurationStep.call_method.isnot(None),
+            ConfigurationStep.call_path.isnot(None),
+        )
+    )
+    if exclude_run is not None:
+        query = query.filter(ConfigurationRun.id != exclude_run)
+    rows = query.order_by(ConfigurationRun.created_at.desc(), ConfigurationStep.position).all()
+    out, keys = [], set()
+    for row in rows:
+        key = _call_key(row.call_method, row.call_path, row.call_body)
+        if key not in keys:
+            keys.add(key)
+            out.append(row)
+    return out
+
+
+def _prior_text(rows: list) -> str:
+    if not rows:
+        return ""
+    lines = [
+        "Earlier runs of this source proposed or applied these. Keep every one that the excerpts still "
+        "support: send its normal call again (the server shows existing ones as No change)."
+    ]
+    for row in rows[:60]:
+        lines.append(f"- {row.call_method} {row.call_path} {row.target}")
+    return "\n".join(lines)
 
 
 def start_run(db: Session, user: User, configuration_id, goal_note: Optional[str]) -> ConfigurationRun:
