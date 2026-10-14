@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from typing import Any
 
 import httpx
@@ -13,6 +14,22 @@ OPENAI_MODELS = "https://api.openai.com/v1/models"
 XAI_MODELS = "https://api.x.ai/v1/models"
 ANTHROPIC_MODELS = "https://api.anthropic.com/v1/models"
 ANTHROPIC_VERSION = "2023-06-01"
+
+
+DEFAULT_TIMEOUT_S = 300.0
+
+
+def model_timeout() -> float:
+    """Seconds to wait for the model. CONFIGURING_AGENT_TIMEOUT_S, default 300.
+
+    90 s was too short for large reasoning models in UAT (grok-4.7).
+    """
+    raw = os.getenv("CONFIGURING_AGENT_TIMEOUT_S", "").strip()
+    try:
+        value = float(raw) if raw else DEFAULT_TIMEOUT_S
+    except ValueError:
+        return DEFAULT_TIMEOUT_S
+    return value if value > 0 else DEFAULT_TIMEOUT_S
 
 
 class ProviderError(Exception):
@@ -54,13 +71,13 @@ def list_models(provider: str, api_key: str) -> list[dict[str, str]]:
     return rows
 
 
-def propose(provider: str, model: str, api_key: str, *, chunks: list[str], goal_note: str | None, feedback: str | None = None, permissions: list[str] | None = None) -> dict[str, Any]:
+def propose(provider: str, model: str, api_key: str, *, chunks: list[str], goal_note: str | None, feedback: str | None = None, permissions: list[str] | None = None, catalog: str | None = None) -> dict[str, Any]:
     """Ask the stored provider and model for configuration steps. Returns parsed JSON."""
     if provider not in PROVIDERS:
         raise ProviderError(f"Provider must be one of: {', '.join(PROVIDERS)}.")
     if not model:
         raise ProviderError("No model is selected.")
-    system = _system_prompt(permissions)
+    system = _system_prompt(permissions, catalog)
     user = _user_prompt(chunks, goal_note, feedback)
     if provider == "anthropic":
         text = _anthropic(model, api_key, system, user)
@@ -70,8 +87,13 @@ def propose(provider: str, model: str, api_key: str, *, chunks: list[str], goal_
     return _parse_json(text)
 
 
-def _system_prompt(permissions: list[str] | None = None) -> str:
-    """Scope is the confirming user's permissions, not the Schema catalog (L-2)."""
+def _system_prompt(permissions: list[str] | None = None, catalog: str | None = None) -> str:
+    """Scope is the confirming user's permissions, not the Schema catalog (L-2).
+
+    The routes and body formats come from the real routers' schemas, and the
+    catalog block carries real ids (UAT 145f6b3: D-4, D-5, D-7)."""
+    from app.services.configuring_agent_catalog import route_formats_text
+
     hidden = ", ".join(not_schema_tables())
     held = ", ".join(sorted(permissions or [])) or "none listed"
     return (
@@ -101,7 +123,23 @@ def _system_prompt(permissions: list[str] | None = None) -> str:
         "any role a permission the user does not hold, and do not change the user's own role. "
         "Do not create users. "
         "Experiment templates may be created with POST /v1/experiment-templates when the excerpts ask for one. "
-        "Add-column data_type is text, numeric, integer, boolean, date, timestamptz, or list."
+        "Add-column data_type is text, numeric, integer, boolean, date, timestamptz, or list. "
+        "These are the ONLY routes. Any other path (for example /v1/layouts, /v1/container-types, "
+        "/v1/relations) does not exist; use the routes below exactly, with these body field names "
+        "(display_name, not name or label, for tables and columns):\n"
+        + route_formats_text()
+        + "\nUse ids from the catalog below for table_id, list_id, role_id, column ids and sample type ids. "
+        "For a table or column created by an earlier step in this run, put its display_name in table_id "
+        "and add that step to depends_on; it is resolved at apply time. "
+        "Before proposing anything, check the catalog: if a table, column, list, entry, role, or container "
+        "type already exists, do not propose it again. "
+        "Sample types and matrices are entries in the existing sample_types and matrix_types lists: "
+        "add a missing one with POST /lists/sample_types/entries or POST /lists/matrix_types/entries. "
+        "Never propose a new table for sample types, matrices, or container types. "
+        "Never invent values the excerpts do not give. Kit lot numbers, part numbers, expiry dates, and serials "
+        "are recorded per run, not configured: do not create lists or entries for them. "
+        "A cutoff or acceptance limit in the excerpts is example data from the SOP; do not configure it as a value."
+        + ("\n\nCatalog for this lab:\n" + catalog if catalog else "")
     )
 
 
@@ -141,7 +179,7 @@ def _openai_compatible(url: str, model: str, api_key: str, system: str, user: st
                     {"role": "user", "content": user},
                 ],
             },
-            timeout=90.0,
+            timeout=model_timeout(),
         )
     except httpx.HTTPError as exc:
         raise ProviderError(f"The {url} call failed.") from exc
@@ -162,12 +200,12 @@ def _anthropic(model: str, api_key: str, system: str, user: str) -> str:
             },
             json={
                 "model": model,
-                "max_tokens": 4096,
+                "max_tokens": 8192,
                 "temperature": 0,
                 "system": system,
                 "messages": [{"role": "user", "content": user}],
             },
-            timeout=90.0,
+            timeout=model_timeout(),
         )
     except httpx.HTTPError as exc:
         raise ProviderError("The Anthropic call failed.") from exc

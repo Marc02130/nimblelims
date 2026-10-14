@@ -24,6 +24,12 @@ def _uuid(value) -> Optional[UUID]:
         return None
 
 
+def _slug(text: str, prefix: Optional[str] = None) -> str:
+    from app.services.ui_schema_service import _slug as schema_slug
+
+    return schema_slug(text, prefix)
+
+
 def existing_change(db, user: User, method: str, path: str, body: Any):
     """Return an AppliedChange for an object that already exists, else None."""
     from app.services.configuring_agent_apply import AppliedChange
@@ -98,7 +104,11 @@ def existing_change(db, user: User, method: str, path: str, body: Any):
         if physical:
             row = query.filter(SchemaTable.physical_name == physical).first()
         elif display:
-            row = query.filter(func.lower(SchemaTable.display_name) == display.lower()).first()
+            # The API names a new table x_<slug>; match that too (UAT G5 rerun).
+            row = query.filter(
+                (func.lower(SchemaTable.display_name) == display.lower())
+                | (SchemaTable.physical_name == _slug(display, "x"))
+            ).first()
         else:
             row = None
         return AppliedChange("table", row.display_name, row.id) if row else None
@@ -115,7 +125,10 @@ def existing_change(db, user: User, method: str, path: str, body: Any):
         if physical:
             row = query.filter(SchemaColumn.physical_name == physical).first()
         elif display:
-            row = query.filter(func.lower(SchemaColumn.display_name) == display.lower()).first()
+            row = query.filter(
+                (func.lower(SchemaColumn.display_name) == display.lower())
+                | (SchemaColumn.physical_name == _slug(display))
+            ).first()
         else:
             row = None
         return AppliedChange("column", row.display_name, row.id) if row else None
