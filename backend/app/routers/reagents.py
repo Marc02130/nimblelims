@@ -11,7 +11,8 @@ up with ``quantity_remaining`` 0, and void a use with ``active`` false.
 
 Use flow: the run or experiment holds the reagent; pick a lot, enter the
 quantity used, and the lot's quantity remaining goes down. An expired lot
-(expiration_date before the use date) or an inactive lot is refused (422).
+(effective expiry before the use date), an unreleased, QC-rejected or
+inactive lot is refused (422). ``released`` defaults true; QC release sets it.
 """
 from datetime import date, timedelta
 from decimal import Decimal
@@ -304,6 +305,7 @@ def _lot_out(row: ReagentLot) -> ReagentLotResponse:
         out.catalog_number = row.source.catalog_number
     out.effective_expiration_date = effective_expiration(row)
     out.expired = lot_expired(row)
+    out.usable = bool(row.active and row.released and row.qc_status != "rejected" and not out.expired)
     return out
 
 
@@ -324,6 +326,7 @@ async def list_reagent_lots(
     if usable:
         q = q.filter(
             ReagentLot.active.is_(True),
+            ReagentLot.released.is_(True),
             ReagentLot.qc_status != "rejected",
             (ReagentLot.quantity_remaining.is_(None)) | (ReagentLot.quantity_remaining > 0),
         )
@@ -402,6 +405,9 @@ async def update_reagent_lot(
         _source_for(db, data["reagent_vendor_id"], row.reagent_id)
     if data.get("lot_number"):
         data["lot_number"] = data["lot_number"].strip()
+    if data.get("qc_status") == "released" and "released" not in data:
+        # QC release releases the lot unless the caller says otherwise.
+        data["released"] = True
     for k, v in data.items():
         setattr(row, k, v)
     row.modified_by = current_user.id
@@ -460,6 +466,8 @@ async def record_reagent_use(
     if not lot.active:
         raise HTTPException(status_code=422, detail=f"Lot {lot.lot_number} is inactive and can't be used")
     used_on = body.used_on or date.today()
+    if not lot.released:
+        raise HTTPException(status_code=422, detail=f"Lot {lot.lot_number} is not released for use")
     if lot.qc_status == "rejected":
         raise HTTPException(status_code=422, detail=f"Lot {lot.lot_number} was rejected by QC and can't be used")
     if lot_expired(lot, used_on):

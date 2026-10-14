@@ -108,6 +108,9 @@ class ReagentLot(Base):
     opened_date = Column(Date, nullable=True)
     storage_location = Column(String(255), nullable=True)
     qc_status = Column(String(16), nullable=False, default="pending", server_default="pending")
+    # Lab-controlled gate, separate from active: a lot is usable only when
+    # released. Defaults true; labs that hold lots for QC set it false on receipt.
+    released = Column(Boolean, nullable=False, default=True, server_default="true")
     coa_url = Column(String(1024), nullable=True)
     description = Column(Text, nullable=True)
     active = Column(Boolean, nullable=False, default=True, server_default="true")

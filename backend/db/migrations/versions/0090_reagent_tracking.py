@@ -15,6 +15,9 @@ lot was used, so lot and expiry are recorded on the run instead of as columns.
 * reagent_uses: a lot used on a LIMS run or an experiment. Lot number and
   expiry are copied at record time. Tenant-scoped like LIMS runs (created_by's
   client).
+* Lots carry ``released`` (default true), a lab-set gate separate from
+  ``active`` and ``qc_status``: use needs released, active, not expired, not
+  QC-rejected.
 * No delete: rows carry ``active``; a lot's quantity remaining can go to 0.
 * The five tables are configurable (Schema display rule, kind core) and are
   registered in the Schema catalog here for every existing client, with the
@@ -146,6 +149,7 @@ def upgrade() -> None:
         sa.Column("opened_date", sa.Date(), nullable=True),
         sa.Column("storage_location", sa.String(255), nullable=True),
         sa.Column("qc_status", sa.String(16), nullable=False, server_default="pending"),
+        sa.Column("released", sa.Boolean(), nullable=False, server_default="true"),
         sa.Column("coa_url", sa.String(1024), nullable=True),
         sa.Column("description", sa.Text(), nullable=True),
         *_audit_cols(),

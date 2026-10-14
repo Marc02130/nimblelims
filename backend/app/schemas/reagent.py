@@ -136,6 +136,7 @@ class ReagentLotCreate(BaseModel):
     storage_location: Optional[str] = Field(None, max_length=255)
     coa_url: Optional[str] = Field(None, max_length=1024)
     qc_status: QcStatus = "pending"
+    released: bool = True
     description: Optional[str] = None
     active: bool = True
 
@@ -156,6 +157,7 @@ class ReagentLotUpdate(BaseModel):
     storage_location: Optional[str] = Field(None, max_length=255)
     coa_url: Optional[str] = Field(None, max_length=1024)
     qc_status: Optional[QcStatus] = None
+    released: Optional[bool] = None
     description: Optional[str] = None
     active: Optional[bool] = None
 
@@ -180,6 +182,8 @@ class ReagentLotResponse(BaseModel):
     opened_date: Optional[date] = None
     storage_location: Optional[str] = None
     qc_status: str = "pending"
+    released: bool = True
+    usable: bool = True
     coa_url: Optional[str] = None
     effective_expiration_date: Optional[date] = None
     description: Optional[str] = None
