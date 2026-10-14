@@ -11,7 +11,7 @@ from typing import Any, Optional
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.services.configuring_agent_allow import STOP_BANNER, classify_call
+from app.services.configuring_agent_allow import STOP_BANNER, asks_for_a_change, classify_call, out_of_scope_request
 from app.services.configuring_agent_apply import (
     AtomicSession,
     CannotExpress,
@@ -330,13 +330,32 @@ def _key_for_run(db: Session) -> tuple[ConfiguringAgentSettings, str]:
     return row, provider_key(row, row.agent_provider)
 
 
-def _steps_from_proposal(parsed: dict) -> list[dict]:
-    steps = parsed.get("steps")
-    if isinstance(steps, list) and steps:
-        return [step for step in steps if isinstance(step, dict)]
-    if parsed.get("target") or parsed.get("gap"):
+NO_STEPS_GAP = "The model proposed no configuration change for this request, so nothing can be applied."
+
+
+def _steps_from_proposal(parsed: dict, target: Optional[str] = None) -> list[dict]:
+    """The model's rows. Zero rows, or a bare refusal, is one stop row with the
+    reason (D-6, UAT 1787efc: a redo returned 400 'no steps'), never an error."""
+    steps = parsed.get("steps") if isinstance(parsed, dict) else None
+    if isinstance(steps, list):
+        rows = [step for step in steps if isinstance(step, dict)]
+        if rows:
+            return rows
+    if isinstance(parsed, dict) and (parsed.get("target") or parsed.get("gap")):
         return [parsed]
-    raise HTTPException(status.HTTP_400_BAD_REQUEST, "The model did not return any configuration steps.")
+    reason = ""
+    if isinstance(parsed, dict):
+        for key in ("gap", "reason", "refusal", "message", "banner", "note"):
+            if isinstance(parsed.get(key), str) and parsed[key].strip():
+                reason = parsed[key].strip()
+                break
+    return [{
+        "group": "other",
+        "target": target or "Configuration",
+        "action": "No change proposed",
+        "why": reason[:500] or "The model returned no steps.",
+        "gap": f"{NO_STEPS_GAP} {reason}".strip()[:1000],
+    }]
 
 
 INCLUDED = "included"
@@ -399,8 +418,15 @@ def _add_step(
         group = classified.group
     else:
         group = raw.get("group") or "other"
-        present = existing_named(db, user, raw.get("target")) if user is not None else None
-        if present:
+        # D-6 (UAT 1787efc): stops win. A routing or asked-for request is a stop
+        # even when its target names an existing table (routing_map). A call-less
+        # row is No change only when the database holds the object and the row
+        # asks for nothing but that object as it is (add/reuse), never a change.
+        area = out_of_scope_request(raw)
+        present = existing_named(db, user, raw.get("target")) if user is not None and not area else None
+        if area:
+            gap = area if not gap else f"{area} {gap}"
+        elif present and not asks_for_a_change(raw):
             # G5 (UAT 06c630b): the model wrote a gap for something that already
             # exists. The database (not the gap text) confirms it: No change.
             unchanged, gap = True, None
@@ -805,7 +831,7 @@ def redo_step(db: Session, user: User, run_id, step_id, feedback: str) -> Config
         )
     except ProviderError as exc:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, exc.message) from exc
-    raw_steps = _steps_from_proposal(parsed)
+    raw_steps = _steps_from_proposal(parsed, step.target)
     replacement = _add_step(db, run, step.position, raw_steps[0], user)
     # Carrier only. The original step is updated in place so redo does not insert a second row.
     step.group_name = replacement.group_name

@@ -211,3 +211,26 @@ def classify_call(method: str, path: str, body: Any = None) -> Classified:
         None,
         f"No configuration API matches {method} {path}.",
     )
+
+
+_AREA_WORDS = (
+    (re.compile(r"\brout(e|es|ed|ing)\b|routing[_ -]?map", re.I), "Routing stays as built."),
+    (re.compile(r"asked[_ -]?for", re.I), "Asked-for stays as built."),
+)
+_CHANGE_WORDS = re.compile(
+    r"\b(update|replace|change|modify|edit|remove|delete|drop|grant|revoke|rename|retire|"
+    r"deprecate|route|reroute|assign|move|merge|refuse|enable|disable)\w*", re.I)
+
+
+def out_of_scope_request(raw: dict) -> Optional[str]:
+    """A call-less row asking for routing or asked-for: the stop reason."""
+    text = " ".join(str(raw.get(k) or "") for k in ("target", "action", "why", "gap"))
+    for pattern, reason in _AREA_WORDS:
+        if pattern.search(text):
+            return reason
+    return None
+
+
+def asks_for_a_change(raw: dict) -> bool:
+    """The row wants an existing object changed, not added or reused as is."""
+    return bool(_CHANGE_WORDS.search(str(raw.get("action") or "")))

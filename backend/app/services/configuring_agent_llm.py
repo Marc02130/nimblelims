@@ -286,5 +286,11 @@ def _parse_json(text: str) -> dict[str, Any]:
         # A nested object of a truncated reply (a step's body) is not the answer.
         if isinstance(parsed, dict) and "steps" in parsed:
             return parsed
+        # A bare refusal or single row ({"gap": ...}) is the answer only when it
+        # is the outermost object; an inner one is part of a cut-off reply.
+        if start == starts[0] and isinstance(parsed, dict) and (
+            set(parsed) & {"target", "gap", "reason", "refusal"}
+        ):
+            return parsed
     reason = "cut off" if starts else "no JSON object"
     raise BadReply(f"The model did not return configuration JSON ({reason}; {len(raw)} chars).")
