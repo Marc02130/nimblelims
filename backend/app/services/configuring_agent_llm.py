@@ -6,6 +6,8 @@ import json
 import os
 from typing import Any
 
+import logging
+
 import httpx
 
 from app.services.configuring_agent_allow import PROVIDERS, not_schema_tables
@@ -36,6 +38,19 @@ class ProviderError(Exception):
     def __init__(self, message: str):
         self.message = message
         super().__init__(message)
+
+
+class BadReply(ProviderError):
+    """The model answered, but not with usable JSON (prose, fences, truncation,
+    empty content). Retried once with a JSON-only reminder."""
+
+
+log = logging.getLogger(__name__)
+PARSE_ATTEMPTS = 2
+RETRY_NOTE = (
+    "Your previous reply could not be parsed as JSON{why}. Reply again with the complete JSON object only: "
+    "no markdown, no text before or after it. Keep each why short so the reply is not cut off."
+)
 
 
 def list_models(provider: str, api_key: str) -> list[dict[str, str]]:
@@ -79,12 +94,26 @@ def propose(provider: str, model: str, api_key: str, *, chunks: list[str], goal_
         raise ProviderError("No model is selected.")
     system = _system_prompt(permissions, catalog)
     user = _user_prompt(chunks, goal_note, feedback)
+    last: BadReply | None = None
+    for attempt in range(PARSE_ATTEMPTS):
+        prompt = user if last is None else user + "\n\n" + RETRY_NOTE.format(why=_why(last))
+        try:
+            return _parse_json(_call(provider, model, api_key, system, prompt))
+        except BadReply as exc:
+            last = exc
+            log.warning("configuring agent: unusable model reply (attempt %s): %s", attempt + 1, exc.message)
+    raise ProviderError("The model did not return configuration JSON, twice. Start the run again.")
+
+
+def _why(exc: "BadReply") -> str:
+    return " (it was cut off)" if "cut off" in exc.message else ""
+
+
+def _call(provider: str, model: str, api_key: str, system: str, user: str) -> str:
     if provider == "anthropic":
-        text = _anthropic(model, api_key, system, user)
-    else:
-        url = "https://api.openai.com/v1/chat/completions" if provider == "openai" else "https://api.x.ai/v1/chat/completions"
-        text = _openai_compatible(url, model, api_key, system, user)
-    return _parse_json(text)
+        return _anthropic(model, api_key, system, user)
+    url = "https://api.openai.com/v1/chat/completions" if provider == "openai" else "https://api.x.ai/v1/chat/completions"
+    return _openai_compatible(url, model, api_key, system, user)
 
 
 def _system_prompt(permissions: list[str] | None = None, catalog: str | None = None) -> str:
@@ -114,6 +143,8 @@ def _system_prompt(permissions: list[str] | None = None, catalog: str | None = N
         "contents, routing_map, and work_orders; such a change is a gap. "
         f"Not schema tables: {hidden}. Do not add columns on them. "
         "List values use POST /lists and POST /lists/{name}/entries, group other. "
+        "A sample-type transition's operation is aliquot or pool only; a derivation such as DNA extraction "
+        "from blood uses aliquot. "
         "Never drop and never delete. To retire a list, entry, role, or transition, PATCH active false. "
         "To retire a table or column, POST its /deprecate route. To retire a container, "
         "PATCH /containers/{container_id}/contents/{sample_id} with {\"amount\": 0}. "
@@ -195,8 +226,18 @@ def _openai_compatible(url: str, model: str, api_key: str, system: str, user: st
         raise ProviderError(f"The {url} call failed.") from exc
     if response.status_code >= 400:
         raise ProviderError("The model call failed. Check the key and the model.")
-    data = response.json()
-    return data["choices"][0]["message"]["content"]
+    try:
+        choice = response.json()["choices"][0]
+    except (ValueError, KeyError, IndexError, TypeError) as exc:
+        raise BadReply("The model reply had no choices.") from exc
+    if choice.get("finish_reason") == "length":
+        raise BadReply("The model reply was cut off (finish_reason length).")
+    content = (choice.get("message") or {}).get("content")
+    if isinstance(content, list):  # content parts
+        content = "".join(p.get("text", "") for p in content if isinstance(p, dict))
+    if not content:
+        raise BadReply("The model reply was empty.")
+    return content
 
 
 def _anthropic(model: str, api_key: str, system: str, user: str) -> str:
@@ -222,20 +263,28 @@ def _anthropic(model: str, api_key: str, system: str, user: str) -> str:
     if response.status_code >= 400:
         raise ProviderError("The model call failed. Check the key and the model.")
     data = response.json()
+    if data.get("stop_reason") == "max_tokens":
+        raise BadReply("The model reply was cut off (max_tokens).")
     parts = [block.get("text", "") for block in data.get("content") or [] if block.get("type") == "text"]
     return "\n".join(parts)
 
 
 def _parse_json(text: str) -> dict[str, Any]:
+    """The configuration object in a reply. Accepts a bare object, a fenced
+    block anywhere, or an object with prose around it (first balanced one
+    that decodes to an object with "steps")."""
     raw = (text or "").strip()
-    if raw.startswith("```"):
-        raw = raw.split("\n", 1)[-1]
-        if raw.endswith("```"):
-            raw = raw[: raw.rfind("```")]
-    try:
-        parsed = json.loads(raw)
-    except json.JSONDecodeError as exc:
-        raise ProviderError("The model did not return configuration JSON.") from exc
-    if not isinstance(parsed, dict):
-        raise ProviderError("The model did not return configuration JSON.")
-    return parsed
+    if not raw:
+        raise BadReply("The model reply was empty.")
+    decoder = json.JSONDecoder()
+    starts = [i for i, ch in enumerate(raw) if ch == "{"]
+    for start in starts:
+        try:
+            parsed, _end = decoder.raw_decode(raw, start)
+        except json.JSONDecodeError:
+            continue
+        # A nested object of a truncated reply (a step's body) is not the answer.
+        if isinstance(parsed, dict) and "steps" in parsed:
+            return parsed
+    reason = "cut off" if starts else "no JSON object"
+    raise BadReply(f"The model did not return configuration JSON ({reason}; {len(raw)} chars).")
