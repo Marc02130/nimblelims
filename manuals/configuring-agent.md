@@ -62,3 +62,5 @@ Not a chat. Not a parser editor. Not dose-response. Not ELN process definitions,
 ## Slice input
 
 The first lab packet for a real run is `UAT_Scripts/config-agent-slice/`. Load the matching database rows only with `backend/seed_config_agent_slice.py --apply` on a fresh database. That loader is not a migration.
+
+Kit or reagent lot numbers, part numbers, expiry dates and serials are per-run facts. The agent does not propose columns, lists or entries for them; any such proposal is stopped, at proposal and again at Apply, with a reason pointing to reagent tracking, a future feature.

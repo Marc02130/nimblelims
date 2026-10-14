@@ -914,10 +914,39 @@ def table_facts(db, user: User, ref) -> Optional[dict[str, Any]]:
     return None
 
 
+REAGENT_TRACKING_GAP = (
+    "Kit and reagent lot, part number, expiry and serial details are recorded per run by reagent "
+    "tracking, a future feature (a reagent/vendor table, a lot table with expiry, and the run or "
+    "experiment detail recording which lot was used). They are not configured as columns."
+)
+
+_REAGENT_PHRASES = (
+    ("lot",), ("lots",), ("expiry",), ("expiration",), ("expires",), ("exp", "date"),
+    ("serial",), ("sn",), ("part", "number"), ("part", "no"), ("part", "num"), ("pn",),
+    ("catalog", "number"), ("cat", "no"), ("catalogue", "number"),
+)
+
+
+def reagent_tracking_column(body: Any) -> bool:
+    """A proposed column for per-run kit/reagent lot, part, expiry or serial data."""
+    if not isinstance(body, dict):
+        return False
+    for key in ("display_name", "physical_name", "name"):
+        words = [w for w in re.split(r"[^a-z0-9]+", str(body.get(key) or "").lower()) if w]
+        for phrase in _REAGENT_PHRASES:
+            n = len(phrase)
+            if any(tuple(words[i:i + n]) == phrase for i in range(len(words) - n + 1)):
+                return True
+    return False
+
+
 def column_home_gap(db, user: User, method: str, path: str, body: Any) -> Optional[str]:
-    """D-5: a new column on a table that can't take one, with where it belongs."""
+    """D-5: a new column on a table that can't take one, with where it belongs.
+    Kit lot/part/expiry/serial columns always stop: reagent tracking (future)."""
     if (method or "").upper() != "POST" or path != "/v1/schema/columns" or not isinstance(body, dict):
         return None
+    if reagent_tracking_column(body):
+        return REAGENT_TRACKING_GAP
     table = table_facts(db, user, body.get("table_id"))
     if table is None or table.get("can_add_columns"):
         return None
