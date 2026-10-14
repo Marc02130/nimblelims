@@ -39,3 +39,19 @@ automated test asserts them:
 - **D-9 Survives restart**: compose down/up. The tests prove the rows are
   committed, not that the volume survives.
 - **L-3 Postgres statement log**: scored from the server's statement log in UAT.
+
+## Configuring agent UAT fixes (145f6b3) that CI can't run
+
+`tests/test_configuring_agent_uat_fixes.py` feeds the UAT's own model bodies
+(names instead of ids, `name`/`table`/`required`, roles and tables by name) in
+place of the model, on the migrated database, and proves table + column +
+layout + relation apply and that the rerun is a no-op. Not automated:
+- **Whether a live model follows the new prompt** (catalog ids, routes, reuse of
+  `sample_types`/`matrix_types`, no invented lot numbers): needs a live key
+  (D-2). Re-run UAT D-4/D-7/G5 with grok-4.7.
+- **L-2 two-user test** with the seed `config-editor` persona (config:edit, no
+  schema:edit): run `python seed_dev_passwords.py --apply` with
+  `DEV_SEED_CONFIG_EDITOR_PASSWORD` set, then log in as that user. The test only
+  checks the seed role's permissions.
+- **Timeout long enough for grok-4.7**: default 300 s, `CONFIGURING_AGENT_TIMEOUT_S`.
+  Only the setting reaching httpx is tested.

@@ -1,7 +1,7 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import ConfiguringAgentRun, { dependencyProblem, includedRows, stoppedIncluded } from '../pages/admin/ConfiguringAgentRun';
+import ConfiguringAgentRun, { dependencyProblem, diffText, includedRows, stoppedIncluded } from '../pages/admin/ConfiguringAgentRun';
 import { apiService } from '../services/apiService';
 
 jest.mock('../services/apiService', () => ({
@@ -161,4 +161,31 @@ test('a gap that merely starts with the API prefix is shown as a normal stop', a
   await openRun(run);
   expect(screen.getByText(/Apply writes nothing while an included row is stopped/)).toBeInTheDocument();
   expect(screen.queryByText(/Fix the cause and apply again/)).toBeNull();
+});
+
+test('G5: rows show before and after; a rerun row says no change', async () => {
+  expect(diffText(null)).toBeNull();
+  expect(diffText({ before: null, after: { name: 'Serum' }, changed: true })).toBe(
+    'Before: not there yet → After: {"name":"Serum"}'
+  );
+  expect(diffText({ before: { active: true }, after: { active: true }, changed: false })).toBe(
+    'No change: already {"active":true}'
+  );
+  await openRun(runWith([
+    step({ position: 0, diff: { before: { permission_ids: [] }, after: { permission_ids: ['p1'] }, changed: true } }),
+    step({ position: 1, status: 'unchanged', included: false, decision: 'excluded',
+      diff: { before: { name: 'Serum' }, after: { name: 'Serum' }, changed: false } }),
+  ]));
+  expect(screen.getByTestId('diff-0').textContent).toBe('Before: {"permission_ids":[]} → After: {"permission_ids":["p1"]}');
+  expect(screen.getByTestId('diff-1').textContent).toBe('No change: already {"name":"Serum"}');
+});
+
+test('viewer-only stop: banner and count come from the run payload', async () => {
+  await openRun({
+    ...runWith([step({ position: 0, status: 'stopped', gap: 'This would grant permissions you don\'t hold (result:review).', stopped_for_viewer: true })]),
+    banner: "Can't apply this change through configuration APIs",
+    stopped_count: 1,
+  });
+  expect(screen.getByText("Can't apply this change through configuration APIs")).toBeInTheDocument();
+  expect(screen.getByText(/stopped 1/)).toBeInTheDocument();
 });
