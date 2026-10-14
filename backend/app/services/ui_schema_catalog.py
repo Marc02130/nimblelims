@@ -44,6 +44,12 @@ LAB_TABLES: tuple[str, ...] = (
     "instruments",
     "locations",
     "eln_processes",
+    # Reagent tracking (0090): catalog plus per-run lot use.
+    "vendors",
+    "reagents",
+    "reagent_vendors",
+    "reagent_lots",
+    "reagent_uses",
 )
 
 SYSTEM_TABLES: tuple[str, ...] = (
@@ -108,6 +114,11 @@ DISPLAY_NAMES: Mapping[str, str] = {
     "instruments": "Instruments",
     "locations": "Locations",
     "eln_processes": "Processes",
+    "vendors": "Vendors",
+    "reagents": "Reagents",
+    "reagent_vendors": "Reagent vendors",
+    "reagent_lots": "Reagent lots",
+    "reagent_uses": "Reagent uses",
     "container_types": "Container types",
     "instrument_types": "Instrument types",
     "sample_type_transitions": "Sample type transitions",
