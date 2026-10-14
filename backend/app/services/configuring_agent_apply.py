@@ -222,9 +222,10 @@ def _safe_uuid(value) -> Optional[UUID]:
 
 
 def register_catalog(db, user: User) -> None:
-    """Register the configurable tables (the Schema display rule) inside the apply
-    transaction, once per apply. Never at run start (D-3/L-4): a run commits no
-    catalog rows before confirm, and a rolled-back apply leaves none."""
+    """Idempotent safety net. Migration 0089 registers every configurable
+    existing table up front (D-3/L-4); this only catches tables or clients
+    created after it, inside the apply transaction, once per apply. Never at
+    run start, and a rolled-back apply leaves nothing."""
     if isinstance(db, AtomicSession):
         if db.__dict__.get("_catalog_ready"):
             return

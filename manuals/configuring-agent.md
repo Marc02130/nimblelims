@@ -43,7 +43,7 @@ Only tables marked as taking new columns get them (Samples and lab tables you cr
 
 Duplicates are matched on content, not only the name: a template whose name has the same content words (for example *Qubit dsDNA HS Assay* and *Qubit 4 dsDNA HS quantitation*), or the same definition, is **No change**. Re-adding a column that already exists is **No change**, not a stop. A new row whose name is close to an existing one (for example *EDTA Tube* when *K2EDTA Tube (5mL)* exists) shows **Already exists with a similar name** and starts excluded; include it only if it really is different.
 
-Starting a run writes no Schema catalog rows. The tables the agent may change are registered when you confirm Apply, inside the same transaction, and only those the Schema screen shows (never lists, list entries or units).
+The tables the agent may change are registered in the Schema catalog up front, by migration 0089: every existing table the Schema screen shows (never lists, list entries or units), with its columns and default table privileges. Starting a run writes nothing but the run and its proposed steps. Apply re-checks the catalog idempotently inside its transaction only as a safety net for tables or clients created after the migration.
 
 Apply is one transaction. If a step cannot be expressed, or an API or permission error occurs, every change from that apply is undone. The screen then shows Stopped or Failed. The banner when a change cannot be expressed is: `Can't apply this change through configuration APIs`. The banner and the stopped count include rows that are stops only for you (for example, a permission you don't hold).
 
