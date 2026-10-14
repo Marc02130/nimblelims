@@ -388,7 +388,8 @@ The `full_svg` endpoint does not filter excluded points from the plotted data. E
 4. `reagent_lots`: reagent, optional reagent-vendor it was bought from, lot number (unique per reagent), expiration, purchased date, received date + received by (defaults to the user), opened date, storage location, quantity received / remaining, unit, QC status (`pending` / `released` / `rejected`), certificate of analysis link.
 5. **Effective expiry** = the earlier of the printed expiration and opened date + the reagent's stability after opening. Shown on lots and copied onto each use.
 6. `reagent_uses`: the run or experiment holds the reagent. Pick a lot, enter the quantity used (required, in the lot's unit; another unit → 422); the lot's quantity remaining goes down (422 below 0). Lot number, effective expiry and unit are copied. Who/when is `created_by` / `created_at`. Voiding (`active` false) puts the quantity back; a void can't be undone.
-7. **Blocked at use (422):** effectively expired, QC-rejected, or inactive lots. `?usable=true` hides them.
+7. **Released flag** on lots (`released`, separate from `active`): a lab-set gate. Default **true**, so labs that don't hold lots work as before; labs that QC-hold set it false on receipt. Setting QC status to `released` also sets `released` true unless the same request says otherwise. QC status stays as its own field.
+8. **Blocked at use (422):** not released, effectively expired (hard block, Marc), QC-rejected, or inactive. `?usable=true` hides them; lots carry `usable`.
 8. Locks: no DELETE routes; `active` flag and created/modified audit fields on every table; a lot retires with quantity remaining 0. RLS: catalog readable/writable by lab roles and `config:edit` (Client role sees nothing); `reagent_uses` scoped to the recorder's client.
 9. All five tables registered in the Schema catalog (kind core) by `0090` for every client.
 10. Configuring agent: may `POST /v1/vendors`, `/v1/reagents`, `/v1/reagent-vendors` (names → ids, `part_number`/`cat_no` → `catalog_number`, `-20 °C`/`2-8C`/`room temperature` → storage values; rerun = No change). Lots and lot use stop with a reason pointing at `/v1/reagent-lots` and `/v1/reagent-uses`. The kit-lot column stop and the prompt point at these routes.
@@ -398,7 +399,6 @@ The `full_svg` endpoint does not filter excluded points from the plotted data. E
 - CoA as an uploaded file (today a link).
 - Reagents used panel on the ELN experiment page (API already takes `experiment_id`).
 - Warning ahead of expiry; reorder notifications / purchase orders.
-- QC `pending` lots are usable today (only `rejected` blocks); decide if pending should block.
 - Units are free text, no conversion against `units`.
 - Supervisor override for an expired lot (hard block today).
 - Lots are lab-wide (like instruments), not per client.
