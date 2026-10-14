@@ -19,7 +19,7 @@ If no key is stored, the server uses only that provider’s environment variable
 
 The settings row is named **Configuring agent** and has an id.
 
-The server waits up to 300 seconds for the model. Set `CONFIGURING_AGENT_TIMEOUT_S` to change it (large reasoning models can need more).
+The model call runs in the background: **Start** returns at once (HTTP 202, status *reading inputs*) and the page checks every 3 seconds until the proposal is stored. The server waits up to 300 seconds for the model; set `CONFIGURING_AGENT_TIMEOUT_S` to change it. A run still reading inputs well after that (for example after a server restart) is shown as failed: start a new run. `CONFIGURING_AGENT_ASYNC=0` turns the background call off.
 
 ## A configuration
 
@@ -38,6 +38,12 @@ Each proposed step shows a target, an action, and a one-line why. Groups are Sch
 The proposal is one change set. Every row stays on screen, including stops, each with its reason. Each row has an **Include** checkbox; **Redo** with feedback still replaces one row. A row you lack the permission for is greyed out with `Needs {permission}` and can't be included. **Apply N changes** asks you to confirm once. If the included rows contain roles or privileges, schema changes, **Set inactive**, or **Amount → 0**, a second dialog, **You are responsible for these changes**, needs its checkbox before Confirm. Cancel at either dialog writes nothing. Apply writes nothing while an included row is stopped, or while an included row depends on an excluded stopped row. Apply posts only the included rows, in order, in one transaction, through existing APIs, as you (the confirming user). The agent never drops or deletes, and never grants privileges. Every row shows **Before → After** against the live configuration. Running the same file again shows rows that already exist, or already have the proposed values, as **Already there, nothing to change** and **No change**; they start excluded, and even if included, Apply writes nothing and records nothing for them.
 
 The model is given this lab's catalog with ids (Schema tables and columns, lists and their entries, roles, container types, layout screen keys) and the exact routes and body formats, generated from the real API schemas. Names it still sends (a table by name, `name` instead of `display_name`, a role by name, a list entry `value`) are turned into the real ids and fields when the row is proposed and again at Apply, so a column can be added to a table created by an earlier row. Sample types and matrices are entries in the existing `sample_types` and `matrix_types` lists; a new table for them (or for container types) is a stop. Lot numbers, expiry dates and serials are recorded per run and are never configured; a list for them is a stop.
+
+Only tables marked as taking new columns get them (Samples and lab tables you create). Experiments, tests, results and containers do not: a field there is a stop that says where it belongs. A measured result, such as a Qubit concentration in ng/µL, is an **analyte** on an **analysis** and is recorded on the sample's test (POST `/analytes`, POST `/analyses`, POST `/analyses/{analysis}/analytes`). The experiment template is the process, not the result fields.
+
+Duplicates are matched on content, not only the name: a template whose name has the same content words (for example *Qubit dsDNA HS Assay* and *Qubit 4 dsDNA HS quantitation*), or the same definition, is **No change**. Re-adding a column that already exists is **No change**, not a stop. A new row whose name is close to an existing one (for example *EDTA Tube* when *K2EDTA Tube (5mL)* exists) shows **Already exists with a similar name** and starts excluded; include it only if it really is different.
+
+Starting a run writes no Schema catalog rows. The tables the agent may change are registered when you confirm Apply, inside the same transaction, and only those the Schema screen shows (never lists, list entries or units).
 
 Apply is one transaction. If a step cannot be expressed, or an API or permission error occurs, every change from that apply is undone. The screen then shows Stopped or Failed. The banner when a change cannot be expressed is: `Can't apply this change through configuration APIs`. The banner and the stopped count include rows that are stops only for you (for example, a permission you don't hold).
 
