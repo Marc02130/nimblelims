@@ -379,13 +379,27 @@ The `full_svg` endpoint does not filter excluded points from the plotted data. E
 
 ---
 
-## Reagent tracking (future feature, not built)
+## Reagent tracking (step 2)
 
-**What:** Track kits and reagents and record which lot each run used, Sapio-style:
-1. A reagent table for reagent/kit and vendor info (name, vendor, part/catalog number).
-2. A reagent lot table: lot number, expiry date, received/opened dates, linked to the reagent.
-3. Run/experiment detail recording which lot was used (a reference from the run or experiment detail to the lot), so expiry can be checked at use.
+**Done (branch `reagent-tracking`, migration `0090_reagent_tracking`), per Marc's design:**
+1. `vendors` (name, contact, email, phone, website).
+2. `reagents` are vendor-agnostic: name, storage condition (`-80C` / `-20C` / `4C` / `RT`), unit, hazard class, SDS link, stability after opening (days).
+3. `reagent_vendors`: a reagent as sold by one vendor (a reagent can have several): catalog number, unit, unit of sale, quantity per unit of sale, price per unit, reorder point, reorder quantity, lead time (days), preferred-vendor flag, notes. Reagents list shows quantity on hand and a **Reorder** flag when on-hand ≤ a source's reorder point.
+4. `reagent_lots`: reagent, optional reagent-vendor it was bought from, lot number (unique per reagent), expiration, purchased date, received date + received by (defaults to the user), opened date, storage location, quantity received / remaining, unit, QC status (`pending` / `released` / `rejected`), certificate of analysis link.
+5. **Effective expiry** = the earlier of the printed expiration and opened date + the reagent's stability after opening. Shown on lots and copied onto each use.
+6. `reagent_uses`: the run or experiment holds the reagent. Pick a lot, enter the quantity used (required, in the lot's unit; another unit → 422); the lot's quantity remaining goes down (422 below 0). Lot number, effective expiry and unit are copied. Who/when is `created_by` / `created_at`. Voiding (`active` false) puts the quantity back; a void can't be undone.
+7. **Released flag** on lots (`released`, separate from `active`): a lab-set gate. Default **true**, so labs that don't hold lots work as before; labs that QC-hold set it false on receipt. Setting QC status to `released` also sets `released` true unless the same request says otherwise. QC status stays as its own field.
+8. **Blocked at use (422):** not released, effectively expired (hard block, Marc), QC-rejected, or inactive. `?usable=true` hides them; lots carry `usable`.
+8. Locks: no DELETE routes; `active` flag and created/modified audit fields on every table; a lot retires with quantity remaining 0. RLS: catalog readable/writable by lab roles and `config:edit` (Client role sees nothing); `reagent_uses` scoped to the recorder's client.
+9. All five tables registered in the Schema catalog (kind core) by `0090` for every client.
+10. Configuring agent: may `POST /v1/vendors`, `/v1/reagents`, `/v1/reagent-vendors` (names → ids, `part_number`/`cat_no` → `catalog_number`, `-20 °C`/`2-8C`/`room temperature` → storage values; rerun = No change). Lots and lot use stop with a reason pointing at `/v1/reagent-lots` and `/v1/reagent-uses`. The kit-lot column stop and the prompt point at these routes.
+11. UI: **Admin → Reagents** (Vendors / Reagents / Reagent vendors / Lots tabs) and **Reagents used** on the LIMS run page.
 
-**Why:** SOPs name kit lot numbers, part numbers, expiry dates and serials. These are per-run facts, not configuration. Until this exists the Configuring Agent stops any proposal to add such columns (or lists/entries) and points to this feature (`reagent_tracking_column` / `REAGENT_TRACKING_GAP` in `backend/app/services/configuring_agent_catalog.py`).
-
-**Status:** Backlog. Not built in PR #157.
+**Left (follow-ups):**
+- CoA as an uploaded file (today a link).
+- Reagents used panel on the ELN experiment page (API already takes `experiment_id`).
+- Warning ahead of expiry; reorder notifications / purchase orders.
+- Units are free text, no conversion against `units`.
+- Supervisor override for an expired lot (hard block today).
+- Lots are lab-wide (like instruments), not per client.
+- Live UAT of the agent proposing reagents/vendors from CMDL-SOP2310 (Qubit kit).

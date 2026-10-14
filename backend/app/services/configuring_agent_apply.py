@@ -304,6 +304,8 @@ async def _dispatch(db, user: User, method: str, path: str, body: dict, kind: st
         return await _analyses(db, user, path, body)
     if path == "/v1/sample-type-transitions":
         return _transition(db, user, body)
+    if path in ("/v1/vendors", "/v1/reagents", "/v1/reagent-vendors"):
+        return await _reagent_catalog(db, user, path, body)
     if path.startswith("/users/"):
         return await _user_role(db, user, path, body)
     if re.match(r"^/containers/[^/]+/contents/[^/]+$", path):
@@ -436,6 +438,20 @@ async def _container_type(db, user, body: dict) -> list[AppliedChange]:
 
     created = await create_container_type(ContainerTypeCreate.model_validate(body), user, db)
     return [AppliedChange("container_type", created.name, created.id)]
+
+
+async def _reagent_catalog(db, user, path: str, body: dict) -> list[AppliedChange]:
+    from app.routers.reagents import create_reagent, create_reagent_vendor, create_vendor
+    from app.schemas.reagent import ReagentCreate, ReagentVendorCreate, VendorCreate
+
+    if path == "/v1/reagent-vendors":
+        created = await create_reagent_vendor(ReagentVendorCreate.model_validate(body), user, db)
+        return [AppliedChange("reagent_vendor", created.catalog_number or created.vendor_name or "source", created.id)]
+    if path == "/v1/vendors":
+        created = await create_vendor(VendorCreate.model_validate(body), user, db)
+        return [AppliedChange("vendor", created.name, created.id)]
+    created = await create_reagent(ReagentCreate.model_validate(body), user, db)
+    return [AppliedChange("reagent", created.name, created.id)]
 
 
 def _transition(db, user, body: dict) -> list[AppliedChange]:

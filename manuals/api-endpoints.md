@@ -2393,6 +2393,19 @@ Admin UI: `/admin/sample-type-transitions`. Template default dest sample type (E
 
 ---
 
+## Reagent tracking
+
+No DELETE routes. Retire with `active: false`; use a lot up with `quantity_remaining: 0`. Every row has `active`, `created_*`, `modified_*`.
+
+| Method | Path | Permission | Notes |
+|--------|------|------------|-------|
+| GET / POST, GET / PATCH `{id}` | `/v1/vendors` | read: any user (inactive only for `config:edit`); write: `config:edit` | `{name, contact?, email?, phone?, website?}`; name unique (case-insensitive) |
+| same | `/v1/reagents` | same | vendor-agnostic `{name, storage_condition? (-80C\|-20C\|4C\|RT), unit?, hazard_class?, sds_url?, stability_after_opening_days?}`; response adds `vendor_names`, `quantity_on_hand`, `below_reorder_point` |
+| same | `/v1/reagent-vendors` | same | `{reagent_id, vendor_id, catalog_number?, unit?, unit_of_sale?, quantity_per_unit_of_sale?, price_per_unit?, reorder_point?, reorder_quantity?, lead_time_days?, is_preferred?, notes?}`; inactive reagent/vendor → 422 |
+| same | `/v1/reagent-lots` | same | `{reagent_id? \| reagent_vendor_id?, lot_number, expiration_date?, purchased_date?, received_date?, received_by?, opened_date?, storage_location?, quantity_received?, quantity_remaining?, unit?, qc_status? (pending\|released\|rejected), released? (default true), coa_url?}`; qc_status released also sets released true unless given; source must sell that reagent (422); response adds `effective_expiration_date`, `expired`; `?usable=true` = active, released, not rejected, not effectively expired, quantity left |
+| GET / POST | `/v1/reagent-uses` | read: any user (RLS: own client); write: `experiment:manage` | `{reagent_lot_id, quantity_used, unit?, lims_run_id? \| experiment_id?, analysis_id?, used_on?, note?}`; decrements the lot; 422 for an unreleased / effectively expired / QC-rejected / inactive lot, quantity over remaining, or a unit other than the lot's |
+| PATCH | `/v1/reagent-uses/{id}` | `experiment:manage` | `{active: false}` voids and returns the quantity; `{note}` |
+
 ## Configuring agent
 
 Gate: `config:edit`. Missing permission: **403** `You can't change configuring-agent settings.`

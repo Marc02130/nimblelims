@@ -842,6 +842,83 @@ export class ApiService {
     return response.data;
   }
 
+  // Reagent tracking: vendors, reagents, lots, and the lot used on a run.
+  // No delete: retire with active false; a lot's quantity_remaining can go to 0.
+  async getVendors(params?: { search?: string; active?: boolean }) {
+    const response: AxiosResponse = await this.api.get('/v1/vendors', { params });
+    return response.data;
+  }
+
+  async createVendor(data: Record<string, unknown>) {
+    const response: AxiosResponse = await this.api.post('/v1/vendors', data);
+    return response.data;
+  }
+
+  async updateVendor(id: string, data: Record<string, unknown>) {
+    const response: AxiosResponse = await this.api.patch(`/v1/vendors/${id}`, data);
+    return response.data;
+  }
+
+  async getReagents(params?: { search?: string; vendor_id?: string; active?: boolean }) {
+    const response: AxiosResponse = await this.api.get('/v1/reagents', { params });
+    return response.data;
+  }
+
+  async createReagent(data: Record<string, unknown>) {
+    const response: AxiosResponse = await this.api.post('/v1/reagents', data);
+    return response.data;
+  }
+
+  async updateReagent(id: string, data: Record<string, unknown>) {
+    const response: AxiosResponse = await this.api.patch(`/v1/reagents/${id}`, data);
+    return response.data;
+  }
+
+  async getReagentVendors(params?: { reagent_id?: string; vendor_id?: string; active?: boolean }) {
+    const response: AxiosResponse = await this.api.get('/v1/reagent-vendors', { params });
+    return response.data;
+  }
+
+  async createReagentVendor(data: Record<string, unknown>) {
+    const response: AxiosResponse = await this.api.post('/v1/reagent-vendors', data);
+    return response.data;
+  }
+
+  async updateReagentVendor(id: string, data: Record<string, unknown>) {
+    const response: AxiosResponse = await this.api.patch(`/v1/reagent-vendors/${id}`, data);
+    return response.data;
+  }
+
+  async getReagentLots(params?: { reagent_id?: string; search?: string; active?: boolean; usable?: boolean }) {
+    const response: AxiosResponse = await this.api.get('/v1/reagent-lots', { params });
+    return response.data;
+  }
+
+  async createReagentLot(data: Record<string, unknown>) {
+    const response: AxiosResponse = await this.api.post('/v1/reagent-lots', data);
+    return response.data;
+  }
+
+  async updateReagentLot(id: string, data: Record<string, unknown>) {
+    const response: AxiosResponse = await this.api.patch(`/v1/reagent-lots/${id}`, data);
+    return response.data;
+  }
+
+  async getReagentUses(params?: { lims_run_id?: string; experiment_id?: string; reagent_lot_id?: string }) {
+    const response: AxiosResponse = await this.api.get('/v1/reagent-uses', { params });
+    return response.data;
+  }
+
+  async recordReagentUse(data: Record<string, unknown>) {
+    const response: AxiosResponse = await this.api.post('/v1/reagent-uses', data);
+    return response.data;
+  }
+
+  async voidReagentUse(id: string) {
+    const response: AxiosResponse = await this.api.patch(`/v1/reagent-uses/${id}`, { active: false });
+    return response.data;
+  }
+
   // Instrument types / instruments / CRO sources (data-parsers P0)
   async getInstrumentTypes(params?: { search?: string; active?: boolean }) {
     const response: AxiosResponse = await this.api.get('/v1/instrument-types', { params });

@@ -294,7 +294,7 @@ def test_timeout_default_still_300():
     assert llm.DEFAULT_TIMEOUT_S == 300.0
 
 
-# ------------------------------------------------ reagent tracking (future feature)
+# ------------------------------------------------ reagent tracking (kit-lot stop points at it)
 
 @pytest.mark.parametrize("name", [
     "Kit lot number", "Qubit kit part number", "Reagent expiry date", "Lot", "Expiration Date",
@@ -305,7 +305,8 @@ def test_per_run_kit_lot_part_expiry_columns_stop_at_proposal(db_session, admin,
         _step("POST", "/v1/schema/columns", {"display_name": name, "table_id": "samples", "data_type": "text"}),
     ])
     assert run.steps[0].status == "stopped"
-    assert "reagent tracking" in run.steps[0].gap and "future feature" in run.steps[0].gap
+    assert "reagent tracking" in run.steps[0].gap
+    assert "POST /v1/reagents" in run.steps[0].gap and "POST /v1/reagent-uses" in run.steps[0].gap
 
 
 @pytest.mark.parametrize("name", ["Plot ID", "Slot position", "Volume (uL)", "Parent sample", "Qubit dsDNA HS reagent volume", "Kit Note"])
@@ -330,5 +331,5 @@ def test_reagent_tracking_column_stops_at_apply_and_writes_nothing(db_session, a
 
 def test_prompt_points_kit_lots_to_reagent_tracking():
     prompt = llm._system_prompt(None, "")
-    assert "reagent tracking, a future feature" in prompt
+    assert "Use reagent tracking instead" in prompt and "POST /v1/vendors" in prompt
     assert "columns for them" in prompt

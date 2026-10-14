@@ -38,6 +38,13 @@ _OUT_OF_SCOPE = (
     ("/samples/receive", "Receive is a lab motion, not a configuration write."),
 )
 
+REAGENT_LOT_GAP = (
+    "Reagent lots and lot use are recorded at the bench, not by this configuration run: receive a lot on "
+    "the Reagents screen (POST /v1/reagent-lots) and record the lot used on the LIMS run or experiment "
+    "(POST /v1/reagent-uses). A lot number or expiry in an SOP is example data."
+)
+_REAGENT_BENCH = ("/v1/reagent-lots", "/v1/reagent-uses")
+
 _ALLOWED: tuple[tuple[str, re.Pattern[str], str, str, str], ...] = (
     ("POST", re.compile(r"^/v1/schema/tables$"), "schema_tables", "schema:edit", "table"),
     ("POST", re.compile(r"^/v1/schema/tables/[^/]+/deprecate$"), "schema_tables", "schema:edit", "table"),
@@ -63,6 +70,12 @@ _ALLOWED: tuple[tuple[str, re.Pattern[str], str, str, str], ...] = (
     ("POST", re.compile(r"^/analyses/[^/]+/analytes$"), "other", "config:edit", "analysis_analytes"),
     # Container retire: contents amount -> 0 is the only container removal (L-B).
     ("PATCH", re.compile(r"^/containers/[^/]+/contents/[^/]+$"), "other", "sample:update", "contents_amount"),
+    # Reagent tracking (step 2): the agent may add a vendor, a vendor-agnostic
+    # reagent, and the reagent-vendor source (catalog number, units, reorder
+    # info). Lots and lot use are bench records (REAGENT_LOT_GAP).
+    ("POST", re.compile(r"^/v1/vendors$"), "other", "config:edit", "vendor"),
+    ("POST", re.compile(r"^/v1/reagents$"), "other", "config:edit", "reagent"),
+    ("POST", re.compile(r"^/v1/reagent-vendors$"), "other", "config:edit", "reagent_vendor"),
 )
 
 DROP_DELETE_GAP = (
@@ -184,6 +197,9 @@ def classify_call(method: str, path: str, body: Any = None) -> Classified:
         return Classified(
             False, "other", None, None, "No existing API grants a user access to a project. This run will not invent one."
         )
+    for prefix in _REAGENT_BENCH:
+        if path == prefix or path.startswith(prefix + "/"):
+            return Classified(False, "other", None, None, REAGENT_LOT_GAP)
     for prefix, reason in _OUT_OF_SCOPE:
         if path == prefix or path.startswith(prefix + "/"):
             return Classified(False, "other", None, None, reason)

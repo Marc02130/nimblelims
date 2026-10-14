@@ -83,6 +83,26 @@ def existing_change(db, user: User, method: str, path: str, body: Any):
         row = db.query(model).filter(func.lower(model.name) == name.lower()).first()
         return AppliedChange("analysis" if model is Analysis else "analyte", row.name, row.id) if row else None
 
+    if path in ("/v1/vendors", "/v1/reagents") and name:
+        from models.reagent import Reagent, Vendor
+
+        model = Vendor if path == "/v1/vendors" else Reagent
+        row = db.query(model).filter(func.lower(model.name) == name.lower()).first()
+        return AppliedChange("vendor" if model is Vendor else "reagent", row.name, row.id) if row else None
+
+    if path == "/v1/reagent-vendors":
+        from models.reagent import ReagentVendor
+
+        reagent_id, vendor_id = _uuid(data.get("reagent_id")), _uuid(data.get("vendor_id"))
+        if not reagent_id or not vendor_id:
+            return None
+        query = db.query(ReagentVendor).filter(
+            ReagentVendor.reagent_id == reagent_id, ReagentVendor.vendor_id == vendor_id)
+        if data.get("catalog_number"):
+            query = query.filter(ReagentVendor.catalog_number == str(data["catalog_number"]))
+        row = query.first()
+        return AppliedChange("reagent_vendor", row.catalog_number or str(row.id), row.id) if row else None
+
     link = re.match(r"^/analyses/([^/]+)/analytes$", path)
     if link:
         from models.analysis import Analysis
