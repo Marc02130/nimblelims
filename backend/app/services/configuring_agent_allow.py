@@ -56,6 +56,11 @@ _ALLOWED: tuple[tuple[str, re.Pattern[str], str, str, str], ...] = (
     ("POST", re.compile(r"^/v1/sample-type-transitions$"), "other", "config:edit", "sample_type_transition"),
     ("PATCH", re.compile(r"^/users/[^/]+$"), "other", "config:edit", "user_role"),
     ("PUT", re.compile(r"^/roles/[^/]+/permissions$"), "other", "config:edit", "role_permissions"),
+    # D-5 (UAT 06c630b): a measured result (Qubit concentration) lives on an
+    # analyte of an analysis, recorded on the DNA sample's test (SPEC §11 item 5).
+    ("POST", re.compile(r"^/analyses$"), "other", "config:edit", "analysis"),
+    ("POST", re.compile(r"^/analytes$"), "other", "config:edit", "analyte"),
+    ("POST", re.compile(r"^/analyses/[^/]+/analytes$"), "other", "config:edit", "analysis_analytes"),
     # Container retire: contents amount -> 0 is the only container removal (L-B).
     ("PATCH", re.compile(r"^/containers/[^/]+/contents/[^/]+$"), "other", "sample:update", "contents_amount"),
 )

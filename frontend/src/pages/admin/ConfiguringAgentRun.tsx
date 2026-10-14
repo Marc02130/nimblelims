@@ -83,7 +83,10 @@ interface StepRow {
   retryable?: boolean;
   stopped_for_viewer?: boolean;
   diff?: StepDiff | null;
+  near_matches?: string[];
 }
+
+export const POLL_MS = 3000;
 
 export interface StepDiff {
   before: unknown;
@@ -254,6 +257,23 @@ const ConfiguringAgentRun: React.FC = () => {
     }
   };
 
+  // Item 5: the model call runs in the background (grok-4.7 takes 96-300 s).
+  // While the run is reading inputs, poll it until the proposal is stored.
+  const runId = run?.id;
+  const reading = run?.status === 'reading_inputs';
+  useEffect(() => {
+    if (!runId || !reading) return undefined;
+    const timer = setInterval(async () => {
+      try {
+        const next = await apiService.getConfigurationRun(runId);
+        if (next.status !== 'reading_inputs') setRun(next);
+      } catch {
+        /* keep polling; the run on screen stays */
+      }
+    }, POLL_MS);
+    return () => clearInterval(timer);
+  }, [runId, reading]);
+
   const grouped = useMemo(() => {
     const steps = run?.steps || [];
     return GROUP_ORDER.map((group) => ({
@@ -386,6 +406,11 @@ const ConfiguringAgentRun: React.FC = () => {
           <Typography variant="body2" sx={{ mb: 1 }}>
             Run id {run.id} · {run.status} · applied {run.applied_count} · excluded {run.skipped_count} · stopped {run.stopped_count}
           </Typography>
+          {run.status === 'reading_inputs' && (
+            <Alert severity="info" sx={{ mb: 2 }}>
+              The model is reading the lab files. This can take several minutes; the proposal appears here when it is ready.
+            </Alert>
+          )}
           {run.banner && <Alert severity="warning" sx={{ mb: 2 }}>{run.banner}</Alert>}
           {run.error_message && (
             <Alert severity="error" sx={{ mb: 2 }}>
@@ -427,6 +452,11 @@ const ConfiguringAgentRun: React.FC = () => {
                       ? ` · depends on row ${step.depends_on.map((dep) => dep + 1).join(', ')}`
                       : ''}
                   </Typography>
+                  {step.near_matches && step.near_matches.length > 0 && (
+                    <Alert severity="info" sx={{ mt: 1 }} data-testid={`near-${step.position}`}>
+                      {`Already exists with a similar name: ${step.near_matches.join(', ')}. Reuse it, or include this row if it is different.`}
+                    </Alert>
+                  )}
                   {diffText(step.diff) && (
                     <Typography
                       variant="body2"

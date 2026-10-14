@@ -55,3 +55,18 @@ layout + relation apply and that the rerun is a no-op. Not automated:
   checks the seed role's permissions.
 - **Timeout long enough for grok-4.7**: default 300 s, `CONFIGURING_AGENT_TIMEOUT_S`.
   Only the setting reaching httpx is tested.
+
+## Configuring agent re-score (06c630b) that CI can't run
+
+`tests/test_configuring_agent_round2.py` covers D-5 (column on experiments is a
+stop naming the analyte/analysis home; analyte + analysis + link apply and rerun
+as No change), D-7 (renamed equivalent template is No change), G5 (re-adding an
+existing column, with a call or as a gap row, is No change), near-matches, the
+background run and polling, and D-3/L-4 (start commits no catalog rows; Apply
+registers exactly the Schema display set). Not automated:
+- **Whether grok-4.7 now proposes analytes for Qubit and reuses
+  'K2EDTA Tube (5mL)'**: needs the live key (D-2). Re-run D-5/D-7/G5 in UAT.
+- **A real 96-300 s model call in the background**: the tests run the task
+  inline; the 300 s ceiling and the stale-run cutoff are checked by value only.
+- **D-5 on the bench** (entering a Qubit concentration on the DNA sample's
+  test after Apply): Katinka/Marc sign-off, as before.

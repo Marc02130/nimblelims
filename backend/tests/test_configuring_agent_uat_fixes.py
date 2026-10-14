@@ -335,10 +335,13 @@ async def test_relation_by_table_and_column_names(mig, monkeypatch):
     run = _start(db, admin, configuration, monkeypatch, steps)
     body = run.steps[0].call_body
     assert body["cardinality"] == "one_to_many"
-    for key in ("from_table_id", "to_table_id", "fk_column_id"):
-        assert uuid.UUID(body[key])
+    # D-3/L-4 (06c630b round): the run registers no catalog rows, so before
+    # confirm unregistered tables are still names; Apply registers and resolves.
     result, _ = await svc.apply_run(db, admin, run.id, second_confirm=True)
     assert result.status == "done", result.steps[0].gap or result.steps[0].error_message
+    from models.ui_schema import SchemaRelation
+
+    assert db.query(SchemaRelation).filter(SchemaRelation.client_id == admin.client_id).count() == 1
     rerun = _start(db, admin, configuration, monkeypatch, steps)
     assert rerun.steps[0].status == "unchanged"
 

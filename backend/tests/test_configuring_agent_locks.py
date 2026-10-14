@@ -411,7 +411,9 @@ def test_second_confirm_kinds():
 
 
 def test_apply_endpoint_second_confirm_over_http(client, db_session, test_admin_user, monkeypatch):
-
+    # The inline run path (CONFIGURING_AGENT_ASYNC=0); the background path has
+    # its own test in test_configuring_agent_round2.py.
+    monkeypatch.setenv("CONFIGURING_AGENT_ASYNC", "0")
     login = client.post("/auth/login", json={"username": "admin", "password": "adminpassword"})
     headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
     configuration = Configuration(id=uuid.uuid4(), client_id=test_admin_user.client_id, name=f"H {uuid.uuid4().hex[:6]}")

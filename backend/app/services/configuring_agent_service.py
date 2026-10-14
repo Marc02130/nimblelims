@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import logging
 import uuid
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Optional
 
@@ -39,6 +41,8 @@ from models.configuring_agent import (
     ConfiguringAgentSettings,
 )
 from models.user import User
+
+logger = logging.getLogger(__name__)
 
 MAX_FILE_BYTES = 10_485_760
 SETTINGS_DENIED = "You can't change configuring-agent settings."
@@ -351,7 +355,15 @@ def _add_step(
     db: Session, run: ConfigurationRun, position: int, raw: dict, user: Optional[User] = None
 ) -> ConfigurationStep:
     """One proposal row. A row the APIs can't express is kept, stopped, with its reason (D-6)."""
-    from app.services.configuring_agent_catalog import describe_change, resolve_body, reuse_gap
+    from app.services.configuring_agent_catalog import (
+        column_home_gap,
+        describe_change,
+        existing_named,
+        near_matches,
+        resolve_body,
+        resolve_path,
+        reuse_gap,
+    )
 
     call = raw.get("call") if isinstance(raw.get("call"), dict) else {}
     method = ((call.get("method") or "") if call else "").upper()
@@ -369,19 +381,33 @@ def _add_step(
         if classified.ok and not gap and user is not None:
             # Names -> ids and the model's key mistakes -> real field names. Stored
             # resolved so the row shows the real request; apply resolves again.
+            path = resolve_path(db, user, method, path)
             body = resolve_body(db, user, method, path, body)
             again = classify_call(method, path, body if isinstance(body, dict) else {})
             if not again.ok:
                 gap = again.gap
+            elif describe_change(db, user, method, path, body)["changed"] is False:
+                # G5: already there. A no-op, never a stop, even on a table
+                # that can't take new fields.
+                unchanged = True
+            elif column_home_gap(db, user, method, path, body):
+                # D-5: say where the field belongs instead of a 422 at apply.
+                gap = column_home_gap(db, user, method, path, body)
             # Escalation is not frozen here: it is judged for the confirmer at view
             # and at apply (G1). Only API-expressibility stops are stored.
-            elif not describe_change(db, user, method, path, body)["changed"]:
-                unchanged = True
         group = classified.group
     else:
         group = raw.get("group") or "other"
-        if not gap:
+        present = existing_named(db, user, raw.get("target")) if user is not None else None
+        if present:
+            # G5 (UAT 06c630b): the model wrote a gap for something that already
+            # exists. The database (not the gap text) confirms it: No change.
+            unchanged, gap = True, None
+        elif not gap:
             gap = "This step does not name a configuration API."
+    near = []
+    if method and path and not gap and not unchanged and user is not None:
+        near = near_matches(db, user, method, path, body)
     blocked = bool(gap)
     if blocked:
         state = "stopped"
@@ -401,7 +427,9 @@ def _add_step(
         why=(str(raw.get("why") or ""))[:500] or "Requested by the lab file.",
         # Every row starts included except a no-op rerun row. A stopped row stays
         # included until the user excludes it, so Apply refuses while it is in.
-        decision=EXCLUDED if unchanged else INCLUDED,
+        # A near-match (item 4) also starts excluded: reuse the existing one, or
+        # include the row if it really is different.
+        decision=EXCLUDED if (unchanged or near) else INCLUDED,
         status=state,
         call_method=method or None,
         call_path=path or None,
@@ -430,7 +458,24 @@ def _catalog_for_prompt(db: Session, user: User) -> str:
     return catalog_text(catalog_snapshot(db, user))
 
 
-def start_run(db: Session, user: User, configuration_id, goal_note: Optional[str]) -> ConfigurationRun:
+@dataclass
+class PendingRun:
+    """What the model call needs, captured before the request returns."""
+
+    run_id: Any
+    user_id: Any
+    client_id: Any
+    provider: str
+    model: str
+    key: str
+    excerpts: list
+    goal_note: Optional[str]
+    catalog: str
+
+
+def begin_run(db: Session, user: User, configuration_id, goal_note: Optional[str]) -> tuple[ConfigurationRun, PendingRun]:
+    """Validate and create the run (status reading_inputs). No model call yet.
+    Commits only the run row: no catalog rows (D-3/L-4)."""
     configuration = _configuration(db, user, configuration_id)
     if _ready_documents(db, configuration.id) < 1:
         raise HTTPException(
@@ -439,6 +484,7 @@ def start_run(db: Session, user: User, configuration_id, goal_note: Optional[str
         )
     settings, key = _key_for_run(db)
     excerpts = _excerpt(db, configuration.id, goal_note or configuration.name)
+    catalog = _catalog_for_prompt(db, user)
     run = ConfigurationRun(
         id=uuid.uuid4(),
         configuration_id=configuration.id,
@@ -451,30 +497,52 @@ def start_run(db: Session, user: User, configuration_id, goal_note: Optional[str
         modified_by=user.id,
     )
     db.add(run)
-    db.flush()
+    db.commit()
+    db.refresh(run)
+    pending = PendingRun(
+        run_id=run.id,
+        user_id=user.id,
+        client_id=user.client_id,
+        provider=settings.agent_provider,
+        model=settings.agent_model,
+        key=key,
+        excerpts=list(excerpts),
+        goal_note=run.goal_note,
+        catalog=catalog,
+    )
+    return run, pending
+
+
+def finish_run(db: Session, user: User, pending: PendingRun, raise_errors: bool = True) -> ConfigurationRun:
+    """Call the model and store the proposal rows. Used inline (start_run) and
+    from the background task (item 5: grok-4.7 takes 96-300 s)."""
+    run = db.query(ConfigurationRun).filter(ConfigurationRun.id == pending.run_id).one()
     try:
         parsed = propose(
-            settings.agent_provider,
-            settings.agent_model,
-            key,
-            chunks=excerpts,
-            goal_note=run.goal_note,
+            pending.provider,
+            pending.model,
+            pending.key,
+            chunks=pending.excerpts,
+            goal_note=pending.goal_note,
             # The confirmer isn't known yet; send no one's permissions (G1).
             permissions=None,
-            catalog=_catalog_for_prompt(db, user),
+            catalog=pending.catalog,
         )
+        raw_steps = _steps_from_proposal(parsed)
     except ProviderError as exc:
         run.status = "failed"
         run.error_message = exc.message
         db.commit()
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, exc.message) from exc
-    try:
-        raw_steps = _steps_from_proposal(parsed)
+        if raise_errors:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, exc.message) from exc
+        return run
     except HTTPException as exc:
         run.status = "failed"
         run.error_message = str(exc.detail)
         db.commit()
-        raise
+        if raise_errors:
+            raise
+        return run
     # Keep every row. Each stop stays in place with its reason (D-6); no first-stop break.
     stopped = 0
     for index, raw in enumerate(raw_steps):
@@ -486,6 +554,62 @@ def start_run(db: Session, user: User, configuration_id, goal_note: Optional[str
     run.status = "stopped" if stopped else "proposing"
     db.commit()
     db.refresh(run)
+    return run
+
+
+def start_run(db: Session, user: User, configuration_id, goal_note: Optional[str]) -> ConfigurationRun:
+    """Synchronous run: begin, call the model, store the rows."""
+    _run_row, pending = begin_run(db, user, configuration_id, goal_note)
+    return finish_run(db, user, pending)
+
+
+# Tests point the background task at their own session; production uses SessionLocal.
+BACKGROUND_SESSION_FACTORY = None
+
+
+def run_in_background(pending: PendingRun, session_factory=None) -> None:
+    """Background task body: its own session, the starter's RLS context."""
+    from app.database import SessionLocal, set_rls_context
+
+    factory = session_factory or BACKGROUND_SESSION_FACTORY
+    owned = factory is None
+    db = SessionLocal() if owned else factory()
+    try:
+        if owned:
+            set_rls_context(db, user_id=str(pending.user_id), client_id=str(pending.client_id))
+        user = db.query(User).filter(User.id == pending.user_id).one()
+        try:
+            finish_run(db, user, pending, raise_errors=False)
+        except Exception:  # noqa: BLE001 - a run must never stay reading_inputs
+            logger.exception("configuring agent background run failed")
+            db.rollback()
+            run = db.query(ConfigurationRun).filter(ConfigurationRun.id == pending.run_id).first()
+            if run is not None and run.status == "reading_inputs":
+                run.status = "failed"
+                run.error_message = "The run failed while reading the model's proposal. Start a new run."
+                db.commit()
+    finally:
+        if owned:
+            db.close()
+
+
+STALE_MESSAGE = "The model call did not finish. Start a new run."
+
+
+def expire_stale(db: Session, run: ConfigurationRun) -> ConfigurationRun:
+    """A run still reading inputs well past the model timeout (e.g. the server
+    restarted mid-call) is marked failed, so polling ends."""
+    from app.services.configuring_agent_llm import model_timeout
+
+    if run.status != "reading_inputs" or run.created_at is None:
+        return run
+    created = run.created_at
+    now = datetime.now(timezone.utc) if created.tzinfo else datetime.utcnow()
+    if (now - created).total_seconds() > model_timeout() + 120:
+        run.status = "failed"
+        run.error_message = STALE_MESSAGE
+        db.commit()
+        db.refresh(run)
     return run
 
 
@@ -536,10 +660,23 @@ def _diff(step: ConfigurationStep, db: Optional[Session], viewer: Optional[User]
         return None
 
 
+def _near(step: ConfigurationStep, db: Optional[Session], viewer: Optional[User]) -> list[str]:
+    """Existing objects this new row nearly duplicates (item 4)."""
+    from app.services.configuring_agent_catalog import near_matches
+
+    if db is None or viewer is None or step.status not in ("proposed",) or not step.call_path:
+        return []
+    try:
+        return near_matches(db, viewer, step.call_method, step.call_path, step.call_body)
+    except Exception:  # noqa: BLE001 - advisory only
+        return []
+
+
 def step_payload(step: ConfigurationStep, db: Optional[Session] = None, viewer: Optional[User] = None) -> dict[str, Any]:
     facts = _step_facts(step, db, viewer)
     return {
         "diff": _diff(step, db, viewer),
+        "near_matches": _near(step, db, viewer),
         "id": step.id,
         "position": step.position,
         "group": step.group_name,
