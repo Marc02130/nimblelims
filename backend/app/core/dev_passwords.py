@@ -29,6 +29,7 @@ PERSONAS: tuple[tuple[str, str], ...] = (
     ("bob-tech", "DEV_SEED_BOB_TECH_PASSWORD"),
     ("carol-manager", "DEV_SEED_CAROL_MANAGER_PASSWORD"),
     ("david-cro", "DEV_SEED_DAVID_CRO_PASSWORD"),
+    ("config-editor", "DEV_SEED_CONFIG_EDITOR_PASSWORD"),
 )
 
 _PERSONA_ENV = dict(PERSONAS)

@@ -23,6 +23,7 @@ Personas and env vars:
   bob-tech        DEV_SEED_BOB_TECH_PASSWORD
   carol-manager   DEV_SEED_CAROL_MANAGER_PASSWORD
   david-cro       DEV_SEED_DAVID_CRO_PASSWORD
+  config-editor   DEV_SEED_CONFIG_EDITOR_PASSWORD
 
 ``--check`` never prints a password. A row needs a password when the hash
 is the locked marker, a legacy 64-hex digest, ``must_change_password`` is
