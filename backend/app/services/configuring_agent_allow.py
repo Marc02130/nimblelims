@@ -223,8 +223,10 @@ _CHANGE_WORDS = re.compile(
 
 
 def out_of_scope_request(raw: dict) -> Optional[str]:
-    """A call-less row asking for routing or asked-for: the stop reason."""
-    text = " ".join(str(raw.get(k) or "") for k in ("target", "action", "why", "gap"))
+    """A call-less row asking for routing or asked-for: the stop reason. Only
+    the request (target and action) is read, never the model's why or gap text,
+    where 'no route defines that field' is not a routing request (UAT 7d84e07)."""
+    text = " ".join(str(raw.get(k) or "") for k in ("target", "action"))
     for pattern, reason in _AREA_WORDS:
         if pattern.search(text):
             return reason
