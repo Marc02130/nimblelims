@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { act, render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import ConfiguringAgentRun, { dependencyProblem, diffText, includedRows, stoppedIncluded } from '../pages/admin/ConfiguringAgentRun';
 import { apiService } from '../services/apiService';
@@ -188,4 +188,36 @@ test('viewer-only stop: banner and count come from the run payload', async () =>
   });
   expect(screen.getByText("Can't apply this change through configuration APIs")).toBeInTheDocument();
   expect(screen.getByText(/stopped 1/)).toBeInTheDocument();
+});
+
+test('near-matches are shown on the row', async () => {
+  await openRun(runWith([
+    step({ position: 0, target: 'EDTA Tube', included: false, decision: 'excluded',
+      near_matches: ["container type 'K2EDTA Tube (5mL)'"] }),
+  ]));
+  expect(screen.getByTestId('near-0').textContent).toContain("K2EDTA Tube (5mL)");
+});
+
+test('a run reading inputs polls until the proposal is stored', async () => {
+  jest.useFakeTimers();
+  try {
+    const pending = { ...runWith([]), status: 'reading_inputs' };
+    const ready = runWith([step({ position: 0, target: 'Serum' })]);
+    api.getConfigurations.mockResolvedValue([{ ...configuration, runs: [{ id: 'run1', name: 'Cfg run', status: 'reading_inputs', banner: null }] }]);
+    api.getConfigurationRun.mockResolvedValueOnce(pending).mockResolvedValueOnce(pending).mockResolvedValue(ready);
+    render(
+      <MemoryRouter>
+        <ConfiguringAgentRun />
+      </MemoryRouter>
+    );
+    fireEvent.click(await screen.findByText('Cfg'));
+    fireEvent.click(await screen.findByText('Cfg run · reading_inputs'));
+    expect(await screen.findByText(/The model is reading the lab files/)).toBeInTheDocument();
+    await act(async () => { jest.advanceTimersByTime(3000); });
+    await act(async () => { jest.advanceTimersByTime(3000); });
+    expect(await screen.findByText('Serum')).toBeInTheDocument();
+    expect(screen.queryByText(/The model is reading the lab files/)).toBeNull();
+  } finally {
+    jest.useRealTimers();
+  }
 });
