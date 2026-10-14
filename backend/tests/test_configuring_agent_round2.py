@@ -292,3 +292,43 @@ def test_http_start_is_202_then_polling_shows_the_proposal(client, db_session, t
 
 def test_timeout_default_still_300():
     assert llm.DEFAULT_TIMEOUT_S == 300.0
+
+
+# ------------------------------------------------ reagent tracking (future feature)
+
+@pytest.mark.parametrize("name", [
+    "Kit lot number", "Qubit kit part number", "Reagent expiry date", "Lot", "Expiration Date",
+    "Instrument serial", "Catalog number", "Exp date", "Reagent lot",
+])
+def test_per_run_kit_lot_part_expiry_columns_stop_at_proposal(db_session, admin, configuration, monkeypatch, name):
+    run = _start(db_session, admin, configuration, monkeypatch, [
+        _step("POST", "/v1/schema/columns", {"display_name": name, "table_id": "samples", "data_type": "text"}),
+    ])
+    assert run.steps[0].status == "stopped"
+    assert "reagent tracking" in run.steps[0].gap and "future feature" in run.steps[0].gap
+
+
+@pytest.mark.parametrize("name", ["Plot ID", "Slot position", "Volume (uL)", "Parent sample", "Qubit dsDNA HS reagent volume", "Kit Note"])
+def test_ordinary_columns_are_not_mistaken_for_reagent_tracking(name):
+    assert not cat.reagent_tracking_column({"display_name": name})
+
+
+def test_reagent_tracking_column_stops_at_apply_and_writes_nothing(db_session, admin):
+    import asyncio
+
+    from app.services.configuring_agent_apply import CannotExpress, execute_step
+    from models.ui_schema import SchemaColumn
+
+    with pytest.raises(CannotExpress) as stop:
+        asyncio.run(execute_step(db_session, admin, "POST", "/v1/schema/columns",
+                                 {"display_name": "Kit lot", "table_id": "samples", "data_type": "text"}))
+    assert "reagent tracking" in str(stop.value)
+    assert not db_session.query(SchemaColumn).filter(SchemaColumn.display_name == "Kit lot").count()
+    assert "kit_lot" not in {r[0] for r in db_session.execute(text(
+        "SELECT column_name FROM information_schema.columns WHERE table_name = 'samples'"))}
+
+
+def test_prompt_points_kit_lots_to_reagent_tracking():
+    prompt = llm._system_prompt(None, "")
+    assert "reagent tracking, a future feature" in prompt
+    assert "columns for them" in prompt
