@@ -90,6 +90,7 @@ const FIELDS: Record<TabKey, Field[]> = {
     { key: 'unit', label: 'Unit' },
     { key: 'storage_location', label: 'Storage location' },
     { key: 'qc_status', label: 'QC status', type: 'choice', choices: ['pending', 'released', 'rejected'] },
+    { key: 'released', label: 'Released for use', type: 'bool' },
     { key: 'coa_url', label: 'Certificate of analysis (link)' },
   ],
 };
@@ -123,6 +124,7 @@ const COLUMNS: Record<TabKey, { key: string; label: string }[]> = {
     { key: 'unit', label: 'Unit' },
     { key: 'storage_location', label: 'Location' },
     { key: 'qc_status', label: 'QC' },
+    { key: 'released', label: 'Released' },
   ],
 };
 
@@ -176,7 +178,7 @@ const ReagentsManagement: React.FC = () => {
     setEditing(row || {});
     const initial: Row = { active: row ? row.active : true };
     FIELDS[tab].forEach((f) => {
-      initial[f.key] = row?.[f.key] ?? (f.type === 'bool' ? false : f.key === 'qc_status' ? 'pending' : '');
+      initial[f.key] = row?.[f.key] ?? (f.key === 'released' ? true : f.type === 'bool' ? false : f.key === 'qc_status' ? 'pending' : '');
     });
     setForm(initial);
   };
@@ -279,7 +281,7 @@ const ReagentsManagement: React.FC = () => {
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
         Vendors, reagents (vendor-agnostic), the vendors each reagent is bought from, and received lots. Record the lot used on a run from the LIMS run page. Nothing is
-        deleted: turn Active off to retire a row, or set a lot&apos;s quantity remaining to 0. An opened lot expires at the earlier of its printed expiry and opened date + stability.
+        deleted: turn Active off to retire a row, or set a lot&apos;s quantity remaining to 0. A lot is usable only when Released (on by default; QC release turns it on). An opened lot expires at the earlier of its printed expiry and opened date + stability.
       </Typography>
       {error && !editing && (
         <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
@@ -332,6 +334,8 @@ const ReagentsManagement: React.FC = () => {
                     <Chip size="small" color="error" label="Expired" />
                   ) : row.qc_status === 'rejected' ? (
                     <Chip size="small" color="error" label="QC rejected" />
+                  ) : row.released === false ? (
+                    <Chip size="small" color="warning" label="Not released" />
                   ) : row.below_reorder_point ? (
                     <Chip size="small" color="warning" label="Reorder" />
                   ) : (

@@ -56,6 +56,7 @@ beforeEach(() => {
   api.getReagentLots.mockResolvedValue([
     { id: 'l1', reagent_id: 'r1', reagent_name: 'Qubit dsDNA HS', lot_number: 'L-2291', effective_expiration_date: '2020-01-01', qc_status: 'released', active: true, expired: true },
     { id: 'l3', reagent_id: 'r1', reagent_name: 'Qubit dsDNA HS', lot_number: 'L-3000', qc_status: 'rejected', active: true, expired: false },
+    { id: 'l4', reagent_id: 'r1', reagent_name: 'Qubit dsDNA HS', lot_number: 'L-4000', qc_status: 'pending', released: false, active: true, expired: false },
   ]);
   api.getReagentUses.mockResolvedValue([]);
 });
@@ -74,6 +75,7 @@ describe('ReagentsManagement', () => {
     expect(await screen.findByText('L-2291')).toBeInTheDocument();
     expect(screen.getByText('Expired')).toBeInTheDocument();
     expect(screen.getByText('QC rejected')).toBeInTheDocument();
+    expect(screen.getByText('Not released')).toBeInTheDocument();
   });
 
   test('adds a vendor', async () => {

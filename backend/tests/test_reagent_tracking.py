@@ -371,3 +371,25 @@ def test_use_records_audit_and_unit(client, admin_h, lot, run, test_admin_user):
 def test_agent_maps_storage_condition():
     assert cat._storage_condition("-20 °C") == "-20C" and cat._storage_condition("2-8C") == "4C"
     assert cat._storage_condition("room temperature") == "RT"
+
+
+def test_released_flag_gates_use(client, admin_h, lot, run):
+    assert lot["released"] is True and lot["usable"] is True  # default
+    held = client.patch(f"/v1/reagent-lots/{lot['id']}", headers=admin_h, json={"released": False}).json()
+    assert held["released"] is False and held["active"] is True and held["usable"] is False
+    r = client.post("/v1/reagent-uses", headers=admin_h, json={"reagent_lot_id": lot["id"], "lims_run_id": str(run.id), "quantity_used": 1})
+    assert r.status_code == 422 and "not released" in r.json()["detail"]
+    assert lot["id"] not in {x["id"] for x in client.get("/v1/reagent-lots", headers=admin_h, params={"usable": True}).json()}
+    # QC release releases the lot unless told otherwise.
+    back = client.patch(f"/v1/reagent-lots/{lot['id']}", headers=admin_h, json={"qc_status": "released"}).json()
+    assert back["released"] is True
+    r = client.post("/v1/reagent-uses", headers=admin_h, json={"reagent_lot_id": lot["id"], "lims_run_id": str(run.id), "quantity_used": 1})
+    assert r.status_code == 201
+
+
+def test_lot_can_be_received_unreleased(client, admin_h, lot):
+    r = client.post("/v1/reagent-lots", headers=admin_h, json={
+        "reagent_id": lot["reagent_id"], "lot_number": "HOLD-1", "released": False})
+    assert r.status_code == 201 and r.json()["released"] is False and r.json()["qc_status"] == "pending"
+    kept = client.patch(f"/v1/reagent-lots/{r.json()['id']}", headers=admin_h, json={"qc_status": "released", "released": False})
+    assert kept.json()["released"] is False
