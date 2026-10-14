@@ -376,3 +376,16 @@ Unknown `curve_category` string from R raises `ValueError` mid-loop with dirty s
 
 **P3 — SVG shows excluded data points** (`dose_response.py:256-338`)
 The `full_svg` endpoint does not filter excluded points from the plotted data. Excluded points appear in the SVG alongside the curve fit.
+
+---
+
+## Reagent tracking (future feature, not built)
+
+**What:** Track kits and reagents and record which lot each run used, Sapio-style:
+1. A reagent table for reagent/kit and vendor info (name, vendor, part/catalog number).
+2. A reagent lot table: lot number, expiry date, received/opened dates, linked to the reagent.
+3. Run/experiment detail recording which lot was used (a reference from the run or experiment detail to the lot), so expiry can be checked at use.
+
+**Why:** SOPs name kit lot numbers, part numbers, expiry dates and serials. These are per-run facts, not configuration. Until this exists the Configuring Agent stops any proposal to add such columns (or lists/entries) and points to this feature (`reagent_tracking_column` / `REAGENT_TRACKING_GAP` in `backend/app/services/configuring_agent_catalog.py`).
+
+**Status:** Backlog. Not built in PR #157.
