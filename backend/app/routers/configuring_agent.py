@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, UploadFile, status
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
@@ -30,6 +30,8 @@ from app.services.configuring_agent_service import (
     set_key,
     settings_payload,
     skip_step,
+    begin_run,
+    run_in_background,
     start_run,
     _settings,
     _settings_read,
@@ -185,15 +187,29 @@ async def post_document(
     )
 
 
+def _run_async() -> bool:
+    """Item 5: the model call runs in the background by default and the page polls
+    GET /runs/{id}. CONFIGURING_AGENT_ASYNC=0 keeps the old inline call."""
+    import os
+
+    return os.getenv("CONFIGURING_AGENT_ASYNC", "1").strip().lower() not in ("0", "false", "no")
+
+
 @router.post("/configurations/{configuration_id}/runs", status_code=201)
 def post_run(
     configuration_id: UUID,
     body: RunBody,
+    background: BackgroundTasks,
     user: User = Depends(require_configuring_agent),
     db: Session = Depends(get_db),
 ):
-    run = start_run(db, user, configuration_id, body.goal_note)
-    return _json(run_payload(run, db, user), 201)
+    if not _run_async():
+        run = start_run(db, user, configuration_id, body.goal_note)
+        return _json(run_payload(run, db, user), 201)
+    run, pending = begin_run(db, user, configuration_id, body.goal_note)
+    background.add_task(run_in_background, pending)
+    # 202: the run exists (status reading_inputs); poll GET /runs/{id}.
+    return _json(run_payload(run, db, user), 202)
 
 
 @router.get("/runs/{run_id}")
@@ -202,9 +218,9 @@ def get_run(
     user: User = Depends(require_configuring_agent),
     db: Session = Depends(get_db),
 ):
-    from app.services.configuring_agent_service import _run
+    from app.services.configuring_agent_service import _run, expire_stale
 
-    return _json(run_payload(_run(db, user, run_id), db, user))
+    return _json(run_payload(expire_stale(db, _run(db, user, run_id)), db, user))
 
 
 @router.post("/runs/{run_id}/steps/{step_id}/accept")

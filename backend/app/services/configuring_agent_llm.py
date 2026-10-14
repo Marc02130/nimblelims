@@ -138,7 +138,16 @@ def _system_prompt(permissions: list[str] | None = None, catalog: str | None = N
         "Never propose a new table for sample types, matrices, or container types. "
         "Never invent values the excerpts do not give. Kit lot numbers, part numbers, expiry dates, and serials "
         "are recorded per run, not configured: do not create lists or entries for them. "
-        "A cutoff or acceptance limit in the excerpts is example data from the SOP; do not configure it as a value."
+        "A cutoff or acceptance limit in the excerpts is example data from the SOP; do not configure it as a value. "
+        "Only tables marked 'new columns OK' take new columns; experiments, tests, results and containers do not. "
+        "A measured result (for example a Qubit concentration in ng/uL) is an analyte on an analysis, recorded "
+        "on the sample's test: POST /analytes (units_default by unit name or id), POST /analyses (method required), "
+        "then POST /analyses/{analysis name or id}/analytes with analyte_ids (names of analytes created earlier "
+        "are allowed; add those steps to depends_on). The experiment template is the process, not the result fields. "
+        "If something the excerpts need already exists (same or nearly the same name, e.g. 'K2EDTA Tube (5mL)' for "
+        "an EDTA tube, or the same template under another name), reuse it: do not create a near-duplicate. "
+        "If it already exists exactly, still send its normal call (the server shows it as No change); "
+        "never write a gap for something that already exists."
         + ("\n\nCatalog for this lab:\n" + catalog if catalog else "")
     )
 
