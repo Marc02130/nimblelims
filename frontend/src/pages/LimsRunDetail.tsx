@@ -36,6 +36,7 @@ import { apiService, PromotionPreview } from '../services/apiService';
 import PublishPromotionDialog from '../components/runs/PublishPromotionDialog';
 import DoseResponseTab from './DoseResponse/DoseResponseTab';
 import StartCohortPanel from '../components/experiments/StartCohortPanel';
+import ReagentUsePanel from '../components/reagents/ReagentUsePanel';
 
 const apiErrorMsg = (err: any, fallback: string): string => {
   const detail = err?.response?.data?.detail;
@@ -619,6 +620,8 @@ const LimsRunDetail: React.FC = () => {
       {activeTab === 2 && runId && (
         <DoseResponseTab runId={runId} runStatus={run.status} />
       )}
+
+      {runId && <ReagentUsePanel limsRunId={runId} analysisId={run.analysis_id} />}
 
       <PublishPromotionDialog
         open={publishDialogOpen}

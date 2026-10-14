@@ -26,6 +26,7 @@ import ListsAdmin from './pages/admin/ListsAdmin';
 import ContainerTypesManagement from './pages/admin/ContainerTypesManagement';
 import UnitsManagement from './pages/admin/UnitsManagement';
 import InstrumentCatalogManagement from './pages/admin/InstrumentCatalogManagement';
+import ReagentsManagement from './pages/admin/ReagentsManagement';
 import DataParsersManagement from './pages/admin/DataParsersManagement';
 import UsersManagement from './pages/admin/UsersManagement';
 import RolesManagement from './pages/admin/RolesManagement';
@@ -353,6 +354,16 @@ function AppRoutes() {
           element={
             hasPermission('config:edit') ? (
               <InstrumentCatalogManagement />
+            ) : (
+              <Navigate to="/dashboard" replace />
+            )
+          }
+        />
+        <Route
+          path="/admin/reagents"
+          element={
+            hasPermission('config:edit') ? (
+              <ReagentsManagement />
             ) : (
               <Navigate to="/dashboard" replace />
             )
