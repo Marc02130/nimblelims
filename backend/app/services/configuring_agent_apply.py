@@ -221,10 +221,29 @@ def _safe_uuid(value) -> Optional[UUID]:
         return None
 
 
+def register_catalog(db, user: User) -> None:
+    """Register the configurable tables (the Schema display rule) inside the apply
+    transaction, once per apply. Never at run start (D-3/L-4): a run commits no
+    catalog rows before confirm, and a rolled-back apply leaves none."""
+    if isinstance(db, AtomicSession):
+        if db.__dict__.get("_catalog_ready"):
+            return
+        object.__setattr__(db, "_catalog_ready", True)
+    from app.services.ui_schema_service import UiSchemaService
+
+    UiSchemaService(db, user).ensure_catalog()
+
+
 async def execute_step(db, user: User, method: str, path: str, body: Any) -> list[AppliedChange]:
     if is_drop_or_delete(method, path):
         raise CannotExpress("Drop and delete are never applied by the configuring agent.")
-    from app.services.configuring_agent_catalog import describe_change, resolve_body, reuse_gap
+    from app.services.configuring_agent_catalog import (
+        column_home_gap,
+        describe_change,
+        resolve_body,
+        resolve_path,
+        reuse_gap,
+    )
 
     original = body if isinstance(body, dict) else {}
     early = classify_call(method, path, original)
@@ -233,8 +252,11 @@ async def execute_step(db, user: User, method: str, path: str, body: Any) -> lis
     reuse = reuse_gap(method, path, body)
     if reuse:
         raise CannotExpress(reuse)
+    if (path or "").startswith("/v1/schema/"):
+        register_catalog(db, user)
     # Names -> ids again at apply: a table created by an earlier row in this same
     # apply (flushed) now resolves.
+    path = resolve_path(db, user, method, path)
     body = resolve_body(db, user, method, path, body)
     payload = body if isinstance(body, dict) else {}
     classified = classify_call(method, path, payload)
@@ -251,6 +273,9 @@ async def execute_step(db, user: User, method: str, path: str, body: Any) -> lis
         # Safe rerun (D-7): the object is already there, so this is a no-op.
         present.noop = True
         return [present]
+    home = column_home_gap(db, user, method, path, body)
+    if home:
+        raise CannotExpress(home)
     if (method or "").upper() in ("PUT", "PATCH") or path.endswith("/deprecate"):
         diff = describe_change(db, user, method, path, body)
         if not diff["changed"]:
@@ -273,6 +298,8 @@ async def _dispatch(db, user: User, method: str, path: str, body: dict, kind: st
         return _templates(db, user, method, path, body)
     if path == "/containers/types":
         return await _container_type(db, user, body)
+    if path == "/analyses" or path == "/analytes" or re.match(r"^/analyses/[^/]+/analytes$", path):
+        return await _analyses(db, user, path, body)
     if path == "/v1/sample-type-transitions":
         return _transition(db, user, body)
     if path.startswith("/users/"):
@@ -378,6 +405,27 @@ def _templates(db, user, method: str, path: str, body: dict) -> list[AppliedChan
         return [AppliedChange("experiment_template", created.name, created.id)]
     updated = svc.update_template(_uuid_from_path(path), ExperimentTemplateUpdate.model_validate(body))
     return [AppliedChange("experiment_template", updated.name, updated.id)]
+
+
+async def _analyses(db, user, path: str, body: dict) -> list[AppliedChange]:
+    """Analysis, analyte, and the analysis-analyte link, through their routers."""
+    from app.routers.analyses import create_analysis, link_analytes_to_analysis
+    from app.routers.analytes import create_analyte
+    from app.schemas.analysis import AnalysisCreate, AnalyteLinkRequest
+    from app.schemas.analyte import AnalyteCreate
+
+    if path == "/analyses":
+        created = await create_analysis(AnalysisCreate.model_validate(body), user, db)
+        return [AppliedChange("analysis", created.name, created.id)]
+    if path == "/analytes":
+        created = await create_analyte(AnalyteCreate.model_validate(body), user, db)
+        return [AppliedChange("analyte", created.name, created.id)]
+    try:
+        analysis_id = UUID(path.split("/")[2])
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail="Analysis not found") from exc
+    linked = await link_analytes_to_analysis(analysis_id, AnalyteLinkRequest.model_validate(body), user, db)
+    return [AppliedChange("analysis_analytes", ", ".join(a.name for a in linked) or "analytes", analysis_id)]
 
 
 async def _container_type(db, user, body: dict) -> list[AppliedChange]:

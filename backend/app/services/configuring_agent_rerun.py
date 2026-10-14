@@ -69,11 +69,32 @@ def existing_change(db, user: User, method: str, path: str, body: Any):
         row = db.query(ContainerType).filter(func.lower(ContainerType.name) == name.lower()).first()
         return AppliedChange("container_type", row.name, row.id) if row else None
 
-    if path == "/v1/experiment-templates" and name:
-        from models.experiment import ExperimentTemplate
+    if path == "/v1/experiment-templates" and (name or data.get("template_definition")):
+        # D-7 (UAT 06c630b): equivalent content, not only the same name.
+        from app.services.configuring_agent_catalog import equivalent_template
 
-        row = db.query(ExperimentTemplate).filter(func.lower(ExperimentTemplate.name) == name.lower()).first()
+        row = equivalent_template(db, data)
         return AppliedChange("experiment_template", row.name, row.id) if row else None
+
+    if path in ("/analyses", "/analytes") and name:
+        from models.analysis import Analysis, Analyte
+
+        model = Analysis if path == "/analyses" else Analyte
+        row = db.query(model).filter(func.lower(model.name) == name.lower()).first()
+        return AppliedChange("analysis" if model is Analysis else "analyte", row.name, row.id) if row else None
+
+    link = re.match(r"^/analyses/([^/]+)/analytes$", path)
+    if link:
+        from models.analysis import Analysis
+
+        analysis_id = _uuid(link.group(1))
+        wanted = {_uuid(item) for item in data.get("analyte_ids") or []}
+        if analysis_id is None or not wanted or None in wanted:
+            return None
+        row = db.query(Analysis).filter(Analysis.id == analysis_id).first()
+        if row is not None and wanted <= {a.id for a in row.analytes}:
+            return AppliedChange("analysis_analytes", row.name, row.id)
+        return None
 
     if path == "/v1/sample-type-transitions":
         from models.sample import SampleTypeTransition
@@ -120,7 +141,14 @@ def existing_change(db, user: User, method: str, path: str, body: Any):
         physical = str(data.get("physical_name") or "").strip()
         display = str(data.get("display_name") or "").strip()
         if not table_id:
-            return None
+            # G5: the table isn't registered yet (read-only catalog), but the
+            # column may already exist in Postgres.
+            from app.services.configuring_agent_catalog import existing_column
+
+            found = existing_column(db, user, data)
+            if found is None:
+                return None
+            return AppliedChange("column", found["column"]["display_name"], _uuid(found["column"].get("id")))
         query = db.query(SchemaColumn).filter(SchemaColumn.table_id == table_id)
         if physical:
             row = query.filter(SchemaColumn.physical_name == physical).first()

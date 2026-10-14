@@ -62,9 +62,14 @@ def _schema_for(method: str, kind: str):
         SchemaRelationCreate,
         SchemaTableCreate,
     )
+    from app.schemas.analysis import AnalysisCreate, AnalyteLinkRequest
+    from app.schemas.analyte import AnalyteCreate
     from app.schemas.user import RolePermissionsUpdate
 
     table = {
+        ("POST", "analysis"): AnalysisCreate,
+        ("POST", "analyte"): AnalyteCreate,
+        ("POST", "analysis_analytes"): AnalyteLinkRequest,
         ("POST", "table"): SchemaTableCreate,
         ("POST", "column"): SchemaColumnCreate,
         ("PUT", "layout"): SchemaLayoutPut,
@@ -94,6 +99,7 @@ _PATH_NAMES = {
     r"^/users/[^/]+$": "/users/{user_id}",
     r"^/roles/[^/]+/permissions$": "/roles/{role_id}/permissions",
     r"^/containers/[^/]+/contents/[^/]+$": "/containers/{container_id}/contents/{sample_id}",
+    r"^/analyses/[^/]+/analytes$": "/analyses/{analysis_id}/analytes",
 }
 
 
@@ -106,7 +112,10 @@ def _readable_path(pattern: str) -> str:
 def _type_of(prop: dict, defs: dict) -> str:
     if "$ref" in prop:
         name = prop["$ref"].split("/")[-1]
-        return _fields_text(defs.get(name, {}), defs)
+        target = defs.get(name, {})
+        if "enum" in target:
+            return "|".join(str(v) for v in target["enum"])
+        return _fields_text(target, defs)
     if "enum" in prop:
         return "|".join(str(v) for v in prop["enum"])
     if "anyOf" in prop:
@@ -162,40 +171,77 @@ def route_formats_text() -> str:
 # ---------------------------------------------------------------- catalog ---
 
 
-def catalog_snapshot(db, user: User) -> dict[str, Any]:
-    """The confirmer's client's catalog with ids. Registers the Schema catalog on
-    view (same as the Schema screen), never DDL."""
-    from models.container import ContainerType
-    from models.list import List as ListModel, ListEntry
-    from models.ui_schema import SchemaColumn
-    from models.user import Role
-    from app.schemas.ui_schema import SCREEN_KEYS
-    from app.services.ui_schema_service import UiSchemaService
+def configurable_tables(db, user: User) -> list[dict[str, Any]]:
+    """Tables a change can be made to and used through configuration: the Schema
+    display rule (``shown_in_schema``). Read only (D-3/L-4): nothing is registered
+    here. A table not registered yet has ``id`` None and its columns come from
+    Postgres reflection; Apply registers it (inside the apply transaction)."""
+    from models.ui_schema import SchemaColumn, SchemaTable
+    from app.services import ui_schema_catalog as catalog
+    from app.services.ui_schema_service import ADD_COLUMN_OUT
 
-    tables = []
-    try:
-        rows = UiSchemaService(db, user).list_tables()
-    except Exception:  # noqa: BLE001 - the prompt still works without tables
-        rows = []
-    for table in rows:
-        columns = (
-            db.query(SchemaColumn)
-            .filter(SchemaColumn.table_id == table.id)
-            .order_by(SchemaColumn.sort_order, SchemaColumn.physical_name)
-            .all()
-        )
-        tables.append(
+    registered = {
+        t.physical_name: t
+        for t in db.query(SchemaTable).filter(SchemaTable.client_id == user.client_id).all()
+    }
+    wanted = list(catalog.LAB_TABLES) + list(catalog.SYSTEM_TABLES)
+    present = catalog.existing_tables(db, wanted + list(registered))
+    reflected = catalog.reflect_columns(db, [n for n in wanted if n in present and n not in registered])
+    out: list[dict[str, Any]] = []
+    names = list(dict.fromkeys(wanted + sorted(registered)))
+    for name in names:
+        row = registered.get(name)
+        kind = row.kind if row is not None else catalog.kind_for(name)
+        if not catalog.shown_in_schema(name, kind):
+            continue
+        if row is None and name not in present:
+            continue
+        if row is not None and (row.status or "active") != "active":
+            continue
+        if row is not None:
+            cols = [
+                {"id": str(c.id), "physical_name": c.physical_name, "display_name": c.display_name}
+                for c in db.query(SchemaColumn)
+                .filter(SchemaColumn.table_id == row.id)
+                .order_by(SchemaColumn.sort_order, SchemaColumn.physical_name)
+                .all()
+            ]
+        else:
+            cols = [
+                {"id": None, "physical_name": c.name, "display_name": catalog.column_display_name(c.name, c.is_fk)}
+                for c in reflected.get(name, [])
+            ]
+        if kind == "system" or name in ADD_COLUMN_OUT:
+            can_add = False
+        elif kind == "core":
+            can_add = name == "samples"
+        else:
+            can_add = True
+        out.append(
             {
-                "id": str(table.id),
-                "physical_name": table.physical_name,
-                "display_name": table.display_name,
-                "kind": table.kind,
-                "columns": [
-                    {"id": str(c.id), "physical_name": c.physical_name, "display_name": c.display_name}
-                    for c in columns
-                ],
+                "id": str(row.id) if row is not None else None,
+                "physical_name": name,
+                "display_name": row.display_name if row is not None else catalog.display_name_for(name),
+                "kind": kind,
+                "can_add_columns": can_add,
+                "columns": cols,
             }
         )
+    return out
+
+
+def catalog_snapshot(db, user: User) -> dict[str, Any]:
+    """The confirmer's client's catalog with ids. Read only: no catalog rows are
+    registered or committed before confirm (D-3/L-4)."""
+    from models.container import ContainerType
+    from models.list import List as ListModel, ListEntry
+    from models.user import Role
+    from app.schemas.ui_schema import SCREEN_KEYS
+
+    try:
+        tables = configurable_tables(db, user)
+    except Exception:  # noqa: BLE001 - the prompt still works without tables
+        tables = []
     lists = []
     for row in db.query(ListModel).filter(ListModel.active == True).order_by(ListModel.name).all():  # noqa: E712
         entries = (
@@ -220,15 +266,62 @@ def catalog_snapshot(db, user: User) -> dict[str, Any]:
         "lists": lists,
         "roles": roles,
         "container_types": containers,
+        "experiment_templates": _named_rows(db, "experiment_template"),
+        "analyses": _named_rows(db, "analysis"),
+        "analytes": _named_rows(db, "analyte"),
+        "units": _named_rows(db, "unit"),
         "screen_keys": list(SCREEN_KEYS),
     }
 
 
+def _model_for(kind: str):
+    if kind == "experiment_template":
+        from models.experiment import ExperimentTemplate
+
+        return ExperimentTemplate
+    if kind == "analysis":
+        from models.analysis import Analysis
+
+        return Analysis
+    if kind == "analyte":
+        from models.analysis import Analyte
+
+        return Analyte
+    if kind == "unit":
+        from models.unit import Unit
+
+        return Unit
+    if kind == "container_type":
+        from models.container import ContainerType
+
+        return ContainerType
+    raise KeyError(kind)
+
+
+def _named_rows(db, kind: str) -> list[dict[str, Any]]:
+    try:
+        model = _model_for(kind)
+        query = db.query(model)
+        if hasattr(model, "active"):
+            query = query.filter(model.active == True)  # noqa: E712
+        return [{"id": str(r.id), "name": r.name} for r in query.order_by(model.name).limit(300).all()]
+    except Exception:  # noqa: BLE001
+        return []
+
+
 def catalog_text(snapshot: dict[str, Any]) -> str:
-    lines = ["Schema tables (id physical_name \"display\" kind: columns):"]
+    lines = [
+        "Schema tables (id physical_name \"display\" kind [new columns allowed?]: columns). "
+        "id 'unregistered' means: put the physical_name in table_id; it is registered at apply."
+    ]
     for t in snapshot.get("tables") or []:
-        cols = ", ".join(f"{c['physical_name']}={c['id']}" for c in t["columns"])
-        lines.append(f"- {t['id']} {t['physical_name']} \"{t['display_name']}\" {t['kind']}: {cols}")
+        cols = ", ".join(
+            f"{c['physical_name']}={c['id']}" if c.get("id") else c["physical_name"] for c in t["columns"]
+        )
+        flag = "new columns OK" if t.get("can_add_columns") else "NO new columns"
+        lines.append(
+            f"- {t['id'] or 'unregistered'} {t['physical_name']} \"{t['display_name']}\" {t['kind']} [{flag}]: {cols}"
+        )
     lines.append("Lists (id name: entries):")
     for item in snapshot.get("lists") or []:
         entries = ", ".join(f"{e['name']}={e['id']}" for e in item["entries"])
@@ -237,6 +330,13 @@ def catalog_text(snapshot: dict[str, Any]) -> str:
     lines.append(
         "Container types: " + (", ".join(f"{c['name']}={c['id']}" for c in snapshot.get("container_types") or []) or "none")
     )
+    for key, label in (
+        ("experiment_templates", "Experiment templates"),
+        ("analyses", "Analyses"),
+        ("analytes", "Analytes"),
+        ("units", "Units"),
+    ):
+        lines.append(f"{label}: " + (", ".join(f"{r['name']}={r['id']}" for r in snapshot.get(key) or []) or "none"))
     lines.append("Layout screen_key values: " + ", ".join(snapshot.get("screen_keys") or []))
     return "\n".join(lines)
 
@@ -439,6 +539,9 @@ def resolve_body(db, user: User, method: str, path: str, body: Any) -> Any:
         if "active" in data:
             out["active"] = data["active"]
         return out
+
+    if method == "POST" and (path in ("/analytes",) or re.match(r"^/analyses/[^/]+/analytes$", path)):
+        return _resolve_analysis_bodies(db, path, data)
 
     if path == "/containers/types" and method == "POST":
         if "name" not in data and _first(data, "display_name", "label"):
@@ -676,4 +779,231 @@ def _current_values(db, user: User, method: str, path: str, body: Any) -> Option
                 entry["column_id"] = str(column_id)
             current.append(entry)
         return {"_rows": current}
+    return None
+
+
+# ------------------------------------------- equivalence and near-matches ---
+# UAT 06c630b: a rerun renamed the template ('Qubit dsDNA HS Assay' ->
+# 'Qubit 4 dsDNA HS quantitation') and slipped past name matching (D-7); the
+# agent created 'EDTA Tube' though 'K2EDTA Tube (5mL)' existed.
+
+_GENERIC = {
+    "a", "an", "the", "of", "on", "for", "and", "with", "by", "using", "in", "to",
+    "assay", "assays", "quantitation", "quantification", "quant", "test", "testing",
+    "method", "procedure", "protocol", "run", "measurement", "template", "sop",
+}
+
+
+def name_tokens(text: Any) -> set[str]:
+    """Content words of a name: lower case, no generic words, no bare numbers."""
+    words = re.findall(r"[a-z0-9]+", str(text or "").lower())
+    return {w for w in words if w not in _GENERIC and not w.isdigit()}
+
+
+def _fuzzy_hits(a: set[str], b: set[str]) -> int:
+    hits = 0
+    for word in a:
+        if word in b or any(len(word) >= 3 and len(other) >= 3 and (word in other or other in word) for other in b):
+            hits += 1
+    return hits
+
+
+def equivalent_names(a: Any, b: Any) -> bool:
+    """Same thing under another name: identical content words."""
+    ta, tb = name_tokens(a), name_tokens(b)
+    return bool(ta) and ta == tb
+
+
+def near_names(a: Any, b: Any) -> bool:
+    """Probably the same thing: most content words match (substring counts,
+    so 'edta' matches 'k2edta'). Not equivalent, so the user decides."""
+    if str(a or "").strip().lower() == str(b or "").strip().lower():
+        return False
+    ta, tb = name_tokens(a), name_tokens(b)
+    if not ta or not tb or ta == tb:
+        return False
+    union = len(ta | tb)
+    hits = min(_fuzzy_hits(ta, tb), _fuzzy_hits(tb, ta))
+    return hits >= 1 and hits / max(1, min(len(ta), len(tb))) >= 1.0 and hits / union >= 0.5
+
+
+def equivalent_template(db, body: dict):
+    """An existing experiment template with the same content: same name, the
+    same content words in the name, or the same non-empty definition."""
+    from models.experiment import ExperimentTemplate
+
+    name = str(body.get("name") or "").strip()
+    definition = body.get("template_definition") or None
+    rows = db.query(ExperimentTemplate).filter(ExperimentTemplate.active == True).all()  # noqa: E712
+    for row in rows:
+        if name and row.name.strip().lower() == name.lower():
+            return row
+    for row in rows:
+        if name and equivalent_names(row.name, name):
+            return row
+        if definition and (row.template_definition or None) == definition:
+            return row
+    return None
+
+
+def _candidates(db, user: User, method: str, path: str, body: dict) -> list[tuple[str, str]]:
+    """(kind, name) of existing objects of the same kind the new row could duplicate."""
+    method = (method or "").upper()
+    if method != "POST":
+        return []
+    if path == "/containers/types":
+        return [("container type", r["name"]) for r in _named_rows(db, "container_type")]
+    if path == "/v1/experiment-templates":
+        return [("experiment template", r["name"]) for r in _named_rows(db, "experiment_template")]
+    if path == "/analyses":
+        return [("analysis", r["name"]) for r in _named_rows(db, "analysis")]
+    if path == "/analytes":
+        return [("analyte", r["name"]) for r in _named_rows(db, "analyte")]
+    entry = re.match(r"^/lists/([^/]+)/entries$", path)
+    if entry:
+        lst = find_list(db, entry.group(1))
+        if lst is None:
+            return []
+        from models.list import ListEntry
+
+        rows = db.query(ListEntry).filter(ListEntry.list_id == lst.id, ListEntry.active == True).all()  # noqa: E712
+        return [(f"{lst.name} entry", r.name) for r in rows]
+    if path == "/v1/schema/tables":
+        return [("table", t["display_name"]) for t in configurable_tables(db, user)]
+    if path == "/v1/schema/columns":
+        table = table_facts(db, user, body.get("table_id"))
+        return [("column", c["display_name"]) for c in (table or {}).get("columns", [])]
+    return []
+
+
+def _new_name(path: str, body: dict) -> Any:
+    if path in ("/v1/schema/tables", "/v1/schema/columns"):
+        return body.get("display_name")
+    return body.get("name")
+
+
+def near_matches(db, user: User, method: str, path: str, body: Any) -> list[str]:
+    """Existing objects whose names nearly match a new row's name (item 4)."""
+    path = (path or "").split("?", 1)[0].rstrip("/")
+    data = body if isinstance(body, dict) else {}
+    name = _new_name(path, data)
+    if not name:
+        return []
+    out = []
+    for kind, existing in _candidates(db, user, method, path, data):
+        if near_names(name, existing):
+            out.append(f"{kind} '{existing}'")
+    return out[:5]
+
+
+def table_facts(db, user: User, ref) -> Optional[dict[str, Any]]:
+    """The configurable table a ref names (registered or not), with its columns."""
+    if ref in (None, ""):
+        return None
+    text = str(ref).strip()
+    slug = _slug(text)
+    for table in configurable_tables(db, user):
+        if table["id"] and table["id"] == text:
+            return table
+        if text in (table["physical_name"],) or slug == table["physical_name"]:
+            return table
+        if table["display_name"].lower() == text.lower():
+            return table
+        if slug and (slug + "s" == table["physical_name"] or f"x_{slug}" == table["physical_name"]):
+            return table
+    return None
+
+
+def column_home_gap(db, user: User, method: str, path: str, body: Any) -> Optional[str]:
+    """D-5: a new column on a table that can't take one, with where it belongs."""
+    if (method or "").upper() != "POST" or path != "/v1/schema/columns" or not isinstance(body, dict):
+        return None
+    table = table_facts(db, user, body.get("table_id"))
+    if table is None or table.get("can_add_columns"):
+        return None
+    return (
+        f"{table['display_name']} can't take new fields. A measured result such as a concentration is an "
+        "analyte on an analysis (POST /analytes, POST /analyses, POST /analyses/{analysis_id}/analytes) and is "
+        "recorded on the sample's test. Run details belong in a lab table you create (POST /v1/schema/tables) "
+        "or on samples."
+    )
+
+
+def existing_column(db, user: User, body: dict) -> Optional[dict[str, Any]]:
+    """An existing column (registered or only in Postgres) a POST column re-adds."""
+    table = table_facts(db, user, body.get("table_id"))
+    if table is None:
+        return None
+    display = str(body.get("display_name") or "").strip().lower()
+    physical = str(body.get("physical_name") or "").strip() or _slug(display)
+    for column in table["columns"]:
+        if column["physical_name"] == physical or column["display_name"].strip().lower() == display:
+            return {"table": table, "column": column}
+    return None
+
+
+def existing_named(db, user: User, target: Any) -> Optional[str]:
+    """G5: what a call-less row names, when it already exists. Checked against the
+    database, never taken from the model's gap text."""
+    name = str(target or "").strip()
+    if not name:
+        return None
+    low = name.lower()
+    for table in configurable_tables(db, user):
+        if table["display_name"].lower() == low or table["physical_name"] == name:
+            return f"table {table['display_name']}"
+        for column in table["columns"]:
+            if column["display_name"].strip().lower() == low or column["physical_name"] == name:
+                return f"column {column['display_name']} on {table['display_name']}"
+    for kind in ("experiment_template", "container_type", "analysis", "analyte"):
+        for row in _named_rows(db, kind):
+            if row["name"].strip().lower() == low:
+                return f"{kind.replace('_', ' ')} {row['name']}"
+    return None
+
+
+def resolve_path(db, user: User, method: str, path: str) -> str:
+    """Names in a path -> ids, where the route takes an id (analysis by name)."""
+    clean = (path or "").split("?", 1)[0].rstrip("/")
+    match = re.match(r"^/analyses/([^/]+)/analytes$", clean)
+    if match and _uuid(match.group(1)) is None:
+        from urllib.parse import unquote
+
+        from models.analysis import Analysis
+
+        name = unquote(match.group(1))
+        row = db.query(Analysis).filter(func.lower(Analysis.name) == name.lower()).first()
+        if row is not None:
+            return f"/analyses/{row.id}/analytes"
+    return path
+
+
+def _resolve_analysis_bodies(db, path: str, data: dict) -> Optional[dict]:
+    from models.analysis import Analyte
+
+    if path == "/analytes":
+        out = dict(data)
+        unit_ref = _first(data, "units_default", "unit", "units", "unit_name")
+        for key in ("unit", "units", "unit_name"):
+            out.pop(key, None)
+        if unit_ref is not None:
+            unit = None
+            if _uuid(unit_ref) is None:
+                from models.unit import Unit
+
+                unit = db.query(Unit).filter(func.lower(Unit.name) == str(unit_ref).strip().lower()).first()
+            out["units_default"] = str(unit.id) if unit is not None else unit_ref
+        if out.get("data_type"):
+            out["data_type"] = str(out["data_type"]).lower()
+        return out
+    if re.match(r"^/analyses/[^/]+/analytes$", path):
+        refs = data.get("analyte_ids") or data.get("analytes") or data.get("names") or []
+        ids = []
+        for ref in refs if isinstance(refs, list) else [refs]:
+            if _uuid(ref):
+                ids.append(str(ref))
+                continue
+            row = db.query(Analyte).filter(func.lower(Analyte.name) == str(ref).strip().lower()).first()
+            ids.append(str(row.id) if row is not None else ref)
+        return {"analyte_ids": ids}
     return None
