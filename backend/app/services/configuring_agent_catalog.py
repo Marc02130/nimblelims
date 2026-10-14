@@ -33,6 +33,10 @@ SEED_LISTS = ("sample_types", "matrix_types")
 # Per-run values are recorded when the work happens. They are never list values
 # or configuration (UAT: the model invented kit lot numbers).
 _RUN_VALUE_RE = re.compile(r"\b(lot|lots|lot[_ ]?(no|number|numbers)|expiry|expiration|serial)\b", re.I)
+_RUN_VALUE_GAP = (
+    "Lot numbers, expiry dates and serials are recorded when the work is done, by reagent tracking "
+    "(reagent lots and the lot used on each run). They are not configuration values."
+)
 _SEED_KINDS = {
     "sample_type": "sample_types",
     "sample_types": "sample_types",
@@ -65,6 +69,7 @@ def _schema_for(method: str, kind: str):
     from app.schemas.analysis import AnalysisCreate, AnalyteLinkRequest
     from app.schemas.analyte import AnalyteCreate
     from app.schemas.user import RolePermissionsUpdate
+    from app.schemas.reagent import ReagentCreate, ReagentVendorCreate, VendorCreate
 
     table = {
         ("POST", "analysis"): AnalysisCreate,
@@ -85,6 +90,9 @@ def _schema_for(method: str, kind: str):
         ("POST", "sample_type_transition"): SampleTypeTransitionCreate,
         ("PUT", "role_permissions"): RolePermissionsUpdate,
         ("PATCH", "contents_amount"): ContentsUpdate,
+        ("POST", "vendor"): VendorCreate,
+        ("POST", "reagent"): ReagentCreate,
+        ("POST", "reagent_vendor"): ReagentVendorCreate,
     }
     return table.get((method, kind))
 
@@ -270,6 +278,8 @@ def catalog_snapshot(db, user: User) -> dict[str, Any]:
         "analyses": _named_rows(db, "analysis"),
         "analytes": _named_rows(db, "analyte"),
         "units": _named_rows(db, "unit"),
+        "vendors": _named_rows(db, "vendor"),
+        "reagents": _named_rows(db, "reagent"),
         "screen_keys": list(SCREEN_KEYS),
     }
 
@@ -295,6 +305,14 @@ def _model_for(kind: str):
         from models.container import ContainerType
 
         return ContainerType
+    if kind == "vendor":
+        from models.reagent import Vendor
+
+        return Vendor
+    if kind == "reagent":
+        from models.reagent import Reagent
+
+        return Reagent
     raise KeyError(kind)
 
 
@@ -335,6 +353,8 @@ def catalog_text(snapshot: dict[str, Any]) -> str:
         ("analyses", "Analyses"),
         ("analytes", "Analytes"),
         ("units", "Units"),
+        ("vendors", "Vendors"),
+        ("reagents", "Reagents"),
     ):
         lines.append(f"{label}: " + (", ".join(f"{r['name']}={r['id']}" for r in snapshot.get(key) or []) or "none"))
     lines.append("Layout screen_key values: " + ", ".join(snapshot.get("screen_keys") or []))
@@ -543,6 +563,9 @@ def resolve_body(db, user: User, method: str, path: str, body: Any) -> Any:
     if method == "POST" and (path in ("/analytes",) or re.match(r"^/analyses/[^/]+/analytes$", path)):
         return _resolve_analysis_bodies(db, path, data)
 
+    if path in ("/v1/vendors", "/v1/reagents", "/v1/reagent-vendors") and method == "POST":
+        return _resolve_reagent_body(db, path, data)
+
     if path == "/containers/types" and method == "POST":
         if "name" not in data and _first(data, "display_name", "label"):
             data["name"] = _first(data, "display_name", "label")
@@ -615,16 +638,10 @@ def reuse_gap(method: str, path: str, body: Any) -> Optional[str]:
     if method == "POST" and path == "/lists":
         name = str(_first(data, "name", "display_name") or "")
         if _RUN_VALUE_RE.search(name.replace("_", " ")):
-            return (
-                "Lot numbers, expiry dates and serials are recorded when the work is done. "
-                "They are not configuration values."
-            )
+            return _RUN_VALUE_GAP
     entry = re.match(r"^/lists/([^/]+)/entries$", path)
     if method == "POST" and entry and _RUN_VALUE_RE.search(entry.group(1).replace("_", " ")):
-        return (
-            "Lot numbers, expiry dates and serials are recorded when the work is done. "
-            "They are not configuration values."
-        )
+        return _RUN_VALUE_GAP
     return None
 
 
@@ -858,6 +875,10 @@ def _candidates(db, user: User, method: str, path: str, body: dict) -> list[tupl
         return [("analysis", r["name"]) for r in _named_rows(db, "analysis")]
     if path == "/analytes":
         return [("analyte", r["name"]) for r in _named_rows(db, "analyte")]
+    if path == "/v1/vendors":
+        return [("vendor", r["name"]) for r in _named_rows(db, "vendor")]
+    if path == "/v1/reagents":
+        return [("reagent", r["name"]) for r in _named_rows(db, "reagent")]
     entry = re.match(r"^/lists/([^/]+)/entries$", path)
     if entry:
         lst = find_list(db, entry.group(1))
@@ -921,9 +942,11 @@ def table_facts(db, user: User, ref) -> Optional[dict[str, Any]]:
 
 
 REAGENT_TRACKING_GAP = (
-    "Kit and reagent lot, part number, expiry and serial details are recorded per run by reagent "
-    "tracking, a future feature (a reagent/vendor table, a lot table with expiry, and the run or "
-    "experiment detail recording which lot was used). They are not configured as columns."
+    "Kit and reagent lot, part number, expiry and serial details are not columns: reagent tracking "
+    "records them. Add the kit or reagent with POST /v1/reagents, its supplier with POST /v1/vendors, and "
+    "the catalog number, unit and reorder info with POST /v1/reagent-vendors. Lots are received on the Reagents screen "
+    "(POST /v1/reagent-lots) and the lot used is recorded on each LIMS run or experiment "
+    "(POST /v1/reagent-uses), which keeps the lot number and expiry on the run."
 )
 
 _REAGENT_PHRASES = (
@@ -989,7 +1012,7 @@ def transition_gap(method: str, path: str, body: Any) -> Optional[str]:
 
 def column_home_gap(db, user: User, method: str, path: str, body: Any) -> Optional[str]:
     """D-5: a new column on a table that can't take one, with where it belongs.
-    Kit lot/part/expiry/serial columns always stop: reagent tracking (future)."""
+    Kit lot/part/expiry/serial columns always stop: they point at reagent tracking."""
     if (method or "").upper() != "POST" or path != "/v1/schema/columns" or not isinstance(body, dict):
         return None
     if reagent_tracking_column(body):
@@ -1083,3 +1106,72 @@ def _resolve_analysis_bodies(db, path: str, data: dict) -> Optional[dict]:
             ids.append(str(row.id) if row is not None else ref)
         return {"analyte_ids": ids}
     return None
+
+
+def _resolve_reagent_body(db, path: str, data: dict) -> dict:
+    """Vendor / reagent / reagent-vendor bodies: the model's usual keys -> real
+    fields, reagent and vendor names -> ids. Never invents a value."""
+    if path == "/v1/reagent-vendors":
+        return _resolve_source_body(db, data)
+    out: dict[str, Any] = {"name": _first(data, "name", "display_name", "label", "title")}
+    if data.get("description"):
+        out["description"] = data["description"]
+    if path == "/v1/vendors":
+        contact = _first(data, "contact", "contact_name", "contact_info")
+        if contact is not None:
+            out["contact"] = contact
+        for key in ("email", "phone", "website"):
+            if data.get(key):
+                out[key] = data[key]
+        return out
+    storage = _first(data, "storage_condition", "storage", "storage_temperature")
+    if storage is not None:
+        out["storage_condition"] = _storage_condition(storage)
+    for key in ("hazard_class", "sds_url", "stability_after_opening_days"):
+        if data.get(key) not in (None, ""):
+            out[key] = data[key]
+    unit = _first(data, "unit", "units")
+    if unit is not None:
+        out["unit"] = str(unit)
+    return out
+
+
+def _storage_condition(value) -> Any:
+    """'-20 °C', 'freezer -20', '2-8C', 'room temperature' -> the API's values.
+    Anything else is left as written so the API's 422 stops the row."""
+    text = str(value).lower().replace("°", "").replace(" ", "")
+    if "-80" in text:
+        return "-80C"
+    if "-20" in text:
+        return "-20C"
+    if text in ("4c", "4", "2-8c", "2to8c", "refrigerated", "fridge") or "2-8" in text:
+        return "4C"
+    if text in ("rt", "roomtemperature", "ambient", "15-25c", "20-25c"):
+        return "RT"
+    return value
+
+
+def _named_id(db, model, ref):
+    if ref is None or _uuid(ref) is not None:
+        return ref
+    row = db.query(model).filter(func.lower(model.name) == str(ref).strip().lower()).first()
+    return str(row.id) if row is not None else ref
+
+
+def _resolve_source_body(db, data: dict) -> dict:
+    from models.reagent import Reagent, Vendor
+
+    out: dict[str, Any] = {
+        "reagent_id": _named_id(db, Reagent, _first(data, "reagent_id", "reagent", "reagent_name", "kit")),
+        "vendor_id": _named_id(db, Vendor, _first(data, "vendor_id", "vendor", "vendor_name", "supplier", "manufacturer")),
+    }
+    catalog_number = _first(data, "catalog_number", "catalog_no", "cat_no", "part_number", "part_no", "catalog")
+    if catalog_number is not None:
+        out["catalog_number"] = str(catalog_number)
+    if data.get("price") not in (None, "") and data.get("price_per_unit") in (None, ""):
+        data = {**data, "price_per_unit": data["price"]}
+    for key in ("unit", "unit_of_sale", "quantity_per_unit_of_sale", "reorder_point", "reorder_quantity",
+                "lead_time_days", "price_per_unit", "is_preferred", "notes"):
+        if data.get(key) not in (None, ""):
+            out[key] = data[key]
+    return out
