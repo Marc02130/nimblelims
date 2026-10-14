@@ -23,8 +23,11 @@ SEED_CLIENT = "00000000-0000-0000-0000-000000000001"
 MIGRATION = os.path.join(os.path.dirname(__file__), "..", "db", "migrations", "versions", "0089_register_schema_catalog.py")
 
 
-def _migration():
-    spec = importlib.util.spec_from_file_location("m0089", MIGRATION)
+MIGRATION_0090 = os.path.join(os.path.dirname(__file__), "..", "db", "migrations", "versions", "0090_reagent_tracking.py")
+
+
+def _migration(path=MIGRATION):
+    spec = importlib.util.spec_from_file_location("m" + os.path.basename(path)[:4], path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
@@ -40,7 +43,7 @@ def _display_set(conn):
 
 def test_frozen_migration_list_matches_the_live_display_rule():
     module = _migration()
-    frozen = {t[0]: (t[1], t[2]) for t in module.TABLES}
+    frozen = {t[0]: (t[1], t[2]) for t in module.TABLES + _migration(MIGRATION_0090).TABLES}
     live = {
         n: (catalog.kind_for(n), catalog.display_name_for(n))
         for n in list(catalog.LAB_TABLES) + list(catalog.SYSTEM_TABLES)
@@ -137,6 +140,9 @@ def test_downgrade_removes_only_its_rows_and_upgrade_restores_them(migrated_engi
     from alembic.runtime.migration import MigrationContext
 
     module = _migration()
+    # 0090 registers the reagent tables with the same helpers; include them so
+    # the round trip covers every catalog row on a fresh DB.
+    module.TABLES = module.TABLES + _migration(MIGRATION_0090).TABLES
     with migrated_engine.connect() as conn:
         transaction = conn.begin()
         try:
