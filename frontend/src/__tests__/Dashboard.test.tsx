@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import Dashboard from '../pages/Dashboard';
@@ -7,7 +7,11 @@ import { UserProvider } from '../contexts/UserContext';
 
 // Mock the API service
 jest.mock('../services/apiService', () => ({
+  // Real helpers (ApiService.formatError, addClientFilterIfNeeded, types); only the client is mocked.
+  ...jest.requireActual('../services/apiService'),
   apiService: {
+    // UserProvider probes the cookie session on mount (P4/S10). Plain fn: survives resetMocks.
+    getCurrentUser: () => Promise.resolve(mockUser),
     getSamples: jest.fn(),
     getListEntries: jest.fn(),
     getProjects: jest.fn(),
@@ -98,7 +102,7 @@ describe('Dashboard', () => {
     renderWithProviders(<Dashboard />);
     
     expect(screen.getByText('Dashboard')).toBeInTheDocument();
-    expect(screen.getByText(/Welcome, testuser/)).toBeInTheDocument();
+    expect(await screen.findByText(/Welcome, testuser/)).toBeInTheDocument();
   });
 
   test('displays summary cards', async () => {
@@ -133,9 +137,11 @@ describe('Dashboard', () => {
     });
     
     await waitFor(() => {
-      expect(screen.getByText('All Statuses')).toBeInTheDocument();
-      expect(screen.getByText('Received')).toBeInTheDocument();
-      expect(screen.getByText('Available for Testing')).toBeInTheDocument();
+      // Options are in the open listbox (the grid's status chips use the same names).
+      const options = within(screen.getByRole('listbox'));
+      expect(options.getByText('All Statuses')).toBeInTheDocument();
+      expect(options.getByText('Received')).toBeInTheDocument();
+      expect(options.getByText('Available for Testing')).toBeInTheDocument();
     });
   });
 
@@ -148,9 +154,10 @@ describe('Dashboard', () => {
     });
     
     await waitFor(() => {
-      expect(screen.getByText('All Projects')).toBeInTheDocument();
-      expect(screen.getByText('Project A')).toBeInTheDocument();
-      expect(screen.getByText('Project B')).toBeInTheDocument();
+      const options = within(screen.getByRole('listbox'));
+      expect(options.getByText('All Projects')).toBeInTheDocument();
+      expect(options.getByText('Project A')).toBeInTheDocument();
+      expect(options.getByText('Project B')).toBeInTheDocument();
     });
   });
 
@@ -158,8 +165,45 @@ describe('Dashboard', () => {
     renderWithProviders(<Dashboard />);
     
     await waitFor(() => {
-      expect(screen.getByText('Received')).toBeInTheDocument();
-      expect(screen.getByText('Available for Testing')).toBeInTheDocument();
+      const chip = (name: string) =>
+        screen.getAllByText(name).map((el) => el.closest('.MuiChip-root')).find(Boolean);
+      const received = chip('Received');
+      const available = chip('Available for Testing');
+      expect(received).toHaveClass('MuiChip-colorDefault');
+      expect(available).toHaveClass('MuiChip-colorPrimary');
     });
+  });
+
+  test('shows type, matrix and project names when samples carry only ids', async () => {
+    // The samples API returns list-entry ids, not *_info objects.
+    const { apiService } = require('../services/apiService');
+    apiService.getSamples.mockResolvedValue([
+      {
+        ...mockSamples[0],
+        sample_type_info: undefined,
+        matrix_info: undefined,
+        project: undefined,
+        sample_type: 'st-1',
+        matrix: 'mx-1',
+        project_id: '1',
+      },
+    ]);
+    apiService.getListEntries.mockImplementation((name: string) =>
+      Promise.resolve(
+        ({
+          sample_status: [{ id: '1', name: 'Received' }],
+          sample_types: [{ id: 'st-1', name: 'Whole Blood' }],
+          matrix_types: [{ id: 'mx-1', name: 'EDTA Plasma' }],
+          qc_types: [],
+        } as Record<string, any[]>)[name] || []
+      )
+    );
+
+    renderWithProviders(<Dashboard />);
+
+    expect(await screen.findByText('Whole Blood')).toBeInTheDocument();
+    expect(screen.getByText('EDTA Plasma')).toBeInTheDocument();
+    expect(screen.getAllByText('Project A').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Unknown')).not.toBeInTheDocument();
   });
 });

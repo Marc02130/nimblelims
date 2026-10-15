@@ -41,30 +41,31 @@ export function addClientFilterIfNeeded(
 }
 
 // Types for eligible samples with prioritization
+// Optional fields are nullable in the API (Pydantic Optional -> JSON null).
 export interface EligibleSample {
   id: string;
   name: string;
-  description?: string;
-  due_date?: string;
-  received_date?: string;
-  date_sampled?: string;
+  description?: string | null;
+  due_date?: string | null;
+  received_date?: string | null;
+  date_sampled?: string | null;
   sample_type: string;
   status: string;
   matrix: string;
   project_id: string;
-  qc_type?: string;
+  qc_type?: string | null;
   // Prioritization fields
-  days_until_expiration?: number;
-  days_until_due?: number;
+  days_until_expiration?: number | null;
+  days_until_due?: number | null;
   is_expired: boolean;
   is_overdue: boolean;
-  expiration_warning?: string;
+  expiration_warning?: string | null;
   // Analysis context
-  shelf_life?: number;
+  shelf_life?: number | null;
   // Project context
-  project_name?: string;
-  project_due_date?: string;
-  effective_due_date?: string;
+  project_name?: string | null;
+  project_due_date?: string | null;
+  effective_due_date?: string | null;
 }
 
 export interface EligibleSamplesResponse {

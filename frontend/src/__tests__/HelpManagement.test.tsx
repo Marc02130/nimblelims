@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent, within } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import HelpManagement from '../pages/admin/HelpManagement';
@@ -8,6 +8,8 @@ import { apiService } from '../services/apiService';
 
 // Mock the API service
 jest.mock('../services/apiService', () => ({
+  // Real helpers (ApiService.formatError, addClientFilterIfNeeded, types); only the client is mocked.
+  ...jest.requireActual('../services/apiService'),
   apiService: {
     getHelp: jest.fn(),
     getRoles: jest.fn(),
@@ -88,7 +90,7 @@ describe('HelpManagement', () => {
 
     await waitFor(() => {
       expect(screen.getByText('Help Management')).toBeInTheDocument();
-      expect(screen.getByText('Create Help Entry')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Create Help Entry' })).toBeInTheDocument();
     });
   });
 
@@ -173,18 +175,17 @@ describe('HelpManagement', () => {
     renderWithProviders(<HelpManagement />);
 
     await waitFor(() => {
-      expect(screen.getByText('Filter by Role')).toBeInTheDocument();
+      expect(screen.getByRole('combobox', { name: 'Filter by Role' })).toBeInTheDocument();
     });
 
     // Test role filter dropdown
-    const roleFilter = screen.getByLabelText('Filter by Role');
+    const roleFilter = screen.getByRole('combobox', { name: 'Filter by Role' });
     fireEvent.mouseDown(roleFilter);
 
-    await waitFor(() => {
-      expect(screen.getByText('All Roles')).toBeInTheDocument();
-      expect(screen.getByText('Administrator')).toBeInTheDocument();
-      expect(screen.getByText('Lab Manager')).toBeInTheDocument();
-    });
+    const listbox = await screen.findByRole('listbox');
+    expect(within(listbox).getByText('All Roles')).toBeInTheDocument();
+    expect(within(listbox).getByText('Administrator')).toBeInTheDocument();
+    expect(within(listbox).getByText('Lab Manager')).toBeInTheDocument();
   });
 
   it('opens create dialog when Create Help Entry button is clicked', async () => {
@@ -206,16 +207,16 @@ describe('HelpManagement', () => {
     renderWithProviders(<HelpManagement />);
 
     await waitFor(() => {
-      expect(screen.getByText('Create Help Entry')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Create Help Entry' })).toBeInTheDocument();
     });
 
-    const createButton = screen.getByText('Create Help Entry');
+    const createButton = screen.getByRole('button', { name: 'Create Help Entry' });
     fireEvent.click(createButton);
 
     await waitFor(() => {
-      expect(screen.getByText('Create Help Entry')).toBeInTheDocument();
-      expect(screen.getByLabelText('Section')).toBeInTheDocument();
-      expect(screen.getByLabelText('Content')).toBeInTheDocument();
+      expect(screen.getByRole('dialog')).toHaveTextContent('Create Help Entry');
+      expect(within(screen.getByRole('dialog')).getByRole('textbox', { name: /^Section/ })).toBeInTheDocument();
+      expect(within(screen.getByRole('dialog')).getByRole('textbox', { name: /^Content/ })).toBeInTheDocument();
     });
   });
 
@@ -249,15 +250,15 @@ describe('HelpManagement', () => {
     renderWithProviders(<HelpManagement />);
 
     await waitFor(() => {
-      expect(screen.getByText('Create Help Entry')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Create Help Entry' })).toBeInTheDocument();
     });
 
-    const createButton = screen.getByText('Create Help Entry');
+    const createButton = screen.getByRole('button', { name: 'Create Help Entry' });
     fireEvent.click(createButton);
 
     await waitFor(() => {
-      const sectionInput = screen.getByLabelText('Section');
-      const contentInput = screen.getByLabelText('Content');
+      const sectionInput = within(screen.getByRole('dialog')).getByRole('textbox', { name: /^Section/ });
+      const contentInput = within(screen.getByRole('dialog')).getByRole('textbox', { name: /^Content/ });
       
       fireEvent.change(sectionInput, { target: { value: 'Test Section' } });
       fireEvent.change(contentInput, { target: { value: 'Test content' } });
@@ -270,7 +271,7 @@ describe('HelpManagement', () => {
       expect(mockApiService.createHelpEntry).toHaveBeenCalledWith({
         section: 'Test Section',
         content: 'Test content',
-        role_filter: '',
+        role_filter: null, // no role selected = visible to all roles
       });
     });
   });
@@ -372,8 +373,8 @@ describe('HelpManagement', () => {
     });
 
     // Update fields
-    const sectionInput = screen.getByLabelText('Section');
-    const contentInput = screen.getByLabelText('Content');
+    const sectionInput = within(screen.getByRole('dialog')).getByRole('textbox', { name: /^Section/ });
+    const contentInput = within(screen.getByRole('dialog')).getByRole('textbox', { name: /^Content/ });
 
     fireEvent.change(sectionInput, { target: { value: 'Updated Section' } });
     fireEvent.change(contentInput, { target: { value: 'Updated content' } });
@@ -479,18 +480,17 @@ describe('HelpManagement', () => {
     renderWithProviders(<HelpManagement />);
 
     await waitFor(() => {
-      expect(screen.getByText('Filter by Role')).toBeInTheDocument();
+      expect(screen.getByRole('combobox', { name: 'Filter by Role' })).toBeInTheDocument();
     });
 
     // Test role filter
-    const roleFilter = screen.getByLabelText('Filter by Role');
+    const roleFilter = screen.getByRole('combobox', { name: 'Filter by Role' });
     fireEvent.mouseDown(roleFilter);
 
-    await waitFor(() => {
-      expect(screen.getByText('All Roles')).toBeInTheDocument();
-      expect(screen.getByText('Administrator')).toBeInTheDocument();
-      expect(screen.getByText('Lab Manager')).toBeInTheDocument();
-    });
+    const listbox = await screen.findByRole('listbox');
+    expect(within(listbox).getByText('All Roles')).toBeInTheDocument();
+    expect(within(listbox).getByText('Administrator')).toBeInTheDocument();
+    expect(within(listbox).getByText('Lab Manager')).toBeInTheDocument();
   });
 
   it('handles API errors during create', async () => {
@@ -513,15 +513,15 @@ describe('HelpManagement', () => {
     renderWithProviders(<HelpManagement />);
 
     await waitFor(() => {
-      expect(screen.getByText('Create Help Entry')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Create Help Entry' })).toBeInTheDocument();
     });
 
-    const createButton = screen.getByText('Create Help Entry');
+    const createButton = screen.getByRole('button', { name: 'Create Help Entry' });
     fireEvent.click(createButton);
 
     await waitFor(() => {
-      const sectionInput = screen.getByLabelText('Section');
-      const contentInput = screen.getByLabelText('Content');
+      const sectionInput = within(screen.getByRole('dialog')).getByRole('textbox', { name: /^Section/ });
+      const contentInput = within(screen.getByRole('dialog')).getByRole('textbox', { name: /^Content/ });
       
       fireEvent.change(sectionInput, { target: { value: 'Test Section' } });
       fireEvent.change(contentInput, { target: { value: 'Test content' } });

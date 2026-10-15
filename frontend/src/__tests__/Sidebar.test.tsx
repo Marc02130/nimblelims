@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { BrowserRouter, MemoryRouter } from 'react-router-dom';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import Sidebar from '../components/Sidebar';
@@ -7,6 +7,8 @@ import { UserProvider } from '../contexts/UserContext';
 
 // Mock the API service
 jest.mock('../services/apiService', () => ({
+  // Real helpers (ApiService.formatError, addClientFilterIfNeeded, types); only the client is mocked.
+  ...jest.requireActual('../services/apiService'),
   apiService: {
     getCurrentUser: jest.fn(),
     setAuthToken: jest.fn(),
@@ -23,6 +25,10 @@ jest.mock('@mui/material/useMediaQuery', () => ({
 
 const theme = createTheme();
 
+// Sidebar renders the same content twice: a temporary drawer for mobile
+// (keepMounted) and a permanent one for desktop. Query the permanent one.
+const sidebar = () => within(document.querySelector('.MuiDrawer-docked') as HTMLElement);
+
 // Mock user context
 const createMockUser = (permissions: string[] = [], role: string = 'Lab Technician') => ({
   user: {
@@ -36,7 +42,8 @@ const createMockUser = (permissions: string[] = [], role: string = 'Lab Technici
   loading: false,
   login: jest.fn(),
   logout: jest.fn(),
-  hasPermission: jest.fn((perm: string) => permissions.includes(perm) || role === 'Administrator'),
+  // Plain function, not jest.fn: CRA's resetMocks would wipe the implementation.
+  hasPermission: ((perm: string) => permissions.includes(perm) || role === 'Administrator'),
 });
 
 // Mock UserContext
@@ -48,10 +55,15 @@ jest.mock('../contexts/UserContext', () => {
   };
 });
 
+// The logged-out case passes user: null.
+type MockUserContext = Omit<ReturnType<typeof createMockUser>, 'user'> & {
+  user: ReturnType<typeof createMockUser>['user'] | null;
+};
+
 const renderWithProviders = (
   component: React.ReactElement,
   initialEntries: string[] = ['/dashboard'],
-  mockUser = createMockUser(['sample:create', 'sample:read', 'sample:update', 'batch:manage', 'result:enter', 'project:manage', 'config:edit'])
+  mockUser: MockUserContext = createMockUser(['sample:create', 'sample:read', 'sample:update', 'batch:manage', 'result:enter', 'project:manage', 'config:edit'])
 ) => {
   const { useUser } = require('../contexts/UserContext');
   useUser.mockReturnValue(mockUser);
@@ -84,40 +96,40 @@ describe('Sidebar', () => {
     test('renders sidebar with logo and core features', () => {
       renderWithProviders(<Sidebar {...defaultProps} />);
       
-      expect(screen.getByText('NimbleLIMS')).toBeInTheDocument();
-      expect(screen.getByText('Core Features')).toBeInTheDocument();
-      expect(screen.getByText('Dashboard')).toBeInTheDocument();
+      expect(sidebar().getByText('NimbleLIMS')).toBeInTheDocument();
+      expect(sidebar().getByText('Core Features')).toBeInTheDocument();
+      expect(sidebar().getByText('Dashboard')).toBeInTheDocument();
     });
 
     test('renders all core navigation items when user has permissions', () => {
       renderWithProviders(<Sidebar {...defaultProps} />);
       
-      expect(screen.getByText('Dashboard')).toBeInTheDocument();
-      expect(screen.getByText('Receive')).toBeInTheDocument();
-      expect(screen.getAllByText('Asked-for').length).toBeGreaterThan(0);
-      expect(screen.getByText('Containers')).toBeInTheDocument();
-      expect(screen.getByText('Batches')).toBeInTheDocument();
-      expect(screen.getByText('Results')).toBeInTheDocument();
+      expect(sidebar().getByText('Dashboard')).toBeInTheDocument();
+      expect(sidebar().getByText('Receive')).toBeInTheDocument();
+      expect(sidebar().getAllByText('Asked-for').length).toBeGreaterThan(0);
+      expect(sidebar().getByText('Containers')).toBeInTheDocument();
+      expect(sidebar().getByText('Batches')).toBeInTheDocument();
+      expect(sidebar().getByText('Results')).toBeInTheDocument();
     });
 
     test('renders admin section when user has config:edit permission', () => {
       renderWithProviders(<Sidebar {...defaultProps} />);
       
-      expect(screen.getByText('Admin')).toBeInTheDocument();
+      expect(sidebar().getByText('Admin')).toBeInTheDocument();
     });
 
     test('does not render admin section when user lacks config:edit permission', () => {
       const mockUser = createMockUser(['sample:create'], 'Lab Technician');
       renderWithProviders(<Sidebar {...defaultProps} />, ['/dashboard'], mockUser);
       
-      expect(screen.queryByText('Admin')).not.toBeInTheDocument();
+      expect(sidebar().queryByText('Admin')).not.toBeInTheDocument();
     });
 
     test('renders user info at bottom', () => {
       renderWithProviders(<Sidebar {...defaultProps} />);
       
-      expect(screen.getByText(/testuser/)).toBeInTheDocument();
-      expect(screen.getByText(/Lab Technician/)).toBeInTheDocument();
+      expect(sidebar().getByText(/testuser/)).toBeInTheDocument();
+      expect(sidebar().getByText(/Lab Technician/)).toBeInTheDocument();
     });
   });
 
@@ -126,14 +138,14 @@ describe('Sidebar', () => {
       const mockUser = createMockUser(['sample:update'], 'Lab Technician');
       renderWithProviders(<Sidebar {...defaultProps} />, ['/dashboard'], mockUser);
       
-      expect(screen.queryByText('Receive')).not.toBeInTheDocument();
-      expect(screen.getAllByText('Containers').length).toBeGreaterThan(0);
+      expect(sidebar().queryByText('Receive')).not.toBeInTheDocument();
+      expect(sidebar().getAllByText('Containers').length).toBeGreaterThan(0);
     });
 
     test('places Asked-for immediately after Receive', () => {
       renderWithProviders(<Sidebar {...defaultProps} />);
-      const receive = screen.getAllByText('Receive')[0];
-      const askedFor = screen.getAllByText('Asked-for')[0];
+      const receive = sidebar().getAllByText('Receive')[0];
+      const askedFor = sidebar().getAllByText('Asked-for')[0];
       expect(
         receive.compareDocumentPosition(askedFor) & Node.DOCUMENT_POSITION_FOLLOWING
       ).toBeTruthy();
@@ -142,57 +154,57 @@ describe('Sidebar', () => {
     test('hides Asked-for without sample:read or test:assign', () => {
       const mockUser = createMockUser(['sample:create'], 'Lab Technician');
       renderWithProviders(<Sidebar {...defaultProps} />, ['/dashboard'], mockUser);
-      expect(screen.queryByText('Asked-for')).not.toBeInTheDocument();
+      expect(sidebar().queryByText('Asked-for')).not.toBeInTheDocument();
     });
 
     test('hides Containers when user lacks sample:update permission', () => {
       const mockUser = createMockUser(['sample:create'], 'Lab Technician');
       renderWithProviders(<Sidebar {...defaultProps} />, ['/dashboard'], mockUser);
       
-      expect(screen.getAllByText('Receive').length).toBeGreaterThan(0);
-      expect(screen.queryByText('Containers')).not.toBeInTheDocument();
+      expect(sidebar().getAllByText('Receive').length).toBeGreaterThan(0);
+      expect(sidebar().queryByText('Containers')).not.toBeInTheDocument();
     });
 
     test('hides Batches when user lacks batch:manage permission', () => {
       const mockUser = createMockUser(['sample:create'], 'Lab Technician');
       renderWithProviders(<Sidebar {...defaultProps} />, ['/dashboard'], mockUser);
       
-      expect(screen.queryByText('Batches')).not.toBeInTheDocument();
+      expect(sidebar().queryByText('Batches')).not.toBeInTheDocument();
     });
 
     test('hides Results when user lacks result:enter permission', () => {
       const mockUser = createMockUser(['sample:create'], 'Lab Technician');
       renderWithProviders(<Sidebar {...defaultProps} />, ['/dashboard'], mockUser);
       
-      expect(screen.queryByText('Results')).not.toBeInTheDocument();
+      expect(sidebar().queryByText('Results')).not.toBeInTheDocument();
     });
 
-    test('hides Client section when user lacks project:manage permission', () => {
+    test('hides Lab Management section when user lacks project:manage permission', () => {
       const mockUser = createMockUser(['sample:create'], 'Lab Technician');
       renderWithProviders(<Sidebar {...defaultProps} />, ['/dashboard'], mockUser);
       
-      expect(screen.queryByText('Client')).not.toBeInTheDocument();
-      expect(screen.queryByText('Clients')).not.toBeInTheDocument();
-      expect(screen.queryByText('Client Projects')).not.toBeInTheDocument();
+      expect(sidebar().queryByText('Lab Mgmt')).not.toBeInTheDocument();
+      expect(sidebar().queryByText('Clients')).not.toBeInTheDocument();
+      expect(sidebar().queryByText('Client Proj')).not.toBeInTheDocument();
     });
 
     test('shows Dashboard even when user has no permissions', () => {
       const mockUser = createMockUser([], 'Client');
       renderWithProviders(<Sidebar {...defaultProps} />, ['/dashboard'], mockUser);
       
-      expect(screen.getByText('Dashboard')).toBeInTheDocument();
+      expect(sidebar().getByText('Dashboard')).toBeInTheDocument();
     });
 
     test('Administrator role shows all items regardless of permissions array', () => {
       const mockUser = createMockUser([], 'Administrator');
       renderWithProviders(<Sidebar {...defaultProps} />, ['/dashboard'], mockUser);
       
-      expect(screen.getByText('Receive')).toBeInTheDocument();
-      expect(screen.getByText('Containers')).toBeInTheDocument();
-      expect(screen.getByText('Batches')).toBeInTheDocument();
-      expect(screen.getByText('Results')).toBeInTheDocument();
-      expect(screen.getByText('Client')).toBeInTheDocument();
-      expect(screen.getByText('Admin')).toBeInTheDocument();
+      expect(sidebar().getByText('Receive')).toBeInTheDocument();
+      expect(sidebar().getByText('Containers')).toBeInTheDocument();
+      expect(sidebar().getByText('Batches')).toBeInTheDocument();
+      expect(sidebar().getByText('Results')).toBeInTheDocument();
+      expect(sidebar().getByText('Lab Mgmt')).toBeInTheDocument();
+      expect(sidebar().getByText('Admin')).toBeInTheDocument();
     });
   });
 
@@ -200,7 +212,7 @@ describe('Sidebar', () => {
     test('navigates to dashboard when logo is clicked', () => {
       const { container } = renderWithProviders(<Sidebar {...defaultProps} />, ['/receive']);
       
-      const logo = screen.getByLabelText('Navigate to dashboard');
+      const logo = sidebar().getByLabelText('Navigate to dashboard');
       fireEvent.click(logo);
       
       // Navigation is handled by react-router, so we just verify the click happened
@@ -210,7 +222,7 @@ describe('Sidebar', () => {
     test('navigates when navigation item is clicked', () => {
       const { container } = renderWithProviders(<Sidebar {...defaultProps} />);
       
-      const receiveButton = screen.getAllByLabelText('Navigate to Receive')[0];
+      const receiveButton = sidebar().getAllByLabelText('Navigate to Receive')[0];
       fireEvent.click(receiveButton);
       
       expect(receiveButton).toBeInTheDocument();
@@ -220,7 +232,7 @@ describe('Sidebar', () => {
       mockUseMediaQuery.mockReturnValue(true); // Mobile
       renderWithProviders(<Sidebar {...defaultProps} mobileOpen={true} />);
       
-      const dashboardButton = screen.getByLabelText('Navigate to Dashboard');
+      const dashboardButton = sidebar().getByLabelText('Navigate to Dashboard');
       fireEvent.click(dashboardButton);
       
       // onMobileClose should be called (mocked)
@@ -232,28 +244,28 @@ describe('Sidebar', () => {
     test('highlights Dashboard when on /dashboard route', () => {
       renderWithProviders(<Sidebar {...defaultProps} />, ['/dashboard']);
       
-      const dashboardButton = screen.getByLabelText('Navigate to Dashboard');
+      const dashboardButton = sidebar().getByLabelText('Navigate to Dashboard');
       expect(dashboardButton).toHaveAttribute('aria-current', 'page');
     });
 
     test('highlights Receive when on /receive route', () => {
       renderWithProviders(<Sidebar {...defaultProps} />, ['/receive']);
       
-      const receiveButton = screen.getAllByLabelText('Navigate to Receive')[0];
+      const receiveButton = sidebar().getAllByLabelText('Navigate to Receive')[0];
       expect(receiveButton).toHaveAttribute('aria-current', 'page');
     });
 
     test('highlights admin Overview when on /admin route', () => {
       renderWithProviders(<Sidebar {...defaultProps} />, ['/admin']);
       
-      const overviewButton = screen.getByLabelText('Navigate to Overview');
+      const overviewButton = sidebar().getByLabelText('Navigate to Overview');
       expect(overviewButton).toHaveAttribute('aria-current', 'page');
     });
 
     test('highlights Lists Management when on /admin/lists route', () => {
       renderWithProviders(<Sidebar {...defaultProps} />, ['/admin/lists']);
       
-      const listsButton = screen.getByLabelText('Navigate to Lists Management');
+      const listsButton = sidebar().getByLabelText('Navigate to Lists');
       expect(listsButton).toHaveAttribute('aria-current', 'page');
     });
   });
@@ -262,14 +274,14 @@ describe('Sidebar', () => {
     test('expands admin accordion when on admin route', () => {
       renderWithProviders(<Sidebar {...defaultProps} />, ['/admin']);
       
-      const accordion = screen.getByLabelText('Admin section');
+      const accordion = sidebar().getByLabelText('Admin section');
       expect(accordion).toHaveAttribute('aria-expanded', 'true');
     });
 
     test('collapses admin accordion when not on admin route', () => {
       renderWithProviders(<Sidebar {...defaultProps} />, ['/dashboard']);
       
-      const accordion = screen.getByLabelText('Admin section');
+      const accordion = sidebar().getByLabelText('Admin section');
       // Accordion should be collapsed initially when not on admin route
       // Note: The component sets expanded based on route, so this may vary
     });
@@ -277,7 +289,7 @@ describe('Sidebar', () => {
     test('toggles accordion when clicked', () => {
       renderWithProviders(<Sidebar {...defaultProps} />, ['/dashboard']);
       
-      const accordion = screen.getByLabelText('Admin section');
+      const accordion = sidebar().getByLabelText('Admin section');
       fireEvent.click(accordion);
       
       // Accordion should toggle
@@ -287,62 +299,62 @@ describe('Sidebar', () => {
     test('shows all admin sub-items when expanded', () => {
       renderWithProviders(<Sidebar {...defaultProps} />, ['/admin']);
       
-      expect(screen.getByText('Overview')).toBeInTheDocument();
-      expect(screen.getByText('Lists Management')).toBeInTheDocument();
-      expect(screen.getByText('Container Types')).toBeInTheDocument();
-      expect(screen.getByText('Users Management')).toBeInTheDocument();
-      expect(screen.getByText('Roles & Permissions')).toBeInTheDocument();
-      expect(screen.getByText('Analyses Management')).toBeInTheDocument();
-      expect(screen.getByText('Analytes Management')).toBeInTheDocument();
-      expect(screen.getByText('Test Batteries')).toBeInTheDocument();
+      expect(sidebar().getByText('Overview')).toBeInTheDocument();
+      expect(sidebar().getByText('Lists')).toBeInTheDocument();
+      expect(sidebar().getByText('Container Types')).toBeInTheDocument();
+      expect(sidebar().getByText('Users Management')).toBeInTheDocument();
+      expect(sidebar().getByText('Roles & Permissions')).toBeInTheDocument();
+      expect(sidebar().getByText('Analyses Management')).toBeInTheDocument();
+      expect(sidebar().getByText('Analytes Management')).toBeInTheDocument();
+      expect(sidebar().getByText('Test Batteries')).toBeInTheDocument();
     });
   });
 
-  describe('Client Accordion', () => {
-    test('renders Client section when user has project:manage permission', () => {
+  describe('Lab Management Accordion (clients, projects)', () => {
+    test('renders Lab Management section when user has project:manage permission', () => {
       const mockUser = createMockUser(['project:manage'], 'Lab Manager');
       renderWithProviders(<Sidebar {...defaultProps} />, ['/dashboard'], mockUser);
       
-      expect(screen.getByText('Client')).toBeInTheDocument();
+      expect(sidebar().getByText('Lab Mgmt')).toBeInTheDocument();
     });
 
-    test('does not render Client section when user lacks project:manage permission', () => {
+    test('does not render Lab Management section when user lacks project:manage permission', () => {
       const mockUser = createMockUser(['sample:create'], 'Lab Technician');
       renderWithProviders(<Sidebar {...defaultProps} />, ['/dashboard'], mockUser);
       
-      expect(screen.queryByText('Client')).not.toBeInTheDocument();
+      expect(sidebar().queryByText('Lab Mgmt')).not.toBeInTheDocument();
     });
 
-    test('expands Client accordion when on /clients route', () => {
+    test('expands Lab Management accordion when on /clients route', () => {
       renderWithProviders(<Sidebar {...defaultProps} />, ['/clients']);
       
-      const accordion = screen.getByLabelText('Client section');
+      const accordion = sidebar().getByLabelText('Lab Management section');
       expect(accordion).toHaveAttribute('aria-expanded', 'true');
-      expect(screen.getByText('Clients')).toBeInTheDocument();
-      expect(screen.getByText('Client Projects')).toBeInTheDocument();
+      expect(sidebar().getByText('Clients')).toBeInTheDocument();
+      expect(sidebar().getByText('Client Proj')).toBeInTheDocument();
     });
 
-    test('expands Client accordion when on /client-projects route', () => {
+    test('expands Lab Management accordion when on /client-projects route', () => {
       renderWithProviders(<Sidebar {...defaultProps} />, ['/client-projects']);
       
-      const accordion = screen.getByLabelText('Client section');
+      const accordion = sidebar().getByLabelText('Lab Management section');
       expect(accordion).toHaveAttribute('aria-expanded', 'true');
-      expect(screen.getByText('Clients')).toBeInTheDocument();
-      expect(screen.getByText('Client Projects')).toBeInTheDocument();
+      expect(sidebar().getByText('Clients')).toBeInTheDocument();
+      expect(sidebar().getByText('Client Proj')).toBeInTheDocument();
     });
 
-    test('collapses Client accordion when not on client routes', () => {
+    test('collapses Lab Management accordion when not on client routes', () => {
       renderWithProviders(<Sidebar {...defaultProps} />, ['/dashboard']);
       
-      const accordion = screen.getByLabelText('Client section');
+      const accordion = sidebar().getByLabelText('Lab Management section');
       // Accordion may be collapsed initially when not on client route
       expect(accordion).toBeInTheDocument();
     });
 
-    test('toggles Client accordion when clicked', () => {
+    test('toggles Lab Management accordion when clicked', () => {
       renderWithProviders(<Sidebar {...defaultProps} />, ['/dashboard']);
       
-      const accordion = screen.getByLabelText('Client section');
+      const accordion = sidebar().getByLabelText('Lab Management section');
       fireEvent.click(accordion);
       
       // Accordion should toggle
@@ -352,43 +364,43 @@ describe('Sidebar', () => {
     test('shows all client sub-items when expanded', () => {
       renderWithProviders(<Sidebar {...defaultProps} />, ['/clients']);
       
-      expect(screen.getByText('Clients')).toBeInTheDocument();
-      expect(screen.getByText('Client Projects')).toBeInTheDocument();
+      expect(sidebar().getByText('Clients')).toBeInTheDocument();
+      expect(sidebar().getByText('Client Proj')).toBeInTheDocument();
     });
 
     test('highlights Clients when on /clients route', () => {
       renderWithProviders(<Sidebar {...defaultProps} />, ['/clients']);
       
-      const clientsButton = screen.getByLabelText('Navigate to Clients');
+      const clientsButton = sidebar().getByLabelText('Navigate to Clients');
       expect(clientsButton).toHaveAttribute('aria-current', 'page');
     });
 
     test('highlights Client Projects when on /client-projects route', () => {
       renderWithProviders(<Sidebar {...defaultProps} />, ['/client-projects']);
       
-      const clientProjectsButton = screen.getByLabelText('Navigate to Client Projects');
+      const clientProjectsButton = sidebar().getByLabelText('Client Projects');
       expect(clientProjectsButton).toHaveAttribute('aria-current', 'page');
     });
 
     test('has primary color icon when on client routes', () => {
       renderWithProviders(<Sidebar {...defaultProps} />, ['/clients']);
       
-      const accordion = screen.getByLabelText('Client section');
+      const accordion = sidebar().getByLabelText('Lab Management section');
       expect(accordion).toBeInTheDocument();
       // Icon color is tested through the component structure
     });
 
-    test('has proper ARIA labels for client accordion', () => {
+    test('has proper ARIA labels for lab management accordion', () => {
       renderWithProviders(<Sidebar {...defaultProps} />);
       
-      expect(screen.getByLabelText('Client section')).toBeInTheDocument();
-      expect(screen.getByLabelText('client navigation')).toBeInTheDocument();
+      expect(sidebar().getByLabelText('Lab Management section')).toBeInTheDocument();
+      expect(sidebar().getByLabelText('lab management navigation')).toBeInTheDocument();
     });
 
     test('nested items have proper indentation (pl: 4)', () => {
       renderWithProviders(<Sidebar {...defaultProps} />, ['/clients']);
       
-      const clientsButton = screen.getByLabelText('Navigate to Clients');
+      const clientsButton = sidebar().getByLabelText('Navigate to Clients');
       // The sx={{ pl: 4 }} styling is applied to ListItemButton
       expect(clientsButton).toBeInTheDocument();
     });
@@ -428,9 +440,9 @@ describe('Sidebar', () => {
       renderWithProviders(<Sidebar {...defaultProps} />, ['/dashboard'], mockUser);
       
       // Should still render Dashboard
-      expect(screen.getByText('Dashboard')).toBeInTheDocument();
+      expect(sidebar().getByText('Dashboard')).toBeInTheDocument();
       // Should not render permission-gated items
-      expect(screen.queryByText('Receive')).not.toBeInTheDocument();
+      expect(sidebar().queryByText('Receive')).not.toBeInTheDocument();
     });
 
     test('handles missing user gracefully', () => {
@@ -445,18 +457,18 @@ describe('Sidebar', () => {
       renderWithProviders(<Sidebar {...defaultProps} />, ['/dashboard'], mockUser);
       
       // Should still render basic structure
-      expect(screen.getByText('NimbleLIMS')).toBeInTheDocument();
+      expect(sidebar().getByText('NimbleLIMS')).toBeInTheDocument();
     });
 
     test('handles nested admin routes correctly', () => {
       renderWithProviders(<Sidebar {...defaultProps} />, ['/admin/analyses/123/analytes']);
       
       // Admin accordion should be expanded
-      const accordion = screen.getByLabelText('Admin section');
+      const accordion = sidebar().getByLabelText('Admin section');
       expect(accordion).toBeInTheDocument();
       
       // Analyses Management should be highlighted (prefix match)
-      const analysesButton = screen.getByLabelText('Navigate to Analyses Management');
+      const analysesButton = sidebar().getByLabelText('Navigate to Analyses Management');
       expect(analysesButton).toHaveAttribute('aria-current', 'page');
     });
   });
@@ -465,23 +477,23 @@ describe('Sidebar', () => {
     test('has proper ARIA labels for navigation items', () => {
       renderWithProviders(<Sidebar {...defaultProps} />);
       
-      expect(screen.getByLabelText('Navigate to Dashboard')).toBeInTheDocument();
-      expect(screen.getByLabelText('Navigate to Receive')).toBeInTheDocument();
+      expect(sidebar().getByLabelText('Navigate to Dashboard')).toBeInTheDocument();
+      expect(sidebar().getByLabelText('Navigate to Receive')).toBeInTheDocument();
       expect(screen.getByLabelText('main navigation')).toBeInTheDocument();
     });
 
     test('has aria-current for active items', () => {
       renderWithProviders(<Sidebar {...defaultProps} />, ['/dashboard']);
       
-      const dashboardButton = screen.getByLabelText('Navigate to Dashboard');
+      const dashboardButton = sidebar().getByLabelText('Navigate to Dashboard');
       expect(dashboardButton).toHaveAttribute('aria-current', 'page');
     });
 
     test('has proper ARIA labels for admin accordion', () => {
       renderWithProviders(<Sidebar {...defaultProps} />);
       
-      expect(screen.getByLabelText('Admin section')).toBeInTheDocument();
-      expect(screen.getByLabelText('admin navigation')).toBeInTheDocument();
+      expect(sidebar().getByLabelText('Admin section')).toBeInTheDocument();
+      expect(sidebar().getByLabelText('admin navigation')).toBeInTheDocument();
     });
   });
 });

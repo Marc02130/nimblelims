@@ -7,7 +7,11 @@ import { UserProvider } from '../contexts/UserContext';
 
 // Mock the API service
 jest.mock('../services/apiService', () => ({
+  // Real helpers (ApiService.formatError, addClientFilterIfNeeded, types); only the client is mocked.
+  ...jest.requireActual('../services/apiService'),
   apiService: {
+    // UserProvider probes the cookie session on mount (P4/S10). Plain fn: survives resetMocks.
+    getCurrentUser: () => Promise.reject(new Error('no session')),
     getLists: jest.fn(),
     createList: jest.fn(),
     updateList: jest.fn(),
@@ -194,7 +198,7 @@ describe('ListsManagement', () => {
       expect(screen.getByText('Create New List')).toBeInTheDocument();
     });
 
-    const nameInput = screen.getByLabelText('List Name');
+    const nameInput = screen.getByLabelText(/^List Name/);
     fireEvent.change(nameInput, { target: { value: 'New List' } });
 
     const submitButton = screen.getByText('Create');
@@ -330,7 +334,7 @@ describe('ListsManagement', () => {
       expect(screen.getByText('Create New List')).toBeInTheDocument();
     });
 
-    const nameInput = screen.getByLabelText('List Name');
+    const nameInput = screen.getByLabelText(/^List Name/);
     fireEvent.change(nameInput, { target: { value: 'Sample Status' } });
 
     const submitButton = screen.getByText('Create');
@@ -351,9 +355,11 @@ describe('ListsManagement', () => {
       expect(searchInput).toHaveValue('test');
     });
 
-    // Find clear button
-    const clearButton = screen.getByRole('button', { hidden: true });
-    // This would be the clear icon button
+    fireEvent.click(screen.getByRole('button', { name: 'Clear search' }));
+
+    await waitFor(() => {
+      expect(searchInput).toHaveValue('');
+    });
   });
 });
 

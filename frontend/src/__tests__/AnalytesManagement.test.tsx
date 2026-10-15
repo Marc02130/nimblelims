@@ -7,7 +7,11 @@ import { UserProvider } from '../contexts/UserContext';
 
 // Mock the API service
 jest.mock('../services/apiService', () => ({
+  // Real helpers (ApiService.formatError, addClientFilterIfNeeded, types); only the client is mocked.
+  ...jest.requireActual('../services/apiService'),
   apiService: {
+    // UserProvider probes the cookie session on mount (P4/S10). Plain fn: survives resetMocks.
+    getCurrentUser: () => Promise.reject(new Error('no session')),
     getAnalytes: jest.fn(),
     createAnalyte: jest.fn(),
     updateAnalyte: jest.fn(),
@@ -164,7 +168,7 @@ describe('AnalytesManagement', () => {
       expect(screen.getByText('Create New Analyte')).toBeInTheDocument();
     });
 
-    const nameInput = screen.getByLabelText('Analyte Name');
+    const nameInput = screen.getByLabelText(/^Analyte Name/);
     fireEvent.change(nameInput, { target: { value: 'TOC' } });
 
     const descriptionInput = screen.getByLabelText('Description');
@@ -215,7 +219,7 @@ describe('AnalytesManagement', () => {
       expect(screen.getByText('Create New Analyte')).toBeInTheDocument();
     });
 
-    const nameInput = screen.getByLabelText('Analyte Name');
+    const nameInput = screen.getByLabelText(/^Analyte Name/);
     fireEvent.change(nameInput, { target: { value: 'pH' } });
 
     const submitButton = screen.getByText('Create');
@@ -239,7 +243,7 @@ describe('AnalytesManagement', () => {
       expect(screen.getByText('Create New Analyte')).toBeInTheDocument();
     });
 
-    const nameInput = screen.getByLabelText('Analyte Name');
+    const nameInput = screen.getByLabelText(/^Analyte Name/);
     fireEvent.change(nameInput, { target: { value: 'A' } });
 
     const submitButton = screen.getByText('Create');
@@ -263,7 +267,7 @@ describe('AnalytesManagement', () => {
       expect(screen.getByText('Create New Analyte')).toBeInTheDocument();
     });
 
-    const nameInput = screen.getByLabelText('Analyte Name');
+    const nameInput = screen.getByLabelText(/^Analyte Name/);
     fireEvent.change(nameInput, { target: { value: 'New Analyte' } });
 
     const descriptionInput = screen.getByLabelText('Description');

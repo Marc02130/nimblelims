@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import ContainerManagement from '../pages/ContainerManagement';
@@ -7,7 +7,11 @@ import { UserProvider } from '../contexts/UserContext';
 
 // Mock the API service
 jest.mock('../services/apiService', () => ({
+  // Real helpers (ApiService.formatError, addClientFilterIfNeeded, types); only the client is mocked.
+  ...jest.requireActual('../services/apiService'),
   apiService: {
+    // UserProvider probes the cookie session on mount (P4/S10). Plain fn: survives resetMocks.
+    getCurrentUser: () => Promise.reject(new Error('no session')),
     getContainers: jest.fn(),
     getContainerTypes: jest.fn(),
     getUnits: jest.fn(),
@@ -119,12 +123,11 @@ describe('ContainerManagement', () => {
   test('opens create container dialog', async () => {
     renderWithProviders(<ContainerManagement />);
     
-    const createButton = screen.getByText('Create Container');
+    const createButton = screen.getByRole('button', { name: 'Create Container' });
     fireEvent.click(createButton);
-    
-    await waitFor(() => {
-      expect(screen.getByText('Create Container')).toBeInTheDocument();
-    });
+
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText('Create Container')).toBeInTheDocument();
   });
 
   test('handles container row click', async () => {

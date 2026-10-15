@@ -269,7 +269,8 @@ const AnalysisAnalytesConfig: React.FC = () => {
   if (!loading && !analysis) {
     return (
       <Box>
-        <Alert severity="error">Analysis not found</Alert>
+        {/* Show the load error (permission, server) rather than masking it as "not found". */}
+        <Alert severity="error">{error || 'Analysis not found'}</Alert>
       </Box>
     );
   }
@@ -325,7 +326,7 @@ const AnalysisAnalytesConfig: React.FC = () => {
               ),
               endAdornment: searchTerm && (
                 <InputAdornment position="end">
-                  <IconButton size="small" onClick={() => setSearchTerm('')}>
+                  <IconButton size="small" onClick={() => setSearchTerm('')} aria-label="Clear search">
                     <Clear />
                   </IconButton>
                 </InputAdornment>

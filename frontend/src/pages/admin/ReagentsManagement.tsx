@@ -224,7 +224,7 @@ const ReagentsManagement: React.FC = () => {
       );
     }
     if (f.type === 'vendor' || f.type === 'reagent' || f.type === 'source' || f.type === 'choice') {
-      const pool =
+      const pool: Row[] =
         f.type === 'choice'
           ? (f.choices || []).map((c) => ({ id: c, name: c, active: true }))
           : f.type === 'vendor'

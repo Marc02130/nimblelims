@@ -7,7 +7,11 @@ import { UserProvider } from '../contexts/UserContext';
 
 // Mock the API service
 jest.mock('../services/apiService', () => ({
+  // Real helpers (ApiService.formatError, addClientFilterIfNeeded, types); only the client is mocked.
+  ...jest.requireActual('../services/apiService'),
   apiService: {
+    // UserProvider probes the cookie session on mount (P4/S10). Plain fn: survives resetMocks.
+    getCurrentUser: () => Promise.reject(new Error('no session')),
     getTestBatteries: jest.fn(),
     getTestBattery: jest.fn(),
     createTestBattery: jest.fn(),
@@ -64,6 +68,15 @@ const renderWithProviders = (
   component: React.ReactElement,
   user = mockAdminUser
 ) => {
+  // The session probe is rejected in tests, so supply the user through useUser.
+  jest.spyOn(require('../contexts/UserContext'), 'useUser').mockReturnValue({
+    user,
+    loading: false,
+    login: jest.fn(),
+    logout: jest.fn(),
+    hasPermission: (permission: string) => user.permissions.includes(permission),
+  });
+
   return render(
     <BrowserRouter>
       <ThemeProvider theme={theme}>
@@ -176,9 +189,17 @@ describe('TestBatteriesManagement', () => {
     
     renderWithProviders(<TestBatteriesManagement />);
     
-    await waitFor(() => {
-      expect(screen.getByText(/Failed to load test batteries/i)).toBeInTheDocument();
-    });
+    // The server's detail is shown when present.
+    expect(await screen.findByText('Server error')).toBeInTheDocument();
+  });
+
+  it('shows fallback error message when the failure has no detail', async () => {
+    const { apiService } = require('../services/apiService');
+    apiService.getTestBatteries.mockRejectedValue({ response: { status: 500 } });
+
+    renderWithProviders(<TestBatteriesManagement />);
+
+    expect(await screen.findByText(/Failed to load test batteries/i)).toBeInTheDocument();
   });
 
   it('shows permission error for unauthorized users', async () => {

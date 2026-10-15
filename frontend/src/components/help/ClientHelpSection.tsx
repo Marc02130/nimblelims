@@ -55,8 +55,15 @@ const ClientHelpSection: React.FC = () => {
 
   if (loading) {
     return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight={200}>
-        <CircularProgress />
+      <Box
+        display="flex"
+        justifyContent="center"
+        alignItems="center"
+        minHeight={200}
+        aria-live="polite"
+        aria-label="Loading help content"
+      >
+        <CircularProgress aria-label="Loading" />
       </Box>
     );
   }

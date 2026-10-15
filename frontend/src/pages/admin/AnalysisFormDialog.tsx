@@ -150,8 +150,9 @@ const AnalysisFormDialog: React.FC<AnalysisFormDialogProps> = ({
         name: values.name,
         description: values.description || undefined,
         method: values.method || undefined,
-        turnaround_time: values.turnaround_time || undefined,
-        cost: values.cost || undefined,
+        // ?? not ||: a cost of 0 is valid (validation allows >= 0) and must be sent.
+        turnaround_time: values.turnaround_time ?? undefined,
+        cost: values.cost ?? undefined,
         analyte_ids: selectedAnalyteIds,
       });
       onClose();

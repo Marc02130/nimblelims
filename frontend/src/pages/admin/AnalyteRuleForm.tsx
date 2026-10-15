@@ -76,8 +76,10 @@ const createValidationSchema = (isEdit: boolean) => Yup.object({
   default_value: Yup.string().max(255, 'Default value must be less than 255 characters').nullable(),
 }).test('low-high-range', 'Low value must be less than or equal to high value', function (values) {
   const { low_value, high_value } = values;
-  if (low_value !== null && low_value !== undefined && high_value !== null && high_value !== undefined) {
-    return low_value <= high_value;
+  if (low_value !== null && low_value !== undefined && high_value !== null && high_value !== undefined
+      && low_value > high_value) {
+    // Attach the error to low_value: an object-level error has no field and was never shown.
+    return this.createError({ path: 'low_value', message: 'Low value must be less than or equal to high value' });
   }
   return true;
 });
@@ -120,9 +122,10 @@ const AnalyteRuleForm: React.FC<AnalyteRuleFormProps> = ({
     analyte_id: rule?.analyte_id || '',
     data_type: rule?.data_type || '',
     list_id: rule?.list_id || '',
-    high_value: rule?.high_value || null,
-    low_value: rule?.low_value || null,
-    significant_figures: rule?.significant_figures || null,
+    // ?? not ||: a limit of 0 (e.g. pH low 0) is a real value and must survive editing.
+    high_value: rule?.high_value ?? null,
+    low_value: rule?.low_value ?? null,
+    significant_figures: rule?.significant_figures ?? null,
     calculation: rule?.calculation || '',
     reported_name: rule?.reported_name || '',
     is_required: rule?.is_required || false,
@@ -204,8 +207,10 @@ const AnalyteRuleForm: React.FC<AnalyteRuleFormProps> = ({
                 <Grid container spacing={2} sx={{ mt: 0 }}>
                   <Grid size={12}>
                     <FormControl fullWidth required={!isEdit} margin="normal" disabled={isEdit}>
-                      <InputLabel>Analyte</InputLabel>
+                      <InputLabel id="analyte-rule-analyte-label">Analyte</InputLabel>
                       <Select
+                        labelId="analyte-rule-analyte-label"
+                        label="Analyte"
                         value={values.analyte_id}
                         onChange={(e) => setFieldValue('analyte_id', e.target.value)}
                         error={touched.analyte_id && !!errors.analyte_id}
@@ -226,8 +231,10 @@ const AnalyteRuleForm: React.FC<AnalyteRuleFormProps> = ({
 
                   <Grid size={{ xs: 12, sm: 6 }}>
                     <FormControl fullWidth margin="normal">
-                      <InputLabel>Data Type</InputLabel>
+                      <InputLabel id="analyte-rule-data-type-label">Data Type</InputLabel>
                       <Select
+                        labelId="analyte-rule-data-type-label"
+                        label="Data Type"
                         value={values.data_type || ''}
                         onChange={(e) => setFieldValue('data_type', e.target.value || null)}
                       >

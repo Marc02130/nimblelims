@@ -31,14 +31,15 @@ const renderWithProviders = (component: React.ReactElement) => {
 };
 
 describe('App', () => {
-  test('renders login when user is not authenticated', () => {
+  test('renders login when user is not authenticated', async () => {
     // Mock no user
     const { apiService } = require('./services/apiService');
     apiService.getCurrentUser.mockRejectedValue(new Error('Not authenticated'));
     
     renderWithProviders(<App />);
     
-    expect(screen.getByText('LIMS Login')).toBeInTheDocument();
+    // The cookie-session probe (/auth/me) settles first, then the login page shows.
+    expect(await screen.findByText('LIMS Login')).toBeInTheDocument();
   });
 
   test('renders dashboard when user is authenticated', async () => {
@@ -54,7 +55,7 @@ describe('App', () => {
     
     renderWithProviders(<App />);
     
-    await screen.findByText('Dashboard');
-    expect(screen.getByText('Dashboard')).toBeInTheDocument();
+    // "Dashboard" is both the page heading and a sidebar item.
+    expect(await screen.findByRole('heading', { name: 'Dashboard' })).toBeInTheDocument();
   });
 });

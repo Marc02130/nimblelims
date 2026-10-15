@@ -80,6 +80,7 @@ interface Sample {
 interface Test {
   id: string;
   sample_id: string;
+  analysis_id?: string;
   custom_attributes?: Record<string, any>;
 }
 
@@ -122,8 +123,14 @@ const ResultsEntryTable: React.FC<ResultsEntryTableProps> = ({
     loadAnalytes();
     loadQualifiers();
     loadCustomAttributeConfigs();
-    initializeResults();
   }, [testId, samples]);
+
+  // Build the result rows once analytes have loaded. This used to run in the effect above,
+  // before loadAnalytes resolved, so results stayed empty and typed values were dropped.
+  useEffect(() => {
+    initializeResults();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [analytes, samples, testId]);
 
   useEffect(() => {
     if (!canExecuteWorkflow) return;
@@ -150,7 +157,8 @@ const ResultsEntryTable: React.FC<ResultsEntryTableProps> = ({
   const loadAnalytes = async () => {
     try {
       setLoading(true);
-      const data = await apiService.getAnalysisAnalytes(testId);
+      // Analytes belong to the test's analysis; the endpoint takes an analysis id, not a test id.
+      const data = await apiService.getAnalysisAnalytes(test?.analysis_id ?? testId);
       setAnalytes(data.sort((a: Analyte, b: Analyte) => a.display_order - b.display_order));
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Failed to load analytes');
@@ -169,19 +177,16 @@ const ResultsEntryTable: React.FC<ResultsEntryTableProps> = ({
   };
 
   const initializeResults = () => {
-    const initialResults: Result[] = [];
-    samples.forEach(sample => {
-      analytes.forEach(analyte => {
-        initialResults.push({
-          test_id: testId,
-          analyte_id: analyte.id,
-          raw_result: analyte.default_value || '',
-          reported_result: '',
-          qualifiers: '',
-          calculated_result: '',
-        });
-      });
-    });
+    // One test has one result per analyte. (Looping over samples too created duplicate
+    // rows per analyte, and every duplicate was submitted.)
+    const initialResults: Result[] = analytes.map(analyte => ({
+      test_id: testId,
+      analyte_id: analyte.id,
+      raw_result: analyte.default_value || '',
+      reported_result: '',
+      qualifiers: '',
+      calculated_result: '',
+    }));
     setResults(initialResults);
   };
 
@@ -244,17 +249,28 @@ const ResultsEntryTable: React.FC<ResultsEntryTableProps> = ({
         return;
       }
 
+      // POST /results/batch expects {batch_id, results: [{test_id, analyte_results}]} (US-28).
+      // The old flat {batch_id, test_id, results} body did not match and was rejected (422).
       const resultsData = {
         batch_id: batchId,
-        test_id: testId,
-        results: results.map(result => ({
-          ...result,
-          entry_date: new Date().toISOString(),
-        })),
+        results: [
+          {
+            test_id: testId,
+            analyte_results: results
+              .filter(result => result.raw_result || result.reported_result)
+              .map(result => ({
+                analyte_id: result.analyte_id,
+                raw_result: result.raw_result || null,
+                reported_result: result.reported_result || null,
+                qualifiers: result.qualifiers || null,
+              })),
+          },
+        ],
       };
 
       const savedResults = await apiService.enterBatchResults(batchId, resultsData);
-      setResults(savedResults);
+      // Keep the entered rows: the response is not a Result[] (it can be an object or empty),
+      // and replacing state with it broke the table (results.find on a non-array).
       onResultsSaved(savedResults);
       setSuccess('Results saved successfully');
     } catch (err: any) {
@@ -505,8 +521,10 @@ const ResultsEntryTable: React.FC<ResultsEntryTableProps> = ({
                                 sx={{ mt: 1 }}
                               />
                               <FormControl fullWidth size="small" sx={{ mt: 1 }}>
-                                <InputLabel>Qualifiers</InputLabel>
+                                <InputLabel id={`qualifiers-label-${sample.id}-${analyte.id}`}>Qualifiers</InputLabel>
                                 <Select
+                                  labelId={`qualifiers-label-${sample.id}-${analyte.id}`}
+                                  label="Qualifiers"
                                   value={result?.qualifiers || ''}
                                   onChange={(e) => handleResultChange(sample.id, analyte.id, 'qualifiers', e.target.value)}
                                 >
