@@ -235,7 +235,7 @@ def register_catalog(db, user: User) -> None:
     UiSchemaService(db, user).ensure_catalog()
 
 
-async def execute_step(db, user: User, method: str, path: str, body: Any) -> list[AppliedChange]:
+def execute_step(db, user: User, method: str, path: str, body: Any) -> list[AppliedChange]:
     if is_drop_or_delete(method, path):
         raise CannotExpress("Drop and delete are never applied by the configuring agent.")
     from app.services.configuring_agent_catalog import (
@@ -284,32 +284,32 @@ async def execute_step(db, user: User, method: str, path: str, body: Any) -> lis
             # G5: the target already has these values. No call, no write.
             return [AppliedChange(classified.kind or "other", str(path), None, noop=True)]
     try:
-        return await _dispatch(db, user, method.upper(), path, body, classified.kind or "other")
+        return _dispatch(db, user, method.upper(), path, body, classified.kind or "other")
     except ValidationError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
-async def _dispatch(db, user: User, method: str, path: str, body: dict, kind: str) -> list[AppliedChange]:
+def _dispatch(db, user: User, method: str, path: str, body: dict, kind: str) -> list[AppliedChange]:
     if path == "/roles" or path.startswith("/roles/"):
-        return await _roles(db, user, method, path, body)
+        return _roles(db, user, method, path, body)
     if path.startswith("/v1/schema/"):
         return _schema(db, user, method, path, body, kind)
     if path == "/lists" or path.startswith("/lists/"):
-        return await _lists(db, user, method, path, body, kind)
+        return _lists(db, user, method, path, body, kind)
     if path.startswith("/v1/experiment-templates"):
         return _templates(db, user, method, path, body)
     if path == "/containers/types":
-        return await _container_type(db, user, body)
+        return _container_type(db, user, body)
     if path == "/analyses" or path == "/analytes" or re.match(r"^/analyses/[^/]+/analytes$", path):
-        return await _analyses(db, user, path, body)
+        return _analyses(db, user, path, body)
     if path == "/v1/sample-type-transitions":
         return _transition(db, user, body)
     if path in ("/v1/vendors", "/v1/reagents", "/v1/reagent-vendors"):
-        return await _reagent_catalog(db, user, path, body)
+        return _reagent_catalog(db, user, path, body)
     if path.startswith("/users/"):
-        return await _user_role(db, user, path, body)
+        return _user_role(db, user, path, body)
     if re.match(r"^/containers/[^/]+/contents/[^/]+$", path):
-        return await _contents_amount_zero(db, user, path, body)
+        return _contents_amount_zero(db, user, path, body)
     raise CannotExpress(f"No configuration API matches {method} {path}.")
 
 
@@ -376,23 +376,23 @@ def _schema(db, user: User, method: str, path: str, body: dict, kind: str) -> li
     raise CannotExpress(f"No configuration API matches {method} {path}.")
 
 
-async def _lists(db, user, method: str, path: str, body: dict, kind: str) -> list[AppliedChange]:
+def _lists(db, user, method: str, path: str, body: dict, kind: str) -> list[AppliedChange]:
     from app.routers.lists import create_list, create_list_entry, update_list, update_list_entry
     from app.schemas.list import ListCreate, ListEntryCreate, ListEntryUpdate, ListUpdate
 
     if method == "POST" and path == "/lists":
-        created = await create_list(ListCreate.model_validate(body), user, db)
+        created = create_list(ListCreate.model_validate(body), user, db)
         return [AppliedChange("list", created.name, created.id)]
     entry = re.match(r"^/lists/([^/]+)/entries$", path)
     if method == "POST" and entry:
-        created = await create_list_entry(entry.group(1), ListEntryCreate.model_validate(body), user, db)
+        created = create_list_entry(entry.group(1), ListEntryCreate.model_validate(body), user, db)
         return [AppliedChange("list_entry", created.name, created.id)]
     if method == "PATCH" and re.match(r"^/lists/[^/]+$", path):
-        updated = await update_list(_uuid_from_path(path), ListUpdate.model_validate(body), user, db)
+        updated = update_list(_uuid_from_path(path), ListUpdate.model_validate(body), user, db)
         return [AppliedChange("list", updated.name, updated.id)]
     entry_one = re.match(r"^/lists/([^/]+)/entries/([^/]+)$", path)
     if entry_one and method == "PATCH":
-        updated = await update_list_entry(
+        updated = update_list_entry(
             entry_one.group(1), UUID(entry_one.group(2)), ListEntryUpdate.model_validate(body), user, db
         )
         return [AppliedChange("list_entry", updated.name, updated.id)]
@@ -411,7 +411,7 @@ def _templates(db, user, method: str, path: str, body: dict) -> list[AppliedChan
     return [AppliedChange("experiment_template", updated.name, updated.id)]
 
 
-async def _analyses(db, user, path: str, body: dict) -> list[AppliedChange]:
+def _analyses(db, user, path: str, body: dict) -> list[AppliedChange]:
     """Analysis, analyte, and the analysis-analyte link, through their routers."""
     from app.routers.analyses import create_analysis, link_analytes_to_analysis
     from app.routers.analytes import create_analyte
@@ -419,28 +419,28 @@ async def _analyses(db, user, path: str, body: dict) -> list[AppliedChange]:
     from app.schemas.analyte import AnalyteCreate
 
     if path == "/analyses":
-        created = await create_analysis(AnalysisCreate.model_validate(body), user, db)
+        created = create_analysis(AnalysisCreate.model_validate(body), user, db)
         return [AppliedChange("analysis", created.name, created.id)]
     if path == "/analytes":
-        created = await create_analyte(AnalyteCreate.model_validate(body), user, db)
+        created = create_analyte(AnalyteCreate.model_validate(body), user, db)
         return [AppliedChange("analyte", created.name, created.id)]
     try:
         analysis_id = UUID(path.split("/")[2])
     except ValueError as exc:
         raise HTTPException(status_code=404, detail="Analysis not found") from exc
-    linked = await link_analytes_to_analysis(analysis_id, AnalyteLinkRequest.model_validate(body), user, db)
+    linked = link_analytes_to_analysis(analysis_id, AnalyteLinkRequest.model_validate(body), user, db)
     return [AppliedChange("analysis_analytes", ", ".join(a.name for a in linked) or "analytes", analysis_id)]
 
 
-async def _container_type(db, user, body: dict) -> list[AppliedChange]:
+def _container_type(db, user, body: dict) -> list[AppliedChange]:
     from app.routers.containers import create_container_type
     from app.schemas.container import ContainerTypeCreate
 
-    created = await create_container_type(ContainerTypeCreate.model_validate(body), user, db)
+    created = create_container_type(ContainerTypeCreate.model_validate(body), user, db)
     return [AppliedChange("container_type", created.name, created.id)]
 
 
-async def _reagent_catalog(db, user, path: str, body: dict) -> list[AppliedChange]:
+def _reagent_catalog(db, user, path: str, body: dict) -> list[AppliedChange]:
     from app.routers.reagents import create_reagent, create_reagent_vendor, create_vendor
     from app.schemas.reagent import ReagentCreate, ReagentVendorCreate, VendorCreate
 
@@ -463,15 +463,15 @@ def _transition(db, user, body: dict) -> list[AppliedChange]:
     return [AppliedChange("sample_type_transition", name, created.id)]
 
 
-async def _user_role(db, user, path: str, body: dict) -> list[AppliedChange]:
+def _user_role(db, user, path: str, body: dict) -> list[AppliedChange]:
     from app.routers.users import update_user
     from app.schemas.user import UserUpdate
 
-    updated = await update_user(_uuid_from_path(path), UserUpdate.model_validate(body), user, db)
+    updated = update_user(_uuid_from_path(path), UserUpdate.model_validate(body), user, db)
     return [AppliedChange("user_role", updated.name, updated.id)]
 
 
-async def _contents_amount_zero(db, user, path: str, body: dict) -> list[AppliedChange]:
+def _contents_amount_zero(db, user, path: str, body: dict) -> list[AppliedChange]:
     """Container retire: PATCH contents amount to 0. Nothing is deleted."""
     from app.routers.containers import update_container_contents
     from app.schemas.container import ContentsUpdate
@@ -480,11 +480,11 @@ async def _contents_amount_zero(db, user, path: str, body: dict) -> list[Applied
     container_id, sample_id = UUID(parts[1]), UUID(parts[3])
     if (body or {}).get("amount") not in (0, 0.0) or set(body or {}) != {"amount"}:
         raise CannotExpress("The only container change this run makes is Amount \u2192 0.")
-    await update_container_contents(container_id, sample_id, ContentsUpdate(amount=0), user, db)
+    update_container_contents(container_id, sample_id, ContentsUpdate(amount=0), user, db)
     return [AppliedChange("contents_amount", f"{container_id}/{sample_id}", container_id)]
 
 
-async def _roles(db, user, method: str, path: str, body: dict) -> list[AppliedChange]:
+def _roles(db, user, method: str, path: str, body: dict) -> list[AppliedChange]:
     from app.routers.roles import update_role_permissions
     from app.schemas.user import RolePermissionsUpdate
 
@@ -500,5 +500,5 @@ async def _roles(db, user, method: str, path: str, body: dict) -> list[AppliedCh
         raise CannotExpress("Lab personnel input does not grant schema:edit.")
     role = db.query(Role).filter(Role.id == role_id).first()
     label = role.name if role else str(role_id)
-    await update_role_permissions(role_id, data, user, db)
+    update_role_permissions(role_id, data, user, db)
     return [AppliedChange("role_permissions", label, role_id)]
