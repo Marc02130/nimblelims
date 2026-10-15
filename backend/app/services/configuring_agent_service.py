@@ -719,9 +719,12 @@ def run_in_background(pending: PendingRun, session_factory=None) -> None:
     factory = session_factory or BACKGROUND_SESSION_FACTORY
     owned = factory is None
     db = SessionLocal() if owned else factory()
+    # Same RLS context as the starting request, whatever the session source
+    # (tests inject a factory; production uses SessionLocal).
+    previous = {k: db.info.get(k) for k in ("rls_user_id", "rls_client_id")}
     try:
-        if owned:
-            set_rls_context(db, user_id=str(pending.user_id), client_id=str(pending.client_id))
+        set_rls_context(db, user_id=str(pending.user_id),
+                        client_id=str(pending.client_id) if pending.client_id else None)
         user = db.query(User).filter(User.id == pending.user_id).one()
         try:
             finish_run(db, user, pending, raise_errors=False)
@@ -744,6 +747,12 @@ def run_in_background(pending: PendingRun, session_factory=None) -> None:
     finally:
         if owned:
             db.close()
+        else:
+            for key, value in previous.items():
+                if value is None:
+                    db.info.pop(key, None)
+                else:
+                    db.info[key] = value
 
 
 STALE_MESSAGE = "The model call did not finish. Start a new run."

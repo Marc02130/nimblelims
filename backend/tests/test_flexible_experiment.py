@@ -549,6 +549,7 @@ class TestSopParseJobs:
                 job_id=job_id,
                 sop_text=MOCK_SOP_TEXT,
                 instrument_text=MOCK_INSTRUMENT_TEXT,
+                user_id=uuid4(),  # superuser engine: any RLS user context
             )
 
         # Re-read from DB after task completion
@@ -587,6 +588,7 @@ class TestSopParseJobs:
                 job_id=job_id,
                 sop_text=MOCK_SOP_TEXT,
                 instrument_text=MOCK_INSTRUMENT_TEXT,
+                user_id=uuid4(),  # superuser engine: any RLS user context
             )
 
         Session = self._make_session_factory(db_engine)
@@ -622,6 +624,7 @@ class TestSopParseJobs:
                 job_id=job_id,
                 sop_text=MOCK_SOP_TEXT,
                 instrument_text=MOCK_INSTRUMENT_TEXT,
+                user_id=uuid4(),  # superuser engine: any RLS user context
             )
 
         Session = self._make_session_factory(db_engine)

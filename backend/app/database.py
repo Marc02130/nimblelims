@@ -4,6 +4,9 @@ Database configuration and session management
 from __future__ import annotations
 
 from typing import Optional
+from contextlib import contextmanager
+from typing import Iterator
+
 from sqlalchemy import create_engine, event, text
 from sqlalchemy.orm import sessionmaker, Session
 import os
@@ -113,6 +116,32 @@ def set_rls_context(
             {"v": str(client_id)},
         )
     db.flush()
+
+
+class MissingRlsContext(RuntimeError):
+    """A background session was asked for without the originating user."""
+
+
+@contextmanager
+def background_session(user_id, client_id=None, session_factory=None) -> Iterator[Session]:
+    """A session for work outside the request (background task, thread) that
+    carries the originating request's RLS context (user and client).
+
+    Capture user_id/client_id at request time and pass them in. Without a user
+    this fails closed: under RLS a contextless session sees no client rows, so
+    work would silently do nothing, or worse, run unscoped as a superuser.
+    The after_begin hook re-applies the context after every commit.
+    """
+    if not user_id:
+        raise MissingRlsContext("background session needs the originating user_id")
+    db = (session_factory or SessionLocal)()
+    try:
+        set_rls_context(db, user_id=str(user_id), client_id=str(client_id) if client_id else None)
+        yield db
+    finally:
+        db.info.pop("rls_user_id", None)
+        db.info.pop("rls_client_id", None)
+        db.close()
 
 
 def get_db():
