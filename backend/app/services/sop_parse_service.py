@@ -68,8 +68,9 @@ class NoProviderKey(Exception):
 def resolve_sop_parse_llm(settings) -> tuple[str, str, str]:
     """(provider, model, key) for SOP parse.
 
-    1. Configuring-agent settings with a provider and model: that provider and
-       model, with its stored key or its env var (never another vendor).
+    1. Configuring-agent settings with a provider: that provider only, with its
+       stored key or its own env var. Never another vendor's key. Model: the
+       stored model, else SOP_PARSE_MODEL, else DEFAULT_MODELS[provider].
     2. Else SOP_PARSE_PROVIDER if set, else the first of ENV_PROVIDER_ORDER
        whose env key is set. Model: SOP_PARSE_MODEL, else DEFAULT_MODELS.
     No key: NoProviderKey with a message naming the variables.
@@ -78,11 +79,18 @@ def resolve_sop_parse_llm(settings) -> tuple[str, str, str]:
 
     provider = getattr(settings, "agent_provider", None) if settings is not None else None
     model = getattr(settings, "agent_model", None) if settings is not None else None
-    if provider and model:
+    if provider:
+        if provider not in ENV_KEY_NAMES:
+            raise NoProviderKey(f"Configuring agent provider {provider!r} is not one of anthropic, openai, or xai.")
         try:
-            return provider, model, resolve_provider_key(provider, settings.key_ciphertext)
+            key = resolve_provider_key(provider, settings.key_ciphertext)
         except MissingProviderKey as exc:
-            raise NoProviderKey(f"{exc} {NO_KEY_MESSAGE}") from exc
+            raise NoProviderKey(
+                f"No key configured for {provider}. Set it under Configuring agent settings "
+                f"or set {exc.env_name} on the backend. SOP parse will not use another provider's key."
+            ) from exc
+        model = model or (os.getenv("SOP_PARSE_MODEL") or "").strip() or DEFAULT_MODELS[provider]
+        return provider, model, key
 
     wanted = (os.getenv("SOP_PARSE_PROVIDER") or "").strip().lower()
     order = (wanted,) if wanted else ENV_PROVIDER_ORDER

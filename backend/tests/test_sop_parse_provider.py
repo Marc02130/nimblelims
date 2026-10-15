@@ -76,9 +76,25 @@ def test_env_order_and_overrides(clean_env):
     assert sps.resolve_sop_parse_llm(None) == ("xai", "grok-custom", "x")
 
 
-def test_settings_without_model_fall_back_to_env(clean_env):
+def test_settings_provider_without_model_uses_that_provider_default(clean_env):
+    clean_env.setenv("OPENAI_API_KEY", "o")
     clean_env.setenv("XAI_API_KEY", "x")
-    assert sps.resolve_sop_parse_llm(_settings("openai", None))[0] == "xai"
+    assert sps.resolve_sop_parse_llm(_settings("openai", None)) == ("openai", sps.DEFAULT_MODELS["openai"], "o")
+
+
+@pytest.mark.parametrize("provider", ["anthropic", "openai", "xai"])
+@pytest.mark.parametrize("model", [None, "m-1"])
+def test_configured_provider_never_falls_through_to_another_env_key(clean_env, provider, model):
+    """UAT 9d0108f: provider set, key cleared, model null fell through to XAI_API_KEY."""
+    for p, name in ENV.items():
+        if p != provider:
+            clean_env.setenv(name, f"env-{p}")
+    with pytest.raises(sps.NoProviderKey) as exc:
+        sps.resolve_sop_parse_llm(_settings(provider, model))
+    msg = str(exc.value)
+    assert msg.startswith(f"No key configured for {provider}.")
+    assert ENV[provider] in msg
+    assert "env-" not in msg
 
 
 # ── no key ───────────────────────────────────────────────────────────────────

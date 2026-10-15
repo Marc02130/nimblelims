@@ -95,7 +95,7 @@ def test_key_round_trip_and_no_other_vendor(monkeypatch):
     row = SimpleNamespace(key_ciphertext=token, agent_model="grok", agent_provider="xai")
     clear_stored_key(row)
     assert row.key_ciphertext is None
-    assert row.agent_model is None
+    assert row.agent_model == "grok"  # only the key is cleared
     assert row.agent_provider == "xai"
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     monkeypatch.setenv("XAI_API_KEY", "not-for-openai")

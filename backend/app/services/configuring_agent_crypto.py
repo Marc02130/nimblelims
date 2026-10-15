@@ -44,9 +44,8 @@ def decrypt_secret(token: str) -> str:
 
 
 def clear_stored_key(settings) -> None:
-    """Clearing the key also clears the model. The provider stays."""
+    """Clears only the key. The provider and model stay (UAT 9d0108f)."""
     settings.key_ciphertext = None
-    settings.agent_model = None
 
 
 def resolve_provider_key(provider: str, stored_ciphertext: str | None) -> str:
