@@ -2414,7 +2414,7 @@ Gate: `config:edit`. Missing permission: **403** `You can't change configuring-a
 
 Settings row name `Configuring agent`, fixed id. Key ciphertext is never returned. `key_set` is a boolean. Changing `provider` clears the stored key and, unless `model` is sent in that same save, the model. `DELETE` of the key clears only the key; `agent_provider` and `agent_model` stay.
 
-`GET /v1/configuring-agent/models?provider=openai|xai|anthropic` calls that provider only. A missing key names `OPENAI_API_KEY`, `XAI_API_KEY`, or `ANTHROPIC_API_KEY`. No other vendor is tried.
+`GET /v1/configuring-agent/models?provider=openai|xai|anthropic` calls that provider only. A missing key fails with "No key configured for <provider>" and names `OPENAI_API_KEY`, `XAI_API_KEY`, or `ANTHROPIC_API_KEY`. No other vendor is tried.
 
 Configurations are unique per client by name. Each has an id. Documents and chunks belong to the configuration. Chunks are `vector(384)` from local MiniLM (ragged). The document response does not include file text. Document upload accepts PDF (text extracted), DOCX, TXT, CSV, MD, or JSON; `file_type` is `pdf`, `docx`, or `txt`. Other binary files get **415**; a file with no text gets **400**.
 

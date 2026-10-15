@@ -11,7 +11,11 @@ jest.mock('@mui/x-data-grid', () => ({
 import WorkOrders from '../pages/WorkOrders';
 
 jest.mock('../services/apiService', () => ({
+  // Real helpers (ApiService.formatError, addClientFilterIfNeeded, types); only the client is mocked.
+  ...jest.requireActual('../services/apiService'),
   apiService: {
+    // UserProvider probes the cookie session on mount (P4/S10). Plain fn: survives resetMocks.
+    getCurrentUser: () => Promise.reject(new Error('no session')),
     getWorkOrders: jest.fn().mockResolvedValue({ items: [], count: 0 }),
     startWorkOrder: jest.fn(),
   },

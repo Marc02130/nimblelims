@@ -7,6 +7,8 @@ import { UserProvider } from '../contexts/UserContext';
 
 // Mock the API service
 jest.mock('../services/apiService', () => ({
+  // Real helpers (ApiService.formatError, addClientFilterIfNeeded, types); only the client is mocked.
+  ...jest.requireActual('../services/apiService'),
   apiService: {
     getCurrentUser: jest.fn(),
     setAuthToken: jest.fn(),
@@ -54,7 +56,8 @@ const createMockUser = (permissions: string[] = [], role: string = 'Lab Technici
   loading: false,
   login: jest.fn(),
   logout: jest.fn(),
-  hasPermission: jest.fn((perm: string) => permissions.includes(perm) || role === 'Administrator'),
+  // Plain function, not jest.fn: CRA's resetMocks would wipe the implementation.
+  hasPermission: ((perm: string) => permissions.includes(perm) || role === 'Administrator'),
 });
 
 // Mock UserContext
@@ -66,10 +69,15 @@ jest.mock('../contexts/UserContext', () => {
   };
 });
 
+// The logged-out case passes user: null.
+type MockUserContext = Omit<ReturnType<typeof createMockUser>, 'user'> & {
+  user: ReturnType<typeof createMockUser>['user'] | null;
+};
+
 const renderWithProviders = (
   component: React.ReactElement,
   initialEntries: string[] = ['/dashboard'],
-  mockUser = createMockUser(['sample:create', 'sample:update', 'batch:manage', 'result:enter', 'project:manage', 'config:edit'])
+  mockUser: MockUserContext = createMockUser(['sample:create', 'sample:update', 'batch:manage', 'result:enter', 'project:manage', 'config:edit'])
 ) => {
   const { useUser } = require('../contexts/UserContext');
   useUser.mockReturnValue(mockUser);
@@ -313,8 +321,10 @@ describe('MainLayout', () => {
         </MainLayout>
       );
 
-      const menuButton = screen.queryByLabelText('open drawer');
-      expect(menuButton).not.toBeInTheDocument();
+      // The hamburger stays in the DOM and is hidden by a CSS breakpoint
+      // (display: { sm: 'none' }), which jsdom does not apply. On desktop the
+      // collapse-sidebar toggle is rendered instead.
+      expect(screen.getByLabelText('Collapse sidebar')).toBeInTheDocument();
     });
 
     test('hides user info text on mobile', () => {

@@ -162,8 +162,10 @@ const AliquotForm: React.FC<AliquotFormProps> = ({ parentSampleId, onSuccess, on
 
               <Grid size={{ xs: 12, sm: 6 }}>
                 <FormControl fullWidth required>
-                  <InputLabel>Sample Type</InputLabel>
+                  <InputLabel id="aliquot-sample-type-label">Sample Type</InputLabel>
                   <Select
+                    labelId="aliquot-sample-type-label"
+                    label="Sample Type"
                     value={formData.sample_type}
                     onChange={(e) => handleInputChange('sample_type', e.target.value)}
                   >
@@ -178,8 +180,10 @@ const AliquotForm: React.FC<AliquotFormProps> = ({ parentSampleId, onSuccess, on
 
               <Grid size={{ xs: 12, sm: 6 }}>
                 <FormControl fullWidth required>
-                  <InputLabel>Matrix</InputLabel>
+                  <InputLabel id="aliquot-matrix-label">Matrix</InputLabel>
                   <Select
+                    labelId="aliquot-matrix-label"
+                    label="Matrix"
                     value={formData.matrix}
                     onChange={(e) => handleInputChange('matrix', e.target.value)}
                   >
@@ -219,8 +223,10 @@ const AliquotForm: React.FC<AliquotFormProps> = ({ parentSampleId, onSuccess, on
 
               <Grid size={{ xs: 12, sm: 6 }}>
                 <FormControl fullWidth required>
-                  <InputLabel>Container Type</InputLabel>
+                  <InputLabel id="aliquot-container-type-label">Container Type</InputLabel>
                   <Select
+                    labelId="aliquot-container-type-label"
+                    label="Container Type"
                     value={formData.container_type}
                     onChange={(e) => handleInputChange('container_type', e.target.value)}
                   >
@@ -245,8 +251,10 @@ const AliquotForm: React.FC<AliquotFormProps> = ({ parentSampleId, onSuccess, on
 
               <Grid size={{ xs: 12, sm: 3 }}>
                 <FormControl fullWidth>
-                  <InputLabel>Concentration Units</InputLabel>
+                  <InputLabel id="aliquot-concentration-units-label">Concentration Units</InputLabel>
                   <Select
+                    labelId="aliquot-concentration-units-label"
+                    label="Concentration Units"
                     value={formData.concentration_units}
                     onChange={(e) => handleInputChange('concentration_units', e.target.value)}
                   >
@@ -271,8 +279,10 @@ const AliquotForm: React.FC<AliquotFormProps> = ({ parentSampleId, onSuccess, on
 
               <Grid size={{ xs: 12, sm: 3 }}>
                 <FormControl fullWidth>
-                  <InputLabel>Amount Units</InputLabel>
+                  <InputLabel id="aliquot-amount-units-label">Amount Units</InputLabel>
                   <Select
+                    labelId="aliquot-amount-units-label"
+                    label="Amount Units"
                     value={formData.amount_units}
                     onChange={(e) => handleInputChange('amount_units', e.target.value)}
                   >

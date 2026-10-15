@@ -5,7 +5,11 @@ import ConfiguringAgentRun, { dependencyProblem, diffText, includedRows, stopped
 import { apiService } from '../services/apiService';
 
 jest.mock('../services/apiService', () => ({
+  // Real helpers (ApiService.formatError, addClientFilterIfNeeded, types); only the client is mocked.
+  ...jest.requireActual('../services/apiService'),
   apiService: {
+    // UserProvider probes the cookie session on mount (P4/S10). Plain fn: survives resetMocks.
+    getCurrentUser: () => Promise.reject(new Error('no session')),
     getConfigurations: jest.fn(),
     createConfiguration: jest.fn(),
     uploadConfigurationDocument: jest.fn(),
@@ -44,7 +48,7 @@ const runWith = (steps: ReturnType<typeof step>[]) => ({
   configuration_id: 'c1',
   status: 'proposing',
   goal_note: null,
-  banner: null,
+  banner: null as string | null,
   error_message: null,
   applied_count: 0,
   skipped_count: 0,

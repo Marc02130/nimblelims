@@ -217,7 +217,7 @@ const UnitFormDialog: React.FC<UnitFormDialogProps> = ({
 
                   <Grid size={{ xs: 12, sm: 6 }}>
                     <Field name="multiplier">
-                      {({ field, meta }: any) => (
+                      {({ field, meta, form }: any) => (
                         <TextField
                           {...field}
                           label="Multiplier"
@@ -232,7 +232,9 @@ const UnitFormDialog: React.FC<UnitFormDialogProps> = ({
                           value={lockAtOne ? 1 : (field.value ?? '')}
                           onChange={(e) => {
                             const value = e.target.value === '' ? null : parseFloat(e.target.value);
-                            field.onChange({ target: { value } });
+                            // field.onChange needs an event with target.name; without it Formik
+                            // ignored the change, so edits to this field were silently dropped.
+                            form.setFieldValue(field.name, value);
                           }}
                         />
                       )}

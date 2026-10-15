@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent, within } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import ClientProjects from '../pages/ClientProjects';
 import { apiService } from '../services/apiService';
@@ -18,7 +18,8 @@ const mockUser = {
   email: 'test@example.com',
   role: 'Administrator',
   permissions: ['project:manage', 'sample:read'],
-  hasPermission: jest.fn((perm: string) => {
+  // Plain function, not jest.fn: CRA's resetMocks would wipe the implementation.
+  hasPermission: ((perm: string) => {
     return ['project:manage', 'sample:read'].includes(perm);
   }),
 };
@@ -109,12 +110,12 @@ describe('ClientProjects', () => {
   it('opens create form when create button is clicked', async () => {
     renderComponent();
 
-    const createButton = screen.getByText('Create Client Project');
+    const createButton = screen.getByRole('button', { name: 'Create Client Project' });
     fireEvent.click(createButton);
 
-    await waitFor(() => {
-      expect(screen.getByText('Create Client Project')).toBeInTheDocument();
-    });
+    // The form dialog opens with the same title as the button.
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText('Create Client Project')).toBeInTheDocument();
   });
 
   it('filters client projects by search term', async () => {
@@ -140,13 +141,12 @@ describe('ClientProjects', () => {
       expect(screen.getByText('Project Alpha')).toBeInTheDocument();
     });
 
-    const clientFilter = screen.getByLabelText(/filter by client/i);
+    const clientFilter = screen.getByRole('combobox', { name: /filter by client/i });
     fireEvent.mouseDown(clientFilter);
-    
-    await waitFor(() => {
-      const clientOption = screen.getByText('Client A');
-      fireEvent.click(clientOption);
-    });
+
+    // "Client A" also appears in the grid; pick it from the menu.
+    const listbox = await screen.findByRole('listbox');
+    fireEvent.click(within(listbox).getByRole('option', { name: 'Client A' }));
 
     await waitFor(() => {
       expect(mockApiService.getClientProjects).toHaveBeenCalledWith(
@@ -244,7 +244,8 @@ describe('ClientProjects', () => {
 
     await waitFor(() => {
       expect(mockApiService.getClientProjects).toHaveBeenCalledWith(
-        expect.objectContaining({ page: 1, size: 10 })
+        // DataGrid page 0 -> API page 1; default page size is 25 (sent as query strings).
+        expect.objectContaining({ page: '1', size: '25' })
       );
     });
   });

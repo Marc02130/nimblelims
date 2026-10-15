@@ -8,6 +8,14 @@ import { apiService } from '../services/apiService';
 jest.mock('../services/apiService');
 const mockApiService = apiService as jest.Mocked<typeof apiService>;
 
+// The table checks workflow:execute via useUser (needs a provider). Plain fn: survives resetMocks.
+jest.mock('../contexts/UserContext', () => ({
+  useUser: () => ({
+    user: { id: 'u1', username: 'tech', role: 'Lab Technician', permissions: ['result:enter'] },
+    hasPermission: (perm: string) => perm === 'result:enter',
+  }),
+}));
+
 const mockSamples = [
   {
     id: 'sample1',
@@ -88,11 +96,20 @@ describe('ResultsEntryTable', () => {
     render(<ResultsEntryTable {...defaultProps} />);
 
     await waitFor(() => {
+      // Without a test object the testId is used (legacy callers).
       expect(mockApiService.getAnalysisAnalytes).toHaveBeenCalledWith('test123');
     });
 
-    expect(screen.getByText('pH')).toBeInTheDocument();
+    expect(await screen.findByText('pH')).toBeInTheDocument();
     expect(screen.getByText('Temperature (°C)')).toBeInTheDocument();
+  });
+
+  it("loads analytes by the test's analysis id when the test is given", async () => {
+    render(<ResultsEntryTable {...defaultProps} test={{ id: 'test123', sample_id: 'sample1', analysis_id: 'analysis9' }} />);
+
+    await waitFor(() => {
+      expect(mockApiService.getAnalysisAnalytes).toHaveBeenCalledWith('analysis9');
+    });
   });
 
   it('displays samples and their positions', async () => {
@@ -126,9 +143,11 @@ describe('ResultsEntryTable', () => {
     });
 
     const rawResultInputs = screen.getAllByLabelText('Raw Result');
-    await user.type(rawResultInputs[0], '7.5');
+    await user.clear(rawResultInputs[0]); // pH defaults to 7.0
+    // jsdom drops a trailing "." mid-typing in number inputs, so set the value in one go.
+    fireEvent.change(rawResultInputs[0], { target: { value: '7.5' } });
 
-    expect(rawResultInputs[0]).toHaveValue('7.5');
+    await waitFor(() => expect(screen.getAllByLabelText('Raw Result')[0]).toHaveValue(7.5));
   });
 
   it('validates numeric results', async () => {
@@ -140,12 +159,14 @@ describe('ResultsEntryTable', () => {
     });
 
     const rawResultInputs = screen.getAllByLabelText('Raw Result');
-    await user.type(rawResultInputs[0], '5.0'); // Below minimum
+    fireEvent.change(rawResultInputs[0], { target: { value: '5.0' } }); // Below minimum
 
     await user.click(screen.getByText('Save Results'));
+    expect(mockApiService.enterBatchResults).not.toHaveBeenCalled();
 
     await waitFor(() => {
-      expect(screen.getByText(/pH is below minimum value/)).toBeInTheDocument();
+      // Shown inline under the field and in the save error alert.
+      expect(screen.getAllByText(/pH is below minimum value/).length).toBeGreaterThanOrEqual(2);
     });
   });
 
@@ -160,18 +181,25 @@ describe('ResultsEntryTable', () => {
     });
 
     const rawResultInputs = screen.getAllByLabelText('Raw Result');
-    await user.type(rawResultInputs[0], '7.0');
+    fireEvent.change(rawResultInputs[0], { target: { value: '7.0' } });
 
     await user.click(screen.getByText('Save Results'));
 
     await waitFor(() => {
       expect(mockApiService.enterBatchResults).toHaveBeenCalledWith(
         'batch123',
-        expect.objectContaining({
+        {
           batch_id: 'batch123',
-          test_id: 'test123',
-          results: expect.any(Array),
-        })
+          results: [
+            {
+              test_id: 'test123',
+              // pH entered; Temperature left blank (not sent)
+              analyte_results: [
+                { analyte_id: 'analyte1', raw_result: '7.0', reported_result: null, qualifiers: null },
+              ],
+            },
+          ],
+        }
       );
     });
 
@@ -180,7 +208,7 @@ describe('ResultsEntryTable', () => {
 
   it('handles API errors gracefully', async () => {
     const user = userEvent.setup();
-    mockApiService.enterBatchResults.mockRejectedValue(new Error('API Error'));
+    mockApiService.enterBatchResults.mockRejectedValue({ response: { data: { detail: 'API Error' } } });
 
     render(<ResultsEntryTable {...defaultProps} />);
 
@@ -218,7 +246,7 @@ describe('ResultsEntryTable', () => {
     });
 
     // Check if qualifier dropdowns are present
-    const qualifierSelects = screen.getAllByLabelText('Qualifiers');
+    const qualifierSelects = await screen.findAllByRole('combobox', { name: 'Qualifiers' });
     expect(qualifierSelects.length).toBeGreaterThan(0);
   });
 });

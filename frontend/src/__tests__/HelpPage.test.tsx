@@ -8,6 +8,8 @@ import { apiService } from '../services/apiService';
 
 // Mock the API service
 jest.mock('../services/apiService', () => ({
+  // Real helpers (ApiService.formatError, addClientFilterIfNeeded, types); only the client is mocked.
+  ...jest.requireActual('../services/apiService'),
   apiService: {
     getHelp: jest.fn(),
     setAuthToken: jest.fn(),
@@ -115,7 +117,7 @@ describe('HelpPage', () => {
 
     mockApiService.getHelp.mockResolvedValue(mockHelpEntries);
 
-    renderWithProviders(<HelpPage />, 'lab-technician');
+    renderWithProviders(<HelpPage />, 'Lab Technician');
 
     await waitFor(() => {
       expect(screen.getByText('Help & Support')).toBeInTheDocument();
@@ -167,16 +169,17 @@ describe('HelpPage', () => {
     expect(screen.queryByText('Help & Support')).not.toBeInTheDocument();
   });
 
-  it('displays loading state while fetching help content', () => {
+  it('displays loading state while fetching help content', async () => {
     mockApiService.getHelp.mockImplementation(
       () => new Promise(() => {}) // Never resolves
     );
 
     renderWithProviders(<HelpPage />, 'Client');
 
-    // Check for loading indicator (ClientHelpSection handles this internally)
-    // The component should be rendering
-    expect(screen.getByText('Help & Support')).toBeInTheDocument();
+    // The session probe resolves first, then ClientHelpSection shows its
+    // spinner while help is loading (the heading appears only after load).
+    expect(await screen.findByLabelText('Loading help content')).toBeInTheDocument();
+    expect(screen.queryByText('Help & Support')).not.toBeInTheDocument();
   });
 
   it('handles API errors gracefully for Client users', async () => {
@@ -186,7 +189,7 @@ describe('HelpPage', () => {
 
     await waitFor(() => {
       // ClientHelpSection should handle the error and display it
-      expect(mockApiService.getHelp).toHaveBeenCalledWith({ role: 'Client' });
+      expect(mockApiService.getHelp).toHaveBeenCalledWith() // server filters by session role;
     });
   });
 
@@ -204,7 +207,7 @@ describe('HelpPage', () => {
     renderWithProviders(<HelpPage />, 'Client');
 
     await waitFor(() => {
-      expect(mockApiService.getHelp).toHaveBeenCalledWith({ role: 'Client' });
+      expect(mockApiService.getHelp).toHaveBeenCalledWith() // server filters by session role;
     });
   });
 
@@ -219,10 +222,10 @@ describe('HelpPage', () => {
 
     mockApiService.getHelp.mockResolvedValue(mockHelpEntries);
 
-    renderWithProviders(<HelpPage />, 'lab-technician');
+    renderWithProviders(<HelpPage />, 'Lab Technician');
 
     await waitFor(() => {
-      expect(mockApiService.getHelp).toHaveBeenCalledWith({ role: 'lab-technician' });
+      expect(mockApiService.getHelp).toHaveBeenCalledWith() // server filters by session role;
     });
   });
 
@@ -280,7 +283,7 @@ describe('HelpPage', () => {
     renderWithProviders(<HelpPage />, 'Client');
 
     await waitFor(() => {
-      expect(mockApiService.getHelp).toHaveBeenCalledWith({ role: 'Client' });
+      expect(mockApiService.getHelp).toHaveBeenCalledWith() // server filters by session role;
       expect(screen.getByText('Viewing Projects')).toBeInTheDocument();
       expect(screen.getByText('Public Help')).toBeInTheDocument();
     });
@@ -318,10 +321,10 @@ describe('HelpPage', () => {
 
     mockApiService.getHelp.mockResolvedValue(mockHelpEntries);
 
-    renderWithProviders(<HelpPage />, 'lab-technician');
+    renderWithProviders(<HelpPage />, 'Lab Technician');
 
     await waitFor(() => {
-      expect(mockApiService.getHelp).toHaveBeenCalledWith({ role: 'lab-technician' });
+      expect(mockApiService.getHelp).toHaveBeenCalledWith() // server filters by session role;
       expect(screen.getByText('Accessioning Workflow')).toBeInTheDocument();
       expect(screen.getByText('Public Help')).toBeInTheDocument();
     });
@@ -388,21 +391,17 @@ describe('HelpPage', () => {
       pages: 1,
     };
 
-    // Mock API to return only Client and public entries when role=Client
-    mockApiService.getHelp.mockImplementation((filters) => {
-      if (filters?.role === 'Client') {
-        return Promise.resolve({
-          help_entries: mockHelpEntries.help_entries.filter(
-            (e) => e.role_filter === 'Client' || e.role_filter === null
-          ),
-          total: 2,
-          page: 1,
-          size: 10,
-          pages: 1,
-        });
-      }
-      return Promise.resolve(mockHelpEntries);
-    });
+    // The backend filters by the session user's role (the section sends no role
+    // param); simulate what it returns for this user.
+    mockApiService.getHelp.mockResolvedValue({
+        help_entries: mockHelpEntries.help_entries.filter(
+          (e) => e.role_filter === 'Client' || e.role_filter === null
+        ),
+        total: 2,
+        page: 1,
+        size: 10,
+        pages: 1,
+      });
 
     renderWithProviders(<HelpPage />, 'Client');
 
@@ -444,23 +443,19 @@ describe('HelpPage', () => {
       pages: 1,
     };
 
-    // Mock API to return only lab-technician and public entries when role=lab-technician
-    mockApiService.getHelp.mockImplementation((filters) => {
-      if (filters?.role === 'lab-technician') {
-        return Promise.resolve({
-          help_entries: mockHelpEntries.help_entries.filter(
-            (e) => e.role_filter === 'lab-technician' || e.role_filter === null
-          ),
-          total: 2,
-          page: 1,
-          size: 10,
-          pages: 1,
-        });
-      }
-      return Promise.resolve(mockHelpEntries);
-    });
+    // The backend filters by the session user's role (the section sends no role
+    // param); simulate what it returns for this user.
+    mockApiService.getHelp.mockResolvedValue({
+        help_entries: mockHelpEntries.help_entries.filter(
+          (e) => e.role_filter === 'lab-technician' || e.role_filter === null
+        ),
+        total: 2,
+        page: 1,
+        size: 10,
+        pages: 1,
+      });
 
-    renderWithProviders(<HelpPage />, 'lab-technician');
+    renderWithProviders(<HelpPage />, 'Lab Technician');
 
     await waitFor(() => {
       expect(screen.getByText('Accessioning Workflow')).toBeInTheDocument();
@@ -472,10 +467,10 @@ describe('HelpPage', () => {
   it('handles API errors gracefully for lab-technician users', async () => {
     mockApiService.getHelp.mockRejectedValue(new Error('API Error'));
 
-    renderWithProviders(<HelpPage />, 'lab-technician');
+    renderWithProviders(<HelpPage />, 'Lab Technician');
 
     await waitFor(() => {
-      expect(mockApiService.getHelp).toHaveBeenCalledWith({ role: 'lab-technician' });
+      expect(mockApiService.getHelp).toHaveBeenCalledWith() // server filters by session role;
     });
   });
 
@@ -498,7 +493,7 @@ describe('HelpPage', () => {
 
     mockApiService.getHelp.mockResolvedValue(mockHelpEntries);
 
-    renderWithProviders(<HelpPage />, 'lab-technician');
+    renderWithProviders(<HelpPage />, 'Lab Technician');
 
     await waitFor(() => {
       // Check for heading with ARIA label
@@ -518,7 +513,10 @@ describe('HelpPage', () => {
       expect(accordion).toHaveAttribute('aria-expanded');
       
       // Check accordion details ARIA attributes
-      const details = screen.getByRole('region');
+      // MUI v7 renders more than one region per accordion; pick the details by id.
+      const details = screen
+        .getAllByRole('region', { hidden: true }) // collapsed accordion
+        .find((el) => el.id === 'Accessioning Workflow-content');
       expect(details).toHaveAttribute('id', 'Accessioning Workflow-content');
       expect(details).toHaveAttribute('aria-labelledby', 'Accessioning Workflow-header');
     });
@@ -555,23 +553,19 @@ describe('HelpPage', () => {
       pages: 1,
     };
 
-    // Mock API to return only lab-technician and public entries when role=lab-technician
-    mockApiService.getHelp.mockImplementation((filters) => {
-      if (filters?.role === 'lab-technician') {
-        return Promise.resolve({
-          help_entries: mockHelpEntries.help_entries.filter(
-            (e) => e.role_filter === 'lab-technician' || e.role_filter === null
-          ),
-          total: 2,
-          page: 1,
-          size: 10,
-          pages: 1,
-        });
-      }
-      return Promise.resolve(mockHelpEntries);
-    });
+    // The backend filters by the session user's role (the section sends no role
+    // param); simulate what it returns for this user.
+    mockApiService.getHelp.mockResolvedValue({
+        help_entries: mockHelpEntries.help_entries.filter(
+          (e) => e.role_filter === 'lab-technician' || e.role_filter === null
+        ),
+        total: 2,
+        page: 1,
+        size: 10,
+        pages: 1,
+      });
 
-    renderWithProviders(<HelpPage />, 'lab-technician');
+    renderWithProviders(<HelpPage />, 'Lab Technician');
 
     await waitFor(() => {
       expect(screen.getByText('Accessioning Workflow')).toBeInTheDocument();
@@ -725,7 +719,10 @@ describe('HelpPage', () => {
       expect(accordion).toHaveAttribute('aria-expanded');
       
       // Check accordion details ARIA attributes
-      const details = screen.getByRole('region');
+      // MUI v7 renders more than one region per accordion; pick the details by id.
+      const details = screen
+        .getAllByRole('region', { hidden: true }) // collapsed accordion
+        .find((el) => el.id === 'Results Review-content');
       expect(details).toHaveAttribute('id', 'Results Review-content');
       expect(details).toHaveAttribute('aria-labelledby', 'Results Review-header');
     });
@@ -893,7 +890,10 @@ describe('HelpPage', () => {
       expect(accordion).toHaveAttribute('aria-expanded');
       
       // Check accordion details ARIA attributes
-      const details = screen.getByRole('region');
+      // MUI v7 renders more than one region per accordion; pick the details by id.
+      const details = screen
+        .getAllByRole('region', { hidden: true }) // collapsed accordion
+        .find((el) => el.id === 'User Management-content');
       expect(details).toHaveAttribute('id', 'User Management-content');
       expect(details).toHaveAttribute('aria-labelledby', 'User Management-header');
     });

@@ -333,7 +333,7 @@ const HelpManagement: React.FC = () => {
                 ),
                 endAdornment: searchTerm && (
                   <InputAdornment position="end">
-                    <IconButton size="small" onClick={() => setSearchTerm('')}>
+                    <IconButton size="small" onClick={() => setSearchTerm('')} aria-label="Clear search">
                       <Clear />
                     </IconButton>
                   </InputAdornment>
@@ -341,8 +341,9 @@ const HelpManagement: React.FC = () => {
               }}
             />
             <FormControl size="small" sx={{ minWidth: isMobile ? '100%' : 200 }}>
-              <InputLabel>Filter by Role</InputLabel>
+              <InputLabel id="help-role-filter-label">Filter by Role</InputLabel>
               <Select
+                labelId="help-role-filter-label"
                 value={roleFilter}
                 label="Filter by Role"
                 onChange={(e) => {

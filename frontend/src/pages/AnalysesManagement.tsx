@@ -774,7 +774,7 @@ const AnalysesManagement: React.FC = () => {
               ),
               endAdornment: searchTerm && (
                 <InputAdornment position="end">
-                  <IconButton size="small" onClick={() => setSearchTerm('')}>
+                  <IconButton size="small" onClick={() => setSearchTerm('')} aria-label="Clear search">
                     <Clear />
                   </IconButton>
                 </InputAdornment>

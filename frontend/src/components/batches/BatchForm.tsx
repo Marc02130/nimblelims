@@ -382,8 +382,9 @@ const BatchForm: React.FC<BatchFormProps> = ({ batch, onSuccess, onCancel }) => 
 
               <Grid size={{ xs: 12, sm: 6 }}>
                     <FormControl fullWidth error={touched.type && !!errors.type}>
-                  <InputLabel>Batch Type</InputLabel>
+                  <InputLabel id="batch-form-type-label">Batch Type</InputLabel>
                   <Select
+                        labelId="batch-form-type-label"
                         name="type"
                         value={values.type}
                         onChange={(e) => setFieldValue('type', e.target.value)}
@@ -401,8 +402,9 @@ const BatchForm: React.FC<BatchFormProps> = ({ batch, onSuccess, onCancel }) => 
 
               <Grid size={{ xs: 12, sm: 6 }}>
                     <FormControl fullWidth required error={touched.status && !!errors.status}>
-                  <InputLabel>Status</InputLabel>
+                  <InputLabel id="batch-form-status-label">Status</InputLabel>
                   <Select
+                        labelId="batch-form-status-label"
                         name="status"
                         value={values.status}
                         onChange={(e) => setFieldValue('status', e.target.value)}

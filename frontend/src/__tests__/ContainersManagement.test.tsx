@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent, within } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import ContainerManagement from '../pages/ContainerManagement';
 import { apiService } from '../services/apiService';
@@ -97,15 +97,12 @@ describe('ContainerManagement', () => {
       expect(screen.getByText('Container Management')).toBeInTheDocument();
     });
 
-    // Find and click edit button
-    const editButtons = screen.getAllByLabelText(/Edit container/i);
-    if (editButtons.length > 0) {
-      fireEvent.click(editButtons[0]);
+    // Find and click edit button (the grid renders once loading finishes)
+    const editButtons = await screen.findAllByLabelText(/Edit container CONTAINER-001/i);
+    fireEvent.click(editButtons[0]);
 
-      await waitFor(() => {
-        expect(screen.getByText(/Edit Container/i)).toBeInTheDocument();
-      });
-    }
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText('Edit Container: CONTAINER-001')).toBeInTheDocument();
   });
 
   it('renders DataGrid with correct columns', async () => {
@@ -129,9 +126,10 @@ describe('ContainerManagement', () => {
       expect(screen.getByText('Container Management')).toBeInTheDocument();
     });
 
-    // Verify DataGrid is rendered
-    const dataGrid = document.querySelector('.MuiDataGrid-root');
-    expect(dataGrid).toBeInTheDocument();
+    // Verify DataGrid is rendered once loading finishes
+    expect(await screen.findByText('CONTAINER-001')).toBeInTheDocument();
+    expect(document.querySelector('.MuiDataGrid-root')).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'Name' })).toBeInTheDocument();
   });
 
   it('shows create container button', async () => {
@@ -159,12 +157,12 @@ describe('ContainerManagement', () => {
       expect(screen.getByText('Create Container')).toBeInTheDocument();
     });
 
-    // Click create button
-    fireEvent.click(screen.getByText('Create Container'));
+    // Click create button: the dialog opens in create mode (no "Edit Container:" title)
+    fireEvent.click(screen.getByRole('button', { name: 'Create Container' }));
 
-    await waitFor(() => {
-      expect(screen.getByText(/Create Container/i)).toBeInTheDocument();
-    });
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText('Create Container')).toBeInTheDocument();
+    expect(within(dialog).queryByText(/Edit Container:/)).not.toBeInTheDocument();
   });
 });
 

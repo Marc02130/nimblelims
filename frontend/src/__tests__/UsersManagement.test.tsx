@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { BrowserRouter, MemoryRouter } from 'react-router-dom';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import UsersManagement from '../pages/admin/UsersManagement';
@@ -7,7 +7,11 @@ import { UserProvider } from '../contexts/UserContext';
 
 // Mock the API service
 jest.mock('../services/apiService', () => ({
+  // Real helpers (ApiService.formatError, addClientFilterIfNeeded, types); only the client is mocked.
+  ...jest.requireActual('../services/apiService'),
   apiService: {
+    // UserProvider probes the cookie session on mount (P4/S10). Plain fn: survives resetMocks.
+    getCurrentUser: () => Promise.reject(new Error('no session')),
     getUsers: jest.fn(),
     createUser: jest.fn(),
     updateUser: jest.fn(),
@@ -199,27 +203,30 @@ describe('UsersManagement', () => {
       expect(screen.getByText('Create New User')).toBeInTheDocument();
     });
 
-    const usernameInput = screen.getByLabelText('Username');
+    // Name is required (display name).
+    fireEvent.change(within(screen.getByRole('dialog')).getByRole('textbox', { name: /^Name/ }), { target: { value: 'New User' } });
+
+    const usernameInput = within(screen.getByRole('dialog')).getByRole('textbox', { name: /^Username/ });
     fireEvent.change(usernameInput, { target: { value: 'newuser' } });
 
-    const emailInput = screen.getByLabelText('Email');
+    const emailInput = within(screen.getByRole('dialog')).getByRole('textbox', { name: /^Email/ });
     fireEvent.change(emailInput, { target: { value: 'newuser@example.com' } });
 
-    const passwordInput = screen.getByLabelText('Password');
+    const passwordInput = within(screen.getByRole('dialog')).getByLabelText(/^Password/);
     fireEvent.change(passwordInput, { target: { value: 'password123' } });
 
-    const roleSelect = screen.getByLabelText('Role');
+    const roleSelect = screen.getByRole('combobox', { name: /^Role/ });
     fireEvent.mouseDown(roleSelect);
-    await waitFor(() => {
-      const option = screen.getByText('Lab Technician');
-      fireEvent.click(option);
-    });
+    // Role names also appear in the grid; pick from the menu.
+    fireEvent.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Lab Technician' }));
 
-    const submitButton = screen.getByText('Create');
+    const submitButton = screen.getByRole('button', { name: 'Create' });
     fireEvent.click(submitButton);
 
     await waitFor(() => {
       expect(apiService.createUser).toHaveBeenCalledWith({
+        name: 'New User',
+        description: null,
         username: 'newuser',
         email: 'newuser@example.com',
         password: 'password123',
@@ -241,10 +248,11 @@ describe('UsersManagement', () => {
       expect(screen.getByText('Create New User')).toBeInTheDocument();
     });
 
-    const submitButton = screen.getByText('Create');
+    const submitButton = screen.getByRole('button', { name: 'Create' });
     fireEvent.click(submitButton);
 
     await waitFor(() => {
+      expect(screen.getByText(/^Name is required/)).toBeInTheDocument();
       expect(screen.getByText(/Username is required/i)).toBeInTheDocument();
       expect(screen.getByText(/Email is required/i)).toBeInTheDocument();
       expect(screen.getByText(/Password is required/i)).toBeInTheDocument();
@@ -265,23 +273,24 @@ describe('UsersManagement', () => {
       expect(screen.getByText('Create New User')).toBeInTheDocument();
     });
 
-    const usernameInput = screen.getByLabelText('Username');
+    // Name is required (display name).
+    fireEvent.change(within(screen.getByRole('dialog')).getByRole('textbox', { name: /^Name/ }), { target: { value: 'New User' } });
+
+    const usernameInput = within(screen.getByRole('dialog')).getByRole('textbox', { name: /^Username/ });
     fireEvent.change(usernameInput, { target: { value: 'admin' } });
 
-    const emailInput = screen.getByLabelText('Email');
+    const emailInput = within(screen.getByRole('dialog')).getByRole('textbox', { name: /^Email/ });
     fireEvent.change(emailInput, { target: { value: 'admin@example.com' } });
 
-    const passwordInput = screen.getByLabelText('Password');
+    const passwordInput = within(screen.getByRole('dialog')).getByLabelText(/^Password/);
     fireEvent.change(passwordInput, { target: { value: 'password123' } });
 
-    const roleSelect = screen.getByLabelText('Role');
+    const roleSelect = screen.getByRole('combobox', { name: /^Role/ });
     fireEvent.mouseDown(roleSelect);
-    await waitFor(() => {
-      const option = screen.getByText('Administrator');
-      fireEvent.click(option);
-    });
+    // Role names also appear in the grid; pick from the menu.
+    fireEvent.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Administrator' }));
 
-    const submitButton = screen.getByText('Create');
+    const submitButton = screen.getByRole('button', { name: 'Create' });
     fireEvent.click(submitButton);
 
     await waitFor(() => {
@@ -302,23 +311,24 @@ describe('UsersManagement', () => {
       expect(screen.getByText('Create New User')).toBeInTheDocument();
     });
 
-    const usernameInput = screen.getByLabelText('Username');
+    // Name is required (display name).
+    fireEvent.change(within(screen.getByRole('dialog')).getByRole('textbox', { name: /^Name/ }), { target: { value: 'New User' } });
+
+    const usernameInput = within(screen.getByRole('dialog')).getByRole('textbox', { name: /^Username/ });
     fireEvent.change(usernameInput, { target: { value: 'newuser' } });
 
-    const emailInput = screen.getByLabelText('Email');
+    const emailInput = within(screen.getByRole('dialog')).getByRole('textbox', { name: /^Email/ });
     fireEvent.change(emailInput, { target: { value: 'newuser@example.com' } });
 
-    const passwordInput = screen.getByLabelText('Password');
+    const passwordInput = within(screen.getByRole('dialog')).getByLabelText(/^Password/);
     fireEvent.change(passwordInput, { target: { value: 'short' } });
 
-    const roleSelect = screen.getByLabelText('Role');
+    const roleSelect = screen.getByRole('combobox', { name: /^Role/ });
     fireEvent.mouseDown(roleSelect);
-    await waitFor(() => {
-      const option = screen.getByText('Lab Technician');
-      fireEvent.click(option);
-    });
+    // Role names also appear in the grid; pick from the menu.
+    fireEvent.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Lab Technician' }));
 
-    const submitButton = screen.getByText('Create');
+    const submitButton = screen.getByRole('button', { name: 'Create' });
     fireEvent.click(submitButton);
 
     await waitFor(() => {
@@ -408,9 +418,10 @@ describe('UsersManagement', () => {
     renderWithProviders(<UsersManagement />);
 
     await waitFor(() => {
-      // Check that dates are formatted (not raw ISO strings)
-      expect(screen.getByText(/Never|admin/)).toBeInTheDocument();
+      // A user who never logged in shows "Never"; dates are formatted, not raw ISO strings.
+      expect(screen.getByText('Never')).toBeInTheDocument();
     });
+    expect(screen.queryByText('2024-01-15T10:00:00Z')).not.toBeInTheDocument();
   });
 });
 

@@ -134,15 +134,11 @@ describe('TestsManagement', () => {
       expect(screen.getByText('Tests Management')).toBeInTheDocument();
     });
 
-    // Find and click edit button
-    const editButtons = screen.getAllByLabelText(/Edit test/i);
-    if (editButtons.length > 0) {
-      fireEvent.click(editButtons[0]);
+    // Find and click edit button (the grid renders once loading finishes)
+    const editButtons = await screen.findAllByLabelText(/Edit test TEST-001/i);
+    fireEvent.click(editButtons[0]);
 
-      await waitFor(() => {
-        expect(screen.getByText(/Edit Test/i)).toBeInTheDocument();
-      });
-    }
+    expect(await screen.findByText('Edit Test: TEST-001')).toBeInTheDocument();
   });
 
   it('renders DataGrid with correct columns', async () => {
@@ -171,9 +167,9 @@ describe('TestsManagement', () => {
       expect(screen.getByText('Tests Management')).toBeInTheDocument();
     });
 
-    // Verify DataGrid is rendered (MUI DataGrid renders with specific classes)
-    const dataGrid = document.querySelector('.MuiDataGrid-root');
-    expect(dataGrid).toBeInTheDocument();
+    // Verify DataGrid is rendered once loading finishes
+    expect(await screen.findByText('TEST-001')).toBeInTheDocument();
+    expect(document.querySelector('.MuiDataGrid-root')).toBeInTheDocument();
   });
 
   it('hides edit buttons when user lacks permission', async () => {

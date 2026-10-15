@@ -15,6 +15,7 @@ import {
   Select,
   MenuItem,
   Switch,
+  FormHelperText,
 } from '@mui/material';
 import { Formik, Form, Field } from 'formik';
 import * as Yup from 'yup';
@@ -314,12 +315,13 @@ const UserFormDialog: React.FC<UserFormDialogProps> = ({
                   )}
 
                   <Grid size={{ xs: 12, sm: 6 }}>
-                    <FormControl fullWidth required margin="normal">
-                      <InputLabel>Role</InputLabel>
+                    <FormControl fullWidth required margin="normal" error={touched.role_id && !!errors.role_id}>
+                      <InputLabel id="user-form-role-label">Role</InputLabel>
                       <Select
+                        labelId="user-form-role-label"
+                        label="Role"
                         value={values.role_id}
                         onChange={(e) => setFieldValue('role_id', e.target.value)}
-                        error={touched.role_id && !!errors.role_id}
                       >
                         {roles.map((role) => (
                           <MenuItem key={role.id} value={role.id}>
@@ -327,13 +329,19 @@ const UserFormDialog: React.FC<UserFormDialogProps> = ({
                           </MenuItem>
                         ))}
                       </Select>
+                      {/* Role is required, but its error was never shown. */}
+                      {touched.role_id && errors.role_id && (
+                        <FormHelperText>{String(errors.role_id)}</FormHelperText>
+                      )}
                     </FormControl>
                   </Grid>
 
                   <Grid size={{ xs: 12, sm: 6 }}>
                     <FormControl fullWidth margin="normal">
-                      <InputLabel>Client (Optional)</InputLabel>
+                      <InputLabel id="user-form-client-label">Client (Optional)</InputLabel>
                       <Select
+                        labelId="user-form-client-label"
+                        label="Client (Optional)"
                         value={values.client_id || ''}
                         onChange={(e) => setFieldValue('client_id', e.target.value || null)}
                       >

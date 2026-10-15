@@ -1,13 +1,17 @@
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import AnalysisAnalytesConfig from '../pages/admin/AnalysisAnalytesConfig';
 import { UserProvider } from '../contexts/UserContext';
 
 // Mock the API service
 jest.mock('../services/apiService', () => ({
+  // Real helpers (ApiService.formatError, addClientFilterIfNeeded, types); only the client is mocked.
+  ...jest.requireActual('../services/apiService'),
   apiService: {
+    // UserProvider probes the cookie session on mount (P4/S10). Plain fn: survives resetMocks.
+    getCurrentUser: () => Promise.reject(new Error('no session')),
     getAnalyses: jest.fn(),
     getAnalysisAnalyteRules: jest.fn(),
     createAnalysisAnalyteRule: jest.fn(),
@@ -87,11 +91,23 @@ const renderWithProviders = (component: React.ReactElement, user = mockAdminUser
     <MemoryRouter initialEntries={initialEntries}>
       <ThemeProvider theme={theme}>
         <UserProvider>
-          {component}
+          {/* The page reads :analysisId from the route, so render it under its real path. */}
+          <Routes>
+            <Route path="/admin/analyses/:analysisId/analytes" element={component} />
+          </Routes>
         </UserProvider>
       </ThemeProvider>
     </MemoryRouter>
   );
+};
+
+
+// "Add Analyte Rule" is both the page button and the dialog title.
+const openAddRuleDialog = async () => {
+  fireEvent.click(await screen.findByRole('button', { name: 'Add Analyte Rule' }));
+  const dialog = await screen.findByRole('dialog');
+  expect(within(dialog).getByText('Add Analyte Rule')).toBeInTheDocument();
+  return dialog;
 };
 
 describe('AnalysisAnalytesConfig', () => {
@@ -125,7 +141,7 @@ describe('AnalysisAnalytesConfig', () => {
     renderWithProviders(<AnalysisAnalytesConfig />);
 
     await waitFor(() => {
-      expect(screen.getByText('numeric')).toBeInTheDocument();
+      expect(screen.getAllByText('numeric')).toHaveLength(2); // both rules are numeric
       expect(screen.getByText('0 - 14')).toBeInTheDocument();
       expect(screen.getByText('2')).toBeInTheDocument(); // Significant figures
       expect(screen.getByText('Yes')).toBeInTheDocument(); // Required
@@ -143,15 +159,7 @@ describe('AnalysisAnalytesConfig', () => {
   test('opens add rule dialog on button click', async () => {
     renderWithProviders(<AnalysisAnalytesConfig />);
 
-    await waitFor(() => {
-      expect(screen.getByText('Add Analyte Rule')).toBeInTheDocument();
-    });
-
-    fireEvent.click(screen.getByText('Add Analyte Rule'));
-
-    await waitFor(() => {
-      expect(screen.getByText('Add Analyte Rule')).toBeInTheDocument();
-    });
+    await openAddRuleDialog();
   });
 
   test('creates a new analyte rule', async () => {
@@ -166,52 +174,56 @@ describe('AnalysisAnalytesConfig', () => {
 
     renderWithProviders(<AnalysisAnalytesConfig />);
 
+    const dialog = await openAddRuleDialog();
+
+    // Only analytes not yet configured (TOC) are offered.
+    fireEvent.mouseDown(within(dialog).getByRole('combobox', { name: /^Analyte/ }));
+    const listbox = await screen.findByRole('listbox');
+    expect(within(listbox).queryByText('pH')).not.toBeInTheDocument();
+    fireEvent.click(within(listbox).getByRole('option', { name: /TOC/ }));
+
+    fireEvent.change(within(dialog).getByLabelText('Low Value'), { target: { value: '0' } });
+    fireEvent.change(within(dialog).getByLabelText('High Value'), { target: { value: '50' } });
+
+    const addButton = within(dialog).getByRole('button', { name: 'Add' });
+    await waitFor(() => expect(addButton).toBeEnabled());
+    fireEvent.click(addButton);
+
     await waitFor(() => {
-      expect(screen.getByText('Add Analyte Rule')).toBeInTheDocument();
+      expect(apiService.createAnalysisAnalyteRule).toHaveBeenCalledWith('1', {
+        analyte_id: '3',
+        is_required: false,
+        low_value: 0,
+        high_value: 50,
+      });
     });
-
-    fireEvent.click(screen.getByText('Add Analyte Rule'));
-
-    await waitFor(() => {
-      expect(screen.getByText('Add Analyte Rule')).toBeInTheDocument();
-    });
-
-    // Select analyte, fill form, submit
-    // This would require interacting with the form dialog
   });
 
   test('validates low <= high range', async () => {
     renderWithProviders(<AnalysisAnalytesConfig />);
 
-    await waitFor(() => {
-      expect(screen.getByText('Add Analyte Rule')).toBeInTheDocument();
-    });
+    const dialog = await openAddRuleDialog();
 
-    fireEvent.click(screen.getByText('Add Analyte Rule'));
+    const low = within(dialog).getByLabelText('Low Value');
+    fireEvent.change(low, { target: { value: '20' } });
+    fireEvent.change(within(dialog).getByLabelText('High Value'), { target: { value: '10' } });
+    fireEvent.blur(low);
 
-    await waitFor(() => {
-      expect(screen.getByText('Add Analyte Rule')).toBeInTheDocument();
-    });
-
-    // Fill form with invalid range (low > high)
-    // This would require interacting with the form dialog
+    expect(await within(dialog).findByText('Low value must be less than or equal to high value')).toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: 'Add' })).toBeDisabled();
   });
 
   test('validates significant figures is positive integer', async () => {
     renderWithProviders(<AnalysisAnalytesConfig />);
 
-    await waitFor(() => {
-      expect(screen.getByText('Add Analyte Rule')).toBeInTheDocument();
-    });
+    const dialog = await openAddRuleDialog();
 
-    fireEvent.click(screen.getByText('Add Analyte Rule'));
+    const sigFigs = within(dialog).getByLabelText('Significant Figures');
+    fireEvent.change(sigFigs, { target: { value: '0' } });
+    fireEvent.blur(sigFigs);
 
-    await waitFor(() => {
-      expect(screen.getByText('Add Analyte Rule')).toBeInTheDocument();
-    });
-
-    // Fill form with invalid significant figures
-    // This would require interacting with the form dialog
+    expect(await within(dialog).findByText('Significant figures must be at least 1')).toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: 'Add' })).toBeDisabled();
   });
 
   test('filters rules by search term', async () => {
@@ -232,7 +244,8 @@ describe('AnalysisAnalytesConfig', () => {
 
   test('handles API error gracefully', async () => {
     const { apiService } = require('../services/apiService');
-    apiService.getAnalysisAnalyteRules.mockRejectedValue(new Error('API Error'));
+    // A rules failure is tolerated (empty list); failing to load the analysis is not.
+    apiService.getAnalyses.mockRejectedValue({ response: { status: 500 } });
 
     renderWithProviders(<AnalysisAnalytesConfig />);
 
