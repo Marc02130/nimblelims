@@ -19,7 +19,7 @@ router = APIRouter()
 
 
 @router.get("", response_model=List[ClientResponse])
-async def get_clients(
+def get_clients(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -58,7 +58,7 @@ async def get_clients(
 
 
 @router.post("", response_model=ClientResponse, status_code=status.HTTP_201_CREATED)
-async def create_client(
+def create_client(
     client_data: ClientCreate,
     current_user: User = Depends(require_permission("config:edit")),
     db: Session = Depends(get_db)
@@ -101,7 +101,7 @@ async def create_client(
 
 
 @router.patch("/{client_id}", response_model=ClientResponse)
-async def update_client(
+def update_client(
     client_id: UUID,
     client_data: ClientUpdate,
     current_user: User = Depends(require_permission("config:edit")),
@@ -156,7 +156,7 @@ async def update_client(
 
 
 @router.delete("/{client_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_client(
+def delete_client(
     client_id: UUID,
     current_user: User = Depends(require_permission("config:edit")),
     db: Session = Depends(get_db)

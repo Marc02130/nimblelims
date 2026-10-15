@@ -164,13 +164,13 @@ def get_configuration(
 
 
 @router.post("/configurations/{configuration_id}/documents", status_code=201)
-async def post_document(
+def post_document(
     configuration_id: UUID,
     file: UploadFile = File(...),
     user: User = Depends(require_configuring_agent),
     db: Session = Depends(get_db),
 ):
-    data = await file.read()
+    data = file.file.read()
     doc = add_document(db, user, configuration_id, file.filename or "upload", data)
     return _json(
         {
@@ -266,11 +266,11 @@ def post_include(
 
 
 @router.post("/runs/{run_id}/apply")
-async def post_apply(
+def post_apply(
     run_id: UUID,
     body: Optional[ApplyBody] = None,
     user: User = Depends(require_configuring_agent),
     db: Session = Depends(get_db),
 ):
-    run, code = await apply_run(db, user, run_id, second_confirm=bool(body and body.second_confirm))
+    run, code = apply_run(db, user, run_id, second_confirm=bool(body and body.second_confirm))
     return _json(run_payload(run, db, user), code)

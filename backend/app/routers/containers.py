@@ -25,7 +25,7 @@ router = APIRouter()
 
 # Container Types endpoints
 @router.get("/types", response_model=List[ContainerTypeResponse])
-async def get_container_types(
+def get_container_types(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -47,7 +47,7 @@ async def get_container_types(
 
 
 @router.post("/types", response_model=ContainerTypeResponse)
-async def create_container_type(
+def create_container_type(
     container_type_data: ContainerTypeCreate,
     current_user: User = Depends(require_config_edit),
     db: Session = Depends(get_db)
@@ -76,7 +76,7 @@ async def create_container_type(
 
 
 @router.patch("/types/{type_id}", response_model=ContainerTypeResponse)
-async def update_container_type(
+def update_container_type(
     type_id: UUID,
     container_type_data: ContainerTypeUpdate,
     current_user: User = Depends(require_config_edit),
@@ -113,7 +113,7 @@ async def update_container_type(
 
 # Containers endpoints
 @router.get("", response_model=List[ContainerWithContentsResponse])
-async def get_containers(
+def get_containers(
     type_id: Optional[UUID] = Query(None, description="Filter by container type"),
     parent_id: Optional[UUID] = Query(None, description="Filter by parent container"),
     project_ids: Optional[str] = Query(None, description="Comma-separated list of project IDs for cross-project filtering"),
@@ -205,7 +205,7 @@ async def get_containers(
 
 
 @router.post("", response_model=ContainerResponse)
-async def create_container(
+def create_container(
     container_data: ContainerCreate,
     current_user: User = Depends(require_sample_create),
     db: Session = Depends(get_db)
@@ -285,7 +285,7 @@ async def create_container(
 
 
 @router.get("/{container_id}", response_model=ContainerWithContentsResponse)
-async def get_container(
+def get_container(
     container_id: UUID,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -336,7 +336,7 @@ async def get_container(
 
 
 @router.patch("/{container_id}", response_model=ContainerResponse)
-async def update_container(
+def update_container(
     container_id: UUID,
     container_data: ContainerUpdate,
     current_user: User = Depends(require_sample_update),
@@ -420,7 +420,7 @@ async def update_container(
 
 # Contents endpoints
 @router.get("/{container_id}/contents", response_model=ContentsListResponse)
-async def get_container_contents(
+def get_container_contents(
     container_id: UUID,
     page: int = Query(1, ge=1, description="Page number"),
     size: int = Query(10, ge=1, le=100, description="Page size"),
@@ -482,7 +482,7 @@ async def get_container_contents(
 
 
 @router.post("/{container_id}/contents", response_model=ContentsResponse)
-async def add_sample_to_container(
+def add_sample_to_container(
     container_id: UUID,
     contents_data: ContentsCreate,
     current_user: User = Depends(require_sample_create),
@@ -652,7 +652,7 @@ async def add_sample_to_container(
 
 
 @router.patch("/{container_id}/contents/{sample_id}", response_model=ContentsResponse)
-async def update_container_contents(
+def update_container_contents(
     container_id: UUID,
     sample_id: UUID,
     contents_data: ContentsUpdate,
@@ -685,7 +685,7 @@ async def update_container_contents(
 
 
 @router.delete("/{container_id}/contents/{sample_id}")
-async def remove_sample_from_container(
+def remove_sample_from_container(
     container_id: UUID,
     sample_id: UUID,
     current_user: User = Depends(require_sample_update),
