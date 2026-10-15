@@ -202,6 +202,27 @@ def _user_prompt(chunks: list[str], goal_note: str | None, feedback: str | None)
     return "\n\n".join(parts)
 
 
+def _http_reason(exc: Exception) -> str:
+    """A short, key-free reason for a failed model call (UAT: 'failed' with no why)."""
+    if isinstance(exc, httpx.TimeoutException):
+        return f"timed out after {int(model_timeout())} s (CONFIGURING_AGENT_TIMEOUT_S)"
+    if isinstance(exc, httpx.ConnectError):
+        return "could not connect"
+    return type(exc).__name__
+
+
+def _status_reason(response) -> str:
+    detail = ""
+    try:
+        body = response.json()
+        err = body.get("error") if isinstance(body, dict) else None
+        detail = (err.get("message") if isinstance(err, dict) else err) or ""
+    except Exception:  # noqa: BLE001 - non-JSON error body
+        detail = ""
+    detail = str(detail).strip()[:200]
+    return f"HTTP {response.status_code}" + (f": {detail}" if detail else "")
+
+
 def _get_json(url: str, headers: dict[str, str], params: dict | None = None) -> dict:
     try:
         response = httpx.get(url, headers=headers, params=params, timeout=30.0)
@@ -228,9 +249,9 @@ def _openai_compatible(url: str, model: str, api_key: str, system: str, user: st
             timeout=model_timeout(),
         )
     except httpx.HTTPError as exc:
-        raise ProviderError(f"The {url} call failed.") from exc
+        raise ProviderError(f"The {url} call failed: {_http_reason(exc)}.") from exc
     if response.status_code >= 400:
-        raise ProviderError("The model call failed. Check the key and the model.")
+        raise ProviderError(f"The model call failed ({_status_reason(response)}). Check the key and the model.")
     try:
         choice = response.json()["choices"][0]
     except (ValueError, KeyError, IndexError, TypeError) as exc:
@@ -264,9 +285,9 @@ def _anthropic(model: str, api_key: str, system: str, user: str) -> str:
             timeout=model_timeout(),
         )
     except httpx.HTTPError as exc:
-        raise ProviderError("The Anthropic call failed.") from exc
+        raise ProviderError(f"The Anthropic call failed: {_http_reason(exc)}.") from exc
     if response.status_code >= 400:
-        raise ProviderError("The model call failed. Check the key and the model.")
+        raise ProviderError(f"The model call failed ({_status_reason(response)}). Check the key and the model.")
     data = response.json()
     if data.get("stop_reason") == "max_tokens":
         raise BadReply("The model reply was cut off (max_tokens).")

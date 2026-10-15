@@ -445,12 +445,12 @@ async def _reagent_catalog(db, user, path: str, body: dict) -> list[AppliedChang
     from app.schemas.reagent import ReagentCreate, ReagentVendorCreate, VendorCreate
 
     if path == "/v1/reagent-vendors":
-        created = await create_reagent_vendor(ReagentVendorCreate.model_validate(body), user, db)
+        created = create_reagent_vendor(ReagentVendorCreate.model_validate(body), user, db)
         return [AppliedChange("reagent_vendor", created.catalog_number or created.vendor_name or "source", created.id)]
     if path == "/v1/vendors":
-        created = await create_vendor(VendorCreate.model_validate(body), user, db)
+        created = create_vendor(VendorCreate.model_validate(body), user, db)
         return [AppliedChange("vendor", created.name, created.id)]
-    created = await create_reagent(ReagentCreate.model_validate(body), user, db)
+    created = create_reagent(ReagentCreate.model_validate(body), user, db)
     return [AppliedChange("reagent", created.name, created.id)]
 
 

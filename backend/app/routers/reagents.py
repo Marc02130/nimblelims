@@ -20,8 +20,8 @@ from typing import List, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import func
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy import func, update
+from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import Session
 
 from app.core.rbac import require_config_edit, require_experiment_manage
@@ -94,7 +94,7 @@ def lot_expired(lot: ReagentLot, on: Optional[date] = None) -> bool:
 # ------------------------------------------------------------------ vendors ---
 
 @vendors_router.get("", response_model=List[VendorResponse])
-async def list_vendors(
+def list_vendors(
     search: Optional[str] = Query(None),
     active: Optional[bool] = Query(None),
     current_user: User = Depends(get_current_user),
@@ -107,7 +107,7 @@ async def list_vendors(
 
 
 @vendors_router.get("/{vendor_id}", response_model=VendorResponse)
-async def get_vendor(vendor_id: UUID, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def get_vendor(vendor_id: UUID, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     row = db.query(Vendor).filter(Vendor.id == vendor_id).first()
     if not row or (not row.active and not _has_config_edit(current_user, db)):
         raise HTTPException(status_code=404, detail="Vendor not found")
@@ -115,7 +115,7 @@ async def get_vendor(vendor_id: UUID, current_user: User = Depends(get_current_u
 
 
 @vendors_router.post("", response_model=VendorResponse, status_code=status.HTTP_201_CREATED)
-async def create_vendor(
+def create_vendor(
     body: VendorCreate,
     current_user: User = Depends(require_config_edit),
     db: Session = Depends(get_db),
@@ -128,7 +128,7 @@ async def create_vendor(
 
 
 @vendors_router.patch("/{vendor_id}", response_model=VendorResponse)
-async def update_vendor(
+def update_vendor(
     vendor_id: UUID,
     body: VendorUpdate,
     current_user: User = Depends(require_config_edit),
@@ -165,7 +165,7 @@ def _reagent_out(db: Session, row: Reagent) -> ReagentResponse:
 
 
 @reagents_router.get("", response_model=List[ReagentResponse])
-async def list_reagents(
+def list_reagents(
     search: Optional[str] = Query(None),
     vendor_id: Optional[UUID] = Query(None),
     active: Optional[bool] = Query(None),
@@ -182,7 +182,7 @@ async def list_reagents(
 
 
 @reagents_router.get("/{reagent_id}", response_model=ReagentResponse)
-async def get_reagent(reagent_id: UUID, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def get_reagent(reagent_id: UUID, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     row = db.query(Reagent).filter(Reagent.id == reagent_id).first()
     if not row or (not row.active and not _has_config_edit(current_user, db)):
         raise HTTPException(status_code=404, detail="Reagent not found")
@@ -190,7 +190,7 @@ async def get_reagent(reagent_id: UUID, current_user: User = Depends(get_current
 
 
 @reagents_router.post("", response_model=ReagentResponse, status_code=status.HTTP_201_CREATED)
-async def create_reagent(
+def create_reagent(
     body: ReagentCreate,
     current_user: User = Depends(require_config_edit),
     db: Session = Depends(get_db),
@@ -203,7 +203,7 @@ async def create_reagent(
 
 
 @reagents_router.patch("/{reagent_id}", response_model=ReagentResponse)
-async def update_reagent(
+def update_reagent(
     reagent_id: UUID,
     body: ReagentUpdate,
     current_user: User = Depends(require_config_edit),
@@ -232,7 +232,7 @@ def _source_out(row: ReagentVendor) -> ReagentVendorResponse:
 
 
 @reagent_vendors_router.get("", response_model=List[ReagentVendorResponse])
-async def list_reagent_vendors(
+def list_reagent_vendors(
     reagent_id: Optional[UUID] = Query(None),
     vendor_id: Optional[UUID] = Query(None),
     active: Optional[bool] = Query(None),
@@ -248,7 +248,7 @@ async def list_reagent_vendors(
 
 
 @reagent_vendors_router.get("/{source_id}", response_model=ReagentVendorResponse)
-async def get_reagent_vendor(source_id: UUID, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def get_reagent_vendor(source_id: UUID, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     row = db.query(ReagentVendor).filter(ReagentVendor.id == source_id).first()
     if not row or (not row.active and not _has_config_edit(current_user, db)):
         raise HTTPException(status_code=404, detail="Reagent vendor not found")
@@ -256,7 +256,7 @@ async def get_reagent_vendor(source_id: UUID, current_user: User = Depends(get_c
 
 
 @reagent_vendors_router.post("", response_model=ReagentVendorResponse, status_code=status.HTTP_201_CREATED)
-async def create_reagent_vendor(
+def create_reagent_vendor(
     body: ReagentVendorCreate,
     current_user: User = Depends(require_config_edit),
     db: Session = Depends(get_db),
@@ -280,7 +280,7 @@ async def create_reagent_vendor(
 
 
 @reagent_vendors_router.patch("/{source_id}", response_model=ReagentVendorResponse)
-async def update_reagent_vendor(
+def update_reagent_vendor(
     source_id: UUID,
     body: ReagentVendorUpdate,
     current_user: User = Depends(require_config_edit),
@@ -310,7 +310,7 @@ def _lot_out(row: ReagentLot) -> ReagentLotResponse:
 
 
 @reagent_lots_router.get("", response_model=List[ReagentLotResponse])
-async def list_reagent_lots(
+def list_reagent_lots(
     reagent_id: Optional[UUID] = Query(None),
     search: Optional[str] = Query(None),
     active: Optional[bool] = Query(None),
@@ -337,7 +337,7 @@ async def list_reagent_lots(
 
 
 @reagent_lots_router.get("/{lot_id}", response_model=ReagentLotResponse)
-async def get_reagent_lot(lot_id: UUID, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def get_reagent_lot(lot_id: UUID, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     row = db.query(ReagentLot).filter(ReagentLot.id == lot_id).first()
     if not row or (not row.active and not _has_config_edit(current_user, db)):
         raise HTTPException(status_code=404, detail="Reagent lot not found")
@@ -356,7 +356,7 @@ def _source_for(db: Session, source_id: Optional[UUID], reagent_id: Optional[UUI
 
 
 @reagent_lots_router.post("", response_model=ReagentLotResponse, status_code=status.HTTP_201_CREATED)
-async def create_reagent_lot(
+def create_reagent_lot(
     body: ReagentLotCreate,
     current_user: User = Depends(require_config_edit),
     db: Session = Depends(get_db),
@@ -391,7 +391,7 @@ async def create_reagent_lot(
 
 
 @reagent_lots_router.patch("/{lot_id}", response_model=ReagentLotResponse)
-async def update_reagent_lot(
+def update_reagent_lot(
     lot_id: UUID,
     body: ReagentLotUpdate,
     current_user: User = Depends(require_config_edit),
@@ -425,7 +425,7 @@ def _use_out(row: ReagentUse) -> ReagentUseResponse:
 
 
 @reagent_uses_router.get("", response_model=List[ReagentUseResponse])
-async def list_reagent_uses(
+def list_reagent_uses(
     lims_run_id: Optional[UUID] = Query(None),
     experiment_id: Optional[UUID] = Query(None),
     reagent_lot_id: Optional[UUID] = Query(None),
@@ -446,7 +446,7 @@ async def list_reagent_uses(
 
 
 @reagent_uses_router.post("", response_model=ReagentUseResponse, status_code=status.HTTP_201_CREATED)
-async def record_reagent_use(
+def record_reagent_use(
     body: ReagentUseCreate,
     current_user: User = Depends(require_experiment_manage),
     db: Session = Depends(get_db),
@@ -460,7 +460,9 @@ async def record_reagent_use(
         raise HTTPException(status_code=404, detail="LIMS run not found")
     if body.experiment_id is not None and not db.query(Experiment).filter(Experiment.id == body.experiment_id).first():
         raise HTTPException(status_code=404, detail="Experiment not found")
-    lot = db.query(ReagentLot).filter(ReagentLot.id == body.reagent_lot_id).with_for_update().first()
+    # No row lock while validating: the draw-down below is one atomic UPDATE,
+    # so the lot row is locked only for that statement plus the commit (RT-7).
+    lot = db.query(ReagentLot).filter(ReagentLot.id == body.reagent_lot_id).first()
     if lot is None:
         raise HTTPException(status_code=404, detail="Reagent lot not found")
     if not lot.active:
@@ -483,14 +485,32 @@ async def record_reagent_use(
             status_code=422,
             detail=f"Lot {lot.lot_number} is counted in {lot.unit}; enter the quantity in {lot.unit}",
         )
+    if quantity <= 0:
+        raise HTTPException(status_code=422, detail="Quantity used must be greater than 0")
     if lot.quantity_remaining is not None:
-        if quantity > Decimal(lot.quantity_remaining):
+        try:
+            left = db.execute(
+                update(ReagentLot)
+                .where(
+                    ReagentLot.id == lot.id,
+                    ReagentLot.active.is_(True),
+                    ReagentLot.released.is_(True),
+                    ReagentLot.quantity_remaining >= quantity,
+                )
+                .values(quantity_remaining=ReagentLot.quantity_remaining - quantity, modified_by=current_user.id)
+                .returning(ReagentLot.quantity_remaining)
+                .execution_options(synchronize_session=False)
+            ).scalar_one_or_none()
+        except OperationalError:
+            db.rollback()
+            raise HTTPException(status_code=503, detail="The lot is busy; try again")
+        if left is None:
+            db.rollback()
+            current = db.query(ReagentLot.quantity_remaining).filter(ReagentLot.id == lot.id).scalar()
             raise HTTPException(
                 status_code=422,
-                detail=f"Lot {lot.lot_number} has {lot.quantity_remaining} {lot.unit or ''} left".strip(),
+                detail=f"Lot {lot.lot_number} has {current} {lot.unit or ''} left".strip(),
             )
-        lot.quantity_remaining = Decimal(lot.quantity_remaining) - quantity
-        lot.modified_by = current_user.id
     row = ReagentUse(
         reagent_lot_id=lot.id,
         lims_run_id=body.lims_run_id,
@@ -510,7 +530,7 @@ async def record_reagent_use(
 
 
 @reagent_uses_router.patch("/{use_id}", response_model=ReagentUseResponse)
-async def update_reagent_use(
+def update_reagent_use(
     use_id: UUID,
     body: ReagentUseUpdate,
     current_user: User = Depends(require_experiment_manage),
@@ -525,10 +545,15 @@ async def update_reagent_use(
         raise HTTPException(status_code=422, detail="A voided use stays voided. Record the use again.")
     if data.get("active") is False and row.active:
         row.active = False
-        lot = db.query(ReagentLot).filter(ReagentLot.id == row.reagent_lot_id).with_for_update().first()
-        if lot is not None and lot.quantity_remaining is not None:
-            lot.quantity_remaining = Decimal(lot.quantity_remaining) + Decimal(row.quantity_used)
-            lot.modified_by = current_user.id
+        db.execute(
+            update(ReagentLot)
+            .where(ReagentLot.id == row.reagent_lot_id, ReagentLot.quantity_remaining.isnot(None))
+            .values(
+                quantity_remaining=ReagentLot.quantity_remaining + Decimal(row.quantity_used),
+                modified_by=current_user.id,
+            )
+            .execution_options(synchronize_session=False)
+        )
     if "note" in data:
         row.note = data["note"]
     row.modified_by = current_user.id

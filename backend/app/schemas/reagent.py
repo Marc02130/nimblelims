@@ -199,7 +199,7 @@ class ReagentUseCreate(BaseModel):
     """Select a lot, then the quantity used. The lot's quantity remaining goes down."""
 
     reagent_lot_id: UUID
-    quantity_used: Decimal = Field(..., ge=0)
+    quantity_used: Decimal = Field(..., gt=0)
     lims_run_id: Optional[UUID] = None
     experiment_id: Optional[UUID] = None
     analysis_id: Optional[UUID] = None
