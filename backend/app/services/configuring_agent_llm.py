@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from typing import Any
 
 import logging
@@ -34,8 +35,28 @@ def model_timeout() -> float:
     return value if value > 0 else DEFAULT_TIMEOUT_S
 
 
+_ACCOUNT_ID = re.compile(
+    r"\b(team|organi[sz]ation|org|account|project|workspace|tenant)(s?)\b(\s*(?:id)?\s*[:=#]?\s*[\"']?)"
+    r"((?=[A-Za-z_-]*\d)[A-Za-z0-9][A-Za-z0-9_-]{5,})",  # ids carry a digit; plain words don't
+    re.I,
+)
+_UUID = re.compile(r"\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b", re.I)
+_PREFIXED_ID = re.compile(r"\b(org|proj|acct|team|user)-[A-Za-z0-9]{8,}\b")
+
+
+def redact_ids(text: str) -> str:
+    """Hide team/org/account ids that providers echo in errors (UAT 67481e9:
+    an xAI 404 showed the team id)."""
+    if not text:
+        return text
+    text = _ACCOUNT_ID.sub(lambda m: f"{m.group(1)}{m.group(2)}{m.group(3)}[redacted]", text)
+    text = _PREFIXED_ID.sub("[redacted]", text)
+    return _UUID.sub("[redacted]", text)
+
+
 class ProviderError(Exception):
     def __init__(self, message: str):
+        message = redact_ids(message)
         self.message = message
         super().__init__(message)
 
