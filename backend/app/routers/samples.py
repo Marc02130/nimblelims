@@ -31,7 +31,7 @@ router = APIRouter()
 
 
 @router.get("/eligible", response_model=EligibleSamplesResponse)
-async def get_eligible_samples(
+def get_eligible_samples(
     request: Request,
     test_ids: Optional[str] = Query(None, description="Comma-separated list of test/analysis IDs to filter by"),
     project_id: Optional[str] = Query(None, description="Filter by project ID"),
@@ -346,7 +346,7 @@ def _create_tests_for_sample(
 
 
 @router.get("", response_model=SampleListResponse)
-async def get_samples(
+def get_samples(
     request: Request,
     project_id: Optional[str] = Query(None, description="Filter by project ID"),
     status: Optional[str] = Query(None, description="Filter by status ID"),
@@ -511,7 +511,7 @@ async def get_samples(
 
 
 @router.get("/{sample_id}", response_model=SampleResponse)
-async def get_sample(
+def get_sample(
     sample_id: UUID,
     current_user: User = Depends(require_sample_read),
     db: Session = Depends(get_db)
@@ -540,7 +540,7 @@ async def get_sample(
 
 
 @router.post("/", response_model=SampleResponse)
-async def create_sample(
+def create_sample(
     sample_data: SampleCreate,
     current_user: User = Depends(require_sample_create),
     db: Session = Depends(get_db)
@@ -617,7 +617,7 @@ async def create_sample(
     response_model=SampleReceiveResponse,
     status_code=status.HTTP_201_CREATED,
 )
-async def receive_sample(
+def receive_sample(
     receive_data: SampleReceiveRequest,
     current_user: User = Depends(require_sample_create),
     db: Session = Depends(get_db),
@@ -633,7 +633,7 @@ async def receive_sample(
 
 
 @router.post("/accession", response_model=SampleResponse)
-async def accession_sample(
+def accession_sample(
     accession_data: SampleAccessioningRequest,
     current_user: User = Depends(require_sample_create),
     db: Session = Depends(get_db)
@@ -859,7 +859,7 @@ async def accession_sample(
 
 
 @router.post("/bulk-accession", response_model=List[SampleResponse])
-async def bulk_accession_samples(
+def bulk_accession_samples(
     bulk_data: BulkSampleAccessioningRequest,
     current_user: User = Depends(require_sample_create),
     db: Session = Depends(get_db)
@@ -1189,7 +1189,7 @@ async def bulk_accession_samples(
 
 
 @router.patch("/{sample_id}", response_model=SampleResponse)
-async def update_sample(
+def update_sample(
     sample_id: UUID,
     sample_data: SampleUpdate,
     current_user: User = Depends(require_sample_update),
@@ -1279,7 +1279,7 @@ async def update_sample(
 
 
 @router.delete("/{sample_id}")
-async def delete_sample(
+def delete_sample(
     sample_id: UUID,
     current_user: User = Depends(require_sample_delete),
     db: Session = Depends(get_db)
@@ -1323,7 +1323,7 @@ async def delete_sample(
 
 
 @router.patch("/{sample_id}/status", response_model=SampleResponse)
-async def update_sample_status(
+def update_sample_status(
     sample_id: UUID,
     status_id: UUID,
     current_user: User = Depends(require_sample_update),

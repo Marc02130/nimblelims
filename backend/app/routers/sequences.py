@@ -28,7 +28,7 @@ class SequenceStartResponse(BaseModel):
 
 
 @router.post("/{entity_type}/start", response_model=SequenceStartResponse)
-async def set_sequence_start(
+def set_sequence_start(
     entity_type: str,
     body: SequenceStartRequest,
     current_user: User = Depends(require_config_edit),
