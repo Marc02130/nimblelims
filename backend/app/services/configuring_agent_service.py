@@ -572,7 +572,9 @@ def release_db_for_model_call(db: Session) -> None:
     fresh transaction (RLS GUCs re-applied by the after_begin hook) on next use.
     Callers must not touch the session between this and the model reply.
     """
-    db.commit()
+    from app.database import release_transaction
+
+    release_transaction(db)
 
 
 def finish_run(db: Session, user: User, pending: PendingRun, raise_errors: bool = True) -> ConfigurationRun:
