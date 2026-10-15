@@ -30,7 +30,7 @@ from app.services.configuring_agent_crypto import (
     resolve_provider_key,
 )
 from app.services.configuring_agent_embeddings import EMBEDDING_MODEL, embed_texts
-from app.services.configuring_agent_extract import UnsupportedFileType, detect_kind, extract_text
+from app.services.configuring_agent_extract import NoTextInFile, UnsupportedFileType, file_text
 from app.services.configuring_agent_llm import ProviderError, list_models, propose
 from app.services.configuring_agent_allow import PROVIDERS
 from models.configuring_agent import (
@@ -247,12 +247,11 @@ def add_document(db: Session, user: User, configuration_id, filename: str, data:
     if len(data) > MAX_FILE_BYTES:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "File is larger than 10 MB.")
     try:
-        kind = detect_kind(data, filename)
-        text = extract_text(data, kind)
+        text = file_text(data, filename)
     except UnsupportedFileType as exc:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
-    if not text.strip():
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "That file has no text to configure from.")
+    except NoTextInFile as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "That file has no text to configure from.") from exc
     labeled = split_with_headings(text)
     if not labeled:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "That file has no text to configure from.")

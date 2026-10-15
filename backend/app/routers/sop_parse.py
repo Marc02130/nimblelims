@@ -50,9 +50,20 @@ def create_parse_job(
         instrument_file, field_name=instrument_file.filename or "instrument_file"
     )
 
-    # Decode file bytes to text (UTF-8 with BOM stripping)
-    sop_text = sop_bytes.decode("utf-8-sig", errors="replace")
-    instrument_text = instrument_bytes.decode("utf-8-sig", errors="replace")
+    # Same extraction as the configuring agent: PDF/DOCX text, refuse binary
+    # and text-less files here instead of completing with an empty template.
+    from app.services.configuring_agent_extract import NoTextInFile, UnsupportedFileType, file_text
+
+    def _text(data: bytes, upload: UploadFile, label: str) -> str:
+        try:
+            return file_text(data, upload.filename or "")
+        except UnsupportedFileType as exc:
+            raise HTTPException(status.HTTP_415_UNSUPPORTED_MEDIA_TYPE, f"{label}: {exc}") from exc
+        except NoTextInFile as exc:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, f"{label}: {exc}") from exc
+
+    sop_text = _text(sop_bytes, sop_file, "SOP file")
+    instrument_text = _text(instrument_bytes, instrument_file, "Instrument file")
 
     job = service.create_job(
         sop_filename=sop_file.filename,

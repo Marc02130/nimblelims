@@ -1905,7 +1905,9 @@ Base path: `/api/v1/sop-parse`. Requires **`experiment:manage`**. Used to upload
 - `GET /sop-parse/{job_id}` — Job status: `pending`, `processing`, `complete`, `failed`; when complete, `result` contains extracted JSON (`template_definition`, parser/worklist fragments as produced by the service).
 - `POST /sop-parse/{job_id}/apply` — After status is `complete`, creates template (and related records) in one transaction. **409** if already applied (idempotent retry safe).
 
-**Configuration:** SOP parse uses the same providers and client as the configuring agent (Anthropic, OpenAI, or xAI). It uses the provider and model chosen under Configuring agent settings (stored key, or that provider's env var), else the first of `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `XAI_API_KEY` that is set (override with `SOP_PARSE_PROVIDER` / `SOP_PARSE_MODEL`). Default models when only an env key is set: `claude-opus-4-5-20251101`, `gpt-4.1`, `grok-4`. With no key, the job fails with a message naming the variables. Provider errors are recorded with account ids redacted.
+**Uploads:** `sop_file` may be PDF (text is extracted), DOCX, or plain text; `instrument_file` must be text (CSV). Other binary files get **415**; a file with no extractable text (for example a scanned PDF) gets **422**. Both happen at upload, so no job is created.
+
+**Configuration:** SOP parse uses the same providers and client as the configuring agent (Anthropic, OpenAI, or xAI). If a provider is chosen under Configuring agent settings, it uses only that provider: its stored key or its own env var (never another provider's key; with neither, the job fails with "No key configured for <provider>"), and the stored model or else the default below. With no provider chosen, it uses the first of `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `XAI_API_KEY` that is set (override with `SOP_PARSE_PROVIDER` / `SOP_PARSE_MODEL`). Default models when only an env key is set: `claude-opus-4-5-20251101`, `gpt-4.1`, `grok-4`. With no key, the job fails with a message naming the variables. Provider errors are recorded with account ids redacted.
 
 **RLS:** `sop_parse_jobs` and related experiment-engine tables use client-scoped RLS (see migrations 0041/0042 and `.docs/internal/design/experiment-planning.md`).
 
@@ -2410,7 +2412,7 @@ No DELETE routes. Retire with `active: false`; use a lot up with `quantity_remai
 
 Gate: `config:edit`. Missing permission: **403** `You can't change configuring-agent settings.`
 
-Settings row name `Configuring agent`, fixed id. Key ciphertext is never returned. `key_set` is a boolean. Changing `provider` clears the stored key and, unless `model` is sent in that same save, the model. `DELETE` of the key also clears `agent_model`.
+Settings row name `Configuring agent`, fixed id. Key ciphertext is never returned. `key_set` is a boolean. Changing `provider` clears the stored key and, unless `model` is sent in that same save, the model. `DELETE` of the key clears only the key; `agent_provider` and `agent_model` stay.
 
 `GET /v1/configuring-agent/models?provider=openai|xai|anthropic` calls that provider only. A missing key names `OPENAI_API_KEY`, `XAI_API_KEY`, or `ANTHROPIC_API_KEY`. No other vendor is tried.
 

@@ -10,6 +10,32 @@ class UnsupportedFileType(ValueError):
     pass
 
 
+class NoTextInFile(ValueError):
+    pass
+
+
+def file_text(data: bytes, filename: str = "") -> str:
+    """Text of an uploaded lab file. One path for the configuring agent and SOP parse.
+
+    UnsupportedFileType: not PDF/DOCX/text, or a PDF/DOCX that can't be read.
+    NoTextInFile: readable but no extractable text (e.g. a scanned PDF).
+    """
+    if not data:
+        raise NoTextInFile("That file is empty.")
+    kind = detect_kind(data, filename)
+    try:
+        text = extract_text(data, kind)
+    except UnsupportedFileType:
+        raise
+    except Exception as exc:  # noqa: BLE001 - corrupt PDF/DOCX
+        raise UnsupportedFileType(f"Could not read that {kind.upper()} file.") from exc
+    if not text.strip():
+        if kind == "pdf":
+            raise NoTextInFile("That PDF has no extractable text (it may be a scanned image). Upload a text PDF, DOCX, or TXT.")
+        raise NoTextInFile("That file has no text.")
+    return text
+
+
 def detect_kind(data: bytes, filename: str = "") -> str:
     lower = (filename or "").lower()
     if data.startswith(b"%PDF") or lower.endswith(".pdf"):
