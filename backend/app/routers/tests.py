@@ -23,6 +23,12 @@ from app.core.security import get_current_user
 from datetime import datetime
 from uuid import UUID
 
+from app.core.db_errors import commit_or_409
+
+TEST_UNIQUE = {
+    "tests_name_key": "This sample already has that test (same analysis). Use the existing test.",
+}
+
 router = APIRouter()
 
 
@@ -194,7 +200,7 @@ def create_test(
     )
     
     db.add(test)
-    db.commit()
+    commit_or_409(db, TEST_UNIQUE)
     db.refresh(test)
     
     return TestResponse.from_orm(test)
@@ -266,7 +272,7 @@ def assign_test_to_sample(
     )
     
     db.add(test)
-    db.commit()
+    commit_or_409(db, TEST_UNIQUE)
     db.refresh(test)
     
     return TestResponse.from_orm(test)
