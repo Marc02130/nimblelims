@@ -64,6 +64,9 @@ def create_parse_job(
         job_id=job.id,
         sop_text=sop_text,
         instrument_text=instrument_text,
+        # RLS context of this request, for the task's own sessions.
+        user_id=service.current_user.id if service.current_user else None,
+        client_id=service.current_user.client_id if service.current_user else None,
     )
 
     out = SopParseJobRead.model_validate(job)

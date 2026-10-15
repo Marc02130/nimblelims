@@ -15,14 +15,17 @@ Claude extraction prompt produces:
       "worklist_config": WorklistConfig dict
     }
 
-Background tasks use their own SessionLocal() to avoid sharing a session with the
-HTTP request that spawned them (per design doc decision).
+Background tasks use their own sessions (app.database.background_session) to
+avoid sharing a session with the HTTP request that spawned them (per design doc
+decision); each carries the requesting user's RLS context.
 """
 from __future__ import annotations
 
 import json
 import uuid
 from typing import Optional
+
+import logging
 
 import anthropic
 from fastapi import HTTPException, status
@@ -99,6 +102,9 @@ positions, source/destination plates). The mandatory_review_count in template_de
 should be the total count of transfer_steps where mandatory_review=true.
 If information is not present in the SOP, use null for optional fields and empty
 arrays for lists. Do not invent information that is not in the SOP."""
+
+
+logger = logging.getLogger(__name__)
 
 
 class SOPParseService:
@@ -234,6 +240,9 @@ class SOPParseService:
         job_id: uuid.UUID,
         sop_text: str,
         instrument_text: str,
+        user_id: Optional[uuid.UUID] = None,
+        client_id: Optional[uuid.UUID] = None,
+        session_factory=None,
     ) -> None:
         """
         Background task: call Claude API, parse result, update job status.
@@ -243,23 +252,32 @@ class SOPParseService:
           Session 1: mark job as processing, then release connection.
           [Claude API call — no DB connection held]
           Session 2: write result (complete or failed), then release connection.
+
+        Both sessions carry the requesting user's RLS context (user_id and
+        client_id captured at request time), so the task can only see and
+        write that client's jobs. No user: fail closed, touch nothing.
         """
-        from app.database import SessionLocal
+        from app.database import MissingRlsContext, background_session
 
         # ── Session 1: mark processing ──────────────────────────────────────
-        db = SessionLocal()
         try:
-            repo = SopParseJobRepository(db)
-            job = repo.get_by_id(job_id)
-            if not job:
-                return
-            repo.mark_processing(job)
-            db.commit()
-        except Exception:
-            db.rollback()
+            with background_session(user_id, client_id, session_factory) as db:
+                try:
+                    repo = SopParseJobRepository(db)
+                    job = repo.get_by_id(job_id)
+                    if not job:
+                        return
+                    repo.mark_processing(job)
+                    db.commit()
+                except Exception:
+                    db.rollback()
+                    return
+        except MissingRlsContext:
+            logger.error("SOP parse job %s started without a user; not run", job_id)
             return
-        finally:
-            db.close()
+        except Exception:  # noqa: BLE001 - no DB: nothing to mark; job stays pending
+            logger.exception("SOP parse job %s: could not open its session", job_id)
+            return
 
         # ── Anthropic API call — no DB connection held ───────────────────────
         error_message: Optional[str] = None
@@ -300,18 +318,19 @@ class SOPParseService:
                 error_message = f"Unexpected error: {str(e)}"
 
         # ── Session 2: write result ──────────────────────────────────────────
-        db = SessionLocal()
         try:
-            repo = SopParseJobRepository(db)
-            job = repo.get_by_id(job_id)
-            if not job:
-                return
-            if error_message:
-                repo.mark_failed(job, error_message)
-            else:
-                repo.mark_complete(job, result)
-            db.commit()
-        except Exception:
-            db.rollback()
-        finally:
-            db.close()
+            with background_session(user_id, client_id, session_factory) as db:
+                try:
+                    repo = SopParseJobRepository(db)
+                    job = repo.get_by_id(job_id)
+                    if not job:
+                        return
+                    if error_message:
+                        repo.mark_failed(job, error_message)
+                    else:
+                        repo.mark_complete(job, result)
+                    db.commit()
+                except Exception:
+                    db.rollback()
+        except Exception:  # noqa: BLE001
+            logger.exception("SOP parse job %s: could not save its result", job_id)
