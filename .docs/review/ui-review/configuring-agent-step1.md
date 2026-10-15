@@ -164,7 +164,7 @@ No chat box, no prompt, no test message, no streaming panel.
 
 | Control | Copy |
 |---------|------|
-| Clear key confirm | “Clear the {provider} key? Configuring agent can't call that provider until a key is set again.” The selected model is cleared too. This dialog is already on the page. |
+| Clear key confirm | “Clear the {provider} key? Configuring agent can't call that provider until a key is set again.” The provider and model stay. This dialog is already on the page. |
 | Set key success | “Key saved.” Do not repeat the key. |
 | Test connection | Pass and fail sentences above. The response does not include the key, a key prefix, or `OPENAI_API_KEY` / `XAI_API_KEY` / `ANTHROPIC_API_KEY` values. |
 

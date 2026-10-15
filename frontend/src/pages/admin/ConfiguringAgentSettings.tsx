@@ -261,7 +261,7 @@ const ConfiguringAgentSettings: React.FC = () => {
         <DialogTitle>Clear key</DialogTitle>
         <DialogContent>
           <DialogContentText>
-            {`Clear the ${providerLabel} key? Configuring agent can't call that provider until a key is set again. The selected model is cleared too.`}
+            {`Clear the ${providerLabel} key? Configuring agent can't call that provider until a key is set again.`}
           </DialogContentText>
         </DialogContent>
         <DialogActions>
