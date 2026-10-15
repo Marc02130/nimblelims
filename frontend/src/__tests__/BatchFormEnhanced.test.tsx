@@ -75,8 +75,6 @@ const createMockEligibleSamples = (samples: Partial<EligibleSample>[]): Eligible
     is_expired: s.is_expired ?? false,
     is_overdue: s.is_overdue ?? false,
     expiration_warning: s.expiration_warning || null,
-    analysis_id: s.analysis_id || null,
-    analysis_name: s.analysis_name || null,
     shelf_life: s.shelf_life || null,
     project_name: s.project_name || 'Project Alpha',
     project_due_date: s.project_due_date || null,
@@ -88,6 +86,17 @@ const createMockEligibleSamples = (samples: Partial<EligibleSample>[]): Eligible
   pages: 1,
   warnings: [],
 });
+
+
+// Step 1 -> Step 2, then pick a test: eligible samples load only once at least one
+// test/analysis is selected (the step shows an info prompt until then).
+const goToSamplesStep = async (user: ReturnType<typeof userEvent.setup>) => {
+  await user.type(screen.getByLabelText('Batch name'), 'Test Batch');
+  await user.click(screen.getByRole('button', { name: 'Next' }));
+  const filter = await screen.findByLabelText('Filter by Test/Analysis');
+  await user.click(filter);
+  await user.click(await screen.findByRole('option', { name: 'EPA Method 8080' }));
+};
 
 const renderWithProviders = (component: React.ReactElement) => {
   return render(
@@ -110,7 +119,10 @@ describe('BatchFormEnhanced', () => {
     });
     
     mockApiService.getProjects.mockResolvedValue(mockProjects);
-    mockApiService.getAnalyses.mockResolvedValue(mockAnalyses);
+    // /analyses is paginated: {analyses, total, ...}
+    mockApiService.getAnalyses.mockResolvedValue({ analyses: mockAnalyses, total: 2, page: 1, size: 10, pages: 1 } as any);
+    // The form calls getContainerTypes().catch(); an unmocked (undefined) return breaks loading.
+    mockApiService.getContainerTypes.mockResolvedValue([] as any);
     mockApiService.getContainers.mockResolvedValue([]);
     mockApiService.getEligibleSamples.mockResolvedValue(createMockEligibleSamples([]));
   });
@@ -164,7 +176,6 @@ describe('BatchFormEnhanced', () => {
           days_until_due: 10,
           is_expired: false,
           is_overdue: false,
-          analysis_name: 'EPA Method 8080',
           shelf_life: 14,
         },
       ]));
@@ -176,8 +187,7 @@ describe('BatchFormEnhanced', () => {
       });
 
       // Navigate to step 2
-      await user.type(screen.getByLabelText('Batch name'), 'Test Batch');
-      await user.click(screen.getByText('Next'));
+      await goToSamplesStep(user);
 
       await waitFor(() => {
         expect(screen.getByText('Eligible Samples')).toBeInTheDocument();
@@ -215,8 +225,7 @@ describe('BatchFormEnhanced', () => {
         expect(screen.getByLabelText('Batch name')).toBeInTheDocument();
       });
 
-      await user.type(screen.getByLabelText('Batch name'), 'Test Batch');
-      await user.click(screen.getByText('Next'));
+      await goToSamplesStep(user);
 
       await waitFor(() => {
         expect(screen.getByText('Eligible Samples')).toBeInTheDocument();
@@ -249,8 +258,7 @@ describe('BatchFormEnhanced', () => {
         expect(screen.getByLabelText('Batch name')).toBeInTheDocument();
       });
 
-      await user.type(screen.getByLabelText('Batch name'), 'Test Batch');
-      await user.click(screen.getByText('Next'));
+      await goToSamplesStep(user);
 
       await waitFor(() => {
         expect(mockApiService.getEligibleSamples).toHaveBeenCalled();
@@ -269,10 +277,9 @@ describe('BatchFormEnhanced', () => {
       // API should not be called yet
       expect(mockApiService.getEligibleSamples).not.toHaveBeenCalled();
 
-      await user.type(screen.getByLabelText('Batch name'), 'Test Batch');
-      await user.click(screen.getByText('Next'));
+      await goToSamplesStep(user);
 
-      // Now on step 2, API should be called
+      // On step 2 with a test selected, the API is called
       await waitFor(() => {
         expect(mockApiService.getEligibleSamples).toHaveBeenCalled();
       });
@@ -287,8 +294,7 @@ describe('BatchFormEnhanced', () => {
         expect(screen.getByLabelText('Batch name')).toBeInTheDocument();
       });
 
-      await user.type(screen.getByLabelText('Batch name'), 'Test Batch');
-      await user.click(screen.getByText('Next'));
+      await goToSamplesStep(user);
 
       await waitFor(() => {
         expect(screen.getByText('Eligible Samples')).toBeInTheDocument();
@@ -349,8 +355,7 @@ describe('BatchFormEnhanced', () => {
         expect(screen.getByLabelText('Batch name')).toBeInTheDocument();
       });
 
-      await user.type(screen.getByLabelText('Batch name'), 'Test Batch');
-      await user.click(screen.getByText('Next'));
+      await goToSamplesStep(user);
 
       await waitFor(() => {
         expect(screen.getByText('Eligible Samples')).toBeInTheDocument();
@@ -380,8 +385,7 @@ describe('BatchFormEnhanced', () => {
         expect(screen.getByLabelText('Batch name')).toBeInTheDocument();
       });
 
-      await user.type(screen.getByLabelText('Batch name'), 'Test Batch');
-      await user.click(screen.getByText('Next'));
+      await goToSamplesStep(user);
 
       await waitFor(() => {
         expect(screen.getByText('Eligible Samples')).toBeInTheDocument();
@@ -426,8 +430,7 @@ describe('BatchFormEnhanced', () => {
         expect(screen.getByLabelText('Batch name')).toBeInTheDocument();
       });
 
-      await user.type(screen.getByLabelText('Batch name'), 'Test Batch');
-      await user.click(screen.getByText('Next'));
+      await goToSamplesStep(user);
 
       await waitFor(() => {
         expect(screen.getByText('Eligible Samples')).toBeInTheDocument();
@@ -458,8 +461,7 @@ describe('BatchFormEnhanced', () => {
         expect(screen.getByLabelText('Batch name')).toBeInTheDocument();
       });
 
-      await user.type(screen.getByLabelText('Batch name'), 'Test Batch');
-      await user.click(screen.getByText('Next'));
+      await goToSamplesStep(user);
 
       await waitFor(() => {
         expect(screen.getByText('Eligible Samples')).toBeInTheDocument();
@@ -484,8 +486,7 @@ describe('BatchFormEnhanced', () => {
       });
 
       // Step 1: Batch Details
-      await user.type(screen.getByLabelText('Batch name'), 'Test Batch');
-      await user.click(screen.getByText('Next'));
+      await goToSamplesStep(user);
 
       // Step 2: Eligible Samples (skip, no containers selected)
       await waitFor(() => {
@@ -495,7 +496,8 @@ describe('BatchFormEnhanced', () => {
 
       // Step 3: QC Samples (skip)
       await waitFor(() => {
-        expect(screen.getByText('QC Samples')).toBeInTheDocument();
+        // "QC Samples" is also the stepper label; the step's heading is the h6.
+        expect(screen.getByRole('heading', { name: 'QC Samples' })).toBeInTheDocument();
       });
       await user.click(screen.getByText('Next'));
 
@@ -548,7 +550,10 @@ describe('BatchFormEnhanced Priority Cell Rendering', () => {
     });
     
     mockApiService.getProjects.mockResolvedValue(mockProjects);
-    mockApiService.getAnalyses.mockResolvedValue(mockAnalyses);
+    // /analyses is paginated: {analyses, total, ...}
+    mockApiService.getAnalyses.mockResolvedValue({ analyses: mockAnalyses, total: 2, page: 1, size: 10, pages: 1 } as any);
+    // The form calls getContainerTypes().catch(); an unmocked (undefined) return breaks loading.
+    mockApiService.getContainerTypes.mockResolvedValue([] as any);
     mockApiService.getContainers.mockResolvedValue([]);
   });
 
@@ -571,8 +576,7 @@ describe('BatchFormEnhanced Priority Cell Rendering', () => {
       expect(screen.getByLabelText('Batch name')).toBeInTheDocument();
     });
 
-    await user.type(screen.getByLabelText('Batch name'), 'Test');
-    await user.click(screen.getByText('Next'));
+    await goToSamplesStep(user);
 
     await waitFor(() => {
       expect(screen.getByText('Eligible Samples')).toBeInTheDocument();
@@ -603,8 +607,7 @@ describe('BatchFormEnhanced Priority Cell Rendering', () => {
       expect(screen.getByLabelText('Batch name')).toBeInTheDocument();
     });
 
-    await user.type(screen.getByLabelText('Batch name'), 'Test');
-    await user.click(screen.getByText('Next'));
+    await goToSamplesStep(user);
 
     await waitFor(() => {
       expect(screen.getByText('Eligible Samples')).toBeInTheDocument();
@@ -633,8 +636,7 @@ describe('BatchFormEnhanced Priority Cell Rendering', () => {
       expect(screen.getByLabelText('Batch name')).toBeInTheDocument();
     });
 
-    await user.type(screen.getByLabelText('Batch name'), 'Test');
-    await user.click(screen.getByText('Next'));
+    await goToSamplesStep(user);
 
     await waitFor(() => {
       expect(screen.getByText('Eligible Samples')).toBeInTheDocument();
@@ -661,7 +663,10 @@ describe('BatchFormEnhanced Tooltip Accessibility', () => {
     });
     
     mockApiService.getProjects.mockResolvedValue(mockProjects);
-    mockApiService.getAnalyses.mockResolvedValue(mockAnalyses);
+    // /analyses is paginated: {analyses, total, ...}
+    mockApiService.getAnalyses.mockResolvedValue({ analyses: mockAnalyses, total: 2, page: 1, size: 10, pages: 1 } as any);
+    // The form calls getContainerTypes().catch(); an unmocked (undefined) return breaks loading.
+    mockApiService.getContainerTypes.mockResolvedValue([] as any);
     mockApiService.getContainers.mockResolvedValue([]);
   });
 
@@ -684,8 +689,7 @@ describe('BatchFormEnhanced Tooltip Accessibility', () => {
       expect(screen.getByLabelText('Batch name')).toBeInTheDocument();
     });
 
-    await user.type(screen.getByLabelText('Batch name'), 'Test');
-    await user.click(screen.getByText('Next'));
+    await goToSamplesStep(user);
 
     await waitFor(() => {
       expect(screen.getByText('Eligible Samples')).toBeInTheDocument();

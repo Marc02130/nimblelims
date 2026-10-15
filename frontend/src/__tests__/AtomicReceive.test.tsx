@@ -10,6 +10,8 @@ const mockGetProjects = jest.fn();
 const mockGetContainerTypes = jest.fn();
 
 jest.mock('../services/apiService', () => ({
+  // Real helpers (ApiService.formatError, addClientFilterIfNeeded, types); only the client is mocked.
+  ...jest.requireActual('../services/apiService'),
   apiService: {
     getListEntries: (...args: any[]) => mockGetListEntries(...args),
     getProjects: (...args: any[]) => mockGetProjects(...args),
