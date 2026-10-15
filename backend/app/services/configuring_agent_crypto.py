@@ -22,8 +22,9 @@ class MissingProviderKey(Exception):
         self.provider = provider
         self.env_name = env_name
         super().__init__(
-            f"No key for {provider}. Set it here or set {env_name}. "
-            "Configuring agent will not call another provider."
+            # Same wording as SOP parse: "No key configured for <provider>."
+            f"No key configured for {provider}. Set it under Configuring agent settings "
+            f"or set {env_name} on the backend. Configuring agent will not call another provider."
         )
 
 

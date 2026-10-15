@@ -104,6 +104,9 @@ def test_key_round_trip_and_no_other_vendor(monkeypatch):
         resolve_provider_key("openai", None)
     assert exc.value.env_name == "OPENAI_API_KEY"
     assert "not-for-openai" not in str(exc.value)
+    # One wording for agent and SOP parse.
+    assert str(exc.value).startswith("No key configured for openai.")
+    assert "OPENAI_API_KEY" in str(exc.value)
 
 
 def test_configuration_rows_have_name_and_chunks_stay_with_configuration():
