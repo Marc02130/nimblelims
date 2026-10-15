@@ -1,11 +1,15 @@
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import WorkflowTemplatesManagement from '../pages/admin/WorkflowTemplatesManagement';
 
 jest.mock('../services/apiService', () => ({
+  // Real helpers (ApiService.formatError, addClientFilterIfNeeded, types); only the client is mocked.
+  ...jest.requireActual('../services/apiService'),
   apiService: {
+    // UserProvider probes the cookie session on mount (P4/S10). Plain fn: survives resetMocks.
+    getCurrentUser: () => Promise.reject(new Error('no session')),
     getWorkflowTemplates: jest.fn(),
     createWorkflowTemplate: jest.fn(),
     updateWorkflowTemplate: jest.fn(),
@@ -247,7 +251,9 @@ describe('WorkflowTemplatesManagement', () => {
       expect(screen.getByText('Sample Receipt Workflow')).toBeInTheDocument();
     });
 
-    const deleteBtn = screen.getByRole('button', { name: 'Delete' });
+    // Grid row actions are menuitems; use the Sample Receipt Workflow (t1) row.
+    const row = screen.getByText('Sample Receipt Workflow').closest('[role="row"]') as HTMLElement;
+    const deleteBtn = within(row).getByRole('menuitem', { name: 'Delete' });
     fireEvent.click(deleteBtn);
 
     await waitFor(() => {
@@ -274,7 +280,7 @@ describe('WorkflowTemplatesManagement', () => {
       expect(screen.getByText('Sample Receipt Workflow')).toBeInTheDocument();
     });
 
-    const executeRowBtn = screen.getByRole('button', { name: 'Execute on Entity' });
+    const executeRowBtn = screen.getByRole('menuitem', { name: 'Execute on Entity' });
     fireEvent.click(executeRowBtn);
 
     await waitFor(() => {
@@ -297,7 +303,7 @@ describe('WorkflowTemplatesManagement', () => {
     renderWithProviders(<WorkflowTemplatesManagement />);
 
     await waitFor(() => screen.getByText('Sample Receipt Workflow'));
-    const executeBtn = screen.getByRole('button', { name: 'Execute on Entity' });
+    const executeBtn = screen.getByRole('menuitem', { name: 'Execute on Entity' });
     fireEvent.click(executeBtn);
 
     await waitFor(() => {
