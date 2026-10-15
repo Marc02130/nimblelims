@@ -18,6 +18,8 @@ from app.services.sop_parse_service import SOPParseService
 from app.schemas.flexible_experiment import SopParseJobRead, SopApplyResponse
 from models.user import User
 
+from app.database import release_transaction
+
 router = APIRouter(prefix="/sop-parse", tags=["sop-parse"])
 
 
@@ -64,7 +66,11 @@ def create_parse_job(
         instrument_text=instrument_text,
     )
 
-    return SopParseJobRead.model_validate(job)
+    out = SopParseJobRead.model_validate(job)
+    # Request session cleanup waits for the background extraction (up to 120 s);
+    # don't leave this read idle in a transaction meanwhile.
+    release_transaction(service.db)
+    return out
 
 
 @router.get("/{job_id}", response_model=SopParseJobRead)

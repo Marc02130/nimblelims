@@ -31,6 +31,7 @@ from app.schemas.dose_response import (
     ReviewRequest,
 )
 from app.services.dose_response_fit import DoseResponseFitService
+from app.database import release_transaction
 from app.services.r_calculator_client import RCalculatorClient
 from models.dose_response import (
     CurveCategory,
@@ -330,6 +331,7 @@ def get_result_svg(
             "point_id": str(row.id),
         })
 
+    release_transaction(db)  # read-only from here; no idle transaction during the R call
     svg = _r_client.full_svg(
         points=points,
         model=result.model,

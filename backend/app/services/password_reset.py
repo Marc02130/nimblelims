@@ -140,17 +140,20 @@ def request_password_reset(db: Session, email: str) -> None:
         created_at=now,
     )
     db.add(row)
+    to_address, user_id = user.email, user.id
+    # commit ends the transaction; nothing below touches the DB before SMTP
+    # (reading user.email after commit would reopen one for the send).
     db.commit()
 
     link = f"{public_app_url()}/reset-password#token={quote(raw, safe='')}"
     try:
-        deliver_reset_email(user.email, link, _ttl_minutes())
+        deliver_reset_email(to_address, link, _ttl_minutes())
     except Exception as exc:
         db.delete(row)
         db.commit()
         logger.warning(
             "Password reset email failed for user_id=%s (%s)",
-            user.id,
+            user_id,
             type(exc).__name__,
         )
 

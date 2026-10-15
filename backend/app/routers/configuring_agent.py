@@ -38,6 +38,8 @@ from app.services.configuring_agent_service import (
 )
 from models.user import User
 
+from app.database import release_transaction
+
 router = APIRouter(prefix="/configuring-agent", tags=["configuring-agent"])
 
 
@@ -208,8 +210,13 @@ def post_run(
         return _json(run_payload(run, db, user), 201)
     run, pending = begin_run(db, user, configuration_id, body.goal_note)
     background.add_task(run_in_background, pending)
+    payload = run_payload(run, db, user)
+    # The request session is cleaned up only after background tasks finish, so
+    # the read above would sit idle in a transaction through the model call and
+    # be killed at 60 s (UAT e47c53f). End it now.
+    release_transaction(db)
     # 202: the run exists (status reading_inputs); poll GET /runs/{id}.
-    return _json(run_payload(run, db, user), 202)
+    return _json(payload, 202)
 
 
 @router.get("/runs/{run_id}")

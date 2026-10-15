@@ -70,6 +70,26 @@ def _apply_rls_gucs_on_begin(session, transaction, connection):
         )
 
 
+def release_transaction(db: Session, *, keep_loaded: bool = False) -> None:
+    """End the open transaction and hand the connection back to the pool before
+    an outside call (model, R, SMTP) or a background task.
+
+    idle_in_transaction_session_timeout (60 s) kills a connection left idle in
+    a transaction (UAT 67481e9, e47c53f). The session opens a fresh
+    transaction on next use; the after_begin hook re-applies the RLS GUCs.
+    keep_loaded=True keeps already-loaded objects usable without reloading.
+    """
+    if not keep_loaded:
+        db.commit()
+        return
+    previous = db.expire_on_commit
+    db.expire_on_commit = False
+    try:
+        db.commit()
+    finally:
+        db.expire_on_commit = previous
+
+
 def set_rls_context(
     db: Session,
     *,
