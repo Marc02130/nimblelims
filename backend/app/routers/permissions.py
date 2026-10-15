@@ -19,7 +19,7 @@ router = APIRouter()
 
 
 @router.get("", response_model=List[PermissionResponse])
-async def get_permissions(
+def get_permissions(
     current_user: User = Depends(require_any_permission(["user:manage", "config:edit"])),
     db: Session = Depends(get_db)
 ):
@@ -32,7 +32,7 @@ async def get_permissions(
 
 
 @router.post("", response_model=PermissionResponse, status_code=status.HTTP_201_CREATED)
-async def create_permission(
+def create_permission(
     permission_data: PermissionCreate,
     current_user: User = Depends(require_any_permission(["user:manage", "config:edit"])),
     db: Session = Depends(get_db)
@@ -64,7 +64,7 @@ async def create_permission(
 
 
 @router.patch("/{permission_id}", response_model=PermissionResponse)
-async def update_permission(
+def update_permission(
     permission_id: UUID,
     permission_data: PermissionUpdate,
     current_user: User = Depends(require_any_permission(["user:manage", "config:edit"])),
@@ -105,7 +105,7 @@ async def update_permission(
 
 
 @router.delete("/{permission_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_permission(
+def delete_permission(
     permission_id: UUID,
     current_user: User = Depends(require_any_permission(["user:manage", "config:edit"])),
     db: Session = Depends(get_db)
