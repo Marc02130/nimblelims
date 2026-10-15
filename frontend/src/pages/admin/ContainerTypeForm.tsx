@@ -52,10 +52,16 @@ const validationSchema = Yup.object({
     .required('Material is required')
     .max(255, 'Material must be less than 255 characters'),
   rows: Yup.number()
+    // A cleared number input arrives as '': report "required", not a type error.
+    .transform((value, originalValue) => (originalValue === '' ? undefined : value))
+    .typeError('Rows must be a number')
     .required('Rows are required')
     .integer('Rows must be an integer')
     .min(1, 'Rows must be at least 1'),
   columns: Yup.number()
+    // A cleared number input arrives as '': report "required", not a type error.
+    .transform((value, originalValue) => (originalValue === '' ? undefined : value))
+    .typeError('Columns must be a number')
     .required('Columns are required')
     .integer('Columns must be an integer')
     .min(1, 'Columns must be at least 1'),
@@ -158,7 +164,7 @@ const ContainerTypeForm: React.FC<ContainerTypeFormProps> = ({
 
                   <Grid size={{ xs: 12, sm: 6 }}>
                     <Field name="capacity">
-                      {({ field, meta }: any) => (
+                      {({ field, meta, form }: any) => (
                         <TextField
                           {...field}
                           label="Capacity"
@@ -171,7 +177,9 @@ const ContainerTypeForm: React.FC<ContainerTypeFormProps> = ({
                           value={field.value ?? ''}
                           onChange={(e) => {
                             const value = e.target.value === '' ? null : parseFloat(e.target.value);
-                            field.onChange({ target: { value } });
+                            // field.onChange needs an event with target.name; without it Formik
+                            // ignored the change, so edits to this field were silently dropped.
+                            form.setFieldValue(field.name, value);
                           }}
                         />
                       )}
