@@ -74,3 +74,11 @@ registers exactly the Schema display set). Not automated:
 ## Configuring agent: live 'no JSON' reply (UAT e217b58, Qubit R2 first start)
 
 Not reproducible in CI. The raw model reply (xai grok-4.7, ~130 s) was not logged, so the exact shape is unknown. Likely causes covered by tests in `test_configuring_agent_round3.py`: prose or a fence around the JSON (the old parser only stripped a fence at the very start), a reply cut off at the output limit (`finish_reason: length`, never checked before), and empty/null content. The parser now finds the first top-level object with `steps` anywhere in the reply, a cut-off or empty reply is a `BadReply`, and `propose` retries once with a JSON-only reminder. Each unusable reply is logged (reason and length, no content or key). Live confirmation needs a UAT rerun with the provider.
+
+## SOP parse: live provider calls
+
+`tests/test_sop_parse_provider.py` covers provider selection for Anthropic,
+OpenAI and xAI, the no-key message, and redaction with `httpx.post` mocked, so
+CI never calls a real provider. A live extraction with each real key (and the
+default models `claude-opus-4-5-20251101`, `gpt-4.1`, `grok-4`) is a UAT step
+(`UAT_Scripts/uat-experiment-templates.md` section 4), not a CI test.

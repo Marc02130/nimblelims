@@ -1905,7 +1905,7 @@ Base path: `/api/v1/sop-parse`. Requires **`experiment:manage`**. Used to upload
 - `GET /sop-parse/{job_id}` — Job status: `pending`, `processing`, `complete`, `failed`; when complete, `result` contains extracted JSON (`template_definition`, parser/worklist fragments as produced by the service).
 - `POST /sop-parse/{job_id}/apply` — After status is `complete`, creates template (and related records) in one transaction. **409** if already applied (idempotent retry safe).
 
-**Configuration:** Set environment variable **`ANTHROPIC_API_KEY`** on the backend. If unset, extraction fails with a clear error on the job record.
+**Configuration:** SOP parse uses the same providers and client as the configuring agent (Anthropic, OpenAI, or xAI). It uses the provider and model chosen under Configuring agent settings (stored key, or that provider's env var), else the first of `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `XAI_API_KEY` that is set (override with `SOP_PARSE_PROVIDER` / `SOP_PARSE_MODEL`). Default models when only an env key is set: `claude-opus-4-5-20251101`, `gpt-4.1`, `grok-4`. With no key, the job fails with a message naming the variables. Provider errors are recorded with account ids redacted.
 
 **RLS:** `sop_parse_jobs` and related experiment-engine tables use client-scoped RLS (see migrations 0041/0042 and `.docs/internal/design/experiment-planning.md`).
 

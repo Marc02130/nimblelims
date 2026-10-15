@@ -65,11 +65,9 @@ def _reset(engine, *job_ids):
 
 
 def _parse(Factory, job_id, user_id, client_id):
-    resp = MagicMock()
-    resp.content = [MagicMock(text=RESULT)]
-    with patch("app.services.sop_parse_service.ANTHROPIC_API_KEY", "fake-key"), \
-         patch("anthropic.Anthropic") as cls:
-        cls.return_value.messages.create.return_value = resp
+    with patch.dict("os.environ", {"ANTHROPIC_API_KEY": "fake-key"}), \
+         patch("app.services.sop_parse_service._read_agent_settings", return_value=None), \
+         patch("app.services.sop_parse_service.complete", return_value=RESULT):
         SOPParseService.run_extraction_background(
             job_id=job_id, sop_text="SOP", instrument_text="a,b\n1,2",
             user_id=user_id, client_id=client_id, session_factory=Factory)

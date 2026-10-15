@@ -12,7 +12,7 @@ import pytest
 from unittest.mock import MagicMock, patch
 from uuid import uuid4
 
-import anthropic
+from app.services.configuring_agent_llm import ProviderError
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
@@ -539,11 +539,10 @@ class TestSopParseJobs:
         SessionFactory = self._make_session_factory(db_engine)
 
         with patch("app.database.SessionLocal", SessionFactory), \
-             patch("app.services.sop_parse_service.ANTHROPIC_API_KEY", "fake-key"), \
-             patch("anthropic.Anthropic") as mock_cls:
-            mock_instance = MagicMock()
-            mock_instance.messages.create.return_value = mock_response
-            mock_cls.return_value = mock_instance
+             patch.dict("os.environ", {"ANTHROPIC_API_KEY": "fake-key"}), \
+             patch("app.services.sop_parse_service._read_agent_settings", return_value=None), \
+             patch("app.services.sop_parse_service.complete") as mock_complete:
+            mock_complete.return_value = mock_response.content[0].text
 
             SOPParseService.run_extraction_background(
                 job_id=job_id,
@@ -564,25 +563,19 @@ class TestSopParseJobs:
         finally:
             db.close()
 
-    def test_background_task_anthropic_api_error(self, db_engine):
-        """Anthropic APIError → job status=failed with error_message."""
+    def test_background_task_provider_error(self, db_engine):
+        """Provider error → job status=failed, redacted message."""
         from app.services.sop_parse_service import SOPParseService
 
         job_id = self._seed_job(db_engine)
         SessionFactory = self._make_session_factory(db_engine)
 
-        # Construct an APIError via its documented subclass interface
-        class _FakeAPIError(anthropic.APIError):
-            def __init__(self):
-                pass  # skip super().__init__ to avoid complex constructor
-            message = "rate limit exceeded"
-
         with patch("app.database.SessionLocal", SessionFactory), \
-             patch("app.services.sop_parse_service.ANTHROPIC_API_KEY", "fake-key"), \
-             patch("anthropic.Anthropic") as mock_cls:
-            mock_instance = MagicMock()
-            mock_instance.messages.create.side_effect = _FakeAPIError()
-            mock_cls.return_value = mock_instance
+             patch.dict("os.environ", {"ANTHROPIC_API_KEY": "fake-key"}), \
+             patch("app.services.sop_parse_service._read_agent_settings", return_value=None), \
+             patch("app.services.sop_parse_service.complete") as mock_complete:
+            mock_complete.side_effect = ProviderError(
+                "The model call failed (HTTP 429: rate limit exceeded for team 7f3a9c21d4). Check the key and the model.")
 
             SOPParseService.run_extraction_background(
                 job_id=job_id,
@@ -598,7 +591,9 @@ class TestSopParseJobs:
             failed = SopParseJobRepository(db).get_by_id(job_id)
             assert failed.status.value == "failed"
             assert failed.error_message is not None
-            assert "Anthropic API error" in failed.error_message
+            assert "AI provider error (anthropic)" in failed.error_message
+            assert "rate limit exceeded" in failed.error_message
+            assert "7f3a9c21d4" not in failed.error_message  # redaction kept (#164)
         finally:
             db.close()
 
@@ -614,11 +609,10 @@ class TestSopParseJobs:
         bad_response.content[0].text = "This is definitely not JSON }{{"
 
         with patch("app.database.SessionLocal", SessionFactory), \
-             patch("app.services.sop_parse_service.ANTHROPIC_API_KEY", "fake-key"), \
-             patch("anthropic.Anthropic") as mock_cls:
-            mock_instance = MagicMock()
-            mock_instance.messages.create.return_value = bad_response
-            mock_cls.return_value = mock_instance
+             patch.dict("os.environ", {"ANTHROPIC_API_KEY": "fake-key"}), \
+             patch("app.services.sop_parse_service._read_agent_settings", return_value=None), \
+             patch("app.services.sop_parse_service.complete") as mock_complete:
+            mock_complete.return_value = bad_response.content[0].text
 
             SOPParseService.run_extraction_background(
                 job_id=job_id,
