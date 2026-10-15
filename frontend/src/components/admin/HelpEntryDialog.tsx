@@ -190,9 +190,10 @@ const HelpEntryDialog: React.FC<HelpEntryDialogProps> = ({
                 </Typography>
 
                 <FormControl fullWidth>
-                  <InputLabel>Role Filter</InputLabel>
+                  <InputLabel id="help-entry-role-filter-label">Role Filter</InputLabel>
                   <Field
                     as={Select}
+                    labelId="help-entry-role-filter-label"
                     name="role_filter"
                     label="Role Filter"
                     value={values.role_filter}

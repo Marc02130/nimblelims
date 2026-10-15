@@ -5,10 +5,11 @@ import {
   hasAliquotPair,
   removeAliquotPairAt,
 } from '../components/experiments/aliquotPair';
+import type { AliquotPairEntry } from '../components/experiments/aliquotPair';
 
 describe('aliquotPair', () => {
   it('appends plan and dest together', () => {
-    const next = appendAliquotPair([{ name: 'Header', entry_type: 'experiment_data' }]);
+    const next = appendAliquotPair<AliquotPairEntry>([{ name: 'Header', entry_type: 'experiment_data' }]);
     expect(next).toHaveLength(3);
     expect(next.map((e) => e.predefined_entry_key)).toEqual([
       undefined,
