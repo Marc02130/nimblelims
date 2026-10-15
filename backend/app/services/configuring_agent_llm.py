@@ -130,6 +130,18 @@ def _why(exc: "BadReply") -> str:
     return " (it was cut off)" if "cut off" in exc.message else ""
 
 
+def complete(provider: str, model: str, api_key: str, system: str, user: str) -> str:
+    """One system+user call to the chosen provider; returns the reply text.
+
+    Shared by the configuring agent and SOP parse. Errors are ProviderError
+    (ids redacted) or BadReply."""
+    if provider not in PROVIDERS:
+        raise ProviderError(f"Provider must be one of: {', '.join(PROVIDERS)}.")
+    if not model:
+        raise ProviderError("No model is selected.")
+    return _call(provider, model, api_key, system, user)
+
+
 def _call(provider: str, model: str, api_key: str, system: str, user: str) -> str:
     if provider == "anthropic":
         return _anthropic(model, api_key, system, user)
