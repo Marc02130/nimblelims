@@ -173,20 +173,15 @@ def test_per_run_values_are_never_configured(db_session, admin, configuration, m
     run = _start(db_session, admin, configuration, monkeypatch, [step])
     assert run.steps[0].status == "stopped"
     assert "recorded when the work is done" in run.steps[0].gap
-
-
-@pytest.mark.asyncio
-async def test_apply_also_refuses_a_seed_concept_table(db_session, admin):
+def test_apply_also_refuses_a_seed_concept_table(db_session, admin):
     from app.services.configuring_agent_apply import CannotExpress, execute_step
 
     with pytest.raises(CannotExpress):
-        await execute_step(db_session, admin, "POST", "/v1/schema/tables", {"name": "Blood", "table_type": "sample_type"})
+        execute_step(db_session, admin, "POST", "/v1/schema/tables", {"name": "Blood", "table_type": "sample_type"})
 
 
 # ------------------------------------------------- 4. G5 before/after and rerun no-op
-
-@pytest.mark.asyncio
-async def test_g5_rerun_shows_before_after_and_is_a_noop(db_session, admin, configuration, monkeypatch):
+def test_g5_rerun_shows_before_after_and_is_a_noop(db_session, admin, configuration, monkeypatch):
     _seed_list(db_session, "sample_types", ["Blood"])
     bench = _role_with(db_session, [])
     perm = _get_or_create(db_session, Permission, "sample:update", "x")
@@ -201,7 +196,7 @@ async def test_g5_rerun_shows_before_after_and_is_a_noop(db_session, admin, conf
     assert payload[0]["diff"]["before"] is None and payload[0]["diff"]["changed"] is True
     assert payload[1]["diff"]["before"] == {"permission_ids": []}
     assert payload[1]["diff"]["after"] == {"permission_ids": [str(perm.id)]}
-    result, code = await svc.apply_run(db_session, admin, first.id, second_confirm=True)
+    result, code = svc.apply_run(db_session, admin, first.id, second_confirm=True)
     assert code == 200 and result.status == "done"
     items_before = db_session.execute(text("SELECT count(*) FROM configuration_items")).scalar()
 
@@ -215,7 +210,7 @@ async def test_g5_rerun_shows_before_after_and_is_a_noop(db_session, admin, conf
     # Even if a user includes the rows again, Apply writes nothing and logs nothing.
     for step in rerun.steps:
         svc.set_included(db_session, admin, rerun.id, step.id, True)
-    again, code = await svc.apply_run(db_session, admin, rerun.id, second_confirm=True)
+    again, code = svc.apply_run(db_session, admin, rerun.id, second_confirm=True)
     assert code == 200 and again.status == "done"
     assert [s.status for s in again.steps] == ["unchanged", "unchanged"]
     assert again.applied_count == 0
@@ -280,9 +275,7 @@ def test_model_call_uses_the_configured_timeout(monkeypatch):
 
 
 # ------------------------------------------------- migrated DB: the UAT run end to end
-
-@pytest.mark.asyncio
-async def test_uat_bodies_apply_table_column_layout_relation_then_rerun_is_noop(mig, monkeypatch):
+def test_uat_bodies_apply_table_column_layout_relation_then_rerun_is_noop(mig, monkeypatch):
     db, admin, configuration = mig.db, mig.admin, mig.configuration
     slug = uuid.uuid4().hex[:6]
     # The layout API only offers fields the role can read: set that up first.
@@ -307,7 +300,7 @@ async def test_uat_bodies_apply_table_column_layout_relation_then_rerun_is_noop(
     ]
     run = _start(db, admin, configuration, monkeypatch, steps)
     assert [s.status for s in run.steps] == ["proposed"] * 4, [s.gap for s in run.steps]
-    result, code = await svc.apply_run(db, admin, run.id, second_confirm=True)
+    result, code = svc.apply_run(db, admin, run.id, second_confirm=True)
     assert code == 200 and result.status == "done", [s.gap or s.error_message for s in result.steps]
     from models.ui_schema import SchemaColumn, SchemaLayout, SchemaTable
 
@@ -321,10 +314,7 @@ async def test_uat_bodies_apply_table_column_layout_relation_then_rerun_is_noop(
         svc.step_payload(s, db, admin)["diff"] for s in rerun.steps
     ]
     assert db.query(SchemaTable).filter(SchemaTable.display_name == table_name).count() == 1
-
-
-@pytest.mark.asyncio
-async def test_relation_by_table_and_column_names(mig, monkeypatch):
+def test_relation_by_table_and_column_names(mig, monkeypatch):
     """UAT sent relations by name. They resolve to ids on an existing FK."""
     db, admin, configuration = mig.db, mig.admin, mig.configuration
     steps = [
@@ -337,7 +327,7 @@ async def test_relation_by_table_and_column_names(mig, monkeypatch):
     assert body["cardinality"] == "one_to_many"
     # D-3/L-4 (06c630b round): the run registers no catalog rows, so before
     # confirm unregistered tables are still names; Apply registers and resolves.
-    result, _ = await svc.apply_run(db, admin, run.id, second_confirm=True)
+    result, _ = svc.apply_run(db, admin, run.id, second_confirm=True)
     assert result.status == "done", result.steps[0].gap or result.steps[0].error_message
     from models.ui_schema import SchemaRelation
 

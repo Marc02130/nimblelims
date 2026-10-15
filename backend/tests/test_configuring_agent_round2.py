@@ -66,10 +66,7 @@ def test_start_run_commits_no_catalog_rows(db_session, admin, configuration, mon
     ])
     db_session.expire_all()
     assert _registered(db_session, admin.client_id) == before
-
-
-@pytest.mark.asyncio
-async def test_refused_apply_registers_nothing_and_confirmed_apply_registers_the_display_set(mig, monkeypatch):
+def test_refused_apply_registers_nothing_and_confirmed_apply_registers_the_display_set(mig, monkeypatch):
     db, admin, configuration = mig.db, mig.admin, mig.configuration
     slug = uuid.uuid4().hex[:6]
     run = _start(db, admin, configuration, monkeypatch, [
@@ -77,9 +74,9 @@ async def test_refused_apply_registers_nothing_and_confirmed_apply_registers_the
     ])
     assert _registered(db, admin.client_id) == set()
     with pytest.raises(svc.ApplyRefused):
-        await svc.apply_run(db, admin, run.id, second_confirm=False)  # second confirm missing
+        svc.apply_run(db, admin, run.id, second_confirm=False)  # second confirm missing
     assert _registered(db, admin.client_id) == set()
-    result, code = await svc.apply_run(db, admin, run.id, second_confirm=True)
+    result, code = svc.apply_run(db, admin, run.id, second_confirm=True)
     assert code == 200 and result.status == "done", result.steps[0].gap or result.steps[0].error_message
     expected = {t["physical_name"] for t in cat.configurable_tables(db, admin)}
     assert _registered(db, admin.client_id) == expected
@@ -104,10 +101,7 @@ def test_catalog_marks_which_tables_take_new_columns(db_session, admin):
     assert "Analyses:" in block and "Analytes:" in block and "Units:" in block
     prompt = llm._system_prompt(None, block)
     assert "POST /analytes" in prompt and "analyte on an analysis" in prompt
-
-
-@pytest.mark.asyncio
-async def test_qubit_concentration_lands_as_an_analyte_on_an_analysis(db_session, admin, configuration, monkeypatch):
+def test_qubit_concentration_lands_as_an_analyte_on_an_analysis(db_session, admin, configuration, monkeypatch):
     from models.analysis import Analysis, Analyte
 
     slug = uuid.uuid4().hex[:6]
@@ -119,7 +113,7 @@ async def test_qubit_concentration_lands_as_an_analyte_on_an_analysis(db_session
     ]
     run = _start(db_session, admin, configuration, monkeypatch, steps)
     assert [s.status for s in run.steps] == ["proposed"] * 3, [s.gap for s in run.steps]
-    result, code = await svc.apply_run(db_session, admin, run.id, second_confirm=True)
+    result, code = svc.apply_run(db_session, admin, run.id, second_confirm=True)
     assert code == 200 and result.status == "done", [s.gap or s.error_message for s in result.steps]
     row = db_session.query(Analysis).filter(Analysis.name == analysis).one()
     assert [a.name for a in row.analytes] == [analyte]
@@ -160,14 +154,12 @@ def test_equivalent_names(a, b, same):
 
 
 # ------------------------------------------------ G5 re-adding an existing column
-
-@pytest.mark.asyncio
-async def test_readding_an_existing_column_is_unchanged_not_a_stop(mig, monkeypatch):
+def test_readding_an_existing_column_is_unchanged_not_a_stop(mig, monkeypatch):
     db, admin, configuration = mig.db, mig.admin, mig.configuration
     name = f"Extraction date {uuid.uuid4().hex[:4]}"
     add = _step("POST", "/v1/schema/columns", {"name": name, "table": "samples", "data_type": "date"}, target=name)
     run = _start(db, admin, configuration, monkeypatch, [add])
-    result, code = await svc.apply_run(db, admin, run.id, second_confirm=True)
+    result, code = svc.apply_run(db, admin, run.id, second_confirm=True)
     assert code == 200 and result.status == "done", result.steps[0].gap
     # The same call again, and the UAT shape: no call, a gap saying it exists.
     rerun = _start(db, admin, configuration, monkeypatch, [
@@ -321,8 +313,8 @@ def test_reagent_tracking_column_stops_at_apply_and_writes_nothing(db_session, a
     from models.ui_schema import SchemaColumn
 
     with pytest.raises(CannotExpress) as stop:
-        asyncio.run(execute_step(db_session, admin, "POST", "/v1/schema/columns",
-                                 {"display_name": "Kit lot", "table_id": "samples", "data_type": "text"}))
+        execute_step(db_session, admin, "POST", "/v1/schema/columns",
+                                 {"display_name": "Kit lot", "table_id": "samples", "data_type": "text"})
     assert "reagent tracking" in str(stop.value)
     assert not db_session.query(SchemaColumn).filter(SchemaColumn.display_name == "Kit lot").count()
     assert "kit_lot" not in {r[0] for r in db_session.execute(text(
