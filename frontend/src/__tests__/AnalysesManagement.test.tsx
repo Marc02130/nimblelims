@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { BrowserRouter, MemoryRouter } from 'react-router-dom';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import AnalysesManagement from '../pages/admin/AnalysesManagement';
@@ -7,7 +7,11 @@ import { UserProvider } from '../contexts/UserContext';
 
 // Mock the API service
 jest.mock('../services/apiService', () => ({
+  // Real helpers (ApiService.formatError, addClientFilterIfNeeded, types); only the client is mocked.
+  ...jest.requireActual('../services/apiService'),
   apiService: {
+    // UserProvider probes the cookie session on mount (P4/S10). Plain fn: survives resetMocks.
+    getCurrentUser: () => Promise.reject(new Error('no session')),
     getAnalyses: jest.fn(),
     createAnalysis: jest.fn(),
     updateAnalysis: jest.fn(),
@@ -125,7 +129,8 @@ describe('AnalysesManagement', () => {
 
     await waitFor(() => {
       expect(screen.getByText('pH Analysis')).toBeInTheDocument();
-      expect(screen.getByText('EPA 8080')).toBeInTheDocument();
+      // "EPA 8080" is both that analysis's name and its method.
+      expect(screen.getAllByText('EPA 8080')).toHaveLength(2);
     });
   });
 
@@ -133,9 +138,12 @@ describe('AnalysesManagement', () => {
     renderWithProviders(<AnalysesManagement />);
 
     await waitFor(() => {
-      expect(screen.getByText('EPA 150.1')).toBeInTheDocument();
-      expect(screen.getByText('$25.00')).toBeInTheDocument();
-      expect(screen.getByText('1')).toBeInTheDocument(); // Turnaround time
+      const row = within(screen.getByText('pH Analysis').closest('[role="row"]') as HTMLElement);
+      expect(row.getByText('EPA 150.1')).toBeInTheDocument();
+      expect(row.getByText('$25.00')).toBeInTheDocument();
+      const turnaround = (screen.getByText('pH Analysis').closest('[role="row"]') as HTMLElement)
+        .querySelector('[data-field="turnaround_time"]');
+      expect(turnaround).toHaveTextContent('1');
     });
   });
 
@@ -187,7 +195,7 @@ describe('AnalysesManagement', () => {
       expect(screen.getByText('Create New Analysis')).toBeInTheDocument();
     });
 
-    const nameInput = screen.getByLabelText('Analysis Name');
+    const nameInput = screen.getByLabelText(/Analysis Name/); // required: label ends with *
     fireEvent.change(nameInput, { target: { value: 'TOC Analysis' } });
 
     const methodInput = screen.getByLabelText('Method');
@@ -210,7 +218,11 @@ describe('AnalysesManagement', () => {
         turnaround_time: 3,
         cost: 50.00,
       });
-      expect(apiService.updateAnalysisAnalytes).toHaveBeenCalled();
+    });
+    // No analytes were picked, so none are assigned.
+    expect(apiService.updateAnalysisAnalytes).not.toHaveBeenCalled();
+    await waitFor(() => {
+      expect(screen.queryByText('Create New Analysis')).not.toBeInTheDocument();
     });
   });
 
@@ -227,12 +239,15 @@ describe('AnalysesManagement', () => {
       expect(screen.getByText('Create New Analysis')).toBeInTheDocument();
     });
 
-    const submitButton = screen.getByText('Create');
-    fireEvent.click(submitButton);
+    // Errors show once a field is touched; Create stays disabled while invalid.
+    const nameInput = screen.getByLabelText(/Analysis Name/);
+    fireEvent.focus(nameInput);
+    fireEvent.blur(nameInput);
 
     await waitFor(() => {
       expect(screen.getByText(/Analysis name is required/i)).toBeInTheDocument();
     });
+    expect(screen.getByRole('button', { name: 'Create' })).toBeDisabled();
   });
 
   test('validates unique analysis names', async () => {
@@ -248,10 +263,12 @@ describe('AnalysesManagement', () => {
       expect(screen.getByText('Create New Analysis')).toBeInTheDocument();
     });
 
-    const nameInput = screen.getByLabelText('Analysis Name');
+    const nameInput = screen.getByLabelText(/Analysis Name/); // required: label ends with *
     fireEvent.change(nameInput, { target: { value: 'pH Analysis' } });
 
-    const submitButton = screen.getByText('Create');
+    // Create is disabled until Formik has validated the new value.
+    const submitButton = screen.getByRole('button', { name: 'Create' });
+    await waitFor(() => expect(submitButton).toBeEnabled());
     fireEvent.click(submitButton);
 
     await waitFor(() => {
@@ -272,14 +289,12 @@ describe('AnalysesManagement', () => {
       expect(screen.getByText('Create New Analysis')).toBeInTheDocument();
     });
 
-    const nameInput = screen.getByLabelText('Analysis Name');
+    const nameInput = screen.getByLabelText(/Analysis Name/); // required: label ends with *
     fireEvent.change(nameInput, { target: { value: 'New Analysis' } });
 
     const turnaroundInput = screen.getByLabelText('Turnaround Time (days)');
     fireEvent.change(turnaroundInput, { target: { value: '0' } });
-
-    const submitButton = screen.getByText('Create');
-    fireEvent.click(submitButton);
+    fireEvent.blur(turnaroundInput);
 
     await waitFor(() => {
       expect(screen.getByText(/Turnaround time must be at least 1 day/i)).toBeInTheDocument();
@@ -299,14 +314,12 @@ describe('AnalysesManagement', () => {
       expect(screen.getByText('Create New Analysis')).toBeInTheDocument();
     });
 
-    const nameInput = screen.getByLabelText('Analysis Name');
+    const nameInput = screen.getByLabelText(/Analysis Name/); // required: label ends with *
     fireEvent.change(nameInput, { target: { value: 'New Analysis' } });
 
     const costInput = screen.getByLabelText('Cost');
     fireEvent.change(costInput, { target: { value: '-10' } });
-
-    const submitButton = screen.getByText('Create');
-    fireEvent.click(submitButton);
+    fireEvent.blur(costInput);
 
     await waitFor(() => {
       expect(screen.getByText(/Cost must be greater than or equal to 0/i)).toBeInTheDocument();
@@ -345,17 +358,19 @@ describe('AnalysesManagement', () => {
     });
 
     const searchInput = screen.getByPlaceholderText('Search analyses, methods, or analytes...');
-    fireEvent.change(searchInput, { target: { value: 'EPA' } });
+    // Search matches name, method and analytes ("EPA" would match both rows).
+    fireEvent.change(searchInput, { target: { value: '8080' } });
 
     await waitFor(() => {
       expect(screen.queryByText('pH Analysis')).not.toBeInTheDocument();
-      expect(screen.getByText('EPA 8080')).toBeInTheDocument();
+      expect(screen.getAllByText('EPA 8080').length).toBeGreaterThan(0);
     });
   });
 
   test('handles API error gracefully', async () => {
     const { apiService } = require('../services/apiService');
-    apiService.getAnalyses.mockRejectedValue(new Error('API Error'));
+    // No detail and no message: the page falls back to its own text.
+    apiService.getAnalyses.mockRejectedValue({ response: { status: 500 } });
 
     renderWithProviders(<AnalysesManagement />);
 
@@ -401,8 +416,11 @@ describe('AnalysesManagement', () => {
     renderWithProviders(<AnalysesManagement />);
 
     await waitFor(() => {
-      expect(screen.getByText('1')).toBeInTheDocument(); // pH Analysis analytes
-      expect(screen.getByText('2')).toBeInTheDocument(); // EPA 8080 analytes
+      const count = (name: string) =>
+        (screen.getByText(name, { selector: '[data-field="name"]' }).closest('[role="row"]') as HTMLElement)
+          .querySelector('[data-field="analytes_count"]');
+      expect(count('pH Analysis')).toHaveTextContent('1');
+      expect(count('EPA 8080')).toHaveTextContent('2');
     });
   });
 
