@@ -2,7 +2,7 @@
 
 **Prerequisites:** `uat-security-rbac` (roles and permissions). Users with `experiment:manage`: Administrator, Lab Manager, Lab Technician (default seed). Client user must **not** have this permission.
 
-**Optional:** `ANTHROPIC_API_KEY` set on the backend for end-to-end SOP extraction. Without it, SOP jobs should fail with a clear error — still valid UAT for configuration and UX.
+**Optional:** an AI provider key for end-to-end SOP extraction: a provider, model and key under Configuring agent settings, or `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, or `XAI_API_KEY` on the backend. Without it, SOP jobs should fail with a clear error — still valid UAT for configuration and UX.
 
 **Objective:** Verify experiment template CRUD, **Tables & forms (entries)** authoring, activation, RBAC, and (when configured) SOP upload → apply → review dialog.
 
@@ -43,7 +43,7 @@
 
 ---
 
-## 4. Upload SOP (AI) — when `ANTHROPIC_API_KEY` is set
+## 4. Upload SOP (AI) — when a provider key is configured
 
 | Step | Action | Expected Result |
 |------|--------|-----------------|
@@ -59,7 +59,7 @@
 
 | Step | Action | Expected Result |
 |------|--------|-----------------|
-| 5.1 | With `ANTHROPIC_API_KEY` empty, run upload | Job fails with explicit configuration/error message; **Fill in Manually** or similar path available. |
+| 5.1 | With no Configuring agent key and `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `XAI_API_KEY` all empty, run upload | Job fails with a message naming those variables; **Fill in Manually** or similar path available. |
 
 ---
 

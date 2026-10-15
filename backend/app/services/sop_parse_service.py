@@ -3,12 +3,14 @@ SOPParseService — creates and manages SOP parse jobs.
 
 Background task flow:
     1. POST /sop-parse: create job (status=pending), kick off background task
-    2. Background task: set status=processing → call Claude API
+    2. Background task: set status=processing → call the configured AI provider
+       (same provider selection and client as the configuring agent; see
+       resolve_sop_parse_llm)
     3. On success: set status=complete, store result JSONB
     4. On failure: set status=failed, store error_message
     5. GET /sop-parse/:id: poll status
 
-Claude extraction prompt produces:
+The extraction prompt produces:
     {
       "template_definition": TemplateDefinition dict,
       "parser_config": ParserConfig dict,
@@ -27,11 +29,15 @@ from typing import Optional
 
 import logging
 
-import anthropic
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.core.config import ANTHROPIC_API_KEY
+from app.services.configuring_agent_crypto import (
+    ENV_KEY_NAMES,
+    MissingProviderKey,
+    resolve_provider_key,
+)
+from app.services.configuring_agent_llm import BadReply, ProviderError, complete, redact_ids
 from app.repositories.flexible_experiment_repository import (
     SopParseJobRepository,
     InstrumentParserRepository,
@@ -40,7 +46,75 @@ from app.repositories.flexible_experiment_repository import (
 from models.experiment import ExperimentTemplate
 from models.flexible_experiment import SopParseJob, SopParseJobStatus
 
-# Structured extraction prompt for Claude
+# Without stored configuring-agent settings, the first provider whose env key is
+# set is used, in this order (Anthropic first: it was SOP parse's only provider).
+ENV_PROVIDER_ORDER = ("anthropic", "openai", "xai")
+DEFAULT_MODELS = {
+    "anthropic": "claude-opus-4-5-20251101",
+    "openai": "gpt-4.1",
+    "xai": "grok-4",
+}
+NO_KEY_MESSAGE = (
+    "No AI provider key is configured for SOP parse. Pick a provider and model under "
+    "Configuring agent settings, or set ANTHROPIC_API_KEY, OPENAI_API_KEY, or XAI_API_KEY "
+    "on the backend."
+)
+
+
+class NoProviderKey(Exception):
+    pass
+
+
+def resolve_sop_parse_llm(settings) -> tuple[str, str, str]:
+    """(provider, model, key) for SOP parse.
+
+    1. Configuring-agent settings with a provider and model: that provider and
+       model, with its stored key or its env var (never another vendor).
+    2. Else SOP_PARSE_PROVIDER if set, else the first of ENV_PROVIDER_ORDER
+       whose env key is set. Model: SOP_PARSE_MODEL, else DEFAULT_MODELS.
+    No key: NoProviderKey with a message naming the variables.
+    """
+    import os
+
+    provider = getattr(settings, "agent_provider", None) if settings is not None else None
+    model = getattr(settings, "agent_model", None) if settings is not None else None
+    if provider and model:
+        try:
+            return provider, model, resolve_provider_key(provider, settings.key_ciphertext)
+        except MissingProviderKey as exc:
+            raise NoProviderKey(f"{exc} {NO_KEY_MESSAGE}") from exc
+
+    wanted = (os.getenv("SOP_PARSE_PROVIDER") or "").strip().lower()
+    order = (wanted,) if wanted else ENV_PROVIDER_ORDER
+    for name in order:
+        if name not in ENV_KEY_NAMES:
+            raise NoProviderKey(f"SOP_PARSE_PROVIDER must be one of anthropic, openai, or xai. {NO_KEY_MESSAGE}")
+        key = (os.getenv(ENV_KEY_NAMES[name]) or "").strip()
+        if key:
+            model = (os.getenv("SOP_PARSE_MODEL") or "").strip() or DEFAULT_MODELS[name]
+            return name, model, key
+    raise NoProviderKey(NO_KEY_MESSAGE)
+
+
+def _read_agent_settings(db):
+    """Configuring-agent settings, or None when absent or hidden by RLS."""
+    from models.configuring_agent import ConfiguringAgentSettings, SETTINGS_ID
+
+    row = db.query(ConfiguringAgentSettings).filter(ConfiguringAgentSettings.id == SETTINGS_ID).first()
+    if row is None:
+        return None
+    return {"agent_provider": row.agent_provider, "agent_model": row.agent_model,
+            "key_ciphertext": row.key_ciphertext}
+
+
+class _Settings:
+    def __init__(self, d):
+        self.agent_provider = d.get("agent_provider")
+        self.agent_model = d.get("agent_model")
+        self.key_ciphertext = d.get("key_ciphertext")
+
+
+# Structured extraction prompt
 _EXTRACTION_SYSTEM_PROMPT = """You are a LIMS configuration assistant. You will be given the text content of
 a laboratory Standard Operating Procedure (SOP) document and an example instrument
 output file. Extract the following information and return it as a single JSON object.
@@ -248,9 +322,9 @@ class SOPParseService:
         Background task: call Claude API, parse result, update job status.
 
         Uses two short-lived DB sessions to avoid holding a connection open
-        during the Anthropic API call (which can take 90–120 s):
+        during the model call (which can take minutes):
           Session 1: mark job as processing, then release connection.
-          [Claude API call — no DB connection held]
+          [model call — no DB connection held]
           Session 2: write result (complete or failed), then release connection.
 
         Both sessions carry the requesting user's RLS context (user_id and
@@ -259,6 +333,7 @@ class SOPParseService:
         """
         from app.database import MissingRlsContext, background_session
 
+        agent_settings = None
         # ── Session 1: mark processing ──────────────────────────────────────
         try:
             with background_session(user_id, client_id, session_factory) as db:
@@ -268,6 +343,10 @@ class SOPParseService:
                     if not job:
                         return
                     repo.mark_processing(job)
+                    try:
+                        agent_settings = _read_agent_settings(db)
+                    except Exception:  # noqa: BLE001 - unreadable settings: use env keys
+                        agent_settings = None
                     db.commit()
                 except Exception:
                     db.rollback()
@@ -279,43 +358,40 @@ class SOPParseService:
             logger.exception("SOP parse job %s: could not open its session", job_id)
             return
 
-        # ── Anthropic API call — no DB connection held ───────────────────────
+        # ── Model call — no DB connection held ───────────────────────────────
         error_message: Optional[str] = None
         result: Optional[dict] = None
 
-        if not ANTHROPIC_API_KEY:
-            error_message = "ANTHROPIC_API_KEY is not configured"
+        try:
+            provider, model, api_key = resolve_sop_parse_llm(
+                _Settings(agent_settings) if agent_settings else None)
+        except NoProviderKey as e:
+            error_message = str(e)
+        except Exception as e:  # noqa: BLE001 - e.g. undecryptable stored key
+            error_message = redact_ids(f"Could not read the AI provider key: {e}")
         else:
-            client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
             user_message = (
                 f"SOP content:\n\n{sop_text}\n\n"
                 f"Example instrument output:\n\n{instrument_text}"
             )
             try:
-                message = client.messages.create(
-                    model="claude-opus-4-5-20251101",
-                    max_tokens=4096,
-                    timeout=120.0,
-                    system=_EXTRACTION_SYSTEM_PROMPT,
-                    messages=[{"role": "user", "content": user_message}],
-                )
-                raw_text = message.content[0].text.strip()
-
-                # Strip markdown code fences if Claude wrapped in ```json
+                raw_text = (complete(provider, model, api_key,
+                                     _EXTRACTION_SYSTEM_PROMPT, user_message) or "").strip()
+                # Strip markdown code fences if the model wrapped in ```json
                 if raw_text.startswith("```"):
                     raw_text = raw_text.split("\n", 1)[1]
                     raw_text = raw_text.rsplit("```", 1)[0]
-
                 result = json.loads(raw_text)
-
-            except anthropic.APITimeoutError as e:
-                error_message = f"Anthropic API timeout (>120s): {str(e)}"
-            except anthropic.APIError as e:
-                error_message = f"Anthropic API error: {str(e)}"
+                if not isinstance(result, dict):
+                    raise ValueError("expected a JSON object")
+            except BadReply as e:
+                error_message = f"The model returned malformed JSON: {e.message}"
+            except ProviderError as e:  # message already redacted (#164)
+                error_message = f"AI provider error ({provider}): {e.message}"
             except (json.JSONDecodeError, ValueError, KeyError) as e:
-                error_message = f"Claude returned malformed JSON: {str(e)}"
-            except Exception as e:
-                error_message = f"Unexpected error: {str(e)}"
+                error_message = f"The model returned malformed JSON: {e}"
+            except Exception as e:  # noqa: BLE001
+                error_message = redact_ids(f"Unexpected error: {e}")
 
         # ── Session 2: write result ──────────────────────────────────────────
         try:
