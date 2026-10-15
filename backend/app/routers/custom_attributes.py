@@ -35,7 +35,7 @@ def is_administrator(user: User, db: Session) -> bool:
 
 
 @router.get("", response_model=CustomAttributeConfigListResponse)
-async def get_custom_attribute_configs(
+def get_custom_attribute_configs(
     entity_type: Optional[str] = Query(None, description="Filter by entity type"),
     active: Optional[bool] = Query(None, description="Filter by active status"),
     page: int = Query(1, ge=1, description="Page number"),
@@ -82,7 +82,7 @@ async def get_custom_attribute_configs(
 
 
 @router.post("", response_model=CustomAttributeConfigResponse, status_code=status.HTTP_201_CREATED)
-async def create_custom_attribute_config(
+def create_custom_attribute_config(
     config_data: CustomAttributeConfigCreate,
     current_user: User = Depends(require_config_edit),
     db: Session = Depends(get_db)
@@ -124,7 +124,7 @@ async def create_custom_attribute_config(
 
 
 @router.get("/{config_id}", response_model=CustomAttributeConfigResponse)
-async def get_custom_attribute_config(
+def get_custom_attribute_config(
     config_id: UUID,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -151,7 +151,7 @@ async def get_custom_attribute_config(
 
 
 @router.patch("/{config_id}", response_model=CustomAttributeConfigResponse)
-async def update_custom_attribute_config(
+def update_custom_attribute_config(
     config_id: UUID,
     config_data: CustomAttributeConfigUpdate,
     current_user: User = Depends(require_config_edit),
@@ -212,7 +212,7 @@ async def update_custom_attribute_config(
 
 
 @router.delete("/{config_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_custom_attribute_config(
+def delete_custom_attribute_config(
     config_id: UUID,
     current_user: User = Depends(require_config_edit),
     db: Session = Depends(get_db)

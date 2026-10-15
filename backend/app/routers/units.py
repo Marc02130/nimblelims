@@ -81,7 +81,7 @@ def _reject_multiplier(exc: ConversionError) -> None:
 
 
 @router.get("", response_model=List[UnitResponse])
-async def get_units(
+def get_units(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -105,7 +105,7 @@ async def get_units(
 
 
 @router.post("", response_model=UnitResponse, status_code=status.HTTP_201_CREATED)
-async def create_unit(
+def create_unit(
     unit_data: UnitCreate,
     current_user: User = Depends(require_config_edit),
     db: Session = Depends(get_db)
@@ -153,7 +153,7 @@ async def create_unit(
 
 
 @router.patch("/{unit_id}", response_model=UnitResponse)
-async def update_unit(
+def update_unit(
     unit_id: UUID,
     unit_data: UnitUpdate,
     current_user: User = Depends(require_config_edit),
@@ -212,7 +212,7 @@ async def update_unit(
 
 
 @router.delete("/{unit_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_unit(
+def delete_unit(
     unit_id: UUID,
     current_user: User = Depends(require_config_edit),
     db: Session = Depends(get_db)
@@ -249,7 +249,7 @@ async def delete_unit(
 
 
 @router.post("/{unit_id}/base", response_model=UnitResponse)
-async def set_base_unit(
+def set_base_unit(
     unit_id: UUID,
     current_user: User = Depends(require_config_edit),
     db: Session = Depends(get_db),

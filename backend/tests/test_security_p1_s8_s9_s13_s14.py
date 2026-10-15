@@ -33,7 +33,7 @@ class TestS8UploadCap:
         )
 
         with pytest.raises(HTTPException) as ei:
-            asyncio.run(read_upload_capped(uf))
+            read_upload_capped(uf)
         assert ei.value.status_code == 413
         assert ei.value.detail["code"] == "upload_too_large"
 

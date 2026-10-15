@@ -229,7 +229,7 @@ def import_data(
 
 
 @router.post("/{run_id}/import-file")
-async def import_file(
+def import_file(
     run_id: UUID,
     file: UploadFile = File(...),
     instrument_id: Optional[UUID] = Form(None),
@@ -243,7 +243,7 @@ async def import_file(
     """
     from app.core.uploads import read_upload_capped
 
-    content = await read_upload_capped(file, field_name=file.filename or "import-file")
+    content = read_upload_capped(file, field_name=file.filename or "import-file")
     return service.import_file(
         run_id,
         content,

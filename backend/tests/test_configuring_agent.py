@@ -209,15 +209,12 @@ def _accepted_run():
         confirmed_by=None,
         confirmed_at=None,
     )
-
-
-@pytest.mark.asyncio
-async def test_apply_rolls_back_every_write(monkeypatch):
+def test_apply_rolls_back_every_write(monkeypatch):
     run = _accepted_run()
     db = _Db(run)
     calls = {"n": 0}
 
-    async def execute_step(*_args, **_kwargs):
+    def execute_step(*_args, **_kwargs):
         calls["n"] += 1
         if calls["n"] == 2:
             raise CannotExpress("no junction")
@@ -227,7 +224,7 @@ async def test_apply_rolls_back_every_write(monkeypatch):
     monkeypatch.setattr(agent_service, "_gate", lambda *_a, **_k: None)
     monkeypatch.setattr(agent_service, "_key_for_run", lambda _db: (SimpleNamespace(agent_provider="xai", agent_model="m"), "k"))
     monkeypatch.setattr(agent_service, "execute_step", execute_step)
-    result, code = await agent_service.apply_run(db, SimpleNamespace(id=uuid.uuid4()), run.id)
+    result, code = agent_service.apply_run(db, SimpleNamespace(id=uuid.uuid4()), run.id)
     assert code == 200
     assert result.status == "stopped"
     assert result.banner == STOP_BANNER
@@ -236,30 +233,24 @@ async def test_apply_rolls_back_every_write(monkeypatch):
     assert result.steps[1].status == "stopped"
     assert db.added == []
     assert db.events == ["rollback", "commit"]
-
-
-@pytest.mark.asyncio
-async def test_permission_failure_rolls_back_and_returns_403(monkeypatch):
+def test_permission_failure_rolls_back_and_returns_403(monkeypatch):
     run = _accepted_run()
     db = _Db(run)
 
-    async def execute_step(*_args, **_kwargs):
+    def execute_step(*_args, **_kwargs):
         raise PermissionDenied("Permission 'schema:edit' required")
 
     monkeypatch.setattr(agent_service, "_run", lambda *_a, **_k: run)
     monkeypatch.setattr(agent_service, "_gate", lambda *_a, **_k: None)
     monkeypatch.setattr(agent_service, "_key_for_run", lambda _db: (SimpleNamespace(agent_provider="xai", agent_model="m"), "k"))
     monkeypatch.setattr(agent_service, "execute_step", execute_step)
-    result, code = await agent_service.apply_run(db, SimpleNamespace(id=uuid.uuid4()), run.id)
+    result, code = agent_service.apply_run(db, SimpleNamespace(id=uuid.uuid4()), run.id)
     assert code == 403
     assert result.status == "failed"
     assert result.applied_count == 0
     assert "schema:edit" in result.error_message
     assert db.events == ["rollback", "commit"]
-
-
-@pytest.mark.asyncio
-async def test_new_schema_edit_grant_is_refused(monkeypatch):
+def test_new_schema_edit_grant_is_refused(monkeypatch):
     from models.user import Permission, Role
 
     role_id = uuid.uuid4()
@@ -289,7 +280,7 @@ async def test_new_schema_edit_grant_is_refused(monkeypatch):
 
     monkeypatch.setattr("app.services.configuring_agent_apply._permission_names", lambda _db, _role_id: set())
     with pytest.raises(CannotExpress) as exc:
-        await _roles(
+        _roles(
             DB(),
             SimpleNamespace(id=uuid.uuid4()),
             "PUT",

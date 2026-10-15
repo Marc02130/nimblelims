@@ -44,7 +44,7 @@ def _get_active_list(db: Session, list_name: str) -> ListModel:
 
 
 @router.post("", response_model=ListResponse, status_code=status.HTTP_201_CREATED)
-async def create_list(
+def create_list(
     list_data: ListCreate,
     current_user: User = Depends(require_config_edit),
     db: Session = Depends(get_db)
@@ -88,7 +88,7 @@ async def create_list(
 
 
 @router.get("", response_model=List[ListResponse])
-async def get_lists(
+def get_lists(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -128,7 +128,7 @@ async def get_lists(
 
 
 @router.patch("/{list_id}", response_model=ListResponse)
-async def update_list(
+def update_list(
     list_id: UUID,
     list_data: ListUpdate,
     current_user: User = Depends(require_config_edit),
@@ -186,7 +186,7 @@ async def update_list(
 
 
 @router.delete("/{list_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_list(
+def delete_list(
     list_id: UUID,
     current_user: User = Depends(require_config_edit),
     db: Session = Depends(get_db)
@@ -215,7 +215,7 @@ async def delete_list(
 
 
 @router.get("/{list_name}/entries", response_model=List[ListEntryResponse])
-async def get_list_entries(
+def get_list_entries(
     list_name: str,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -246,7 +246,7 @@ async def get_list_entries(
 
 
 @router.post("/{list_name}/entries", response_model=ListEntryResponse, status_code=status.HTTP_201_CREATED)
-async def create_list_entry(
+def create_list_entry(
     list_name: str,
     entry_data: ListEntryCreate,
     current_user: User = Depends(require_config_edit),
@@ -289,7 +289,7 @@ async def create_list_entry(
 
 
 @router.patch("/{list_name}/entries/{entry_id}", response_model=ListEntryResponse)
-async def update_list_entry(
+def update_list_entry(
     list_name: str,
     entry_id: UUID,
     entry_data: ListEntryUpdate,
@@ -344,7 +344,7 @@ async def update_list_entry(
 
 
 @router.delete("/{list_name}/entries/{entry_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_list_entry(
+def delete_list_entry(
     list_name: str,
     entry_id: UUID,
     current_user: User = Depends(require_config_edit),

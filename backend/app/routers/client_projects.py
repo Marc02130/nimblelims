@@ -25,7 +25,7 @@ router = APIRouter()
 
 
 @router.get("", response_model=ClientProjectListResponse)
-async def get_client_projects(
+def get_client_projects(
     client_id: Optional[UUID] = Query(None, description="Filter by client ID"),
     page: int = Query(1, ge=1, description="Page number"),
     size: int = Query(10, ge=1, le=100, description="Page size"),
@@ -87,7 +87,7 @@ async def get_client_projects(
 
 
 @router.get("/{client_project_id}", response_model=ClientProjectResponse)
-async def get_client_project(
+def get_client_project(
     client_project_id: UUID,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -125,7 +125,7 @@ async def get_client_project(
 
 
 @router.post("", response_model=ClientProjectResponse, status_code=status.HTTP_201_CREATED)
-async def create_client_project(
+def create_client_project(
     client_project_data: ClientProjectCreate,
     current_user: User = Depends(require_permission("project:manage")),
     db: Session = Depends(get_db)
@@ -188,7 +188,7 @@ async def create_client_project(
 
 
 @router.patch("/{client_project_id}", response_model=ClientProjectResponse)
-async def update_client_project(
+def update_client_project(
     client_project_id: UUID,
     client_project_data: ClientProjectUpdate,
     current_user: User = Depends(require_permission("project:manage")),
@@ -255,7 +255,7 @@ async def update_client_project(
 
 
 @router.delete("/{client_project_id}", status_code=status.HTTP_200_OK)
-async def delete_client_project(
+def delete_client_project(
     client_project_id: UUID,
     current_user: User = Depends(require_permission("project:manage")),
     db: Session = Depends(get_db)

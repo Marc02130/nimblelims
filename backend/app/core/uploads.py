@@ -9,7 +9,7 @@ from fastapi import HTTPException, UploadFile, status
 MAX_UPLOAD_FILE_BYTES = 10 * 1024 * 1024
 
 
-async def read_upload_capped(
+def read_upload_capped(
     file: UploadFile,
     *,
     max_bytes: int = MAX_UPLOAD_FILE_BYTES,
@@ -36,7 +36,7 @@ async def read_upload_capped(
         except ValueError:
             pass
 
-    content = await file.read()
+    content = file.file.read()
     if len(content) > max_bytes:
         raise HTTPException(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,

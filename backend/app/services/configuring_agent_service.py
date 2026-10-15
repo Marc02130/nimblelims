@@ -1036,7 +1036,7 @@ def _gate(db: Session, user: User, run: ConfigurationRun, included: list[Configu
         )
 
 
-async def apply_run(
+def apply_run(
     db: Session, user: User, run_id, second_confirm: bool = False
 ) -> tuple[ConfigurationRun, int]:
     """Apply exactly the included rows in one transaction, or roll back. Returns run and HTTP status."""
@@ -1059,7 +1059,7 @@ async def apply_run(
             failing_step_id = step.id
             if _retryable(step):
                 step.status, step.gap, step.stop_source = "proposed", None, None
-            changes = await execute_step(atomic, user, step.call_method, step.call_path, step.call_body or {})
+            changes = execute_step(atomic, user, step.call_method, step.call_path, step.call_body or {})
             if changes and all(change.noop for change in changes):
                 # Rerun no-op (G5): already in place. Nothing written, no ledger row.
                 step.status = "unchanged"

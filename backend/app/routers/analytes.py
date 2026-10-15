@@ -55,7 +55,7 @@ def _build_analyte_response(analyte: Analyte) -> AnalyteResponse:
 
 
 @router.get("", response_model=AnalyteListResponse)
-async def get_analytes(
+def get_analytes(
     search: Optional[str] = Query(None, description="Search by name or CAS number (ilike)"),
     active: Optional[bool] = Query(None, description="Filter by active status"),
     page: int = Query(1, ge=1, description="Page number"),
@@ -133,7 +133,7 @@ async def get_analytes(
 
 
 @router.get("/{analyte_id}", response_model=AnalyteResponse)
-async def get_analyte(
+def get_analyte(
     analyte_id: UUID,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -168,7 +168,7 @@ async def get_analyte(
 
 
 @router.get("/{analyte_id}/aliases", response_model=List[AnalyteAliasRead])
-async def list_analyte_aliases(
+def list_analyte_aliases(
     analyte_id: UUID,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -191,7 +191,7 @@ async def list_analyte_aliases(
     response_model=AnalyteAliasRead,
     status_code=status.HTTP_201_CREATED,
 )
-async def add_analyte_alias(
+def add_analyte_alias(
     analyte_id: UUID,
     body: AnalyteAliasCreate,
     current_user: User = Depends(
@@ -234,7 +234,7 @@ async def add_analyte_alias(
 
 
 @router.delete("/{analyte_id}/aliases/{alias_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_analyte_alias(
+def delete_analyte_alias(
     analyte_id: UUID,
     alias_id: UUID,
     current_user: User = Depends(
@@ -255,7 +255,7 @@ async def delete_analyte_alias(
 
 
 @router.post("", response_model=AnalyteResponse, status_code=status.HTTP_201_CREATED)
-async def create_analyte(
+def create_analyte(
     analyte_data: AnalyteCreate,
     current_user: User = Depends(require_any_permission(["config:edit", "test:configure", "analysis:manage"])),
     db: Session = Depends(get_db)
@@ -318,7 +318,7 @@ async def create_analyte(
 
 
 @router.patch("/{analyte_id}", response_model=AnalyteResponse)
-async def update_analyte(
+def update_analyte(
     analyte_id: UUID,
     analyte_data: AnalyteUpdate,
     current_user: User = Depends(require_any_permission(["config:edit", "test:configure", "analysis:manage"])),
@@ -392,7 +392,7 @@ async def update_analyte(
 
 
 @router.delete("/{analyte_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_analyte(
+def delete_analyte(
     analyte_id: UUID,
     current_user: User = Depends(require_any_permission(["config:edit", "test:configure", "analysis:manage"])),
     db: Session = Depends(get_db)

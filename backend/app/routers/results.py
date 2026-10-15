@@ -35,7 +35,7 @@ router = APIRouter()
 
 
 @router.get("/", response_model=ResultListResponse)
-async def get_results(
+def get_results(
     request: Request,
     test_id: Optional[UUID] = Query(None, description="Filter by test ID"),
     analyte_id: Optional[UUID] = Query(None, description="Filter by analyte ID"),
@@ -110,7 +110,7 @@ async def get_results(
 
 
 @router.get("/{result_id}", response_model=ResultResponse)
-async def get_result(
+def get_result(
     result_id: UUID,
     current_user: User = Depends(require_result_read),
     db: Session = Depends(get_db)
@@ -138,7 +138,7 @@ async def get_result(
 
 
 @router.post("/", response_model=ResultResponse)
-async def create_result(
+def create_result(
     result_data: ResultCreate,
     current_user: User = Depends(require_result_enter),
     db: Session = Depends(get_db)
@@ -201,7 +201,7 @@ async def create_result(
 
 
 @router.post("/batch", response_model=BatchResponse)
-async def enter_batch_results_us28(
+def enter_batch_results_us28(
     batch_data: BatchResultsEntryRequestUS28,
     current_user: User = Depends(require_result_enter),
     db: Session = Depends(get_db)
@@ -580,7 +580,7 @@ async def enter_batch_results_us28(
 
 
 @router.post("/validate", response_model=ResultValidationResponse)
-async def validate_result(
+def validate_result(
     validation_data: ResultValidationRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(
@@ -652,7 +652,7 @@ async def validate_result(
 
 
 @router.patch("/{result_id}", response_model=ResultResponse)
-async def update_result(
+def update_result(
     result_id: UUID,
     result_data: ResultUpdate,
     current_user: User = Depends(require_result_update),
@@ -705,7 +705,7 @@ async def update_result(
 
 
 @router.delete("/{result_id}")
-async def delete_result(
+def delete_result(
     result_id: UUID,
     current_user: User = Depends(require_result_delete),
     db: Session = Depends(get_db)

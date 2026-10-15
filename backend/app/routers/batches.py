@@ -57,7 +57,7 @@ def build_batch_response(batch: Batch, batch_containers: list) -> BatchResponse:
 
 
 @router.get("", response_model=BatchListResponse)
-async def get_batches(
+def get_batches(
     type: Optional[UUID] = Query(None, description="Filter by batch type ID"),
     status: Optional[UUID] = Query(None, description="Filter by status ID"),
     page: int = Query(1, ge=1, description="Page number"),
@@ -111,7 +111,7 @@ async def get_batches(
 
 
 @router.get("/{batch_id}", response_model=BatchResponse)
-async def get_batch(
+def get_batch(
     batch_id: UUID,
     current_user: User = Depends(require_batch_read),
     db: Session = Depends(get_db)
@@ -172,7 +172,7 @@ async def get_batch(
 
 
 @router.post("/validate-compatibility")
-async def validate_batch_compatibility(
+def validate_batch_compatibility(
     data: dict,
     current_user: User = Depends(require_batch_manage),
     db: Session = Depends(get_db)
@@ -371,7 +371,7 @@ async def validate_batch_compatibility(
 
 
 @router.post("", response_model=BatchResponse, status_code=status.HTTP_201_CREATED)
-async def create_batch(
+def create_batch(
     batch_data: BatchCreate,
     current_user: User = Depends(require_batch_manage),
     db: Session = Depends(get_db)
@@ -845,7 +845,7 @@ async def create_batch(
 
 
 @router.post("/with-containers", response_model=BatchResponse)
-async def create_batch_with_containers(
+def create_batch_with_containers(
     batch_data: BatchCreateWithContainersRequest,
     current_user: User = Depends(require_batch_manage),
     db: Session = Depends(get_db)
@@ -917,7 +917,7 @@ async def create_batch_with_containers(
 
 
 @router.post("/{batch_id}/containers", response_model=BatchContainerResponse)
-async def add_container_to_batch(
+def add_container_to_batch(
     batch_id: UUID,
     container_data: BatchContainerRequest,
     current_user: User = Depends(require_batch_manage),
@@ -1001,7 +1001,7 @@ async def add_container_to_batch(
 
 
 @router.patch("/{batch_id}", response_model=BatchResponse)
-async def update_batch(
+def update_batch(
     batch_id: UUID,
     batch_data: BatchUpdate,
     current_user: User = Depends(require_batch_update),
@@ -1090,7 +1090,7 @@ async def update_batch(
 
 
 @router.patch("/{batch_id}/status", response_model=BatchResponse)
-async def update_batch_status(
+def update_batch_status(
     batch_id: UUID,
     status_id: UUID,
     current_user: User = Depends(require_batch_update),
@@ -1146,7 +1146,7 @@ async def update_batch_status(
 
 
 @router.delete("/{batch_id}")
-async def delete_batch(
+def delete_batch(
     batch_id: UUID,
     current_user: User = Depends(require_batch_delete),
     db: Session = Depends(get_db)
@@ -1177,7 +1177,7 @@ async def delete_batch(
 
 
 @router.delete("/{batch_id}/containers/{container_id}")
-async def remove_container_from_batch(
+def remove_container_from_batch(
     batch_id: UUID,
     container_id: UUID,
     current_user: User = Depends(require_batch_manage),

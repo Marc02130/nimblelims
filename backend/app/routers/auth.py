@@ -55,7 +55,7 @@ def _issue_token(user: User, permissions: list, *, must_change: bool) -> str:
 
 
 @router.post("/login", response_model=LoginResponse)
-async def login(
+def login(
     login_data: LoginRequest,
     response: Response,
     db: Session = Depends(get_db),
@@ -154,7 +154,7 @@ async def login(
 
 
 @router.post("/change-password", response_model=ChangePasswordResponse)
-async def change_password(
+def change_password(
     body: ChangePasswordRequest,
     request: Request,
     response: Response,
@@ -211,7 +211,7 @@ async def change_password(
 
 
 @router.post("/logout")
-async def logout(
+def logout(
     request: Request,
     response: Response,
     db: Session = Depends(get_db),
@@ -242,7 +242,7 @@ async def logout(
 
 
 @router.get("/me")
-async def get_me(
+def get_me(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -263,7 +263,7 @@ async def get_me(
 
 
 @router.post("/verify-email", response_model=VerifyEmailResponse)
-async def verify_email(
+def verify_email(
     verify_data: VerifyEmailRequest,
     db: Session = Depends(get_db),
 ):

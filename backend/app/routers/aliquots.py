@@ -61,7 +61,7 @@ def _with_contents(sample: Sample, db: Session, schema):
     return schema(**data)
 
 @router.post("", response_model=AliquotResponse)
-async def create_aliquot(
+def create_aliquot(
     aliquot_data: AliquotCreateRequest,
     current_user: User = Depends(require_sample_create),
     db: Session = Depends(get_db)
@@ -155,17 +155,17 @@ async def create_aliquot(
 
 
 @router.post("/aliquot", response_model=AliquotResponse, include_in_schema=False)
-async def create_aliquot_legacy(
+def create_aliquot_legacy(
     aliquot_data: AliquotCreateRequest,
     current_user: User = Depends(require_sample_create),
     db: Session = Depends(get_db)
 ):
     """Legacy path alias for create_aliquot."""
-    return await create_aliquot(aliquot_data, current_user, db)
+    return create_aliquot(aliquot_data, current_user, db)
 
 
 @router.post("/derivative", response_model=DerivativeResponse)
-async def create_derivative(
+def create_derivative(
     derivative_data: DerivativeCreateRequest,
     current_user: User = Depends(require_sample_create),
     db: Session = Depends(get_db)
@@ -260,7 +260,7 @@ async def create_derivative(
 
 
 @router.post("/pool", response_model=PoolingResponse)
-async def pool_samples(
+def pool_samples(
     pooling_data: PoolingRequest,
     current_user: User = Depends(require_sample_create),
     db: Session = Depends(get_db)
@@ -373,7 +373,7 @@ async def pool_samples(
 
 
 @router.get("/parent/{parent_sample_id}", response_model=List[AliquotResponse])
-async def get_aliquots_for_parent(
+def get_aliquots_for_parent(
     parent_sample_id: UUID,
     current_user: User = Depends(require_sample_read),
     db: Session = Depends(get_db)
@@ -412,7 +412,7 @@ async def get_aliquots_for_parent(
 
 
 @router.get("/derivatives/{parent_sample_id}", response_model=List[DerivativeResponse])
-async def get_derivatives_for_parent(
+def get_derivatives_for_parent(
     parent_sample_id: UUID,
     current_user: User = Depends(require_sample_read),
     db: Session = Depends(get_db)

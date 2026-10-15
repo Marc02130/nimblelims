@@ -27,7 +27,7 @@ router = APIRouter()
 
 
 @router.get("", response_model=TestListResponse)
-async def get_tests(
+def get_tests(
     request: Request,
     sample_id: Optional[UUID] = Query(None, description="Filter by sample ID"),
     analysis_id: Optional[UUID] = Query(None, description="Filter by analysis ID"),
@@ -102,7 +102,7 @@ async def get_tests(
 
 
 @router.get("/{test_id}", response_model=TestResponse)
-async def get_test(
+def get_test(
     test_id: UUID,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -130,7 +130,7 @@ async def get_test(
 
 
 @router.post("/", response_model=TestResponse)
-async def create_test(
+def create_test(
     test_data: TestCreate,
     current_user: User = Depends(require_test_assign),
     db: Session = Depends(get_db)
@@ -201,7 +201,7 @@ async def create_test(
 
 
 @router.post("/assign", response_model=TestResponse)
-async def assign_test_to_sample(
+def assign_test_to_sample(
     assignment_data: TestAssignmentRequest,
     current_user: User = Depends(require_test_assign),
     db: Session = Depends(get_db)
@@ -273,7 +273,7 @@ async def assign_test_to_sample(
 
 
 @router.patch("/{test_id}", response_model=TestResponse)
-async def update_test(
+def update_test(
     test_id: UUID,
     test_data: TestUpdate,
     current_user: User = Depends(require_test_update),
@@ -352,7 +352,7 @@ async def update_test(
 
 
 @router.patch("/{test_id}/status", response_model=TestResponse)
-async def update_test_status(
+def update_test_status(
     test_id: UUID,
     status_data: TestStatusUpdateRequest,
     current_user: User = Depends(require_test_update),
@@ -413,7 +413,7 @@ async def update_test_status(
 
 
 @router.patch("/{test_id}/review", response_model=TestResponse)
-async def review_test(
+def review_test(
     test_id: UUID,
     review_data: TestReviewRequest,
     current_user: User = Depends(require_result_review),
@@ -490,7 +490,7 @@ async def review_test(
 
 
 @router.delete("/{test_id}")
-async def delete_test(
+def delete_test(
     test_id: UUID,
     current_user: User = Depends(require_test_update),
     db: Session = Depends(get_db)

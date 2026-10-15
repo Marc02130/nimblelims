@@ -29,7 +29,7 @@ def _sop_service(
 
 
 @router.post("", response_model=SopParseJobRead, status_code=202)
-async def create_parse_job(
+def create_parse_job(
     background_tasks: BackgroundTasks,
     sop_file: UploadFile = File(..., description="SOP document (text or PDF)"),
     instrument_file: UploadFile = File(..., description="Example instrument output CSV"),
@@ -43,8 +43,8 @@ async def create_parse_job(
     """
     from app.core.uploads import read_upload_capped
 
-    sop_bytes = await read_upload_capped(sop_file, field_name=sop_file.filename or "sop_file")
-    instrument_bytes = await read_upload_capped(
+    sop_bytes = read_upload_capped(sop_file, field_name=sop_file.filename or "sop_file")
+    instrument_bytes = read_upload_capped(
         instrument_file, field_name=instrument_file.filename or "instrument_file"
     )
 

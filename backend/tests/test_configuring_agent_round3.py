@@ -79,7 +79,7 @@ def test_invalid_operation_stops_at_apply_and_writes_nothing(db_session, admin, 
     blood, dna = blood_to_dna
     body = _transition(blood, dna, "dna extraction")["call"]["body"]
     with pytest.raises(CannotExpress) as stop:
-        asyncio.run(execute_step(db_session, admin, "POST", "/v1/sample-type-transitions", body))
+        execute_step(db_session, admin, "POST", "/v1/sample-type-transitions", body)
     assert "aliquot or pool" in str(stop.value)
     assert not db_session.query(SampleTypeTransition).filter(
         SampleTypeTransition.source_sample_type == blood.id).count()
@@ -89,7 +89,7 @@ def test_apply_of_dna_extraction_against_existing_edge_is_a_noop(db_session, adm
     blood, dna = blood_to_dna
     _existing(db_session, admin, blood, dna)
     body = _transition(blood, dna, "dna extraction")["call"]["body"]
-    changes = asyncio.run(execute_step(db_session, admin, "POST", "/v1/sample-type-transitions", body))
+    changes = execute_step(db_session, admin, "POST", "/v1/sample-type-transitions", body)
     assert changes[0].noop
     assert db_session.query(SampleTypeTransition).filter(
         SampleTypeTransition.source_sample_type == blood.id).count() == 1

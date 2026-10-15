@@ -281,18 +281,18 @@ def test_agent_applies_vendor_then_reagent_by_vendor_name_and_rerun_is_noop(db_s
 
     user = _agent_user(db_session, test_org, ["config:edit"])
     vname, rname = _name("Agent Vendor"), _name("Agent Kit")
-    created = asyncio.run(execute_step(db_session, user, "POST", "/v1/vendors", {"display_name": vname}))
+    created = execute_step(db_session, user, "POST", "/v1/vendors", {"display_name": vname})
     assert created[0].kind == "vendor" and not created[0].noop
-    made = asyncio.run(execute_step(db_session, user, "POST", "/v1/reagents", {"name": rname, "unit": "assays"}))
+    made = execute_step(db_session, user, "POST", "/v1/reagents", {"name": rname, "unit": "assays"})
     reagent = db_session.query(Reagent).filter(Reagent.id == made[0].target_id).one()
-    src = asyncio.run(execute_step(db_session, user, "POST", "/v1/reagent-vendors",
-                                   {"reagent": rname, "vendor": vname, "part_number": "Q1", "reorder_point": 2}))
+    src = execute_step(db_session, user, "POST", "/v1/reagent-vendors",
+                                   {"reagent": rname, "vendor": vname, "part_number": "Q1", "reorder_point": 2})
     assert not src[0].noop
     assert reagent.sources[0].vendor.name == vname and reagent.sources[0].catalog_number == "Q1"
-    again_src = asyncio.run(execute_step(db_session, user, "POST", "/v1/reagent-vendors",
-                                         {"reagent": rname, "vendor": vname, "catalog_number": "Q1"}))
+    again_src = execute_step(db_session, user, "POST", "/v1/reagent-vendors",
+                                         {"reagent": rname, "vendor": vname, "catalog_number": "Q1"})
     assert again_src[0].noop
-    again = asyncio.run(execute_step(db_session, user, "POST", "/v1/reagents", {"name": rname.upper()}))
+    again = execute_step(db_session, user, "POST", "/v1/reagents", {"name": rname.upper()})
     assert again[0].noop
     diff = cat.describe_change(db_session, user, "POST", "/v1/vendors", {"name": vname})
     assert diff["changed"] is False
@@ -304,7 +304,7 @@ def test_agent_reagent_needs_config_edit(db_session, test_org):
 
     user = _agent_user(db_session, test_org, ["sample:read"])
     with pytest.raises(PermissionDenied):
-        asyncio.run(execute_step(db_session, user, "POST", "/v1/vendors", {"name": _name("No")}))
+        execute_step(db_session, user, "POST", "/v1/vendors", {"name": _name("No")})
     assert not db_session.query(Vendor).filter(Vendor.created_by == user.id).count()
 
 

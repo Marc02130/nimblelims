@@ -26,7 +26,7 @@ router = APIRouter()
 
 
 @router.get("", response_model=List[UserWithRelationsResponse])
-async def get_users(
+def get_users(
     role_id: Optional[UUID] = Query(None, description="Filter by role ID"),
     client_id: Optional[UUID] = Query(None, description="Filter by client ID"),
     include_inactive: bool = Query(False, description="Include inactive users"),
@@ -81,7 +81,7 @@ async def get_users(
 
 
 @router.post("", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
-async def create_user(
+def create_user(
     user_data: UserCreate,
     current_user: User = Depends(require_any_permission(["user:manage", "config:edit"])),
     db: Session = Depends(get_db)
@@ -162,7 +162,7 @@ async def create_user(
 
 
 @router.patch("/{user_id}", response_model=UserResponse)
-async def update_user(
+def update_user(
     user_id: UUID,
     user_data: UserUpdate,
     current_user: User = Depends(require_any_permission(["user:manage", "config:edit"])),
@@ -260,7 +260,7 @@ async def update_user(
 
 
 @router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_user(
+def delete_user(
     user_id: UUID,
     current_user: User = Depends(require_any_permission(["user:manage", "config:edit"])),
     db: Session = Depends(get_db)

@@ -25,7 +25,7 @@ router = APIRouter()
 
 # Roles endpoints
 @router.get("", response_model=List[RoleResponse])
-async def get_roles(
+def get_roles(
     current_user: User = Depends(require_any_permission(["user:manage", "config:edit"])),
     db: Session = Depends(get_db)
 ):
@@ -38,7 +38,7 @@ async def get_roles(
 
 
 @router.post("", response_model=RoleResponse, status_code=status.HTTP_201_CREATED)
-async def create_role(
+def create_role(
     role_data: RoleCreate,
     current_user: User = Depends(require_any_permission(["user:manage", "config:edit"])),
     db: Session = Depends(get_db)
@@ -70,7 +70,7 @@ async def create_role(
 
 
 @router.patch("/{role_id}", response_model=RoleResponse)
-async def update_role(
+def update_role(
     role_id: UUID,
     role_data: RoleUpdate,
     current_user: User = Depends(require_any_permission(["user:manage", "config:edit"])),
@@ -111,7 +111,7 @@ async def update_role(
 
 
 @router.delete("/{role_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_role(
+def delete_role(
     role_id: UUID,
     current_user: User = Depends(require_any_permission(["user:manage", "config:edit"])),
     db: Session = Depends(get_db)
@@ -144,7 +144,7 @@ async def delete_role(
 
 
 @router.get("/{role_id}/permissions", response_model=List[PermissionResponse])
-async def get_role_permissions(
+def get_role_permissions(
     role_id: UUID,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -168,7 +168,7 @@ async def get_role_permissions(
 
 
 @router.put("/{role_id}/permissions", response_model=List[PermissionResponse])
-async def update_role_permissions(
+def update_role_permissions(
     role_id: UUID,
     permissions_data: RolePermissionsUpdate,
     current_user: User = Depends(require_any_permission(["user:manage", "config:edit"])),
