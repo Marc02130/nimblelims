@@ -27,6 +27,12 @@ from app.core.security import get_current_user, set_current_user_id
 from datetime import datetime, timedelta
 from uuid import UUID
 
+from app.core.db_errors import commit_or_409
+
+SAMPLE_UNIQUE = {
+    "samples_name_key": "A sample with this name already exists. Sample names must be unique.",
+}
+
 router = APIRouter()
 
 
@@ -606,7 +612,7 @@ def create_sample(
     )
     
     db.add(sample)
-    db.commit()
+    commit_or_409(db, SAMPLE_UNIQUE)
     db.refresh(sample)
     
     return SampleResponse.model_validate(sample)

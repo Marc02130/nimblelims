@@ -1,6 +1,7 @@
 """
 FastAPI application for NimbleLims
 """
+from sqlalchemy.exc import IntegrityError
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import validate_security_config
@@ -120,6 +121,17 @@ logger.info("All routers registered")
 async def root():
     print("ROOT ENDPOINT HIT", file=sys.stderr, flush=True)
     return {"message": "NimbleLims API"}
+
+@app.exception_handler(IntegrityError)
+async def _unique_violation_is_409(request: Request, exc: IntegrityError):
+    """Fallback: any unhandled unique violation is a 409, never a 500."""
+    from fastapi.responses import JSONResponse
+    from app.core.db_errors import is_unique_violation
+
+    if is_unique_violation(exc):
+        return JSONResponse(status_code=409, content={"detail": "That record already exists."})
+    return JSONResponse(status_code=400, content={"detail": "The change conflicts with existing data."})
+
 
 @app.get("/health")
 async def health_check():

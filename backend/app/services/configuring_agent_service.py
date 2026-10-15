@@ -5,6 +5,8 @@ from __future__ import annotations
 import logging
 import re
 import uuid
+
+from sqlalchemy.exc import DBAPIError
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Optional
@@ -126,6 +128,7 @@ def provider_key(row: ConfiguringAgentSettings, provider: str) -> str:
 def models_for(db: Session, provider: str) -> list[dict[str, str]]:
     row = _settings_read(db)
     key = provider_key(row, provider)
+    release_db_for_model_call(db)
     try:
         return list_models(provider, key)
     except ProviderError as exc:
@@ -553,10 +556,29 @@ def begin_run(db: Session, user: User, configuration_id, goal_note: Optional[str
     return run, pending
 
 
+DB_LOST_MESSAGE = (
+    "Lost the database connection while saving the model's proposal ({kind}). "
+    "Nothing from this run was saved. Start a new run."
+)
+
+
+def release_db_for_model_call(db: Session) -> None:
+    """End the open transaction before a slow model call (120-300 s).
+
+    UAT 67481e9: the propose step held a transaction open through the model
+    call, so idle_in_transaction_session_timeout (60 s, #162) killed the
+    connection and every run failed with OperationalError. Commit ends the
+    transaction and hands the connection back to the pool; the session opens a
+    fresh transaction (RLS GUCs re-applied by the after_begin hook) on next use.
+    Callers must not touch the session between this and the model reply.
+    """
+    db.commit()
+
+
 def finish_run(db: Session, user: User, pending: PendingRun, raise_errors: bool = True) -> ConfigurationRun:
     """Call the model and store the proposal rows. Used inline (start_run) and
     from the background task (item 5: grok-4.7 takes 96-300 s)."""
-    run = db.query(ConfigurationRun).filter(ConfigurationRun.id == pending.run_id).one()
+    release_db_for_model_call(db)
     try:
         parsed = propose(
             pending.provider,
@@ -570,6 +592,7 @@ def finish_run(db: Session, user: User, pending: PendingRun, raise_errors: bool 
         )
         raw_steps = _steps_from_proposal(parsed)
     except ProviderError as exc:
+        run = db.query(ConfigurationRun).filter(ConfigurationRun.id == pending.run_id).one()
         run.status = "failed"
         run.error_message = exc.message or "The model call failed with no detail. Start a new run."
         db.commit()
@@ -577,12 +600,14 @@ def finish_run(db: Session, user: User, pending: PendingRun, raise_errors: bool 
             raise HTTPException(status.HTTP_400_BAD_REQUEST, exc.message) from exc
         return run
     except HTTPException as exc:
+        run = db.query(ConfigurationRun).filter(ConfigurationRun.id == pending.run_id).one()
         run.status = "failed"
         run.error_message = str(exc.detail or "") or f"The run failed (HTTP {exc.status_code}). Start a new run."
         db.commit()
         if raise_errors:
             raise
         return run
+    run = db.query(ConfigurationRun).filter(ConfigurationRun.id == pending.run_id).one()
     # Keep every row. Each stop stays in place with its reason (D-6); no first-stop break.
     stopped = 0
     seen = set()
@@ -700,14 +725,20 @@ def run_in_background(pending: PendingRun, session_factory=None) -> None:
             finish_run(db, user, pending, raise_errors=False)
         except Exception as exc:  # noqa: BLE001 - a run must never stay reading_inputs
             logger.exception("configuring agent background run failed")
-            db.rollback()
-            run = db.query(ConfigurationRun).filter(ConfigurationRun.id == pending.run_id).first()
-            if run is not None and (run.status == "reading_inputs" or (run.status == "failed" and not run.error_message)):
-                run.status = "failed"
-                run.error_message = (
-                    f"The run failed while reading the model's proposal ({type(exc).__name__}). Start a new run."
-                )
-                db.commit()
+            if isinstance(exc, DBAPIError):
+                message = DB_LOST_MESSAGE.format(kind=type(exc).__name__)
+            else:
+                message = f"The run failed while reading the model's proposal ({type(exc).__name__}). Start a new run."
+            try:
+                db.rollback()
+                run = db.query(ConfigurationRun).filter(ConfigurationRun.id == pending.run_id).first()
+                if run is not None and (run.status == "reading_inputs" or (run.status == "failed" and not run.error_message)):
+                    run.status = "failed"
+                    run.error_message = message
+                    db.commit()
+            except DBAPIError:
+                # Still no database: expire_stale marks the run failed on the next poll.
+                logger.exception("could not record the failed configuring agent run")
     finally:
         if owned:
             db.close()
@@ -909,21 +940,34 @@ def redo_step(db: Session, user: User, run_id, step_id, feedback: str) -> Config
     run = _run(db, user, run_id)
     step = _step(run, step_id)
     settings, key = _key_for_run(db)
+    provider, model = settings.agent_provider, settings.agent_model
     excerpts = _excerpt(db, run.configuration_id, note)
+    catalog = _catalog_for_prompt(db, user)
+    goal_note = run.goal_note
+    release_db_for_model_call(db)
     try:
         parsed = propose(
-            settings.agent_provider,
-            settings.agent_model,
+            provider,
+            model,
             key,
             chunks=excerpts,
-            goal_note=run.goal_note,
+            goal_note=goal_note,
             feedback=note,
             # The confirmer isn't known yet; send no one's permissions (G1).
             permissions=None,
-            catalog=_catalog_for_prompt(db, user),
+            catalog=catalog,
         )
     except ProviderError as exc:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, exc.message) from exc
+    try:
+        run = _run(db, user, run_id)
+        step = _step(run, step_id)
+    except DBAPIError as exc:
+        db.rollback()
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            "Lost the database connection after the model replied. Nothing changed; redo the step again.",
+        ) from exc
     raw_steps = _steps_from_proposal(parsed, step.target)
     replacement = _add_step(db, run, step.position, raw_steps[0], user)
     # Carrier only. The original step is updated in place so redo does not insert a second row.

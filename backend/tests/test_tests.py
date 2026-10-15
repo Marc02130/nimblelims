@@ -300,6 +300,16 @@ class TestTestAssignment:
         assert data["analysis_id"] == str(test_data["analysis"].id)
         assert data["technician_id"] == str(test_admin_user.id)
     
+    def test_assign_same_analysis_twice_is_409(self, client: TestClient, test_admin_user, test_data):
+        """UAT 67481e9: a duplicate assignment returned 500 (tests_name_key)."""
+        token = client.post("/auth/login", json={"username": "admin", "password": "adminpassword"}).json()["access_token"]
+        h = {"Authorization": f"Bearer {token}"}
+        body = {"sample_id": str(test_data["sample"].id), "analysis_id": str(test_data["analysis"].id)}
+        assert client.post("/tests/assign", json=body, headers=h).status_code == 200
+        again = client.post("/tests/assign", json=body, headers=h)
+        assert again.status_code == 409, again.text
+        assert "already has that test" in again.json()["detail"]
+
     def test_assign_test_invalid_sample(self, client: TestClient, test_admin_user, test_data):
         """Test test assignment with invalid sample ID"""
         auth_response = client.post(
