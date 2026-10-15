@@ -366,4 +366,4 @@ See [manuals/HOWTO.md](manuals/HOWTO.md), [`.docs/README.md`](.docs/README.md), 
 
 **Documentation:** [manuals/HOWTO.md](manuals/HOWTO.md), `.docs/review/checklist/experiment-checklist.md`, [processes.md](manuals/processes.md), [experiments.md](manuals/experiments.md), [lims-runs.md](manuals/lims-runs.md), [navigation.md](manuals/navigation.md), [api-endpoints.md](manuals/api-endpoints.md), [`.docs/internal/design/experiment-planning.md`](.docs/internal/design/experiment-planning.md), `UAT_Scripts/uat-experiment-templates.md`.
 
-**Optional env:** `ANTHROPIC_API_KEY` on the backend for SOP extraction (see `backend/app/core/config.py`).
+**Optional env:** SOP extraction uses the configuring agent's provider: the provider and model chosen under Configuring agent settings (stored key, or that provider's env var), else the first of `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `XAI_API_KEY` that is set (override with `SOP_PARSE_PROVIDER` / `SOP_PARSE_MODEL`).

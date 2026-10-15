@@ -566,7 +566,7 @@ Created → In Process → Completed
 - Volume calculated from concentration and amount
 
 ### Variation 5: Experiments and experiment templates
-- **Configure templates** at `/experiments/templates` before or during operations: manual authoring, or SOP + instrument CSV upload with AI extraction (when `ANTHROPIC_API_KEY` is set).
+- **Configure templates** at `/experiments/templates` before or during operations: manual authoring, or SOP + instrument CSV upload with AI extraction (when an AI provider key is configured: Configuring agent settings, or `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` / `XAI_API_KEY`).
 - **Create experiments** from the list page or via workflow actions (`create_experiment`, `create_experiment_from_template` with `experiment_template_id` in params).
 - **Link samples** to experiments from the experiment detail UI or via `link_sample_to_experiment` in a workflow template (after accessioning, context may carry `sample_id`).
 - **Lineage** on experiment detail shows template source and linked experiments; samples list/detail remain the primary place for test/result workflow.
@@ -711,5 +711,5 @@ All workflow steps maintain audit information:
 - Analysis-analyte rules must be configured for validation
 - Units must be configured for concentration/amount conversions
 - Project access is enforced at all workflow stages
-- **Experiment templates** are configured under Experiments (not Admin); use **`experiment:manage`**. SOP-assisted creation needs **`ANTHROPIC_API_KEY`** on the backend. Workflow templates that call `create_experiment_from_template` depend on valid template UUIDs from `/v1/experiment-templates`.
+- **Experiment templates** are configured under Experiments (not Admin); use **`experiment:manage`**. SOP-assisted creation needs an AI provider key: the Configuring agent settings, or **`ANTHROPIC_API_KEY`**, **`OPENAI_API_KEY`**, or **`XAI_API_KEY`** on the backend. Workflow templates that call `create_experiment_from_template` depend on valid template UUIDs from `/v1/experiment-templates`.
 
