@@ -35,7 +35,7 @@
 - **Delete:** `DELETE /v1/experiment-templates/{id}` wired in `apiService`.
 - **SOP-filled fields:** Visual highlight + “from extraction” affordance in edit form after apply.
 
-**Backend:** `backend/app/routers/sop_parse.py`, `SOPParseService` (Claude via `ANTHROPIC_API_KEY`), models `sop_parse_jobs` and related flexible experiment tables.
+**Backend:** `backend/app/routers/sop_parse.py`, `SOPParseService` (configuring agent's provider selection and client: Anthropic, OpenAI, or xAI), models `sop_parse_jobs` and related flexible experiment tables.
 
 **Docs / plan:** See `.claude/plans/experiment-template-ui.md` for the original UI spec (implementation aligns with Phases 1–2; permission for templates is **`experiment:manage`** in code, not `config:edit`).
 
