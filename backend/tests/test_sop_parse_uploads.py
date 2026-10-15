@@ -76,8 +76,9 @@ def test_corrupt_pdf_is_unsupported():
 
 
 def test_configuring_agent_uses_the_shared_helper():
+    from app.services import configuring_agent_extract as ext
     from app.services import configuring_agent_service as svc
-    assert svc.file_text is file_text
+    assert svc.file_kind_and_text is ext.file_kind_and_text
 
 
 # ── POST /v1/sop-parse ───────────────────────────────────────────────────────

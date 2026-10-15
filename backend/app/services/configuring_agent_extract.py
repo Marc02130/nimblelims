@@ -15,7 +15,12 @@ class NoTextInFile(ValueError):
 
 
 def file_text(data: bytes, filename: str = "") -> str:
-    """Text of an uploaded lab file. One path for the configuring agent and SOP parse.
+    """Text only; see file_kind_and_text."""
+    return file_kind_and_text(data, filename)[1]
+
+
+def file_kind_and_text(data: bytes, filename: str = "") -> tuple[str, str]:
+    """(kind, text) of an uploaded lab file; kind is pdf, docx, or txt. One path for the configuring agent and SOP parse.
 
     UnsupportedFileType: not PDF/DOCX/text, or a PDF/DOCX that can't be read.
     NoTextInFile: readable but no extractable text (e.g. a scanned PDF).
@@ -33,7 +38,7 @@ def file_text(data: bytes, filename: str = "") -> str:
         if kind == "pdf":
             raise NoTextInFile("That PDF has no extractable text (it may be a scanned image). Upload a text PDF, DOCX, or TXT.")
         raise NoTextInFile("That file has no text.")
-    return text
+    return kind, text
 
 
 def detect_kind(data: bytes, filename: str = "") -> str:
