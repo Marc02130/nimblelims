@@ -355,6 +355,8 @@ const BatchResultsEntryTable: React.FC<BatchResultsEntryTableProps> = ({
                 label="Raw Result"
                 value={result?.raw_result || ''}
                 onChange={(e) => handleCellChange(test.id, analyte.id, 'raw_result', e.target.value)}
+                // Keep grid keyboard navigation (arrows, Home/End, space) out of the input.
+                onKeyDown={(e) => e.stopPropagation()}
                 error={!!cellError}
                 helperText={cellError || ''}
                 type={analyte.data_type === 'numeric' ? 'number' : 'text'}
@@ -370,12 +372,14 @@ const BatchResultsEntryTable: React.FC<BatchResultsEntryTableProps> = ({
                 label="Reported"
                 value={result?.reported_result || ''}
                 onChange={(e) => handleCellChange(test.id, analyte.id, 'reported_result', e.target.value)}
+                onKeyDown={(e) => e.stopPropagation()}
                 sx={{ mt: 0.5 }}
               />
             </Box>
           );
         },
-        editable: true,
+        // Not grid-editable: the cell renders its own inputs. With editable: true, typing in
+        // them made the grid enter its own edit mode and swallow the keystrokes.
       });
     });
 
