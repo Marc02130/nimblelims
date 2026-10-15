@@ -46,7 +46,7 @@ def _active_filter(query, model, user: User, db: Session):
 # --- Instrument types ---
 
 @instrument_types_router.get("", response_model=List[InstrumentTypeResponse])
-async def list_instrument_types(
+def list_instrument_types(
     search: Optional[str] = Query(None),
     active: Optional[bool] = Query(None),
     current_user: User = Depends(get_current_user),
@@ -67,7 +67,7 @@ async def list_instrument_types(
 
 
 @instrument_types_router.get("/{type_id}", response_model=InstrumentTypeResponse)
-async def get_instrument_type(
+def get_instrument_type(
     type_id: UUID,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -81,7 +81,7 @@ async def get_instrument_type(
 @instrument_types_router.post(
     "", response_model=InstrumentTypeResponse, status_code=status.HTTP_201_CREATED
 )
-async def create_instrument_type(
+def create_instrument_type(
     body: InstrumentTypeCreate,
     current_user: User = Depends(require_config_edit),
     db: Session = Depends(get_db),
@@ -104,7 +104,7 @@ async def create_instrument_type(
 
 
 @instrument_types_router.patch("/{type_id}", response_model=InstrumentTypeResponse)
-async def update_instrument_type(
+def update_instrument_type(
     type_id: UUID,
     body: InstrumentTypeUpdate,
     current_user: User = Depends(require_config_edit),
@@ -130,7 +130,7 @@ async def update_instrument_type(
 
 
 @instrument_types_router.delete("/{type_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_instrument_type(
+def delete_instrument_type(
     type_id: UUID,
     current_user: User = Depends(require_config_edit),
     db: Session = Depends(get_db),
@@ -170,7 +170,7 @@ def _instrument_response(row: Instrument) -> InstrumentResponse:
 
 
 @instruments_router.get("", response_model=List[InstrumentResponse])
-async def list_instruments(
+def list_instruments(
     search: Optional[str] = Query(None),
     instrument_type_id: Optional[UUID] = Query(None),
     active: Optional[bool] = Query(None),
@@ -193,7 +193,7 @@ async def list_instruments(
 
 
 @instruments_router.get("/{instrument_id}", response_model=InstrumentResponse)
-async def get_instrument(
+def get_instrument(
     instrument_id: UUID,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -212,7 +212,7 @@ async def get_instrument(
 @instruments_router.post(
     "", response_model=InstrumentResponse, status_code=status.HTTP_201_CREATED
 )
-async def create_instrument(
+def create_instrument(
     body: InstrumentCreate,
     current_user: User = Depends(require_config_edit),
     db: Session = Depends(get_db),
@@ -249,7 +249,7 @@ async def create_instrument(
 
 
 @instruments_router.patch("/{instrument_id}", response_model=InstrumentResponse)
-async def update_instrument(
+def update_instrument(
     instrument_id: UUID,
     body: InstrumentUpdate,
     current_user: User = Depends(require_config_edit),
@@ -291,7 +291,7 @@ async def update_instrument(
 
 
 @instruments_router.delete("/{instrument_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_instrument(
+def delete_instrument(
     instrument_id: UUID,
     current_user: User = Depends(require_config_edit),
     db: Session = Depends(get_db),
@@ -322,7 +322,7 @@ def _cro_response(row: CroSource) -> CroSourceResponse:
 
 
 @cro_sources_router.get("", response_model=List[CroSourceResponse])
-async def list_cro_sources(
+def list_cro_sources(
     search: Optional[str] = Query(None),
     active: Optional[bool] = Query(None),
     current_user: User = Depends(get_current_user),
@@ -340,7 +340,7 @@ async def list_cro_sources(
 
 
 @cro_sources_router.get("/{source_id}", response_model=CroSourceResponse)
-async def get_cro_source(
+def get_cro_source(
     source_id: UUID,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -359,7 +359,7 @@ async def get_cro_source(
 @cro_sources_router.post(
     "", response_model=CroSourceResponse, status_code=status.HTTP_201_CREATED
 )
-async def create_cro_source(
+def create_cro_source(
     body: CroSourceCreate,
     current_user: User = Depends(require_config_edit),
     db: Session = Depends(get_db),
@@ -389,7 +389,7 @@ async def create_cro_source(
 
 
 @cro_sources_router.patch("/{source_id}", response_model=CroSourceResponse)
-async def update_cro_source(
+def update_cro_source(
     source_id: UUID,
     body: CroSourceUpdate,
     current_user: User = Depends(require_config_edit),
@@ -423,7 +423,7 @@ async def update_cro_source(
 
 
 @cro_sources_router.delete("/{source_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_cro_source(
+def delete_cro_source(
     source_id: UUID,
     current_user: User = Depends(require_config_edit),
     db: Session = Depends(get_db),

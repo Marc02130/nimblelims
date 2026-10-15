@@ -23,7 +23,7 @@ router = APIRouter(prefix="/admin/fields", tags=["field-definitions"])
 
 
 @router.get("", response_model=FieldDefinitionListResponse)
-async def get_field_definitions(
+def get_field_definitions(
     entity_type: Optional[str] = Query(None),
     active: Optional[bool] = Query(None),
     page: int = Query(1, ge=1),
@@ -55,7 +55,7 @@ async def get_field_definitions(
 
 
 @router.post("", response_model=FieldDefinitionResponse, status_code=status.HTTP_201_CREATED)
-async def create_field_definition(
+def create_field_definition(
     field_data: FieldDefinitionCreate,
     current_user: User = Depends(require_config_edit),
     db: Session = Depends(get_db)
@@ -99,7 +99,7 @@ async def create_field_definition(
 
 
 @router.get("/{field_id}", response_model=FieldDefinitionResponse)
-async def get_field_definition(
+def get_field_definition(
     field_id: UUID,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -112,7 +112,7 @@ async def get_field_definition(
 
 
 @router.patch("/{field_id}", response_model=FieldDefinitionResponse)
-async def update_field_definition(
+def update_field_definition(
     field_id: UUID,
     field_data: FieldDefinitionUpdate,
     current_user: User = Depends(require_config_edit),
@@ -135,7 +135,7 @@ async def update_field_definition(
 
 
 @router.delete("/{field_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_field_definition(
+def delete_field_definition(
     field_id: UUID,
     current_user: User = Depends(require_config_edit),
     db: Session = Depends(get_db)

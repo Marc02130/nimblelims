@@ -104,7 +104,7 @@ def validate_role_filter(role_filter: Optional[str], db: Session) -> Optional[st
 
 
 @router.get("", response_model=HelpEntryListResponse)
-async def get_help_entries(
+def get_help_entries(
     role: Optional[str] = Query(None, description="Filter by role (overrides current user role). Accepts role name or slug (case-insensitive). Examples: 'Lab Technician', 'lab-technician', 'Lab Manager', 'lab-manager', 'Administrator', 'administrator', 'Client'"),
     section: Optional[str] = Query(None, description="Filter by section"),
     page: int = Query(1, ge=1, description="Page number"),
@@ -196,7 +196,7 @@ async def get_help_entries(
 
 
 @router.get("/contextual", response_model=HelpEntryResponse)
-async def get_contextual_help(
+def get_contextual_help(
     section: str = Query(..., description="Section name for contextual help. Examples: 'Accessioning Workflow', 'Batch Creation', 'Results Entry', 'Results Review', 'Batch Management', 'Project Management', 'User Management', 'EAV Configuration', 'Row Level Security (RLS)'"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -246,7 +246,7 @@ async def get_contextual_help(
 
 
 @router.post("/admin/help", response_model=HelpEntryResponse, status_code=status.HTTP_201_CREATED)
-async def create_help_entry(
+def create_help_entry(
     help_data: HelpEntryCreate,
     current_user: User = Depends(require_config_edit),
     db: Session = Depends(get_db)
@@ -288,7 +288,7 @@ async def create_help_entry(
 
 
 @router.patch("/admin/help/{help_entry_id}", response_model=HelpEntryResponse)
-async def update_help_entry(
+def update_help_entry(
     help_entry_id: UUID,
     help_data: HelpEntryUpdate,
     current_user: User = Depends(require_config_edit),
@@ -341,7 +341,7 @@ async def update_help_entry(
 
 
 @router.delete("/admin/help/{help_entry_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_help_entry(
+def delete_help_entry(
     help_entry_id: UUID,
     current_user: User = Depends(require_config_edit),
     db: Session = Depends(get_db)

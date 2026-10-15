@@ -81,7 +81,7 @@ def validate_config(
 
 
 @router.post("/test", response_model=TestSuiteResponse)
-async def test_parser_config(
+def test_parser_config(
     parser_config: str = Form(..., description="JSON ParserConfig"),
     files: List[UploadFile] = File(default_factory=list),
     user: User = Depends(require_config_edit),
@@ -112,7 +112,7 @@ async def test_parser_config(
         raise HTTPException(400, f"Max {MAX_SETUP_FILES} files")
     payloads: list[tuple[str, bytes]] = []
     for f in files:
-        content = await f.read()
+        content = f.file.read()
         if len(content) > MAX_SETUP_FILE_BYTES:
             raise HTTPException(400, f"{f.filename} exceeds size limit")
         payloads.append((f.filename or "file", content))
@@ -138,14 +138,14 @@ def activate_parser(
     response_model=SetupFileMeta,
     status_code=status.HTTP_201_CREATED,
 )
-async def upload_setup_file(
+def upload_setup_file(
     parser_id: UUID,
     role: str = Form(...),
     file: UploadFile = File(...),
     user: User = Depends(require_config_edit),
     db: Session = Depends(get_db),
 ):
-    content = await file.read()
+    content = file.file.read()
     return DataParserService(db, current_user=user).add_setup_file(
         parser_id=parser_id,
         role=role,
