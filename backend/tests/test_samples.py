@@ -118,6 +118,21 @@ class TestSamplesCRUD:
         assert "id" in data
         assert "created_at" in data
     
+    def test_duplicate_sample_name_is_409(self, client: TestClient, test_admin_user, test_data):
+        """UAT 67481e9: a duplicate name returned 500 (samples_name_key)."""
+        token = client.post("/auth/login", json={"username": "admin", "password": "adminpassword"}).json()["access_token"]
+        h = {"Authorization": f"Bearer {token}"}
+        body = {
+            "name": "SAMPLE-DUP", "due_date": (datetime.utcnow() + timedelta(days=7)).isoformat(),
+            "received_date": datetime.utcnow().isoformat(), "sample_type": str(test_data["sample_type"].id),
+            "status": str(test_data["status"].id), "matrix": str(test_data["matrix"].id),
+            "project_id": str(test_data["project"].id),
+        }
+        assert client.post("/samples/", json=body, headers=h).status_code == 200
+        again = client.post("/samples/", json=body, headers=h)
+        assert again.status_code == 409, again.text
+        assert "already exists" in again.json()["detail"]
+
     def test_create_sample_validation_error(self, client: TestClient, test_admin_user, test_data):
         """Test sample creation with validation errors"""
         auth_response = client.post(

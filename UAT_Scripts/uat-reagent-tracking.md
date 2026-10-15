@@ -7,6 +7,7 @@
 **Actors:** `config-editor` (config:edit), `lab-tech` (experiment:manage), `client` (client user), `admin`
 **Env:** local docker compose (`lims-*`), http://localhost:3000 + :8000
 **Last run:** main `0a90f6f` (2026-10-14): RT-1..RT-6 and RT-8..RT-10 Pass. **RT-7 Fail (blocker):** at 12 parallel requests the API hung and `/health` timed out. Zero-quantity use was accepted (RT-6 finding). Both are fixed on branch `reagent-use-concurrency`; rerun RT-6 and RT-7 there.
+**Run 67481e9** (2026-10-14): RT-1..RT-10 Pass (RT-1 API only); RT-7 clean at 4/12/20/30 parallel and with a 3 s / 8 s held lock.
 
 Record per row: Pass / Fail / Incomplete, commit SHA, evidence path (API JSON, `pg_stat_activity` dump for RT-7).
 
@@ -44,7 +45,7 @@ Lots on that reagent (quantity 100 mL unless stated otherwise; use dates as of t
 | RT-7 | Concurrency (blocker) | On LC (100 mL): fire **12 and then 20** parallel POST uses of 30 mL as `lab-tech`. While they run, poll `GET /health` every 0.5 s. Then dump `pg_stat_activity` | All requests return within 15 s; exactly 3 × 201, the rest 422; LC remaining = 10, never < 0; sum of active uses + remaining = 100; `/health` answers every poll in < 1 s; no session `idle in transaction`; no restart needed. Repeat with 4 parallel (regression) |
 | RT-8 | No hard delete | DELETE on each of the 5 resources; retire then reactivate a vendor | DELETE → 405 (or 404), rows remain; retire/reactivate via `active` → 200 |
 | RT-9 | Privileges | `lab-tech` POST vendor / GET reagents; `client` GET reagents, lots, uses, POST use, POST vendor; `config-editor` POST use | lab-tech: vendor 403, read 200. client: reads return 0 rows, writes 403. config-editor use 403 (needs experiment:manage) |
-| RT-10 | Audit | SQL: `created_by`/`modified_by` usernames on the RT-4 use, L1 and the vendor | use = lab-tech, lab-tech; lot and vendor = config-editor, config-editor; created_at/modified_at set. *(0a90f6f: Pass by SQL. The script's own query had a bug; use a join on users.id.)* |
+| RT-10 | Audit | SQL: `created_by`/`modified_by` usernames on the RT-4 use, L1 and the vendor | use = lab-tech, lab-tech. Vendor = config-editor, config-editor. Lot: created_by = config-editor, **modified_by = lab-tech** (recording or voiding a use draws down the lot and stamps the lab tech as its last modifier; correct, not a fail). created_at/modified_at set. *(0a90f6f: Pass by SQL. The script's own query had a bug; use a join on users.id.)* |
 
 ---
 
