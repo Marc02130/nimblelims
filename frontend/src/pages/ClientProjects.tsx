@@ -321,7 +321,7 @@ const ClientProjects: React.FC = () => {
                 ),
                 endAdornment: searchTerm && (
                   <InputAdornment position="end">
-                    <IconButton size="small" onClick={() => setSearchTerm('')}>
+                    <IconButton size="small" onClick={() => setSearchTerm('')} aria-label="Clear search">
                       <Clear />
                     </IconButton>
                   </InputAdornment>
@@ -329,8 +329,9 @@ const ClientProjects: React.FC = () => {
               }}
             />
             <FormControl size="small" sx={{ minWidth: 200 }}>
-              <InputLabel>Filter by Client</InputLabel>
+              <InputLabel id="client-projects-client-filter-label">Filter by Client</InputLabel>
               <Select
+                labelId="client-projects-client-filter-label"
                 value={clientFilter}
                 onChange={(e) => {
                   setClientFilter(e.target.value);
