@@ -7,7 +7,11 @@ import { UserProvider } from '../contexts/UserContext';
 
 // Mock the API service
 jest.mock('../services/apiService', () => ({
+  // Real helpers (ApiService.formatError, addClientFilterIfNeeded, types); only the client is mocked.
+  ...jest.requireActual('../services/apiService'),
   apiService: {
+    // UserProvider probes the cookie session on mount (P4/S10). Plain fn: survives resetMocks.
+    getCurrentUser: () => Promise.reject(new Error('no session')),
     getRoles: jest.fn(),
     createRole: jest.fn(),
     updateRole: jest.fn(),
@@ -185,11 +189,12 @@ describe('RolesManagement', () => {
       expect(screen.getByText('Create New Role')).toBeInTheDocument();
     });
 
-    const nameInput = screen.getByLabelText('Role Name');
+    const nameInput = screen.getByLabelText(/^Role Name/);
     fireEvent.change(nameInput, { target: { value: 'Lab Manager' } });
 
     // Select some permissions
-    const sampleCreateCheckbox = screen.getByLabelText(/sample:create/i);
+    // Permissions load when the dialog opens.
+    const sampleCreateCheckbox = await screen.findByRole('checkbox', { name: /sample:create/i });
     fireEvent.click(sampleCreateCheckbox);
 
     const submitButton = screen.getByText('Create');
@@ -339,10 +344,11 @@ describe('RolesManagement', () => {
       expect(screen.getByText('Create New Role')).toBeInTheDocument();
     });
 
-    const nameInput = screen.getByLabelText('Role Name');
+    const nameInput = screen.getByLabelText(/^Role Name/);
     fireEvent.change(nameInput, { target: { value: 'Administrator' } });
 
-    const submitButton = screen.getByText('Create');
+    const submitButton = screen.getByRole('button', { name: 'Create' });
+    await waitFor(() => expect(submitButton).toBeEnabled());
     fireEvent.click(submitButton);
 
     await waitFor(() => {
