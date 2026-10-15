@@ -15,7 +15,7 @@ A person without `config:edit` gets: “You can't change configuring-agent setti
 
 Pick one provider: OpenAI, xAI, or Anthropic. The model list is that provider’s live list, loaded by the server. Changing the provider clears the stored key and the model. Set the key after the provider is chosen. The key is encrypted and is not shown again. Clearing the key clears only the key; the provider and model stay.
 
-If no key is stored, the server uses only that provider’s environment variable: `OPENAI_API_KEY`, `XAI_API_KEY`, or `ANTHROPIC_API_KEY`. It does not call another vendor. The error names the missing variable.
+If no key is stored, the server uses only that provider’s environment variable: `OPENAI_API_KEY`, `XAI_API_KEY`, or `ANTHROPIC_API_KEY`. It does not call another vendor. With neither, the error reads "No key configured for <provider>" and names the missing variable (the same wording SOP parse uses).
 
 The settings row is named **Configuring agent** and has an id.
 
