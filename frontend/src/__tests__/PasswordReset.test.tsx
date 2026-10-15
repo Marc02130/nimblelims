@@ -6,7 +6,11 @@ import ForgotPassword from '../pages/ForgotPassword';
 import ResetPassword from '../pages/ResetPassword';
 
 jest.mock('../services/apiService', () => ({
+  // Real helpers (ApiService.formatError, addClientFilterIfNeeded, types); only the client is mocked.
+  ...jest.requireActual('../services/apiService'),
   apiService: {
+    // UserProvider probes the cookie session on mount (P4/S10). Plain fn: survives resetMocks.
+    getCurrentUser: () => Promise.reject(new Error('no session')),
     requestPasswordReset: jest.fn(),
     confirmPasswordReset: jest.fn(),
   },
