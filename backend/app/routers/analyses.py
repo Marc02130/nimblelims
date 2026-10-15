@@ -59,7 +59,7 @@ def _build_analysis_response(analysis: Analysis) -> AnalysisResponse:
 
 
 @router.get("", response_model=AnalysisListResponse)
-async def get_analyses(
+def get_analyses(
     search: Optional[str] = Query(None, description="Search by name or method (ilike)"),
     active: Optional[bool] = Query(None, description="Filter by active status"),
     page: int = Query(1, ge=1, description="Page number"),
@@ -127,7 +127,7 @@ async def get_analyses(
 
 
 @router.get("/{analysis_id}", response_model=AnalysisResponse)
-async def get_analysis(
+def get_analysis(
     analysis_id: UUID,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -159,7 +159,7 @@ async def get_analysis(
 
 
 @router.post("", response_model=AnalysisResponse, status_code=status.HTTP_201_CREATED)
-async def create_analysis(
+def create_analysis(
     analysis_data: AnalysisCreate,
     current_user: User = Depends(require_any_permission(["config:edit", "test:configure", "analysis:manage"])),
     db: Session = Depends(get_db)
@@ -219,7 +219,7 @@ async def create_analysis(
 
 
 @router.patch("/{analysis_id}", response_model=AnalysisResponse)
-async def update_analysis(
+def update_analysis(
     analysis_id: UUID,
     analysis_data: AnalysisUpdate,
     current_user: User = Depends(require_any_permission(["config:edit", "test:configure", "analysis:manage"])),
@@ -289,7 +289,7 @@ async def update_analysis(
 
 
 @router.delete("/{analysis_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_analysis(
+def delete_analysis(
     analysis_id: UUID,
     current_user: User = Depends(require_any_permission(["config:edit", "test:configure", "analysis:manage"])),
     db: Session = Depends(get_db)
@@ -337,7 +337,7 @@ async def delete_analysis(
 # ============================================================================
 
 @router.get("/{analysis_id}/analytes", response_model=List[AnalyteSimple])
-async def get_analysis_analytes(
+def get_analysis_analytes(
     analysis_id: UUID,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -371,7 +371,7 @@ async def get_analysis_analytes(
 
 
 @router.post("/{analysis_id}/analytes", response_model=List[AnalyteSimple], status_code=status.HTTP_201_CREATED)
-async def link_analytes_to_analysis(
+def link_analytes_to_analysis(
     analysis_id: UUID,
     link_request: AnalyteLinkRequest,
     current_user: User = Depends(require_any_permission(["config:edit", "test:configure", "analysis:manage"])),
@@ -435,7 +435,7 @@ async def link_analytes_to_analysis(
 
 
 @router.put("/{analysis_id}/analytes", response_model=List[AnalyteSimple])
-async def update_analysis_analytes(
+def update_analysis_analytes(
     analysis_id: UUID,
     analyte_ids: dict,
     current_user: User = Depends(require_any_permission(["config:edit", "test:configure", "analysis:manage"])),
@@ -490,7 +490,7 @@ async def update_analysis_analytes(
 
 
 @router.delete("/{analysis_id}/analytes/{analyte_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def unlink_analyte_from_analysis(
+def unlink_analyte_from_analysis(
     analysis_id: UUID,
     analyte_id: UUID,
     current_user: User = Depends(require_any_permission(["config:edit", "test:configure", "analysis:manage"])),
@@ -545,7 +545,7 @@ async def unlink_analyte_from_analysis(
 # ============================================================================
 
 @router.get("/{analysis_id}/analyte-rules", response_model=List[AnalyteRuleResponse])
-async def get_analysis_analyte_rules(
+def get_analysis_analyte_rules(
     analysis_id: UUID,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -596,7 +596,7 @@ async def get_analysis_analyte_rules(
 
 
 @router.post("/{analysis_id}/analyte-rules", response_model=AnalyteRuleResponse, status_code=status.HTTP_201_CREATED)
-async def create_analysis_analyte_rule(
+def create_analysis_analyte_rule(
     analysis_id: UUID,
     rule_data: AnalyteRuleCreate,
     current_user: User = Depends(require_any_permission(["config:edit", "test:configure", "analysis:manage"])),
@@ -691,7 +691,7 @@ async def create_analysis_analyte_rule(
 
 
 @router.patch("/{analysis_id}/analyte-rules/{analyte_id}", response_model=AnalyteRuleResponse)
-async def update_analysis_analyte_rule(
+def update_analysis_analyte_rule(
     analysis_id: UUID,
     analyte_id: UUID,
     rule_data: AnalyteRuleUpdate,
@@ -784,7 +784,7 @@ async def update_analysis_analyte_rule(
 
 
 @router.delete("/{analysis_id}/analyte-rules/{analyte_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_analysis_analyte_rule(
+def delete_analysis_analyte_rule(
     analysis_id: UUID,
     analyte_id: UUID,
     current_user: User = Depends(require_any_permission(["config:edit", "test:configure", "analysis:manage"])),
@@ -830,7 +830,7 @@ async def delete_analysis_analyte_rule(
 
 
 @router.get("/{analysis_id}/param-defs", response_model=AnalysisParamDefsResponse)
-async def get_analysis_param_defs(
+def get_analysis_param_defs(
     analysis_id: UUID,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -843,7 +843,7 @@ async def get_analysis_param_defs(
 
 
 @router.put("/{analysis_id}/param-defs", response_model=AnalysisParamDefsResponse)
-async def put_analysis_param_defs(
+def put_analysis_param_defs(
     analysis_id: UUID,
     body: AnalysisParamDefsPut,
     current_user: User = Depends(require_config_edit),

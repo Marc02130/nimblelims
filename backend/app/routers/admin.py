@@ -38,7 +38,7 @@ def is_administrator(user: User, db: Session) -> bool:
 
 
 @router.get("", response_model=NameTemplateListResponse)
-async def get_name_templates(
+def get_name_templates(
     entity_type: Optional[str] = Query(None, description="Filter by entity type"),
     active: Optional[bool] = Query(None, description="Filter by active status"),
     page: int = Query(1, ge=1, description="Page number"),
@@ -86,7 +86,7 @@ async def get_name_templates(
 
 
 @router.post("", response_model=NameTemplateResponse, status_code=status.HTTP_201_CREATED)
-async def create_name_template(
+def create_name_template(
     template_data: NameTemplateCreate,
     current_user: User = Depends(require_config_edit),
     db: Session = Depends(get_db)
@@ -133,7 +133,7 @@ class NamePreviewResponse(BaseModel):
 
 
 @router.get("/preview", response_model=NamePreviewResponse)
-async def preview_generated_name(
+def preview_generated_name(
     entity_type: str = Query(..., description="Entity type (sample, project, batch, analysis, container)"),
     client_id: Optional[str] = Query(None, description="Client ID for {CLIENT} placeholder (uses abbreviation if set)"),
     reference_date: Optional[str] = Query(None, description="Reference date in YYYY-MM-DD format for date placeholders"),
@@ -281,7 +281,7 @@ async def preview_generated_name(
 
 
 @router.get("/{template_id}", response_model=NameTemplateResponse)
-async def get_name_template(
+def get_name_template(
     template_id: UUID,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -308,7 +308,7 @@ async def get_name_template(
 
 
 @router.patch("/{template_id}", response_model=NameTemplateResponse)
-async def update_name_template(
+def update_name_template(
     template_id: UUID,
     template_data: NameTemplateUpdate,
     current_user: User = Depends(require_config_edit),
@@ -366,7 +366,7 @@ async def update_name_template(
 
 
 @router.delete("/{template_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_name_template(
+def delete_name_template(
     template_id: UUID,
     current_user: User = Depends(require_config_edit),
     db: Session = Depends(get_db)
