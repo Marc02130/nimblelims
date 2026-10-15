@@ -23,16 +23,16 @@ const mockListEntries = {
     { id: 'type1', name: 'Blood' },
     { id: 'type2', name: 'Urine' },
   ],
-  matrices: [
+  matrix_types: [
     { id: 'matrix1', name: 'Serum' },
     { id: 'matrix2', name: 'Plasma' },
   ],
 };
 
 const mockUnits = [
-  { id: 'unit1', name: 'mg/L', type: 'concentration' },
-  { id: 'unit2', name: 'g', type: 'mass' },
-  { id: 'unit3', name: 'mL', type: 'volume' },
+  { id: 'unit1', name: 'mg/L', type_name: 'concentration' },
+  { id: 'unit2', name: 'g', type_name: 'mass' },
+  { id: 'unit3', name: 'mL', type_name: 'volume' },
 ];
 
 const mockContainerTypes = [
@@ -55,7 +55,7 @@ describe('AliquotForm', () => {
     // Mock API calls
     mockApiService.getListEntries.mockImplementation((listName: string) => {
       if (listName === 'sample_types') return Promise.resolve(mockListEntries.sample_types);
-      if (listName === 'matrices') return Promise.resolve(mockListEntries.matrices);
+      if (listName === 'matrix_types') return Promise.resolve(mockListEntries.matrix_types);
       return Promise.resolve([]);
     });
     
@@ -67,16 +67,16 @@ describe('AliquotForm', () => {
     renderWithProviders(<AliquotForm {...defaultProps} />);
 
     await waitFor(() => {
-      expect(screen.getByText('Create Aliquot')).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'Create Aliquot' })).toBeInTheDocument();
     });
 
-    expect(screen.getByLabelText('Aliquot Name')).toBeInTheDocument();
+    expect(screen.getByLabelText(/^Aliquot Name/)).toBeInTheDocument();
     expect(screen.getByLabelText('Description')).toBeInTheDocument();
-    expect(screen.getByLabelText('Sample Type')).toBeInTheDocument();
-    expect(screen.getByLabelText('Matrix')).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: /^Sample Type/ })).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: /^Matrix/ })).toBeInTheDocument();
     expect(screen.getByLabelText('Temperature')).toBeInTheDocument();
-    expect(screen.getByLabelText('Due Date')).toBeInTheDocument();
-    expect(screen.getByLabelText('Container Type')).toBeInTheDocument();
+    expect(screen.getAllByLabelText('Due Date').length).toBeGreaterThan(0);
+    expect(screen.getByRole('combobox', { name: /^Container Type/ })).toBeInTheDocument();
   });
 
   it('loads and populates dropdown options', async () => {
@@ -84,7 +84,7 @@ describe('AliquotForm', () => {
 
     await waitFor(() => {
       expect(mockApiService.getListEntries).toHaveBeenCalledWith('sample_types');
-      expect(mockApiService.getListEntries).toHaveBeenCalledWith('matrices');
+      expect(mockApiService.getListEntries).toHaveBeenCalledWith('matrix_types');
       expect(mockApiService.getUnits).toHaveBeenCalled();
       expect(mockApiService.getContainerTypes).toHaveBeenCalled();
     });
@@ -95,10 +95,10 @@ describe('AliquotForm', () => {
     renderWithProviders(<AliquotForm {...defaultProps} />);
 
     await waitFor(() => {
-      expect(screen.getByLabelText('Aliquot Name')).toBeInTheDocument();
+      expect(screen.getByLabelText(/^Aliquot Name/)).toBeInTheDocument();
     });
 
-    const nameInput = screen.getByLabelText('Aliquot Name');
+    const nameInput = screen.getByLabelText(/^Aliquot Name/);
     await user.type(nameInput, 'Test Aliquot');
 
     expect(nameInput).toHaveValue('Test Aliquot');
@@ -111,26 +111,26 @@ describe('AliquotForm', () => {
     renderWithProviders(<AliquotForm {...defaultProps} />);
 
     await waitFor(() => {
-      expect(screen.getByLabelText('Aliquot Name')).toBeInTheDocument();
+      expect(screen.getByLabelText(/^Aliquot Name/)).toBeInTheDocument();
     });
 
     // Fill in required fields
-    await user.type(screen.getByLabelText('Aliquot Name'), 'Test Aliquot');
+    await user.type(screen.getByLabelText(/^Aliquot Name/), 'Test Aliquot');
     await user.type(screen.getByLabelText('Description'), 'Test Description');
     await user.type(screen.getByLabelText('Temperature'), '25');
 
     // Select dropdowns
-    await user.click(screen.getByLabelText('Sample Type'));
-    await user.click(screen.getByText('Blood'));
+    await user.click(screen.getByRole('combobox', { name: /^Sample Type/ }));
+    await user.click(await screen.findByRole('option', { name: 'Blood' }));
 
-    await user.click(screen.getByLabelText('Matrix'));
-    await user.click(screen.getByText('Serum'));
+    await user.click(screen.getByRole('combobox', { name: /^Matrix/ }));
+    await user.click(await screen.findByRole('option', { name: 'Serum' }));
 
-    await user.click(screen.getByLabelText('Container Type'));
-    await user.click(screen.getByText('Tube'));
+    await user.click(screen.getByRole('combobox', { name: /^Container Type/ }));
+    await user.click(await screen.findByRole('option', { name: 'Tube' }));
 
     // Submit form
-    await user.click(screen.getByText('Create Aliquot'));
+    await user.click(screen.getByRole('button', { name: 'Create Aliquot' }));
 
     await waitFor(() => {
       expect(mockApiService.createAliquot).toHaveBeenCalledWith(
@@ -148,16 +148,16 @@ describe('AliquotForm', () => {
 
   it('handles API errors gracefully', async () => {
     const user = userEvent.setup();
-    mockApiService.createAliquot.mockRejectedValue(new Error('API Error'));
+    mockApiService.createAliquot.mockRejectedValue({ response: { data: { detail: 'API Error' } } });
 
     renderWithProviders(<AliquotForm {...defaultProps} />);
 
     await waitFor(() => {
-      expect(screen.getByLabelText('Aliquot Name')).toBeInTheDocument();
+      expect(screen.getByLabelText(/^Aliquot Name/)).toBeInTheDocument();
     });
 
-    await user.type(screen.getByLabelText('Aliquot Name'), 'Test Aliquot');
-    await user.click(screen.getByText('Create Aliquot'));
+    await user.type(screen.getByLabelText(/^Aliquot Name/), 'Test Aliquot');
+    await user.click(screen.getByRole('button', { name: 'Create Aliquot' }));
 
     await waitFor(() => {
       expect(screen.getByText('API Error')).toBeInTheDocument();
@@ -184,12 +184,12 @@ describe('AliquotForm', () => {
     renderWithProviders(<AliquotForm {...defaultProps} />);
 
     await waitFor(() => {
-      expect(screen.getByLabelText('Aliquot Name')).toBeInTheDocument();
+      expect(screen.getByLabelText(/^Aliquot Name/)).toBeInTheDocument();
     });
 
-    await user.type(screen.getByLabelText('Aliquot Name'), 'Test Aliquot');
-    await user.click(screen.getByText('Create Aliquot'));
+    await user.type(screen.getByLabelText(/^Aliquot Name/), 'Test Aliquot');
+    await user.click(screen.getByRole('button', { name: 'Create Aliquot' }));
 
-    expect(screen.getByText('Create Aliquot')).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Create Aliquot' })).toBeDisabled();
   });
 });

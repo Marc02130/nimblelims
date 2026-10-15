@@ -7,10 +7,26 @@ import { UserProvider } from '../contexts/UserContext';
 
 // Mock the API service
 jest.mock('../services/apiService', () => ({
+  // Real helpers (ApiService.formatError, addClientFilterIfNeeded, types); only the client is mocked.
+  ...jest.requireActual('../services/apiService'),
   apiService: {
+    // UserProvider probes the cookie session on mount (P4/S10). Plain fn: survives resetMocks.
+    getCurrentUser: () => Promise.reject(new Error('no session')),
     getLists: jest.fn(),
     getContainerTypes: jest.fn(),
+    getUsers: jest.fn(),
+    getAnalyses: jest.fn(),
+    getAnalytes: jest.fn(),
+    getRoles: jest.fn(),
+    getTestBatteries: jest.fn(),
   },
+}));
+
+// The 403 test checks the redirect; spying on the ESM export is not allowed.
+const mockNavigate = jest.fn();
+jest.mock('react-router-dom', () => ({
+  ...jest.requireActual('react-router-dom'),
+  useNavigate: () => mockNavigate,
 }));
 
 const theme = createTheme();
@@ -109,6 +125,12 @@ describe('AdminDashboard', () => {
     const { apiService } = require('../services/apiService');
     apiService.getLists.mockResolvedValue(mockLists);
     apiService.getContainerTypes.mockResolvedValue(mockContainerTypes);
+    // The dashboard also loads these counts (each with its own .catch).
+    apiService.getUsers.mockResolvedValue([]);
+    apiService.getAnalyses.mockResolvedValue({ analyses: [], total: 0 });
+    apiService.getAnalytes.mockResolvedValue([]);
+    apiService.getRoles.mockResolvedValue([]);
+    apiService.getTestBatteries.mockResolvedValue({ batteries: [], total: 0 });
   });
 
   test('renders admin dashboard for users with config:edit permission', async () => {
@@ -127,9 +149,9 @@ describe('AdminDashboard', () => {
 
     await waitFor(() => {
       expect(screen.getByText('Total Lists')).toBeInTheDocument();
-      expect(screen.getByText('2')).toBeInTheDocument(); // Total lists count
-      expect(screen.getByText('Container Types')).toBeInTheDocument();
-      expect(screen.getByText('2')).toBeInTheDocument(); // Container types count
+      expect(screen.getByText('Total Users')).toBeInTheDocument();
+      // Two "2"s: lists count and container types count.
+      expect(screen.getAllByText('2')).toHaveLength(2);
     });
   });
 
@@ -138,10 +160,11 @@ describe('AdminDashboard', () => {
     renderWithProviders(<AdminDashboard />);
 
     await waitFor(() => {
-      expect(screen.getByText('Admin')).toBeInTheDocument();
-      expect(screen.getByText('Overview')).toBeInTheDocument();
-      expect(screen.getByText('Lists Management')).toBeInTheDocument();
-      expect(screen.getByText('Container Types')).toBeInTheDocument();
+      // The drawer renders twice (temporary for mobile, permanent for desktop).
+      expect(screen.getAllByText('Admin').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('Overview').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('Lists Management').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('Container Types').length).toBeGreaterThan(0);
     });
   });
 
@@ -158,8 +181,12 @@ describe('AdminDashboard', () => {
     mockUserContext(mockAdminUser);
     renderWithProviders(<AdminDashboard />, ['/admin/lists']);
 
+    // Child pages render in the <Outlet/> (not mounted here); the matching
+    // drawer item is selected.
     await waitFor(() => {
-      expect(screen.getByText('Lists Management')).toBeInTheDocument();
+      const items = screen.getAllByText('Lists Management').map((el) => el.closest('.MuiListItemButton-root'));
+      expect(items.length).toBeGreaterThan(0);
+      items.forEach((item) => expect(item).toHaveClass('Mui-selected'));
     });
   });
 
@@ -167,8 +194,12 @@ describe('AdminDashboard', () => {
     mockUserContext(mockAdminUser);
     renderWithProviders(<AdminDashboard />, ['/admin/container-types']);
 
+    // Child pages render in the <Outlet/> (not mounted here); the matching
+    // drawer item is selected.
     await waitFor(() => {
-      expect(screen.getByText('Container Types Management')).toBeInTheDocument();
+      const items = screen.getAllByText('Container Types').map((el) => el.closest('.MuiListItemButton-root'));
+      expect(items.length).toBeGreaterThan(0);
+      items.forEach((item) => expect(item).toHaveClass('Mui-selected'));
     });
   });
 
@@ -204,9 +235,6 @@ describe('AdminDashboard', () => {
     apiService.getLists.mockRejectedValue(error);
 
     mockUserContext(mockAdminUser);
-    const { useNavigate } = require('react-router-dom');
-    const mockNavigate = jest.fn();
-    jest.spyOn(require('react-router-dom'), 'useNavigate').mockReturnValue(mockNavigate);
 
     renderWithProviders(<AdminDashboard />);
 
