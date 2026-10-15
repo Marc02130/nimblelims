@@ -67,9 +67,15 @@ const Dashboard: React.FC = () => {
   const [lookupData, setLookupData] = useState<{
     statuses: Array<{ id: string; name: string }>;
     projects: Array<{ id: string; name: string }>;
+    sampleTypes: Array<{ id: string; name: string }>;
+    matrices: Array<{ id: string; name: string }>;
+    qcTypes: Array<{ id: string; name: string }>;
   }>({
     statuses: [],
     projects: [],
+    sampleTypes: [],
+    matrices: [],
+    qcTypes: [],
   });
 
   useEffect(() => {
@@ -82,20 +88,33 @@ const Dashboard: React.FC = () => {
 
   const loadData = async () => {
     try {
-      const [statusesRaw, projectsResponse] = await Promise.all([
+      // Samples carry list-entry ids only (no *_info objects), so the grid
+      // needs these lists to show names. Optional lists fall back to [].
+      const optional = (p: Promise<any>) => Promise.resolve(p).catch(() => []);
+      const [statusesRaw, projectsResponse, sampleTypesRaw, matricesRaw, qcTypesRaw] = await Promise.all([
         apiService.getListEntries('sample_status'),  // Use normalized slug format
         apiService.getProjects(),
+        optional(apiService.getListEntries('sample_types')),
+        optional(apiService.getListEntries('matrix_types')),
+        optional(apiService.getListEntries('qc_types')),
       ]);
 
       // Ensure arrays for .map() – API may return objects or paginated shape
-      const statuses = Array.isArray(statusesRaw) ? statusesRaw : [];
+      const asArray = (raw: any) => (Array.isArray(raw) ? raw : []);
+      const statuses = asArray(statusesRaw);
       const projects = Array.isArray(projectsResponse?.projects)
         ? projectsResponse.projects
         : Array.isArray(projectsResponse)
           ? projectsResponse
           : [];
 
-      setLookupData({ statuses, projects });
+      setLookupData({
+        statuses,
+        projects,
+        sampleTypes: asArray(sampleTypesRaw),
+        matrices: asArray(matricesRaw),
+        qcTypes: asArray(qcTypesRaw),
+      });
     } catch (err: any) {
       setError('Failed to load filter data');
     }
@@ -154,19 +173,20 @@ const Dashboard: React.FC = () => {
       field: 'sample_type', 
       headerName: 'Type', 
       width: 150,
-      valueGetter: (value, row) => getLookupName(row.sample_type, [])
+      valueGetter: (value, row) => row.sample_type_info?.name || getLookupName(row.sample_type, lookupData.sampleTypes)
     },
     { 
       field: 'matrix', 
       headerName: 'Matrix', 
       width: 120,
-      valueGetter: (value, row) => getLookupName(row.matrix, [])
+      valueGetter: (value, row) =>
+        row.matrix_info?.name || (row.matrix ? getLookupName(row.matrix, lookupData.matrices) : '')
     },
     { 
       field: 'project', 
       headerName: 'Project', 
       width: 150,
-      valueGetter: (value, row) => row.project?.name || 'Unknown'
+      valueGetter: (value, row) => row.project?.name || getLookupName(row.project_id, lookupData.projects)
     },
     { 
       field: 'due_date', 
@@ -190,7 +210,8 @@ const Dashboard: React.FC = () => {
       field: 'qc_type', 
       headerName: 'QC', 
       width: 100,
-      valueGetter: (value, row) => row.qc_type_info?.name || ''
+      valueGetter: (value, row) =>
+        row.qc_type_info?.name || (row.qc_type ? getLookupName(row.qc_type, lookupData.qcTypes) : '')
     },
   ];
 
@@ -276,8 +297,9 @@ const Dashboard: React.FC = () => {
           <Grid container spacing={2} alignItems="center">
             <Grid size={{ xs: 12, sm: 6, md: 3 }}>
               <FormControl fullWidth size="small">
-                <InputLabel>Status</InputLabel>
+                <InputLabel id="dashboard-status-filter-label">Status</InputLabel>
                 <Select
+                  labelId="dashboard-status-filter-label"
                   value={filters.status}
                   label="Status"
                   onChange={(e) => setFilters({ ...filters, status: e.target.value })}
@@ -294,8 +316,9 @@ const Dashboard: React.FC = () => {
 
             <Grid size={{ xs: 12, sm: 6, md: 3 }}>
               <FormControl fullWidth size="small">
-                <InputLabel>Project</InputLabel>
+                <InputLabel id="dashboard-project-filter-label">Project</InputLabel>
                 <Select
+                  labelId="dashboard-project-filter-label"
                   value={filters.project_id}
                   label="Project"
                   onChange={(e) => setFilters({ ...filters, project_id: e.target.value })}
