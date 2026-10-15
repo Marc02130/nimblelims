@@ -28,6 +28,9 @@ from typing import Dict, List, Optional, Tuple
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
+from sqlalchemy.exc import DBAPIError
+
+from app.database import release_transaction
 from app.services.r_calculator_client import RCalculatorClient
 from models.dose_response import (
     CurveCategory,
@@ -73,10 +76,11 @@ class DoseResponseFitService:
         self._check_not_in_progress(run)
         self._set_fit_in_progress(run, True)
 
+        run_id = run.id
         try:
             return self._run_fit(run)
         finally:
-            self._set_fit_in_progress(run, False)
+            self._clear_fit_in_progress(run_id)
 
     def trigger_refit(self, run_id: uuid.UUID, sample_id: uuid.UUID) -> Dict:
         """Re-fit a single compound after knockout. Creates a new result row."""
@@ -84,10 +88,11 @@ class DoseResponseFitService:
         self._check_run_status(run)
         self._check_not_in_progress(run)
         self._set_fit_in_progress(run, True)
+        run_id = run.id
         try:
             return self._run_fit(run, sample_id_filter=sample_id)
         finally:
-            self._set_fit_in_progress(run, False)
+            self._clear_fit_in_progress(run_id)
 
     # ── Internal ──────────────────────────────────────────────────────────────
 
@@ -120,6 +125,22 @@ class DoseResponseFitService:
         run.fit_in_progress = value
         self.db.flush()
         self.db.commit()
+
+    def _clear_fit_in_progress(self, run_id: uuid.UUID) -> None:
+        """Always clear the flag, even when the fit's connection died: roll back
+        (which discards a dead connection), then update in a fresh transaction.
+        A stuck flag made every retry 409 (UAT e47c53f)."""
+        for attempt in (1, 2):
+            try:
+                self.db.rollback()
+                self.db.query(LimsRun).filter(LimsRun.id == run_id).update(
+                    {LimsRun.fit_in_progress: False}, synchronize_session=False
+                )
+                self.db.commit()
+                return
+            except DBAPIError:
+                logger.warning("clearing fit_in_progress failed (attempt %s)", attempt, exc_info=True)
+        logger.error("fit_in_progress left set for run %s; use POST .../reset-fit", run_id)
 
     def _run_fit(
         self,
@@ -366,6 +387,10 @@ class DoseResponseFitService:
         )
 
         # ── Step 6: POST to R service ─────────────────────────────────────────
+        # No transaction may sit idle through the R call (up to 60 s): Postgres
+        # kills it (idle_in_transaction_session_timeout) and the result write
+        # and the in-progress reset then fail on a dead connection (UAT e47c53f).
+        release_transaction(self.db, keep_loaded=True)
         r_results = self.r_client.fit(r_compounds, r_config)
 
         # ── Step 7: Write results (all-or-nothing transaction) ────────────────
