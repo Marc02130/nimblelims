@@ -77,6 +77,15 @@ const defaultProps = {
   onResultsSaved: jest.fn(),
 };
 
+
+// pH is required on every row (both tests use analysis1). Raw Result inputs run row by row:
+// [row1 pH, row1 Temperature, row2 pH, row2 Temperature].
+const fillRequiredResults = async () => {
+  const inputs = await screen.findAllByLabelText('Raw Result');
+  fireEvent.change(inputs[0], { target: { value: '7.0' } });
+  fireEvent.change(screen.getAllByLabelText('Raw Result')[2], { target: { value: '7.2' } });
+};
+
 describe('BatchResultsEntryTable', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -139,8 +148,10 @@ describe('BatchResultsEntryTable', () => {
 
     const rawResultInputs = screen.getAllByLabelText('Raw Result');
     if (rawResultInputs.length > 0) {
-      await user.type(rawResultInputs[0], '7.5');
-      expect(rawResultInputs[0]).toHaveValue('7.5');
+      // jsdom drops a trailing "." mid-typing in number inputs, so set the value in one go.
+      fireEvent.change(rawResultInputs[0], { target: { value: '7.5' } });
+      // numeric analyte: type="number"
+      await waitFor(() => expect(screen.getAllByLabelText('Raw Result')[0]).toHaveValue(7.5));
     }
   });
 
@@ -173,6 +184,7 @@ describe('BatchResultsEntryTable', () => {
     await waitFor(() => {
       expect(screen.getByText('Submit Results')).toBeInTheDocument();
     });
+    await fillRequiredResults();
 
     await user.click(screen.getByText('Submit Results'));
 
@@ -188,7 +200,10 @@ describe('BatchResultsEntryTable', () => {
         'batch123',
         expect.objectContaining({
           batch_id: 'batch123',
-          results: expect.any(Array),
+          results: [
+            expect.objectContaining({ test_id: 'test1', analyte_results: [expect.objectContaining({ analyte_id: 'analyte1', raw_result: '7.0' })] }),
+            expect.objectContaining({ test_id: 'test2', analyte_results: [expect.objectContaining({ analyte_id: 'analyte1', raw_result: '7.2' })] }),
+          ],
         })
       );
     });
@@ -271,19 +286,10 @@ describe('BatchResultsEntryTable', () => {
       expect(screen.getByText('Submit Results')).toBeInTheDocument();
     });
 
-    // Fill in required fields
-    const rawResultInputs = screen.getAllByLabelText('Raw Result');
-    if (rawResultInputs.length > 0) {
-      await user.type(rawResultInputs[0], '7.0');
-    }
+    await fillRequiredResults();
 
     await user.click(screen.getByText('Submit Results'));
-    await waitFor(() => {
-      const submitButton = screen.getByText('Submit');
-      if (submitButton) {
-        user.click(submitButton);
-      }
-    });
+    await user.click(await screen.findByRole('button', { name: 'Submit' }));
 
     await waitFor(() => {
       expect(defaultProps.onResultsSaved).toHaveBeenCalled();

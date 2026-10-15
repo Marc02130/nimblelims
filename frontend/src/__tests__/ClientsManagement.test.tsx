@@ -7,7 +7,11 @@ import { UserProvider } from '../contexts/UserContext';
 
 // Mock the API service
 jest.mock('../services/apiService', () => ({
+  // Real helpers (ApiService.formatError, addClientFilterIfNeeded, types); only the client is mocked.
+  ...jest.requireActual('../services/apiService'),
   apiService: {
+    // UserProvider probes the cookie session on mount (P4/S10). Plain fn: survives resetMocks.
+    getCurrentUser: () => Promise.reject(new Error('no session')),
     getClients: jest.fn(),
     createClient: jest.fn(),
     updateClient: jest.fn(),
@@ -121,7 +125,7 @@ describe('ClientsManagement', () => {
 
     await waitFor(() => {
       expect(screen.getByText('Description for Client A')).toBeInTheDocument();
-      expect(screen.getByText('Yes')).toBeInTheDocument();
+      expect(screen.getAllByText('Yes')).toHaveLength(2); // Client A and B are active
       expect(screen.getByText('No')).toBeInTheDocument();
     });
   });
@@ -135,9 +139,18 @@ describe('ClientsManagement', () => {
   });
 
   test('redirects to dashboard for users without project:manage permission', () => {
-    renderWithProviders(<ClientsManagement />, mockNonAdminUser);
+    // Read access is sample:read, project:manage or config:edit; with none of them, redirect.
+    renderWithProviders(<ClientsManagement />, { ...mockNonAdminUser, permissions: [] });
 
     expect(mockNavigate).toHaveBeenCalledWith('/dashboard');
+  });
+
+  test('sample:read users can view clients but not create them', async () => {
+    renderWithProviders(<ClientsManagement />, mockNonAdminUser);
+
+    expect(await screen.findByText('Client A')).toBeInTheDocument();
+    expect(mockNavigate).not.toHaveBeenCalled();
+    expect(screen.queryByText('Create Client')).not.toBeInTheDocument();
   });
 
   test('opens create client dialog on button click', async () => {
@@ -177,7 +190,7 @@ describe('ClientsManagement', () => {
       expect(screen.getByText('Create New Client')).toBeInTheDocument();
     });
 
-    const nameInput = screen.getByLabelText('Name');
+    const nameInput = screen.getByLabelText(/^Name/);
     fireEvent.change(nameInput, { target: { value: 'New Client' } });
 
     const descriptionInput = screen.getByLabelText('Description');
@@ -229,7 +242,7 @@ describe('ClientsManagement', () => {
       expect(screen.getByText('Create New Client')).toBeInTheDocument();
     });
 
-    const nameInput = screen.getByLabelText('Name');
+    const nameInput = screen.getByLabelText(/^Name/);
     fireEvent.change(nameInput, { target: { value: 'Client A' } });
 
     const submitButton = screen.getByText('Create');
