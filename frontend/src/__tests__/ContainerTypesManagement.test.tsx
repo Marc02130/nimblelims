@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { BrowserRouter, MemoryRouter } from 'react-router-dom';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import ContainerTypesManagement from '../pages/admin/ContainerTypesManagement';
@@ -7,7 +7,11 @@ import { UserProvider } from '../contexts/UserContext';
 
 // Mock the API service
 jest.mock('../services/apiService', () => ({
+  // Real helpers (ApiService.formatError, addClientFilterIfNeeded, types); only the client is mocked.
+  ...jest.requireActual('../services/apiService'),
   apiService: {
+    // UserProvider probes the cookie session on mount (P4/S10). Plain fn: survives resetMocks.
+    getCurrentUser: () => Promise.reject(new Error('no session')),
     getContainerTypes: jest.fn(),
     createContainerType: jest.fn(),
     updateContainerType: jest.fn(),
@@ -40,7 +44,8 @@ const mockContainerTypes = [
     description: 'Standard 96-well plate',
     capacity: 96,
     material: 'polypropylene',
-    dimensions: '8x12',
+    rows: 8,
+    columns: 12,
     preservative: null,
     active: true,
     created_at: '2024-01-01T00:00:00Z',
@@ -52,7 +57,8 @@ const mockContainerTypes = [
     description: 'Standard 15mL tube',
     capacity: 15,
     material: 'polypropylene',
-    dimensions: '15x100mm',
+    rows: 1,
+    columns: 1,
     preservative: null,
     active: true,
     created_at: '2024-01-01T00:00:00Z',
@@ -113,8 +119,8 @@ describe('ContainerTypesManagement', () => {
     await waitFor(() => {
       expect(screen.getByText('96-well plate')).toBeInTheDocument();
       expect(screen.getByText('Standard 96-well plate')).toBeInTheDocument();
-      expect(screen.getByText('polypropylene')).toBeInTheDocument();
-      expect(screen.getByText('8x12')).toBeInTheDocument();
+      expect(screen.getAllByText('polypropylene')).toHaveLength(2);
+      expect(screen.getByText('8×12')).toBeInTheDocument(); // rows × columns
     });
   });
 
@@ -156,7 +162,8 @@ describe('ContainerTypesManagement', () => {
       description: 'Standard 50mL tube',
       capacity: 50,
       material: 'polypropylene',
-      dimensions: '50x100mm',
+      rows: 5,
+      columns: 10,
       preservative: null,
       active: true,
     });
@@ -173,14 +180,15 @@ describe('ContainerTypesManagement', () => {
       expect(screen.getByText('Create New Container Type')).toBeInTheDocument();
     });
 
-    const nameInput = screen.getByLabelText('Container Type Name');
+    const nameInput = within(screen.getByRole('dialog')).getByRole('textbox', { name: /^Container Type Name/ });
     fireEvent.change(nameInput, { target: { value: '50mL tube' } });
 
-    const materialInput = screen.getByLabelText('Material');
+    const materialInput = within(screen.getByRole('dialog')).getByRole('textbox', { name: /^Material/ });
     fireEvent.change(materialInput, { target: { value: 'polypropylene' } });
 
-    const dimensionsInput = screen.getByLabelText('Dimensions');
-    fireEvent.change(dimensionsInput, { target: { value: '50x100mm' } });
+    // Layout is rows × columns (dimensions replaced by rows/columns).
+    fireEvent.change(within(screen.getByRole('dialog')).getByLabelText(/^Rows/), { target: { value: '5' } });
+    fireEvent.change(within(screen.getByRole('dialog')).getByLabelText(/^Columns/), { target: { value: '10' } });
 
     const submitButton = screen.getByText('Create');
     fireEvent.click(submitButton);
@@ -189,7 +197,8 @@ describe('ContainerTypesManagement', () => {
       expect(apiService.createContainerType).toHaveBeenCalledWith({
         name: '50mL tube',
         material: 'polypropylene',
-        dimensions: '50x100mm',
+        rows: 5,
+        columns: 10,
         description: undefined,
         capacity: undefined,
         preservative: undefined,
@@ -210,13 +219,16 @@ describe('ContainerTypesManagement', () => {
       expect(screen.getByText('Create New Container Type')).toBeInTheDocument();
     });
 
+    // Rows/columns default to 1; clear Rows to check it is required too.
+    fireEvent.change(within(screen.getByRole('dialog')).getByLabelText(/^Rows/), { target: { value: '' } });
+
     const submitButton = screen.getByText('Create');
     fireEvent.click(submitButton);
 
     await waitFor(() => {
       expect(screen.getByText(/Container type name is required/i)).toBeInTheDocument();
       expect(screen.getByText(/Material is required/i)).toBeInTheDocument();
-      expect(screen.getByText(/Dimensions are required/i)).toBeInTheDocument();
+      expect(screen.getByText(/Rows are required/i)).toBeInTheDocument();
     });
   });
 
@@ -233,17 +245,16 @@ describe('ContainerTypesManagement', () => {
       expect(screen.getByText('Create New Container Type')).toBeInTheDocument();
     });
 
-    const nameInput = screen.getByLabelText('Container Type Name');
+    const nameInput = within(screen.getByRole('dialog')).getByRole('textbox', { name: /^Container Type Name/ });
     fireEvent.change(nameInput, { target: { value: 'Test Type' } });
 
-    const materialInput = screen.getByLabelText('Material');
+    const materialInput = within(screen.getByRole('dialog')).getByRole('textbox', { name: /^Material/ });
     fireEvent.change(materialInput, { target: { value: 'plastic' } });
 
-    const dimensionsInput = screen.getByLabelText('Dimensions');
-    fireEvent.change(dimensionsInput, { target: { value: '10x10' } });
 
-    const capacityInput = screen.getByLabelText('Capacity');
+    const capacityInput = within(screen.getByRole('dialog')).getByLabelText(/^Capacity/);
     fireEvent.change(capacityInput, { target: { value: '-5' } });
+    fireEvent.blur(capacityInput); // errors show once the field is touched
 
     const submitButton = screen.getByText('Create');
     fireEvent.click(submitButton);
@@ -350,14 +361,12 @@ describe('ContainerTypesManagement', () => {
       expect(screen.getByText('Create New Container Type')).toBeInTheDocument();
     });
 
-    const nameInput = screen.getByLabelText('Container Type Name');
+    const nameInput = within(screen.getByRole('dialog')).getByRole('textbox', { name: /^Container Type Name/ });
     fireEvent.change(nameInput, { target: { value: '96-well plate' } });
 
-    const materialInput = screen.getByLabelText('Material');
+    const materialInput = within(screen.getByRole('dialog')).getByRole('textbox', { name: /^Material/ });
     fireEvent.change(materialInput, { target: { value: 'plastic' } });
 
-    const dimensionsInput = screen.getByLabelText('Dimensions');
-    fireEvent.change(dimensionsInput, { target: { value: '8x12' } });
 
     const submitButton = screen.getByText('Create');
     fireEvent.click(submitButton);
