@@ -28,7 +28,7 @@ router = APIRouter()
 
 
 @router.get("", response_model=TestBatteryListResponse)
-async def get_test_batteries(
+def get_test_batteries(
     name: Optional[str] = Query(None, description="Filter by name (partial match)"),
     page: int = Query(1, ge=1, description="Page number"),
     size: int = Query(10, ge=1, le=100, description="Page size"),
@@ -84,7 +84,7 @@ async def get_test_batteries(
 
 
 @router.get("/{battery_id}", response_model=TestBatteryWithAnalysesResponse)
-async def get_test_battery(
+def get_test_battery(
     battery_id: UUID,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -136,7 +136,7 @@ async def get_test_battery(
 
 
 @router.post("", response_model=TestBatteryResponse, status_code=status.HTTP_201_CREATED)
-async def create_test_battery(
+def create_test_battery(
     battery_data: TestBatteryCreate,
     current_user: User = Depends(require_any_permission(["config:edit", "test:configure"])),
     db: Session = Depends(get_db)
@@ -178,7 +178,7 @@ async def create_test_battery(
 
 
 @router.patch("/{battery_id}", response_model=TestBatteryResponse)
-async def update_test_battery(
+def update_test_battery(
     battery_id: UUID,
     battery_data: TestBatteryUpdate,
     current_user: User = Depends(require_any_permission(["config:edit", "test:configure"])),
@@ -234,7 +234,7 @@ async def update_test_battery(
 
 
 @router.delete("/{battery_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_test_battery(
+def delete_test_battery(
     battery_id: UUID,
     current_user: User = Depends(require_any_permission(["config:edit", "test:configure"])),
     db: Session = Depends(get_db)
@@ -280,7 +280,7 @@ async def delete_test_battery(
 # Battery-Analyses sub-routes
 
 @router.get("/{battery_id}/analyses", response_model=List[BatteryAnalysisResponse])
-async def get_battery_analyses(
+def get_battery_analyses(
     battery_id: UUID,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -321,7 +321,7 @@ async def get_battery_analyses(
 
 
 @router.post("/{battery_id}/analyses", response_model=BatteryAnalysisResponse, status_code=status.HTTP_201_CREATED)
-async def add_analysis_to_battery(
+def add_analysis_to_battery(
     battery_id: UUID,
     analysis_data: BatteryAnalysisCreate,
     current_user: User = Depends(require_any_permission(["config:edit", "test:configure"])),
@@ -384,7 +384,7 @@ async def add_analysis_to_battery(
 
 
 @router.patch("/{battery_id}/analyses/{analysis_id}", response_model=BatteryAnalysisResponse)
-async def update_battery_analysis(
+def update_battery_analysis(
     battery_id: UUID,
     analysis_id: UUID,
     analysis_data: BatteryAnalysisUpdate,
@@ -437,7 +437,7 @@ async def update_battery_analysis(
 
 
 @router.delete("/{battery_id}/analyses/{analysis_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def remove_analysis_from_battery(
+def remove_analysis_from_battery(
     battery_id: UUID,
     analysis_id: UUID,
     current_user: User = Depends(require_any_permission(["config:edit", "test:configure"])),
