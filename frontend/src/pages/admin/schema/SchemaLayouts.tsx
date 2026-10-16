@@ -20,6 +20,28 @@ const SCREENS = [
   { key: 'samples.detail', label: 'Samples detail' },
 ];
 
+/**
+ * Scrollport for one side of the layout editor.
+ * FillHeightPage is height-locked with overflow hidden so DataGrid pages can
+ * own scrolling. These columns are plain lists, so each one must shrink
+ * (minHeight 0) and scroll itself. Without that, fields past the viewport
+ * are clipped and the outer page scroller never sees the overflow.
+ */
+const columnSx = {
+  flex: '1 1 0',
+  minWidth: 0,
+  minHeight: 0,
+  display: 'flex',
+  flexDirection: 'column',
+  overflow: 'hidden',
+} as const;
+
+const listSx = {
+  flex: '1 1 0',
+  minHeight: 0,
+  overflowY: 'auto',
+} as const;
+
 const SchemaLayouts: React.FC = () => {
   const { hasPermission } = useUser();
   const canEdit = hasPermission('layout:edit') || hasPermission('schema:edit');
@@ -152,32 +174,53 @@ const SchemaLayouts: React.FC = () => {
         </SchemaChrome>
       }
     >
-      <Box display="flex" gap={3} px={1}>
-        <Box flex={1}>
-          <Typography variant="subtitle2">Available (this role can read)</Typography>
-          {available.map((c) => (
-            <Button key={c.id} fullWidth sx={{ justifyContent: 'flex-start' }} onClick={() => add(c)}>
-              {c.display_name}
-            </Button>
-          ))}
+      <Box
+        display="flex"
+        gap={3}
+        px={1}
+        sx={{ flex: '1 1 0', minHeight: 0, minWidth: 0, overflow: 'hidden' }}
+      >
+        <Box sx={columnSx}>
+          <Typography variant="subtitle2" sx={{ flexShrink: 0 }}>
+            Available (this role can read)
+          </Typography>
+          <Box
+            data-testid="schema-layout-available"
+            aria-label="Available fields"
+            sx={listSx}
+          >
+            {available.map((c) => (
+              <Button key={c.id} fullWidth sx={{ justifyContent: 'flex-start' }} onClick={() => add(c)}>
+                {c.display_name}
+              </Button>
+            ))}
+          </Box>
         </Box>
-        <Box flex={1}>
-          <Typography variant="subtitle2">On this layout</Typography>
-          {onLayout.length === 0 && (
-            <Typography variant="body2" color="text.secondary">
-              No layout — default is all readable fields.
-            </Typography>
-          )}
-          {onLayout.map((f) => (
-            <Button
-              key={f.column_id}
-              fullWidth
-              sx={{ justifyContent: 'flex-start' }}
-              onClick={() => remove(f)}
-            >
-              {f.display_name || f.physical_name || f.column_id}
-            </Button>
-          ))}
+        <Box sx={columnSx}>
+          <Typography variant="subtitle2" sx={{ flexShrink: 0 }}>
+            On this layout
+          </Typography>
+          <Box
+            data-testid="schema-layout-editor"
+            aria-label="Layout editor"
+            sx={listSx}
+          >
+            {onLayout.length === 0 && (
+              <Typography variant="body2" color="text.secondary">
+                No layout — default is all readable fields.
+              </Typography>
+            )}
+            {onLayout.map((f) => (
+              <Button
+                key={f.column_id}
+                fullWidth
+                sx={{ justifyContent: 'flex-start' }}
+                onClick={() => remove(f)}
+              >
+                {f.display_name || f.physical_name || f.column_id}
+              </Button>
+            ))}
+          </Box>
         </Box>
       </Box>
     </FillHeightPage>
