@@ -51,6 +51,9 @@ const renderPage = () =>
 
 const scrollStyle = (element: HTMLElement) => window.getComputedStyle(element);
 
+/** jsdom reports a zero length as "0" or "0px" depending on the property. */
+const isZero = (value: string) => value === '0' || value === '0px';
+
 describe('SchemaLayouts', () => {
   it('should scroll the available list and the layout editor', async () => {
     renderPage();
@@ -70,20 +73,21 @@ describe('SchemaLayouts', () => {
       const regionStyle = scrollStyle(region);
       const columnStyle = scrollStyle(region.parentElement as HTMLElement);
       expect(regionStyle.overflowY).toBe('auto');
-      expect(regionStyle.minHeight).toBe('0px');
-      expect(columnStyle.minHeight).toBe('0px');
-      expect(columnStyle.overflowY).toBe('hidden');
+      expect(isZero(regionStyle.minHeight)).toBe(true);
+      expect(isZero(columnStyle.minHeight)).toBe(true);
+      // jsdom does not expand the overflow shorthand into overflowY.
+      expect(columnStyle.overflow).toBe('hidden');
     }
 
     const rowStyle = scrollStyle(available.parentElement?.parentElement as HTMLElement);
-    expect(rowStyle.minHeight).toBe('0px');
-    expect(rowStyle.overflowY).toBe('hidden');
+    expect(isZero(rowStyle.minHeight)).toBe(true);
+    expect(rowStyle.overflow).toBe('hidden');
   });
 
   it('should move a field between the list and the editor', async () => {
     renderPage();
     const available = await screen.findByTestId('schema-layout-available');
-    fireEvent.click(within(available).getByRole('button', { name: 'Field 2' }));
+    fireEvent.click(await within(available).findByRole('button', { name: 'Field 2' }));
 
     const editor = screen.getByTestId('schema-layout-editor');
     expect(within(editor).getByRole('button', { name: 'Field 2' })).toBeInTheDocument();
