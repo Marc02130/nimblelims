@@ -10,7 +10,7 @@ import io
 import json
 import pytest
 from unittest.mock import MagicMock, patch
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from app.services.configuring_agent_llm import ProviderError
 from fastapi.testclient import TestClient
@@ -652,7 +652,7 @@ class TestSopApplyJob:
                 return getattr(self._s, name)
         return lambda: _NoClose(db_session)
 
-    def _seed_complete_job(self, db_session, result: dict = None) -> "uuid.UUID":
+    def _seed_complete_job(self, db_session, result: dict = None) -> "UUID":
         """Seed a complete SopParseJob with a given result dict."""
         from app.repositories.flexible_experiment_repository import SopParseJobRepository
         from models.flexible_experiment import SopParseJobStatus
