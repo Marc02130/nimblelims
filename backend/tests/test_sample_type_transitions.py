@@ -46,7 +46,7 @@ def test_create_list_and_refuse_without_config_edit(
         "/v1/sample-type-transitions",
         json={
             "source_sample_type": str(source.id),
-            "operation": "aliquot",
+            "operation": "derivative",
             "allowed_dest_sample_type": str(dest.id),
         },
         headers=tech,
@@ -61,14 +61,14 @@ def test_crud_roundtrip(client: TestClient, test_admin_user, db_session):
         "/v1/sample-type-transitions",
         json={
             "source_sample_type": str(source.id),
-            "operation": "aliquot",
+            "operation": "derivative",
             "allowed_dest_sample_type": str(dest.id),
         },
         headers=headers,
     )
     assert created.status_code == 201, created.text
     body = created.json()
-    assert body["operation"] == "aliquot"
+    assert body["operation"] == "derivative"
     assert body["source_sample_type_name"] == source.name
     assert body["allowed_dest_sample_type_name"] == dest.name
     row_id = body["id"]
@@ -81,7 +81,7 @@ def test_crud_roundtrip(client: TestClient, test_admin_user, db_session):
         "/v1/sample-type-transitions",
         json={
             "source_sample_type": str(source.id),
-            "operation": "aliquot",
+            "operation": "derivative",
             "allowed_dest_sample_type": str(dest.id),
         },
         headers=headers,
@@ -139,3 +139,44 @@ def test_template_default_dest_sample_type_roundtrip(
     )
     assert plan["config"]["default_dest_sample_type"] == str(dest.id)
     assert plan["config"]["method"] == "aliquot_by_volume"
+
+
+def test_aliquot_transition_that_changes_type_is_refused(
+    client: TestClient, test_admin_user, db_session
+):
+    """An aliquot keeps the sample type; Blood -> DNA is a derivative."""
+    source, dest = _two_types(db_session, test_admin_user)
+    headers = _auth(client, "admin", "adminpassword")
+    r = client.post(
+        "/v1/sample-type-transitions",
+        json={
+            "source_sample_type": str(source.id),
+            "operation": "aliquot",
+            "allowed_dest_sample_type": str(dest.id),
+        },
+        headers=headers,
+    )
+    assert r.status_code == 400, r.text
+    assert r.json()["detail"]["code"] == "aliquot_changes_type"
+
+    created = client.post(
+        "/v1/sample-type-transitions",
+        json={
+            "source_sample_type": str(source.id),
+            "operation": "derivative",
+            "allowed_dest_sample_type": str(dest.id),
+        },
+        headers=headers,
+    )
+    assert created.status_code == 201, created.text
+    patched = client.patch(
+        f"/v1/sample-type-transitions/{created.json()['id']}",
+        json={"operation": "aliquot"},
+        headers=headers,
+    )
+    assert patched.status_code == 400, patched.text
+    listed = client.get(
+        "/v1/sample-type-transitions?operation=derivative", headers=headers
+    )
+    assert listed.status_code == 200
+    assert any(row["id"] == created.json()["id"] for row in listed.json())
