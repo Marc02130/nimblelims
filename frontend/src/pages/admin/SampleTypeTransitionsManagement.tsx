@@ -10,6 +10,7 @@ import {
   DialogTitle,
   FormControl,
   FormControlLabel,
+  FormHelperText,
   InputLabel,
   MenuItem,
   Select,
@@ -18,7 +19,7 @@ import {
 } from '@mui/material';
 import { Add, Delete, Edit } from '@mui/icons-material';
 import { DataGrid, GridActionsCellItem, GridColDef } from '@mui/x-data-grid';
-import { apiService } from '../../services/apiService';
+import { apiService, TransitionOperation } from '../../services/apiService';
 import { useUser } from '../../contexts/UserContext';
 import { FillHeightPage, FillHeightTable } from '../../components/common/FillHeightPage';
 
@@ -26,7 +27,7 @@ interface TransitionRow {
   id: string;
   source_sample_type: string;
   source_sample_type_name?: string | null;
-  operation: 'aliquot' | 'pool';
+  operation: TransitionOperation;
   allowed_dest_sample_type: string;
   allowed_dest_sample_type_name?: string | null;
   active: boolean;
@@ -39,7 +40,7 @@ interface TypeOption {
 
 const emptyForm = {
   source_sample_type: '',
-  operation: 'aliquot' as 'aliquot' | 'pool',
+  operation: 'derivative' as TransitionOperation,
   allowed_dest_sample_type: '',
   active: true,
 };
@@ -201,7 +202,9 @@ const SampleTypeTransitionsManagement: React.FC = () => {
         )}
       </Box>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-        Catalog of allowed aliquot/pool destination sample types (source × operation → dest).
+        Catalog of allowed sample type changes: derivatives (a new child sample of another type,
+        e.g. Blood → DNA) and pools (source × operation → dest). Aliquots keep the type and
+        need no row.
         Execute still refuses dests not in this catalog. Requires config:edit to change.
       </Typography>
       {error && (
@@ -224,8 +227,9 @@ const SampleTypeTransitionsManagement: React.FC = () => {
         <DialogTitle>{editing ? 'Edit transition' : 'Add transition'}</DialogTitle>
         <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 2 }}>
           <FormControl fullWidth size="small" sx={{ mt: 1 }}>
-            <InputLabel>Source sample type</InputLabel>
+            <InputLabel id="transition-source-label">Source sample type</InputLabel>
             <Select
+              labelId="transition-source-label"
               label="Source sample type"
               value={form.source_sample_type}
               onChange={(e) =>
@@ -240,24 +244,33 @@ const SampleTypeTransitionsManagement: React.FC = () => {
             </Select>
           </FormControl>
           <FormControl fullWidth size="small">
-            <InputLabel>Operation</InputLabel>
+            <InputLabel id="transition-operation-label">Operation</InputLabel>
             <Select
+              labelId="transition-operation-label"
               label="Operation"
               value={form.operation}
               onChange={(e) =>
                 setForm((f) => ({
                   ...f,
-                  operation: e.target.value as 'aliquot' | 'pool',
+                  operation: e.target.value as TransitionOperation,
                 }))
               }
             >
-              <MenuItem value="aliquot">aliquot</MenuItem>
-              <MenuItem value="pool">pool</MenuItem>
+              <MenuItem value="derivative">derivative (new child sample, type changes)</MenuItem>
+              <MenuItem value="pool">pool (combine sources)</MenuItem>
+              {form.operation === 'aliquot' && (
+                <MenuItem value="aliquot">aliquot (same type only)</MenuItem>
+              )}
             </Select>
+            <FormHelperText>
+              An aliquot keeps the sample type in a new container and needs no transition.
+              Blood → DNA or Blood → Plasma is a derivative.
+            </FormHelperText>
           </FormControl>
           <FormControl fullWidth size="small">
-            <InputLabel>Dest sample type</InputLabel>
+            <InputLabel id="transition-dest-label">Dest sample type</InputLabel>
             <Select
+              labelId="transition-dest-label"
               label="Dest sample type"
               value={form.allowed_dest_sample_type}
               onChange={(e) =>

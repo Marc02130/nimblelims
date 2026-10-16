@@ -510,6 +510,12 @@ const AliquotPlanEditor: React.FC<AliquotPlanEditorProps> = ({
     catalogsLoading ||
     mixedPoolMessages.size > 0;
 
+  // Aliquot = same sample type, same sample; a type change is a derivative (new child sample).
+  const sameAsParentLabel =
+    operation === 'pool' ? 'Same as parent.' : 'Same as parent (aliquot).';
+  const destOptionLabel = (name: string): string =>
+    operation === 'pool' ? name : `${name} (derivative)`;
+
   return (
     <Box sx={{ mb: 2 }}>
       <Typography variant="subtitle1" gutterBottom>
@@ -518,7 +524,10 @@ const AliquotPlanEditor: React.FC<AliquotPlanEditorProps> = ({
       <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
         The entry method controls one mint operation and all line inputs. Destination sample
         type and destination container type are separate defaults. Each line may inherit, use
-        Same as parent / Same as source, or override. Dest init does not prompt.
+        Same as parent / Same as source, or override. Dest init does not prompt. A line that
+        keeps the parent&apos;s sample type is an aliquot (same sample, new container); a line
+        that changes the type is a derivative (a new child sample, allowed by Sample type
+        transitions).
       </Typography>
 
       {error && (
@@ -571,10 +580,10 @@ const AliquotPlanEditor: React.FC<AliquotPlanEditorProps> = ({
             inputProps={{ 'aria-label': 'Default dest sample type' }}
             onChange={(event) => setDefaultDestSampleType(event.target.value as string)}
           >
-            <MenuItem value="">Same as parent.</MenuItem>
+            <MenuItem value="">{sameAsParentLabel}</MenuItem>
             {defaultOptions.map((option) => (
               <MenuItem key={option.id} value={option.id}>
-                {option.name}
+                {destOptionLabel(option.name)}
               </MenuItem>
             ))}
           </Select>
@@ -715,10 +724,10 @@ const AliquotPlanEditor: React.FC<AliquotPlanEditorProps> = ({
                         }}
                       >
                         <MenuItem value={ENTRY_DEFAULT}>Use entry default</MenuItem>
-                        <MenuItem value={SAME_AS_PARENT}>Same as parent.</MenuItem>
+                        <MenuItem value={SAME_AS_PARENT}>{sameAsParentLabel}</MenuItem>
                         {(catalog?.data?.options || []).map((option) => (
                           <MenuItem key={option.id} value={option.id}>
-                            {option.name}
+                            {destOptionLabel(option.name)}
                           </MenuItem>
                         ))}
                       </Select>

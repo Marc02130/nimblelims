@@ -2380,16 +2380,18 @@ Set the next value for the global sequence `name_template_seq_{entity_type}`.
 
 ## Sample type transitions (E-14)
 
-Client catalog of allowed aliquot/pool destination types. Execute still refuses dests not in this table. Mutate is **`config:edit`** (S3). GET is authenticated; inactive rows only for `config:edit`.
+Client allow-list of sample type changes. Terminology: an **aliquot** is the same sample and sample type in a new container (no new sample, no row needed). A **derivative** changes the sample type and creates a new child sample (Blood → DNA, Blood → Plasma/RBC/WBC). A **pool** combines sources (DNA → Pooled DNA). Execute refuses a type change that has no active row: a type change on an aliquot-method plan line needs a `derivative` row; a pool needs a `pool` row. Mutate is **`config:edit`** (S3). GET is authenticated; inactive rows only for `config:edit`.
+
+Migration `0091_derivative_transitions` converted every existing `aliquot` row whose dest type differs from its source (including the 0068 Blood → DNA seed) to `derivative`; if a derivative twin already existed, the aliquot row was set inactive (never deleted).
 
 | Method | Path | Auth |
 |--------|------|------|
-| GET | `/v1/sample-type-transitions?operation=aliquot\|pool` | logged in |
-| POST | `/v1/sample-type-transitions` | `config:edit` — **201**; **409** `transition_exists` |
+| GET | `/v1/sample-type-transitions?operation=aliquot\|derivative\|pool` | logged in |
+| POST | `/v1/sample-type-transitions` | `config:edit` — **201**; **409** `transition_exists`; **400** `aliquot_changes_type` (an `aliquot` row whose dest type differs from its source) |
 | PATCH | `/v1/sample-type-transitions/{id}` | `config:edit` |
 | DELETE | `/v1/sample-type-transitions/{id}` | `config:edit` — deactivates (**204**) |
 
-Body: `source_sample_type`, `operation` (`aliquot`\|`pool`), `allowed_dest_sample_type`, optional `active`.
+Body: `source_sample_type`, `operation` (`derivative`\|`pool`; `aliquot` only for same type), `allowed_dest_sample_type`, optional `active`. `GET /v1/entries/dest-sample-types?operation=aliquot` (or `derivative`) lists derivative destinations for the source sample's type.
 
 Admin UI: `/admin/sample-type-transitions`. Template default dest sample type (E-12) is `aliquot_pool_plan` `config.default_dest_sample_type`.
 

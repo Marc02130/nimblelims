@@ -19,6 +19,13 @@ class AliquotCreateRequest(BaseModel):
     amount_units: Optional[UUID] = Field(None, description="ID of amount units")
     temperature: Optional[float] = Field(None, description="Temperature of the aliquot")
     qc_type: Optional[UUID] = Field(None, description="ID of QC type from list_entries")
+    sample_type: Optional[UUID] = Field(
+        None,
+        description=(
+            "Optional. An aliquot keeps the parent's sample type; any other value is "
+            "refused (use a derivative to change type)."
+        ),
+    )
 
     @validator('temperature')
     def validate_temperature(cls, v):

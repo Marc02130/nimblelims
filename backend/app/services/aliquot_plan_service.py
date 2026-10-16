@@ -84,6 +84,18 @@ class AliquotPlanService:
                 },
             ) from exc
 
+    @staticmethod
+    def _transition_operation(operation: AliquotOperation) -> AliquotOperation:
+        """Catalog operation that governs a type change.
+
+        An aliquot keeps the sample type, so a type change on an aliquot-method
+        line is a derivative and is checked against derivative transitions.
+        Pools keep their own transitions (DNA -> Pooled DNA).
+        """
+        if operation == AliquotOperation.pool:
+            return AliquotOperation.pool
+        return AliquotOperation.derivative
+
     def list_dest_sample_types(
         self,
         source_sample_id: UUID,
@@ -118,7 +130,8 @@ class AliquotPlanService:
                 .where(
                     SampleTypeTransition.client_id == client_id,
                     SampleTypeTransition.source_sample_type == source.sample_type,
-                    SampleTypeTransition.operation == operation.value,
+                    SampleTypeTransition.operation
+                    == self._transition_operation(operation).value,
                     SampleTypeTransition.active.is_(True),
                     ListEntry.active.is_(True),
                 )
@@ -596,12 +609,14 @@ class AliquotPlanService:
                 source_type,
             )
             if destination_type is None or destination_type == source_type:
+                # Same type: an aliquot (or a same-type pool); no transition needed.
                 continue
+            check_op = self._transition_operation(operation)
             transition = self.db.execute(
                 select(SampleTypeTransition.id).where(
                     SampleTypeTransition.client_id == client_id,
                     SampleTypeTransition.source_sample_type == source_type,
-                    SampleTypeTransition.operation == operation.value,
+                    SampleTypeTransition.operation == check_op.value,
                     SampleTypeTransition.allowed_dest_sample_type == destination_type,
                     SampleTypeTransition.active.is_(True),
                 )
@@ -613,7 +628,7 @@ class AliquotPlanService:
                         "code": "dest_sample_type_not_allowed",
                         "message": (
                             "Destination sample type is not allowed for this "
-                            f"source sample and {operation.value} operation"
+                            f"source sample and {check_op.value} operation"
                         ),
                         "line_id": line.line_id,
                     },

@@ -969,24 +969,36 @@ def reagent_tracking_column(body: Any) -> bool:
     return False
 
 
-TRANSITION_OPERATIONS = ("aliquot", "pool")
+TRANSITION_OPERATIONS = ("aliquot", "derivative", "pool")
+# Words that name a type-changing derivation (Blood -> DNA, Blood -> Plasma).
+_DERIVATIVE_WORDS = ("deriv", "extract", "isolat", "separat", "centrifug", "spin", "fraction")
 
 
 def transition_operation(db, user: User, body: dict) -> Any:
-    """D-7: the model wrote 'dna extraction'. Operations are aliquot or pool
-    only. A pooling word maps to pool; any other invalid operation takes the
-    operation of the existing transition for the same source and destination,
-    so a rerun is No change. Otherwise it stays as written and stops."""
+    """D-7: the model wrote 'dna extraction'. A transition changes the sample
+    type, so its operation is derivative or pool. An aliquot keeps the type and
+    needs no transition, so 'aliquot' between two different types becomes
+    derivative. A pooling word maps to pool and a derivation word to
+    derivative; any other invalid operation takes the operation of the
+    existing transition for the same source and destination, so a rerun is No
+    change. Otherwise it stays as written and stops."""
     raw = body.get("operation")
     op = str(raw or "").strip().lower()
+    source_raw = body.get("source_sample_type")
+    dest_raw = body.get("allowed_dest_sample_type")
+    changes_type = bool(source_raw and dest_raw and str(source_raw) != str(dest_raw))
+    if op == "aliquot" and changes_type:
+        return "derivative"
     if op in TRANSITION_OPERATIONS:
         return op
     if any(word in op for word in ("pool", "combin", "merg")):
         return "pool"
+    if any(word in op for word in _DERIVATIVE_WORDS):
+        return "derivative"
     from models.sample import SampleTypeTransition
 
     try:
-        source, dest = UUID(str(body.get("source_sample_type"))), UUID(str(body.get("allowed_dest_sample_type")))
+        source, dest = UUID(str(source_raw)), UUID(str(dest_raw))
     except (TypeError, ValueError):
         return raw
     ops = {
@@ -1005,8 +1017,8 @@ def transition_gap(method: str, path: str, body: Any) -> Optional[str]:
     if body.get("operation") in TRANSITION_OPERATIONS:
         return None
     return (
-        f"A sample-type transition's operation is aliquot or pool, not '{body.get('operation')}'. "
-        "A derivation such as DNA extraction from blood uses aliquot."
+        f"A sample-type transition's operation is derivative or pool, not '{body.get('operation')}'. "
+        "A derivation such as DNA extraction from blood uses derivative."
     )
 
 

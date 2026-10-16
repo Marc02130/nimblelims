@@ -79,15 +79,16 @@ describe('<AliquotPlanEditor />', () => {
     });
     await waitFor(() => expect(defaultSelect).not.toHaveAttribute('aria-disabled', 'true'));
     await user.click(defaultSelect);
-    await user.click(within(await screen.findByRole('listbox')).getByText('DNA'));
+    await user.click(within(await screen.findByRole('listbox')).getByText('DNA (derivative)'));
 
     const lineSelect = screen.getByRole('combobox', {
       name: 'Dest sample type, line 1',
     });
     await user.click(lineSelect);
     const lineOptions = await screen.findByRole('listbox');
-    expect(within(lineOptions).getByText('Same as parent.')).toBeInTheDocument();
-    await user.click(within(lineOptions).getByText('DNA'));
+    // Same type = aliquot (same sample); a type change = derivative (new child sample).
+    expect(within(lineOptions).getByText('Same as parent (aliquot).')).toBeInTheDocument();
+    await user.click(within(lineOptions).getByText('DNA (derivative)'));
     await user.click(screen.getByRole('button', { name: 'Save plan' }));
 
     await waitFor(() => {

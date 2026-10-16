@@ -114,12 +114,12 @@ class Sample(BaseModel):
 
 
 class SampleTypeTransition(Base):
-    """Client catalog edge for an allowed aliquot or pool destination type."""
+    """Client catalog edge for an allowed derivative or pool destination type (aliquots keep the type)."""
 
     __tablename__ = "sample_type_transitions"
     __table_args__ = (
         CheckConstraint(
-            "operation IN ('aliquot', 'pool')",
+            "operation IN ('aliquot', 'derivative', 'pool')",
             name="ck_sample_type_transitions_operation",
         ),
         UniqueConstraint(

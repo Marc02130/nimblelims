@@ -20,9 +20,15 @@ class AliquotMethod(str, Enum):
 
 
 class AliquotOperation(str, Enum):
-    """Destination transition operation."""
+    """Destination transition operation.
+
+    aliquot: same sample type in a new container (no transition needed).
+    derivative: a new child sample of a different type (Blood -> DNA).
+    pool: several sources combined into one new sample.
+    """
 
     aliquot = "aliquot"
+    derivative = "derivative"
     pool = "pool"
 
 

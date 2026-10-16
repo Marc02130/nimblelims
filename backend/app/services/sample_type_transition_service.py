@@ -68,6 +68,21 @@ class SampleTypeTransitionService:
             )
         return entry
 
+    @staticmethod
+    def _check_operation(source: UUID, operation: str, dest: UUID) -> None:
+        """An aliquot keeps the sample type; a type change is a derivative (or pool)."""
+        if operation == "aliquot" and source != dest:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={
+                    "code": "aliquot_changes_type",
+                    "message": (
+                        "An aliquot keeps the sample type. Use operation 'derivative' "
+                        "for a type change such as Blood to DNA."
+                    ),
+                },
+            )
+
     def _conflict(
         self,
         source: UUID,
@@ -103,6 +118,9 @@ class SampleTypeTransitionService:
     def create(self, data: SampleTypeTransitionCreate) -> SampleTypeTransitionRead:
         self._require_type(data.source_sample_type, "source_sample_type")
         self._require_type(data.allowed_dest_sample_type, "allowed_dest_sample_type")
+        self._check_operation(
+            data.source_sample_type, data.operation, data.allowed_dest_sample_type
+        )
         if self._conflict(
             data.source_sample_type,
             data.operation,
@@ -157,6 +175,7 @@ class SampleTypeTransitionService:
         next_dest = payload.get(
             "allowed_dest_sample_type", row.allowed_dest_sample_type
         )
+        self._check_operation(next_source, next_op, next_dest)
         if self._conflict(next_source, next_op, next_dest, exclude_id=row.id):
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,

@@ -173,7 +173,9 @@ def _put_step_types(client, token, definition, sample_type_id):
     return r.json()
 
 
-def _create_extract_process(client, token, *, dest_type_id, inbound_type_id, name="Extract"):
+def _create_extract_process(
+    client, token, *, dest_type_id, inbound_type_id, name="Extract", plan_lines=None
+):
     tpl = client.post(
         "/v1/experiment-templates",
         json={
@@ -194,6 +196,7 @@ def _create_extract_process(client, token, *, dest_type_id, inbound_type_id, nam
                             "default_dest_sample_type": (
                                 str(dest_type_id) if dest_type_id else None
                             ),
+                            **({"plan_lines": plan_lines} if plan_lines else {}),
                         },
                     }
                 ],
@@ -1848,6 +1851,35 @@ class TestWorkOrderP2:
         assert got.status_code == 200, got.text
         assert str(p2_seed["dna_type"].id) in [
             str(t) for t in got.json().get("emerging_sample_type_ids") or []
+        ]
+
+    def test_emerging_type_honors_per_line_dest_override(
+        self,
+        client: TestClient,
+        admin_token: str,
+        p2_seed,
+    ):
+        """A plan line's own dest type (a derivative) wins over the entry default."""
+        extract = _create_extract_process(
+            client,
+            admin_token,
+            dest_type_id=None,
+            inbound_type_id=p2_seed["sample_type"].id,
+            plan_lines=[
+                {
+                    "source_sample_id": str(uuid4()),
+                    "dest_sample_type": str(p2_seed["dna_type"].id),
+                    "inherit_entry_dest_sample_type": False,
+                }
+            ],
+        )
+        got = client.get(
+            f"/v1/eln-process-definitions/{extract['id']}",
+            headers=_auth(admin_token),
+        )
+        assert got.status_code == 200, got.text
+        assert [str(t) for t in got.json().get("emerging_sample_type_ids") or []] == [
+            str(p2_seed["dna_type"].id)
         ]
 
     def test_map_save_handoff_dest_type_rejected(

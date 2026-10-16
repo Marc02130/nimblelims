@@ -9,14 +9,14 @@ from pydantic import BaseModel, Field
 
 class SampleTypeTransitionCreate(BaseModel):
     source_sample_type: UUID
-    operation: str = Field(..., pattern="^(aliquot|pool)$")
+    operation: str = Field(..., pattern="^(aliquot|derivative|pool)$")
     allowed_dest_sample_type: UUID
     active: bool = True
 
 
 class SampleTypeTransitionUpdate(BaseModel):
     source_sample_type: Optional[UUID] = None
-    operation: Optional[str] = Field(None, pattern="^(aliquot|pool)$")
+    operation: Optional[str] = Field(None, pattern="^(aliquot|derivative|pool)$")
     allowed_dest_sample_type: Optional[UUID] = None
     active: Optional[bool] = None
 

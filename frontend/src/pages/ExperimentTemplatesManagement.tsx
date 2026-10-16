@@ -417,7 +417,7 @@ const ExperimentTemplatesManagement: React.FC = () => {
             .map((row) => ({
               id: String(row.allowed_dest_sample_type),
               name: String(row.allowed_dest_sample_type_name),
-              operation: String(row.operation || 'aliquot'),
+              operation: String(row.operation || 'derivative'),
             })),
         );
       })
@@ -1316,9 +1316,10 @@ const ExperimentTemplatesManagement: React.FC = () => {
                                     const method = String(
                                       entry.config?.method || 'aliquot_by_volume',
                                     );
+                                    // A type change on an aliquot method is a derivative.
                                     const op = method.startsWith('pool')
                                       ? 'pool'
-                                      : 'aliquot';
+                                      : 'derivative';
                                     return opt.operation === op;
                                   })
                                   .map((opt) => [opt.id, opt]),
