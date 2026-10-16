@@ -102,7 +102,35 @@ describe('AliquotForm', () => {
     expect(mockApiService.createAliquot).toHaveBeenCalledWith(
       expect.not.objectContaining({ sample_type: expect.anything() })
     );
+    expect(mockApiService.createAliquot).toHaveBeenCalledWith(
+      expect.not.objectContaining({ concentration: expect.anything() })
+    );
     expect(defaultProps.onSuccess).toHaveBeenCalledWith({ id: mockParentSampleId });
+  });
+
+  it('sends a concentration of 0', async () => {
+    const user = userEvent.setup();
+    mockApiService.createAliquot.mockResolvedValue({ id: mockParentSampleId });
+
+    render(<AliquotForm {...defaultProps} />);
+
+    await waitFor(() => {
+      expect(screen.getByRole('spinbutton', { name: /^Amount/ })).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole('combobox', { name: /^Destination container/ }));
+    await user.click(await screen.findByRole('option', { name: 'Tube A' }));
+    const amountInput = screen.getByRole('spinbutton', { name: /^Amount/ });
+    await user.clear(amountInput);
+    await user.type(amountInput, '2');
+    await user.type(screen.getByRole('spinbutton', { name: /^Concentration/ }), '0');
+    await user.click(screen.getByRole('button', { name: 'Create Aliquot' }));
+
+    await waitFor(() => {
+      expect(mockApiService.createAliquot).toHaveBeenCalledWith(
+        expect.objectContaining({ amount: 2, concentration: 0 })
+      );
+    });
   });
 
   it('handles API errors gracefully', async () => {

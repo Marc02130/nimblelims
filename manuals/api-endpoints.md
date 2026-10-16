@@ -168,6 +168,16 @@ An **aliquot** is the same sample and the same sample type in another container.
 
 **Refusals:** **400** `derivative_same_type`, `dest_sample_type_not_allowed`, plus the amount codes above.
 
+A derivative `temperature` of `0` is stored as 0 °C. Only a null or omitted temperature copies the parent. Plan execute copies `parent.temperature` onto a minted child, including 0.
+
+`POST /aliquots/pool` (`sample:create`) places each listed sample in the destination container and debits that sample's source vessel with the same atomic update. The debits and the destination rows commit together: if one source cannot cover its amount, nothing is debited and no destination row is inserted. The contents row stays, including at amount 0. Optional `source_container_ids` is the same length and order as `samples`, and is required when a sample is already in more than one vessel. A request amount in a different unit of the same type is converted into the source vessel's unit before the debit when that type has a single base unit. A concentration of 0 is **400** (`Cannot pool: concentration is zero`) because volume is amount divided by concentration.
+
+The summary `concentration_units` is the unit already on the source contents when every source shares one (otherwise the request unit). It is not "the" base unit of the concentration type. Seed data has several multiplier-1 concentration units (`g/L`, `ng/µL`, `µg/mL`, `EU/mL`, `copies/µL`); those are different quantities, so a pool of them is **400** `incompatible_units` and debits nothing. Sources that all use `ng/µL` pool in `ng/µL`. Plan execute is the bench pool (it mints a child per line). This route stays for placing the existing samples in one container.
+
+**Refusals:** **400** `amount_required`, `source_contents_missing`, `source_container_required`, `source_amount_null`, `insufficient_amount`, `amount_unit_mismatch`, `incompatible_units`, `aliquot_same_container`. **409** `sample_already_in_container`. **503** `source_busy` when a vessel row lock times out.
+
+Plan execute pool uses that same debit inside the one execute transaction, so one failing line rolls the whole execute back.
+
 `GET /aliquots/parent/{sample_id}` lists every contents row of that sample (same `id`, one row per container). It does not list legacy same-type child samples. `GET /aliquots/derivatives/{sample_id}` lists child samples whose type differs from the parent.
 
 Plan execute uses the same debit. A type-changing mint is named `{parent}-DER-{token}`. A pool mint stays `{parent}-ALQ-{token}`. Rows already named `-ALQ-` are left as they are.

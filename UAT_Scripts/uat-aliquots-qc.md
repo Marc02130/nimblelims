@@ -149,7 +149,7 @@ Create a derivative from a parent sample with a different sample type (e.g., DNA
 |----------|------------------|
 | **API Call** | POST `/aliquots/derivative` with:<br>- `parent_sample_id`: UUID of parent sample<br>- `sample_type`: a different type that has an active `derivative` transition<br>- `container_id`: destination container<br>- `amount`: positive and not greater than the source vessel |
 | **Backend Processing** | 1. Verify parent sample exists and user has access<br>2. Refuse the same type (**400** `derivative_same_type`) and a type with no active derivative transition (**400** `dest_sample_type_not_allowed`)<br>3. Debit the source vessel<br>4. Insert a child sample named `{parent}-DER-{token}` with `parent_sample_id` set<br>5. Link that child to the destination container<br>6. Commit. The parent row stays |
-| **Derivative Record** | - New sample whose name contains `-DER-` and not `-ALQ-`<br>- `sample_type` differs from the parent<br>- `parent_sample_id` points at the parent<br>- Source vessel amount decreased by `amount`<br>- Over-draw is **400** `insufficient_amount` and creates no child |
+| **Derivative Record** | - New sample whose name contains `-DER-` and not `-ALQ-`<br>- `sample_type` differs from the parent<br>- `parent_sample_id` points at the parent<br>- Source vessel amount decreased by `amount`<br>- Over-draw is **400** `insufficient_amount` and creates no child<br>- Temperature `0` is stored as 0 °C. A blank temperature copies the parent, including when the parent is 0 °C |
 | **Container Record** | - Container created and linked via `Contents` junction |
 | **UI Feedback** | - Success message: "Aliquot/Derivative created successfully: DNA-EXTRACT-001"<br>- Dialog closes |
 
@@ -170,6 +170,58 @@ Create a derivative from a parent sample with a different sample type (e.g., DNA
 - [ ] **FAIL** - One or more criteria not met
 
 **Notes**: _________________________________________________________
+
+---
+
+## Test Case 2b: Pool debit is all-or-nothing
+
+### Test Case ID
+TC-POOL-002B
+
+### Description
+Pool two samples into one container. Each source vessel is debited. If the second source cannot cover its amount, the first source is unchanged and the destination stays empty.
+
+### Test Steps
+
+| Step | Action | Expected Result |
+|------|--------|-----------------|
+| 1 | Place sample A in a vessel with amount 10 and sample B in a vessel with amount 3 | Two contents rows |
+| 2 | POST `/aliquots/pool` drawing 6 from each into an empty destination, with positive concentrations | **400** `insufficient_amount` |
+| 3 | Re-read both source vessels and the destination | A is still 10, B is still 3, destination has no contents |
+| 4 | POST the same pool drawing 2 from each | **200**. A is 8, B is 1. Both samples are in the destination. Source rows remain |
+
+### Pass/Fail Criteria
+
+| Criteria | Pass | Fail |
+|----------|------|------|
+| Failed pool debits nothing | ✓ | ✗ |
+| Successful pool conserves amount | ✓ | ✗ |
+| Source contents rows are not deleted | ✓ | ✗ |
+
+---
+
+## Test Case 2c: Pool on seed concentration units
+
+### Test Case ID
+TC-POOL-002C
+
+### Description
+Seed concentration units include several multiplier-1 units (`g/L`, `ng/µL`, `µg/mL`, `EU/mL`, `copies/µL`). They are not one scale. A pool of sources that share `ng/µL` succeeds in that unit. Mixing `ng/µL` with `EU/mL` debits nothing.
+
+### Test Steps
+
+| Step | Action | Expected Result |
+|------|--------|-----------------|
+| 1 | Two vessels, amounts 50, concentration unit `ng/µL` on the contents. The concentration type also has `µg/mL`, `EU/mL`, `copies/µL`, and `g/L` at multiplier 1 | Rows exist |
+| 2 | POST `/aliquots/pool` with one line `ng/µL` and the other `EU/mL` | **400** `incompatible_units`. Both amounts still 50. Destination empty |
+| 3 | POST the same pool with both lines `ng/µL`, amounts 5 and 10 | **200**. Response `concentration_units` is `ng/µL`. Amounts are 45 and 40 |
+
+### Pass/Fail Criteria
+
+| Criteria | Pass | Fail |
+|----------|------|------|
+| Shared seed unit does not require a single base unit | ✓ | ✗ |
+| Mixed seed units debit nothing | ✓ | ✗ |
 
 ---
 

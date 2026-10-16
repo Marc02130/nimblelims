@@ -48,8 +48,8 @@ const ContainerForm: React.FC<ContainerFormProps> = ({
   const initialValues = {
     name: container?.name || '',
     type_id: container?.type_id || '',
-    concentration: container?.concentration || null,
-    amount: container?.amount || null,
+    concentration: container?.concentration ?? null,
+    amount: container?.amount ?? null,
     concentration_units: container?.concentration_units || '',
     amount_units: container?.amount_units || '',
     parent_container_id: container?.parent_container_id || '',
