@@ -26,6 +26,11 @@ jobs:
       # F821 = undefined name: catches latent NameErrors before they reach a request.
       - name: ruff check --select F821
         run: ruff check --select F821 backend/app backend/tests
+      # Zero is a real measurement. Ruff has no rule for this, and
+      # @typescript-eslint/prefer-nullish-coalescing would flag every ||
+      # including strings. This check is limited to named numeric fields.
+      - name: numeric truthiness
+        run: python backend/checks/numeric_truthiness.py
 
   frontend:
     name: Frontend tests and type check
