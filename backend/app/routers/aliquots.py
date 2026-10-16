@@ -264,6 +264,42 @@ def _place_contents(
     return contents
 
 
+def _debit_quantity(db: Session, source: Contents, requested: float, requested_unit: Unit) -> Decimal:
+    """Request amount expressed in the source vessel's unit.
+
+    The atomic debit compares numbers, so a microliter request against a
+    milliliter vessel is converted first. A unitless source is debited by the
+    request number.
+    """
+    if source.amount_units is None or source.amount_units == requested_unit.id:
+        return Decimal(str(requested))
+    source_unit = (
+        db.query(Unit)
+        .filter(Unit.id == source.amount_units, Unit.active == True)  # noqa: E712
+        .first()
+    )
+    if (
+        source_unit is None
+        or source_unit.type != requested_unit.type
+        or source_unit.multiplier is None
+        or requested_unit.multiplier is None
+    ):
+        raise _http(
+            status.HTTP_400_BAD_REQUEST,
+            "amount_unit_mismatch",
+            "Pool amount units must match the source vessel or share its unit type.",
+        )
+    source_multiplier = Decimal(str(source_unit.multiplier))
+    if source_multiplier == 0:
+        raise _http(
+            status.HTTP_400_BAD_REQUEST,
+            "amount_unit_mismatch",
+            "Source amount unit has a zero multiplier.",
+        )
+    base = Decimal(str(requested)) * Decimal(str(requested_unit.multiplier))
+    return base / source_multiplier
+
+
 @router.post("", response_model=AliquotResponse)
 def create_aliquot(
     aliquot_data: AliquotCreateRequest,
@@ -383,7 +419,7 @@ def create_derivative(
             matrix=parent_sample.matrix,
             temperature=(
                 derivative_data.temperature
-                if derivative_data.temperature
+                if derivative_data.temperature is not None
                 else parent_sample.temperature
             ),
             parent_sample_id=parent_sample.id,
@@ -424,8 +460,10 @@ def pool_samples(
     db: Session = Depends(get_db)
 ):
     """
-    Pool multiple samples in a container.
-    Implements US-6: Pooled Samples Creation.
+    Pool samples into one container and debit every source vessel.
+
+    The debits and the destination rows commit together. One refusal rolls
+    the whole call back. A full draw leaves the source contents row at amount 0.
     """
     # Verify container exists
     container = db.query(Container).filter(
@@ -486,7 +524,18 @@ def pool_samples(
             concentration_base = convert_to_base_unit(
                 float(pooling_data.concentrations[i]), str(concentration_unit.id), db
             )
-            volume = amount_base / concentration_base if concentration_base > 0 else 0
+            if concentration_base == 0:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Cannot pool: concentration is zero",
+                )
+            if pooling_data.amounts[i] <= 0:
+                raise _http(
+                    status.HTTP_400_BAD_REQUEST,
+                    "amount_required",
+                    "A positive amount is required so the source vessel can be debited.",
+                )
+            volume = amount_base / concentration_base
             total_volume += volume
             total_concentration += concentration_base * volume
     except ConversionError as exc:
@@ -503,31 +552,51 @@ def pool_samples(
     except ConversionError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
-    for i, sample_id in enumerate(pooling_data.samples):
-        contents = Contents(
-            container_id=pooling_data.container_id,
-            sample_id=sample_id,
-            concentration=pooling_data.concentrations[i],
-            concentration_units=pooling_data.concentration_units[i],
-            amount=pooling_data.amounts[i],
-            amount_units=pooling_data.amount_units[i],
-        )
-        db.add(contents)
-    
     # Calculate average concentration
     average_concentration = total_concentration / total_volume if total_volume > 0 else 0
-    
-    db.commit()
-    
-    return PoolingResponse(
-        container_id=pooling_data.container_id,
-        pooled_samples=pooling_data.samples,
-        total_volume=total_volume,
-        total_volume_units=base_volume_unit.id,
-        average_concentration=average_concentration,
-        concentration_units=base_concentration_unit.id,
-        notes=pooling_data.notes
-    )
+
+    draws = []
+    for i, sample_id in enumerate(pooling_data.samples):
+        source_container_id = None
+        if pooling_data.source_container_ids is not None:
+            source_container_id = pooling_data.source_container_ids[i]
+        source = _resolve_source(db, sample_id, pooling_data.container_id, source_container_id)
+        draws.append(
+            (
+                sample_id,
+                source,
+                _debit_quantity(db, source, pooling_data.amounts[i], amount_rows[i]),
+            )
+        )
+
+    def mutate() -> PoolingResponse:
+        # Lock sources in a stable order so two pools cannot deadlock.
+        for _sample_id, source, transfer in sorted(
+            draws, key=lambda item: (str(item[1].container_id), str(item[1].sample_id))
+        ):
+            debit_contents_amount(db, source, transfer, sample_label=str(_sample_id))
+        for i, (sample_id, source, _transfer) in enumerate(draws):
+            _place_contents(
+                db,
+                pooling_data.container_id,
+                sample_id,
+                Decimal(str(pooling_data.amounts[i])),
+                pooling_data.amount_units[i],
+                pooling_data.concentrations[i],
+                pooling_data.concentration_units[i],
+                source,
+            )
+        return PoolingResponse(
+            container_id=pooling_data.container_id,
+            pooled_samples=pooling_data.samples,
+            total_volume=total_volume,
+            total_volume_units=base_volume_unit.id,
+            average_concentration=average_concentration,
+            concentration_units=base_concentration_unit.id,
+            notes=pooling_data.notes,
+        )
+
+    return _commit_transfer(db, mutate)
 
 
 @router.get("/parent/{parent_sample_id}", response_model=List[AliquotResponse])

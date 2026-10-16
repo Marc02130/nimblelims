@@ -485,6 +485,30 @@ class TestAliquotsAPI:
         db_session.add(mg_ml_unit)
         db_session.flush()
 
+        source1 = Container(
+            name=f"Pool source 1 {uuid4().hex[:6]}",
+            description="source",
+            type_id=container_type.id,
+            created_by=sample_user.id,
+            modified_by=sample_user.id,
+        )
+        source2 = Container(
+            name=f"Pool source 2 {uuid4().hex[:6]}",
+            description="source",
+            type_id=container_type.id,
+            created_by=sample_user.id,
+            modified_by=sample_user.id,
+        )
+        db_session.add_all([source1, source2])
+        db_session.flush()
+        db_session.add(Contents(
+            container_id=source1.id, sample_id=sample1.id, amount=Decimal("50"), amount_units=mg_unit.id,
+        ))
+        db_session.add(Contents(
+            container_id=source2.id, sample_id=sample2.id, amount=Decimal("50"), amount_units=mg_unit.id,
+        ))
+        db_session.flush()
+
         pooling_data = {
             "container_id": str(container.id),
             "samples": [str(sample1.id), str(sample2.id)],
@@ -504,6 +528,13 @@ class TestAliquotsAPI:
         assert str(sample1.id) in data["pooled_samples"]
         assert str(sample2.id) in data["pooled_samples"]
         assert data["notes"] == "Pooled samples for testing"
+        db_session.expire_all()
+        left1 = db_session.query(Contents).filter(Contents.container_id == source1.id).one()
+        left2 = db_session.query(Contents).filter(Contents.container_id == source2.id).one()
+        assert Decimal(left1.amount) == Decimal("45")
+        assert Decimal(left2.amount) == Decimal("40")
+        dest_rows = db_session.query(Contents).filter(Contents.container_id == container.id).all()
+        assert {row.sample_id for row in dest_rows} == {sample1.id, sample2.id}
     
     def test_get_aliquots_for_parent(self, db_session, auth_headers, sample_user):
         """Test getting aliquots for a parent sample"""
@@ -768,7 +799,7 @@ class TestAliquotsAPI:
         assert any(item["name"] == "DNA Extract 2" for item in data)
 
 
-def _tracked_parent(db_session, user, *, label, amount="10"):
+def _tracked_parent(db_session, user, *, label, amount="10", temperature=None):
     """Parent sample sitting in one vessel, plus an empty destination vessel."""
     from models.client import Client
     from models.list import ListEntry
@@ -811,6 +842,7 @@ def _tracked_parent(db_session, user, *, label, amount="10"):
         status=sample_status.id,
         matrix=scratch_entry_id(db_session),
         project_id=project.id,
+        temperature=temperature,
         created_by=user.id,
         modified_by=user.id,
     )
@@ -1050,6 +1082,141 @@ class TestAliquotAmountConservation:
         assert Decimal(dest_row.amount) == Decimal("3")
         assert db_session.query(Sample).filter(Sample.id == parent.id).one().active is True
 
+    def test_derivative_temperature_zero_is_stored(
+        self, db_session, auth_headers, sample_user
+    ):
+        from models.list import ListEntry
+        from models.sample import SampleTypeTransition
+
+        lab = _tracked_parent(db_session, sample_user, label="temp0", temperature=Decimal("4"))
+        parent = lab["parent"]
+        dna = ListEntry(
+            name=f"DNA {uuid4().hex[:6]}",
+            description="DNA",
+            list_id=scratch_list_id(db_session),
+            created_by=sample_user.id,
+            modified_by=sample_user.id,
+        )
+        db_session.add(dna)
+        db_session.flush()
+        db_session.add(SampleTypeTransition(
+            client_id=lab["client"].id,
+            source_sample_type=lab["sample_type"].id,
+            operation="derivative",
+            allowed_dest_sample_type=dna.id,
+            created_by=sample_user.id,
+            modified_by=sample_user.id,
+        ))
+        db_session.flush()
+        body = {
+            "parent_sample_id": str(parent.id),
+            "name": "ice",
+            "sample_type": str(dna.id),
+            "container_id": str(lab["dest"].id),
+            "amount": 1,
+            "temperature": 0,
+        }
+        frozen = client.post("/aliquots/derivative", json=body, headers=auth_headers)
+        assert frozen.status_code == 200, frozen.text
+        assert frozen.json()["temperature"] == 0.0
+        child = db_session.query(Sample).filter(Sample.id == frozen.json()["id"]).one()
+        assert child.temperature == Decimal("0")
+
+        omitted = _tracked_parent(
+            db_session, sample_user, label="tempblank", temperature=Decimal("0")
+        )
+        blank_dest = omitted["dest"]
+        db_session.add(SampleTypeTransition(
+            client_id=omitted["client"].id,
+            source_sample_type=omitted["sample_type"].id,
+            operation="derivative",
+            allowed_dest_sample_type=dna.id,
+            created_by=sample_user.id,
+            modified_by=sample_user.id,
+        ))
+        db_session.flush()
+        inherited = client.post(
+            "/aliquots/derivative",
+            json={
+                "parent_sample_id": str(omitted["parent"].id),
+                "name": "blank",
+                "sample_type": str(dna.id),
+                "container_id": str(blank_dest.id),
+                "amount": 1,
+            },
+            headers=auth_headers,
+        )
+        assert inherited.status_code == 200, inherited.text
+        assert inherited.json()["temperature"] == 0.0
+
+    def test_pool_overdraw_debits_nothing(self, db_session, auth_headers, sample_user):
+        from models.unit import Unit
+
+        rich = _tracked_parent(db_session, sample_user, label="poolrich")
+        poor = _tracked_parent(db_session, sample_user, label="poolpoor", amount="3")
+        volume_type = get_or_create_list_entry(db_session, "unit_type", "volume")
+        conc_type = scratch_entry_id(db_session)
+        amount_unit = (
+            db_session.query(Unit)
+            .filter(Unit.type == volume_type.id, Unit.multiplier == 1, Unit.active == True)  # noqa: E712
+            .first()
+        )
+        if amount_unit is None:
+            amount_unit = Unit(
+                name=f"mL_{uuid4().hex[:4]}",
+                description="mL",
+                type=volume_type.id,
+                multiplier=1.0,
+            )
+            db_session.add(amount_unit)
+        conc_unit = Unit(
+            name=f"mgmL_{uuid4().hex[:4]}",
+            description="mg/mL",
+            type=conc_type,
+            multiplier=1.0,
+            created_by=sample_user.id,
+            modified_by=sample_user.id,
+        )
+        db_session.add(conc_unit)
+        db_session.flush()
+        dest = Container(
+            name=f"Pool dest {uuid4().hex[:6]}",
+            description="dest",
+            type_id=rich["container_type"].id,
+            created_by=sample_user.id,
+            modified_by=sample_user.id,
+        )
+        db_session.add(dest)
+        db_session.flush()
+        body = {
+            "container_id": str(dest.id),
+            "samples": [str(rich["parent"].id), str(poor["parent"].id)],
+            "concentrations": [1.0, 1.0],
+            "concentration_units": [str(conc_unit.id), str(conc_unit.id)],
+            "amounts": [6.0, 6.0],
+            "amount_units": [str(amount_unit.id), str(amount_unit.id)],
+        }
+        refused = client.post("/aliquots/pool", json=body, headers=auth_headers)
+        assert refused.status_code == 400, refused.text
+        assert refused.json()["detail"]["code"] == "insufficient_amount"
+        db_session.expire_all()
+        assert Decimal(
+            db_session.query(Contents).filter(Contents.container_id == rich["source"].id).one().amount
+        ) == Decimal("10")
+        assert Decimal(
+            db_session.query(Contents).filter(Contents.container_id == poor["source"].id).one().amount
+        ) == Decimal("3")
+        assert db_session.query(Contents).filter(Contents.container_id == dest.id).count() == 0
+
+        zero_conc = dict(body, amounts=[1.0, 1.0], concentrations=[0.0, 1.0])
+        zero = client.post("/aliquots/pool", json=zero_conc, headers=auth_headers)
+        assert zero.status_code == 400, zero.text
+        assert "concentration is zero" in zero.text
+        db_session.expire_all()
+        assert Decimal(
+            db_session.query(Contents).filter(Contents.container_id == rich["source"].id).one().amount
+        ) == Decimal("10")
+
 
 def test_parallel_aliquots_do_not_overdraw(db_engine):
     """Concurrent draws of 6 from 10: one succeeds, the vessel is never negative."""
@@ -1237,6 +1404,257 @@ def test_parallel_aliquots_do_not_overdraw(db_engine):
                 )
                 connection.execute(text("DELETE FROM containers WHERE type_id = :i"), {"i": ids["ctype"]})
                 connection.execute(text("DELETE FROM container_types WHERE id = :i"), {"i": ids["ctype"]})
+                connection.execute(text("DELETE FROM projects WHERE id = :i"), {"i": ids["project"]})
+                for entry_id in ids["entries"]:
+                    connection.execute(text("DELETE FROM list_entries WHERE id = :i"), {"i": entry_id})
+                for list_id in ids["lists"]:
+                    connection.execute(text("DELETE FROM lists WHERE id = :i"), {"i": list_id})
+                connection.execute(text("DELETE FROM users WHERE id = :i"), {"i": ids["user"]})
+                connection.execute(text("DELETE FROM roles WHERE id = :i"), {"i": ids["role"]})
+                connection.execute(text("DELETE FROM clients WHERE id = :i"), {"i": ids["org"]})
+        engine.dispose()
+
+
+def test_parallel_pools_do_not_overdraw(db_engine):
+    """Two sources of 10. Concurrent pools each draw 6 from both. One pool wins."""
+    import threading
+    import time
+    from concurrent.futures import ThreadPoolExecutor
+
+    from fastapi import HTTPException
+    from sqlalchemy import create_engine, text
+    from sqlalchemy.orm import sessionmaker
+
+    from app.database import _engine_kwargs
+    from app.routers.aliquots import pool_samples
+    from app.schemas.aliquot import PoolingRequest
+    from models.client import Client
+    from models.list import List, ListEntry
+    from models.project import Project
+    from models.unit import Unit
+    from models.user import Role
+
+    parallel = 8
+    url = db_engine.url.render_as_string(hide_password=False)
+    engine = create_engine(url, pool_size=5, max_overflow=10, **_engine_kwargs(url))
+    session_factory = sessionmaker(bind=engine, autoflush=False)
+    tag = uuid4().hex[:8]
+    ids: dict = {}
+    with session_factory() as session:
+        org = Client(name=f"POOL race {tag}", description="race", billing_info={})
+        role = Role(name=f"pool-race-{tag}", description="race")
+        session.add_all([org, role])
+        session.flush()
+        user = User(
+            name=f"POOL race {tag}",
+            username=f"poolrace{tag}",
+            email=f"poolrace{tag}@example.com",
+            password_hash="x",
+            role_id=role.id,
+            client_id=org.id,
+            must_change_password=False,
+        )
+        session.add(user)
+        session.flush()
+        status_list = List(name=f"pool-status-{tag}", description="status")
+        type_list = List(name=f"pool-type-{tag}", description="type")
+        session.add_all([status_list, type_list])
+        session.flush()
+        status_entry = ListEntry(
+            list_id=status_list.id, name=f"Available {tag}", description="status",
+            created_by=user.id, modified_by=user.id,
+        )
+        type_entry = ListEntry(
+            list_id=type_list.id, name=f"Blood {tag}", description="Blood",
+            created_by=user.id, modified_by=user.id,
+        )
+        matrix_entry = ListEntry(
+            list_id=type_list.id, name=f"Matrix {tag}", description="matrix",
+            created_by=user.id, modified_by=user.id,
+        )
+        project_status = ListEntry(
+            list_id=status_list.id, name=f"Open {tag}", description="open",
+            created_by=user.id, modified_by=user.id,
+        )
+        conc_type = ListEntry(
+            list_id=type_list.id, name=f"conc {tag}", description="concentration",
+            created_by=user.id, modified_by=user.id,
+        )
+        session.add_all([status_entry, type_entry, matrix_entry, project_status, conc_type])
+        session.flush()
+        volume_entry = (
+            session.query(ListEntry).filter(ListEntry.name == "volume").first()
+        )
+        own_volume = volume_entry is None
+        if volume_entry is None:
+            volume_entry = ListEntry(
+                list_id=type_list.id, name="volume", description="volume",
+                created_by=user.id, modified_by=user.id,
+            )
+            session.add(volume_entry)
+            session.flush()
+        amount_unit = (
+            session.query(Unit)
+            .filter(Unit.type == volume_entry.id, Unit.multiplier == 1, Unit.active == True)  # noqa: E712
+            .first()
+        )
+        own_amount_unit = amount_unit is None
+        if amount_unit is None:
+            amount_unit = Unit(
+                name=f"mL_{tag}", description="mL", type=volume_entry.id, multiplier=1,
+            )
+            session.add(amount_unit)
+        conc_unit = Unit(
+            name=f"mgmL_{tag}", description="mg/mL", type=conc_type.id, multiplier=1,
+        )
+        session.add(conc_unit)
+        session.flush()
+        project = Project(
+            name=f"POOL race project {tag}",
+            description="race",
+            start_date="2024-01-01",
+            client_id=org.id,
+            status=project_status.id,
+            created_by=user.id,
+            modified_by=user.id,
+        )
+        session.add(project)
+        session.flush()
+        samples = []
+        sources = []
+        for index in range(2):
+            sample = Sample(
+                name=f"POOL race sample {tag}-{index}",
+                description="race",
+                sample_type=type_entry.id,
+                status=status_entry.id,
+                matrix=matrix_entry.id,
+                project_id=project.id,
+                created_by=user.id,
+                modified_by=user.id,
+            )
+            session.add(sample)
+            session.flush()
+            samples.append(sample)
+        ctype = ContainerType(
+            name=f"POOL race tube {tag}",
+            description="tube",
+            rows=1,
+            columns=1,
+            created_by=user.id,
+            modified_by=user.id,
+        )
+        session.add(ctype)
+        session.flush()
+        for index, sample in enumerate(samples):
+            source = Container(
+                name=f"POOL race source {tag}-{index}",
+                description="source",
+                type_id=ctype.id,
+                created_by=user.id,
+                modified_by=user.id,
+            )
+            session.add(source)
+            session.flush()
+            session.add(Contents(container_id=source.id, sample_id=sample.id, amount=Decimal("10")))
+            sources.append(source)
+        dests = []
+        for index in range(parallel):
+            dest = Container(
+                name=f"POOL race dest {tag}-{index}",
+                description="dest",
+                type_id=ctype.id,
+                created_by=user.id,
+                modified_by=user.id,
+            )
+            dests.append(dest)
+        session.add_all(dests)
+        session.commit()
+        ids = {
+            "user": user.id,
+            "samples": [sample.id for sample in samples],
+            "sources": [source.id for source in sources],
+            "dests": [dest.id for dest in dests],
+            "org": org.id,
+            "role": role.id,
+            "project": project.id,
+            "ctype": ctype.id,
+            "lists": [status_list.id, type_list.id],
+            "entries": [
+                status_entry.id, type_entry.id, matrix_entry.id, project_status.id, conc_type.id,
+            ],
+            "units": [conc_unit.id] + ([amount_unit.id] if own_amount_unit else []),
+            "amount_unit": amount_unit.id,
+            "conc_unit": conc_unit.id,
+        }
+        if own_volume:
+            ids["entries"].append(volume_entry.id)
+
+    def _draw(dest_id):
+        gate.wait()
+        with session_factory() as session:
+            user = session.get(User, ids["user"])
+            try:
+                pool_samples(
+                    PoolingRequest(
+                        container_id=dest_id,
+                        samples=ids["samples"],
+                        concentrations=[1, 1],
+                        concentration_units=[ids["conc_unit"], ids["conc_unit"]],
+                        amounts=[6, 6],
+                        amount_units=[ids["amount_unit"], ids["amount_unit"]],
+                        source_container_ids=ids["sources"],
+                    ),
+                    current_user=user,
+                    db=session,
+                )
+                return 200, None
+            except HTTPException as exc:
+                detail = exc.detail if isinstance(exc.detail, dict) else {"message": str(exc.detail)}
+                return exc.status_code, detail.get("code") or detail.get("message")
+            except Exception as exc:
+                return type(exc).__name__, str(exc)
+
+    gate = threading.Barrier(parallel)
+    started = time.monotonic()
+    try:
+        with ThreadPoolExecutor(parallel) as pool:
+            codes = list(pool.map(_draw, ids["dests"]))
+        elapsed = time.monotonic() - started
+        assert elapsed < 20, elapsed
+        assert codes.count((200, None)) == 1, codes
+        assert {code for code, _ in codes if code != 200} == {400}, codes
+        assert all(detail == "insufficient_amount" for _code, detail in codes if _code == 400), codes
+        with session_factory() as session:
+            for source_id in ids["sources"]:
+                left = session.query(Contents).filter(Contents.container_id == source_id).one()
+                assert Decimal(left.amount) == Decimal("4")
+            placed = session.query(Contents).filter(Contents.sample_id.in_(ids["samples"])).count()
+            children = session.query(Sample).filter(
+                Sample.parent_sample_id.in_(ids["samples"])
+            ).count()
+            idle = session.execute(text(
+                "SELECT count(*) FROM pg_stat_activity WHERE state = 'idle in transaction' "
+                "AND pid <> pg_backend_pid()"
+            )).scalar()
+        assert placed == 4
+        assert children == 0
+        assert idle == 0
+    finally:
+        if ids:
+            with engine.begin() as connection:
+                for sample_id in ids["samples"]:
+                    connection.execute(
+                        text("DELETE FROM contents WHERE sample_id = :i"), {"i": sample_id}
+                    )
+                    connection.execute(
+                        text("DELETE FROM samples WHERE id = :i OR parent_sample_id = :i"),
+                        {"i": sample_id},
+                    )
+                connection.execute(text("DELETE FROM containers WHERE type_id = :i"), {"i": ids["ctype"]})
+                connection.execute(text("DELETE FROM container_types WHERE id = :i"), {"i": ids["ctype"]})
+                for unit_id in ids["units"]:
+                    connection.execute(text("DELETE FROM units WHERE id = :i"), {"i": unit_id})
                 connection.execute(text("DELETE FROM projects WHERE id = :i"), {"i": ids["project"]})
                 for entry_id in ids["entries"]:
                     connection.execute(text("DELETE FROM list_entries WHERE id = :i"), {"i": entry_id})

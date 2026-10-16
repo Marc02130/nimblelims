@@ -398,6 +398,8 @@ class TestResultsAPI:
         assert "warnings" in data
         assert "significant_figures" in data
         assert "data_type" in data
+        assert data["low_value"] == 0.0
+        assert data["high_value"] == 1000.0
     
     def test_get_results(self, db_session, auth_headers, sample_user):
         """Test getting results list"""

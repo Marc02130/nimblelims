@@ -591,10 +591,16 @@ def validate_result(
     Validate a result against analysis_analytes rules.
     Requires authentication and result:enter or result:review (S9).
     """
-    # Get analysis_analytes configuration
+    # The request carries the test. Limits live on that test's analysis.
+    lab_test = db.query(Test).filter(Test.id == validation_data.test_id).first()
+    if not lab_test:
+        return ResultValidationResponse(
+            is_valid=False,
+            errors=["Test not found"],
+        )
     analysis_analyte = db.query(AnalysisAnalyte).filter(
-        AnalysisAnalyte.analysis_id == validation_data.test_id,  # This should be analysis_id from test
-        AnalysisAnalyte.analyte_id == validation_data.analyte_id
+        AnalysisAnalyte.analysis_id == lab_test.analysis_id,
+        AnalysisAnalyte.analyte_id == validation_data.analyte_id,
     ).first()
     
     if not analysis_analyte:
@@ -646,8 +652,16 @@ def validate_result(
         warnings=warnings,
         significant_figures=analysis_analyte.significant_figures,
         data_type=analysis_analyte.data_type,
-        high_value=float(analysis_analyte.high_value) if analysis_analyte.high_value else None,
-        low_value=float(analysis_analyte.low_value) if analysis_analyte.low_value else None
+        high_value=(
+            float(analysis_analyte.high_value)
+            if analysis_analyte.high_value is not None
+            else None
+        ),
+        low_value=(
+            float(analysis_analyte.low_value)
+            if analysis_analyte.low_value is not None
+            else None
+        ),
     )
 
 

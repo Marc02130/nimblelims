@@ -161,12 +161,28 @@ class PoolingRequest(BaseModel):
     concentration_units: List[UUID] = Field(..., description="Concentration units for each sample")
     amounts: List[float] = Field(..., description="Amounts for each sample")
     amount_units: List[UUID] = Field(..., description="Amount units for each sample")
+    source_container_ids: Optional[List[UUID]] = Field(
+        None,
+        description=(
+            "Vessel to debit for each sample, in the same order as samples. "
+            "Required for a sample that is already in more than one vessel."
+        ),
+    )
     notes: Optional[str] = Field(None, description="Notes about the pooling")
 
     @validator('samples', 'concentrations', 'concentration_units', 'amounts', 'amount_units')
     def validate_list_lengths(cls, v, values):
         if 'samples' in values and len(v) != len(values['samples']):
             raise ValueError('All lists must have the same length')
+        return v
+
+    @validator('source_container_ids')
+    def validate_source_container_ids(cls, v, values):
+        if v is None:
+            return v
+        samples = values.get('samples')
+        if samples is not None and len(v) != len(samples):
+            raise ValueError('source_container_ids must have the same length as samples')
         return v
 
     @validator('concentrations', 'amounts')
