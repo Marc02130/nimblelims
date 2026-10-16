@@ -33,7 +33,7 @@ def _svc(db: Session, user: User) -> SampleTypeTransitionService:
 
 @router.get("", response_model=List[SampleTypeTransitionRead])
 def list_transitions(
-    operation: Optional[str] = Query(None, pattern="^(aliquot|pool)$"),
+    operation: Optional[str] = Query(None, pattern="^(aliquot|derivative|pool)$"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
