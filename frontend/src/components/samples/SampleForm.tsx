@@ -285,7 +285,7 @@ const SampleForm: React.FC<SampleFormProps> = ({
     sample_type: sample?.sample_type || '',
     status: sample?.status || '',
     matrix: sample?.matrix || '',
-    temperature: sample?.temperature || null,
+    temperature: sample?.temperature ?? null,
     qc_type: sample?.qc_type || '',
     custom_attributes: sample?.custom_attributes || {},
   };
