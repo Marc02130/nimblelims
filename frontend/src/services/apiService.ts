@@ -1202,12 +1202,12 @@ export class ApiService {
 
   // Aliquot/Derivative endpoints
   async createAliquot(aliquotData: any) {
-    const response: AxiosResponse = await this.api.post('/samples/aliquot', aliquotData);
+    const response: AxiosResponse = await this.api.post('/aliquots', aliquotData);
     return response.data;
   }
 
   async createDerivative(derivativeData: any) {
-    const response: AxiosResponse = await this.api.post('/samples/derivative', derivativeData);
+    const response: AxiosResponse = await this.api.post('/aliquots/derivative', derivativeData);
     return response.data;
   }
 
