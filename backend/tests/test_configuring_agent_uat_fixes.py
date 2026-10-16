@@ -110,7 +110,8 @@ def test_resolve_body_fixes_uat_list_entry_and_transition_bodies(db_session, adm
     )
     assert body == {
         "source_sample_type": str(entries["Whole Blood"].id),
-        "operation": "aliquot",
+        # Whole Blood -> Plasma changes the type: an 'Aliquot' there is a derivative.
+        "operation": "derivative",
         "allowed_dest_sample_type": str(entries["Plasma"].id),
     }
 

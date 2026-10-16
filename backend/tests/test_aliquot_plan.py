@@ -384,7 +384,7 @@ class TestAliquotPlanExecute:
             SampleTypeTransition(
                 client_id=test_org.id,
                 source_sample_type=sample.sample_type,
-                operation="aliquot",
+                operation="derivative",
                 allowed_dest_sample_type=destination_type.id,
                 created_by=test_admin_user.id,
                 modified_by=test_admin_user.id,
@@ -438,6 +438,98 @@ class TestAliquotPlanExecute:
             .first()
         )
         assert destination.sample_type == destination_type.id
+
+    def test_type_change_needs_a_derivative_transition(
+        self, client, auth_headers, plan_entry, db_session, test_admin_user, test_org
+    ):
+        """Aliquot = same type, same sample; a type change is a derivative.
+
+        A legacy 'aliquot' row between two types does not authorize the change;
+        a 'derivative' row does. A same-type line needs no transition.
+        """
+        from models.list import ListEntry
+        from models.sample import Sample, SampleTypeTransition
+
+        exp_id = plan_entry["experiment"]["id"]
+        sample, tube, ctype = self._seed_sample_with_content(
+            db_session, test_admin_user, test_org, amount=50.0, experiment_id=exp_id
+        )
+        source_type = (
+            db_session.query(ListEntry).filter(ListEntry.id == sample.sample_type).one()
+        )
+        dna = ListEntry(list_id=source_type.list_id, name=f"dna_{uuid4().hex[:6]}")
+        db_session.add(dna)
+        db_session.flush()
+        legacy = SampleTypeTransition(
+            client_id=test_org.id,
+            source_sample_type=sample.sample_type,
+            operation="aliquot",
+            allowed_dest_sample_type=dna.id,
+            created_by=test_admin_user.id,
+            modified_by=test_admin_user.id,
+        )
+        db_session.add(legacy)
+        db_session.commit()
+
+        def line(dest):
+            return {
+                "source_sample_id": str(sample.id),
+                "source_container_id": str(tube.id),
+                "volume": 0.5,
+                "dest_container_type_id": str(ctype.id),
+                "dest_sample_type": str(dest),
+                "inherit_entry_dest_sample_type": False,
+            }
+
+        url = f"/v1/entries/{plan_entry['entry']['id']}/execute"
+        refused = client.post(url, json={"lines": [line(dna.id)]}, headers=auth_headers)
+        assert refused.status_code == 400, refused.text
+        detail = refused.json()["detail"]
+        assert detail["code"] == "dest_sample_type_not_allowed"
+        assert "derivative" in detail["message"]
+
+        options = client.get(
+            "/v1/entries/dest-sample-types",
+            params={"source_sample_id": str(sample.id), "operation": "derivative"},
+            headers=auth_headers,
+        )
+        assert options.status_code == 200, options.text
+        assert options.json()["options"] == []
+
+        db_session.add(
+            SampleTypeTransition(
+                client_id=test_org.id,
+                source_sample_type=sample.sample_type,
+                operation="derivative",
+                allowed_dest_sample_type=dna.id,
+                created_by=test_admin_user.id,
+                modified_by=test_admin_user.id,
+            )
+        )
+        db_session.commit()
+        options = client.get(
+            "/v1/entries/dest-sample-types",
+            params={"source_sample_id": str(sample.id), "operation": "derivative"},
+            headers=auth_headers,
+        )
+        assert [o["id"] for o in options.json()["options"]] == [str(dna.id)]
+
+        same = client.post(
+            url, json={"lines": [line(sample.sample_type)]}, headers=auth_headers
+        )
+        assert same.status_code == 200, same.text
+        # Same type: an aliquot of the same sample, no new sample.
+        assert same.json()["results"][0]["dest_sample_id"] == str(sample.id)
+
+        derived = client.post(url, json={"lines": [line(dna.id)]}, headers=auth_headers)
+        assert derived.status_code == 200, derived.text
+        child = (
+            db_session.query(Sample)
+            .filter(Sample.id == derived.json()["results"][0]["dest_sample_id"])
+            .one()
+        )
+        assert child.id != sample.id
+        assert child.sample_type == dna.id
 
     def test_mixed_source_type_pool_is_refused(
         self, client, auth_headers, plan_entry, db_session, test_admin_user, test_org
@@ -538,7 +630,7 @@ class TestAliquotPlanExecute:
             SampleTypeTransition(
                 client_id=test_org.id,
                 source_sample_type=sample.sample_type,
-                operation="aliquot",
+                operation="derivative",
                 allowed_dest_sample_type=destination_type.id,
                 created_by=test_admin_user.id,
                 modified_by=test_admin_user.id,
@@ -852,7 +944,7 @@ class TestAliquotPlanExecute:
             SampleTypeTransition(
                 client_id=test_org.id,
                 source_sample_type=parent_type_id,
-                operation="aliquot",
+                operation="derivative",
                 allowed_dest_sample_type=dest_type.id,
                 created_by=test_admin_user.id,
                 modified_by=test_admin_user.id,

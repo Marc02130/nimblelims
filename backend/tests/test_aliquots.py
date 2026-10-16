@@ -135,7 +135,29 @@ class TestAliquotsAPI:
             "temperature": 4.0
         }
         
-        response = client.post("/aliquots/aliquot", json=aliquot_data, headers=auth_headers)
+        # An aliquot keeps the parent's type: a different sample_type is refused.
+        other_type = ListEntry(
+            name="DNA",
+            description="DNA sample",
+            list_id=scratch_list_id(db_session),
+            created_by=sample_user.id,
+            modified_by=sample_user.id
+        )
+        db_session.add(other_type)
+        db_session.flush()
+        changed = client.post(
+            "/aliquots/aliquot",
+            json={**aliquot_data, "sample_type": str(other_type.id)},
+            headers=auth_headers,
+        )
+        assert changed.status_code == 400, changed.text
+        assert changed.json()["detail"]["code"] == "aliquot_type_change_not_allowed"
+
+        response = client.post(
+            "/aliquots/aliquot",
+            json={**aliquot_data, "sample_type": str(sample_type.id)},
+            headers=auth_headers,
+        )
         assert response.status_code == 200, response.text
         
         data = response.json()
@@ -249,6 +271,31 @@ class TestAliquotsAPI:
             "temperature": -20.0
         }
         
+        # No derivative transition Blood -> DNA for this client yet: refused.
+        refused = client.post("/aliquots/derivative", json=derivative_data, headers=auth_headers)
+        assert refused.status_code == 400, refused.text
+        assert refused.json()["detail"]["code"] == "dest_sample_type_not_allowed"
+
+        # Same type is an aliquot, not a derivative.
+        same = client.post(
+            "/aliquots/derivative",
+            json={**derivative_data, "sample_type": str(blood_type.id)},
+            headers=auth_headers,
+        )
+        assert same.status_code == 400, same.text
+        assert same.json()["detail"]["code"] == "derivative_same_type"
+
+        from models.sample import SampleTypeTransition
+        db_session.add(SampleTypeTransition(
+            client_id=client_entity.id,
+            source_sample_type=blood_type.id,
+            operation="derivative",
+            allowed_dest_sample_type=dna_type.id,
+            created_by=sample_user.id,
+            modified_by=sample_user.id,
+        ))
+        db_session.flush()
+
         response = client.post("/aliquots/derivative", json=derivative_data, headers=auth_headers)
         assert response.status_code == 200, response.text
         

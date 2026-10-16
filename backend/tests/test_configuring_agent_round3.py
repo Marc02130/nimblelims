@@ -1,7 +1,7 @@
 """Configuring agent fixes from the UAT re-score on main e217b58.
 
 D-7: the CMDL-SOP2310 rerun proposed an invalid 'dna extraction' transition
-(operation must be aliquot or pool) and a 'Request ID' row near-matched to the
+(operation must be derivative or pool; aliquots keep the type) and a 'Request ID' row near-matched to the
 platform column 'Id'. Qubit: the first async run failed with 'no JSON'; the
 reply is now parsed tolerantly and retried once. The live model can't run in
 CI (tests/KNOWN_FAILURES.md).
@@ -51,7 +51,7 @@ def _transition(blood, dna, operation):
         "source_sample_type": str(blood.id), "allowed_dest_sample_type": str(dna.id)}, target="Blood to DNA")
 
 
-def _existing(db, admin, blood, dna, operation="aliquot"):
+def _existing(db, admin, blood, dna, operation="derivative"):
     db.add(SampleTypeTransition(client_id=admin.client_id, source_sample_type=blood.id, operation=operation,
                                 allowed_dest_sample_type=dna.id, created_by=admin.id, modified_by=admin.id))
     db.flush()
@@ -64,23 +64,40 @@ def test_rerun_of_dna_extraction_transition_is_no_change(db_session, admin, conf
     _existing(db_session, admin, blood, dna)
     run = _start(db_session, admin, configuration, monkeypatch, [_transition(blood, dna, "dna extraction")])
     assert run.steps[0].status == "unchanged"
-    assert run.steps[0].call_body["operation"] == "aliquot"
+    assert run.steps[0].call_body["operation"] == "derivative"
+
+
+def test_legacy_aliquot_word_for_a_type_change_is_a_derivative(db_session, admin, configuration, monkeypatch,
+                                                                blood_to_dna):
+    blood, dna = blood_to_dna
+    _existing(db_session, admin, blood, dna)
+    run = _start(db_session, admin, configuration, monkeypatch, [_transition(blood, dna, "aliquot")])
+    assert run.steps[0].status == "unchanged"
+    assert run.steps[0].call_body["operation"] == "derivative"
+
+
+def test_unknown_operation_takes_the_existing_edge(db_session, admin, configuration, monkeypatch, blood_to_dna):
+    blood, dna = blood_to_dna
+    _existing(db_session, admin, blood, dna)
+    run = _start(db_session, admin, configuration, monkeypatch, [_transition(blood, dna, "transmogrify")])
+    assert run.steps[0].status == "unchanged"
+    assert run.steps[0].call_body["operation"] == "derivative"
 
 
 def test_invalid_operation_without_an_existing_edge_stops_at_proposal(db_session, admin, configuration, monkeypatch,
                                                                       blood_to_dna):
     blood, dna = blood_to_dna
-    run = _start(db_session, admin, configuration, monkeypatch, [_transition(blood, dna, "dna extraction")])
+    run = _start(db_session, admin, configuration, monkeypatch, [_transition(blood, dna, "transmogrify")])
     assert run.steps[0].status == "stopped"
-    assert "aliquot or pool" in run.steps[0].gap
+    assert "derivative or pool" in run.steps[0].gap
 
 
 def test_invalid_operation_stops_at_apply_and_writes_nothing(db_session, admin, blood_to_dna):
     blood, dna = blood_to_dna
-    body = _transition(blood, dna, "dna extraction")["call"]["body"]
+    body = _transition(blood, dna, "transmogrify")["call"]["body"]
     with pytest.raises(CannotExpress) as stop:
         execute_step(db_session, admin, "POST", "/v1/sample-type-transitions", body)
-    assert "aliquot or pool" in str(stop.value)
+    assert "derivative or pool" in str(stop.value)
     assert not db_session.query(SampleTypeTransition).filter(
         SampleTypeTransition.source_sample_type == blood.id).count()
 
@@ -95,13 +112,26 @@ def test_apply_of_dna_extraction_against_existing_edge_is_a_noop(db_session, adm
         SampleTypeTransition.source_sample_type == blood.id).count() == 1
 
 
-@pytest.mark.parametrize("operation,expected", [("Pooling", "pool"), ("ALIQUOT", "aliquot"), ("combine", "pool")])
+@pytest.mark.parametrize("operation,expected", [
+    ("Pooling", "pool"), ("ALIQUOT", "aliquot"), ("combine", "pool"),
+    ("DNA extraction", "derivative"), ("Derivative", "derivative"), ("plasma separation", "derivative"),
+])
 def test_operation_words_normalize(db_session, admin, operation, expected):
     assert cat.transition_operation(db_session, admin, {"operation": operation}) == expected
 
 
 def test_prompt_states_transition_operations():
-    assert "aliquot or pool only" in llm._system_prompt(None, "")
+    prompt = llm._system_prompt(None, "")
+    assert "operation is derivative or pool" in prompt
+    assert "aliquot keeps the sample type" in prompt
+
+
+def test_aliquot_between_two_types_normalizes_to_derivative(db_session, admin):
+    a, b = uuid.uuid4(), uuid.uuid4()
+    body = {"operation": "aliquot", "source_sample_type": str(a), "allowed_dest_sample_type": str(b)}
+    assert cat.transition_operation(db_session, admin, body) == "derivative"
+    same = {"operation": "aliquot", "source_sample_type": str(a), "allowed_dest_sample_type": str(a)}
+    assert cat.transition_operation(db_session, admin, same) == "aliquot"
 
 
 # ------------------------------------------------ D-7 Request ID near-match
