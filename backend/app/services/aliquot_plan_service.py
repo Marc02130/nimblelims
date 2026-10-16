@@ -27,6 +27,8 @@ from app.schemas.aliquot_plan import (
     METHOD_PROFILES,
 )
 from app.core.rbac import validate_client_access
+from app.services.contents_amount import debit_contents_amount
+from app.services.sample_naming import minted_child_name
 from models.entry import (
     ELNProcessSample,
     ELNProcessStep,
@@ -1086,28 +1088,14 @@ class AliquotPlanService:
             )
 
         content = self._find_source_content(r.source_sample_id, r.source_container_id)
-        # S5: refuse null source amount (no silent create-dest-without-debit)
-        if content.amount is None:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail={
-                    "code": "source_amount_null",
-                    "message": (
-                        f"Source contents amount is null for sample {r.source_sample_id}; "
-                        "set a tracked amount before execute"
-                    ),
-                },
-            )
-        current = float(content.amount)
-        if r.transfer_amount > current:
-            raise HTTPException(
-                400,
-                detail=(
-                    f"Insufficient amount on source contents: have {current}, "
-                    f"need {r.transfer_amount}"
-                ),
-            )
-        content.amount = Decimal(str(current - r.transfer_amount))
+        # S5: atomic debit. Null amount and over-draw are refused. The row stays
+        # at amount 0; nothing is deleted.
+        debit_contents_amount(
+            self.db,
+            content,
+            Decimal(str(r.transfer_amount)),
+            sample_label=str(r.source_sample_id),
+        )
 
         # Destination container
         dest_c: Optional[Container] = None
@@ -1165,15 +1153,16 @@ class AliquotPlanService:
             dest_sample = parent
         else:
             # Dest mint / pool: new sample row. Dest-type Hold is a different punch.
+            # A type change is a derivative ({parent}-DER-). A pool keeps -ALQ-.
             status_id = self._available_status_id()
+            mint_op = self._method_operation(r.method)
+            derivative = mint_op != AliquotOperation.pool
+            infix = "DER" if derivative else "ALQ"
+            kind = "Derivative" if derivative else "Pool"
             dest_sample = Sample(
-                name=(
-                    f"{parent.name}-ALQ-{uuid4().hex[:6]}"
-                    if parent.name
-                    else f"ALQ-{uuid4().hex[:8]}"
-                ),
+                name=minted_child_name(parent.name, infix),
                 description=(
-                    f"Aliquot from {parent.name or parent.id} ({r.method.value})"
+                    f"{kind} from {parent.name or parent.id} ({r.method.value})"
                 ),
                 sample_type=r.dest_sample_type or parent.sample_type,
                 status=status_id,

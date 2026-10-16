@@ -14,7 +14,7 @@ What it adds
 * Genomic DNA daughter, sample type ``DNA``, minted by
   ``AliquotPlanService.execute`` so the 0068 catalog row
   Blood × aliquot → DNA is the gate. ``parent_sample_id`` points at the
-  blood sample. The product names that daughter ``{parent}-ALQ-{hex}``;
+  blood sample. The product names that daughter ``{parent}-DER-{hex}``;
   this loader then renames it with the same sample template so the
   committed manifest can name it. Matrix is set to existing ``Genomic DNA``
   after execute, because execute copies the parent matrix.

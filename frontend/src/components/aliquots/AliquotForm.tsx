@@ -15,9 +15,6 @@ import {
   CircularProgress,
   Divider,
 } from '@mui/material';
-import { DatePicker } from '@mui/x-date-pickers/DatePicker';
-import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
-import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { apiService } from '../../services/apiService';
 
 interface AliquotFormProps {
@@ -27,56 +24,52 @@ interface AliquotFormProps {
 }
 
 interface AliquotFormData {
-  name: string;
-  description: string;
-  sample_type: string;
-  matrix: string;
-  temperature: number;
+  container_id: string;
+  source_container_id: string;
   concentration: number;
   concentration_units: string;
   amount: number;
   amount_units: string;
-  container_type: string;
-  due_date: Date | null;
+}
+
+function asRows(data: any): Array<{ id: string; name: string }> {
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data?.items)) return data.items;
+  if (Array.isArray(data?.containers)) return data.containers;
+  return [];
+}
+
+function apiErrorMessage(err: any, fallback: string): string {
+  const detail = err?.response?.data?.detail;
+  if (typeof detail === 'string') return detail;
+  if (detail && typeof detail.message === 'string') return detail.message;
+  return fallback;
 }
 
 const AliquotForm: React.FC<AliquotFormProps> = ({ parentSampleId, onSuccess, onCancel }) => {
   const [formData, setFormData] = useState<AliquotFormData>({
-    name: '',
-    description: '',
-    sample_type: '',
-    matrix: '',
-    temperature: 0,
+    container_id: '',
+    source_container_id: '',
     concentration: 0,
     concentration_units: '',
     amount: 0,
     amount_units: '',
-    container_type: '',
-    due_date: null,
   });
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [listEntries, setListEntries] = useState<any>({});
   const [units, setUnits] = useState<any[]>([]);
-  const [containerTypes, setContainerTypes] = useState<any[]>([]);
+  const [containers, setContainers] = useState<Array<{ id: string; name: string }>>([]);
 
   useEffect(() => {
     const loadData = async () => {
       try {
-          const [sampleTypes, matrices, unitsData, containerTypesData] = await Promise.all([
-          apiService.getListEntries('sample_types'),  // Use normalized slug format
-          apiService.getListEntries('matrix_types'),  // Use normalized slug format
+        const [unitsData, containersData] = await Promise.all([
           apiService.getUnits(),
-          apiService.getContainerTypes(),
+          apiService.getContainers(),
         ]);
-
-        setListEntries({
-          sample_types: sampleTypes,
-          matrices: matrices,
-        });
         setUnits(unitsData);
-        setContainerTypes(containerTypesData);
+        setContainers(asRows(containersData));
       } catch (err) {
         setError('Failed to load form data');
       }
@@ -97,26 +90,40 @@ const AliquotForm: React.FC<AliquotFormProps> = ({ parentSampleId, onSuccess, on
     setLoading(true);
     setError(null);
 
+    if (!formData.container_id) {
+      setError('Choose a destination container.');
+      setLoading(false);
+      return;
+    }
+    if (!(formData.amount > 0)) {
+      setError('Enter an amount greater than zero.');
+      setLoading(false);
+      return;
+    }
+
     try {
-      const aliquotData = {
+      const aliquotData: Record<string, unknown> = {
         parent_sample_id: parentSampleId,
-        name: formData.name,
-        description: formData.description,
-        sample_type: formData.sample_type,
-        matrix: formData.matrix,
-        temperature: formData.temperature,
-        concentration: formData.concentration,
-        concentration_units: formData.concentration_units,
+        container_id: formData.container_id,
         amount: formData.amount,
-        amount_units: formData.amount_units,
-        container_type: formData.container_type,
-        due_date: formData.due_date?.toISOString(),
       };
+      if (formData.source_container_id) {
+        aliquotData.source_container_id = formData.source_container_id;
+      }
+      if (formData.amount_units) {
+        aliquotData.amount_units = formData.amount_units;
+      }
+      if (formData.concentration) {
+        aliquotData.concentration = formData.concentration;
+      }
+      if (formData.concentration_units) {
+        aliquotData.concentration_units = formData.concentration_units;
+      }
 
       const result = await apiService.createAliquot(aliquotData);
       onSuccess(result);
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to create aliquot');
+      setError(apiErrorMessage(err, 'Failed to create aliquot'));
     } finally {
       setLoading(false);
     }
@@ -126,195 +133,139 @@ const AliquotForm: React.FC<AliquotFormProps> = ({ parentSampleId, onSuccess, on
   const amountUnits = units.filter(unit => unit.type_name === 'mass' || unit.type_name === 'volume');
 
   return (
-    <LocalizationProvider dateAdapter={AdapterDateFns}>
-      <Card>
-        <CardContent>
-          <Typography variant="h6" gutterBottom>
-            Create Aliquot
-          </Typography>
-          <Divider sx={{ mb: 2 }} />
+    <Card>
+      <CardContent>
+        <Typography variant="h6" gutterBottom>
+          Create Aliquot
+        </Typography>
+        <Divider sx={{ mb: 2 }} />
 
-          {error && (
-            <Alert severity="error" sx={{ mb: 2 }}>
-              {error}
-            </Alert>
-          )}
+        <Alert severity="info" sx={{ mb: 2 }}>
+          An aliquot is this same sample in another container. It does not create a new sample.
+        </Alert>
 
-          <form onSubmit={handleSubmit}>
-            <Grid container spacing={2}>
-              <Grid size={{ xs: 12, sm: 6 }}>
-                <TextField
-                  fullWidth
-                  label="Aliquot Name"
-                  value={formData.name}
-                  onChange={(e) => handleInputChange('name', e.target.value)}
-                  required
-                />
-              </Grid>
-              <Grid size={{ xs: 12, sm: 6 }}>
-                <TextField
-                  fullWidth
-                  label="Description"
-                  value={formData.description}
-                  onChange={(e) => handleInputChange('description', e.target.value)}
-                />
-              </Grid>
+        {error && (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            {error}
+          </Alert>
+        )}
 
-              <Grid size={{ xs: 12, sm: 6 }}>
-                <FormControl fullWidth required>
-                  <InputLabel id="aliquot-sample-type-label">Sample Type</InputLabel>
-                  <Select
-                    labelId="aliquot-sample-type-label"
-                    label="Sample Type"
-                    value={formData.sample_type}
-                    onChange={(e) => handleInputChange('sample_type', e.target.value)}
-                  >
-                    {listEntries.sample_types?.map((entry: any) => (
-                      <MenuItem key={entry.id} value={entry.id}>
-                        {entry.name}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Grid>
-
-              <Grid size={{ xs: 12, sm: 6 }}>
-                <FormControl fullWidth required>
-                  <InputLabel id="aliquot-matrix-label">Matrix</InputLabel>
-                  <Select
-                    labelId="aliquot-matrix-label"
-                    label="Matrix"
-                    value={formData.matrix}
-                    onChange={(e) => handleInputChange('matrix', e.target.value)}
-                  >
-                    {listEntries.matrices?.map((entry: any) => (
-                      <MenuItem key={entry.id} value={entry.id}>
-                        {entry.name}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Grid>
-
-              <Grid size={{ xs: 12, sm: 6 }}>
-                <TextField
-                  fullWidth
-                  label="Temperature"
-                  type="number"
-                  value={formData.temperature}
-                  onChange={(e) => handleInputChange('temperature', parseFloat(e.target.value))}
-                />
-              </Grid>
-
-              <Grid size={{ xs: 12, sm: 6 }}>
-                <DatePicker
-                  label="Due Date"
-                  value={formData.due_date}
-                  onChange={(date) => handleInputChange('due_date', date)}
-                  slotProps={{ textField: { fullWidth: true } }}
-                />
-              </Grid>
-
-              <Grid size={12}>
-                <Typography variant="subtitle1" sx={{ mt: 2, mb: 1 }}>
-                  Container Information
-                </Typography>
-              </Grid>
-
-              <Grid size={{ xs: 12, sm: 6 }}>
-                <FormControl fullWidth required>
-                  <InputLabel id="aliquot-container-type-label">Container Type</InputLabel>
-                  <Select
-                    labelId="aliquot-container-type-label"
-                    label="Container Type"
-                    value={formData.container_type}
-                    onChange={(e) => handleInputChange('container_type', e.target.value)}
-                  >
-                    {containerTypes.map((type) => (
-                      <MenuItem key={type.id} value={type.id}>
-                        {type.name}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Grid>
-
-              <Grid size={{ xs: 12, sm: 3 }}>
-                <TextField
-                  fullWidth
-                  label="Concentration"
-                  type="number"
-                  value={formData.concentration}
-                  onChange={(e) => handleInputChange('concentration', parseFloat(e.target.value))}
-                />
-              </Grid>
-
-              <Grid size={{ xs: 12, sm: 3 }}>
-                <FormControl fullWidth>
-                  <InputLabel id="aliquot-concentration-units-label">Concentration Units</InputLabel>
-                  <Select
-                    labelId="aliquot-concentration-units-label"
-                    label="Concentration Units"
-                    value={formData.concentration_units}
-                    onChange={(e) => handleInputChange('concentration_units', e.target.value)}
-                  >
-                    {concentrationUnits.map((unit) => (
-                      <MenuItem key={unit.id} value={unit.id}>
-                        {unit.name}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Grid>
-
-              <Grid size={{ xs: 12, sm: 3 }}>
-                <TextField
-                  fullWidth
-                  label="Amount"
-                  type="number"
-                  value={formData.amount}
-                  onChange={(e) => handleInputChange('amount', parseFloat(e.target.value))}
-                />
-              </Grid>
-
-              <Grid size={{ xs: 12, sm: 3 }}>
-                <FormControl fullWidth>
-                  <InputLabel id="aliquot-amount-units-label">Amount Units</InputLabel>
-                  <Select
-                    labelId="aliquot-amount-units-label"
-                    label="Amount Units"
-                    value={formData.amount_units}
-                    onChange={(e) => handleInputChange('amount_units', e.target.value)}
-                  >
-                    {amountUnits.map((unit) => (
-                      <MenuItem key={unit.id} value={unit.id}>
-                        {unit.name}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Grid>
-
-              <Grid size={12}>
-                <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end', mt: 2 }}>
-                  <Button onClick={onCancel} disabled={loading}>
-                    Cancel
-                  </Button>
-                  <Button
-                    type="submit"
-                    variant="contained"
-                    disabled={loading}
-                    startIcon={loading && <CircularProgress size={20} />}
-                  >
-                    Create Aliquot
-                  </Button>
-                </Box>
-              </Grid>
+        <form onSubmit={handleSubmit}>
+          <Grid container spacing={2}>
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <FormControl fullWidth required>
+                <InputLabel id="aliquot-destination-container-label">Destination container</InputLabel>
+                <Select
+                  labelId="aliquot-destination-container-label"
+                  label="Destination container"
+                  value={formData.container_id}
+                  onChange={(e) => handleInputChange('container_id', e.target.value)}
+                >
+                  {containers.map((row) => (
+                    <MenuItem key={row.id} value={row.id}>
+                      {row.name}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
             </Grid>
-          </form>
-        </CardContent>
-      </Card>
-    </LocalizationProvider>
+
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <FormControl fullWidth>
+                <InputLabel id="aliquot-source-container-label">Source container</InputLabel>
+                <Select
+                  labelId="aliquot-source-container-label"
+                  label="Source container"
+                  value={formData.source_container_id}
+                  onChange={(e) => handleInputChange('source_container_id', e.target.value)}
+                >
+                  <MenuItem value="">Only vessel</MenuItem>
+                  {containers.map((row) => (
+                    <MenuItem key={row.id} value={row.id}>
+                      {row.name}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
+
+            <Grid size={{ xs: 12, sm: 3 }}>
+              <TextField
+                fullWidth
+                label="Amount"
+                type="number"
+                value={formData.amount}
+                onChange={(e) => handleInputChange('amount', parseFloat(e.target.value))}
+                required
+                inputProps={{ min: 0, step: 'any' }}
+              />
+            </Grid>
+
+            <Grid size={{ xs: 12, sm: 3 }}>
+              <FormControl fullWidth>
+                <InputLabel id="aliquot-amount-units-label">Amount Units</InputLabel>
+                <Select
+                  labelId="aliquot-amount-units-label"
+                  label="Amount Units"
+                  value={formData.amount_units}
+                  onChange={(e) => handleInputChange('amount_units', e.target.value)}
+                >
+                  {amountUnits.map((unit) => (
+                    <MenuItem key={unit.id} value={unit.id}>
+                      {unit.name}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
+
+            <Grid size={{ xs: 12, sm: 3 }}>
+              <TextField
+                fullWidth
+                label="Concentration"
+                type="number"
+                value={formData.concentration}
+                onChange={(e) => handleInputChange('concentration', parseFloat(e.target.value))}
+              />
+            </Grid>
+
+            <Grid size={{ xs: 12, sm: 3 }}>
+              <FormControl fullWidth>
+                <InputLabel id="aliquot-concentration-units-label">Concentration Units</InputLabel>
+                <Select
+                  labelId="aliquot-concentration-units-label"
+                  label="Concentration Units"
+                  value={formData.concentration_units}
+                  onChange={(e) => handleInputChange('concentration_units', e.target.value)}
+                >
+                  {concentrationUnits.map((unit) => (
+                    <MenuItem key={unit.id} value={unit.id}>
+                      {unit.name}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
+
+            <Grid size={12}>
+              <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end', mt: 2 }}>
+                <Button onClick={onCancel} disabled={loading}>
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  variant="contained"
+                  disabled={loading}
+                  startIcon={loading && <CircularProgress size={20} />}
+                >
+                  Create Aliquot
+                </Button>
+              </Box>
+            </Grid>
+          </Grid>
+        </form>
+      </CardContent>
+    </Card>
   );
 };
 

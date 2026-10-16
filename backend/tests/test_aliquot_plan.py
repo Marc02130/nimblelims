@@ -530,6 +530,8 @@ class TestAliquotPlanExecute:
         )
         assert child.id != sample.id
         assert child.sample_type == dna.id
+        assert child.name.startswith(f"{sample.name}-DER-")
+        assert "-ALQ-" not in child.name
 
     def test_mixed_source_type_pool_is_refused(
         self, client, auth_headers, plan_entry, db_session, test_admin_user, test_org
