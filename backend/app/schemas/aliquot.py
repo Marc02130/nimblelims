@@ -8,17 +8,43 @@ from uuid import UUID
 
 
 class AliquotCreateRequest(BaseModel):
-    """Schema for creating an aliquot from a parent sample"""
-    parent_sample_id: UUID = Field(..., description="ID of parent sample")
-    name: str = Field(..., min_length=1, max_length=255, description="Name for the aliquot")
-    description: Optional[str] = Field(None, description="Description of the aliquot")
-    container_id: UUID = Field(..., description="ID of container for the aliquot")
+    """Place the parent sample in another container. No new Sample row is created."""
+    parent_sample_id: UUID = Field(..., description="ID of the sample to place in the destination container")
+    name: Optional[str] = Field(
+        None,
+        max_length=255,
+        description="Ignored. An aliquot does not create or rename a sample.",
+    )
+    description: Optional[str] = Field(
+        None,
+        description="Ignored. An aliquot does not create a sample.",
+    )
+    container_id: UUID = Field(..., description="Destination container. Must not already hold this sample.")
+    source_container_id: Optional[UUID] = Field(
+        None,
+        description=(
+            "Vessel to debit. Required when the sample is already in more than one container."
+        ),
+    )
     concentration: Optional[float] = Field(None, ge=0, description="Concentration of the aliquot")
     concentration_units: Optional[UUID] = Field(None, description="ID of concentration units")
-    amount: Optional[float] = Field(None, ge=0, description="Amount of the aliquot")
-    amount_units: Optional[UUID] = Field(None, description="ID of amount units")
-    temperature: Optional[float] = Field(None, description="Temperature of the aliquot")
-    qc_type: Optional[UUID] = Field(None, description="ID of QC type from list_entries")
+    amount: Optional[float] = Field(
+        None,
+        ge=0,
+        description="Amount to move into the destination container. Must be positive.",
+    )
+    amount_units: Optional[UUID] = Field(
+        None,
+        description="Must match the source vessel when the source vessel has units.",
+    )
+    temperature: Optional[float] = Field(
+        None,
+        description="Ignored. Temperature stays on the sample and is not changed by an aliquot.",
+    )
+    qc_type: Optional[UUID] = Field(
+        None,
+        description="Ignored. An aliquot does not create a sample and does not change qc_type.",
+    )
     sample_type: Optional[UUID] = Field(
         None,
         description=(
@@ -35,12 +61,26 @@ class AliquotCreateRequest(BaseModel):
 
 
 class DerivativeCreateRequest(BaseModel):
-    """Schema for creating a derivative from a parent sample"""
+    """Create a child sample of a different type. The child is named ``{parent}-DER-{token}``."""
     parent_sample_id: UUID = Field(..., description="ID of parent sample")
-    name: str = Field(..., min_length=1, max_length=255, description="Name for the derivative")
+    name: str = Field(
+        ...,
+        min_length=1,
+        max_length=255,
+        description=(
+            "Caller label. The stored sample name is {parent}-DER-{token}. "
+            "This value is saved as the description only when description is omitted."
+        ),
+    )
     description: Optional[str] = Field(None, description="Description of the derivative")
     sample_type: UUID = Field(..., description="ID of sample type from list_entries")
     container_id: UUID = Field(..., description="ID of container for the derivative")
+    source_container_id: Optional[UUID] = Field(
+        None,
+        description=(
+            "Vessel to debit. Required when the parent is already in more than one container."
+        ),
+    )
     concentration: Optional[float] = Field(None, ge=0, description="Concentration of the derivative")
     concentration_units: Optional[UUID] = Field(None, description="ID of concentration units")
     amount: Optional[float] = Field(None, ge=0, description="Amount of the derivative")
@@ -56,14 +96,17 @@ class DerivativeCreateRequest(BaseModel):
 
 
 class AliquotResponse(BaseModel):
-    """Schema for aliquot response"""
+    """One container placement of a sample. ``id`` is that sample; no child row is created."""
     id: UUID
     name: str
     description: Optional[str] = None
     parent_sample_id: Optional[UUID] = None
+    sample_type: Optional[UUID] = None
     project_id: UUID
     client_id: Optional[UUID] = None
     container_id: Optional[UUID] = None
+    source_container_id: Optional[UUID] = None
+    source_amount_remaining: Optional[float] = None
     concentration: Optional[float] = None
     concentration_units: Optional[UUID] = None
     amount: Optional[float] = None
@@ -91,6 +134,8 @@ class DerivativeResponse(BaseModel):
     client_id: Optional[UUID] = None
     sample_type: Optional[UUID] = None
     container_id: Optional[UUID] = None
+    source_container_id: Optional[UUID] = None
+    source_amount_remaining: Optional[float] = None
     concentration: Optional[float] = None
     concentration_units: Optional[UUID] = None
     amount: Optional[float] = None
