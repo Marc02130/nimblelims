@@ -152,6 +152,26 @@ Create a new sample.
 
 **Response:** `{ sample_id, sample_name, status, project_id, received_date, containers[], tests[] }` → **201**
 
+## Aliquots and derivatives
+
+An **aliquot** is the same sample and the same sample type in another container. **No new Sample row.** A **derivative** changes the sample type and creates a child sample, and only when `sample_type_transitions` has an active `derivative` row for that client. Both calls move a positive amount off the source vessel. The source `contents` row is never deleted; a full draw leaves `amount` 0.
+
+`POST /aliquots` and `POST /aliquots/aliquot` are the same call (`sample:create`).
+
+**Request:** `parent_sample_id`, `container_id` (destination), `amount`. Optional `source_container_id` (required when the sample is already in more than one vessel), `amount_units` (must match the source vessel when that vessel has units; no conversion), `concentration`, `concentration_units`. `name`, `description`, `temperature`, and `qc_type` are accepted and ignored. `sample_type`, when sent, must be the parent's type.
+
+**Response:** the parent sample. `id` is that sample's id. `container_id` and `amount` are the destination placement. `source_container_id` and `source_amount_remaining` report the debit. `parent_sample_id` is the sample's existing lineage parent, not a new child link.
+
+**Refusals:** **400** `aliquot_type_change_not_allowed`, `amount_required`, `source_contents_missing`, `source_container_required`, `source_amount_null`, `insufficient_amount`, `amount_unit_mismatch`, `aliquot_same_container`. **409** `sample_already_in_container`. **503** `source_busy` when the vessel row lock times out.
+
+`POST /aliquots/derivative` (`sample:create`) inserts one child. The stored name is `{parent}-DER-{token}`. The request `name` is a label: it is saved as the description only when `description` is omitted. The child copies the parent's project, matrix, and dates, and is debited from the parent vessel the same way as an aliquot.
+
+**Refusals:** **400** `derivative_same_type`, `dest_sample_type_not_allowed`, plus the amount codes above.
+
+`GET /aliquots/parent/{sample_id}` lists every contents row of that sample (same `id`, one row per container). It does not list legacy same-type child samples. `GET /aliquots/derivatives/{sample_id}` lists child samples whose type differs from the parent.
+
+Plan execute uses the same debit. A type-changing mint is named `{parent}-DER-{token}`. A pool mint stays `{parent}-ALQ-{token}`. Rows already named `-ALQ-` are left as they are.
+
 ## Asked-for and routing (P1 lake + P2)
 
 **Manual:** [asked-for.md](asked-for.md) · **UAT:** `UAT_Scripts/uat-post-receive-work-spine.md`

@@ -58,18 +58,12 @@ Create an aliquot from a parent sample, verifying that project and other propert
 | 3.1 | Verify "Create Aliquot" tab is active | Tab highlighted, aliquot form displayed |
 | 3.2 | Verify parent sample name displayed in dialog title | Title shows: "Create Aliquot or Derivative from {parentSampleName}" |
 | 4 | **Fill Aliquot Form** | |
-| 4.1 | Enter Aliquot Name: `ALIQUOT-001` | Field accepts input |
-| 4.2 | Enter Description: `Aliquot from parent sample` | Field accepts input |
-| 4.3 | Verify Sample Type is pre-filled (same as parent) | Sample type dropdown shows parent's sample type (e.g., "Blood") |
-| 4.4 | Verify Matrix is pre-filled (same as parent) | Matrix dropdown shows parent's matrix |
-| 4.5 | Enter Temperature: `4.0` (or leave blank to inherit) | Field accepts input or inherits from parent |
-| 4.6 | **Container Information** | |
-| 4.7 | Select Container Type: `Tube (1x1)` | Container type selected from dropdown |
-| 4.8 | Enter Container Name: `CONTAINER-ALIQUOT-001` | Field accepts input |
-| 4.9 | Enter Concentration: `10.5` | Field accepts numeric input |
-| 4.10 | Select Concentration Units: `mg/L` | Units dropdown filtered by type: "concentration" |
-| 4.11 | Enter Amount: `2.0` | Field accepts numeric input |
-| 4.12 | Select Amount Units: `mL` | Units dropdown filtered by type: "volume" |
+| 4.1 | Read the note that an aliquot is the same sample in another container | Copy says no new sample is created |
+| 4.2 | Select Destination container: a vessel that does not already hold this sample | Container selected |
+| 4.3 | Leave Source container as "Only vessel" when the sample is in one vessel | Optional source stays empty |
+| 4.4 | Enter Amount less than or equal to the source vessel amount (e.g. `2.0` from `10`) | Field accepts numeric input |
+| 4.5 | Select Amount Units that match the source vessel, if the source has units | Units dropdown filtered by type |
+| 4.6 | Optionally enter concentration | Field accepts numeric input |
 | 5 | Click "Create Aliquot" or "Submit" button | Form submits, loading spinner shown |
 | 6 | Wait for API response | Success message displayed or dialog closes |
 
@@ -77,24 +71,22 @@ Create an aliquot from a parent sample, verifying that project and other propert
 
 | Category | Expected Outcome |
 |----------|------------------|
-| **API Call** | POST `/aliquots/aliquot` called with:<br>- `parent_sample_id`: UUID of parent sample<br>- `name`: "ALIQUOT-001"<br>- `container_id`: UUID of created container<br>- `concentration`, `amount`, units |
-| **Backend Processing** | 1. Verify parent sample exists and user has access<br>2. Check project access (RLS)<br>3. Create container instance (if not pre-created)<br>4. Get "Available for Testing" status<br>5. Create aliquot sample with:<br>   - `parent_sample_id` = parent sample ID<br>   - `sample_type` = parent's sample_type (same)<br>   - `matrix` = parent's matrix (same)<br>   - `project_id` = parent's project_id (inherited)<br>   - `due_date` = parent's due_date (inherited)<br>   - `received_date` = parent's received_date (inherited)<br>   - `status` = "Available for Testing"<br>6. Create `Contents` junction linking aliquot to container<br>7. Commit transaction |
-| **Aliquot Record** | - New sample created with `parent_sample_id` FK set<br>- `sample_type` = parent's sample_type (same type)<br>- `project_id` = parent's project_id (inherited)<br>- `status` = "Available for Testing"<br>- `matrix` = parent's matrix (inherited)<br>- Audit fields set: `created_by`, `modified_by` = current user |
-| **Container Record** | - Container created (if not pre-created)<br>- Container linked to aliquot via `Contents` junction<br>- Concentration and amount with units saved |
-| **UI Feedback** | - Success message: "Aliquot/Derivative created successfully: ALIQUOT-001"<br>- Dialog closes<br>- Optional: Navigate to aliquot in samples list |
+| **API Call** | POST `/aliquots` (alias POST `/aliquots/aliquot`) with:<br>- `parent_sample_id`: UUID of the sample<br>- `container_id`: destination container<br>- `amount`: positive number not greater than the source vessel |
+| **Backend Processing** | 1. Verify the sample exists and the user has access<br>2. Refuse a different `sample_type` (**400** `aliquot_type_change_not_allowed`)<br>3. Debit the source `contents.amount` in one UPDATE<br>4. Insert a `contents` row for the same sample in the destination container<br>5. Do not insert a Sample row<br>6. Commit |
+| **Aliquot Record** | - Response `id` is the parent sample id<br>- Sample row count is unchanged<br>- Source vessel amount decreased by `amount`<br>- Destination vessel holds that amount of the same sample<br>- A full draw leaves the source row with amount 0 (the row is not deleted) |
+| **Over-draw** | Amount greater than the source vessel → **400** `insufficient_amount`. Source amount unchanged. No destination contents row. |
+| **UI Feedback** | - Dialog closes on success<br>- The sample id in the result is the parent sample |
 
 ### Pass/Fail Criteria
 
 | Criteria | Pass | Fail |
 |----------|------|------|
-| Aliquot created successfully | ✓ | ✗ |
-| `parent_sample_id` FK set correctly | ✓ | ✗ |
-| `project_id` inherited from parent | ✓ | ✗ |
-| `sample_type` same as parent | ✓ | ✗ |
-| `matrix` inherited from parent | ✓ | ✗ |
-| Container created and linked | ✓ | ✗ |
-| Status = "Available for Testing" | ✓ | ✗ |
-| Audit fields set | ✓ | ✗ |
+| Aliquot places the same sample in the destination container | ✓ | ✗ |
+| No new Sample row | ✓ | ✗ |
+| Source amount decreased by the transferred amount | ✓ | ✗ |
+| Over-draw refused with **400** `insufficient_amount` | ✓ | ✗ |
+| Source row remains when the remainder is 0 | ✓ | ✗ |
+| Sample type unchanged | ✓ | ✗ |
 
 ### Test Result
 - [ ] **PASS** - All criteria met
@@ -155,9 +147,9 @@ Create a derivative from a parent sample with a different sample type (e.g., DNA
 
 | Category | Expected Outcome |
 |----------|------------------|
-| **API Call** | POST `/aliquots/derivative` called with:<br>- `parent_sample_id`: UUID of parent sample<br>- `name`: "DNA-EXTRACT-001"<br>- `sample_type`: UUID of "DNA Extract" (different from parent)<br>- `container_id`: UUID of created container |
-| **Backend Processing** | 1. Verify parent sample exists and user has access<br>2. Check project access (RLS)<br>3. Create container instance<br>4. Get "Available for Testing" status<br>5. Create derivative sample with:<br>   - `parent_sample_id` = parent sample ID<br>   - `sample_type` = "DNA Extract" (different from parent's "Blood")<br>   - `matrix` = parent's matrix (inherited, same)<br>   - `project_id` = parent's project_id (inherited)<br>   - `due_date` = parent's due_date (inherited)<br>   - `received_date` = parent's received_date (inherited)<br>   - `status` = "Available for Testing"<br>6. Create `Contents` junction linking derivative to container<br>7. Commit transaction |
-| **Derivative Record** | - New sample created with `parent_sample_id` FK set<br>- `sample_type` = "DNA Extract" (different from parent's "Blood")<br>- `project_id` = parent's project_id (inherited)<br>- `matrix` = parent's matrix (inherited)<br>- `status` = "Available for Testing"<br>- Audit fields set |
+| **API Call** | POST `/aliquots/derivative` with:<br>- `parent_sample_id`: UUID of parent sample<br>- `sample_type`: a different type that has an active `derivative` transition<br>- `container_id`: destination container<br>- `amount`: positive and not greater than the source vessel |
+| **Backend Processing** | 1. Verify parent sample exists and user has access<br>2. Refuse the same type (**400** `derivative_same_type`) and a type with no active derivative transition (**400** `dest_sample_type_not_allowed`)<br>3. Debit the source vessel<br>4. Insert a child sample named `{parent}-DER-{token}` with `parent_sample_id` set<br>5. Link that child to the destination container<br>6. Commit. The parent row stays |
+| **Derivative Record** | - New sample whose name contains `-DER-` and not `-ALQ-`<br>- `sample_type` differs from the parent<br>- `parent_sample_id` points at the parent<br>- Source vessel amount decreased by `amount`<br>- Over-draw is **400** `insufficient_amount` and creates no child |
 | **Container Record** | - Container created and linked via `Contents` junction |
 | **UI Feedback** | - Success message: "Aliquot/Derivative created successfully: DNA-EXTRACT-001"<br>- Dialog closes |
 
@@ -263,7 +255,7 @@ Verify QC samples are properly flagged and highlighted in batch views and result
   - Derivative: New sample_id/type, new container_id
   - Inherit project_id, client_id; configurable workflow steps
   - Example: DNA extraction from blood
-  - API: POST `/samples/aliquot` or `/derivative` with parent_id; RBAC: `sample:create`
+  - API: POST `/aliquots` (same sample, new container) or POST `/aliquots/derivative` (child named `{parent}-DER-{token}`); RBAC: `sample:create`
 
 ### User Story US-4 (QC Sample Handling)
 - **As a** Lab Technician
@@ -286,14 +278,14 @@ Verify QC samples are properly flagged and highlighted in batch views and result
 
 ### UI Document (AliquotDerivativeDialog.tsx)
 - **Dialog Component**: Modal dialog with tabs for "Create Aliquot" and "Create Derivative"
-- **AliquotForm**: Form for creating aliquots (pre-fills sample_type from parent)
-- **DerivativeForm**: Form for creating derivatives (allows selecting different sample_type)
+- **AliquotForm**: Places the same sample in a destination container and sends `amount`. It does not collect a new sample type.
+- **DerivativeForm**: Collects a different sample type and a destination container. The server names the child `{parent}-DER-{token}`.
 - **Integration**: Opens after successful sample accessioning, shows parent sample name in title
 
 ### Technical Implementation
-- **POST `/aliquots/aliquot`**: Creates aliquot with same `sample_type` as parent, inherits `project_id`, `matrix`, `due_date`, `received_date`
-- **POST `/aliquots/derivative`**: Creates derivative with different `sample_type`, inherits `project_id`, `matrix`, dates
-- **Both**: Set `parent_sample_id` FK, create container, link via `Contents` junction, set status to "Available for Testing"
+- **POST `/aliquots` and POST `/aliquots/aliquot`**: Same sample, new contents row, source vessel debited. No new Sample row.
+- **POST `/aliquots/derivative`**: New child sample named `{parent}-DER-{token}`, different `sample_type`, source vessel debited. Parent row stays.
+- **Both**: Refuse an over-draw (**400** `insufficient_amount`). A vessel drawn to zero keeps its contents row with amount 0. Nothing is deleted.
 - **QC Flagging**: `samples.qc_type` FK to `list_entries`, displayed in batch views with warning indicators
 
 ### Schema
