@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_
 from app.database import get_db
-from models.sample import Sample
+from models.sample import Sample, SampleTypeTransition
 from models.container import Container, Contents
 from models.unit import Unit
 from models.user import User
@@ -90,6 +90,22 @@ def create_aliquot(
                 detail="Access denied: insufficient project permissions"
             )
     
+    # An aliquot is the same sample type in a new container; a type change is a derivative.
+    if (
+        aliquot_data.sample_type is not None
+        and aliquot_data.sample_type != parent_sample.sample_type
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "code": "aliquot_type_change_not_allowed",
+                "message": (
+                    "An aliquot keeps the parent's sample type. "
+                    "Create a derivative to change the sample type."
+                ),
+            },
+        )
+
     # Verify container exists
     container = db.query(Container).filter(
         Container.id == aliquot_data.container_id,
@@ -194,6 +210,41 @@ def create_derivative(
                 detail="Access denied: insufficient project permissions"
             )
     
+    # A derivative changes the sample type and must be an allowed derivative transition.
+    if derivative_data.sample_type == parent_sample.sample_type:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "code": "derivative_same_type",
+                "message": (
+                    "A derivative must change the sample type. "
+                    "Use an aliquot for the same sample type."
+                ),
+            },
+        )
+    allowed = (
+        db.query(SampleTypeTransition.id)
+        .filter(
+            SampleTypeTransition.client_id == parent_sample.project.client_id,
+            SampleTypeTransition.source_sample_type == parent_sample.sample_type,
+            SampleTypeTransition.operation == "derivative",
+            SampleTypeTransition.allowed_dest_sample_type == derivative_data.sample_type,
+            SampleTypeTransition.active.is_(True),
+        )
+        .first()
+    )
+    if allowed is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "code": "dest_sample_type_not_allowed",
+                "message": (
+                    "This sample type change is not an allowed derivative transition "
+                    "for the client (Sample type transitions)."
+                ),
+            },
+        )
+
     # Verify container exists
     container = db.query(Container).filter(
         Container.id == derivative_data.container_id,
