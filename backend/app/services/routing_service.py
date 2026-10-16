@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import logging
-from typing import List, Optional, Sequence
+from typing import Any, List, Optional, Sequence
 from uuid import UUID, uuid4
 
 from fastapi import HTTPException, status
@@ -402,18 +402,33 @@ class RoutingService:
         entries = (tpl.template_definition or {}).get("entries") or []
         dests: List[UUID] = []
         seen = set()
-        for entry in entries:
-            cfg = entry.get("config") or {}
-            raw = cfg.get("default_dest_sample_type")
+        def _add(raw: Any) -> None:
             if not raw:
-                continue
+                return
             try:
                 dest = raw if isinstance(raw, UUID) else UUID(str(raw))
             except (ValueError, TypeError, AttributeError):
-                continue
+                return
             if dest not in seen:
                 seen.add(dest)
                 dests.append(dest)
+
+        for entry in entries:
+            cfg = entry.get("config") or {}
+            default = cfg.get("default_dest_sample_type")
+            lines = cfg.get("plan_lines") or []
+            if not lines:
+                _add(default)
+                continue
+            # Per-line dest overrides win; lines that inherit use the entry default.
+            for line in lines:
+                if not isinstance(line, dict):
+                    continue
+                inherits = line.get("inherit_entry_dest_sample_type", True)
+                if not inherits and line.get("dest_sample_type"):
+                    _add(line.get("dest_sample_type"))
+                elif inherits:
+                    _add(default)
         return dests
 
     def emerging_types_for_process(
