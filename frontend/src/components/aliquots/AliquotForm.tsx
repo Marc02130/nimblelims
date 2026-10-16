@@ -26,7 +26,7 @@ interface AliquotFormProps {
 interface AliquotFormData {
   container_id: string;
   source_container_id: string;
-  concentration: number;
+  concentration: number | '';
   concentration_units: string;
   amount: number;
   amount_units: string;
@@ -50,7 +50,7 @@ const AliquotForm: React.FC<AliquotFormProps> = ({ parentSampleId, onSuccess, on
   const [formData, setFormData] = useState<AliquotFormData>({
     container_id: '',
     source_container_id: '',
-    concentration: 0,
+    concentration: '',
     concentration_units: '',
     amount: 0,
     amount_units: '',
@@ -113,7 +113,7 @@ const AliquotForm: React.FC<AliquotFormProps> = ({ parentSampleId, onSuccess, on
       if (formData.amount_units) {
         aliquotData.amount_units = formData.amount_units;
       }
-      if (formData.concentration) {
+      if (formData.concentration !== '' && !Number.isNaN(formData.concentration)) {
         aliquotData.concentration = formData.concentration;
       }
       if (formData.concentration_units) {
@@ -225,7 +225,12 @@ const AliquotForm: React.FC<AliquotFormProps> = ({ parentSampleId, onSuccess, on
                 label="Concentration"
                 type="number"
                 value={formData.concentration}
-                onChange={(e) => handleInputChange('concentration', parseFloat(e.target.value))}
+                onChange={(e) =>
+                  handleInputChange(
+                    'concentration',
+                    e.target.value === '' ? '' : parseFloat(e.target.value),
+                  )
+                }
               />
             </Grid>
 

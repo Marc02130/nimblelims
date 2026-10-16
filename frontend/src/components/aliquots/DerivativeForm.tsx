@@ -28,8 +28,8 @@ interface DerivativeFormData {
   name: string;
   description: string;
   sample_type: string;
-  temperature: number;
-  concentration: number;
+  temperature: number | '';
+  concentration: number | '';
   concentration_units: string;
   amount: number;
   amount_units: string;
@@ -56,8 +56,8 @@ const DerivativeForm: React.FC<DerivativeFormProps> = ({ parentSampleId, onSucce
     name: '',
     description: '',
     sample_type: '',
-    temperature: 0,
-    concentration: 0,
+    temperature: '',
+    concentration: '',
     concentration_units: '',
     amount: 0,
     amount_units: '',
@@ -128,9 +128,13 @@ const DerivativeForm: React.FC<DerivativeFormProps> = ({ parentSampleId, onSucce
         amount: formData.amount,
       };
       if (formData.description) derivativeData.description = formData.description;
-      if (formData.temperature) derivativeData.temperature = formData.temperature;
+      if (formData.temperature !== '' && !Number.isNaN(formData.temperature)) {
+        derivativeData.temperature = formData.temperature;
+      }
       if (formData.source_container_id) derivativeData.source_container_id = formData.source_container_id;
-      if (formData.concentration) derivativeData.concentration = formData.concentration;
+      if (formData.concentration !== '' && !Number.isNaN(formData.concentration)) {
+        derivativeData.concentration = formData.concentration;
+      }
       if (formData.concentration_units) derivativeData.concentration_units = formData.concentration_units;
       if (formData.amount_units) derivativeData.amount_units = formData.amount_units;
 
@@ -210,8 +214,13 @@ const DerivativeForm: React.FC<DerivativeFormProps> = ({ parentSampleId, onSucce
                 label="Temperature"
                 type="number"
                 value={formData.temperature}
-                onChange={(e) => handleInputChange('temperature', parseFloat(e.target.value))}
-                helperText="Leave 0 to keep the parent's temperature."
+                onChange={(e) =>
+                  handleInputChange(
+                    'temperature',
+                    e.target.value === '' ? '' : parseFloat(e.target.value),
+                  )
+                }
+                helperText="Blank keeps the parent's temperature. 0 °C is stored as 0."
               />
             </Grid>
 
@@ -264,7 +273,12 @@ const DerivativeForm: React.FC<DerivativeFormProps> = ({ parentSampleId, onSucce
                 label="Concentration"
                 type="number"
                 value={formData.concentration}
-                onChange={(e) => handleInputChange('concentration', parseFloat(e.target.value))}
+                onChange={(e) =>
+                  handleInputChange(
+                    'concentration',
+                    e.target.value === '' ? '' : parseFloat(e.target.value),
+                  )
+                }
               />
             </Grid>
 

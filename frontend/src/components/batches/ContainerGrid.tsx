@@ -292,13 +292,13 @@ const ContainerGrid: React.FC<ContainerGridProps> = ({
                   />
                 </Box>
 
-                  {container.concentration && container.concentration > 0 && (
+                  {container.concentration != null && (
                   <Typography variant="body2">
                     Concentration: {container.concentration} {getUnitName(container.concentration_units)}
                   </Typography>
                 )}
 
-                  {container.amount && container.amount > 0 && (
+                  {container.amount != null && (
                   <Typography variant="body2">
                     Amount: {container.amount} {getUnitName(container.amount_units)}
                   </Typography>
@@ -385,7 +385,7 @@ const ContainerGrid: React.FC<ContainerGridProps> = ({
               <TextField
                 label="Concentration"
                 type="number"
-                value={formData.concentration || ''}
+                value={formData.concentration ?? ''}
                 onChange={(e) => setFormData({ ...formData, concentration: parseFloat(e.target.value) })}
               />
               <FormControl sx={{ minWidth: 120 }}>
@@ -407,7 +407,7 @@ const ContainerGrid: React.FC<ContainerGridProps> = ({
               <TextField
                 label="Amount"
                 type="number"
-                value={formData.amount || ''}
+                value={formData.amount ?? ''}
                 onChange={(e) => setFormData({ ...formData, amount: parseFloat(e.target.value) })}
               />
               <FormControl sx={{ minWidth: 120 }}>
@@ -485,7 +485,7 @@ const ContainerGrid: React.FC<ContainerGridProps> = ({
               <TextField
                 label="Concentration"
                 type="number"
-                value={formData.concentration || ''}
+                value={formData.concentration ?? ''}
                 onChange={(e) => setFormData({ ...formData, concentration: parseFloat(e.target.value) })}
               />
               <FormControl sx={{ minWidth: 120 }}>
@@ -507,7 +507,7 @@ const ContainerGrid: React.FC<ContainerGridProps> = ({
               <TextField
                 label="Amount"
                 type="number"
-                value={formData.amount || ''}
+                value={formData.amount ?? ''}
                 onChange={(e) => setFormData({ ...formData, amount: parseFloat(e.target.value) })}
               />
               <FormControl sx={{ minWidth: 120 }}>

@@ -361,6 +361,115 @@ class TestAliquotPlanExecute:
         assert r.status_code == 400, r.text
         assert r.json()["detail"]["code"] == "source_amount_null"
 
+    def test_pool_execute_is_all_or_nothing_and_keeps_zero_temperature(
+        self, client, auth_headers, plan_entry, db_session, test_admin_user, test_org
+    ):
+        from models.container import Container, Contents
+        from models.sample import Sample
+
+        exp_id = plan_entry["experiment"]["id"]
+        rich, tube_rich, ctype = self._seed_sample_with_content(
+            db_session, test_admin_user, test_org, amount=10.0, experiment_id=exp_id
+        )
+        rich.temperature = Decimal("0")
+        poor = Sample(
+            name=f"SRC {uuid4().hex[:6]}",
+            sample_type=rich.sample_type,
+            status=rich.status,
+            matrix=rich.matrix,
+            project_id=rich.project_id,
+            temperature=Decimal("0"),
+            created_by=test_admin_user.id,
+            modified_by=test_admin_user.id,
+        )
+        db_session.add(poor)
+        db_session.flush()
+        tube_poor = Container(
+            name=f"TUBE-{uuid4().hex[:6]}",
+            type_id=ctype.id,
+            created_by=test_admin_user.id,
+            modified_by=test_admin_user.id,
+        )
+        db_session.add(tube_poor)
+        db_session.flush()
+        db_session.add(
+            Contents(
+                container_id=tube_poor.id,
+                sample_id=poor.id,
+                amount=Decimal("3"),
+                concentration=Decimal("10"),
+            )
+        )
+        db_session.commit()
+        self._link_cohort(db_session, exp_id, poor.id, test_admin_user.id)
+
+        entry_id = plan_entry["entry"]["id"]
+
+        def lines(amount: int):
+            return [
+                {
+                    "source_sample_id": str(rich.id),
+                    "source_container_id": str(tube_rich.id),
+                    "target_amount": amount,
+                    "pool_group": "pool-a",
+                    "dest_container_type_id": str(ctype.id),
+                },
+                {
+                    "source_sample_id": str(poor.id),
+                    "source_container_id": str(tube_poor.id),
+                    "target_amount": amount,
+                    "pool_group": "pool-a",
+                    "dest_container_type_id": str(ctype.id),
+                },
+            ]
+
+        saved = client.put(
+            f"/v1/entries/{entry_id}/aliquot-plan",
+            json={"method": "pool_by_target_amount_per_source", "lines": lines(6)},
+            headers=auth_headers,
+        )
+        assert saved.status_code == 200, saved.text
+        failed = client.post(
+            f"/v1/entries/{entry_id}/execute", json={}, headers=auth_headers
+        )
+        assert failed.status_code == 400, failed.text
+        assert "Insufficient" in str(failed.json()["detail"])
+        db_session.expire_all()
+        assert Decimal(
+            db_session.query(Contents).filter(Contents.container_id == tube_rich.id).one().amount
+        ) == Decimal("10")
+        assert Decimal(
+            db_session.query(Contents).filter(Contents.container_id == tube_poor.id).one().amount
+        ) == Decimal("3")
+        assert (
+            db_session.query(Sample)
+            .filter(Sample.parent_sample_id.in_([rich.id, poor.id]))
+            .count()
+            == 0
+        )
+
+        saved = client.put(
+            f"/v1/entries/{entry_id}/aliquot-plan",
+            json={"method": "pool_by_target_amount_per_source", "lines": lines(1)},
+            headers=auth_headers,
+        )
+        assert saved.status_code == 200, saved.text
+        done = client.post(
+            f"/v1/entries/{entry_id}/execute", json={}, headers=auth_headers
+        )
+        assert done.status_code == 200, done.text
+        db_session.expire_all()
+        for result in done.json()["results"]:
+            child = db_session.query(Sample).filter(Sample.id == result["dest_sample_id"]).one()
+            assert child.temperature == Decimal("0")
+            assert "-ALQ-" in child.name
+        assert Decimal(
+            db_session.query(Contents).filter(Contents.container_id == tube_rich.id).one().amount
+        ) == Decimal("9")
+        assert Decimal(
+            db_session.query(Contents).filter(Contents.container_id == tube_poor.id).one().amount
+        ) == Decimal("2")
+
     def test_destination_type_options_and_execute(
         self, client, auth_headers, plan_entry, db_session, test_admin_user, test_org
     ):

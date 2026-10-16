@@ -129,13 +129,13 @@ const ContainerManagement: React.FC = () => {
       field: 'concentration', 
       headerName: 'Concentration', 
       width: 150,
-      valueGetter: (value, row) => row.concentration ? `${row.concentration} ${row.concentration_units || ''}` : 'N/A'
+      valueGetter: (value, row) => row.concentration != null ? `${row.concentration} ${row.concentration_units || ''}` : 'N/A'
     },
     { 
       field: 'amount', 
       headerName: 'Amount', 
       width: 150,
-      valueGetter: (value, row) => row.amount ? `${row.amount} ${row.amount_units || ''}` : 'N/A'
+      valueGetter: (value, row) => row.amount != null ? `${row.amount} ${row.amount_units || ''}` : 'N/A'
     },
     { 
       field: 'contents_count', 
