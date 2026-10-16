@@ -185,6 +185,38 @@ def _require_one_type(units: Sequence[Unit], label: str) -> None:
         raise ConversionError(f"Cannot convert {label} units of different types")
 
 
+def reporting_unit(db: Session, units: Sequence[Unit], label: str) -> Tuple[Unit, bool]:
+    """Unit for a combined total, and whether values convert onto it.
+
+    A type with exactly one multiplier-1 unit is a scale, so values convert
+    to that base. Seed concentration is not a scale: g/L, ng/µL, µg/mL,
+    EU/mL, and copies/µL are all multiplier 1 and are different quantities.
+    Those values combine only when every source uses the same unit, and the
+    total stays in that unit with no multiplier applied.
+    """
+    if not units:
+        raise ConversionError(f"Cannot pool {label}: no units provided")
+    types = {unit.type for unit in units}
+    if len(types) != 1:
+        raise ConversionError(f"Cannot pool {label} units of different types")
+    distinct = {unit.id: unit for unit in units}
+    bases = active_base_units(db, units[0].type)
+    if len(bases) == 1:
+        return bases[0], True
+    if len(distinct) == 1:
+        return next(iter(distinct.values())), False
+    names = ", ".join(sorted(unit.name for unit in distinct.values()))
+    if not bases:
+        raise ConversionError(
+            f"Cannot pool {label} units ({names}). No base unit for this type."
+        )
+    raise ConversionError(
+        f"Cannot pool {label} units ({names}). "
+        "They are not the same unit, and this type has more than one base unit, "
+        "so they are not on one scale."
+    )
+
+
 def convert_to_base_unit(value: float, unit_id: str, db: Session) -> float:
     """
     Convert a value to its base unit using the unit's multiplier.

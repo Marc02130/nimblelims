@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session
 from app.core.conversions import (
     ConversionError,
     convert_to_base_unit,
-    require_base_unit,
+    reporting_unit,
     require_base_unit_named,
 )
 from app.core.rbac import require_sample_create, require_sample_read
@@ -464,6 +464,12 @@ def pool_samples(
 
     The debits and the destination rows commit together. One refusal rolls
     the whole call back. A full draw leaves the source contents row at amount 0.
+
+    The summary concentration is the unit on the source contents when every
+    source shares it (otherwise the request unit). A type with several
+    multiplier-1 units is not one scale, so mixed units of that type are
+    refused. Plan execute is the bench pool; this route places the existing
+    samples and does not mint a child.
     """
     # Verify container exists
     container = db.query(Container).filter(
@@ -498,62 +504,34 @@ def pool_samples(
                     detail="Access denied: insufficient project permissions"
                 )
     
-    # Convert each amount and concentration to the lab's base (multiplier 1),
-    # then combine. Contents keep the unit the lab recorded.
-    total_volume = 0.0
-    total_concentration = 0.0
-    amount_rows = []
-    concentration_rows = []
+    # Amount and concentration stay in the unit the vessels already use.
+    # A single base unit, when the type has one, is only the conversion scale.
+    amount_rows: List[Unit] = []
+    concentration_rows: List[Unit] = []
 
-    try:
-        for i, sample_id in enumerate(pooling_data.samples):
-            amount_unit = db.query(Unit).filter(Unit.id == pooling_data.amount_units[i]).first()
-            concentration_unit = db.query(Unit).filter(
-                Unit.id == pooling_data.concentration_units[i]
-            ).first()
-            if not amount_unit or not concentration_unit:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Invalid units for sample {sample_id}",
-                )
-            amount_rows.append(amount_unit)
-            concentration_rows.append(concentration_unit)
-            amount_base = convert_to_base_unit(
-                float(pooling_data.amounts[i]), str(amount_unit.id), db
+    for i, sample_id in enumerate(pooling_data.samples):
+        amount_unit = db.query(Unit).filter(Unit.id == pooling_data.amount_units[i]).first()
+        concentration_unit = db.query(Unit).filter(
+            Unit.id == pooling_data.concentration_units[i]
+        ).first()
+        if not amount_unit or not concentration_unit:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid units for sample {sample_id}",
             )
-            concentration_base = convert_to_base_unit(
-                float(pooling_data.concentrations[i]), str(concentration_unit.id), db
+        if pooling_data.concentrations[i] == 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot pool: concentration is zero",
             )
-            if concentration_base == 0:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Cannot pool: concentration is zero",
-                )
-            if pooling_data.amounts[i] <= 0:
-                raise _http(
-                    status.HTTP_400_BAD_REQUEST,
-                    "amount_required",
-                    "A positive amount is required so the source vessel can be debited.",
-                )
-            volume = amount_base / concentration_base
-            total_volume += volume
-            total_concentration += concentration_base * volume
-    except ConversionError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
-
-    if len({unit.type for unit in amount_rows}) != 1 or len({unit.type for unit in concentration_rows}) != 1:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot pool units of different types",
-        )
-    try:
-        base_concentration_unit = require_base_unit(db, concentration_rows[0].type)
-        base_volume_unit = require_base_unit_named(db, "volume")
-    except ConversionError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
-
-    # Calculate average concentration
-    average_concentration = total_concentration / total_volume if total_volume > 0 else 0
+        if pooling_data.amounts[i] <= 0:
+            raise _http(
+                status.HTTP_400_BAD_REQUEST,
+                "amount_required",
+                "A positive amount is required so the source vessel can be debited.",
+            )
+        amount_rows.append(amount_unit)
+        concentration_rows.append(concentration_unit)
 
     draws = []
     for i, sample_id in enumerate(pooling_data.samples):
@@ -561,21 +539,97 @@ def pool_samples(
         if pooling_data.source_container_ids is not None:
             source_container_id = pooling_data.source_container_ids[i]
         source = _resolve_source(db, sample_id, pooling_data.container_id, source_container_id)
-        draws.append(
+        draws.append((sample_id, source, amount_rows[i], concentration_rows[i]))
+
+    amount_units = list(amount_rows)
+    concentration_units = list(concentration_rows)
+    for _sample_id, source, _amount_unit, _concentration_unit in draws:
+        if source.amount_units is not None:
+            source_amount_unit = (
+                db.query(Unit)
+                .filter(Unit.id == source.amount_units, Unit.active == True)  # noqa: E712
+                .first()
+            )
+            if source_amount_unit is None:
+                raise _http(
+                    status.HTTP_400_BAD_REQUEST,
+                    "amount_unit_mismatch",
+                    "Source amount unit is missing or inactive.",
+                )
+            amount_units.append(source_amount_unit)
+        if source.concentration_units is not None:
+            source_concentration_unit = (
+                db.query(Unit)
+                .filter(Unit.id == source.concentration_units, Unit.active == True)  # noqa: E712
+                .first()
+            )
+            if source_concentration_unit is None:
+                raise _http(
+                    status.HTTP_400_BAD_REQUEST,
+                    "incompatible_units",
+                    "Source concentration unit is missing or inactive.",
+                )
+            concentration_units.append(source_concentration_unit)
+
+    try:
+        amount_report, amount_to_base = reporting_unit(db, amount_units, "amount")
+        concentration_report, concentration_to_base = reporting_unit(
+            db, concentration_units, "concentration"
+        )
+    except ConversionError as exc:
+        raise _http(
+            status.HTTP_400_BAD_REQUEST,
+            "incompatible_units",
+            str(exc),
+        ) from exc
+
+    def _reported(value: float, unit: Unit, to_base: bool) -> float:
+        if not to_base:
+            return float(value)
+        return convert_to_base_unit(float(value), str(unit.id), db)
+
+    try:
+        total_volume = 0.0
+        total_concentration = 0.0
+        for i, _sample_id in enumerate(pooling_data.samples):
+            amount_value = _reported(pooling_data.amounts[i], amount_rows[i], amount_to_base)
+            concentration_value = _reported(
+                pooling_data.concentrations[i], concentration_rows[i], concentration_to_base
+            )
+            if concentration_value == 0:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Cannot pool: concentration is zero",
+                )
+            volume = amount_value / concentration_value
+            total_volume += volume
+            total_concentration += concentration_value * volume
+    except ConversionError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+    average_concentration = total_concentration / total_volume if total_volume > 0 else 0
+    try:
+        volume_unit_id = require_base_unit_named(db, "volume").id
+    except ConversionError:
+        volume_unit_id = amount_report.id
+
+    debits = []
+    for i, (sample_id, source, amount_unit, _concentration_unit) in enumerate(draws):
+        debits.append(
             (
                 sample_id,
                 source,
-                _debit_quantity(db, source, pooling_data.amounts[i], amount_rows[i]),
+                _debit_quantity(db, source, pooling_data.amounts[i], amount_unit),
             )
         )
 
     def mutate() -> PoolingResponse:
         # Lock sources in a stable order so two pools cannot deadlock.
         for _sample_id, source, transfer in sorted(
-            draws, key=lambda item: (str(item[1].container_id), str(item[1].sample_id))
+            debits, key=lambda item: (str(item[1].container_id), str(item[1].sample_id))
         ):
             debit_contents_amount(db, source, transfer, sample_label=str(_sample_id))
-        for i, (sample_id, source, _transfer) in enumerate(draws):
+        for i, (sample_id, source, _transfer) in enumerate(debits):
             _place_contents(
                 db,
                 pooling_data.container_id,
@@ -590,9 +644,9 @@ def pool_samples(
             container_id=pooling_data.container_id,
             pooled_samples=pooling_data.samples,
             total_volume=total_volume,
-            total_volume_units=base_volume_unit.id,
+            total_volume_units=volume_unit_id,
             average_concentration=average_concentration,
-            concentration_units=base_concentration_unit.id,
+            concentration_units=concentration_report.id,
             notes=pooling_data.notes,
         )
 

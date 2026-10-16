@@ -1217,6 +1217,111 @@ class TestAliquotAmountConservation:
             db_session.query(Contents).filter(Contents.container_id == rich["source"].id).one().amount
         ) == Decimal("10")
 
+    def test_pool_seed_like_concentration_units(self, db_session, auth_headers, sample_user):
+        """Several multiplier-1 concentration units must not block a shared unit.
+
+        Seed data records g/L, ng/µL, µg/mL, EU/mL, and copies/µL all as
+        multiplier 1. That is not one scale. Sources that share ng/µL pool in
+        that unit. Mixing ng/µL with EU/mL debits nothing.
+        """
+        from models.unit import Unit
+
+        left = _tracked_parent(db_session, sample_user, label="seedpool-a", amount="50")
+        right = _tracked_parent(db_session, sample_user, label="seedpool-b", amount="50")
+        volume_type = get_or_create_list_entry(db_session, "unit_type", "volume")
+        conc_type = scratch_entry_id(db_session)
+        amount_unit = (
+            db_session.query(Unit)
+            .filter(Unit.type == volume_type.id, Unit.multiplier == 1, Unit.active == True)  # noqa: E712
+            .first()
+        )
+        if amount_unit is None:
+            amount_unit = Unit(
+                name=f"mL_{uuid4().hex[:4]}",
+                description="mL",
+                type=volume_type.id,
+                multiplier=1.0,
+            )
+            db_session.add(amount_unit)
+        created = []
+        for name in ("ng/µL", "µg/mL", "EU/mL", "copies/µL", "g/L"):
+            unit = Unit(
+                name=f"{name} {uuid4().hex[:6]}",
+                description=name,
+                type=conc_type,
+                multiplier=1.0,
+                created_by=sample_user.id,
+                modified_by=sample_user.id,
+            )
+            db_session.add(unit)
+            created.append(unit)
+        db_session.flush()
+        ng_ul, _ug_ml, eu_ml, _copies, _g_l = created
+        for lab, conc_unit in ((left, ng_ul), (right, ng_ul)):
+            row = db_session.query(Contents).filter(Contents.container_id == lab["source"].id).one()
+            row.amount_units = amount_unit.id
+            row.concentration = Decimal("10")
+            row.concentration_units = conc_unit.id
+        db_session.flush()
+        dest = Container(
+            name=f"Seed pool {uuid4().hex[:6]}",
+            description="dest",
+            type_id=left["container_type"].id,
+            created_by=sample_user.id,
+            modified_by=sample_user.id,
+        )
+        db_session.add(dest)
+        db_session.flush()
+        shared = {
+            "container_id": str(dest.id),
+            "samples": [str(left["parent"].id), str(right["parent"].id)],
+            "amounts": [5.0, 10.0],
+            "amount_units": [str(amount_unit.id), str(amount_unit.id)],
+            "source_container_ids": [str(left["source"].id), str(right["source"].id)],
+        }
+        mixed = client.post(
+            "/aliquots/pool",
+            json={
+                **shared,
+                "concentrations": [10.0, 20.0],
+                "concentration_units": [str(ng_ul.id), str(eu_ml.id)],
+            },
+            headers=auth_headers,
+        )
+        assert mixed.status_code == 400, mixed.text
+        assert mixed.json()["detail"]["code"] == "incompatible_units"
+        db_session.expire_all()
+        assert Decimal(
+            db_session.query(Contents).filter(Contents.container_id == left["source"].id).one().amount
+        ) == Decimal("50")
+        assert Decimal(
+            db_session.query(Contents).filter(Contents.container_id == right["source"].id).one().amount
+        ) == Decimal("50")
+        assert db_session.query(Contents).filter(Contents.container_id == dest.id).count() == 0
+
+        pooled = client.post(
+            "/aliquots/pool",
+            json={
+                **shared,
+                "concentrations": [10.0, 20.0],
+                "concentration_units": [str(ng_ul.id), str(ng_ul.id)],
+            },
+            headers=auth_headers,
+        )
+        assert pooled.status_code == 200, pooled.text
+        body = pooled.json()
+        assert body["concentration_units"] == str(ng_ul.id)
+        assert abs(body["average_concentration"] - 15.0) < 0.001
+        db_session.expire_all()
+        assert Decimal(
+            db_session.query(Contents).filter(Contents.container_id == left["source"].id).one().amount
+        ) == Decimal("45")
+        assert Decimal(
+            db_session.query(Contents).filter(Contents.container_id == right["source"].id).one().amount
+        ) == Decimal("40")
+        dest_rows = db_session.query(Contents).filter(Contents.container_id == dest.id).all()
+        assert {row.sample_id for row in dest_rows} == {left["parent"].id, right["parent"].id}
+
 
 def test_parallel_aliquots_do_not_overdraw(db_engine):
     """Concurrent draws of 6 from 10: one succeeds, the vessel is never negative."""
