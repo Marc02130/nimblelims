@@ -77,7 +77,9 @@ export interface EligibleSamplesResponse {
   warnings: string[];
 }
 
-export type AliquotOperation = 'aliquot' | 'pool';
+/** aliquot: same type, same sample. derivative: type change, new child sample. pool: combine. */
+export type AliquotOperation = 'aliquot' | 'derivative' | 'pool';
+export type TransitionOperation = 'aliquot' | 'derivative' | 'pool';
 export type AliquotMethod =
   | 'aliquot_by_volume'
   | 'aliquot_by_target_amount'
@@ -2276,7 +2278,7 @@ export class ApiService {
     return response.data;
   }
 
-  async getSampleTypeTransitions(operation?: 'aliquot' | 'pool') {
+  async getSampleTypeTransitions(operation?: TransitionOperation) {
     const response: AxiosResponse = await this.api.get(
       'v1/sample-type-transitions',
       { params: operation ? { operation } : undefined },
@@ -2286,7 +2288,7 @@ export class ApiService {
 
   async createSampleTypeTransition(data: {
     source_sample_type: string;
-    operation: 'aliquot' | 'pool';
+    operation: TransitionOperation;
     allowed_dest_sample_type: string;
     active?: boolean;
   }) {
@@ -2301,7 +2303,7 @@ export class ApiService {
     id: string,
     data: {
       source_sample_type?: string;
-      operation?: 'aliquot' | 'pool';
+      operation?: TransitionOperation;
       allowed_dest_sample_type?: string;
       active?: boolean;
     },
