@@ -57,7 +57,7 @@ It is **not** the primary home for large-scale result data analysis or dose-resp
 
 **Experiment Header** = experiment data with `predefined_entry_key = experiment_header` (same kind as other experiment data tables).
 
-Sample and experiment data are the two table kinds. **Reagent** is its own entry type (`predefined_entry_key = reagents`, wrapper `reagents`, cardinality 1). The author stores `config.allowed_reagent_ids` from the Admin reagent catalog. On the experiment, **Record lot used** posts `/v1/reagent-uses` with `experiment_id`. A reagent absent from that allow-list is **422** `reagent_not_in_template`. Entries capture process data; sample identity stays on Sample.
+Sample and experiment data are the two table kinds. **Reagent** is its own entry type (`predefined_entry_key = reagents`, wrapper `reagents`, cardinality 1). The author stores `config.allowed_reagent_ids` from the Admin reagent catalog. Creating an experiment copies that list onto the experiment entry. A later edit of the template leaves existing experiments on the list they had at creation. On the experiment, **Record lot used** posts `/v1/reagent-uses` with `experiment_id`. A reagent absent from that experiment's list is **422** `reagent_not_in_template`. A reagent that is inactive at use time is **422** `reagent_inactive`, including when its lot is still usable and its id is still on the experiment's list. Entries capture process data; sample identity stays on Sample.
 
 ### Columns
 

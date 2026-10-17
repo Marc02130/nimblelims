@@ -237,3 +237,102 @@ def test_experiment_use_follows_template_allow_list(client: TestClient, test_adm
     assert body["experiment_id"] == experiment["id"]
     assert body["reagent_lot_id"] == good["id"]
     assert float(body["quantity_used"]) == 2
+
+
+def test_template_edit_leaves_existing_experiment_allow_list(client: TestClient, test_admin_user):
+    headers = _login(client, "admin", "adminpassword")
+    original = _reagent(client, headers)
+    added_later = _reagent(client, headers)
+    original_lot = _lot(client, headers, original["id"])
+    later_lot = _lot(client, headers, added_later["id"])
+    template = _template(client, headers, [original["id"]])
+    experiment = _experiment(client, headers, template["id"])
+
+    updated = client.patch(
+        f"/v1/experiment-templates/{template['id']}",
+        headers=headers,
+        json={
+            "template_definition": {
+                "experiment_name": "Reagent experiment",
+                "entries": [
+                    {
+                        "entry_type": "reagent",
+                        "name": "Reagents",
+                        "config": {"allowed_reagent_ids": [added_later["id"]]},
+                    }
+                ],
+            }
+        },
+    )
+    assert updated.status_code == 200, updated.text
+    assert updated.json()["template_definition"]["entries"][0]["config"]["allowed_reagent_ids"] == [
+        added_later["id"]
+    ]
+
+    entries = client.get(f"/v1/experiments/{experiment['id']}/entries", headers=headers)
+    assert entries.status_code == 200, entries.text
+    reagent_entries = [row for row in entries.json()["entries"] if row["entry_type"] == "reagent"]
+    assert reagent_entries[0]["config"]["allowed_reagent_ids"] == [original["id"]]
+
+    kept = client.post(
+        "/v1/reagent-uses",
+        headers=headers,
+        json={
+            "reagent_lot_id": original_lot["id"],
+            "experiment_id": experiment["id"],
+            "quantity_used": "1",
+        },
+    )
+    assert kept.status_code == 201, kept.text
+    refused = client.post(
+        "/v1/reagent-uses",
+        headers=headers,
+        json={
+            "reagent_lot_id": later_lot["id"],
+            "experiment_id": experiment["id"],
+            "quantity_used": "1",
+        },
+    )
+    assert refused.status_code == 422
+    assert refused.json()["detail"]["code"] == "reagent_not_in_template"
+
+
+def test_inactive_reagent_refused_on_experiment(client: TestClient, test_admin_user, db_session):
+    from models.flexible_experiment import LimsRun
+
+    headers = _login(client, "admin", "adminpassword")
+    reagent = _reagent(client, headers)
+    lot = _lot(client, headers, reagent["id"])
+    template = _template(client, headers, [reagent["id"]])
+    experiment = _experiment(client, headers, template["id"])
+    retired = client.patch(f"/v1/reagents/{reagent['id']}", headers=headers, json={"active": False})
+    assert retired.status_code == 200, retired.text
+    assert retired.json()["active"] is False
+    still_usable = client.get(f"/v1/reagent-lots/{lot['id']}", headers=headers)
+    assert still_usable.status_code == 200, still_usable.text
+    assert still_usable.json()["usable"] is True
+    assert still_usable.json()["active"] is True
+
+    refused = client.post(
+        "/v1/reagent-uses",
+        headers=headers,
+        json={
+            "reagent_lot_id": lot["id"],
+            "experiment_id": experiment["id"],
+            "quantity_used": "1",
+        },
+    )
+    assert refused.status_code == 422
+    assert refused.json()["detail"]["code"] == "reagent_inactive"
+    remaining = client.get(f"/v1/reagent-lots/{lot['id']}", headers=headers).json()["quantity_remaining"]
+    assert float(remaining) == 10
+
+    run = LimsRun(name=_name("Run"), created_by=test_admin_user.id)
+    db_session.add(run)
+    db_session.commit()
+    on_run = client.post(
+        "/v1/reagent-uses",
+        headers=headers,
+        json={"reagent_lot_id": lot["id"], "lims_run_id": str(run.id), "quantity_used": "1"},
+    )
+    assert on_run.status_code == 201, on_run.text
