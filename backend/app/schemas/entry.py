@@ -30,8 +30,9 @@ class EntryCreate(BaseModel):
     entry_type: str = Field(
         ...,
         description=(
-            "experiment_sample_data | experiment_data | predefined_action | display_table "
-            "(legacy: sample_data, experiment_detail)"
+            "experiment_sample_data | experiment_data | predefined_action | reagent | display_table "
+            "(legacy: sample_data, experiment_detail). "
+            "reagent stores allowed_reagent_ids; the lot is chosen at use."
         ),
     )
     name: str = Field(..., min_length=1, max_length=255)

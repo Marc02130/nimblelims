@@ -78,12 +78,86 @@ def _reject_template_accepted_sample_types(
             )
 
 
+REAGENT_ENTRY_INVALID = "reagent_entry_invalid"
+
+
+def _stamp_reagent_entries(entries: Any) -> Any:
+    """A Reagent entry is the reagents wrapper: one key, catalog ids in config."""
+    if not isinstance(entries, list):
+        return entries
+    out = []
+    for entry in entries:
+        if not isinstance(entry, dict):
+            out.append(entry)
+            continue
+        stamped = dict(entry)
+        if stamped.get("entry_type") == "reagent" or stamped.get("predefined_entry_key") == "reagents":
+            stamped["entry_type"] = "reagent"
+            stamped["predefined_entry_key"] = "reagents"
+        out.append(stamped)
+    return out
+
+
+def _reagent_entry_invalid(message: str) -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        detail={"code": REAGENT_ENTRY_INVALID, "message": message},
+    )
+
+
+def _reject_invalid_reagent_entries(
+    db: Session, template_definition: Optional[Dict[str, Any]]
+) -> None:
+    """A Reagent entry names one or more active catalog reagents."""
+    if template_definition is None:
+        return
+    entries = template_definition.get("entries") or []
+    if not isinstance(entries, list):
+        return
+    from models.reagent import Reagent
+
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        if entry.get("entry_type") != "reagent" and entry.get("predefined_entry_key") != "reagents":
+            continue
+        config = entry.get("config")
+        raw_ids = config.get("allowed_reagent_ids") if isinstance(config, dict) else None
+        if raw_ids is None or not isinstance(raw_ids, list) or len(raw_ids) == 0:
+            raise _reagent_entry_invalid(
+                "A Reagent entry must list at least one reagent from the catalog."
+            )
+        parsed: List[UUID] = []
+        for raw in raw_ids:
+            if raw is None:
+                raise _reagent_entry_invalid(
+                    "A Reagent entry lists a value that is not a reagent id."
+                )
+            try:
+                parsed.append(UUID(str(raw)))
+            except (ValueError, TypeError):
+                raise _reagent_entry_invalid(
+                    "A Reagent entry lists a value that is not a reagent id."
+                )
+        found = {
+            row.id: row
+            for row in db.query(Reagent).filter(Reagent.id.in_(parsed)).all()
+        }
+        for reagent_id in parsed:
+            row = found.get(reagent_id)
+            if row is None or row.active is not True:
+                raise _reagent_entry_invalid(
+                    "A Reagent entry lists a reagent that is not an active catalog reagent."
+                )
+
+
 def _with_aliquot_pair(template_definition: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
-    if not template_definition:
+    if template_definition is None:
         return template_definition
     _reject_template_accepted_sample_types(template_definition)
     td = dict(template_definition)
-    entries = ensure_aliquot_pair_in_entries(td.get("entries") or [])
+    entries = _stamp_reagent_entries(td.get("entries") or [])
+    entries = ensure_aliquot_pair_in_entries(entries)
     over = reject_if_wrapper_over_capacity(entries)
     if over:
         raise HTTPException(
@@ -348,12 +422,14 @@ class ExperimentService:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Experiment template with name '{data.name}' already exists",
             )
+        definition = _with_aliquot_pair(data.template_definition)
+        _reject_invalid_reagent_entries(self.db, definition)
         t = self.repo.create_template(
             name=data.name,
             description=data.description,
             active=True,
             lifecycle_type=data.lifecycle_type,
-            template_definition=_with_aliquot_pair(data.template_definition),
+            template_definition=definition,
             custom_attributes=data.custom_attributes,
             created_by=self._user_id(),
             modified_by=self._user_id(),
@@ -377,9 +453,9 @@ class ExperimentService:
         if data.active is not None:
             update_kwargs["active"] = data.active
         if data.template_definition is not None:
-            update_kwargs["template_definition"] = _with_aliquot_pair(
-                data.template_definition
-            )
+            definition = _with_aliquot_pair(data.template_definition)
+            _reject_invalid_reagent_entries(self.db, definition)
+            update_kwargs["template_definition"] = definition
         if data.custom_attributes is not None:
             update_kwargs["custom_attributes"] = data.custom_attributes
         if data.lifecycle_type is not None:

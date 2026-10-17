@@ -34,6 +34,13 @@ WRAPPER_CATALOG: Dict[str, Dict[str, Any]] = {
         "mint": False,
         "add_label": "Samples",
     },
+    "reagents": {
+        "keys": ("reagents",),
+        "cardinality": 1,
+        "atomic_pair": False,
+        "mint": False,
+        "add_label": "Reagents",
+    },
 }
 
 _KEY_TO_WRAPPER = {

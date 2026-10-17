@@ -9,6 +9,7 @@ Types of Entries (entry_type):
 - 'experiment_sample_data' : One row per sample in the experiment (process data + RO sample fields)
 - 'experiment_data'        : Purpose-specific table/form (plan lines, header); rows not auto from cohort
 - 'predefined_action'      : OOB behaviors (aliquot/pool execute, etc.)
+- 'reagent'                : Catalog reagents this experiment may use; the lot is chosen at use
 - 'display_table'          : Read-only structured display (legacy)
 - Legacy aliases (normalized on write): 'sample_data' → experiment_sample_data,
   'experiment_detail' → experiment_data
@@ -48,6 +49,7 @@ ENTRY_TYPES = frozenset(
         "experiment_sample_data",
         "experiment_data",
         "predefined_action",
+        "reagent",
         "display_table",
         # legacy
         "sample_data",
@@ -122,6 +124,7 @@ PREDEFINED_ENTRY_KEYS = frozenset(
         "samples",  # experiment_sample_data — cohort display
         "aliquot_pool_plan",  # experiment_data — plan lines + execute
         "aliquots_pools",  # experiment_sample_data — post-execute view
+        "reagents",  # reagent — catalog reagents allowed; lot chosen at use
     }
 )
 
@@ -163,6 +166,14 @@ PREDEFINED_ENTRY_DEFAULTS = {
             "sample_columns": ["client_sample_id", "sample_type"],
             "minted_sample_ids": [],
             "populated_after_execute": False,
+        },
+    },
+    "reagents": {
+        "entry_type": "reagent",
+        "name": "Reagents",
+        "description": "Catalog reagents this experiment may use; the lab tech picks the lot at use",
+        "config": {
+            "allowed_reagent_ids": [],
         },
     },
 }
