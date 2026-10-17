@@ -535,6 +535,10 @@ class TestAliquotsAPI:
         assert Decimal(left2.amount) == Decimal("40")
         dest_rows = db_session.query(Contents).filter(Contents.container_id == container.id).all()
         assert {row.sample_id for row in dest_rows} == {sample1.id, sample2.id}
+        # 5 of 10 mg/mL and 10 of 20 mg/mL is 15 in the shared unit, on every destination row.
+        for row in dest_rows:
+            assert abs(float(row.concentration) - 15.0) < 0.001
+            assert row.concentration_units == mg_ml_unit.id
     
     def test_get_aliquots_for_parent(self, db_session, auth_headers, sample_user):
         """Test getting aliquots for a parent sample"""
@@ -1324,6 +1328,9 @@ class TestAliquotAmountConservation:
         ) == Decimal("40")
         dest_rows = db_session.query(Contents).filter(Contents.container_id == dest.id).all()
         assert {row.sample_id for row in dest_rows} == {left["parent"].id, right["parent"].id}
+        for row in dest_rows:
+            assert abs(float(row.concentration) - 15.0) < 0.001
+            assert row.concentration_units == canonical_base_unit(same_scale).id
 
     def test_pool_converts_equal_mass_concentrations(self, db_session, auth_headers, sample_user):
         """ng/µL and µg/mL are the same scale. EU/mL is not."""
@@ -1417,6 +1424,13 @@ class TestAliquotAmountConservation:
         body = pooled.json()
         assert body["concentration_units"] == str(g_per_l.id)
         assert abs(body["average_concentration"] - 1.0) < 0.0001
+        db_session.expire_all()
+        mixed_rows = db_session.query(Contents).filter(Contents.container_id == dest.id).all()
+        assert len(mixed_rows) == 2
+        for row in mixed_rows:
+            assert abs(float(row.concentration) - 1.0) < 0.0001
+            assert row.concentration_units == g_per_l.id
+            assert row.concentration != Decimal("1000")
         db_session.expire_all()
         assert Decimal(
             db_session.query(Contents).filter(Contents.container_id == left["source"].id).one().amount
