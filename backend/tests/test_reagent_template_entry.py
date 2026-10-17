@@ -1,9 +1,13 @@
 """Reagent entry on an experiment template.
 
 The template names the default catalog reagents. Creating an experiment copies
-that list onto the entry. It is a prefill, not a limit: on a template experiment
-and on an ad hoc experiment the lab tech can record a lot of any active reagent.
-Inactive reagents, and expired or QC-rejected lots, stay refused.
+that list onto the entry. Those defaults, and reagents the tech adds later,
+are the experiment's saved list. POST /v1/reagent-uses with an experiment_id
+refuses a reagent that is not on that list (422 reagent_not_on_experiment)
+and leaves the lot quantity unchanged. The tech adds it first. Check order on
+an experiment use: the saved list, then reagent_inactive, then the lot rules.
+A LIMS-run-only use skips the list check. Inactive reagents, and expired or
+QC-rejected lots, stay refused.
 """
 import uuid
 from datetime import date, timedelta
@@ -167,14 +171,30 @@ def test_template_prefills_default_reagents(client: TestClient, test_admin_user)
     assert reagent_entries[0]["config"]["allowed_reagent_ids"] == [first["id"], second["id"]]
 
 
-def test_experiment_use_accepts_off_template_active_reagent(client: TestClient, test_admin_user):
+def test_experiment_use_accepts_off_template_active_reagent(
+    client: TestClient, test_admin_user, db_session
+):
+    """Same scenario as before, updated: an off-list experiment use is refused until the add.
+
+    The template default still records. A LIMS-run-only use of the off-list
+    lot still records. An off-list inactive reagent is reagent_not_on_experiment
+    because the list is checked before the active flag.
+    """
+    from models.flexible_experiment import LimsRun
+
     headers = _login(client, "admin", "adminpassword")
     allowed = _reagent(client, headers)
     other = _reagent(client, headers)
+    retired = _reagent(client, headers)
     good = _lot(client, headers, allowed["id"])
     expired = _lot(client, headers, allowed["id"])
     rejected = _lot(client, headers, allowed["id"])
     off_template = _lot(client, headers, other["id"])
+    retired_lot = _lot(client, headers, retired["id"])
+    retired_off = client.patch(
+        f"/v1/reagents/{retired['id']}", headers=headers, json={"active": False}
+    )
+    assert retired_off.status_code == 200, retired_off.text
 
     patched_exp = client.patch(
         f"/v1/reagent-lots/{expired['id']}",
@@ -202,6 +222,65 @@ def test_experiment_use_accepts_off_template_active_reagent(client: TestClient, 
     assert reagent_entries[0]["config"]["allowed_reagent_ids"] == [allowed["id"]]
     assert reagent_entries[0]["predefined_entry_key"] == "reagents"
 
+    refused = client.post(
+        "/v1/reagent-uses",
+        headers=headers,
+        json={
+            "reagent_lot_id": off_template["id"],
+            "experiment_id": experiment["id"],
+            "quantity_used": "1",
+        },
+    )
+    assert refused.status_code == 422
+    assert refused.json()["detail"]["code"] == "reagent_not_on_experiment"
+    off_remaining = client.get(f"/v1/reagent-lots/{off_template['id']}", headers=headers)
+    assert off_remaining.status_code == 200, off_remaining.text
+    assert float(off_remaining.json()["quantity_remaining"]) == 10
+    still_defaults = client.get(f"/v1/experiments/{experiment['id']}/entries", headers=headers)
+    assert still_defaults.status_code == 200, still_defaults.text
+    reagent_entries = [
+        row for row in still_defaults.json()["entries"] if row["entry_type"] == "reagent"
+    ]
+    assert reagent_entries[0]["config"]["allowed_reagent_ids"] == [allowed["id"]]
+
+    off_list_inactive = client.post(
+        "/v1/reagent-uses",
+        headers=headers,
+        json={
+            "reagent_lot_id": retired_lot["id"],
+            "experiment_id": experiment["id"],
+            "quantity_used": "1",
+        },
+    )
+    assert off_list_inactive.status_code == 422
+    assert off_list_inactive.json()["detail"]["code"] == "reagent_not_on_experiment"
+    retired_remaining = client.get(f"/v1/reagent-lots/{retired_lot['id']}", headers=headers)
+    assert float(retired_remaining.json()["quantity_remaining"]) == 10
+
+    run = LimsRun(name=_name("Run"), created_by=test_admin_user.id)
+    db_session.add(run)
+    db_session.commit()
+    on_run = client.post(
+        "/v1/reagent-uses",
+        headers=headers,
+        json={
+            "reagent_lot_id": off_template["id"],
+            "lims_run_id": str(run.id),
+            "quantity_used": "1",
+        },
+    )
+    assert on_run.status_code == 201, on_run.text
+    assert on_run.json()["lims_run_id"] == str(run.id)
+    off_remaining = client.get(f"/v1/reagent-lots/{off_template['id']}", headers=headers)
+    assert float(off_remaining.json()["quantity_remaining"]) == 9
+
+    added = client.post(
+        f"/v1/experiments/{experiment['id']}/reagents",
+        headers=headers,
+        json={"reagent_id": other["id"]},
+    )
+    assert added.status_code == 201, added.text
+    assert added.json()["allowed_reagent_ids"] == [allowed["id"], other["id"]]
     accepted = client.post(
         "/v1/reagent-uses",
         headers=headers,
@@ -215,14 +294,7 @@ def test_experiment_use_accepts_off_template_active_reagent(client: TestClient, 
     assert accepted.json()["experiment_id"] == experiment["id"]
     assert accepted.json()["reagent_lot_id"] == off_template["id"]
     off_remaining = client.get(f"/v1/reagent-lots/{off_template['id']}", headers=headers)
-    assert off_remaining.status_code == 200, off_remaining.text
-    assert float(off_remaining.json()["quantity_remaining"]) == 9
-    still_defaults = client.get(f"/v1/experiments/{experiment['id']}/entries", headers=headers)
-    assert still_defaults.status_code == 200, still_defaults.text
-    reagent_entries = [
-        row for row in still_defaults.json()["entries"] if row["entry_type"] == "reagent"
-    ]
-    assert reagent_entries[0]["config"]["allowed_reagent_ids"] == [allowed["id"]]
+    assert float(off_remaining.json()["quantity_remaining"]) == 8
 
     expired_use = client.post(
         "/v1/reagent-uses",
@@ -318,11 +390,11 @@ def test_template_edit_leaves_prefilled_reagents(client: TestClient, test_admin_
             "quantity_used": "1",
         },
     )
-    assert added.status_code == 201, added.text
-    assert added.json()["reagent_lot_id"] == later_lot["id"]
+    assert added.status_code == 422
+    assert added.json()["detail"]["code"] == "reagent_not_on_experiment"
     later_remaining = client.get(f"/v1/reagent-lots/{later_lot['id']}", headers=headers)
     assert later_remaining.status_code == 200, later_remaining.text
-    assert float(later_remaining.json()["quantity_remaining"]) == 9
+    assert float(later_remaining.json()["quantity_remaining"]) == 10
     unchanged = client.get(f"/v1/experiments/{experiment['id']}/entries", headers=headers)
     assert unchanged.status_code == 200, unchanged.text
     reagent_entries = [row for row in unchanged.json()["entries"] if row["entry_type"] == "reagent"]
@@ -428,6 +500,29 @@ def test_ad_hoc_experiment_records_active_reagent(client: TestClient, test_admin
     entries = client.get(f"/v1/experiments/{experiment['id']}/entries", headers=headers)
     assert entries.status_code == 200, entries.text
     assert entries.json()["entries"] == []
+
+    before_add = client.post(
+        "/v1/reagent-uses",
+        headers=headers,
+        json={
+            "reagent_lot_id": lot["id"],
+            "experiment_id": experiment["id"],
+            "quantity_used": "1",
+        },
+    )
+    assert before_add.status_code == 422
+    assert before_add.json()["detail"]["code"] == "reagent_not_on_experiment"
+    remaining = client.get(f"/v1/reagent-lots/{lot['id']}", headers=headers).json()["quantity_remaining"]
+    assert float(remaining) == 10
+    assert client.get(f"/v1/experiments/{experiment['id']}/entries", headers=headers).json()["entries"] == []
+
+    added = client.post(
+        f"/v1/experiments/{experiment['id']}/reagents",
+        headers=headers,
+        json={"reagent_id": reagent["id"]},
+    )
+    assert added.status_code == 201, added.text
+    assert added.json()["allowed_reagent_ids"] == [reagent["id"]]
 
     recorded = client.post(
         "/v1/reagent-uses",

@@ -421,6 +421,7 @@ def update_reagent_lot(
 # --------------------------------------------------------------------- uses ---
 
 REAGENT_INACTIVE = "reagent_inactive"
+REAGENT_NOT_ON_EXPERIMENT = "reagent_not_on_experiment"
 
 
 def _stored_reagent_ids(config: object) -> List[str]:
@@ -543,6 +544,36 @@ def save_experiment_reagent(
     )
 
 
+def _reagent_label(db: Session, reagent_id: UUID) -> str:
+    reagent = db.query(Reagent).filter(Reagent.id == reagent_id).first()
+    if reagent is not None and reagent.name:
+        return reagent.name
+    return "This reagent"
+
+
+def _refuse_reagent_not_on_experiment(db: Session, experiment_id: UUID, reagent_id: UUID) -> None:
+    """Refuse an experiment use until the reagent is on the saved list.
+
+    Template defaults copied onto the experiment count. No reagent entry means
+    the reagent is not on the list. This runs before the inactive check, so an
+    off-list reagent is ``reagent_not_on_experiment`` even when the catalog row
+    is inactive. A reagent already on the list that is later inactivated falls
+    through to ``reagent_inactive``. A LIMS-run-only use does not call this.
+    """
+    entry = _reagent_entry_for(db, experiment_id)
+    stored = _stored_reagent_ids(entry.config) if entry is not None else []
+    if str(reagent_id) in stored:
+        return
+    label = _reagent_label(db, reagent_id)
+    raise HTTPException(
+        status_code=422,
+        detail={
+            "code": REAGENT_NOT_ON_EXPERIMENT,
+            "message": f"{label} isn't on this experiment. Add it before recording a lot.",
+        },
+    )
+
+
 def _refuse_inactive_reagent(db: Session, reagent_id: UUID, action: str = "recorded") -> None:
     """A use or an add refuses an inactive catalog reagent."""
     reagent = db.query(Reagent).filter(Reagent.id == reagent_id).first()
@@ -630,9 +661,13 @@ def record_reagent_use(
     lot = db.query(ReagentLot).filter(ReagentLot.id == body.reagent_lot_id).first()
     if lot is None:
         raise HTTPException(status_code=404, detail="Reagent lot not found")
-    # A template's reagent list is a default, not a limit. Any active catalog
-    # reagent can be recorded on a template experiment or an ad hoc experiment.
-    # Every use, including a LIMS-run-only use, refuses an inactive catalog reagent.
+    # Check order when experiment_id is set: the saved list first
+    # (reagent_not_on_experiment), then the catalog active flag
+    # (reagent_inactive), then the lot rules below. Template defaults
+    # snapshotted onto the experiment count as on the list. A LIMS-run-only
+    # use skips the list check and still refuses an inactive catalog reagent.
+    if body.experiment_id is not None:
+        _refuse_reagent_not_on_experiment(db, body.experiment_id, lot.reagent_id)
     _refuse_inactive_reagent(db, lot.reagent_id)
     if lot.active is not True:
         raise HTTPException(status_code=422, detail=f"Lot {lot.lot_number} is inactive and can't be used")
