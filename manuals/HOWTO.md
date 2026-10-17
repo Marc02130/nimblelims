@@ -82,7 +82,7 @@ Handbook: [asked-for.md](asked-for.md).
 
 1. The sample must already be received (identity + vessels), Available for Testing, Tests count 0.
 2. Open Asked-for → **Record requested analysis**.
-3. Pick sample(s), pick an active analysis, TAT ≥ 1 (days). Save. Stay on `/asked-for`.
+3. Pick sample(s), pick an active analysis, TAT of 0 or greater (days). Save. Stay on `/asked-for`.
 
 One action may cover a set of samples (same analysis + TAT). The API still writes one row per sample. Status is `requested`. Cancel while `requested` is allowed; then you may record the same analysis again. Duplicate open `(sample, analysis)` → **409**.
 
@@ -96,7 +96,7 @@ Params: intent only. P1 sends `{}` OOB — do not type assay params here, and do
 |------|------|
 | Duplicate open `(sample, analysis)` | **409** (full rollback) |
 | No project access / client write / hidden sample | **403** (not 404) |
-| Discarded sample / inactive analysis / TAT &lt; 1 | **422** |
+| Discarded sample / inactive analysis / TAT &lt; 0 | **422** |
 | Receive with non-empty `analysis_ids` | **422** (receive freeze) |
 
 ---
@@ -123,7 +123,7 @@ Empty Route 0→**422** is **Tobias-signed Pass** on `8cfa2a9`. Signed AC-P2-9..
 4. **Route:** snapshots the ordered list, **zero Tests**, **zero** dest samples/containers. Dest type on a later aliquot/pool plan is catalog intent, **not** a Sample. Receive still mints identity + first vessel — that is **not** dest mint.
 5. **Scan:** a tech must **not** scan DNA before extract execute. There is no DNA tube until execute.
 
-**Setup:** an administrator configures **Routing map** at `/admin/routing-map`. Each row is TAT plus an ordered `process_definition[]`. There is **no admin-picked analysis or sample type**. A route **may list several LimsRun analyses**. Assignment when the ask is an **assay:** first process’s first Experiment/LimsRun allow-list **and** the asked-for analysis on **exactly one** LimsRun in that chain (assay step). **Quantified DNA ask (CEO Confirm 1–6 Rolf):** Qubit once; wear existing Qubit; **422** on 0 LimsRuns. Extract is typically an experiment (equipment) and is not counted; it **may** be a LimsRun later. Named asked-for LimsRun slot Closed (**OQ-WO-8 Closed**): eligibility is `asked.analysis_id` vs that slot, not contains-Qubit. Process QC (Qubit/Nanodrop) is a supporting LimsRun, **not** an asked-for. Parser is **not** on the map or the process step — chosen at import (instrument XOR CRO). Map save does **not** AND inbound type across later processes. It **does** 422 when the type emerging from process *x* is not accepted by process *x+1* (authoring, not a runnable extract→Qubit), **and** 422 if an **assay** asked-for analysis appears 0 or 2+ times among LimsRuns.
+**Setup:** an administrator configures **Routing map** at `/admin/routing-map`. Each row is TAT plus an ordered `process_definition[]`. TAT min and TAT max are integers of 0 or greater, and max is greater than or equal to min. A 0-day asked-for matches a map whose range includes 0. There is **no admin-picked analysis or sample type**. A route **may list several LimsRun analyses**. Assignment when the ask is an **assay:** first process’s first Experiment/LimsRun allow-list **and** the asked-for analysis on **exactly one** LimsRun in that chain (assay step). **Quantified DNA ask (CEO Confirm 1–6 Rolf):** Qubit once; wear existing Qubit; **422** on 0 LimsRuns. Extract is typically an experiment (equipment) and is not counted; it **may** be a LimsRun later. Named asked-for LimsRun slot Closed (**OQ-WO-8 Closed**): eligibility is `asked.analysis_id` vs that slot, not contains-Qubit. Process QC (Qubit/Nanodrop) is a supporting LimsRun, **not** an asked-for. Parser is **not** on the map or the process step — chosen at import (instrument XOR CRO). Map save does **not** AND inbound type across later processes. It **does** 422 when the type emerging from process *x* is not accepted by process *x+1* (authoring, not a runnable extract→Qubit), **and** 422 if an **assay** asked-for analysis appears 0 or 2+ times among LimsRuns.
 
 Map save returns **409** when another active row has an **overlapping TAT range**, an **overlapping first-step allow-list**, **and** overlapping LIMS Run analyses. Extract-first and Qubit-first for the same TAT are legal at save when types or analyses differ. Overlapping TAT alone is not a 409.
 
