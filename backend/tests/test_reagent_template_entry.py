@@ -335,4 +335,7 @@ def test_inactive_reagent_refused_on_experiment(client: TestClient, test_admin_u
         headers=headers,
         json={"reagent_lot_id": lot["id"], "lims_run_id": str(run.id), "quantity_used": "1"},
     )
-    assert on_run.status_code == 201, on_run.text
+    assert on_run.status_code == 422
+    assert on_run.json()["detail"]["code"] == "reagent_inactive"
+    remaining = client.get(f"/v1/reagent-lots/{lot['id']}", headers=headers).json()["quantity_remaining"]
+    assert float(remaining) == 10

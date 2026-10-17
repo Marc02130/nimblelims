@@ -464,8 +464,8 @@ def _refuse_reagent_outside_template(db: Session, experiment_id: UUID, reagent_i
         )
 
 
-def _refuse_inactive_reagent_on_experiment(db: Session, reagent_id: UUID) -> None:
-    """The experiment checks the catalog reagent's active flag at use time."""
+def _refuse_inactive_reagent(db: Session, reagent_id: UUID) -> None:
+    """A use on a run or an experiment refuses an inactive catalog reagent."""
     reagent = db.query(Reagent).filter(Reagent.id == reagent_id).first()
     if reagent is None or reagent.active is not True:
         label = reagent.name if reagent is not None and reagent.name else "This reagent"
@@ -473,7 +473,7 @@ def _refuse_inactive_reagent_on_experiment(db: Session, reagent_id: UUID) -> Non
             status_code=422,
             detail={
                 "code": REAGENT_INACTIVE,
-                "message": f"{label} is inactive and can't be recorded on the experiment.",
+                "message": f"{label} is inactive and can't be recorded.",
             },
         )
 
@@ -526,12 +526,11 @@ def record_reagent_use(
     lot = db.query(ReagentLot).filter(ReagentLot.id == body.reagent_lot_id).first()
     if lot is None:
         raise HTTPException(status_code=404, detail="Reagent lot not found")
-    # experiment_id uses the allow-list copied at experiment creation, then the
-    # catalog reagent's current active flag. A LIMS-run-only use (experiment_id
-    # is None) keeps the lot rules and accepts a usable lot of an inactive reagent.
+    # experiment_id uses the allow-list copied at experiment creation.
+    # Every use, including a LIMS-run-only use, refuses an inactive catalog reagent.
     if body.experiment_id is not None:
         _refuse_reagent_outside_template(db, body.experiment_id, lot.reagent_id)
-        _refuse_inactive_reagent_on_experiment(db, lot.reagent_id)
+    _refuse_inactive_reagent(db, lot.reagent_id)
     if lot.active is not True:
         raise HTTPException(status_code=422, detail=f"Lot {lot.lot_number} is inactive and can't be used")
     used_on = body.used_on or date.today()
