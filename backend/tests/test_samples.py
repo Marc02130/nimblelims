@@ -370,6 +370,31 @@ class TestSampleAccessioning:
         data = response.json()
         assert data["name"] == "SAMPLE-007"
         assert data["description"] == "Test accession sample"
+
+    def test_accession_duplicate_sample_name_is_409(self, client: TestClient, test_admin_user, test_data):
+        """A duplicate accession name is a conflict, not an internal error."""
+        token = client.post(
+            "/auth/login",
+            json={"username": "admin", "password": "adminpassword"},
+        ).json()["access_token"]
+        headers = {"Authorization": f"Bearer {token}"}
+        accession_data = {
+            "name": f"SAMPLE-DUP-{uuid4().hex[:8]}",
+            "description": "Duplicate accession",
+            "due_date": (datetime.utcnow() + timedelta(days=7)).isoformat(),
+            "received_date": datetime.utcnow().isoformat(),
+            "sample_type": str(test_data["sample_type"].id),
+            "matrix": str(test_data["matrix"].id),
+            "temperature": 0,
+            "client_id": str(test_data["client"].id),
+            "project_id": str(test_data["project"].id),
+            "assigned_tests": [],
+        }
+        first = client.post("/samples/accession", json=accession_data, headers=headers)
+        assert first.status_code == 200, first.text
+        again = client.post("/samples/accession", json=accession_data, headers=headers)
+        assert again.status_code == 409, again.text
+        assert "already exists" in again.json()["detail"]
     
     def test_accession_sample_with_tests(self, client: TestClient, test_admin_user, test_data, db_session: Session):
         """Test sample accessioning with test assignment"""
