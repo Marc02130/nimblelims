@@ -2,7 +2,7 @@
 
 **Stem:** `reagent-tracking`
 **Bars:** RT-1..RT-10, Tobias provisional bars (2026-10-14). Promote to final when Tobias signs off.
-**UI:** Admin → **Reagents** (`/admin/reagents`) · LIMS run detail → **Reagents used** panel
+**UI:** Admin → **Reagents** (`/admin/reagents`) · LIMS run detail → **Reagents used** panel · Experiment template **Type → Reagent** · experiment entry lot picker
 **API:** `/v1/vendors`, `/v1/reagents`, `/v1/reagent-vendors`, `/v1/reagent-lots`, `/v1/reagent-uses` (see `manuals/api-endpoints.md`)
 **Actors:** `config-editor` (config:edit), `lab-tech` (experiment:manage), `client` (client user), `admin`
 **Env:** local docker compose (`lims-*`), http://localhost:3000 + :8000
@@ -46,6 +46,7 @@ Lots on that reagent (quantity 100 mL unless stated otherwise; use dates as of t
 | RT-8 | No hard delete | DELETE on each of the 5 resources; retire then reactivate a vendor | DELETE → 405 (or 404), rows remain; retire/reactivate via `active` → 200 |
 | RT-9 | Privileges | `lab-tech` POST vendor / GET reagents; `client` GET reagents, lots, uses, POST use, POST vendor; `config-editor` POST use | lab-tech: vendor 403, read 200. client: reads return 0 rows, writes 403. config-editor use 403 (needs experiment:manage) |
 | RT-10 | Audit | SQL: `created_by`/`modified_by` usernames on the RT-4 use, L1 and the vendor | use = lab-tech, lab-tech. Vendor = config-editor, config-editor. Lot: created_by = config-editor, **modified_by = lab-tech** (recording or voiding a use draws down the lot and stamps the lab tech as its last modifier; correct, not a fail). created_at/modified_at set. *(0a90f6f: Pass by SQL. The script's own query had a bug; use a join on users.id.)* |
+| RT-11 | Template allow-list | As `config-editor`, create two catalog reagents (A allowed, B off-template), each with a released lot. On **Experiment templates**, add a **Reagent** entry (Type dropdown or **+ Reagents**) and select reagent A. Create an experiment from that template. As `lab-tech`, on the experiment entry record a lot of A. POST a use of B with that `experiment_id`. PATCH A's lot to expired and POST again; create a released-then-rejected lot of A and POST it. Save a Reagent entry with an empty allow-list. | The Type list includes **Reagent**. Create stores `entry_type=reagent`, `predefined_entry_key=reagents`, and `config.allowed_reagent_ids` = [A]. The experiment entry offers lots of A. The valid use is **201** and `experiment_id` is the experiment. B is **422** `reagent_not_in_template`. The expired lot and the rejected lot are **422**. An empty, unknown, or inactive allow-list is **422** `reagent_entry_invalid`. A LIMS-run use of B (no `experiment_id`) stays **201**. |
 
 ---
 

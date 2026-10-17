@@ -52,11 +52,12 @@ It is **not** the primary home for large-scale result data analysis or dose-resp
 |------|-----------------|--------|------|
 | **`experiment_sample_data`** | Per-sample process data | **Table** | One row per sample in the experiment cohort |
 | **`experiment_data`** | Experiment-level / purpose tables (incl. **Experiment Header**) | **Table only** (no form layout) | Multi-row free rows (`row_key`); user adds rows |
-| Legacy/runtime compatibility | `sample_data`, `experiment_detail`, `predefined_action`, `display_table` | — | Do not use as new product kinds |
+| **`reagent`** | Catalog reagents this experiment may use | Lot picker | The template names the reagents; the lab tech picks the lot at use |
+| Legacy/runtime compatibility | `sample_data`, `experiment_detail`, `predefined_action`, `display_table` | — | Kept for existing templates |
 
-**Experiment Header** = experiment data with `predefined_entry_key = experiment_header` (same kind as other experiment data tables; not a separate “Overview” product type).
+**Experiment Header** = experiment data with `predefined_entry_key = experiment_header` (same kind as other experiment data tables).
 
-There are **two product kinds only**. Built-in behavior is a **predefined wrapper** (`predefined_entry_key`) on one of those kinds, not a third kind. Entries capture process data; they are not copies of Sample.
+Sample and experiment data are the two table kinds. **Reagent** is its own entry type (`predefined_entry_key = reagents`, wrapper `reagents`, cardinality 1). The author stores `config.allowed_reagent_ids` from the Admin reagent catalog. On the experiment, **Record lot used** posts `/v1/reagent-uses` with `experiment_id`. A reagent absent from that allow-list is **422** `reagent_not_in_template`. Entries capture process data; sample identity stays on Sample.
 
 ### Columns
 
@@ -80,7 +81,7 @@ There are **two product kinds only**. Built-in behavior is a **predefined wrappe
 
 - `EntryCapturePanel` on experiment detail (Entries).
 - **Instantiate from template** if entries not yet created (also auto on create when template has `entries`).
-- Sample data: table by cohort. Experiment data: multi-row table + Add/Delete row. Aliquot: `AliquotPlanEditor`.
+- Sample data: table by cohort. Experiment data: multi-row table + Add/Delete row. Aliquot: `AliquotPlanEditor`. Reagent: lot picker limited to `config.allowed_reagent_ids`.
 
 ### Aliquot / pool destination sample type
 
