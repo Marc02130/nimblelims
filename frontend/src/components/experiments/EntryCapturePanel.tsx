@@ -698,7 +698,11 @@ const EntryCapturePanel: React.FC<EntryCapturePanelProps> = ({
             Or <strong>Add aliquot/pool</strong> to create the plan and dest pair together. Add any
             active reagent below, then record its lot.
           </Alert>
-          <ReagentUsePanel experimentId={experimentId} defaultReagentIds={[]} />
+          <ReagentUsePanel
+            experimentId={experimentId}
+            defaultReagentIds={[]}
+            onReagentsChanged={load}
+          />
         </>
       ) : (
         entries.map((entry) => {
@@ -774,6 +778,7 @@ const EntryCapturePanel: React.FC<EntryCapturePanelProps> = ({
                   <ReagentUsePanel
                     experimentId={experimentId}
                     defaultReagentIds={defaultReagentIds}
+                    onReagentsChanged={load}
                   />
                 ) : isSampleScoped(entry.entry_type) ? (
                   sampleIds.length === 0 ? (
@@ -977,7 +982,13 @@ const EntryCapturePanel: React.FC<EntryCapturePanelProps> = ({
       {entries.length > 0 &&
         !entries.some(
           (entry) => entry.entry_type === 'reagent' || entry.predefined_entry_key === 'reagents',
-        ) && <ReagentUsePanel experimentId={experimentId} defaultReagentIds={[]} />}
+        ) && (
+          <ReagentUsePanel
+            experimentId={experimentId}
+            defaultReagentIds={[]}
+            onReagentsChanged={load}
+          />
+        )}
     </Box>
   );
 };

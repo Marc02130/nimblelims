@@ -329,6 +329,90 @@ def test_template_edit_leaves_prefilled_reagents(client: TestClient, test_admin_
     assert reagent_entries[0]["config"]["allowed_reagent_ids"] == [original["id"]]
 
 
+def _reagent_ids_on(client, headers, experiment_id):
+    entries = client.get(f"/v1/experiments/{experiment_id}/entries", headers=headers)
+    assert entries.status_code == 200, entries.text
+    reagent_entries = [row for row in entries.json()["entries"] if row["entry_type"] == "reagent"]
+    return reagent_entries
+
+
+def test_added_reagent_is_saved_and_reloads_on_template_and_ad_hoc(client: TestClient, test_admin_user):
+    headers = _login(client, "admin", "adminpassword")
+    default = _reagent(client, headers)
+    extra = _reagent(client, headers)
+    inactive = _reagent(client, headers)
+    retired = client.patch(f"/v1/reagents/{inactive['id']}", headers=headers, json={"active": False})
+    assert retired.status_code == 200, retired.text
+
+    template = _template(client, headers, [default["id"]])
+    experiment = _experiment(client, headers, template["id"])
+    added = client.post(
+        f"/v1/experiments/{experiment['id']}/reagents",
+        headers=headers,
+        json={"reagent_id": extra["id"]},
+    )
+    assert added.status_code == 201, added.text
+    assert added.json()["allowed_reagent_ids"] == [default["id"], extra["id"]]
+    reloaded = _reagent_ids_on(client, headers, experiment["id"])
+    assert len(reloaded) == 1
+    assert reloaded[0]["config"]["allowed_reagent_ids"] == [default["id"], extra["id"]]
+
+    duplicate = client.post(
+        f"/v1/experiments/{experiment['id']}/reagents",
+        headers=headers,
+        json={"reagent_id": extra["id"]},
+    )
+    assert duplicate.status_code == 200, duplicate.text
+    assert duplicate.json()["allowed_reagent_ids"] == [default["id"], extra["id"]]
+    reloaded = _reagent_ids_on(client, headers, experiment["id"])
+    assert reloaded[0]["config"]["allowed_reagent_ids"] == [default["id"], extra["id"]]
+
+    refused = client.post(
+        f"/v1/experiments/{experiment['id']}/reagents",
+        headers=headers,
+        json={"reagent_id": inactive["id"]},
+    )
+    assert refused.status_code == 422
+    assert refused.json()["detail"]["code"] == "reagent_inactive"
+    reloaded = _reagent_ids_on(client, headers, experiment["id"])
+    assert reloaded[0]["config"]["allowed_reagent_ids"] == [default["id"], extra["id"]]
+
+    ad_hoc = client.post("/v1/experiments", headers=headers, json={"name": _name("Ad hoc")})
+    assert ad_hoc.status_code == 201, ad_hoc.text
+    ad_hoc_id = ad_hoc.json()["id"]
+    assert _reagent_ids_on(client, headers, ad_hoc_id) == []
+    created = client.post(
+        f"/v1/experiments/{ad_hoc_id}/reagents",
+        headers=headers,
+        json={"reagent_id": default["id"]},
+    )
+    assert created.status_code == 201, created.text
+    assert created.json()["allowed_reagent_ids"] == [default["id"]]
+    reloaded = _reagent_ids_on(client, headers, ad_hoc_id)
+    assert len(reloaded) == 1
+    assert reloaded[0]["predefined_entry_key"] == "reagents"
+    assert reloaded[0]["config"]["allowed_reagent_ids"] == [default["id"]]
+
+    again = client.post(
+        f"/v1/experiments/{ad_hoc_id}/reagents",
+        headers=headers,
+        json={"reagent_id": default["id"]},
+    )
+    assert again.status_code == 200, again.text
+    assert again.json()["allowed_reagent_ids"] == [default["id"]]
+    assert len(_reagent_ids_on(client, headers, ad_hoc_id)) == 1
+
+    blocked = client.post(
+        f"/v1/experiments/{ad_hoc_id}/reagents",
+        headers=headers,
+        json={"reagent_id": inactive["id"]},
+    )
+    assert blocked.status_code == 422
+    assert blocked.json()["detail"]["code"] == "reagent_inactive"
+    reloaded = _reagent_ids_on(client, headers, ad_hoc_id)
+    assert reloaded[0]["config"]["allowed_reagent_ids"] == [default["id"]]
+
+
 def test_ad_hoc_experiment_records_active_reagent(client: TestClient, test_admin_user):
     headers = _login(client, "admin", "adminpassword")
     reagent = _reagent(client, headers)

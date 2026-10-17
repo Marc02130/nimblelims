@@ -49,6 +49,11 @@ interface LotOption {
   effective_expiration_date?: string | null;
   quantity_remaining?: string | number | null;
   unit?: string | null;
+  usable?: boolean;
+  active?: boolean;
+  released?: boolean;
+  expired?: boolean;
+  qc_status?: string | null;
 }
 
 interface CatalogReagent {
@@ -61,11 +66,84 @@ interface Props {
   experimentId?: string;
   analysisId?: string | null;
   /**
-   * Default reagents copied from the template. Undefined on a LIMS run, which
-   * offers every usable lot. An empty list is an experiment with no defaults.
+   * Reagents saved on the experiment. Undefined on a LIMS run, which offers
+   * every usable lot. An empty list is an experiment with nothing saved yet.
    */
   defaultReagentIds?: string[];
+  /** Reload the experiment after a reagent is saved, so a new entry appears. */
+  onReagentsChanged?: () => void;
 }
+
+const lotIsUsable = (lot: LotOption) => {
+  if (lot.usable === false || lot.active === false || lot.released === false) return false;
+  if (lot.expired === true || lot.qc_status === 'rejected') return false;
+  return true;
+};
+
+const lotLabel = (lot: LotOption) =>
+  `${lot.lot_number}${lot.effective_expiration_date ? ` · exp ${lot.effective_expiration_date}` : ''}${
+    lot.quantity_remaining != null ? ` · ${lot.quantity_remaining} ${lot.unit || ''} left` : ''
+  }`;
+
+const ReagentLotPicker: React.FC<{
+  reagentId: string;
+  reagentName: string;
+  lots: LotOption[];
+  canRecord: boolean;
+  saving: boolean;
+  onRecord: (lotId: string, quantity: string) => Promise<void>;
+}> = ({ reagentId, reagentName, lots, canRecord, saving, onRecord }) => {
+  const [lotId, setLotId] = useState('');
+  const [quantity, setQuantity] = useState('');
+  const label = `Lot for ${reagentName}`;
+  return (
+    <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1, mb: 1, flexWrap: 'wrap' }}>
+      <Typography sx={{ minWidth: 160, pt: 1 }}>{reagentName}</Typography>
+      <FormControl size="small" sx={{ minWidth: 240 }}>
+        <InputLabel id={`lot-for-${reagentId}`}>{label}</InputLabel>
+        <Select
+          labelId={`lot-for-${reagentId}`}
+          label={label}
+          value={lotId}
+          onChange={(event) => setLotId(String(event.target.value))}
+        >
+          {lots.map((lot) => (
+            <MenuItem key={lot.id} value={lot.id}>
+              {lotLabel(lot)}
+            </MenuItem>
+          ))}
+        </Select>
+      </FormControl>
+      {lots.length === 0 && (
+        <Typography variant="body2" color="text.secondary" sx={{ pt: 1 }}>
+          No usable lots for {reagentName}.
+        </Typography>
+      )}
+      {canRecord && (
+        <>
+          <TextField
+            label={`Quantity for ${reagentName}`}
+            size="small"
+            type="number"
+            required
+            value={quantity}
+            onChange={(event) => setQuantity(event.target.value)}
+            sx={{ width: 160 }}
+          />
+          <Button
+            variant="contained"
+            size="small"
+            sx={{ mt: 0.5 }}
+            disabled={saving || !lotId || quantity === ''}
+            onClick={() => onRecord(lotId, quantity)}
+          >
+            Record
+          </Button>
+        </>
+      )}
+    </Box>
+  );
+};
 
 const errorText = (err: any, fallback: string) => {
   const detail = err?.response?.data?.detail;
@@ -81,6 +159,7 @@ const ReagentUsePanel: React.FC<Props> = ({
   experimentId,
   analysisId,
   defaultReagentIds,
+  onReagentsChanged,
 }) => {
   const { hasPermission } = useUser();
   const canRecord = hasPermission('experiment:manage');
@@ -146,9 +225,34 @@ const ReagentUsePanel: React.FC<Props> = ({
     };
   }, [experimentId]);
 
-  const addReagent = (reagentId: string) => {
-    if (!reagentId || chosenIds.includes(reagentId)) return;
-    setChosenIds((prev) => (prev.includes(reagentId) ? prev : [...prev, reagentId]));
+  const loadLots = useCallback(async () => {
+    const loaded = ((await apiService.getReagentLots({ usable: true })) || []) as LotOption[];
+    setLots(loaded.filter(lotIsUsable));
+  }, []);
+
+  useEffect(() => {
+    if (!experimentId) return;
+    let cancelled = false;
+    loadLots().catch((err) => {
+      if (!cancelled) setError(errorText(err, 'Failed to load reagent lots'));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [experimentId, loadLots]);
+
+  const addReagent = async (reagentId: string) => {
+    if (!experimentId || !reagentId || reagentId === '__none') return;
+    try {
+      const saved = await apiService.addExperimentReagent(experimentId, reagentId);
+      const ids = Array.isArray(saved?.allowed_reagent_ids)
+        ? saved.allowed_reagent_ids.map((id: unknown) => String(id))
+        : chosenIds;
+      setChosenIds(ids);
+      if (onReagentsChanged) await onReagentsChanged();
+    } catch (err) {
+      setError(errorText(err, 'Could not add the reagent'));
+    }
   };
 
   const openDialog = async () => {
@@ -159,13 +263,7 @@ const ReagentUsePanel: React.FC<Props> = ({
     setNote('');
     setOpen(true);
     try {
-      const loaded = ((await apiService.getReagentLots({ usable: true })) || []) as LotOption[];
-      if (onExperiment) {
-        const allow = new Set(chosenIds);
-        setLots(loaded.filter((lot) => lot.reagent_id != null && allow.has(lot.reagent_id)));
-      } else {
-        setLots(loaded);
-      }
+      await loadLots();
     } catch (err) {
       setError(errorText(err, 'Failed to load reagent lots'));
     }
@@ -185,6 +283,13 @@ const ReagentUsePanel: React.FC<Props> = ({
       });
       setOpen(false);
       await load();
+      if (limsRunId) {
+        try {
+          await loadLots();
+        } catch {
+          // The use was recorded; the lot list refreshes on the next open.
+        }
+      }
     } catch (err) {
       setError(errorText(err, 'Could not record the reagent use'));
     } finally {
@@ -202,54 +307,86 @@ const ReagentUsePanel: React.FC<Props> = ({
   };
 
   const addable = catalog.filter((row) => !chosenIds.includes(row.id));
-  const chosenNames = chosenIds.map((id) => catalog.find((row) => row.id === id)?.name || id);
+  const reagentName = (id: string) => catalog.find((row) => row.id === id)?.name || id;
+
+  const recordForReagent = async (lotIdForReagent: string, quantityForReagent: string) => {
+    setSaving(true);
+    setError(null);
+    try {
+      await apiService.recordReagentUse({
+        reagent_lot_id: lotIdForReagent,
+        ...target,
+        analysis_id: analysisId || undefined,
+        quantity_used: quantityForReagent,
+        unit: lots.find((lot) => lot.id === lotIdForReagent)?.unit || undefined,
+      });
+      await load();
+      await loadLots();
+    } catch (err) {
+      setError(errorText(err, 'Could not record the reagent use'));
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <Card sx={{ mt: 2 }}>
       <CardContent>
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1, gap: 1 }}>
           <Typography variant="h6">Reagents used</Typography>
-          {canRecord && (
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              {onExperiment && (
-                <FormControl size="small" sx={{ minWidth: 220 }}>
-                  <InputLabel id="add-reagent-label">Add reagent</InputLabel>
-                  <Select
-                    labelId="add-reagent-label"
-                    label="Add reagent"
-                    value=""
-                    onChange={(event) => addReagent(String(event.target.value || ''))}
-                  >
-                    <MenuItem value="" sx={{ display: 'none' }} />
-                    {addable.length === 0 ? (
-                      <MenuItem value="__none" disabled>
-                        {catalog.length === 0
-                          ? 'No active reagents in the catalog'
-                          : 'Every active reagent is already on this experiment'}
-                      </MenuItem>
-                    ) : (
-                      addable.map((row) => (
-                        <MenuItem key={row.id} value={row.id}>
-                          {row.name}
-                        </MenuItem>
-                      ))
-                    )}
-                  </Select>
-                </FormControl>
-              )}
-              <Button variant="outlined" size="small" onClick={openDialog}>
-                Record lot used
-              </Button>
-            </Box>
+          {canRecord && onExperiment && (
+            <FormControl size="small" sx={{ minWidth: 220 }}>
+              <InputLabel id="add-reagent-label">Add reagent</InputLabel>
+              <Select
+                labelId="add-reagent-label"
+                label="Add reagent"
+                value=""
+                onChange={(event) => addReagent(String(event.target.value || ''))}
+              >
+                <MenuItem value="" sx={{ display: 'none' }} />
+                {addable.length === 0 ? (
+                  <MenuItem value="__none" disabled>
+                    {catalog.length === 0
+                      ? 'No active reagents in the catalog'
+                      : 'Every active reagent is already on this experiment'}
+                  </MenuItem>
+                ) : (
+                  addable.map((row) => (
+                    <MenuItem key={row.id} value={row.id}>
+                      {row.name}
+                    </MenuItem>
+                  ))
+                )}
+              </Select>
+            </FormControl>
+          )}
+          {canRecord && !onExperiment && (
+            <Button variant="outlined" size="small" onClick={openDialog}>
+              Record lot used
+            </Button>
           )}
         </Box>
-        {onExperiment && (
+        {onExperiment && chosenIds.length === 0 && (
           <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-            {chosenIds.length === 0
-              ? 'No reagents yet. Add a reagent, then record its lot.'
-              : `On this experiment: ${chosenNames.join(', ')}`}
+            No reagents yet. Add a reagent, then record its lot.
           </Typography>
         )}
+        {onExperiment &&
+          chosenIds.map((reagentId) => {
+            const name = reagentName(reagentId);
+            const mine = lots.filter((lot) => lot.reagent_id === reagentId && lotIsUsable(lot));
+            return (
+              <ReagentLotPicker
+                key={reagentId}
+                reagentId={reagentId}
+                reagentName={name}
+                lots={mine}
+                canRecord={canRecord}
+                saving={saving}
+                onRecord={recordForReagent}
+              />
+            );
+          })}
         {error && !open && (
           <Alert severity="error" sx={{ mb: 1 }} onClose={() => setError(null)}>
             {error}

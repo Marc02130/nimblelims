@@ -27,6 +27,7 @@ jest.mock('../services/apiService', () => ({
     getReagentUses: jest.fn(),
     getReagentLots: jest.fn(),
     recordReagentUse: jest.fn(),
+    addExperimentReagent: jest.fn(),
   },
 }));
 
@@ -135,23 +136,37 @@ describe('Experiment reagent capture', () => {
     values: [],
   };
 
-  test('offers lots of the default reagents and records the use on the experiment', async () => {
+  const lots = [
+    { id: 'l1', reagent_id: 'r1', reagent_name: 'Qubit dsDNA HS', lot_number: 'L-OK', unit: 'mL', usable: true },
+    {
+      id: 'l1-old',
+      reagent_id: 'r1',
+      reagent_name: 'Qubit dsDNA HS',
+      lot_number: 'L-OLD',
+      unit: 'mL',
+      usable: false,
+      expired: true,
+      qc_status: 'rejected',
+      active: false,
+      released: false,
+    },
+    { id: 'l2', reagent_id: 'r2', reagent_name: 'Ethanol', lot_number: 'L-OFF', unit: 'mL', usable: true },
+  ];
+
+  test('offers lots of the saved reagent and records the use on the experiment', async () => {
     api.getExperimentEntries.mockResolvedValue({ entries: [reagentEntry] });
-    api.getReagentLots.mockResolvedValue([
-      { id: 'l1', reagent_id: 'r1', reagent_name: 'Qubit dsDNA HS', lot_number: 'L-OK', unit: 'mL' },
-      { id: 'l2', reagent_id: 'r2', reagent_name: 'Ethanol', lot_number: 'L-OFF', unit: 'mL' },
-    ]);
+    api.getReagentLots.mockResolvedValue(lots);
     wrap(<EntryCapturePanel experimentId="exp1" />);
 
     expect(await screen.findByText('Reagents')).toBeInTheDocument();
     expect(screen.getByText('Reagent')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: /Record lot used/i }));
     await waitFor(() => expect(api.getReagentLots).toHaveBeenCalledWith({ usable: true }));
-    fireEvent.mouseDown(screen.getByLabelText('Lot'));
+    fireEvent.mouseDown(await screen.findByLabelText('Lot for Qubit dsDNA HS'));
     expect(await screen.findByRole('option', { name: /L-OK/ })).toBeInTheDocument();
     expect(screen.queryByRole('option', { name: /L-OFF/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: /L-OLD/ })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('option', { name: /L-OK/ }));
-    fireEvent.change(screen.getByLabelText(/Quantity used/), { target: { value: '2' } });
+    fireEvent.change(screen.getByLabelText(/Quantity for Qubit dsDNA HS/), { target: { value: '2' } });
     fireEvent.click(screen.getByRole('button', { name: 'Record' }));
     await waitFor(() => expect(api.recordReagentUse).toHaveBeenCalled());
     expect(api.recordReagentUse.mock.calls[0][0]).toMatchObject({
@@ -162,23 +177,50 @@ describe('Experiment reagent capture', () => {
     });
   });
 
-  test('adds a reagent that was not prefilled and records its lot', async () => {
-    api.getExperimentEntries.mockResolvedValue({ entries: [reagentEntry] });
-    api.getReagentLots.mockResolvedValue([
-      { id: 'l1', reagent_id: 'r1', reagent_name: 'Qubit dsDNA HS', lot_number: 'L-OK', unit: 'mL' },
-      { id: 'l2', reagent_id: 'r2', reagent_name: 'Ethanol', lot_number: 'L-OFF', unit: 'mL' },
-    ]);
+  test("each reagent's lot picker lists only that reagent's usable lots", async () => {
+    api.getExperimentEntries.mockResolvedValue({
+      entries: [
+        {
+          ...reagentEntry,
+          config: { allowed_reagent_ids: ['r1', 'r2'], status: 'draft' },
+        },
+      ],
+    });
+    api.getReagentLots.mockResolvedValue(lots);
     wrap(<EntryCapturePanel experimentId="exp1" />);
-    expect(await screen.findByText(/On this experiment: Qubit dsDNA HS/)).toBeInTheDocument();
-    fireEvent.mouseDown(screen.getByLabelText('Add reagent'));
+
+    fireEvent.mouseDown(await screen.findByLabelText('Lot for Qubit dsDNA HS'));
+    expect(await screen.findByRole('option', { name: /L-OK/ })).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: /L-OFF/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: /L-OLD/ })).not.toBeInTheDocument();
+    fireEvent.keyDown(screen.getByRole('listbox'), { key: 'Escape' });
+
+    fireEvent.mouseDown(screen.getByLabelText('Lot for Ethanol'));
+    expect(await screen.findByRole('option', { name: /L-OFF/ })).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: /L-OK/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: /L-OLD/ })).not.toBeInTheDocument();
+  });
+
+  test('adds a reagent through the API and then records its own lot', async () => {
+    let entries = [reagentEntry];
+    api.getExperimentEntries.mockImplementation(async () => ({ entries }));
+    api.getReagentLots.mockResolvedValue(lots);
+    api.addExperimentReagent.mockImplementation(async (_experimentId: string, reagentId: string) => {
+      const ids = ['r1', reagentId];
+      entries = [{ ...reagentEntry, config: { allowed_reagent_ids: ids, status: 'draft' } }];
+      return { experiment_id: 'exp1', entry_id: 'e1', allowed_reagent_ids: ids };
+    });
+    wrap(<EntryCapturePanel experimentId="exp1" />);
+    fireEvent.mouseDown(await screen.findByLabelText('Add reagent'));
     fireEvent.click(await screen.findByRole('option', { name: 'Ethanol' }));
-    expect(screen.getByText(/On this experiment: Qubit dsDNA HS, Ethanol/)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: /Record lot used/i }));
-    await waitFor(() => expect(api.getReagentLots).toHaveBeenCalledWith({ usable: true }));
-    fireEvent.mouseDown(screen.getByLabelText('Lot'));
-    fireEvent.click(await screen.findByRole('option', { name: /L-OFF/ }));
-    fireEvent.change(screen.getByLabelText(/Quantity used/), { target: { value: '1' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Record' }));
+    await waitFor(() => expect(api.addExperimentReagent).toHaveBeenCalledWith('exp1', 'r2'));
+    fireEvent.mouseDown(await screen.findByLabelText('Lot for Ethanol'));
+    expect(await screen.findByRole('option', { name: /L-OFF/ })).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: /L-OK/ })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('option', { name: /L-OFF/ }));
+    fireEvent.change(screen.getByLabelText(/Quantity for Ethanol/), { target: { value: '1' } });
+    const recordButtons = screen.getAllByRole('button', { name: 'Record' });
+    fireEvent.click(recordButtons[recordButtons.length - 1]);
     await waitFor(() => expect(api.recordReagentUse).toHaveBeenCalled());
     expect(api.recordReagentUse.mock.calls[0][0]).toMatchObject({
       reagent_lot_id: 'l2',
@@ -189,18 +231,26 @@ describe('Experiment reagent capture', () => {
   });
 
   test('adds a reagent on an experiment with no template entry and records its lot', async () => {
-    api.getExperimentEntries.mockResolvedValue({ entries: [] });
-    api.getReagentLots.mockResolvedValue([
-      { id: 'l2', reagent_id: 'r2', reagent_name: 'Ethanol', lot_number: 'L-OFF', unit: 'mL' },
-    ]);
+    let entries: unknown[] = [];
+    api.getExperimentEntries.mockImplementation(async () => ({ entries }));
+    api.getReagentLots.mockResolvedValue(lots);
+    api.addExperimentReagent.mockImplementation(async () => {
+      entries = [
+        {
+          ...reagentEntry,
+          config: { allowed_reagent_ids: ['r2'], status: 'draft' },
+        },
+      ];
+      return { experiment_id: 'exp1', entry_id: 'e1', allowed_reagent_ids: ['r2'] };
+    });
     wrap(<EntryCapturePanel experimentId="exp1" />);
     expect(await screen.findByText(/No reagents yet/i)).toBeInTheDocument();
     fireEvent.mouseDown(screen.getByLabelText('Add reagent'));
     fireEvent.click(await screen.findByRole('option', { name: 'Ethanol' }));
-    fireEvent.click(screen.getByRole('button', { name: /Record lot used/i }));
-    fireEvent.mouseDown(screen.getByLabelText('Lot'));
+    await waitFor(() => expect(api.addExperimentReagent).toHaveBeenCalledWith('exp1', 'r2'));
+    fireEvent.mouseDown(await screen.findByLabelText('Lot for Ethanol'));
     fireEvent.click(await screen.findByRole('option', { name: /L-OFF/ }));
-    fireEvent.change(screen.getByLabelText(/Quantity used/), { target: { value: '4' } });
+    fireEvent.change(screen.getByLabelText(/Quantity for Ethanol/), { target: { value: '4' } });
     fireEvent.click(screen.getByRole('button', { name: 'Record' }));
     await waitFor(() => expect(api.recordReagentUse).toHaveBeenCalled());
     expect(api.recordReagentUse.mock.calls[0][0]).toMatchObject({
@@ -212,9 +262,7 @@ describe('Experiment reagent capture', () => {
 
   test('shows the API refusal when the reagent is inactive', async () => {
     api.getExperimentEntries.mockResolvedValue({ entries: [reagentEntry] });
-    api.getReagentLots.mockResolvedValue([
-      { id: 'l1', reagent_id: 'r1', reagent_name: 'Qubit dsDNA HS', lot_number: 'L-OK', unit: 'mL' },
-    ]);
+    api.getReagentLots.mockResolvedValue(lots);
     api.recordReagentUse.mockRejectedValue({
       response: {
         data: {
@@ -226,10 +274,9 @@ describe('Experiment reagent capture', () => {
       },
     });
     wrap(<EntryCapturePanel experimentId="exp1" />);
-    fireEvent.click(await screen.findByRole('button', { name: /Record lot used/i }));
-    fireEvent.mouseDown(screen.getByLabelText('Lot'));
+    fireEvent.mouseDown(await screen.findByLabelText('Lot for Qubit dsDNA HS'));
     fireEvent.click(await screen.findByRole('option', { name: /L-OK/ }));
-    fireEvent.change(screen.getByLabelText(/Quantity used/), { target: { value: '1' } });
+    fireEvent.change(screen.getByLabelText(/Quantity for Qubit dsDNA HS/), { target: { value: '1' } });
     fireEvent.click(screen.getByRole('button', { name: 'Record' }));
     expect(await screen.findByText(/inactive and can't be recorded/i)).toBeInTheDocument();
   });

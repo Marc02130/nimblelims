@@ -52,12 +52,12 @@ It is **not** the primary home for large-scale result data analysis or dose-resp
 |------|-----------------|--------|------|
 | **`experiment_sample_data`** | Per-sample process data | **Table** | One row per sample in the experiment cohort |
 | **`experiment_data`** | Experiment-level / purpose tables (incl. **Experiment Header**) | **Table only** (no form layout) | Multi-row free rows (`row_key`); user adds rows |
-| **`reagent`** | Catalog reagents this experiment may use | Lot picker | The template names the reagents; the lab tech picks the lot at use |
+| **`reagent`** | Default reagents, plus any the tech adds | One lot picker per reagent | The saved list filters each picker to that reagent's usable lots |
 | Legacy/runtime compatibility | `sample_data`, `experiment_detail`, `predefined_action`, `display_table` | — | Kept for existing templates |
 
 **Experiment Header** = experiment data with `predefined_entry_key = experiment_header` (same kind as other experiment data tables).
 
-Sample and experiment data are the two table kinds. **Reagent** is its own entry type (`predefined_entry_key = reagents`, wrapper `reagents`, cardinality 1). The author stores `config.allowed_reagent_ids` from the Admin reagent catalog. That list is the default, not a limit. Creating an experiment copies it onto the experiment entry. A later edit of the template leaves existing experiments on the defaults they had at creation. On a template experiment, **Add reagent** can add any other active catalog reagent, then **Record lot used** posts `/v1/reagent-uses` with `experiment_id`. An ad hoc experiment (no template, and so no reagent entry) uses the same add-then-lot steps. A reagent that is inactive at use time is **422** `reagent_inactive`, including when its lot is still usable and its id is still on the experiment's default list. A LIMS-run use of that same lot is **422** `reagent_inactive` as well, and the lot quantity stays unchanged. Entries capture process data; sample identity stays on Sample.
+Sample and experiment data are the two table kinds. **Reagent** is its own entry type (`predefined_entry_key = reagents`, wrapper `reagents`, cardinality 1). The author stores `config.allowed_reagent_ids` from the Admin reagent catalog. That list is the default, not a limit. Creating an experiment copies it onto the experiment entry. A later edit of the template leaves existing experiments on the defaults they had at creation. On a template experiment, **Add reagent** posts `/v1/experiments/{id}/reagents` and appends that active catalog reagent to the experiment entry. A reload still shows it. Adding the same id again is idempotent and does not duplicate the row. An inactive reagent is **422** `reagent_inactive` and the list stays as it was. Each listed reagent has its own lot picker, limited to that reagent's usable lots, and **Record** posts `/v1/reagent-uses` with `experiment_id`. An ad hoc experiment with no reagent entry gets one when the first reagent is added. There is no delete route for a reagent on the experiment. A reagent that is inactive at use time is **422** `reagent_inactive`, including when its lot is still usable and its id is still on the experiment's default list. A LIMS-run use of that same lot is **422** `reagent_inactive` as well, and the lot quantity stays unchanged. Entries capture process data; sample identity stays on Sample.
 
 ### Columns
 
@@ -81,7 +81,7 @@ Sample and experiment data are the two table kinds. **Reagent** is its own entry
 
 - `EntryCapturePanel` on experiment detail (Entries).
 - **Instantiate from template** if entries not yet created (also auto on create when template has `entries`).
-- Sample data: table by cohort. Experiment data: multi-row table + Add/Delete row. Aliquot: `AliquotPlanEditor`. Reagent: default reagents from `config.allowed_reagent_ids`, plus Add reagent for any active catalog reagent, then the lot.
+- Sample data: table by cohort. Experiment data: multi-row table + Add/Delete row. Aliquot: `AliquotPlanEditor`. Reagent: the saved `config.allowed_reagent_ids` list, one lot picker per reagent filtered to that reagent's usable lots.
 
 ### Aliquot / pool destination sample type
 
