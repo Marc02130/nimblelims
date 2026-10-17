@@ -17,6 +17,7 @@ from app.schemas.field_definition import (
 )
 from app.core.security import get_current_user
 from app.core.rbac import require_config_edit
+from app.core.patch_fields import explicit_updates
 from models.user import User
 
 router = APIRouter(prefix="/admin/fields", tags=["field-definitions"])
@@ -123,7 +124,7 @@ def update_field_definition(
     if not field_def:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="FieldDefinition not found")
 
-    update_data = field_data.dict(exclude_unset=True)
+    update_data = explicit_updates(field_data, field_def)
     for key, value in update_data.items():
         if key == "entity_type" and value:
             value = value.lower()

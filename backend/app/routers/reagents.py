@@ -25,6 +25,7 @@ from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import Session
 
 from app.core.rbac import require_config_edit, require_experiment_manage
+from app.core.patch_fields import explicit_updates
 from app.core.security import get_current_user, get_user_permissions
 from app.database import get_db
 from app.schemas.reagent import (
@@ -137,7 +138,7 @@ def update_vendor(
     row = db.query(Vendor).filter(Vendor.id == vendor_id).first()
     if not row:
         raise HTTPException(status_code=404, detail="Vendor not found")
-    data = body.model_dump(exclude_unset=True)
+    data = explicit_updates(body, row, refuse_null={"active"})
     if data.get("name") and data["name"].strip().lower() != row.name.lower():
         if db.query(Vendor).filter(func.lower(Vendor.name) == data["name"].strip().lower()).first():
             raise HTTPException(status_code=400, detail="Vendor name already exists")
@@ -212,7 +213,7 @@ def update_reagent(
     row = db.query(Reagent).filter(Reagent.id == reagent_id).first()
     if not row:
         raise HTTPException(status_code=404, detail="Reagent not found")
-    data = body.model_dump(exclude_unset=True)
+    data = explicit_updates(body, row, refuse_null={"active"})
     if data.get("name") and data["name"].strip().lower() != row.name.lower():
         if db.query(Reagent).filter(func.lower(Reagent.name) == data["name"].strip().lower()).first():
             raise HTTPException(status_code=400, detail="Reagent name already exists")
@@ -289,7 +290,7 @@ def update_reagent_vendor(
     row = db.query(ReagentVendor).filter(ReagentVendor.id == source_id).first()
     if not row:
         raise HTTPException(status_code=404, detail="Reagent vendor not found")
-    for k, v in body.model_dump(exclude_unset=True).items():
+    for k, v in explicit_updates(body, row, refuse_null={"active"}).items():
         setattr(row, k, v)
     row.modified_by = current_user.id
     return _source_out(_commit(db, row, "This vendor and catalog number are already on the reagent"))
@@ -400,7 +401,7 @@ def update_reagent_lot(
     row = db.query(ReagentLot).filter(ReagentLot.id == lot_id).first()
     if not row:
         raise HTTPException(status_code=404, detail="Reagent lot not found")
-    data = body.model_dump(exclude_unset=True)
+    data = explicit_updates(body, row, refuse_null={"active"})
     if data.get("reagent_vendor_id"):
         _source_for(db, data["reagent_vendor_id"], row.reagent_id)
     if data.get("lot_number"):
@@ -540,7 +541,7 @@ def update_reagent_use(
     row = db.query(ReagentUse).filter(ReagentUse.id == use_id).first()
     if not row:
         raise HTTPException(status_code=404, detail="Reagent use not found")
-    data = body.model_dump(exclude_unset=True)
+    data = explicit_updates(body, row, refuse_null={"active"})
     if data.get("active") is True and not row.active:
         raise HTTPException(status_code=422, detail="A voided use stays voided. Record the use again.")
     if data.get("active") is False and row.active:

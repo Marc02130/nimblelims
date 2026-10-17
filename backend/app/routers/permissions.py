@@ -13,6 +13,7 @@ from app.schemas.user import (
 )
 from app.core.security import get_current_user
 from app.core.rbac import require_any_permission
+from app.core.patch_fields import explicit_updates
 from uuid import UUID
 
 router = APIRouter()
@@ -81,21 +82,21 @@ def update_permission(
             detail="Permission not found"
         )
     
-    # Check for unique name if updating
-    if permission_data.name and permission_data.name != permission.name:
-        existing_permission = db.query(Permission).filter(Permission.name == permission_data.name).first()
+    updates = explicit_updates(permission_data, permission, refuse_null={"active"})
+    if "name" in updates and updates["name"] != permission.name:
+        existing_permission = db.query(Permission).filter(Permission.name == updates["name"]).first()
         if existing_permission:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Permission name already exists"
             )
-        permission.name = permission_data.name
+        permission.name = updates["name"]
     
-    if permission_data.description is not None:
-        permission.description = permission_data.description
+    if "description" in updates:
+        permission.description = updates["description"]
     
-    if permission_data.active is not None:
-        permission.active = permission_data.active
+    if "active" in updates:
+        permission.active = updates["active"]
     
     permission.modified_by = current_user.id
     db.commit()

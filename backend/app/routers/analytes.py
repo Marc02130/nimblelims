@@ -18,6 +18,7 @@ from app.schemas.analyte import (
 )
 from app.core.security import get_current_user, get_user_permissions
 from app.core.rbac import require_any_permission
+from app.core.patch_fields import assign_updates, explicit_updates
 from uuid import UUID
 from sqlalchemy.orm import joinedload
 from sqlalchemy import func
@@ -337,43 +338,26 @@ def update_analyte(
                 detail="Analyte not found"
             )
         
-        # Check for unique name if updating
-        if analyte_data.name and analyte_data.name != analyte.name:
-            existing_analyte = db.query(Analyte).filter(Analyte.name == analyte_data.name).first()
+        updates = explicit_updates(analyte_data, analyte, refuse_null={"active"})
+        if "name" in updates and updates["name"] != analyte.name:
+            existing_analyte = db.query(Analyte).filter(Analyte.name == updates["name"]).first()
             if existing_analyte:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Analyte name already exists"
                 )
-            analyte.name = analyte_data.name
-        
-        if analyte_data.description is not None:
-            analyte.description = analyte_data.description
-        
-        if analyte_data.active is not None:
-            analyte.active = analyte_data.active
-        
-        # Update optional fields if they exist on the model
-        if hasattr(analyte, 'cas_number') and analyte_data.cas_number is not None:
-            analyte.cas_number = analyte_data.cas_number
-        
-        if hasattr(analyte, 'units_default') and analyte_data.units_default is not None:
-            # Validate units_default if provided
-            if analyte_data.units_default:
-                from models.unit import Unit
-                unit = db.query(Unit).filter(Unit.id == analyte_data.units_default).first()
-                if not unit:
-                    raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        detail="Invalid units_default: unit not found"
-                    )
-            analyte.units_default = analyte_data.units_default
-        
-        if hasattr(analyte, 'data_type') and analyte_data.data_type is not None:
-            analyte.data_type = analyte_data.data_type.value if analyte_data.data_type else None
-        
-        if hasattr(analyte, 'custom_attributes') and analyte_data.custom_attributes is not None:
-            analyte.custom_attributes = analyte_data.custom_attributes
+        if "units_default" in updates and updates["units_default"] is not None:
+            from models.unit import Unit
+            unit = db.query(Unit).filter(Unit.id == updates["units_default"]).first()
+            if not unit:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid units_default: unit not found"
+                )
+        if "data_type" in updates and updates["data_type"] is not None:
+            data_type = updates["data_type"]
+            updates["data_type"] = data_type.value if hasattr(data_type, "value") else data_type
+        assign_updates(analyte, updates)
         
         analyte.modified_by = current_user.id
         db.commit()

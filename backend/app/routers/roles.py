@@ -18,6 +18,7 @@ from app.schemas.user import (
 )
 from app.core.security import get_current_user
 from app.core.rbac import require_any_permission
+from app.core.patch_fields import explicit_updates
 from uuid import UUID
 
 router = APIRouter()
@@ -87,21 +88,21 @@ def update_role(
             detail="Role not found"
         )
     
-    # Check for unique name if updating
-    if role_data.name and role_data.name != role.name:
-        existing_role = db.query(Role).filter(Role.name == role_data.name).first()
+    updates = explicit_updates(role_data, role, refuse_null={"active"})
+    if "name" in updates and updates["name"] != role.name:
+        existing_role = db.query(Role).filter(Role.name == updates["name"]).first()
         if existing_role:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Role name already exists"
             )
-        role.name = role_data.name
+        role.name = updates["name"]
     
-    if role_data.description is not None:
-        role.description = role_data.description
+    if "description" in updates:
+        role.description = updates["description"]
     
-    if role_data.active is not None:
-        role.active = role_data.active
+    if "active" in updates:
+        role.active = updates["active"]
     
     role.modified_by = current_user.id
     db.commit()

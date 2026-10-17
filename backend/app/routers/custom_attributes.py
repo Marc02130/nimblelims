@@ -16,6 +16,7 @@ from app.schemas.custom_attributes_config import (
 )
 from app.core.security import get_current_user
 from app.core.rbac import require_config_edit
+from app.core.patch_fields import explicit_updates
 from uuid import UUID
 
 router = APIRouter(prefix="/admin/custom-attributes", tags=["custom-attributes"])
@@ -169,10 +170,11 @@ def update_custom_attribute_config(
             detail="Custom attribute configuration not found"
         )
     
+    updates = explicit_updates(config_data, config)
     # Check for unique constraint if updating entity_type or attr_name
-    if config_data.entity_type or config_data.attr_name:
-        new_entity_type = config_data.entity_type or config.entity_type
-        new_attr_name = config_data.attr_name or config.attr_name
+    if "entity_type" in updates or "attr_name" in updates:
+        new_entity_type = updates.get("entity_type") or config.entity_type
+        new_attr_name = updates.get("attr_name") or config.attr_name
         
         if new_entity_type != config.entity_type or new_attr_name != config.attr_name:
             existing_config = db.query(CustomAttributeConfig).filter(
@@ -189,19 +191,19 @@ def update_custom_attribute_config(
                     detail=f"Custom attribute '{new_attr_name}' already exists for entity type '{new_entity_type}'"
                 )
     
-    # Update fields
-    if config_data.entity_type is not None:
-        config.entity_type = config_data.entity_type
-    if config_data.attr_name is not None:
-        config.attr_name = config_data.attr_name
-    if config_data.data_type is not None:
-        config.data_type = config_data.data_type.value
-    if config_data.validation_rules is not None:
-        config.validation_rules = config_data.validation_rules
-    if config_data.description is not None:
-        config.description = config_data.description
-    if config_data.active is not None:
-        config.active = config_data.active
+    if "entity_type" in updates:
+        config.entity_type = updates["entity_type"]
+    if "attr_name" in updates:
+        config.attr_name = updates["attr_name"]
+    if "data_type" in updates:
+        data_type = updates["data_type"]
+        config.data_type = data_type.value if hasattr(data_type, "value") else data_type
+    if "validation_rules" in updates:
+        config.validation_rules = updates["validation_rules"]
+    if "description" in updates:
+        config.description = updates["description"]
+    if "active" in updates:
+        config.active = updates["active"]
     
     config.modified_by = current_user.id
     

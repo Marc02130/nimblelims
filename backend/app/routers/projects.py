@@ -17,6 +17,7 @@ from app.schemas.project import (
 )
 from app.core.security import get_current_user
 from app.core.rbac import require_permission, validate_client_access
+from app.core.patch_fields import explicit_updates
 from uuid import UUID
 import logging
 
@@ -347,79 +348,79 @@ def update_project(
                 detail="Project not found"
             )
         
-        # Check for unique name if updating
-        if project_data.name and project_data.name != project.name:
-            existing_project = db.query(Project).filter(Project.name == project_data.name).first()
+        updates = explicit_updates(project_data, project, refuse_null={"active"})
+        if "name" in updates and updates["name"] != project.name:
+            existing_project = db.query(Project).filter(Project.name == updates["name"]).first()
             if existing_project:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Project name already exists"
                 )
-            project.name = project_data.name
+            project.name = updates["name"]
         
-        # Update fields if provided
-        if project_data.description is not None:
-            project.description = project_data.description
+        if "description" in updates:
+            project.description = updates["description"]
         
-        if project_data.start_date is not None:
-            project.start_date = project_data.start_date
+        if "start_date" in updates:
+            project.start_date = updates["start_date"]
         
-        if project_data.client_id is not None:
-            # Verify client exists
-            client = db.query(Client).filter(Client.id == project_data.client_id).first()
+        if "client_id" in updates:
+            client = db.query(Client).filter(Client.id == updates["client_id"]).first()
             if not client:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Client not found"
                 )
-            # Validate client access: non-System/Admin users can only update projects for their own client
-            validate_client_access(current_user, project_data.client_id)
-            project.client_id = project_data.client_id
+            validate_client_access(current_user, updates["client_id"])
+            project.client_id = updates["client_id"]
         else:
-            # If not updating client_id, validate access to existing project's client_id
             validate_client_access(current_user, project.client_id)
         
-        if project_data.client_project_id is not None:
-            if project_data.client_project_id:
-                # Validate client_project_id
+        if "client_project_id" in updates:
+            if updates["client_project_id"] is not None:
                 client_project = db.query(ClientProject).filter(
-                    ClientProject.id == project_data.client_project_id
+                    ClientProject.id == updates["client_project_id"]
                 ).first()
                 if not client_project:
                     raise HTTPException(
                         status_code=status.HTTP_400_BAD_REQUEST,
                         detail="Client project not found"
                     )
-                # Verify client_project belongs to the project's client
-                target_client_id = project_data.client_id if project_data.client_id else project.client_id
+                target_client_id = updates["client_id"] if "client_id" in updates else project.client_id
                 if client_project.client_id != target_client_id:
                     raise HTTPException(
                         status_code=status.HTTP_400_BAD_REQUEST,
                         detail="Client project does not belong to the specified client"
                     )
-            project.client_project_id = project_data.client_project_id
+            project.client_project_id = updates["client_project_id"]
         
-        if project_data.status is not None:
-            project.status = project_data.status
+        if "status" in updates:
+            project.status = updates["status"]
         
-        if project_data.active is not None:
-            project.active = project_data.active
+        if "active" in updates:
+            project.active = updates["active"]
+        
+        if "due_date" in updates:
+            project.due_date = updates["due_date"]
         
         # Validate and update custom_attributes if provided
-        if project_data.custom_attributes is not None:
-            from app.core.custom_attributes import validate_custom_attributes
-            try:
-                validated_custom_attributes = validate_custom_attributes(
-                    db, "projects", project_data.custom_attributes
-                )
-                project.custom_attributes = validated_custom_attributes
-            except HTTPException:
-                raise
-            except ValueError as e:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=str(e)
-                )
+        if "custom_attributes" in updates:
+            if updates["custom_attributes"] is None:
+                project.custom_attributes = None
+            else:
+                from app.core.custom_attributes import validate_custom_attributes
+                try:
+                    validated_custom_attributes = validate_custom_attributes(
+                        db, "projects", updates["custom_attributes"]
+                    )
+                    project.custom_attributes = validated_custom_attributes
+                except HTTPException:
+                    raise
+                except ValueError as e:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=str(e)
+                    )
         
         project.modified_by = current_user.id
         db.commit()
