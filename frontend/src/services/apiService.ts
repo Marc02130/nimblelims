@@ -446,8 +446,11 @@ export class ApiService {
     return response.data;
   }
 
-  async deleteContent(id: string) {
-    const response: AxiosResponse = await this.api.delete(`/contents/${id}`);
+  async updateContent(containerId: string, sampleId: string, contentData: { amount?: number; concentration?: number; concentration_units?: string; amount_units?: string }) {
+    const response: AxiosResponse = await this.api.patch(
+      `/containers/${containerId}/contents/${sampleId}`,
+      contentData,
+    );
     return response.data;
   }
 
