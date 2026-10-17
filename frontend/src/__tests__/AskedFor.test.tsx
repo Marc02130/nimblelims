@@ -100,6 +100,7 @@ describe('AskedForForm TAT', () => {
 
     await waitFor(() => {
       expect(onSubmit).toHaveBeenCalledTimes(1);
+      expect(screen.getByRole('button', { name: 'Record asked-for' })).toBeEnabled();
     });
     expect(onSubmit).toHaveBeenCalledWith(
       expect.objectContaining({
