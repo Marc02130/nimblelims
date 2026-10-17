@@ -590,11 +590,7 @@ const ExperimentTemplatesManagement: React.FC = () => {
           ...(next.config || {}),
           allowed_reagent_ids: Array.isArray(prior) ? prior : [],
         };
-      } else if (
-        patch.entry_type !== undefined &&
-        patch.entry_type !== 'reagent' &&
-        e.predefined_entry_key === 'reagents'
-      ) {
+      } else if (patch.entry_type !== undefined && e.predefined_entry_key === 'reagents') {
         next.predefined_entry_key = undefined;
       }
       return next;

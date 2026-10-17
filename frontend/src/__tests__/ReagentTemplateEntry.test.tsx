@@ -92,7 +92,7 @@ describe('Experiment template Reagent entry', () => {
     fireEvent.click(screen.getByRole('button', { name: /^Create$/ }));
 
     await waitFor(() => expect(api.createExperimentTemplate).toHaveBeenCalled());
-    const payload = api.createExperimentTemplate.mock.calls[0][0] as {
+    const payload = api.createExperimentTemplate.mock.calls[0][0] as unknown as {
       template_definition: { entries: Array<Record<string, unknown>> };
     };
     const reagent = payload.template_definition.entries.find((entry) => entry.entry_type === 'reagent');
