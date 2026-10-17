@@ -634,8 +634,8 @@ def validate_result(
         except ValueError:
             pass  # Already caught by data type validation
     
-    # Check significant figures
-    if analysis_analyte.significant_figures:
+    # Check significant figures. 0 is a real setting, not "unset".
+    if analysis_analyte.significant_figures is not None:
         try:
             if validation_data.reported_result:
                 from app.core.conversions import count_significant_figures

@@ -3,6 +3,7 @@ Samples router for NimbleLims
 """
 from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import and_, or_, func, case, text, literal_column
 from sqlalchemy.dialects.postgresql import JSONB
@@ -27,7 +28,7 @@ from app.core.security import get_current_user, set_current_user_id
 from datetime import datetime, timedelta
 from uuid import UUID
 
-from app.core.db_errors import commit_or_409
+from app.core.db_errors import commit_or_409, constraint_name, is_unique_violation
 
 SAMPLE_UNIQUE = {
     "samples_name_key": "A sample with this name already exists. Sample names must be unique.",
@@ -855,6 +856,21 @@ def accession_sample(
     except HTTPException:
         # Re-raise HTTP exceptions as-is
         raise
+    except IntegrityError as exc:
+        db.rollback()
+        if is_unique_violation(exc):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=SAMPLE_UNIQUE.get(
+                    constraint_name(exc) or "",
+                    SAMPLE_UNIQUE["samples_name_key"],
+                ),
+            ) from exc
+        logger.error(f"Error during sample accession: {str(exc)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Internal server error during sample accession: {str(exc)}",
+        ) from exc
     except Exception as e:
         logger.error(f"Error during sample accession: {str(e)}", exc_info=True)
         db.rollback()

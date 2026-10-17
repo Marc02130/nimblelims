@@ -71,20 +71,35 @@ def require_base_unit_named(db: Session, type_name: str) -> Unit:
     return require_base_unit(db, entry.id)
 
 
+# Names that label the scale when more than one unit has multiplier 1.
+# 1 mg/mL = 1 g/L, so both are multiplier 1; reports use g/L.
+_PREFERRED_BASE_NAMES = ("g/L", "mol/L", "L", "g")
+
+
+def canonical_base_unit(bases: Sequence[Unit]) -> Unit:
+    """One multiplier-1 unit to label the scale.
+
+    Several units may equal the base (multiplier 1) when they are the same
+    quantity. Prefer a stable name so the reported unit does not change.
+    """
+    by_name = {unit.name: unit for unit in bases}
+    for name in _PREFERRED_BASE_NAMES:
+        found = by_name.get(name)
+        if found is not None:
+            return found
+    return sorted(bases, key=lambda unit: (unit.name or "", str(unit.id)))[0]
+
+
 def require_base_unit(db: Session, type_id) -> Unit:
-    """The lab's base unit for a type: the one active unit with multiplier 1."""
+    """The lab's base unit for a type: an active unit with multiplier 1."""
     bases = active_base_units(db, type_id)
-    if len(bases) == 1:
-        return bases[0]
     if not bases:
         raise ConversionError(
             "No base unit for this type. Pick one under Units. Its multiplier is 1."
         )
-    names = ", ".join(sorted(unit.name for unit in bases))
-    raise ConversionError(
-        f"This type has more than one base unit ({names}). "
-        "Pick one under Units and set the others relative to it."
-    )
+    if len(bases) == 1:
+        return bases[0]
+    return canonical_base_unit(bases)
 
 
 def designate_base_unit(db: Session, unit: Unit) -> None:
@@ -188,11 +203,13 @@ def _require_one_type(units: Sequence[Unit], label: str) -> None:
 def reporting_unit(db: Session, units: Sequence[Unit], label: str) -> Tuple[Unit, bool]:
     """Unit for a combined total, and whether values convert onto it.
 
-    A type with exactly one multiplier-1 unit is a scale, so values convert
-    to that base. Seed concentration is not a scale: g/L, ng/µL, µg/mL,
-    EU/mL, and copies/µL are all multiplier 1 and are different quantities.
-    Those values combine only when every source uses the same unit, and the
-    total stays in that unit with no multiplier applied.
+    Units of one type share a scale: ``value_in_base = value * multiplier``.
+    The base is any active unit with multiplier 1. When several equal the
+    base (1 mg/mL = 1 g/L), reports use a stable name (``g/L`` when present).
+
+    Activity (EU/mL) and copy count (copies/µL) are other unit types, so they
+    do not convert onto a mass concentration. A type with no multiplier-1 unit
+    combines only when every source uses that same unit.
     """
     if not units:
         raise ConversionError(f"Cannot pool {label}: no units provided")
@@ -201,19 +218,13 @@ def reporting_unit(db: Session, units: Sequence[Unit], label: str) -> Tuple[Unit
         raise ConversionError(f"Cannot pool {label} units of different types")
     distinct = {unit.id: unit for unit in units}
     bases = active_base_units(db, units[0].type)
-    if len(bases) == 1:
-        return bases[0], True
+    if bases:
+        return canonical_base_unit(bases), True
     if len(distinct) == 1:
         return next(iter(distinct.values())), False
     names = ", ".join(sorted(unit.name for unit in distinct.values()))
-    if not bases:
-        raise ConversionError(
-            f"Cannot pool {label} units ({names}). No base unit for this type."
-        )
     raise ConversionError(
-        f"Cannot pool {label} units ({names}). "
-        "They are not the same unit, and this type has more than one base unit, "
-        "so they are not on one scale."
+        f"Cannot pool {label} units ({names}). No base unit for this type."
     )
 
 

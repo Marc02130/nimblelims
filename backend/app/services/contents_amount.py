@@ -46,18 +46,7 @@ def debit_contents_amount(
             },
         )
     try:
-        remaining = db.execute(
-            update(Contents)
-            .where(
-                Contents.container_id == source.container_id,
-                Contents.sample_id == source.sample_id,
-                Contents.amount.is_not(None),
-                Contents.amount >= transfer,
-            )
-            .values(amount=Contents.amount - transfer)
-            .returning(Contents.amount)
-            .execution_options(synchronize_session="fetch")
-        ).scalar_one_or_none()
+        remaining = _subtract(db, source, transfer)
     except OperationalError as exc:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -94,6 +83,38 @@ def debit_contents_amount(
             },
         )
     return Decimal(remaining)
+
+
+def _subtract(db: Session, source: Contents, transfer: Decimal):
+    """Return the new amount, or None when the WHERE clause matches no row.
+
+    ``synchronize_session="fetch"`` appends the primary key to RETURNING.
+    ``scalar()`` then sometimes yields ``container_id`` (a UUID) and
+    ``Decimal(remaining)`` raises ``conversion from UUID to Decimal``.
+    ``"evaluate"`` cannot fold ``amount - :transfer``. ``False`` leaves
+    RETURNING as the amount column. The amount attribute is expired so the
+    session does not keep the pre-update value.
+    """
+    result = db.execute(
+        update(Contents)
+        .where(
+            Contents.container_id == source.container_id,
+            Contents.sample_id == source.sample_id,
+            Contents.amount.is_not(None),
+            Contents.amount >= transfer,
+        )
+        .values(amount=Contents.amount - transfer)
+        .returning(Contents.amount)
+        .execution_options(synchronize_session=False)
+    )
+    row = result.one_or_none()
+    db.expire(source, ["amount"])
+    if row is None:
+        return None
+    remaining = row._mapping.get(Contents.amount)
+    if remaining is None:
+        remaining = row._mapping.get("amount")
+    return remaining
 
 
 def _null_amount_message(sample_label: Optional[str]) -> str:

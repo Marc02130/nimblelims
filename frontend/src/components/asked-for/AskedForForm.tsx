@@ -92,7 +92,7 @@ const AskedForForm: React.FC<AskedForFormProps> = ({
       setParams({});
       return;
     }
-    if (analysis.turnaround_time && analysis.turnaround_time >= 1) {
+    if (analysis.turnaround_time != null) {
       setTatDays(analysis.turnaround_time);
     }
     let cancelled = false;

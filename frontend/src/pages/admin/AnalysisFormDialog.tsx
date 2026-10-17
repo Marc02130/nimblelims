@@ -121,7 +121,7 @@ const AnalysisFormDialog: React.FC<AnalysisFormDialogProps> = ({
     name: analysis?.name || '',
     description: analysis?.description || '',
     method: analysis?.method || '',
-    turnaround_time: analysis?.turnaround_time || null,
+    turnaround_time: analysis?.turnaround_time ?? null,
     // Convert cost to number if it's a string (from API Decimal/Numeric types)
     cost: analysis?.cost !== undefined && analysis?.cost !== null
       ? (typeof analysis.cost === 'string' ? parseFloat(analysis.cost) : analysis.cost)
@@ -229,6 +229,7 @@ const AnalysisFormDialog: React.FC<AnalysisFormDialogProps> = ({
                     {({ field, meta }: any) => (
                       <TextField
                         {...field}
+                        value={field.value ?? ''}
                         label="Turnaround Time (days)"
                         type="number"
                         fullWidth
@@ -247,6 +248,7 @@ const AnalysisFormDialog: React.FC<AnalysisFormDialogProps> = ({
                     {({ field, meta }: any) => (
                       <TextField
                         {...field}
+                        value={field.value ?? ''}
                         label="Cost"
                         type="number"
                         fullWidth

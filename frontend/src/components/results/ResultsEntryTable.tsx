@@ -427,7 +427,7 @@ const ResultsEntryTable: React.FC<ResultsEntryTableProps> = ({
                         )}
                         </Box>
                         <Tooltip
-                          title={`Analytes: Rules. ${analyte.is_required ? 'Required field. ' : ''}${analyte.data_type === 'numeric' ? `Numeric type with ${analyte.low_value !== undefined ? `minimum ${analyte.low_value}` : ''}${analyte.high_value !== undefined ? ` maximum ${analyte.high_value}` : ''}. ` : ''}${analyte.significant_figures ? `Significant figures: ${analyte.significant_figures}. ` : ''}Follow validation rules when entering results.`}
+                          title={`Analytes: Rules. ${analyte.is_required ? 'Required field. ' : ''}${analyte.data_type === 'numeric' ? `Numeric type with ${analyte.low_value !== undefined ? `minimum ${analyte.low_value}` : ''}${analyte.high_value !== undefined ? ` maximum ${analyte.high_value}` : ''}. ` : ''}${analyte.significant_figures != null ? `Significant figures: ${analyte.significant_figures}. ` : ''}Follow validation rules when entering results.`}
                           arrow
                           placement="top"
                         >

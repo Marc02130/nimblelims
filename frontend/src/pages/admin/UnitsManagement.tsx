@@ -309,9 +309,9 @@ const UnitsManagement: React.FC = () => {
 
           {duplicateBases.length > 0 && (
             <Alert severity="warning" sx={{ mb: 2 }}>
-              More than one base (multiplier 1) in {duplicateBases.join('; ')}. Pick one base.
-              Set the others relative to it, or use one of them as the base after their
-              multipliers differ.
+              These units equal the base (multiplier 1): {duplicateBases.join('; ')}.
+              They are the same scale. Reports use g/L, mol/L, L, or g when that
+              name is one of them.
             </Alert>
           )}
 

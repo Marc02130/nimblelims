@@ -465,11 +465,11 @@ def pool_samples(
     The debits and the destination rows commit together. One refusal rolls
     the whole call back. A full draw leaves the source contents row at amount 0.
 
-    The summary concentration is the unit on the source contents when every
-    source shares it (otherwise the request unit). A type with several
-    multiplier-1 units is not one scale, so mixed units of that type are
-    refused. Plan execute is the bench pool; this route places the existing
-    samples and does not mint a child.
+    The summary concentration is the type's base unit (multiplier 1). Mixed
+    units of one type convert through that base. A different unit type, such
+    as endotoxin activity or a copy count, does not convert onto it. Plan
+    execute is the bench pool; this route places the existing samples and
+    does not mint a child.
     """
     # Verify container exists
     container = db.query(Container).filter(

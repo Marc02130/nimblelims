@@ -175,7 +175,7 @@ const ReagentsManagement: React.FC = () => {
 
   const openDialog = (row: Row | null) => {
     setError(null);
-    setEditing(row || {});
+    setEditing(row ?? {});
     const initial: Row = { active: row ? row.active : true };
     FIELDS[tab].forEach((f) => {
       initial[f.key] = row?.[f.key] ?? (f.key === 'released' ? true : f.type === 'bool' ? false : f.key === 'qc_status' ? 'pending' : '');
