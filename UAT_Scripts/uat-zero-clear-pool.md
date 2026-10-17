@@ -15,6 +15,12 @@ Run against a database that includes the #178 unit rescale (nM is 1e-9 mol/L and
 1. Record asked-for with TAT (days) set to 0. The row is stored with tat_days 0.
 2. TAT of -1 is refused. The form checks `value < 0`, and the API returns 422.
 
+## Routing map turnaround
+
+1. Add a route with TAT min 0 and TAT max 0. The row saves with that range.
+2. TAT min of -1 is refused. The form checks `value < 0`, and the API returns 422. TAT max stays greater than or equal to TAT min.
+3. Record asked-for with TAT 0 on a sample whose type that route accepts. Route matches the 0-day map and mints a work order.
+
 ## Grid positions stay 1-based
 
 1. Open a batch container grid and edit a container.

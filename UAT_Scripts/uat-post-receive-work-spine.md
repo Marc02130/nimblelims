@@ -54,7 +54,7 @@ P1 records **requested analysis + TAT**. It does **not** assign a Test, mint a T
 
 **Steps (asked-for only)**
 1. Log in as lab-tech. Open `/asked-for` (Sample Mgmt → **Asked-for**) as its own task, not as a continuation of receive.
-2. **Record requested analysis** → multi-select the already-received sample. Pick ELISA. TAT ≥ 1 (default from analysis TAT is fine).
+2. **Record requested analysis** → multi-select the already-received sample. Pick ELISA. TAT of 0 or greater (default from analysis TAT is fine).
 3. Do **not** enter assay params. P1 sends `{}`; params freeze at **LimsRun start** (P2 / WO-7), not here and not on receive.
 4. Save. Stay on `/asked-for`.
 
@@ -160,7 +160,7 @@ This entire `3b56cfb` block is retained as history of that SHA, like the P1 merg
 **Result:** **Pass** (API, 2026-08-29, `3b56cfb`, Tobias)
 
 1. Record `COUNT(work_orders)` and `COUNT(tests)` for a received sample before saving requested analysis.
-2. `POST /v1/asked-for` with an active analysis, TAT ≥ 1, and valid `params` (empty `{}` is acceptable).
+2. `POST /v1/asked-for` with an active analysis, TAT of 0 or greater, and valid `params` (empty `{}` is acceptable).
 3. Recount before invoking either Route endpoint.
 
 **Expect**
@@ -277,7 +277,7 @@ Do **not** read this as P2–P5 Pass. Do **not** collapse this stamp with Atomic
 **Result:** **Pass** (2026-08-29, `9c4f9da`, Tobias)
 
 1. Record `COUNT(work_orders)` and `COUNT(tests)` for an already-received sample.
-2. `POST /v1/asked-for` with an active analysis, TAT ≥ 1, and valid `params` (`{}` is acceptable).
+2. `POST /v1/asked-for` with an active analysis, TAT of 0 or greater, and valid `params` (`{}` is acceptable).
 3. Recount before invoking either Route endpoint.
 
 **Expect**

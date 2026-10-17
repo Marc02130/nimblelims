@@ -45,7 +45,7 @@ Route itself does **not** require `experiment:manage`. **Start process** and Lim
 **Precondition, not step 1:** the sample was already received on `/receive` (identity + 1..N vessels), status **Available for Testing**, zero Tests. That receive loop is finished and stamped on its own ([`UAT_Scripts/uat-atomic-receive.md`](../UAT_Scripts/uat-atomic-receive.md)). Extra vessels on the same Sample are extra containers, not daughter Samples. **Leadership Confirm:** a second blood tube **may** carry a **different** asked-for + route than the first (open uniqueness remains `(sample, analysis)`). Two blood tubes → two process assignments (`container_id`).
 
 1. Open **Asked-for** (`/asked-for`) or the sample-detail Asked-for section as its own task.  
-2. **Record requested analysis**: pick sample(s), pick an active analysis, TAT ≥ 1. Leave params empty — `{}` is the P1 path.  
+2. **Record requested analysis**: pick sample(s), pick an active analysis, TAT of 0 or greater. Leave params empty — `{}` is the P1 path.  
 3. Save. Stay on `/asked-for`. Toast: requested analysis recorded. No navigation to Tests.  
 4. `COUNT(tests)` and `COUNT(work_orders)` for those requests are still 0. Sample stays **Available for Testing**.
 
@@ -88,7 +88,7 @@ Route compares current type with the first process’s first ordered Experiment/
 |------|--------|
 | Duplicate open `(sample, analysis)` | **409** (full rollback) |
 | No project access / client write / hidden sample | **403** (not 404) |
-| Discarded sample / inactive analysis / TAT &lt; 1 | **422** |
+| Discarded sample / inactive analysis / TAT &lt; 0 | **422** |
 | Receive with non-empty `analysis_ids` | **422** (receive freeze; not an asked-for call) |
 | Route, zero acceptable rows | **422**, status stays `requested`; type or missing LIMS Run analysis uses `route_sample_type` |
 | Route, two saved rows both accept current type and asked-for analysis | **409**; no silent `first()` |

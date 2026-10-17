@@ -133,6 +133,20 @@ def _range(tat_min: int, tat_max: int) -> NumericRange:
     return NumericRange(tat_min, tat_max, "[]")
 
 
+def _refuse_tat_bounds(tat_min: int, tat_max: int) -> None:
+    """0 days is a real range bound. Only a negative value is refused."""
+    if tat_min < 0 or tat_max < 0:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="tat_min and tat_max must be 0 or greater",
+        )
+    if tat_max < tat_min:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="tat_max must be >= tat_min",
+        )
+
+
 def _range_bounds(value) -> tuple[int, int]:
     lower = int(value.lower) if value.lower is not None else 1
     upper = int(value.upper) if value.upper is not None else lower
@@ -174,6 +188,7 @@ class RoutingService:
         asked_for_step_id: Optional[UUID] = None,
     ) -> List[RoutingMap]:
         """Ordered process list + authored asked-for LimsRun slot."""
+        _refuse_tat_bounds(tat_min, tat_max)
         chain = list(process_definition_ids)
         self._require_definitions(chain)
         types = self._require_first_step_types(chain)
@@ -232,11 +247,7 @@ class RoutingService:
             lo = tat_min
         if tat_max is not None:
             hi = tat_max
-        if hi < lo:
-            raise HTTPException(
-                status.HTTP_422_UNPROCESSABLE_ENTITY,
-                "tat_max must be >= tat_min",
-            )
+        _refuse_tat_bounds(lo, hi)
         chain = list(process_definition_ids) if process_definition_ids is not None else list(
             row.process_definition_ids or []
         )
