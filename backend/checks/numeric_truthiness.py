@@ -7,10 +7,9 @@ Zero is a real measurement. ``if amount``, ``amount or default``, and
 The field set is amount, volume, concentration, temperature, cost, multiplier,
 capacity, significant_figures, turnaround_time, and the limit/plan names
 high_value, low_value, target_amount, target_volume, target_concentration,
-value_number, and transfer_amount. TypeScript also checks a grid position
-written as ``.row ||`` or ``.column ||``. A bare ``row`` is a table row, not
-a coordinate, so ``if (row)`` is left alone. SQL ``limit`` and
-string/collection checks are not in this set.
+value_number, and transfer_amount. Grid row and column are 1-based positions,
+so 0 is not a valid value and they are not in this set. A bare ``row`` is a
+table row. SQL ``limit`` and string/collection checks are not in this set.
 
 ``@typescript-eslint/prefer-nullish-coalescing`` is not used: it flags every
 ``||``, including strings and arrays, and ``npm run lint`` does not run in CI.
@@ -51,7 +50,6 @@ _TS_FIELD = (
     r"target_amount|target_volume|target_concentration|high_value|low_value|"
     r"value_number|transfer_amount|significant_figures|turnaround_time)"
 )
-_TS_GRID = re.compile(r"\.(row|column)\s*\|\|")
 _TS_OR = re.compile(rf"(?<![\w])({_TS_FIELD})\s*\|\|")
 _TS_AND = re.compile(rf"\.({_TS_FIELD})\s*&&")
 _TS_IF = re.compile(rf"if\s*\(\s*!?\s*(?:[\w?]+\.)*({_TS_FIELD})\s*\)")
@@ -108,7 +106,6 @@ def find_typescript_source(source: str, filename: str) -> List[Finding]:
             (_TS_AND, "numeric field {name} used with &&"),
             (_TS_IF, "numeric field {name} used as a truthiness test"),
             (_TS_TERNARY, "numeric field {name} used as a ternary test"),
-            (_TS_GRID, "numeric field {name} used with ||"),
         ):
             match = pattern.search(line)
             if match:
