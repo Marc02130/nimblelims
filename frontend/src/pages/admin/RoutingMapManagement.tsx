@@ -120,6 +120,19 @@ const groupMapRows = (rows: RoutingMapRow[]): GroupedMapRow[] => {
   return order.map((key) => grouped.get(key) as GroupedMapRow);
 };
 
+function tatBoundsMessage(tatMin: number, tatMax: number): string | null {
+  if (!Number.isInteger(tatMin) || tatMin < 0) {
+    return 'TAT min must be an integer of 0 or greater.';
+  }
+  if (!Number.isInteger(tatMax) || tatMax < 0) {
+    return 'TAT max must be an integer of 0 or greater.';
+  }
+  if (tatMax < tatMin) {
+    return 'TAT max must be greater than or equal to TAT min.';
+  }
+  return null;
+}
+
 const RoutingMapManagement: React.FC = () => {
   const { hasPermission } = useUser();
   const canEdit = hasPermission('config:edit');
@@ -133,6 +146,7 @@ const RoutingMapManagement: React.FC = () => {
   const [open, setOpen] = useState(false);
   const [tatMin, setTatMin] = useState(1);
   const [tatMax, setTatMax] = useState(10);
+  const tatMessage = tatBoundsMessage(tatMin, tatMax);
   const [chainIds, setChainIds] = useState<string[]>([]);
   const [askedForStepId, setAskedForStepId] = useState('');
   const [addProcessId, setAddProcessId] = useState('');
@@ -318,7 +332,7 @@ const RoutingMapManagement: React.FC = () => {
   }, [askedForSlotOptions, askedForStepId]);
 
   const handleCreate = async () => {
-    if (!chainIds.length) return;
+    if (!chainIds.length || tatBoundsMessage(tatMin, tatMax)) return;
     setSaving(true);
     try {
       await apiService.createRoutingMap({
@@ -408,7 +422,7 @@ const RoutingMapManagement: React.FC = () => {
   const canSave =
     !saving &&
     chainIds.length > 0 &&
-    tatMax >= tatMin &&
+    tatMessage === null &&
     firstTypeNames.length > 0 &&
     chainAnalysisIds.length > 0 &&
     Boolean(askedForStepId) &&
@@ -460,16 +474,21 @@ const RoutingMapManagement: React.FC = () => {
               type="number"
               value={tatMin}
               onChange={(e) => setTatMin(Number(e.target.value))}
-              inputProps={{ min: 1 }}
+              inputProps={{ min: 0, step: 1 }}
+              error={tatMessage !== null && (tatMin < 0 || !Number.isInteger(tatMin))}
             />
             <TextField
               label="TAT max"
               type="number"
               value={tatMax}
               onChange={(e) => setTatMax(Number(e.target.value))}
-              inputProps={{ min: 1 }}
+              inputProps={{ min: 0, step: 1 }}
+              error={tatMessage !== null && (tatMax < 0 || !Number.isInteger(tatMax) || tatMax < tatMin)}
             />
           </Box>
+          {tatMessage && (
+            <Alert severity="error">{tatMessage}</Alert>
+          )}
           <Typography variant="subtitle2">Ordered processes</Typography>
           <Typography variant="caption" color="text.secondary">
             Each process shows its allowed sample types and LIMS Run analyses. Name which

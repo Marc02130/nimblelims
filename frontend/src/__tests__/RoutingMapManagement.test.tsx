@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 
@@ -55,5 +55,31 @@ describe('RoutingMapManagement', () => {
     await waitFor(() => {
       expect(screen.getByRole('grid')).toBeInTheDocument();
     });
+  });
+
+  test('accepts TAT min of 0 and refuses a negative minimum', async () => {
+    render(
+      <MemoryRouter>
+        <ThemeProvider theme={theme}>
+          <RoutingMapManagement />
+        </ThemeProvider>
+      </MemoryRouter>
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /Add route/i }));
+    const tatMin = await screen.findByLabelText('TAT min');
+    fireEvent.change(tatMin, { target: { value: '0' } });
+
+    expect(screen.queryByText(/TAT min must be an integer of 0 or greater/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/at least 1/i)).not.toBeInTheDocument();
+
+    fireEvent.change(tatMin, { target: { value: '-1' } });
+    expect(await screen.findByText(/TAT min must be an integer of 0 or greater/i)).toBeInTheDocument();
+
+    fireEvent.change(tatMin, { target: { value: '5' } });
+    fireEvent.change(screen.getByLabelText('TAT max'), { target: { value: '0' } });
+    expect(
+      await screen.findByText(/TAT max must be greater than or equal to TAT min/i)
+    ).toBeInTheDocument();
   });
 });

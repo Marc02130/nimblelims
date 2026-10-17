@@ -30,6 +30,10 @@ class RoutingMap(Base):
             "array_length(process_definition_ids, 1) >= 1",
             name="routing_map_chain_chk",
         ),
+        CheckConstraint(
+            "lower(tat_range) >= 0",
+            name="routing_map_tat_lower_chk",
+        ),
     )
 
     id = Column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)

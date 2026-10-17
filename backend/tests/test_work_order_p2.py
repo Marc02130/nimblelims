@@ -527,6 +527,87 @@ class TestWorkOrderP2:
         }
         assert types == {str(p2_seed["dna_type"].id)}
 
+    def test_routing_map_tat_min_zero_accepted_and_negative_refused(
+        self,
+        client: TestClient,
+        admin_token: str,
+        p2_seed,
+    ):
+        definition = _create_lims_run_definition(
+            client, admin_token, p2_seed["analysis_a"].id
+        )
+        _put_step_types(client, admin_token, definition, p2_seed["sample_type"].id)
+        accepted = _create_map(
+            client,
+            admin_token,
+            analysis_id=p2_seed["analysis_a"].id,
+            definition_id=definition["id"],
+            tat_min=0,
+            tat_max=0,
+        )
+        assert accepted.status_code == 201, accepted.text
+        assert accepted.json()[0]["tat_min"] == 0
+        assert accepted.json()[0]["tat_max"] == 0
+
+        negative = _create_map(
+            client,
+            admin_token,
+            analysis_id=p2_seed["analysis_a"].id,
+            definition_id=definition["id"],
+            tat_min=-1,
+            tat_max=1,
+        )
+        assert negative.status_code == 422, negative.text
+        assert "tat_min" in negative.text
+
+        backwards = _create_map(
+            client,
+            admin_token,
+            analysis_id=p2_seed["analysis_a"].id,
+            definition_id=definition["id"],
+            tat_min=2,
+            tat_max=0,
+        )
+        assert backwards.status_code == 422, backwards.text
+        assert "tat_max" in backwards.text
+
+    def test_zero_day_asked_for_matches_zero_day_map(
+        self,
+        client: TestClient,
+        admin_token: str,
+        p2_seed,
+    ):
+        definition = _create_lims_run_definition(
+            client, admin_token, p2_seed["analysis_a"].id
+        )
+        _put_step_types(client, admin_token, definition, p2_seed["sample_type"].id)
+        mapped = _create_map(
+            client,
+            admin_token,
+            analysis_id=p2_seed["analysis_a"].id,
+            definition_id=definition["id"],
+            tat_min=0,
+            tat_max=0,
+        )
+        assert mapped.status_code == 201, mapped.text
+        sample_id = _receive_sample(client, admin_token, p2_seed, "NBIO-P2-TAT0")
+        created = client.post(
+            "/v1/asked-for",
+            json=_asked_for_body(
+                [sample_id], p2_seed["analysis_a"].id, tat_days=0, params={}
+            ),
+            headers=_auth(admin_token),
+        )
+        assert created.status_code == 201, created.text
+        af_id = created.json()["items"][0]["id"]
+        routed = client.post(f"/v1/asked-for/{af_id}/route", headers=_auth(admin_token))
+        assert routed.status_code == 200, routed.text
+        item = routed.json()["items"][0]
+        assert item["no_route"] is False
+        assert item["work_order"] is not None
+        assert item["work_order"]["status"] == "queued"
+        assert str(definition["id"]) in item["work_order"]["process_definition_ids"]
+
     def test_tat_overlap_409(
         self,
         client: TestClient,

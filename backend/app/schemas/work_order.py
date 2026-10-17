@@ -32,8 +32,8 @@ class RoutingMapCreate(BaseModel):
         None,
         description="Ignored. Sample types are taken from the first process's first experiment/LIMS Run.",
     )
-    tat_min: int = Field(..., ge=1)
-    tat_max: int = Field(..., ge=1)
+    tat_min: int = Field(..., ge=0)
+    tat_max: int = Field(..., ge=0)
     process_definition_ids: List[UUID] = Field(..., min_length=1)
     active: bool = True
 
@@ -45,12 +45,22 @@ class RoutingMapCreate(BaseModel):
 
 
 class RoutingMapUpdate(BaseModel):
-    tat_min: Optional[int] = Field(None, ge=1)
-    tat_max: Optional[int] = Field(None, ge=1)
+    tat_min: Optional[int] = Field(None, ge=0)
+    tat_max: Optional[int] = Field(None, ge=0)
     process_definition_ids: Optional[List[UUID]] = Field(None, min_length=1)
     active: Optional[bool] = None
     asked_for_step_id: Optional[UUID] = None
     analysis_id: Optional[UUID] = None
+
+    @model_validator(mode="after")
+    def range_ok(self):
+        if (
+            self.tat_min is not None
+            and self.tat_max is not None
+            and self.tat_max < self.tat_min
+        ):
+            raise ValueError("tat_max must be >= tat_min")
+        return self
 
 
 class RoutingMapRead(BaseModel):
