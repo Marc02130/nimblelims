@@ -1218,12 +1218,12 @@ class TestAliquotAmountConservation:
         ) == Decimal("10")
 
     def test_pool_seed_like_concentration_units(self, db_session, auth_headers, sample_user):
-        """Several multiplier-1 concentration units must not block a shared unit.
+        """Multiplier-1 units of one type are one scale. A different type is not.
 
-        Seed data records g/L, ng/µL, µg/mL, EU/mL, and copies/µL all as
-        multiplier 1. That is not one scale. Sources that share ng/µL pool in
-        that unit. Mixing ng/µL with EU/mL debits nothing.
+        g/L and mg/mL are both multiplier 1 because 1 mg/mL = 1 g/L. EU/mL is
+        activity, a different unit type, and must not convert onto that scale.
         """
+        from app.core.conversions import canonical_base_unit
         from models.unit import Unit
 
         left = _tracked_parent(db_session, sample_user, label="seedpool-a", amount="50")
@@ -1257,6 +1257,8 @@ class TestAliquotAmountConservation:
             created.append(unit)
         db_session.flush()
         ng_ul, _ug_ml, eu_ml, _copies, _g_l = created
+        eu_ml.type = scratch_entry_id(db_session)
+        db_session.flush()
         for lab, conc_unit in ((left, ng_ul), (right, ng_ul)):
             row = db_session.query(Contents).filter(Contents.container_id == lab["source"].id).one()
             row.amount_units = amount_unit.id
@@ -1310,7 +1312,8 @@ class TestAliquotAmountConservation:
         )
         assert pooled.status_code == 200, pooled.text
         body = pooled.json()
-        assert body["concentration_units"] == str(ng_ul.id)
+        same_scale = [unit for unit in created if unit.type == conc_type]
+        assert body["concentration_units"] == str(canonical_base_unit(same_scale).id)
         assert abs(body["average_concentration"] - 15.0) < 0.001
         db_session.expire_all()
         assert Decimal(
@@ -1321,6 +1324,123 @@ class TestAliquotAmountConservation:
         ) == Decimal("40")
         dest_rows = db_session.query(Contents).filter(Contents.container_id == dest.id).all()
         assert {row.sample_id for row in dest_rows} == {left["parent"].id, right["parent"].id}
+
+    def test_pool_converts_equal_mass_concentrations(self, db_session, auth_headers, sample_user):
+        """ng/µL and µg/mL are the same scale. EU/mL is not."""
+        from models.unit import Unit
+
+        left = _tracked_parent(db_session, sample_user, label="masspool-a", amount="50")
+        right = _tracked_parent(db_session, sample_user, label="masspool-b", amount="50")
+        volume_type = get_or_create_list_entry(db_session, "unit_type", "volume")
+        conc_type = scratch_entry_id(db_session)
+        activity_type = scratch_entry_id(db_session)
+        amount_unit = Unit(
+            name=f"mL_{uuid4().hex[:6]}",
+            description="mL",
+            type=volume_type.id,
+            multiplier=1.0,
+            created_by=sample_user.id,
+            modified_by=sample_user.id,
+        )
+        g_per_l = Unit(
+            name="g/L",
+            description="g/L",
+            type=conc_type,
+            multiplier=1,
+            created_by=sample_user.id,
+            modified_by=sample_user.id,
+        )
+        mg_per_ml = Unit(
+            name=f"mg/mL {uuid4().hex[:4]}",
+            description="mg/mL",
+            type=conc_type,
+            multiplier=1,
+            created_by=sample_user.id,
+            modified_by=sample_user.id,
+        )
+        ng_ul = Unit(
+            name=f"ng/µL {uuid4().hex[:4]}",
+            description="ng/µL",
+            type=conc_type,
+            multiplier=Decimal("0.001"),
+            created_by=sample_user.id,
+            modified_by=sample_user.id,
+        )
+        ug_ml = Unit(
+            name=f"µg/mL {uuid4().hex[:4]}",
+            description="µg/mL",
+            type=conc_type,
+            multiplier=Decimal("0.001"),
+            created_by=sample_user.id,
+            modified_by=sample_user.id,
+        )
+        eu_ml = Unit(
+            name=f"EU/mL {uuid4().hex[:4]}",
+            description="EU/mL",
+            type=activity_type,
+            multiplier=1,
+            created_by=sample_user.id,
+            modified_by=sample_user.id,
+        )
+        db_session.add_all([amount_unit, g_per_l, mg_per_ml, ng_ul, ug_ml, eu_ml])
+        db_session.flush()
+        for lab, conc_unit in ((left, ng_ul), (right, ug_ml)):
+            row = db_session.query(Contents).filter(Contents.container_id == lab["source"].id).one()
+            row.amount_units = amount_unit.id
+            row.concentration_units = conc_unit.id
+        dest = Container(
+            name=f"Mass pool {uuid4().hex[:6]}",
+            description="dest",
+            type_id=left["container_type"].id,
+            created_by=sample_user.id,
+            modified_by=sample_user.id,
+        )
+        db_session.add(dest)
+        db_session.flush()
+        shared = {
+            "container_id": str(dest.id),
+            "samples": [str(left["parent"].id), str(right["parent"].id)],
+            "amounts": [1.0, 1.0],
+            "amount_units": [str(amount_unit.id), str(amount_unit.id)],
+            "source_container_ids": [str(left["source"].id), str(right["source"].id)],
+        }
+        pooled = client.post(
+            "/aliquots/pool",
+            json={
+                **shared,
+                "concentrations": [1000.0, 1000.0],
+                "concentration_units": [str(ng_ul.id), str(ug_ml.id)],
+            },
+            headers=auth_headers,
+        )
+        assert pooled.status_code == 200, pooled.text
+        body = pooled.json()
+        assert body["concentration_units"] == str(g_per_l.id)
+        assert abs(body["average_concentration"] - 1.0) < 0.0001
+        db_session.expire_all()
+        assert Decimal(
+            db_session.query(Contents).filter(Contents.container_id == left["source"].id).one().amount
+        ) == Decimal("49")
+
+        refused = client.post(
+            "/aliquots/pool",
+            json={
+                **shared,
+                "container_id": str(dest.id),
+                "concentrations": [1000.0, 5.0],
+                "concentration_units": [str(ng_ul.id), str(eu_ml.id)],
+            },
+            headers=auth_headers,
+        )
+        assert refused.status_code == 400, refused.text
+        assert refused.json()["detail"]["code"] == "incompatible_units"
+        db_session.expire_all()
+        assert Decimal(
+            db_session.query(Contents).filter(Contents.container_id == left["source"].id).one().amount
+        ) == Decimal("49")
+        assert Decimal(
+            db_session.query(Contents).filter(Contents.container_id == right["source"].id).one().amount
+        ) == Decimal("49")
 
 
 def test_parallel_aliquots_do_not_overdraw(db_engine):
