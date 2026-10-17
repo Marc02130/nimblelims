@@ -42,10 +42,10 @@ interface AnalysisFormDialogProps {
   onClose: () => void;
   onSubmit: (data: {
     name: string;
-    description?: string;
-    method?: string;
-    turnaround_time?: number;
-    cost?: number;
+    description?: string | null;
+    method?: string | null;
+    turnaround_time?: number | null;
+    cost?: number | null;
     analyte_ids: string[];
   }) => Promise<void>;
 }
@@ -59,7 +59,7 @@ const validationSchema = Yup.object({
   method: Yup.string().max(255, 'Method must be less than 255 characters'),
   turnaround_time: Yup.number()
     .integer('Turnaround time must be an integer')
-    .min(1, 'Turnaround time must be at least 1 day')
+    .min(0, 'Turnaround time must be 0 or greater')
     .nullable(),
   cost: Yup.number()
     .min(0, 'Cost must be greater than or equal to 0')
@@ -148,11 +148,11 @@ const AnalysisFormDialog: React.FC<AnalysisFormDialogProps> = ({
 
       await onSubmit({
         name: values.name,
-        description: values.description || undefined,
-        method: values.method || undefined,
-        // ?? not ||: a cost of 0 is valid (validation allows >= 0) and must be sent.
-        turnaround_time: values.turnaround_time ?? undefined,
-        cost: values.cost ?? undefined,
+        description: values.description ? values.description : (isEdit ? null : undefined),
+        method: values.method ? values.method : (isEdit ? null : undefined),
+        // 0 is a real turnaround. null is an explicit clear. undefined omits the field.
+        turnaround_time: values.turnaround_time,
+        cost: values.cost,
         analyte_ids: selectedAnalyteIds,
       });
       onClose();
@@ -234,6 +234,7 @@ const AnalysisFormDialog: React.FC<AnalysisFormDialogProps> = ({
                         type="number"
                         fullWidth
                         margin="normal"
+                        inputProps={{ min: 0, step: 1 }}
                         helperText={meta.touched && meta.error ? meta.error : 'Days required for completion'}
                         error={meta.touched && !!meta.error}
                         onChange={(e) => {

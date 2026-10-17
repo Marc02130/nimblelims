@@ -213,7 +213,7 @@ describe('AnalysisAnalytesConfig', () => {
     expect(within(dialog).getByRole('button', { name: 'Add' })).toBeDisabled();
   });
 
-  test('validates significant figures is positive integer', async () => {
+  test('allows significant figures of 0 and rejects a negative value', async () => {
     renderWithProviders(<AnalysisAnalytesConfig />);
 
     const dialog = await openAddRuleDialog();
@@ -222,7 +222,20 @@ describe('AnalysisAnalytesConfig', () => {
     fireEvent.change(sigFigs, { target: { value: '0' } });
     fireEvent.blur(sigFigs);
 
-    expect(await within(dialog).findByText('Significant figures must be at least 1')).toBeInTheDocument();
+    expect(within(dialog).queryByText('Significant figures must be at least 1')).not.toBeInTheDocument();
+    expect(within(dialog).queryByText(/0 or greater/i)).not.toBeInTheDocument();
+
+    fireEvent.mouseDown(within(dialog).getByRole('combobox', { name: /^Analyte/ }));
+    const listbox = await screen.findByRole('listbox');
+    fireEvent.click(within(listbox).getByRole('option', { name: /TOC/ }));
+    await waitFor(() => {
+      expect(within(dialog).getByRole('button', { name: 'Add' })).toBeEnabled();
+    });
+
+    fireEvent.change(sigFigs, { target: { value: '-1' } });
+    fireEvent.blur(sigFigs);
+
+    expect(await within(dialog).findByText('Significant figures must be 0 or greater')).toBeInTheDocument();
     expect(within(dialog).getByRole('button', { name: 'Add' })).toBeDisabled();
   });
 
