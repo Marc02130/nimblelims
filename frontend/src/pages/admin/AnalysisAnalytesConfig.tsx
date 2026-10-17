@@ -129,11 +129,11 @@ const AnalysisAnalytesConfig: React.FC = () => {
     list_id?: string;
     high_value?: number;
     low_value?: number;
-    significant_figures?: number;
-    calculation?: string;
-    reported_name?: string;
+    significant_figures?: number | null;
+    calculation?: string | null;
+    reported_name?: string | null;
     is_required: boolean;
-    default_value?: string;
+    default_value?: string | null;
   }) => {
     if (!analysisId) return;
     await apiService.createAnalysisAnalyteRule(analysisId, data);
@@ -146,11 +146,11 @@ const AnalysisAnalytesConfig: React.FC = () => {
     list_id?: string;
     high_value?: number;
     low_value?: number;
-    significant_figures?: number;
-    calculation?: string;
-    reported_name?: string;
+    significant_figures?: number | null;
+    calculation?: string | null;
+    reported_name?: string | null;
     is_required: boolean;
-    default_value?: string;
+    default_value?: string | null;
   }) => {
     if (!analysisId || !selectedRule) return;
     await apiService.updateAnalysisAnalyteRule(analysisId, selectedRule.analyte_id, data);

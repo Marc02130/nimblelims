@@ -25,6 +25,7 @@ from app.core.rbac import (
     require_sample_delete, require_project_access, validate_client_access
 )
 from app.core.security import get_current_user, set_current_user_id
+from app.core.patch_fields import explicit_updates
 from datetime import datetime, timedelta
 from uuid import UUID
 
@@ -1268,19 +1269,24 @@ def update_sample(
     if project:
         validate_client_access(current_user, project.client_id)
     
-    # Validate and update custom_attributes if provided
-    if sample_data.custom_attributes is not None:
-        from app.core.custom_attributes import validate_custom_attributes
-        validated_custom_attributes = validate_custom_attributes(
-            db=db,
-            entity_type='samples',
-            custom_attributes=sample_data.custom_attributes
-        )
-        sample.custom_attributes = validated_custom_attributes
+    updates = explicit_updates(
+        sample_data, sample, refuse_null={"active"}
+    )
+    if "custom_attributes" in updates:
+        if updates["custom_attributes"] is None:
+            sample.custom_attributes = None
+        else:
+            from app.core.custom_attributes import validate_custom_attributes
+            validated_custom_attributes = validate_custom_attributes(
+                db=db,
+                entity_type='samples',
+                custom_attributes=updates["custom_attributes"]
+            )
+            sample.custom_attributes = validated_custom_attributes
     
-    # Update fields (excluding custom_attributes / extra_fields handled separately)
-    update_data = sample_data.dict(exclude_unset=True, exclude={'custom_attributes', 'extra_fields'})
-    for field, value in update_data.items():
+    for field, value in updates.items():
+        if field in {"custom_attributes", "extra_fields"}:
+            continue
         setattr(sample, field, value)
 
     if sample_data.extra_fields:

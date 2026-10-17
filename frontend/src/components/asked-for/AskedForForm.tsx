@@ -127,8 +127,8 @@ const AskedForForm: React.FC<AskedForFormProps> = ({
       setError('Select a requested analysis.');
       return;
     }
-    if (!Number.isInteger(tatDays) || tatDays < 1) {
-      setError('TAT must be an integer of at least 1 day.');
+    if (!Number.isInteger(tatDays) || tatDays < 0) {
+      setError('TAT must be an integer of 0 or greater.');
       return;
     }
     for (const def of paramDefs) {
@@ -197,7 +197,7 @@ const AskedForForm: React.FC<AskedForFormProps> = ({
         fullWidth
         value={tatDays}
         onChange={(e) => setTatDays(Number(e.target.value))}
-        inputProps={{ min: 1, step: 1 }}
+        inputProps={{ min: 0, step: 1 }}
         required
       />
       {paramDefs.length > 0 && (

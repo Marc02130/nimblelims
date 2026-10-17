@@ -17,6 +17,7 @@ from app.schemas.name_template import (
 from pydantic import BaseModel
 from app.core.security import get_current_user
 from app.core.rbac import require_config_edit
+from app.core.patch_fields import explicit_updates
 from app.core.name_generation import generate_name
 from uuid import UUID
 from datetime import datetime
@@ -326,9 +327,10 @@ def update_name_template(
             detail="Name template not found"
         )
     
+    updates = explicit_updates(template_data, template)
     # Check for unique constraint if activating or changing entity_type
-    new_entity_type = template_data.entity_type or template.entity_type
-    new_active = template_data.active if template_data.active is not None else template.active
+    new_entity_type = updates["entity_type"] if "entity_type" in updates else template.entity_type
+    new_active = updates["active"] if "active" in updates else template.active
     
     if new_active and (new_entity_type != template.entity_type or (template_data.active is not None and not template.active)):
         # Check if there's another active template for this entity_type
@@ -346,17 +348,16 @@ def update_name_template(
                 detail=f"An active template already exists for entity type '{new_entity_type}'. Deactivate it first."
             )
     
-    # Update fields
-    if template_data.entity_type is not None:
-        template.entity_type = template_data.entity_type
-    if template_data.template is not None:
-        template.template = template_data.template
-    if template_data.description is not None:
-        template.description = template_data.description
-    if template_data.active is not None:
-        template.active = template_data.active
-    if template_data.seq_padding_digits is not None:
-        template.seq_padding_digits = template_data.seq_padding_digits
+    if "entity_type" in updates:
+        template.entity_type = updates["entity_type"]
+    if "template" in updates:
+        template.template = updates["template"]
+    if "description" in updates:
+        template.description = updates["description"]
+    if "active" in updates:
+        template.active = updates["active"]
+    if "seq_padding_digits" in updates:
+        template.seq_padding_digits = updates["seq_padding_digits"]
     
     template.modified_by = current_user.id
     db.commit()

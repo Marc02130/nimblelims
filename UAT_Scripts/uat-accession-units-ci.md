@@ -18,7 +18,7 @@
 
 1. Edit an analysis whose turnaround time is 0 and whose cost is 0. Save. Both stay 0.
 2. Edit an analyte rule with significant figures 0. The rule list shows 0, not blank.
-3. On a container grid, row 0 and column 0 stay visible in the editor.
+3. On a container grid, row and column stay 1-based. 0 is refused.
 
 ## Pool concurrency
 

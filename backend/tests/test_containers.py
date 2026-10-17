@@ -959,8 +959,8 @@ class TestContentsManagement:
         assert data["concentration"] == 4.0
         assert data["amount"] == 8.0
     
-    def test_remove_sample_from_container_success(self, client: TestClient, test_admin_user, test_data, db_session: Session):
-        """Test successful sample removal from container"""
+    def test_contents_delete_is_gone_amount_zero_keeps_the_row(self, client: TestClient, test_admin_user, test_data, db_session: Session):
+        """DELETE on a content row is gone. Amount 0 is the retire path and keeps the row."""
         # Create container type, container, and sample
         container_type = ContainerType(
             name="Test Container Type",
@@ -1021,14 +1021,28 @@ class TestContentsManagement:
         )
         token = auth_response.json()["access_token"]
         
-        # Remove sample from container
-        response = client.delete(
-            f"/containers/{container.id}/contents/{sample.id}",
-            headers={"Authorization": f"Bearer {token}"}
-        )
-        
-        assert response.status_code == 200, response.text
-        assert "removed from container successfully" in response.json()["message"]
+        path = f"/containers/{container.id}/contents/{sample.id}"
+        headers = {"Authorization": f"Bearer {token}"}
+
+        # The contents path still accepts PATCH. DELETE is not a route.
+        gone = client.delete(path, headers=headers)
+        assert gone.status_code == 405, gone.text
+
+        db_session.expire_all()
+        still = db_session.query(Contents).filter_by(
+            container_id=container.id, sample_id=sample.id
+        ).one()
+        assert float(still.amount) == 4.0
+
+        retired = client.patch(path, json={"amount": 0}, headers=headers)
+        assert retired.status_code == 200, retired.text
+        assert retired.json()["amount"] == 0
+
+        db_session.expire_all()
+        kept = db_session.query(Contents).filter_by(
+            container_id=container.id, sample_id=sample.id
+        ).one()
+        assert float(kept.amount) == 0.0
 
 
 class TestContainerValidation:

@@ -20,6 +20,7 @@ from app.core.security import (
     bump_password_epoch,
 )
 from app.core.rbac import require_any_permission
+from app.core.patch_fields import explicit_updates
 from uuid import UUID
 
 router = APIRouter()
@@ -179,78 +180,74 @@ def update_user(
             detail="User not found"
         )
     
-    # Check for unique username if updating
-    if user_data.username and user_data.username != user.username:
-        existing_user = db.query(User).filter(User.username == user_data.username).first()
+    updates = explicit_updates(
+        user_data,
+        user,
+        refuse_null={"active", "password", "username", "email", "name", "role_id"},
+    )
+    if "username" in updates and updates["username"] != user.username:
+        existing_user = db.query(User).filter(User.username == updates["username"]).first()
         if existing_user:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Username already exists"
             )
-        user.username = user_data.username
+        user.username = updates["username"]
     
-    # Check for unique email if updating
-    if user_data.email and user_data.email != user.email:
-        existing_email = db.query(User).filter(User.email == user_data.email).first()
+    if "email" in updates and updates["email"] != user.email:
+        existing_email = db.query(User).filter(User.email == updates["email"]).first()
         if existing_email:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Email already exists"
             )
-        user.email = user_data.email
+        user.email = updates["email"]
     
-    # Update name if provided
-    if user_data.name and user_data.name != user.name:
-        existing_name = db.query(User).filter(User.name == user_data.name).first()
+    if "name" in updates and updates["name"] != user.name:
+        existing_name = db.query(User).filter(User.name == updates["name"]).first()
         if existing_name:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Name already exists"
             )
-        user.name = user_data.name
+        user.name = updates["name"]
     
-    # Update description if provided
-    if user_data.description is not None:
-        user.description = user_data.description
+    if "description" in updates:
+        user.description = updates["description"]
     
-    # Update password if provided — complexity + force change on next login
-    if user_data.password:
+    if "password" in updates:
         complexity_errors = validate_password_complexity(
-            user_data.password, username=user_data.username or user.username
+            updates["password"], username=updates.get("username") or user.username
         )
         if complexity_errors:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail={"code": "password_complexity", "errors": complexity_errors},
             )
-        user.password_hash = get_password_hash(user_data.password)
+        user.password_hash = get_password_hash(updates["password"])
         user.must_change_password = True
         bump_password_epoch(user)
     
-    # Update role if provided
-    if user_data.role_id:
-        role = db.query(Role).filter(Role.id == user_data.role_id, Role.active == True).first()
+    if "role_id" in updates:
+        role = db.query(Role).filter(Role.id == updates["role_id"], Role.active == True).first()
         if not role:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Invalid role_id"
             )
-        user.role_id = user_data.role_id
+        user.role_id = updates["role_id"]
     
-    # Update client if provided
-    if user_data.client_id is not None:
-        if user_data.client_id:
-            client = db.query(Client).filter(Client.id == user_data.client_id, Client.active == True).first()
-            if not client:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Invalid client_id"
-                )
-        user.client_id = user_data.client_id
+    if "client_id" in updates:
+        client = db.query(Client).filter(Client.id == updates["client_id"], Client.active == True).first()
+        if not client:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid client_id"
+            )
+        user.client_id = updates["client_id"]
     
-    # Update active status if provided
-    if user_data.active is not None:
-        user.active = user_data.active
+    if "active" in updates:
+        user.active = updates["active"]
     
     user.modified_by = current_user.id
     db.commit()

@@ -12,6 +12,7 @@ from models.user import User
 from app.schemas.client import ClientResponse, ClientCreate, ClientUpdate
 from app.core.security import get_current_user, set_current_user_id
 from app.core.rbac import require_permission, is_system_client_or_admin
+from app.core.patch_fields import explicit_updates
 from uuid import UUID
 
 logger = logging.getLogger(__name__)
@@ -118,21 +119,22 @@ def update_client(
             detail="Client not found"
         )
     
-    # Check for unique name if updating
-    if client_data.name and client_data.name != client.name:
-        existing_client = db.query(Client).filter(Client.name == client_data.name).first()
+    updates = explicit_updates(client_data, client, refuse_null={"active"})
+    if "name" in updates and updates["name"] != client.name:
+        existing_client = db.query(Client).filter(Client.name == updates["name"]).first()
         if existing_client:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Client name already exists"
             )
-        client.name = client_data.name
+        client.name = updates["name"]
     
-    if client_data.description is not None:
-        client.description = client_data.description
+    if "description" in updates:
+        client.description = updates["description"]
     
-    if client_data.abbreviation is not None:
-        abbr = client_data.abbreviation.strip() if client_data.abbreviation else None
+    if "abbreviation" in updates:
+        raw = updates["abbreviation"]
+        abbr = raw.strip() if isinstance(raw, str) else None
         if abbr:
             existing = db.query(Client).filter(Client.abbreviation == abbr, Client.id != client_id).first()
             if existing:
@@ -142,11 +144,11 @@ def update_client(
                 )
         client.abbreviation = abbr or None
     
-    if client_data.billing_info is not None:
-        client.billing_info = client_data.billing_info
+    if "billing_info" in updates:
+        client.billing_info = updates["billing_info"]
     
-    if client_data.active is not None:
-        client.active = client_data.active
+    if "active" in updates:
+        client.active = updates["active"]
     
     client.modified_by = current_user.id
     db.commit()

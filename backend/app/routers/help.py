@@ -15,6 +15,7 @@ from app.schemas.help import (
 )
 from app.core.security import get_current_user, get_user_permissions
 from app.core.rbac import require_config_edit
+from app.core.patch_fields import explicit_updates
 from uuid import UUID
 
 router = APIRouter()
@@ -314,22 +315,23 @@ def update_help_entry(
             detail="Help entry not found"
         )
     
-    # Update fields
-    if help_data.section is not None:
-        help_entry.section = help_data.section
-        help_entry.name = help_data.section  # Update name to match section
+    updates = explicit_updates(help_data, help_entry, refuse_null={"active"})
+    if "section" in updates:
+        help_entry.section = updates["section"]
+        help_entry.name = updates["section"]
     
-    if help_data.content is not None:
-        help_entry.content = help_data.content
-        help_entry.description = help_data.content[:255] if len(help_data.content) > 255 else help_data.content
+    if "content" in updates:
+        help_entry.content = updates["content"]
+        content = updates["content"] or ""
+        help_entry.description = content[:255]
     
     if "role_filter" in help_data.model_fields_set:
         # Validate and normalize role_filter. An explicit null makes the entry
         # public; omitting the field leaves it unchanged.
         help_entry.role_filter = validate_role_filter(help_data.role_filter, db)
     
-    if help_data.active is not None:
-        help_entry.active = help_data.active
+    if "active" in updates:
+        help_entry.active = updates["active"]
     
     # Update audit fields
     help_entry.modified_by = current_user.id

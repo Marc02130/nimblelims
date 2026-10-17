@@ -136,10 +136,10 @@ const AnalysesManagement: React.FC = () => {
 
   const handleCreate = async (data: {
     name: string;
-    description?: string;
-    method?: string;
-    turnaround_time?: number;
-    cost?: number;
+    description?: string | null;
+    method?: string | null;
+    turnaround_time?: number | null;
+    cost?: number | null;
     analyte_ids: string[];
   }) => {
     const { analyte_ids, ...analysisData } = data;
@@ -155,10 +155,10 @@ const AnalysesManagement: React.FC = () => {
 
   const handleUpdate = async (data: {
     name: string;
-    description?: string;
-    method?: string;
-    turnaround_time?: number;
-    cost?: number;
+    description?: string | null;
+    method?: string | null;
+    turnaround_time?: number | null;
+    cost?: number | null;
     analyte_ids: string[];
   }) => {
     if (!selectedAnalysis) return;

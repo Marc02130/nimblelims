@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.core.rbac import require_config_edit, require_workflow_execute
+from app.core.patch_fields import explicit_updates
 from app.services.experiment_service import ExperimentService
 from app.schemas.experiment import (
     ExperimentCreate,
@@ -414,23 +415,24 @@ def update_workflow_template(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Workflow template not found",
         )
-    if body.name is not None:
+    updates = explicit_updates(body, template, refuse_null={"active"})
+    if "name" in updates:
         other = db.query(WorkflowTemplate).filter(
-            WorkflowTemplate.name == body.name,
+            WorkflowTemplate.name == updates["name"],
             WorkflowTemplate.id != template_id,
         ).first()
         if other:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"A template with name '{body.name}' already exists.",
+                detail=f"A template with name '{updates['name']}' already exists.",
             )
-        template.name = body.name
-    if body.description is not None:
-        template.description = body.description
-    if body.active is not None:
-        template.active = body.active
-    if body.template_definition is not None:
-        template.template_definition = body.template_definition
+        template.name = updates["name"]
+    if "description" in updates:
+        template.description = updates["description"]
+    if "active" in updates:
+        template.active = updates["active"]
+    if "template_definition" in updates:
+        template.template_definition = updates["template_definition"]
     template.modified_by = current_user.id
     db.commit()
     db.refresh(template)

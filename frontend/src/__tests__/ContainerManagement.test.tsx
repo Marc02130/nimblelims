@@ -18,7 +18,7 @@ jest.mock('../services/apiService', () => ({
     getSamples: jest.fn(),
     createContainer: jest.fn(),
     updateContainer: jest.fn(),
-    deleteContent: jest.fn(),
+    updateContent: jest.fn(),
   },
 }));
 

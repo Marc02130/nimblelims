@@ -17,17 +17,49 @@ from models.user import User
 from models.list import ListEntry
 from app.schemas.batch import (
     BatchCreate, BatchUpdate, BatchResponse, BatchListResponse,
-    BatchContainerRequest, BatchContainerResponse, BatchCreateWithContainersRequest
+    BatchContainerRequest, BatchContainerResponse, BatchContainerBody,
+    BatchCreateWithContainersRequest
 )
 from app.core.rbac import (
     require_batch_manage, require_batch_read, require_batch_update,
     require_batch_delete, require_project_access, validate_client_access
 )
 from app.core.security import get_current_user
+from app.core.patch_fields import explicit_updates
 from datetime import datetime
 from uuid import UUID
 
 router = APIRouter()
+
+
+def batch_container_response(bc: BatchContainer) -> BatchContainerResponse:
+    """Include the container id and its 1-based grid position."""
+    container = bc.container
+    body = None
+    if container is not None:
+        body = BatchContainerBody(
+            id=container.id,
+            name=container.name,
+            row=container.row,
+            column=container.column,
+            type_id=container.type_id,
+            concentration=float(container.concentration) if container.concentration is not None else None,
+            concentration_units=container.concentration_units,
+            amount=float(container.amount) if container.amount is not None else None,
+            amount_units=container.amount_units,
+        )
+    return BatchContainerResponse(
+        batch_id=bc.batch_id,
+        container_id=bc.container_id,
+        position=bc.position,
+        notes=bc.notes,
+        id=body.id if body is not None else bc.container_id,
+        name=body.name if body is not None else None,
+        row=body.row if body is not None else None,
+        column=body.column if body is not None else None,
+        type_id=body.type_id if body is not None else None,
+        container=body,
+    )
 
 
 def build_batch_response(batch: Batch, batch_containers: list) -> BatchResponse:
@@ -52,7 +84,7 @@ def build_batch_response(batch: Batch, batch_containers: list) -> BatchResponse:
         created_by=batch.created_by,
         modified_at=batch.modified_at,
         modified_by=batch.modified_by,
-        containers=[BatchContainerResponse.from_orm(bc) for bc in batch_containers] if batch_containers else []
+        containers=[batch_container_response(bc) for bc in batch_containers] if batch_containers else []
     )
 
 
@@ -997,7 +1029,7 @@ def add_container_to_batch(
     db.commit()
     db.refresh(batch_container)
     
-    return BatchContainerResponse.from_orm(batch_container)
+    return batch_container_response(batch_container)
 
 
 @router.patch("/{batch_id}", response_model=BatchResponse)
@@ -1056,9 +1088,8 @@ def update_batch(
                         detail=f"Access denied: insufficient client permissions for batch"
                     )
     
-    # Validate and update custom_attributes if provided
-    update_data = batch_data.dict(exclude_unset=True)
-    if 'custom_attributes' in update_data:
+    update_data = explicit_updates(batch_data, batch, refuse_null={"active"})
+    if 'custom_attributes' in update_data and update_data['custom_attributes'] is not None:
         from app.core.custom_attributes import validate_custom_attributes
         try:
             validated_custom_attributes = validate_custom_attributes(

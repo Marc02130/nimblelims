@@ -51,11 +51,11 @@ interface AnalyteRuleFormProps {
     list_id?: string;
     high_value?: number;
     low_value?: number;
-    significant_figures?: number;
-    calculation?: string;
-    reported_name?: string;
+    significant_figures?: number | null;
+    calculation?: string | null;
+    reported_name?: string | null;
     is_required: boolean;
-    default_value?: string;
+    default_value?: string | null;
   }) => Promise<void>;
 }
 
@@ -68,7 +68,7 @@ const createValidationSchema = (isEdit: boolean) => Yup.object({
   low_value: Yup.number().nullable(),
   significant_figures: Yup.number()
     .integer('Significant figures must be an integer')
-    .min(1, 'Significant figures must be at least 1')
+    .min(0, 'Significant figures must be 0 or greater')
     .nullable(),
   calculation: Yup.string().nullable(),
   reported_name: Yup.string().max(255, 'Reported name must be less than 255 characters').nullable(),
@@ -160,16 +160,27 @@ const AnalyteRuleForm: React.FC<AnalyteRuleFormProps> = ({
         is_required: values.is_required,
       };
 
+      const optionalNumber = (value: number | null | undefined) =>
+        value !== null && value !== undefined;
       if (values.data_type) submitData.data_type = values.data_type;
+      else if (isEdit) submitData.data_type = null;
       if (values.list_id) submitData.list_id = values.list_id;
-      if (values.high_value !== null && values.high_value !== undefined) submitData.high_value = values.high_value;
-      if (values.low_value !== null && values.low_value !== undefined) submitData.low_value = values.low_value;
-      if (values.significant_figures !== null && values.significant_figures !== undefined) {
+      else if (isEdit) submitData.list_id = null;
+      if (optionalNumber(values.high_value)) submitData.high_value = values.high_value;
+      else if (isEdit) submitData.high_value = null;
+      if (optionalNumber(values.low_value)) submitData.low_value = values.low_value;
+      else if (isEdit) submitData.low_value = null;
+      if (optionalNumber(values.significant_figures)) {
         submitData.significant_figures = values.significant_figures;
+      } else if (isEdit) {
+        submitData.significant_figures = null;
       }
       if (values.calculation) submitData.calculation = values.calculation;
+      else if (isEdit) submitData.calculation = null;
       if (values.reported_name) submitData.reported_name = values.reported_name;
+      else if (isEdit) submitData.reported_name = null;
       if (values.default_value) submitData.default_value = values.default_value;
+      else if (isEdit) submitData.default_value = null;
 
       await onSubmit(submitData);
       onClose();
@@ -312,6 +323,7 @@ const AnalyteRuleForm: React.FC<AnalyteRuleFormProps> = ({
                           type="number"
                           fullWidth
                           margin="normal"
+                          inputProps={{ min: 0, step: 1 }}
                           helperText={meta.touched && meta.error ? meta.error : 'Number of significant figures'}
                           error={meta.touched && !!meta.error}
                           onChange={(e) => {

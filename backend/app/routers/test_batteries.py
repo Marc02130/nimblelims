@@ -22,6 +22,7 @@ from app.schemas.test_battery import (
 )
 from app.core.security import get_current_user
 from app.core.rbac import require_any_permission
+from app.core.patch_fields import explicit_updates
 from uuid import UUID
 
 router = APIRouter()
@@ -195,21 +196,21 @@ def update_test_battery(
             detail="Test battery not found"
         )
     
-    # Check for unique name if updating
-    if battery_data.name and battery_data.name != battery.name:
-        existing_battery = db.query(TestBattery).filter(TestBattery.name == battery_data.name).first()
+    updates = explicit_updates(battery_data, battery, refuse_null={"active"})
+    if "name" in updates and updates["name"] != battery.name:
+        existing_battery = db.query(TestBattery).filter(TestBattery.name == updates["name"]).first()
         if existing_battery:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Test battery name already exists"
             )
-        battery.name = battery_data.name
+        battery.name = updates["name"]
     
-    if battery_data.description is not None:
-        battery.description = battery_data.description
+    if "description" in updates:
+        battery.description = updates["description"]
     
-    if battery_data.active is not None:
-        battery.active = battery_data.active
+    if "active" in updates:
+        battery.active = updates["active"]
     
     battery.modified_by = current_user.id
     db.commit()
@@ -414,11 +415,12 @@ def update_battery_analysis(
             detail="Analysis not found in this battery"
         )
     
-    # Update fields
-    if analysis_data.sequence is not None:
-        battery_analysis.sequence = analysis_data.sequence
-    if analysis_data.optional is not None:
-        battery_analysis.optional = analysis_data.optional
+    # sequence and optional are NOT NULL, so an explicit null is 422.
+    updates = explicit_updates(analysis_data, battery_analysis)
+    if "sequence" in updates:
+        battery_analysis.sequence = updates["sequence"]
+    if "optional" in updates:
+        battery_analysis.optional = updates["optional"]
     
     db.commit()
     db.refresh(battery_analysis)

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Box,
   Grid,
@@ -54,6 +54,11 @@ const ContainerDetails: React.FC<ContainerDetailsProps> = ({
   const [showAddContent, setShowAddContent] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [contents, setContents] = useState<any[]>(container.contents || []);
+
+  useEffect(() => {
+    setContents(container.contents || []);
+  }, [container]);
 
   const handleAddContent = async (contentData: any) => {
     setLoading(true);
@@ -76,12 +81,19 @@ const ContainerDetails: React.FC<ContainerDetailsProps> = ({
     }
   };
 
-  const handleRemoveContent = async (contentId: string) => {
+  const handleClearContent = async (content: any) => {
+    const sampleId = content.sample_id || content.sample?.id;
+    if (!container?.id || !sampleId) {
+      setError('This content has no sample, so its amount cannot be set to 0.');
+      return;
+    }
     try {
-      await apiService.deleteContent(contentId);
-      // Refresh container data
+      await apiService.updateContent(container.id, sampleId, { amount: 0 });
+      setContents((rows) => rows.map((row) => (
+        (row.sample_id || row.sample?.id) === sampleId ? { ...row, amount: 0 } : row
+      )));
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to remove sample from container');
+      setError(err.response?.data?.detail || 'Failed to set the content amount to 0');
     }
   };
 
@@ -154,7 +166,7 @@ const ContainerDetails: React.FC<ContainerDetailsProps> = ({
               <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
                 <Typography variant="h6">
                   <Science sx={{ mr: 1, verticalAlign: 'middle' }} />
-                  Contents ({container.contents?.length || 0})
+                  Contents ({contents.length})
                 </Typography>
                 <Button
                   startIcon={<Add />}
@@ -166,18 +178,19 @@ const ContainerDetails: React.FC<ContainerDetailsProps> = ({
                 </Button>
               </Box>
               
-              {container.contents && container.contents.length > 0 ? (
+              {contents.length > 0 ? (
                 <List dense>
-                  {container.contents.map((content: any) => (
-                    <ListItem key={content.id}>
+                  {contents.map((content: any) => (
+                    <ListItem key={content.sample_id || content.sample?.id}>
                       <ListItemText
-                        primary={content.sample.name}
+                        primary={content.sample?.name || 'Sample'}
                         secondary={`${content.concentration} ${getLookupName(content.concentration_units, lookupData.units)} • ${content.amount} ${getLookupName(content.amount_units, lookupData.units)}`}
                       />
                       <ListItemSecondaryAction>
                         <IconButton
                           size="small"
-                          onClick={() => handleRemoveContent(content.id)}
+                          aria-label="Set content amount to 0"
+                          onClick={() => handleClearContent(content)}
                         >
                           <Delete />
                         </IconButton>

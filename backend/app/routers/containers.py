@@ -17,6 +17,7 @@ from app.core.rbac import (
     require_config_edit
 )
 from app.core.security import get_current_user, get_user_permissions
+from app.core.patch_fields import explicit_updates
 from datetime import datetime
 from uuid import UUID
 
@@ -97,8 +98,8 @@ def update_container_type(
             detail="Container type not found"
         )
     
-    # Update fields
-    update_data = container_type_data.dict(exclude_unset=True)
+    # rows and columns are NOT NULL and stay at least 1 (schema ge=1).
+    update_data = explicit_updates(container_type_data, container_type, refuse_null={"active"})
     for field, value in update_data.items():
         setattr(container_type, field, value)
     
@@ -378,8 +379,15 @@ def update_container(
             detail="Container not found"
         )
     
+    # row and column are 1-based. The columns are nullable in the table, so
+    # an explicit null would clear a required coordinate. Refuse that here.
+    # ge=1 on the schema already returns 422 for 0.
+    update_data = explicit_updates(
+        container_data, container, refuse_null={"active", "row", "column"}
+    )
+
     # Validate container type if being updated
-    if container_data.type_id is not None:
+    if "type_id" in update_data:
         container_type = db.query(ContainerType).filter(
             ContainerType.id == container_data.type_id,
             ContainerType.active == True
@@ -391,8 +399,8 @@ def update_container(
                 detail="Invalid container type ID"
             )
     
-    # Validate parent container if being updated
-    if container_data.parent_container_id is not None:
+    # Validate parent container if being updated. Null clears the parent.
+    if update_data.get("parent_container_id") is not None:
         parent = db.query(Container).filter(
             Container.id == container_data.parent_container_id,
             Container.active == True
@@ -404,8 +412,6 @@ def update_container(
                 detail="Invalid parent container ID"
             )
     
-    # Update fields
-    update_data = container_data.dict(exclude_unset=True)
     for field, value in update_data.items():
         setattr(container, field, value)
     
@@ -673,8 +679,7 @@ def update_container_contents(
             detail="Contents not found"
         )
     
-    # Update fields
-    update_data = contents_data.dict(exclude_unset=True)
+    update_data = explicit_updates(contents_data, contents)
     for field, value in update_data.items():
         setattr(contents, field, value)
     
@@ -682,30 +687,3 @@ def update_container_contents(
     db.refresh(contents)
     
     return ContentsResponse.from_orm(contents)
-
-
-@router.delete("/{container_id}/contents/{sample_id}")
-def remove_sample_from_container(
-    container_id: UUID,
-    sample_id: UUID,
-    current_user: User = Depends(require_sample_update),
-    db: Session = Depends(get_db)
-):
-    """
-    Remove a sample from a container.
-    """
-    contents = db.query(Contents).filter(
-        Contents.container_id == container_id,
-        Contents.sample_id == sample_id
-    ).first()
-    
-    if not contents:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Contents not found"
-        )
-    
-    db.delete(contents)
-    db.commit()
-    
-    return {"message": "Sample removed from container successfully"}

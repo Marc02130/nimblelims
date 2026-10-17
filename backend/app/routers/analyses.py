@@ -27,6 +27,7 @@ from app.schemas.asked_for import (
 from app.services.asked_for_service import AskedForService
 from app.core.security import get_current_user, get_user_permissions
 from app.core.rbac import require_any_permission, require_config_edit
+from app.core.patch_fields import assign_updates, explicit_updates
 from uuid import UUID
 import logging
 
@@ -241,36 +242,16 @@ def update_analysis(
                 detail="Analysis not found"
             )
         
-        # Check for unique name if updating
-        if analysis_data.name and analysis_data.name != analysis.name:
-            existing_analysis = db.query(Analysis).filter(Analysis.name == analysis_data.name).first()
+        # exclude_unset keeps an explicit null so turnaround and cost can be cleared.
+        updates = explicit_updates(analysis_data, analysis, refuse_null={"active"})
+        if "name" in updates and updates["name"] != analysis.name:
+            existing_analysis = db.query(Analysis).filter(Analysis.name == updates["name"]).first()
             if existing_analysis:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Analysis name already exists"
                 )
-            analysis.name = analysis_data.name
-        
-        if analysis_data.description is not None:
-            analysis.description = analysis_data.description
-        
-        if analysis_data.method is not None:
-            analysis.method = analysis_data.method
-        
-        if analysis_data.turnaround_time is not None:
-            analysis.turnaround_time = analysis_data.turnaround_time
-        
-        if analysis_data.cost is not None:
-            analysis.cost = analysis_data.cost
-        
-        if analysis_data.shelf_life is not None:
-            analysis.shelf_life = analysis_data.shelf_life
-        
-        if analysis_data.active is not None:
-            analysis.active = analysis_data.active
-        
-        if analysis_data.custom_attributes is not None:
-            analysis.custom_attributes = analysis_data.custom_attributes
+        assign_updates(analysis, updates)
         
         analysis.modified_by = current_user.id
         db.commit()
@@ -722,37 +703,17 @@ def update_analysis_analyte_rule(
                 detail="Analyte rule not found"
             )
         
-        # Validate low <= high if both are provided
-        low_value = rule_data.low_value if rule_data.low_value is not None else rule.low_value
-        high_value = rule_data.high_value if rule_data.high_value is not None else rule.high_value
+        # An explicit null clears a nullable limit. is_required is NOT NULL.
+        updates = explicit_updates(rule_data, rule)
+        low_value = updates["low_value"] if "low_value" in updates else rule.low_value
+        high_value = updates["high_value"] if "high_value" in updates else rule.high_value
         if low_value is not None and high_value is not None:
             if low_value > high_value:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Low value must be less than or equal to high value"
                 )
-        
-        # Update rule fields
-        if rule_data.data_type is not None:
-            rule.data_type = rule_data.data_type
-        if rule_data.list_id is not None:
-            rule.list_id = rule_data.list_id
-        if rule_data.high_value is not None:
-            rule.high_value = rule_data.high_value
-        if rule_data.low_value is not None:
-            rule.low_value = rule_data.low_value
-        if rule_data.significant_figures is not None:
-            rule.significant_figures = rule_data.significant_figures
-        if rule_data.calculation is not None:
-            rule.calculation = rule_data.calculation
-        if rule_data.reported_name is not None:
-            rule.reported_name = rule_data.reported_name
-        if rule_data.display_order is not None:
-            rule.display_order = rule_data.display_order
-        if rule_data.is_required is not None:
-            rule.is_required = rule_data.is_required
-        if rule_data.default_value is not None:
-            rule.default_value = rule_data.default_value
+        assign_updates(rule, updates)
         
         db.commit()
         db.refresh(rule)

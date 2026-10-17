@@ -20,6 +20,7 @@ from app.core.rbac import (
     require_result_read, validate_client_access
 )
 from app.core.security import get_current_user
+from app.core.patch_fields import explicit_updates
 from datetime import datetime
 from uuid import UUID
 
@@ -333,19 +334,22 @@ def update_test(
     # Validate client access: non-System/Admin users can only update tests for their own client's projects
     validate_client_access(current_user, test.sample.project.client_id)
     
-    # Validate and update custom_attributes if provided
-    if test_data.custom_attributes is not None:
-        from app.core.custom_attributes import validate_custom_attributes
-        validated_custom_attributes = validate_custom_attributes(
-            db=db,
-            entity_type='tests',
-            custom_attributes=test_data.custom_attributes
-        )
-        test.custom_attributes = validated_custom_attributes
+    updates = explicit_updates(test_data, test, refuse_null={"active"})
+    if "custom_attributes" in updates:
+        if updates["custom_attributes"] is None:
+            test.custom_attributes = None
+        else:
+            from app.core.custom_attributes import validate_custom_attributes
+            validated_custom_attributes = validate_custom_attributes(
+                db=db,
+                entity_type='tests',
+                custom_attributes=updates["custom_attributes"]
+            )
+            test.custom_attributes = validated_custom_attributes
     
-    # Update fields (excluding custom_attributes which is handled above)
-    update_data = test_data.dict(exclude_unset=True, exclude={'custom_attributes'})
-    for field, value in update_data.items():
+    for field, value in updates.items():
+        if field == "custom_attributes":
+            continue
         setattr(test, field, value)
     
     test.modified_by = current_user.id

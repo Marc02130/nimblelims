@@ -65,7 +65,7 @@ Mounted in `backend/app/main.py`.
 
 `POST /samples/receive` is accession (identity + first vessel, zero Tests). It is not an entry action and not a rule action (§4).
 
-`DELETE /samples/{sample_id}` sets `active=False` in current code. `DELETE /containers/{container_id}/contents/{sample_id}` removes a contents row. `DELETE /v1/entries/{entry_id}` removes an entry row. Those routes exist. P1 entries and P1 rules do not use them as the retire path. The retire path is status change or amount → 0 (FB-E7, FB-R6, Katinka). This spec does not restamp the existing delete routes.
+`DELETE /samples/{sample_id}` sets `active=False` in current code. `DELETE /v1/entries/{entry_id}` removes an entry row. Those routes exist. `DELETE /containers/{container_id}/contents/{sample_id}` is not a route. A content row is retired by `PATCH` with amount 0, and the row stays. P1 entries and P1 rules use status change or amount → 0 (FB-E7, FB-R6, Katinka).
 
 No materials or lot router exists. `container_types.material` is vessel composition, not lot tracking. The placeholder [materials-and-lot-tracking](../../ideas/materials-and-lot-tracking.md) described an inventory that is not shipped. Rolf puts Material Tracking in the P1 picker. FB-E6: the entry calls an API from the table above, or it stops and says the change cannot be expressed. It does not create a lot table, a JSONB config field, or a list-as-schema.
 

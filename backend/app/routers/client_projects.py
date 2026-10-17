@@ -17,6 +17,7 @@ from app.schemas.client_project import (
 )
 from app.core.security import get_current_user
 from app.core.rbac import require_permission, validate_client_access
+from app.core.patch_fields import explicit_updates
 from uuid import UUID
 
 logger = logging.getLogger(__name__)
@@ -212,37 +213,39 @@ def update_client_project(
     # Validate client access: non-System/Admin users can only update their own client's projects
     validate_client_access(current_user, client_project.client_id)
     
-    # Check for unique name if updating
-    if client_project_data.name and client_project_data.name != client_project.name:
+    updates = explicit_updates(client_project_data, client_project, refuse_null={"active"})
+    if "name" in updates and updates["name"] != client_project.name:
         existing_client_project = db.query(ClientProject).filter(
-            ClientProject.name == client_project_data.name
+            ClientProject.name == updates["name"]
         ).first()
         if existing_client_project:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Client project name already exists"
             )
-        client_project.name = client_project_data.name
+        client_project.name = updates["name"]
     
-    if client_project_data.description is not None:
-        client_project.description = client_project_data.description
+    if "description" in updates:
+        client_project.description = updates["description"]
     
-    if client_project_data.active is not None:
-        client_project.active = client_project_data.active
+    if "active" in updates:
+        client_project.active = updates["active"]
     
-    # Validate and update custom_attributes if provided
-    if client_project_data.custom_attributes is not None:
-        from app.core.custom_attributes import validate_custom_attributes
-        try:
-            validated_custom_attributes = validate_custom_attributes(
-                db, "client_projects", client_project_data.custom_attributes
-            )
-            client_project.custom_attributes = validated_custom_attributes
-        except ValueError as e:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=str(e)
-            )
+    if "custom_attributes" in updates:
+        if updates["custom_attributes"] is None:
+            client_project.custom_attributes = None
+        else:
+            from app.core.custom_attributes import validate_custom_attributes
+            try:
+                validated_custom_attributes = validate_custom_attributes(
+                    db, "client_projects", updates["custom_attributes"]
+                )
+                client_project.custom_attributes = validated_custom_attributes
+            except ValueError as e:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=str(e)
+                )
     
     # Update audit fields
     client_project.modified_by = current_user.id

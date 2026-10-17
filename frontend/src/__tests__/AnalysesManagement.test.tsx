@@ -276,7 +276,7 @@ describe('AnalysesManagement', () => {
     });
   });
 
-  test('validates turnaround time is positive integer', async () => {
+  test('allows turnaround time of 0 and rejects a negative value', async () => {
     renderWithProviders(<AnalysesManagement />);
 
     await waitFor(() => {
@@ -297,7 +297,15 @@ describe('AnalysesManagement', () => {
     fireEvent.blur(turnaroundInput);
 
     await waitFor(() => {
-      expect(screen.getByText(/Turnaround time must be at least 1 day/i)).toBeInTheDocument();
+      expect(screen.queryByText(/Turnaround time must be at least 1 day/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/0 or greater/i)).not.toBeInTheDocument();
+    });
+
+    fireEvent.change(turnaroundInput, { target: { value: '-1' } });
+    fireEvent.blur(turnaroundInput);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Turnaround time must be 0 or greater/i)).toBeInTheDocument();
     });
   });
 

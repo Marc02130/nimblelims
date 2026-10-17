@@ -10,6 +10,7 @@ from models.user import User
 from models.list import ListEntry
 from app.core.security import get_current_user, get_user_permissions
 from app.core.rbac import require_config_edit
+from app.core.patch_fields import explicit_updates
 from app.core.conversions import (
     ConversionError,
     assert_multiplier_for_save,
@@ -170,28 +171,30 @@ def update_unit(
             detail="Unit not found"
         )
     
-    # Check for unique name if updating
-    if unit_data.name and unit_data.name != unit.name:
-        existing_unit = db.query(Unit).filter(Unit.name == unit_data.name).first()
+    updates = explicit_updates(unit_data, unit, refuse_null={"active"})
+    if "name" in updates and updates["name"] != unit.name:
+        existing_unit = db.query(Unit).filter(Unit.name == updates["name"]).first()
         if existing_unit:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Unit name already exists"
             )
-        unit.name = unit_data.name
-    
-    if unit_data.description is not None:
-        unit.description = unit_data.description
+        unit.name = updates["name"]
+    if "description" in updates:
+        unit.description = updates["description"]
     new_type = unit.type
-    if unit_data.type is not None:
-        unit_type = db.query(ListEntry).filter(ListEntry.id == unit_data.type).first()
+    if "type" in updates:
+        unit_type = db.query(ListEntry).filter(ListEntry.id == updates["type"]).first()
         if not unit_type:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Invalid unit type"
             )
-        new_type = unit_data.type
-    new_multiplier = unit.multiplier if unit_data.multiplier is None else unit_data.multiplier
+        new_type = updates["type"]
+    if "multiplier" in updates:
+        new_multiplier = updates["multiplier"]
+    else:
+        new_multiplier = unit.multiplier
     if new_multiplier is not None:
         try:
             checked = assert_multiplier_for_save(
@@ -200,9 +203,11 @@ def update_unit(
         except ConversionError as exc:
             _reject_multiplier(exc)
         unit.multiplier = checked
+    elif "multiplier" in updates:
+        unit.multiplier = None
     unit.type = new_type
-    if unit_data.active is not None:
-        unit.active = unit_data.active
+    if "active" in updates:
+        unit.active = updates["active"]
     
     unit.modified_by = current_user.id
     db.commit()

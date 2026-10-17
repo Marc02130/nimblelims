@@ -10,6 +10,7 @@ from models.user import User
 from app.schemas.list import ListEntryResponse, ListResponse, ListEntryCreate, ListEntryUpdate, ListCreate, ListUpdate
 from app.core.security import get_current_user, get_user_permissions
 from app.core.rbac import require_config_edit
+from app.core.patch_fields import explicit_updates
 from datetime import datetime
 from uuid import UUID
 
@@ -160,8 +161,7 @@ def update_list(
                 detail=f"List with name '{list_data.name}' already exists"
             )
     
-    # Update fields
-    update_data = list_data.dict(exclude_unset=True)
+    update_data = explicit_updates(list_data, list_obj, refuse_null={"active"})
     for field, value in update_data.items():
         setattr(list_obj, field, value)
     
@@ -329,8 +329,7 @@ def update_list_entry(
                 detail=f"Entry with name '{entry_data.name}' already exists in list '{list_name}'"
             )
     
-    # Update fields
-    update_data = entry_data.dict(exclude_unset=True)
+    update_data = explicit_updates(entry_data, entry, refuse_null={"active"})
     for field, value in update_data.items():
         setattr(entry, field, value)
     

@@ -172,7 +172,7 @@ A derivative `temperature` of `0` is stored as 0 °C. Only a null or omitted tem
 
 `POST /aliquots/pool` (`sample:create`) places each listed sample in the destination container and debits that sample's source vessel with the same atomic update. The debits and the destination rows commit together: if one source cannot cover its amount, nothing is debited and no destination row is inserted. The contents row stays, including at amount 0. Optional `source_container_ids` is the same length and order as `samples`, and is required when a sample is already in more than one vessel. A request amount in a different unit of the same type is converted into the source vessel's unit before the debit when that type has a single base unit. A concentration of 0 is **400** (`Cannot pool: concentration is zero`) because volume is amount divided by concentration.
 
-The summary `concentration_units` is the unit already on the source contents when every source shares one (otherwise the request unit). It is not "the" base unit of the concentration type. Seed data has several multiplier-1 concentration units (`g/L`, `ng/µL`, `µg/mL`, `EU/mL`, `copies/µL`); those are different quantities, so a pool of them is **400** `incompatible_units` and debits nothing. Sources that all use `ng/µL` pool in `ng/µL`. Plan execute is the bench pool (it mints a child per line). This route stays for placing the existing samples in one container.
+The summary `concentration_units` is the shared reporting unit for that unit type. Mass concentration reports in the multiplier-1 unit (g/L when that base is present). ng/µL and µg/mL convert onto that scale. EU/mL is activity and copies/µL is copy concentration, so either one pooled with a mass concentration is **400** `incompatible_units` and debits nothing. Each destination contents row stores that combined concentration and the shared unit, not the source's own requested concentration. The source is still debited by the transferred quantity. Plan execute is the bench pool (it mints a child per line). This route stays for placing the existing samples in one container.
 
 **Refusals:** **400** `amount_required`, `source_contents_missing`, `source_container_required`, `source_amount_null`, `insufficient_amount`, `amount_unit_mismatch`, `incompatible_units`, `aliquot_same_container`. **409** `sample_already_in_container`. **503** `source_busy` when a vessel row lock times out.
 
@@ -1109,18 +1109,21 @@ Update an analysis (partial update).
 {
   "name": "Updated Analysis Name",
   "method": "Updated Method",
-  "turnaround_time": 7,
+  "turnaround_time": 0,
   "cost": 150.00,
   "active": false,
   "custom_attributes": {"notes": "Updated"}
 }
 ```
 
+Turnaround time and cost accept 0. An explicit JSON null clears a nullable field (`turnaround_time`, `cost`, `description`, `method`, `shelf_life`). Omitting the key leaves the stored value. `name` and `active` cannot be cleared.
+
 **Response:** Updated AnalysisResponse
 
 **Error Responses:**
 - `404`: Analysis not found
 - `400`: Analysis name already exists (if changing name)
+- `422`: a required field was sent as null, or a number is below its minimum
 
 ### DELETE /analyses/{id}
 Soft-delete an analysis (sets active=false).

@@ -11,6 +11,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 
 from app.core.rbac import require_config_edit
+from app.core.patch_fields import explicit_updates
 from app.core.security import get_current_user, get_user_permissions
 from app.database import get_db
 from app.schemas.instrument_catalog import (
@@ -113,7 +114,7 @@ def update_instrument_type(
     row = db.query(InstrumentType).filter(InstrumentType.id == type_id).first()
     if not row:
         raise HTTPException(status_code=404, detail="Instrument type not found")
-    data = body.model_dump(exclude_unset=True)
+    data = explicit_updates(body, row, refuse_null={"active"})
     if "name" in data and data["name"] != row.name:
         if db.query(InstrumentType).filter(InstrumentType.name == data["name"]).first():
             raise HTTPException(status_code=400, detail="Instrument type name already exists")
@@ -258,7 +259,7 @@ def update_instrument(
     row = db.query(Instrument).filter(Instrument.id == instrument_id).first()
     if not row:
         raise HTTPException(status_code=404, detail="Instrument not found")
-    data = body.model_dump(exclude_unset=True)
+    data = explicit_updates(body, row, refuse_null={"active"})
     if "instrument_type_id" in data:
         if not db.query(InstrumentType).filter(
             InstrumentType.id == data["instrument_type_id"]
@@ -398,7 +399,7 @@ def update_cro_source(
     row = db.query(CroSource).filter(CroSource.id == source_id).first()
     if not row:
         raise HTTPException(status_code=404, detail="CRO source not found")
-    data = body.model_dump(exclude_unset=True)
+    data = explicit_updates(body, row, refuse_null={"active"})
     if "name" in data and data["name"] != row.name:
         if db.query(CroSource).filter(CroSource.name == data["name"]).first():
             raise HTTPException(status_code=400, detail="CRO source name already exists")

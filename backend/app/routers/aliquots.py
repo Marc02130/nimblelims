@@ -630,14 +630,25 @@ def pool_samples(
         ):
             debit_contents_amount(db, source, transfer, sample_label=str(_sample_id))
         for i, (sample_id, source, _transfer) in enumerate(debits):
+            # The destination holds the mixture concentration in the shared
+            # reporting unit, not each source's requested concentration.
+            # The amount is the quantity that moved, in the shared amount unit.
+            if amount_to_base:
+                placed_amount = Decimal(str(_reported(
+                    pooling_data.amounts[i], amount_rows[i], True
+                )))
+                placed_amount_unit = amount_report.id
+            else:
+                placed_amount = Decimal(str(pooling_data.amounts[i]))
+                placed_amount_unit = pooling_data.amount_units[i]
             _place_contents(
                 db,
                 pooling_data.container_id,
                 sample_id,
-                Decimal(str(pooling_data.amounts[i])),
-                pooling_data.amount_units[i],
-                pooling_data.concentrations[i],
-                pooling_data.concentration_units[i],
+                placed_amount,
+                placed_amount_unit,
+                average_concentration,
+                concentration_report.id,
                 source,
             )
         return PoolingResponse(

@@ -207,10 +207,9 @@ Pooling = multiple content rows on one **tube/well (1×1)**:
 **PATCH** `/containers/{container_id}/contents/{sample_id}`
 - Update contents (concentration/amount)
 - Requires: `sample:update` permission
+- Amount `0` retires the row. The row stays.
 
-**DELETE** `/containers/{container_id}/contents/{sample_id}`
-- Remove sample from container
-- Requires: `sample:update` permission
+There is no DELETE for a content row. `DELETE /containers/{container_id}/contents/{sample_id}` and `DELETE /contents/{id}` are not routes.
 
 **Implementation**: `backend/app/routers/containers.py`
 
@@ -597,7 +596,7 @@ Containers follow a lifecycle from creation to archival.
 - Display container information
 - List contents (samples in container)
 - Add sample to container dialog
-- Remove sample from container
+- Set a content amount to 0
 - Edit container button
 
 ### Container Grid (Batch View)
