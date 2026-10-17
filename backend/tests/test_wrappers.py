@@ -22,6 +22,13 @@ def test_wrapper_mate_and_lookup():
     assert wrapper_mate_key("aliquot_pool_plan") == "aliquots_pools"
     assert wrapper_mate_key("aliquots_pools") == "aliquot_pool_plan"
     assert wrapper_mate_key("experiment_header") is None
+    assert wrapper_id_for_key("reagents") == "reagents"
+    assert wrapper_mate_key("reagents") is None
+    spec = WRAPPER_CATALOG["reagents"]
+    assert spec["keys"] == ("reagents",)
+    assert spec["cardinality"] == 1
+    assert spec["atomic_pair"] is False
+    assert spec["mint"] is False
 
 
 def test_wrapper_capacity_one_pair_ok_two_plans_not():

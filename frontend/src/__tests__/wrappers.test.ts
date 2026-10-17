@@ -21,6 +21,10 @@ describe('WRAPPER_CATALOG', () => {
     expect(wrapperMateKey('aliquot_pool_plan')).toBe('aliquots_pools');
     expect(wrapperMateKey('aliquots_pools')).toBe('aliquot_pool_plan');
     expect(wrapperMateKey('experiment_header')).toBeNull();
+    expect(wrapperIdForKey('reagents')).toBe('reagents');
+    expect(wrapperMateKey('reagents')).toBeNull();
+    expect(WRAPPER_CATALOG.reagents.cardinality).toBe(1);
+    expect(WRAPPER_CATALOG.reagents.mint).toBe(false);
   });
 
   it('treats one pair as at capacity', () => {

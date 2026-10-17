@@ -195,6 +195,20 @@ class ReagentLotResponse(BaseModel):
     modified_at: datetime
 
 
+class ExperimentReagentAdd(BaseModel):
+    """Add one active catalog reagent to an experiment's saved reagent list."""
+
+    reagent_id: UUID
+
+
+class ExperimentReagentListResponse(BaseModel):
+    """The experiment's reagent entry after an add. The list is what reloads."""
+
+    experiment_id: UUID
+    entry_id: UUID
+    allowed_reagent_ids: list[str]
+
+
 class ReagentUseCreate(BaseModel):
     """Select a lot, then the quantity used. The lot's quantity remaining goes down."""
 

@@ -4,7 +4,7 @@
  * (cardinality 1). n-instances: ideas/aliquot-pool-multiple-pairs.md
  */
 
-export type WrapperId = 'aliquot_pool' | 'experiment_header' | 'samples';
+export type WrapperId = 'aliquot_pool' | 'experiment_header' | 'samples' | 'reagents';
 
 export type WrapperSpec = {
   id: WrapperId;
@@ -41,6 +41,14 @@ export const WRAPPER_CATALOG: Record<WrapperId, WrapperSpec> = {
     atomicPair: false,
     mint: false,
     addLabel: 'Samples',
+  },
+  reagents: {
+    id: 'reagents',
+    keys: ['reagents'],
+    cardinality: 1,
+    atomicPair: false,
+    mint: false,
+    addLabel: 'Reagents',
   },
 };
 
