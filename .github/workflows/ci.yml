@@ -32,6 +32,26 @@ jobs:
       - name: numeric truthiness
         run: python backend/checks/numeric_truthiness.py
 
+  backend-tests:
+    name: Backend tests (pytest)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install backend dependencies
+        run: pip install -r backend/requirements.txt
+      # Tests start Postgres themselves (testcontainers, pgvector/pgvector:pg15).
+      # The GitHub runner provides Docker; no extra service container is required.
+      - name: pytest
+        working-directory: backend
+        run: python -m pytest -q --tb=line
+        env:
+          ENVIRONMENT: test
+          ALLOW_INSECURE_DEFAULTS: "true"
+          SECRET_KEY: pytest-secret-key-not-for-production
+
   frontend:
     name: Frontend tests and type check
     runs-on: ubuntu-latest
