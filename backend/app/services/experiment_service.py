@@ -108,7 +108,7 @@ def _reagent_entry_invalid(message: str) -> HTTPException:
 def _reject_invalid_reagent_entries(
     db: Session, template_definition: Optional[Dict[str, Any]]
 ) -> None:
-    """A Reagent entry names one or more active catalog reagents."""
+    """A Reagent entry names one or more active catalog reagents as its defaults."""
     if template_definition is None:
         return
     entries = template_definition.get("entries") or []

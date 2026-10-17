@@ -143,7 +143,7 @@ const ENTRY_TYPE_OPTIONS: {
     value: 'reagent',
     label: 'Reagent',
     helper:
-      'Names the catalog reagents this experiment may use. The lab tech picks the lot when the experiment runs.',
+      'Default catalog reagents for this experiment. The lab tech can add any active reagent, then picks the lot.',
   },
 ];
 
@@ -294,7 +294,7 @@ const PREDEFINED_PRESETS: {
     entry: {
       entry_type: 'reagent',
       name: 'Reagents',
-      description: 'Catalog reagents this experiment may use; the lab tech picks the lot at use',
+      description: 'Default catalog reagents; the lab tech can add any active reagent and then picks the lot',
       predefined_entry_key: 'reagents',
       config: { allowed_reagent_ids: [] },
       fields: [],
@@ -1120,7 +1120,7 @@ const ExperimentTemplatesManagement: React.FC = () => {
                     const ids = entry.config?.allowed_reagent_ids;
                     return !Array.isArray(ids) || ids.length === 0;
                   })
-                    ? ' A Reagent entry needs at least one allowed reagent from the catalog.'
+                    ? ' A Reagent entry needs at least one default reagent from the catalog.'
                     : ' These are the reusable capture places instantiated when an experiment is created from this template.'}
                 </div>
               )}
@@ -1341,11 +1341,11 @@ const ExperimentTemplatesManagement: React.FC = () => {
                             entry.config.allowed_reagent_ids.length === 0)
                         }
                       >
-                        <InputLabel id={`allowed-reagents-${ei}`}>Allowed reagents</InputLabel>
+                        <InputLabel id={`allowed-reagents-${ei}`}>Default reagents</InputLabel>
                         <Select
                           multiple
                           labelId={`allowed-reagents-${ei}`}
-                          label="Allowed reagents"
+                          label="Default reagents"
                           value={
                             Array.isArray(entry.config?.allowed_reagent_ids)
                               ? entry.config.allowed_reagent_ids
@@ -1380,7 +1380,7 @@ const ExperimentTemplatesManagement: React.FC = () => {
                           )}
                         </Select>
                         <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5 }}>
-                          The lab tech picks a lot of one of these reagents when the experiment runs.
+                          These reagents are prefilled on the experiment. The lab tech can add any other active reagent, then record its lot.
                         </Typography>
                       </FormControl>
                     )}
@@ -1664,7 +1664,7 @@ const ExperimentTemplatesManagement: React.FC = () => {
                     )}
                     {!isDataTable && entry.entry_type === 'reagent' && (
                       <Typography variant="body2" color="text.secondary">
-                        Lots are recorded on the experiment. This entry stores the allowed reagents.
+                        Lots are recorded on the experiment. This entry stores the default reagents.
                       </Typography>
                     )}
                   </Box>

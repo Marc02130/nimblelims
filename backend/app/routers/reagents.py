@@ -417,51 +417,7 @@ def update_reagent_lot(
 
 # --------------------------------------------------------------------- uses ---
 
-REAGENT_NOT_IN_TEMPLATE = "reagent_not_in_template"
 REAGENT_INACTIVE = "reagent_inactive"
-
-
-def _reagent_ids_allowed_on_experiment(db: Session, experiment_id: UUID) -> set:
-    """Active reagent entries on the experiment: the template's allow-list snapshot."""
-    from models.entry import Entry
-
-    rows = (
-        db.query(Entry)
-        .filter(Entry.experiment_id == experiment_id, Entry.active.is_(True))
-        .all()
-    )
-    allowed: set = set()
-    for row in rows:
-        if row.entry_type != "reagent" and row.predefined_entry_key != "reagents":
-            continue
-        config = row.config if isinstance(row.config, dict) else None
-        if config is None:
-            continue
-        raw_ids = config.get("allowed_reagent_ids")
-        if raw_ids is None or not isinstance(raw_ids, list):
-            continue
-        for raw in raw_ids:
-            if raw is None:
-                continue
-            try:
-                allowed.add(UUID(str(raw)))
-            except (ValueError, TypeError):
-                continue
-    return allowed
-
-
-def _refuse_reagent_outside_template(db: Session, experiment_id: UUID, reagent_id: UUID) -> None:
-    if reagent_id not in _reagent_ids_allowed_on_experiment(db, experiment_id):
-        raise HTTPException(
-            status_code=422,
-            detail={
-                "code": REAGENT_NOT_IN_TEMPLATE,
-                "message": (
-                    "This reagent is not one of the reagents named on the experiment template. "
-                    "Record a lot of an allowed reagent."
-                ),
-            },
-        )
 
 
 def _refuse_inactive_reagent(db: Session, reagent_id: UUID) -> None:
@@ -526,10 +482,9 @@ def record_reagent_use(
     lot = db.query(ReagentLot).filter(ReagentLot.id == body.reagent_lot_id).first()
     if lot is None:
         raise HTTPException(status_code=404, detail="Reagent lot not found")
-    # experiment_id uses the allow-list copied at experiment creation.
+    # A template's reagent list is a default, not a limit. Any active catalog
+    # reagent can be recorded on a template experiment or an ad hoc experiment.
     # Every use, including a LIMS-run-only use, refuses an inactive catalog reagent.
-    if body.experiment_id is not None:
-        _refuse_reagent_outside_template(db, body.experiment_id, lot.reagent_id)
     _refuse_inactive_reagent(db, lot.reagent_id)
     if lot.active is not True:
         raise HTTPException(status_code=422, detail=f"Lot {lot.lot_number} is inactive and can't be used")

@@ -32,7 +32,7 @@ class EntryCreate(BaseModel):
         description=(
             "experiment_sample_data | experiment_data | predefined_action | reagent | display_table "
             "(legacy: sample_data, experiment_detail). "
-            "reagent stores allowed_reagent_ids; the lot is chosen at use."
+            "reagent stores allowed_reagent_ids as the default reagents; any active reagent can be added, then the lot."
         ),
     )
     name: str = Field(..., min_length=1, max_length=255)

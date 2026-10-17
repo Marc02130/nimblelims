@@ -691,11 +691,15 @@ const EntryCapturePanel: React.FC<EntryCapturePanelProps> = ({
       </Typography>
 
       {entries.length === 0 ? (
-        <Alert severity="info">
-          No entries yet. If the experiment template defines{' '}
-          <code>template_definition.entries</code>, use <strong>Instantiate from template</strong>.
-          Or <strong>Add aliquot/pool</strong> to create the plan and dest pair together.
-        </Alert>
+        <>
+          <Alert severity="info">
+            No entries yet. If the experiment template defines{' '}
+            <code>template_definition.entries</code>, use <strong>Instantiate from template</strong>.
+            Or <strong>Add aliquot/pool</strong> to create the plan and dest pair together. Add any
+            active reagent below, then record its lot.
+          </Alert>
+          <ReagentUsePanel experimentId={experimentId} defaultReagentIds={[]} />
+        </>
       ) : (
         entries.map((entry) => {
           const links = (entry.field_definition_links || [])
@@ -708,7 +712,7 @@ const EntryCapturePanel: React.FC<EntryCapturePanelProps> = ({
           const dataRows = rowKeysByEntry[entry.id] || [];
           const isReagentEntry =
             entry.entry_type === 'reagent' || entry.predefined_entry_key === 'reagents';
-          const allowedReagentIds = Array.isArray(entry.config?.allowed_reagent_ids)
+          const defaultReagentIds = Array.isArray(entry.config?.allowed_reagent_ids)
             ? entry.config.allowed_reagent_ids
             : [];
 
@@ -769,7 +773,7 @@ const EntryCapturePanel: React.FC<EntryCapturePanelProps> = ({
                 {isReagentEntry ? (
                   <ReagentUsePanel
                     experimentId={experimentId}
-                    allowedReagentIds={allowedReagentIds}
+                    defaultReagentIds={defaultReagentIds}
                   />
                 ) : isSampleScoped(entry.entry_type) ? (
                   sampleIds.length === 0 ? (
@@ -970,6 +974,10 @@ const EntryCapturePanel: React.FC<EntryCapturePanelProps> = ({
           );
         })
       )}
+      {entries.length > 0 &&
+        !entries.some(
+          (entry) => entry.entry_type === 'reagent' || entry.predefined_entry_key === 'reagents',
+        ) && <ReagentUsePanel experimentId={experimentId} defaultReagentIds={[]} />}
     </Box>
   );
 };

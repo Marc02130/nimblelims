@@ -1,8 +1,9 @@
 """Reagent entry on an experiment template.
 
-The template names the catalog reagents. At use the lab tech picks a lot of
-one of those reagents, recorded on reagent_uses with experiment_id. A reagent
-that is not on the template is refused. Expired and QC-rejected lots stay refused.
+The template names the default catalog reagents. Creating an experiment copies
+that list onto the entry. It is a prefill, not a limit: on a template experiment
+and on an ad hoc experiment the lab tech can record a lot of any active reagent.
+Inactive reagents, and expired or QC-rejected lots, stay refused.
 """
 import uuid
 from datetime import date, timedelta
@@ -152,7 +153,21 @@ def test_reagent_entry_validation(client: TestClient, test_admin_user):
     assert ok.status_code == 201, ok.text
 
 
-def test_experiment_use_follows_template_allow_list(client: TestClient, test_admin_user):
+def test_template_prefills_default_reagents(client: TestClient, test_admin_user):
+    headers = _login(client, "admin", "adminpassword")
+    first = _reagent(client, headers)
+    second = _reagent(client, headers)
+    template = _template(client, headers, [first["id"], second["id"]])
+    experiment = _experiment(client, headers, template["id"])
+    entries = client.get(f"/v1/experiments/{experiment['id']}/entries", headers=headers)
+    assert entries.status_code == 200, entries.text
+    reagent_entries = [row for row in entries.json()["entries"] if row["entry_type"] == "reagent"]
+    assert len(reagent_entries) == 1
+    assert reagent_entries[0]["predefined_entry_key"] == "reagents"
+    assert reagent_entries[0]["config"]["allowed_reagent_ids"] == [first["id"], second["id"]]
+
+
+def test_experiment_use_accepts_off_template_active_reagent(client: TestClient, test_admin_user):
     headers = _login(client, "admin", "adminpassword")
     allowed = _reagent(client, headers)
     other = _reagent(client, headers)
@@ -187,7 +202,7 @@ def test_experiment_use_follows_template_allow_list(client: TestClient, test_adm
     assert reagent_entries[0]["config"]["allowed_reagent_ids"] == [allowed["id"]]
     assert reagent_entries[0]["predefined_entry_key"] == "reagents"
 
-    refused = client.post(
+    accepted = client.post(
         "/v1/reagent-uses",
         headers=headers,
         json={
@@ -196,8 +211,18 @@ def test_experiment_use_follows_template_allow_list(client: TestClient, test_adm
             "quantity_used": "1",
         },
     )
-    assert refused.status_code == 422
-    assert refused.json()["detail"]["code"] == "reagent_not_in_template"
+    assert accepted.status_code == 201, accepted.text
+    assert accepted.json()["experiment_id"] == experiment["id"]
+    assert accepted.json()["reagent_lot_id"] == off_template["id"]
+    off_remaining = client.get(f"/v1/reagent-lots/{off_template['id']}", headers=headers)
+    assert off_remaining.status_code == 200, off_remaining.text
+    assert float(off_remaining.json()["quantity_remaining"]) == 9
+    still_defaults = client.get(f"/v1/experiments/{experiment['id']}/entries", headers=headers)
+    assert still_defaults.status_code == 200, still_defaults.text
+    reagent_entries = [
+        row for row in still_defaults.json()["entries"] if row["entry_type"] == "reagent"
+    ]
+    assert reagent_entries[0]["config"]["allowed_reagent_ids"] == [allowed["id"]]
 
     expired_use = client.post(
         "/v1/reagent-uses",
@@ -239,7 +264,7 @@ def test_experiment_use_follows_template_allow_list(client: TestClient, test_adm
     assert float(body["quantity_used"]) == 2
 
 
-def test_template_edit_leaves_existing_experiment_allow_list(client: TestClient, test_admin_user):
+def test_template_edit_leaves_prefilled_reagents(client: TestClient, test_admin_user):
     headers = _login(client, "admin", "adminpassword")
     original = _reagent(client, headers)
     added_later = _reagent(client, headers)
@@ -284,7 +309,7 @@ def test_template_edit_leaves_existing_experiment_allow_list(client: TestClient,
         },
     )
     assert kept.status_code == 201, kept.text
-    refused = client.post(
+    added = client.post(
         "/v1/reagent-uses",
         headers=headers,
         json={
@@ -293,11 +318,65 @@ def test_template_edit_leaves_existing_experiment_allow_list(client: TestClient,
             "quantity_used": "1",
         },
     )
+    assert added.status_code == 201, added.text
+    assert added.json()["reagent_lot_id"] == later_lot["id"]
+    later_remaining = client.get(f"/v1/reagent-lots/{later_lot['id']}", headers=headers)
+    assert later_remaining.status_code == 200, later_remaining.text
+    assert float(later_remaining.json()["quantity_remaining"]) == 9
+    unchanged = client.get(f"/v1/experiments/{experiment['id']}/entries", headers=headers)
+    assert unchanged.status_code == 200, unchanged.text
+    reagent_entries = [row for row in unchanged.json()["entries"] if row["entry_type"] == "reagent"]
+    assert reagent_entries[0]["config"]["allowed_reagent_ids"] == [original["id"]]
+
+
+def test_ad_hoc_experiment_records_active_reagent(client: TestClient, test_admin_user):
+    headers = _login(client, "admin", "adminpassword")
+    reagent = _reagent(client, headers)
+    lot = _lot(client, headers, reagent["id"])
+    created = client.post(
+        "/v1/experiments",
+        headers=headers,
+        json={"name": _name("Ad hoc")},
+    )
+    assert created.status_code == 201, created.text
+    experiment = created.json()
+    assert experiment.get("experiment_template_id") is None
+    entries = client.get(f"/v1/experiments/{experiment['id']}/entries", headers=headers)
+    assert entries.status_code == 200, entries.text
+    assert entries.json()["entries"] == []
+
+    recorded = client.post(
+        "/v1/reagent-uses",
+        headers=headers,
+        json={
+            "reagent_lot_id": lot["id"],
+            "experiment_id": experiment["id"],
+            "quantity_used": "1",
+        },
+    )
+    assert recorded.status_code == 201, recorded.text
+    assert recorded.json()["experiment_id"] == experiment["id"]
+    remaining = client.get(f"/v1/reagent-lots/{lot['id']}", headers=headers).json()["quantity_remaining"]
+    assert float(remaining) == 9
+
+    retired = client.patch(f"/v1/reagents/{reagent['id']}", headers=headers, json={"active": False})
+    assert retired.status_code == 200, retired.text
+    refused = client.post(
+        "/v1/reagent-uses",
+        headers=headers,
+        json={
+            "reagent_lot_id": lot["id"],
+            "experiment_id": experiment["id"],
+            "quantity_used": "1",
+        },
+    )
     assert refused.status_code == 422
-    assert refused.json()["detail"]["code"] == "reagent_not_in_template"
+    assert refused.json()["detail"]["code"] == "reagent_inactive"
+    remaining = client.get(f"/v1/reagent-lots/{lot['id']}", headers=headers).json()["quantity_remaining"]
+    assert float(remaining) == 9
 
 
-def test_inactive_reagent_refused_on_experiment(client: TestClient, test_admin_user, db_session):
+def test_inactive_reagent_refused_on_experiment_and_lims_run(client: TestClient, test_admin_user, db_session):
     from models.flexible_experiment import LimsRun
 
     headers = _login(client, "admin", "adminpassword")

@@ -1,8 +1,8 @@
 /**
- * Reagents used on a LIMS run (or experiment): pick a lot, enter the quantity
- * used; the lot's quantity remaining goes down. Expired (effective expiry),
- * QC-rejected and inactive lots are refused by the API; the picker only offers
- * usable lots. A wrong entry is voided (no delete).
+ * Reagents used on a LIMS run or an experiment. On an experiment the template
+ * list is the default: the tech can add any active catalog reagent, then pick
+ * a usable lot. Expired, QC-rejected, and inactive lots are refused by the API.
+ * A wrong entry is voided (no delete).
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import {
@@ -51,12 +51,20 @@ interface LotOption {
   unit?: string | null;
 }
 
+interface CatalogReagent {
+  id: string;
+  name: string;
+}
+
 interface Props {
   limsRunId?: string;
   experimentId?: string;
   analysisId?: string | null;
-  /** When set, the picker offers lots of these catalog reagents only. */
-  allowedReagentIds?: string[];
+  /**
+   * Default reagents copied from the template. Undefined on a LIMS run, which
+   * offers every usable lot. An empty list is an experiment with no defaults.
+   */
+  defaultReagentIds?: string[];
 }
 
 const errorText = (err: any, fallback: string) => {
@@ -72,12 +80,15 @@ const ReagentUsePanel: React.FC<Props> = ({
   limsRunId,
   experimentId,
   analysisId,
-  allowedReagentIds,
+  defaultReagentIds,
 }) => {
   const { hasPermission } = useUser();
   const canRecord = hasPermission('experiment:manage');
+  const onExperiment = Boolean(experimentId);
   const [uses, setUses] = useState<ReagentUseRow[]>([]);
   const [lots, setLots] = useState<LotOption[]>([]);
+  const [catalog, setCatalog] = useState<CatalogReagent[]>([]);
+  const [chosenIds, setChosenIds] = useState<string[]>(defaultReagentIds ?? []);
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const [lotId, setLotId] = useState('');
@@ -85,6 +96,7 @@ const ReagentUsePanel: React.FC<Props> = ({
   const [usedOn, setUsedOn] = useState('');
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
+  const snapshotKey = defaultReagentIds === undefined ? '' : defaultReagentIds.join('\n');
 
   const target = limsRunId ? { lims_run_id: limsRunId } : { experiment_id: experimentId };
 
@@ -101,6 +113,44 @@ const ReagentUsePanel: React.FC<Props> = ({
     load();
   }, [load]);
 
+  useEffect(() => {
+    if (defaultReagentIds === undefined) return;
+    setChosenIds(defaultReagentIds);
+    // snapshotKey is the stable identity of the prefilled ids.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [snapshotKey]);
+
+  useEffect(() => {
+    if (!experimentId) return;
+    let cancelled = false;
+    apiService
+      .getReagents({ active: true })
+      .then((raw) => {
+        if (cancelled) return;
+        const list = (Array.isArray(raw) ? raw : []) as Array<{
+          id?: string;
+          name?: string;
+          active?: boolean;
+        }>;
+        setCatalog(
+          list
+            .filter((row) => row?.id && row?.name && row.active !== false)
+            .map((row) => ({ id: String(row.id), name: String(row.name) })),
+        );
+      })
+      .catch((err) => {
+        if (!cancelled) setError(errorText(err, 'Failed to load reagents'));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [experimentId]);
+
+  const addReagent = (reagentId: string) => {
+    if (!reagentId || chosenIds.includes(reagentId)) return;
+    setChosenIds((prev) => (prev.includes(reagentId) ? prev : [...prev, reagentId]));
+  };
+
   const openDialog = async () => {
     setError(null);
     setLotId('');
@@ -110,8 +160,8 @@ const ReagentUsePanel: React.FC<Props> = ({
     setOpen(true);
     try {
       const loaded = ((await apiService.getReagentLots({ usable: true })) || []) as LotOption[];
-      if (allowedReagentIds !== undefined) {
-        const allow = new Set(allowedReagentIds);
+      if (onExperiment) {
+        const allow = new Set(chosenIds);
         setLots(loaded.filter((lot) => lot.reagent_id != null && allow.has(lot.reagent_id)));
       } else {
         setLots(loaded);
@@ -151,17 +201,55 @@ const ReagentUsePanel: React.FC<Props> = ({
     }
   };
 
+  const addable = catalog.filter((row) => !chosenIds.includes(row.id));
+  const chosenNames = chosenIds.map((id) => catalog.find((row) => row.id === id)?.name || id);
+
   return (
     <Card sx={{ mt: 2 }}>
       <CardContent>
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1, gap: 1 }}>
           <Typography variant="h6">Reagents used</Typography>
           {canRecord && (
-            <Button variant="outlined" size="small" onClick={openDialog}>
-              Record lot used
-            </Button>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              {onExperiment && (
+                <FormControl size="small" sx={{ minWidth: 220 }}>
+                  <InputLabel id="add-reagent-label">Add reagent</InputLabel>
+                  <Select
+                    labelId="add-reagent-label"
+                    label="Add reagent"
+                    value=""
+                    onChange={(event) => addReagent(String(event.target.value || ''))}
+                  >
+                    <MenuItem value="" sx={{ display: 'none' }} />
+                    {addable.length === 0 ? (
+                      <MenuItem value="__none" disabled>
+                        {catalog.length === 0
+                          ? 'No active reagents in the catalog'
+                          : 'Every active reagent is already on this experiment'}
+                      </MenuItem>
+                    ) : (
+                      addable.map((row) => (
+                        <MenuItem key={row.id} value={row.id}>
+                          {row.name}
+                        </MenuItem>
+                      ))
+                    )}
+                  </Select>
+                </FormControl>
+              )}
+              <Button variant="outlined" size="small" onClick={openDialog}>
+                Record lot used
+              </Button>
+            </Box>
           )}
         </Box>
+        {onExperiment && (
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+            {chosenIds.length === 0
+              ? 'No reagents yet. Add a reagent, then record its lot.'
+              : `On this experiment: ${chosenNames.join(', ')}`}
+          </Typography>
+        )}
         {error && !open && (
           <Alert severity="error" sx={{ mb: 1 }} onClose={() => setError(null)}>
             {error}
@@ -229,8 +317,10 @@ const ReagentUsePanel: React.FC<Props> = ({
           </FormControl>
           {lots.length === 0 && (
             <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-              {allowedReagentIds !== undefined
-                ? 'No usable lots of the reagents named on this experiment template.'
+              {onExperiment
+                ? chosenIds.length === 0
+                  ? 'Add a reagent, then record its lot.'
+                  : 'No usable lots of the reagents on this experiment. Receive a lot under Admin → Reagents.'
                 : 'No usable lots. Receive a lot under Admin → Reagents.'}
             </Typography>
           )}
