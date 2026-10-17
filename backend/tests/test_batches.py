@@ -583,6 +583,8 @@ class TestBatchesAPI:
             name="Container 1",
             description="Test container 1",
             type_id=container_type.id,
+            row=2,
+            column=3,
             created_by=sample_user.id,
             modified_by=sample_user.id
         )
@@ -678,6 +680,15 @@ class TestBatchesAPI:
         assert data["name"] == "Cross-Project Batch"
         assert "containers" in data
         assert len(data["containers"]) == 2
+        by_name = {row["name"]: row for row in data["containers"]}
+        placed = by_name["Container 1"]
+        assert placed["id"] == str(container1.id)
+        assert placed["container_id"] == str(container1.id)
+        assert placed["row"] == 2
+        assert placed["column"] == 3
+        assert placed["container"]["id"] == str(container1.id)
+        assert placed["container"]["row"] == 2
+        assert placed["container"]["column"] == 3
     
     def test_create_cross_project_batch_incompatible(self, db_session, auth_headers, sample_user):
         """Test creating a cross-project batch with incompatible samples (no shared analysis)"""

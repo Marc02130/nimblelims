@@ -20,7 +20,8 @@ from app.schemas.result import (
     BatchResultEntryRequest, BatchResultsEntryRequest, ResultValidationRequest, ResultValidationResponse,
     BatchResultsEntryRequestUS28, TestResultEntry, AnalyteResultEntry
 )
-from app.schemas.batch import BatchResponse, BatchContainerResponse
+from app.schemas.batch import BatchResponse
+from app.routers.batches import batch_container_response
 from app.core.rbac import (
     require_result_enter, require_result_read, require_result_update,
     require_result_delete, require_result_review, require_permission,
@@ -28,6 +29,7 @@ from app.core.rbac import (
     validate_client_access
 )
 from app.core.security import get_current_user
+from app.core.patch_fields import explicit_updates
 from datetime import datetime
 from uuid import UUID
 
@@ -543,14 +545,7 @@ def enter_batch_results_us28(
         db.refresh(batch)
         
         # Get batch containers for response
-        batch_containers_response = []
-        for bc in batch_containers:
-            batch_containers_response.append(BatchContainerResponse(
-                batch_id=bc.batch_id,
-                container_id=bc.container_id,
-                position=bc.position,
-                notes=bc.notes
-            ))
+        batch_containers_response = [batch_container_response(bc) for bc in batch_containers]
         
         return BatchResponse(
             id=batch.id,
@@ -691,8 +686,8 @@ def update_result(
     validate_client_access(current_user, result.test.sample.project.client_id)
     
     # Validate custom_attributes if provided
-    update_data = result_data.dict(exclude_unset=True)
-    if 'custom_attributes' in update_data:
+    update_data = explicit_updates(result_data, result)
+    if 'custom_attributes' in update_data and update_data['custom_attributes'] is not None:
         from app.core.custom_attributes import validate_custom_attributes
         try:
             validated_custom_attributes = validate_custom_attributes(

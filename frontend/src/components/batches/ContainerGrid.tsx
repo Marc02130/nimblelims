@@ -54,6 +54,34 @@ interface Container {
   }>;
 }
 
+/** Batch membership rows sometimes nest the container and sometimes are flat. */
+export function containerFromBatchMember(member: any): Container {
+  const nested = member && typeof member.container === 'object' && member.container !== null
+    ? member.container
+    : null;
+  const source = nested ?? member ?? {};
+  const id = source.id ?? member?.container_id;
+  return {
+    ...source,
+    id,
+    name: source.name ?? '',
+    type: source.type ?? source.type_id ?? '',
+    type_id: source.type_id ?? (typeof source.type === 'string' ? source.type : undefined),
+    row: source.row ?? member?.row,
+    column: source.column ?? member?.column,
+  };
+}
+
+function gridPositionMessage(value: unknown, label: string): string | null {
+  if (typeof value !== 'number' || Number.isNaN(value)) {
+    return `${label} is required`;
+  }
+  if (value < 1) {
+    return `${label} must be 1 or greater`;
+  }
+  return null;
+}
+
 interface ContainerGridProps {
   batchId: string;
   containers: Container[];
@@ -90,8 +118,9 @@ const ContainerGrid: React.FC<ContainerGridProps> = ({
     try {
       const batch = await apiService.getBatch(batchId);
       if (batch.containers) {
-        setBatchContainers(batch.containers.map((bc: any) => bc.container || bc));
-        onContainersChange(batch.containers.map((bc: any) => bc.container || bc));
+        const rows = batch.containers.map((bc: any) => containerFromBatchMember(bc));
+        setBatchContainers(rows);
+        onContainersChange(rows);
       }
     } catch (err: any) {
       console.error('Failed to load batch containers:', err);
@@ -129,6 +158,12 @@ const ContainerGrid: React.FC<ContainerGridProps> = ({
   };
 
   const handleAddContainer = async () => {
+    const rowMessage = gridPositionMessage(formData.row, 'Row');
+    const columnMessage = gridPositionMessage(formData.column, 'Column');
+    if (rowMessage || columnMessage) {
+      setError(rowMessage || columnMessage);
+      return;
+    }
     try {
       setLoading(true);
       const result = await apiService.addContainerToBatch(batchId, formData);
@@ -146,6 +181,16 @@ const ContainerGrid: React.FC<ContainerGridProps> = ({
 
   const handleEditContainer = async () => {
     if (!selectedContainer) return;
+    const rowMessage = gridPositionMessage(formData.row, 'Row');
+    const columnMessage = gridPositionMessage(formData.column, 'Column');
+    if (rowMessage || columnMessage) {
+      setError(rowMessage || columnMessage);
+      return;
+    }
+    if (!selectedContainer.id) {
+      setError('This container has no id, so it cannot be updated.');
+      return;
+    }
 
     try {
       setLoading(true);
@@ -371,13 +416,25 @@ const ContainerGrid: React.FC<ContainerGridProps> = ({
                 label="Row"
                 type="number"
                 value={formData.row ?? ''}
-                onChange={(e) => setFormData({ ...formData, row: parseInt(e.target.value) })}
+                error={gridPositionMessage(formData.row, 'Row') != null && formData.row != null}
+                helperText={formData.row != null ? gridPositionMessage(formData.row, 'Row') : 'Starts at 1'}
+                inputProps={{ min: 1, step: 1 }}
+                onChange={(e) => setFormData({
+                  ...formData,
+                  row: e.target.value === '' ? null : parseInt(e.target.value, 10),
+                })}
               />
               <TextField
                 label="Column"
                 type="number"
                 value={formData.column ?? ''}
-                onChange={(e) => setFormData({ ...formData, column: parseInt(e.target.value) })}
+                error={gridPositionMessage(formData.column, 'Column') != null && formData.column != null}
+                helperText={formData.column != null ? gridPositionMessage(formData.column, 'Column') : 'Starts at 1'}
+                inputProps={{ min: 1, step: 1 }}
+                onChange={(e) => setFormData({
+                  ...formData,
+                  column: e.target.value === '' ? null : parseInt(e.target.value, 10),
+                })}
               />
             </Box>
 
@@ -471,13 +528,25 @@ const ContainerGrid: React.FC<ContainerGridProps> = ({
                 label="Row"
                 type="number"
                 value={formData.row ?? ''}
-                onChange={(e) => setFormData({ ...formData, row: parseInt(e.target.value) })}
+                error={gridPositionMessage(formData.row, 'Row') != null && formData.row != null}
+                helperText={formData.row != null ? gridPositionMessage(formData.row, 'Row') : 'Starts at 1'}
+                inputProps={{ min: 1, step: 1 }}
+                onChange={(e) => setFormData({
+                  ...formData,
+                  row: e.target.value === '' ? null : parseInt(e.target.value, 10),
+                })}
               />
               <TextField
                 label="Column"
                 type="number"
                 value={formData.column ?? ''}
-                onChange={(e) => setFormData({ ...formData, column: parseInt(e.target.value) })}
+                error={gridPositionMessage(formData.column, 'Column') != null && formData.column != null}
+                helperText={formData.column != null ? gridPositionMessage(formData.column, 'Column') : 'Starts at 1'}
+                inputProps={{ min: 1, step: 1 }}
+                onChange={(e) => setFormData({
+                  ...formData,
+                  column: e.target.value === '' ? null : parseInt(e.target.value, 10),
+                })}
               />
             </Box>
 

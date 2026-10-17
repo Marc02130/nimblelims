@@ -59,12 +59,38 @@ class BatchContainerRequest(BaseModel):
     notes: Optional[str] = Field(None, description="Notes about this container in the batch")
 
 
+class BatchContainerBody(BaseModel):
+    """Container fields the batch grid edits. id is the container id."""
+    id: UUID
+    name: Optional[str] = None
+    row: Optional[int] = None
+    column: Optional[int] = None
+    type_id: Optional[UUID] = None
+    concentration: Optional[float] = None
+    concentration_units: Optional[UUID] = None
+    amount: Optional[float] = None
+    amount_units: Optional[UUID] = None
+
+    class Config:
+        from_attributes = True
+
+
 class BatchContainerResponse(BaseModel):
-    """Schema for batch container response"""
+    """Schema for batch container response.
+
+    id, row, and column are copied from the container. The grid edits that
+    container, so a response without them becomes PATCH /containers/undefined.
+    """
     batch_id: UUID
     container_id: UUID
-    position: Optional[str]
-    notes: Optional[str]
+    position: Optional[str] = None
+    notes: Optional[str] = None
+    id: UUID
+    name: Optional[str] = None
+    row: Optional[int] = None
+    column: Optional[int] = None
+    type_id: Optional[UUID] = None
+    container: Optional[BatchContainerBody] = None
 
     class Config:
         from_attributes = True
