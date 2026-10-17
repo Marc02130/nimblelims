@@ -53,6 +53,15 @@ interface ApiError {
 const apiErrorMsg = (err: unknown, fallback: string): string => {
   const detail = (err as ApiError)?.response?.data?.detail;
   if (typeof detail === 'string') return detail;
+  if (
+    typeof detail === 'object' &&
+    detail !== null &&
+    !Array.isArray(detail) &&
+    'message' in detail &&
+    typeof (detail as { message?: unknown }).message === 'string'
+  ) {
+    return (detail as { message: string }).message;
+  }
   if (Array.isArray(detail) && detail.length > 0) {
     const first = detail[0];
     if (
@@ -82,6 +91,7 @@ interface TemplateEntryDeclaration {
     | 'experiment_sample_data'
     | 'experiment_data'
     | 'predefined_action'
+    | 'reagent'
     | 'display_table'
     | 'sample_data'
     | 'experiment_detail';
@@ -95,6 +105,7 @@ interface TemplateEntryDeclaration {
     sample_columns?: string[];
     status?: string;
     depends_on?: string[];
+    allowed_reagent_ids?: string[];
     [key: string]: unknown;
   };
   fields?: TemplateEntryField[];
@@ -127,6 +138,12 @@ const ENTRY_TYPE_OPTIONS: {
     value: 'predefined_action',
     label: 'Aliquot / pool (predefined)',
     helper: 'Plan + execute aliquot/pool (not FieldDefinition columns)',
+  },
+  {
+    value: 'reagent',
+    label: 'Reagent',
+    helper:
+      'Names the catalog reagents this experiment may use. The lab tech picks the lot when the experiment runs.',
   },
 ];
 
@@ -271,6 +288,18 @@ const PREDEFINED_PRESETS: {
       fields: [],
     },
   },
+  {
+    key: 'reagents',
+    label: 'Reagents',
+    entry: {
+      entry_type: 'reagent',
+      name: 'Reagents',
+      description: 'Catalog reagents this experiment may use; the lab tech picks the lot at use',
+      predefined_entry_key: 'reagents',
+      config: { allowed_reagent_ids: [] },
+      fields: [],
+    },
+  },
 ];
 
 /** New templates start with Header + Samples so create always yields a reusable entry spine. */
@@ -322,6 +351,7 @@ const ExperimentTemplatesManagement: React.FC = () => {
   const [destTypeOptions, setDestTypeOptions] = useState<
     Array<{ id: string; name: string; operation: string }>
   >([]);
+  const [reagentOptions, setReagentOptions] = useState<{ id: string; name: string }[]>([]);
 
   // Create FieldDefinition (entry columns — not Custom Fields for Sample/Test)
   const [createFieldOpen, setCreateFieldOpen] = useState(false);
@@ -375,6 +405,24 @@ const ExperimentTemplatesManagement: React.FC = () => {
 
   useEffect(() => {
     loadTemplates();
+  }, []);
+
+  useEffect(() => {
+    apiService
+      .getReagents({ active: true })
+      .then((raw) => {
+        const list = (Array.isArray(raw) ? raw : []) as Array<{
+          id?: string;
+          name?: string;
+          active?: boolean;
+        }>;
+        setReagentOptions(
+          list
+            .filter((row) => row?.id && row?.name && row.active !== false)
+            .map((row) => ({ id: String(row.id), name: String(row.name) })),
+        );
+      })
+      .catch(() => setReagentOptions([]));
   }, []);
 
   useEffect(() => {
@@ -504,6 +552,13 @@ const ExperimentTemplatesManagement: React.FC = () => {
         errors[1] = true;
         break;
       }
+      if (e.entry_type === 'reagent') {
+        const ids = e.config?.allowed_reagent_ids;
+        if (!Array.isArray(ids) || ids.length === 0) {
+          errors[1] = true;
+          break;
+        }
+      }
     }
     return { valid: !errors.some(Boolean), tabErrors: errors };
   };
@@ -524,7 +579,26 @@ const ExperimentTemplatesManagement: React.FC = () => {
   };
 
   const updateEntry = (index: number, patch: Partial<TemplateEntryDeclaration>) => {
-    const updated = entriesList.map((e, i) => (i === index ? { ...e, ...patch } : e));
+    const updated = entriesList.map((e, i) => {
+      if (i !== index) return e;
+      const next: TemplateEntryDeclaration = { ...e, ...patch };
+      if (patch.entry_type === 'reagent') {
+        const prior = next.config?.allowed_reagent_ids;
+        next.predefined_entry_key = 'reagents';
+        next.fields = [];
+        next.config = {
+          ...(next.config || {}),
+          allowed_reagent_ids: Array.isArray(prior) ? prior : [],
+        };
+      } else if (
+        patch.entry_type !== undefined &&
+        patch.entry_type !== 'reagent' &&
+        e.predefined_entry_key === 'reagents'
+      ) {
+        next.predefined_entry_key = undefined;
+      }
+      return next;
+    });
     const nextKey = patch.predefined_entry_key;
     if (nextKey === 'aliquot_pool_plan' || nextKey === 'aliquots_pools') {
       setEntries(appendAliquotPair(updated));
@@ -1044,8 +1118,14 @@ const ExperimentTemplatesManagement: React.FC = () => {
               {tabErrors[0] && <div>Basic Info: Template name and experiment name are required.</div>}
               {tabErrors[1] && (
                 <div>
-                  Tables &amp; forms: Add at least one entry; each needs a name and type. These are the
-                  reusable capture places instantiated when an experiment is created from this template.
+                  Tables &amp; forms: each entry needs a name and a type.
+                  {(formDef.entries ?? []).some((entry) => {
+                    if (entry.entry_type !== 'reagent') return false;
+                    const ids = entry.config?.allowed_reagent_ids;
+                    return !Array.isArray(ids) || ids.length === 0;
+                  })
+                    ? ' A Reagent entry needs at least one allowed reagent from the catalog.'
+                    : ' These are the reusable capture places instantiated when an experiment is created from this template.'}
                 </div>
               )}
             </Alert>
@@ -1214,8 +1294,9 @@ const ExperimentTemplatesManagement: React.FC = () => {
                         sx={{ minWidth: 180, flex: 1 }}
                       />
                       <FormControl size="small" sx={{ minWidth: 200 }}>
-                        <InputLabel>Type</InputLabel>
+                        <InputLabel id={`entry-type-${ei}`}>Type</InputLabel>
                         <Select
+                          labelId={`entry-type-${ei}`}
                           label="Type"
                           value={entry.entry_type}
                           onChange={(e) =>
@@ -1252,6 +1333,61 @@ const ExperimentTemplatesManagement: React.FC = () => {
                       {ENTRY_TYPE_OPTIONS.find((o) => o.value === entry.entry_type)?.helper ||
                         entry.entry_type}
                     </Typography>
+
+                    {entry.entry_type === 'reagent' && (
+                      <FormControl
+                        size="small"
+                        fullWidth
+                        sx={{ mb: 1.5 }}
+                        error={
+                          tabErrors[1] &&
+                          (!Array.isArray(entry.config?.allowed_reagent_ids) ||
+                            entry.config.allowed_reagent_ids.length === 0)
+                        }
+                      >
+                        <InputLabel id={`allowed-reagents-${ei}`}>Allowed reagents</InputLabel>
+                        <Select
+                          multiple
+                          labelId={`allowed-reagents-${ei}`}
+                          label="Allowed reagents"
+                          value={
+                            Array.isArray(entry.config?.allowed_reagent_ids)
+                              ? entry.config.allowed_reagent_ids
+                              : []
+                          }
+                          onChange={(event) => {
+                            const value = event.target.value;
+                            const ids = typeof value === 'string' ? value.split(',') : value;
+                            updateEntry(ei, {
+                              config: {
+                                ...(entry.config || {}),
+                                allowed_reagent_ids: ids,
+                              },
+                            });
+                          }}
+                          renderValue={(selected) =>
+                            (selected as string[])
+                              .map((id) => reagentOptions.find((row) => row.id === id)?.name || id)
+                              .join(', ')
+                          }
+                        >
+                          {reagentOptions.length === 0 ? (
+                            <MenuItem value="" disabled>
+                              No active reagents in the catalog
+                            </MenuItem>
+                          ) : (
+                            reagentOptions.map((row) => (
+                              <MenuItem key={row.id} value={row.id}>
+                                {row.name}
+                              </MenuItem>
+                            ))
+                          )}
+                        </Select>
+                        <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5 }}>
+                          The lab tech picks a lot of one of these reagents when the experiment runs.
+                        </Typography>
+                      </FormControl>
+                    )}
 
                     {entry.predefined_entry_key === 'aliquot_pool_plan' && (
                       <Box sx={{ mb: 1.5 }}>
@@ -1528,6 +1664,11 @@ const ExperimentTemplatesManagement: React.FC = () => {
                       <Typography variant="body2" color="text.secondary">
                         Aliquot/pool uses the plan editor at runtime — no table columns here. Set
                         predefined key to <code>aliquot_pool_plan</code> if needed.
+                      </Typography>
+                    )}
+                    {!isDataTable && entry.entry_type === 'reagent' && (
+                      <Typography variant="body2" color="text.secondary">
+                        Lots are recorded on the experiment. This entry stores the allowed reagents.
                       </Typography>
                     )}
                   </Box>

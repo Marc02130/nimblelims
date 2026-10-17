@@ -43,6 +43,7 @@ export interface ReagentUseRow {
 
 interface LotOption {
   id: string;
+  reagent_id?: string;
   reagent_name?: string;
   lot_number: string;
   effective_expiration_date?: string | null;
@@ -54,14 +55,25 @@ interface Props {
   limsRunId?: string;
   experimentId?: string;
   analysisId?: string | null;
+  /** When set, the picker offers lots of these catalog reagents only. */
+  allowedReagentIds?: string[];
 }
 
 const errorText = (err: any, fallback: string) => {
   const detail = err?.response?.data?.detail;
-  return typeof detail === 'string' ? detail : fallback;
+  if (typeof detail === 'string') return detail;
+  if (detail && typeof detail === 'object' && typeof detail.message === 'string') {
+    return detail.message;
+  }
+  return fallback;
 };
 
-const ReagentUsePanel: React.FC<Props> = ({ limsRunId, experimentId, analysisId }) => {
+const ReagentUsePanel: React.FC<Props> = ({
+  limsRunId,
+  experimentId,
+  analysisId,
+  allowedReagentIds,
+}) => {
   const { hasPermission } = useUser();
   const canRecord = hasPermission('experiment:manage');
   const [uses, setUses] = useState<ReagentUseRow[]>([]);
@@ -97,7 +109,13 @@ const ReagentUsePanel: React.FC<Props> = ({ limsRunId, experimentId, analysisId 
     setNote('');
     setOpen(true);
     try {
-      setLots((await apiService.getReagentLots({ usable: true })) || []);
+      const loaded = ((await apiService.getReagentLots({ usable: true })) || []) as LotOption[];
+      if (allowedReagentIds !== undefined) {
+        const allow = new Set(allowedReagentIds);
+        setLots(loaded.filter((lot) => lot.reagent_id != null && allow.has(lot.reagent_id)));
+      } else {
+        setLots(loaded);
+      }
     } catch (err) {
       setError(errorText(err, 'Failed to load reagent lots'));
     }
@@ -211,7 +229,9 @@ const ReagentUsePanel: React.FC<Props> = ({ limsRunId, experimentId, analysisId 
           </FormControl>
           {lots.length === 0 && (
             <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-              No usable lots. Receive a lot under Admin → Reagents.
+              {allowedReagentIds !== undefined
+                ? 'No usable lots of the reagents named on this experiment template.'
+                : 'No usable lots. Receive a lot under Admin → Reagents.'}
             </Typography>
           )}
           <TextField
