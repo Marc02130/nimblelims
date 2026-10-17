@@ -77,7 +77,7 @@ class AskedFor(Base):
             "status IN ('requested', 'routed', 'cancelled')",
             name="asked_for_status_chk",
         ),
-        CheckConstraint("tat_days > 0", name="asked_for_tat_days_chk"),
+        CheckConstraint("tat_days >= 0", name="asked_for_tat_days_chk"),
         Index("ix_asked_for_sample_id", "sample_id"),
         Index("ix_asked_for_status", "status"),
         Index(

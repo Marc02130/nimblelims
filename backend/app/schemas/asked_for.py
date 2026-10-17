@@ -51,7 +51,7 @@ class AskedForCreate(BaseModel):
     sample_ids: List[UUID] = Field(default_factory=list)
     sample_id: Optional[UUID] = None
     analysis_id: UUID
-    tat_days: int = Field(..., ge=1)
+    tat_days: int = Field(..., ge=0)
     params: Dict[str, Any] = Field(default_factory=dict)
 
     @model_validator(mode="after")

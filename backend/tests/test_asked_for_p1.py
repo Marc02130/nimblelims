@@ -288,7 +288,7 @@ class TestAskedForP1:
         )
         assert r.status_code == 201, r.text
 
-    def test_tat_days_zero_422(
+    def test_tat_days_zero_accepted(
         self,
         client: TestClient,
         admin_token: str,
@@ -304,7 +304,27 @@ class TestAskedForP1:
             ),
             headers=_auth(admin_token),
         )
+        assert r.status_code == 201, r.text
+        assert r.json()["items"][0]["tat_days"] == 0
+
+    def test_tat_days_negative_422(
+        self,
+        client: TestClient,
+        admin_token: str,
+        receive_seed,
+        db_session: Session,
+        test_admin_user: User,
+    ):
+        sample_id = _receive_sample(client, admin_token, receive_seed, "NBIO-AF-TAT-NEG")
+        r = client.post(
+            "/v1/asked-for",
+            json=_asked_for_body(
+                [sample_id], receive_seed["analysis_a"].id, tat_days=-1
+            ),
+            headers=_auth(admin_token),
+        )
         assert r.status_code == 422, r.text
+        assert "tat_days" in r.text
 
     def test_hidden_sample_403_not_404(
         self,

@@ -252,10 +252,10 @@ class AskedForService:
         params: Optional[Dict[str, Any]] = None,
     ) -> List[AskedFor]:
         deny_client_write(self.user)
-        if tat_days < 1:
+        if tat_days < 0:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="tat_days must be greater than 0",
+                detail="tat_days must be 0 or greater",
             )
         self._require_active_analysis(analysis_id)
         validated = self.validate_params(analysis_id, params)
