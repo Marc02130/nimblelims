@@ -201,7 +201,7 @@ const AnalysisAnalytesConfig: React.FC = () => {
       field: 'significant_figures',
       headerName: 'Sig Figs',
       width: 100,
-      valueGetter: (value) => value || 'N/A',
+      valueGetter: (value) => value ?? 'N/A',
     },
     {
       field: 'is_required',

@@ -253,7 +253,7 @@ const AnalysesManagement: React.FC = () => {
       field: 'turnaround_time',
       headerName: 'Turnaround (days)',
       width: 150,
-      valueGetter: (value, row) => (row as Analysis).turnaround_time || 'N/A',
+      valueGetter: (value, row) => (row as Analysis).turnaround_time ?? 'N/A',
     },
     {
       field: 'cost',

@@ -31,7 +31,9 @@ def test_typescript_flags_or_and_allows_nullish():
         "if (formData.concentration !== '' && !Number.isNaN(formData.concentration)) {\n"
         "  send(formData.concentration);\n"
         "}\n"
-        "const label = unit.type_name === 'mass' || unit.type_name === 'volume';\n",
+        "const label = unit.type_name === 'mass' || unit.type_name === 'volume';\n"
+        "const row = formData.row ?? '';\n"
+        "const figures = rule.significant_figures ?? null;\n",
         "Form.tsx",
     )
     assert clean == []

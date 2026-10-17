@@ -370,13 +370,13 @@ const ContainerGrid: React.FC<ContainerGridProps> = ({
               <TextField
                 label="Row"
                 type="number"
-                value={formData.row || ''}
+                value={formData.row ?? ''}
                 onChange={(e) => setFormData({ ...formData, row: parseInt(e.target.value) })}
               />
               <TextField
                 label="Column"
                 type="number"
-                value={formData.column || ''}
+                value={formData.column ?? ''}
                 onChange={(e) => setFormData({ ...formData, column: parseInt(e.target.value) })}
               />
             </Box>
@@ -470,13 +470,13 @@ const ContainerGrid: React.FC<ContainerGridProps> = ({
               <TextField
                 label="Row"
                 type="number"
-                value={formData.row || ''}
+                value={formData.row ?? ''}
                 onChange={(e) => setFormData({ ...formData, row: parseInt(e.target.value) })}
               />
               <TextField
                 label="Column"
                 type="number"
-                value={formData.column || ''}
+                value={formData.column ?? ''}
                 onChange={(e) => setFormData({ ...formData, column: parseInt(e.target.value) })}
               />
             </Box>
