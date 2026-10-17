@@ -10,6 +10,11 @@ Run against a database that includes the #178 unit rescale (nM is 1e-9 mol/L and
 4. Clear significant figures and save. The rule list no longer shows the previous number.
 5. A negative turnaround time or negative significant figures is refused in the form.
 
+## Asked-for turnaround time
+
+1. Record asked-for with TAT (days) set to 0. The row is stored with tat_days 0.
+2. TAT of -1 is refused. The form checks `value < 0`, and the API returns 422.
+
 ## Grid positions stay 1-based
 
 1. Open a batch container grid and edit a container.
@@ -27,8 +32,8 @@ Run against a database that includes the #178 unit rescale (nM is 1e-9 mol/L and
 
 1. Open a container that holds a sample.
 2. Use the remove-content button.
-3. The contents amount becomes 0. The request is PATCH /containers/{container id}/contents/{sample id} with amount 0.
-4. No DELETE /contents/{id} request is sent.
+3. The contents amount becomes 0. The request is PATCH /containers/{container id}/contents/{sample id} with amount 0. The contents row is still there.
+4. DELETE /containers/{container id}/contents/{sample id} returns 405. DELETE /contents/{id} is not a route.
 
 ## Pool concentration
 

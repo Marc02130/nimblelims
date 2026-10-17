@@ -74,7 +74,7 @@ Never treat them as interchangeable.
 | GET | `/containers` | Filters: type, parent, project_ids |
 | GET/POST/PATCH | `/containers/{id}` | |
 | GET/POST | `/containers/{id}/contents` | |
-| PATCH/DELETE | `/containers/{id}/contents/{sample_id}` | |
+| PATCH | `/containers/{id}/contents/{sample_id}` | Amount 0 retires the row. No DELETE route. |
 
 Permissions: `sample:create|update|read` for instances.
 

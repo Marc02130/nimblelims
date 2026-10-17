@@ -687,30 +687,3 @@ def update_container_contents(
     db.refresh(contents)
     
     return ContentsResponse.from_orm(contents)
-
-
-@router.delete("/{container_id}/contents/{sample_id}")
-def remove_sample_from_container(
-    container_id: UUID,
-    sample_id: UUID,
-    current_user: User = Depends(require_sample_update),
-    db: Session = Depends(get_db)
-):
-    """
-    Remove a sample from a container.
-    """
-    contents = db.query(Contents).filter(
-        Contents.container_id == container_id,
-        Contents.sample_id == sample_id
-    ).first()
-    
-    if not contents:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Contents not found"
-        )
-    
-    db.delete(contents)
-    db.commit()
-    
-    return {"message": "Sample removed from container successfully"}

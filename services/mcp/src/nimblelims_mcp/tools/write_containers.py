@@ -70,7 +70,7 @@ def register(mcp, client, tokens) -> None:
         """Patch one content row. Calls PATCH /containers/{container_id}/contents/{sample_id}.
 
         Requires sample:update. Setting amount to 0 is how a content row is
-        retired. This tool does not call DELETE /containers/{container_id}/contents/{sample_id}.
+        retired. The API has no DELETE route for a content row.
         Amount 0 is a real value and is sent. Omitted fields are left unchanged.
         """
         body = omit_none(
