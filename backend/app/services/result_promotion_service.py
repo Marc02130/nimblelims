@@ -403,9 +403,9 @@ class ResultPromotionService:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Authenticated user required to promote results",
             )
-        # Use local now() — ResultResponse validator rejects utcnow() as "future"
-        # when the host timezone is behind UTC (see schemas/result.py).
-        now = datetime.now()
+        # entry_date is a naive UTC instant. The validator compares its calendar
+        # day in the lab zone, so utcnow() is today there.
+        now = datetime.utcnow()
         pending = 0
 
         for item in plan.items:

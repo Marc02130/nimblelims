@@ -213,8 +213,11 @@ def test_agent_run_start_leaves_no_session_idle_in_transaction(real, monkeypatch
                                      "permissions": ["config:edit", "schema:edit", "layout:edit"]})
 
     def per_request():
+        from app.core.lab_time import publish_lab_zone
+
         db = Session()
         try:
+            publish_lab_zone(db)
             yield db
         finally:
             db.close()

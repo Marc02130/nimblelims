@@ -71,8 +71,11 @@ def world(db_engine):
                                      "role": role.name, "permissions": PERMS})
 
     def per_request_db():
+        from app.core.lab_time import publish_lab_zone
+
         db = Session()
         try:
+            publish_lab_zone(db)
             yield db
         finally:
             db.close()

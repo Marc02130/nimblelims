@@ -30,6 +30,7 @@ from datetime import datetime, timedelta
 from uuid import UUID
 
 from app.core.db_errors import commit_or_409, constraint_name, is_unique_violation
+from app.core.lab_time import days_from_today, resolve_lab_timezone
 
 SAMPLE_UNIQUE = {
     "samples_name_key": "A sample with this name already exists. Sample names must be unique.",
@@ -94,7 +95,7 @@ def get_eligible_samples(
     
     # Build base query with project join for due_date inheritance
     # We need to join with tests and analyses to get shelf_life for expiration calculation
-    now = datetime.utcnow()
+    zone_name = resolve_lab_timezone(db)
     
     # Get completed and cancelled test status IDs to exclude
     from models.list import List, ListEntry
@@ -195,9 +196,8 @@ def get_eligible_samples(
         # Compute days_until_due
         days_until_due = None
         is_overdue = False
-        if effective_due_date:
-            delta = effective_due_date - now
-            days_until_due = delta.days
+        if effective_due_date is not None:
+            days_until_due = days_from_today(effective_due_date, zone_name)
             is_overdue = days_until_due < 0
             if is_overdue:
                 overdue_count += 1
@@ -207,10 +207,9 @@ def get_eligible_samples(
         is_expired = False
         expiration_warning = None
         
-        if sample.date_sampled and shelf_life:
+        if sample.date_sampled is not None and shelf_life is not None:
             expiration_date = sample.date_sampled + timedelta(days=shelf_life)
-            delta = expiration_date - now
-            days_until_expiration = delta.days
+            days_until_expiration = days_from_today(expiration_date, zone_name)
             is_expired = days_until_expiration < 0
             
             if is_expired:

@@ -27,6 +27,8 @@ from app.core.rbac import (
 from app.core.security import get_current_user
 from app.core.patch_fields import explicit_updates
 from datetime import datetime
+
+from app.core.lab_time import days_from_today, resolve_lab_timezone
 from uuid import UUID
 
 router = APIRouter()
@@ -329,7 +331,7 @@ def validate_batch_compatibility(
         }
     
     # Check for expired samples based on date_sampled + shelf_life
-    now = datetime.utcnow()
+    zone_name = resolve_lab_timezone(db)
     expired_samples = []
     expiring_soon_samples = []
     
@@ -357,7 +359,7 @@ def validate_batch_compatibility(
         
         # Compute expiration date and days until expiration
         expiration_date = sample.date_sampled + timedelta(days=min_shelf_life)
-        days_until_expiration = (expiration_date - now).days
+        days_until_expiration = days_from_today(expiration_date, zone_name)
         
         if days_until_expiration < 0:
             expired_samples.append({

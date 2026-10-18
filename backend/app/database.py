@@ -146,8 +146,13 @@ def background_session(user_id, client_id=None, session_factory=None) -> Iterato
 
 def get_db():
     """Dependency to get database session"""
+    from app.core.lab_time import publish_lab_zone
+
     db = SessionLocal()
     try:
+        # Before body validation, so date validators see the lab zone.
+        # A corrupt saved zone is remembered and does not block this session.
+        publish_lab_zone(db)
         yield db
     finally:
         db.info.pop("rls_user_id", None)

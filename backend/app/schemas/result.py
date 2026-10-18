@@ -50,7 +50,7 @@ class ResultUpdate(BaseModel):
 
     @validator('entry_date')
     def validate_entry_date(cls, v):
-        if v and is_future(v):
+        if v is not None and is_future(v):
             raise ValueError('Entry date cannot be in the future')
         return v
 

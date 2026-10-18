@@ -5,7 +5,13 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from app.core.lab_time import INVALID_TIMEZONE, ensure_lab_setting, known_zone, resolve_lab_timezone
+from app.core.lab_time import (
+    INVALID_TIMEZONE,
+    ensure_lab_setting,
+    known_zone,
+    remember_lab_zone,
+    resolve_lab_timezone,
+)
 from app.core.rbac import require_admin, require_lab_manager
 from app.database import get_db
 from app.schemas.lab_setting import LabTimezoneResponse, LabTimezoneUpdate
@@ -56,4 +62,6 @@ def update_lab_timezone(
     row.modified_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(row)
-    return LabTimezoneResponse(timezone=row.timezone or name)
+    saved = row.timezone or name
+    remember_lab_zone(saved)
+    return LabTimezoneResponse(timezone=saved)

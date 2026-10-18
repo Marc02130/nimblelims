@@ -188,6 +188,16 @@ def migrated_engine(migrated_pg_container):
     engine.dispose()
 
 
+@pytest.fixture(autouse=True)
+def _reset_published_lab_zone():
+    """Date validators read a process-wide zone. Each test starts without one."""
+    from app.core.lab_time import clear_published_lab_zone
+
+    clear_published_lab_zone()
+    yield
+    clear_published_lab_zone()
+
+
 @pytest.fixture(scope="function")
 def db_session(db_engine):
     """Wrap each test in a transaction that is rolled back on teardown."""
@@ -212,6 +222,9 @@ def db_session(db_engine):
 def client(db_session):
     """FastAPI test client with DB session override."""
     def override_get_db():
+        from app.core.lab_time import publish_lab_zone
+
+        publish_lab_zone(db_session)
         try:
             yield db_session
         finally:

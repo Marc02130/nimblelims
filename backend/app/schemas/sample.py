@@ -30,7 +30,7 @@ class SampleBase(BaseModel):
 
     @validator('received_date', 'report_date')
     def validate_dates(cls, v):
-        if v and is_future(v):
+        if v is not None and is_future(v):
             raise ValueError('Date cannot be in the future')
         return v
 
@@ -143,7 +143,7 @@ class SampleUpdate(BaseModel):
     # received_date and report_date still cannot be in the future
     @validator('received_date', 'report_date')
     def validate_dates(cls, v):
-        if v and is_future(v):
+        if v is not None and is_future(v):
             raise ValueError('Date cannot be in the future')
         return v
 
