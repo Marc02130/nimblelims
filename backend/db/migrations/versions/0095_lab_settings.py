@@ -7,7 +7,7 @@ The row starts empty. The API seeds it from LAB_TIMEZONE on first start
 when the column is blank. This upgrade only creates the table, inserts
 that row, and grants lims_app. It does not drop or delete anything.
 There is no RLS policy: startup reads the row before a user is signed in,
-and the API restricts edits to Administrator and Lab Manager.
+and the API restricts edits to Administrator. A lab manager may read the row.
 """
 
 from alembic import op

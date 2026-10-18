@@ -1,4 +1,4 @@
-"""The lab clock. Lab managers and administrators read and update it."""
+"""The lab clock. Administrators change it. Lab managers may read it."""
 
 from datetime import datetime, timezone
 
@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.core.lab_time import INVALID_TIMEZONE, ensure_lab_setting, known_zone, resolve_lab_timezone
-from app.core.rbac import require_lab_manager
+from app.core.rbac import require_admin, require_lab_manager
 from app.database import get_db
 from app.schemas.lab_setting import LabTimezoneResponse, LabTimezoneUpdate
 from models.user import User
@@ -37,10 +37,14 @@ def read_lab_timezone(
 @router.patch("", response_model=LabTimezoneResponse)
 def update_lab_timezone(
     body: LabTimezoneUpdate,
-    current_user: User = Depends(require_lab_manager),
+    current_user: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
-    """Save the lab zone. The environment does not override a saved value."""
+    """Save the lab zone. Only an administrator can change it.
+
+    The configuring agent has no allow-list entry for this path. A call made
+    with any other role is 403 here as well.
+    """
     try:
         zone = known_zone(body.timezone)
     except ValueError:
