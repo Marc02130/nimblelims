@@ -18,6 +18,7 @@ services:
   backend:
     environment:
       ENVIRONMENT: production
+      LAB_TIMEZONE: ${LAB_TIMEZONE:-UTC}
       ALLOW_INSECURE_DEFAULTS: "false"
       ALLOW_DEV_SEED_USERS: "false"
       SECRET_KEY: ${SECRET_KEY:?Set a strong SECRET_KEY}

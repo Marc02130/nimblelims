@@ -79,6 +79,8 @@ services:
       JWT_ACCESS_TOKEN_EXPIRE_MINUTES: 30
       DEBUG: "True"
       ENVIRONMENT: development
+      # IANA zone for server default dates (e.g. a blank reagent "Used on"). Unset = UTC.
+      LAB_TIMEZONE: ${LAB_TIMEZONE:-UTC}
       ALLOW_INSECURE_DEFAULTS: "true"
       ALLOW_DEV_SEED_USERS: "true"
       R_CALCULATOR_URL: http://r-calculator:8000

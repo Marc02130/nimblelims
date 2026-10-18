@@ -20,12 +20,16 @@ from decimal import Decimal
 from typing import List, Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
+from fastapi.routing import APIRoute
 from sqlalchemy import func, update
 from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import Session
 
 from app.core.rbac import require_config_edit, require_experiment_manage
+from app.core.lab_time import lab_today
 from app.core.patch_fields import explicit_updates
 from app.core.security import get_current_user, get_user_permissions
 from app.database import get_db
@@ -56,7 +60,43 @@ vendors_router = APIRouter(prefix="/vendors", tags=["reagents"])
 reagents_router = APIRouter(prefix="/reagents", tags=["reagents"])
 reagent_vendors_router = APIRouter(prefix="/reagent-vendors", tags=["reagents"])
 reagent_lots_router = APIRouter(prefix="/reagent-lots", tags=["reagents"])
-reagent_uses_router = APIRouter(prefix="/reagent-uses", tags=["reagents"])
+
+INVALID_DATE = "invalid_date"
+
+
+def _invalid_date_message(errors) -> Optional[str]:
+    """The validator's sentence when every body error is on ``used_on``."""
+    if not errors:
+        return None
+    for error in errors:
+        loc = error.get("loc") or ()
+        if len(loc) < 2 or loc[0] != "body" or loc[-1] != "used_on":
+            return None
+    return str(errors[0].get("msg") or "")
+
+
+class _ReagentUseRoute(APIRoute):
+    """A bad ``used_on`` is 422 ``invalid_date``; the validator's message stays."""
+
+    def get_route_handler(self):
+        handler = super().get_route_handler()
+
+        async def route_handler(request: Request):
+            try:
+                return await handler(request)
+            except RequestValidationError as exc:
+                message = _invalid_date_message(exc.errors())
+                if message is None:
+                    raise
+                return JSONResponse(
+                    status_code=422,
+                    content={"detail": {"code": INVALID_DATE, "message": message}},
+                )
+
+        return route_handler
+
+
+reagent_uses_router = APIRouter(prefix="/reagent-uses", tags=["reagents"], route_class=_ReagentUseRoute)
 experiment_reagents_router = APIRouter(prefix="/experiments", tags=["reagents"])
 
 
@@ -759,7 +799,7 @@ def record_reagent_use(
     _refuse_inactive_reagent(db, lot.reagent_id)
     if lot.active is not True:
         _refuse(LOT_INACTIVE, f"Lot {lot.lot_number} is inactive and can't be used")
-    used_on = body.used_on or date.today()
+    used_on = body.used_on if body.used_on is not None else lab_today()
     if lot.released is not True:
         _refuse(LOT_UNRELEASED, f"Lot {lot.lot_number} is not released for use")
     if lot.qc_status == "rejected":
