@@ -91,10 +91,13 @@ const ReagentLotPicker: React.FC<{
   lots: LotOption[];
   canRecord: boolean;
   saving: boolean;
-  onRecord: (lotId: string, quantity: string) => Promise<void>;
-}> = ({ reagentId, reagentName, lots, canRecord, saving, onRecord }) => {
+  onRecord: (lotId: string, quantity: string, usedOn: string, note: string) => Promise<void>;
+  onRemove?: () => void;
+}> = ({ reagentId, reagentName, lots, canRecord, saving, onRecord, onRemove }) => {
   const [lotId, setLotId] = useState('');
   const [quantity, setQuantity] = useState('');
+  const [usedOn, setUsedOn] = useState('');
+  const [note, setNote] = useState('');
   const label = `Lot for ${reagentName}`;
   return (
     <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1, mb: 1, flexWrap: 'wrap' }}>
@@ -130,15 +133,43 @@ const ReagentLotPicker: React.FC<{
             onChange={(event) => setQuantity(event.target.value)}
             sx={{ width: 160 }}
           />
+          <TextField
+            label="Used on"
+            size="small"
+            type="date"
+            sx={{ width: 160 }}
+            InputLabelProps={{ shrink: true }}
+            value={usedOn}
+            onChange={(event) => setUsedOn(event.target.value)}
+            helperText="Leave empty for today"
+          />
+          <TextField
+            label="Note"
+            size="small"
+            sx={{ width: 200 }}
+            value={note}
+            onChange={(event) => setNote(event.target.value)}
+          />
           <Button
             variant="contained"
             size="small"
             sx={{ mt: 0.5 }}
             disabled={saving || !lotId || quantity === ''}
-            onClick={() => onRecord(lotId, quantity)}
+            onClick={() => onRecord(lotId, quantity, usedOn, note)}
           >
             Record
           </Button>
+          {onRemove && (
+            <Button
+              size="small"
+              sx={{ mt: 0.5 }}
+              disabled={saving}
+              aria-label={`Remove ${reagentName}`}
+              onClick={onRemove}
+            >
+              Remove
+            </Button>
+          )}
         </>
       )}
     </Box>
@@ -314,7 +345,26 @@ const ReagentUsePanel: React.FC<Props> = ({
   const addable = catalog.filter((row) => !chosenIds.includes(row.id));
   const reagentName = (id: string) => names.find((row) => row.id === id)?.name || id;
 
-  const recordForReagent = async (lotIdForReagent: string, quantityForReagent: string) => {
+  const removeReagent = async (reagentId: string) => {
+    if (!experimentId) return;
+    try {
+      const saved = await apiService.setExperimentReagentActive(experimentId, reagentId, false);
+      const ids = Array.isArray(saved?.allowed_reagent_ids)
+        ? saved.allowed_reagent_ids.map((id: unknown) => String(id))
+        : chosenIds.filter((id) => id !== reagentId);
+      setChosenIds(ids);
+      if (onReagentsChanged) await onReagentsChanged();
+    } catch (err) {
+      setError(errorText(err, 'Could not remove the reagent'));
+    }
+  };
+
+  const recordForReagent = async (
+    lotIdForReagent: string,
+    quantityForReagent: string,
+    usedOnForReagent: string,
+    noteForReagent: string,
+  ) => {
     setSaving(true);
     setError(null);
     try {
@@ -324,6 +374,8 @@ const ReagentUsePanel: React.FC<Props> = ({
         analysis_id: analysisId || undefined,
         quantity_used: quantityForReagent,
         unit: lots.find((lot) => lot.id === lotIdForReagent)?.unit || undefined,
+        used_on: usedOnForReagent || undefined,
+        note: noteForReagent || undefined,
       });
       await load();
       await loadLots();
@@ -389,6 +441,7 @@ const ReagentUsePanel: React.FC<Props> = ({
                 canRecord={canRecord}
                 saving={saving}
                 onRecord={recordForReagent}
+                onRemove={canRecord ? () => removeReagent(reagentId) : undefined}
               />
             );
           })}

@@ -28,6 +28,7 @@ jest.mock('../services/apiService', () => ({
     getReagentLots: jest.fn(),
     recordReagentUse: jest.fn(),
     addExperimentReagent: jest.fn(),
+    setExperimentReagentActive: jest.fn(),
   },
 }));
 
@@ -277,6 +278,59 @@ describe('Experiment reagent capture', () => {
     expect(await screen.findByRole('option', { name: 'Ethanol' })).toBeInTheDocument();
     expect(screen.queryByRole('option', { name: 'Retired buffer' })).not.toBeInTheDocument();
     expect(screen.queryByRole('option', { name: 'Qubit dsDNA HS' })).not.toBeInTheDocument();
+  });
+
+  test('removes a reagent from the picker and keeps the recorded use', async () => {
+    let entries = [reagentEntry];
+    api.getExperimentEntries.mockImplementation(async () => ({ entries }));
+    api.getReagentLots.mockResolvedValue(lots);
+    api.getReagentUses.mockResolvedValue([
+      {
+        id: 'u-kept',
+        reagent_name: 'Qubit dsDNA HS',
+        lot_number: 'L-OK',
+        used_on: '2026-10-18',
+        quantity_used: '2',
+        unit: 'mL',
+        note: 'bench note',
+      },
+    ]);
+    api.setExperimentReagentActive.mockImplementation(async () => {
+      entries = [{ ...reagentEntry, config: { allowed_reagent_ids: [], removed_reagent_ids: ['r1'], status: 'draft' } }];
+      return { experiment_id: 'exp1', entry_id: 'e1', allowed_reagent_ids: [], removed_reagent_ids: ['r1'] };
+    });
+    wrap(<EntryCapturePanel experimentId="exp1" />);
+    expect(await screen.findByText('bench note')).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole('button', { name: 'Remove Qubit dsDNA HS' }));
+    await waitFor(() =>
+      expect(api.setExperimentReagentActive).toHaveBeenCalledWith('exp1', 'r1', false),
+    );
+    await waitFor(() => expect(screen.queryByLabelText('Lot for Qubit dsDNA HS')).not.toBeInTheDocument());
+    expect(screen.getByText('bench note')).toBeInTheDocument();
+    expect(screen.getByText('L-OK')).toBeInTheDocument();
+    fireEvent.mouseDown(screen.getByLabelText('Add reagent'));
+    expect(await screen.findByRole('option', { name: 'Qubit dsDNA HS' })).toBeInTheDocument();
+  });
+
+  test('records a used-on date and note from the experiment lot row', async () => {
+    api.getExperimentEntries.mockResolvedValue({ entries: [reagentEntry] });
+    api.getReagentLots.mockResolvedValue(lots);
+    wrap(<EntryCapturePanel experimentId="exp1" />);
+    fireEvent.mouseDown(await screen.findByLabelText('Lot for Qubit dsDNA HS'));
+    fireEvent.click(await screen.findByRole('option', { name: /L-OK/ }));
+    fireEvent.change(screen.getByLabelText(/Quantity for Qubit dsDNA HS/), { target: { value: '1' } });
+    fireEvent.change(screen.getByLabelText('Used on'), { target: { value: '2026-10-01' } });
+    fireEvent.change(screen.getByLabelText('Note'), { target: { value: 'opened today' } });
+    expect(screen.getByText('Leave empty for today')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Record' }));
+    await waitFor(() => expect(api.recordReagentUse).toHaveBeenCalled());
+    expect(api.recordReagentUse.mock.calls[0][0]).toMatchObject({
+      reagent_lot_id: 'l1',
+      experiment_id: 'exp1',
+      quantity_used: '1',
+      used_on: '2026-10-01',
+      note: 'opened today',
+    });
   });
 
   test('shows the API refusal when the reagent is inactive', async () => {
