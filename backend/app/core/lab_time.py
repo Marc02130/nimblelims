@@ -113,7 +113,11 @@ def resolve_lab_timezone(db: Session, *, commit_seed: bool = False) -> str:
         known_zone(stored)
     except ValueError as exc:
         raise RuntimeError(
-            f"The saved lab timezone {stored!r} is not a known IANA time zone. " + _EXAMPLE
+            f"The saved lab timezone {stored!r} is not a known IANA time zone. "
+            "Update lab_settings.timezone directly, for example "
+            "UPDATE lab_settings SET timezone = 'America/New_York'; "
+            "If the API is already up, an administrator can PATCH /v1/lab-settings instead. "
+            "LAB_TIMEZONE does not replace a saved value."
         ) from exc
     return stored
 
