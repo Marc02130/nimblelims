@@ -28,7 +28,7 @@ def upgrade() -> None:
             id uuid PRIMARY KEY,
             timezone varchar(64),
             modified_at timestamptz NOT NULL DEFAULT now(),
-            modified_by uuid REFERENCES users(id) ON DELETE RESTRICT
+            modified_by uuid REFERENCES users(id)
         );
         """
     )
