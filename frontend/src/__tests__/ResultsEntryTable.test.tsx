@@ -3,6 +3,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import ResultsEntryTable from '../components/results/ResultsEntryTable';
 import { apiService } from '../services/apiService';
+import { localDateString } from '../utils/localDate';
 
 // Mock the API service
 jest.mock('../services/apiService');
@@ -193,6 +194,7 @@ describe('ResultsEntryTable', () => {
           results: [
             {
               test_id: 'test123',
+              entry_date: localDateString(),
               // pH entered; Temperature left blank (not sent)
               analyte_results: [
                 { analyte_id: 'analyte1', raw_result: '7.0', reported_result: null, qualifiers: null },
@@ -204,6 +206,24 @@ describe('ResultsEntryTable', () => {
     });
 
     expect(defaultProps.onResultsSaved).toHaveBeenCalled();
+  });
+
+  it('caps entry date at the browser today and shows the API sentence', async () => {
+    const user = userEvent.setup();
+    mockApiService.enterBatchResults.mockRejectedValue({
+      response: {
+        data: {
+          detail: [{ loc: ['body', 'results', 0, 'entry_date'], msg: 'Entry date cannot be in the future' }],
+        },
+      },
+    });
+
+    render(<ResultsEntryTable {...defaultProps} />);
+
+    expect(await screen.findByLabelText('Entry date')).toHaveAttribute('max', localDateString());
+    await user.click(screen.getByText('Save Results'));
+
+    expect(await screen.findByText('results.0.entry_date: Entry date cannot be in the future')).toBeInTheDocument();
   });
 
   it('handles API errors gracefully', async () => {

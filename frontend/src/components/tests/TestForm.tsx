@@ -15,14 +15,13 @@ import {
   Alert,
 } from '@mui/material';
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
-import { DatePicker } from '@mui/x-date-pickers/DatePicker';
-import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
-import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { Formik, Form, Field } from 'formik';
 import * as Yup from 'yup';
 import CustomAttributeField from '../common/CustomAttributeField';
 import { apiService } from '../../services/apiService';
 import { useUser } from '../../contexts/UserContext';
+import { apiErrorText } from '../../utils/apiErrorText';
+import { calendarDateInput, localDateString } from '../../utils/localDate';
 
 interface CustomAttributeConfig {
   id: string;
@@ -176,6 +175,7 @@ const TestForm: React.FC<TestFormProps> = ({
   const [loading, setLoading] = useState(false);
   const [customAttributeConfigs, setCustomAttributeConfigs] = useState<CustomAttributeConfig[]>([]);
   const [configsError, setConfigsError] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const isEditMode = !!test;
   const canUpdate = hasPermission('test:update');
 
@@ -217,6 +217,7 @@ const TestForm: React.FC<TestFormProps> = ({
 
   const handleSubmit = async (values: any) => {
     setLoading(true);
+    setSubmitError(null);
     try {
       // Prepare update data (only include fields that are set)
       const updateData: any = {};
@@ -231,8 +232,7 @@ const TestForm: React.FC<TestFormProps> = ({
 
       await onSubmit(updateData);
     } catch (error) {
-      // Error handling is done in parent component
-      throw error;
+      setSubmitError(apiErrorText(error, 'Could not save the test'));
     } finally {
       setLoading(false);
     }
@@ -249,6 +249,12 @@ const TestForm: React.FC<TestFormProps> = ({
       {configsError && (
         <Alert severity="error" sx={{ mb: 2 }}>
           {configsError}
+        </Alert>
+      )}
+
+      {submitError && (
+        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setSubmitError(null)}>
+          {submitError}
         </Alert>
       )}
 
@@ -344,57 +350,33 @@ const TestForm: React.FC<TestFormProps> = ({
               </Grid>
 
               <Grid size={{ xs: 12, sm: 6 }}>
-                <LocalizationProvider dateAdapter={AdapterDateFns}>
-                  <DatePicker
-                    label="Test Date"
-                    value={values.test_date ? (() => {
-                      // Parse date string in local timezone (YYYY-MM-DD format)
-                      const dateStr = values.test_date;
-                      if (dateStr && typeof dateStr === 'string' && dateStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
-                        const [year, month, day] = dateStr.split('-').map(Number);
-                        return new Date(year, month - 1, day);
-                      }
-                      return new Date(dateStr);
-                    })() : null}
-                    onChange={(date) => {
-                      if (date) {
-                        // Format date in local timezone as YYYY-MM-DD
-                        const year = date.getFullYear();
-                        const month = String(date.getMonth() + 1).padStart(2, '0');
-                        const day = String(date.getDate()).padStart(2, '0');
-                        setFieldValue('test_date', `${year}-${month}-${day}`);
-                      } else {
-                        setFieldValue('test_date', null);
-                      }
-                    }}
-                    slotProps={{
-                      textField: {
-                        fullWidth: true,
-                        error: touched.test_date && !!errors.test_date,
-                        helperText: touched.test_date && errors.test_date ? String(errors.test_date) : undefined,
-                        disabled: !canUpdate,
-                      },
-                    }}
-                  />
-                </LocalizationProvider>
+                <TextField
+                  label="Test Date"
+                  type="date"
+                  fullWidth
+                  disabled={!canUpdate}
+                  value={calendarDateInput(values.test_date)}
+                  onChange={(event) => setFieldValue('test_date', event.target.value || null)}
+                  InputLabelProps={{ shrink: true }}
+                  inputProps={{ max: localDateString() }}
+                  error={touched.test_date && !!errors.test_date}
+                  helperText={touched.test_date && errors.test_date ? String(errors.test_date) : undefined}
+                />
               </Grid>
 
               <Grid size={{ xs: 12, sm: 6 }}>
-                <LocalizationProvider dateAdapter={AdapterDateFns}>
-                  <DatePicker
-                    label="Review Date"
-                    value={values.review_date ? new Date(values.review_date) : null}
-                    onChange={(date) => setFieldValue('review_date', date ? date.toISOString() : null)}
-                    slotProps={{
-                      textField: {
-                        fullWidth: true,
-                        error: touched.review_date && !!errors.review_date,
-                        helperText: touched.review_date && errors.review_date ? String(errors.review_date) : undefined,
-                        disabled: !canUpdate,
-                      },
-                    }}
-                  />
-                </LocalizationProvider>
+                <TextField
+                  label="Review Date"
+                  type="date"
+                  fullWidth
+                  disabled={!canUpdate}
+                  value={calendarDateInput(values.review_date)}
+                  onChange={(event) => setFieldValue('review_date', event.target.value || null)}
+                  InputLabelProps={{ shrink: true }}
+                  inputProps={{ max: localDateString() }}
+                  error={touched.review_date && !!errors.review_date}
+                  helperText={touched.review_date && errors.review_date ? String(errors.review_date) : undefined}
+                />
               </Grid>
 
               {/* Custom Attributes */}

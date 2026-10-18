@@ -22,7 +22,7 @@ class TestBase(BaseModel):
 
     @validator('review_date', 'test_date')
     def validate_dates(cls, v):
-        if v and is_future(v):
+        if v is not None and is_future(v):
             raise ValueError('Date cannot be in the future')
         return v
 
@@ -46,7 +46,7 @@ class TestUpdate(BaseModel):
 
     @validator('review_date', 'test_date')
     def validate_dates(cls, v):
-        if v and is_future(v):
+        if v is not None and is_future(v):
             raise ValueError('Date cannot be in the future')
         return v
 
@@ -83,7 +83,7 @@ class TestAssignmentRequest(BaseModel):
 
     @validator('test_date')
     def validate_test_date(cls, v):
-        if v and is_future(v):
+        if v is not None and is_future(v):
             raise ValueError('Test date cannot be in the future')
         return v
 
@@ -97,7 +97,7 @@ class TestStatusUpdateRequest(BaseModel):
 
     @validator('review_date', 'test_date')
     def validate_dates(cls, v):
-        if v and is_future(v):
+        if v is not None and is_future(v):
             raise ValueError('Date cannot be in the future')
         return v
 

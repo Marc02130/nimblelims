@@ -8,8 +8,9 @@ the table exists. The API process checks the setting at startup, after
 migrations.
 """
 import os
+import threading
 from datetime import date, datetime, timezone, tzinfo
-from typing import Optional
+from typing import Optional, Union
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from sqlalchemy.exc import IntegrityError, OperationalError, ProgrammingError
@@ -135,6 +136,80 @@ def resolve_lab_timezone(db: Session, *, commit_seed: bool = False) -> str:
 def lab_today(db: Session, now: Optional[datetime] = None) -> date:
     """Today on the lab's clock. A naive ``now`` is read as UTC."""
     return clock_date(resolve_lab_timezone(db), now)
+
+
+def as_calendar_day(value: Union[date, datetime], zone_name: str) -> date:
+    """The calendar day of ``value`` in ``zone_name``. A naive datetime is UTC."""
+    if isinstance(value, datetime):
+        return clock_date(zone_name, value)
+    return value
+
+
+def days_from_today(
+    value: Union[date, datetime],
+    zone_name: str,
+    now: Optional[datetime] = None,
+) -> int:
+    """Whole calendar days from the lab's today until ``value``. Negative when past."""
+    return (as_calendar_day(value, zone_name) - clock_date(zone_name, now)).days
+
+
+# Validators run before the route body and have no session. The request's
+# get_db publishes the zone first; a corrupt saved zone is remembered so the
+# validator can raise it without blocking PATCH /v1/lab-settings.
+_publish_lock = threading.Lock()
+_published_zone: Optional[str] = None
+_published_error: Optional[BaseException] = None
+
+
+def publish_lab_zone(db: Session) -> None:
+    """Remember the zone for this process.
+
+    A missing table, an empty row, a bad seed, or a corrupt saved zone is
+    remembered and re-raised by a date validator. This function itself does
+    not raise, so authentication and PATCH /v1/lab-settings still run.
+    """
+    global _published_zone, _published_error
+    try:
+        name = resolve_lab_timezone(db)
+    except (LabTimezoneInvalid, RuntimeError) as exc:
+        with _publish_lock:
+            _published_zone = None
+            _published_error = exc
+        return
+    with _publish_lock:
+        _published_zone = name
+        _published_error = None
+
+
+def remember_lab_zone(name: str) -> None:
+    """Validators see a zone an administrator just saved."""
+    global _published_zone, _published_error
+    with _publish_lock:
+        _published_zone = name
+        _published_error = None
+
+
+def clear_published_lab_zone() -> None:
+    global _published_zone, _published_error
+    with _publish_lock:
+        _published_zone = None
+        _published_error = None
+
+
+def current_lab_zone() -> str:
+    """The zone published for this process, or the error that blocked it."""
+    with _publish_lock:
+        name = _published_zone
+        error = _published_error
+    if name is not None:
+        return name
+    if error is not None:
+        raise error
+    raise LabTimezoneInvalid(
+        "The lab timezone is not available for this request. "
+        "An administrator can PATCH /v1/lab-settings."
+    )
 
 
 def require_lab_timezone_on_startup() -> None:

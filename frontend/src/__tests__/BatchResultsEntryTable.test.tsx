@@ -3,6 +3,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import BatchResultsEntryTable from '../components/results/BatchResultsEntryTable';
 import { apiService } from '../services/apiService';
+import { localDateString } from '../utils/localDate';
 
 // Mock the API service
 jest.mock('../services/apiService');
@@ -87,6 +88,11 @@ const fillRequiredResults = async () => {
 };
 
 describe('BatchResultsEntryTable', () => {
+  it('caps entry date at the browser today', async () => {
+    render(<BatchResultsEntryTable {...defaultProps} />);
+    expect(await screen.findByLabelText('Entry date')).toHaveAttribute('max', localDateString());
+  });
+
   beforeEach(() => {
     jest.clearAllMocks();
     

@@ -12,13 +12,14 @@ Templates support placeholders:
 - {BATCH}: Batch name (e.g. when generating sample names in batch context)
 - {PROJECT}: Project name (e.g. when generating sample names in project context)
 """
-from datetime import datetime
+from datetime import date, datetime
 from typing import Optional, Dict, Any
 import re
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 from models.name_template import NameTemplate
+from app.core.lab_time import lab_today
 import uuid
 
 # Max length for sequence_key suffix in sequence name (PostgreSQL identifier safe).
@@ -136,11 +137,41 @@ def check_name_uniqueness(db: Session, entity_type: str, name: str) -> bool:
     return count == 0
 
 
+def template_calendar(db: Session, reference: Optional[date] = None) -> date:
+    """Day for ``{YYYY}``, ``{YY}``, ``{MM}``, ``{DD}``, and ``{YYYYMMDD}``.
+
+    An explicit date wins, including the year/month/day on a datetime the
+    caller chose. When the caller omits it, the day is today in the lab
+    timezone, not the process clock.
+    """
+    if reference is None:
+        return lab_today(db)
+    if isinstance(reference, datetime):
+        return reference.date()
+    return reference
+
+
+def fill_date_placeholders(template: str, day: date) -> Dict[str, str]:
+    """Date-token replacements present in ``template``."""
+    replacements: Dict[str, str] = {}
+    if '{YYYY}' in template:
+        replacements['{YYYY}'] = str(day.year)
+    if '{YY}' in template:
+        replacements['{YY}'] = str(day.year % 100).zfill(2)
+    if '{MM}' in template:
+        replacements['{MM}'] = f"{day.month:02d}"
+    if '{DD}' in template:
+        replacements['{DD}'] = f"{day.day:02d}"
+    if '{YYYYMMDD}' in template:
+        replacements['{YYYYMMDD}'] = day.strftime('%Y%m%d')
+    return replacements
+
+
 def generate_name(
     db: Session,
     entity_type: str,
     client_name: Optional[str] = None,
-    reference_date: Optional[datetime] = None,
+    reference_date: Optional[date] = None,
     max_retries: int = 10,
     **kwargs
 ) -> str:
@@ -151,7 +182,7 @@ def generate_name(
         db: Database session
         entity_type: Type of entity (sample, project, batch, analysis, container)
         client_name: Optional client name/code for {CLIENT} placeholder
-        reference_date: Optional date to use for date placeholders (defaults to now)
+        reference_date: Optional date for date placeholders (defaults to the lab's today)
         max_retries: Maximum number of retries if name is not unique
         **kwargs: Additional context for template placeholders
     
@@ -168,24 +199,12 @@ def generate_name(
         return str(uuid.uuid4())
     
     template = template_obj.template
-    now = reference_date if reference_date else datetime.now()
-    
+    day = template_calendar(db, reference_date)
+
     # Retry loop for uniqueness
     for attempt in range(max_retries):
         # Build replacement dictionary (non-SEQ first so we can compute sequence_key from "name without SEQ")
-        replacements: Dict[str, str] = {}
-        
-        # Date placeholders
-        if '{YYYY}' in template:
-            replacements['{YYYY}'] = str(now.year)
-        if '{YY}' in template:
-            replacements['{YY}'] = str(now.year % 100).zfill(2)
-        if '{MM}' in template:
-            replacements['{MM}'] = f"{now.month:02d}"
-        if '{DD}' in template:
-            replacements['{DD}'] = f"{now.day:02d}"
-        if '{YYYYMMDD}' in template:
-            replacements['{YYYYMMDD}'] = now.strftime('%Y%m%d')
+        replacements: Dict[str, str] = fill_date_placeholders(template, day)
         
         # Client placeholder (client_name is typically client.abbreviation or client.name from caller)
         # {CLIENT} and {CLIABV} are synonyms (CLIABV = client abbreviation)

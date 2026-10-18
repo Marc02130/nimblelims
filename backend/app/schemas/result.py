@@ -50,7 +50,7 @@ class ResultUpdate(BaseModel):
 
     @validator('entry_date')
     def validate_entry_date(cls, v):
-        if v and is_future(v):
+        if v is not None and is_future(v):
             raise ValueError('Entry date cannot be in the future')
         return v
 
@@ -108,6 +108,13 @@ class TestResultEntry(BaseModel):
     """Schema for results for a single test"""
     test_id: UUID = Field(..., description="ID of test")
     analyte_results: List[AnalyteResultEntry] = Field(..., description="List of analyte results for this test")
+    entry_date: Optional[datetime] = Field(None, description="Date result was entered")
+
+    @validator('entry_date')
+    def validate_entry_date(cls, v):
+        if v is not None and is_future(v):
+            raise ValueError('Entry date cannot be in the future')
+        return v
 
 
 class BatchResultsEntryRequestUS28(BaseModel):

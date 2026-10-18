@@ -1,5 +1,6 @@
 import axios, { AxiosInstance, AxiosResponse } from 'axios';
 import { isPublicAuthPath } from './publicAuthPath';
+import { apiErrorText } from '../utils/apiErrorText';
 
 // Use nginx proxy at /api/ which forwards to backend:8000
 // This avoids CORS issues and works in Docker
@@ -709,41 +710,7 @@ export class ApiService {
    * Validation 422 bodies are arrays of { type, loc, msg, input, ctx }.
    */
   static formatError(err: any, fallback: string): string {
-    const detail = err?.response?.data?.detail;
-    if (typeof detail === 'string' && detail.trim()) return detail;
-    if (Array.isArray(detail) && detail.length > 0) {
-      return (
-        detail
-          .map((d: any) => {
-            if (typeof d === 'string') return d;
-            if (d?.msg) {
-              const loc = Array.isArray(d.loc)
-                ? d.loc.filter((x: any) => x !== 'body' && x !== 'query').join('.')
-                : '';
-              return loc ? `${loc}: ${d.msg}` : d.msg;
-            }
-            return null;
-          })
-          .filter(Boolean)
-          .join('; ') || fallback
-      );
-    }
-    if (detail && typeof detail === 'object') {
-      if (typeof detail.message === 'string') {
-        const extra =
-          Array.isArray(detail.errors) && detail.errors.length
-            ? ` ${detail.errors.slice(0, 3).join('; ')}`
-            : '';
-        return `${detail.message}${extra}`;
-      }
-      try {
-        return JSON.stringify(detail);
-      } catch {
-        return fallback;
-      }
-    }
-    if (typeof err?.message === 'string' && err.message) return err.message;
-    return fallback;
+    return apiErrorText(err, fallback);
   }
 
   async getAnalysis(id: string) {
