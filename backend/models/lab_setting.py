@@ -18,4 +18,6 @@ class LabSetting(Base):
     id = Column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     timezone = Column(String(64), nullable=True)
     modified_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    modified_by = Column(PostgresUUID(as_uuid=True), ForeignKey("users.id"))
+    modified_by = Column(
+        PostgresUUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT")
+    )
