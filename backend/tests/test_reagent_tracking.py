@@ -8,11 +8,12 @@ the configuring agent may add vendors/reagents but never lots or uses.
 """
 import asyncio
 import uuid
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 
 import pytest
 from sqlalchemy import text
 
+from app.core import lab_time
 from app.main import app
 from app.services import configuring_agent_allow as allow
 from app.services import configuring_agent_catalog as cat
@@ -409,3 +410,56 @@ def test_zero_or_negative_use_is_refused(client, admin_h, lot, run, qty):
     assert "greater than 0" in r.json()["detail"]["message"]
     after = client.get("/v1/reagent-lots", headers=admin_h).json()
     assert float(next(x for x in after if x["id"] == lot["id"])["quantity_remaining"]) == 100
+
+
+@pytest.mark.parametrize(
+    "utc_moment, expected",
+    [
+        (datetime(2026, 10, 19, 0, 0, tzinfo=timezone.utc), date(2026, 10, 18)),  # 8:00 PM EDT
+        (datetime(2026, 10, 19, 1, 30, tzinfo=timezone.utc), date(2026, 10, 18)),  # 9:30 PM EDT
+        (datetime(2026, 10, 19, 3, 59, tzinfo=timezone.utc), date(2026, 10, 18)),  # 11:59 PM EDT
+        (datetime(2026, 10, 19, 4, 0, tzinfo=timezone.utc), date(2026, 10, 19)),  # midnight EDT
+    ],
+)
+def test_lab_today_uses_the_lab_clock_between_8pm_and_midnight(monkeypatch, utc_moment, expected):
+    monkeypatch.setenv("LAB_TIMEZONE", "America/New_York")
+    assert lab_time.lab_today(utc_moment) == expected
+    monkeypatch.delenv("LAB_TIMEZONE")
+    assert lab_time.lab_today(utc_moment) == utc_moment.date()
+
+
+def test_unknown_lab_timezone_is_refused(monkeypatch):
+    monkeypatch.setenv("LAB_TIMEZONE", "Mars/Olympus_Mons")
+    with pytest.raises(RuntimeError, match="LAB_TIMEZONE"):
+        lab_time.lab_today()
+
+
+def test_blank_used_on_is_the_lab_date_in_the_evening(client, admin_h, lot, run, monkeypatch):
+    monkeypatch.setenv("LAB_TIMEZONE", "America/New_York")
+    evening = datetime(2026, 10, 19, 1, 30, tzinfo=timezone.utc)  # 9:30 PM EDT on Oct 18
+    monkeypatch.setattr(lab_time, "_utcnow", lambda: evening)
+    r = client.post("/v1/reagent-uses", headers=admin_h, json={
+        "reagent_lot_id": lot["id"], "lims_run_id": str(run.id), "quantity_used": 1})
+    assert r.status_code == 201, r.text
+    assert r.json()["used_on"] == "2026-10-18"
+    sent = client.post("/v1/reagent-uses", headers=admin_h, json={
+        "reagent_lot_id": lot["id"], "lims_run_id": str(run.id), "quantity_used": 1, "used_on": "2026-10-17"})
+    assert sent.status_code == 201, sent.text
+    assert sent.json()["used_on"] == "2026-10-17"
+
+
+@pytest.mark.parametrize("bad", ["2026-13-45", "not-a-date", "2026-02-30"])
+def test_invalid_used_on_has_a_code(client, admin_h, lot, run, bad):
+    r = client.post("/v1/reagent-uses", headers=admin_h, json={
+        "reagent_lot_id": lot["id"], "lims_run_id": str(run.id), "quantity_used": 1, "used_on": bad})
+    assert r.status_code == 422, r.text
+    detail = r.json()["detail"]
+    assert detail["code"] == "invalid_date"
+    assert "valid date" in detail["message"]
+    after = client.get(f"/v1/reagent-lots/{lot['id']}", headers=admin_h).json()
+    assert float(after["quantity_remaining"]) == 100
+
+    mixed = client.post("/v1/reagent-uses", headers=admin_h, json={
+        "lims_run_id": str(run.id), "quantity_used": 1, "used_on": bad})
+    assert mixed.status_code == 422
+    assert isinstance(mixed.json()["detail"], list)

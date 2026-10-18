@@ -5,11 +5,14 @@ from sqlalchemy.exc import IntegrityError
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import validate_security_config
+from app.core.lab_time import lab_zone
 from app.routers import auth, samples, tests, containers, batches, results, aliquots, lists, projects, analyses, analytes, units, users, roles, permissions, clients, test_batteries, client_projects, custom_attributes, help, admin, sequences, workflows, experiments, lims_runs, sop_parse, lims_run_checklists, dose_response, field_definitions, eln_processes, eln_process_definitions, entries, sample_journey, instrument_catalog, data_parsers, asked_for, work_orders, sample_type_transitions, ui_schema, config_schema, configuring_agent, reagents
 import logging
 
 # S3: refuse missing/default JWT secret unless explicit local insecure flags
 validate_security_config()
+# An unknown LAB_TIMEZONE stops startup instead of stamping uses on the wrong day.
+lab_zone()
 
 # Configure logging
 logging.basicConfig(

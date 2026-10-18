@@ -29,6 +29,7 @@ import {
 } from '@mui/material';
 import { apiService } from '../../services/apiService';
 import { useUser } from '../../contexts/UserContext';
+import { localDateString } from '../../utils/localDate';
 
 export interface ReagentUseRow {
   id: string;
@@ -91,7 +92,8 @@ const ReagentLotPicker: React.FC<{
   lots: LotOption[];
   canRecord: boolean;
   saving: boolean;
-  onRecord: (lotId: string, quantity: string, usedOn: string, note: string) => Promise<void>;
+  /** Resolves true when the use was saved. */
+  onRecord: (lotId: string, quantity: string, usedOn: string, note: string) => Promise<boolean>;
   onRemove?: () => void;
 }> = ({ reagentId, reagentName, lots, canRecord, saving, onRecord, onRemove }) => {
   const [lotId, setLotId] = useState('');
@@ -155,7 +157,13 @@ const ReagentLotPicker: React.FC<{
             size="small"
             sx={{ mt: 0.5 }}
             disabled={saving || !lotId || quantity === ''}
-            onClick={() => onRecord(lotId, quantity, usedOn, note)}
+            onClick={async () => {
+              const saved = await onRecord(lotId, quantity, usedOn, note);
+              if (saved === true) {
+                setUsedOn('');
+                setNote('');
+              }
+            }}
           >
             Record
           </Button>
@@ -314,7 +322,7 @@ const ReagentUsePanel: React.FC<Props> = ({
         analysis_id: analysisId || undefined,
         quantity_used: quantity,
         unit: lots.find((l) => l.id === lotId)?.unit || undefined,
-        used_on: usedOn || undefined,
+        used_on: usedOn || localDateString(),
         note: note || undefined,
       });
       setOpen(false);
@@ -364,7 +372,7 @@ const ReagentUsePanel: React.FC<Props> = ({
     quantityForReagent: string,
     usedOnForReagent: string,
     noteForReagent: string,
-  ) => {
+  ): Promise<boolean> => {
     setSaving(true);
     setError(null);
     try {
@@ -374,16 +382,21 @@ const ReagentUsePanel: React.FC<Props> = ({
         analysis_id: analysisId || undefined,
         quantity_used: quantityForReagent,
         unit: lots.find((lot) => lot.id === lotIdForReagent)?.unit || undefined,
-        used_on: usedOnForReagent || undefined,
+        used_on: usedOnForReagent || localDateString(),
         note: noteForReagent || undefined,
       });
-      await load();
-      await loadLots();
     } catch (err) {
       setError(errorText(err, 'Could not record the reagent use'));
+      setSaving(false);
+      return false;
+    }
+    try {
+      await load();
+      await loadLots();
     } finally {
       setSaving(false);
     }
+    return true;
   };
 
   return (
@@ -425,7 +438,9 @@ const ReagentUsePanel: React.FC<Props> = ({
         </Box>
         {onExperiment && chosenIds.length === 0 && (
           <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-            No reagents yet. Add a reagent, then record its lot.
+            {uses.length === 0
+              ? 'No reagents yet. Add a reagent, then record its lot.'
+              : 'No reagents on this experiment now. The lots already recorded stay listed below. Add a reagent to record another lot.'}
           </Typography>
         )}
         {onExperiment &&

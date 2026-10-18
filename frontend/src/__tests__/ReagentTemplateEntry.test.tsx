@@ -10,6 +10,7 @@ jest.mock('@mui/x-data-grid', () => ({
 import ExperimentTemplatesManagement from '../pages/ExperimentTemplatesManagement';
 import EntryCapturePanel from '../components/experiments/EntryCapturePanel';
 import { apiService } from '../services/apiService';
+import { localDateString } from '../utils/localDate';
 
 jest.mock('../services/apiService', () => ({
   ...jest.requireActual('../services/apiService'),
@@ -124,7 +125,18 @@ describe('Experiment template Reagent entry', () => {
 });
 
 describe('Experiment reagent capture', () => {
-  const reagentEntry = {
+  const reagentEntry: {
+    id: string;
+    experiment_id: string;
+    entry_type: string;
+    name: string;
+    predefined_entry_key: string;
+    sort_order: number;
+    active: boolean;
+    config: { allowed_reagent_ids: string[]; removed_reagent_ids?: string[]; status: string };
+    field_definition_links: never[];
+    values: never[];
+  } = {
     id: 'e1',
     experiment_id: 'exp1',
     entry_type: 'reagent',
@@ -308,6 +320,8 @@ describe('Experiment reagent capture', () => {
     await waitFor(() => expect(screen.queryByLabelText('Lot for Qubit dsDNA HS')).not.toBeInTheDocument());
     expect(screen.getByText('bench note')).toBeInTheDocument();
     expect(screen.getByText('L-OK')).toBeInTheDocument();
+    expect(await screen.findByText(/lots already recorded stay listed below/i)).toBeInTheDocument();
+    expect(screen.queryByText(/No reagents yet/i)).not.toBeInTheDocument();
     fireEvent.mouseDown(screen.getByLabelText('Add reagent'));
     expect(await screen.findByRole('option', { name: 'Qubit dsDNA HS' })).toBeInTheDocument();
   });
@@ -331,6 +345,47 @@ describe('Experiment reagent capture', () => {
       used_on: '2026-10-01',
       note: 'opened today',
     });
+    await waitFor(() => expect(screen.getByLabelText('Used on')).toHaveValue(''));
+    expect(screen.getByLabelText('Note')).toHaveValue('');
+  });
+
+  test('keeps Used on and Note when the API refuses the use', async () => {
+    api.getExperimentEntries.mockResolvedValue({ entries: [reagentEntry] });
+    api.getReagentLots.mockResolvedValue(lots);
+    api.recordReagentUse.mockRejectedValue({
+      response: { data: { detail: { code: 'insufficient_amount', message: 'Lot L-OK has 1 mL left' } } },
+    });
+    wrap(<EntryCapturePanel experimentId="exp1" />);
+    fireEvent.mouseDown(await screen.findByLabelText('Lot for Qubit dsDNA HS'));
+    fireEvent.click(await screen.findByRole('option', { name: /L-OK/ }));
+    fireEvent.change(screen.getByLabelText(/Quantity for Qubit dsDNA HS/), { target: { value: '5' } });
+    fireEvent.change(screen.getByLabelText('Used on'), { target: { value: '2026-10-01' } });
+    fireEvent.change(screen.getByLabelText('Note'), { target: { value: 'opened today' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Record' }));
+    expect(await screen.findByText('Lot L-OK has 1 mL left')).toBeInTheDocument();
+    expect(screen.getByLabelText('Used on')).toHaveValue('2026-10-01');
+    expect(screen.getByLabelText('Note')).toHaveValue('opened today');
+  });
+
+  test("sends the browser's local date when Used on is left empty", async () => {
+    api.getExperimentEntries.mockResolvedValue({ entries: [reagentEntry] });
+    api.getReagentLots.mockResolvedValue(lots);
+    wrap(<EntryCapturePanel experimentId="exp1" />);
+    fireEvent.mouseDown(await screen.findByLabelText('Lot for Qubit dsDNA HS'));
+    fireEvent.click(await screen.findByRole('option', { name: /L-OK/ }));
+    fireEvent.change(screen.getByLabelText(/Quantity for Qubit dsDNA HS/), { target: { value: '1' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Record' }));
+    await waitFor(() => expect(api.recordReagentUse).toHaveBeenCalled());
+    expect(api.recordReagentUse.mock.calls[0][0].used_on).toBe(localDateString());
+  });
+
+  test('says no reagents yet only when nothing has been recorded', async () => {
+    api.getExperimentEntries.mockResolvedValue({
+      entries: [{ ...reagentEntry, config: { allowed_reagent_ids: [], status: 'draft' } }],
+    });
+    wrap(<EntryCapturePanel experimentId="exp1" />);
+    expect(await screen.findByText(/No reagents yet/i)).toBeInTheDocument();
+    expect(screen.queryByText(/lots already recorded/i)).not.toBeInTheDocument();
   });
 
   test('shows the API refusal when the reagent is inactive', async () => {
