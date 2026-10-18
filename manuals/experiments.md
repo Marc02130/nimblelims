@@ -52,11 +52,12 @@ It is **not** the primary home for large-scale result data analysis or dose-resp
 |------|-----------------|--------|------|
 | **`experiment_sample_data`** | Per-sample process data | **Table** | One row per sample in the experiment cohort |
 | **`experiment_data`** | Experiment-level / purpose tables (incl. **Experiment Header**) | **Table only** (no form layout) | Multi-row free rows (`row_key`); user adds rows |
-| Legacy/runtime compatibility | `sample_data`, `experiment_detail`, `predefined_action`, `display_table` | — | Do not use as new product kinds |
+| **`reagent`** | Default reagents, plus any the tech adds | One lot picker per reagent | The saved list filters each picker; a use of a reagent not on it is **422** `reagent_not_on_experiment` |
+| Legacy/runtime compatibility | `sample_data`, `experiment_detail`, `predefined_action`, `display_table` | — | Kept for existing templates |
 
-**Experiment Header** = experiment data with `predefined_entry_key = experiment_header` (same kind as other experiment data tables; not a separate “Overview” product type).
+**Experiment Header** = experiment data with `predefined_entry_key = experiment_header` (same kind as other experiment data tables).
 
-There are **two product kinds only**. Built-in behavior is a **predefined wrapper** (`predefined_entry_key`) on one of those kinds, not a third kind. Entries capture process data; they are not copies of Sample.
+Sample and experiment data are the two table kinds. **Reagent** is its own entry type (`predefined_entry_key = reagents`, wrapper `reagents`, cardinality 1). The author stores `config.allowed_reagent_ids` from the Admin reagent catalog. Creating an experiment copies that default list onto the experiment entry, and those snapshotted defaults count as on the experiment. A later edit of the template leaves existing experiments on the defaults they had at creation. On a template experiment, **Add reagent** posts `/v1/experiments/{id}/reagents` and appends that active catalog reagent to the experiment entry. A reload still shows it. Adding the same id again is idempotent and does not duplicate the row. An inactive reagent is **422** `reagent_inactive` and the list stays as it was. Each listed reagent has its own lot picker, limited to that reagent's usable lots, and **Record** posts `/v1/reagent-uses` with `experiment_id`. A reagent that is not on the saved list is **422** `reagent_not_on_experiment` and the lot quantity stays unchanged. The tech adds it first. An ad hoc experiment with no reagent entry gets one when the first reagent is added; until then an experiment use is `reagent_not_on_experiment`. There is no delete route for a reagent on the experiment. Check order on an experiment use: the saved list (`reagent_not_on_experiment`), then the catalog active flag (`reagent_inactive`), then the lot rules. An off-list reagent is `reagent_not_on_experiment` even when it is also inactive. A reagent that is inactive at use time and is already on the list is **422** `reagent_inactive`, including when its lot is still usable. A LIMS-run-only use skips the list check. A LIMS-run use of an inactive reagent is **422** `reagent_inactive`, and the lot quantity stays unchanged. Entries capture process data; sample identity stays on Sample.
 
 ### Columns
 
@@ -80,7 +81,7 @@ There are **two product kinds only**. Built-in behavior is a **predefined wrappe
 
 - `EntryCapturePanel` on experiment detail (Entries).
 - **Instantiate from template** if entries not yet created (also auto on create when template has `entries`).
-- Sample data: table by cohort. Experiment data: multi-row table + Add/Delete row. Aliquot: `AliquotPlanEditor`.
+- Sample data: table by cohort. Experiment data: multi-row table + Add/Delete row. Aliquot: `AliquotPlanEditor`. Reagent: the saved `config.allowed_reagent_ids` list, one lot picker per reagent filtered to that reagent's usable lots. Recording a lot of a reagent that is not on that list is **422** `reagent_not_on_experiment`.
 
 ### Aliquot / pool destination sample type
 

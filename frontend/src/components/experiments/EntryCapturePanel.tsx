@@ -1,6 +1,6 @@
 /**
  * Entry capture UI for an Experiment.
- * Kinds: experiment_sample_data | experiment_data | predefined_action | display_table
+ * Kinds: experiment_sample_data | experiment_data | predefined_action | reagent | display_table
  * (legacy sample_data / experiment_detail still accepted).
  *
  * experiment_sample_data → table: one row per cohort sample
@@ -43,6 +43,7 @@ import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { apiService } from '../../services/apiService';
 import AliquotPlanEditor from './AliquotPlanEditor';
+import ReagentUsePanel from '../reagents/ReagentUsePanel';
 import {
   ALIQUOT_PLAN_ENTRY,
   ALIQUOT_PLAN_KEY,
@@ -95,7 +96,12 @@ interface Entry {
   predefined_entry_key?: string | null;
   sort_order: number;
   active: boolean;
-  config?: { status?: string; submitted_at?: string; sample_columns?: string[] } | null;
+  config?: {
+    status?: string;
+    submitted_at?: string;
+    sample_columns?: string[];
+    allowed_reagent_ids?: string[];
+  } | null;
   field_definition_links: FieldLink[];
   values: EntryValue[];
 }
@@ -112,6 +118,7 @@ const isWritableEntry = (entryType: string) =>
 const typeLabel = (entryType: string): string => {
   if (entryType === 'sample_data') return 'experiment_sample_data';
   if (entryType === 'experiment_detail') return 'experiment_data';
+  if (entryType === 'reagent') return 'Reagent';
   return entryType;
 };
 
@@ -153,6 +160,7 @@ const TYPE_COLORS: Record<string, 'default' | 'primary' | 'secondary' | 'info' |
   sample_data: 'primary',
   experiment_detail: 'info',
   predefined_action: 'warning',
+  reagent: 'secondary',
   display_table: 'default',
 };
 
@@ -683,11 +691,19 @@ const EntryCapturePanel: React.FC<EntryCapturePanelProps> = ({
       </Typography>
 
       {entries.length === 0 ? (
-        <Alert severity="info">
-          No entries yet. If the experiment template defines{' '}
-          <code>template_definition.entries</code>, use <strong>Instantiate from template</strong>.
-          Or <strong>Add aliquot/pool</strong> to create the plan and dest pair together.
-        </Alert>
+        <>
+          <Alert severity="info">
+            No entries yet. If the experiment template defines{' '}
+            <code>template_definition.entries</code>, use <strong>Instantiate from template</strong>.
+            Or <strong>Add aliquot/pool</strong> to create the plan and dest pair together. Add any
+            active reagent below, then record its lot.
+          </Alert>
+          <ReagentUsePanel
+            experimentId={experimentId}
+            defaultReagentIds={[]}
+            onReagentsChanged={load}
+          />
+        </>
       ) : (
         entries.map((entry) => {
           const links = (entry.field_definition_links || [])
@@ -698,6 +714,11 @@ const EntryCapturePanel: React.FC<EntryCapturePanelProps> = ({
           const entryStatus = entry.config?.status || 'draft';
           const isSubmitted = entryStatus === 'submitted';
           const dataRows = rowKeysByEntry[entry.id] || [];
+          const isReagentEntry =
+            entry.entry_type === 'reagent' || entry.predefined_entry_key === 'reagents';
+          const defaultReagentIds = Array.isArray(entry.config?.allowed_reagent_ids)
+            ? entry.config.allowed_reagent_ids
+            : [];
 
           return (
             <Accordion key={entry.id} defaultExpanded={entries.length <= 3}>
@@ -753,7 +774,13 @@ const EntryCapturePanel: React.FC<EntryCapturePanelProps> = ({
                   />
                 )}
 
-                {isSampleScoped(entry.entry_type) ? (
+                {isReagentEntry ? (
+                  <ReagentUsePanel
+                    experimentId={experimentId}
+                    defaultReagentIds={defaultReagentIds}
+                    onReagentsChanged={load}
+                  />
+                ) : isSampleScoped(entry.entry_type) ? (
                   sampleIds.length === 0 ? (
                     <Alert severity="warning">
                       No samples on this experiment yet. Select the cohort at start (queue / scan),
@@ -952,6 +979,16 @@ const EntryCapturePanel: React.FC<EntryCapturePanelProps> = ({
           );
         })
       )}
+      {entries.length > 0 &&
+        !entries.some(
+          (entry) => entry.entry_type === 'reagent' || entry.predefined_entry_key === 'reagents',
+        ) && (
+          <ReagentUsePanel
+            experimentId={experimentId}
+            defaultReagentIds={[]}
+            onReagentsChanged={load}
+          />
+        )}
     </Box>
   );
 };

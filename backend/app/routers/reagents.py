@@ -29,6 +29,8 @@ from app.core.patch_fields import explicit_updates
 from app.core.security import get_current_user, get_user_permissions
 from app.database import get_db
 from app.schemas.reagent import (
+    ExperimentReagentAdd,
+    ExperimentReagentListResponse,
     ReagentCreate,
     ReagentLotCreate,
     ReagentLotResponse,
@@ -53,6 +55,7 @@ reagents_router = APIRouter(prefix="/reagents", tags=["reagents"])
 reagent_vendors_router = APIRouter(prefix="/reagent-vendors", tags=["reagents"])
 reagent_lots_router = APIRouter(prefix="/reagent-lots", tags=["reagents"])
 reagent_uses_router = APIRouter(prefix="/reagent-uses", tags=["reagents"])
+experiment_reagents_router = APIRouter(prefix="/experiments", tags=["reagents"])
 
 
 def _has_config_edit(user: User, db: Session) -> bool:
@@ -417,12 +420,204 @@ def update_reagent_lot(
 
 # --------------------------------------------------------------------- uses ---
 
+REAGENT_INACTIVE = "reagent_inactive"
+REAGENT_NOT_ON_EXPERIMENT = "reagent_not_on_experiment"
+
+
+def _stored_reagent_ids(config: object) -> List[str]:
+    """Ids already saved on a reagent entry, in order, skipping blanks."""
+    if not isinstance(config, dict):
+        return []
+    raw_ids = config.get("allowed_reagent_ids")
+    if raw_ids is None or not isinstance(raw_ids, list):
+        return []
+    stored: List[str] = []
+    for raw in raw_ids:
+        if raw is None:
+            continue
+        try:
+            stored.append(str(UUID(str(raw))))
+        except (ValueError, TypeError):
+            continue
+    return stored
+
+
+def _reagent_entry_for(db: Session, experiment_id: UUID):
+    """The active reagent entry on the experiment, if one has been saved."""
+    from models.entry import Entry
+
+    rows = (
+        db.query(Entry)
+        .filter(Entry.experiment_id == experiment_id, Entry.active.is_(True))
+        .order_by(Entry.sort_order.asc(), Entry.created_at.asc())
+        .all()
+    )
+    for row in rows:
+        if row.entry_type == "reagent" or row.predefined_entry_key == "reagents":
+            return row
+    return None
+
+
+def save_experiment_reagent(
+    db: Session, experiment_id: UUID, reagent_id: UUID, current_user: User
+) -> tuple[ExperimentReagentListResponse, bool]:
+    """Append an active reagent to the experiment's saved list.
+
+    A second add of the same reagent leaves the list as it is. An ad hoc
+    experiment with no reagent entry gets one. Returns the saved list and
+    whether this call appended the reagent.
+    """
+    from sqlalchemy.orm.attributes import flag_modified
+
+    from models.entry import PREDEFINED_ENTRY_DEFAULTS, Entry
+    from models.experiment import Experiment
+
+    experiment = db.query(Experiment).filter(Experiment.id == experiment_id).first()
+    if experiment is None:
+        raise HTTPException(status_code=404, detail="Experiment not found")
+    reagent = db.query(Reagent).filter(Reagent.id == reagent_id).first()
+    if reagent is None:
+        raise HTTPException(status_code=404, detail="Reagent not found")
+    _refuse_inactive_reagent(db, reagent_id, "added")
+
+    reagent_key = str(reagent_id)
+    entry = _reagent_entry_for(db, experiment_id)
+    if entry is None:
+        decl = PREDEFINED_ENTRY_DEFAULTS["reagents"]
+        max_sort = (
+            db.query(func.max(Entry.sort_order))
+            .filter(Entry.experiment_id == experiment_id, Entry.active.is_(True))
+            .scalar()
+        )
+        sort_order = 0 if max_sort is None else int(max_sort) + 1
+        entry = Entry(
+            experiment_id=experiment_id,
+            entry_type="reagent",
+            name=decl["name"],
+            description=decl.get("description"),
+            predefined_entry_key="reagents",
+            sort_order=sort_order,
+            config={
+                "allowed_reagent_ids": [reagent_key],
+                "status": "draft",
+            },
+            active=True,
+            created_by=current_user.id,
+            modified_by=current_user.id,
+        )
+        db.add(entry)
+        _commit(db, entry, "Could not save the reagent on this experiment")
+        return (
+            ExperimentReagentListResponse(
+                experiment_id=experiment_id,
+                entry_id=entry.id,
+                allowed_reagent_ids=[reagent_key],
+            ),
+            True,
+        )
+
+    stored = _stored_reagent_ids(entry.config)
+    if reagent_key in stored:
+        return (
+            ExperimentReagentListResponse(
+                experiment_id=experiment_id,
+                entry_id=entry.id,
+                allowed_reagent_ids=stored,
+            ),
+            False,
+        )
+
+    config = dict(entry.config) if isinstance(entry.config, dict) else {}
+    config["allowed_reagent_ids"] = stored + [reagent_key]
+    config.setdefault("status", "draft")
+    entry.config = config
+    flag_modified(entry, "config")
+    entry.modified_by = current_user.id
+    _commit(db, entry, "Could not save the reagent on this experiment")
+    return (
+        ExperimentReagentListResponse(
+            experiment_id=experiment_id,
+            entry_id=entry.id,
+            allowed_reagent_ids=_stored_reagent_ids(entry.config),
+        ),
+        True,
+    )
+
+
+def _reagent_label(db: Session, reagent_id: UUID) -> str:
+    reagent = db.query(Reagent).filter(Reagent.id == reagent_id).first()
+    if reagent is not None and reagent.name:
+        return reagent.name
+    return "This reagent"
+
+
+def _refuse_reagent_not_on_experiment(db: Session, experiment_id: UUID, reagent_id: UUID) -> None:
+    """Refuse an experiment use until the reagent is on the saved list.
+
+    Template defaults copied onto the experiment count. No reagent entry means
+    the reagent is not on the list. This runs before the inactive check, so an
+    off-list reagent is ``reagent_not_on_experiment`` even when the catalog row
+    is inactive. A reagent already on the list that is later inactivated falls
+    through to ``reagent_inactive``. A LIMS-run-only use does not call this.
+    """
+    entry = _reagent_entry_for(db, experiment_id)
+    stored = _stored_reagent_ids(entry.config) if entry is not None else []
+    if str(reagent_id) in stored:
+        return
+    label = _reagent_label(db, reagent_id)
+    raise HTTPException(
+        status_code=422,
+        detail={
+            "code": REAGENT_NOT_ON_EXPERIMENT,
+            "message": f"{label} isn't on this experiment. Add it before recording a lot.",
+        },
+    )
+
+
+def _refuse_inactive_reagent(db: Session, reagent_id: UUID, action: str = "recorded") -> None:
+    """A use or an add refuses an inactive catalog reagent."""
+    reagent = db.query(Reagent).filter(Reagent.id == reagent_id).first()
+    if reagent is None or reagent.active is not True:
+        label = reagent.name if reagent is not None and reagent.name else "This reagent"
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "code": REAGENT_INACTIVE,
+                "message": f"{label} is inactive and can't be {action}.",
+            },
+        )
+
 def _use_out(row: ReagentUse) -> ReagentUseResponse:
     out = ReagentUseResponse.model_validate(row)
     if row.lot is not None:
         out.reagent_id = row.lot.reagent_id
         out.reagent_name = row.lot.reagent.name if row.lot.reagent is not None else None
     return out
+
+
+@experiment_reagents_router.post(
+    "/{experiment_id}/reagents",
+    response_model=ExperimentReagentListResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def add_experiment_reagent(
+    experiment_id: UUID,
+    body: ExperimentReagentAdd,
+    current_user: User = Depends(require_experiment_manage),
+    db: Session = Depends(get_db),
+):
+    """Save a reagent on the experiment. A duplicate add returns the same list."""
+    from fastapi import Response
+
+    # Response is imported locally so the status can change for an idempotent add.
+    payload, created = save_experiment_reagent(db, experiment_id, body.reagent_id, current_user)
+    if created:
+        return payload
+    return Response(
+        content=payload.model_dump_json(),
+        media_type="application/json",
+        status_code=status.HTTP_200_OK,
+    )
 
 
 @reagent_uses_router.get("", response_model=List[ReagentUseResponse])
@@ -466,10 +661,18 @@ def record_reagent_use(
     lot = db.query(ReagentLot).filter(ReagentLot.id == body.reagent_lot_id).first()
     if lot is None:
         raise HTTPException(status_code=404, detail="Reagent lot not found")
-    if not lot.active:
+    # Check order when experiment_id is set: the saved list first
+    # (reagent_not_on_experiment), then the catalog active flag
+    # (reagent_inactive), then the lot rules below. Template defaults
+    # snapshotted onto the experiment count as on the list. A LIMS-run-only
+    # use skips the list check and still refuses an inactive catalog reagent.
+    if body.experiment_id is not None:
+        _refuse_reagent_not_on_experiment(db, body.experiment_id, lot.reagent_id)
+    _refuse_inactive_reagent(db, lot.reagent_id)
+    if lot.active is not True:
         raise HTTPException(status_code=422, detail=f"Lot {lot.lot_number} is inactive and can't be used")
     used_on = body.used_on or date.today()
-    if not lot.released:
+    if lot.released is not True:
         raise HTTPException(status_code=422, detail=f"Lot {lot.lot_number} is not released for use")
     if lot.qc_status == "rejected":
         raise HTTPException(status_code=422, detail=f"Lot {lot.lot_number} was rejected by QC and can't be used")
