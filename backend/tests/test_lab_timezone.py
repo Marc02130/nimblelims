@@ -74,16 +74,24 @@ def test_saved_zone_wins_over_the_environment(monkeypatch, db_session):
 
 def test_invalid_env_does_not_seed(monkeypatch, db_session):
     monkeypatch.setenv("LAB_TIMEZONE", "Mars/Olympus_Mons")
-    with pytest.raises(RuntimeError, match=r"not a known IANA time zone"):
+    with pytest.raises(RuntimeError) as caught:
         lab_time.resolve_lab_timezone(db_session)
+    message = str(caught.value)
+    assert "LAB_TIMEZONE 'Mars/Olympus_Mons' is not a known IANA time zone" in message
+    assert "LAB_TIMEZONE=America/New_York" in message
+    assert "UPDATE lab_settings SET timezone" not in message
     row = db_session.query(LabSetting).filter(LabSetting.id == LAB_SETTINGS_ID).first()
     assert row is None or row.timezone is None
 
 
 def test_missing_env_and_empty_row_refuse(monkeypatch, db_session):
     monkeypatch.delenv("LAB_TIMEZONE", raising=False)
-    with pytest.raises(RuntimeError, match=r"LAB_TIMEZONE=America/New_York"):
+    with pytest.raises(RuntimeError) as missing:
         lab_time.resolve_lab_timezone(db_session)
+    message = str(missing.value)
+    assert "LAB_TIMEZONE is required until a lab timezone is saved" in message
+    assert "LAB_TIMEZONE=America/New_York" in message
+    assert "UPDATE lab_settings SET timezone" not in message
     row = db_session.query(LabSetting).filter(LabSetting.id == LAB_SETTINGS_ID).one()
     row.timezone = "   "
     db_session.flush()
@@ -96,8 +104,15 @@ def test_corrupt_saved_zone_is_not_replaced(monkeypatch, db_session):
     row = LabSetting(id=LAB_SETTINGS_ID, timezone="Not/AZone")
     db_session.add(row)
     db_session.flush()
-    with pytest.raises(RuntimeError, match=r"saved lab timezone"):
+    with pytest.raises(RuntimeError) as caught:
         lab_time.resolve_lab_timezone(db_session)
+    message = str(caught.value)
+    assert "The saved lab timezone 'Not/AZone' is not a known IANA time zone" in message
+    assert "UPDATE lab_settings SET timezone = 'America/New_York'" in message
+    assert "PATCH /v1/lab-settings" in message
+    assert "administrator" in message
+    assert "LAB_TIMEZONE does not replace a saved value" in message
+    assert "Set LAB_TIMEZONE=" not in message
     db_session.refresh(row)
     assert row.timezone == "Not/AZone"
 
