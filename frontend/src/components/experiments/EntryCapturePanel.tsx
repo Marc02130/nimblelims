@@ -101,6 +101,7 @@ interface Entry {
     submitted_at?: string;
     sample_columns?: string[];
     allowed_reagent_ids?: string[];
+    removed_reagent_ids?: string[];
   } | null;
   field_definition_links: FieldLink[];
   values: EntryValue[];

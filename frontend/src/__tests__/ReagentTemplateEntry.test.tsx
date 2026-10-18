@@ -124,7 +124,18 @@ describe('Experiment template Reagent entry', () => {
 });
 
 describe('Experiment reagent capture', () => {
-  const reagentEntry = {
+  const reagentEntry: {
+    id: string;
+    experiment_id: string;
+    entry_type: string;
+    name: string;
+    predefined_entry_key: string;
+    sort_order: number;
+    active: boolean;
+    config: { allowed_reagent_ids: string[]; removed_reagent_ids?: string[]; status: string };
+    field_definition_links: never[];
+    values: never[];
+  } = {
     id: 'e1',
     experiment_id: 'exp1',
     entry_type: 'reagent',
