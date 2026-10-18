@@ -18,7 +18,7 @@ from pydantic import BaseModel
 from app.core.security import get_current_user
 from app.core.rbac import require_config_edit
 from app.core.patch_fields import explicit_updates
-from app.core.name_generation import generate_name
+from app.core.name_generation import fill_date_placeholders, template_calendar
 from uuid import UUID
 from datetime import datetime
 
@@ -204,22 +204,10 @@ def preview_generated_name(
             )
         
         template = template_obj.template
-        now = ref_date if ref_date else datetime.now()
-        
+        day = template_calendar(db, ref_date)
+
         # Build replacement dictionary (without consuming sequence)
-        replacements = {}
-        
-        # Date placeholders
-        if '{YYYY}' in template:
-            replacements['{YYYY}'] = str(now.year)
-        if '{YY}' in template:
-            replacements['{YY}'] = str(now.year % 100).zfill(2)
-        if '{MM}' in template:
-            replacements['{MM}'] = f"{now.month:02d}"
-        if '{DD}' in template:
-            replacements['{DD}'] = f"{now.day:02d}"
-        if '{YYYYMMDD}' in template:
-            replacements['{YYYYMMDD}'] = now.strftime('%Y%m%d')
+        replacements = fill_date_placeholders(template, day)
         # Sequence placeholder - use next value for preview, pad with template.seq_padding_digits
         if '{SEQ}' in template:
             from sqlalchemy import text

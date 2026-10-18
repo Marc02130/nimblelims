@@ -409,18 +409,24 @@ def enter_batch_results_us28(
                     existing_result.raw_result = analyte_result.raw_result
                     existing_result.reported_result = analyte_result.reported_result
                     existing_result.qualifiers = analyte_result.qualifiers
+                    if test_result_entry.entry_date is not None:
+                        existing_result.entry_date = test_result_entry.entry_date
                     existing_result.modified_by = current_user.id
                     existing_result.modified_at = datetime.utcnow()
                     created_results.append(existing_result)
                 else:
-                    # Create new result
+                    # Create new result. An omitted entry date stays the write instant.
                     new_result = Result(
                         test_id=test_result_entry.test_id,
                         analyte_id=analyte_id,
                         raw_result=analyte_result.raw_result,
                         reported_result=analyte_result.reported_result,
                         qualifiers=analyte_result.qualifiers,
-                        entry_date=datetime.utcnow(),
+                        entry_date=(
+                            datetime.utcnow()
+                            if test_result_entry.entry_date is None
+                            else test_result_entry.entry_date
+                        ),
                         entered_by=current_user.id,
                         created_by=current_user.id,
                         modified_by=current_user.id,

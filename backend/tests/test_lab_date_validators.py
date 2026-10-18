@@ -12,7 +12,7 @@ import pytest
 from pydantic import ValidationError
 
 from app.core import lab_time
-from app.schemas.result import ResultCreate, ResultResponse, ResultUpdate
+from app.schemas.result import ResultCreate, ResultResponse, ResultUpdate, TestResultEntry
 from app.schemas.sample import (
     BulkSampleAccessioningRequest,
     SampleAccessioningRequest,
@@ -121,6 +121,14 @@ def _result(when):
     return {"test_id": UID, "analyte_id": UID, "entered_by": UID, "entry_date": when}
 
 
+def _batch_entry(when):
+    return {
+        "test_id": UID,
+        "analyte_results": [{"analyte_id": UID}],
+        "entry_date": when,
+    }
+
+
 def _result_response(when):
     return {
         "id": UID,
@@ -147,6 +155,7 @@ _CASES = [
     (ResultCreate, _result),
     (ResultUpdate, _result),
     (ResultResponse, _result_response),
+    (TestResultEntry, _batch_entry),
 ]
 
 

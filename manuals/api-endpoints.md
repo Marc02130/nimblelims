@@ -253,7 +253,7 @@ These are explicit later planning actions, not calls that Receive or asked-for c
 }
 ```
 
-**Note:** `custom_attributes` are validated against active configurations for 'samples' entity type. `received_date` and `report_date` cannot fall on a later calendar day than today in the lab timezone. `due_date` may. The same lab day applies to test `test_date` and `review_date`, and to result `entry_date`. A time that is still today in the lab is accepted after UTC has already moved to the next day. Eligible-sample and batch expiration day counts use that same lab calendar.
+**Note:** `custom_attributes` are validated against active configurations for 'samples' entity type. `received_date` and `report_date` cannot fall on a later calendar day than today in the lab timezone. `due_date` may. The same lab day applies to test `test_date` and `review_date`, and to result `entry_date` (including `entry_date` on `POST /results/batch`). The sample and test forms cap received, report, test, review, and entry dates at the browser's today and show the API sentence when a later day is refused. `due_date` is not capped. A time that is still today in the lab is accepted after UTC has already moved to the next day. Eligible-sample and batch expiration day counts use that same lab calendar.
 
 **Response:** Sample with created tests
 
@@ -2342,7 +2342,7 @@ Authorization: Bearer <admin_token>
 
 ## Admin - Name Templates
 
-Name templates define how auto-generated entity names (e.g. sample, project, batch) are built. Placeholders: `{SEQ}` (padded by `seq_padding_digits`; **scoped by “name without SEQ”** so e.g. template `{PROJECT}-{SEQ}` gives per-project sequences—first sample in each project is `…-01`), `{YYYY}`, `{YY}`, `{MM}`, `{DD}`, `{YYYYMMDD}`, `{CLIENT}` / `{CLIABV}` (client abbreviation when set, else client name), `{BATCH}` (batch name), `{PROJECT}` (project name). See `backend/app/core/name_generation.py` and `ids-and-configuration.md`.
+Name templates define how auto-generated entity names (e.g. sample, project, batch) are built. Placeholders: `{SEQ}` (padded by `seq_padding_digits`; **scoped by “name without SEQ”** so e.g. template `{PROJECT}-{SEQ}` gives per-project sequences—first sample in each project is `…-01`), `{YYYY}`, `{YY}`, `{MM}`, `{DD}`, `{YYYYMMDD}`, `{CLIENT}` / `{CLIABV}` (client abbreviation when set, else client name), `{BATCH}` (batch name), `{PROJECT}` (project name). Date placeholders use the lab's today when the caller does not pass a date. Sample, project, batch, analysis, and container names share that helper. An explicit `received_date` or `start_date` still stamps that calendar day. See `backend/app/core/name_generation.py` and `ids-and-configuration.md`.
 
 ### GET /admin/name-templates
 List name templates with filtering and pagination.
@@ -2379,7 +2379,7 @@ Soft-delete a name template (sets active=false).
 ### GET /admin/name-templates/preview
 Preview a generated name without consuming a sequence value.
 
-**Query Parameters:** `entity_type` (required), `client_id?`, `reference_date?` (YYYY-MM-DD)
+**Query Parameters:** `entity_type` (required), `client_id?`, `reference_date?` (YYYY-MM-DD). When `reference_date` is omitted, date placeholders use today in the lab timezone. A supplied `reference_date` is used as that calendar day.
 
 **Response:** `{ preview: string }`
 

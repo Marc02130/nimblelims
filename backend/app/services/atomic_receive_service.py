@@ -214,10 +214,11 @@ def receive_sample(
     # Use a savepoint so failure does not abort the outer receive transaction.
     try:
         with db.begin_nested():
+            # Date tokens use the lab's today. received_at is the stored instant
+            # and is already tomorrow in UTC during an evening in the lab.
             sample_name = generate_name_for_sample(
                 db=db,
                 project_id=str(project.id),
-                received_date=received_at,
             )
             if not sample_name:
                 raise ValueError("empty generated name")

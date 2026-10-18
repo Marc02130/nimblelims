@@ -24,6 +24,8 @@ import {
 } from '@mui/icons-material';
 import { DataGrid, GridColDef, GridRowParams, GridCellParams, GridRenderCellParams } from '@mui/x-data-grid';
 import { apiService } from '../../services/apiService';
+import { apiErrorText } from '../../utils/apiErrorText';
+import { localDateString } from '../../utils/localDate';
 
 interface Analyte {
   id: string;
@@ -95,6 +97,7 @@ const BatchResultsEntryTable: React.FC<BatchResultsEntryTableProps> = ({
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [entryDate, setEntryDate] = useState(() => localDateString());
   const [validationErrors, setValidationErrors] = useState<ValidationError[]>([]);
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
   const [qcFailures, setQcFailures] = useState<any[]>([]);
@@ -137,7 +140,7 @@ const BatchResultsEntryTable: React.FC<BatchResultsEntryTableProps> = ({
       
       setAnalytesMap(analytesMap);
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to load analytes');
+      setError(apiErrorText(err, 'Failed to load analytes'));
     } finally {
       setLoading(false);
     }
@@ -454,6 +457,7 @@ const BatchResultsEntryTable: React.FC<BatchResultsEntryTableProps> = ({
 
           return {
             test_id: test.id,
+            entry_date: entryDate !== '' ? entryDate : null,
             analyte_results: analyteResults,
           };
         }).filter(tr => tr.analyte_results.length > 0),
@@ -492,7 +496,7 @@ const BatchResultsEntryTable: React.FC<BatchResultsEntryTableProps> = ({
           setError(`Warning: ${errorDetail.qc_failures.length} QC failure(s) detected.`);
         }
       } else {
-        setError(errorDetail?.message || errorDetail || 'Failed to save results');
+        setError(apiErrorText(err, 'Failed to save results'));
       }
     } finally {
       setSaving(false);
@@ -512,6 +516,17 @@ const BatchResultsEntryTable: React.FC<BatchResultsEntryTableProps> = ({
     <Box>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
         <Typography variant="h6">Bulk Results Entry</Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+        <TextField
+          label="Entry date"
+          type="date"
+          size="small"
+          value={entryDate}
+          onChange={(event) => setEntryDate(event.target.value)}
+          InputLabelProps={{ shrink: true }}
+          inputProps={{ max: localDateString() }}
+          sx={{ width: 160 }}
+        />
         <Button
           variant="contained"
           startIcon={saving ? <CircularProgress size={20} /> : <SaveIcon />}
@@ -520,6 +535,7 @@ const BatchResultsEntryTable: React.FC<BatchResultsEntryTableProps> = ({
         >
           Submit Results
         </Button>
+        </Box>
       </Box>
 
       {error && (

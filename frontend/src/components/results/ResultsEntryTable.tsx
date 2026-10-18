@@ -33,6 +33,8 @@ import {
 } from '@mui/icons-material';
 import { apiService } from '../../services/apiService';
 import { useUser } from '../../contexts/UserContext';
+import { apiErrorText } from '../../utils/apiErrorText';
+import { localDateString } from '../../utils/localDate';
 
 interface CustomAttributeConfig {
   id: string;
@@ -107,6 +109,7 @@ const ResultsEntryTable: React.FC<ResultsEntryTableProps> = ({
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [entryDate, setEntryDate] = useState(() => localDateString());
   const [success, setSuccess] = useState<string | null>(null);
   const [qualifiers, setQualifiers] = useState<any[]>([]);
   const [customAttributeConfigs, setCustomAttributeConfigs] = useState<CustomAttributeConfig[]>([]);
@@ -161,7 +164,7 @@ const ResultsEntryTable: React.FC<ResultsEntryTableProps> = ({
       const data = await apiService.getAnalysisAnalytes(test?.analysis_id ?? testId);
       setAnalytes(data.sort((a: Analyte, b: Analyte) => a.display_order - b.display_order));
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to load analytes');
+      setError(apiErrorText(err, 'Failed to load analytes'));
     } finally {
       setLoading(false);
     }
@@ -256,6 +259,7 @@ const ResultsEntryTable: React.FC<ResultsEntryTableProps> = ({
         results: [
           {
             test_id: testId,
+            entry_date: entryDate !== '' ? entryDate : null,
             analyte_results: results
               .filter(result => result.raw_result || result.reported_result)
               .map(result => ({
@@ -274,7 +278,7 @@ const ResultsEntryTable: React.FC<ResultsEntryTableProps> = ({
       onResultsSaved(savedResults);
       setSuccess('Results saved successfully');
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to save results');
+      setError(apiErrorText(err, 'Failed to save results'));
     } finally {
       setSaving(false);
     }
@@ -325,6 +329,16 @@ const ResultsEntryTable: React.FC<ResultsEntryTableProps> = ({
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2, mb: 2 }}>
         <Typography variant="h6">Results Entry</Typography>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+          <TextField
+            label="Entry date"
+            type="date"
+            size="small"
+            value={entryDate}
+            onChange={(event) => setEntryDate(event.target.value)}
+            InputLabelProps={{ shrink: true }}
+            inputProps={{ max: localDateString() }}
+            sx={{ width: 160 }}
+          />
           {canExecuteWorkflow && workflowTemplates.length > 0 && (
             <>
               <FormControl size="small" sx={{ minWidth: 200 }}>

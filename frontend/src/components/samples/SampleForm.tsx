@@ -29,6 +29,8 @@ import { useNavigate } from 'react-router-dom';
 import CustomAttributeField from '../common/CustomAttributeField';
 import { apiService } from '../../services/apiService';
 import { useUser } from '../../contexts/UserContext';
+import { apiErrorText } from '../../utils/apiErrorText';
+import { calendarDateInput, localDateString } from '../../utils/localDate';
 
 /** Shows experiments this sample participated in (view-only, used in SampleForm when readOnly). */
 function SampleExperimentsSection({ sampleId }: { sampleId: string }) {
@@ -235,6 +237,7 @@ const SampleForm: React.FC<SampleFormProps> = ({
   const [loading, setLoading] = useState(false);
   const [customAttributeConfigs, setCustomAttributeConfigs] = useState<CustomAttributeConfig[]>([]);
   const [configsError, setConfigsError] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [loadingConfigs, setLoadingConfigs] = useState(false);
   const isEditMode = !!sample;
   const canUpdate = hasPermission('sample:update');
@@ -292,6 +295,7 @@ const SampleForm: React.FC<SampleFormProps> = ({
 
   const handleSubmit = async (values: any) => {
     setLoading(true);
+    setSubmitError(null);
     try {
       // Prepare update data (only include fields that are set)
       const updateData: any = {};
@@ -311,8 +315,7 @@ const SampleForm: React.FC<SampleFormProps> = ({
 
       await onSubmit(updateData);
     } catch (error) {
-      // Error handling is done in parent component
-      throw error;
+      setSubmitError(apiErrorText(error, 'Could not save the sample'));
     } finally {
       setLoading(false);
     }
@@ -337,6 +340,12 @@ const SampleForm: React.FC<SampleFormProps> = ({
       {configsError && (
         <Alert severity="error" sx={{ mb: 2 }}>
           {configsError}
+        </Alert>
+      )}
+
+      {submitError && (
+        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setSubmitError(null)}>
+          {submitError}
         </Alert>
       )}
 
@@ -428,57 +437,33 @@ const SampleForm: React.FC<SampleFormProps> = ({
               </Grid>
 
               <Grid size={{ xs: 12, sm: 4 }}>
-                <LocalizationProvider dateAdapter={AdapterDateFns}>
-                  <DatePicker
-                    label="Received Date"
-                    value={values.received_date ? (() => {
-                      // Parse date string in local timezone (YYYY-MM-DD format)
-                      const dateStr = values.received_date;
-                      if (dateStr && typeof dateStr === 'string' && dateStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
-                        const [year, month, day] = dateStr.split('-').map(Number);
-                        return new Date(year, month - 1, day);
-                      }
-                      return new Date(dateStr);
-                    })() : null}
-                    onChange={(date) => {
-                      if (date) {
-                        // Format date in local timezone as YYYY-MM-DD
-                        const year = date.getFullYear();
-                        const month = String(date.getMonth() + 1).padStart(2, '0');
-                        const day = String(date.getDate()).padStart(2, '0');
-                        setFieldValue('received_date', `${year}-${month}-${day}`);
-                      } else {
-                        setFieldValue('received_date', null);
-                      }
-                    }}
-                    slotProps={{
-                      textField: {
-                        fullWidth: true,
-                        error: touched.received_date && !!errors.received_date,
-                        helperText: touched.received_date && errors.received_date ? String(errors.received_date) : undefined,
-                        disabled: isViewMode,
-                      },
-                    }}
-                  />
-                </LocalizationProvider>
+                <TextField
+                  label="Received Date"
+                  type="date"
+                  fullWidth
+                  disabled={isViewMode}
+                  value={calendarDateInput(values.received_date)}
+                  onChange={(event) => setFieldValue('received_date', event.target.value || null)}
+                  InputLabelProps={{ shrink: true }}
+                  inputProps={{ max: localDateString() }}
+                  error={touched.received_date && !!errors.received_date}
+                  helperText={touched.received_date && errors.received_date ? String(errors.received_date) : undefined}
+                />
               </Grid>
 
               <Grid size={{ xs: 12, sm: 4 }}>
-                <LocalizationProvider dateAdapter={AdapterDateFns}>
-                  <DatePicker
-                    label="Report Date"
-                    value={values.report_date ? new Date(values.report_date) : null}
-                    onChange={(date) => setFieldValue('report_date', date ? date.toISOString() : null)}
-                    slotProps={{
-                      textField: {
-                        fullWidth: true,
-                        error: touched.report_date && !!errors.report_date,
-                        helperText: touched.report_date && errors.report_date ? String(errors.report_date) : undefined,
-                        disabled: isViewMode,
-                      },
-                    }}
-                  />
-                </LocalizationProvider>
+                <TextField
+                  label="Report Date"
+                  type="date"
+                  fullWidth
+                  disabled={isViewMode}
+                  value={calendarDateInput(values.report_date)}
+                  onChange={(event) => setFieldValue('report_date', event.target.value || null)}
+                  InputLabelProps={{ shrink: true }}
+                  inputProps={{ max: localDateString() }}
+                  error={touched.report_date && !!errors.report_date}
+                  helperText={touched.report_date && errors.report_date ? String(errors.report_date) : undefined}
+                />
               </Grid>
 
               <Grid size={{ xs: 12, sm: 6 }}>

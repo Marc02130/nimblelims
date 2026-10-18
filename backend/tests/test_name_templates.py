@@ -19,8 +19,10 @@ from app.core.name_generation import (
     generate_name_for_batch, generate_name_for_analysis, generate_name_for_container,
     check_name_uniqueness
 )
-from datetime import datetime
+from app.core import lab_time
+from datetime import datetime, timezone
 from uuid import uuid4
+from models.lab_setting import LAB_SETTINGS_ID, LabSetting
 
 
 class TestNameTemplatesCRUD:
@@ -489,6 +491,85 @@ class TestNameGeneration:
         seq_part = name.replace("PAD-", "")
         assert len(seq_part) == 4
         assert seq_part.isdigit()
+
+
+class TestLabDayNameStamp:
+    """{YYYY}{MM}{DD} follows the lab calendar, including at 21:00 ET."""
+
+    def test_accession_at_21_et_stamps_todays_lab_date(
+        self, db_session: Session, test_admin_user, client: TestClient, monkeypatch
+    ):
+        # 21:00 America/New_York on 2026-10-18 is already 2026-10-19 in UTC.
+        monkeypatch.setattr(
+            lab_time,
+            "_utcnow",
+            lambda: datetime(2026, 10, 19, 1, 0, tzinfo=timezone.utc),
+        )
+        row = db_session.query(LabSetting).filter(LabSetting.id == LAB_SETTINGS_ID).first()
+        if row is None:
+            row = LabSetting(id=LAB_SETTINGS_ID, timezone="America/New_York")
+            db_session.add(row)
+        else:
+            row.timezone = "America/New_York"
+        db_session.query(NameTemplate).filter(
+            NameTemplate.entity_type.in_(["sample", "analysis", "container", "batch", "project"])
+        ).update({"active": False}, synchronize_session=False)
+
+        def add_template(entity_type: str, template: str) -> None:
+            db_session.add(NameTemplate(
+                id=uuid4(),
+                name=f"{entity_type}_lab_day",
+                entity_type=entity_type,
+                template=template,
+                active=True,
+                created_by=test_admin_user.id,
+                modified_by=test_admin_user.id,
+            ))
+
+        add_template("sample", "S-{YYYY}{MM}{DD}-{SEQ}")
+        add_template("analysis", "AN-{YYYY}{MM}{DD}")
+        add_template("container", "C-{YYYYMMDD}")
+        add_template("batch", "B-{YYYY}-{MM}-{DD}")
+        add_template("project", "P-{YYYY}{MM}{DD}")
+        db_session.commit()
+
+        # Receive omits the clock and lets the helper use the lab day.
+        accessioned = generate_name_for_sample(db_session)
+        assert "20261018" in accessioned
+        assert "20261019" not in accessioned
+
+        # The same helper covers analysis, container, and batch when no date is passed.
+        assert "20261018" in generate_name_for_analysis(db_session)
+        assert "20261018" in generate_name_for_container(db_session)
+        assert generate_name_for_batch(db_session) == "B-2026-10-18"
+
+        # A date the caller chose still wins over the lab day.
+        chosen = generate_name(
+            db_session, "sample", reference_date=datetime(2026, 1, 2)
+        )
+        assert "20260102" in chosen
+        assert "20261018" not in chosen
+
+        auth = client.post(
+            "/auth/login",
+            json={"username": "admin", "password": "adminpassword"},
+        )
+        token = auth.json()["access_token"]
+        headers = {"Authorization": f"Bearer {token}"}
+        preview = client.get(
+            "/admin/name-templates/preview",
+            params={"entity_type": "project"},
+            headers=headers,
+        )
+        assert preview.status_code == 200, preview.text
+        assert preview.json()["preview"] == "P-20261018"
+        dated = client.get(
+            "/admin/name-templates/preview",
+            params={"entity_type": "project", "reference_date": "2026-01-02"},
+            headers=headers,
+        )
+        assert dated.status_code == 200, dated.text
+        assert dated.json()["preview"] == "P-20260102"
 
 
 class TestSequenceStartEndpoint:
