@@ -158,7 +158,7 @@ def test_expired_lot_is_blocked_at_use(client, admin_h, lot, run):
                  json={"expiration_date": str(date.today() - timedelta(days=1))})
     assert client.get(f"/v1/reagent-lots/{lot['id']}", headers=admin_h).json()["expired"] is True
     r = client.post("/v1/reagent-uses", headers=admin_h, json={"reagent_lot_id": lot["id"], "lims_run_id": str(run.id), "quantity_used": 1})
-    assert r.status_code == 422 and "expired" in r.json()["detail"]
+    assert r.status_code == 422 and r.json()["detail"]["code"] == "lot_expired" and "expired" in r.json()["detail"]["message"]
     # Back-dated use on a day the lot was still good is allowed.
     r = client.post("/v1/reagent-uses", headers=admin_h, json={
         "reagent_lot_id": lot["id"], "lims_run_id": str(run.id), "quantity_used": 1, "used_on": str(date.today() - timedelta(days=2))})
@@ -168,7 +168,7 @@ def test_expired_lot_is_blocked_at_use(client, admin_h, lot, run):
 def test_inactive_lot_is_blocked_at_use(client, admin_h, lot, run):
     client.patch(f"/v1/reagent-lots/{lot['id']}", headers=admin_h, json={"active": False})
     r = client.post("/v1/reagent-uses", headers=admin_h, json={"reagent_lot_id": lot["id"], "lims_run_id": str(run.id), "quantity_used": 1})
-    assert r.status_code == 422 and "inactive" in r.json()["detail"]
+    assert r.status_code == 422 and r.json()["detail"]["code"] == "lot_inactive" and "inactive" in r.json()["detail"]["message"]
 
 
 def test_use_needs_a_run_or_experiment_and_permission(client, admin_h, tech_h, lot, run):
@@ -342,7 +342,7 @@ def test_opened_lot_uses_effective_expiry(client, admin_h, lot, run):
     got = client.patch(f"/v1/reagent-lots/{lot['id']}", headers=admin_h, json={"opened_date": str(opened)}).json()
     assert got["effective_expiration_date"] == str(opened + timedelta(days=10)) and got["expired"] is True
     r = client.post("/v1/reagent-uses", headers=admin_h, json={"reagent_lot_id": lot["id"], "lims_run_id": str(run.id), "quantity_used": 1})
-    assert r.status_code == 422 and "stability" in r.json()["detail"]
+    assert r.status_code == 422 and r.json()["detail"]["code"] == "lot_expired" and "stability" in r.json()["detail"]["message"]
     assert lot["id"] not in {x["id"] for x in client.get("/v1/reagent-lots", headers=admin_h, params={"usable": True}).json()}
     # Opened yesterday: effective expiry = opened + 10, still good, and the use records it.
     client.patch(f"/v1/reagent-lots/{lot['id']}", headers=admin_h, json={"opened_date": str(date.today() - timedelta(days=1))})
@@ -353,7 +353,7 @@ def test_opened_lot_uses_effective_expiry(client, admin_h, lot, run):
 def test_qc_rejected_lot_is_blocked(client, admin_h, lot, run):
     client.patch(f"/v1/reagent-lots/{lot['id']}", headers=admin_h, json={"qc_status": "rejected"})
     r = client.post("/v1/reagent-uses", headers=admin_h, json={"reagent_lot_id": lot["id"], "lims_run_id": str(run.id), "quantity_used": 1})
-    assert r.status_code == 422 and "QC" in r.json()["detail"]
+    assert r.status_code == 422 and r.json()["detail"]["code"] == "lot_rejected" and "QC" in r.json()["detail"]["message"]
 
 
 def test_use_records_audit_and_unit(client, admin_h, lot, run, test_admin_user):
@@ -378,7 +378,7 @@ def test_released_flag_gates_use(client, admin_h, lot, run):
     held = client.patch(f"/v1/reagent-lots/{lot['id']}", headers=admin_h, json={"released": False}).json()
     assert held["released"] is False and held["active"] is True and held["usable"] is False
     r = client.post("/v1/reagent-uses", headers=admin_h, json={"reagent_lot_id": lot["id"], "lims_run_id": str(run.id), "quantity_used": 1})
-    assert r.status_code == 422 and "not released" in r.json()["detail"]
+    assert r.status_code == 422 and r.json()["detail"]["code"] == "lot_unreleased" and "not released" in r.json()["detail"]["message"]
     assert lot["id"] not in {x["id"] for x in client.get("/v1/reagent-lots", headers=admin_h, params={"usable": True}).json()}
     # QC release releases the lot unless told otherwise.
     back = client.patch(f"/v1/reagent-lots/{lot['id']}", headers=admin_h, json={"qc_status": "released"}).json()
@@ -400,5 +400,7 @@ def test_zero_or_negative_use_is_refused(client, admin_h, lot, run, qty):
     r = client.post("/v1/reagent-uses", headers=admin_h, json={
         "reagent_lot_id": lot["id"], "lims_run_id": str(run.id), "quantity_used": qty})
     assert r.status_code == 422, r.text
+    assert r.json()["detail"]["code"] == "quantity_not_positive"
+    assert "greater than 0" in r.json()["detail"]["message"]
     after = client.get("/v1/reagent-lots", headers=admin_h).json()
     assert float(next(x for x in after if x["id"] == lot["id"])["quantity_remaining"]) == 100

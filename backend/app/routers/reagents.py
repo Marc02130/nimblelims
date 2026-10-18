@@ -62,6 +62,12 @@ def _has_config_edit(user: User, db: Session) -> bool:
     return "config:edit" in get_user_permissions(user, db)
 
 
+def _can_read_inactive_reagents(user: User, db: Session) -> bool:
+    """Catalog editors already see inactive rows. Experiment seats need the names too."""
+    permissions = get_user_permissions(user, db)
+    return "config:edit" in permissions or "experiment:manage" in permissions
+
+
 def _visible(query, model, user: User, db: Session, active: Optional[bool]):
     if not _has_config_edit(user, db):
         return query.filter(model.active.is_(True))
@@ -173,10 +179,19 @@ def list_reagents(
     search: Optional[str] = Query(None),
     vendor_id: Optional[UUID] = Query(None),
     active: Optional[bool] = Query(None),
+    include_inactive: bool = Query(
+        False,
+        description="Include inactive reagents for experiment:manage or config:edit",
+    ),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    q = _visible(db.query(Reagent), Reagent, current_user, db, active)
+    if include_inactive is True and _can_read_inactive_reagents(current_user, db):
+        q = db.query(Reagent)
+        if active is not None:
+            q = q.filter(Reagent.active.is_(active))
+    else:
+        q = _visible(db.query(Reagent), Reagent, current_user, db, active)
     if vendor_id:
         q = q.filter(Reagent.sources.any(ReagentVendor.vendor_id == vendor_id))
     if search:
@@ -318,7 +333,10 @@ def list_reagent_lots(
     reagent_id: Optional[UUID] = Query(None),
     search: Optional[str] = Query(None),
     active: Optional[bool] = Query(None),
-    usable: Optional[bool] = Query(None, description="Only active, unexpired lots with quantity left"),
+    usable: Optional[bool] = Query(
+        None,
+        description="Active released unexpired lots of active reagents, with quantity left",
+    ),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -327,15 +345,16 @@ def list_reagent_lots(
         q = q.filter(ReagentLot.reagent_id == reagent_id)
     if search:
         q = q.filter(ReagentLot.lot_number.ilike(f"%{search}%"))
-    if usable:
+    if usable is True:
         q = q.filter(
             ReagentLot.active.is_(True),
+            ReagentLot.reagent.has(Reagent.active.is_(True)),
             ReagentLot.released.is_(True),
             ReagentLot.qc_status != "rejected",
             (ReagentLot.quantity_remaining.is_(None)) | (ReagentLot.quantity_remaining > 0),
         )
     rows = q.order_by(ReagentLot.expiration_date.asc().nullslast(), ReagentLot.lot_number).all()
-    if usable:
+    if usable is True:
         rows = [r for r in rows if not lot_expired(r)]
     return [_lot_out(r) for r in rows]
 
@@ -422,6 +441,16 @@ def update_reagent_lot(
 
 REAGENT_INACTIVE = "reagent_inactive"
 REAGENT_NOT_ON_EXPERIMENT = "reagent_not_on_experiment"
+LOT_EXPIRED = "lot_expired"
+LOT_REJECTED = "lot_rejected"
+LOT_UNRELEASED = "lot_unreleased"
+LOT_INACTIVE = "lot_inactive"
+QUANTITY_NOT_POSITIVE = "quantity_not_positive"
+
+
+def _refuse(code: str, message: str) -> None:
+    """A 422 that keeps the sentence and adds a machine-readable code."""
+    raise HTTPException(status_code=422, detail={"code": code, "message": message})
 
 
 def _stored_reagent_ids(config: object) -> List[str]:
@@ -670,18 +699,18 @@ def record_reagent_use(
         _refuse_reagent_not_on_experiment(db, body.experiment_id, lot.reagent_id)
     _refuse_inactive_reagent(db, lot.reagent_id)
     if lot.active is not True:
-        raise HTTPException(status_code=422, detail=f"Lot {lot.lot_number} is inactive and can't be used")
+        _refuse(LOT_INACTIVE, f"Lot {lot.lot_number} is inactive and can't be used")
     used_on = body.used_on or date.today()
     if lot.released is not True:
-        raise HTTPException(status_code=422, detail=f"Lot {lot.lot_number} is not released for use")
+        _refuse(LOT_UNRELEASED, f"Lot {lot.lot_number} is not released for use")
     if lot.qc_status == "rejected":
-        raise HTTPException(status_code=422, detail=f"Lot {lot.lot_number} was rejected by QC and can't be used")
+        _refuse(LOT_REJECTED, f"Lot {lot.lot_number} was rejected by QC and can't be used")
     if lot_expired(lot, used_on):
         effective = effective_expiration(lot)
         why = " (opened lot past its stability)" if effective != lot.expiration_date else ""
-        raise HTTPException(
-            status_code=422,
-            detail=f"Lot {lot.lot_number} expired on {effective.isoformat()}{why} and can't be used",
+        _refuse(
+            LOT_EXPIRED,
+            f"Lot {lot.lot_number} expired on {effective.isoformat()}{why} and can't be used",
         )
     quantity = Decimal(body.quantity_used)
     if body.unit and lot.unit and body.unit.strip().lower() != lot.unit.strip().lower():
@@ -690,7 +719,7 @@ def record_reagent_use(
             detail=f"Lot {lot.lot_number} is counted in {lot.unit}; enter the quantity in {lot.unit}",
         )
     if quantity <= 0:
-        raise HTTPException(status_code=422, detail="Quantity used must be greater than 0")
+        _refuse(QUANTITY_NOT_POSITIVE, "Quantity used must be greater than 0")
     if lot.quantity_remaining is not None:
         try:
             left = db.execute(

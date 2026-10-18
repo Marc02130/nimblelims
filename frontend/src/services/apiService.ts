@@ -860,7 +860,12 @@ export class ApiService {
     return response.data;
   }
 
-  async getReagents(params?: { search?: string; vendor_id?: string; active?: boolean }) {
+  async getReagents(params?: {
+    search?: string;
+    vendor_id?: string;
+    active?: boolean;
+    include_inactive?: boolean;
+  }) {
     const response: AxiosResponse = await this.api.get('/v1/reagents', { params });
     return response.data;
   }
