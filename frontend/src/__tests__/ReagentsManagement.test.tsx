@@ -4,6 +4,7 @@ import { ThemeProvider, createTheme } from '@mui/material/styles';
 import ReagentsManagement from '../pages/admin/ReagentsManagement';
 import ReagentUsePanel from '../components/reagents/ReagentUsePanel';
 import { apiService } from '../services/apiService';
+import { localDateString } from '../utils/localDate';
 
 jest.mock('../services/apiService', () => ({
   // Real helpers (ApiService.formatError, addClientFilterIfNeeded, types); only the client is mocked.
@@ -123,5 +124,29 @@ describe('ReagentUsePanel', () => {
     await waitFor(() => expect(api.recordReagentUse).toHaveBeenCalled());
     expect(api.recordReagentUse.mock.calls[0][0]).toMatchObject({ reagent_lot_id: 'l2', lims_run_id: 'run1', quantity_used: '3', unit: 'assays' });
     expect(await screen.findByText(/expired on 2026-01-01/)).toBeInTheDocument();
+  });
+
+  test('caps the dialog Used on date and shows a future-date refusal', async () => {
+    api.getReagentLots.mockResolvedValue([{ id: 'l2', reagent_name: 'Kit', lot_number: 'L9', unit: 'assays', active: true }]);
+    api.recordReagentUse.mockRejectedValue({
+      response: {
+        data: {
+          detail: {
+            code: 'used_on_in_future',
+            message: 'Used on 2026-10-19 is after today in the lab timezone (2026-10-18).',
+          },
+        },
+      },
+    });
+    wrap(<ReagentUsePanel limsRunId="run1" />);
+    fireEvent.click(await screen.findByRole('button', { name: /Record lot used/i }));
+    expect(await screen.findByLabelText('Used on')).toHaveAttribute('max', localDateString());
+    fireEvent.mouseDown(screen.getByLabelText('Lot'));
+    fireEvent.click(await screen.findByRole('option', { name: /L9/ }));
+    fireEvent.change(screen.getByLabelText(/Quantity used/), { target: { value: '1' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Record' }));
+    expect(
+      await screen.findByText('Used on 2026-10-19 is after today in the lab timezone (2026-10-18).'),
+    ).toBeInTheDocument();
   });
 });

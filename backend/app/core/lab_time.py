@@ -19,6 +19,15 @@ from models.lab_setting import LAB_SETTINGS_ID, LabSetting
 
 _EXAMPLE = "Set LAB_TIMEZONE=America/New_York for the first start, or save a zone such as America/New_York."
 INVALID_TIMEZONE = "invalid_timezone"
+LAB_TIMEZONE_INVALID = "lab_timezone_invalid"
+
+
+class LabTimezoneInvalid(RuntimeError):
+    """The saved zone is non-blank and not a known IANA name.
+
+    Startup still exits, because this is a RuntimeError. A request that
+    resolves the zone is answered 503 ``lab_timezone_invalid`` instead.
+    """
 
 
 def env_timezone_name() -> Optional[str]:
@@ -86,8 +95,9 @@ def ensure_lab_setting(db: Session) -> LabSetting:
 def resolve_lab_timezone(db: Session, *, commit_seed: bool = False) -> str:
     """The saved zone, seeding it from ``LAB_TIMEZONE`` when the row is empty.
 
-    Raises RuntimeError when neither source is a valid zone, or when the saved
-    zone is unknown. A saved value is never replaced by the environment.
+    Raises RuntimeError when neither source is a valid zone. A non-blank saved
+    zone that ZoneInfo does not know raises LabTimezoneInvalid (a RuntimeError).
+    A saved value is never replaced by the environment.
     """
     row = ensure_lab_setting(db)
     stored = "" if row.timezone is None else row.timezone.strip()
@@ -112,7 +122,7 @@ def resolve_lab_timezone(db: Session, *, commit_seed: bool = False) -> str:
     try:
         known_zone(stored)
     except ValueError as exc:
-        raise RuntimeError(
+        raise LabTimezoneInvalid(
             f"The saved lab timezone {stored!r} is not a known IANA time zone. "
             "Update lab_settings.timezone directly, for example "
             "UPDATE lab_settings SET timezone = 'America/New_York'; "

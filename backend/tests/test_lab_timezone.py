@@ -76,6 +76,7 @@ def test_invalid_env_does_not_seed(monkeypatch, db_session):
     monkeypatch.setenv("LAB_TIMEZONE", "Mars/Olympus_Mons")
     with pytest.raises(RuntimeError) as caught:
         lab_time.resolve_lab_timezone(db_session)
+    assert not isinstance(caught.value, lab_time.LabTimezoneInvalid)
     message = str(caught.value)
     assert "LAB_TIMEZONE 'Mars/Olympus_Mons' is not a known IANA time zone" in message
     assert "LAB_TIMEZONE=America/New_York" in message
@@ -88,6 +89,7 @@ def test_missing_env_and_empty_row_refuse(monkeypatch, db_session):
     monkeypatch.delenv("LAB_TIMEZONE", raising=False)
     with pytest.raises(RuntimeError) as missing:
         lab_time.resolve_lab_timezone(db_session)
+    assert not isinstance(missing.value, lab_time.LabTimezoneInvalid)
     message = str(missing.value)
     assert "LAB_TIMEZONE is required until a lab timezone is saved" in message
     assert "LAB_TIMEZONE=America/New_York" in message
@@ -104,8 +106,9 @@ def test_corrupt_saved_zone_is_not_replaced(monkeypatch, db_session):
     row = LabSetting(id=LAB_SETTINGS_ID, timezone="Not/AZone")
     db_session.add(row)
     db_session.flush()
-    with pytest.raises(RuntimeError) as caught:
+    with pytest.raises(lab_time.LabTimezoneInvalid) as caught:
         lab_time.resolve_lab_timezone(db_session)
+    assert isinstance(caught.value, RuntimeError)
     message = str(caught.value)
     assert "The saved lab timezone 'Not/AZone' is not a known IANA time zone" in message
     assert "UPDATE lab_settings SET timezone = 'America/New_York'" in message
@@ -272,3 +275,27 @@ def test_evening_expiry_and_usable_lots_follow_the_lab_date(client, test_admin_u
     mine_utc = next(row for row in on_hand_utc.json() if row["id"] == reagent["id"])
     assert float(mine_utc["quantity_on_hand"]) == 0
     assert vendor["id"]
+
+
+def test_corrupt_saved_zone_is_503_and_patch_repairs_it(client, db_session, test_admin_user, monkeypatch):
+    monkeypatch.setenv("LAB_TIMEZONE", "America/New_York")
+    row = LabSetting(id=LAB_SETTINGS_ID, timezone="Not/AZone")
+    db_session.add(row)
+    db_session.flush()
+    admin = _login(client, "admin", "adminpassword")
+    got = client.get("/v1/lab-settings", headers=admin)
+    assert got.status_code == 503, got.text
+    detail = got.json()["detail"]
+    assert detail["code"] == "lab_timezone_invalid"
+    assert "Not/AZone" in detail["message"]
+    assert "UPDATE lab_settings SET timezone = 'America/New_York'" in detail["message"]
+    assert "PATCH /v1/lab-settings" in detail["message"]
+    lots = client.get("/v1/reagent-lots", headers=admin)
+    assert lots.status_code == 503, lots.text
+    assert lots.json()["detail"]["code"] == "lab_timezone_invalid"
+    repaired = client.patch("/v1/lab-settings", headers=admin, json={"timezone": "America/Chicago"})
+    assert repaired.status_code == 200, repaired.text
+    assert repaired.json()["timezone"] == "America/Chicago"
+    again = client.get("/v1/lab-settings", headers=admin)
+    assert again.status_code == 200, again.text
+    assert again.json()["timezone"] == "America/Chicago"

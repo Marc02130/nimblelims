@@ -367,6 +367,30 @@ describe('Experiment reagent capture', () => {
     expect(screen.getByLabelText('Note')).toHaveValue('opened today');
   });
 
+  test('caps Used on at the browser today and shows a future-date refusal', async () => {
+    api.getExperimentEntries.mockResolvedValue({ entries: [reagentEntry] });
+    api.getReagentLots.mockResolvedValue(lots);
+    api.recordReagentUse.mockRejectedValue({
+      response: {
+        data: {
+          detail: {
+            code: 'used_on_in_future',
+            message: 'Used on 2026-10-19 is after today in the lab timezone (2026-10-18).',
+          },
+        },
+      },
+    });
+    wrap(<EntryCapturePanel experimentId="exp1" />);
+    fireEvent.mouseDown(await screen.findByLabelText('Lot for Qubit dsDNA HS'));
+    fireEvent.click(await screen.findByRole('option', { name: /L-OK/ }));
+    fireEvent.change(screen.getByLabelText(/Quantity for Qubit dsDNA HS/), { target: { value: '1' } });
+    expect(screen.getByLabelText('Used on')).toHaveAttribute('max', localDateString());
+    fireEvent.click(screen.getByRole('button', { name: 'Record' }));
+    expect(
+      await screen.findByText('Used on 2026-10-19 is after today in the lab timezone (2026-10-18).'),
+    ).toBeInTheDocument();
+  });
+
   test("sends the browser's local date when Used on is left empty", async () => {
     api.getExperimentEntries.mockResolvedValue({ entries: [reagentEntry] });
     api.getReagentLots.mockResolvedValue(lots);

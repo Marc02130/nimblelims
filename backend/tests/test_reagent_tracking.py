@@ -158,14 +158,17 @@ def test_record_use_copies_lot_and_expiry_and_draws_down(client, admin_h, lot, r
 
 
 def test_expired_lot_is_blocked_at_use(client, admin_h, lot, run):
-    client.patch(f"/v1/reagent-lots/{lot['id']}", headers=admin_h,
-                 json={"expiration_date": str(date.today() - timedelta(days=1))})
+    still_good = date.today() - timedelta(days=2)
+    client.patch(f"/v1/reagent-lots/{lot['id']}", headers=admin_h, json={
+        "expiration_date": str(date.today() - timedelta(days=1)),
+        "received_date": str(still_good),
+    })
     assert client.get(f"/v1/reagent-lots/{lot['id']}", headers=admin_h).json()["expired"] is True
     r = client.post("/v1/reagent-uses", headers=admin_h, json={"reagent_lot_id": lot["id"], "lims_run_id": str(run.id), "quantity_used": 1})
     assert r.status_code == 422 and r.json()["detail"]["code"] == "lot_expired" and "expired" in r.json()["detail"]["message"]
-    # Back-dated use on a day the lot was still good is allowed.
+    # Back-dated use on a day the lot was still good, and already received, is allowed.
     r = client.post("/v1/reagent-uses", headers=admin_h, json={
-        "reagent_lot_id": lot["id"], "lims_run_id": str(run.id), "quantity_used": 1, "used_on": str(date.today() - timedelta(days=2))})
+        "reagent_lot_id": lot["id"], "lims_run_id": str(run.id), "quantity_used": 1, "used_on": str(still_good)})
     assert r.status_code == 201, r.text
 
 
@@ -433,6 +436,10 @@ def test_blank_used_on_is_the_lab_date_in_the_evening(client, admin_h, lot, run,
         "/v1/lab-settings", headers=admin_h, json={"timezone": "America/New_York"}
     )
     assert saved.status_code == 200, saved.text
+    received = client.patch(
+        f"/v1/reagent-lots/{lot['id']}", headers=admin_h, json={"received_date": "2026-10-01"}
+    )
+    assert received.status_code == 200, received.text
     evening = datetime(2026, 10, 19, 1, 30, tzinfo=timezone.utc)  # 9:30 PM EDT on Oct 18
     monkeypatch.setattr(lab_time, "_utcnow", lambda: evening)
     r = client.post("/v1/reagent-uses", headers=admin_h, json={
@@ -443,6 +450,92 @@ def test_blank_used_on_is_the_lab_date_in_the_evening(client, admin_h, lot, run,
         "reagent_lot_id": lot["id"], "lims_run_id": str(run.id), "quantity_used": 1, "used_on": "2026-10-17"})
     assert sent.status_code == 201, sent.text
     assert sent.json()["used_on"] == "2026-10-17"
+
+
+def _use(client, headers, lot_id, run_id, **extra):
+    body = {"reagent_lot_id": lot_id, "lims_run_id": str(run_id), "quantity_used": 1}
+    body.update(extra)
+    return client.post("/v1/reagent-uses", headers=headers, json=body)
+
+
+def test_used_on_follows_the_lab_day_expiry_and_receipt(client, admin_h, lot, run, monkeypatch):
+    """Future dates, evening rollover, expiry versus used_on, and receipt."""
+    from app.schemas._dates import is_future
+
+    lab_day = date(2026, 10, 18)
+    assert is_future(lab_day, today=lab_day) is False
+    assert is_future(date(2026, 10, 19), today=lab_day) is True
+    assert is_future(None, today=lab_day) is False
+
+    monkeypatch.setenv("LAB_TIMEZONE", "UTC")
+    saved = client.patch("/v1/lab-settings", headers=admin_h, json={"timezone": "America/New_York"})
+    assert saved.status_code == 200, saved.text
+    evening = datetime(2026, 10, 19, 0, 30, tzinfo=timezone.utc)  # 8:30 PM EDT on Oct 18
+    monkeypatch.setattr(lab_time, "_utcnow", lambda: evening)
+    prepared = client.patch(f"/v1/reagent-lots/{lot['id']}", headers=admin_h, json={
+        "received_date": "2026-10-10",
+        "expiration_date": "2026-10-18",
+    })
+    assert prepared.status_code == 200, prepared.text
+
+    future = _use(client, admin_h, lot["id"], run.id, used_on="2026-10-19")
+    assert future.status_code == 422, future.text
+    assert future.json()["detail"]["code"] == "used_on_in_future"
+    assert "2026-10-19" in future.json()["detail"]["message"]
+    assert "2026-10-18" in future.json()["detail"]["message"]
+
+    today_use = _use(client, admin_h, lot["id"], run.id, used_on="2026-10-18")
+    assert today_use.status_code == 201, today_use.text
+    assert today_use.json()["used_on"] == "2026-10-18"
+
+    early = _use(client, admin_h, lot["id"], run.id, used_on="2026-10-09")
+    assert early.status_code == 422, early.text
+    assert early.json()["detail"]["code"] == "used_on_before_receipt"
+    assert "2026-10-10" in early.json()["detail"]["message"]
+    on_receipt = _use(client, admin_h, lot["id"], run.id, used_on="2026-10-10")
+    assert on_receipt.status_code == 201, on_receipt.text
+
+    after_expiry = client.patch(f"/v1/reagent-lots/{lot['id']}", headers=admin_h, json={
+        "expiration_date": "2026-10-17",
+    })
+    assert after_expiry.status_code == 200, after_expiry.text
+    usable = client.get("/v1/reagent-lots", headers=admin_h, params={"usable": True})
+    assert lot["id"] not in {row["id"] for row in usable.json()}
+    refused = _use(client, admin_h, lot["id"], run.id, used_on="2026-10-18")
+    assert refused.status_code == 422, refused.text
+    assert refused.json()["detail"]["code"] == "lot_expired"
+    still_good = _use(client, admin_h, lot["id"], run.id, used_on="2026-10-17")
+    assert still_good.status_code == 201, still_good.text
+
+    omitted = _use(client, admin_h, lot["id"], run.id)
+    assert omitted.status_code == 422, omitted.text
+    assert omitted.json()["detail"]["code"] == "lot_expired"
+    expires_today = client.patch(f"/v1/reagent-lots/{lot['id']}", headers=admin_h, json={
+        "expiration_date": "2026-10-18",
+    })
+    assert expires_today.status_code == 200, expires_today.text
+    fallback = _use(client, admin_h, lot["id"], run.id)
+    assert fallback.status_code == 201, fallback.text
+    assert fallback.json()["used_on"] == "2026-10-18"
+    still_listed = client.get("/v1/reagent-lots", headers=admin_h, params={"usable": True})
+    assert lot["id"] in {row["id"] for row in still_listed.json()}
+
+    experiment = client.post("/v1/experiments", headers=admin_h, json={"name": _name("Used on")})
+    assert experiment.status_code == 201, experiment.text
+    added = client.post(
+        f"/v1/experiments/{experiment.json()['id']}/reagents",
+        headers=admin_h,
+        json={"reagent_id": lot["reagent_id"]},
+    )
+    assert added.status_code == 201, added.text
+    on_experiment = client.post("/v1/reagent-uses", headers=admin_h, json={
+        "reagent_lot_id": lot["id"],
+        "experiment_id": experiment.json()["id"],
+        "quantity_used": 1,
+        "used_on": "2026-10-19",
+    })
+    assert on_experiment.status_code == 422, on_experiment.text
+    assert on_experiment.json()["detail"]["code"] == "used_on_in_future"
 
 
 @pytest.mark.parametrize("bad", ["2026-13-45", "not-a-date", "2026-02-30"])
