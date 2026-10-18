@@ -1,17 +1,26 @@
 """The lab's calendar date.
 
-``LAB_TIMEZONE`` (an IANA name such as ``America/New_York``) sets the lab's
-clock. Unset means UTC. A server fallback date comes from here, never from the
-host clock, so an evening entry in a lab west of UTC is not stamped tomorrow.
+``LAB_TIMEZONE`` is a required IANA name such as ``America/New_York``. The API
+refuses to start when it is missing, blank, or unknown. A server fallback date
+comes from this zone, never from the host clock, so an evening entry in a lab
+west of UTC is not stamped tomorrow.
 """
 import os
 from datetime import date, datetime, timezone, tzinfo
 from typing import Optional
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
+_SET_IT = (
+    "Set LAB_TIMEZONE to an IANA time zone, for example LAB_TIMEZONE=America/New_York."
+)
+
 
 def lab_timezone_name() -> str:
-    return (os.getenv("LAB_TIMEZONE") or "").strip() or "UTC"
+    raw = os.getenv("LAB_TIMEZONE")
+    name = "" if raw is None else raw.strip()
+    if name == "":
+        raise RuntimeError(f"LAB_TIMEZONE is required. {_SET_IT}")
+    return name
 
 
 def lab_zone() -> tzinfo:
@@ -19,7 +28,9 @@ def lab_zone() -> tzinfo:
     try:
         return ZoneInfo(name)
     except (ZoneInfoNotFoundError, ValueError) as exc:
-        raise RuntimeError(f"LAB_TIMEZONE {name!r} is not a known IANA time zone") from exc
+        raise RuntimeError(
+            f"LAB_TIMEZONE {name!r} is not a known IANA time zone. {_SET_IT}"
+        ) from exc
 
 
 def _utcnow() -> datetime:

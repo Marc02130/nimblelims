@@ -11,7 +11,7 @@ import logging
 
 # S3: refuse missing/default JWT secret unless explicit local insecure flags
 validate_security_config()
-# An unknown LAB_TIMEZONE stops startup instead of stamping uses on the wrong day.
+# LAB_TIMEZONE is required. Missing, blank, or unknown stops startup.
 lab_zone()
 
 # Configure logging

@@ -282,6 +282,7 @@ Copy `backend/env.example` to `backend/.env` and configure:
 - Database connection settings
 - JWT secret keys
 - Application environment settings
+- `LAB_TIMEZONE` — required IANA time zone for server default dates (for example `America/New_York`). The API refuses to start when it is unset, empty, or unknown. Compose has no default (`${LAB_TIMEZONE:?...}`). Pytest and CI set `UTC` explicitly. Alembic, `create_admin.py`, the seed scripts, and the MCP service do not read it.
 
 ### Optional Environment Variables
 

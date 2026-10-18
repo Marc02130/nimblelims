@@ -115,6 +115,7 @@ This step implements the Docker configuration from the Technical Document (Secti
   POSTGRES_PASSWORD=securepassword123
   POSTGRES_DB=lims_mvp
   JWT_SECRET_KEY=supersecretkeychangeme
+  LAB_TIMEZONE=America/New_York
   ```
 - Update `docker-compose.yml` if needed to reference these (e.g., via `env_file: .env`).
 

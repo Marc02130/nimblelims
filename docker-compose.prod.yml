@@ -18,7 +18,7 @@ services:
   backend:
     environment:
       ENVIRONMENT: production
-      LAB_TIMEZONE: ${LAB_TIMEZONE:-UTC}
+      LAB_TIMEZONE: ${LAB_TIMEZONE:?Set LAB_TIMEZONE to an IANA time zone, for example America/New_York}
       ALLOW_INSECURE_DEFAULTS: "false"
       ALLOW_DEV_SEED_USERS: "false"
       SECRET_KEY: ${SECRET_KEY:?Set a strong SECRET_KEY}

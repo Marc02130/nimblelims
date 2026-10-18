@@ -69,7 +69,7 @@ A fresh database locks these accounts, plus `alice-tech`, `bob-tech`, `carol-man
 
 ### Important Gotchas
 
-- **Backend tests (`pytest`)**: Tests use `from models.xxx import ...` + `import models` (with PYTHONPATH or cwd set to backend during pytest). The old `app.models` import bug appears fixed in current conftest.py. Use `pytest` with the testcontainer fixtures (they require Docker).
+- **Backend tests (`pytest`)**: Tests use `from models.xxx import ...` + `import models` (with PYTHONPATH or cwd set to backend during pytest). The old `app.models` import bug appears fixed in current conftest.py. Use `pytest` with the testcontainer fixtures (they require Docker). `LAB_TIMEZONE` is required by the API (no UTC default). `tests/conftest.py` sets `UTC` before importing the app. Compose fails closed without the variable (`America/New_York` is the example in `.env.example`). Alembic, the seed scripts, and MCP do not read it.
 - **Frontend ESLint**: The `.eslintrc.js` extends `@typescript-eslint/recommended` but the correct config path for eslint legacy config is `plugin:@typescript-eslint/recommended`. The `npm run lint` command fails due to this. The `package.json` eslintConfig (`react-app` preset) works fine with `react-scripts`. Use `DISABLE_ESLINT_PLUGIN=true npm run build` to bypass for CI/build verification.
 - **Frontend tests**: Some Jest tests fail due to MUI X DataGrid v8 compatibility issues with the Jest/JSDOM environment (hash module import errors). About 61 of 116 tests pass. CustomFieldsManagement.test.tsx needs ongoing updates as Field Management UI evolves (OOB fields, list-backed selects via source lists instead of inline options).
 - **Gitignore for frontend/public**: Was causing issues (legacy Gatsby 'public' entry); has been cleaned up to not ignore CRA public/ (index.html, etc.).
@@ -80,7 +80,7 @@ A fresh database locks these accounts, plus `alice-tech`, `bob-tech`, `carol-man
 For local backend development:
 ```
 cd backend && python3 -m venv venv && source venv/bin/activate && pip install -r requirements.txt
-DATABASE_URL="<see docker-compose.yml for DB credentials>" python run_server.py
+DATABASE_URL="<see docker-compose.yml for DB credentials>" LAB_TIMEZONE=America/New_York python run_server.py
 ```
 
 For local frontend development:

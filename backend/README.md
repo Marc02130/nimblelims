@@ -286,6 +286,7 @@ Required environment variables (see `env.example`):
 - `JWT_SECRET_KEY` - Secret key for JWT token signing
 - `JWT_ALGORITHM` - JWT algorithm (default: HS256)
 - `JWT_ACCESS_TOKEN_EXPIRE_MINUTES` - Token expiration time
+- `LAB_TIMEZONE` - IANA time zone for server default dates (for example `America/New_York`). The API refuses to start when this is unset, empty, or unknown. There is no UTC default. Alembic, `create_admin.py`, and the seed scripts do not read it.
 
 Optional environment variables:
 - `REQUIRE_QC_FOR_BATCH_TYPES` - Comma-separated list of batch type UUIDs that require QC samples

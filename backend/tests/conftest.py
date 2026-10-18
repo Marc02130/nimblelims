@@ -9,6 +9,8 @@ os.environ.setdefault("ENVIRONMENT", "test")
 os.environ.setdefault("ALLOW_INSECURE_DEFAULTS", "true")
 os.environ.setdefault("SECRET_KEY", "pytest-secret-key-not-for-production")
 os.environ.setdefault("EMBEDDING_PROVIDER", "stub")
+# The app has no default zone. Tests pin UTC so import of app.main can start.
+os.environ.setdefault("LAB_TIMEZONE", "UTC")
 
 import pytest
 from fastapi.testclient import TestClient

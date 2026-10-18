@@ -51,6 +51,7 @@ jobs:
           ENVIRONMENT: test
           ALLOW_INSECURE_DEFAULTS: "true"
           SECRET_KEY: pytest-secret-key-not-for-production
+          LAB_TIMEZONE: UTC
 
   frontend:
     name: Frontend tests and type check
