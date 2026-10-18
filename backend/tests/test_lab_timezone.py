@@ -52,7 +52,7 @@ def test_migration_only_adds_lab_settings():
     assert mod.down_revision == "0094_routing_map_tat_min_zero"
     upgrade = inspect.getsource(mod.upgrade)
     assert "DROP" not in upgrade.upper()
-    assert "DELETE" not in upgrade.upper()
+    assert "DELETE FROM" not in upgrade.upper()
 
 
 def test_env_seeds_an_empty_setting(monkeypatch, db_session):

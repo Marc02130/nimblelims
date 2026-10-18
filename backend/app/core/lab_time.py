@@ -12,7 +12,7 @@ from datetime import date, datetime, timezone, tzinfo
 from typing import Optional
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from sqlalchemy.exc import OperationalError, ProgrammingError
+from sqlalchemy.exc import IntegrityError, OperationalError, ProgrammingError
 from sqlalchemy.orm import Session
 
 from models.lab_setting import LAB_SETTINGS_ID, LabSetting
@@ -69,10 +69,17 @@ def ensure_lab_setting(db: Session) -> LabSetting:
     except (ProgrammingError, OperationalError) as exc:
         db.rollback()
         raise _missing_table(exc) from exc
-    if row is None:
-        row = LabSetting(id=LAB_SETTINGS_ID, timezone=None)
-        db.add(row)
-        db.flush()
+    if row is not None:
+        return row
+    # Parallel requests can all see an empty table. Insert inside a savepoint
+    # so the loser of the primary-key race keeps the caller's transaction.
+    try:
+        with db.begin_nested():
+            row = LabSetting(id=LAB_SETTINGS_ID, timezone=None)
+            db.add(row)
+            db.flush()
+    except IntegrityError:
+        row = db.query(LabSetting).filter(LabSetting.id == LAB_SETTINGS_ID).one()
     return row
 
 
