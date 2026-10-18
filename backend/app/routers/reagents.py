@@ -7,7 +7,8 @@ price). A lot belongs to a reagent and may name the source it was bought from.
 Catalog writes (vendors, reagents, sources, lots) need config:edit. Recording a lot used
 on a LIMS run or experiment needs experiment:manage, the same seat that runs
 them. There are no DELETE routes: retire a row with ``active`` false, use a lot
-up with ``quantity_remaining`` 0, and void a use with ``active`` false.
+up with ``quantity_remaining`` 0, void a use with ``active`` false, and take a
+reagent off an experiment with ``PATCH`` ``active`` false (add it again to restore it).
 
 Use flow: the run or experiment holds the reagent; pick a lot, enter the
 quantity used, and the lot's quantity remaining goes down. An expired lot
@@ -31,6 +32,7 @@ from app.database import get_db
 from app.schemas.reagent import (
     ExperimentReagentAdd,
     ExperimentReagentListResponse,
+    ExperimentReagentStatus,
     ReagentCreate,
     ReagentLotCreate,
     ReagentLotResponse,
@@ -446,6 +448,10 @@ LOT_REJECTED = "lot_rejected"
 LOT_UNRELEASED = "lot_unreleased"
 LOT_INACTIVE = "lot_inactive"
 QUANTITY_NOT_POSITIVE = "quantity_not_positive"
+INSUFFICIENT_AMOUNT = "insufficient_amount"
+INCOMPATIBLE_UNITS = "incompatible_units"
+USE_TARGET_REQUIRED = "use_target_required"
+VOIDED_USE_STAYS_VOIDED = "voided_use_stays_voided"
 
 
 def _refuse(code: str, message: str) -> None:
@@ -453,11 +459,11 @@ def _refuse(code: str, message: str) -> None:
     raise HTTPException(status_code=422, detail={"code": code, "message": message})
 
 
-def _stored_reagent_ids(config: object) -> List[str]:
-    """Ids already saved on a reagent entry, in order, skipping blanks."""
+def _stored_ids(config: object, key: str) -> List[str]:
+    """Ids saved under one config key, in order, skipping blanks."""
     if not isinstance(config, dict):
         return []
-    raw_ids = config.get("allowed_reagent_ids")
+    raw_ids = config.get(key)
     if raw_ids is None or not isinstance(raw_ids, list):
         return []
     stored: List[str] = []
@@ -469,6 +475,20 @@ def _stored_reagent_ids(config: object) -> List[str]:
         except (ValueError, TypeError):
             continue
     return stored
+
+
+def _stored_reagent_ids(config: object) -> List[str]:
+    """Ids on the experiment's active reagent list."""
+    return _stored_ids(config, "allowed_reagent_ids")
+
+
+def _reagent_list_response(experiment_id: UUID, entry) -> ExperimentReagentListResponse:
+    return ExperimentReagentListResponse(
+        experiment_id=experiment_id,
+        entry_id=entry.id,
+        allowed_reagent_ids=_stored_reagent_ids(entry.config),
+        removed_reagent_ids=_stored_ids(entry.config, "removed_reagent_ids"),
+    )
 
 
 def _reagent_entry_for(db: Session, experiment_id: UUID):
@@ -536,41 +556,60 @@ def save_experiment_reagent(
         )
         db.add(entry)
         _commit(db, entry, "Could not save the reagent on this experiment")
-        return (
-            ExperimentReagentListResponse(
-                experiment_id=experiment_id,
-                entry_id=entry.id,
-                allowed_reagent_ids=[reagent_key],
-            ),
-            True,
-        )
+        return _reagent_list_response(experiment_id, entry), True
 
     stored = _stored_reagent_ids(entry.config)
+    removed = _stored_ids(entry.config, "removed_reagent_ids")
     if reagent_key in stored:
-        return (
-            ExperimentReagentListResponse(
-                experiment_id=experiment_id,
-                entry_id=entry.id,
-                allowed_reagent_ids=stored,
-            ),
-            False,
-        )
+        return _reagent_list_response(experiment_id, entry), False
 
     config = dict(entry.config) if isinstance(entry.config, dict) else {}
+    if reagent_key in removed:
+        config["removed_reagent_ids"] = [item for item in removed if item != reagent_key]
     config["allowed_reagent_ids"] = stored + [reagent_key]
     config.setdefault("status", "draft")
     entry.config = config
     flag_modified(entry, "config")
     entry.modified_by = current_user.id
     _commit(db, entry, "Could not save the reagent on this experiment")
-    return (
-        ExperimentReagentListResponse(
-            experiment_id=experiment_id,
-            entry_id=entry.id,
-            allowed_reagent_ids=_stored_reagent_ids(entry.config),
-        ),
-        True,
-    )
+    return _reagent_list_response(experiment_id, entry), True
+
+
+def remove_experiment_reagent(
+    db: Session, experiment_id: UUID, reagent_id: UUID, current_user: User
+) -> ExperimentReagentListResponse:
+    """Take a reagent off the active list. The row stays, flagged removed.
+
+    Recorded uses are left alone. Adding the reagent again clears the flag.
+    A second remove leaves the lists as they are.
+    """
+    from sqlalchemy.orm.attributes import flag_modified
+
+    from models.experiment import Experiment
+
+    experiment = db.query(Experiment).filter(Experiment.id == experiment_id).first()
+    if experiment is None:
+        raise HTTPException(status_code=404, detail="Experiment not found")
+    entry = _reagent_entry_for(db, experiment_id)
+    if entry is None:
+        raise HTTPException(status_code=404, detail="Experiment has no reagent list")
+    reagent_key = str(reagent_id)
+    stored = _stored_reagent_ids(entry.config)
+    removed = _stored_ids(entry.config, "removed_reagent_ids")
+    if reagent_key not in stored:
+        if reagent_key in removed:
+            return _reagent_list_response(experiment_id, entry)
+        raise HTTPException(status_code=404, detail="Reagent is not on this experiment")
+    config = dict(entry.config) if isinstance(entry.config, dict) else {}
+    config["allowed_reagent_ids"] = [item for item in stored if item != reagent_key]
+    if reagent_key not in removed:
+        config["removed_reagent_ids"] = removed + [reagent_key]
+    config.setdefault("status", "draft")
+    entry.config = config
+    flag_modified(entry, "config")
+    entry.modified_by = current_user.id
+    _commit(db, entry, "Could not remove the reagent from this experiment")
+    return _reagent_list_response(experiment_id, entry)
 
 
 def _reagent_label(db: Session, reagent_id: UUID) -> str:
@@ -584,9 +623,10 @@ def _refuse_reagent_not_on_experiment(db: Session, experiment_id: UUID, reagent_
     """Refuse an experiment use until the reagent is on the saved list.
 
     Template defaults copied onto the experiment count. No reagent entry means
-    the reagent is not on the list. This runs before the inactive check, so an
-    off-list reagent is ``reagent_not_on_experiment`` even when the catalog row
-    is inactive. A reagent already on the list that is later inactivated falls
+    the reagent is not on the list. A removed reagent is not on the list until
+    it is added again. This runs before the inactive check, so an off-list
+    reagent is ``reagent_not_on_experiment`` even when the catalog row is
+    inactive. A reagent already on the list that is later inactivated falls
     through to ``reagent_inactive``. A LIMS-run-only use does not call this.
     """
     entry = _reagent_entry_for(db, experiment_id)
@@ -649,6 +689,25 @@ def add_experiment_reagent(
     )
 
 
+@experiment_reagents_router.patch(
+    "/{experiment_id}/reagents",
+    response_model=ExperimentReagentListResponse,
+)
+def update_experiment_reagent(
+    experiment_id: UUID,
+    body: ExperimentReagentStatus,
+    current_user: User = Depends(require_experiment_manage),
+    db: Session = Depends(get_db),
+):
+    """Remove a reagent from the active list. There is no delete route."""
+    if body.active is not False:
+        _refuse(
+            "reagent_remove_required",
+            "Set active to false to remove the reagent. Add it again to restore it.",
+        )
+    return remove_experiment_reagent(db, experiment_id, body.reagent_id, current_user)
+
+
 @reagent_uses_router.get("", response_model=List[ReagentUseResponse])
 def list_reagent_uses(
     lims_run_id: Optional[UUID] = Query(None),
@@ -680,7 +739,7 @@ def record_reagent_use(
     from models.flexible_experiment import LimsRun
 
     if body.lims_run_id is None and body.experiment_id is None:
-        raise HTTPException(status_code=422, detail="Record the use on a LIMS run or an experiment")
+        _refuse(USE_TARGET_REQUIRED, "Record the use on a LIMS run or an experiment")
     if body.lims_run_id is not None and not db.query(LimsRun).filter(LimsRun.id == body.lims_run_id).first():
         raise HTTPException(status_code=404, detail="LIMS run not found")
     if body.experiment_id is not None and not db.query(Experiment).filter(Experiment.id == body.experiment_id).first():
@@ -714,9 +773,9 @@ def record_reagent_use(
         )
     quantity = Decimal(body.quantity_used)
     if body.unit and lot.unit and body.unit.strip().lower() != lot.unit.strip().lower():
-        raise HTTPException(
-            status_code=422,
-            detail=f"Lot {lot.lot_number} is counted in {lot.unit}; enter the quantity in {lot.unit}",
+        _refuse(
+            INCOMPATIBLE_UNITS,
+            f"Lot {lot.lot_number} is counted in {lot.unit}; enter the quantity in {lot.unit}",
         )
     if quantity <= 0:
         _refuse(QUANTITY_NOT_POSITIVE, "Quantity used must be greater than 0")
@@ -740,9 +799,9 @@ def record_reagent_use(
         if left is None:
             db.rollback()
             current = db.query(ReagentLot.quantity_remaining).filter(ReagentLot.id == lot.id).scalar()
-            raise HTTPException(
-                status_code=422,
-                detail=f"Lot {lot.lot_number} has {current} {lot.unit or ''} left".strip(),
+            _refuse(
+                INSUFFICIENT_AMOUNT,
+                f"Lot {lot.lot_number} has {current} {lot.unit or ''} left".strip(),
             )
     row = ReagentUse(
         reagent_lot_id=lot.id,
@@ -774,8 +833,8 @@ def update_reagent_use(
     if not row:
         raise HTTPException(status_code=404, detail="Reagent use not found")
     data = explicit_updates(body, row, refuse_null={"active"})
-    if data.get("active") is True and not row.active:
-        raise HTTPException(status_code=422, detail="A voided use stays voided. Record the use again.")
+    if data.get("active") is True and row.active is not True:
+        _refuse(VOIDED_USE_STAYS_VOIDED, "A voided use stays voided. Record the use again.")
     if data.get("active") is False and row.active:
         row.active = False
         db.execute(

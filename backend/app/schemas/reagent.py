@@ -202,11 +202,19 @@ class ExperimentReagentAdd(BaseModel):
 
 
 class ExperimentReagentListResponse(BaseModel):
-    """The experiment's reagent entry after an add. The list is what reloads."""
+    """The experiment's reagent entry after an add or a removal. The active list is what reloads."""
 
     experiment_id: UUID
     entry_id: UUID
     allowed_reagent_ids: list[str]
+    removed_reagent_ids: list[str] = Field(default_factory=list)
+
+
+class ExperimentReagentStatus(BaseModel):
+    """Turn a saved reagent off the active list. Add it again to restore it."""
+
+    reagent_id: UUID
+    active: bool
 
 
 class ReagentUseCreate(BaseModel):

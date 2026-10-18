@@ -144,12 +144,15 @@ def test_record_use_copies_lot_and_expiry_and_draws_down(client, admin_h, lot, r
     too_much = client.post("/v1/reagent-uses", headers=admin_h, json={
         "reagent_lot_id": lot["id"], "lims_run_id": str(run.id), "quantity_used": "500"})
     assert too_much.status_code == 422
+    assert too_much.json()["detail"]["code"] == "insufficient_amount"
+    assert "left" in too_much.json()["detail"]["message"]
 
     void = client.patch(f"/v1/reagent-uses/{use['id']}", headers=admin_h, json={"active": False})
     assert void.status_code == 200 and void.json()["active"] is False
     assert float(client.get(f"/v1/reagent-lots/{lot['id']}", headers=admin_h).json()["quantity_remaining"]) == 100
     again = client.patch(f"/v1/reagent-uses/{use['id']}", headers=admin_h, json={"active": True})
     assert again.status_code == 422
+    assert again.json()["detail"]["code"] == "voided_use_stays_voided"
     assert client.get("/v1/reagent-uses", headers=admin_h, params={"lims_run_id": str(run.id)}).json() == []
 
 
@@ -173,7 +176,7 @@ def test_inactive_lot_is_blocked_at_use(client, admin_h, lot, run):
 
 def test_use_needs_a_run_or_experiment_and_permission(client, admin_h, tech_h, lot, run):
     r = client.post("/v1/reagent-uses", headers=admin_h, json={"reagent_lot_id": lot["id"], "quantity_used": 1})
-    assert r.status_code == 422
+    assert r.status_code == 422 and r.json()["detail"]["code"] == "use_target_required"
     r = client.post("/v1/reagent-uses", headers=admin_h, json={"reagent_lot_id": lot["id"], "lims_run_id": str(run.id)})
     assert r.status_code == 422  # quantity used is required
     r = client.post("/v1/reagent-uses", headers=admin_h, json={"reagent_lot_id": lot["id"], "lims_run_id": str(uuid.uuid4()), "quantity_used": 1})
@@ -366,6 +369,8 @@ def test_use_records_audit_and_unit(client, admin_h, lot, run, test_admin_user):
     wrong = client.post("/v1/reagent-uses", headers=admin_h, json={
         "reagent_lot_id": lot["id"], "lims_run_id": str(run.id), "quantity_used": 2, "unit": "mL"})
     assert wrong.status_code == 422
+    assert wrong.json()["detail"]["code"] == "incompatible_units"
+    assert "counted in" in wrong.json()["detail"]["message"]
 
 
 def test_agent_maps_storage_condition():

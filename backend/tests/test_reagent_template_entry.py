@@ -672,3 +672,173 @@ def test_experiment_seat_can_read_inactive_reagent_names(
     blocked = client.get("/v1/reagents", headers=reader, params={"include_inactive": True})
     assert blocked.status_code == 200, blocked.text
     assert reagent["id"] not in {row["id"] for row in blocked.json()}
+
+
+def _seat(db_session, client_id, suffix, perm_name, perm_desc):
+    from app.core.security import get_password_hash
+    from models.user import Permission, Role, User
+    from tests.conftest import _get_or_create, _grant
+
+    role = _get_or_create(db_session, Role, f"{suffix}-{uuid.uuid4().hex[:8]}", suffix)
+    perm = _get_or_create(db_session, Permission, perm_name, perm_desc)
+    _grant(db_session, role, [perm])
+    username = f"{suffix}-{uuid.uuid4().hex[:8]}"
+    user = User(
+        name=suffix,
+        username=username,
+        email=f"{username}@example.com",
+        password_hash=get_password_hash("seatpassword"),
+        role_id=role.id,
+        client_id=client_id,
+        must_change_password=False,
+    )
+    db_session.add(user)
+    db_session.commit()
+    return username
+
+
+def test_remove_and_restore_experiment_reagent(client: TestClient, test_admin_user, db_session):
+    """A template default comes off the active list by a status flag, not a delete."""
+    from app.main import app as fastapi_app
+
+    headers = _login(client, "admin", "adminpassword")
+    reagent = _reagent(client, headers, name=_name("Default reagent"))
+    other = _reagent(client, headers)
+    lot = _lot(client, headers, reagent["id"])
+    template = _template(client, headers, [reagent["id"]])
+    experiment = _experiment(client, headers, template["id"])
+    tech = _seat(db_session, test_admin_user.client_id, "lab-tech", "experiment:manage", "Manage experiments")
+    reader = _seat(db_session, test_admin_user.client_id, "client", "sample:read", "Read samples")
+    editor = _seat(db_session, test_admin_user.client_id, "config-editor", "config:edit", "Edit configuration")
+    tech_h = _login(client, tech, "seatpassword")
+    reader_h = _login(client, reader, "seatpassword")
+    editor_h = _login(client, editor, "seatpassword")
+
+    recorded = client.post(
+        "/v1/reagent-uses",
+        headers=tech_h,
+        json={
+            "reagent_lot_id": lot["id"],
+            "experiment_id": experiment["id"],
+            "quantity_used": "1",
+            "used_on": "2026-10-01",
+            "note": "bench note",
+        },
+    )
+    assert recorded.status_code == 201, recorded.text
+    use = recorded.json()
+    assert use["used_on"] == "2026-10-01"
+    assert use["note"] == "bench note"
+    assert use["experiment_id"] == experiment["id"]
+    assert float(client.get(f"/v1/reagent-lots/{lot['id']}", headers=headers).json()["quantity_remaining"]) == 9
+
+    for seat in (reader_h, editor_h):
+        blocked_remove = client.patch(
+            f"/v1/experiments/{experiment['id']}/reagents",
+            headers=seat,
+            json={"reagent_id": reagent["id"], "active": False},
+        )
+        assert blocked_remove.status_code == 403, blocked_remove.text
+        blocked_add = client.post(
+            f"/v1/experiments/{experiment['id']}/reagents",
+            headers=seat,
+            json={"reagent_id": other["id"]},
+        )
+        assert blocked_add.status_code == 403, blocked_add.text
+
+    removed = client.patch(
+        f"/v1/experiments/{experiment['id']}/reagents",
+        headers=tech_h,
+        json={"reagent_id": reagent["id"], "active": False},
+    )
+    assert removed.status_code == 200, removed.text
+    assert removed.json()["allowed_reagent_ids"] == []
+    assert removed.json()["removed_reagent_ids"] == [reagent["id"]]
+
+    entries = client.get(f"/v1/experiments/{experiment['id']}/entries", headers=tech_h)
+    assert entries.status_code == 200, entries.text
+    reagent_entries = [
+        row
+        for row in entries.json()["entries"]
+        if row.get("entry_type") == "reagent" or row.get("predefined_entry_key") == "reagents"
+    ]
+    assert reagent_entries[0]["config"]["allowed_reagent_ids"] == []
+    assert reagent_entries[0]["config"]["removed_reagent_ids"] == [reagent["id"]]
+
+    uses = client.get("/v1/reagent-uses", headers=tech_h, params={"experiment_id": experiment["id"]})
+    assert uses.status_code == 200, uses.text
+    kept = [row for row in uses.json() if row["id"] == use["id"]]
+    assert len(kept) == 1
+    assert kept[0]["note"] == "bench note"
+    assert kept[0]["used_on"] == "2026-10-01"
+    assert kept[0]["active"] is True
+    assert float(client.get(f"/v1/reagent-lots/{lot['id']}", headers=headers).json()["quantity_remaining"]) == 9
+
+    refused = client.post(
+        "/v1/reagent-uses",
+        headers=tech_h,
+        json={
+            "reagent_lot_id": lot["id"],
+            "experiment_id": experiment["id"],
+            "quantity_used": "1",
+        },
+    )
+    assert refused.status_code == 422
+    assert refused.json()["detail"]["code"] == "reagent_not_on_experiment"
+    assert float(client.get(f"/v1/reagent-lots/{lot['id']}", headers=headers).json()["quantity_remaining"]) == 9
+
+    again = client.patch(
+        f"/v1/experiments/{experiment['id']}/reagents",
+        headers=tech_h,
+        json={"reagent_id": reagent["id"], "active": False},
+    )
+    assert again.status_code == 200, again.text
+    assert again.json()["allowed_reagent_ids"] == []
+    assert again.json()["removed_reagent_ids"] == [reagent["id"]]
+
+    restore_flag = client.patch(
+        f"/v1/experiments/{experiment['id']}/reagents",
+        headers=tech_h,
+        json={"reagent_id": reagent["id"], "active": True},
+    )
+    assert restore_flag.status_code == 422
+    assert restore_flag.json()["detail"]["code"] == "reagent_remove_required"
+    assert "Add it again" in restore_flag.json()["detail"]["message"]
+
+    missing = client.patch(
+        f"/v1/experiments/{experiment['id']}/reagents",
+        headers=tech_h,
+        json={"reagent_id": other["id"], "active": False},
+    )
+    assert missing.status_code == 404
+
+    restored = client.post(
+        f"/v1/experiments/{experiment['id']}/reagents",
+        headers=tech_h,
+        json={"reagent_id": reagent["id"]},
+    )
+    assert restored.status_code == 201, restored.text
+    assert restored.json()["allowed_reagent_ids"] == [reagent["id"]]
+    assert restored.json()["removed_reagent_ids"] == []
+
+    omitted_date = client.post(
+        "/v1/reagent-uses",
+        headers=tech_h,
+        json={
+            "reagent_lot_id": lot["id"],
+            "experiment_id": experiment["id"],
+            "quantity_used": "1",
+            "note": "opened today",
+        },
+    )
+    assert omitted_date.status_code == 201, omitted_date.text
+    assert omitted_date.json()["used_on"] == str(date.today())
+    assert omitted_date.json()["note"] == "opened today"
+    assert float(client.get(f"/v1/reagent-lots/{lot['id']}", headers=headers).json()["quantity_remaining"]) == 8
+    uses = client.get("/v1/reagent-uses", headers=tech_h, params={"experiment_id": experiment["id"]})
+    assert {row["id"] for row in uses.json()} == {use["id"], omitted_date.json()["id"]}
+
+    for route in fastapi_app.routes:
+        path = getattr(route, "path", "")
+        if "experiments" in path and path.rstrip("/").endswith("/reagents"):
+            assert "DELETE" not in (getattr(route, "methods", set()) or set()), path

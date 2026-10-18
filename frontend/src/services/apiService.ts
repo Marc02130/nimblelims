@@ -918,6 +918,14 @@ export class ApiService {
     return response.data;
   }
 
+  async setExperimentReagentActive(experimentId: string, reagentId: string, active: boolean) {
+    const response: AxiosResponse = await this.api.patch(
+      `/v1/experiments/${experimentId}/reagents`,
+      { reagent_id: reagentId, active },
+    );
+    return response.data;
+  }
+
   async getReagentUses(params?: { lims_run_id?: string; experiment_id?: string; reagent_lot_id?: string }) {
     const response: AxiosResponse = await this.api.get('/v1/reagent-uses', { params });
     return response.data;
