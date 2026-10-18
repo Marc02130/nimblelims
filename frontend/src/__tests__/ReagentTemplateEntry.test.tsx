@@ -260,6 +260,25 @@ describe('Experiment reagent capture', () => {
     });
   });
 
+  test('shows an inactivated reagent by name', async () => {
+    api.getReagents.mockResolvedValue([
+      { id: 'r1', name: 'Qubit dsDNA HS', active: false },
+      { id: 'r2', name: 'Ethanol', active: true },
+      { id: 'r3', name: 'Retired buffer', active: false },
+    ]);
+    api.getExperimentEntries.mockResolvedValue({ entries: [reagentEntry] });
+    api.getReagentLots.mockResolvedValue([]);
+    wrap(<EntryCapturePanel experimentId="exp1" />);
+
+    expect(await screen.findByLabelText('Lot for Qubit dsDNA HS')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Lot for r1')).not.toBeInTheDocument();
+    await waitFor(() => expect(api.getReagents).toHaveBeenCalledWith({ include_inactive: true }));
+    fireEvent.mouseDown(screen.getByLabelText('Add reagent'));
+    expect(await screen.findByRole('option', { name: 'Ethanol' })).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: 'Retired buffer' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: 'Qubit dsDNA HS' })).not.toBeInTheDocument();
+  });
+
   test('shows the API refusal when the reagent is inactive', async () => {
     api.getExperimentEntries.mockResolvedValue({ entries: [reagentEntry] });
     api.getReagentLots.mockResolvedValue(lots);

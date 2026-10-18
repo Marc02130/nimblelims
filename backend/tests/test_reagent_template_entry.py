@@ -306,7 +306,8 @@ def test_experiment_use_accepts_off_template_active_reagent(
         },
     )
     assert expired_use.status_code == 422
-    assert "expired" in expired_use.json()["detail"]
+    assert expired_use.json()["detail"]["code"] == "lot_expired"
+    assert "expired" in expired_use.json()["detail"]["message"]
 
     rejected_use = client.post(
         "/v1/reagent-uses",
@@ -318,7 +319,8 @@ def test_experiment_use_accepts_off_template_active_reagent(
         },
     )
     assert rejected_use.status_code == 422
-    assert "rejected" in rejected_use.json()["detail"]
+    assert rejected_use.json()["detail"]["code"] == "lot_rejected"
+    assert "rejected" in rejected_use.json()["detail"]["message"]
 
     recorded = client.post(
         "/v1/reagent-uses",
@@ -597,3 +599,76 @@ def test_inactive_reagent_refused_on_experiment_and_lims_run(client: TestClient,
     assert on_run.json()["detail"]["code"] == "reagent_inactive"
     remaining = client.get(f"/v1/reagent-lots/{lot['id']}", headers=headers).json()["quantity_remaining"]
     assert float(remaining) == 10
+    usable = client.get("/v1/reagent-lots", headers=headers, params={"usable": True})
+    assert usable.status_code == 200, usable.text
+    assert lot["id"] not in {row["id"] for row in usable.json()}
+
+
+def test_usable_lots_exclude_inactive_reagents(client: TestClient, test_admin_user):
+    headers = _login(client, "admin", "adminpassword")
+    active = _reagent(client, headers)
+    retired = _reagent(client, headers)
+    kept = _lot(client, headers, active["id"])
+    dropped = _lot(client, headers, retired["id"])
+    before = client.get("/v1/reagent-lots", headers=headers, params={"usable": True})
+    assert before.status_code == 200, before.text
+    ids = {row["id"] for row in before.json()}
+    assert kept["id"] in ids
+    assert dropped["id"] in ids
+
+    patched = client.patch(f"/v1/reagents/{retired['id']}", headers=headers, json={"active": False})
+    assert patched.status_code == 200, patched.text
+    assert patched.json()["active"] is False
+    after = client.get("/v1/reagent-lots", headers=headers, params={"usable": True})
+    assert after.status_code == 200, after.text
+    ids = {row["id"] for row in after.json()}
+    assert kept["id"] in ids
+    assert dropped["id"] not in ids
+    one = client.get(f"/v1/reagent-lots/{dropped['id']}", headers=headers)
+    assert one.status_code == 200, one.text
+    assert one.json()["active"] is True
+    assert one.json()["usable"] is True
+    assert float(one.json()["quantity_remaining"]) == 10
+
+
+def test_experiment_seat_can_read_inactive_reagent_names(
+    client: TestClient, test_admin_user, test_user, db_session
+):
+    from app.core.security import get_password_hash
+    from models.user import Permission, Role, User
+    from tests.conftest import _get_or_create, _grant
+
+    headers = _login(client, "admin", "adminpassword")
+    reagent = _reagent(client, headers)
+    retired = client.patch(f"/v1/reagents/{reagent['id']}", headers=headers, json={"active": False})
+    assert retired.status_code == 200, retired.text
+
+    role = _get_or_create(db_session, Role, "bench-tech", "Bench tech")
+    perm = _get_or_create(db_session, Permission, "experiment:manage", "Manage experiments")
+    _grant(db_session, role, [perm])
+    username = f"bench-{uuid.uuid4().hex[:8]}"
+    tech = User(
+        name="Bench Tech",
+        username=username,
+        email=f"{username}@example.com",
+        password_hash=get_password_hash("techpassword"),
+        role_id=role.id,
+        client_id=test_admin_user.client_id,
+        must_change_password=False,
+    )
+    db_session.add(tech)
+    db_session.commit()
+    tech_h = _login(client, username, "techpassword")
+    plain = client.get("/v1/reagents", headers=tech_h)
+    assert plain.status_code == 200, plain.text
+    assert reagent["id"] not in {row["id"] for row in plain.json()}
+    shown = client.get("/v1/reagents", headers=tech_h, params={"include_inactive": True})
+    assert shown.status_code == 200, shown.text
+    match = next(row for row in shown.json() if row["id"] == reagent["id"])
+    assert match["name"] == reagent["name"]
+    assert match["active"] is False
+
+    reader = _login(client, "testuser", "testpassword")
+    blocked = client.get("/v1/reagents", headers=reader, params={"include_inactive": True})
+    assert blocked.status_code == 200, blocked.text
+    assert reagent["id"] not in {row["id"] for row in blocked.json()}

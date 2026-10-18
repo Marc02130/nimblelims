@@ -167,6 +167,7 @@ const ReagentUsePanel: React.FC<Props> = ({
   const [uses, setUses] = useState<ReagentUseRow[]>([]);
   const [lots, setLots] = useState<LotOption[]>([]);
   const [catalog, setCatalog] = useState<CatalogReagent[]>([]);
+  const [names, setNames] = useState<CatalogReagent[]>([]);
   const [chosenIds, setChosenIds] = useState<string[]>(defaultReagentIds ?? []);
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
@@ -203,7 +204,7 @@ const ReagentUsePanel: React.FC<Props> = ({
     if (!experimentId) return;
     let cancelled = false;
     apiService
-      .getReagents({ active: true })
+      .getReagents({ include_inactive: true })
       .then((raw) => {
         if (cancelled) return;
         const list = (Array.isArray(raw) ? raw : []) as Array<{
@@ -211,10 +212,14 @@ const ReagentUsePanel: React.FC<Props> = ({
           name?: string;
           active?: boolean;
         }>;
+        const named = list
+          .filter((row) => row?.id && row?.name)
+          .map((row) => ({ id: String(row.id), name: String(row.name), active: row.active }));
+        setNames(named.map((row) => ({ id: row.id, name: row.name })));
         setCatalog(
-          list
-            .filter((row) => row?.id && row?.name && row.active !== false)
-            .map((row) => ({ id: String(row.id), name: String(row.name) })),
+          named
+            .filter((row) => row.active !== false)
+            .map((row) => ({ id: row.id, name: row.name })),
         );
       })
       .catch((err) => {
@@ -307,7 +312,7 @@ const ReagentUsePanel: React.FC<Props> = ({
   };
 
   const addable = catalog.filter((row) => !chosenIds.includes(row.id));
-  const reagentName = (id: string) => catalog.find((row) => row.id === id)?.name || id;
+  const reagentName = (id: string) => names.find((row) => row.id === id)?.name || id;
 
   const recordForReagent = async (lotIdForReagent: string, quantityForReagent: string) => {
     setSaving(true);
