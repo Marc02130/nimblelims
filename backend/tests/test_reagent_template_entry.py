@@ -10,7 +10,7 @@ A LIMS-run-only use skips the list check. Inactive reagents, and expired or
 QC-rejected lots, stay refused.
 """
 import uuid
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 
 from fastapi.testclient import TestClient
 
@@ -832,7 +832,7 @@ def test_remove_and_restore_experiment_reagent(client: TestClient, test_admin_us
         },
     )
     assert omitted_date.status_code == 201, omitted_date.text
-    assert omitted_date.json()["used_on"] == str(date.today())
+    assert omitted_date.json()["used_on"] == datetime.now(timezone.utc).date().isoformat()
     assert omitted_date.json()["note"] == "opened today"
     assert float(client.get(f"/v1/reagent-lots/{lot['id']}", headers=headers).json()["quantity_remaining"]) == 8
     uses = client.get("/v1/reagent-uses", headers=tech_h, params={"experiment_id": experiment["id"]})

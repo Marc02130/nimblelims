@@ -51,6 +51,8 @@ jobs:
           ENVIRONMENT: test
           ALLOW_INSECURE_DEFAULTS: "true"
           SECRET_KEY: pytest-secret-key-not-for-production
+          # Seeds lab_settings when the test row is empty. Tests read the saved zone.
+          LAB_TIMEZONE: UTC
 
   frontend:
     name: Frontend tests and type check

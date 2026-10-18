@@ -18,7 +18,9 @@ services:
   backend:
     environment:
       ENVIRONMENT: production
-      LAB_TIMEZONE: ${LAB_TIMEZONE:-UTC}
+      # Seeds lab_settings when that row is empty. Empty is allowed so migrations
+      # can run. The API then refuses to start if the database has no valid zone.
+      LAB_TIMEZONE: ${LAB_TIMEZONE:-}
       ALLOW_INSECURE_DEFAULTS: "false"
       ALLOW_DEV_SEED_USERS: "false"
       SECRET_KEY: ${SECRET_KEY:?Set a strong SECRET_KEY}

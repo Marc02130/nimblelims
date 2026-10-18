@@ -421,21 +421,18 @@ def test_zero_or_negative_use_is_refused(client, admin_h, lot, run, qty):
         (datetime(2026, 10, 19, 4, 0, tzinfo=timezone.utc), date(2026, 10, 19)),  # midnight EDT
     ],
 )
-def test_lab_today_uses_the_lab_clock_between_8pm_and_midnight(monkeypatch, utc_moment, expected):
-    monkeypatch.setenv("LAB_TIMEZONE", "America/New_York")
-    assert lab_time.lab_today(utc_moment) == expected
-    monkeypatch.delenv("LAB_TIMEZONE")
-    assert lab_time.lab_today(utc_moment) == utc_moment.date()
-
-
-def test_unknown_lab_timezone_is_refused(monkeypatch):
-    monkeypatch.setenv("LAB_TIMEZONE", "Mars/Olympus_Mons")
-    with pytest.raises(RuntimeError, match="LAB_TIMEZONE"):
-        lab_time.lab_today()
+def test_clock_date_uses_the_named_zone_between_8pm_and_midnight(utc_moment, expected):
+    assert lab_time.clock_date("America/New_York", utc_moment) == expected
 
 
 def test_blank_used_on_is_the_lab_date_in_the_evening(client, admin_h, lot, run, monkeypatch):
-    monkeypatch.setenv("LAB_TIMEZONE", "America/New_York")
+    # The lot fixture may already have seeded UTC from the test env. The saved
+    # zone wins, including over a different LAB_TIMEZONE.
+    monkeypatch.setenv("LAB_TIMEZONE", "UTC")
+    saved = client.patch(
+        "/v1/lab-settings", headers=admin_h, json={"timezone": "America/New_York"}
+    )
+    assert saved.status_code == 200, saved.text
     evening = datetime(2026, 10, 19, 1, 30, tzinfo=timezone.utc)  # 9:30 PM EDT on Oct 18
     monkeypatch.setattr(lab_time, "_utcnow", lambda: evening)
     r = client.post("/v1/reagent-uses", headers=admin_h, json={

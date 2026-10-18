@@ -115,7 +115,9 @@ This step implements the Docker configuration from the Technical Document (Secti
   POSTGRES_PASSWORD=securepassword123
   POSTGRES_DB=lims_mvp
   JWT_SECRET_KEY=supersecretkeychangeme
+  LAB_TIMEZONE=America/New_York
   ```
+- `LAB_TIMEZONE` seeds `lab_settings` on first API start when that row is empty. A zone saved later wins. The API refuses to start when neither is a real IANA zone. There is no UTC default.
 - Update `docker-compose.yml` if needed to reference these (e.g., via `env_file: .env`).
 
 #### Step 6: Start Docker and Verify the Environment
