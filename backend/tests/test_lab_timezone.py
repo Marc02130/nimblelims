@@ -1,7 +1,8 @@
 """Lab timezone stored on lab_settings.
 
 LAB_TIMEZONE seeds the row only when it is empty. After that the saved value
-wins. Administrator and Lab Manager can read and update it. Other roles cannot.
+wins. An administrator changes it. A lab manager may read it. A lab manager,
+lab technician, client, or configuration editor cannot change it.
 """
 import importlib.util
 import inspect
@@ -157,7 +158,7 @@ def test_unknown_zone_is_invalid_timezone(client, test_admin_user, raw):
     assert "America/New_York" in response.json()["detail"]["message"]
 
 
-def test_admin_and_lab_manager_can_read_and_update(client, db_session, test_org, test_admin_user, monkeypatch):
+def test_admin_updates_and_lab_manager_can_only_read(client, db_session, test_org, test_admin_user, monkeypatch):
     monkeypatch.setenv("LAB_TIMEZONE", "UTC")
     admin = _login(client, "admin", "adminpassword")
     seeded = client.get("/v1/lab-settings", headers=admin)
@@ -173,9 +174,13 @@ def test_admin_and_lab_manager_can_read_and_update(client, db_session, test_org,
 
     _person(db_session, test_org, "lab-manager", "Lab Manager", ["experiment:manage"])
     manager = _login(client, "lab-manager", "pass-word-1")
+    seen = client.get("/v1/lab-settings", headers=manager)
+    assert seen.status_code == 200, seen.text
+    assert seen.json()["timezone"] == "America/New_York"
     changed = client.patch("/v1/lab-settings", headers=manager, json={"timezone": "America/Chicago"})
-    assert changed.status_code == 200, changed.text
-    assert client.get("/v1/lab-settings", headers=manager).json()["timezone"] == "America/Chicago"
+    assert changed.status_code == 403, changed.text
+    assert "Administrator" in changed.json()["detail"]
+    assert client.get("/v1/lab-settings", headers=admin).json()["timezone"] == "America/New_York"
 
 
 @pytest.mark.parametrize(
@@ -189,11 +194,12 @@ def test_admin_and_lab_manager_can_read_and_update(client, db_session, test_org,
 def test_other_roles_cannot_edit_the_timezone(client, db_session, test_org, username, role_name, perms):
     _person(db_session, test_org, username, role_name, perms)
     headers = _login(client, username, "pass-word-1")
-    for method in ("get", "patch"):
-        kwargs = {"json": {"timezone": "America/New_York"}} if method == "patch" else {}
-        response = getattr(client, method)("/v1/lab-settings", headers=headers, **kwargs)
-        assert response.status_code == 403, response.text
-        assert "Lab Manager" in response.json()["detail"]
+    denied = client.get("/v1/lab-settings", headers=headers)
+    assert denied.status_code == 403, denied.text
+    assert "Lab Manager" in denied.json()["detail"]
+    changed = client.patch("/v1/lab-settings", headers=headers, json={"timezone": "America/New_York"})
+    assert changed.status_code == 403, changed.text
+    assert "Administrator" in changed.json()["detail"]
 
 
 def test_evening_expiry_and_usable_lots_follow_the_lab_date(client, test_admin_user, monkeypatch):
