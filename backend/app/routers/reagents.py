@@ -30,6 +30,7 @@ from sqlalchemy.orm import Session
 
 from app.core.rbac import require_config_edit, require_experiment_manage
 from app.core.lab_time import lab_today
+from app.schemas._dates import is_future
 from app.core.patch_fields import explicit_updates
 from app.core.security import get_current_user, get_user_permissions
 from app.database import get_db
@@ -494,6 +495,8 @@ def update_reagent_lot(
 REAGENT_INACTIVE = "reagent_inactive"
 REAGENT_NOT_ON_EXPERIMENT = "reagent_not_on_experiment"
 LOT_EXPIRED = "lot_expired"
+USED_ON_IN_FUTURE = "used_on_in_future"
+USED_ON_BEFORE_RECEIPT = "used_on_before_receipt"
 LOT_REJECTED = "lot_rejected"
 LOT_UNRELEASED = "lot_unreleased"
 LOT_INACTIVE = "lot_inactive"
@@ -809,7 +812,18 @@ def record_reagent_use(
     _refuse_inactive_reagent(db, lot.reagent_id)
     if lot.active is not True:
         _refuse(LOT_INACTIVE, f"Lot {lot.lot_number} is inactive and can't be used")
-    used_on = body.used_on if body.used_on is not None else lab_today(db)
+    today = lab_today(db)
+    used_on = body.used_on if body.used_on is not None else today
+    if is_future(used_on, today=today):
+        _refuse(
+            USED_ON_IN_FUTURE,
+            f"Used on {used_on.isoformat()} is after today in the lab timezone ({today.isoformat()}).",
+        )
+    if lot.received_date is not None and used_on < lot.received_date:
+        _refuse(
+            USED_ON_BEFORE_RECEIPT,
+            f"Lot {lot.lot_number} was received on {lot.received_date.isoformat()}. Used on can't be earlier.",
+        )
     if lot.released is not True:
         _refuse(LOT_UNRELEASED, f"Lot {lot.lot_number} is not released for use")
     if lot.qc_status == "rejected":

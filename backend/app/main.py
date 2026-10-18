@@ -7,7 +7,7 @@ from sqlalchemy.exc import IntegrityError
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import validate_security_config
-from app.core.lab_time import require_lab_timezone_on_startup
+from app.core.lab_time import LAB_TIMEZONE_INVALID, LabTimezoneInvalid, require_lab_timezone_on_startup
 from app.routers import auth, samples, tests, containers, batches, results, aliquots, lists, projects, analyses, analytes, units, users, roles, permissions, clients, test_batteries, client_projects, custom_attributes, help, admin, sequences, workflows, experiments, lims_runs, sop_parse, lims_run_checklists, dose_response, field_definitions, eln_processes, eln_process_definitions, entries, sample_journey, instrument_catalog, data_parsers, asked_for, work_orders, sample_type_transitions, ui_schema, config_schema, configuring_agent, reagents, lab_settings
 import logging
 
@@ -138,6 +138,17 @@ logger.info("All routers registered")
 async def root():
     print("ROOT ENDPOINT HIT", file=sys.stderr, flush=True)
     return {"message": "NimbleLims API"}
+
+@app.exception_handler(LabTimezoneInvalid)
+async def _lab_timezone_invalid(_request: Request, exc: LabTimezoneInvalid):
+    """A saved zone that went bad while the API is up. PATCH can still repair it."""
+    from fastapi.responses import JSONResponse
+
+    return JSONResponse(
+        status_code=503,
+        content={"detail": {"code": LAB_TIMEZONE_INVALID, "message": str(exc)}},
+    )
+
 
 @app.exception_handler(IntegrityError)
 async def _unique_violation_is_409(request: Request, exc: IntegrityError):

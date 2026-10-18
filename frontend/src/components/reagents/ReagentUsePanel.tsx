@@ -141,6 +141,7 @@ const ReagentLotPicker: React.FC<{
             type="date"
             sx={{ width: 160 }}
             InputLabelProps={{ shrink: true }}
+            inputProps={{ max: localDateString() }}
             value={usedOn}
             onChange={(event) => setUsedOn(event.target.value)}
             helperText="Leave empty for today"
@@ -551,6 +552,7 @@ const ReagentUsePanel: React.FC<Props> = ({
             fullWidth
             sx={{ mt: 2 }}
             InputLabelProps={{ shrink: true }}
+            inputProps={{ max: localDateString() }}
             value={usedOn}
             onChange={(e) => setUsedOn(e.target.value)}
             helperText="Leave empty for today"
