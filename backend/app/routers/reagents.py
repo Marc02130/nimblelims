@@ -138,9 +138,16 @@ def effective_expiration(lot: ReagentLot) -> Optional[date]:
     return min(dates) if dates else None
 
 
-def lot_expired(lot: ReagentLot, on: Optional[date] = None) -> bool:
+def lot_expired(lot: ReagentLot, on: Optional[date] = None, *, today: Optional[date] = None) -> bool:
+    """True when the effective expiry is before ``on``, or before ``today``.
+
+    Callers pass the lab's calendar date. There is no server-local fallback.
+    """
+    when = on if on is not None else today
+    if when is None:
+        raise TypeError("lot_expired requires the lab date")
     effective = effective_expiration(lot)
-    return effective is not None and effective < (on or date.today())
+    return effective is not None and effective < when
 
 
 # ------------------------------------------------------------------ vendors ---
@@ -205,10 +212,11 @@ def _reagent_out(db: Session, row: Reagent) -> ReagentResponse:
     out = ReagentResponse.model_validate(row)
     sources = [src for src in row.sources if src.active]
     out.vendor_names = sorted({src.vendor.name for src in sources if src.vendor is not None})
+    today = lab_today(db)
     on_hand = db.query(func.coalesce(func.sum(ReagentLot.quantity_remaining), 0)).filter(
         ReagentLot.reagent_id == row.id,
         ReagentLot.active.is_(True),
-        (ReagentLot.expiration_date.is_(None)) | (ReagentLot.expiration_date >= date.today()),
+        (ReagentLot.expiration_date.is_(None)) | (ReagentLot.expiration_date >= today),
     ).scalar()
     out.quantity_on_hand = on_hand
     points = [src.reorder_point for src in sources if src.reorder_point is not None]
@@ -358,14 +366,15 @@ def update_reagent_vendor(
 
 # --------------------------------------------------------------------- lots ---
 
-def _lot_out(row: ReagentLot) -> ReagentLotResponse:
+def _lot_out(db: Session, row: ReagentLot, *, today: Optional[date] = None) -> ReagentLotResponse:
+    when = lab_today(db) if today is None else today
     out = ReagentLotResponse.model_validate(row)
     out.reagent_name = row.reagent.name if row.reagent is not None else None
     if row.source is not None:
         out.vendor_name = row.source.vendor.name if row.source.vendor is not None else None
         out.catalog_number = row.source.catalog_number
     out.effective_expiration_date = effective_expiration(row)
-    out.expired = lot_expired(row)
+    out.expired = lot_expired(row, today=when)
     out.usable = bool(row.active and row.released and row.qc_status != "rejected" and not out.expired)
     return out
 
@@ -396,9 +405,10 @@ def list_reagent_lots(
             (ReagentLot.quantity_remaining.is_(None)) | (ReagentLot.quantity_remaining > 0),
         )
     rows = q.order_by(ReagentLot.expiration_date.asc().nullslast(), ReagentLot.lot_number).all()
+    today = lab_today(db)
     if usable is True:
-        rows = [r for r in rows if not lot_expired(r)]
-    return [_lot_out(r) for r in rows]
+        rows = [r for r in rows if not lot_expired(r, today=today)]
+    return [_lot_out(db, r, today=today) for r in rows]
 
 
 @reagent_lots_router.get("/{lot_id}", response_model=ReagentLotResponse)
@@ -406,7 +416,7 @@ def get_reagent_lot(lot_id: UUID, current_user: User = Depends(get_current_user)
     row = db.query(ReagentLot).filter(ReagentLot.id == lot_id).first()
     if not row or (not row.active and not _has_config_edit(current_user, db)):
         raise HTTPException(status_code=404, detail="Reagent lot not found")
-    return _lot_out(row)
+    return _lot_out(db, row)
 
 
 def _source_for(db: Session, source_id: Optional[UUID], reagent_id: Optional[UUID]) -> Optional[ReagentVendor]:
@@ -452,7 +462,7 @@ def create_reagent_lot(
         data["received_by"] = current_user.id
     row = ReagentLot(**data, created_by=current_user.id, modified_by=current_user.id)
     db.add(row)
-    return _lot_out(_commit(db, row, "This lot number already exists for the reagent"))
+    return _lot_out(db, _commit(db, row, "This lot number already exists for the reagent"))
 
 
 @reagent_lots_router.patch("/{lot_id}", response_model=ReagentLotResponse)
@@ -476,7 +486,7 @@ def update_reagent_lot(
     for k, v in data.items():
         setattr(row, k, v)
     row.modified_by = current_user.id
-    return _lot_out(_commit(db, row, "This lot number already exists for the reagent"))
+    return _lot_out(db, _commit(db, row, "This lot number already exists for the reagent"))
 
 
 # --------------------------------------------------------------------- uses ---
@@ -799,7 +809,7 @@ def record_reagent_use(
     _refuse_inactive_reagent(db, lot.reagent_id)
     if lot.active is not True:
         _refuse(LOT_INACTIVE, f"Lot {lot.lot_number} is inactive and can't be used")
-    used_on = body.used_on if body.used_on is not None else lab_today()
+    used_on = body.used_on if body.used_on is not None else lab_today(db)
     if lot.released is not True:
         _refuse(LOT_UNRELEASED, f"Lot {lot.lot_number} is not released for use")
     if lot.qc_status == "rejected":

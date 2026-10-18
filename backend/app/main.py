@@ -1,18 +1,20 @@
 """
 FastAPI application for NimbleLims
 """
+from contextlib import asynccontextmanager
+
 from sqlalchemy.exc import IntegrityError
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import validate_security_config
-from app.core.lab_time import lab_zone
-from app.routers import auth, samples, tests, containers, batches, results, aliquots, lists, projects, analyses, analytes, units, users, roles, permissions, clients, test_batteries, client_projects, custom_attributes, help, admin, sequences, workflows, experiments, lims_runs, sop_parse, lims_run_checklists, dose_response, field_definitions, eln_processes, eln_process_definitions, entries, sample_journey, instrument_catalog, data_parsers, asked_for, work_orders, sample_type_transitions, ui_schema, config_schema, configuring_agent, reagents
+from app.core.lab_time import require_lab_timezone_on_startup
+from app.routers import auth, samples, tests, containers, batches, results, aliquots, lists, projects, analyses, analytes, units, users, roles, permissions, clients, test_batteries, client_projects, custom_attributes, help, admin, sequences, workflows, experiments, lims_runs, sop_parse, lims_run_checklists, dose_response, field_definitions, eln_processes, eln_process_definitions, entries, sample_journey, instrument_catalog, data_parsers, asked_for, work_orders, sample_type_transitions, ui_schema, config_schema, configuring_agent, reagents, lab_settings
 import logging
 
-# S3: refuse missing/default JWT secret unless explicit local insecure flags
+# S3: refuse missing/default JWT secret unless explicit local insecure flags.
+# The lab zone is checked in the lifespan, after Alembic, so importing this
+# module does not need lab_settings to exist yet.
 validate_security_config()
-# LAB_TIMEZONE is required. Missing, blank, or unknown stops startup.
-lab_zone()
 
 # Configure logging
 logging.basicConfig(
@@ -28,11 +30,21 @@ logger.info("=== FASTAPI APPLICATION STARTING ===")
 # Database schema is managed by Alembic migrations ONLY
 # Run migrations: docker exec lims-backend python run_migrations.py
 
+
+@asynccontextmanager
+async def _lifespan(_app: FastAPI):
+    # start.sh migrates, then uvicorn loads this app. The check runs here,
+    # not at import, so the table can be created first.
+    require_lab_timezone_on_startup()
+    yield
+
+
 app = FastAPI(
     title="NimbleLIMS API",
     description="NimbleLIMS API",
     version="1.0.0",
-    redirect_slashes=False  # Don't redirect URLs with/without trailing slashes
+    redirect_slashes=False,  # Don't redirect URLs with/without trailing slashes
+    lifespan=_lifespan,
 )
 
 # Request logging middleware (S4: never log bodies — passwords / PII)
@@ -117,6 +129,7 @@ app.include_router(entries.router, prefix="/v1")
 app.include_router(sample_type_transitions.router, prefix="/v1")
 app.include_router(ui_schema.router, prefix="/v1")
 app.include_router(configuring_agent.router, prefix="/v1")
+app.include_router(lab_settings.router)
 app.include_router(sample_journey.router, prefix="/v1")
 app.include_router(dose_response.router, prefix="/v1")
 logger.info("All routers registered")

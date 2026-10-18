@@ -79,8 +79,9 @@ services:
       JWT_ACCESS_TOKEN_EXPIRE_MINUTES: 30
       DEBUG: "True"
       ENVIRONMENT: development
-      # Required IANA zone for server default dates. No default.
-      LAB_TIMEZONE: ${LAB_TIMEZONE:?Set LAB_TIMEZONE to an IANA time zone, for example America/New_York}
+      # Seeds lab_settings when that row is empty. Empty is allowed so migrations
+      # can run. The API then refuses to start if the database has no valid zone.
+      LAB_TIMEZONE: ${LAB_TIMEZONE:-}
       ALLOW_INSECURE_DEFAULTS: "true"
       ALLOW_DEV_SEED_USERS: "true"
       R_CALCULATOR_URL: http://r-calculator:8000

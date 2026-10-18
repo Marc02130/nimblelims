@@ -100,3 +100,4 @@ from .configuring_agent import (
     ConfigurationStep,
     ConfiguringAgentSettings,
 )
+from .lab_setting import LAB_SETTINGS_ID, LabSetting

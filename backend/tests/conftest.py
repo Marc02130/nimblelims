@@ -4,12 +4,15 @@ Uses testcontainers-python (PostgreSQL 15) to prevent SQLite/JSONB divergence.
 """
 import os
 
-# S3: allow tests to import app.core.config before any other imports
-os.environ.setdefault("ENVIRONMENT", "test")
+# S3: allow tests to import app.core.config before any other imports.
+# Assign, do not setdefault: a developer shell often exports ENVIRONMENT=development,
+# and the API startup check must not open that database from the test client.
+os.environ["ENVIRONMENT"] = "test"
 os.environ.setdefault("ALLOW_INSECURE_DEFAULTS", "true")
 os.environ.setdefault("SECRET_KEY", "pytest-secret-key-not-for-production")
 os.environ.setdefault("EMBEDDING_PROVIDER", "stub")
-# The app has no default zone. Tests pin UTC so import of app.main can start.
+# Tests pin UTC. lab_settings is seeded from this only while the row is empty.
+# ENVIRONMENT=test skips the process startup check, so import does not query.
 os.environ.setdefault("LAB_TIMEZONE", "UTC")
 
 import pytest
