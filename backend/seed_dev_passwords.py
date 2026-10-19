@@ -87,6 +87,7 @@ from app.core.security import (
 from models.user import User
 
 _LEGACY_SHA256 = re.compile(r"[0-9a-f]{64}")
+_SECRETS_KEY_RE = re.compile(r"^[A-Z_][A-Z0-9_]*$")
 
 
 class SeedPasswordError(RuntimeError):
@@ -150,11 +151,12 @@ def _connect() -> tuple[Session, object]:
     user = "unknown"
     if "://" in url and "@" in url:
         user = url.split("://", 1)[1].split(":", 1)[0]
-    print(f"Connecting as DB user '{user}' → {host}")
+    print(f"Connecting as DB user '{user}' → {host}", file=sys.stderr)
     if user == "lims_app":
         print(
             "WARNING: connected as lims_app. RLS can hide rows. "
-            "Set MIGRATE_DATABASE_URL to the migrator owner."
+            "Set MIGRATE_DATABASE_URL to the migrator owner.",
+            file=sys.stderr,
         )
     engine = create_engine(url)
     session = sessionmaker(bind=engine)()
@@ -276,22 +278,43 @@ def print_generated(generated: list[tuple[str, str, str]]) -> None:
         print(password)
 
 
-def write_secrets_file(path: Path, generated: list[tuple[str, str, str]]) -> None:
-    """Create ``path`` exclusively, mode 0600, and write ``KEY=<quoted>`` lines.
+def write_secrets_file(
+    path: Path,
+    generated: list[tuple[str, str, str]],
+    *,
+    force: bool = False,
+) -> None:
+    """Write ``KEY=<quoted>`` lines to ``path`` at mode 0600.
 
     Each value is ``shlex.quote``d so the file loads with
-    ``set -a; . PATH; set +a``. ``O_EXCL`` refuses an existing file.
-    ``fchmod`` keeps mode 0600 even when the process umask would widen
-    the create mode.
+    ``set -a; . PATH; set +a``. Keys must match
+    ``^[A-Z_][A-Z0-9_]*$``. Without ``force``, ``O_EXCL`` refuses an
+    existing file. ``force`` truncates that file and keeps mode 0600.
+    A missing parent folder raises ``SeedPasswordError``.
     """
     target = path.expanduser()
-    flags = os.O_CREAT | os.O_EXCL | os.O_WRONLY
-    try:
-        descriptor = os.open(str(target), flags, 0o600)
-    except FileExistsError as exc:
-        raise SeedPasswordError(
-            f"Refusing to overwrite secrets file: {target}"
-        ) from exc
+    parent = target.parent
+    if not parent.is_dir():
+        raise SeedPasswordError(f"Secrets file parent folder does not exist: {parent}")
+    for _username, env_name, _password in generated:
+        if not _SECRETS_KEY_RE.fullmatch(env_name):
+            raise SeedPasswordError(f"Invalid secrets-file key: {env_name}")
+    if target.exists() and not force:
+        raise SeedPasswordError(f"Refusing to overwrite secrets file: {target}")
+    if target.exists():
+        flags = os.O_WRONLY | os.O_TRUNC
+        descriptor = os.open(str(target), flags)
+    else:
+        try:
+            descriptor = os.open(str(target), os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+        except FileExistsError as exc:
+            raise SeedPasswordError(
+                f"Refusing to overwrite secrets file: {target}"
+            ) from exc
+        except FileNotFoundError as exc:
+            raise SeedPasswordError(
+                f"Secrets file parent folder does not exist: {parent}"
+            ) from exc
     try:
         os.fchmod(descriptor, 0o600)
         with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
@@ -309,16 +332,19 @@ def write_secrets_file(path: Path, generated: list[tuple[str, str, str]]) -> Non
 def report_generated(
     generated: list[tuple[str, str, str]],
     secrets_out: str | None,
+    *,
+    force: bool = False,
 ) -> None:
     """Tell the operator where passwords went. Streams never include one.
 
-    ``secrets_out`` writes the file. Without it, local runs still print once.
+    ``secrets_out`` writes the file. Stdout is only the path line.
+    Without it, local runs still print once.
     """
     if secrets_out:
         if not generated:
             print(f"No generated passwords. {secrets_out} was not created.")
             return
-        write_secrets_file(Path(secrets_out), generated)
+        write_secrets_file(Path(secrets_out), generated, force=force)
         print(f"Generated passwords written to {secrets_out}")
         return
     print_generated(generated)
@@ -346,8 +372,8 @@ def main(argv: list[str] | None = None) -> int:
         help=(
             "Write generated passwords to this new file (mode 0600) as "
             "KEY=<shlex.quote(value)>. Load with set -a; . PATH; set +a. "
-            "Refuses if the file exists. Stdout prints only the path. "
-            "UAT must use this."
+            "Refuses if the file exists unless --force. Stdout prints "
+            "only the path line. UAT must use this."
         ),
     )
     parser.add_argument(
@@ -358,7 +384,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--force",
         action="store_true",
-        help="Rotate rows that already look changed.",
+        help=(
+            "Rotate rows that already look changed. Overwrite an existing "
+            "--secrets-out file (mode 0600)."
+        ),
     )
     parser.add_argument(
         "--defaults-file",
@@ -381,6 +410,12 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     try:
         if args.apply:
+            if args.secrets_out:
+                dest = Path(args.secrets_out).expanduser()
+                if dest.exists() and not args.force:
+                    raise SeedPasswordError(
+                        f"Refusing to overwrite secrets file: {dest}"
+                    )
             before = user_count(session)
             lines, generated = apply_personas(
                 session, only=only or None, force=args.force, defaults=defaults
@@ -393,15 +428,16 @@ def main(argv: list[str] | None = None) -> int:
             written: Path | None = None
             if args.secrets_out and generated:
                 written = Path(args.secrets_out).expanduser()
-                write_secrets_file(written, generated)
+                write_secrets_file(written, generated, force=args.force)
             try:
                 session.commit()
             except Exception:
-                if written is not None:
+                if written is not None and not args.force:
                     written.unlink(missing_ok=True)
                 raise
+            status = sys.stderr if args.secrets_out else sys.stdout
             for line in lines:
-                print(line)
+                print(line, file=status)
             if args.secrets_out:
                 if written is None:
                     print(f"No generated passwords. {args.secrets_out} was not created.")
