@@ -1,6 +1,6 @@
 # UAT: database roles
 
-Stem: `db-roles`. Migration `0102_migration_role_owner` (revises `0101_revoke_probe_execute`).
+Stem: `db-roles`. Migration `0103_migration_role_owner` (revises `0102_instant_timestamptz`).
 
 The bootstrap superuser (`POSTGRES_USER`) only creates roles and extensions. `lims_migrate` owns application objects and runs Alembic. `lims_app` is the only runtime role.
 

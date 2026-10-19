@@ -1,7 +1,7 @@
 """Move app-object ownership to the non-superuser migration role.
 
-Revision ID: 0102_migration_role_owner
-Revises: 0101_revoke_probe_execute
+Revision ID: 0103_migration_role_owner
+Revises: 0102_instant_timestamptz
 
 ``lims_migrate`` owns the application objects and is the role that runs
 Alembic. It is not a superuser. It has ``BYPASSRLS`` because it owns
@@ -20,17 +20,16 @@ that statement is issued on its own, and only when the actor is a superuser.
 A clean volume already creates objects as ``lims_migrate``, so the ownership
 loop is a no-op there.
 
-Draft PR #191 adds ``0102_instant_timestamptz`` on top of
-``0101_revoke_probe_execute``. That revision has to be renumbered after this
-one merges.
+This revision follows ``0102_instant_timestamptz`` (merged in #191) so
+Alembic has a single head.
 
 Downgrade does not move ownership back and does not grant ``EXECUTE`` again.
 """
 from alembic import op
 from sqlalchemy import text
 
-revision = "0102_migration_role_owner"
-down_revision = "0101_revoke_probe_execute"
+revision = "0103_migration_role_owner"
+down_revision = "0102_instant_timestamptz"
 branch_labels = None
 depends_on = None
 
