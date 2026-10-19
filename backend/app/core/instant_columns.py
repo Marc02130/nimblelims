@@ -1,7 +1,7 @@
 """UTC instant columns versus lab-day columns.
 
 Instant columns hold a moment. They are ``timestamptz``. The migration
-``0099_instant_timestamptz`` reads a naive UTC wall time with
+``0100_instant_timestamptz`` reads a naive UTC wall time with
 ``USING col AT TIME ZONE 'UTC'`` so the instant does not shift.
 
 Calendar columns hold a lab day. They stay ``timestamp without time zone``.

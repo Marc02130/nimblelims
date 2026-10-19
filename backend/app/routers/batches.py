@@ -31,6 +31,7 @@ from app.core.patch_fields import explicit_updates
 from datetime import datetime, timezone
 
 from app.core.lab_time import days_from_today, resolve_lab_timezone
+from app.schemas._dates import store_calendar_day
 from uuid import UUID
 
 router = APIRouter()
@@ -1207,6 +1208,36 @@ def update_batch(
     return build_batch_response(batch, batch_containers)
 
 
+_BATCH_STATUS_LIST = "batch_status"
+_IN_PROCESS_NAME = "in process"
+_COMPLETED_NAME = "completed"
+
+
+def calendar_stamp_for_batch_status(db: Session, status_entry: ListEntry) -> Optional[str]:
+    """Which calendar column a batch_status entry writes.
+
+    ``start`` when the entry name is In Process, ``end`` when it is Completed,
+    otherwise None. The parent list must be named ``batch_status``. The entry
+    id is not compared to a fixed string. ``list_entries.code`` is not used:
+    that column only allows ``positive`` and ``negative``.
+    """
+    from models.list import List as ListModel
+
+    parent = (
+        db.query(ListModel).filter(ListModel.id == status_entry.list_id).one_or_none()
+    )
+    if parent is None or parent.name != _BATCH_STATUS_LIST:
+        return None
+    if status_entry.name is None:
+        return None
+    label = status_entry.name.strip().casefold()
+    if label == _IN_PROCESS_NAME:
+        return "start"
+    if label == _COMPLETED_NAME:
+        return "end"
+    return None
+
+
 @router.patch("/{batch_id}/status", response_model=BatchResponse)
 def update_batch_status(
     batch_id: UUID,
@@ -1233,13 +1264,18 @@ def update_batch_status(
             detail="Invalid status ID"
         )
     
-    # Update status and dates
+    # Update status and dates. Match the batch_status entry's name.
+    # A UUID never equals the strings "in_process" or "completed", so those
+    # comparisons never wrote start_date or end_date.
     batch.status = status_id
-    if status_id == "in_process":  # Assuming this is the "In Process" status
-        batch.start_date = datetime.now(timezone.utc)
-    elif status_id == "completed":  # Assuming this is the "Completed" status
-        batch.end_date = datetime.now(timezone.utc)
-    
+    stamp = calendar_stamp_for_batch_status(db, status_entry)
+    if stamp is not None:
+        lab_day = store_calendar_day(datetime.now(timezone.utc))
+        if stamp == "start":
+            batch.start_date = lab_day
+        elif stamp == "end":
+            batch.end_date = lab_day
+
     batch.modified_by = current_user.id
     batch.modified_at = datetime.now(timezone.utc)
     

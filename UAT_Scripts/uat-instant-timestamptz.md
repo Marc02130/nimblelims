@@ -1,6 +1,6 @@
 # UAT: instant columns are timestamptz
 
-Stack: migration `0099_instant_timestamptz` after `0098_batch_access_status`.
+Stack: migration `0100_instant_timestamptz` after `0099_batch_update_qualifiers`.
 
 ## What changed
 

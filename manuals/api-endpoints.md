@@ -770,6 +770,13 @@ Containers in the batch, with each content's `sample_id`, `sample_name`, `qc_typ
 
 **Requires:** `batch:read`. **403** / **404** as on `GET /batches/{id}`. A container the caller cannot read is left out of the list.
 
+### PATCH /batches/{id}/status?status_id={uuid}
+Set the batch status. **Requires** `batch:update`.
+
+`status_id` is a `list_entries` id. When that entry belongs to the list named `batch_status` and its name is `In Process` (any case), `start_date` becomes naive midnight of the lab's calendar day. When the name is `Completed`, `end_date` becomes that midnight. Any other name, including the same words on a different list, does not write those columns. The entry id is not compared to the strings `in_process` or `completed`. `list_entries.code` is not used for this; that column only allows `positive` and `negative`.
+
+Migration 0099 grants `batch:update` to Administrator, Lab Manager, and Lab Technician, the same roles that already have `batch:manage`. Client and Configuration Editor do not receive it. `batch:delete` is unchanged.
+
 ### GET /batches/{id}/tests
 Active tests for samples in those containers. Returns a JSON array (`id`, `name`, `status`, `analysis_id`, `sample_id`), not the paginated `/tests` envelope. An empty batch the caller can see returns `[]`.
 
@@ -2513,7 +2520,7 @@ Curve Curator counts for one run. **Requires** `experiment:manage`.
 
 A fit treats a sample as a positive or negative control only when `samples.qc_type` points at a list entry whose `code` is `positive` or `negative`. The entry's display name is not used. Seed rows `Positive Control` and `Negative Control` on `qc_types` are backfilled with those codes. Renaming the entry leaves the code in place. A missing control is **422** `detail.code` `missing_positive_control` or `missing_negative_control`, with `detail.message` naming the code the QC type needs. The curve SVG uses the same codes and still draws an un-normalized plot when a control is absent.
 
-Result qualifiers are the list `result_qualifiers` (`GET /lists/result_qualifiers/entries`). `GET /lists/qualifiers/entries` is **404**. Enter Results loads `result_qualifiers`.
+Result qualifiers are the list `result_qualifiers` (`GET /lists/result_qualifiers/entries`). `GET /lists/qualifiers/entries` is **404**. Enter Results loads `result_qualifiers`. Migration 0099 moves `<LOD` and `ND` off the inactive list `Result Qualifiers` onto `result_qualifiers` and keeps their ids. A whole-run dose-response fit marks every earlier fit on that run superseded, so each compound has one live (`superseded_by` null) result. A single-compound refit supersedes only that compound.
 
 ### GET /v1/lims-runs/{id}/promotion/preview
 Dry-run of what publish would write to existing Tests/Results when `analysis_id` is set. **No DB writes and no Test creation.**

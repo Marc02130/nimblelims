@@ -84,7 +84,9 @@ def analyte_by_name(session, name: str) -> Analyte:
 def list_entry(session, list_name: str, entry_name: str) -> ListEntry:
     """Look up a seeded entry. Migration 0007 normalized core list names to
     snake_case ("Sample Status" -> "sample_status") while later seeds (0060)
-    use display names, so accept either spelling."""
+    use display names, so accept either spelling. Migration 0099 moves
+    <LOD and ND onto result_qualifiers; "Result Qualifiers" still matches
+    that slug, and the entry is only on one of the two lists."""
     names = {list_name, list_name.strip().lower().replace(" ", "_")}
     return (
         session.query(ListEntry)

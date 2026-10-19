@@ -151,6 +151,8 @@ Created → In Process → Completed
 
 **Note**: Status transitions are not enforced by the system; any status can be set at any time.
 
+`PATCH /batches/{id}/status` requires `batch:update` (Administrator, Lab Manager, and Lab Technician). Choosing the `batch_status` entry named **In Process** stores `start_date` as naive midnight of the lab's calendar day. **Completed** stores `end_date` the same way. The match is the entry's name on the `batch_status` list.
+
 ## Batch Types
 
 Batch types are configured via the `batch_types` list. Common types include:

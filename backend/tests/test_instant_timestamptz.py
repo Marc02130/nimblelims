@@ -29,7 +29,7 @@ from models.base import Base
 
 BACKEND = Path(__file__).resolve().parents[1]
 REPO = BACKEND.parent
-BEFORE = "0098_batch_access_status"
+BEFORE = "0099_batch_update_qualifiers"
 NAIVE = datetime(2020, 1, 15, 19, 23)
 _IDENT = re.compile(r"^[a-z_][a-z0-9_]*$")
 
