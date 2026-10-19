@@ -10,7 +10,7 @@ Catalog + seed notes for atomic receive UAT and pytest.
 
 Seeded BioTech entities come from migration **0058** (clients, users, projects, lists, analyses, analytes, container types). Migration **0059** seeds lifecycle samples **with aliquots / `parent_sample_id`** — those rows are **not** receive fixtures. CORE receive uses **payloads + live receive API**.
 
-Migration **0060** adds missing **Test Status** (`Assigned/Pending`) and **Result Qualifiers** (`<LOD`, `ND`) when needed. Assigned/Pending is for **later explicit add-test**, not for receive.
+Migration **0060** adds missing **Test Status** (`Assigned/Pending`) and **Result Qualifiers** (`<LOD`, `ND`) when needed. Assigned/Pending is for **later explicit add-test**, not for receive. Migration **0099** moves `<LOD` and `ND` onto `result_qualifiers` and marks the `Result Qualifiers` list inactive. It does not delete either list or those entries.
 
 ---
 

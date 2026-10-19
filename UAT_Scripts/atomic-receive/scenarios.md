@@ -28,7 +28,7 @@ Lookups (0058, resolve by name at runtime — list names are slugs after 0007):
 | analyte cell count | `Total Cell Count` | `analytes` (`analyte-cell-count`, `units_default` NULL) |
 | sample status | `Available for Testing` | `sample_status` (`11111111-…`) |
 | test status | `Assigned/Pending` | `test_status` (`22222222-…`, seeded by **0060**) — used only after explicit add-test |
-| qualifiers | `<LOD`, `ND` | `Result Qualifiers` (seeded by **0060**) |
+| qualifiers | `<LOD`, `ND` | Seeded on `Result Qualifiers` by **0060**. Migration **0099** moves those entries onto `result_qualifiers` and marks `Result Qualifiers` inactive. The entry ids stay the same. |
 | default tube | `Cryovial (2mL)` | `container_types` (`ctype-001-cryovial`) |
 
 Default tube: Cryovial (2mL). Receive UI does not preselect a tube and does not offer analyses.

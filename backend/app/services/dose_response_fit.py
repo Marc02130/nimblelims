@@ -278,7 +278,7 @@ class DoseResponseFitService:
         for row in test_data_rows:
             if str(row.id) in excluded_data_ids:
                 continue
-            if sample_id_filter and row.sample_id != sample_id_filter:
+            if sample_id_filter is not None and row.sample_id != sample_id_filter:
                 continue
 
             well_def = well_def_by_pos.get(row.well_position or "")
@@ -394,19 +394,18 @@ class DoseResponseFitService:
         now = datetime.now(timezone.utc)
         client_id = self.current_user.client_id
 
-        # Supersede old results for re-fit case
-        if sample_id_filter:
-            old_results = (
-                self.db.query(DoseResponseResult)
-                .filter(
-                    DoseResponseResult.lims_run_id == run.id,
-                    DoseResponseResult.sample_id == sample_id_filter,
-                    DoseResponseResult.superseded_by.is_(None),
-                )
-                .all()
+        # Supersede every live fit this call replaces. A whole-run fit
+        # (no sample filter) must leave one live row per compound. A
+        # single-compound refit supersedes only that compound.
+        old_query = self.db.query(DoseResponseResult).filter(
+            DoseResponseResult.lims_run_id == run.id,
+            DoseResponseResult.superseded_by.is_(None),
+        )
+        if sample_id_filter is not None:
+            old_query = old_query.filter(
+                DoseResponseResult.sample_id == sample_id_filter
             )
-        else:
-            old_results = []
+        old_results = old_query.all()
 
         new_rows = []
         for r_res in r_results:
@@ -421,9 +420,10 @@ class DoseResponseFitService:
                 if row2.sample_id == sid and str(row2.id) in excluded_data_ids
             )
 
-            # Determine fit_version
-            prior = next((o for o in old_results if o.sample_id == sid), None)
-            fit_version = (prior.fit_version + 1) if prior else 1
+            # Every live row for this compound is superseded, not only the first.
+            priors = [o for o in old_results if o.sample_id == sid]
+            versions = [p.fit_version for p in priors if p.fit_version is not None]
+            fit_version = (max(versions) + 1) if len(versions) > 0 else 1
 
             new_row = DoseResponseResult(
                 lims_run_id = run.id,
@@ -448,7 +448,7 @@ class DoseResponseFitService:
                 fit_triggered_by  = self.current_user.id,
                 client_id         = client_id,
             )
-            new_rows.append((new_row, prior))
+            new_rows.append((new_row, priors))
 
             if r_res.get("success"):
                 fitted += 1
@@ -461,11 +461,11 @@ class DoseResponseFitService:
                 "potency":        r_res.get("potency"),
             })
 
-        # Atomic write: add all new rows, link superseded rows
-        for new_row, prior in new_rows:
+        # Atomic write: add all new rows, link every superseded row
+        for new_row, priors in new_rows:
             self.db.add(new_row)
             self.db.flush()  # get new_row.id
-            if prior:
+            for prior in priors:
                 prior.superseded_by = new_row.id
 
         self.db.commit()
