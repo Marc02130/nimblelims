@@ -1,21 +1,10 @@
-"""Why a cross-client batch GET is still 404.
+"""batches_access is unchanged. Existence is a separate probe.
 
-batches_access hides a batch the caller cannot reach through
-has_project_access, and FORCE ROW LEVEL SECURITY applies to lims_app.
-The handler's 403 branch runs only after that query returns the row, so it
-never runs for another client's batch.
-
-Seeing existence and the owning client, without the batch's other columns,
-needs one of: a SECURITY DEFINER function, a new RLS policy, or a grant to a
-role that bypasses RLS. This change does none of those. The four cases
-(cross-client 403, unknown id 404, own client 200, mixed batch still filtered)
-are not automated here for that reason.
-
-Sibling routes that 404 the same way: GET /batches/{id},
-GET /batches/{id}/containers, GET /batches/{id}/tests,
-POST /batches/{id}/containers, PATCH /batches/{id},
-PATCH /batches/{id}/status, DELETE /batches/{id},
-and removing a container from the batch.
+The policy still hides a batch the caller cannot reach through
+has_project_access, and FORCE ROW LEVEL SECURITY still applies.
+batch_access_status is the only security-definer function whose name
+contains batch. It returns a status word, not the owner. The HTTP cases
+live in test_batch_access_status_rls.py.
 """
 from sqlalchemy import text
 
@@ -33,14 +22,15 @@ def test_batch_policy_hides_rows_the_caller_cannot_access(migrated_engine):
         ).scalar()
         definers = conn.execute(
             text(
-                "SELECT count(*) FROM pg_proc "
-                "WHERE prosecdef AND proname ILIKE '%batch%'"
+                "SELECT proname FROM pg_proc "
+                "WHERE prosecdef AND proname ILIKE '%batch%' "
+                "ORDER BY proname"
             )
-        ).scalar()
+        ).fetchall()
     assert policy is not None
     assert "has_project_access" in policy
     assert forced is True
-    assert definers == 0
+    assert [row[0] for row in definers] == ["batch_access_status"]
 
 
 def test_seed_qc_codes_and_qualifier_list_name(migrated_engine):

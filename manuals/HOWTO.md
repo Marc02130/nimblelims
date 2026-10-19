@@ -182,7 +182,7 @@ P1 does not instantiate a process from requested analysis. Classic `/tests` can 
 
 ## Later results
 
-Classic path: **Results** (`/results`) — type a number on an existing Test (batch grid). Unit from `analytes.units_default` when that lock is enforced; missing unit is a later persist-packet **422**, not a receive rule. The Qualifiers dropdown reads `GET /lists/result_qualifiers/entries`. There is no list named `qualifiers`.
+Classic path: **Results** (`/results`) — type a number on an existing Test (batch grid). Unit from `analytes.units_default` when that lock is enforced; missing unit is a later persist-packet **422**, not a receive rule. Opening another client's batch (`GET /batches/{id}`, its containers, or its tests) is **403** `batch_forbidden` with a generic message. A batch id that does not exist is **404**. A mixed-client batch still lists only the caller's containers and tests. The Qualifiers dropdown reads `GET /lists/result_qualifiers/entries`. There is no list named `qualifiers`.
 
 Dose-response controls are the sample's QC type **code**, not the label on screen. `positive` and `negative` are the only codes. Stock entries are named Positive Control and Negative Control; a lab can rename them. A fit with neither role present is **422** `missing_positive_control` or `missing_negative_control`.
 
