@@ -17,5 +17,6 @@ That disagrees with the earlier reading that seeded `utcnow()` values are UTC wa
 5. A QC sample created with a batch has `received_date` equal to the lab's today.
 6. Batch and project forms submit `YYYY-MM-DD` from the picker. They do not call `toISOString()`.
 7. Reagent `used_on` and lot dates stay SQL `date`. Instant columns are unchanged.
+8. `GET` responses for those lab-day fields are `YYYY-MM-DD`, not `YYYY-MM-DDT00:00:00`. `POST /projects` stores `due_date` the same way `PATCH` does, for a date-only body and for an offset body.
 
 Automated coverage: `backend/tests/test_calendar_date_columns.py`, `backend/tests/test_date_only_lab_day.py`, `backend/tests/test_batch_status_calendar.py`, `frontend/src/__tests__/localDate.test.ts`.

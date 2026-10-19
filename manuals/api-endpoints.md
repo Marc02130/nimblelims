@@ -35,7 +35,7 @@
 
 ## Timestamps
 
-Instant fields (`created_at`, `modified_at`, `started_at`, `completed_at`, `published_at`, `canceled_at`, `last_login`, `last_fit_at`, and the other audit clocks) are `timestamptz`. The API sends them as UTC and the value ends in `Z` or an explicit offset. Screens show them in the browser's local time. Calendar dates (`received_date`, `report_date`, `due_date`, `test_date`, `review_date`, `entry_date`, `date_sampled`, `start_date`, `end_date`) are SQL `date` lab days and are not given a timezone. An offset-bearing value is converted to the lab-zone calendar day on input. A naive value, including one that is not midnight, is lab-zone wall time, so the stored day is its date part. `due_date` and `date_sampled` are not future-capped. Batch `start_date` and `end_date` follow the same rule, and a later lab day is allowed for scheduling. Project `start_date` and `due_date` normalize the same way. `used_on` and the reagent lot dates were already SQL `date`. Future-day checks (`received_date`, `report_date`, `test_date`, `review_date`, `entry_date`, temperature bounds, and the other input rules) run on create and update bodies only. Response models do not re-run them, so a stored date that is "future" after a lab-zone change still returns **200** from `GET /samples`, `GET /tests`, `GET /results`, and the matching detail routes.
+Instant fields (`created_at`, `modified_at`, `started_at`, `completed_at`, `published_at`, `canceled_at`, `last_login`, `last_fit_at`, and the other audit clocks) are `timestamptz`. The API sends them as UTC and the value ends in `Z` or an explicit offset. Screens show them in the browser's local time. Calendar dates (`received_date`, `report_date`, `due_date`, `test_date`, `review_date`, `entry_date`, `date_sampled`, `start_date`, `end_date`) are SQL `date` lab days and are not given a timezone. Responses send them as `YYYY-MM-DD`. An offset-bearing value is converted to the lab-zone calendar day on input. A naive value, including one that is not midnight, is lab-zone wall time, so the stored day is its date part. `due_date` and `date_sampled` are not future-capped. Batch `start_date` and `end_date` follow the same rule, and a later lab day is allowed for scheduling. Project `start_date` and `due_date` normalize the same way. `used_on` and the reagent lot dates were already SQL `date`. Future-day checks (`received_date`, `report_date`, `test_date`, `review_date`, `entry_date`, temperature bounds, and the other input rules) run on create and update bodies only. Response models do not re-run them, so a stored date that is "future" after a lab-zone change still returns **200** from `GET /samples`, `GET /tests`, `GET /results`, and the matching detail routes.
 
 ## Authentication
 
@@ -533,7 +533,8 @@ List projects accessible to the current user with optional filtering and paginat
       "id": "uuid",
       "name": "Project Name",
       "description": "Project description",
-      "start_date": "2025-01-01T00:00:00Z",
+      "start_date": "2025-01-01",
+      "due_date": "2025-12-31",
       "client_id": "uuid",
       "client_project_id": "uuid",
       "status": "uuid",
