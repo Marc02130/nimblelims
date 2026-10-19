@@ -26,6 +26,7 @@ This document contains User Acceptance Testing (UAT) scripts for batch creation 
   - Projects with `due_date` values (for due date inheritance)
 - Test user accounts:
   - Lab Technician with `batch:manage` permission and access to multiple projects
+- A client user opening another client's batch (`GET /batches/{id}`, `/containers`, or `/tests`) still receives **404**. Row-level security hides the row, so the handler cannot tell existence from absence without a new database privilege. An unknown id is also **404**. The caller's own batch is **200**. A mixed-client batch still returns only the rows that policy already allows.
 
 ---
 

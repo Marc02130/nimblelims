@@ -209,7 +209,7 @@ Review and approve test results, updating test status to "Complete" and sample s
 | 3 | **Review Results** | |
 | 3.1 | Verify all required analytes have results | Results displayed for all required analytes |
 | 3.2 | Check result values against expected ranges | Values within configured ranges |
-| 3.3 | Review qualifiers and notes | Qualifiers and notes visible (if applicable) |
+| 3.3 | Review qualifiers and notes | Qualifiers dropdown lists entries from `GET /lists/result_qualifiers/entries` (not `/lists/qualifiers/entries`, which is 404). Notes visible when present |
 | 3.4 | Verify calculations (if applicable) | Calculated results displayed (post-MVP) |
 | 4 | **Approve Test** | |
 | 4.1 | Click "Approve" or "Mark Complete" button | Review dialog or confirmation appears |
