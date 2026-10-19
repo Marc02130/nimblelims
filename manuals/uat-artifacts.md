@@ -42,7 +42,7 @@ python scripts/scan_uat_evidence.py /path/to/evidence --secrets-file PATH
 
 `--secrets-file` is the `--secrets-out` file for the round. The scan also reads `POSTGRES_PASSWORD`, `LIMS_MIGRATE_PASSWORD`, `LIMS_APP_PASSWORD`, `SECRET_KEY`, and `DEV_SEED_*` / `SLICE_*` password variables from the environment.
 
-The default reviewed allowlist is [`scripts/uat_evidence_allowlist.json`](../scripts/uat_evidence_allowlist.json). Each entry is a concrete path plus either a line number or a file SHA-256, with `approved_by` and `date`. There is no allow-by-extension. Changed bytes no longer match. Pass `--allowlist PATH` to use another file, or `--no-allowlist` to scan with none.
+The default reviewed allowlist is [`scripts/uat_evidence_allowlist.json`](../scripts/uat_evidence_allowlist.json). Each entry is an exact path relative to the evidence folder (normalized, no `..`, no absolute path) plus either a line number or a file SHA-256, with `reviewed_by`, `approved_by`, and `date`. A hit is suppressed only when that same scanned file's own SHA-256 equals the entry hash. Tar members are separate paths (`archive.tar!ui/name.png`). A file entry never covers a member, and a member entry never covers a file. There is no allow-by-extension. Changed bytes no longer match. Pass `--allowlist PATH` to use another file, or `--no-allowlist` to scan with none.
 
 The scan refuses (exit 1, list of hits) on:
 

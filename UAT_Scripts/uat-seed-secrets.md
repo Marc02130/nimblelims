@@ -57,16 +57,18 @@ The filter replaces the entire next line with `[redacted]`. It exits non-zero wh
 python scripts/scan_uat_evidence.py /path/to/evidence
 ```
 
-Expect exit 0 and `evidence scan clean`. The default reviewed allowlist is `scripts/uat_evidence_allowlist.json` (path plus line or SHA-256, never by extension). A non-zero exit lists hits and the folder is not shared. Hits are a `printed once` header in any case, a 24-character mixed pool-token window (`_` and `-` count as symbols), a configured compose or seed secret, a bcrypt marker, a `.dump` / `.dump.gz` / `PGDMP` dump, nested gzip/zlib/tar payloads, or a binary that is not on that allowlist.
+Expect exit 0 and `evidence scan clean`. The default reviewed allowlist is `scripts/uat_evidence_allowlist.json` (exact evidence-relative path plus line or SHA-256, never by extension or path suffix). Tar members need their own entries (`archive.tar!ui/name.png`). A non-zero exit lists hits and the folder is not shared. Hits are a `printed once` header in any case, a 24-character mixed pool-token window (`_` and `-` count as symbols), a configured compose or seed secret, a bcrypt marker, a `.dump` / `.dump.gz` / `PGDMP` dump, nested gzip/zlib/tar payloads, or a binary that is not on that allowlist.
 
 ## TC-SECRETS-003 — Reviewed allowlist and r38 clean lines
 
 1. Scan `backend/tests/data/r38_clean_lines.txt` in a folder with `--no-allowlist`. Expect exit 0.
 2. Copy that file, inject a runtime-generated pool password, and scan again with `--no-allowlist`. Expect a pool-token hit. The password must not appear in the hit text.
-3. Confirm `scripts/uat_evidence_allowlist.json` lists these two SHA-256 entries, each with `approved_by` and `date`:
+3. Confirm `scripts/uat_evidence_allowlist.json` lists these two SHA-256 entries, each with non-empty `reviewed_by`, `approved_by`, and `date`:
    - `ui/r38_results_America_New_York.png`
    - `ui/r38_results_UTC.png`
 4. Changing one byte of an allowlisted file must make the entry stop matching.
+5. `other/ui/r38_results_UTC.png` with a runtime-generated pool token must still be reported when only `ui/r38_results_UTC.png` is allowlisted.
+6. A tar member named `ui/r38_results_UTC.png` with a runtime-generated pool token must still be reported when only the loose file path is allowlisted.
 
 ## Sign-off
 
