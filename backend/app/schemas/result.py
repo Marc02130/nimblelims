@@ -34,7 +34,7 @@ class ResultCreate(ResultBase):
     Entry-date checks run on create, update, and batch entry, not on read.
     """
 
-    @validator('entry_date')
+    @validator('entry_date', always=True)
     def validate_entry_date(cls, v):
         if v is not None and is_future(v):
             raise ValueError('Entry date cannot be in the future')
