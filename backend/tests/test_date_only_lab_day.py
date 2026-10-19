@@ -310,10 +310,13 @@ def test_offset_bearing_values_still_convert(monkeypatch):
     aware_tomorrow = datetime(2026, 10, 19, 16, 0, tzinfo=timezone.utc)
     assert lab_time.as_calendar_day(aware_tomorrow, "America/New_York") == date(2026, 10, 19)
     assert is_future(aware_tomorrow) is True
-    # A non-midnight naive value is still UTC wall time.
+    # F12: a non-midnight naive value is lab-zone wall time, not UTC wall time.
+    # datetime(2026, 10, 19, 2, 0) used to be 2026-10-18 in America/New_York
+    # because 02:00 was read as UTC. Seeded utcnow() rows are still UTC wall
+    # time; the date migration keeps their date part instead of shifting them.
     naive_evening = datetime(2026, 10, 19, 2, 0)
-    assert lab_time.as_calendar_day(naive_evening, "America/New_York") == date(2026, 10, 18)
-    assert is_future(naive_evening) is False
+    assert lab_time.as_calendar_day(naive_evening, "America/New_York") == date(2026, 10, 19)
+    assert is_future(naive_evening) is True
     stored_midnight = datetime(2026, 10, 19, 0, 0)
     assert lab_time.as_calendar_day(stored_midnight, "America/New_York") == date(2026, 10, 19)
     assert lab_time.days_from_today(stored_midnight, "America/New_York") == 1
@@ -494,13 +497,12 @@ def _stored_and_get(client, headers, db_session, world, path, response):
 
 
 def _assert_lab_midnight(stored, fetched, field):
-    assert stored == _LAB_DAY, stored
-    assert stored.tzinfo is None
+    assert stored == date(2026, 10, 19), stored
     assert lab_time.days_from_today(stored, "America/New_York") == 0
     assert fetched.status_code == 200, fetched.text
     text = fetched.json()[field]
-    assert text.startswith("2026-10-19T00:00:00"), text
-    assert "Z" not in text
+    assert text.startswith("2026-10-19"), text
+    assert not text.endswith("Z")
     assert "+" not in text
 
 
@@ -575,10 +577,8 @@ def test_due_and_sampled_offsets_count_as_the_lab_day(
     assert written.status_code == 200, written.text
     db_session.expire_all()
     sample = db_session.query(Sample).filter(Sample.id == world["sample"].id).one()
-    assert sample.due_date == _LAB_DAY
-    assert sample.due_date.tzinfo is None
-    assert sample.date_sampled == _LAB_DAY
-    assert sample.date_sampled.tzinfo is None
+    assert sample.due_date == date(2026, 10, 19)
+    assert sample.date_sampled == date(2026, 10, 19)
     assert lab_time.days_from_today(sample.due_date, "America/New_York") == 0
     eligible = client.get(
         "/samples/eligible",
@@ -593,7 +593,7 @@ def test_due_and_sampled_offsets_count_as_the_lab_day(
     assert row["days_until_expiration"] == 1, row
     detail = client.get(f"/samples/{sample.id}", headers=headers)
     assert detail.status_code == 200, detail.text
-    assert detail.json()["due_date"].startswith("2026-10-19T00:00:00")
+    assert detail.json()["due_date"].startswith("2026-10-19")
 
 
 def test_batch_dates_store_the_lab_day_and_allow_a_later_day(
@@ -611,15 +611,13 @@ def test_batch_dates_store_the_lab_day_and_allow_a_later_day(
     assert today.status_code == 200, today.text
     db_session.expire_all()
     batch = db_session.query(Batch).filter(Batch.id == batch_id).one()
-    assert batch.start_date == _LAB_DAY
-    assert batch.start_date.tzinfo is None
-    assert batch.end_date == _LAB_DAY
-    assert batch.end_date.tzinfo is None
+    assert batch.start_date == date(2026, 10, 19)
+    assert batch.end_date == date(2026, 10, 19)
     assert lab_time.days_from_today(batch.start_date, "America/New_York") == 0
     detail = client.get(f"/batches/{batch_id}", headers=headers)
     assert detail.status_code == 200, detail.text
-    assert detail.json()["start_date"].startswith("2026-10-19T00:00:00")
-    assert detail.json()["end_date"].startswith("2026-10-19T00:00:00")
+    assert detail.json()["start_date"].startswith("2026-10-19")
+    assert detail.json()["end_date"].startswith("2026-10-19")
     later = client.patch(
         f"/batches/{batch_id}",
         json={"start_date": "2026-10-21T00:00:00Z", "end_date": "2026-11-01"},
@@ -628,10 +626,8 @@ def test_batch_dates_store_the_lab_day_and_allow_a_later_day(
     assert later.status_code == 200, later.text
     db_session.expire_all()
     batch = db_session.query(Batch).filter(Batch.id == batch_id).one()
-    assert batch.start_date == datetime(2026, 10, 20, 0, 0)
-    assert batch.start_date.tzinfo is None
-    assert batch.end_date == datetime(2026, 11, 1, 0, 0)
-    assert batch.end_date.tzinfo is None
+    assert batch.start_date == date(2026, 10, 20)
+    assert batch.end_date == date(2026, 11, 1)
     unchanged = client.patch(
         f"/batches/{batch_id}",
         json={"start_date": "2026-11-01T00:00:00"},
@@ -640,7 +636,7 @@ def test_batch_dates_store_the_lab_day_and_allow_a_later_day(
     assert unchanged.status_code == 200, unchanged.text
     db_session.expire_all()
     batch = db_session.query(Batch).filter(Batch.id == batch_id).one()
-    assert batch.start_date == datetime(2026, 11, 1, 0, 0)
+    assert batch.start_date == date(2026, 11, 1)
 
 
 def test_store_calendar_day_leaves_naive_and_none(monkeypatch):
@@ -648,11 +644,11 @@ def test_store_calendar_day_leaves_naive_and_none(monkeypatch):
     lab_time.remember_lab_zone("America/New_York")
     assert store_calendar_day(None) is None
     naive_midnight = datetime(2026, 10, 19, 0, 0)
-    assert store_calendar_day(naive_midnight) is naive_midnight
+    assert store_calendar_day(naive_midnight) == naive_midnight
     naive_noon = datetime(2026, 10, 19, 12, 0)
-    assert store_calendar_day(naive_noon) is naive_noon
+    assert store_calendar_day(naive_noon) == naive_midnight
     plain = date(2026, 10, 19)
-    assert store_calendar_day(plain) is plain
+    assert store_calendar_day(plain) == naive_midnight
     aware = datetime(2026, 10, 20, 0, 0, tzinfo=timezone.utc)
     stored = store_calendar_day(aware)
     assert stored == _LAB_DAY

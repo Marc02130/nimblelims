@@ -37,6 +37,8 @@ Bring the stack up and log in. Do not duplicate setup here.
 
 Need `sample:create` for Receive. Need `test:assign` plus project access for requested analysis and the later Route action. Client role cannot receive, write asked-for, or Route; those writes return **403**, not 404. Route does **not** require `experiment:manage`.
 
+Received, due, test, review, report, entry, sampled, and batch or project start and end dates are calendar days (`YYYY-MM-DD`). A date picked on the batch or project form is that local day. It is not sent through UTC. A time that is still today in the lab is accepted after UTC has rolled to the next day.
+
 ---
 
 ## 2. Accession (receive)

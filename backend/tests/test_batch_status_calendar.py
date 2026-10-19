@@ -1,5 +1,5 @@
 """PATCH /batches/{id}/status writes a lab-day midnight from the status name."""
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from uuid import uuid4
 
 import pytest
@@ -107,8 +107,7 @@ def test_status_name_writes_lab_day_midnight(
     )
     assert started.status_code == 200, started.text
     db_session.refresh(batch)
-    assert batch.start_date == datetime(2026, 10, 18, 0, 0)
-    assert batch.start_date.tzinfo is None
+    assert batch.start_date == date(2026, 10, 18)
     assert batch.end_date is None
     assert batch.status == in_process.id
 
@@ -119,9 +118,8 @@ def test_status_name_writes_lab_day_midnight(
     )
     assert finished.status_code == 200, finished.text
     db_session.refresh(batch)
-    assert batch.end_date == datetime(2026, 10, 18, 0, 0)
-    assert batch.end_date.tzinfo is None
-    assert batch.start_date == datetime(2026, 10, 18, 0, 0)
+    assert batch.end_date == date(2026, 10, 18)
+    assert batch.start_date == date(2026, 10, 18)
 
     other = _batch(db_session, user_id)
     decoy_response = client.patch(

@@ -15,9 +15,28 @@ export const localDateString = (now: Date = new Date(), timeZone?: string): stri
 
 /** YYYY-MM-DD prefix of a stored date, or '' when there is nothing to show. */
 export const calendarDateInput = (value: unknown): string => {
+  if (value instanceof Date) {
+    if (Number.isNaN(value.getTime())) return '';
+    return localDateString(value);
+  }
   if (typeof value !== 'string' || value === '') return '';
   const match = /^(\d{4}-\d{2}-\d{2})/.exec(value);
   return match ? match[1] : '';
+};
+
+/** A picker Date for a calendar day. `new Date("YYYY-MM-DD")` is UTC midnight. */
+export const parseCalendarDate = (value: unknown): Date | null => {
+  const day = calendarDateInput(value);
+  if (day === '') return null;
+  const [year, month, date] = day.split('-').map(Number);
+  if (!year || !month || !date) return null;
+  return new Date(year, month - 1, date);
+};
+
+/** The picker day as YYYY-MM-DD. Never `toISOString()`. */
+export const formatCalendarDate = (value: Date | null | undefined): string | null => {
+  if (value == null || Number.isNaN(value.getTime())) return null;
+  return localDateString(value);
 };
 
 const HAS_OFFSET = /(?:Z|[+-]\d{2}:\d{2})$/;

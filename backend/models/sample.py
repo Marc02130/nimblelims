@@ -4,6 +4,7 @@ from sqlalchemy import (
     Boolean,
     CheckConstraint,
     Column,
+    Date,
     DateTime,
     ForeignKey,
     Numeric,
@@ -20,11 +21,11 @@ class Sample(BaseModel):
     __tablename__ = "samples"
 
     # Sample-specific fields
-    due_date = Column(DateTime)
-    received_date = Column(DateTime)
-    report_date = Column(DateTime)
+    due_date = Column(Date)
+    received_date = Column(Date)
+    report_date = Column(Date)
     date_sampled = Column(
-        DateTime, nullable=True
+        Date, nullable=True
     )  # When sample was collected (for expiration calc)
     sample_type = Column(
         PostgresUUID(as_uuid=True), ForeignKey("list_entries.id"), nullable=False

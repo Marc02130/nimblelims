@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, DateTime, ForeignKey, Boolean
+from sqlalchemy import Column, String, Date, DateTime, ForeignKey, Boolean
 from sqlalchemy.dialects.postgresql import UUID as PostgresUUID, JSONB
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -12,8 +12,8 @@ class Test(BaseModel):
     sample_id = Column(PostgresUUID(as_uuid=True), ForeignKey('samples.id'), nullable=False)
     analysis_id = Column(PostgresUUID(as_uuid=True), ForeignKey('analyses.id'), nullable=False)
     status = Column(PostgresUUID(as_uuid=True), ForeignKey('list_entries.id'), nullable=False)
-    review_date = Column(DateTime)
-    test_date = Column(DateTime)
+    review_date = Column(Date)
+    test_date = Column(Date)
     technician_id = Column(PostgresUUID(as_uuid=True), ForeignKey('users.id'))
     custom_attributes = Column(JSONB, nullable=True, server_default='{}')
     asked_for_params = Column(JSONB, nullable=True)
