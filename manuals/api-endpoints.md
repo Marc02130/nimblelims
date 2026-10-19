@@ -761,17 +761,19 @@ Or if incompatible:
 ### GET /batches/{id}
 Get batch details with containers.
 
-**Requires:** `batch:read` permission
+**Requires:** `batch:read`. A missing or inactive batch is **404** `Batch not found`. A batch that exists but this session cannot see under `batches_access` is **403** `{"code":"batch_forbidden","message":"Access denied"}`. That body has no client id, client name, batch name, or batch contents. The same **403** / **404** applies to `GET /batches/{id}/containers`, `GET /batches/{id}/tests`, `POST /batches/{id}/containers`, `PATCH /batches/{id}`, `PATCH /batches/{id}/status`, `DELETE /batches/{id}`, and `DELETE /batches/{id}/containers/{container_id}`.
+
+The check is `batch_access_status(batch_id)`, a `SECURITY DEFINER` function owned by the migration role (that role bypasses row security). It reads `app.current_user_id`, the same session setting as `current_user_id()`. It returns only `not_found`, `forbidden`, or `visible`. It does not take a client id and does not return one. `EXECUTE` is revoked from `PUBLIC` and granted only to `lims_app`. No batch policy is loosened and no extra table grant is added. After the status is `visible`, containers, contents, and tests still go through their own policies, so a mixed-client batch returns only the caller's rows.
 
 ### GET /batches/{id}/containers
-Containers in the batch, with each content's `sample_id`, `sample_name`, `qc_type`, and `sample.qc_type`. Enter Results uses this list. An empty batch returns `[]`.
+Containers in the batch, with each content's `sample_id`, `sample_name`, `qc_type`, and `sample.qc_type`. Enter Results uses this list. An empty batch the caller can see returns `[]`.
 
-**Requires:** `batch:read`. A caller whose client does not own the batch's projects is **403**. A missing batch is **404**. Row-level security still hides samples the caller cannot see.
+**Requires:** `batch:read`. **403** / **404** as on `GET /batches/{id}`. A container the caller cannot read is left out of the list.
 
 ### GET /batches/{id}/tests
-Active tests for samples in those containers. Returns a JSON array (`id`, `name`, `status`, `analysis_id`, `sample_id`), not the paginated `/tests` envelope. An empty batch returns `[]`.
+Active tests for samples in those containers. Returns a JSON array (`id`, `name`, `status`, `analysis_id`, `sample_id`), not the paginated `/tests` envelope. An empty batch the caller can see returns `[]`.
 
-**Requires:** `batch:read`. Same **403** / **404** rules as the containers route. Test rows are still filtered by the tests access policy.
+**Requires:** `batch:read`. **403** / **404** as on `GET /batches/{id}`. Test rows are still filtered by the tests access policy.
 
 ### POST /batches/{id}/containers
 Add container to existing batch.

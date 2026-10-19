@@ -182,7 +182,7 @@ P1 does not instantiate a process from requested analysis. Classic `/tests` can 
 
 ## Later results
 
-Classic path: **Results** (`/results`) — type a number on an existing Test (batch grid). Unit from `analytes.units_default` when that lock is enforced; missing unit is a later persist-packet **422**, not a receive rule.
+Classic path: **Results** (`/results`) — type a number on an existing Test (batch grid). Unit from `analytes.units_default` when that lock is enforced; missing unit is a later persist-packet **422**, not a receive rule. Opening another client's batch (`GET /batches/{id}`, its containers, or its tests) is **403** `batch_forbidden` with a generic message. A batch id that does not exist is **404**. A mixed-client batch still lists only the caller's containers and tests.
 
 The WO-7 lock puts Test selection/creation and the params freeze on the **first LimsRun start** for the asked-for analysis — **not** on receive, Route, or work-order Start. Freeze skip NULL is **Tobias Pass** on `bf51b19`. `{}` on `99b692d3` stays `8cfa2a9` history. `if test: continue` is **not** a freeze. Do **not** teach skip-on-`{}` on the old default. **OQ-WO-6 extract CLOSED** for the common path. Extract is typically a process. **OQ-WO-7 Closed** (WGS params on the DNA Test from the WO after C3), not freeze skip. **AC-P2-OQ-WO-7 Pass** (Tobias, 2026-09-01, `80f054b`). After C3, DNA WGS freezes `{library_kit: TruSeq}` from the blood WO, **not** `{}`. Leftover **`9f86d14`** not recoded. Closeout **1.4 / OQ-WO-8 Closed** (**Full Leadership Confirm**; **CEO Confirm 1–6 stands**; named asked-for LimsRun slot Closed — not contains-Qubit). **Do not claim overall P2 Pass.**
 

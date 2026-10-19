@@ -86,6 +86,24 @@ def _install_access_functions(engine):
             $$ LANGUAGE plpgsql SECURITY DEFINER;
         """))
         conn.execute(text(mod.NEW_FUNCTION))
+        status_path = (
+            Path(__file__).resolve().parents[1]
+            / "db"
+            / "migrations"
+            / "versions"
+            / "0097_batch_access_status.py"
+        )
+        status_spec = importlib.util.spec_from_file_location(
+            "_mig_0097_batch_access_status", status_path
+        )
+        status_mod = importlib.util.module_from_spec(status_spec)
+        status_spec.loader.exec_module(status_mod)
+        conn.execute(text(status_mod.CREATE_FUNCTION))
+        conn.execute(
+            text(
+                "REVOKE ALL ON FUNCTION public.batch_access_status(uuid) FROM PUBLIC"
+            )
+        )
         conn.commit()
 
 
