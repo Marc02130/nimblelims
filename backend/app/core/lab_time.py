@@ -8,12 +8,12 @@ Importing this module does not touch the database, so Alembic can run before
 the table exists. The API starts without a zone so that login and the admin
 setup step can run.
 """
-import os
 import threading
 from datetime import date, datetime, timezone, tzinfo
 from typing import Optional, Union
-from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError, available_timezones
 
+from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError, OperationalError, ProgrammingError
 from sqlalchemy.orm import Session
 
@@ -37,28 +37,47 @@ class LabTimezoneUnset(RuntimeError):
     """No saved IANA zone. An administrator must PATCH /v1/lab-settings."""
 
 
-def env_timezone_name() -> Optional[str]:
-    """The environment value, or None when unset or blank.
-
-    This is not a fallback. Callers that need the lab zone must read
-    ``lab_settings``.
-    """
-    raw = os.getenv("LAB_TIMEZONE")
-    name = "" if raw is None else raw.strip()
-    if name == "":
-        return None
-    return name
-
-
 def known_zone(name: str) -> tzinfo:
-    """Return the IANA zone. Raises ValueError when the name is blank or unknown."""
+    """Return the IANA zone. Raises ValueError when the name is blank or unknown.
+
+    The name must be in ``zoneinfo.available_timezones()``. That rejects
+    leftovers such as ``localtime``, ``posixrules``, and ``Factory`` on
+    some systems; Postgres must still accept the name on PATCH.
+    """
     cleaned = name.strip()
-    if cleaned == "":
-        raise ValueError("empty")
+    if cleaned == "" or cleaned not in available_timezones():
+        raise ValueError(cleaned or "empty")
     try:
         return ZoneInfo(cleaned)
     except (ZoneInfoNotFoundError, ValueError) as exc:
         raise ValueError(cleaned) from exc
+
+
+def postgres_accepts_timezone(db: Session, name: str) -> bool:
+    """True when Postgres knows ``name`` and ``AT TIME ZONE`` succeeds."""
+    found = db.execute(
+        text("SELECT 1 FROM pg_catalog.pg_timezone_names WHERE name = :z"),
+        {"z": name},
+    ).scalar()
+    if found is None:
+        return False
+    nested = db.begin_nested()
+    try:
+        db.execute(text("SELECT now() AT TIME ZONE :z"), {"z": name})
+    except (ProgrammingError, OperationalError):
+        nested.rollback()
+        return False
+    nested.commit()
+    return True
+
+
+def accept_lab_timezone(db: Session, name: str) -> str:
+    """The name to store. Raises ValueError when Python or Postgres rejects it."""
+    zone = known_zone(name)
+    key = getattr(zone, "key", None) or name.strip()
+    if not postgres_accepts_timezone(db, key):
+        raise ValueError(key)
+    return key
 
 
 def clock_date(zone_name: str, now: Optional[datetime] = None) -> date:

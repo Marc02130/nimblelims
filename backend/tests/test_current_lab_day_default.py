@@ -167,7 +167,7 @@ def test_omitted_entry_date_stores_the_lab_day(migrated_engine) -> None:
             trans.rollback()
 
 
-def test_blank_or_missing_lab_settings_use_utc(migrated_engine) -> None:
+def test_blank_or_missing_lab_settings_raise(migrated_engine) -> None:
     """Blank, NULL, and missing rows fail. There is no UTC fallback."""
     with migrated_engine.connect() as conn:
         trans = conn.begin()

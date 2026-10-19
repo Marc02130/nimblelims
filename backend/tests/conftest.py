@@ -11,8 +11,7 @@ os.environ["ENVIRONMENT"] = "test"
 os.environ.setdefault("ALLOW_INSECURE_DEFAULTS", "true")
 os.environ.setdefault("SECRET_KEY", "pytest-secret-key-not-for-production")
 os.environ.setdefault("EMBEDDING_PROVIDER", "stub")
-# Tests that need a lab zone set it on lab_settings. There is no env fallback.
-os.environ.setdefault("LAB_TIMEZONE", "UTC")
+# Tests that need a lab zone set it on lab_settings. Nothing reads LAB_TIMEZONE.
 # Import builds an engine immediately. Tests do not query that engine.
 # Fixtures pass the testcontainer URL through the environment. No password.
 os.environ.setdefault(

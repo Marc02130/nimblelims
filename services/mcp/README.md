@@ -58,7 +58,7 @@ Do not point stdio at `http://backend:8000`. That name exists only on the Compos
 | `MCP_TRANSPORT` | `streamable-http` | `streamable-http` or `stdio`. |
 | `NIMBLELIMS_ACCESS_TOKEN` | empty | Optional Bearer token for local dogfood. Never commit a real token. Not set in the image or in Compose. |
 
-The MCP process does not read `LAB_TIMEZONE`. The API stores the lab zone on `lab_settings`. There is no environment fallback. An administrator must save a real IANA zone after login.
+The MCP process does not read `LAB_TIMEZONE` (nothing does). The API stores the lab zone on `lab_settings`. There is no environment fallback. An administrator must save a real IANA zone after login.
 
 ## Auth
 

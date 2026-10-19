@@ -56,7 +56,9 @@ def test_migration_only_adds_lab_settings():
     assert "DELETE FROM" not in upgrade.upper()
 
 
-def test_env_seeds_an_empty_setting(monkeypatch, db_session):
+def test_empty_row_stays_unset_when_lab_timezone_is_in_the_environment(
+    monkeypatch, db_session
+):
     """LAB_TIMEZONE does not seed. An empty row stays empty and fails loudly."""
     _clear_lab_timezone(db_session)
     monkeypatch.setenv("LAB_TIMEZONE", "America/New_York")
@@ -148,7 +150,7 @@ def test_startup_skips_the_database_during_tests(monkeypatch):
     lab_time.require_lab_timezone_on_startup()
 
 
-def test_startup_resolves_and_commits_the_seed_outside_tests(monkeypatch):
+def test_startup_does_not_seed_or_require_a_zone(monkeypatch):
     """Startup does not seed and does not require a zone."""
     monkeypatch.setenv("ENVIRONMENT", "development")
     seen = {}
@@ -175,6 +177,22 @@ def test_unknown_zone_is_invalid_timezone(client, test_admin_user, raw):
     assert response.status_code == 422, response.text
     assert response.json()["detail"]["code"] == "invalid_timezone"
     assert "America/New_York" in response.json()["detail"]["message"]
+
+
+@pytest.mark.parametrize("raw", ["localtime", "posixrules", "Factory"])
+def test_posix_leftover_zones_are_invalid_timezone(client, test_admin_user, raw):
+    headers = _login(client, "admin", "adminpassword")
+    response = client.patch("/v1/lab-settings", headers=headers, json={"timezone": raw})
+    assert response.status_code == 422, response.text
+    assert response.json()["detail"]["code"] == "invalid_timezone"
+
+
+def test_iana_zone_still_saves(client, test_admin_user):
+    headers = _login(client, "admin", "adminpassword")
+    response = client.patch("/v1/lab-settings", headers=headers, json={"timezone": "UTC"})
+    assert response.status_code == 200, response.text
+    assert response.json()["timezone"] == "UTC"
+    assert response.json()["timezone_configured"] is True
 
 
 def test_admin_updates_and_lab_manager_can_only_read(client, db_session, test_org, test_admin_user, monkeypatch):

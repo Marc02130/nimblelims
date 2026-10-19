@@ -290,7 +290,7 @@ Required environment variables (see `env.example`):
 - `JWT_SECRET_KEY` - Secret key for JWT token signing
 - `JWT_ALGORITHM` - JWT algorithm (default: HS256)
 - `JWT_ACCESS_TOKEN_EXPIRE_MINUTES` - Token expiration time
-- `LAB_TIMEZONE` - not a fallback. The lab zone lives only on `lab_settings`. An empty, blank, or NULL value fails until an administrator saves a real IANA name with `PATCH /v1/lab-settings`. The API starts without a zone so login and that setup step can run. `create_admin.py` and the seed scripts do not read it. A lab manager can read the saved zone with `GET`. Lab managers, lab technicians, clients, and configuration editors receive 403 on update.
+- The lab zone lives only on `lab_settings`. Nothing reads `LAB_TIMEZONE`. An empty, blank, or NULL value fails until an administrator saves a real IANA name with `PATCH /v1/lab-settings`. The API starts without a zone so login and that setup step can run. `create_admin.py` and the seed scripts do not read an environment zone. A lab manager can read the saved zone with `GET`. Lab managers, lab technicians, clients, and configuration editors receive 403 on update.
 
 Optional environment variables:
 - `REQUIRE_QC_FOR_BATCH_TYPES` - Comma-separated list of batch type UUIDs that require QC samples

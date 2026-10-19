@@ -8,8 +8,8 @@ from sqlalchemy.orm import Session
 from app.core.lab_time import (
     INVALID_TIMEZONE,
     LabTimezoneUnset,
+    accept_lab_timezone,
     ensure_lab_setting,
-    known_zone,
     remember_lab_zone,
     resolve_lab_timezone,
 )
@@ -57,10 +57,9 @@ def update_lab_timezone(
     with any other role is 403 here as well.
     """
     try:
-        zone = known_zone(body.timezone)
+        name = accept_lab_timezone(db, body.timezone)
     except ValueError:
         _refuse_invalid()
-    name = getattr(zone, "key", None) or body.timezone.strip()
     row = ensure_lab_setting(db)
     row.timezone = name
     row.modified_by = current_user.id
