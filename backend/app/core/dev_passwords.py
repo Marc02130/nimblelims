@@ -15,6 +15,10 @@ import os
 import secrets
 import string
 
+# 24 characters. Every symbol here can appear in a generated password.
+DEV_PASSWORD_POOL = string.ascii_letters + string.digits + "!@#$%^&*-_"
+DEV_PASSWORD_LENGTH = 24
+
 # Neither bcrypt (``$2…``) nor 64-hex SHA256, so ``verify_password`` returns
 # False and the account cannot be used.
 SEED_LOCKED = "!seed-locked"
@@ -37,14 +41,15 @@ _PERSONA_ENV = dict(PERSONAS)
 
 def generate_dev_password() -> str:
     """Strong random password. Meets the app complexity rules. Not logged."""
+    symbols = "!@#$%^&*-_"
     required = [
         secrets.choice(string.ascii_uppercase),
         secrets.choice(string.ascii_lowercase),
         secrets.choice(string.digits),
-        secrets.choice("!@#$%^&*-_"),
+        secrets.choice(symbols),
     ]
-    pool = string.ascii_letters + string.digits + "!@#$%^&*-_"
-    chars = required + [secrets.choice(pool) for _ in range(20)]
+    extra = DEV_PASSWORD_LENGTH - len(required)
+    chars = required + [secrets.choice(DEV_PASSWORD_POOL) for _ in range(extra)]
     for index in range(len(chars) - 1, 0, -1):
         swap = secrets.randbelow(index + 1)
         chars[index], chars[swap] = chars[swap], chars[index]
@@ -79,7 +84,8 @@ def require_seed_passwords(usernames: list[str]) -> dict[str, str]:
             "Missing seed password env vars: "
             + ", ".join(missing)
             + ". Set them, or run python backend/seed_dev_passwords.py --apply "
-            "and export the printed values. Names are in .env.example. "
+            "--secrets-out PATH and export the variables from that file. "
+            "UAT uses --secrets-out only. Names are in .env.example. "
             "This runner does not fall back to a default."
         )
     return {

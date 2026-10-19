@@ -23,6 +23,6 @@ docker compose exec -T db psql -U lims_bootstrap -d lims_db \
 
 ## TC-ROLES-002 — App still reads as lims_app
 
-1. Sign in as `admin` after `seed_dev_passwords.py --apply`.
+1. Sign in as `admin` after `seed_dev_passwords.py --apply --secrets-out PATH`. UAT uses `--secrets-out` only. See [uat-artifacts.md](../manuals/uat-artifacts.md).
 2. `GET /batches` returns **200**.
 3. A batch id that does not exist is **404**. A batch that exists and this session cannot see is **403** `{"code":"batch_forbidden","message":"Access denied"}`. That split is by design: the status tells the caller whether the id exists. The 403 body has no batch id, client id, or project id.

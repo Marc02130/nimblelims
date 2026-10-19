@@ -33,3 +33,4 @@ Review stamps stay under [`.docs/review/`](../.docs/review/). Local scratch copi
 | [lims-runs.md](lims-runs.md) | LIMS Runs (`/runs`); params freeze at LimsRun start (WO-7), not on receive |
 | [workflow-accessioning-to-reporting.md](workflow-accessioning-to-reporting.md) | End-to-end workflow |
 | [useful-command-line.md](useful-command-line.md) | CLI notes |
+| [uat-artifacts.md](uat-artifacts.md) | UAT backups (`/workspace/.uat-backups/`), `--secrets-out`, evidence scan |

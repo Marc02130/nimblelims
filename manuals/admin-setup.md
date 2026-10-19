@@ -6,7 +6,7 @@ After starting the application with `docker-compose up -d --build`, Alembic migr
 
 - **Username**: `admin`
 - **Email**: `admin@lims.example.com`
-- **Password**: not in git. On a fresh database run `docker compose exec backend python seed_dev_passwords.py --apply`. That uses `DEV_SEED_ADMIN_PASSWORD` if set, or prints a password once. Production bootstrap still requires `BOOTSTRAP_ADMIN_PASSWORD` (`create_admin.py`).
+- **Password**: not in git. On a fresh database run `docker compose exec backend python seed_dev_passwords.py --apply --secrets-out /tmp/uat-secrets.env`. That uses `DEV_SEED_ADMIN_PASSWORD` if set, or writes a generated password to that new `0600` file. UAT uses `--secrets-out` only. Production bootstrap still requires `BOOTSTRAP_ADMIN_PASSWORD` (`create_admin.py`). See [uat-artifacts.md](uat-artifacts.md).
 
 ## ⚠️ SECURITY WARNING
 

@@ -50,7 +50,7 @@ layout + relation apply and that the rerun is a no-op. Not automated:
   `sample_types`/`matrix_types`, no invented lot numbers): needs a live key
   (D-2). Re-run UAT D-4/D-7/G5 with grok-4.7.
 - **L-2 two-user test** with the seed `config-editor` persona (config:edit, no
-  schema:edit): run `python seed_dev_passwords.py --apply` with
+  schema:edit): run `python seed_dev_passwords.py --apply --secrets-out PATH` with
   `DEV_SEED_CONFIG_EDITOR_PASSWORD` set, then log in as that user. The test only
   checks the seed role's permissions.
 - **Timeout long enough for grok-4.7**: default 300 s, `CONFIGURING_AGENT_TIMEOUT_S`.

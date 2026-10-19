@@ -47,7 +47,8 @@ jobs:
       - name: Install backend dependencies
         run: pip install -r backend/requirements.txt
       # Tests start Postgres themselves (testcontainers, pgvector/pgvector:pg15).
-      # The GitHub runner provides Docker; no extra service container is required.
+      # conftest creates roles the same way db/zz-roles.sh does, runs Alembic as
+      # non-superuser lims_migrate, then runs db/scripts/uat_privilege_snapshot.sql.
       - name: pytest
         working-directory: backend
         run: python -m pytest -q --tb=line
@@ -55,7 +56,7 @@ jobs:
           ENVIRONMENT: test
           ALLOW_INSECURE_DEFAULTS: "true"
           SECRET_KEY: pytest-secret-key-not-for-production
-          # Import builds an engine. No password. Migrations use the testcontainer URL.
+          # Import builds an engine. No password. Migrations use lims_migrate on the testcontainer.
           DATABASE_URL: postgresql://lims_app@127.0.0.1:5432/lims_db
 
   frontend:

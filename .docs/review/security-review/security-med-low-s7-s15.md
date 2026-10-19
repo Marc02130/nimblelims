@@ -31,7 +31,7 @@
 | **Sec1** | Med | S9: unauthenticated validate must be impossible after P1. |
 | **Sec2** | Med | S8: caps server-side; nginx alone insufficient. |
 | **Sec3** | Med | S7: no cross-client sample start via raw UUID. |
-| **Sec4** | Med | S12: prod profile must not ship `5432:5432` + `lims_password`. |
+| **Sec4** | Med | S12: prod profile must not ship `5432:5432` + `<redacted>`. |
 | **Sec5** | Low | S15: never store plaintext passwords in throttle state. |
 | **Sec6** | Med | S11: FORCE must not be claimed until tested as `lims_app`. |
 | **Sec7** | Low | S10: no marketing claim that browser RBAC is security. |

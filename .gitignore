@@ -66,6 +66,7 @@ Thumbs.db
 !.grok/teams/**
 
 # --- Local dumps ---
+.uat-backups/
 TestData/
 *.db
 *.sqlite
