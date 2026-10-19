@@ -315,6 +315,11 @@ export class ApiService {
     return response.data;
   }
 
+  async updateLabSettings(body: { timezone: string }) {
+    const response: AxiosResponse = await this.api.patch('/v1/lab-settings', body);
+    return response.data;
+  }
+
   // Sample endpoints
   async getSamples(filters?: Record<string, string | undefined>) {
     const response: AxiosResponse = await this.api.get('/samples', {

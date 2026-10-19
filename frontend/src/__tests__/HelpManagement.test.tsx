@@ -38,6 +38,7 @@ const renderWithProviders = (ui: React.ReactElement, permissions: string[] = ['c
     email: 'admin@example.com',
     role: 'Administrator',
     permissions: permissions,
+    timezone_configured: true,
   });
 
   return render(

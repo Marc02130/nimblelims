@@ -117,11 +117,10 @@ This step implements the Docker configuration from the Technical Document (Secti
   LIMS_MIGRATE_PASSWORD=change-me
   LIMS_APP_PASSWORD=change-me
   SECRET_KEY=change-me-to-a-long-random-string
-  LAB_TIMEZONE=America/New_York
   ```
 - `POSTGRES_USER` only bootstraps the cluster. The API connects as `lims_app`. Alembic connects as `lims_migrate`. See `manuals/db-roles.md`.
-- Every deployment must set `LAB_TIMEZONE` or save `lab_settings.timezone`. There is no fallback. `LAB_TIMEZONE` seeds `lab_settings` on first API start when that row is empty. A zone saved later wins. The API refuses to start when neither is a real IANA zone.
-- A fresh database also needs the five required `${VAR:?}` secrets: `POSTGRES_USER`, `POSTGRES_PASSWORD`, `LIMS_MIGRATE_PASSWORD`, `LIMS_APP_PASSWORD`, and `SECRET_KEY`. Compose exits before it starts a container when one of the five is missing.
+- The lab timezone is required. It is stored in `lab_settings.timezone` and set by an administrator at the required post-login step, or with `PATCH /v1/lab-settings`. There is no environment fallback. `current_lab_day()` raises until it is set. The API starts without a zone so that setup step can run.
+- A fresh database needs the five required `${VAR:?}` secrets: `POSTGRES_USER`, `POSTGRES_PASSWORD`, `LIMS_MIGRATE_PASSWORD`, `LIMS_APP_PASSWORD`, and `SECRET_KEY`. Compose exits before it starts a container when one of the five is missing.
 
 #### Step 6: Start Docker and Verify the Environment
 - Ensure Docker Desktop is running on your Mac (open the app if not).
