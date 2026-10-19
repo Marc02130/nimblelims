@@ -120,7 +120,7 @@ This step implements the Docker configuration from the Technical Document (Secti
   LAB_TIMEZONE=America/New_York
   ```
 - `POSTGRES_USER` only bootstraps the cluster. The API connects as `lims_app`. Alembic connects as `lims_migrate`. See `manuals/db-roles.md`.
-- `LAB_TIMEZONE` seeds `lab_settings` on first API start when that row is empty. A zone saved later wins. The API refuses to start when neither is a real IANA zone. There is no UTC default.
+- `LAB_TIMEZONE` is not a fallback. An administrator must save a real IANA zone after login. The API starts without one so that setup step can run.
 - Compose reads `.env` for `${POSTGRES_USER}`, `${POSTGRES_PASSWORD}`, `${LIMS_MIGRATE_PASSWORD}`, `${LIMS_APP_PASSWORD}`, and `${SECRET_KEY}`. Each of those is required. `docker compose up` exits before it starts a container when one is missing.
 
 #### Step 6: Start Docker and Verify the Environment

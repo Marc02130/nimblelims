@@ -290,7 +290,7 @@ Required environment variables (see `env.example`):
 - `JWT_SECRET_KEY` - Secret key for JWT token signing
 - `JWT_ALGORITHM` - JWT algorithm (default: HS256)
 - `JWT_ACCESS_TOKEN_EXPIRE_MINUTES` - Token expiration time
-- `LAB_TIMEZONE` - IANA time zone that seeds `lab_settings` when that row is empty (for example `America/New_York`). A saved zone wins after that. The API refuses to start when neither this nor the saved row is a real zone. There is no UTC default. The check runs after migrations, so importing the app and running Alembic do not need the table yet. `create_admin.py` and the seed scripts do not read it. An administrator updates the saved zone with `PATCH /v1/lab-settings`. A lab manager can read it with `GET`. Lab managers, lab technicians, clients, and configuration editors receive 403 on update.
+- `LAB_TIMEZONE` - not a fallback. The lab zone lives only on `lab_settings`. An empty, blank, or NULL value fails until an administrator saves a real IANA name with `PATCH /v1/lab-settings`. The API starts without a zone so login and that setup step can run. `create_admin.py` and the seed scripts do not read it. A lab manager can read the saved zone with `GET`. Lab managers, lab technicians, clients, and configuration editors receive 403 on update.
 
 Optional environment variables:
 - `REQUIRE_QC_FOR_BATCH_TYPES` - Comma-separated list of batch type UUIDs that require QC samples

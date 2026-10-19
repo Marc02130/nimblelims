@@ -288,7 +288,7 @@ Copy `backend/env.example` to `backend/.env` and configure:
 - Database connection settings
 - JWT secret keys
 - Application environment settings
-- `LAB_TIMEZONE` — IANA time zone that seeds `lab_settings` when that row is empty (for example `America/New_York`). After a zone is saved, the database value wins. There is no UTC default. The API refuses to start when neither source is a real zone. Compose passes the variable through and allows it to be empty so migrations can run first. Pytest and CI set `UTC` explicitly. Alembic, `create_admin.py`, the seed scripts, and the MCP service do not read it. An administrator changes the saved zone with `PATCH /v1/lab-settings`. A lab manager can read it with `GET /v1/lab-settings`. Lab managers, lab technicians, clients, and configuration editors cannot change it. The configuring agent has no allow-list entry for that path, so it cannot change the zone either. There is no lab-settings page in the admin UI.
+- `LAB_TIMEZONE` — not a fallback. The lab zone lives only on `lab_settings`. An empty, blank, or NULL value fails until an administrator saves a real IANA name with `PATCH /v1/lab-settings`. `/auth/me` reports `timezone_configured`. Non-admin users are blocked after login; administrators are sent to a required setup step. Compose may still pass the variable through; the API does not seed from it. Pytest sets a timezone on `lab_settings` explicitly. Alembic, `create_admin.py`, the seed scripts, and the MCP service do not read it. A lab manager can read the saved zone with `GET /v1/lab-settings`. Lab managers, lab technicians, clients, and configuration editors cannot change it. The configuring agent has no allow-list entry for that path.
 
 ### Optional Environment Variables
 
