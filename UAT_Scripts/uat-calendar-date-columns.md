@@ -18,5 +18,6 @@ That disagrees with the earlier reading that seeded `utcnow()` values are UTC wa
 6. Batch and project forms submit `YYYY-MM-DD` from the picker. They do not call `toISOString()`.
 7. Reagent `used_on` and lot dates stay SQL `date`. Instant columns are unchanged.
 8. `GET` responses for those lab-day fields are `YYYY-MM-DD`, not `YYYY-MM-DDT00:00:00`. `POST /projects` stores `due_date` the same way `PATCH` does, for a date-only body and for an offset body.
+9. A raw `INSERT` into `results` that omits `entry_date`, with the clock at `2026-10-20T01:00Z` and the lab zone `America/New_York`, stores `2026-10-19`. A blank or missing `lab_settings` row stores the UTC day `2026-10-20`. Downgrade restores `CURRENT_DATE` and drops `public.current_lab_day()`.
 
-Automated coverage: `backend/tests/test_calendar_date_columns.py`, `backend/tests/test_date_only_lab_day.py`, `backend/tests/test_batch_status_calendar.py`, `frontend/src/__tests__/localDate.test.ts`.
+Automated coverage: `backend/tests/test_calendar_date_columns.py`, `backend/tests/test_date_only_lab_day.py`, `backend/tests/test_batch_status_calendar.py`, `backend/tests/test_current_lab_day_default.py`, `frontend/src/__tests__/localDate.test.ts`.
