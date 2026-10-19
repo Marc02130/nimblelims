@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import os
+import shlex
 import stat
 import subprocess
 import sys
@@ -45,6 +46,19 @@ def _assert_absent(text: str, password: str) -> None:
         assert form not in text
 
 
+def _value_from_secrets_file(text: str, env_name: str) -> str:
+    for line in text.splitlines():
+        if line.startswith(f"{env_name}="):
+            parsed = shlex.split(line[len(env_name) + 1 :])
+            assert len(parsed) == 1
+            return parsed[0]
+    raise AssertionError(f"{env_name} missing from secrets file")
+
+
+def _quoted_assignment(env_name: str, password: str) -> str:
+    return f"{env_name}={shlex.quote(password)}"
+
+
 @pytest.mark.parametrize("symbol", list(DEV_PASSWORD_POOL))
 def test_secrets_out_streams_hide_every_pool_symbol(symbol, tmp_path, capsys):
     password = _password(symbol)
@@ -57,7 +71,9 @@ def test_secrets_out_streams_hide_every_pool_symbol(symbol, tmp_path, capsys):
     _assert_absent(captured.out, password)
     _assert_absent(captured.err, password)
     assert f"Generated passwords written to {dest}" in captured.out
-    assert password in dest.read_text(encoding="utf-8")
+    stored = dest.read_text(encoding="utf-8")
+    assert _quoted_assignment(ENV_NAME, password) in stored
+    assert _value_from_secrets_file(stored, ENV_NAME) == password
     assert stat.S_IMODE(dest.stat().st_mode) == 0o600
 
 
@@ -87,6 +103,8 @@ def test_secrets_file_is_0600_under_a_permissive_umask(tmp_path):
     finally:
         os.umask(previous)
     assert stat.S_IMODE(dest.stat().st_mode) == 0o600
+    stored = dest.read_text(encoding="utf-8")
+    assert _quoted_assignment(ENV_NAME, password) in stored
 
 
 def test_secrets_file_refuses_an_existing_path(tmp_path):
@@ -97,6 +115,45 @@ def test_secrets_file_refuses_an_existing_path(tmp_path):
             dest, [("admin", ENV_NAME, _password("#"))]
         )
     assert dest.read_text(encoding="utf-8") == "keep\n"
+
+
+def test_secrets_file_round_trips_special_chars_through_bash(tmp_path):
+    # Built at runtime so the source has no password-like literal for scanners.
+    ampersand = chr(38)
+    dollar = chr(36)
+    generated = [
+        ("admin", "DEV_SEED_ADMIN_PASSWORD", f"amp{ampersand}and{dollar}sign"),
+        ("lab-tech", "DEV_SEED_LAB_TECH_PASSWORD", "has spaces and 'single' and \"double\""),
+        ("client", "DEV_SEED_CLIENT_PASSWORD", f"all of {ampersand} {dollar} ' \"  together"),
+    ]
+    dest = tmp_path / "secrets.env"
+    seed_dev_passwords.write_secrets_file(dest, generated)
+    stored = dest.read_text(encoding="utf-8")
+    expected = {env_name: password for _username, env_name, password in generated}
+    for env_name, password in expected.items():
+        assert _quoted_assignment(env_name, password) in stored
+        assert _value_from_secrets_file(stored, env_name) == password
+
+    names = " ".join(shlex.quote(name) for name in expected)
+    script = (
+        "set -euo pipefail\n"
+        "set -a\n"
+        f". {shlex.quote(str(dest))}\n"
+        "set +a\n"
+        "python3 -c "
+        "'import json, os, sys; "
+        "print(json.dumps({name: os.environ[name] for name in sys.argv[1:]}))' "
+        f"{names}\n"
+    )
+    proc = subprocess.run(
+        ["bash", "-c", script],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert proc.returncode == 0, proc.stderr
+    loaded = json.loads(proc.stdout)
+    assert loaded == expected
 
 
 def test_main_secrets_out_does_not_print_the_password(
@@ -135,7 +192,8 @@ def test_main_secrets_out_does_not_print_the_password(
     assert code == 0
     assert stat.S_IMODE(dest.stat().st_mode) == 0o600
     stored = dest.read_text(encoding="utf-8")
-    password = stored.split("DEV_SEED_CLIENT_PASSWORD=", 1)[1].splitlines()[0]
+    password = _value_from_secrets_file(stored, "DEV_SEED_CLIENT_PASSWORD")
+    assert _quoted_assignment("DEV_SEED_CLIENT_PASSWORD", password) in stored
     _assert_absent(captured.out, password)
     _assert_absent(captured.err, password)
     assert "Generated passwords written to" in captured.out

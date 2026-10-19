@@ -65,7 +65,7 @@ Default logins (development/UAT). Passwords are not stored in git:
 - **Lab Manager**: `lab-manager` / `DEV_SEED_LAB_MANAGER_PASSWORD`
 - **CRO Partner**: `client` / `DEV_SEED_CLIENT_PASSWORD`
 
-A fresh database locks these accounts, plus `alice-tech`, `bob-tech`, `carol-manager`, and `david-cro`, until `python backend/seed_dev_passwords.py --apply --secrets-out PATH`. That writes generated passwords to a new `0600` file and prints only the path. UAT uses `--secrets-out` only. Do not write the value into this file. Every deployment must set `LAB_TIMEZONE` or save `lab_settings.timezone`. There is no fallback. A fresh compose database also needs `POSTGRES_USER`, `POSTGRES_PASSWORD`, `LIMS_MIGRATE_PASSWORD`, `LIMS_APP_PASSWORD`, and `SECRET_KEY` (Compose `${VAR:?}`).
+A fresh database locks these accounts, plus `alice-tech`, `bob-tech`, `carol-manager`, and `david-cro`, until `python backend/seed_dev_passwords.py --apply --secrets-out PATH`. That writes generated passwords to a new `0600` file as `KEY=<shlex.quote(value)>` and prints only the path. Load it with `set -a; . PATH; set +a`. UAT uses `--secrets-out` only. Do not write the value into this file. Every deployment must set `LAB_TIMEZONE` or save `lab_settings.timezone`. There is no fallback. A fresh compose database also needs `POSTGRES_USER`, `POSTGRES_PASSWORD`, `LIMS_MIGRATE_PASSWORD`, `LIMS_APP_PASSWORD`, and `SECRET_KEY` (Compose `${VAR:?}`).
 
 ### Important Gotchas
 

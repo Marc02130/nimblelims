@@ -83,8 +83,8 @@ def require_seed_passwords(usernames: list[str]) -> dict[str, str]:
         raise SystemExit(
             "Missing seed password env vars: "
             + ", ".join(missing)
-            + ". Set them, or run python backend/seed_dev_passwords.py --apply "
-            "--secrets-out PATH and export the variables from that file. "
+            +             ". Set them, or run python backend/seed_dev_passwords.py --apply "
+            "--secrets-out PATH and load it with set -a; . PATH; set +a. "
             "UAT uses --secrets-out only. Names are in .env.example. "
             "This runner does not fall back to a default."
         )
