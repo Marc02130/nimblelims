@@ -746,6 +746,8 @@ def test_get_summary_aggregates_correctly(client, db_session, test_admin_user, t
     assert body["by_category"]["INACTIVE"] == 1
     assert body["by_review_status"]["approved"] == 2
     assert body["by_review_status"]["pending"] == 1
+    assert body["last_fit_at"] is not None
+    assert body["last_fit_at"].endswith("Z")
 
 
 # ---------------------------------------------------------------------------
@@ -777,6 +779,57 @@ def test_get_summary_excludes_superseded_results(client, db_session, test_admin_
     )
     assert resp.status_code == 200
     assert resp.json()["total"] == 1  # only the active version
+
+
+def test_summary_last_fit_at_is_null_without_a_fit(client, db_session, test_admin_user, test_org, admin_token, dr_setup):
+    run = dr_setup["run"]
+    resp = client.get(
+        f"/v1/lims-runs/{run.id}/dose-response/summary",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["total"] == 0
+    assert resp.json()["last_fit_at"] is None
+
+
+def test_summary_last_fit_at_is_the_latest_current_fit(client, db_session, test_admin_user, test_org, admin_token, dr_setup):
+    run = dr_setup["run"]
+    sample = dr_setup["test_sample"]
+    current = DoseResponseResult(
+        lims_run_id=run.id,
+        sample_id=sample.id,
+        model="4PL",
+        curve_category=CurveCategory.SIGMOID,
+        quality_flag="ok",
+        review_status=ReviewStatus.pending,
+        fit_version=2,
+        client_id=test_org.id,
+        fit_triggered_at=datetime(2026, 10, 18, 23, 23, tzinfo=timezone.utc),
+    )
+    db_session.add(current)
+    db_session.flush()
+    superseded = DoseResponseResult(
+        lims_run_id=run.id,
+        sample_id=sample.id,
+        model="4PL",
+        curve_category=CurveCategory.SIGMOID,
+        quality_flag="ok",
+        review_status=ReviewStatus.pending,
+        fit_version=1,
+        superseded_by=current.id,
+        client_id=test_org.id,
+        fit_triggered_at=datetime(2026, 10, 19, 1, 0, tzinfo=timezone.utc),
+    )
+    db_session.add(superseded)
+    db_session.commit()
+
+    resp = client.get(
+        f"/v1/lims-runs/{run.id}/dose-response/summary",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["total"] == 1
+    assert resp.json()["last_fit_at"] == "2026-10-18T23:23:00Z"
 
 
 # ---------------------------------------------------------------------------

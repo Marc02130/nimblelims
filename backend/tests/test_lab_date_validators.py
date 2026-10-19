@@ -139,23 +139,27 @@ def _result_response(when):
     }
 
 
-# Each class that checks a date, including response models that inherit the check.
+# Input schemas refuse a lab-tomorrow. Response models must not: a stored
+# date can become "future" after the lab zone moves, and a read must still work.
 _CASES = [
     (SampleCreate, _sample_create),
     (SampleUpdate, _sample_update),
-    (SampleResponse, _sample_response),
     (SampleAccessioningRequest, _accession),
     (BulkSampleAccessioningRequest, _bulk),
     (TestCreate, _test_create),
     (TestUpdate, _test_update),
-    (TestResponse, _test_response),
     (TestAssignmentRequest, _assign),
     (TestStatusUpdateRequest, _status),
     (TestReviewRequest, _review),
     (ResultCreate, _result),
     (ResultUpdate, _result),
-    (ResultResponse, _result_response),
     (TestResultEntry, _batch_entry),
+]
+
+_RESPONSE_CASES = [
+    (SampleResponse, _sample_response),
+    (TestResponse, _test_response),
+    (ResultResponse, _result_response),
 ]
 
 
@@ -180,6 +184,22 @@ def test_each_validator_accepts_the_lab_today_and_refuses_tomorrow(utc_moment, l
         with pytest.raises(ValidationError) as caught:
             model(**build(tomorrow))
         assert "future" in str(caught.value).lower(), model.__name__
+
+
+@pytest.mark.parametrize(
+    "utc_moment, lab_day",
+    [
+        (datetime(2026, 10, 19, 0, 0, tzinfo=timezone.utc), date(2026, 10, 18)),
+        (datetime(2026, 10, 19, 4, 0, tzinfo=timezone.utc), date(2026, 10, 19)),
+    ],
+)
+def test_response_models_accept_a_stored_future_date(utc_moment, lab_day, monkeypatch):
+    monkeypatch.setattr(lab_time, "_utcnow", lambda: utc_moment)
+    lab_time.remember_lab_zone("America/New_York")
+    tomorrow = _noon_utc(lab_day + timedelta(days=1))
+    for model, build in _RESPONSE_CASES:
+        parsed = model(**build(tomorrow))
+        assert parsed is not None
 
 
 def test_days_from_today_follows_the_lab_calendar(monkeypatch):

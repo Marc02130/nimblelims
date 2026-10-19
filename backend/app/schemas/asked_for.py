@@ -11,7 +11,7 @@ PARAM_DATA_TYPES = ("number", "int", "text", "bool")
 ASKED_FOR_STATUSES = ("requested", "routed", "cancelled")
 
 
-class AnalysisParamDefItem(BaseModel):
+class AnalysisParamDefFields(BaseModel):
     key: str = Field(..., min_length=1, max_length=128)
     data_type: str = Field(..., description="number | int | text | bool")
     unit: Optional[str] = None
@@ -19,6 +19,10 @@ class AnalysisParamDefItem(BaseModel):
     source_list_id: Optional[UUID] = None
     allowed_values: Optional[List[Any]] = None
     sort_order: int = 0
+
+
+class AnalysisParamDefItem(AnalysisParamDefFields):
+    """Write shape. The data_type allow-list is an input rule."""
 
     @model_validator(mode="after")
     def check_data_type(self):
@@ -29,7 +33,7 @@ class AnalysisParamDefItem(BaseModel):
         return self
 
 
-class AnalysisParamDefRead(AnalysisParamDefItem):
+class AnalysisParamDefRead(AnalysisParamDefFields):
     id: UUID
     analysis_id: UUID
 

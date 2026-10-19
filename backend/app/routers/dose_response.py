@@ -390,6 +390,14 @@ def get_summary(
 
     mean_r2 = sum(r_squareds) / len(r_squareds) if r_squareds else None
 
+    last_fit_at = None
+    for row in all_latest:
+        instant = row.fit_triggered_at if row.fit_triggered_at is not None else row.created_at
+        if instant is None:
+            continue
+        if last_fit_at is None or instant > last_fit_at:
+            last_fit_at = instant
+
     return DoseResponseSummary(
         total=total,
         by_category=by_category,
@@ -397,6 +405,7 @@ def get_summary(
         ic50_range=ic50_range,
         mean_r_squared=mean_r2,
         fit_in_progress=run.fit_in_progress,
+        last_fit_at=last_fit_at,
     )
 
 

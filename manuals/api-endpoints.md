@@ -35,7 +35,7 @@
 
 ## Timestamps
 
-Instant fields (`created_at`, `modified_at`, `started_at`, `completed_at`, `published_at`, `canceled_at`, `last_login`, and the other audit clocks) are UTC and end in `Z` or an explicit offset. Screens show them in the browser's local time. Calendar dates (`received_date`, `report_date`, `due_date`, `test_date`, `review_date`, `entry_date`, `used_on`, `start_date`, `end_date`) are lab days and are not given a timezone. Most instant columns are still `timestamp without time zone`; the value stored is UTC wall time.
+Instant fields (`created_at`, `modified_at`, `started_at`, `completed_at`, `published_at`, `canceled_at`, `last_login`, `last_fit_at`, and the other audit clocks) are UTC and end in `Z` or an explicit offset. Screens show them in the browser's local time. Calendar dates (`received_date`, `report_date`, `due_date`, `test_date`, `review_date`, `entry_date`, `used_on`, `start_date`, `end_date`) are lab days and are not given a timezone. Most instant columns are still `timestamp without time zone`; the value stored is UTC wall time. Future-day checks (`received_date`, `report_date`, `test_date`, `review_date`, `entry_date`, temperature bounds, and the other input rules) run on create and update bodies only. Response models do not re-run them, so a stored date that is "future" after a lab-zone change still returns **200** from `GET /samples`, `GET /tests`, `GET /results`, and the matching detail routes.
 
 ## Authentication
 
@@ -257,7 +257,7 @@ These are explicit later planning actions, not calls that Receive or asked-for c
 }
 ```
 
-**Note:** `custom_attributes` are validated against active configurations for 'samples' entity type. `received_date` and `report_date` cannot fall on a later calendar day than today in the lab timezone. `due_date` may. The same lab day applies to test `test_date` and `review_date`, and to result `entry_date` (including `entry_date` on `POST /results/batch`). The sample and test forms cap received, report, test, review, and entry dates at the browser's today and show the API sentence when a later day is refused. `due_date` is not capped. A time that is still today in the lab is accepted after UTC has already moved to the next day. A `YYYY-MM-DD` value, and a stored naive midnight that was saved that way, is that calendar day and is not shifted by the zone. A value that carries an offset is still converted into the lab zone. Eligible-sample and batch expiration day counts use that same lab calendar, so a midnight due or expiry date counts as that day.
+**Note:** `custom_attributes` are validated against active configurations for 'samples' entity type. `received_date` and `report_date` cannot fall on a later calendar day than today in the lab timezone. `due_date` may. The same lab day applies to test `test_date` and `review_date`, and to result `entry_date` (including `entry_date` on `POST /results/batch`). Those refusals are **422** on create and update only. `GET /samples`, `GET /tests`, `GET /results`, and their detail routes do not re-check a stored date, so one future value does not turn the list into **500**. The sample and test forms cap received, report, test, review, and entry dates at the browser's today and show the API sentence when a later day is refused. `due_date` is not capped. A time that is still today in the lab is accepted after UTC has already moved to the next day. A `YYYY-MM-DD` value, and a stored naive midnight that was saved that way, is that calendar day and is not shifted by the zone. A value that carries an offset is still converted into the lab zone. Eligible-sample and batch expiration day counts use that same lab calendar, so a midnight due or expiry date counts as that day.
 
 **Response:** Sample with created tests
 
@@ -762,6 +762,16 @@ Or if incompatible:
 Get batch details with containers.
 
 **Requires:** `batch:read` permission
+
+### GET /batches/{id}/containers
+Containers in the batch, with each content's `sample_id`, `sample_name`, `qc_type`, and `sample.qc_type`. Enter Results uses this list. An empty batch returns `[]`.
+
+**Requires:** `batch:read`. A caller whose client does not own the batch's projects is **403**. A missing batch is **404**. Row-level security still hides samples the caller cannot see.
+
+### GET /batches/{id}/tests
+Active tests for samples in those containers. Returns a JSON array (`id`, `name`, `status`, `analysis_id`, `sample_id`), not the paginated `/tests` envelope. An empty batch returns `[]`.
+
+**Requires:** `batch:read`. Same **403** / **404** rules as the containers route. Test rows are still filtered by the tests access policy.
 
 ### POST /batches/{id}/containers
 Add container to existing batch.
@@ -2493,6 +2503,11 @@ Operator steps: [configuring-agent.md](configuring-agent.md).
 ## LIMS Runs — promote-on-publish
 
 Full run lifecycle is under `/v1/lims-runs`. See [lims-runs.md](lims-runs.md) for product rules.
+
+### GET /v1/lims-runs/{id}/dose-response/summary
+Curve Curator counts for one run. **Requires** `experiment:manage`.
+
+**Response:** `total`, `by_category`, `by_review_status`, `ic50_range`, `mean_r_squared`, `fit_in_progress`, `last_fit_at`. `last_fit_at` is the latest `fit_triggered_at` (or `created_at` when the fit time was not stored) among results that are not superseded. It is UTC and ends in `Z`. It is `null` when the run has no current fit. The dose-response tab shows that instant in the browser's local time, and shows — only when `last_fit_at` is null.
 
 ### GET /v1/lims-runs/{id}/promotion/preview
 Dry-run of what publish would write to existing Tests/Results when `analysis_id` is set. **No DB writes and no Test creation.**

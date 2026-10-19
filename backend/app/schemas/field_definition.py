@@ -35,10 +35,17 @@ class FieldDefinitionBase(BaseModel):
     is_materialized_column: bool = Field(True, description="Whether this is a top-level column")
     column_name: Optional[str] = Field(None, max_length=255, description="Column name if materialized")
 
+
+class FieldDefinitionCreate(FieldDefinitionBase):
+    """Schema for creating a FieldDefinition.
+
+    Name and rule checks are input rules. FieldDefinitionResponse does not
+    re-run them.
+    """
+
     @validator('entity_type')
     def validate_entity_type(cls, v):
-        # Allow all for now as per requirements; can restrict later
-        if not v or not v.strip():
+        if v is None or not v.strip():
             raise ValueError("entity_type is required")
         return v.strip().lower()
 
@@ -48,23 +55,11 @@ class FieldDefinitionBase(BaseModel):
             raise ValueError("name must contain only alphanumeric characters, underscores, and hyphens")
         return v
 
-    @validator('data_type')
-    def validate_data_type(cls, v, values):
-        # Basic validation
-        return v
-
     @validator('validation_rules')
     def validate_validation_rules(cls, v, values):
         if not isinstance(v, dict):
             raise ValueError("validation_rules must be a dictionary")
-        # Lists are the source of truth for list data_type; validation_rules for scalars (min/max etc)
-        # Do not embed options here.
         return v
-
-
-class FieldDefinitionCreate(FieldDefinitionBase):
-    """Schema for creating a FieldDefinition"""
-    pass
 
 
 class FieldDefinitionUpdate(BaseModel):

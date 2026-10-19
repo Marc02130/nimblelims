@@ -4,7 +4,7 @@ Batches router for NimbleLims
 import os
 from typing import List, Optional, Set
 from fastapi import APIRouter, Depends, HTTPException, status, Query
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import and_, or_, text, func
 from sqlalchemy.dialects.postgresql import UUID as PostgresUUID
 from app.database import get_db
@@ -18,8 +18,10 @@ from models.list import ListEntry
 from app.schemas.batch import (
     BatchCreate, BatchUpdate, BatchResponse, BatchListResponse,
     BatchContainerRequest, BatchContainerResponse, BatchContainerBody,
-    BatchCreateWithContainersRequest
+    BatchCreateWithContainersRequest, BatchContainerRead, BatchContainerContentRead,
+    BatchContentSample,
 )
+from app.schemas.test import TestResponse
 from app.core.rbac import (
     require_batch_manage, require_batch_read, require_batch_update,
     require_batch_delete, require_project_access, validate_client_access
@@ -203,6 +205,145 @@ def get_batch(
     ).all()
     
     return build_batch_response(batch, batch_containers)
+
+
+def _require_batch_client_access(db: Session, batch: Batch, current_user: User) -> None:
+    """Same client check as GET /batches/{id}. RLS still filters the queries."""
+    batch_containers = db.query(BatchContainer).filter(
+        BatchContainer.batch_id == batch.id
+    ).all()
+    container_ids = [row.container_id for row in batch_containers]
+    if not container_ids:
+        return
+    contents = db.query(Contents).filter(
+        Contents.container_id.in_(container_ids)
+    ).all()
+    sample_ids = [row.sample_id for row in contents if row.sample_id is not None]
+    if not sample_ids:
+        return
+    project_ids = [
+        row[0]
+        for row in db.query(Sample.project_id).filter(
+            Sample.id.in_(sample_ids),
+            Sample.active == True,
+        ).distinct().all()
+    ]
+    if not project_ids:
+        return
+    projects = db.query(Project).filter(Project.id.in_(project_ids)).all()
+    for project in projects:
+        try:
+            validate_client_access(current_user, project.client_id)
+        except HTTPException:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied: insufficient client permissions for batch",
+            )
+
+
+def _active_batch_or_404(db: Session, batch_id: UUID) -> Batch:
+    batch = db.query(Batch).filter(
+        Batch.id == batch_id,
+        Batch.active == True,
+    ).first()
+    if batch is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Batch not found",
+        )
+    return batch
+
+
+@router.get("/{batch_id}/containers", response_model=List[BatchContainerRead])
+def get_batch_containers(
+    batch_id: UUID,
+    current_user: User = Depends(require_batch_read),
+    db: Session = Depends(get_db),
+):
+    """
+    Containers in a batch, with the samples Enter Results lists.
+
+    GET was missing, so the page received 405 from POST /batches/{id}/containers.
+    """
+    batch = _active_batch_or_404(db, batch_id)
+    _require_batch_client_access(db, batch, current_user)
+
+    links = db.query(BatchContainer).filter(BatchContainer.batch_id == batch.id).all()
+    container_ids = [link.container_id for link in links]
+    if not container_ids:
+        return []
+
+    containers = db.query(Container).filter(
+        Container.id.in_(container_ids),
+        Container.active == True,
+    ).all()
+    by_id = {container.id: container for container in containers}
+    contents = db.query(Contents).options(joinedload(Contents.sample)).filter(
+        Contents.container_id.in_(container_ids)
+    ).all()
+    contents_by_container: dict = {}
+    for content in contents:
+        contents_by_container.setdefault(content.container_id, []).append(content)
+
+    result: List[BatchContainerRead] = []
+    for link in links:
+        container = by_id.get(link.container_id)
+        if container is None:
+            continue
+        content_rows: List[BatchContainerContentRead] = []
+        for content in contents_by_container.get(container.id, []):
+            sample = content.sample
+            sample_name = sample.name if sample is not None else None
+            qc_type = sample.qc_type if sample is not None else None
+            content_rows.append(BatchContainerContentRead(
+                sample_id=content.sample_id,
+                sample_name=sample_name,
+                qc_type=qc_type,
+                sample=BatchContentSample(qc_type=qc_type) if sample is not None else None,
+            ))
+        result.append(BatchContainerRead(
+            id=container.id,
+            name=container.name,
+            row=container.row,
+            column=container.column,
+            contents=content_rows,
+        ))
+    return result
+
+
+@router.get("/{batch_id}/tests", response_model=List[TestResponse])
+def get_batch_tests(
+    batch_id: UUID,
+    current_user: User = Depends(require_batch_read),
+    db: Session = Depends(get_db),
+):
+    """
+    Active tests for samples in this batch.
+
+    Enter Results calls this path. It did not exist (404). RLS on tests
+    still hides rows the caller cannot see.
+    """
+    batch = _active_batch_or_404(db, batch_id)
+    _require_batch_client_access(db, batch, current_user)
+
+    links = db.query(BatchContainer).filter(BatchContainer.batch_id == batch.id).all()
+    container_ids = [link.container_id for link in links]
+    if not container_ids:
+        return []
+    sample_ids = [
+        row[0]
+        for row in db.query(Contents.sample_id).filter(
+            Contents.container_id.in_(container_ids),
+            Contents.sample_id.isnot(None),
+        ).distinct().all()
+    ]
+    if not sample_ids:
+        return []
+    tests = db.query(Test).filter(
+        Test.sample_id.in_(sample_ids),
+        Test.active == True,
+    ).all()
+    return [TestResponse.model_validate(test) for test in tests]
 
 
 @router.post("/validate-compatibility")
