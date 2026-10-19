@@ -824,7 +824,7 @@ class ExperimentService:
         if data.set_started_at and experiment.started_at is None:
             self.repo.update_experiment(
                 experiment,
-                started_at=datetime.now(timezone.utc).replace(tzinfo=None),
+                started_at=datetime.now(timezone.utc),
                 modified_by=self._user_id(),
             )
 

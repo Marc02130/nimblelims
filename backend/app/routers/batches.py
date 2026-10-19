@@ -1195,7 +1195,7 @@ def update_batch(
         setattr(batch, field, value)
     
     batch.modified_by = current_user.id
-    batch.modified_at = datetime.utcnow()
+    batch.modified_at = datetime.now(timezone.utc)
     
     db.commit()
     db.refresh(batch)
@@ -1275,9 +1275,9 @@ def update_batch_status(
             batch.start_date = lab_day
         elif stamp == "end":
             batch.end_date = lab_day
-    
+
     batch.modified_by = current_user.id
-    batch.modified_at = datetime.utcnow()
+    batch.modified_at = datetime.now(timezone.utc)
     
     db.commit()
     db.refresh(batch)
@@ -1305,7 +1305,7 @@ def delete_batch(
     # Soft delete
     batch.active = False
     batch.modified_by = current_user.id
-    batch.modified_at = datetime.utcnow()
+    batch.modified_at = datetime.now(timezone.utc)
     
     db.commit()
     

@@ -42,8 +42,8 @@ class Experiment(BaseModel):
         ForeignKey('list_entries.id'),
         nullable=True,
     )
-    started_at = Column(DateTime, nullable=True)
-    completed_at = Column(DateTime, nullable=True)
+    started_at = Column(DateTime(timezone=True), nullable=True)
+    completed_at = Column(DateTime(timezone=True), nullable=True)
     custom_attributes = Column(JSONB, nullable=True, server_default='{}')  # legacy - phased out via hard cutover to FieldDefinition
 
     # === Deprecation plan for custom_attributes (hard cutover) ===
@@ -94,9 +94,9 @@ class ExperimentDetail(Base):
     content = Column(JSONB, nullable=False, server_default='{}')
     sort_order = Column(Integer, nullable=False, server_default='0')
     custom_attributes = Column(JSONB, nullable=True, server_default='{}')  # legacy - phased out via hard cutover to FieldDefinition
-    created_at = Column(DateTime, default=func.now(), nullable=False)
+    created_at = Column(DateTime(timezone=True), default=func.now(), nullable=False)
     created_by = Column(PostgresUUID(as_uuid=True), ForeignKey('users.id'), nullable=True)
-    modified_at = Column(DateTime, default=func.now(), onupdate=func.now(), nullable=False)
+    modified_at = Column(DateTime(timezone=True), default=func.now(), onupdate=func.now(), nullable=False)
     modified_by = Column(PostgresUUID(as_uuid=True), ForeignKey('users.id'), nullable=True)
 
     experiment = relationship("Experiment", back_populates="details")
@@ -140,9 +140,9 @@ class ExperimentSampleExecution(Base):
         nullable=True,
     )
     custom_attributes = Column(JSONB, nullable=True, server_default='{}')  # legacy - phased out via hard cutover to FieldDefinition
-    created_at = Column(DateTime, default=func.now(), nullable=False)
+    created_at = Column(DateTime(timezone=True), default=func.now(), nullable=False)
     created_by = Column(PostgresUUID(as_uuid=True), ForeignKey('users.id'), nullable=True)
-    modified_at = Column(DateTime, default=func.now(), onupdate=func.now(), nullable=False)
+    modified_at = Column(DateTime(timezone=True), default=func.now(), onupdate=func.now(), nullable=False)
     modified_by = Column(PostgresUUID(as_uuid=True), ForeignKey('users.id'), nullable=True)
 
     __table_args__ = (

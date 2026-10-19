@@ -19,9 +19,9 @@ class Result(Base):
     id = Column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     description = Column(Text, nullable=True)
     active = Column(Boolean, nullable=False, server_default='true', default=True)
-    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     created_by = Column(PostgresUUID(as_uuid=True), ForeignKey('users.id'), nullable=True)
-    modified_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
+    modified_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
     modified_by = Column(PostgresUUID(as_uuid=True), ForeignKey('users.id'), nullable=True)
 
     test_id = Column(PostgresUUID(as_uuid=True), ForeignKey('tests.id'), nullable=False)

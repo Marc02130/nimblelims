@@ -10,7 +10,7 @@ from models.project import Project
 from models.client import Client
 from models.list import List, ListEntry
 from app.core.security import create_access_token
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
 
@@ -921,7 +921,7 @@ class TestSampleEditRBAC:
     def test_update_sample_audit_fields(self, client: TestClient, test_admin_user, test_data, db_session: Session):
         """Test that audit fields (modified_at, modified_by) are updated on PATCH"""
         # Create a test sample
-        original_modified_at = datetime.utcnow() - timedelta(hours=1)
+        original_modified_at = datetime.now(timezone.utc) - timedelta(hours=1)
         sample = Sample(
             name="SAMPLE-AUDIT-001",
             description="Test sample for audit",

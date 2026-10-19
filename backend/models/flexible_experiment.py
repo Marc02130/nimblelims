@@ -120,13 +120,13 @@ class LimsRun(Base):
     fit_in_progress = Column(Boolean, nullable=False, server_default='false', default=False)
     # Queue start cohort: { "sample_ids": [...], "locked_at": "..." }
     cohort = Column(JSONB, nullable=True, server_default='{}')
-    started_at = Column(DateTime, nullable=True)
-    completed_at = Column(DateTime, nullable=True)
-    published_at = Column(DateTime, nullable=True)
-    canceled_at = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+    started_at = Column(DateTime(timezone=True), nullable=True)
+    completed_at = Column(DateTime(timezone=True), nullable=True)
+    published_at = Column(DateTime(timezone=True), nullable=True)
+    canceled_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     created_by = Column(PostgresUUID(as_uuid=True), ForeignKey('users.id'), nullable=True)
-    modified_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
+    modified_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
     modified_by = Column(PostgresUUID(as_uuid=True), ForeignKey('users.id'), nullable=True)
 
     experiment_template = relationship("ExperimentTemplate")
@@ -178,9 +178,9 @@ class LimsRunData(Base):
         nullable=True,
         index=True,
     )
-    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     created_by = Column(PostgresUUID(as_uuid=True), ForeignKey('users.id'), nullable=True)
-    modified_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
+    modified_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
     modified_by = Column(PostgresUUID(as_uuid=True), ForeignKey('users.id'), nullable=True)
 
     lims_run = relationship("LimsRun", back_populates="data_rows")
@@ -219,9 +219,9 @@ class DataParser(Base):
     version_group_id = Column(PostgresUUID(as_uuid=True), nullable=False, index=True)
     version = Column(Integer, nullable=False, default=1)
     active = Column(Boolean, nullable=False, default=False)
-    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     created_by = Column(PostgresUUID(as_uuid=True), ForeignKey('users.id'), nullable=True)
-    modified_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
+    modified_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
     modified_by = Column(PostgresUUID(as_uuid=True), ForeignKey('users.id'), nullable=True)
 
     instrument = relationship("Instrument", foreign_keys=[instrument_id])
@@ -280,7 +280,7 @@ class ParserSetupFile(Base):
     content_type = Column(String(128), nullable=True)
     size_bytes = Column(Integer, nullable=False)
     content = Column(LargeBinary, nullable=False)
-    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     created_by = Column(PostgresUUID(as_uuid=True), ForeignKey('users.id'), nullable=True)
 
     parser = relationship("DataParser", back_populates="setup_files")
@@ -315,7 +315,7 @@ class LimsRunImport(Base):
         index=True,
     )
     filename = Column(String(512), nullable=True)
-    imported_at = Column(DateTime, server_default=func.now(), nullable=False)
+    imported_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     imported_by = Column(PostgresUUID(as_uuid=True), ForeignKey('users.id'), nullable=True)
 
     lims_run = relationship("LimsRun")
@@ -358,9 +358,9 @@ class RobotWorklistConfig(Base):
     name = Column(String(255), nullable=False)
     description = Column(Text, nullable=True)
     worklist_config = Column(JSONB, nullable=False, server_default='{}')
-    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     created_by = Column(PostgresUUID(as_uuid=True), ForeignKey('users.id'), nullable=True)
-    modified_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
+    modified_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
     modified_by = Column(PostgresUUID(as_uuid=True), ForeignKey('users.id'), nullable=True)
 
     experiment_template = relationship("ExperimentTemplate")
@@ -404,9 +404,9 @@ class SopParseJob(Base):
     instrument_filename = Column(String(512), nullable=True)
     result = Column(JSONB, nullable=True)
     error_message = Column(Text, nullable=True)
-    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     created_by = Column(PostgresUUID(as_uuid=True), ForeignKey('users.id'), nullable=True)
-    modified_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
+    modified_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
     modified_by = Column(PostgresUUID(as_uuid=True), ForeignKey('users.id'), nullable=True)
 
     experiment_template = relationship("ExperimentTemplate")
