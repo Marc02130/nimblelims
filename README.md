@@ -44,7 +44,7 @@ This project uses a five-container Docker setup:
    docker compose up -d --build
    ```
 
-   `.env.example` uses `change-me` placeholders. A fresh database needs `LAB_TIMEZONE` plus the five required Compose secrets: `POSTGRES_USER`, `POSTGRES_PASSWORD`, `LIMS_MIGRATE_PASSWORD`, `LIMS_APP_PASSWORD`, and `SECRET_KEY`. Compose uses `${VAR:?}` for those five and will not start when any of them is unset. `POSTGRES_USER` is the bootstrap superuser (`lims_bootstrap`). The API connects as `lims_app`. Alembic connects as `lims_migrate`. Role details: [manuals/db-roles.md](manuals/db-roles.md).
+   `.env.example` uses `change-me` placeholders. Every deployment must set `LAB_TIMEZONE` or save `lab_settings.timezone`. A fresh database also needs the five required Compose secrets: `POSTGRES_USER`, `POSTGRES_PASSWORD`, `LIMS_MIGRATE_PASSWORD`, `LIMS_APP_PASSWORD`, and `SECRET_KEY`. Compose uses `${VAR:?}` for those five and will not start when any of them is unset. When the lab zone is missing, lab-day defaults such as `results.entry_date` via `public.current_lab_day()` use the UTC calendar day. `POSTGRES_USER` is the bootstrap superuser (`lims_bootstrap`). The API connects as `lims_app`. Alembic connects as `lims_migrate`. Role details: [manuals/db-roles.md](manuals/db-roles.md).
    
    This will automatically:
    - Start the database container
@@ -288,7 +288,7 @@ Copy `backend/env.example` to `backend/.env` and configure:
 - Database connection settings
 - JWT secret keys
 - Application environment settings
-- `LAB_TIMEZONE` — IANA time zone that seeds `lab_settings` when that row is empty (for example `America/New_York`). After a zone is saved, the database value wins. There is no UTC default. The API refuses to start when neither source is a real zone. Compose passes the variable through and allows it to be empty so migrations can run first. Pytest and CI set `UTC` explicitly. Alembic, `create_admin.py`, the seed scripts, and the MCP service do not read it. An administrator changes the saved zone with `PATCH /v1/lab-settings`. A lab manager can read it with `GET /v1/lab-settings`. Lab managers, lab technicians, clients, and configuration editors cannot change it. The configuring agent has no allow-list entry for that path, so it cannot change the zone either. There is no lab-settings page in the admin UI.
+- `LAB_TIMEZONE` — required for every deployment unless `lab_settings.timezone` is already saved. IANA name that seeds `lab_settings` when that row is empty (for example `America/New_York`). After a zone is saved, the database value wins. The API refuses to start when neither source is a real zone. When the zone is missing, lab-day defaults such as `results.entry_date` via `public.current_lab_day()` use the UTC calendar day. Compose passes the variable through and allows it to be empty so migrations can run first. Pytest and CI set `UTC` explicitly. Alembic, `create_admin.py`, the seed scripts, and the MCP service do not read it. An administrator changes the saved zone with `PATCH /v1/lab-settings`. A lab manager can read it with `GET /v1/lab-settings`. Lab managers, lab technicians, clients, and configuration editors cannot change it. The configuring agent has no allow-list entry for that path, so it cannot change the zone either. There is no lab-settings page in the admin UI.
 
 ### Optional Environment Variables
 
