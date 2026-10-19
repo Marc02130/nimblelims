@@ -499,6 +499,54 @@ def test_refit_creates_new_version(db_session, test_admin_user, test_org, dr_set
     assert v2.review_status == ReviewStatus.pending
 
 
+def test_whole_run_refit_supersedes_every_live_fit(db_session, test_admin_user, test_org, dr_setup):
+    """A fit with no sample filter leaves one live row per compound."""
+    user_id = test_admin_user.id
+    client_id = test_org.id
+    run = dr_setup["run"]
+    tmpl = dr_setup["tmpl"]
+    first = dr_setup["test_sample"]
+    second = _make_sample(db_session, user_id, client_id, None)
+    _make_well(db_session, tmpl.id, client_id, "A2", 2.0)
+    _make_data_row(db_session, run.id, second.id, "A2", 40.0, user_id)
+
+    mock_r = MagicMock()
+    mock_r.fit.return_value = [_sigmoid_r_result(first.id), _sigmoid_r_result(second.id)]
+    svc = DoseResponseFitService(db_session, test_admin_user, r_client=mock_r)
+    svc.trigger_fit(run.id)
+
+    leftover = DoseResponseResult(
+        lims_run_id=run.id,
+        sample_id=first.id,
+        model="4PL",
+        curve_category=CurveCategory.SIGMOID,
+        quality_flag="ok",
+        fit_version=5,
+        client_id=client_id,
+    )
+    db_session.add(leftover)
+    db_session.commit()
+
+    svc.trigger_fit(run.id)
+    rows = (
+        db_session.query(DoseResponseResult)
+        .filter(DoseResponseResult.lims_run_id == run.id)
+        .all()
+    )
+    live = [row for row in rows if row.superseded_by is None]
+    assert len(live) == 2
+    live_by_sample = {row.sample_id: row for row in live}
+    assert set(live_by_sample) == {first.id, second.id}
+    assert live_by_sample[first.id].fit_version == 6
+    assert live_by_sample[second.id].fit_version == 2
+    first_priors = [row for row in rows if row.sample_id == first.id and row.id != live_by_sample[first.id].id]
+    assert len(first_priors) == 2
+    assert all(row.superseded_by == live_by_sample[first.id].id for row in first_priors)
+    second_priors = [row for row in rows if row.sample_id == second.id and row.superseded_by is not None]
+    assert len(second_priors) == 1
+    assert second_priors[0].superseded_by == live_by_sample[second.id].id
+
+
 # ---------------------------------------------------------------------------
 # 12. trigger_refit — only fits the target compound
 # ---------------------------------------------------------------------------
